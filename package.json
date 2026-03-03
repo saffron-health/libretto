@@ -49,6 +49,7 @@
 		}
 	},
 	"scripts": {
+		"postinstall": "node ./scripts/postinstall.mjs",
 		"build": "tsup",
 		"type-check": "tsc --noEmit"
 	},
