@@ -71,4 +71,5 @@ export type DebugBundle = {
 	logPath: string;
 	stepHistory: StepHistoryEntry[];
 	pageUrl: string;
+	visualizationEnabled?: boolean;
 };

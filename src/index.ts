@@ -42,6 +42,15 @@ export {
 	type PageRequestOptions,
 } from "./network/network.js";
 
+// Download helpers
+export {
+	downloadViaClick,
+	downloadAndSave,
+	type DownloadResult,
+	type DownloadViaClickOptions,
+	type SaveDownloadOptions,
+} from "./download/download.js";
+
 // Debug
 export { debugPause, type DebugPauseOptions } from "./debug/pause.js";
 
@@ -53,3 +62,60 @@ export {
 	setDebugMode,
 	setDryRun,
 } from "./config/config.js";
+
+// Instrumentation
+export {
+	instrumentPage,
+	installInstrumentation,
+	instrumentContext,
+	type InstrumentationOptions,
+	type InstrumentedPage,
+} from "./instrumentation/instrument.js";
+
+// Visualization
+export {
+	ensureGhostCursor,
+	moveGhostCursor,
+	ghostClick,
+	hideGhostCursor,
+	type GhostCursorOptions,
+} from "./visualization/ghost-cursor.js";
+export {
+	ensureHighlightLayer,
+	showHighlight,
+	clearHighlights,
+	type HighlightOptions,
+} from "./visualization/highlight.js";
+
+// Run (job runner)
+export {
+	defineJob,
+	defineJobs,
+	createLocalRunner,
+	launchJob,
+	getJobStatus,
+	stopJob,
+	waitForPause,
+	resumeJob,
+	runRegisteredJob,
+	parseRuntimeArgs,
+	getRegisteredJobs,
+	listRegisteredJobTypes,
+	resolveRegisteredJob,
+	registerJobs,
+	launchBrowser,
+	debugPause as runDebugPause,
+	findJobTypeByDefinition,
+	type LocalRunner,
+	type RunRegisteredJobInput,
+	type AnyJobDef,
+	type JobsMap,
+	type JobDefParams,
+	type LocalRunnerJobContext,
+	type JobLaunchInput,
+	type LaunchConfig,
+	type JobLaunchResult,
+	type JobStatus,
+	type LaunchBrowserArgs,
+	type BrowserSession,
+} from "./run/api.js";

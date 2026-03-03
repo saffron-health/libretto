@@ -37,6 +37,11 @@
 			"import": "./dist/network/index.js",
 			"require": "./dist/network/index.cjs"
 		},
+		"./download": {
+			"types": "./dist/download/index.d.ts",
+			"import": "./dist/download/index.js",
+			"require": "./dist/download/index.cjs"
+		},
 		"./debug": {
 			"types": "./dist/debug/index.d.ts",
 			"import": "./dist/debug/index.js",
@@ -46,6 +51,26 @@
 			"types": "./dist/config/index.d.ts",
 			"import": "./dist/config/index.js",
 			"require": "./dist/config/index.cjs"
+		},
+		"./instrumentation": {
+			"types": "./dist/instrumentation/index.d.ts",
+			"import": "./dist/instrumentation/index.js",
+			"require": "./dist/instrumentation/index.cjs"
+		},
+		"./visualization": {
+			"types": "./dist/visualization/index.d.ts",
+			"import": "./dist/visualization/index.js",
+			"require": "./dist/visualization/index.cjs"
+		},
+		"./llm": {
+			"types": "./dist/llm/index.d.ts",
+			"import": "./dist/llm/index.js",
+			"require": "./dist/llm/index.cjs"
+		},
+		"./run": {
+			"types": "./dist/run/api.d.ts",
+			"import": "./dist/run/api.js",
+			"require": "./dist/run/api.cjs"
 		}
 	},
 	"scripts": {
@@ -63,5 +88,11 @@
 		"tsup": "^8.0.0",
 		"typescript": "^5.7.0",
 		"zod": "^3.25.0"
+	},
+	"dependencies": {
+		"@ai-sdk/anthropic": "^3.0.53",
+		"@ai-sdk/google-vertex": "^4.0.72",
+		"@ai-sdk/openai": "^3.0.39",
+		"ai": "^6.0.110"
 	}
 }

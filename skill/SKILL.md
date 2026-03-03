@@ -21,8 +21,8 @@ If it's not obvious which element to click or what value to enter, **ask the use
 ## Commands
 
 ```bash
-libretto-cli open <url> [--headed]     # Launch browser and navigate (headless by default)
-libretto-cli exec <code>               # Execute Playwright TypeScript code
+libretto-cli open <url> [--headless]   # Launch browser and navigate (headed by default)
+libretto-cli exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
 libretto-cli snapshot --objective "<what to find>" --context "<situational info>"
 libretto-cli save <url|domain>         # Save session (cookies, localStorage) to .libretto-cli/profiles/
 libretto-cli network                   # Show last 20 captured network requests
@@ -32,6 +32,10 @@ libretto-cli close                     # Close the browser
 
 All commands accept `--session <name>` for isolated browser instances (default: `default`).
 Built-in sessions: `default`, `dev-server`, `browser-agent`.
+
+## Visualize Mode (`--visualize`)
+
+Add `--visualize` to any `exec` command to show a ghost cursor and element highlight before each action executes. Use it when the user wants to see what will be clicked/filled before it happens.
 
 ## Globals Available in `exec`
 
