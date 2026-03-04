@@ -21,13 +21,14 @@ import {
 	openSync,
 	appendFileSync,
 } from "node:fs";
-import { basename, extname, isAbsolute, join } from "node:path";
+import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { cwd } from "node:process";
 import { createServer } from "node:net";
+import { pathToFileURL } from "node:url";
 import { z } from "zod";
-import { launchJob, getJobStatus, stopJob, waitForPause, resumeJob } from "../src/run/launcher.js";
-import type { LaunchConfig } from "../src/run/types.js";
+import { setDebugMode } from "../src/config/config.js";
+import { launchBrowser } from "../src/run/browser.js";
 
 // ── LLM client factory ─────────────────────────────────────────────────
 // Users must call setLLMClientFactory() before using snapshot/interpret commands.
@@ -2212,13 +2213,13 @@ function wrapPageForActionLogging(page: Page, runId: string): void {
 function printUsage(): void {
 	console.log(`Usage: libretto-cli <command> [--session <name>]
 
-Commands:
-  open <url> [--headless] Launch browser and open URL (headed by default)
-                          Automatically loads saved profile if available
-  run <jobType> [--params <json> | --params-file <path>]  Run a registered local integration job
-  save <url|domain>       Save current browser session (cookies, localStorage, etc.)
-  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight)
-  snapshot --objective <text> --context <text>  Capture PNG + HTML and analyze with configured analyzer (run snapshot configure first)
+		Commands:
+		  open <url> [--headless] Launch browser and open URL (headed by default)
+		                          Automatically loads saved profile if available
+		  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]  Run an exported async integration function from a file
+		  save <url|domain>       Save current browser session (cookies, localStorage, etc.)
+	  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight)
+	  snapshot --objective <text> --context <text>  Capture PNG + HTML and analyze with configured analyzer (run snapshot configure first)
   snapshot configure <codex|opencode|claude> [-- <command prefix...>]  Configure snapshot analyzer
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
@@ -2336,12 +2337,12 @@ function parseRunParamsArgs(args: string[]): unknown {
 	const { value: inlineParams, args: withoutInline } = extractOption(
 		args,
 		"--params",
-		"Usage: libretto-cli run <jobType> [--params <json> | --params-file <path>] [--session <name>]",
+		"Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]",
 	);
 	const { value: paramsFile, args: remaining } = extractOption(
 		withoutInline,
 		"--params-file",
-		"Usage: libretto-cli run <jobType> [--params <json> | --params-file <path>] [--session <name>]",
+		"Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]",
 	);
 
 	if (inlineParams && paramsFile) {
@@ -2369,11 +2370,134 @@ function parseRunParamsArgs(args: string[]): unknown {
 		}
 	}
 
-	const unexpected = remaining.slice(2).find((arg) => arg.startsWith("--"));
+	const allowedRunFlags = new Set([
+		"--headed",
+		"--headless",
+		"--debug",
+	]);
+	const unexpected = remaining
+		.slice(3)
+		.find((arg) => arg.startsWith("--") && !allowedRunFlags.has(arg));
 	if (unexpected) {
 		throw new Error(`Unknown option for run command: ${unexpected}`);
 	}
 	return {};
+}
+
+function parseRunHeadlessMode(args: string[]): boolean | undefined {
+	const hasHeadedFlag = args.includes("--headed");
+	const hasHeadlessFlag = args.includes("--headless");
+	if (hasHeadedFlag && hasHeadlessFlag) {
+		throw new Error("Cannot pass both --headed and --headless.");
+	}
+	if (hasHeadedFlag) return false;
+	if (hasHeadlessFlag) return true;
+	return undefined;
+}
+
+function parseRunDebugMode(args: string[]): boolean {
+	const { value: rawDebug } = extractOption(
+		args,
+		"--debug",
+		"Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]",
+	);
+	if (rawDebug === undefined) return true;
+	const normalized = rawDebug.trim().toLowerCase();
+	if (normalized === "true") return true;
+	if (normalized === "false") return false;
+	throw new Error(`Invalid value for --debug: "${rawDebug}". Expected true or false.`);
+}
+
+type ExportedIntegrationFunction = (
+	ctx: {
+		logger: unknown;
+		page: Page;
+		context: BrowserContext;
+		browser: Browser;
+		session: string;
+		integrationPath: string;
+		exportName: string;
+		headless: boolean;
+	},
+	input: unknown,
+) => Promise<unknown>;
+
+function isExportedIntegrationFunction(value: unknown): value is ExportedIntegrationFunction {
+	return typeof value === "function";
+}
+
+async function runIntegrationFromFile(args: {
+	integrationPath: string;
+	exportName: string;
+	session: string;
+	params: unknown;
+	headless: boolean;
+}): Promise<void> {
+	const absolutePath = isAbsolute(args.integrationPath)
+		? args.integrationPath
+		: resolve(cwd(), args.integrationPath);
+	if (!existsSync(absolutePath)) {
+		throw new Error(`Integration file does not exist: ${absolutePath}`);
+	}
+
+	let loadedModule: Record<string, unknown>;
+	try {
+		loadedModule = (await import(pathToFileURL(absolutePath).href)) as Record<string, unknown>;
+	} catch (error) {
+		throw new Error(
+			`Failed to import integration module at ${absolutePath}: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+
+	const targetExport = loadedModule[args.exportName];
+	if (!targetExport) {
+		const availableExports = Object.keys(loadedModule);
+		const detail =
+			availableExports.length > 0
+				? ` Available exports: ${availableExports.join(", ")}`
+				: " The module has no exports.";
+		throw new Error(
+			`Export "${args.exportName}" was not found in ${absolutePath}.${detail}`,
+		);
+	}
+
+	if (!isExportedIntegrationFunction(targetExport)) {
+		throw new Error(
+			`Export "${args.exportName}" in ${absolutePath} must be an async function with signature (ctx, input).`,
+		);
+	}
+	console.log(
+		`Running integration "${args.exportName}" from ${absolutePath} (${args.headless ? "headless" : "headed"})...`,
+	);
+
+	const integrationLogger = log.withScope("integration-run", {
+		integrationPath: absolutePath,
+		integrationExport: args.exportName,
+		session: args.session,
+	});
+	const browserSession = await launchBrowser({
+		sessionName: args.session,
+		headless: args.headless,
+	});
+
+	try {
+		await targetExport(
+			{
+				logger: integrationLogger,
+				page: browserSession.page,
+				context: browserSession.context,
+				browser: browserSession.browser,
+				session: args.session,
+				integrationPath: absolutePath,
+				exportName: args.exportName,
+				headless: args.headless,
+			},
+			args.params ?? {},
+		);
+		console.log("Integration completed.");
+	} finally {
+		await browserSession.close();
+	}
 }
 
 export async function runLibrettoCLI(): Promise<void> {
@@ -2437,55 +2561,30 @@ export async function runLibrettoCLI(): Promise<void> {
 				break;
 			}
 			case "run": {
-				const jobType = args[1];
-				if (!jobType || jobType.startsWith("--")) {
+				const integrationPath = args[1];
+				const exportName = args[2];
+				if (
+					!integrationPath ||
+					integrationPath.startsWith("--") ||
+					!exportName ||
+					exportName.startsWith("--")
+				) {
 					console.error(
-						"Usage: libretto run <jobType> [--params <json>] [--session <name>] [--config <json>]",
+						"Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]",
 					);
 					process.exit(1);
 				}
-
 				const params = parseRunParamsArgs(args);
-				const rawConfig = (() => {
-					const idx = args.indexOf("--config");
-					if (idx < 0) return undefined;
-					return args[idx + 1];
-				})();
-				let config: LaunchConfig | undefined;
-				if (rawConfig) {
-					try { config = JSON.parse(rawConfig); } catch {
-						console.error("Invalid JSON for --config");
-						process.exit(1);
-					}
-				}
-				const result = await launchJob({ jobType, params, session, config });
-				console.log(JSON.stringify(result, null, 2));
-				break;
-			}
-			case "status": {
-				const status = await getJobStatus({ session });
-				console.log(JSON.stringify(status, null, 2));
-				break;
-			}
-			case "stop": {
-				const stopResult = await stopJob({ session });
-				console.log(stopResult.stopped ? `Session "${session}" stopped.` : `Session "${session}" is not running.`);
-				break;
-			}
-			case "wait-until-pause": {
-				const timeoutStr = (() => {
-					const idx = args.indexOf("--timeout");
-					if (idx < 0) return undefined;
-					return args[idx + 1];
-				})();
-				const timeoutMs = timeoutStr ? parseInt(timeoutStr, 10) * 1000 : undefined;
-				const pauseResult = await waitForPause({ session, timeoutMs });
-				console.log(JSON.stringify(pauseResult, null, 2));
-				break;
-			}
-			case "resume": {
-				const resumeResult = await resumeJob({ session });
-				console.log(resumeResult.signaled ? "Resume signal sent." : "Failed to send resume signal.");
+				const headlessMode = parseRunHeadlessMode(args);
+				const debugMode = parseRunDebugMode(args);
+				setDebugMode(debugMode);
+				await runIntegrationFromFile({
+					integrationPath,
+					exportName,
+					session,
+					params,
+					headless: headlessMode ?? false,
+				});
 				break;
 			}
 			case "save": {
