@@ -4,3 +4,5 @@ dist/
 .DS_Store
 tmp/
 .libretto-cli/
+.codex/
+.vscode/settings.json
