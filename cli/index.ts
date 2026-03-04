@@ -7,6 +7,7 @@ import {
 import { Logger } from "../src/logger/logger.js";
 import { createFileLogSink } from "../src/logger/sinks.js";
 import type { LLMClient } from "../src/llm/types.js";
+import { installInstrumentation } from "../src/instrumentation/instrument.js";
 import { spawn, spawnSync } from "node:child_process";
 import {
 	existsSync,
@@ -25,6 +26,8 @@ import { homedir } from "node:os";
 import { cwd } from "node:process";
 import { createServer } from "node:net";
 import { z } from "zod";
+import { launchJob, getJobStatus, stopJob, waitForPause, resumeJob } from "../src/run/launcher.js";
+import type { LaunchConfig } from "../src/run/types.js";
 
 // ── LLM client factory ─────────────────────────────────────────────────
 // Users must call setLLMClientFactory() before using snapshot/interpret commands.
@@ -1451,6 +1454,7 @@ await new Promise(() => {});
 	const child = spawn("node", ["--input-type=module", "-e", launcherCode], {
 		detached: true,
 		stdio: ["ignore", "ignore", childStderrFd],
+		cwd: join(REPO_ROOT, "packages", "libretto"),
 	});
 	child.unref();
 
@@ -1493,11 +1497,15 @@ await new Promise(() => {});
 	throw new Error("Failed to connect to browser.");
 }
 
-async function runExec(code: string, session: string): Promise<void> {
-	log.info("exec-start", { session, codeLength: code.length, codePreview: code.slice(0, 200) });
+async function runExec(code: string, session: string, visualize = false): Promise<void> {
+	log.info("exec-start", { session, codeLength: code.length, codePreview: code.slice(0, 200), visualize });
 	const { browser, context, page } = await connect(session);
 	const sessionState = getSessionStateOrThrow(session);
 	wrapPageForActionLogging(page, sessionState.runId);
+
+	if (visualize) {
+		await installInstrumentation(page, { visualize: true, logger: log });
+	}
 
 	try {
 		const execState: Record<string, unknown> = {};
@@ -2205,10 +2213,11 @@ function printUsage(): void {
 	console.log(`Usage: libretto-cli <command> [--session <name>]
 
 Commands:
-  open <url> [--headed]   Launch browser and open URL (headless by default)
+  open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
+  run <jobType> [--params <json> | --params-file <path>]  Run a registered local integration job
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
-  exec <code>             Execute Playwright typescript code
+  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight)
   snapshot --objective <text> --context <text>  Capture PNG + HTML and analyze with configured analyzer (run snapshot configure first)
   snapshot configure <codex|opencode|claude> [-- <command prefix...>]  Configure snapshot analyzer
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
@@ -2221,7 +2230,7 @@ Options:
                           Built-in sessions: default, dev-server, browser-agent
 
 Examples:
-  libretto-cli open https://linkedin.com --headed
+  libretto-cli open https://linkedin.com
   # ... manually log in ...
   libretto-cli save linkedin.com
   # Next time you open linkedin.com, you'll be logged in automatically
@@ -2255,6 +2264,7 @@ Sessions:
 
 const CLI_COMMANDS = new Set([
 	"open",
+	"run",
 	"save",
 	"exec",
 	"snapshot",
@@ -2322,6 +2332,50 @@ function extractOption(
 	return { value, args: result };
 }
 
+function parseRunParamsArgs(args: string[]): unknown {
+	const { value: inlineParams, args: withoutInline } = extractOption(
+		args,
+		"--params",
+		"Usage: libretto-cli run <jobType> [--params <json> | --params-file <path>] [--session <name>]",
+	);
+	const { value: paramsFile, args: remaining } = extractOption(
+		withoutInline,
+		"--params-file",
+		"Usage: libretto-cli run <jobType> [--params <json> | --params-file <path>] [--session <name>]",
+	);
+
+	if (inlineParams && paramsFile) {
+		throw new Error("Pass either --params or --params-file, not both.");
+	}
+
+	if (paramsFile) {
+		const content = readFileSync(paramsFile, "utf8");
+		try {
+			return JSON.parse(content);
+		} catch (error) {
+			throw new Error(
+				`Invalid JSON in --params-file: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
+
+	if (inlineParams) {
+		try {
+			return JSON.parse(inlineParams);
+		} catch (error) {
+			throw new Error(
+				`Invalid JSON in --params: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
+
+	const unexpected = remaining.slice(2).find((arg) => arg.startsWith("--"));
+	if (unexpected) {
+		throw new Error(`Unknown option for run command: ${unexpected}`);
+	}
+	return {};
+}
+
 export async function runLibrettoCLI(): Promise<void> {
 	const rawArgs = process.argv.slice(2);
 
@@ -2365,15 +2419,73 @@ export async function runLibrettoCLI(): Promise<void> {
 
 		switch (command) {
 			case "open": {
-				const headed = args.includes("--headed");
+				const hasHeadedFlag = args.includes("--headed");
+				const hasHeadlessFlag = args.includes("--headless");
+				if (hasHeadedFlag && hasHeadlessFlag) {
+					console.error("Cannot pass both --headed and --headless.");
+					process.exit(1);
+				}
+				const headed = hasHeadedFlag || !hasHeadlessFlag;
 				const url = args.slice(1).find((a) => !a.startsWith("--"));
 				if (!url) {
 					console.error(
-						"Usage: libretto-cli open <url> [--headed] [--session <name>]",
+						"Usage: libretto-cli open <url> [--headless] [--session <name>]",
 					);
 					process.exit(1);
 				}
 				await runOpen(url, headed, session);
+				break;
+			}
+			case "run": {
+				const jobType = args[1];
+				if (!jobType || jobType.startsWith("--")) {
+					console.error(
+						"Usage: libretto run <jobType> [--params <json>] [--session <name>] [--config <json>]",
+					);
+					process.exit(1);
+				}
+
+				const params = parseRunParamsArgs(args);
+				const rawConfig = (() => {
+					const idx = args.indexOf("--config");
+					if (idx < 0) return undefined;
+					return args[idx + 1];
+				})();
+				let config: LaunchConfig | undefined;
+				if (rawConfig) {
+					try { config = JSON.parse(rawConfig); } catch {
+						console.error("Invalid JSON for --config");
+						process.exit(1);
+					}
+				}
+				const result = await launchJob({ jobType, params, session, config });
+				console.log(JSON.stringify(result, null, 2));
+				break;
+			}
+			case "status": {
+				const status = await getJobStatus({ session });
+				console.log(JSON.stringify(status, null, 2));
+				break;
+			}
+			case "stop": {
+				const stopResult = await stopJob({ session });
+				console.log(stopResult.stopped ? `Session "${session}" stopped.` : `Session "${session}" is not running.`);
+				break;
+			}
+			case "wait-until-pause": {
+				const timeoutStr = (() => {
+					const idx = args.indexOf("--timeout");
+					if (idx < 0) return undefined;
+					return args[idx + 1];
+				})();
+				const timeoutMs = timeoutStr ? parseInt(timeoutStr, 10) * 1000 : undefined;
+				const pauseResult = await waitForPause({ session, timeoutMs });
+				console.log(JSON.stringify(pauseResult, null, 2));
+				break;
+			}
+			case "resume": {
+				const resumeResult = await resumeJob({ session });
+				console.log(resumeResult.signaled ? "Resume signal sent." : "Failed to send resume signal.");
 				break;
 			}
 			case "save": {
@@ -2388,15 +2500,16 @@ export async function runLibrettoCLI(): Promise<void> {
 				break;
 			}
 			case "exec": {
+				const visualize = args.includes("--visualize");
 				const code = args
 					.slice(1)
-					.filter((a) => !a.startsWith("--"))
+					.filter((a) => a !== "--visualize" && !a.startsWith("--"))
 					.join(" ");
 				if (!code) {
-					console.error("Usage: libretto-cli exec <code> [--session <name>]");
+					console.error("Usage: libretto-cli exec <code> [--session <name>] [--visualize]");
 					process.exit(1);
 				}
-				await runExec(code, session);
+				await runExec(code, session, visualize);
 				break;
 			}
 				case "snapshot": {
@@ -2496,6 +2609,22 @@ export async function runLibrettoCLI(): Promise<void> {
 	}
 	await log.flush();
 	process.exit(0);
+}
+
+// Auto-configure LLM client from env vars when running as standalone CLI
+if (!llmClientFactory) {
+	const hasAnyCreds =
+		process.env.GOOGLE_CLOUD_PROJECT ||
+		process.env.GCLOUD_PROJECT ||
+		process.env.ANTHROPIC_API_KEY ||
+		process.env.OPENAI_API_KEY;
+
+	if (hasAnyCreds) {
+		setLLMClientFactory(async (_logger, model) => {
+			const { createLLMClient } = await import("../src/llm/client.js");
+			return createLLMClient(model);
+		});
+	}
 }
 
 runLibrettoCLI();
