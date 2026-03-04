@@ -1580,7 +1580,7 @@ async function runExec(
   // logs a warning to session.log so we can diagnose why an exec is taking
   // forever. The `onActivity` callback is passed into wrapPageForActionLogging
   // and wrapLocator so that every action (success or failure) resets the timer.
-  const STALL_THRESHOLD_MS = 20_000;
+  const STALL_THRESHOLD_MS = 60_000;
   let lastActivityTs = Date.now();
   const onActivity = () => {
     lastActivityTs = Date.now();
@@ -1594,6 +1594,9 @@ async function runExec(
         silenceMs,
         codePreview: code.slice(0, 200),
       });
+      console.warn(
+        `[stall-warning] No Playwright activity for ${Math.round(silenceMs / 1000)}s — exec may be hung (code: ${code.slice(0, 100)}...)`,
+      );
     }
   }, STALL_THRESHOLD_MS);
 
@@ -2381,11 +2384,7 @@ const LOCATOR_RETURNING_METHODS = [
 // Used as the `selector` field in action log entries so you can trace the full
 // locator chain, e.g. `locator("[role=\"listitem\"]").first().locator("button")`.
 function formatHint(method: string, args: any[]): string {
-  const formatted = args
-    .map((a: any) =>
-      typeof a === "string" ? JSON.stringify(a) : JSON.stringify(a),
-    )
-    .join(", ");
+  const formatted = args.map((a: any) => JSON.stringify(a)).join(", ");
   return `${method}(${formatted})`;
 }
 
