@@ -1,0 +1,25 @@
+{
+	"name": "libretto-cli",
+	"version": "0.0.1",
+	"type": "module",
+	"bin": {
+		"libretto-cli": "./dist/index.js",
+		"libretto": "./dist/index.js"
+	},
+	"scripts": {
+		"build": "tsup",
+		"type-check": "tsc --noEmit",
+		"dev": "tsx src/index.ts"
+	},
+	"dependencies": {
+		"libretto": "workspace:*",
+		"playwright": "^1.52.0",
+		"zod": "^3.25.0"
+	},
+	"devDependencies": {
+		"@types/node": "^25.3.3",
+		"tsup": "^8.0.0",
+		"tsx": "^4.19.2",
+		"typescript": "^5.7.0"
+	}
+}
