@@ -4,10 +4,10 @@ import {
 	type BrowserContext,
 	type Page,
 } from "playwright";
-import { Logger } from "../src/logger/logger.js";
-import { createFileLogSink } from "../src/logger/sinks.js";
-import type { LLMClient } from "../src/llm/types.js";
-import { installInstrumentation } from "../src/instrumentation/instrument.js";
+import { Logger } from "libretto/logger";
+import { createFileLogSink } from "libretto/logger";
+import type { LLMClient } from "libretto/llm";
+import { installInstrumentation } from "libretto/instrumentation";
 import { spawn, spawnSync } from "node:child_process";
 import {
 	existsSync,
@@ -26,8 +26,8 @@ import { homedir } from "node:os";
 import { cwd } from "node:process";
 import { createServer } from "node:net";
 import { z } from "zod";
-import { launchJob, getJobStatus, stopJob, waitForPause, resumeJob } from "../src/run/launcher.js";
-import type { LaunchConfig } from "../src/run/types.js";
+import { launchJob, getJobStatus, stopJob, waitForPause, resumeJob } from "libretto/run";
+import type { LaunchConfig } from "libretto/run";
 
 // ── LLM client factory ─────────────────────────────────────────────────
 // Users must call setLLMClientFactory() before using snapshot/interpret commands.
@@ -2621,7 +2621,7 @@ if (!llmClientFactory) {
 
 	if (hasAnyCreds) {
 		setLLMClientFactory(async (_logger, model) => {
-			const { createLLMClient } = await import("../src/llm/client.js");
+			const { createLLMClient } = await import("libretto/llm");
 			return createLLMClient(model);
 		});
 	}
