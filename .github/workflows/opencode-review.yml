@@ -26,7 +26,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @repo/config build
       - name: Remove generated local skill artifact
         run: rm -rf .agents/skills/libretto
       - name: Configure git author for any agent commits

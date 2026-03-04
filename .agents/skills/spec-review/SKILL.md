@@ -1,13 +1,13 @@
 ---
 name: spec-review
-description: Review a spec for under-specified areas, bugs, and adherence to the generate-spec skill. Use when asked to review, critique, or check a spec.
+description: Review a spec for under-specified areas, bugs, and adherence to the spec requirements in this skill. Use when asked to review, critique, or check a spec.
 ---
 
 Review the spec the user points you to. Follow these steps in order.
 
-## Step 1: Read the spec and the generate-spec skill
+## Step 1: Read the spec
 
-Read the spec file the user references. Then read `.agents/skills/generate-spec/SKILL.md` to understand the requirements specs must meet.
+Read the spec file the user references.
 
 ## Step 2: Research the codebase
 
@@ -47,9 +47,9 @@ Do **not** flag:
 - Test assertion details — the test runner catches these
 - Wiring specifics that are obvious from context (e.g., "this function isn't exported yet" — that's an implementation detail, not a spec concern)
 
-### Adherence to generate-spec skill
+### Adherence to spec requirements
 
-Check whether the spec follows the structure and principles in `generate-spec/SKILL.md`:
+Check whether the spec follows the structure and principles listed in this skill:
 
 - Does it have all required sections (problem overview, solution overview, goals, non-goals, important files, implementation)?
 - Is each phase commit-sized (under 100 lines of change)?
@@ -78,7 +78,7 @@ Use this format:
 
 ## Adherence
 
-- [Finding referencing specific generate-spec requirement]
+- [Finding referencing specific requirement from this skill]
 
 ## Verdict
 
@@ -90,7 +90,7 @@ If a category has no findings, write "None" under it.
 ## Principles
 
 - **Review the plan, not the implementation.** A spec is a design document, not a line-by-line coding guide. Don't flag things that tooling (typechecker, linter, test runner) will catch during implementation. Focus on decisions that, if wrong, would waste significant time or produce incorrect behavior.
-- Be specific. Every finding must reference a spec section and a source file or generate-spec requirement.
-- Be conservative. Only flag things that would cause an implementer to go down the wrong path, produce a design-level bug, or violate an explicit generate-spec rule.
+- Be specific. Every finding must reference a spec section and a source file or requirement in this skill.
+- Be conservative. Only flag things that would cause an implementer to go down the wrong path, produce a design-level bug, or violate an explicit rule in this skill.
 - Do not suggest scope additions. The goal is to find holes in the existing scope, not to expand it.
-- Do not comment on writing style or formatting unless it violates generate-spec structure requirements.
+- Do not comment on writing style or formatting unless it violates the structure requirements in this skill.

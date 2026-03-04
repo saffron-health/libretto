@@ -51,7 +51,12 @@ If you need conditional imports, consider refactoring the code structure.`;
 
 			// Check apply_patch operations
 			if (tool === "apply_patch") {
-				if (dynamicImportPattern.test(args.patchText)) {
+				const addedLines = args.patchText
+					.split("\n")
+					.filter((line: string) => line.startsWith("+") && !line.startsWith("+++"))
+					.map((line: string) => line.slice(1));
+
+				if (addedLines.some((line: string) => dynamicImportPattern.test(line))) {
 					throw new Error(errorMessage);
 				}
 			}
