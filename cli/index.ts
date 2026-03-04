@@ -87,7 +87,12 @@ function getRepoRoot(): string {
 
 const REPO_ROOT = getRepoRoot();
 const STATE_DIR = join(REPO_ROOT, "tmp", "libretto-cli");
+const LIBRETTO_DIR = join(REPO_ROOT, ".libretto-cli");
 const PROFILES_DIR = join(REPO_ROOT, ".libretto-cli", "profiles");
+const SNAPSHOT_ANALYZER_CONFIG_PATH = join(
+	LIBRETTO_DIR,
+	"snapshot-config.json",
+);
 
 // Migrate legacy .playwriter profiles to .libretto-cli
 const LEGACY_PROFILES_DIR = join(REPO_ROOT, ".playwriter", "profiles");
@@ -130,6 +135,40 @@ type InterpretArgs = {
 	pngPath?: string;
 	htmlPath?: string;
 };
+
+const SnapshotAnalyzerPresetSchema = z.enum(["codex", "opencode", "claude"]);
+type SnapshotAnalyzerPreset = z.infer<typeof SnapshotAnalyzerPresetSchema>;
+
+const SnapshotAnalyzerConfigSchema = z.object({
+	version: z.literal(1),
+	preset: SnapshotAnalyzerPresetSchema,
+	commandPrefix: z.array(z.string()).min(1),
+	updatedAt: z.string(),
+});
+
+type SnapshotAnalyzerConfig = z.infer<typeof SnapshotAnalyzerConfigSchema>;
+
+const SNAPSHOT_ANALYZER_PRESETS: Record<SnapshotAnalyzerPreset, string[]> = {
+	codex: ["codex", "exec", "--skip-git-repo-check", "--sandbox", "read-only"],
+	opencode: ["opencode", "run", "--format", "json"],
+	claude: ["claude", "-p"],
+};
+
+const InterpretResultSchema = z.object({
+	answer: z.string(),
+	selectors: z
+		.array(
+			z.object({
+				label: z.string(),
+				selector: z.string(),
+				rationale: z.string(),
+			}),
+		)
+		.default([]),
+	notes: z.string().optional().default(""),
+});
+
+type InterpretResult = z.infer<typeof InterpretResultSchema>;
 
 function validateSessionName(session: string): void {
 	if (
@@ -335,6 +374,394 @@ function collectSelectorHints(html: string, limit = 120): string[] {
 	}
 
 	return candidates;
+}
+
+function ensureLibrettoDir(): void {
+	mkdirSync(LIBRETTO_DIR, { recursive: true });
+}
+
+function quoteShellArg(value: string): string {
+	if (/^[a-zA-Z0-9_./:@=-]+$/.test(value)) return value;
+	return JSON.stringify(value);
+}
+
+function formatCommandPrefix(prefix: string[]): string {
+	return prefix.map((arg) => quoteShellArg(arg)).join(" ");
+}
+
+function readSnapshotAnalyzerConfig(): SnapshotAnalyzerConfig | null {
+	if (!existsSync(SNAPSHOT_ANALYZER_CONFIG_PATH)) return null;
+	try {
+		const raw = readFileSync(SNAPSHOT_ANALYZER_CONFIG_PATH, "utf-8");
+		return SnapshotAnalyzerConfigSchema.parse(JSON.parse(raw));
+	} catch (err) {
+		throw new Error(
+			`Snapshot analyzer config is invalid at ${SNAPSHOT_ANALYZER_CONFIG_PATH}. Delete it or run 'libretto-cli snapshot configure --clear'.`,
+		);
+	}
+}
+
+function writeSnapshotAnalyzerConfig(
+	preset: SnapshotAnalyzerPreset,
+	commandPrefix: string[],
+): SnapshotAnalyzerConfig {
+	ensureLibrettoDir();
+	const config = SnapshotAnalyzerConfigSchema.parse({
+		version: 1,
+		preset,
+		commandPrefix,
+		updatedAt: new Date().toISOString(),
+	});
+	writeFileSync(
+		SNAPSHOT_ANALYZER_CONFIG_PATH,
+		JSON.stringify(config, null, 2),
+		"utf-8",
+	);
+	return config;
+}
+
+function clearSnapshotAnalyzerConfig(): boolean {
+	if (!existsSync(SNAPSHOT_ANALYZER_CONFIG_PATH)) return false;
+	unlinkSync(SNAPSHOT_ANALYZER_CONFIG_PATH);
+	return true;
+}
+
+function printSnapshotAnalyzerConfig(config: SnapshotAnalyzerConfig): void {
+	console.log(`Snapshot analyzer preset: ${config.preset}`);
+	console.log(`Command prefix: ${formatCommandPrefix(config.commandPrefix)}`);
+	console.log(`Config file: ${SNAPSHOT_ANALYZER_CONFIG_PATH}`);
+	console.log(`Updated at: ${config.updatedAt}`);
+}
+
+function printSnapshotConfigureUsage(): void {
+	console.log(
+		`Usage: libretto-cli snapshot configure <codex|opencode|claude> [-- <command prefix...>]
+       libretto-cli snapshot configure --show
+       libretto-cli snapshot configure --clear`,
+	);
+}
+
+function runSnapshotConfigure(args: string[]): void {
+	if (args.includes("--show")) {
+		const config = readSnapshotAnalyzerConfig();
+		if (!config) {
+			console.log(
+				`No snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' to set one.`,
+			);
+			return;
+		}
+		printSnapshotAnalyzerConfig(config);
+		return;
+	}
+
+	if (args.includes("--clear")) {
+		const removed = clearSnapshotAnalyzerConfig();
+		if (removed) {
+			console.log(`Cleared snapshot analyzer config: ${SNAPSHOT_ANALYZER_CONFIG_PATH}`);
+		} else {
+			console.log("No snapshot analyzer config was set.");
+		}
+		return;
+	}
+
+	const presetArg = args[0];
+	const parsedPreset = SnapshotAnalyzerPresetSchema.safeParse(presetArg);
+	if (!parsedPreset.success) {
+		printSnapshotConfigureUsage();
+		throw new Error(
+			"Missing or invalid preset. Use one of: codex, opencode, claude.",
+		);
+	}
+
+	const separator = args.indexOf("--");
+	const customPrefix =
+		separator >= 0 ? args.slice(separator + 1).filter(Boolean) : null;
+	if (separator >= 0 && customPrefix && customPrefix.length === 0) {
+		throw new Error(
+			"Custom command prefix cannot be empty after '--'.",
+		);
+	}
+
+	const preset = parsedPreset.data;
+	const commandPrefix =
+		customPrefix && customPrefix.length > 0
+			? customPrefix
+			: SNAPSHOT_ANALYZER_PRESETS[preset];
+	const config = writeSnapshotAnalyzerConfig(preset, commandPrefix);
+	console.log("Snapshot analyzer configured.");
+	printSnapshotAnalyzerConfig(config);
+}
+
+type ExternalCommandResult = {
+	exitCode: number;
+	stdout: string;
+	stderr: string;
+};
+
+async function runExternalCommand(
+	command: string,
+	args: string[],
+	stdinText?: string,
+): Promise<ExternalCommandResult> {
+	return await new Promise((resolve, reject) => {
+		const child = spawn(command, args, {
+			stdio: ["pipe", "pipe", "pipe"],
+		});
+
+		let stdout = "";
+		let stderr = "";
+
+		child.stdout.on("data", (chunk: Buffer | string) => {
+			stdout += chunk.toString();
+		});
+
+		child.stderr.on("data", (chunk: Buffer | string) => {
+			stderr += chunk.toString();
+		});
+
+		child.on("error", (err) => {
+			const error = err as NodeJS.ErrnoException;
+			if (error.code === "ENOENT") {
+				reject(
+					new Error(
+						`Command not found: ${command}. Configure a different analyzer with 'libretto-cli snapshot configure'.`,
+					),
+				);
+				return;
+			}
+			reject(err);
+		});
+
+		child.on("close", (code) => {
+			resolve({
+				exitCode: code ?? 1,
+				stdout,
+				stderr,
+			});
+		});
+
+		if (stdinText !== undefined) {
+			child.stdin.write(stdinText);
+		}
+		child.stdin.end();
+	});
+}
+
+function stripAnsi(value: string): string {
+	return value.replace(
+		// eslint-disable-next-line no-control-regex
+		/\u001b\[[0-9;]*[A-Za-z]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g,
+		"",
+	);
+}
+
+function extractJsonObjectCandidates(text: string): string[] {
+	const candidates: string[] = [];
+	const seen = new Set<string>();
+	const add = (value: string) => {
+		const trimmed = value.trim();
+		if (!trimmed || seen.has(trimmed)) return;
+		seen.add(trimmed);
+		candidates.push(trimmed);
+	};
+
+	try {
+		const direct = text.trim();
+		if (direct.startsWith("{") && direct.endsWith("}")) {
+			add(direct);
+		}
+	} catch {}
+
+	const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)```/gi;
+	let codeBlockMatch: RegExpExecArray | null;
+	while ((codeBlockMatch = codeBlockRegex.exec(text)) !== null) {
+		const body = codeBlockMatch[1]?.trim();
+		if (body && body.startsWith("{") && body.endsWith("}")) {
+			add(body);
+		}
+	}
+
+	const lines = text.split("\n");
+	for (const line of lines) {
+		const trimmed = line.trim();
+		if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+			add(trimmed);
+		}
+	}
+
+	let depth = 0;
+	let start = -1;
+	let inString = false;
+	let escaped = false;
+	for (let i = 0; i < text.length; i++) {
+		const char = text[i]!;
+		if (inString) {
+			if (escaped) {
+				escaped = false;
+				continue;
+			}
+			if (char === "\\") {
+				escaped = true;
+				continue;
+			}
+			if (char === "\"") {
+				inString = false;
+			}
+			continue;
+		}
+
+		if (char === "\"") {
+			inString = true;
+			continue;
+		}
+		if (char === "{") {
+			if (depth === 0) start = i;
+			depth += 1;
+			continue;
+		}
+		if (char === "}") {
+			if (depth > 0) depth -= 1;
+			if (depth === 0 && start >= 0) {
+				add(text.slice(start, i + 1));
+				start = -1;
+			}
+		}
+	}
+
+	return candidates;
+}
+
+function collectStringLeaves(
+	value: unknown,
+	out: string[],
+	depth: number = 0,
+): void {
+	if (depth > 6 || value == null) return;
+	if (typeof value === "string") {
+		out.push(value);
+		return;
+	}
+	if (Array.isArray(value)) {
+		for (const item of value) {
+			collectStringLeaves(item, out, depth + 1);
+		}
+		return;
+	}
+	if (typeof value === "object") {
+		for (const nested of Object.values(value as Record<string, unknown>)) {
+			collectStringLeaves(nested, out, depth + 1);
+		}
+	}
+}
+
+function parseInterpretResultFromText(text: string): InterpretResult {
+	const cleaned = stripAnsi(text).trim();
+	const candidates = extractJsonObjectCandidates(cleaned);
+	if (candidates.length === 0) {
+		throw new Error(
+			"Analyzer output did not include a JSON object matching the interpret schema.",
+		);
+	}
+
+	for (const candidate of candidates) {
+		try {
+			const parsed = JSON.parse(candidate);
+			const valid = InterpretResultSchema.safeParse(parsed);
+			if (valid.success) {
+				return valid.data;
+			}
+
+			const nestedStrings: string[] = [];
+			collectStringLeaves(parsed, nestedStrings);
+			for (const nestedText of nestedStrings) {
+				const nestedCandidates = extractJsonObjectCandidates(nestedText);
+				for (const nestedCandidate of nestedCandidates) {
+					try {
+						const nestedParsed = JSON.parse(nestedCandidate);
+						const nestedValid = InterpretResultSchema.safeParse(nestedParsed);
+						if (nestedValid.success) {
+							return nestedValid.data;
+						}
+					} catch {}
+				}
+			}
+		} catch {}
+	}
+
+	throw new Error(
+		"Analyzer output could not be parsed as valid interpret JSON. Ensure the configured command returns only the requested JSON object.",
+	);
+}
+
+async function runSnapshotAnalyzer(
+	config: SnapshotAnalyzerConfig,
+	prompt: string,
+	pngPath: string,
+): Promise<InterpretResult> {
+	const command = config.commandPrefix[0];
+	if (!command) {
+		throw new Error(
+			"Snapshot analyzer config is invalid: command prefix is empty.",
+		);
+	}
+
+	const baseArgs = config.commandPrefix.slice(1);
+	const screenshotHint =
+		`\n\nScreenshot file path: ${pngPath}\n` +
+		"Use the screenshot alongside the HTML snapshot context above.";
+
+	if (config.preset === "codex") {
+		mkdirSync(STATE_DIR, { recursive: true });
+		const outputPath = join(
+			STATE_DIR,
+			`snapshot-analyzer-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+		);
+		const args = [
+			...baseArgs,
+			"--output-last-message",
+			outputPath,
+			"-i",
+			pngPath,
+			"-",
+		];
+		const result = await runExternalCommand(command, args, prompt);
+		const outputText = existsSync(outputPath)
+			? readFileSync(outputPath, "utf-8")
+			: result.stdout;
+		if (existsSync(outputPath)) {
+			unlinkSync(outputPath);
+		}
+		if (result.exitCode !== 0) {
+			throw new Error(
+				`Analyzer command failed (${formatCommandPrefix([command, ...args])}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
+			);
+		}
+		return parseInterpretResultFromText(outputText);
+	}
+
+	if (config.preset === "opencode") {
+		const args = [...baseArgs, "-f", pngPath, `${prompt}${screenshotHint}`];
+		const result = await runExternalCommand(command, args);
+		if (result.exitCode !== 0) {
+			throw new Error(
+				`Analyzer command failed (${formatCommandPrefix([command, ...args])}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
+			);
+		}
+		return parseInterpretResultFromText(result.stdout);
+	}
+
+	if (config.preset === "claude") {
+		const args = [...baseArgs, `${prompt}${screenshotHint}`];
+		const result = await runExternalCommand(command, args);
+		if (result.exitCode !== 0) {
+			throw new Error(
+				`Analyzer command failed (${formatCommandPrefix([command, ...args])}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
+			);
+		}
+		return parseInterpretResultFromText(result.stdout);
+	}
+
+	throw new Error(`Unsupported snapshot analyzer preset: ${config.preset}`);
 }
 
 function findLatestScreenshotPair(screenshotsDir: string): ScreenshotPair {
@@ -1144,7 +1571,6 @@ async function runInterpret(args: InterpretArgs): Promise<void> {
 		args.pngPath,
 		args.htmlPath,
 	);
-	const imageBase64 = readFileAsBase64(pngPath);
 	const htmlContent = readFileSync(htmlPath, "utf-8");
 	const htmlCharLimit = 500_000;
 	const { text: trimmedHtml, truncated } = truncateText(
@@ -1179,46 +1605,43 @@ async function runInterpret(args: InterpretArgs): Promise<void> {
 	}
 
 	prompt += `HTML snapshot:\n\n${trimmedHtml}`;
+	prompt += "\n\nReturn only a JSON object. Do not include markdown code fences or extra commentary.";
 
-	if (!llmClientFactory) {
+	let parsed: InterpretResult;
+	const configuredAnalyzer = readSnapshotAnalyzerConfig();
+	if (configuredAnalyzer) {
+		log.info("interpret-analyzer-config", {
+			preset: configuredAnalyzer.preset,
+			commandPrefix: configuredAnalyzer.commandPrefix,
+		});
+		parsed = await runSnapshotAnalyzer(configuredAnalyzer, prompt, pngPath);
+	} else if (llmClientFactory) {
+		log.info("interpret-analyzer-factory-fallback", {});
+		const imageBase64 = readFileAsBase64(pngPath);
+		const client = await llmClientFactory(log, "google/gemini-3-flash-preview");
+		const result = await client.generateObjectFromMessages({
+			schema: InterpretResultSchema,
+			messages: [
+				{
+					role: "user",
+					content: [
+						{ type: "text", text: prompt },
+						{
+							type: "image",
+							image: `data:${getMimeType(pngPath)};base64,${imageBase64}`,
+						},
+					],
+				},
+			],
+			temperature: 0.1,
+		});
+		parsed = InterpretResultSchema.parse(result);
+	} else {
 		throw new Error(
-			"LLM client not configured. Call setLLMClientFactory() before using snapshot/interpret commands.",
+			"No snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude). Library integrations can still set a factory via setLLMClientFactory().",
 		);
 	}
-	const client = await llmClientFactory(log, "google/gemini-3-flash-preview");
 
-	const interpretSchema = z.object({
-		answer: z.string(),
-		selectors: z
-			.array(
-				z.object({
-					label: z.string(),
-					selector: z.string(),
-					rationale: z.string(),
-				}),
-			)
-			.default([]),
-		notes: z.string().optional().default(""),
-	});
-
-	const result = await client.generateObjectFromMessages({
-		schema: interpretSchema,
-		messages: [
-			{
-				role: "user",
-				content: [
-					{ type: "text", text: prompt },
-					{
-						type: "image",
-						image: `data:${getMimeType(pngPath)};base64,${imageBase64}`,
-					},
-				],
-			},
-		],
-		temperature: 0.1,
-	});
-
-	const parsed = interpretSchema.parse(result);
 	log.info("interpret-success", { selectorCount: parsed.selectors.length, answer: parsed.answer.slice(0, 200) });
 	const outputLines: string[] = [];
 	outputLines.push("Interpretation:");
@@ -1735,9 +2158,10 @@ Commands:
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
   exec <code>             Execute Playwright typescript code
   snapshot --objective <text> --context <text>  Capture PNG + HTML and analyze with vision model
+  snapshot configure <codex|opencode|claude> [-- <command prefix...>]  Configure snapshot analyzer
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
-  interpret <objective>   Interpret a snapshot PNG + HTML pair with selectors
+  interpret --objective <text> --context <text> [--png <path>] [--html <path>]   Interpret a snapshot PNG + HTML pair
   close                   Close the browser
 
 Options:
@@ -1752,6 +2176,10 @@ Examples:
 
   libretto-cli exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
   libretto-cli exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
+  libretto-cli snapshot configure codex
+  libretto-cli snapshot configure opencode
+  libretto-cli snapshot configure claude
+  libretto-cli snapshot configure codex -- codex exec --skip-git-repo-check --sandbox read-only
   libretto-cli snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
   libretto-cli close
 
@@ -1920,6 +2348,10 @@ export async function runLibrettoCLI(): Promise<void> {
 				break;
 			}
 			case "snapshot": {
+				if (args[1] === "configure") {
+					runSnapshotConfigure(args.slice(2));
+					break;
+				}
 				const { value: objective, args: withoutObjective } = extractOption(
 					args,
 					"--objective",
