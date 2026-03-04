@@ -14,6 +14,7 @@
 			"libretto/logger": ["../libretto/src/logger/index.ts"],
 			"libretto/llm": ["../libretto/src/llm/index.ts"],
 			"libretto/instrumentation": ["../libretto/src/instrumentation/index.ts"],
+			"libretto/config": ["../libretto/src/config/index.ts"],
 			"libretto/run": ["../libretto/src/run/api.ts"]
 		}
 	},
