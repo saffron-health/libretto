@@ -76,7 +76,8 @@
 	"scripts": {
 		"postinstall": "node ./scripts/postinstall.mjs",
 		"build": "tsup",
-		"type-check": "tsc --noEmit"
+		"type-check": "tsc --noEmit",
+		"dev": "tsx cli/index.ts"
 	},
 	"peerDependencies": {
 		"playwright": ">=1.40.0",
@@ -86,6 +87,7 @@
 		"@types/node": "^25.3.3",
 		"playwright": "^1.52.0",
 		"tsup": "^8.0.0",
+		"tsx": "^4.19.2",
 		"typescript": "^5.7.0",
 		"zod": "^3.25.0"
 	},
