@@ -31,7 +31,7 @@ import { setDebugMode } from "libretto/config";
 import { launchBrowser } from "libretto/run";
 
 // ── LLM client factory ─────────────────────────────────────────────────
-// Users must call setLLMClientFactory() before using snapshot/interpret commands.
+// Users must call setLLMClientFactory() before using snapshot analysis commands.
 let llmClientFactory:
   | ((logger: Logger, model: string) => Promise<LLMClient>)
   | null = null;
@@ -2511,7 +2511,6 @@ Commands:
   snapshot configure <codex|opencode|claude> [-- <command prefix...>]  Configure snapshot analyzer
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
-  interpret --objective <text> --context <text> [--png <path>] [--html <path>]   Interpret a snapshot PNG + HTML pair
   close                   Close the browser
 
 Options:
@@ -2557,7 +2556,6 @@ const CLI_COMMANDS = new Set([
   "save",
   "exec",
   "snapshot",
-  "interpret",
   "network",
   "actions",
   "close",
@@ -2607,8 +2605,7 @@ function extractOption(
       const next = args[i + 1];
       if (!next || next.startsWith("--")) {
         throw new Error(
-          usage ||
-            `Usage: libretto-cli interpret <objective> [--png <path>] [--html <path>] [--session <name>]`,
+          usage || `Missing value for ${option}. Run 'libretto-cli --help' for usage.`,
         );
       }
       value = next;
@@ -2948,37 +2945,6 @@ export async function runLibrettoCLI(): Promise<void> {
           process.exit(1);
         }
         await runSnapshot(session, objective, context);
-        break;
-      }
-      case "interpret": {
-        const { value: pngPath, args: withoutPng } = extractOption(
-          args,
-          "--png",
-          "Usage: libretto-cli interpret --objective <text> --context <text> [--png <path>] [--html <path>] [--session <name>]",
-        );
-        const { value: htmlPath, args: withoutHtml } = extractOption(
-          withoutPng,
-          "--html",
-          "Usage: libretto-cli interpret --objective <text> --context <text> [--png <path>] [--html <path>] [--session <name>]",
-        );
-        const { value: objective, args: withoutObjective } = extractOption(
-          withoutHtml,
-          "--objective",
-          "Usage: libretto-cli interpret --objective <text> --context <text> [--png <path>] [--html <path>] [--session <name>]",
-        );
-        const { value: context, args: _withoutContext } = extractOption(
-          withoutObjective,
-          "--context",
-          "Usage: libretto-cli interpret --objective <text> --context <text> [--png <path>] [--html <path>] [--session <name>]",
-        );
-        if (!objective || !context) {
-          console.error(
-            "Error: both --objective and --context are required.\n" +
-              "Usage: libretto-cli interpret --objective <text> --context <text> [--png <path>] [--html <path>] [--session <name>]",
-          );
-          process.exit(1);
-        }
-        await runInterpret({ objective, session, context, pngPath, htmlPath });
         break;
       }
       case "network":
