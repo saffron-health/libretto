@@ -14,6 +14,12 @@ Use the `libretto-cli` CLI to automate web interactions, debug browser agent job
 - Testing interactions before codifying them in source files
 - Saving and restoring login sessions across browser launches
 
+## Assessing a Site's Security Posture
+
+**Only do this when the user explicitly asks you to.** Do not proactively assess a site's security posture or run bot detection probes unless the user specifically requests it (e.g., "assess the security posture", "check for bot detection", "probe the site's defenses", "what integration approach should we use").
+
+When asked, read the `integration-approach-selection.md` file in this skill's directory. It contains step-by-step probes to run against a live Chrome session and a decision framework for choosing a data capture strategy (fetch calls vs passive interception vs DOM extraction). After running the probes, produce the Site Assessment Summary described at the end of that document.
+
 ## Ask, Don't Guess
 
 If it's not obvious which element to click or what value to enter, **ask the user** — don't try multiple things hoping one works. Present what you see on the page and let the user tell you where to go. One question is faster than a 30-second timeout from a wrong guess.
