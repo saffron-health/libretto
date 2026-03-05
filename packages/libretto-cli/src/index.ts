@@ -25,6 +25,7 @@ import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { cwd } from "node:process";
 import { createServer } from "node:net";
+import * as moduleBuiltin from "node:module";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { setDebugMode } from "libretto/config";
@@ -1652,10 +1653,8 @@ async function runExec(
       Buffer,
     };
 
-    const AsyncFunction = Object.getPrototypeOf(
-      async function () {},
-    ).constructor;
-    const fn = new AsyncFunction(...Object.keys(helpers), code);
+    const helperNames = Object.keys(helpers);
+    const fn = compileExecFunction(code, helperNames);
 
     const result = await fn(...Object.values(helpers));
     log.info("exec-success", { session, hasResult: result !== undefined });
@@ -1675,6 +1674,81 @@ async function runExec(
     clearInterval(stallInterval);
     process.removeListener("SIGINT", sigintHandler);
     disconnectBrowser(browser, session);
+  }
+}
+
+type ExecFunction = (...args: unknown[]) => Promise<unknown>;
+
+type StripTypeScriptTypesFn = (
+  code: string,
+  options?: { mode?: "strip" | "transform" },
+) => string;
+
+const stripTypeScriptTypes = (
+  moduleBuiltin as { stripTypeScriptTypes?: StripTypeScriptTypesFn }
+).stripTypeScriptTypes;
+
+function compileExecFunction(code: string, helperNames: string[]): ExecFunction {
+  const typeStripped = compileTypeScriptExecFunction(code, helperNames);
+  if (typeStripped) return typeStripped;
+
+  const AsyncFunction = Object.getPrototypeOf(
+    async function () {},
+  ).constructor as new (...args: string[]) => ExecFunction;
+  return new AsyncFunction(...helperNames, code);
+}
+
+function compileTypeScriptExecFunction(
+  code: string,
+  helperNames: string[],
+): ExecFunction | null {
+  if (!stripTypeScriptTypes) return null;
+
+  const wrappedSource = `(async function __librettoExec(${helperNames.join(", ")}) {\n${code}\n})`;
+  const jsSource = withSuppressedStripTypeScriptWarning(() =>
+    stripTypeScriptTypes(wrappedSource, { mode: "strip" }),
+  );
+  const createFunction = new Function(`return ${jsSource}`) as () => ExecFunction;
+  return createFunction();
+}
+
+function withSuppressedStripTypeScriptWarning<T>(action: () => T): T {
+  type EmitWarningFn = (...args: unknown[]) => void;
+  const mutableProcess = process as unknown as { emitWarning: EmitWarningFn };
+  const originalEmitWarning = mutableProcess.emitWarning;
+
+  mutableProcess.emitWarning = (...args: unknown[]) => {
+    const warning = args[0];
+    const typeOrOptions = args[1];
+    const warningMessage =
+      typeof warning === "string"
+        ? warning
+        : warning instanceof Error
+          ? warning.message
+          : "";
+    const warningType =
+      typeof typeOrOptions === "string"
+        ? typeOrOptions
+        : typeof typeOrOptions === "object" &&
+            typeOrOptions !== null &&
+            "type" in typeOrOptions &&
+            typeof (typeOrOptions as { type?: unknown }).type === "string"
+          ? ((typeOrOptions as { type?: string }).type ?? "")
+          : "";
+
+    if (
+      warningType === "ExperimentalWarning" &&
+      warningMessage.includes("stripTypeScriptTypes")
+    ) {
+      return;
+    }
+    originalEmitWarning(...args);
+  };
+
+  try {
+    return action();
+  } finally {
+    mutableProcess.emitWarning = originalEmitWarning;
   }
 }
 
