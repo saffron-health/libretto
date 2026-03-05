@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { describe, expect } from "vitest";
@@ -8,6 +9,10 @@ function wait(ms: number): Promise<void> {
 }
 
 describe("cli test fixtures", () => {
+  test("creates workspace under OS temp directory", async ({ workspaceDir }) => {
+    expect(workspaceDir.startsWith(tmpdir())).toBe(true);
+  });
+
   test.concurrent(
     "isolates workspace files for concurrent test A",
     async ({ workspacePath }) => {

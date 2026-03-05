@@ -69,15 +69,15 @@ Do not refactor or edit `packages/libretto-cli/src/index.ts` in this spec. Tests
 
 ### Phase 4: Add deterministic state-driven CLI tests
 
-- [ ] Add tests for `snapshot configure --show` when no config is set.
-- [ ] Add tests for `snapshot configure <preset>` and `snapshot configure --clear` state transitions.
-- [ ] Add tests for `network` and `actions` commands using seeded log files in temp run dirs.
-- [ ] Add tests for `network --clear` and `actions --clear` behavior against seeded files.
-- [ ] Success criteria: stateful command tests run without launching a browser process.
+- [x] Add tests for `snapshot configure --show` when no config is set.
+- [x] Add tests for `snapshot configure <preset>` and `snapshot configure --clear` state transitions.
+- [x] Add tests for `network` and `actions` commands using seeded log files in temp run dirs.
+- [x] Add tests for `network --clear` and `actions --clear` behavior against seeded files.
+- [x] Success criteria: stateful command tests run without launching a browser process.
 
 ### Phase 5: Add CI execution and guardrails
 
-- [ ] Add CI workflow step to run `pnpm test`.
-- [ ] Ensure tests write only within temp workspaces and never mutate repo-local runtime state.
-- [ ] Document the test strategy and fixture constraints briefly in the spec or test README.
-- [ ] Success criteria: CI passes in a clean environment and reproduces local test results.
+- [x] Add CI workflow step to run `pnpm test`.
+- [x] Ensure tests write only within temp workspaces and never mutate repo-local runtime state.
+- [x] Document the test strategy and fixture constraints briefly in the spec or test README.
+- [x] Success criteria: CI passes in a clean environment and reproduces local test results.
