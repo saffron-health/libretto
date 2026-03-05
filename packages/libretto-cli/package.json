@@ -9,7 +9,9 @@
 	"scripts": {
 		"build": "tsup",
 		"type-check": "tsc --noEmit",
-		"dev": "tsx src/index.ts"
+		"dev": "tsx src/index.ts",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"libretto": "workspace:*",

@@ -5,6 +5,11 @@
 	"scripts": {
 		"build": "pnpm -r build",
 		"type-check": "pnpm -r type-check",
-		"dev": "pnpm --filter libretto build && pnpm --filter libretto-cli build && pnpm --filter libretto-cli exec node dist/index.js"
+		"dev": "pnpm --filter libretto build && pnpm --filter libretto-cli build && pnpm --filter libretto-cli exec node dist/index.js",
+		"test": "pnpm --filter libretto-cli test",
+		"test:watch": "pnpm --filter libretto-cli test:watch"
+	},
+	"devDependencies": {
+		"vitest": "^4.0.18"
 	}
 }

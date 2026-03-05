@@ -37,6 +37,7 @@ Do not refactor or edit `packages/libretto-cli/src/index.ts` in this spec. Tests
 - `package.json` — workspace scripts and shared dev dependencies.
 - `pnpm-workspace.yaml` — workspace package boundaries.
 - `packages/libretto-cli/package.json` — CLI package scripts and dependencies.
+- `packages/libretto-cli/vitest.config.ts` — package-local Vitest configuration for inline CLI tests.
 - `packages/libretto-cli/src/index.ts` — CLI runtime behavior under test (read-only for this spec).
 - `README.md` — top-level project context.
 
@@ -44,19 +45,19 @@ Do not refactor or edit `packages/libretto-cli/src/index.ts` in this spec. Tests
 
 ### Phase 1: Add Vitest workspace scaffolding
 
-- [ ] Add workspace-level dev dependency for `vitest`.
-- [ ] Add root scripts: `test` and `test:watch`.
-- [ ] Add root Vitest config to run package tests in this monorepo.
-- [ ] Add package-level test setup files for cleanup hooks and stable defaults.
-- [ ] Success criteria: `pnpm test` runs and passes with initial smoke tests.
+- [x] Add workspace-level dev dependency for `vitest`.
+- [x] Add root scripts: `test` and `test:watch`.
+- [x] Add package-level Vitest config and root test orchestration through package scripts.
+- [x] Add package-level test scaffolding for stable smoke-test execution.
+- [x] Success criteria: `pnpm test` runs and passes with initial smoke tests.
 
 ### Phase 2: Add scoped-workspace CLI fixtures
 
-- [ ] Add a fixture that creates a unique temp workspace per test and switches subprocess cwd into it.
-- [ ] Add seed helpers for `.libretto-cli` and `tmp/libretto-cli` state files and run directories.
-- [ ] Add a `spawnCli` fixture that executes the built CLI and captures `exitCode`, `stdout`, and `stderr`.
-- [ ] Add teardown cleanup that removes temp workspace artifacts after each test.
-- [ ] Success criteria: two tests can run in parallel without shared state collisions.
+- [x] Add a fixture that creates a unique temp workspace per test and switches subprocess cwd into it.
+- [x] Add seed helpers for `.libretto-cli` and `tmp/libretto-cli` state files and run directories.
+- [x] Add a `spawnCli` fixture that executes the built CLI and captures `exitCode`, `stdout`, and `stderr`.
+- [x] Add teardown cleanup that removes temp workspace artifacts after each test.
+- [x] Success criteria: two tests can run in parallel without shared state collisions.
 
 ### Phase 3: Add very basic CLI subprocess tests
 
