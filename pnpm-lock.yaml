@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  packages/libretto:
     dependencies:
       '@ai-sdk/anthropic':
         specifier: ^3.0.53
@@ -30,15 +32,37 @@ importers:
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(tsx@4.21.0)(typescript@5.9.3)
-      tsx:
-        specifier: ^4.19.2
-        version: 4.21.0
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
       zod:
         specifier: ^3.25.0
         version: 3.25.76
+
+  packages/libretto-cli:
+    dependencies:
+      libretto:
+        specifier: workspace:*
+        version: link:../libretto
+      playwright:
+        specifier: ^1.52.0
+        version: 1.58.2
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.3
+        version: 25.3.3
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(tsx@4.21.0)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
 packages:
 
