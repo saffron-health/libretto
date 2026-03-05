@@ -32,7 +32,10 @@ type SeedHelpers = {
 type CliFixtures = {
   workspaceDir: string;
   workspacePath: (...parts: string[]) => string;
-  spawnCli: (args: string[], env?: Record<string, string>) => Promise<SpawnResult>;
+  librettoCli: (
+    command: string,
+    env?: Record<string, string>,
+  ) => Promise<SpawnResult>;
 } & SeedHelpers;
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -104,6 +107,53 @@ async function spawnProcess(
   });
 }
 
+function parseCommandArgs(command: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let quote: '"' | "'" | null = null;
+  let escape = false;
+
+  for (const char of command) {
+    if (escape) {
+      current += char;
+      escape = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escape = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current) args.push(current);
+  return args;
+}
+
 export const test = base.extend<CliFixtures>({
   workspaceDir: async ({}, use) => {
     const workspaceDir = await mkdtemp(join(tmpdir(), "libretto-cli-test-"));
@@ -118,10 +168,15 @@ export const test = base.extend<CliFixtures>({
     await use((...parts: string[]) => join(workspaceDir, ...parts));
   },
 
-  spawnCli: async ({ workspaceDir }, use) => {
+  librettoCli: async ({ workspaceDir }, use) => {
     ensureBuilt();
-    await use(async (args: string[], env?: Record<string, string>) => {
-      return await spawnProcess(process.execPath, [cliEntry, ...args], workspaceDir, env);
+    await use(async (command: string, env?: Record<string, string>) => {
+      return await spawnProcess(
+        process.execPath,
+        [cliEntry, ...parseCommandArgs(command)],
+        workspaceDir,
+        env,
+      );
     });
   },
 

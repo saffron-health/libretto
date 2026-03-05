@@ -63,8 +63,8 @@ describe("cli test fixtures", () => {
 
   test(
     "spawns CLI with workspace cwd",
-    async ({ spawnCli, workspacePath }) => {
-      const result = await spawnCli(["--help"]);
+    async ({ librettoCli, workspacePath }) => {
+      const result = await librettoCli("--help");
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Usage: libretto-cli");
       expect(existsSync(workspacePath("tmp", "libretto-cli"))).toBe(true);
