@@ -12,6 +12,7 @@ type SessionState = {
   session: string;
   runId: string;
   startedAt: string;
+  mode?: "read-only" | "interactive";
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -24,6 +25,10 @@ type SpawnResult = {
 
 type SeedHelpers = {
   seedSessionState: (state?: Partial<SessionState>) => Promise<SessionState>;
+  seedSessionPermission: (
+    session: string,
+    mode: "read-only" | "interactive",
+  ) => Promise<string>;
   seedSnapshotConfig: (config?: JsonRecord) => Promise<string>;
   seedNetworkLog: (runId: string, entries: JsonRecord[]) => Promise<string>;
   seedActionLog: (runId: string, entries: JsonRecord[]) => Promise<string>;
@@ -189,6 +194,7 @@ export const test = base.extend<CliFixtures>({
         port: state?.port ?? 9222,
         pid: state?.pid ?? 12345,
         startedAt: state?.startedAt ?? "2026-01-01T00:00:00.000Z",
+        mode: state?.mode,
       };
       const dir = workspacePath("tmp", "libretto-cli");
       await mkdir(dir, { recursive: true });
@@ -210,6 +216,22 @@ export const test = base.extend<CliFixtures>({
         preset: "codex",
         commandPrefix: ["codex", "exec"],
         updatedAt: "2026-01-01T00:00:00.000Z",
+      };
+      await writeFile(path, JSON.stringify(payload, null, 2), "utf8");
+      return path;
+    });
+  },
+
+  seedSessionPermission: async ({ workspacePath }, use) => {
+    await use(async (session: string, mode: "read-only" | "interactive") => {
+      const dir = workspacePath(".libretto-cli");
+      const path = workspacePath(".libretto-cli", "session-permissions.json");
+      await mkdir(dir, { recursive: true });
+      const payload = {
+        version: 1,
+        sessions: {
+          [session]: mode,
+        },
       };
       await writeFile(path, JSON.stringify(payload, null, 2), "utf8");
       return path;

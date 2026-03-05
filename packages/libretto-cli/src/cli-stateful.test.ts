@@ -155,4 +155,110 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(cleared).toBe("");
     expect(existsSync(workspacePath("tmp", "libretto-cli", "run-actions", "actions.jsonl"))).toBe(true);
   });
+
+  test("blocks exec in read-only open sessions", async ({
+    seedSessionState,
+    librettoCli,
+  }) => {
+    await seedSessionState({
+      session: "readonly-session",
+      mode: "read-only",
+    });
+
+    const result = await librettoCli(
+      "exec \"return await page.title()\" --session readonly-session",
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "Session \"readonly-session\" is read-only. Only a human can authorize interactive mode.",
+    );
+  });
+
+  test("rejects exec when session mode is not specified", async ({
+    seedSessionState,
+    librettoCli,
+  }) => {
+    await seedSessionState({
+      session: "legacy-session",
+    });
+
+    const result = await librettoCli(
+      "exec \"return await page.title()\" --session legacy-session",
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "Session \"legacy-session\" is read-only. Only a human can authorize interactive mode.",
+    );
+    expect(result.stderr).toContain(
+      "libretto-cli session-mode interactive --session legacy-session",
+    );
+  });
+
+  test("allows exec when session mode is missing but session is permissioned interactive", async ({
+    seedSessionState,
+    seedSessionPermission,
+    librettoCli,
+  }) => {
+    await seedSessionState({
+      session: "permissioned-session",
+    });
+    await seedSessionPermission("permissioned-session", "interactive");
+
+    const result = await librettoCli(
+      "exec \"return await page.title()\" --session permissioned-session",
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).not.toContain("is read-only");
+    expect(result.stderr).toContain(
+      "No browser running for session \"permissioned-session\".",
+    );
+  });
+
+  test("does not apply read-only guard when session allows actions", async ({
+    seedSessionState,
+    librettoCli,
+  }) => {
+    await seedSessionState({
+      session: "interactive-session",
+      mode: "interactive",
+    });
+
+    const result = await librettoCli(
+      "exec \"return await page.title()\" --session interactive-session",
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).not.toContain("is read-only");
+    expect(result.stderr).toContain(
+      "No browser running for session \"interactive-session\".",
+    );
+  });
+
+  test("rejects exec after session is switched back to read-only", async ({
+    seedSessionState,
+    librettoCli,
+  }) => {
+    await seedSessionState({
+      session: "flip-session",
+      mode: "interactive",
+    });
+
+    const setReadOnly = await librettoCli(
+      "session-mode read-only --session flip-session",
+    );
+    expect(setReadOnly.exitCode).toBe(0);
+    expect(setReadOnly.stdout).toContain(
+      "Session \"flip-session\" is now read-only.",
+    );
+
+    const result = await librettoCli(
+      "exec \"return await page.title()\" --session flip-session",
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "Session \"flip-session\" is read-only. Only a human can authorize interactive mode.",
+    );
+    expect(result.stderr).toContain(
+      "libretto-cli session-mode interactive --session flip-session",
+    );
+  });
 });

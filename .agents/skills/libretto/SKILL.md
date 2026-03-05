@@ -29,6 +29,8 @@ If it's not obvious which element to click or what value to enter, **ask the use
 ```bash
 npx libretto open <url> [--headless]   # Launch browser and navigate (headed by default)
 npx libretto exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
+npx libretto run <integrationFile> <integrationExport> # Execute integration actions
+npx libretto session-mode <read-only|interactive> [--session <name>] # Set session mode explicitly
 npx libretto snapshot --objective "<what to find>" --context "<situational info>"
 npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto-cli/profiles/
 npx libretto network                   # Show last 20 captured network requests
@@ -38,6 +40,15 @@ npx libretto close                     # Close the browser
 
 All commands accept `--session <name>` for isolated browser instances (default: `default`).
 Built-in sessions: `default`, `dev-server`, `browser-agent`.
+
+## Interactive Consent Rule
+
+After starting a session with `open` (or when preparing to use `run`), ask:
+"Do you want this session to be interactive?"
+
+- If user says **no**, keep it read-only and use read-only-safe commands (`snapshot`, `network`, `actions`).
+- If user says **yes**, run `npx libretto session-mode interactive --session <name>` and then proceed with `exec`/`run`.
+- Never change session mode unless the user explicitly approves.
 
 ## Visualize Mode (`--visualize`)
 
@@ -54,6 +65,9 @@ The `state` object persists across `exec` calls within the same session — use 
 ```bash
 # Open a page
 npx libretto open https://example.com
+# Ask user if they want interactive mode
+# If yes:
+npx libretto session-mode interactive --session default
 
 # Interact with elements
 npx libretto exec "await page.locator('button:has-text(\"Sign in\")').click()"
@@ -97,9 +111,11 @@ When browser automation jobs fail (selectors timing out, clicks not working), us
 1. Add `page.pause()` before the problematic code section
 2. Start the job with `npx browser-agent start` (debug mode is always enabled locally)
 3. Wait ~60 seconds for the browser to hit the breakpoint
-4. Use `npx libretto exec` (with `--session browser-agent`) to inspect and prototype fixes
-5. Once the fix works, codify it in source files
-6. Restart the job to verify end-to-end
+4. Ask user if they approve interactive mode for `browser-agent`
+5. If approved, run `npx libretto session-mode interactive --session browser-agent`
+6. Use `npx libretto exec` (with `--session browser-agent`) to inspect and prototype fixes
+7. Once the fix works, codify it in source files
+8. Restart the job to verify end-to-end
 
 ```bash
 # Start job in background
@@ -109,6 +125,7 @@ npx browser-agent start \
   --params '{"vendorName":"eClinicalWorks"}'
 
 # Inspect page state
+npx libretto session-mode interactive --session browser-agent
 npx libretto exec --session browser-agent "return await page.url();"
 npx libretto snapshot --session browser-agent \
   --objective "Find dropdown menus and their current selections" \

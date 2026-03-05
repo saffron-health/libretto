@@ -7,6 +7,7 @@ import { getLog, PROFILES_DIR, REPO_ROOT, setLogFile } from "./context";
 import {
   clearSessionState,
   generateRunId,
+  getSessionPermissionMode,
   getRunDir,
   getSessionStateOrThrow,
   logFileForRun,
@@ -202,8 +203,9 @@ export async function runOpen(
   session: string,
 ): Promise<void> {
   let log = getLog();
+  const sessionMode = getSessionPermissionMode(session);
   const url = normalizeUrl(rawUrl);
-  log.info("open-start", { url, headed, session });
+  log.info("open-start", { url, headed, session, sessionMode });
 
   const existing = await tryConnect(session);
   if (existing) {
@@ -212,6 +214,10 @@ export async function runOpen(
       const page = existing.contexts()[0]?.pages()[0];
       if (page) {
         await page.goto(url);
+        const existingState = readSessionState(session);
+        if (existingState && existingState.mode !== sessionMode) {
+          writeSessionState({ ...existingState, mode: sessionMode });
+        }
         log.info("open-navigated", { url, session });
         console.log(`Navigated to: ${url}`);
         return;
@@ -228,14 +234,15 @@ export async function runOpen(
   setLogFile(runLogPath);
   log = getLog();
 
-  const mode = headed ? "headed" : "headless";
+  const browserMode = headed ? "headed" : "headless";
   const domain = normalizeDomain(url);
   const profilePath = getProfilePath(domain);
   const useProfile = hasProfile(domain);
 
   log.info("open-launching", {
     url,
-    mode,
+    mode: browserMode,
+    sessionMode,
     session,
     port,
     runId,
@@ -248,7 +255,7 @@ export async function runOpen(
     console.log(`Loading saved profile for ${domain}`);
   }
   console.log(
-    `Launching ${mode} browser (session: ${session}, run: ${runId})...`,
+    `Launching ${browserMode} browser (session: ${session}, run: ${runId})...`,
   );
 
   const escapedProfilePath = profilePath
@@ -627,16 +634,18 @@ await new Promise(() => {});
         session,
         runId,
         startedAt: new Date().toISOString(),
+        mode: sessionMode,
       });
       log.info("open-success", {
         url,
-        mode,
+        mode: browserMode,
+        sessionMode,
         session,
         port,
         runId,
         pid: child.pid,
       });
-      console.log(`Browser open (${mode}): ${url}`);
+      console.log(`Browser open (${browserMode}): ${url}`);
 
       await new Promise((r) => setTimeout(r, 2000));
       return;

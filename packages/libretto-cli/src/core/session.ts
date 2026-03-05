@@ -7,13 +7,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { getLog, STATE_DIR } from "./context";
+import { getLog, LIBRETTO_DIR, STATE_DIR } from "./context";
 
 const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+const SESSION_PERMISSIONS_PATH = join(LIBRETTO_DIR, "session-permissions.json");
 
 export const SESSION_DEFAULT = "default";
 export const SESSION_DEV_SERVER = "dev-server";
 export const SESSION_BROWSER_AGENT = "browser-agent";
+export type SessionMode = "read-only" | "interactive";
 
 export type SessionState = {
   port: number;
@@ -21,6 +23,12 @@ export type SessionState = {
   session: string;
   runId: string;
   startedAt: string;
+  mode?: SessionMode;
+};
+
+type SessionPermissions = {
+  version: 1;
+  sessions: Record<string, SessionMode>;
 };
 
 export function generateRunId(): string {
@@ -142,4 +150,92 @@ export function clearSessionState(session: string): void {
   }
   unlinkSync(stateFile);
   log.info("session-state-cleared", { session, stateFile });
+}
+
+function ensureLibrettoDir(): void {
+  mkdirSync(LIBRETTO_DIR, { recursive: true });
+}
+
+function isSessionMode(value: unknown): value is SessionMode {
+  return value === "read-only" || value === "interactive";
+}
+
+export function readSessionPermissions(): SessionPermissions {
+  if (!existsSync(SESSION_PERMISSIONS_PATH)) {
+    return { version: 1, sessions: {} };
+  }
+
+  try {
+    const raw = JSON.parse(
+      readFileSync(SESSION_PERMISSIONS_PATH, "utf-8"),
+    ) as Record<string, unknown>;
+
+    if (raw.version !== 1) {
+      throw new Error("unsupported version");
+    }
+    if (
+      typeof raw.sessions !== "object" ||
+      raw.sessions === null ||
+      Array.isArray(raw.sessions)
+    ) {
+      throw new Error("sessions must be an object");
+    }
+
+    const sessions = raw.sessions as Record<string, unknown>;
+    const normalized: Record<string, SessionMode> = {};
+    for (const [session, mode] of Object.entries(sessions)) {
+      if (!isSessionMode(mode)) {
+        throw new Error(`invalid mode for session "${session}"`);
+      }
+      normalized[session] = mode;
+    }
+
+    return { version: 1, sessions: normalized };
+  } catch {
+    throw new Error(
+      `Session permissions are invalid at ${SESSION_PERMISSIONS_PATH}.`,
+    );
+  }
+}
+
+export function writeSessionPermissions(permissions: SessionPermissions): void {
+  ensureLibrettoDir();
+  writeFileSync(
+    SESSION_PERMISSIONS_PATH,
+    JSON.stringify(permissions, null, 2),
+    "utf-8",
+  );
+}
+
+export function getSessionPermissionMode(session: string): SessionMode {
+  const permissions = readSessionPermissions();
+  return permissions.sessions[session] ?? "read-only";
+}
+
+export function setSessionPermissionMode(
+  session: string,
+  mode: SessionMode,
+): void {
+  const permissions = readSessionPermissions();
+  if (mode === "read-only") {
+    delete permissions.sessions[session];
+  } else {
+    permissions.sessions[session] = mode;
+  }
+  writeSessionPermissions(permissions);
+}
+
+export function resolveSessionMode(
+  session: string,
+  sessionState?: SessionState | null,
+): SessionMode {
+  return sessionState?.mode ?? getSessionPermissionMode(session);
+}
+
+export function readOnlySessionError(session: string): string {
+  return (
+    `Session "${session}" is read-only. ` +
+    "Only a human can authorize interactive mode. " +
+    `If you want me to enable it, explicitly tell me to run: libretto-cli session-mode interactive --session ${session}`
+  );
 }
