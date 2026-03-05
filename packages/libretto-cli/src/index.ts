@@ -1403,7 +1403,7 @@ async function setupActionTracking(p) {
 
 const browser = await chromium.launch({
 	headless: ${!headed},
-	args: ['--remote-debugging-port=${port}', '--remote-debugging-address=127.0.0.1', '--no-focus-on-check'],
+	args: ['--disable-blink-features=AutomationControlled', '--remote-debugging-port=${port}', '--remote-debugging-address=127.0.0.1', '--no-focus-on-check'],
 });
 
 browser.on('disconnected', () => {
