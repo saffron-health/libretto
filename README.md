@@ -23,10 +23,11 @@ The `snapshot` command analyzes browser snapshots using an LLM. There are two wa
 Configure an external coding agent — no API keys needed in libretto, the agent handles its own authentication:
 
 ```bash
-# Use one of: codex, opencode, claude
+# Use one of: codex, opencode, claude, gemini
 libretto-cli snapshot configure codex
 libretto-cli snapshot configure opencode
 libretto-cli snapshot configure claude
+libretto-cli snapshot configure gemini
 
 # Optionally provide a custom command prefix
 libretto-cli snapshot configure codex -- my-custom-codex --flag

@@ -140,7 +140,12 @@ type InterpretArgs = {
   htmlPath?: string;
 };
 
-const SnapshotAnalyzerPresetSchema = z.enum(["codex", "opencode", "claude"]);
+const SnapshotAnalyzerPresetSchema = z.enum([
+  "codex",
+  "opencode",
+  "claude",
+  "gemini",
+]);
 type SnapshotAnalyzerPreset = z.infer<typeof SnapshotAnalyzerPresetSchema>;
 
 const SnapshotAnalyzerConfigSchema = z.object({
@@ -156,6 +161,7 @@ const SNAPSHOT_ANALYZER_PRESETS: Record<SnapshotAnalyzerPreset, string[]> = {
   codex: ["codex", "exec", "--skip-git-repo-check", "--sandbox", "read-only"],
   opencode: ["opencode", "run", "--format", "json"],
   claude: [join(homedir(), ".claude", "local", "claude"), "-p"],
+  gemini: ["gemini", "--output-format", "json"],
 };
 
 const InterpretResultSchema = z.object({
@@ -413,6 +419,8 @@ abstract class UserCodingAgent {
         return new OpencodeUserCodingAgent(config);
       case "claude":
         return new ClaudeUserCodingAgent(config);
+      case "gemini":
+        return new GeminiUserCodingAgent(config);
     }
   }
 
@@ -467,7 +475,7 @@ abstract class UserCodingAgent {
 
   static printConfigureUsage(): void {
     console.log(
-      `Usage: libretto-cli snapshot configure <codex|opencode|claude> [-- <command prefix...>]
+      `Usage: libretto-cli snapshot configure <codex|opencode|claude|gemini> [-- <command prefix...>]
        libretto-cli snapshot configure --show
        libretto-cli snapshot configure --clear`,
     );
@@ -503,7 +511,7 @@ abstract class UserCodingAgent {
     if (!parsedPreset.success) {
       this.printConfigureUsage();
       throw new Error(
-        "Missing or invalid preset. Use one of: codex, opencode, claude.",
+        "Missing or invalid preset. Use one of: codex, opencode, claude, gemini.",
       );
     }
 
@@ -625,6 +633,16 @@ class OpencodeUserCodingAgent extends UserCodingAgent {
 }
 
 class ClaudeUserCodingAgent extends UserCodingAgent {
+  async analyzeSnapshot(
+    prompt: string,
+    pngPath: string,
+  ): Promise<InterpretResult> {
+    const args = [...this.baseArgs, `${prompt}${this.screenshotHint(pngPath)}`];
+    return await this.runAndParse(args);
+  }
+}
+
+class GeminiUserCodingAgent extends UserCodingAgent {
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
@@ -1811,8 +1829,8 @@ async function captureScreenshot(session: string): Promise<ScreenshotPair> {
 
 async function runSnapshot(
   session: string,
-  objective: string,
-  context: string,
+  objective?: string,
+  context?: string,
 ): Promise<void> {
   const { pngPath, htmlPath } = await captureScreenshot(session);
 
@@ -1820,7 +1838,41 @@ async function runSnapshot(
   console.log(`  PNG:  ${pngPath}`);
   console.log(`  HTML: ${htmlPath}`);
 
-  await runInterpret({ objective, session, context, pngPath, htmlPath });
+  const normalizedObjective = objective?.trim();
+  const normalizedContext = context?.trim();
+  if (!normalizedObjective && !normalizedContext) {
+    console.log("Use --objective flag to analyze snapshots.");
+    return;
+  }
+
+  if (!normalizedObjective) {
+    throw new Error(
+      "Couldn't run analysis: --objective is required when providing --context.",
+    );
+  }
+
+  if (!normalizedContext) {
+    throw new Error(
+      "Couldn't run analysis: --context is required when using --objective.",
+    );
+  }
+
+  const configuredAgent = UserCodingAgent.getConfigured();
+  const canAnalyzeSnapshots =
+    configuredAgent !== null || llmClientFactory !== null;
+  if (!canAnalyzeSnapshots) {
+    throw new Error(
+      "Couldn't run analysis: no snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude/gemini) to enable analysis.",
+    );
+  }
+
+  await runInterpret({
+    objective: normalizedObjective,
+    session,
+    context: normalizedContext,
+    pngPath,
+    htmlPath,
+  });
 }
 
 async function runInterpret(args: InterpretArgs): Promise<void> {
@@ -1905,7 +1957,7 @@ async function runInterpret(args: InterpretArgs): Promise<void> {
     parsed = InterpretResultSchema.parse(result);
   } else {
     throw new Error(
-      "No snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude). Library integrations can still set a factory via setLLMClientFactory().",
+      "No snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
     );
   }
 
@@ -2581,8 +2633,8 @@ Commands:
   run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]  Run an exported async integration function from a file
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
   exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight)
-  snapshot --objective <text> --context <text>  Capture PNG + HTML and analyze with configured analyzer (run snapshot configure first)
-  snapshot configure <codex|opencode|claude> [-- <command prefix...>]  Configure snapshot analyzer
+  snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when both flags are provided
+  snapshot configure <codex|opencode|claude|gemini> [-- <command prefix...>]  Configure snapshot analyzer
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
   close                   Close the browser
@@ -2602,7 +2654,9 @@ Examples:
   libretto-cli snapshot configure codex
   libretto-cli snapshot configure opencode
   libretto-cli snapshot configure claude
+  libretto-cli snapshot configure gemini
   libretto-cli snapshot configure codex -- codex exec --skip-git-repo-check --sandbox read-only
+  libretto-cli snapshot
   libretto-cli snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
   libretto-cli close
 
@@ -2988,36 +3042,16 @@ export async function runLibrettoCLI(): Promise<void> {
           runSnapshotConfigure(args.slice(2));
           break;
         }
-        const configuredAgent = UserCodingAgent.getConfigured();
-        const canAnalyzeSnapshots =
-          configuredAgent !== null || llmClientFactory !== null;
         const { value: objective, args: withoutObjective } = extractOption(
           args,
           "--objective",
-          "Usage: libretto-cli snapshot --objective <text> --context <text> [--session <name>]",
+          "Usage: libretto-cli snapshot [--objective <text> --context <text>] [--session <name>]",
         );
         const { value: context } = extractOption(
           withoutObjective,
           "--context",
-          "Usage: libretto-cli snapshot --objective <text> --context <text> [--session <name>]",
+          "Usage: libretto-cli snapshot [--objective <text> --context <text>] [--session <name>]",
         );
-        if (!objective || !context) {
-          let message =
-            "Error: both --objective and --context are required.\n" +
-            "Usage: libretto-cli snapshot --objective <text> --context <text> [--session <name>]";
-          if (args.includes("--objective") && !canAnalyzeSnapshots) {
-            message +=
-              "\nNo snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude) first.";
-          }
-          console.error(message);
-          process.exit(1);
-        }
-        if (!canAnalyzeSnapshots) {
-          console.error(
-            "No snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude) first.",
-          );
-          process.exit(1);
-        }
         await runSnapshot(session, objective, context);
         break;
       }
