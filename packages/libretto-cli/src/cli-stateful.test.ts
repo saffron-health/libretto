@@ -38,6 +38,30 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(existsSync(configPath)).toBe(false);
   });
 
+  test("configures gemini snapshot analyzer preset", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const configure = await librettoCli("snapshot configure gemini");
+    expect(configure.exitCode).toBe(0);
+    expect(configure.stdout).toContain("Snapshot analyzer configured.");
+
+    const configPath = workspacePath(
+      ".libretto-cli",
+      "snapshot-config.json",
+    );
+    const rawConfig = JSON.parse(await readFile(configPath, "utf8")) as {
+      preset?: string;
+      commandPrefix?: string[];
+    };
+    expect(rawConfig.preset).toBe("gemini");
+    expect(rawConfig.commandPrefix).toEqual([
+      "gemini",
+      "--output-format",
+      "json",
+    ]);
+  });
+
   test("reads and clears network logs from seeded run data", async ({
     seedSessionState,
     seedNetworkLog,
