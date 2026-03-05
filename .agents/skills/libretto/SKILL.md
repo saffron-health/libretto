@@ -1,11 +1,11 @@
 ---
 name: libretto-cli
-description: "Browser automation CLI using Playwright.\n\nWHEN TO USE THIS SKILL:\n- When you need to interact with a web page (click, fill, navigate) rather than just read it\n- When debugging browser agent job failures (selectors timing out, clicks not working, elements not found)\n- When you need to test or prototype Playwright interactions before codifying them\n- When you need to save or restore login sessions for authenticated pages\n- When you need to understand what's on a page (use the snapshot command)\n- When scraping dynamic content that requires JavaScript execution\n\nWHEN NOT TO USE THIS SKILL:\n- When you only need to read static web content (use read_web_page instead)\n- When you need to modify browser agent source code (edit files directly)\n- When you need to run a full browser agent job end-to-end (use .bin/browser-agent CLI)"
+description: "Browser automation CLI using Playwright.\n\nWHEN TO USE THIS SKILL:\n- When you need to interact with a web page (click, fill, navigate) rather than just read it\n- When debugging browser agent job failures (selectors timing out, clicks not working, elements not found)\n- When you need to test or prototype Playwright interactions before codifying them\n- When you need to save or restore login sessions for authenticated pages\n- When you need to understand what's on a page (use the snapshot command)\n- When scraping dynamic content that requires JavaScript execution\n\nWHEN NOT TO USE THIS SKILL:\n- When you only need to read static web content (use read_web_page instead)\n- When you need to modify browser agent source code (edit files directly)\n- When you need to run a full browser agent job end-to-end (use npx browser-agent CLI)"
 ---
 
 # Browser Automation with Libretto CLI
 
-Use the `libretto-cli` CLI to automate web interactions, debug browser agent jobs, and prototype fixes interactively.
+Use the `npx libretto` CLI to automate web interactions, debug browser agent jobs, and prototype fixes interactively.
 
 ## When to Use
 
@@ -27,13 +27,13 @@ If it's not obvious which element to click or what value to enter, **ask the use
 ## Commands
 
 ```bash
-libretto-cli open <url> [--headless]   # Launch browser and navigate (headed by default)
-libretto-cli exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
-libretto-cli snapshot --objective "<what to find>" --context "<situational info>"
-libretto-cli save <url|domain>         # Save session (cookies, localStorage) to .libretto-cli/profiles/
-libretto-cli network                   # Show last 20 captured network requests
-libretto-cli actions                   # Show last 20 captured user/agent actions
-libretto-cli close                     # Close the browser
+npx libretto open <url> [--headless]   # Launch browser and navigate (headed by default)
+npx libretto exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
+npx libretto snapshot --objective "<what to find>" --context "<situational info>"
+npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto-cli/profiles/
+npx libretto network                   # Show last 20 captured network requests
+npx libretto actions                   # Show last 20 captured user/agent actions
+npx libretto close                     # Close the browser
 ```
 
 All commands accept `--session <name>` for isolated browser instances (default: `default`).
@@ -53,24 +53,24 @@ The `state` object persists across `exec` calls within the same session — use 
 
 ```bash
 # Open a page
-libretto-cli open https://example.com
+npx libretto open https://example.com
 
 # Interact with elements
-libretto-cli exec "await page.locator('button:has-text(\"Sign in\")').click()"
-libretto-cli exec "await page.fill('input[name=\"email\"]', 'user@example.com')"
+npx libretto exec "await page.locator('button:has-text(\"Sign in\")').click()"
+npx libretto exec "await page.fill('input[name=\"email\"]', 'user@example.com')"
 
 # Understand the page — always provide objective and context
-libretto-cli snapshot \
+npx libretto snapshot \
   --objective "Find the sign-in form fields and submit button" \
   --context "Navigated to example.com login page. Expecting email/password inputs and a submit button."
 
 # Include relevant network calls in context when debugging API interactions
-libretto-cli snapshot \
+npx libretto snapshot \
   --objective "Find why the referral list is empty" \
   --context "Logged into eClinicalWorks. Clicked Open Referrals tab. Table appears but shows no rows. Recent POST to /servlet/AjaxServlet returned 200 but with empty body."
 
 # Done
-libretto-cli close
+npx libretto close
 ```
 
 ## Workflow: Save and Restore Login Sessions
@@ -79,15 +79,15 @@ Profiles persist cookies and localStorage across browser launches. They are save
 
 ```bash
 # Open a site in headed mode so you can log in manually
-libretto-cli open https://portal.example.com --headed
+npx libretto open https://portal.example.com --headed
 
 # ... manually log in in the browser window ...
 
 # Save the session
-libretto-cli save portal.example.com
+npx libretto save portal.example.com
 
 # Next time you open this domain, you'll be logged in automatically
-libretto-cli open https://portal.example.com
+npx libretto open https://portal.example.com
 ```
 
 ## Workflow: Interactive Debugging
@@ -95,30 +95,30 @@ libretto-cli open https://portal.example.com
 When browser automation jobs fail (selectors timing out, clicks not working), use the interactive debugging workflow instead of edit-restart cycles. This reduces iteration time from 5-10 minutes to ~30 seconds.
 
 1. Add `page.pause()` before the problematic code section
-2. Start the job with `.bin/browser-agent start` (debug mode is always enabled locally)
+2. Start the job with `npx browser-agent start` (debug mode is always enabled locally)
 3. Wait ~60 seconds for the browser to hit the breakpoint
-4. Use `libretto-cli exec` (with `--session browser-agent`) to inspect and prototype fixes
+4. Use `npx libretto exec` (with `--session browser-agent`) to inspect and prototype fixes
 5. Once the fix works, codify it in source files
 6. Restart the job to verify end-to-end
 
 ```bash
 # Start job in background
-.bin/browser-agent start \
+npx browser-agent start \
   --job-type pull-open-referrals \
   --tenant-slug hhb \
   --params '{"vendorName":"eClinicalWorks"}'
 
 # Inspect page state
-libretto-cli exec --session browser-agent "return await page.url();"
-libretto-cli snapshot --session browser-agent \
+npx libretto exec --session browser-agent "return await page.url();"
+npx libretto snapshot --session browser-agent \
   --objective "Find dropdown menus and their current selections" \
   --context "Browser agent hit breakpoint during pull-open-referrals job. Need to inspect dropdown state."
 
 # List dropdown options
-libretto-cli exec --session browser-agent "return await page.locator('option').allTextContents();"
+npx libretto exec --session browser-agent "return await page.locator('option').allTextContents();"
 
 # Test a fix
-libretto-cli exec --session browser-agent "await page.locator('.dropdown-trigger').click(); return 'clicked';"
+npx libretto exec --session browser-agent "await page.locator('.dropdown-trigger').click(); return 'clicked';"
 ```
 
 ## Snapshot — The Primary Observation Tool
@@ -147,12 +147,12 @@ Context gives the vision agent situational awareness. Include:
 6. **Network calls** — any relevant HTTP requests/responses (e.g., "POST /api/referrals returned 200 with empty array")
 
 ```bash
-libretto-cli snapshot \
+npx libretto snapshot \
   --objective "Find the referral status column in the table" \
   --context "Logged into eClinicalWorks as admin. Navigated to Referrals > Open Referrals tab. Expecting a table of open referrals with columns for patient name, provider, and status."
 
 # Debugging example
-libretto-cli snapshot \
+npx libretto snapshot \
   --objective "Find the error message or alert" \
   --context "Clicked Submit on the new referral form after filling in all required fields. Expected to see a success confirmation, but the page appears to still be on the form."
 ```
@@ -163,17 +163,17 @@ When the snapshot doesn't give you enough detail — why an element is hidden, w
 
 - **`outerHTML`** — See the complete markup of an element including all attributes.
   ```bash
-  libretto-cli exec "const el = await page.locator('#myElement').elementHandle(); return await page.evaluate(el => el.outerHTML.substring(0, 500), el);"
+  npx libretto exec "const el = await page.locator('#myElement').elementHandle(); return await page.evaluate(el => el.outerHTML.substring(0, 500), el);"
   ```
 - **Computed styles / parent chain** — Debug why Playwright can't click an element.
   ```bash
-  libretto-cli exec "const el = await page.locator('#myElement').elementHandle(); return await page.evaluate(el => { const chain = []; let n = el; for (let i = 0; i < 8 && n; i++) { const s = getComputedStyle(n); chain.push({ tag: n.tagName, id: n.id, display: s.display, visibility: s.visibility }); n = n.parentElement; } return chain; }, el);"
+  npx libretto exec "const el = await page.locator('#myElement').elementHandle(); return await page.evaluate(el => { const chain = []; let n = el; for (let i = 0; i < 8 && n; i++) { const s = getComputedStyle(n); chain.push({ tag: n.tagName, id: n.id, display: s.display, visibility: s.visibility }); n = n.parentElement; } return chain; }, el);"
   ```
 - **Any DOM property** — `page.evaluate` gives you full access: `getBoundingClientRect()`, `dataset`, `children`, `classList`, attached event listeners, etc.
 
 ## Tips
 
-- **Never use `page.screenshot()` via `exec`.** Use `libretto-cli snapshot` instead — it captures the viewport, sends the screenshot + HTML to a vision model, and returns actionable selectors. The `fullPage` option is especially dangerous — it scrolls the entire page to stitch a screenshot, which can crash JavaScript-heavy pages (especially EMR portals like eClinicalWorks).
+- **Never use `page.screenshot()` via `exec`.** Use `npx libretto snapshot` instead — it captures the viewport, sends the screenshot + HTML to a vision model, and returns actionable selectors. The `fullPage` option is especially dangerous — it scrolls the entire page to stitch a screenshot, which can crash JavaScript-heavy pages (especially EMR portals like eClinicalWorks).
 - **Never run `exec` commands in parallel.** Always wait for one `exec` to finish before starting the next. Do not use `run_in_background` for `exec` calls. Running simultaneous `exec` calls opens multiple CDP connections to the same page, which corrupts the page state and kills the browser.
 - If `open` is called when a session already has a browser running, it navigates the existing browser to the new URL instead of launching a new one.
 - Use `return <value>` in `exec` to print results. Strings print raw; objects print as JSON.
@@ -182,57 +182,57 @@ When the snapshot doesn't give you enough detail — why an element is hidden, w
 
 ## Network Logging
 
-Network requests are captured automatically when a browser is opened via `libretto-cli open`. All non-static HTTP responses (excluding `.css`, `.js`, `.png`, `.jpg`, `.gif`, `.woff`, `.ico`, `.svg`, and `chrome-extension://` URLs) are logged to `tmp/libretto-cli/<runId>/network.jsonl`.
+Network requests are captured automatically when a browser is opened via `npx libretto open`. All non-static HTTP responses (excluding `.css`, `.js`, `.png`, `.jpg`, `.gif`, `.woff`, `.ico`, `.svg`, and `chrome-extension://` URLs) are logged to `tmp/libretto-cli/<runId>/network.jsonl`.
 
-### CLI: `libretto-cli network`
+### CLI: `npx libretto network`
 
 ```bash
-libretto-cli network                              # show last 20 requests
-libretto-cli network --last 50                    # show last 50
-libretto-cli network --filter 'referral|patient'  # regex filter on URL
-libretto-cli network --method POST                # filter by HTTP method
-libretto-cli network --clear                      # truncate the log file
+npx libretto network                              # show last 20 requests
+npx libretto network --last 50                    # show last 50
+npx libretto network --filter 'referral|patient'  # regex filter on URL
+npx libretto network --method POST                # filter by HTTP method
+npx libretto network --clear                      # truncate the log file
 ```
 
 ### In exec: `networkLog()`
 
 ```bash
-libretto-cli exec "return await networkLog()"
-libretto-cli exec "return await networkLog({ filter: 'servlet', last: 5 })"
-libretto-cli exec "return await networkLog({ method: 'POST' })"
+npx libretto exec "return await networkLog()"
+npx libretto exec "return await networkLog({ filter: 'servlet', last: 5 })"
+npx libretto exec "return await networkLog({ method: 'POST' })"
 ```
 
 Returns an array of objects with: `ts`, `method`, `url`, `status`, `contentType`, `postData` (POST/PUT/PATCH only, first 2000 chars), `size`, `durationMs`.
 
-**Note:** Network logging only works for sessions opened via `libretto-cli open`. It does not capture requests for external sessions like `--session browser-agent`.
+**Note:** Network logging only works for sessions opened via `npx libretto open`. It does not capture requests for external sessions like `--session browser-agent`.
 
 ## Action Logging
 
-Browser actions are captured automatically when a browser is opened via `libretto-cli open`. Both user interactions (manual clicks, typing in the headed browser window) and agent actions (programmatic Playwright API calls via `exec`) are logged to `tmp/libretto-cli/<runId>/actions.jsonl` with a `source` field of `'user'` or `'agent'` to distinguish the two.
+Browser actions are captured automatically when a browser is opened via `npx libretto open`. Both user interactions (manual clicks, typing in the headed browser window) and agent actions (programmatic Playwright API calls via `exec`) are logged to `tmp/libretto-cli/<runId>/actions.jsonl` with a `source` field of `'user'` or `'agent'` to distinguish the two.
 
-### CLI: `libretto-cli actions`
+### CLI: `npx libretto actions`
 
 ```bash
-libretto-cli actions                              # show last 20 actions
-libretto-cli actions --last 50                    # show last 50
-libretto-cli actions --filter 'button|input'      # regex filter on selector/value
-libretto-cli actions --action click                # filter by action type
-libretto-cli actions --source user                 # only manual user actions
-libretto-cli actions --source agent                # only programmatic agent actions
-libretto-cli actions --clear                       # truncate the log file
+npx libretto actions                              # show last 20 actions
+npx libretto actions --last 50                    # show last 50
+npx libretto actions --filter 'button|input'      # regex filter on selector/value
+npx libretto actions --action click                # filter by action type
+npx libretto actions --source user                 # only manual user actions
+npx libretto actions --source agent                # only programmatic agent actions
+npx libretto actions --clear                       # truncate the log file
 ```
 
 ### In exec: `actionLog()`
 
 ```bash
-libretto-cli exec "return await actionLog()"
-libretto-cli exec "return await actionLog({ source: 'user', last: 5 })"
-libretto-cli exec "return await actionLog({ action: 'click' })"
+npx libretto exec "return await actionLog()"
+npx libretto exec "return await actionLog({ source: 'user', last: 5 })"
+npx libretto exec "return await actionLog({ action: 'click' })"
 ```
 
 Returns an array of objects with: `ts`, `action`, `source` (`'user'` | `'agent'`), `selector`, `value`, `url`, `duration`, `success`, `error`.
 
-**Note:** Action logging only works for sessions opened via `libretto-cli open`. It does not capture actions for external sessions like `--session browser-agent`.
+**Note:** Action logging only works for sessions opened via `npx libretto open`. It does not capture actions for external sessions like `--session browser-agent`.
 
 ## Workflow: Creating a New Browser Automation Script
 
@@ -242,9 +242,9 @@ Use Libretto CLI interactively to build a brand new workflow file from scratch. 
 
 ### Starting the Session
 
-The browser stays open indefinitely until explicitly closed with `libretto-cli close` or by the user closing the window. **Do not** set any timeouts, auto-close timers, or call `close` until the user says the workflow session is done. Ensure that you open the browser in `--headed` mode so the user can see what's happening.
+The browser stays open indefinitely until explicitly closed with `npx libretto close` or by the user closing the window. **Do not** set any timeouts, auto-close timers, or call `close` until the user says the workflow session is done. Ensure that you open the browser in `--headed` mode so the user can see what's happening.
 
-**Do NOT ask the user about saved login sessions.** Do not ask if they have a saved session or if they need to log in. Always open the page in `--headed` mode and let the user log in manually in the browser window. Do not use `libretto-cli save` during workflow creation.
+**Do NOT ask the user about saved login sessions.** Do not ask if they have a saved session or if they need to log in. Always open the page in `--headed` mode and let the user log in manually in the browser window. Do not use `npx libretto save` during workflow creation.
 
 ### Choosing Between Playwright and Network Requests
 
@@ -260,7 +260,7 @@ As you explore interactively, the general pattern is:
 1. Use Playwright to fill out the form, select dropdowns, check boxes — whatever the UI requires
 2. **Ask the user for confirmation before submitting** — describe what you're about to submit and wait for approval
 3. Submit the form — network requests are captured automatically (see "Network Logging" above)
-4. Check the captured requests with `libretto-cli network --method POST` or `networkLog()`
+4. Check the captured requests with `npx libretto network --method POST` or `networkLog()`
 5. Inspect the captured request (URL, method, headers, body) to understand the payload structure
 6. Test recreating that request directly via `page.evaluate(() => fetch(...))` — confirm with the user before sending
 7. In the generated production code, skip the form-filling steps and fire the network request directly, parameterized with the relevant input values
@@ -271,23 +271,23 @@ Network requests are captured automatically in the background (see "Network Logg
 
 ```bash
 # Fill out a form
-libretto-cli exec "await page.locator('#department').selectOption('Cardiology'); return 'selected';"
-libretto-cli exec "await page.locator('#status').selectOption('Open'); return 'selected';"
+npx libretto exec "await page.locator('#department').selectOption('Cardiology'); return 'selected';"
+npx libretto exec "await page.locator('#status').selectOption('Open'); return 'selected';"
 
 # ASK THE USER before submitting — describe what will be submitted
 # Then submit and check what requests fired
-libretto-cli exec "await page.locator('#submitBtn').click(); await page.waitForTimeout(3000); return 'submitted';"
-libretto-cli network --method POST --last 5
+npx libretto exec "await page.locator('#submitBtn').click(); await page.waitForTimeout(3000); return 'submitted';"
+npx libretto network --method POST --last 5
 
 # Or query the log programmatically
-libretto-cli exec "return await networkLog({ method: 'POST', last: 5 })"
+npx libretto exec "return await networkLog({ method: 'POST', last: 5 })"
 ```
 
 For page-load requests (data fetched during navigation), just navigate and then check the log:
 
 ```bash
-libretto-cli exec "await page.goto('https://portal.example.com/encounters'); await page.waitForTimeout(3000); return 'loaded';"
-libretto-cli network --last 20
+npx libretto exec "await page.goto('https://portal.example.com/encounters'); await page.waitForTimeout(3000); return 'loaded';"
+npx libretto network --last 20
 ```
 
 ### Testing a Captured Endpoint
@@ -298,7 +298,7 @@ Note: `page.evaluate(() => fetch(...))` works for replaying both fetch-based and
 
 ```bash
 # Recreate the captured request directly — confirm with user first
-libretto-cli exec "
+npx libretto exec "
   const resp = await page.evaluate(async () => {
     const r = await fetch('/servlet/AjaxServlet', {
       method: 'POST',
@@ -311,7 +311,7 @@ libretto-cli exec "
 "
 
 # Extract session variables (safe — reads window properties, no server call)
-libretto-cli exec "
+npx libretto exec "
   return await page.evaluate(() => ({
     sessionDID: (window as any).sessionDID,
     userId: (window as any).TrUserId
@@ -326,10 +326,10 @@ After completing the interactive exploration (navigating pages, inspecting eleme
 **STOP AND ASK BEFORE GENERATING CODE.** Once the interactive workflow is figured out, you MUST pause and ask the user the following before writing any production code:
 
 1. "Are there any existing files or patterns in the codebase you want me to reference?"
-2. "Do you want me to incorporate any of your manual browser interactions from the actions log (`libretto-cli actions --source user`) into the generated code?"
+2. "Do you want me to incorporate any of your manual browser interactions from the actions log (`npx libretto actions --source user`) into the generated code?"
 3. "Any other guidance for how the production code should be structured?"
 
-Wait for the user's response. If they point you to files, read those first. If they say yes to the actions log, run `libretto-cli actions --source user` and incorporate the relevant actions. If they give structural guidance, follow it. Only then proceed to generate.
+Wait for the user's response. If they point you to files, read those first. If they say yes to the actions log, run `npx libretto actions --source user` and incorporate the relevant actions. If they give structural guidance, follow it. Only then proceed to generate.
 
 After getting the user's input:
 
@@ -346,7 +346,7 @@ For workflows that use network requests for data extraction or form submission, 
 
 #### Playwright Locators
 
-When codifying UI interaction steps, **translate libretto-cli `exec` code into proper Playwright locator APIs**. Do not copy-paste `page.evaluate()` / `document.querySelector()` patterns from the interactive session into the production file.
+When codifying UI interaction steps, **translate `npx libretto exec` code into proper Playwright locator APIs**. Do not copy-paste `page.evaluate()` / `document.querySelector()` patterns from the interactive session into the production file.
 
 **Use Playwright locators for:**
 
@@ -420,6 +420,6 @@ class ApiClient {
 
 ## Patient Safety Warning
 
-Browser automation jobs process real patient health information. The libretto-cli CLI executes arbitrary code with full page access. **Never** execute code that submits forms, sends referrals, deletes data, or modifies patient records.
+Browser automation jobs process real patient health information. The `npx libretto` CLI executes arbitrary code with full page access. **Never** execute code that submits forms, sends referrals, deletes data, or modifies patient records.
 
 See `apps/browser-agent/docs/interactive-debugging-workflow.md` for the complete debugging guide.
