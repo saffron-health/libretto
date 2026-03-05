@@ -14,6 +14,18 @@ pnpm type-check
 pnpm --filter libretto-cli dev
 ```
 
+## cli safety mode
+
+`libretto-cli open` now starts sessions in read-only mode by default. This prevents `libretto-cli exec` from running Playwright automation unless you explicitly opt in.
+
+```bash
+# default: read-only session (exec blocked)
+libretto-cli open https://example.com
+
+# opt in to interactive automation for this session
+libretto-cli open https://example.com --allow-actions
+```
+
 ## snapshot analyzer configuration
 
 The `snapshot` command analyzes browser snapshots using an LLM. There are two ways to configure it:

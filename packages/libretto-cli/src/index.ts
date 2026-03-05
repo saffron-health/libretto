@@ -124,6 +124,7 @@ type SessionState = {
   session: string;
   runId: string;
   startedAt: string;
+  mode?: "read-only" | "interactive";
 };
 
 type ScreenshotPair = {
@@ -1103,9 +1104,10 @@ async function runOpen(
   rawUrl: string,
   headed: boolean,
   session: string,
+  mode: "read-only" | "interactive",
 ): Promise<void> {
   const url = normalizeUrl(rawUrl);
-  log.info("open-start", { url, headed, session });
+  log.info("open-start", { url, headed, session, mode });
 
   const existing = await tryConnect(session);
   if (existing) {
@@ -1114,7 +1116,14 @@ async function runOpen(
       const page = existing.contexts()[0]?.pages()[0];
       if (page) {
         await page.goto(url);
-        log.info("open-navigated", { url, session });
+        const existingState = readSessionState(session);
+        if (existingState) {
+          writeSessionState({
+            ...existingState,
+            mode,
+          });
+        }
+        log.info("open-navigated", { url, session, mode });
         console.log(`Navigated to: ${url}`);
         return;
       }
@@ -1134,14 +1143,15 @@ async function runOpen(
     [createFileLogSink({ filePath: runLogPath })],
   );
 
-  const mode = headed ? "headed" : "headless";
+  const browserMode = headed ? "headed" : "headless";
   const domain = normalizeDomain(url);
   const profilePath = getProfilePath(domain);
   const useProfile = hasProfile(domain);
 
   log.info("open-launching", {
     url,
-    mode,
+    mode: browserMode,
+    sessionMode: mode,
     session,
     port,
     runId,
@@ -1154,7 +1164,7 @@ async function runOpen(
     console.log(`Loading saved profile for ${domain}`);
   }
   console.log(
-    `Launching ${mode} browser (session: ${session}, run: ${runId})...`,
+    `Launching ${browserMode} browser (session: ${session}, run: ${runId})...`,
   );
 
   const escapedProfilePath = profilePath
@@ -1534,16 +1544,18 @@ await new Promise(() => {});
         session,
         runId,
         startedAt: new Date().toISOString(),
+        mode,
       });
       log.info("open-success", {
         url,
-        mode,
+        mode: browserMode,
+        sessionMode: mode,
         session,
         port,
         runId,
         pid: child.pid,
       });
-      console.log(`Browser open (${mode}): ${url}`);
+      console.log(`Browser open (${browserMode}): ${url}`);
 
       // Wait a bit longer for the page to load
       await new Promise((r) => setTimeout(r, 2000));
@@ -1566,8 +1578,14 @@ async function runExec(
     codePreview: code.slice(0, 200),
     visualize,
   });
-  const { browser, context, page } = await connect(session);
   const sessionState = getSessionStateOrThrow(session);
+  if (sessionState.mode === "read-only") {
+    throw new Error(
+      `Session "${session}" is read-only. Re-open with '--allow-actions' to enable exec.`,
+    );
+  }
+
+  const { browser, context, page } = await connect(session);
 
   // ── Stall detection ────────────────────────────────────────────────
   // Detects when an exec hangs silently (e.g. every Playwright locator times
@@ -2576,7 +2594,7 @@ function printUsage(): void {
   console.log(`Usage: libretto-cli <command> [--session <name>]
 
 Commands:
-  open <url> [--headless] Launch browser and open URL (headed by default)
+  open <url> [--headless] [--allow-actions] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
   run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]  Run an exported async integration function from a file
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
@@ -2593,6 +2611,9 @@ Options:
 
 Examples:
   libretto-cli open https://linkedin.com
+  # read-only by default (exec blocked)
+  libretto-cli open https://linkedin.com --allow-actions
+  # exec enabled for this session
   # ... manually log in ...
   libretto-cli save linkedin.com
   # Next time you open linkedin.com, you'll be logged in automatically
@@ -2915,19 +2936,23 @@ export async function runLibrettoCLI(): Promise<void> {
       case "open": {
         const hasHeadedFlag = args.includes("--headed");
         const hasHeadlessFlag = args.includes("--headless");
+        const allowActions = args.includes("--allow-actions");
         if (hasHeadedFlag && hasHeadlessFlag) {
           console.error("Cannot pass both --headed and --headless.");
           process.exit(1);
         }
         const headed = hasHeadedFlag || !hasHeadlessFlag;
+        const mode: "read-only" | "interactive" = allowActions
+          ? "interactive"
+          : "read-only";
         const url = args.slice(1).find((a) => !a.startsWith("--"));
         if (!url) {
           console.error(
-            "Usage: libretto-cli open <url> [--headless] [--session <name>]",
+            "Usage: libretto-cli open <url> [--headless] [--allow-actions] [--session <name>]",
           );
           process.exit(1);
         }
-        await runOpen(url, headed, session);
+        await runOpen(url, headed, session, mode);
         break;
       }
       case "run": {

@@ -27,7 +27,7 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("open");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Usage: libretto-cli open <url> [--headless] [--session <name>]",
+      "Usage: libretto-cli open <url> [--headless] [--allow-actions] [--session <name>]",
     );
   });
 

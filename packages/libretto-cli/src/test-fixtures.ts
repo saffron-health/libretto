@@ -12,6 +12,7 @@ type SessionState = {
   session: string;
   runId: string;
   startedAt: string;
+  mode?: "read-only" | "interactive";
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -189,6 +190,7 @@ export const test = base.extend<CliFixtures>({
         port: state?.port ?? 9222,
         pid: state?.pid ?? 12345,
         startedAt: state?.startedAt ?? "2026-01-01T00:00:00.000Z",
+        mode: state?.mode,
       };
       const dir = workspacePath("tmp", "libretto-cli");
       await mkdir(dir, { recursive: true });

@@ -131,4 +131,41 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(cleared).toBe("");
     expect(existsSync(workspacePath("tmp", "libretto-cli", "run-actions", "actions.jsonl"))).toBe(true);
   });
+
+  test("blocks exec in read-only open sessions", async ({
+    seedSessionState,
+    librettoCli,
+  }) => {
+    await seedSessionState({
+      session: "readonly-session",
+      mode: "read-only",
+    });
+
+    const result = await librettoCli(
+      "exec \"return await page.title()\" --session readonly-session",
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "Session \"readonly-session\" is read-only. Re-open with '--allow-actions' to enable exec.",
+    );
+  });
+
+  test("does not apply read-only guard when session allows actions", async ({
+    seedSessionState,
+    librettoCli,
+  }) => {
+    await seedSessionState({
+      session: "interactive-session",
+      mode: "interactive",
+    });
+
+    const result = await librettoCli(
+      "exec \"return await page.title()\" --session interactive-session",
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).not.toContain("is read-only");
+    expect(result.stderr).toContain(
+      "No browser running for session \"interactive-session\".",
+    );
+  });
 });
