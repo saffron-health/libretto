@@ -11,7 +11,7 @@ import {
   PROFILES_DIR,
   REPO_ROOT,
   setLogFile,
-} from "./context";
+} from "./context.js";
 import {
   clearSessionState,
   generateRunId,
@@ -20,7 +20,7 @@ import {
   logFileForSession,
   readSessionState,
   writeSessionState,
-} from "./session";
+} from "./session.js";
 
 async function pickFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {

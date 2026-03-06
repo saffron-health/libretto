@@ -3,8 +3,8 @@ import type { Page } from "playwright";
 import {
   getSessionActionsLogPath,
   getSessionNetworkLogPath,
-} from "./context";
-import { assertSessionStateExistsOrThrow } from "./session";
+} from "./context.js";
+import { assertSessionStateExistsOrThrow } from "./session.js";
 
 export type NetworkLogEntry = {
   ts: string;
