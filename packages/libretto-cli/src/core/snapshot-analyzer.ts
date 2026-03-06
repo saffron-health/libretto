@@ -1,26 +1,22 @@
 import {
   existsSync,
-  mkdirSync,
+  mkdtempSync,
   readFileSync,
-  statSync,
-  readdirSync,
-  unlinkSync,
+  rmSync,
 } from "node:fs";
-import { basename, extname, isAbsolute, join, resolve } from "node:path";
+import { extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
+import { tmpdir } from "node:os";
 import { z } from "zod";
 import {
   type AiConfig,
   formatCommandPrefix,
   readAiConfig,
-  runAiConfigure,
 } from "./ai-config";
 import {
   getLLMClientFactory,
   getLog,
-  STATE_DIR,
 } from "./context";
-import { getRunDir, getSessionStateOrThrow } from "./session";
 
 export type ScreenshotPair = {
   pngPath: string;
@@ -32,8 +28,8 @@ export type InterpretArgs = {
   objective: string;
   session: string;
   context: string;
-  pngPath?: string;
-  htmlPath?: string;
+  pngPath: string;
+  htmlPath: string;
 };
 
 const InterpretResultSchema = z.object({
@@ -65,8 +61,6 @@ abstract class UserCodingAgent {
     switch (config.preset) {
       case "codex":
         return new CodexUserCodingAgent(config);
-      case "opencode":
-        return new OpencodeUserCodingAgent(config);
       case "claude":
         return new ClaudeUserCodingAgent(config);
       case "gemini":
@@ -138,9 +132,9 @@ class CodexUserCodingAgent extends UserCodingAgent {
     prompt: string,
     pngPath: string,
   ): Promise<InterpretResult> {
-    mkdirSync(STATE_DIR, { recursive: true });
+    const tempDir = mkdtempSync(join(tmpdir(), "libretto-cli-analyzer-"));
     const outputPath = join(
-      STATE_DIR,
+      tempDir,
       `snapshot-analyzer-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
     );
     const args = [
@@ -159,25 +153,8 @@ class CodexUserCodingAgent extends UserCodingAgent {
       }
       return parseInterpretResultFromText(outputText);
     } finally {
-      if (existsSync(outputPath)) {
-        unlinkSync(outputPath);
-      }
+      rmSync(tempDir, { recursive: true, force: true });
     }
-  }
-}
-
-class OpencodeUserCodingAgent extends UserCodingAgent {
-  async analyzeSnapshot(
-    prompt: string,
-    pngPath: string,
-  ): Promise<InterpretResult> {
-    const args = [
-      ...this.baseArgs,
-      `${prompt}${this.screenshotHint(pngPath)}`,
-      "-f",
-      pngPath,
-    ];
-    return await this.runAndParse(args);
   }
 }
 
@@ -464,121 +441,6 @@ function collectSelectorHints(html: string, limit = 120): string[] {
   return candidates;
 }
 
-function findLatestScreenshotPair(screenshotsDir: string): ScreenshotPair {
-  if (!existsSync(screenshotsDir)) {
-    throw new Error(
-      `No snapshots directory found: ${screenshotsDir}. Run 'libretto-cli snapshot' first.`,
-    );
-  }
-
-  const entries = readdirSync(screenshotsDir, { withFileTypes: true });
-  const pairs = new Map<
-    string,
-    { pngPath?: string; htmlPath?: string; mtimeMs: number }
-  >();
-
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    const ext = extname(entry.name);
-    if (ext !== ".png" && ext !== ".html") continue;
-    const baseName = basename(entry.name, ext);
-    const fullPath = join(screenshotsDir, entry.name);
-    const stat = statSync(fullPath);
-    const current = pairs.get(baseName) || { mtimeMs: 0 };
-    const next = {
-      ...current,
-      mtimeMs: Math.max(current.mtimeMs, stat.mtimeMs),
-    };
-    if (ext === ".png") next.pngPath = fullPath;
-    if (ext === ".html") next.htmlPath = fullPath;
-    pairs.set(baseName, next);
-  }
-
-  let latestBaseName: string | null = null;
-  let latestPngPath: string | null = null;
-  let latestHtmlPath: string | null = null;
-  let latestMtime = 0;
-
-  pairs.forEach((pair, baseName) => {
-    if (!pair.pngPath || !pair.htmlPath) return;
-    if (!latestBaseName || pair.mtimeMs > latestMtime) {
-      latestBaseName = baseName;
-      latestPngPath = pair.pngPath;
-      latestHtmlPath = pair.htmlPath;
-      latestMtime = pair.mtimeMs;
-    }
-  });
-
-  if (!latestBaseName || !latestPngPath || !latestHtmlPath) {
-    throw new Error(
-      `No snapshot + HTML pair found in ${screenshotsDir}. Run 'libretto-cli snapshot' first.`,
-    );
-  }
-
-  return {
-    baseName: latestBaseName,
-    pngPath: latestPngPath,
-    htmlPath: latestHtmlPath,
-  };
-}
-
-function resolveScreenshotPair(
-  session: string,
-  pngPath?: string,
-  htmlPath?: string,
-): ScreenshotPair {
-  const state = getSessionStateOrThrow(session);
-  const runDir = getRunDir(state.runId);
-  let resolvedPng = pngPath ? resolvePath(pngPath) : undefined;
-  let resolvedHtml = htmlPath ? resolvePath(htmlPath) : undefined;
-
-  if (resolvedPng && !existsSync(resolvedPng)) {
-    throw new Error(`PNG file not found: ${resolvedPng}`);
-  }
-  if (resolvedHtml && !existsSync(resolvedHtml)) {
-    throw new Error(`HTML file not found: ${resolvedHtml}`);
-  }
-
-  if (resolvedPng && !resolvedHtml) {
-    const candidate = resolvedPng.replace(/\.[^.]+$/, ".html");
-    if (existsSync(candidate)) {
-      resolvedHtml = candidate;
-    }
-  }
-
-  if (resolvedHtml && !resolvedPng) {
-    const candidate = resolvedHtml.replace(/\.[^.]+$/, ".png");
-    if (existsSync(candidate)) {
-      resolvedPng = candidate;
-    }
-  }
-
-  if (!resolvedPng || !resolvedHtml) {
-    if (!resolvedPng && !resolvedHtml) {
-      return findLatestScreenshotPair(runDir);
-    }
-    throw new Error(
-      "Both PNG and HTML paths are required if one is provided (or ensure matching .png/.html exists).",
-    );
-  }
-
-  return {
-    baseName: basename(resolvedPng, extname(resolvedPng)),
-    pngPath: resolvedPng,
-    htmlPath: resolvedHtml,
-  };
-}
-
-export function runSnapshotConfigure(input: {
-  preset?: string;
-  clear?: boolean;
-  customPrefix?: string[];
-}): void {
-  runAiConfigure(input, {
-    configureCommandName: "libretto-cli ai configure",
-  });
-}
-
 export async function runInterpret(args: InterpretArgs): Promise<void> {
   const log = getLog();
   log.info("interpret-start", {
@@ -588,11 +450,15 @@ export async function runInterpret(args: InterpretArgs): Promise<void> {
   });
   process.env.NODE_ENV = "development";
 
-  const { pngPath, htmlPath } = resolveScreenshotPair(
-    args.session,
-    args.pngPath,
-    args.htmlPath,
-  );
+  const pngPath = resolvePath(args.pngPath);
+  const htmlPath = resolvePath(args.htmlPath);
+  if (!existsSync(pngPath)) {
+    throw new Error(`PNG file not found: ${pngPath}`);
+  }
+  if (!existsSync(htmlPath)) {
+    throw new Error(`HTML file not found: ${htmlPath}`);
+  }
+
   const htmlContent = readFileSync(htmlPath, "utf-8");
   const htmlCharLimit = 500_000;
   const { text: trimmedHtml, truncated } = truncateText(
@@ -643,7 +509,7 @@ export async function runInterpret(args: InterpretArgs): Promise<void> {
     const llmClientFactory = getLLMClientFactory();
     if (!llmClientFactory) {
       throw new Error(
-        "No AI config set. Run 'libretto-cli ai configure codex' (or opencode/claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
+        "No AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
       );
     }
 

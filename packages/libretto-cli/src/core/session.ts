@@ -6,11 +6,17 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
-import { getLog, LIBRETTO_DIR, STATE_DIR } from "./context";
+import {
+  getLog,
+  getSessionDir,
+  getSessionLogsPath,
+  getSessionStatePath,
+  LIBRETTO_CONFIG_DIR,
+  LIBRETTO_CONFIG_PATH,
+  LIBRETTO_SESSIONS_DIR,
+} from "./context";
 
 const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
-const SESSION_PERMISSIONS_PATH = join(LIBRETTO_DIR, "session-permissions.json");
 
 export const SESSION_DEFAULT = "default";
 export const SESSION_DEV_SERVER = "dev-server";
@@ -27,7 +33,6 @@ export type SessionState = {
 };
 
 type SessionPermissions = {
-  version: 1;
   sessions: Record<string, SessionMode>;
 };
 
@@ -39,14 +44,11 @@ export function generateRunId(): string {
     .replace(/^(\d{8})(\d{6})$/, "$1-$2");
 }
 
-export function getRunDir(runId: string): string {
-  return join(STATE_DIR, runId);
-}
-
-export function logFileForRun(runId: string): string {
-  const dir = getRunDir(runId);
+export function logFileForSession(session: string): string {
+  validateSessionName(session);
+  const dir = getSessionDir(session);
   mkdirSync(dir, { recursive: true });
-  return join(dir, "session.log");
+  return getSessionLogsPath(session);
 }
 
 export function validateSessionName(session: string): void {
@@ -64,8 +66,9 @@ export function validateSessionName(session: string): void {
 
 export function getStateFilePath(session: string): string {
   validateSessionName(session);
-  mkdirSync(STATE_DIR, { recursive: true });
-  return join(STATE_DIR, `${session}.json`);
+  const sessionDir = getSessionDir(session);
+  mkdirSync(sessionDir, { recursive: true });
+  return getSessionStatePath(session);
 }
 
 export function readSessionState(session: string): SessionState | null {
@@ -92,31 +95,42 @@ export function readSessionState(session: string): SessionState | null {
 }
 
 function listActiveSessions(): string[] {
-  if (!existsSync(STATE_DIR)) return [];
-  return readdirSync(STATE_DIR)
-    .filter((f) => f.endsWith(".json"))
-    .map((f) => f.replace(/\.json$/, ""));
+  if (!existsSync(LIBRETTO_SESSIONS_DIR)) return [];
+  return readdirSync(LIBRETTO_SESSIONS_DIR).filter((session) =>
+    existsSync(getSessionStatePath(session)),
+  );
 }
 
-export function getSessionStateOrThrow(session: string): SessionState {
+function throwSessionNotFoundError(session: string): never {
+  const active = listActiveSessions();
+  const lines = [`No session "${session}" found.`];
+  if (active.length > 0) {
+    lines.push("");
+    lines.push("Active sessions:");
+    for (const name of active) {
+      lines.push(`  ${name}`);
+    }
+  } else {
+    lines.push("");
+    lines.push("No active sessions.");
+  }
+  lines.push("");
+  lines.push("Start one with:");
+  lines.push(`  libretto-cli open <url> --session ${session}`);
+  throw new Error(lines.join("\n"));
+}
+
+export function assertSessionStateExistsOrThrow(session: string): void {
   const stateFile = getStateFilePath(session);
   if (!existsSync(stateFile)) {
-    const active = listActiveSessions();
-    const lines = [`No session "${session}" found.`];
-    if (active.length > 0) {
-      lines.push("");
-      lines.push("Active sessions:");
-      for (const name of active) {
-        lines.push(`  ${name}`);
-      }
-    } else {
-      lines.push("");
-      lines.push("No active sessions.");
-    }
-    lines.push("");
-    lines.push(`Start one with:`);
-    lines.push(`  libretto-cli open <url> --session ${session}`);
-    throw new Error(lines.join("\n"));
+    throwSessionNotFoundError(session);
+  }
+}
+
+export function readSessionStateOrThrow(session: string): SessionState {
+  const stateFile = getStateFilePath(session);
+  if (!existsSync(stateFile)) {
+    throwSessionNotFoundError(session);
   }
 
   try {
@@ -153,7 +167,7 @@ export function clearSessionState(session: string): void {
 }
 
 function ensureLibrettoDir(): void {
-  mkdirSync(LIBRETTO_DIR, { recursive: true });
+  mkdirSync(LIBRETTO_CONFIG_DIR, { recursive: true });
 }
 
 function isSessionMode(value: unknown): value is SessionMode {
@@ -161,27 +175,41 @@ function isSessionMode(value: unknown): value is SessionMode {
 }
 
 export function readSessionPermissions(): SessionPermissions {
-  if (!existsSync(SESSION_PERMISSIONS_PATH)) {
-    return { version: 1, sessions: {} };
+  if (!existsSync(LIBRETTO_CONFIG_PATH)) {
+    return { sessions: {} };
   }
 
   try {
-    const raw = JSON.parse(
-      readFileSync(SESSION_PERMISSIONS_PATH, "utf-8"),
+    const rawConfig = JSON.parse(
+      readFileSync(LIBRETTO_CONFIG_PATH, "utf-8"),
     ) as Record<string, unknown>;
 
-    if (raw.version !== 1) {
+    if (rawConfig.version !== 1) {
       throw new Error("unsupported version");
     }
+
+    const rawPermissions = rawConfig.permissions;
+    if (rawPermissions === undefined) {
+      return { sessions: {} };
+    }
     if (
-      typeof raw.sessions !== "object" ||
-      raw.sessions === null ||
-      Array.isArray(raw.sessions)
+      typeof rawPermissions !== "object" ||
+      rawPermissions === null ||
+      Array.isArray(rawPermissions)
+    ) {
+      throw new Error("permissions must be an object");
+    }
+
+    const typedPermissions = rawPermissions as Record<string, unknown>;
+    if (
+      typeof typedPermissions.sessions !== "object" ||
+      typedPermissions.sessions === null ||
+      Array.isArray(typedPermissions.sessions)
     ) {
       throw new Error("sessions must be an object");
     }
 
-    const sessions = raw.sessions as Record<string, unknown>;
+    const sessions = typedPermissions.sessions as Record<string, unknown>;
     const normalized: Record<string, SessionMode> = {};
     for (const [session, mode] of Object.entries(sessions)) {
       if (!isSessionMode(mode)) {
@@ -190,19 +218,49 @@ export function readSessionPermissions(): SessionPermissions {
       normalized[session] = mode;
     }
 
-    return { version: 1, sessions: normalized };
+    return { sessions: normalized };
   } catch {
     throw new Error(
-      `Session permissions are invalid at ${SESSION_PERMISSIONS_PATH}.`,
+      `Session permissions are invalid at ${LIBRETTO_CONFIG_PATH}.`,
     );
   }
 }
 
 export function writeSessionPermissions(permissions: SessionPermissions): void {
   ensureLibrettoDir();
+  let rawConfig: Record<string, unknown> = { version: 1 };
+
+  if (existsSync(LIBRETTO_CONFIG_PATH)) {
+    try {
+      const parsed = JSON.parse(
+        readFileSync(LIBRETTO_CONFIG_PATH, "utf-8"),
+      ) as Record<string, unknown>;
+      if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        Array.isArray(parsed)
+      ) {
+        throw new Error("config must be an object");
+      }
+      rawConfig = parsed;
+    } catch {
+      throw new Error(
+        `Session permissions are invalid at ${LIBRETTO_CONFIG_PATH}.`,
+      );
+    }
+  }
+
+  if (rawConfig.version !== undefined && rawConfig.version !== 1) {
+    throw new Error(
+      `Session permissions are invalid at ${LIBRETTO_CONFIG_PATH}.`,
+    );
+  }
+
+  rawConfig.version = 1;
+  rawConfig.permissions = permissions;
   writeFileSync(
-    SESSION_PERMISSIONS_PATH,
-    JSON.stringify(permissions, null, 2),
+    LIBRETTO_CONFIG_PATH,
+    JSON.stringify(rawConfig, null, 2),
     "utf-8",
   );
 }
