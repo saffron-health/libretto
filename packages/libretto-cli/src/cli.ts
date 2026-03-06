@@ -18,6 +18,7 @@ import {
 const CLI_COMMANDS = new Set([
   "open",
   "run",
+  "session-mode",
   "save",
   "exec",
   "snapshot",
@@ -35,9 +36,10 @@ function printUsage(): void {
 Commands:
   open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
-  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]  Run an exported async integration function from a file
+  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]  Run an exported async integration function from a file (blocked until interactive)
+  session-mode <read-only|interactive> Set session execution mode
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
-  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight)
+  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight; blocked until interactive)
   snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when both flags are provided
   snapshot configure <codex|opencode|claude|gemini> [-- <command prefix...>]  Configure snapshot analyzer
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
@@ -50,6 +52,9 @@ Options:
 
 Examples:
   libretto-cli open https://linkedin.com
+  # default sessions are read-only; enable actions only after explicit human approval
+  libretto-cli session-mode interactive --session default
+
   # ... manually log in ...
   libretto-cli save linkedin.com
   # Next time you open linkedin.com, you'll be logged in automatically

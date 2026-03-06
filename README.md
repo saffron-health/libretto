@@ -14,6 +14,25 @@ pnpm type-check
 pnpm --filter libretto-cli dev
 ```
 
+## cli safety mode
+
+`libretto-cli open` starts sessions in read-only mode by default. `exec` and `run` are blocked until the session is explicitly made interactive.
+
+```bash
+# default: read-only session (exec blocked)
+libretto-cli open https://example.com
+
+# user explicitly approves this session for actions
+libretto-cli session-mode interactive --session default
+
+# now action commands can run in that session
+libretto-cli exec "return await page.url()" --session default
+libretto-cli run ./integration.ts main --session default
+
+# lock it back down afterward
+libretto-cli session-mode read-only --session default
+```
+
 ## snapshot analyzer configuration
 
 The `snapshot` command analyzes browser snapshots using an LLM. There are two ways to configure it:

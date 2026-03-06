@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect } from "vitest";
 import { test } from "./test-fixtures";
 
@@ -36,6 +37,88 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
       "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
+    );
+  });
+
+  test("fails run by default in read-only session", async ({ librettoCli }) => {
+    const result = await librettoCli("run ./integration.ts main");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "Session \"default\" is read-only. Only a human can authorize interactive mode.",
+    );
+  });
+
+  test("allows run guard when session is permissioned interactive", async ({
+    librettoCli,
+    seedSessionPermission,
+  }) => {
+    await seedSessionPermission("default", "interactive");
+    const result = await librettoCli("run ./integration.ts main");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).not.toContain("is read-only");
+    expect(result.stderr).toContain("Integration file does not exist:");
+  });
+
+  test("fails open when deprecated --allow-actions flag is passed", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("open https://example.com --allow-actions");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "--allow-actions is not supported for open.",
+    );
+  });
+
+  test("fails run when deprecated --allow-actions flag is passed", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("run ./integration.ts main --allow-actions");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("--allow-actions is not supported for run.");
+  });
+
+  test("session-mode interactive writes session permission", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const result = await librettoCli(
+      "session-mode interactive --session consented",
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Session \"consented\" is now interactive.");
+
+    const raw = JSON.parse(
+      await readFile(
+        workspacePath(".libretto-cli", "session-permissions.json"),
+        "utf8",
+      ),
+    ) as { sessions?: Record<string, string> };
+    expect(raw.sessions?.consented).toBe("interactive");
+  });
+
+  test("session-mode read-only removes interactive permission", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await librettoCli("session-mode interactive --session toggled");
+    const result = await librettoCli("session-mode read-only --session toggled");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Session \"toggled\" is now read-only.");
+
+    const raw = JSON.parse(
+      await readFile(
+        workspacePath(".libretto-cli", "session-permissions.json"),
+        "utf8",
+      ),
+    ) as { sessions?: Record<string, string> };
+    expect(raw.sessions?.toggled).toBeUndefined();
+  });
+
+  test("fails session-mode with invalid mode", async ({ librettoCli }) => {
+    const result = await librettoCli("session-mode maybe --session default");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "Usage: libretto-cli session-mode <read-only|interactive> [--session <name>]",
     );
   });
 

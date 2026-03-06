@@ -10,7 +10,12 @@ import { setDebugMode } from "libretto/config";
 import { launchBrowser } from "libretto/run";
 import { connect, disconnectBrowser } from "../core/browser";
 import { getLog } from "../core/context";
-import { getSessionStateOrThrow } from "../core/session";
+import {
+  getSessionPermissionMode,
+  getSessionStateOrThrow,
+  readOnlySessionError,
+  resolveSessionMode,
+} from "../core/session";
 import {
   readActionLog,
   readNetworkLog,
@@ -98,6 +103,12 @@ async function runExec(
   visualize = false,
 ): Promise<void> {
   const log = getLog();
+  const sessionState = getSessionStateOrThrow(session);
+  const mode = resolveSessionMode(session, sessionState);
+  if (mode !== "interactive") {
+    throw new Error(readOnlySessionError(session));
+  }
+
   log.info("exec-start", {
     session,
     codeLength: code.length,
@@ -105,7 +116,6 @@ async function runExec(
     visualize,
   });
   const { browser, context, page } = await connect(session);
-  const sessionState = getSessionStateOrThrow(session);
 
   const STALL_THRESHOLD_MS = 60_000;
   let lastActivityTs = Date.now();
@@ -343,14 +353,32 @@ export function registerExecutionCommands(yargs: Argv): Argv {
           .option("params-file", { type: "string" })
           .option("headed", { type: "boolean", default: false })
           .option("headless", { type: "boolean", default: false })
-          .option("debug", { type: "string" }),
+          .option("debug", { type: "string" })
+          .option("allow-actions", {
+            type: "boolean",
+            default: false,
+            hidden: true,
+          }),
       async (argv) => {
         const usage =
-          "Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]";
+          "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]";
         const integrationPath = argv.integrationFile as string | undefined;
         const exportName = argv.integrationExport as string | undefined;
         if (!integrationPath || !exportName) {
           throw new Error(usage);
+        }
+
+        const session = String(argv.session);
+        const allowActions = Boolean(
+          argv["allow-actions"] ?? (argv as { allowActions?: boolean }).allowActions,
+        );
+        if (allowActions) {
+          throw new Error(
+            `--allow-actions is not supported for run. ${readOnlySessionError(session)}`,
+          );
+        }
+        if (getSessionPermissionMode(session) !== "interactive") {
+          throw new Error(readOnlySessionError(session));
         }
 
         const rawInlineParams = argv.params as string | undefined;
@@ -390,7 +418,7 @@ export function registerExecutionCommands(yargs: Argv): Argv {
         await runIntegrationFromFile({
           integrationPath,
           exportName,
-          session: String(argv.session),
+          session,
           params,
           headless: headlessMode ?? false,
         });
