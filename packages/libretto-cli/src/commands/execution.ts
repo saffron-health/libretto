@@ -235,6 +235,22 @@ function resolveWorkflowStorageStatePath(workflow: LibrettoWorkflow): string | u
   return resolveLocalAuthProfilePath(authProfile.domain);
 }
 
+function getMissingLocalAuthProfileError(args: {
+  domain: string;
+  profilePath: string;
+  session: string;
+}): string {
+  const normalizedDomain = normalizeDomain(args.domain);
+  return [
+    `Local auth profile not found for domain "${normalizedDomain}".`,
+    `Expected profile file: ${args.profilePath}`,
+    "To create it:",
+    `  1. libretto-cli open https://${normalizedDomain} --headed --session ${args.session}`,
+    "  2. Log in manually in the browser window.",
+    `  3. libretto-cli save ${normalizedDomain} --session ${args.session}`,
+  ].join("\n");
+}
+
 async function runIntegrationFromFile(args: {
   integrationPath: string;
   exportName: string;
@@ -290,7 +306,17 @@ async function runIntegrationFromFile(args: {
     session: args.session,
   });
   const workflow = targetExport;
+  const authProfile = workflow.metadata.authProfile;
   const storageStatePath = resolveWorkflowStorageStatePath(workflow);
+  if (authProfile?.type === "local" && storageStatePath && !existsSync(storageStatePath)) {
+    throw new Error(
+      getMissingLocalAuthProfileError({
+        domain: authProfile.domain,
+        profilePath: storageStatePath,
+        session: args.session,
+      }),
+    );
+  }
   const browserSession = await launchBrowser({
     sessionName: args.session,
     headless: args.headless,

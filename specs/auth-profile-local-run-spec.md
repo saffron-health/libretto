@@ -55,10 +55,10 @@ Add an explicit `LibrettoWorkflow` class to carry integration metadata and run l
 
 ### Phase 2: Enforce fail-fast runtime behavior for declared local auth
 
-- [ ] In `run`, when `authProfile.type === "local"` is declared, verify the corresponding profile file exists before launching the browser.
-- [ ] Return a clear error that includes the expected profile path and next action (`open` -> manual login -> `save`).
-- [ ] Keep behavior unchanged for integrations with no `authProfile` metadata.
-- [ ] Success criteria: subprocess CLI test with interactive session permission and an integration that declares local auth fails before browser launch when profile file is missing, with deterministic error text.
+- [x] In `run`, when `authProfile.type === "local"` is declared, verify the corresponding profile file exists before launching the browser.
+- [x] Return a clear error that includes the expected profile path and next action (`open` -> manual login -> `save`).
+- [x] Keep behavior unchanged for integrations with no `authProfile` metadata.
+- [x] Success criteria: subprocess CLI test with interactive session permission and an integration that declares local auth fails before browser launch when profile file is missing, with deterministic error text.
 
 ### Phase 3: Authoring and prompt guidance updates
 

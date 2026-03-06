@@ -94,6 +94,48 @@ export async function main() {
     expect(result.stderr).toContain("must be a Libretto workflow instance");
   });
 
+  test("fails run when local auth profile is declared but missing", async ({
+    librettoCli,
+    seedSessionPermission,
+    workspacePath,
+  }) => {
+    const librettoEntryUrl = new URL(
+      "../../libretto/dist/index.js",
+      import.meta.url,
+    ).href;
+    await seedSessionPermission("default", "interactive");
+    await writeFile(
+      workspacePath("integration.ts"),
+      `
+import { workflow } from "${librettoEntryUrl}";
+
+export const main = workflow(
+  { authProfile: { type: "local", domain: "app.example.com" } },
+  async () => {
+    return "ok";
+  },
+);
+`,
+      "utf8",
+    );
+
+    const result = await librettoCli("run ./integration.ts main");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      'Local auth profile not found for domain "app.example.com".',
+    );
+    expect(result.stderr).toContain(
+      "Expected profile file:",
+    );
+    expect(result.stderr).toContain(
+      ".libretto-cli/profiles/app.example.com.json",
+    );
+    expect(result.stderr).toContain(
+      "libretto-cli open https://app.example.com --headed --session default",
+    );
+    expect(result.stderr).toContain("libretto-cli save app.example.com --session default");
+  });
+
   test("fails open when deprecated --allow-actions flag is passed", async ({
     librettoCli,
   }) => {
