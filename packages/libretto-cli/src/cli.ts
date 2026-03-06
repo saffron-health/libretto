@@ -7,7 +7,13 @@ import { registerBrowserCommands } from "./commands/browser";
 import { registerExecutionCommands } from "./commands/execution";
 import { registerLogCommands } from "./commands/logs";
 import { registerSnapshotCommands } from "./commands/snapshot";
-import { flushLog, getLog, setLogFile, STATE_DIR } from "./core/context";
+import {
+  ensureLibrettoSetup,
+  flushLog,
+  getLog,
+  setLogFile,
+  STATE_DIR,
+} from "./core/context";
 import {
   getStateFilePath,
   logFileForRun,
@@ -195,16 +201,14 @@ function createParser(): Argv {
 
 export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
-  initializeLogger(rawArgs);
-  const log = getLog();
+  ensureLibrettoSetup();
+  let loggerInitialized = false;
 
   try {
     validateLegacySessionArg(rawArgs);
 
     const args = filterSessionArgs(rawArgs);
     const command = args[0];
-
-    log.info("cli-command", { command, args });
 
     if (!command || command === "--help" || command === "-h" || command === "help") {
       printUsage();
@@ -219,14 +223,21 @@ export async function runLibrettoCLI(): Promise<void> {
       process.exit(1);
     }
 
+    initializeLogger(rawArgs);
+    loggerInitialized = true;
+    const log = getLog();
     const parser = createParser();
+    log.info("cli-command", { command, args });
     await parser.parseAsync();
 
     await flushLog();
     process.exit(0);
   } catch (err) {
-    log.error("cli-error", { error: err, args: rawArgs });
-    await flushLog();
+    if (loggerInitialized) {
+      const log = getLog();
+      log.error("cli-error", { error: err, args: rawArgs });
+      await flushLog();
+    }
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
     process.exit(1);

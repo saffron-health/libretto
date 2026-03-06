@@ -1,8 +1,21 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { cwd } from "node:process";
 import { z } from "zod";
-import { LIBRETTO_CONFIG_PATH } from "./context";
+
+function getRepoRoot(): string {
+  const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf-8",
+  });
+  if (result.status === 0 && result.stdout) {
+    return result.stdout.trim();
+  }
+  return cwd();
+}
+
+const LIBRETTO_CONFIG_PATH = join(getRepoRoot(), ".libretto", "config.json");
 
 export const CURRENT_CONFIG_VERSION = 1;
 

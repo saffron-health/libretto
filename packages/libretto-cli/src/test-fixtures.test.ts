@@ -67,7 +67,9 @@ describe("cli test fixtures", () => {
       const result = await librettoCli("--help");
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Usage: libretto-cli");
-      expect(existsSync(workspacePath("tmp", "libretto-cli"))).toBe(true);
+      expect(existsSync(workspacePath(".libretto"))).toBe(true);
+      expect(existsSync(workspacePath(".libretto", ".gitignore"))).toBe(true);
+      expect(existsSync(workspacePath("tmp", "libretto-cli"))).toBe(false);
     },
     20_000,
   );

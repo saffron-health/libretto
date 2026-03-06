@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { describe, expect } from "vitest";
 import { test } from "./test-fixtures";
@@ -8,6 +9,22 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Usage: libretto-cli <command> [--session <name>]");
     expect(result.stderr).toBe("");
+  });
+
+  test("bootstraps .libretto state on --help without creating legacy dirs", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const result = await librettoCli("--help");
+    expect(result.exitCode).toBe(0);
+
+    expect(existsSync(workspacePath(".libretto"))).toBe(true);
+    expect(existsSync(workspacePath(".libretto", ".gitignore"))).toBe(true);
+    expect(existsSync(workspacePath(".libretto", "sessions"))).toBe(true);
+    expect(existsSync(workspacePath(".libretto", "profiles"))).toBe(true);
+
+    expect(existsSync(workspacePath(".libretto-cli"))).toBe(false);
+    expect(existsSync(workspacePath("tmp", "libretto-cli"))).toBe(false);
   });
 
   test("prints usage for help command", async ({ librettoCli }) => {
