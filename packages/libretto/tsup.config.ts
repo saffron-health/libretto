@@ -19,7 +19,7 @@ export default defineConfig({
 	},
 	format: ["esm", "cjs"],
 	dts: true,
-	splitting: false,
+	bundle: false,
 	minify: false,
 	clean: true,
 	outDir: "dist",
