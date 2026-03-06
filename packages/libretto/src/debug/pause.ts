@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { isDebugMode } from "../config/config.js";
 
 export type DebugPauseOptions = {
+	/** Whether pause mode is enabled for this call. Defaults to env-based debug mode. */
+	enabled?: boolean;
 	/** Directory for pause signal files. Defaults to `tmp/libretto` in cwd. */
 	signalDir?: string;
 	/** Session name for the signal file. Defaults to "libretto". */
@@ -51,7 +53,8 @@ export async function debugPause(
 	page: Page,
 	options?: DebugPauseOptions,
 ): Promise<void> {
-	if (!isDebugMode()) return;
+	const enabled = options?.enabled ?? isDebugMode();
+	if (!enabled) return;
 
 	const pausedFile = getPausedFilePath(options);
 	const resumeFile = getResumeFilePath(options);

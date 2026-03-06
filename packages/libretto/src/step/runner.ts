@@ -5,7 +5,7 @@ import type { RunnerConfig, Step, StepHistoryEntry, DebugBundle } from "./types.
 import { Logger } from "../logger/logger.js";
 import { createFileLogSink, prettyConsoleSink } from "../logger/sinks.js";
 import type { LoggerApi } from "../logger/logger.js";
-import { setDebugMode, setDryRun } from "../config/config.js";
+import { isDryRun } from "../config/config.js";
 import { debugPause } from "../debug/pause.js";
 import { attemptWithRecovery } from "../recovery/recovery.js";
 
@@ -20,14 +20,12 @@ export type Runner = {
 export function createRunner(config: RunnerConfig = {}): Runner {
 	const {
 		llmClient,
-		dryRun = false,
-		debug = false,
+		dryRun: dryRunOption,
+		debug: debugOption,
 		logDir = join(process.cwd(), "tmp", "libretto", "logs"),
 	} = config;
-
-	// Set global config overrides
-	setDebugMode(debug);
-	setDryRun(dryRun);
+	const dryRun = dryRunOption ?? isDryRun();
+	const debug = debugOption ?? false;
 
 	return {
 		run: async (page: Page, steps: Step[]) => {
@@ -158,7 +156,10 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 						stepLogger.info("step:debug-bundle", { path: bundle.bundlePath });
 
 						// Pause for debugging
-						await debugPause(page, { signalDir: join(logDir, "..") });
+						await debugPause(page, {
+							enabled: debug,
+							signalDir: join(logDir, ".."),
+						});
 
 						throw firstError;
 					}

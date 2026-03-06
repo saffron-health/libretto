@@ -59,8 +59,6 @@ export {
 	isDebugMode,
 	isDryRun,
 	shouldPauseBeforeMutation,
-	setDebugMode,
-	setDryRun,
 } from "./config/config.js";
 
 // Instrumentation

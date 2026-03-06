@@ -12,7 +12,6 @@ import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 import type { Argv } from "yargs";
 import { installInstrumentation } from "libretto/instrumentation";
-import { setDebugMode } from "libretto/config";
 import { launchBrowser } from "libretto/run";
 import {
   type LibrettoAuthProfile,
@@ -286,6 +285,7 @@ async function runIntegrationFromFile(args: {
   session: string;
   params: unknown;
   headless: boolean;
+  debug: boolean;
 }): Promise<void> {
   const log = getLog();
   const absolutePath = isAbsolute(args.integrationPath)
@@ -361,6 +361,7 @@ async function runIntegrationFromFile(args: {
     integrationPath: absolutePath,
     exportName: args.exportName,
     headless: args.headless,
+    debug: args.debug,
   };
 
   try {
@@ -416,10 +417,10 @@ export function registerExecutionCommands(yargs: Argv): Argv {
             default: false,
             hidden: true,
           })
-          .option("debug", { type: "string" }),
+          .option("debug", { type: "boolean" }),
       async (argv) => {
         const usage =
-          "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]";
+          "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug]";
         const integrationPath = argv.integrationFile as string | undefined;
         const exportName = argv.integrationExport as string | undefined;
         if (!integrationPath || !exportName) {
@@ -467,24 +468,19 @@ export function registerExecutionCommands(yargs: Argv): Argv {
             ? true
             : undefined;
 
-        const rawDebug = argv.debug as string | undefined;
-        const debugMode = (() => {
-          if (rawDebug === undefined) return true;
-          const normalized = rawDebug.trim().toLowerCase();
-          if (normalized === "true") return true;
-          if (normalized === "false") return false;
-          throw new Error(
-            `Invalid value for --debug: "${rawDebug}". Expected true or false.`,
-          );
-        })();
+        const debugFlag = argv.debug as boolean | undefined;
+        const debugMode =
+          debugFlag !== undefined
+            ? debugFlag
+            : process.env.LIBRETTO_DEBUG === "true";
 
-        setDebugMode(debugMode);
         await runIntegrationFromFile({
           integrationPath,
           exportName,
           session,
           params,
           headless: headlessMode ?? false,
+          debug: debugMode,
         });
       },
     );

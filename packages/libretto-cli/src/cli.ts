@@ -39,7 +39,7 @@ function printUsage(): void {
 Commands:
   open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
-  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]  Run an exported Libretto workflow from a file (blocked until interactive)
+  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug]  Run an exported Libretto workflow from a file (blocked until interactive)
   session-mode <read-only|interactive> Set session execution mode
   ai configure [preset] [-- <command prefix...>]  Configure AI runtime for analysis commands
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
