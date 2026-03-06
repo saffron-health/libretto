@@ -32,6 +32,20 @@ describe("basic CLI subprocess behavior", () => {
     );
   });
 
+  test("fails open with actionable error when browser child spawn fails", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("open https://example.com", {
+      PATH: "/definitely-not-real",
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Failed to launch browser child process:");
+    expect(result.stderr).toContain(
+      "Ensure Node.js is available in PATH for child processes.",
+    );
+    expect(result.stderr).toContain("Check logs:");
+  });
+
   test("fails exec with missing code usage error", async ({ librettoCli }) => {
     const result = await librettoCli("exec");
     expect(result.exitCode).toBe(1);
