@@ -1,40 +1,47 @@
 import type { Page } from "playwright";
-import { writeFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { writeFileSync, rmSync, existsSync, mkdirSync } from "node:fs";
 import { isDebugMode } from "../config/config.js";
+import {
+	ensureLibrettoPauseSignalDir,
+	getLibrettoPausedSignalPath,
+	getLibrettoResumeSignalPath,
+	getPauseSignalPathForDir,
+} from "../runtime/paths.js";
 
 export type DebugPauseOptions = {
-	/** Directory for pause signal files. Defaults to `tmp/libretto` in cwd. */
+	/** Directory for pause signal files. Defaults to `.libretto/sessions/<sessionName>` in cwd. */
 	signalDir?: string;
 	/** Session name for the signal file. Defaults to "libretto". */
 	sessionName?: string;
 };
-
-function getSignalDir(options?: DebugPauseOptions): string {
-	return options?.signalDir ?? join(process.cwd(), "tmp", "libretto");
-}
 
 function getSessionName(options?: DebugPauseOptions): string {
 	return options?.sessionName ?? "libretto";
 }
 
 function getPausedFilePath(options?: DebugPauseOptions): string {
-	return join(getSignalDir(options), `${getSessionName(options)}.paused`);
+	const signalDir = options?.signalDir;
+	const sessionName = getSessionName(options);
+	if (signalDir) {
+		return getPauseSignalPathForDir(signalDir, sessionName, "paused");
+	}
+	return getLibrettoPausedSignalPath(sessionName);
 }
 
 function getResumeFilePath(options?: DebugPauseOptions): string {
-	return join(getSignalDir(options), `${getSessionName(options)}.resume`);
+	const signalDir = options?.signalDir;
+	const sessionName = getSessionName(options);
+	if (signalDir) {
+		return getPauseSignalPathForDir(signalDir, sessionName, "resume");
+	}
+	return getLibrettoResumeSignalPath(sessionName);
 }
 
 function cleanupPauseFiles(options?: DebugPauseOptions): void {
-	try {
-		const pausedFile = getPausedFilePath(options);
-		if (existsSync(pausedFile)) unlinkSync(pausedFile);
-	} catch {}
-	try {
-		const resumeFile = getResumeFilePath(options);
-		if (existsSync(resumeFile)) unlinkSync(resumeFile);
-	} catch {}
+	const pausedFile = getPausedFilePath(options);
+	const resumeFile = getResumeFilePath(options);
+	if (existsSync(pausedFile)) rmSync(pausedFile, { force: true });
+	if (existsSync(resumeFile)) rmSync(resumeFile, { force: true });
 }
 
 /**
@@ -56,7 +63,11 @@ export async function debugPause(
 	const pausedFile = getPausedFilePath(options);
 	const resumeFile = getResumeFilePath(options);
 
-	mkdirSync(getSignalDir(options), { recursive: true });
+	if (options?.signalDir) {
+		mkdirSync(options.signalDir, { recursive: true });
+	} else {
+		ensureLibrettoPauseSignalDir(getSessionName(options));
+	}
 	cleanupPauseFiles(options);
 
 	const url = page.url();

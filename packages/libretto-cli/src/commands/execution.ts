@@ -29,7 +29,6 @@ import {
   getSessionPermissionMode,
   readSessionStateOrThrow,
   readOnlySessionError,
-  resolveSessionMode,
 } from "../core/session";
 import {
   readActionLog,
@@ -124,7 +123,7 @@ async function runExec(
 ): Promise<void> {
   const log = getLog();
   const sessionState = readSessionStateOrThrow(session);
-  const mode = resolveSessionMode(session, sessionState);
+  const mode = sessionState.mode ?? "read-only";
   if (mode !== "interactive") {
     throw new Error(readOnlySessionError(session));
   }
