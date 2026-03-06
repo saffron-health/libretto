@@ -608,11 +608,6 @@ await new Promise(() => {});
   let childSpawnError: Error | null = null;
   let childEarlyExit: { code: number | null; signal: NodeJS.Signals | null } | null =
     null;
-  const readChildSpawnError = (): Error | null => childSpawnError;
-  const readChildEarlyExit = (): {
-    code: number | null;
-    signal: NodeJS.Signals | null;
-  } | null => childEarlyExit;
 
   child.on("error", (err) => {
     childSpawnError = err;
@@ -635,8 +630,8 @@ await new Promise(() => {});
   const cdpStartupTimeoutMs = cdpPollIntervalMs * cdpMaxAttempts;
 
   for (let i = 0; i < cdpMaxAttempts; i++) {
-    const spawnError = readChildSpawnError();
-    if (spawnError) {
+    const spawnError = childSpawnError as Error | null;
+    if (spawnError !== null) {
       const errWithCode = spawnError as Error & { code?: string };
       const hint =
         errWithCode.code === "ENOENT"
@@ -647,8 +642,11 @@ await new Promise(() => {});
       );
     }
 
-    const earlyExit = readChildEarlyExit();
-    if (earlyExit) {
+    const earlyExit = childEarlyExit as {
+      code: number | null;
+      signal: NodeJS.Signals | null;
+    } | null;
+    if (earlyExit !== null) {
       const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
       throw new Error(
         `Browser child process exited before startup (status: ${status}). Check logs: ${runLogPath}`,
