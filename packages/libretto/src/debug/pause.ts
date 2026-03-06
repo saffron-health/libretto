@@ -4,8 +4,6 @@ import { isDebugMode } from "../config/config.js";
 export type DebugPauseOptions = {
 	/** Whether pause mode is enabled for this call. Defaults to env-based debug mode. */
 	enabled?: boolean;
-	/** @deprecated Unused in IPC pause mode. */
-	signalDir?: string;
 	/** Session name to include in pause metadata. Defaults to "libretto". */
 	sessionName?: string;
 };

@@ -40,6 +40,7 @@ type SeedHelpers = {
 type CliFixtures = {
   workspaceDir: string;
   workspacePath: (...parts: string[]) => string;
+  librettoRuntimePath: string;
   librettoCli: (
     command: string,
     env?: Record<string, string>,
@@ -51,6 +52,8 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(here, "../../..");
 const cliEntry = resolve(repoRoot, "packages/libretto-cli/dist/index.js");
 const librettoEntry = resolve(repoRoot, "packages/libretto/dist/index.js");
+const librettoRuntimePath = new URL("../../libretto/dist/index.js", import.meta.url)
+  .href;
 
 let didBuild = false;
 
@@ -189,6 +192,10 @@ export const test = base.extend<CliFixtures>({
 
   workspacePath: async ({ workspaceDir }, use) => {
     await use((...parts: string[]) => join(workspaceDir, ...parts));
+  },
+
+  librettoRuntimePath: async ({}, use) => {
+    await use(librettoRuntimePath);
   },
 
   librettoCli: async ({ workspaceDir }, use) => {

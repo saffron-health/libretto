@@ -1,27 +1,12 @@
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  unlinkSync,
-  mkdirSync,
-} from "node:fs";
+import { readFileSync } from "node:fs";
+import { fork } from "node:child_process";
 import * as moduleBuiltin from "node:module";
-import { cwd } from "node:process";
-import { isAbsolute, resolve, join } from "node:path";
-import { pathToFileURL } from "node:url";
-import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import type { Argv } from "yargs";
 import { installInstrumentation } from "libretto/instrumentation";
-import { launchBrowser } from "libretto/run";
-import {
-  type LibrettoAuthProfile,
-  type LibrettoWorkflowContext,
-} from "libretto";
 import {
   connect,
   disconnectBrowser,
-  getProfilePath,
-  normalizeDomain,
 } from "../core/browser";
 import { getLog } from "../core/context";
 import {
@@ -35,9 +20,12 @@ import {
   readNetworkLog,
   wrapPageForActionLogging,
 } from "../core/telemetry";
+import type {
+  RunIntegrationWorkerMessage,
+  RunIntegrationWorkerRequest,
+} from "../workers/run-integration-worker-protocol";
 
 type ExecFunction = (...args: unknown[]) => Promise<unknown>;
-const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
 type StripTypeScriptTypesFn = (
   code: string,
@@ -233,145 +221,6 @@ async function runExec(
   }
 }
 
-function resolveLocalAuthProfilePath(domain: string): string {
-  return getProfilePath(normalizeDomain(domain));
-}
-
-type LoadedLibrettoWorkflow = {
-  metadata: {
-    authProfile?: LibrettoAuthProfile;
-  };
-  run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
-};
-
-function isLoadedLibrettoWorkflow(value: unknown): value is LoadedLibrettoWorkflow {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Record<PropertyKey, unknown>;
-  return (
-    candidate[LIBRETTO_WORKFLOW_BRAND] === true &&
-    typeof candidate.run === "function" &&
-    !!candidate.metadata &&
-    typeof candidate.metadata === "object"
-  );
-}
-
-function resolveWorkflowStorageStatePath(workflow: LoadedLibrettoWorkflow): string | undefined {
-  const authProfile = workflow.metadata.authProfile;
-  if (authProfile?.type !== "local") {
-    return undefined;
-  }
-  return resolveLocalAuthProfilePath(authProfile.domain);
-}
-
-function getMissingLocalAuthProfileError(args: {
-  domain: string;
-  profilePath: string;
-  session: string;
-}): string {
-  const normalizedDomain = normalizeDomain(args.domain);
-  return [
-    `Local auth profile not found for domain "${normalizedDomain}".`,
-    `Expected profile file: ${args.profilePath}`,
-    "To create it:",
-    `  1. libretto-cli open https://${normalizedDomain} --headed --session ${args.session}`,
-    "  2. Log in manually in the browser window.",
-    `  3. libretto-cli save ${normalizedDomain} --session ${args.session}`,
-  ].join("\n");
-}
-
-async function runIntegrationFromFile(args: {
-  integrationPath: string;
-  exportName: string;
-  session: string;
-  params: unknown;
-  headless: boolean;
-  debug: boolean;
-}): Promise<void> {
-  const log = getLog();
-  const absolutePath = isAbsolute(args.integrationPath)
-    ? args.integrationPath
-    : resolve(cwd(), args.integrationPath);
-  if (!existsSync(absolutePath)) {
-    throw new Error(`Integration file does not exist: ${absolutePath}`);
-  }
-
-  let loadedModule: Record<string, unknown>;
-  try {
-    loadedModule = (await import(pathToFileURL(absolutePath).href)) as Record<
-      string,
-      unknown
-    >;
-  } catch (error) {
-    throw new Error(
-      `Failed to import integration module at ${absolutePath}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  const targetExport = loadedModule[args.exportName];
-  if (!targetExport) {
-    const availableExports = Object.keys(loadedModule);
-    const detail =
-      availableExports.length > 0
-        ? ` Available exports: ${availableExports.join(", ")}`
-        : " The module has no exports.";
-    throw new Error(
-      `Export "${args.exportName}" was not found in ${absolutePath}.${detail}`,
-    );
-  }
-
-  if (!isLoadedLibrettoWorkflow(targetExport)) {
-    throw new Error(
-      `Export "${args.exportName}" in ${absolutePath} must be a Libretto workflow instance. Use workflow(...) from "libretto".`,
-    );
-  }
-
-  console.log(
-    `Running integration "${args.exportName}" from ${absolutePath} (${args.headless ? "headless" : "headed"})...`,
-  );
-
-  const integrationLogger = log.withScope("integration-run", {
-    integrationPath: absolutePath,
-    integrationExport: args.exportName,
-    session: args.session,
-  });
-  const workflow = targetExport;
-  const authProfile = workflow.metadata.authProfile;
-  const storageStatePath = resolveWorkflowStorageStatePath(workflow);
-  if (authProfile?.type === "local" && storageStatePath && !existsSync(storageStatePath)) {
-    throw new Error(
-      getMissingLocalAuthProfileError({
-        domain: authProfile.domain,
-        profilePath: storageStatePath,
-        session: args.session,
-      }),
-    );
-  }
-  const browserSession = await launchBrowser({
-    sessionName: args.session,
-    headless: args.headless,
-    storageStatePath,
-  });
-
-  const workflowContext: LibrettoWorkflowContext = {
-    logger: integrationLogger,
-    page: browserSession.page,
-    context: browserSession.context,
-    browser: browserSession.browser,
-    session: args.session,
-    integrationPath: absolutePath,
-    exportName: args.exportName,
-    headless: args.headless,
-    debug: args.debug,
-  };
-
-  try {
-    await workflow.run(workflowContext, args.params ?? {});
-    console.log("Integration completed.");
-  } finally {
-    await browserSession.close();
-  }
-}
-
 function parseJsonArg(label: string, raw: string): unknown {
   try {
     return JSON.parse(raw);
@@ -380,6 +229,113 @@ function parseJsonArg(label: string, raw: string): unknown {
       `Invalid JSON in ${label}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+function isRunIntegrationWorkerMessage(
+  value: unknown,
+): value is RunIntegrationWorkerMessage {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  if (candidate.type === "completed") return true;
+  if (
+    candidate.type === "failed" &&
+    typeof candidate.message === "string"
+  ) {
+    return true;
+  }
+  if (
+    candidate.type === "paused" &&
+    typeof candidate.details === "object" &&
+    candidate.details !== null
+  ) {
+    const details = candidate.details as Record<string, unknown>;
+    return (
+      typeof details.sessionName === "string" &&
+      typeof details.pausedAt === "string" &&
+      typeof details.url === "string"
+    );
+  }
+  return false;
+}
+
+async function runIntegrationFromFile(args: RunIntegrationWorkerRequest): Promise<void> {
+  const workerEntryPath = fileURLToPath(
+    new URL("./workers/run-integration-worker.js", import.meta.url),
+  );
+  const payload = JSON.stringify(args);
+  const worker = fork(workerEntryPath, [payload], {
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+    env: process.env,
+  });
+
+  const onStdout = (chunk: Buffer | string) => {
+    process.stdout.write(chunk.toString());
+  };
+  const onStderr = (chunk: Buffer | string) => {
+    process.stderr.write(chunk.toString());
+  };
+  worker.stdout?.on("data", onStdout);
+  worker.stderr?.on("data", onStderr);
+
+  const cleanup = () => {
+    worker.stdout?.off("data", onStdout);
+    worker.stderr?.off("data", onStderr);
+    worker.removeAllListeners("message");
+    worker.removeAllListeners("error");
+    worker.removeAllListeners("exit");
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+
+    const resolveOnce = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+
+    const rejectOnce = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+
+    worker.on("message", (raw: unknown) => {
+      if (!isRunIntegrationWorkerMessage(raw)) return;
+      if (raw.type === "completed") {
+        resolveOnce();
+        return;
+      }
+      if (raw.type === "paused") {
+        console.log("Workflow paused.");
+        if (worker.connected) {
+          worker.disconnect();
+        }
+        worker.unref();
+        resolveOnce();
+        return;
+      }
+      rejectOnce(new Error(raw.message));
+    });
+
+    worker.on("error", (error) => {
+      rejectOnce(error);
+    });
+
+    worker.on("exit", (code, signal) => {
+      if (settled) return;
+      if (code === 0) {
+        resolveOnce();
+        return;
+      }
+      const reason = signal
+        ? `signal ${signal}`
+        : `code ${code ?? 1}`;
+      rejectOnce(new Error(`Integration worker exited with ${reason}.`));
+    });
+  });
 }
 
 export function registerExecutionCommands(yargs: Argv): Argv {

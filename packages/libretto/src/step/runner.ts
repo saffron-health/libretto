@@ -158,7 +158,6 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 						// Pause for debugging
 						await debugPause(page, {
 							enabled: debug,
-							signalDir: join(logDir, ".."),
 						});
 
 						throw firstError;

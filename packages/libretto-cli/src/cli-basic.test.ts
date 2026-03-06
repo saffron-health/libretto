@@ -245,6 +245,67 @@ export const main = workflow(
     expect(result.stderr).not.toContain("Local auth profile not found for domain");
   });
 
+  test("returns paused status when workflow hits debugPause", async ({
+    librettoCli,
+    librettoRuntimePath,
+    seedSessionPermission,
+    writeWorkflowScript,
+  }) => {
+    await seedSessionPermission("default", "interactive");
+    const integrationFilePath = await writeWorkflowScript(
+      "integration-pause.mjs",
+      `
+import { workflow, debugPause } from "${
+  librettoRuntimePath
+}";
+
+export const main = workflow({}, async (ctx) => {
+  console.log("WORKFLOW_BEFORE_PAUSE");
+  await debugPause(ctx.page, { enabled: ctx.debug, sessionName: ctx.session });
+  console.log("WORKFLOW_AFTER_PAUSE");
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" main --session default --headless --debug`,
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("WORKFLOW_BEFORE_PAUSE");
+    expect(result.stdout).toContain("Workflow paused.");
+    expect(result.stdout).not.toContain("WORKFLOW_AFTER_PAUSE");
+    expect(result.stdout).not.toContain("Integration completed.");
+  }, 45_000);
+
+  test("completes workflow run when no pause is triggered", async ({
+    librettoCli,
+    librettoRuntimePath,
+    seedSessionPermission,
+    writeWorkflowScript,
+  }) => {
+    await seedSessionPermission("default", "interactive");
+    const integrationFilePath = await writeWorkflowScript(
+      "integration-complete.mjs",
+      `
+import { workflow } from "${
+  librettoRuntimePath
+}";
+
+export const main = workflow({}, async () => {
+  console.log("WORKFLOW_COMPLETES");
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" main --session default --headless`,
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("WORKFLOW_COMPLETES");
+    expect(result.stdout).toContain("Integration completed.");
+    expect(result.stdout).not.toContain("Workflow paused.");
+  }, 45_000);
+
   test("fails open when deprecated --allow-actions flag is passed", async ({
     librettoCli,
   }) => {
