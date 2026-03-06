@@ -10,11 +10,11 @@ import { setDebugMode } from "libretto/config";
 import { launchBrowser } from "libretto/run";
 import { connect, disconnectBrowser } from "../core/browser";
 import { getLog } from "../core/context";
+import { createExecBindings } from "../core/exec-bindings";
 import { getSessionStateOrThrow } from "../core/session";
 import {
   readActionLog,
   readNetworkLog,
-  wrapPageForActionLogging,
 } from "../core/telemetry";
 
 type ExecFunction = (...args: unknown[]) => Promise<unknown>;
@@ -137,10 +137,15 @@ async function runExec(
   };
   process.on("SIGINT", sigintHandler);
 
-  wrapPageForActionLogging(page, sessionState.runId, onActivity);
+  const { page: execPage, context: execContext } = createExecBindings({
+    page,
+    context,
+    runId: sessionState.runId,
+    onActivity,
+  });
 
   if (visualize) {
-    await installInstrumentation(page, { visualize: true, logger: log });
+    await installInstrumentation(execPage, { visualize: true, logger: log });
   }
 
   try {
@@ -164,8 +169,8 @@ async function runExec(
     };
 
     const helpers = {
-      page,
-      context,
+      page: execPage,
+      context: execContext,
       state: execState,
       browser,
       networkLog,
