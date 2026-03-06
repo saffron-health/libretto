@@ -23,18 +23,18 @@ import {
   disconnectBrowser,
   getProfilePath,
   normalizeDomain,
-} from "../core/browser";
-import { getLog } from "../core/context";
+} from "../core/browser.js";
+import { getLog } from "../core/context.js";
 import {
   getSessionPermissionMode,
   readSessionStateOrThrow,
   readOnlySessionError,
-} from "../core/session";
+} from "../core/session.js";
 import {
   readActionLog,
   readNetworkLog,
   wrapPageForActionLogging,
-} from "../core/telemetry";
+} from "../core/telemetry.js";
 
 type ExecFunction = (...args: unknown[]) => Promise<unknown>;
 const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");

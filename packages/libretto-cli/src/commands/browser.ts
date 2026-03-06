@@ -1,12 +1,12 @@
 import type { Argv } from "yargs";
-import { runClose, runOpen, runSave } from "../core/browser";
+import { runClose, runOpen, runSave } from "../core/browser.js";
 import {
   readOnlySessionError,
   readSessionState,
   setSessionPermissionMode,
   writeSessionState,
   type SessionMode,
-} from "../core/session";
+} from "../core/session.js";
 
 function runSessionMode(session: string, mode: SessionMode): void {
   setSessionPermissionMode(session, mode);
@@ -95,4 +95,4 @@ export function registerBrowserCommands(yargs: Argv): Argv {
     });
 }
 
-export { runClose } from "../core/browser";
+export { runClose } from "../core/browser.js";
