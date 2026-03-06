@@ -2,10 +2,7 @@ import { mkdirSync } from "node:fs";
 import type { Argv } from "yargs";
 import { connect, disconnectBrowser } from "../core/browser";
 import { getLog, getSessionSnapshotRunDir } from "../core/context";
-import {
-  generateRunId,
-  assertSessionStateExistsOrThrow,
-} from "../core/session";
+import { generateRunId } from "../core/session";
 import {
   canAnalyzeSnapshots,
   runInterpret,
@@ -15,7 +12,6 @@ import {
 async function captureScreenshot(session: string): Promise<ScreenshotPair> {
   const log = getLog();
   log.info("screenshot-start", { session });
-  assertSessionStateExistsOrThrow(session);
   const snapshotRunId = `snapshot-${generateRunId()}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
