@@ -9,9 +9,9 @@ import {
   type LibrettoWorkflowContext,
   type RunDebugPauseDetails,
 } from "libretto";
-import { getProfilePath, normalizeDomain } from "../core/browser";
-import { getLog } from "../core/context";
-import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol";
+import { getProfilePath, normalizeDomain } from "../core/browser.js";
+import { getLog } from "../core/context.js";
+import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol.js";
 
 const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 

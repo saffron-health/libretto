@@ -8,15 +8,7 @@ import {
 } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { test as base } from "vitest";
-
-type SessionState = {
-  port: number;
-  pid: number;
-  session: string;
-  runId: string;
-  startedAt: string;
-  mode?: "read-only" | "interactive";
-};
+import { SESSION_STATE_VERSION, type SessionState } from "./core/session.js";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -234,7 +226,14 @@ export const test = base.extend<CliFixtures>({
       await mkdir(dir, { recursive: true });
       await writeFile(
         workspacePath(".libretto", "sessions", session, "state.json"),
-        JSON.stringify(normalized, null, 2),
+        JSON.stringify(
+          {
+            version: SESSION_STATE_VERSION,
+            ...normalized,
+          },
+          null,
+          2,
+        ),
       );
       return normalized;
     });

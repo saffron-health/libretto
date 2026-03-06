@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
-import { LIBRETTO_CONFIG_PATH } from "./context";
+import { LIBRETTO_CONFIG_PATH } from "./context.js";
 
 export const CURRENT_CONFIG_VERSION = 1;
 

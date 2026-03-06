@@ -117,7 +117,7 @@ const runner = createRunner({
   llmClient,            // optional — enables AI recovery & extraction
   dryRun: false,        // run in dry-run mode
   debug: false,         // enable debug mode
-  logDir: "./logs",     // defaults to tmp/libretto/logs
+  logDir: "./logs",     // defaults to .libretto/sessions/<sessionName>/logs
 });
 
 await runner.run(page, steps);

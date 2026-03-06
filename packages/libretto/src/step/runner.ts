@@ -8,6 +8,10 @@ import type { LoggerApi } from "../logger/logger.js";
 import { isDryRun } from "../config/config.js";
 import { debugPause } from "../debug/pause.js";
 import { attemptWithRecovery } from "../recovery/recovery.js";
+import {
+	ensureLibrettoRunnerLogDir,
+	getRunnerLogPathForDir,
+} from "../runtime/paths.js";
 
 export type Runner = {
 	run: (page: Page, steps: Step[]) => Promise<void>;
@@ -22,16 +26,18 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 		llmClient,
 		dryRun: dryRunOption,
 		debug: debugOption,
-		logDir = join(process.cwd(), "tmp", "libretto", "logs"),
+		sessionName = "libretto",
+		logDir: configuredLogDir,
 	} = config;
 	const dryRun = dryRunOption ?? isDryRun();
 	const debug = debugOption ?? false;
+	const logDir = configuredLogDir ?? ensureLibrettoRunnerLogDir(sessionName);
 
 	return {
 		run: async (page: Page, steps: Step[]) => {
 			mkdirSync(logDir, { recursive: true });
 
-			const logPath = join(logDir, "session.log");
+			const logPath = getRunnerLogPathForDir(logDir);
 			const logger = new Logger()
 				.withSink(createFileLogSink({ filePath: logPath }))
 				.withSink(prettyConsoleSink);
@@ -158,6 +164,7 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 						// Pause for debugging
 						await debugPause(page, {
 							enabled: debug,
+							sessionName,
 						});
 
 						throw firstError;
@@ -222,10 +229,7 @@ async function generateDebugBundle(
 		});
 	}
 
-	let pageUrl = "";
-	try {
-		pageUrl = page.url();
-	} catch {}
+	const pageUrl = page.isClosed() ? "" : page.url();
 
 	const bundle: DebugBundle = {
 		timestamp: new Date().toISOString(),
