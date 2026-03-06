@@ -1,53 +1,56 @@
 import type { Page } from "playwright";
-import { writeFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { isDebugMode } from "../config/config.js";
 
 export type DebugPauseOptions = {
 	/** Whether pause mode is enabled for this call. Defaults to env-based debug mode. */
 	enabled?: boolean;
-	/** Directory for pause signal files. Defaults to `tmp/libretto` in cwd. */
+	/** @deprecated Unused in IPC pause mode. */
 	signalDir?: string;
-	/** Session name for the signal file. Defaults to "libretto". */
+	/** Session name to include in pause metadata. Defaults to "libretto". */
 	sessionName?: string;
 };
 
-function getSignalDir(options?: DebugPauseOptions): string {
-	return options?.signalDir ?? join(process.cwd(), "tmp", "libretto");
-}
+export type DebugPauseDetails = {
+	sessionName: string;
+	pausedAt: string;
+	url: string;
+};
 
 function getSessionName(options?: DebugPauseOptions): string {
 	return options?.sessionName ?? "libretto";
 }
 
-function getPausedFilePath(options?: DebugPauseOptions): string {
-	return join(getSignalDir(options), `${getSessionName(options)}.paused`);
+export class DebugPauseSignal extends Error {
+	public readonly details: DebugPauseDetails;
+
+	constructor(details: DebugPauseDetails) {
+		super(`Workflow paused at ${details.url}`);
+		this.name = "DebugPauseSignal";
+		this.details = details;
+	}
 }
 
-function getResumeFilePath(options?: DebugPauseOptions): string {
-	return join(getSignalDir(options), `${getSessionName(options)}.resume`);
-}
-
-function cleanupPauseFiles(options?: DebugPauseOptions): void {
-	try {
-		const pausedFile = getPausedFilePath(options);
-		if (existsSync(pausedFile)) unlinkSync(pausedFile);
-	} catch {}
-	try {
-		const resumeFile = getResumeFilePath(options);
-		if (existsSync(resumeFile)) unlinkSync(resumeFile);
-	} catch {}
+export function isDebugPauseSignal(error: unknown): error is DebugPauseSignal {
+	if (!error || typeof error !== "object") return false;
+	const candidate = error as {
+		name?: unknown;
+		details?: {
+			sessionName?: unknown;
+			pausedAt?: unknown;
+			url?: unknown;
+		};
+	};
+	if (candidate.name !== "DebugPauseSignal") return false;
+	return (
+		typeof candidate.details?.sessionName === "string" &&
+		typeof candidate.details?.pausedAt === "string" &&
+		typeof candidate.details?.url === "string"
+	);
 }
 
 /**
- * Pauses execution and signals external tools that the agent is paused and
- * ready for inspection.
- *
- * Works in both headless and headed mode, unlike page.pause() which is a
- * no-op in headless mode.
- *
- * Writes a signal file so that external tooling can detect the pause.
- * Blocks until a resume file appears.
+ * Signals a workflow pause to the caller.
+ * When enabled, this throws a typed signal that supervisors can intercept.
  */
 export async function debugPause(
 	page: Page,
@@ -56,33 +59,14 @@ export async function debugPause(
 	const enabled = options?.enabled ?? isDebugMode();
 	if (!enabled) return;
 
-	const pausedFile = getPausedFilePath(options);
-	const resumeFile = getResumeFilePath(options);
-
-	mkdirSync(getSignalDir(options), { recursive: true });
-	cleanupPauseFiles(options);
-
 	const url = page.url();
-	const signal = JSON.stringify({
-		session: getSessionName(options),
+	const details: DebugPauseDetails = {
+		sessionName: getSessionName(options),
 		pausedAt: new Date().toISOString(),
-		pid: process.pid,
 		url,
-	});
-	writeFileSync(pausedFile, signal);
+	};
 
 	console.log(`[debugPause] Paused at ${url}`);
-	console.log(
-		`[debugPause] Waiting for resume signal... (create ${resumeFile})`,
-	);
-
-	try {
-		while (!existsSync(resumeFile)) {
-			await new Promise((r) => setTimeout(r, 500));
-		}
-	} finally {
-		cleanupPauseFiles(options);
-	}
-
-	console.log("[debugPause] Resumed");
+	console.log("[debugPause] Signaling pause to supervisor...");
+	throw new DebugPauseSignal(details);
 }

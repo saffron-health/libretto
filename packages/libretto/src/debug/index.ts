@@ -1,1 +1,7 @@
-export { debugPause, type DebugPauseOptions } from "./pause.js";
+export {
+	debugPause,
+	DebugPauseSignal,
+	isDebugPauseSignal,
+	type DebugPauseOptions,
+	type DebugPauseDetails,
+} from "./pause.js";

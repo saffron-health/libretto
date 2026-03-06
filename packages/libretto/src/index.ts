@@ -52,7 +52,13 @@ export {
 } from "./download/download.js";
 
 // Debug
-export { debugPause, type DebugPauseOptions } from "./debug/pause.js";
+export {
+	debugPause,
+	DebugPauseSignal,
+	isDebugPauseSignal,
+	type DebugPauseOptions,
+	type DebugPauseDetails,
+} from "./debug/pause.js";
 
 // Config
 export {
@@ -89,7 +95,10 @@ export {
 export {
 	launchBrowser,
 	debugPause as runDebugPause,
+	DebugPauseSignal as RunDebugPauseSignal,
+	isDebugPauseSignal as isRunDebugPauseSignal,
 	type DebugPauseOptions as RunDebugPauseOptions,
+	type DebugPauseDetails as RunDebugPauseDetails,
 	type LaunchBrowserArgs,
 	type BrowserSession,
 } from "./run/api.js";

@@ -2,4 +2,10 @@
 export { launchBrowser, type LaunchBrowserArgs, type BrowserSession } from "./browser.js";
 
 // --- Debug pause ---
-export { debugPause, type DebugPauseOptions } from "../debug/pause.js";
+export {
+	debugPause,
+	DebugPauseSignal,
+	isDebugPauseSignal,
+	type DebugPauseOptions,
+	type DebugPauseDetails,
+} from "../debug/pause.js";
