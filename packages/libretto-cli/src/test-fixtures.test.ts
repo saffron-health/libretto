@@ -71,7 +71,7 @@ describe("cli test fixtures", () => {
     async ({ librettoCli, workspacePath }) => {
       const result = await librettoCli("--help");
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("libretto-cli [command]");
+      expect(result.stdout).toMatch(/libretto-cli [<\[]command[>\]]/);
       expect(existsSync(workspacePath(".libretto"))).toBe(true);
       expect(existsSync(workspacePath(".libretto", ".gitignore"))).toBe(true);
       expect(existsSync(workspacePath("tmp", "libretto-cli"))).toBe(false);

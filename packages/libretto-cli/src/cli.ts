@@ -119,6 +119,7 @@ function createParser(
     .scriptName("libretto-cli")
     .parserConfiguration({ "populate--": true })
     .strictCommands()
+    .demandCommand(1)
     .option("session", {
       type: "string",
       describe: "Use a named session",

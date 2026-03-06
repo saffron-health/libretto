@@ -9,7 +9,7 @@ describe("basic CLI subprocess behavior", () => {
   test("prints usage for --help", async ({ librettoCli }) => {
     const result = await librettoCli("--help");
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("libretto-cli [command]");
+    expect(result.stdout).toMatch(/libretto-cli [<\[]command[>\]]/);
     expect(result.stderr).toBe("");
   });
 
@@ -48,10 +48,18 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
+  test("fails when only global options are passed without a command", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("--session abc12");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Not enough non-option arguments");
+  });
+
   test("fails unknown command with non-zero exit code", async ({ librettoCli }) => {
     const result = await librettoCli("nope-command");
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("libretto-cli [command]");
+    expect(result.stderr).toMatch(/libretto-cli [<\[]command[>\]]/);
     expect(result.stderr).toContain("Unknown command: nope-command");
     expect(result.stdout).toBe("");
   });
@@ -82,7 +90,7 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("exec --session test1");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
+      "Usage: libretto-cli exec <code> --session <name> [--visualize]",
     );
   });
 
@@ -346,7 +354,7 @@ export const main = workflow(
     const result = await librettoCli("session-mode maybe --session default");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Usage: libretto-cli session-mode <read-only|interactive> [--session <name>]",
+      "Usage: libretto-cli session-mode <read-only|interactive> --session <name>",
     );
   });
 
@@ -354,7 +362,7 @@ export const main = workflow(
     const result = await librettoCli("save --session test1");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Usage: libretto-cli save <url|domain> [--session <name>]",
+      "Usage: libretto-cli save <url|domain> --session <name>",
     );
   });
 

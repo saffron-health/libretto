@@ -395,7 +395,7 @@ export function registerExecutionCommands(yargs: Argv): Argv {
         const code = codeParts.join(" ");
         if (!code) {
           throw new Error(
-            "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
+            "Usage: libretto-cli exec <code> --session <name> [--visualize]",
           );
         }
         await runExec(code, String(argv.session), Boolean(argv.visualize));

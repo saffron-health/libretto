@@ -14,7 +14,7 @@ If it's not obvious which element to click or what value to enter, **ask the use
 ## Commands
 
 ```bash
-npx libretto open <url> [--headed]     # Launch browser and navigate (headless by default)
+npx libretto open <url> [--headed]     # Launch browser and navigate (headed by default)
 npx libretto exec <code> --session <name> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
 npx libretto run <integrationFile> <integrationExport> --session <name> # Execute integration actions
 npx libretto session-mode <read-only|interactive> --session <name> # Set session mode explicitly
