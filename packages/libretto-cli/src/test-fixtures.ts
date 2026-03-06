@@ -23,7 +23,6 @@ type SpawnResult = {
 };
 
 type SeedHelpers = {
-  seedDefaultSession: (session?: string) => Promise<string>;
   seedSessionState: (state?: Partial<SessionState>) => Promise<SessionState>;
   seedSessionPermission: (
     session: string,
@@ -203,13 +202,6 @@ export const test = base.extend<CliFixtures>({
         JSON.stringify(normalized, null, 2),
       );
       return normalized;
-    });
-  },
-
-  seedDefaultSession: async ({}, use) => {
-    await use(async (session?: string) => {
-      const value = session ?? testDefaultSession;
-      return value;
     });
   },
 
