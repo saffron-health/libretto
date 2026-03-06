@@ -605,11 +605,17 @@ await new Promise(() => {});
 
   log.info("open-child-spawned", { pid: child.pid, port, session });
 
+  let childSpawnError: Error | null = null;
+  let childEarlyExit: { code: number | null; signal: NodeJS.Signals | null } | null =
+    null;
+
   child.on("error", (err) => {
+    childSpawnError = err;
     log.error("open-child-spawn-error", { error: err, session, port });
   });
 
   child.on("exit", (code, signal) => {
+    childEarlyExit = { code, signal };
     log.warn("open-child-exited", {
       code,
       signal,
@@ -619,8 +625,30 @@ await new Promise(() => {});
     });
   });
 
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 500));
+  const cdpPollIntervalMs = 500;
+  const cdpMaxAttempts = 30;
+  const cdpStartupTimeoutMs = cdpPollIntervalMs * cdpMaxAttempts;
+
+  for (let i = 0; i < cdpMaxAttempts; i++) {
+    if (childSpawnError) {
+      const errWithCode = childSpawnError as Error & { code?: string };
+      const hint =
+        errWithCode.code === "ENOENT"
+          ? " Ensure Node.js is available in PATH for child processes."
+          : "";
+      throw new Error(
+        `Failed to launch browser child process: ${childSpawnError.message}.${hint} Check logs: ${runLogPath}`,
+      );
+    }
+
+    if (childEarlyExit) {
+      const status = childEarlyExit.code ?? childEarlyExit.signal ?? "unknown";
+      throw new Error(
+        `Browser child process exited before startup (status: ${status}). Check logs: ${runLogPath}`,
+      );
+    }
+
+    await new Promise((r) => setTimeout(r, cdpPollIntervalMs));
     const ready = await fetch(`http://127.0.0.1:${port}/json/version`)
       .then(() => true)
       .catch(() => false);
@@ -652,8 +680,15 @@ await new Promise(() => {});
     }
   }
 
-  log.error("open-timeout", { session, port, pid: child.pid, attempts: 30 });
-  throw new Error("Failed to connect to browser.");
+  log.error("open-timeout", {
+    session,
+    port,
+    pid: child.pid,
+    attempts: cdpMaxAttempts,
+  });
+  throw new Error(
+    `Failed to connect to browser after ${Math.ceil(cdpStartupTimeoutMs / 1000)}s. Check startup logs: ${runLogPath}`,
+  );
 }
 
 export async function runSave(urlOrDomain: string, session: string): Promise<void> {
