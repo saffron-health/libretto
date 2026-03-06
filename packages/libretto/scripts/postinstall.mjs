@@ -28,10 +28,10 @@ function main() {
 		return;
 	}
 
-	const destinationSkillDir = join(skillsRoot, "libretto-network-skill");
+	const destinationSkillDir = join(skillsRoot, "libretto");
 	mkdirSync(destinationSkillDir, { recursive: true });
 	cpSync(sourceSkillDir, destinationSkillDir, { recursive: true, force: true });
-	log(`Synced skill "libretto-network-skill" to "${destinationSkillDir}".`);
+	log(`Synced skill "libretto" to ".agents/skills/libretto".`);
 }
 
 try {
