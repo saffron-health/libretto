@@ -17,4 +17,26 @@ If on a non-main branch where the existing PR is already merged, the uncommitted
 
 Commit the changes. Use gh cli to check if a PR exists for this branch. If no PR exists, create one with an appropriate title and description. If a PR exists, query its current title and description and update them if the new changes warrant it. Push the changes.
 
+### PR body formatting
+
+When the PR body contains Markdown code spans/backticks, parentheses, angle brackets, or shell-sensitive characters, do not pass it directly via `--body "..."` because shells can mangle it.
+
+Use `--body-file` with stdin/heredoc instead:
+
+```bash
+cat <<'EOF' | gh pr create --base main --head <branch> --title "<title>" --body-file -
+## Summary
+- item with `code`
+EOF
+```
+
+Use the same pattern for updates:
+
+```bash
+cat <<'EOF' | gh pr edit <branch-or-number> --body-file -
+## Updated Summary
+- item with `code`
+EOF
+```
+
 For follow-up edits in this session, continue to commit, push, and update the PR as needed.
