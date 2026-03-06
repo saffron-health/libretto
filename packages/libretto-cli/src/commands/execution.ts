@@ -1,8 +1,15 @@
-import { existsSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  unlinkSync,
+  mkdirSync,
+} from "node:fs";
 import * as moduleBuiltin from "node:module";
 import { cwd } from "node:process";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { spawn } from "node:child_process";
 import type { Argv } from "yargs";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { installInstrumentation } from "libretto/instrumentation";
@@ -11,7 +18,6 @@ import { launchBrowser } from "libretto/run";
 import { connect, disconnectBrowser } from "../core/browser";
 import { getLog } from "../core/context";
 import {
-  getSessionPermissionMode,
   getSessionStateOrThrow,
   readOnlySessionError,
   resolveSessionMode,
@@ -83,17 +89,21 @@ function compileTypeScriptExecFunction(
   const jsSource = withSuppressedStripTypeScriptWarning(() =>
     stripTypeScriptTypes(wrappedSource, { mode: "strip" }),
   );
-  const createFunction = new Function(`return ${jsSource}`) as () => ExecFunction;
+  const createFunction = new Function(
+    `return ${jsSource}`,
+  ) as () => ExecFunction;
   return createFunction();
 }
 
-function compileExecFunction(code: string, helperNames: string[]): ExecFunction {
+function compileExecFunction(
+  code: string,
+  helperNames: string[],
+): ExecFunction {
   const typeStripped = compileTypeScriptExecFunction(code, helperNames);
   if (typeStripped) return typeStripped;
 
-  const AsyncFunction = Object.getPrototypeOf(
-    async function () {},
-  ).constructor as new (...args: string[]) => ExecFunction;
+  const AsyncFunction = Object.getPrototypeOf(async function () {})
+    .constructor as new (...args: string[]) => ExecFunction;
   return new AsyncFunction(...helperNames, code);
 }
 
@@ -353,12 +363,7 @@ export function registerExecutionCommands(yargs: Argv): Argv {
           .option("params-file", { type: "string" })
           .option("headed", { type: "boolean", default: false })
           .option("headless", { type: "boolean", default: false })
-          .option("debug", { type: "string" })
-          .option("allow-actions", {
-            type: "boolean",
-            default: false,
-            hidden: true,
-          }),
+          .option("debug", { type: "string" }),
       async (argv) => {
         const usage =
           "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]";
@@ -369,17 +374,6 @@ export function registerExecutionCommands(yargs: Argv): Argv {
         }
 
         const session = String(argv.session);
-        const allowActions = Boolean(
-          argv["allow-actions"] ?? (argv as { allowActions?: boolean }).allowActions,
-        );
-        if (allowActions) {
-          throw new Error(
-            `--allow-actions is not supported for run. ${readOnlySessionError(session)}`,
-          );
-        }
-        if (getSessionPermissionMode(session) !== "interactive") {
-          throw new Error(readOnlySessionError(session));
-        }
 
         const rawInlineParams = argv.params as string | undefined;
         const paramsFile = argv["params-file"] as string | undefined;
@@ -403,7 +397,11 @@ export function registerExecutionCommands(yargs: Argv): Argv {
         if (hasHeadedFlag && hasHeadlessFlag) {
           throw new Error("Cannot pass both --headed and --headless.");
         }
-        const headlessMode = hasHeadedFlag ? false : hasHeadlessFlag ? true : undefined;
+        const headlessMode = hasHeadedFlag
+          ? false
+          : hasHeadlessFlag
+            ? true
+            : undefined;
 
         const rawDebug = argv.debug as string | undefined;
         const debugMode = (() => {
@@ -411,7 +409,9 @@ export function registerExecutionCommands(yargs: Argv): Argv {
           const normalized = rawDebug.trim().toLowerCase();
           if (normalized === "true") return true;
           if (normalized === "false") return false;
-          throw new Error(`Invalid value for --debug: "${rawDebug}". Expected true or false.`);
+          throw new Error(
+            `Invalid value for --debug: "${rawDebug}". Expected true or false.`,
+          );
         })();
 
         setDebugMode(debugMode);

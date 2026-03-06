@@ -28,13 +28,14 @@ npx libretto close                     # Close the browser
 All commands accept `--session <name>` for isolated browser instances (default: `default`).
 Built-in sessions: `default`, `dev-server`, `browser-agent`.
 
-## Interactive Consent Rule
+## Session Mode: Read-Only by Default
 
-After starting a session with `open` (or when preparing to use `run`), ask:
-"Do you want this session to be interactive?"
+Sessions start in **read-only mode** by default. When opening a browser, tell the user:
 
-- If user says **no**, keep it read-only and use read-only-safe commands (`snapshot`, `network`, `actions`).
-- If user says **yes**, run `npx libretto session-mode interactive --session <name>` and then proceed with `exec`/`run`.
+> "Starting in read-only mode — I'll observe the page without clicking or making requests. If you'd like me to interact with elements (click, fill, submit) or make network requests, let me know and I'll switch to interactive mode."
+
+- Use read-only-safe commands (`snapshot`, `network`, `actions`) until the user grants write access.
+- When the user requests interactive mode, run `npx libretto session-mode interactive --session <name>` and then proceed with `exec`/`run`.
 - Never change session mode unless the user explicitly approves.
 
 ## Visualize Mode (`--visualize`)
@@ -50,10 +51,10 @@ The `state` object persists across `exec` calls within the same session — use 
 ## Workflow: Browse and Interact
 
 ```bash
-# Open a page
+# Open a page (starts in read-only mode)
 npx libretto open https://example.com
-# Ask user if they want interactive mode
-# If yes:
+
+# When user grants interactive access:
 npx libretto session-mode interactive --session default
 
 # Interact with elements
@@ -244,39 +245,25 @@ Use Libretto CLI interactively to build a brand new integration from scratch. Na
 
 **IMPORTANT:** Do NOT explore the codebase or research existing code before starting. This skill file and the CLI commands below contain everything you need. Jump straight into using the CLI interactively — ask the user for the URL, open the browser, and start working. The only exception is if the user mentions a specific file or piece of code to reference — then read that specific file first, but nothing more.
 
-### Before You Start: Clarify the Approach
+### Before You Start: Approach Selection
 
-Before opening the browser, check whether the user's prompt already specifies:
+By default, use the **preferred ordering of approaches**: try the network-first approach (`page.evaluate(fetch(...))`) first, then fall back to Playwright DOM automation if that doesn't work (see "Integration Approaches" below).
 
-1. **Which integration approach to use** — Did they say to use network requests (`page.evaluate(fetch(...))`), Playwright DOM automation, or a specific strategy?
-2. **Whether to run a security posture review** — Did they ask you to assess the site's bot detection, fetch interception, or security posture?
+**If the user explicitly specifies an approach**, use it instead.
 
-**If the user specified an approach**, use it — skip the security review and go with what they asked for.
+As part of starting the session, silently run a **security posture review** using the probes from `integration-approach-selection.md` (in this skill's directory) to assess the site's bot detection, fetch interception, and security posture. This tells you:
 
-**If the user asked for a security review**, run the security posture review described below.
-
-**If neither is specified**, ask the user before proceeding:
-
-> "Before we start — would you like me to run a security posture review on the site to determine the best integration approach? Or would you prefer I default to the network-first approach (using `page.evaluate(fetch(...))`) and fall back to Playwright automation if that doesn't work?"
-
-Once you have the answer, proceed accordingly.
-
-### Security Posture Review
-
-Run the probes from `integration-approach-selection.md` (in this skill's directory). This answers one question: **which approaches are safe to use on this site?**
-
-The output is a Site Assessment Summary that tells you:
 - Whether `page.evaluate(fetch(...))` is safe (fetch not patched, no aggressive bot detection)
 - Whether `page.on('response', ...)` interception is viable
 - Whether you need to restrict to DOM-only extraction
 
-**Present the security assessment to the user and get their input** before proceeding. The user may have context about the site that affects the approach (e.g., they know the site uses a specific framework, or they've tried certain approaches before).
+If the security review reveals that the default network-first approach won't work (e.g., fetch is monkey-patched, aggressive bot detection), **adapt your approach accordingly and tell the user what you found and which approach you're switching to.** You don't need to ask permission to switch — just explain what you discovered and proceed.
 
-Once approved, use the security-recommended approach as you build the integration.
+The user may also share context during the session that changes the approach (e.g., they know the site blocks direct fetch). Adapt as needed.
 
 ### Handling Approach Mismatches
 
-The security review tells you what's *safe*, but not necessarily what *works* for every endpoint or data source on the site. As you build the integration, you may find that the recommended approach doesn't produce usable data for a specific part of the workflow. When this happens, **explain what you found, adapt your approach** for that specific part, and keep going.
+The security review tells you what's _safe_, but not necessarily what _works_ for every endpoint or data source on the site. As you build the integration, you may find that the recommended approach doesn't produce usable data for a specific part of the workflow. When this happens, **explain what you found, adapt your approach** for that specific part, and keep going.
 
 Common mismatches:
 

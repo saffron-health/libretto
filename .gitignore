@@ -6,3 +6,4 @@ tmp/
 .libretto-cli/
 .codex/
 .vscode/settings.json
+.env
