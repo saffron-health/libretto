@@ -2,8 +2,6 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
-tmp/
-.libretto-cli/
 .codex/
 .vscode/settings.json
 .env

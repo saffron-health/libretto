@@ -22,6 +22,10 @@ export default defineConfig({
         replacement: resolve(__dirname, "../libretto/src/config/index.ts"),
       },
       {
+        find: /^libretto\/state$/,
+        replacement: resolve(__dirname, "../libretto/src/state/index.ts"),
+      },
+      {
         find: /^libretto\/run$/,
         replacement: resolve(__dirname, "../libretto/src/run/api.ts"),
       },

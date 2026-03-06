@@ -52,6 +52,7 @@ export type RunnerConfig = {
 	llmClient?: LLMClient;
 	dryRun?: boolean;
 	debug?: boolean;
+	sessionName?: string;
 	logDir?: string;
 };
 

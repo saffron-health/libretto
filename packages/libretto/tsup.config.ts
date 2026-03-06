@@ -14,6 +14,7 @@ export default defineConfig({
 		"instrumentation/index": "src/instrumentation/index.ts",
 		"visualization/index": "src/visualization/index.ts",
 		"llm/index": "src/llm/index.ts",
+		"state/index": "src/state/index.ts",
 		"run/api": "src/run/api.ts",
 	},
 	format: ["esm", "cjs"],

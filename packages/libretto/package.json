@@ -64,6 +64,11 @@
 			"import": "./dist/llm/index.js",
 			"require": "./dist/llm/index.cjs"
 		},
+		"./state": {
+			"types": "./dist/state/index.d.ts",
+			"import": "./dist/state/index.js",
+			"require": "./dist/state/index.cjs"
+		},
 		"./run": {
 			"types": "./dist/run/api.d.ts",
 			"import": "./dist/run/api.js",
