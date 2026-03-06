@@ -12,8 +12,8 @@ import {
   setLogFile,
 } from "./core/context";
 import {
+  generateSessionName,
   logFileForSession,
-  SESSION_DEFAULT,
   validateSessionName,
 } from "./core/session";
 
@@ -33,6 +33,17 @@ const CLI_COMMANDS = new Set([
   "help",
 ]);
 
+const SESSION_REQUIRED_COMMANDS = new Set([
+  "run",
+  "session-mode",
+  "save",
+  "exec",
+  "snapshot",
+  "network",
+  "actions",
+  "close",
+]);
+
 function printUsage(): void {
   console.log(`Usage: libretto-cli <command> [--session <name>]
 
@@ -50,16 +61,17 @@ Commands:
   close                   Close the browser
 
 Options:
-  --session <name>        Use a named session (default: "default")
-                          Built-in sessions: default, dev-server, browser-agent
+  --session <name>        Use a named session
+                          Required for: run, session-mode, save, exec, snapshot, network, actions, close
+                          If omitted for open, a 5-character id is auto-generated
 
 Examples:
   libretto-cli open https://linkedin.com
-  # default sessions are read-only; enable actions only after explicit human approval
-  libretto-cli session-mode interactive --session default
+  # open prints the generated session id (for example: abc12)
+  libretto-cli session-mode interactive --session abc12
 
   # ... manually log in ...
-  libretto-cli save linkedin.com
+  libretto-cli save linkedin.com --session abc12
   # Next time you open linkedin.com, you'll be logged in automatically
 
   libretto-cli exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
@@ -105,19 +117,11 @@ function filterSessionArgs(args: string[]): string[] {
   return result;
 }
 
-function parseSessionForLog(rawArgs: string[]): string {
+function getExplicitSession(rawArgs: string[]): string | undefined {
   const idx = rawArgs.indexOf("--session");
-  if (idx < 0) return SESSION_DEFAULT;
+  if (idx < 0) return undefined;
   const value = rawArgs[idx + 1];
-  if (!value || value.startsWith("--") || CLI_COMMANDS.has(value)) {
-    return SESSION_DEFAULT;
-  }
-  try {
-    validateSessionName(value);
-    return value;
-  } catch {
-    return SESSION_DEFAULT;
-  }
+  return value;
 }
 
 function validateLegacySessionArg(rawArgs: string[]): void {
@@ -132,25 +136,24 @@ function validateLegacySessionArg(rawArgs: string[]): void {
   validateSessionName(value);
 }
 
-function initializeLogger(rawArgs: string[]): void {
-  const sessionForLog = parseSessionForLog(rawArgs);
-  const logFilePath = logFileForSession(sessionForLog);
+function initializeLogger(rawArgs: string[], session: string): void {
+  const logFilePath = logFileForSession(session);
 
   setLogFile(logFilePath);
   getLog().info("cli-start", {
     args: rawArgs,
     cwd: process.cwd(),
-    session: sessionForLog,
+    session,
   });
 }
 
-function createParser(): Argv {
+function createParser(defaultSession: string): Argv {
   let parser: Argv = (yargs(hideBin(process.argv)) as Argv)
     .scriptName("libretto-cli")
     .parserConfiguration({ "populate--": true })
     .option("session", {
       type: "string",
-      default: SESSION_DEFAULT,
+      default: defaultSession,
       describe: "Use a named session",
       global: true,
     })
@@ -180,8 +183,7 @@ function createParser(): Argv {
 export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   ensureLibrettoSetup();
-  initializeLogger(rawArgs);
-  const log = getLog();
+  let log: ReturnType<typeof getLog> | null = null;
 
   try {
     validateLegacySessionArg(rawArgs);
@@ -202,14 +204,27 @@ export async function runLibrettoCLI(): Promise<void> {
       process.exit(1);
     }
 
-    const parser = createParser();
+    const explicitSession = getExplicitSession(rawArgs);
+    if (SESSION_REQUIRED_COMMANDS.has(command) && !explicitSession) {
+      throw new Error(
+        `Missing --session for "${command}". Start with 'libretto-cli open <url>' and use the returned session id.`,
+      );
+    }
+
+    const sessionId = explicitSession ?? generateSessionName();
+    initializeLogger(rawArgs, sessionId);
+    log = getLog();
+
+    const parser = createParser(sessionId);
     log.info("cli-command", { command, args });
     await parser.parseAsync();
 
     await flushLog();
     process.exit(0);
   } catch (err) {
-    log.error("cli-error", { error: err, args: rawArgs });
+    if (log) {
+      log.error("cli-error", { error: err, args: rawArgs });
+    }
     await flushLog();
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);

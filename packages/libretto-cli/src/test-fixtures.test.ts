@@ -44,7 +44,6 @@ describe("cli test fixtures", () => {
   }) => {
     const seeded = await seedSessionState({
       session: "spec-session",
-      runId: "run-2",
     });
     await seedNetworkLog("spec-session", [
       { ts: "2026-01-01T00:00:00.000Z", method: "GET", url: "https://example.com", status: 200, contentType: "text/html", size: 1, durationMs: 1 },

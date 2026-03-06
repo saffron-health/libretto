@@ -17,8 +17,9 @@ import {
 } from "./context";
 
 const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+const AUTO_SESSION_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
+const AUTO_SESSION_LENGTH = 5;
 
-export const SESSION_DEFAULT = "default";
 export const SESSION_DEV_SERVER = "dev-server";
 export const SESSION_BROWSER_AGENT = "browser-agent";
 export type SessionMode = "read-only" | "interactive";
@@ -27,7 +28,6 @@ export type SessionState = {
   port: number;
   pid: number;
   session: string;
-  runId: string;
   startedAt: string;
   mode?: SessionMode;
 };
@@ -36,12 +36,13 @@ type SessionPermissions = {
   sessions: Record<string, SessionMode>;
 };
 
-export function generateRunId(): string {
-  return new Date()
-    .toISOString()
-    .replace(/[-:T]/g, "")
-    .replace(/\..+/, "")
-    .replace(/^(\d{8})(\d{6})$/, "$1-$2");
+export function generateSessionName(): string {
+  let value = "";
+  for (let i = 0; i < AUTO_SESSION_LENGTH; i += 1) {
+    const index = Math.floor(Math.random() * AUTO_SESSION_CHARS.length);
+    value += AUTO_SESSION_CHARS[index];
+  }
+  return value;
 }
 
 export function logFileForSession(session: string): string {
@@ -151,7 +152,6 @@ export function writeSessionState(state: SessionState): void {
     stateFile,
     port: state.port,
     pid: state.pid,
-    runId: state.runId,
   });
 }
 
