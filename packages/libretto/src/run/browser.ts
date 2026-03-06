@@ -1,7 +1,8 @@
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { createServer } from "node:net";
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { ensureLibrettoSessionStatePath } from "../runtime/paths.js";
+import { SESSION_STATE_VERSION, SessionStateFileSchema } from "../state/session-state.js";
 
 async function pickFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
@@ -59,11 +60,34 @@ export async function launchBrowser({
   page.setDefaultTimeout(30_000);
   page.setDefaultNavigationTimeout(45_000);
 
-  const metadataPath = join(process.cwd(), "tmp", "libretto", `${sessionName}.json`);
-  mkdirSync(dirname(metadataPath), { recursive: true });
+  const metadataPath = ensureLibrettoSessionStatePath(sessionName);
+  const existingStateRaw = existsSync(metadataPath)
+    ? (JSON.parse(readFileSync(metadataPath, "utf-8")) as unknown)
+    : undefined;
+
+  const parsedExistingState = SessionStateFileSchema.safeParse(existingStateRaw);
+
   writeFileSync(
     metadataPath,
-    JSON.stringify({ session: sessionName, port: debugPort, startedAt: new Date().toISOString() }, null, 2),
+    JSON.stringify(
+      {
+        version: parsedExistingState.success
+          ? parsedExistingState.data.version
+          : SESSION_STATE_VERSION,
+        session: sessionName,
+        port: debugPort,
+        pid: process.pid,
+        runId: parsedExistingState.success
+          ? parsedExistingState.data.runId
+          : `runtime-${Date.now()}`,
+        startedAt: new Date().toISOString(),
+        ...(parsedExistingState.success && parsedExistingState.data.mode
+          ? { mode: parsedExistingState.data.mode }
+          : {}),
+      },
+      null,
+      2,
+    ),
   );
 
   return {
@@ -74,9 +98,6 @@ export async function launchBrowser({
     metadataPath,
     close: async () => {
       await browser.close();
-      if (existsSync(metadataPath)) {
-        try { unlinkSync(metadataPath); } catch {}
-      }
     },
   };
 }

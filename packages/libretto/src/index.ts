@@ -22,6 +22,17 @@ export {
 
 // LLM client interface
 export type { LLMClient, Message, MessageContentPart } from "./llm/types.js";
+export {
+	SESSION_STATE_VERSION,
+	SessionModeSchema,
+	SessionStateFileSchema,
+	parseSessionStateData,
+	parseSessionStateContent,
+	serializeSessionState,
+	type SessionMode,
+	type SessionState,
+	type SessionStateFile,
+} from "./state/index.js";
 
 // Recovery
 export { executeRecoveryAgent } from "./recovery/agent.js";

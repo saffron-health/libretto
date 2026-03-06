@@ -1,10 +1,10 @@
 import type {
   RunIntegrationWorkerMessage,
   RunIntegrationWorkerRequest,
-} from "./run-integration-worker-protocol";
-import { runIntegrationFromFileInWorker } from "./run-integration-runtime";
-import { ensureLibrettoSetup, setLogFile } from "../core/context";
-import { logFileForSession } from "../core/session";
+} from "./run-integration-worker-protocol.js";
+import { runIntegrationFromFileInWorker } from "./run-integration-runtime.js";
+import { ensureLibrettoSetup, setLogFile } from "../core/context.js";
+import { logFileForSession } from "../core/session.js";
 
 function sendMessage(message: RunIntegrationWorkerMessage): void {
   if (typeof process.send === "function") {

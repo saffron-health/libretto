@@ -16,22 +16,28 @@ function main() {
 	const initCwd = process.env.INIT_CWD ? resolve(process.env.INIT_CWD) : null;
 	const installRoot = initCwd ?? process.cwd();
 
-	const skillsRoot = join(installRoot, ".agents", "skills");
-	if (!isDirectory(skillsRoot)) {
-		log(`Skipped: "${skillsRoot}" does not exist.`);
-		return;
-	}
-
 	const sourceSkillDir = join(packageDir, "skill");
 	if (!isDirectory(sourceSkillDir)) {
 		log(`Skipped: source skill directory not found at "${sourceSkillDir}".`);
 		return;
 	}
 
-	const destinationSkillDir = join(skillsRoot, "libretto");
-	mkdirSync(destinationSkillDir, { recursive: true });
-	cpSync(sourceSkillDir, destinationSkillDir, { recursive: true, force: true });
-	log(`Synced skill "libretto" to ".agents/skills/libretto".`);
+	const targets = [
+		join(installRoot, ".agents", "skills"),
+		join(installRoot, ".claude", "skills"),
+	];
+
+	for (const skillsRoot of targets) {
+		if (!isDirectory(skillsRoot)) {
+			log(`Skipped: "${skillsRoot}" does not exist.`);
+			continue;
+		}
+
+		const destinationSkillDir = join(skillsRoot, "libretto");
+		mkdirSync(destinationSkillDir, { recursive: true });
+		cpSync(sourceSkillDir, destinationSkillDir, { recursive: true, force: true });
+		log(`Synced skill "libretto" to "${skillsRoot}/libretto".`);
+	}
 }
 
 try {

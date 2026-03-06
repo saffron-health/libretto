@@ -103,7 +103,7 @@ Target layout:
 
 ### Phase 5: Move default `libretto` package runtime state out of `tmp/libretto`
 
-- [ ] Change `launchBrowser` metadata path default to `.libretto/sessions/<session>/state.json`-compatible location (or sibling metadata file in the same session dir).
+- [ ] Change `launchBrowser` metadata path default to `.libretto/sessions/<session>/state.json`.
 - [ ] Change `debugPause` default signal directory from `tmp/libretto` to `.libretto/sessions/<session>/`.
 - [ ] Change runner default `logDir` from `tmp/libretto/logs` to a `.libretto/sessions/<session>/`-scoped logs location.
 - [ ] Ensure these defaults remain overridable by explicit options.

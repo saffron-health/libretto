@@ -7,23 +7,22 @@ import { installInstrumentation } from "libretto/instrumentation";
 import {
   connect,
   disconnectBrowser,
-} from "../core/browser";
-import { getLog } from "../core/context";
+} from "../core/browser.js";
+import { getLog } from "../core/context.js";
 import {
   getSessionPermissionMode,
   readSessionStateOrThrow,
   readOnlySessionError,
-  resolveSessionMode,
-} from "../core/session";
+} from "../core/session.js";
 import {
   readActionLog,
   readNetworkLog,
   wrapPageForActionLogging,
-} from "../core/telemetry";
+} from "../core/telemetry.js";
 import type {
   RunIntegrationWorkerMessage,
   RunIntegrationWorkerRequest,
-} from "../workers/run-integration-worker-protocol";
+} from "../workers/run-integration-worker-protocol.js";
 
 type ExecFunction = (...args: unknown[]) => Promise<unknown>;
 
@@ -111,7 +110,7 @@ async function runExec(
 ): Promise<void> {
   const log = getLog();
   const sessionState = readSessionStateOrThrow(session);
-  const mode = resolveSessionMode(session, sessionState);
+  const mode = sessionState.mode ?? "read-only";
   if (mode !== "interactive") {
     throw new Error(readOnlySessionError(session));
   }
@@ -260,7 +259,7 @@ function isRunIntegrationWorkerMessage(
 
 async function runIntegrationFromFile(args: RunIntegrationWorkerRequest): Promise<void> {
   const workerEntryPath = fileURLToPath(
-    new URL("./workers/run-integration-worker.js", import.meta.url),
+    new URL("../workers/run-integration-worker.js", import.meta.url),
   );
   const payload = JSON.stringify(args);
   const worker = fork(workerEntryPath, [payload], {
