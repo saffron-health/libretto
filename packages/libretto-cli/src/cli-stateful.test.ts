@@ -284,7 +284,6 @@ describe("state-driven CLI subprocess behavior", () => {
         {
           version: 2,
           session,
-          runId: "run-invalid-version",
           port: 65534,
           pid: 12345,
           startedAt: "2026-01-01T00:00:00.000Z",

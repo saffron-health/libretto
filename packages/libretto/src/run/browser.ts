@@ -77,9 +77,6 @@ export async function launchBrowser({
         session: sessionName,
         port: debugPort,
         pid: process.pid,
-        runId: parsedExistingState.success
-          ? parsedExistingState.data.runId
-          : `runtime-${Date.now()}`,
         startedAt: new Date().toISOString(),
         ...(parsedExistingState.success && parsedExistingState.data.mode
           ? { mode: parsedExistingState.data.mode }
