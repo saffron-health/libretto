@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 import { writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { RunnerConfig, Step, StepHistoryEntry, DebugBundle } from "./types.js";
 import { Logger } from "../logger/logger.js";
 import { createFileLogSink, prettyConsoleSink } from "../logger/sinks.js";
@@ -8,6 +8,11 @@ import type { LoggerApi } from "../logger/logger.js";
 import { setDebugMode, setDryRun } from "../config/config.js";
 import { debugPause } from "../debug/pause.js";
 import { attemptWithRecovery } from "../recovery/recovery.js";
+import {
+	ensureLibrettoRunnerLogDir,
+	getLibrettoPauseSignalDir,
+	getRunnerLogPathForDir,
+} from "../runtime/paths.js";
 
 export type Runner = {
 	run: (page: Page, steps: Step[]) => Promise<void>;
@@ -22,8 +27,14 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 		llmClient,
 		dryRun = false,
 		debug = false,
-		logDir = join(process.cwd(), "tmp", "libretto", "logs"),
+		sessionName = "libretto",
+		logDir: configuredLogDir,
 	} = config;
+	const logDir = configuredLogDir ?? ensureLibrettoRunnerLogDir(sessionName);
+	const pauseSignalDir =
+		configuredLogDir === undefined
+			? getLibrettoPauseSignalDir(sessionName)
+			: dirname(logDir);
 
 	// Set global config overrides
 	setDebugMode(debug);
@@ -33,7 +44,7 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 		run: async (page: Page, steps: Step[]) => {
 			mkdirSync(logDir, { recursive: true });
 
-			const logPath = join(logDir, "session.log");
+			const logPath = getRunnerLogPathForDir(logDir);
 			const logger = new Logger()
 				.withSink(createFileLogSink({ filePath: logPath }))
 				.withSink(prettyConsoleSink);
@@ -158,7 +169,7 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 						stepLogger.info("step:debug-bundle", { path: bundle.bundlePath });
 
 						// Pause for debugging
-						await debugPause(page, { signalDir: join(logDir, "..") });
+						await debugPause(page, { signalDir: pauseSignalDir, sessionName });
 
 						throw firstError;
 					}

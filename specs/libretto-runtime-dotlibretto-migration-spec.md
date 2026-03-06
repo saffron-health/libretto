@@ -65,11 +65,11 @@ Use one shared internal path helper module in `packages/libretto` so `launchBrow
 
 ### Phase 3: Migrate runner defaults to session-scoped `.libretto` paths
 
-- [ ] Add `sessionName` to `RunnerConfig` (default `"libretto"`) so runner defaults are session-scoped.
-- [ ] Change runner default `logDir` from `tmp/libretto/logs` to `.libretto/sessions/<session>/logs`.
-- [ ] Change default structured log filename from `session.log` to `logs.jsonl`.
-- [ ] Ensure debug pause integration uses the same resolved session directory as runner defaults.
-- [ ] Success criteria: `createRunner({ sessionName: "my-session" })` writes logs/artifacts under `.libretto/sessions/my-session/` and does not create `tmp/libretto/`.
+- [x] Add `sessionName` to `RunnerConfig` (default `"libretto"`) so runner defaults are session-scoped.
+- [x] Change runner default `logDir` from `tmp/libretto/logs` to `.libretto/sessions/<session>/logs`.
+- [x] Change default structured log filename from `session.log` to `logs.jsonl`.
+- [x] Ensure debug pause integration uses the same resolved session directory as runner defaults.
+- [x] Success criteria: `createRunner({ sessionName: "my-session" })` writes logs/artifacts under `.libretto/sessions/my-session/` and does not create `tmp/libretto/`.
 
 ### Phase 4: Docs and verification
 

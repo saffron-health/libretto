@@ -1,8 +1,12 @@
 import type { Page } from "playwright";
 import { writeFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { isDebugMode } from "../config/config.js";
-import { ensureLibrettoPauseSignalDir, getLibrettoPauseSignalDir } from "../runtime/paths.js";
+import {
+	ensureLibrettoPauseSignalDir,
+	getLibrettoPausedSignalPath,
+	getLibrettoResumeSignalPath,
+	getPauseSignalPathForDir,
+} from "../runtime/paths.js";
 
 export type DebugPauseOptions = {
 	/** Directory for pause signal files. Defaults to `.libretto/sessions/<sessionName>` in cwd. */
@@ -11,23 +15,26 @@ export type DebugPauseOptions = {
 	sessionName?: string;
 };
 
-function getSignalDir(options?: DebugPauseOptions): string {
-	return (
-		options?.signalDir ??
-		getLibrettoPauseSignalDir(getSessionName(options))
-	);
-}
-
 function getSessionName(options?: DebugPauseOptions): string {
 	return options?.sessionName ?? "libretto";
 }
 
 function getPausedFilePath(options?: DebugPauseOptions): string {
-	return join(getSignalDir(options), `${getSessionName(options)}.paused`);
+	const signalDir = options?.signalDir;
+	const sessionName = getSessionName(options);
+	if (signalDir) {
+		return getPauseSignalPathForDir(signalDir, sessionName, "paused");
+	}
+	return getLibrettoPausedSignalPath(sessionName);
 }
 
 function getResumeFilePath(options?: DebugPauseOptions): string {
-	return join(getSignalDir(options), `${getSessionName(options)}.resume`);
+	const signalDir = options?.signalDir;
+	const sessionName = getSessionName(options);
+	if (signalDir) {
+		return getPauseSignalPathForDir(signalDir, sessionName, "resume");
+	}
+	return getLibrettoResumeSignalPath(sessionName);
 }
 
 function cleanupPauseFiles(options?: DebugPauseOptions): void {
