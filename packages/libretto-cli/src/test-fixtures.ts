@@ -2,7 +2,10 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import {
+  execFile,
+  spawnSync,
+} from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { test as base } from "vitest";
 
@@ -41,6 +44,7 @@ type CliFixtures = {
     command: string,
     env?: Record<string, string>,
   ) => Promise<SpawnResult>;
+  writeWorkflowScript: (fileName: string, source: string) => Promise<string>;
 } & SeedHelpers;
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -75,41 +79,6 @@ function ensureBuilt(): void {
     );
   }
   didBuild = true;
-}
-
-async function spawnProcess(
-  command: string,
-  args: string[],
-  cwd: string,
-  env?: Record<string, string>,
-): Promise<SpawnResult> {
-  return await new Promise<SpawnResult>((resolveResult, reject) => {
-    const child = spawn(command, args, {
-      cwd,
-      env: { ...process.env, ...env },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.on("data", (chunk: Buffer | string) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on("data", (chunk: Buffer | string) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", reject);
-    child.on("close", (code) => {
-      resolveResult({
-        exitCode: code ?? 1,
-        stdout,
-        stderr,
-      });
-    });
-  });
 }
 
 function parseCommandArgs(command: string): string[] {
@@ -159,6 +128,55 @@ function parseCommandArgs(command: string): string[] {
   return args;
 }
 
+async function execProcess(
+  command: string,
+  args: string[],
+  cwd: string,
+  env?: Record<string, string>,
+): Promise<SpawnResult> {
+  return await new Promise<SpawnResult>((resolveResult, reject) => {
+    execFile(
+      command,
+      args,
+      {
+        cwd,
+        env: { ...process.env, ...env },
+        maxBuffer: 10 * 1024 * 1024,
+      },
+      (error, stdout, stderr) => {
+        if (!error) {
+          resolveResult({
+            exitCode: 0,
+            stdout: String(stdout),
+            stderr: String(stderr),
+          });
+          return;
+        }
+
+        const candidate = (
+          error as NodeJS.ErrnoException & { code?: number | string }
+        ).code;
+        const exitCode = typeof candidate === "number" ? candidate : 1;
+        if (error.name === "AbortError") {
+          reject(error);
+          return;
+        }
+        resolveResult({
+          exitCode,
+          stdout: String(stdout ?? ""),
+          stderr: String(stderr ?? ""),
+        });
+      },
+    );
+  });
+}
+
+function stripCodeFence(source: string): string {
+  const trimmed = source.trim();
+  const match = trimmed.match(/^```(?:\w+)?\n([\s\S]*?)\n```$/);
+  return match ? match[1] : source;
+}
+
 export const test = base.extend<CliFixtures>({
   workspaceDir: async ({}, use) => {
     const workspaceDir = await mkdtemp(join(tmpdir(), "libretto-cli-test-"));
@@ -176,12 +194,21 @@ export const test = base.extend<CliFixtures>({
   librettoCli: async ({ workspaceDir }, use) => {
     ensureBuilt();
     await use(async (command: string, env?: Record<string, string>) => {
-      return await spawnProcess(
+      return await execProcess(
         process.execPath,
         [cliEntry, ...parseCommandArgs(command)],
         workspaceDir,
         env,
       );
+    });
+  },
+
+  writeWorkflowScript: async ({ workspacePath }, use) => {
+    await use(async (fileName: string, source: string) => {
+      const normalized = stripCodeFence(source);
+      const scriptPath = workspacePath(fileName);
+      await writeFile(scriptPath, normalized, "utf8");
+      return scriptPath;
     });
   },
 
