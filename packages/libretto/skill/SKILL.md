@@ -19,14 +19,15 @@ npx libretto exec <code> [--visualize] # Execute Playwright TypeScript code (--v
 npx libretto run <integrationFile> <integrationExport> # Execute integration actions
 npx libretto session-mode <read-only|interactive> [--session <name>] # Set session mode explicitly
 npx libretto snapshot --objective "<what to find>" --context "<situational info>"
-npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto-cli/profiles/
+npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto/profiles/
 npx libretto network                   # Show last 20 captured network requests
 npx libretto actions                   # Show last 20 captured user/agent actions
 npx libretto close                     # Close the browser
 ```
 
-All commands accept `--session <name>` for isolated browser instances (default: `default`).
-Built-in sessions: `default`, `dev-server`, `browser-agent`.
+All commands accept `--session <name>` for isolated browser instances.
+If `--session` is omitted on `open`, Libretto auto-generates a 5-character session id and prints it.
+Built-in sessions: `dev-server`, `browser-agent`.
 
 ## Session Mode: Read-Only by Default
 
@@ -54,8 +55,8 @@ The `state` object persists across `exec` calls within the same session — use 
 # Open a page (starts in read-only mode)
 npx libretto open https://example.com
 
-# When user grants interactive access:
-npx libretto session-mode interactive --session default
+# When user grants interactive access (replace abc12 with the id printed by open):
+npx libretto session-mode interactive --session abc12
 
 # Interact with elements
 npx libretto exec "await page.locator('button:has-text(\"Sign in\")').click()"
@@ -187,7 +188,7 @@ When the snapshot doesn't give you enough detail — why an element is hidden, w
 
 ## Network Logging
 
-Network requests are captured automatically when a browser is opened via `npx libretto open`. All non-static HTTP responses (excluding `.css`, `.js`, `.png`, `.jpg`, `.gif`, `.woff`, `.ico`, `.svg`, and `chrome-extension://` URLs) are logged to `tmp/libretto-cli/<runId>/network.jsonl`.
+Network requests are captured automatically when a browser is opened via `npx libretto open`. All non-static HTTP responses (excluding `.css`, `.js`, `.png`, `.jpg`, `.gif`, `.woff`, `.ico`, `.svg`, and `chrome-extension://` URLs) are logged to `.libretto/sessions/<session>/network.jsonl`.
 
 ### CLI: `npx libretto network`
 
@@ -213,7 +214,7 @@ Returns an array of objects with: `ts`, `method`, `url`, `status`, `contentType`
 
 ## Action Logging
 
-Browser actions are captured automatically when a browser is opened via `npx libretto open`. Both user interactions (manual clicks, typing in the headed browser window) and agent actions (programmatic Playwright API calls via `exec`) are logged to `tmp/libretto-cli/<runId>/actions.jsonl` with a `source` field of `'user'` or `'agent'` to distinguish the two.
+Browser actions are captured automatically when a browser is opened via `npx libretto open`. Both user interactions (manual clicks, typing in the headed browser window) and agent actions (programmatic Playwright API calls via `exec`) are logged to `.libretto/sessions/<session>/actions.jsonl` with a `source` field of `'user'` or `'agent'` to distinguish the two.
 
 ### CLI: `npx libretto actions`
 

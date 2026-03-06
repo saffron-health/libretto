@@ -13,7 +13,6 @@ import {
 } from "./context";
 import {
   clearSessionState,
-  generateRunId,
   getSessionPermissionMode,
   readSessionStateOrThrow,
   logFileForSession,
@@ -234,7 +233,6 @@ export async function runOpen(
   }
 
   const port = await pickFreePort();
-  const runId = generateRunId();
   const runLogPath = logFileForSession(session);
   const networkLogPath = getSessionNetworkLogPath(session);
   const actionsLogPath = getSessionActionsLogPath(session);
@@ -253,7 +251,6 @@ export async function runOpen(
     sessionMode,
     session,
     port,
-    runId,
     domain,
     useProfile,
     profilePath: useProfile ? profilePath : undefined,
@@ -263,7 +260,7 @@ export async function runOpen(
     console.log(`Loading saved profile for ${domain}`);
   }
   console.log(
-    `Launching ${browserMode} browser (session: ${session}, run: ${runId})...`,
+    `Launching ${browserMode} browser (session: ${session})...`,
   );
 
   const escapedProfilePath = profilePath
@@ -679,7 +676,6 @@ await new Promise(() => {});
         port,
         pid: child.pid!,
         session,
-        runId,
         startedAt: new Date().toISOString(),
         mode: sessionMode,
       });
@@ -689,7 +685,6 @@ await new Promise(() => {});
         sessionMode,
         session,
         port,
-        runId,
         pid: child.pid,
       });
       console.log(`Browser open (${browserMode}): ${url}`);

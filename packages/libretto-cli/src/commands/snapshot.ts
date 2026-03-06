@@ -2,17 +2,24 @@ import { mkdirSync } from "node:fs";
 import type { Argv } from "yargs";
 import { connect, disconnectBrowser } from "../core/browser";
 import { getLog, getSessionSnapshotRunDir } from "../core/context";
-import { generateRunId } from "../core/session";
 import {
   canAnalyzeSnapshots,
   runInterpret,
   type ScreenshotPair,
 } from "../core/snapshot-analyzer";
 
+function generateSnapshotTimestampId(): string {
+  return new Date()
+    .toISOString()
+    .replace(/[-:T]/g, "")
+    .replace(/\..+/, "")
+    .replace(/^(\d{8})(\d{6})$/, "$1-$2");
+}
+
 async function captureScreenshot(session: string): Promise<ScreenshotPair> {
   const log = getLog();
   log.info("screenshot-start", { session });
-  const snapshotRunId = `snapshot-${generateRunId()}-${Math.random()
+  const snapshotRunId = `snapshot-${generateSnapshotTimestampId()}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
   const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);

@@ -22,15 +22,16 @@ pnpm --filter libretto-cli dev
 # default: read-only session (exec blocked)
 libretto-cli open https://example.com
 
+# open prints a generated 5-char session id (for example: abc12)
 # user explicitly approves this session for actions
-libretto-cli session-mode interactive --session default
+libretto-cli session-mode interactive --session abc12
 
 # now action commands can run in that session
-libretto-cli exec "return await page.url()" --session default
-libretto-cli run ./integration.ts main --session default
+libretto-cli exec "return await page.url()" --session abc12
+libretto-cli run ./integration.ts main --session abc12
 
 # lock it back down afterward
-libretto-cli session-mode read-only --session default
+libretto-cli session-mode read-only --session abc12
 ```
 
 ## AI configuration

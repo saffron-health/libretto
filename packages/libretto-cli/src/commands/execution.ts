@@ -26,7 +26,6 @@ import {
 } from "../core/browser";
 import { getLog } from "../core/context";
 import {
-  getSessionPermissionMode,
   readSessionStateOrThrow,
   readOnlySessionError,
   resolveSessionMode,
