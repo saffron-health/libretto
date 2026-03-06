@@ -72,7 +72,7 @@ export function registerBrowserCommands(yargs: Argv): Argv {
         const mode = argv.mode;
         if (mode !== "read-only" && mode !== "interactive") {
           throw new Error(
-            "Usage: libretto-cli session-mode <read-only|interactive> [--session <name>]",
+            "Usage: libretto-cli session-mode <read-only|interactive> --session <name>",
           );
         }
         runSessionMode(String(argv.session), mode);
@@ -85,7 +85,7 @@ export function registerBrowserCommands(yargs: Argv): Argv {
       async (argv) => {
         const urlOrDomain = argv.urlOrDomain as string | undefined;
         if (!urlOrDomain) {
-          throw new Error("Usage: libretto-cli save <url|domain> [--session <name>]");
+          throw new Error("Usage: libretto-cli save <url|domain> --session <name>");
         }
         await runSave(urlOrDomain, String(argv.session));
       },
