@@ -2,7 +2,7 @@ import { Logger, createFileLogSink } from "libretto/logger";
 import type { LLMClient } from "libretto/llm";
 import { spawnSync } from "node:child_process";
 import { cwd } from "node:process";
-import { existsSync, mkdirSync, renameSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 function getRepoRoot(): string {
@@ -16,22 +16,58 @@ function getRepoRoot(): string {
 }
 
 export const REPO_ROOT = getRepoRoot();
-export const STATE_DIR = join(REPO_ROOT, "tmp", "libretto-cli");
-export const LIBRETTO_DIR = join(REPO_ROOT, ".libretto-cli");
 export const LIBRETTO_CONFIG_DIR = join(REPO_ROOT, ".libretto");
 export const LIBRETTO_CONFIG_PATH = join(LIBRETTO_CONFIG_DIR, "config.json");
-export const PROFILES_DIR = join(LIBRETTO_DIR, "profiles");
+export const PROFILES_DIR = join(LIBRETTO_CONFIG_DIR, "profiles");
+export const LIBRETTO_SESSIONS_DIR = join(LIBRETTO_CONFIG_DIR, "sessions");
+export const LIBRETTO_GITIGNORE_PATH = join(LIBRETTO_CONFIG_DIR, ".gitignore");
 
-const LEGACY_PROFILES_DIR = join(REPO_ROOT, ".playwriter", "profiles");
-if (existsSync(LEGACY_PROFILES_DIR) && !existsSync(PROFILES_DIR)) {
-  mkdirSync(LIBRETTO_DIR, { recursive: true });
-  renameSync(LEGACY_PROFILES_DIR, PROFILES_DIR);
+const LIBRETTO_GITIGNORE_CONTENT = [
+  "# Local libretto runtime state",
+  "sessions/",
+  "profiles/",
+  "",
+].join("\n");
+
+export function getSessionDir(session: string): string {
+  return join(LIBRETTO_SESSIONS_DIR, session);
 }
 
-const LEGACY_BT_PROFILES_DIR = join(REPO_ROOT, ".browser-tap", "profiles");
-if (existsSync(LEGACY_BT_PROFILES_DIR) && !existsSync(PROFILES_DIR)) {
-  mkdirSync(LIBRETTO_DIR, { recursive: true });
-  renameSync(LEGACY_BT_PROFILES_DIR, PROFILES_DIR);
+export function getSessionStatePath(session: string): string {
+  return join(getSessionDir(session), "state.json");
+}
+
+export function getSessionLogsPath(session: string): string {
+  return join(getSessionDir(session), "logs.jsonl");
+}
+
+export function getSessionNetworkLogPath(session: string): string {
+  return join(getSessionDir(session), "network.jsonl");
+}
+
+export function getSessionActionsLogPath(session: string): string {
+  return join(getSessionDir(session), "actions.jsonl");
+}
+
+export function getSessionSnapshotsDir(session: string): string {
+  return join(getSessionDir(session), "snapshots");
+}
+
+export function getSessionSnapshotRunDir(
+  session: string,
+  snapshotRunId: string,
+): string {
+  return join(getSessionSnapshotsDir(session), snapshotRunId);
+}
+
+export function ensureLibrettoSetup(): void {
+  mkdirSync(LIBRETTO_CONFIG_DIR, { recursive: true });
+  mkdirSync(LIBRETTO_SESSIONS_DIR, { recursive: true });
+  mkdirSync(PROFILES_DIR, { recursive: true });
+
+  if (!existsSync(LIBRETTO_GITIGNORE_PATH)) {
+    writeFileSync(LIBRETTO_GITIGNORE_PATH, LIBRETTO_GITIGNORE_CONTENT, "utf-8");
+  }
 }
 
 let log: Logger | null = null;
@@ -40,15 +76,13 @@ export function setLogFile(filePath: string): void {
   log = new Logger(["libretto-cli"], [createFileLogSink({ filePath })]);
 }
 
-export function ensureLog(): void {
-  if (log) return;
-  mkdirSync(STATE_DIR, { recursive: true });
-  setLogFile(join(STATE_DIR, "cli.log"));
-}
-
 export function getLog(): Logger {
-  ensureLog();
-  return log as Logger;
+  if (!log) {
+    throw new Error(
+      "Logger is not initialized. Call setLogFile(...) before calling getLog().",
+    );
+  }
+  return log;
 }
 
 export async function flushLog(): Promise<void> {

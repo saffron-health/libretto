@@ -12,7 +12,7 @@ This package runs CLI tests with Vitest as subprocess-based black-box checks.
 
 - Shared fixture helpers live in `src/test-fixtures.ts`.
 - Every test gets a unique temp workspace directory under the OS temp directory.
-- Seed helpers write `.libretto-cli` and `tmp/libretto-cli` state inside the temp workspace only.
+- Seed helpers write `.libretto` state inside the temp workspace only.
 - `librettoCli` executes the built CLI with subprocess `cwd` set to the temp workspace.
 
 ## Guardrails

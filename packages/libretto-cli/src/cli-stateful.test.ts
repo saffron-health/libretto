@@ -66,18 +66,6 @@ describe("state-driven CLI subprocess behavior", () => {
     ]);
   });
 
-  test("supports snapshot configure as a compatibility alias", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    const configure = await librettoCli("snapshot configure codex");
-    expect(configure.exitCode).toBe(0);
-    expect(configure.stdout).toContain("AI config saved.");
-
-    const configPath = workspacePath(".libretto", "config.json");
-    expect(existsSync(configPath)).toBe(true);
-  });
-
   test("reads and clears network logs from seeded run data", async ({
     seedSessionState,
     seedNetworkLog,
@@ -88,7 +76,7 @@ describe("state-driven CLI subprocess behavior", () => {
       session: "net-session",
       runId: "run-net",
     });
-    const logPath = await seedNetworkLog("run-net", [
+    const logPath = await seedNetworkLog("net-session", [
       {
         ts: "2026-01-01T00:00:00.000Z",
         method: "GET",
@@ -123,7 +111,9 @@ describe("state-driven CLI subprocess behavior", () => {
 
     const cleared = await readFile(logPath, "utf8");
     expect(cleared).toBe("");
-    expect(existsSync(workspacePath("tmp", "libretto-cli", "run-net", "network.jsonl"))).toBe(true);
+    expect(
+      existsSync(workspacePath(".libretto", "sessions", "net-session", "network.jsonl")),
+    ).toBe(true);
   });
 
   test("reads and clears action logs from seeded run data", async ({
@@ -136,7 +126,7 @@ describe("state-driven CLI subprocess behavior", () => {
       session: "actions-session",
       runId: "run-actions",
     });
-    const logPath = await seedActionLog("run-actions", [
+    const logPath = await seedActionLog("actions-session", [
       {
         ts: "2026-01-01T00:00:00.000Z",
         action: "click",
@@ -169,7 +159,11 @@ describe("state-driven CLI subprocess behavior", () => {
 
     const cleared = await readFile(logPath, "utf8");
     expect(cleared).toBe("");
-    expect(existsSync(workspacePath("tmp", "libretto-cli", "run-actions", "actions.jsonl"))).toBe(true);
+    expect(
+      existsSync(
+        workspacePath(".libretto", "sessions", "actions-session", "actions.jsonl"),
+      ),
+    ).toBe(true);
   });
 
   test("blocks exec in read-only open sessions", async ({

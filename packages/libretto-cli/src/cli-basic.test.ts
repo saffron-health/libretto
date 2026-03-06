@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { describe, expect } from "vitest";
 import { test } from "./test-fixtures";
@@ -8,6 +9,22 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Usage: libretto-cli <command> [--session <name>]");
     expect(result.stderr).toBe("");
+  });
+
+  test("bootstraps .libretto state on --help without creating legacy dirs", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const result = await librettoCli("--help");
+    expect(result.exitCode).toBe(0);
+
+    expect(existsSync(workspacePath(".libretto"))).toBe(true);
+    expect(existsSync(workspacePath(".libretto", ".gitignore"))).toBe(true);
+    expect(existsSync(workspacePath(".libretto", "sessions"))).toBe(true);
+    expect(existsSync(workspacePath(".libretto", "profiles"))).toBe(true);
+
+    expect(existsSync(workspacePath(".libretto-cli"))).toBe(false);
+    expect(existsSync(workspacePath("tmp", "libretto-cli"))).toBe(false);
   });
 
   test("prints usage for help command", async ({ librettoCli }) => {
@@ -157,7 +174,7 @@ export const main = workflow(
       "Expected profile file:",
     );
     expect(result.stderr).toContain(
-      ".libretto-cli/profiles/app.example.com.json",
+      ".libretto/profiles/app.example.com.json",
     );
     expect(result.stderr).toContain(
       "libretto-cli open https://app.example.com --headed --session default",
@@ -214,9 +231,9 @@ export const main = workflow(
 `,
       "utf8",
     );
-    await mkdir(workspacePath(".libretto-cli", "profiles"), { recursive: true });
+    await mkdir(workspacePath(".libretto", "profiles"), { recursive: true });
     await writeFile(
-      workspacePath(".libretto-cli", "profiles", "app.example.com.json"),
+      workspacePath(".libretto", "profiles", "app.example.com.json"),
       JSON.stringify({ cookies: [], origins: [] }),
       "utf8",
     );
@@ -258,11 +275,15 @@ export const main = workflow(
 
     const raw = JSON.parse(
       await readFile(
-        workspacePath(".libretto-cli", "session-permissions.json"),
+        workspacePath(".libretto", "config.json"),
         "utf8",
       ),
-    ) as { sessions?: Record<string, string> };
-    expect(raw.sessions?.consented).toBe("interactive");
+    ) as {
+      permissions?: {
+        sessions?: Record<string, string>;
+      };
+    };
+    expect(raw.permissions?.sessions?.consented).toBe("interactive");
   });
 
   test("session-mode read-only removes interactive permission", async ({
@@ -276,11 +297,15 @@ export const main = workflow(
 
     const raw = JSON.parse(
       await readFile(
-        workspacePath(".libretto-cli", "session-permissions.json"),
+        workspacePath(".libretto", "config.json"),
         "utf8",
       ),
-    ) as { sessions?: Record<string, string> };
-    expect(raw.sessions?.toggled).toBeUndefined();
+    ) as {
+      permissions?: {
+        sessions?: Record<string, string>;
+      };
+    };
+    expect(raw.permissions?.sessions?.toggled).toBeUndefined();
   });
 
   test("fails session-mode with invalid mode", async ({ librettoCli }) => {

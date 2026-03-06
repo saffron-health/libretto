@@ -46,18 +46,24 @@ describe("cli test fixtures", () => {
       session: "spec-session",
       runId: "run-2",
     });
-    await seedNetworkLog("run-2", [
+    await seedNetworkLog("spec-session", [
       { ts: "2026-01-01T00:00:00.000Z", method: "GET", url: "https://example.com", status: 200, contentType: "text/html", size: 1, durationMs: 1 },
     ]);
-    await seedActionLog("run-2", [
+    await seedActionLog("spec-session", [
       { ts: "2026-01-01T00:00:00.000Z", action: "click", source: "agent", success: true },
     ]);
     const configPath = await seedSnapshotConfig();
 
     expect(seeded.session).toBe("spec-session");
-    expect(existsSync(workspacePath("tmp", "libretto-cli", "spec-session.json"))).toBe(true);
-    expect(existsSync(workspacePath("tmp", "libretto-cli", "run-2", "network.jsonl"))).toBe(true);
-    expect(existsSync(workspacePath("tmp", "libretto-cli", "run-2", "actions.jsonl"))).toBe(true);
+    expect(
+      existsSync(workspacePath(".libretto", "sessions", "spec-session", "state.json")),
+    ).toBe(true);
+    expect(
+      existsSync(workspacePath(".libretto", "sessions", "spec-session", "network.jsonl")),
+    ).toBe(true);
+    expect(
+      existsSync(workspacePath(".libretto", "sessions", "spec-session", "actions.jsonl")),
+    ).toBe(true);
     expect(existsSync(configPath)).toBe(true);
   });
 
@@ -67,7 +73,9 @@ describe("cli test fixtures", () => {
       const result = await librettoCli("--help");
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Usage: libretto-cli");
-      expect(existsSync(workspacePath("tmp", "libretto-cli"))).toBe(true);
+      expect(existsSync(workspacePath(".libretto"))).toBe(true);
+      expect(existsSync(workspacePath(".libretto", ".gitignore"))).toBe(true);
+      expect(existsSync(workspacePath("tmp", "libretto-cli"))).toBe(false);
     },
     20_000,
   );

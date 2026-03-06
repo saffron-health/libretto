@@ -6,7 +6,7 @@ import { LIBRETTO_CONFIG_PATH } from "./context";
 
 export const CURRENT_CONFIG_VERSION = 1;
 
-export const AiPresetSchema = z.enum(["codex", "opencode", "claude", "gemini"]);
+export const AiPresetSchema = z.enum(["codex", "claude", "gemini"]);
 export type AiPreset = z.infer<typeof AiPresetSchema>;
 
 export const AiConfigSchema = z
@@ -18,17 +18,24 @@ export const AiConfigSchema = z
   .strict();
 export type AiConfig = z.infer<typeof AiConfigSchema>;
 
+const SessionModeSchema = z.enum(["read-only", "interactive"]);
+const SessionPermissionsSchema = z
+  .object({
+    sessions: z.record(SessionModeSchema),
+  })
+  .strict();
+
 export const LibrettoConfigSchema = z
   .object({
     version: z.literal(CURRENT_CONFIG_VERSION),
     ai: AiConfigSchema.optional(),
+    permissions: SessionPermissionsSchema.optional(),
   })
   .strict();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
 
 export const AI_CONFIG_PRESETS: Record<AiPreset, string[]> = {
   codex: ["codex", "exec", "--skip-git-repo-check", "--sandbox", "read-only"],
-  opencode: ["opencode", "run", "--format", "json"],
   claude: [join(homedir(), ".claude", "local", "claude"), "-p"],
   gemini: ["gemini", "--output-format", "json"],
 };
@@ -108,6 +115,7 @@ export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolea
   writeLibrettoConfig(
     {
       version: librettoConfig.version,
+      permissions: librettoConfig.permissions,
     },
     configPath,
   );
@@ -123,7 +131,7 @@ function printAiConfig(config: AiConfig, configPath: string): void {
 
 function printConfigureUsage(commandName: string): void {
   console.log(
-    `Usage: ${commandName} <codex|opencode|claude|gemini> [-- <command prefix...>]
+    `Usage: ${commandName} <codex|claude|gemini> [-- <command prefix...>]
        ${commandName}
        ${commandName} --clear`,
   );
@@ -171,7 +179,7 @@ export function runAiConfigure(
   if (!parsedPreset.success) {
     printConfigureUsage(configureCommandName);
     throw new Error(
-      "Missing or invalid preset. Use one of: codex, opencode, claude, gemini.",
+      "Missing or invalid preset. Use one of: codex, claude, gemini.",
     );
   }
 

@@ -20,7 +20,7 @@ import {
 import { getLog } from "../core/context";
 import {
   getSessionPermissionMode,
-  getSessionStateOrThrow,
+  readSessionStateOrThrow,
   readOnlySessionError,
   resolveSessionMode,
 } from "../core/session";
@@ -112,7 +112,7 @@ async function runExec(
   visualize = false,
 ): Promise<void> {
   const log = getLog();
-  const sessionState = getSessionStateOrThrow(session);
+  const sessionState = readSessionStateOrThrow(session);
   const mode = resolveSessionMode(session, sessionState);
   if (mode !== "interactive") {
     throw new Error(readOnlySessionError(session));
@@ -156,7 +156,7 @@ async function runExec(
   };
   process.on("SIGINT", sigintHandler);
 
-  wrapPageForActionLogging(page, sessionState.runId, onActivity);
+  wrapPageForActionLogging(page, session, onActivity);
 
   if (visualize) {
     await installInstrumentation(page, { visualize: true, logger: log });
