@@ -75,7 +75,7 @@ function quoteShellArg(value: string): string {
   return JSON.stringify(value);
 }
 
-function formatCommandPrefix(prefix: string[]): string {
+export function formatCommandPrefix(prefix: string[]): string {
   return prefix.map((arg) => quoteShellArg(arg)).join(" ");
 }
 

@@ -1,10 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { describe, expect, vi } from "vitest";
+import { describe, expect } from "vitest";
 import { test } from "../test-fixtures";
-
-vi.mock("./context", () => ({
-  LIBRETTO_CONFIG_PATH: "/tmp/libretto-config-test.json",
-}));
 
 import { readLibrettoConfig } from "./ai-config";
 

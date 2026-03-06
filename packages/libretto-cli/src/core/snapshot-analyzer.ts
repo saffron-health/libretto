@@ -9,7 +9,12 @@ import {
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
-import { type AiConfig, readAiConfig, runAiConfigure } from "./ai-config";
+import {
+  type AiConfig,
+  formatCommandPrefix,
+  readAiConfig,
+  runAiConfigure,
+} from "./ai-config";
 import {
   getLLMClientFactory,
   getLog,
@@ -52,15 +57,6 @@ type ExternalCommandResult = {
   stdout: string;
   stderr: string;
 };
-
-function quoteShellArg(value: string): string {
-  if (/^[a-zA-Z0-9_./:@=-]+$/.test(value)) return value;
-  return JSON.stringify(value);
-}
-
-function formatCommandPrefix(prefix: string[]): string {
-  return prefix.map((arg) => quoteShellArg(arg)).join(" ");
-}
 
 abstract class UserCodingAgent {
   protected constructor(protected readonly config: AiConfig) {}

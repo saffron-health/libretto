@@ -217,18 +217,18 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     await seedSessionState({
       session: "permissioned-session",
+      port: 65534,
     });
     await seedSessionPermission("permissioned-session", "interactive");
 
     const result = await librettoCli(
       "exec \"return await page.title()\" --session permissioned-session",
     );
+    expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("is read-only");
-    if (result.exitCode !== 0) {
-      expect(result.stderr).toContain(
-        "No browser running for session \"permissioned-session\".",
-      );
-    }
+    expect(result.stderr).toContain(
+      "No browser running for session \"permissioned-session\".",
+    );
   });
 
   test("does not apply read-only guard when session allows actions", async ({
@@ -237,18 +237,18 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     await seedSessionState({
       session: "interactive-session",
+      port: 65534,
       mode: "interactive",
     });
 
     const result = await librettoCli(
       "exec \"return await page.title()\" --session interactive-session",
     );
+    expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("is read-only");
-    if (result.exitCode !== 0) {
-      expect(result.stderr).toContain(
-        "No browser running for session \"interactive-session\".",
-      );
-    }
+    expect(result.stderr).toContain(
+      "No browser running for session \"interactive-session\".",
+    );
   });
 
   test("rejects exec after session is switched back to read-only", async ({
