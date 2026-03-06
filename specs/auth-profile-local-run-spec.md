@@ -69,7 +69,7 @@ Add an explicit `LibrettoWorkflow` class to carry integration metadata and run l
 
 ### Phase 4: End-to-end verification and docs alignment
 
-- [ ] Add/adjust tests for: metadata present + missing profile error, metadata absent default behavior, and storageState handoff path.
-- [ ] Run `pnpm --filter libretto-cli test`.
-- [ ] Run `pnpm --filter libretto-cli type-check` and `pnpm --filter libretto type-check`.
-- [ ] Success criteria: all listed test/type-check commands pass and spec changes are reflected in relevant usage docs.
+- [x] Add/adjust tests for: metadata present + missing profile error, metadata absent default behavior, and storageState handoff path.
+- [x] Run `pnpm --filter libretto-cli test`.
+- [x] Run `pnpm --filter libretto-cli type-check` and `pnpm --filter libretto type-check`.
+- [x] Success criteria: all listed test/type-check commands pass and spec changes are reflected in relevant usage docs.

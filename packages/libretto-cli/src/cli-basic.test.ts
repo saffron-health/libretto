@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { describe, expect } from "vitest";
 import { test } from "./test-fixtures";
 
@@ -134,6 +134,69 @@ export const main = workflow(
       "libretto-cli open https://app.example.com --headed --session default",
     );
     expect(result.stderr).toContain("libretto-cli save app.example.com --session default");
+  });
+
+  test("does not require local auth profile when auth metadata is absent", async ({
+    librettoCli,
+    seedSessionPermission,
+    workspacePath,
+  }) => {
+    const librettoEntryUrl = new URL(
+      "../../libretto/dist/index.js",
+      import.meta.url,
+    ).href;
+    await seedSessionPermission("default", "interactive");
+    await writeFile(
+      workspacePath("integration.ts"),
+      `
+import { workflow } from "${librettoEntryUrl}";
+
+export const main = workflow({}, async () => "ok");
+`,
+      "utf8",
+    );
+
+    const result = await librettoCli("run ./integration.ts main", {
+      PLAYWRIGHT_BROWSERS_PATH: workspacePath("missing-playwright-browsers"),
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).not.toContain("Local auth profile not found for domain");
+  });
+
+  test("proceeds when declared local auth profile file exists", async ({
+    librettoCli,
+    seedSessionPermission,
+    workspacePath,
+  }) => {
+    const librettoEntryUrl = new URL(
+      "../../libretto/dist/index.js",
+      import.meta.url,
+    ).href;
+    await seedSessionPermission("default", "interactive");
+    await writeFile(
+      workspacePath("integration.ts"),
+      `
+import { workflow } from "${librettoEntryUrl}";
+
+export const main = workflow(
+  { authProfile: { type: "local", domain: "app.example.com" } },
+  async () => "ok",
+);
+`,
+      "utf8",
+    );
+    await mkdir(workspacePath(".libretto-cli", "profiles"), { recursive: true });
+    await writeFile(
+      workspacePath(".libretto-cli", "profiles", "app.example.com.json"),
+      JSON.stringify({ cookies: [], origins: [] }),
+      "utf8",
+    );
+
+    const result = await librettoCli("run ./integration.ts main", {
+      PLAYWRIGHT_BROWSERS_PATH: workspacePath("missing-playwright-browsers"),
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).not.toContain("Local auth profile not found for domain");
   });
 
   test("fails open when deprecated --allow-actions flag is passed", async ({
