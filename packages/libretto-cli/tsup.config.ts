@@ -1,14 +1,11 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-	entry: {
-		index: "src/index.ts",
-	},
+	entry: ["src/**/*.ts", "!src/**/*.test.ts", "!src/test-fixtures.ts"],
 	format: ["esm"],
 	dts: false,
 	clean: true,
-	bundle: true,
-	splitting: false,
+	bundle: false,
 	minify: false,
 	banner: {
 		js: "#!/usr/bin/env node",

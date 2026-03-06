@@ -10,12 +10,13 @@
 		"sourceMap": true,
 		"outDir": "./dist",
 		"baseUrl": ".",
-	"paths": {
-		"libretto": ["../libretto/src/index.ts"],
-		"libretto/logger": ["../libretto/src/logger/index.ts"],
-		"libretto/llm": ["../libretto/src/llm/index.ts"],
-		"libretto/instrumentation": ["../libretto/src/instrumentation/index.ts"],
-		"libretto/config": ["../libretto/src/config/index.ts"],
+		"paths": {
+			"libretto": ["../libretto/src/index.ts"],
+			"libretto/logger": ["../libretto/src/logger/index.ts"],
+			"libretto/llm": ["../libretto/src/llm/index.ts"],
+			"libretto/instrumentation": ["../libretto/src/instrumentation/index.ts"],
+			"libretto/config": ["../libretto/src/config/index.ts"],
+			"libretto/state": ["../libretto/src/state/index.ts"],
 			"libretto/run": ["../libretto/src/run/api.ts"]
 		}
 	},

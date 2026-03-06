@@ -1,5 +1,5 @@
 import type { Argv } from "yargs";
-import { runAiConfigure } from "../core/ai-config";
+import { runAiConfigure } from "../core/ai-config.js";
 
 export function registerAICommands(yargs: Argv): Argv {
   return yargs.command(

@@ -12,11 +12,11 @@ import {
   type AiConfig,
   formatCommandPrefix,
   readAiConfig,
-} from "./ai-config";
+} from "./ai-config.js";
 import {
   getLLMClientFactory,
   getLog,
-} from "./context";
+} from "./context.js";
 
 export type ScreenshotPair = {
   pngPath: string;
