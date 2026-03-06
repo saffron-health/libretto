@@ -6,7 +6,7 @@ import {
   formatNetworkEntry,
   readActionLog,
   readNetworkLog,
-} from "../core/telemetry";
+} from "../core/telemetry.js";
 
 export function registerLogCommands(yargs: Argv): Argv {
   return yargs

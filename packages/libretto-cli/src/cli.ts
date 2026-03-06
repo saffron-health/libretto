@@ -1,21 +1,21 @@
 import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
-import { registerAICommands } from "./commands/ai";
-import { registerBrowserCommands } from "./commands/browser";
-import { registerExecutionCommands } from "./commands/execution";
-import { registerLogCommands } from "./commands/logs";
-import { registerSnapshotCommands } from "./commands/snapshot";
+import { registerAICommands } from "./commands/ai.js";
+import { registerBrowserCommands } from "./commands/browser.js";
+import { registerExecutionCommands } from "./commands/execution.js";
+import { registerLogCommands } from "./commands/logs.js";
+import { registerSnapshotCommands } from "./commands/snapshot.js";
 import {
   ensureLibrettoSetup,
   flushLog,
   getLog,
   setLogFile,
-} from "./core/context";
+} from "./core/context.js";
 import {
   logFileForSession,
   SESSION_DEFAULT,
   validateSessionName,
-} from "./core/session";
+} from "./core/session.js";
 
 const CLI_COMMANDS = new Set([
   "open",
