@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { test as base } from "vitest";
-import { SESSION_STATE_VERSION, type SessionState } from "./core/session";
+import { SESSION_STATE_VERSION, type SessionState } from "./core/session.js";
 
 type JsonRecord = Record<string, unknown>;
 

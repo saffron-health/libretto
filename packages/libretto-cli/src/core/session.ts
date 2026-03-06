@@ -14,7 +14,7 @@ import {
   LIBRETTO_CONFIG_DIR,
   LIBRETTO_CONFIG_PATH,
   LIBRETTO_SESSIONS_DIR,
-} from "./context";
+} from "./context.js";
 import {
   SESSION_STATE_VERSION,
   SessionModeSchema,
