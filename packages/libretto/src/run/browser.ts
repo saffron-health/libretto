@@ -23,6 +23,7 @@ export type LaunchBrowserArgs = {
   sessionName: string;
   headless?: boolean;
   viewport?: { width: number; height: number };
+  storageStatePath?: string;
 };
 
 export type BrowserSession = {
@@ -38,6 +39,7 @@ export async function launchBrowser({
   sessionName,
   headless = false,
   viewport = { width: 1366, height: 768 },
+  storageStatePath,
 }: LaunchBrowserArgs): Promise<BrowserSession> {
   const debugPort = await pickFreePort();
   const browser = await chromium.launch({
@@ -49,7 +51,10 @@ export async function launchBrowser({
     ],
   });
 
-  const context = await browser.newContext({ viewport });
+  const context = await browser.newContext({
+    viewport,
+    ...(storageStatePath ? { storageState: storageStatePath } : {}),
+  });
   const page = await context.newPage();
   page.setDefaultTimeout(30_000);
   page.setDefaultNavigationTimeout(45_000);

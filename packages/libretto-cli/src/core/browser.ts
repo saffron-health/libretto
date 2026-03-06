@@ -608,6 +608,11 @@ await new Promise(() => {});
   let childSpawnError: Error | null = null;
   let childEarlyExit: { code: number | null; signal: NodeJS.Signals | null } | null =
     null;
+  const readChildSpawnError = (): Error | null => childSpawnError;
+  const readChildEarlyExit = (): {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+  } | null => childEarlyExit;
 
   child.on("error", (err) => {
     childSpawnError = err;
@@ -630,19 +635,21 @@ await new Promise(() => {});
   const cdpStartupTimeoutMs = cdpPollIntervalMs * cdpMaxAttempts;
 
   for (let i = 0; i < cdpMaxAttempts; i++) {
-    if (childSpawnError) {
-      const errWithCode = childSpawnError as Error & { code?: string };
+    const spawnError = readChildSpawnError();
+    if (spawnError) {
+      const errWithCode = spawnError as Error & { code?: string };
       const hint =
         errWithCode.code === "ENOENT"
           ? " Ensure Node.js is available in PATH for child processes."
           : "";
       throw new Error(
-        `Failed to launch browser child process: ${childSpawnError.message}.${hint} Check logs: ${runLogPath}`,
+        `Failed to launch browser child process: ${spawnError.message}.${hint} Check logs: ${runLogPath}`,
       );
     }
 
-    if (childEarlyExit) {
-      const status = childEarlyExit.code ?? childEarlyExit.signal ?? "unknown";
+    const earlyExit = readChildEarlyExit();
+    if (earlyExit) {
+      const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
       throw new Error(
         `Browser child process exited before startup (status: ${status}). Check logs: ${runLogPath}`,
       );

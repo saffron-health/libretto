@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { describe, expect } from "vitest";
 import { test } from "./test-fixtures";
 
@@ -71,6 +71,27 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("is read-only");
     expect(result.stderr).toContain("Integration file does not exist:");
+  });
+
+  test("fails run when export is not a Libretto workflow instance", async ({
+    librettoCli,
+    seedSessionPermission,
+    workspacePath,
+  }) => {
+    await seedSessionPermission("default", "interactive");
+    await writeFile(
+      workspacePath("integration.ts"),
+      `
+export async function main() {
+  return "ok";
+}
+`,
+      "utf8",
+    );
+
+    const result = await librettoCli("run ./integration.ts main");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("must be a Libretto workflow instance");
   });
 
   test("fails open when deprecated --allow-actions flag is passed", async ({

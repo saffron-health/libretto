@@ -95,3 +95,13 @@ export {
 	type LaunchBrowserArgs,
 	type BrowserSession,
 } from "./run/api.js";
+
+// Workflow helpers
+export {
+	LibrettoWorkflow,
+	workflow,
+	type LibrettoAuthProfile,
+	type LibrettoWorkflowMetadata,
+	type LibrettoWorkflowContext,
+	type LibrettoWorkflowHandler,
+} from "./workflow/workflow.js";

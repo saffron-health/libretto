@@ -45,13 +45,13 @@ Add an explicit `LibrettoWorkflow` class to carry integration metadata and run l
 
 ### Phase 1: Add local auth profile contract and loader plumbing
 
-- [ ] Add a `LibrettoWorkflow` class that stores `{ authProfile?: { type: "local"; domain: string } }` metadata and a `run(ctx, input)` handler.
-- [ ] Add/extend a `workflow(meta, fn)` helper that returns a `LibrettoWorkflow` instance.
-- [ ] Update `libretto run` loader to require that the selected export is a `LibrettoWorkflow` instance.
-- [ ] Read auth metadata only from the `LibrettoWorkflow` instance.
-- [ ] Extend `launchBrowser` args to accept optional `storageStatePath` and pass it to `browser.newContext({ storageState })` when provided.
-- [ ] Ensure domain normalization uses hostname (e.g., `app.example.com`) and maps to `.libretto-cli/profiles/<domain>.json`.
-- [ ] Success criteria: focused tests confirm (1) the resolver maps declared domain metadata to the expected profile path and (2) `run` returns a clear error when the export is not a `LibrettoWorkflow` instance.
+- [x] Add a `LibrettoWorkflow` class that stores `{ authProfile?: { type: "local"; domain: string } }` metadata and a `run(ctx, input)` handler.
+- [x] Add/extend a `workflow(meta, fn)` helper that returns a `LibrettoWorkflow` instance.
+- [x] Update `libretto run` loader to require that the selected export is a `LibrettoWorkflow` instance.
+- [x] Read auth metadata only from the `LibrettoWorkflow` instance.
+- [x] Extend `launchBrowser` args to accept optional `storageStatePath` and pass it to `browser.newContext({ storageState })` when provided.
+- [x] Ensure domain normalization uses hostname (e.g., `app.example.com`) and maps to `.libretto-cli/profiles/<domain>.json`.
+- [x] Success criteria: subprocess tests confirm `run` returns a clear error when the export is not a Libretto workflow instance, and type checks pass for the new workflow + storage-state plumbing.
 
 ### Phase 2: Enforce fail-fast runtime behavior for declared local auth
 
