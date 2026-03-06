@@ -15,18 +15,19 @@ If it's not obvious which element to click or what value to enter, **ask the use
 
 ```bash
 npx libretto open <url> [--headed]     # Launch browser and navigate (headless by default)
-npx libretto exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
-npx libretto run <integrationFile> <integrationExport> # Execute integration actions
-npx libretto session-mode <read-only|interactive> [--session <name>] # Set session mode explicitly
-npx libretto snapshot --objective "<what to find>" --context "<situational info>"
-npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto/profiles/
-npx libretto network                   # Show last 20 captured network requests
-npx libretto actions                   # Show last 20 captured user/agent actions
-npx libretto close                     # Close the browser
+npx libretto exec <code> --session <name> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
+npx libretto run <integrationFile> <integrationExport> --session <name> # Execute integration actions
+npx libretto session-mode <read-only|interactive> --session <name> # Set session mode explicitly
+npx libretto snapshot --session <name> --objective "<what to find>" --context "<situational info>"
+npx libretto save <url|domain> --session <name> # Save session (cookies, localStorage) to .libretto/profiles/
+npx libretto network --session <name>  # Show last 20 captured network requests
+npx libretto actions --session <name>  # Show last 20 captured user/agent actions
+npx libretto close --session <name>    # Close the browser
 ```
 
-All commands accept `--session <name>` for isolated browser instances.
-If `--session` is omitted on `open`, Libretto auto-generates a 5-character session id and prints it.
+`open` accepts optional `--session <name>`.
+If omitted on `open`, Libretto auto-generates a 5-character session id and prints it.
+All other session-bound commands require `--session <name>`.
 Built-in sessions: `dev-server`, `browser-agent`.
 
 ## Session Mode: Read-Only by Default
@@ -59,26 +60,26 @@ npx libretto open https://example.com
 npx libretto session-mode interactive --session abc12
 
 # Interact with elements
-npx libretto exec "await page.locator('button:has-text(\"Sign in\")').click()"
-npx libretto exec "await page.fill('input[name=\"email\"]', 'user@example.com')"
+npx libretto exec --session abc12 "await page.locator('button:has-text(\"Sign in\")').click()"
+npx libretto exec --session abc12 "await page.fill('input[name=\"email\"]', 'user@example.com')"
 
 # Understand the page — always provide objective and context
-npx libretto snapshot \
+npx libretto snapshot --session abc12 \
   --objective "Find the sign-in form fields and submit button" \
   --context "Navigated to example.com login page. Expecting email/password inputs and a submit button."
 
 # Include relevant network calls in context when debugging API interactions
-npx libretto snapshot \
+npx libretto snapshot --session abc12 \
   --objective "Find why the referral list is empty" \
   --context "Logged into eClinicalWorks. Clicked Open Referrals tab. Table appears but shows no rows. Recent POST to /servlet/AjaxServlet returned 200 but with empty body."
 
 # Done
-npx libretto close
+npx libretto close --session abc12
 ```
 
 ## Workflow: Save and Restore Login Sessions
 
-Profiles persist cookies and localStorage across browser launches. They are saved to `.libretto-cli/profiles/<domain>.json` (git-ignored) and loaded automatically on `open`.
+Profiles persist cookies and localStorage across browser launches. They are saved to `.libretto/profiles/<domain>.json` (git-ignored) and loaded automatically on `open`.
 
 ```bash
 # Open a site in headed mode so you can log in manually
@@ -87,7 +88,7 @@ npx libretto open https://portal.example.com --headed
 # ... manually log in in the browser window ...
 
 # Save the session
-npx libretto save portal.example.com
+npx libretto save portal.example.com --session abc12
 
 # Next time you open this domain, you'll be logged in automatically
 npx libretto open https://portal.example.com
