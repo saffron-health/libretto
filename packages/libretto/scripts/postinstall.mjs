@@ -22,17 +22,38 @@ function main() {
 		return;
 	}
 
-	const sourceSkillDir = join(packageDir, "skill");
-	if (!isDirectory(sourceSkillDir)) {
-		log(`Skipped: source skill directory not found at "${sourceSkillDir}".`);
+	const sourceSkillsDir = join(packageDir, "skills");
+	if (!isDirectory(sourceSkillsDir)) {
+		log(`Skipped: source skills directory not found at "${sourceSkillsDir}".`);
 		return;
 	}
 
-	const destinationSkillDir = join(skillsRoot, "libretto");
-	mkdirSync(destinationSkillDir, { recursive: true });
-	cpSync(sourceSkillDir, destinationSkillDir, { recursive: true, force: true });
+	const skillCopies = [
+		{ source: "original-skill", destination: "libretto" },
+		{
+			source: "libretto-network-skill",
+			destination: "libretto-network-skill"
+		}
+	];
 
-	log(`Synced skill to "${destinationSkillDir}".`);
+	let syncedCount = 0;
+	for (const { source, destination } of skillCopies) {
+		const sourceSkillDir = join(sourceSkillsDir, source);
+		if (!isDirectory(sourceSkillDir)) {
+			log(`Skipped: source skill directory not found at "${sourceSkillDir}".`);
+			continue;
+		}
+
+		const destinationSkillDir = join(skillsRoot, destination);
+		mkdirSync(destinationSkillDir, { recursive: true });
+		cpSync(sourceSkillDir, destinationSkillDir, { recursive: true, force: true });
+		log(`Synced skill "${destination}" to "${destinationSkillDir}".`);
+		syncedCount += 1;
+	}
+
+	if (syncedCount === 0) {
+		log("Skipped: no source skill directories were synced.");
+	}
 }
 
 try {
