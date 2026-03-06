@@ -245,7 +245,7 @@ Use Libretto CLI interactively to build a brand new integration from scratch. Na
 
 **IMPORTANT:** Do NOT explore the codebase or research existing code before starting. This skill file and the CLI commands below contain everything you need. Jump straight into using the CLI interactively — ask the user for the URL, open the browser, and start working. The only exception is if the user mentions a specific file or piece of code to reference — then read that specific file first, but nothing more.
 
-### Before You Start: Approach Selection
+### Approach Selection
 
 By default, use the **preferred ordering of approaches**: try the network-first approach (`page.evaluate(fetch(...))`) first, then fall back to Playwright DOM automation if that doesn't work (see "Integration Approaches" below).
 
