@@ -1,100 +1,100 @@
 {
-	"name": "libretto",
-	"version": "0.0.1",
-	"type": "module",
-	"packageManager": "pnpm@9.15.4",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js",
-			"require": "./dist/index.cjs"
-		},
-		"./step": {
-			"types": "./dist/step/index.d.ts",
-			"import": "./dist/step/index.js",
-			"require": "./dist/step/index.cjs"
-		},
-		"./logger": {
-			"types": "./dist/logger/index.d.ts",
-			"import": "./dist/logger/index.js",
-			"require": "./dist/logger/index.cjs"
-		},
-		"./recovery": {
-			"types": "./dist/recovery/index.d.ts",
-			"import": "./dist/recovery/index.js",
-			"require": "./dist/recovery/index.cjs"
-		},
-		"./extract": {
-			"types": "./dist/extract/index.d.ts",
-			"import": "./dist/extract/index.js",
-			"require": "./dist/extract/index.cjs"
-		},
-		"./network": {
-			"types": "./dist/network/index.d.ts",
-			"import": "./dist/network/index.js",
-			"require": "./dist/network/index.cjs"
-		},
-		"./download": {
-			"types": "./dist/download/index.d.ts",
-			"import": "./dist/download/index.js",
-			"require": "./dist/download/index.cjs"
-		},
-		"./debug": {
-			"types": "./dist/debug/index.d.ts",
-			"import": "./dist/debug/index.js",
-			"require": "./dist/debug/index.cjs"
-		},
-		"./config": {
-			"types": "./dist/config/index.d.ts",
-			"import": "./dist/config/index.js",
-			"require": "./dist/config/index.cjs"
-		},
-		"./instrumentation": {
-			"types": "./dist/instrumentation/index.d.ts",
-			"import": "./dist/instrumentation/index.js",
-			"require": "./dist/instrumentation/index.cjs"
-		},
-		"./visualization": {
-			"types": "./dist/visualization/index.d.ts",
-			"import": "./dist/visualization/index.js",
-			"require": "./dist/visualization/index.cjs"
-		},
-		"./llm": {
-			"types": "./dist/llm/index.d.ts",
-			"import": "./dist/llm/index.js",
-			"require": "./dist/llm/index.cjs"
-		},
-		"./state": {
-			"types": "./dist/state/index.d.ts",
-			"import": "./dist/state/index.js",
-			"require": "./dist/state/index.cjs"
-		},
-		"./run": {
-			"types": "./dist/run/api.d.ts",
-			"import": "./dist/run/api.js",
-			"require": "./dist/run/api.cjs"
-		}
-	},
-	"scripts": {
-		"postinstall": "node ./scripts/postinstall.mjs",
-		"build": "tsup",
-		"type-check": "tsc --noEmit"
-	},
-	"peerDependencies": {
-		"playwright": ">=1.40.0",
-		"zod": ">=3.0.0"
-	},
-	"devDependencies": {
-		"@types/node": "^25.3.3",
-		"playwright": "^1.52.0",
-		"tsup": "^8.0.0",
-		"typescript": "^5.7.0",
-		"zod": "^3.25.0"
-	},
-	"dependencies": {
-		"@ai-sdk/anthropic": "^3.0.53",
-		"@ai-sdk/google-vertex": "^4.0.72",
-		"@ai-sdk/openai": "^3.0.39",
-		"ai": "^6.0.110"
-	}
+  "name": "libretto",
+  "version": "0.0.1",
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./step": {
+      "types": "./dist/step/index.d.ts",
+      "import": "./dist/step/index.js",
+      "require": "./dist/step/index.cjs"
+    },
+    "./logger": {
+      "types": "./dist/logger/index.d.ts",
+      "import": "./dist/logger/index.js",
+      "require": "./dist/logger/index.cjs"
+    },
+    "./recovery": {
+      "types": "./dist/recovery/index.d.ts",
+      "import": "./dist/recovery/index.js",
+      "require": "./dist/recovery/index.cjs"
+    },
+    "./extract": {
+      "types": "./dist/extract/index.d.ts",
+      "import": "./dist/extract/index.js",
+      "require": "./dist/extract/index.cjs"
+    },
+    "./network": {
+      "types": "./dist/network/index.d.ts",
+      "import": "./dist/network/index.js",
+      "require": "./dist/network/index.cjs"
+    },
+    "./download": {
+      "types": "./dist/download/index.d.ts",
+      "import": "./dist/download/index.js",
+      "require": "./dist/download/index.cjs"
+    },
+    "./debug": {
+      "types": "./dist/debug/index.d.ts",
+      "import": "./dist/debug/index.js",
+      "require": "./dist/debug/index.cjs"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.js",
+      "require": "./dist/config/index.cjs"
+    },
+    "./instrumentation": {
+      "types": "./dist/instrumentation/index.d.ts",
+      "import": "./dist/instrumentation/index.js",
+      "require": "./dist/instrumentation/index.cjs"
+    },
+    "./visualization": {
+      "types": "./dist/visualization/index.d.ts",
+      "import": "./dist/visualization/index.js",
+      "require": "./dist/visualization/index.cjs"
+    },
+    "./llm": {
+      "types": "./dist/llm/index.d.ts",
+      "import": "./dist/llm/index.js",
+      "require": "./dist/llm/index.cjs"
+    },
+    "./state": {
+      "types": "./dist/state/index.d.ts",
+      "import": "./dist/state/index.js",
+      "require": "./dist/state/index.cjs"
+    },
+    "./run": {
+      "types": "./dist/run/api.d.ts",
+      "import": "./dist/run/api.js",
+      "require": "./dist/run/api.cjs"
+    }
+  },
+  "scripts": {
+    "postinstall": "node ./scripts/postinstall.mjs; npx playwright install chromium",
+    "build": "tsup",
+    "type-check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.40.0",
+    "zod": ">=3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "playwright": "^1.52.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "zod": "^3.25.0"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.53",
+    "@ai-sdk/google-vertex": "^4.0.72",
+    "@ai-sdk/openai": "^3.0.39",
+    "ai": "^6.0.110"
+  }
 }
