@@ -10,7 +10,6 @@ type SessionState = {
   port: number;
   pid: number;
   session: string;
-  runId: string;
   startedAt: string;
   mode?: "read-only" | "interactive";
 };
@@ -24,6 +23,7 @@ type SpawnResult = {
 };
 
 type SeedHelpers = {
+  seedDefaultSession: (session?: string) => Promise<string>;
   seedSessionState: (state?: Partial<SessionState>) => Promise<SessionState>;
   seedSessionPermission: (
     session: string,
@@ -47,6 +47,7 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(here, "../../..");
 const cliEntry = resolve(repoRoot, "packages/libretto-cli/dist/index.js");
 const librettoEntry = resolve(repoRoot, "packages/libretto/dist/index.js");
+const testDefaultSession = "abc12";
 
 let didBuild = false;
 
@@ -187,10 +188,9 @@ export const test = base.extend<CliFixtures>({
 
   seedSessionState: async ({ workspacePath }, use) => {
     await use(async (state?: Partial<SessionState>) => {
-      const session = state?.session ?? "default";
+      const session = state?.session ?? testDefaultSession;
       const normalized: SessionState = {
         session,
-        runId: state?.runId ?? "run-seeded",
         port: state?.port ?? 9222,
         pid: state?.pid ?? 12345,
         startedAt: state?.startedAt ?? "2026-01-01T00:00:00.000Z",
@@ -203,6 +203,13 @@ export const test = base.extend<CliFixtures>({
         JSON.stringify(normalized, null, 2),
       );
       return normalized;
+    });
+  },
+
+  seedDefaultSession: async ({}, use) => {
+    await use(async (session?: string) => {
+      const value = session ?? testDefaultSession;
+      return value;
     });
   },
 

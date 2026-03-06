@@ -27,6 +27,18 @@ describe("basic CLI subprocess behavior", () => {
     expect(existsSync(workspacePath("tmp", "libretto-cli"))).toBe(false);
   });
 
+  test("auto-generates a 5-char session id for open without --session", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("open https://example.com", {
+      PATH: "/definitely-not-real",
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toMatch(
+      /Launching headed browser \(session: [a-z0-9]{5}\)\.\.\./,
+    );
+  });
+
   test("prints usage for help command", async ({ librettoCli }) => {
     const result = await librettoCli("help");
     expect(result.exitCode).toBe(0);
@@ -64,27 +76,31 @@ describe("basic CLI subprocess behavior", () => {
   });
 
   test("fails exec with missing code usage error", async ({ librettoCli }) => {
-    const result = await librettoCli("exec");
+    const result = await librettoCli("exec --session test1");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
       "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
     );
   });
 
-  test("fails run by default in read-only session", async ({ librettoCli }) => {
+  test("fails run when --session is not provided", async ({ librettoCli }) => {
     const result = await librettoCli("run ./integration.ts main");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Session \"default\" is read-only. Only a human can authorize interactive mode.",
+      'Missing --session for "run".',
     );
   });
 
   test("allows run guard when session is permissioned interactive", async ({
     librettoCli,
+    seedDefaultSession,
     seedSessionPermission,
   }) => {
-    await seedSessionPermission("default", "interactive");
-    const result = await librettoCli("run ./integration.ts main");
+    const defaultSession = await seedDefaultSession();
+    await seedSessionPermission(defaultSession, "interactive");
+    const result = await librettoCli(
+      `run ./integration.ts main --session ${defaultSession}`,
+    );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("is read-only");
     expect(result.stderr).toContain("Integration file does not exist:");
@@ -92,10 +108,12 @@ describe("basic CLI subprocess behavior", () => {
 
   test("fails run when export is not a Libretto workflow instance", async ({
     librettoCli,
+    seedDefaultSession,
     seedSessionPermission,
     workspacePath,
   }) => {
-    await seedSessionPermission("default", "interactive");
+    const defaultSession = await seedDefaultSession();
+    await seedSessionPermission(defaultSession, "interactive");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -106,17 +124,21 @@ export async function main() {
       "utf8",
     );
 
-    const result = await librettoCli("run ./integration.ts main");
+    const result = await librettoCli(
+      `run ./integration.ts main --session ${defaultSession}`,
+    );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("must be a Libretto workflow instance");
   });
 
   test("accepts branded Libretto workflow contract across module boundaries", async ({
     librettoCli,
+    seedDefaultSession,
     seedSessionPermission,
     workspacePath,
   }) => {
-    await seedSessionPermission("default", "interactive");
+    const defaultSession = await seedDefaultSession();
+    await seedSessionPermission(defaultSession, "interactive");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -133,15 +155,19 @@ export const main = {
       "utf8",
     );
 
-    const result = await librettoCli("run ./integration.ts main", {
+    const result = await librettoCli(
+      `run ./integration.ts main --session ${defaultSession}`,
+      {
       PLAYWRIGHT_BROWSERS_PATH: workspacePath("missing-playwright-browsers"),
-    });
+      },
+    );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("must be a Libretto workflow instance");
   });
 
   test("fails run when local auth profile is declared but missing", async ({
     librettoCli,
+    seedDefaultSession,
     seedSessionPermission,
     workspacePath,
   }) => {
@@ -149,7 +175,8 @@ export const main = {
       "../../libretto/src/workflow/workflow.ts",
       import.meta.url,
     ).href;
-    await seedSessionPermission("default", "interactive");
+    const defaultSession = await seedDefaultSession();
+    await seedSessionPermission(defaultSession, "interactive");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -165,7 +192,9 @@ export const main = workflow(
       "utf8",
     );
 
-    const result = await librettoCli("run ./integration.ts main");
+    const result = await librettoCli(
+      `run ./integration.ts main --session ${defaultSession}`,
+    );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
       'Local auth profile not found for domain "app.example.com".',
@@ -177,13 +206,16 @@ export const main = workflow(
       ".libretto/profiles/app.example.com.json",
     );
     expect(result.stderr).toContain(
-      "libretto-cli open https://app.example.com --headed --session default",
+      `libretto-cli open https://app.example.com --headed --session ${defaultSession}`,
     );
-    expect(result.stderr).toContain("libretto-cli save app.example.com --session default");
+    expect(result.stderr).toContain(
+      `libretto-cli save app.example.com --session ${defaultSession}`,
+    );
   });
 
   test("does not require local auth profile when auth metadata is absent", async ({
     librettoCli,
+    seedDefaultSession,
     seedSessionPermission,
     workspacePath,
   }) => {
@@ -191,7 +223,8 @@ export const main = workflow(
       "../../libretto/src/workflow/workflow.ts",
       import.meta.url,
     ).href;
-    await seedSessionPermission("default", "interactive");
+    const defaultSession = await seedDefaultSession();
+    await seedSessionPermission(defaultSession, "interactive");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -202,15 +235,19 @@ export const main = workflow({}, async () => "ok");
       "utf8",
     );
 
-    const result = await librettoCli("run ./integration.ts main", {
-      PLAYWRIGHT_BROWSERS_PATH: workspacePath("missing-playwright-browsers"),
-    });
+    const result = await librettoCli(
+      `run ./integration.ts main --session ${defaultSession}`,
+      {
+        PLAYWRIGHT_BROWSERS_PATH: workspacePath("missing-playwright-browsers"),
+      },
+    );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("Local auth profile not found for domain");
   });
 
   test("proceeds when declared local auth profile file exists", async ({
     librettoCli,
+    seedDefaultSession,
     seedSessionPermission,
     workspacePath,
   }) => {
@@ -218,7 +255,8 @@ export const main = workflow({}, async () => "ok");
       "../../libretto/src/workflow/workflow.ts",
       import.meta.url,
     ).href;
-    await seedSessionPermission("default", "interactive");
+    const defaultSession = await seedDefaultSession();
+    await seedSessionPermission(defaultSession, "interactive");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -238,9 +276,12 @@ export const main = workflow(
       "utf8",
     );
 
-    const result = await librettoCli("run ./integration.ts main", {
-      PLAYWRIGHT_BROWSERS_PATH: workspacePath("missing-playwright-browsers"),
-    });
+    const result = await librettoCli(
+      `run ./integration.ts main --session ${defaultSession}`,
+      {
+        PLAYWRIGHT_BROWSERS_PATH: workspacePath("missing-playwright-browsers"),
+      },
+    );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("Local auth profile not found for domain");
   });
@@ -255,12 +296,14 @@ export const main = workflow(
     );
   });
 
-  test("fails run when deprecated --allow-actions flag is passed", async ({
+  test("ignores deprecated --allow-actions flag for run", async ({
     librettoCli,
   }) => {
-    const result = await librettoCli("run ./integration.ts main --allow-actions");
+    const result = await librettoCli(
+      "run ./integration.ts main --allow-actions --session test1",
+    );
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("--allow-actions is not supported for run.");
+    expect(result.stderr).toContain("Integration file does not exist:");
   });
 
   test("session-mode interactive writes session permission", async ({
@@ -317,7 +360,7 @@ export const main = workflow(
   });
 
   test("fails save with missing target usage error", async ({ librettoCli }) => {
-    const result = await librettoCli("save");
+    const result = await librettoCli("save --session test1");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
       "Usage: libretto-cli save <url|domain> [--session <name>]",

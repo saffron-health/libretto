@@ -74,7 +74,6 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     await seedSessionState({
       session: "net-session",
-      runId: "run-net",
     });
     const logPath = await seedNetworkLog("net-session", [
       {
@@ -124,7 +123,6 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     await seedSessionState({
       session: "actions-session",
-      runId: "run-actions",
     });
     const logPath = await seedActionLog("actions-session", [
       {
