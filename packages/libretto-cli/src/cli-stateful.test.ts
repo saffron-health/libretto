@@ -204,7 +204,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
   });
 
-  test("allows exec when session mode is missing but session is permissioned interactive", async ({
+  test("rejects exec when session mode is missing even if permissioned interactive", async ({
     seedSessionState,
     seedSessionPermission,
     librettoCli,
@@ -219,9 +219,8 @@ describe("state-driven CLI subprocess behavior", () => {
       "exec \"return await page.title()\" --session permissioned-session",
     );
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).not.toContain("is read-only");
     expect(result.stderr).toContain(
-      "No browser running for session \"permissioned-session\".",
+      "Session \"permissioned-session\" is read-only. Only a human can authorize interactive mode.",
     );
   });
 

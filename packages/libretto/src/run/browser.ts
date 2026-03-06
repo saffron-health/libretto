@@ -1,6 +1,6 @@
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { createServer } from "node:net";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { ensureLibrettoSessionStatePath } from "../runtime/paths.js";
 import { SESSION_STATE_VERSION, SessionStateFileSchema } from "../state/session-state.js";
 
@@ -61,41 +61,29 @@ export async function launchBrowser({
   page.setDefaultNavigationTimeout(45_000);
 
   const metadataPath = ensureLibrettoSessionStatePath(sessionName);
-  const previousState =
-    existsSync(metadataPath) ? readFileSync(metadataPath, "utf-8") : null;
-  let previousStateObject: Record<string, unknown> = {};
+  const existingStateRaw = existsSync(metadataPath)
+    ? (JSON.parse(readFileSync(metadataPath, "utf-8")) as unknown)
+    : undefined;
 
-  if (previousState) {
-    try {
-      const parsed = JSON.parse(previousState) as unknown;
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        previousStateObject = parsed as Record<string, unknown>;
-      }
-    } catch {}
-  }
-
-  const parsedPreviousState = SessionStateFileSchema.safeParse(previousStateObject);
-
-  const preservedRunId =
-    parsedPreviousState.success
-      ? parsedPreviousState.data.runId
-      : `runtime-${Date.now()}`;
-  const preservedVersion =
-    parsedPreviousState.success
-      ? parsedPreviousState.data.version
-      : SESSION_STATE_VERSION;
+  const parsedExistingState = SessionStateFileSchema.safeParse(existingStateRaw);
 
   writeFileSync(
     metadataPath,
     JSON.stringify(
       {
-        ...previousStateObject,
-        version: preservedVersion,
+        version: parsedExistingState.success
+          ? parsedExistingState.data.version
+          : SESSION_STATE_VERSION,
         session: sessionName,
         port: debugPort,
         pid: process.pid,
-        runId: preservedRunId,
+        runId: parsedExistingState.success
+          ? parsedExistingState.data.runId
+          : `runtime-${Date.now()}`,
         startedAt: new Date().toISOString(),
+        ...(parsedExistingState.success && parsedExistingState.data.mode
+          ? { mode: parsedExistingState.data.mode }
+          : {}),
       },
       null,
       2,
@@ -110,16 +98,6 @@ export async function launchBrowser({
     metadataPath,
     close: async () => {
       await browser.close();
-      if (previousState === null) {
-        if (existsSync(metadataPath)) {
-          try { unlinkSync(metadataPath); } catch {}
-        }
-        return;
-      }
-
-      try {
-        writeFileSync(metadataPath, previousState, "utf-8");
-      } catch {}
     },
   };
 }

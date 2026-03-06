@@ -233,10 +233,7 @@ async function generateDebugBundle(
 		});
 	}
 
-	let pageUrl = "";
-	try {
-		pageUrl = page.url();
-	} catch {}
+	const pageUrl = page.isClosed() ? "" : page.url();
 
 	const bundle: DebugBundle = {
 		timestamp: new Date().toISOString(),

@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import { writeFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, rmSync, existsSync, mkdirSync } from "node:fs";
 import { isDebugMode } from "../config/config.js";
 import {
 	ensureLibrettoPauseSignalDir,
@@ -38,14 +38,10 @@ function getResumeFilePath(options?: DebugPauseOptions): string {
 }
 
 function cleanupPauseFiles(options?: DebugPauseOptions): void {
-	try {
-		const pausedFile = getPausedFilePath(options);
-		if (existsSync(pausedFile)) unlinkSync(pausedFile);
-	} catch {}
-	try {
-		const resumeFile = getResumeFilePath(options);
-		if (existsSync(resumeFile)) unlinkSync(resumeFile);
-	} catch {}
+	const pausedFile = getPausedFilePath(options);
+	const resumeFile = getResumeFilePath(options);
+	if (existsSync(pausedFile)) rmSync(pausedFile, { force: true });
+	if (existsSync(resumeFile)) rmSync(resumeFile, { force: true });
 }
 
 /**

@@ -288,13 +288,6 @@ export function setSessionPermissionMode(
   writeSessionPermissions(permissions);
 }
 
-export function resolveSessionMode(
-  session: string,
-  sessionState?: SessionState | null,
-): SessionMode {
-  return sessionState?.mode ?? getSessionPermissionMode(session);
-}
-
 export function readOnlySessionError(session: string): string {
   return (
     `Session "${session}" is read-only. ` +
