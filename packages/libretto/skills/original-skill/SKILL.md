@@ -263,7 +263,12 @@ Use Libretto CLI interactively to build a brand new workflow file from scratch. 
 
 The browser stays open indefinitely until explicitly closed with `libretto-cli close` or by the user closing the window. **Do not** set any timeouts, auto-close timers, or call `close` until the user says the workflow session is done. Ensure that you open the browser in `--headed` mode so the user can see what's happening.
 
-**Do NOT ask the user about saved login sessions.** Do not ask if they have a saved session or if they need to log in. Always open the page in `--headed` mode and let the user log in manually in the browser window. Do not use `libretto-cli save` during workflow creation.
+If the site requires login, ask the user how auth should work in the generated workflow:
+
+1. Save a local profile (recommended for local runs): open in `--headed`, have the user log in manually, run `libretto-cli save <domain>`, and generate workflow metadata with `authProfile: { type: "local", domain: "<hostname>" }`.
+2. Use user-managed credential logic in Playwright code (no local profile dependency).
+
+If local profile is chosen, include this warning in your generated workflow guidance: local profiles are machine-local (other users/environments will not have them), and sessions can expire so re-login/re-save may be required.
 
 ### Choosing Between Playwright and Network Requests
 

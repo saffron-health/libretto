@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "ai": {
+    "preset": "codex",
+    "commandPrefix": [
+      "codex",
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox",
+      "read-only"
+    ],
+    "updatedAt": "2026-03-06T04:10:02.651Z"
+  }
+}
