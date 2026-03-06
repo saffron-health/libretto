@@ -99,7 +99,7 @@ async function runSnapshot(
 
   if (!canAnalyzeSnapshots()) {
     throw new Error(
-      "Couldn't run analysis: no snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude/gemini) to enable analysis.",
+      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or opencode/claude/gemini) to enable analysis.",
     );
   }
 

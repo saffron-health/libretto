@@ -84,18 +84,18 @@ Add a first-class `ai` command entry point so users configure model behavior in 
 
 Switch snapshot analysis to consume the new shared AI config path and helpers. Behavior should remain functionally the same, with only configuration source and user guidance updated.
 
-- [ ] Replace snapshot-specific config reads in `snapshot-analyzer.ts` with shared AI config resolver calls.
-- [ ] Keep existing analyzer execution adapters (`codex`, `opencode`, `claude`, `gemini`) but source their command prefix from shared AI config.
-- [ ] Update missing-config and command-not-found error strings to point users to `libretto-cli ai configure ...`.
-- [ ] Do not change prompt/schema generation logic for snapshot interpretation in this phase.
-- [ ] Success criteria: snapshot analysis still works when AI config exists and fails with actionable `ai configure` guidance when missing.
+- [x] Replace snapshot-specific config reads in `snapshot-analyzer.ts` with shared AI config resolver calls.
+- [x] Keep existing analyzer execution adapters (`codex`, `opencode`, `claude`, `gemini`) but source their command prefix from shared AI config.
+- [x] Update missing-config and command-not-found error strings to point users to `libretto-cli ai configure ...`.
+- [x] Do not change prompt/schema generation logic for snapshot interpretation in this phase.
+- [x] Success criteria: snapshot analysis still works when AI config exists and fails with actionable `ai configure` guidance when missing.
 
 ### Phase 5: Update tests and docs for new config contract
 
 Finalize the contract by updating automated coverage and user documentation. This phase ensures the new AI config model is validated end-to-end and clearly documented.
 
-- [ ] Update `cli-stateful.test.ts` config tests from snapshot-specific command/path terminology to AI command/path terminology.
-- [ ] Update `test-fixtures.ts` seed helper to write `.libretto/config.json` with the new schema.
-- [ ] Update README section from “snapshot analyzer configuration” to generic “AI configuration”.
-- [ ] Run `pnpm --filter libretto-cli test` and ensure all CLI tests pass with the new config path and messages.
-- [ ] Success criteria: test suite passes and docs/examples consistently reference `.libretto/config.json` and `ai configure`.
+- [x] Update `cli-stateful.test.ts` config tests from snapshot-specific command/path terminology to AI command/path terminology.
+- [x] Update `test-fixtures.ts` seed helper to write `.libretto/config.json` with the new schema.
+- [x] Update README section from “snapshot analyzer configuration” to generic “AI configuration”.
+- [x] Run `pnpm --filter libretto-cli test` and ensure all CLI tests pass with the new config path and messages.
+- [x] Success criteria: test suite passes and docs/examples consistently reference `.libretto/config.json` and `ai configure`.

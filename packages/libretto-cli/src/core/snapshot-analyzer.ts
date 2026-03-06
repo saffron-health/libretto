@@ -231,7 +231,7 @@ async function runExternalCommand(
       if (error.code === "ENOENT") {
         reject(
           new Error(
-            `Command not found: ${command}. Configure AI with 'libretto-cli snapshot configure'.`,
+            `Command not found: ${command}. Configure AI with 'libretto-cli ai configure'.`,
           ),
         );
         return;
@@ -579,7 +579,7 @@ export function runSnapshotConfigure(input: {
   customPrefix?: string[];
 }): void {
   runAiConfigure(input, {
-    configureCommandName: "libretto-cli snapshot configure",
+    configureCommandName: "libretto-cli ai configure",
   });
 }
 
@@ -647,7 +647,7 @@ export async function runInterpret(args: InterpretArgs): Promise<void> {
     const llmClientFactory = getLLMClientFactory();
     if (!llmClientFactory) {
       throw new Error(
-        "No snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
+        "No AI config set. Run 'libretto-cli ai configure codex' (or opencode/claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
       );
     }
 

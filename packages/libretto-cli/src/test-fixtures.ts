@@ -208,14 +208,16 @@ export const test = base.extend<CliFixtures>({
 
   seedSnapshotConfig: async ({ workspacePath }, use) => {
     await use(async (config?: JsonRecord) => {
-      const dir = workspacePath(".libretto-cli");
-      const path = workspacePath(".libretto-cli", "snapshot-config.json");
+      const dir = workspacePath(".libretto");
+      const path = workspacePath(".libretto", "config.json");
       await mkdir(dir, { recursive: true });
       const payload = config ?? {
         version: 1,
-        preset: "codex",
-        commandPrefix: ["codex", "exec"],
-        updatedAt: "2026-01-01T00:00:00.000Z",
+        ai: {
+          preset: "codex",
+          commandPrefix: ["codex", "exec"],
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
       };
       await writeFile(path, JSON.stringify(payload, null, 2), "utf8");
       return path;
