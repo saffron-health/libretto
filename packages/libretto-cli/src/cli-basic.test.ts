@@ -296,14 +296,14 @@ export const main = workflow(
     );
   });
 
-  test("ignores deprecated --allow-actions flag for run", async ({
+  test("fails run when deprecated --allow-actions flag is passed", async ({
     librettoCli,
   }) => {
     const result = await librettoCli(
       "run ./integration.ts main --allow-actions --session test1",
     );
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Integration file does not exist:");
+    expect(result.stderr).toContain("--allow-actions is not supported for run.");
   });
 
   test("session-mode interactive writes session permission", async ({
