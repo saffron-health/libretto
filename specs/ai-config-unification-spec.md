@@ -62,23 +62,23 @@ Create the minimal shared config contract and storage location first. This phase
 
 Move configuration behavior out of snapshot-specific code and into shared AI handlers. This keeps the command UX consistent while decoupling it from any single feature area.
 
-- [ ] Extract preset defaults and configure argument parsing from `snapshot-analyzer.ts` into shared AI config handlers.
-- [ ] Implement shared operations:
-- [ ] `show`: prints current AI config and file path.
-- [ ] `configure`: writes `ai` section with preset/custom command prefix and fresh `updatedAt`.
-- [ ] `clear`: removes only AI config state (either remove `ai` key or reset file to `{ version }`; choose one behavior and document it).
-- [ ] Ensure all user-facing output is AI terminology (not snapshot terminology).
-- [ ] Success criteria: configure/show/clear output references AI config only, and file writes occur at `.libretto/config.json`.
+- [x] Extract preset defaults and configure argument parsing from `snapshot-analyzer.ts` into shared AI config handlers.
+- [x] Implement shared operations:
+- [x] `show`: prints current AI config and file path.
+- [x] `configure`: writes `ai` section with preset/custom command prefix and fresh `updatedAt`.
+- [x] `clear`: removes only AI config state (either remove `ai` key or reset file to `{ version }`; choose one behavior and document it).
+- [x] Ensure all user-facing output is AI terminology (not snapshot terminology).
+- [x] Success criteria: configure/show/clear output references AI config only, and file writes occur at `.libretto/config.json`.
 
 ### Phase 3: Expose AI CLI command surface
 
 Add a first-class `ai` command entry point so users configure model behavior in one obvious place. This phase is focused on discoverable CLI UX, not analyzer internals.
 
-- [ ] Add `ai configure [preset]` command in CLI registration with `--show`, `--clear`, and optional custom prefix via `--` separator.
+- [ ] Add `ai configure [preset]` command in CLI registration with `--clear` and optional custom prefix via `--` separator.
 - [ ] Update root usage text/examples to show `libretto-cli ai configure ...`.
 - [ ] Keep command behavior deterministic and aligned with existing configure UX semantics.
 - [ ] Decide whether to keep `snapshot configure` as temporary alias in this phase; if kept, ensure help text labels it as compatibility behavior.
-- [ ] Success criteria: `libretto-cli ai configure codex`, `--show`, and `--clear` all run successfully with expected stdout and exit code `0`.
+- [ ] Success criteria: `libretto-cli ai configure codex`, bare `libretto-cli ai configure` (show), and `--clear` all run successfully with expected stdout and exit code `0`.
 
 ### Phase 4: Rewire snapshot analyzer to shared AI config resolver
 

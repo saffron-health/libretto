@@ -132,25 +132,16 @@ export function registerSnapshotCommands(yargs: Argv): Argv {
     .command(
       "snapshot configure [preset]",
       "Configure snapshot analyzer",
-      (cmd) =>
-        cmd
-          .option("show", { type: "boolean", default: false })
-          .option("clear", { type: "boolean", default: false }),
+      (cmd) => cmd.option("clear", { type: "boolean", default: false }),
       (argv) => {
-        const args: string[] = [];
-        if (argv.show) args.push("--show");
-        if (argv.clear) args.push("--clear");
-        const preset = argv.preset as string | undefined;
-        if (preset) args.push(preset);
-
         const customPrefix = Array.isArray(argv["--"])
           ? (argv["--"] as string[])
           : [];
-        if (customPrefix.length > 0) {
-          args.push("--", ...customPrefix);
-        }
-
-        runSnapshotConfigure(args);
+        runSnapshotConfigure({
+          clear: Boolean(argv.clear),
+          preset: argv.preset as string | undefined,
+          customPrefix,
+        });
       },
     );
 }

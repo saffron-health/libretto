@@ -52,7 +52,7 @@ libretto-cli snapshot configure gemini
 libretto-cli snapshot configure codex -- my-custom-codex --flag
 
 # Show current configuration
-libretto-cli snapshot configure --show
+libretto-cli snapshot configure
 
 # Clear configuration
 libretto-cli snapshot configure --clear
