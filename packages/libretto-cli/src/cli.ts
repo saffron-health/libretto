@@ -39,7 +39,7 @@ function printUsage(): void {
 Commands:
   open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
-  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]  Run an exported async integration function from a file (blocked until interactive)
+  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]  Run an exported Libretto workflow from a file (blocked until interactive)
   session-mode <read-only|interactive> Set session execution mode
   ai configure [preset] [-- <command prefix...>]  Configure AI runtime for analysis commands
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
@@ -83,6 +83,8 @@ Available in exec:
 Profiles:
   Profiles are saved to .libretto-cli/profiles/<domain>.json (git-ignored)
   They persist cookies, localStorage, and session data across browser launches.
+  Local profiles are machine-local and are not shared with other users/environments.
+  Sessions can expire; if run fails auth, log in again and re-save the profile.
 
 Sessions:
   Session state is stored in .libretto/sessions/<session>/state.json
