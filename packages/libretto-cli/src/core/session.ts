@@ -71,10 +71,6 @@ export function getStateFilePath(session: string): string {
   return getSessionStatePath(session);
 }
 
-function parseSessionState(content: string, stateFile: string): SessionState {
-  return parseSessionStateContent(content, stateFile);
-}
-
 export function readSessionState(session: string): SessionState | null {
   const log = getLog();
   const stateFile = getStateFilePath(session);
@@ -85,7 +81,7 @@ export function readSessionState(session: string): SessionState | null {
 
   try {
     const content = readFileSync(stateFile, "utf-8");
-    const state = parseSessionState(content, stateFile);
+    const state = parseSessionStateContent(content, stateFile);
     log.info("session-state-read", {
       session,
       port: state.port,
@@ -142,7 +138,7 @@ export function readSessionStateOrThrow(session: string): SessionState {
   }
 
   try {
-    return parseSessionState(readFileSync(stateFile, "utf-8"), stateFile);
+    return parseSessionStateContent(readFileSync(stateFile, "utf-8"), stateFile);
   } catch (err) {
     throw new Error(
       `Could not read session state for "${session}": ${err instanceof Error ? err.message : String(err)}`,
