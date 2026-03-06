@@ -411,6 +411,11 @@ export function registerExecutionCommands(yargs: Argv): Argv {
           .option("params-file", { type: "string" })
           .option("headed", { type: "boolean", default: false })
           .option("headless", { type: "boolean", default: false })
+          .option("allow-actions", {
+            type: "boolean",
+            default: false,
+            hidden: true,
+          })
           .option("debug", { type: "string" }),
       async (argv) => {
         const usage =
@@ -422,6 +427,17 @@ export function registerExecutionCommands(yargs: Argv): Argv {
         }
 
         const session = String(argv.session);
+        const allowActions = Boolean(
+          argv["allow-actions"] ?? (argv as { allowActions?: boolean }).allowActions,
+        );
+        if (allowActions) {
+          throw new Error(
+            `--allow-actions is not supported for run. ${readOnlySessionError(session)}`,
+          );
+        }
+        if (getSessionPermissionMode(session) !== "interactive") {
+          throw new Error(readOnlySessionError(session));
+        }
 
         const rawInlineParams = argv.params as string | undefined;
         const paramsFile = argv["params-file"] as string | undefined;
