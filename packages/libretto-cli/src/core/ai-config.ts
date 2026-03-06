@@ -19,7 +19,7 @@ const LIBRETTO_CONFIG_PATH = join(getRepoRoot(), ".libretto", "config.json");
 
 export const CURRENT_CONFIG_VERSION = 1;
 
-export const AiPresetSchema = z.enum(["codex", "opencode", "claude", "gemini"]);
+export const AiPresetSchema = z.enum(["codex", "claude", "gemini"]);
 export type AiPreset = z.infer<typeof AiPresetSchema>;
 
 export const AiConfigSchema = z
@@ -41,7 +41,6 @@ export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
 
 export const AI_CONFIG_PRESETS: Record<AiPreset, string[]> = {
   codex: ["codex", "exec", "--skip-git-repo-check", "--sandbox", "read-only"],
-  opencode: ["opencode", "run", "--format", "json"],
   claude: [join(homedir(), ".claude", "local", "claude"), "-p"],
   gemini: ["gemini", "--output-format", "json"],
 };
@@ -136,7 +135,7 @@ function printAiConfig(config: AiConfig, configPath: string): void {
 
 function printConfigureUsage(commandName: string): void {
   console.log(
-    `Usage: ${commandName} <codex|opencode|claude|gemini> [-- <command prefix...>]
+    `Usage: ${commandName} <codex|claude|gemini> [-- <command prefix...>]
        ${commandName}
        ${commandName} --clear`,
   );
@@ -184,7 +183,7 @@ export function runAiConfigure(
   if (!parsedPreset.success) {
     printConfigureUsage(configureCommandName);
     throw new Error(
-      "Missing or invalid preset. Use one of: codex, opencode, claude, gemini.",
+      "Missing or invalid preset. Use one of: codex, claude, gemini.",
     );
   }
 

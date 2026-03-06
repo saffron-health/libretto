@@ -7,7 +7,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { getLog, LIBRETTO_DIR, STATE_DIR } from "./context";
+import {
+  getLog,
+  getSessionDir,
+  getSessionLogsPath,
+  getSessionStatePath,
+  LIBRETTO_DIR,
+  LIBRETTO_SESSIONS_DIR,
+} from "./context";
 
 const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 const SESSION_PERMISSIONS_PATH = join(LIBRETTO_DIR, "session-permissions.json");
@@ -39,14 +46,11 @@ export function generateRunId(): string {
     .replace(/^(\d{8})(\d{6})$/, "$1-$2");
 }
 
-export function getRunDir(runId: string): string {
-  return join(STATE_DIR, runId);
-}
-
-export function logFileForRun(runId: string): string {
-  const dir = getRunDir(runId);
+export function logFileForSession(session: string): string {
+  validateSessionName(session);
+  const dir = getSessionDir(session);
   mkdirSync(dir, { recursive: true });
-  return join(dir, "session.log");
+  return getSessionLogsPath(session);
 }
 
 export function validateSessionName(session: string): void {
@@ -64,8 +68,9 @@ export function validateSessionName(session: string): void {
 
 export function getStateFilePath(session: string): string {
   validateSessionName(session);
-  mkdirSync(STATE_DIR, { recursive: true });
-  return join(STATE_DIR, `${session}.json`);
+  const sessionDir = getSessionDir(session);
+  mkdirSync(sessionDir, { recursive: true });
+  return getSessionStatePath(session);
 }
 
 export function readSessionState(session: string): SessionState | null {
@@ -92,31 +97,42 @@ export function readSessionState(session: string): SessionState | null {
 }
 
 function listActiveSessions(): string[] {
-  if (!existsSync(STATE_DIR)) return [];
-  return readdirSync(STATE_DIR)
-    .filter((f) => f.endsWith(".json"))
-    .map((f) => f.replace(/\.json$/, ""));
+  if (!existsSync(LIBRETTO_SESSIONS_DIR)) return [];
+  return readdirSync(LIBRETTO_SESSIONS_DIR).filter((session) =>
+    existsSync(getSessionStatePath(session)),
+  );
 }
 
-export function getSessionStateOrThrow(session: string): SessionState {
+function throwSessionNotFoundError(session: string): never {
+  const active = listActiveSessions();
+  const lines = [`No session "${session}" found.`];
+  if (active.length > 0) {
+    lines.push("");
+    lines.push("Active sessions:");
+    for (const name of active) {
+      lines.push(`  ${name}`);
+    }
+  } else {
+    lines.push("");
+    lines.push("No active sessions.");
+  }
+  lines.push("");
+  lines.push("Start one with:");
+  lines.push(`  libretto-cli open <url> --session ${session}`);
+  throw new Error(lines.join("\n"));
+}
+
+export function assertSessionStateExistsOrThrow(session: string): void {
   const stateFile = getStateFilePath(session);
   if (!existsSync(stateFile)) {
-    const active = listActiveSessions();
-    const lines = [`No session "${session}" found.`];
-    if (active.length > 0) {
-      lines.push("");
-      lines.push("Active sessions:");
-      for (const name of active) {
-        lines.push(`  ${name}`);
-      }
-    } else {
-      lines.push("");
-      lines.push("No active sessions.");
-    }
-    lines.push("");
-    lines.push(`Start one with:`);
-    lines.push(`  libretto-cli open <url> --session ${session}`);
-    throw new Error(lines.join("\n"));
+    throwSessionNotFoundError(session);
+  }
+}
+
+export function readSessionStateOrThrow(session: string): SessionState {
+  const stateFile = getStateFilePath(session);
+  if (!existsSync(stateFile)) {
+    throwSessionNotFoundError(session);
   }
 
   try {

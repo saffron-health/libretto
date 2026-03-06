@@ -3,14 +3,20 @@ import { openSync, existsSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
-import { getLog, PROFILES_DIR, REPO_ROOT, setLogFile } from "./context";
+import {
+  getLog,
+  getSessionActionsLogPath,
+  getSessionNetworkLogPath,
+  PROFILES_DIR,
+  REPO_ROOT,
+  setLogFile,
+} from "./context";
 import {
   clearSessionState,
   generateRunId,
   getSessionPermissionMode,
-  getRunDir,
-  getSessionStateOrThrow,
-  logFileForRun,
+  readSessionStateOrThrow,
+  logFileForSession,
   readSessionState,
   writeSessionState,
 } from "./session";
@@ -128,7 +134,7 @@ export async function connect(
 }> {
   const log = getLog();
   log.info("connect", { session, timeoutMs });
-  const state = getSessionStateOrThrow(session);
+  const state = readSessionStateOrThrow(session);
   const browser = await tryConnectToPort(state.port, timeoutMs);
   if (!browser) {
     log.error("connect-no-browser", {
@@ -229,7 +235,9 @@ export async function runOpen(
 
   const port = await pickFreePort();
   const runId = generateRunId();
-  const runLogPath = logFileForRun(runId);
+  const runLogPath = logFileForSession(session);
+  const networkLogPath = getSessionNetworkLogPath(session);
+  const actionsLogPath = getSessionActionsLogPath(session);
 
   setLogFile(runLogPath);
   log = getLog();
@@ -267,14 +275,20 @@ export async function runOpen(
     : "";
 
   const escapedLogPath = runLogPath.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const escapedNetworkLogPath = networkLogPath
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
+  const escapedActionsLogPath = actionsLogPath
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
 
   const launcherCode = `
 import { chromium } from 'playwright';
 import { appendFileSync, mkdirSync } from 'node:fs';
 
 const LOG_FILE = '${escapedLogPath}';
-const NETWORK_LOG = '${escapedLogPath}'.replace('session.log', 'network.jsonl');
-const ACTIONS_LOG = NETWORK_LOG.replace('network.jsonl', 'actions.jsonl');
+const NETWORK_LOG = '${escapedNetworkLogPath}';
+const ACTIONS_LOG = '${escapedActionsLogPath}';
 mkdirSync(NETWORK_LOG.replace(/\\/[^\\/]+$/, ''), { recursive: true });
 
 const STATIC_EXT_RE = /\\.(css|js|png|jpg|jpeg|gif|woff|woff2|ttf|ico|svg)(\\?|$)/i;

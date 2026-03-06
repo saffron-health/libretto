@@ -77,21 +77,21 @@ Target layout:
 
 ### Phase 2: Move CLI session state and logs into per-session directories
 
-- [ ] Move session state file from `tmp/libretto-cli/<session>.json` to `.libretto/sessions/<session>/state.json`.
-- [ ] Replace run-directory/per-run log helpers with session-directory helpers and `logs.jsonl`.
-- [ ] Update logger initialization in `cli.ts` to write to per-session `logs.jsonl`.
-- [ ] After logger defaults move off `tmp/libretto-cli`, allow early `getLog()` usage on help/error paths without recreating legacy dirs.
-- [ ] Update `open` child process logging path to append JSONL entries to `.libretto/sessions/<session>/logs.jsonl`.
-- [ ] Success criteria: session commands (`open`, `close`, `exec` guard paths) operate using only `.libretto/sessions/<session>/state.json` + `logs.jsonl`.
+- [x] Move session state file from `tmp/libretto-cli/<session>.json` to `.libretto/sessions/<session>/state.json`.
+- [x] Replace run-directory/per-run log helpers with session-directory helpers and `logs.jsonl`.
+- [x] Update logger initialization in `cli.ts` to write to per-session `logs.jsonl`.
+- [x] After logger defaults move off `tmp/libretto-cli`, allow early `getLog()` usage on help/error paths without recreating legacy dirs.
+- [x] Update `open` child process logging path to append JSONL entries to `.libretto/sessions/<session>/logs.jsonl`.
+- [x] Success criteria: session commands (`open`, `close`, `exec` guard paths) operate using only `.libretto/sessions/<session>/state.json` + `logs.jsonl`.
 
 ### Phase 3: Move telemetry and snapshots to session-scoped `.libretto` paths
 
-- [ ] Move network/action telemetry files to `.libretto/sessions/<session>/network.jsonl` and `.libretto/sessions/<session>/actions.jsonl`.
-- [ ] Update `network` and `actions` read/clear commands to use the new per-session files.
-- [ ] Move snapshot captures to `.libretto/sessions/<session>/snapshots/<snapshot-run-id>/page.png` and `page.html`.
-- [ ] Update snapshot pair discovery and `runInterpret` defaults to find the latest pair in the new snapshot tree.
-- [ ] Keep temporary analyzer output under `.libretto` (not `tmp/`) and delete it after parse as today.
-- [ ] Success criteria: stateful tests prove network/actions/snapshot files are created under `.libretto/sessions/<session>/...` and no files are created in `tmp/libretto-cli/`.
+- [x] Move network/action telemetry files to `.libretto/sessions/<session>/network.jsonl` and `.libretto/sessions/<session>/actions.jsonl`.
+- [x] Update `network` and `actions` read/clear commands to use the new per-session files.
+- [x] Move snapshot captures to `.libretto/sessions/<session>/snapshots/<snapshot-run-id>/page.png` and `page.html`.
+- [x] Require explicit snapshot PNG/HTML paths from the current `snapshot` command flow; remove implicit latest-pair lookup from previous runs.
+- [x] Remove repository-scoped analyzer temp directories; use transient OS temp files and delete them after parse.
+- [x] Success criteria: stateful tests prove network/actions/snapshot files are created under `.libretto/sessions/<session>/...` and no files are created in `tmp/libretto-cli/`.
 
 ### Phase 4: Consolidate session permission state into `.libretto/config.json`
 

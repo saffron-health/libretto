@@ -43,9 +43,8 @@ There are two ways to configure it:
 Configure an external coding agent — no API keys needed in libretto, the agent handles its own authentication:
 
 ```bash
-# Use one of: codex, opencode, claude, gemini
+# Use one of: codex, claude, gemini
 libretto-cli ai configure codex
-libretto-cli ai configure opencode
 libretto-cli ai configure claude
 libretto-cli ai configure gemini
 
@@ -57,9 +56,6 @@ libretto-cli ai configure
 
 # Clear configuration
 libretto-cli ai configure --clear
-
-# Compatibility alias (still supported)
-libretto-cli snapshot configure codex
 ```
 
 ### Option 2: Built-in LLM client via environment variables

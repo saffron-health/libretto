@@ -1,5 +1,3 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
 import { registerAICommands } from "./commands/ai";
@@ -12,14 +10,11 @@ import {
   flushLog,
   getLog,
   setLogFile,
-  STATE_DIR,
 } from "./core/context";
 import {
-  getStateFilePath,
-  logFileForRun,
+  logFileForSession,
   SESSION_DEFAULT,
   validateSessionName,
-  type SessionState,
 } from "./core/session";
 
 const CLI_COMMANDS = new Set([
@@ -50,7 +45,6 @@ Commands:
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
   exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight; blocked until interactive)
   snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when both flags are provided
-  snapshot configure [preset] [-- <command prefix...>]  Compatibility alias for ai configure
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
   close                   Close the browser
@@ -71,11 +65,9 @@ Examples:
   libretto-cli exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
   libretto-cli exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
   libretto-cli ai configure codex
-  libretto-cli ai configure opencode
   libretto-cli ai configure claude
   libretto-cli ai configure gemini
-  libretto-cli ai configure codex -- codex exec --skip-git-repo-check --sandbox read-only
-  libretto-cli snapshot configure codex   # compatibility alias
+  libretto-cli ai configure <codex|claude|gemini> -- <command prefix...>
   libretto-cli snapshot
   libretto-cli snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
   libretto-cli close
@@ -93,7 +85,8 @@ Profiles:
   They persist cookies, localStorage, and session data across browser launches.
 
 Sessions:
-  Session state is stored in tmp/libretto-cli/<session>.json
+  Session state is stored in .libretto/sessions/<session>/state.json
+  CLI logs are stored in .libretto/sessions/<session>/logs.jsonl
   Each session runs an isolated browser instance on a dynamic port.
 `);
 }
@@ -139,30 +132,13 @@ function validateLegacySessionArg(rawArgs: string[]): void {
 
 function initializeLogger(rawArgs: string[]): void {
   const sessionForLog = parseSessionForLog(rawArgs);
-
-  const runIdForLog = (() => {
-    try {
-      const stateFile = getStateFilePath(sessionForLog);
-      if (existsSync(stateFile)) {
-        const state = JSON.parse(readFileSync(stateFile, "utf-8")) as SessionState;
-        if (state?.runId) return state.runId;
-      }
-    } catch {}
-    return null;
-  })();
-
-  const logFilePath = (() => {
-    if (runIdForLog) return logFileForRun(runIdForLog);
-    mkdirSync(STATE_DIR, { recursive: true });
-    return join(STATE_DIR, "cli.log");
-  })();
+  const logFilePath = logFileForSession(sessionForLog);
 
   setLogFile(logFilePath);
   getLog().info("cli-start", {
     args: rawArgs,
     cwd: process.cwd(),
     session: sessionForLog,
-    runId: runIdForLog,
   });
 }
 
@@ -202,7 +178,8 @@ function createParser(): Argv {
 export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   ensureLibrettoSetup();
-  let loggerInitialized = false;
+  initializeLogger(rawArgs);
+  const log = getLog();
 
   try {
     validateLegacySessionArg(rawArgs);
@@ -223,9 +200,6 @@ export async function runLibrettoCLI(): Promise<void> {
       process.exit(1);
     }
 
-    initializeLogger(rawArgs);
-    loggerInitialized = true;
-    const log = getLog();
     const parser = createParser();
     log.info("cli-command", { command, args });
     await parser.parseAsync();
@@ -233,11 +207,8 @@ export async function runLibrettoCLI(): Promise<void> {
     await flushLog();
     process.exit(0);
   } catch (err) {
-    if (loggerInitialized) {
-      const log = getLog();
-      log.error("cli-error", { error: err, args: rawArgs });
-      await flushLog();
-    }
+    log.error("cli-error", { error: err, args: rawArgs });
+    await flushLog();
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
     process.exit(1);

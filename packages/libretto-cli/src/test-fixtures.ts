@@ -30,8 +30,8 @@ type SeedHelpers = {
     mode: "read-only" | "interactive",
   ) => Promise<string>;
   seedSnapshotConfig: (config?: JsonRecord) => Promise<string>;
-  seedNetworkLog: (runId: string, entries: JsonRecord[]) => Promise<string>;
-  seedActionLog: (runId: string, entries: JsonRecord[]) => Promise<string>;
+  seedNetworkLog: (session: string, entries: JsonRecord[]) => Promise<string>;
+  seedActionLog: (session: string, entries: JsonRecord[]) => Promise<string>;
 };
 
 type CliFixtures = {
@@ -196,10 +196,10 @@ export const test = base.extend<CliFixtures>({
         startedAt: state?.startedAt ?? "2026-01-01T00:00:00.000Z",
         mode: state?.mode,
       };
-      const dir = workspacePath("tmp", "libretto-cli");
+      const dir = workspacePath(".libretto", "sessions", session);
       await mkdir(dir, { recursive: true });
       await writeFile(
-        workspacePath("tmp", "libretto-cli", `${session}.json`),
+        workspacePath(".libretto", "sessions", session, "state.json"),
         JSON.stringify(normalized, null, 2),
       );
       return normalized;
@@ -241,10 +241,10 @@ export const test = base.extend<CliFixtures>({
   },
 
   seedNetworkLog: async ({ workspacePath }, use) => {
-    await use(async (runId: string, entries: JsonRecord[]) => {
-      const runDir = workspacePath("tmp", "libretto-cli", runId);
-      const logPath = workspacePath("tmp", "libretto-cli", runId, "network.jsonl");
-      await mkdir(runDir, { recursive: true });
+    await use(async (session: string, entries: JsonRecord[]) => {
+      const sessionDir = workspacePath(".libretto", "sessions", session);
+      const logPath = workspacePath(".libretto", "sessions", session, "network.jsonl");
+      await mkdir(sessionDir, { recursive: true });
       const body = entries.map((entry) => JSON.stringify(entry)).join("\n");
       await writeFile(logPath, body ? `${body}\n` : "", "utf8");
       return logPath;
@@ -252,10 +252,10 @@ export const test = base.extend<CliFixtures>({
   },
 
   seedActionLog: async ({ workspacePath }, use) => {
-    await use(async (runId: string, entries: JsonRecord[]) => {
-      const runDir = workspacePath("tmp", "libretto-cli", runId);
-      const logPath = workspacePath("tmp", "libretto-cli", runId, "actions.jsonl");
-      await mkdir(runDir, { recursive: true });
+    await use(async (session: string, entries: JsonRecord[]) => {
+      const sessionDir = workspacePath(".libretto", "sessions", session);
+      const logPath = workspacePath(".libretto", "sessions", session, "actions.jsonl");
+      await mkdir(sessionDir, { recursive: true });
       const body = entries.map((entry) => JSON.stringify(entry)).join("\n");
       await writeFile(logPath, body ? `${body}\n` : "", "utf8");
       return logPath;

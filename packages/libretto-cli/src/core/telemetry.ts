@@ -1,7 +1,10 @@
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { Page } from "playwright";
-import { join } from "node:path";
-import { getRunDir, getSessionStateOrThrow } from "./session";
+import {
+  getSessionActionsLogPath,
+  getSessionNetworkLogPath,
+} from "./context";
+import { assertSessionStateExistsOrThrow } from "./session";
 
 export type NetworkLogEntry = {
   ts: string;
@@ -15,16 +18,12 @@ export type NetworkLogEntry = {
   durationMs: number | null;
 };
 
-export function getNetworkLogPath(runId: string): string {
-  return join(getRunDir(runId), "network.jsonl");
-}
-
 export function readNetworkLog(
   session: string,
   opts: { last?: number; filter?: string; method?: string } = {},
 ): NetworkLogEntry[] {
-  const state = getSessionStateOrThrow(session);
-  const logPath = getNetworkLogPath(state.runId);
+  assertSessionStateExistsOrThrow(session);
+  const logPath = getSessionNetworkLogPath(session);
   if (!existsSync(logPath)) return [];
 
   const lines = readFileSync(logPath, "utf-8")
@@ -72,8 +71,8 @@ export function formatNetworkEntry(e: NetworkLogEntry): string {
 }
 
 export function clearNetworkLog(session: string): void {
-  const state = getSessionStateOrThrow(session);
-  const logPath = getNetworkLogPath(state.runId);
+  assertSessionStateExistsOrThrow(session);
+  const logPath = getSessionNetworkLogPath(session);
   writeFileSync(logPath, "");
 }
 
@@ -89,17 +88,13 @@ export type ActionLogEntry = {
   error?: string;
 };
 
-export function getActionLogPath(runId: string): string {
-  return join(getRunDir(runId), "actions.jsonl");
-}
-
 export function parentLogAction(
-  runId: string,
+  session: string,
   entry: Record<string, unknown>,
 ): void {
   try {
     const record = { ts: new Date().toISOString(), ...entry };
-    appendFileSync(getActionLogPath(runId), JSON.stringify(record) + "\n");
+    appendFileSync(getSessionActionsLogPath(session), JSON.stringify(record) + "\n");
   } catch {}
 }
 
@@ -112,8 +107,8 @@ export function readActionLog(
     source?: string;
   } = {},
 ): ActionLogEntry[] {
-  const state = getSessionStateOrThrow(session);
-  const logPath = getActionLogPath(state.runId);
+  assertSessionStateExistsOrThrow(session);
+  const logPath = getSessionActionsLogPath(session);
   if (!existsSync(logPath)) return [];
 
   const lines = readFileSync(logPath, "utf-8")
@@ -164,8 +159,8 @@ export function formatActionEntry(e: ActionLogEntry): string {
 }
 
 export function clearActionLog(session: string): void {
-  const state = getSessionStateOrThrow(session);
-  const logPath = getActionLogPath(state.runId);
+  assertSessionStateExistsOrThrow(session);
+  const logPath = getSessionActionsLogPath(session);
   writeFileSync(logPath, "");
 }
 
@@ -231,7 +226,7 @@ function formatHint(method: string, args: any[]): string {
 function wrapLocator(
   locator: any,
   hint: string,
-  runId: string,
+  session: string,
   page: Page,
   onActivity?: () => void,
 ): any {
@@ -250,7 +245,7 @@ function wrapLocator(
       } catch {}
       try {
         const result = await origAct(...actArgs);
-        parentLogAction(runId, {
+        parentLogAction(session, {
           action: actMethod,
           source: "agent",
           selector: hint,
@@ -264,7 +259,7 @@ function wrapLocator(
         onActivity?.();
         return result;
       } catch (err: any) {
-        parentLogAction(runId, {
+        parentLogAction(session, {
           action: actMethod,
           source: "agent",
           selector: hint,
@@ -293,7 +288,7 @@ function wrapLocator(
         args.length > 0
           ? `${hint}.${formatHint(method, args)}`
           : `${hint}.${method}()`;
-      return wrapLocator(child, childHint, runId, page, onActivity);
+      return wrapLocator(child, childHint, session, page, onActivity);
     };
   }
 
@@ -302,7 +297,7 @@ function wrapLocator(
     locator.nth = (index: number) => {
       const child = origNth(index);
       const childHint = `${hint}.nth(${index})`;
-      return wrapLocator(child, childHint, runId, page, onActivity);
+      return wrapLocator(child, childHint, session, page, onActivity);
     };
   }
 
@@ -312,7 +307,7 @@ function wrapLocator(
       const items: any[] = await origAll();
       return items.map((item: any, i: number) => {
         const childHint = `${hint}.all()[${i}]`;
-        return wrapLocator(item, childHint, runId, page, onActivity);
+        return wrapLocator(item, childHint, session, page, onActivity);
       });
     };
   }
@@ -322,7 +317,7 @@ function wrapLocator(
 
 export function wrapPageForActionLogging(
   page: Page,
-  runId: string,
+  session: string,
   onActivity?: () => void,
 ): void {
   const PAGE_ACTIONS = [
@@ -350,7 +345,7 @@ export function wrapPageForActionLogging(
       } catch {}
       try {
         const result = await orig(...args);
-        parentLogAction(runId, {
+        parentLogAction(session, {
           action: method,
           source: "agent",
           selector: typeof args[0] === "string" ? args[0] : undefined,
@@ -362,7 +357,7 @@ export function wrapPageForActionLogging(
         onActivity?.();
         return result;
       } catch (err: any) {
-        parentLogAction(runId, {
+        parentLogAction(session, {
           action: method,
           source: "agent",
           selector: typeof args[0] === "string" ? args[0] : undefined,
@@ -388,7 +383,7 @@ export function wrapPageForActionLogging(
       const start = Date.now();
       try {
         const result = await orig(...args);
-        parentLogAction(runId, {
+        parentLogAction(session, {
           action: method,
           source: "agent",
           url: typeof args[0] === "string" ? args[0] : page.url(),
@@ -398,7 +393,7 @@ export function wrapPageForActionLogging(
         onActivity?.();
         return result;
       } catch (err: any) {
-        parentLogAction(runId, {
+        parentLogAction(session, {
           action: method,
           source: "agent",
           url: typeof args[0] === "string" ? args[0] : undefined,
@@ -428,7 +423,7 @@ export function wrapPageForActionLogging(
     (page as any)[factory] = (...factoryArgs: any[]) => {
       const locator = orig(...factoryArgs);
       const hint = formatHint(factory, factoryArgs);
-      return wrapLocator(locator, hint, runId, page, onActivity);
+      return wrapLocator(locator, hint, session, page, onActivity);
     };
   }
 }

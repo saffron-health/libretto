@@ -1,37 +1,33 @@
 import { mkdirSync } from "node:fs";
 import type { Argv } from "yargs";
 import { connect, disconnectBrowser } from "../core/browser";
-import { getLog } from "../core/context";
-import { getRunDir, getSessionStateOrThrow } from "../core/session";
+import { getLog, getSessionSnapshotRunDir } from "../core/context";
+import {
+  generateRunId,
+  assertSessionStateExistsOrThrow,
+} from "../core/session";
 import {
   canAnalyzeSnapshots,
   runInterpret,
-  runSnapshotConfigure,
   type ScreenshotPair,
 } from "../core/snapshot-analyzer";
 
 async function captureScreenshot(session: string): Promise<ScreenshotPair> {
   const log = getLog();
   log.info("screenshot-start", { session });
-  const state = getSessionStateOrThrow(session);
-  const runDir = getRunDir(state.runId);
-  mkdirSync(runDir, { recursive: true });
+  assertSessionStateExistsOrThrow(session);
+  const snapshotRunId = `snapshot-${generateRunId()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);
+  mkdirSync(snapshotRunDir, { recursive: true });
   const { browser, page } = await connect(session);
 
   try {
     const title = await page.title();
     const pageUrl = page.url();
-    const sanitizedTitle = title
-      .replace(/[^a-zA-Z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .toLowerCase()
-      .slice(0, 50);
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const baseName = `${sanitizedTitle}-${timestamp}`;
-
-    const pngPath = `${runDir}/${baseName}.png`;
-    const htmlPath = `${runDir}/${baseName}.html`;
+    const pngPath = `${snapshotRunDir}/page.png`;
+    const htmlPath = `${snapshotRunDir}/page.html`;
 
     await page.screenshot({ path: pngPath });
 
@@ -45,8 +41,9 @@ async function captureScreenshot(session: string): Promise<ScreenshotPair> {
       title,
       pngPath,
       htmlPath,
+      snapshotRunId,
     });
-    return { pngPath, htmlPath, baseName };
+    return { pngPath, htmlPath, baseName: snapshotRunId };
   } catch (err) {
     let pageAlive = false;
     let browserConnected = false;
@@ -99,7 +96,7 @@ async function runSnapshot(
 
   if (!canAnalyzeSnapshots()) {
     throw new Error(
-      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or opencode/claude/gemini) to enable analysis.",
+      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini) to enable analysis.",
     );
   }
 
@@ -113,35 +110,19 @@ async function runSnapshot(
 }
 
 export function registerSnapshotCommands(yargs: Argv): Argv {
-  return yargs
-    .command(
-      "snapshot",
-      "Capture PNG + HTML; analyze when objective/context provided",
-      (cmd) =>
-        cmd
-          .option("objective", { type: "string" })
-          .option("context", { type: "string" }),
-      async (argv) => {
-        await runSnapshot(
-          String(argv.session),
-          argv.objective as string | undefined,
-          argv.context as string | undefined,
-        );
-      },
-    )
-    .command(
-      "snapshot configure [preset]",
-      "Configure AI runtime (compatibility alias for 'ai configure')",
-      (cmd) => cmd.option("clear", { type: "boolean", default: false }),
-      (argv) => {
-        const customPrefix = Array.isArray(argv["--"])
-          ? (argv["--"] as string[])
-          : [];
-        runSnapshotConfigure({
-          clear: Boolean(argv.clear),
-          preset: argv.preset as string | undefined,
-          customPrefix,
-        });
-      },
-    );
+  return yargs.command(
+    "snapshot",
+    "Capture PNG + HTML; analyze when objective/context provided",
+    (cmd) =>
+      cmd
+        .option("objective", { type: "string" })
+        .option("context", { type: "string" }),
+    async (argv) => {
+      await runSnapshot(
+        String(argv.session),
+        argv.objective as string | undefined,
+        argv.context as string | undefined,
+      );
+    },
+  );
 }

@@ -16,7 +16,6 @@ function getRepoRoot(): string {
 }
 
 export const REPO_ROOT = getRepoRoot();
-export const STATE_DIR = join(REPO_ROOT, "tmp", "libretto-cli");
 export const LIBRETTO_DIR = join(REPO_ROOT, ".libretto-cli");
 export const LIBRETTO_CONFIG_DIR = join(REPO_ROOT, ".libretto");
 export const LIBRETTO_CONFIG_PATH = join(LIBRETTO_CONFIG_DIR, "config.json");
@@ -27,8 +26,8 @@ export const LIBRETTO_GITIGNORE_PATH = join(LIBRETTO_CONFIG_DIR, ".gitignore");
 
 const LIBRETTO_GITIGNORE_CONTENT = [
   "# Local libretto runtime state",
-  "*",
-  "!.gitignore",
+  "sessions/",
+  "profiles/",
   "",
 ].join("\n");
 
@@ -79,16 +78,13 @@ export function setLogFile(filePath: string): void {
   log = new Logger(["libretto-cli"], [createFileLogSink({ filePath })]);
 }
 
-export function ensureLog(): void {
-  if (log) return;
-  ensureLibrettoSetup();
-  mkdirSync(STATE_DIR, { recursive: true });
-  setLogFile(join(STATE_DIR, "cli.log"));
-}
-
 export function getLog(): Logger {
-  ensureLog();
-  return log as Logger;
+  if (!log) {
+    throw new Error(
+      "Logger is not initialized. Call setLogFile(...) before calling getLog().",
+    );
+  }
+  return log;
 }
 
 export async function flushLog(): Promise<void> {
