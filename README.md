@@ -33,9 +33,10 @@ libretto-cli run ./integration.ts main --session default
 libretto-cli session-mode read-only --session default
 ```
 
-## snapshot analyzer configuration
+## AI configuration
 
-The `snapshot` command analyzes browser snapshots using an LLM. There are two ways to configure it:
+Analysis commands use a shared AI runtime config file at `.libretto/config.json`.
+There are two ways to configure it:
 
 ### Option 1: External coding agent (recommended)
 
@@ -43,19 +44,22 @@ Configure an external coding agent — no API keys needed in libretto, the agent
 
 ```bash
 # Use one of: codex, opencode, claude, gemini
-libretto-cli snapshot configure codex
-libretto-cli snapshot configure opencode
-libretto-cli snapshot configure claude
-libretto-cli snapshot configure gemini
+libretto-cli ai configure codex
+libretto-cli ai configure opencode
+libretto-cli ai configure claude
+libretto-cli ai configure gemini
 
 # Optionally provide a custom command prefix
-libretto-cli snapshot configure codex -- my-custom-codex --flag
+libretto-cli ai configure codex -- my-custom-codex --flag
 
 # Show current configuration
-libretto-cli snapshot configure --show
+libretto-cli ai configure
 
 # Clear configuration
-libretto-cli snapshot configure --clear
+libretto-cli ai configure --clear
+
+# Compatibility alias (still supported)
+libretto-cli snapshot configure codex
 ```
 
 ### Option 2: Built-in LLM client via environment variables
@@ -66,4 +70,4 @@ If no external agent is configured, the CLI falls back to its built-in LLM clien
 - `ANTHROPIC_API_KEY` — for Anthropic models
 - `OPENAI_API_KEY` — for OpenAI models
 
-If neither an external agent nor any of these environment variables are configured, the `snapshot` command will fail with an error.
+If neither an external agent nor any of these environment variables are configured, analysis commands (including `snapshot`) will fail with an error.

@@ -5,17 +5,19 @@ import {
   statSync,
   readdirSync,
   unlinkSync,
-  writeFileSync,
 } from "node:fs";
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
-import { homedir } from "node:os";
 import { z } from "zod";
+import {
+  type AiConfig,
+  formatCommandPrefix,
+  readAiConfig,
+  runAiConfigure,
+} from "./ai-config";
 import {
   getLLMClientFactory,
   getLog,
-  LIBRETTO_DIR,
-  SNAPSHOT_ANALYZER_CONFIG_PATH,
   STATE_DIR,
 } from "./context";
 import { getRunDir, getSessionStateOrThrow } from "./session";
@@ -32,30 +34,6 @@ export type InterpretArgs = {
   context: string;
   pngPath?: string;
   htmlPath?: string;
-};
-
-const SnapshotAnalyzerPresetSchema = z.enum([
-  "codex",
-  "opencode",
-  "claude",
-  "gemini",
-]);
-export type SnapshotAnalyzerPreset = z.infer<typeof SnapshotAnalyzerPresetSchema>;
-
-const SnapshotAnalyzerConfigSchema = z.object({
-  version: z.literal(1),
-  preset: SnapshotAnalyzerPresetSchema,
-  commandPrefix: z.array(z.string()).min(1),
-  updatedAt: z.string(),
-});
-
-type SnapshotAnalyzerConfig = z.infer<typeof SnapshotAnalyzerConfigSchema>;
-
-const SNAPSHOT_ANALYZER_PRESETS: Record<SnapshotAnalyzerPreset, string[]> = {
-  codex: ["codex", "exec", "--skip-git-repo-check", "--sandbox", "read-only"],
-  opencode: ["opencode", "run", "--format", "json"],
-  claude: [join(homedir(), ".claude", "local", "claude"), "-p"],
-  gemini: ["gemini", "--output-format", "json"],
 };
 
 const InterpretResultSchema = z.object({
@@ -80,23 +58,10 @@ type ExternalCommandResult = {
   stderr: string;
 };
 
-function ensureLibrettoDir(): void {
-  mkdirSync(LIBRETTO_DIR, { recursive: true });
-}
-
-function quoteShellArg(value: string): string {
-  if (/^[a-zA-Z0-9_./:@=-]+$/.test(value)) return value;
-  return JSON.stringify(value);
-}
-
-function formatCommandPrefix(prefix: string[]): string {
-  return prefix.map((arg) => quoteShellArg(arg)).join(" ");
-}
-
 abstract class UserCodingAgent {
-  protected constructor(protected readonly config: SnapshotAnalyzerConfig) {}
+  protected constructor(protected readonly config: AiConfig) {}
 
-  static resolveFromConfig(config: SnapshotAnalyzerConfig): UserCodingAgent {
+  static resolveFromConfig(config: AiConfig): UserCodingAgent {
     switch (config.preset) {
       case "codex":
         return new CodexUserCodingAgent(config);
@@ -109,16 +74,8 @@ abstract class UserCodingAgent {
     }
   }
 
-  static readConfiguredConfig(): SnapshotAnalyzerConfig | null {
-    if (!existsSync(SNAPSHOT_ANALYZER_CONFIG_PATH)) return null;
-    try {
-      const raw = readFileSync(SNAPSHOT_ANALYZER_CONFIG_PATH, "utf-8");
-      return SnapshotAnalyzerConfigSchema.parse(JSON.parse(raw));
-    } catch {
-      throw new Error(
-        `Snapshot analyzer config is invalid at ${SNAPSHOT_ANALYZER_CONFIG_PATH}. Delete it or run 'libretto-cli snapshot configure --clear'.`,
-      );
-    }
+  static readConfiguredConfig(): AiConfig | null {
+    return readAiConfig();
   }
 
   static getConfigured(): UserCodingAgent | null {
@@ -126,107 +83,14 @@ abstract class UserCodingAgent {
     return config ? this.resolveFromConfig(config) : null;
   }
 
-  static writeConfig(
-    preset: SnapshotAnalyzerPreset,
-    commandPrefix: string[],
-  ): SnapshotAnalyzerConfig {
-    ensureLibrettoDir();
-    const config = SnapshotAnalyzerConfigSchema.parse({
-      version: 1,
-      preset,
-      commandPrefix,
-      updatedAt: new Date().toISOString(),
-    });
-    writeFileSync(
-      SNAPSHOT_ANALYZER_CONFIG_PATH,
-      JSON.stringify(config, null, 2),
-      "utf-8",
-    );
-    return config;
-  }
-
-  static clearConfig(): boolean {
-    if (!existsSync(SNAPSHOT_ANALYZER_CONFIG_PATH)) return false;
-    unlinkSync(SNAPSHOT_ANALYZER_CONFIG_PATH);
-    return true;
-  }
-
-  static printConfig(config: SnapshotAnalyzerConfig): void {
-    console.log(`Snapshot analyzer preset: ${config.preset}`);
-    console.log(`Command prefix: ${formatCommandPrefix(config.commandPrefix)}`);
-    console.log(`Config file: ${SNAPSHOT_ANALYZER_CONFIG_PATH}`);
-    console.log(`Updated at: ${config.updatedAt}`);
-  }
-
-  static printConfigureUsage(): void {
-    console.log(
-      `Usage: libretto-cli snapshot configure <codex|opencode|claude|gemini> [-- <command prefix...>]
-       libretto-cli snapshot configure --show
-       libretto-cli snapshot configure --clear`,
-    );
-  }
-
-  static configureFromArgs(args: string[]): void {
-    if (args.includes("--show")) {
-      const config = this.readConfiguredConfig();
-      if (!config) {
-        console.log(
-          `No snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' to set one.`,
-        );
-        return;
-      }
-      this.printConfig(config);
-      return;
-    }
-
-    if (args.includes("--clear")) {
-      const removed = this.clearConfig();
-      if (removed) {
-        console.log(
-          `Cleared snapshot analyzer config: ${SNAPSHOT_ANALYZER_CONFIG_PATH}`,
-        );
-      } else {
-        console.log("No snapshot analyzer config was set.");
-      }
-      return;
-    }
-
-    const presetArg = args[0];
-    const parsedPreset = SnapshotAnalyzerPresetSchema.safeParse(presetArg);
-    if (!parsedPreset.success) {
-      this.printConfigureUsage();
-      throw new Error(
-        "Missing or invalid preset. Use one of: codex, opencode, claude, gemini.",
-      );
-    }
-
-    const separator = args.indexOf("--");
-    const customPrefix =
-      separator >= 0 ? args.slice(separator + 1).filter(Boolean) : null;
-    if (separator >= 0 && customPrefix && customPrefix.length === 0) {
-      throw new Error("Custom command prefix cannot be empty after '--'.");
-    }
-
-    const preset = parsedPreset.data;
-    const commandPrefix =
-      customPrefix && customPrefix.length > 0
-        ? customPrefix
-        : SNAPSHOT_ANALYZER_PRESETS[preset];
-    const config = this.writeConfig(preset, commandPrefix);
-    console.log("Snapshot analyzer configured.");
-    this.printConfig(config);
-  }
-
-  get snapshotAnalyzerConfig(): SnapshotAnalyzerConfig {
+  get snapshotAnalyzerConfig(): AiConfig {
     return this.config;
   }
 
   protected get command(): string {
     const command = this.config.commandPrefix[0];
     if (!command) {
-      throw new Error(
-        "Snapshot analyzer config is invalid: command prefix is empty.",
-      );
+      throw new Error("AI config is invalid: command prefix is empty.");
     }
     return command;
   }
@@ -363,7 +227,7 @@ async function runExternalCommand(
       if (error.code === "ENOENT") {
         reject(
           new Error(
-            `Command not found: ${command}. Configure a different analyzer with 'libretto-cli snapshot configure'.`,
+            `Command not found: ${command}. Configure AI with 'libretto-cli ai configure'.`,
           ),
         );
         return;
@@ -705,8 +569,14 @@ function resolveScreenshotPair(
   };
 }
 
-export function runSnapshotConfigure(args: string[]): void {
-  UserCodingAgent.configureFromArgs(args);
+export function runSnapshotConfigure(input: {
+  preset?: string;
+  clear?: boolean;
+  customPrefix?: string[];
+}): void {
+  runAiConfigure(input, {
+    configureCommandName: "libretto-cli ai configure",
+  });
 }
 
 export async function runInterpret(args: InterpretArgs): Promise<void> {
@@ -773,7 +643,7 @@ export async function runInterpret(args: InterpretArgs): Promise<void> {
     const llmClientFactory = getLLMClientFactory();
     if (!llmClientFactory) {
       throw new Error(
-        "No snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
+        "No AI config set. Run 'libretto-cli ai configure codex' (or opencode/claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
       );
     }
 

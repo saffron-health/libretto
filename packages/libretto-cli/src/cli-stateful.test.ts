@@ -4,62 +4,78 @@ import { describe, expect } from "vitest";
 import { test } from "./test-fixtures";
 
 describe("state-driven CLI subprocess behavior", () => {
-  test("shows missing snapshot analyzer config", async ({ librettoCli }) => {
-    const result = await librettoCli("snapshot configure --show");
+  test("shows missing AI config", async ({ librettoCli }) => {
+    const result = await librettoCli("ai configure");
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("No snapshot analyzer configured.");
+    expect(result.stdout).toContain("No AI config set.");
   });
 
-  test("configures, shows, and clears snapshot analyzer config", async ({
+  test("configures, shows, and clears AI config", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const configure = await librettoCli("ai configure codex");
+    expect(configure.exitCode).toBe(0);
+    expect(configure.stdout).toContain("AI config saved.");
+
+    const configPath = workspacePath(".libretto", "config.json");
+    expect(existsSync(configPath)).toBe(true);
+    const rawConfig = JSON.parse(await readFile(configPath, "utf8")) as {
+      ai?: {
+        preset?: string;
+      };
+    };
+    expect(rawConfig.ai?.preset).toBe("codex");
+
+    const show = await librettoCli("ai configure");
+    expect(show.exitCode).toBe(0);
+    expect(show.stdout).toContain("AI preset: codex");
+
+    const clear = await librettoCli("ai configure --clear");
+    expect(clear.exitCode).toBe(0);
+    expect(clear.stdout).toContain("Cleared AI config:");
+
+    const clearedConfig = JSON.parse(await readFile(configPath, "utf8")) as {
+      version?: number;
+      ai?: unknown;
+    };
+    expect(clearedConfig.version).toBe(1);
+    expect(clearedConfig.ai).toBeUndefined();
+  });
+
+  test("configures gemini AI preset", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const configure = await librettoCli("ai configure gemini");
+    expect(configure.exitCode).toBe(0);
+    expect(configure.stdout).toContain("AI config saved.");
+
+    const configPath = workspacePath(".libretto", "config.json");
+    const rawConfig = JSON.parse(await readFile(configPath, "utf8")) as {
+      ai?: {
+        preset?: string;
+        commandPrefix?: string[];
+      };
+    };
+    expect(rawConfig.ai?.preset).toBe("gemini");
+    expect(rawConfig.ai?.commandPrefix).toEqual([
+      "gemini",
+      "--output-format",
+      "json",
+    ]);
+  });
+
+  test("supports snapshot configure as a compatibility alias", async ({
     librettoCli,
     workspacePath,
   }) => {
     const configure = await librettoCli("snapshot configure codex");
     expect(configure.exitCode).toBe(0);
-    expect(configure.stdout).toContain("Snapshot analyzer configured.");
+    expect(configure.stdout).toContain("AI config saved.");
 
-    const configPath = workspacePath(
-      ".libretto-cli",
-      "snapshot-config.json",
-    );
+    const configPath = workspacePath(".libretto", "config.json");
     expect(existsSync(configPath)).toBe(true);
-    const rawConfig = JSON.parse(await readFile(configPath, "utf8")) as {
-      preset?: string;
-    };
-    expect(rawConfig.preset).toBe("codex");
-
-    const show = await librettoCli("snapshot configure --show");
-    expect(show.exitCode).toBe(0);
-    expect(show.stdout).toContain("Snapshot analyzer preset: codex");
-
-    const clear = await librettoCli("snapshot configure --clear");
-    expect(clear.exitCode).toBe(0);
-    expect(clear.stdout).toContain("Cleared snapshot analyzer config:");
-    expect(existsSync(configPath)).toBe(false);
-  });
-
-  test("configures gemini snapshot analyzer preset", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    const configure = await librettoCli("snapshot configure gemini");
-    expect(configure.exitCode).toBe(0);
-    expect(configure.stdout).toContain("Snapshot analyzer configured.");
-
-    const configPath = workspacePath(
-      ".libretto-cli",
-      "snapshot-config.json",
-    );
-    const rawConfig = JSON.parse(await readFile(configPath, "utf8")) as {
-      preset?: string;
-      commandPrefix?: string[];
-    };
-    expect(rawConfig.preset).toBe("gemini");
-    expect(rawConfig.commandPrefix).toEqual([
-      "gemini",
-      "--output-format",
-      "json",
-    ]);
   });
 
   test("reads and clears network logs from seeded run data", async ({
@@ -201,6 +217,7 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     await seedSessionState({
       session: "permissioned-session",
+      port: 65534,
     });
     await seedSessionPermission("permissioned-session", "interactive");
 
@@ -220,6 +237,7 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     await seedSessionState({
       session: "interactive-session",
+      port: 65534,
       mode: "interactive",
     });
 

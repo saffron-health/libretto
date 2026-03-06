@@ -99,7 +99,7 @@ async function runSnapshot(
 
   if (!canAnalyzeSnapshots()) {
     throw new Error(
-      "Couldn't run analysis: no snapshot analyzer configured. Run 'libretto-cli snapshot configure codex' (or opencode/claude/gemini) to enable analysis.",
+      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or opencode/claude/gemini) to enable analysis.",
     );
   }
 
@@ -131,26 +131,17 @@ export function registerSnapshotCommands(yargs: Argv): Argv {
     )
     .command(
       "snapshot configure [preset]",
-      "Configure snapshot analyzer",
-      (cmd) =>
-        cmd
-          .option("show", { type: "boolean", default: false })
-          .option("clear", { type: "boolean", default: false }),
+      "Configure AI runtime (compatibility alias for 'ai configure')",
+      (cmd) => cmd.option("clear", { type: "boolean", default: false }),
       (argv) => {
-        const args: string[] = [];
-        if (argv.show) args.push("--show");
-        if (argv.clear) args.push("--clear");
-        const preset = argv.preset as string | undefined;
-        if (preset) args.push(preset);
-
         const customPrefix = Array.isArray(argv["--"])
           ? (argv["--"] as string[])
           : [];
-        if (customPrefix.length > 0) {
-          args.push("--", ...customPrefix);
-        }
-
-        runSnapshotConfigure(args);
+        runSnapshotConfigure({
+          clear: Boolean(argv.clear),
+          preset: argv.preset as string | undefined,
+          customPrefix,
+        });
       },
     );
 }

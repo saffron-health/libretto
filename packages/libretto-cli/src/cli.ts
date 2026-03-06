@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
+import { registerAICommands } from "./commands/ai";
 import { registerBrowserCommands } from "./commands/browser";
 import { registerExecutionCommands } from "./commands/execution";
 import { registerLogCommands } from "./commands/logs";
@@ -19,6 +20,7 @@ const CLI_COMMANDS = new Set([
   "open",
   "run",
   "session-mode",
+  "ai",
   "save",
   "exec",
   "snapshot",
@@ -38,10 +40,11 @@ Commands:
                           Automatically loads saved profile if available
   run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug <true|false>]  Run an exported async integration function from a file (blocked until interactive)
   session-mode <read-only|interactive> Set session execution mode
+  ai configure [preset] [-- <command prefix...>]  Configure AI runtime for analysis commands
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
   exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight; blocked until interactive)
   snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when both flags are provided
-  snapshot configure <codex|opencode|claude|gemini> [-- <command prefix...>]  Configure snapshot analyzer
+  snapshot configure [preset] [-- <command prefix...>]  Compatibility alias for ai configure
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
   close                   Close the browser
@@ -61,11 +64,12 @@ Examples:
 
   libretto-cli exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
   libretto-cli exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
-  libretto-cli snapshot configure codex
-  libretto-cli snapshot configure opencode
-  libretto-cli snapshot configure claude
-  libretto-cli snapshot configure gemini
-  libretto-cli snapshot configure codex -- codex exec --skip-git-repo-check --sandbox read-only
+  libretto-cli ai configure codex
+  libretto-cli ai configure opencode
+  libretto-cli ai configure claude
+  libretto-cli ai configure gemini
+  libretto-cli ai configure codex -- codex exec --skip-git-repo-check --sandbox read-only
+  libretto-cli snapshot configure codex   # compatibility alias
   libretto-cli snapshot
   libretto-cli snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
   libretto-cli close
@@ -180,6 +184,7 @@ function createParser(): Argv {
   parser = registerBrowserCommands(parser);
   parser = registerExecutionCommands(parser);
   parser = registerLogCommands(parser);
+  parser = registerAICommands(parser);
   parser = registerSnapshotCommands(parser);
   parser = parser.command("help", "Show usage", () => {}, () => {
     printUsage();
