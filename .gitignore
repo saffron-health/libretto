@@ -5,3 +5,4 @@ dist/
 .codex/
 .vscode/settings.json
 .env
+temp/

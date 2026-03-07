@@ -1,16 +1,15 @@
 import type { Page } from "playwright";
 import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { RunnerConfig, Step, StepHistoryEntry, DebugBundle } from "./types.js";
 import { Logger } from "../logger/logger.js";
 import { createFileLogSink, prettyConsoleSink } from "../logger/sinks.js";
 import type { LoggerApi } from "../logger/logger.js";
-import { setDebugMode, setDryRun } from "../config/config.js";
+import { isDryRun } from "../config/config.js";
 import { debugPause } from "../debug/pause.js";
 import { attemptWithRecovery } from "../recovery/recovery.js";
 import {
 	ensureLibrettoRunnerLogDir,
-	getLibrettoPauseSignalDir,
 	getRunnerLogPathForDir,
 } from "../runtime/paths.js";
 
@@ -25,20 +24,14 @@ export type Runner = {
 export function createRunner(config: RunnerConfig = {}): Runner {
 	const {
 		llmClient,
-		dryRun = false,
-		debug = false,
+		dryRun: dryRunOption,
+		debug: debugOption,
 		sessionName = "libretto",
 		logDir: configuredLogDir,
 	} = config;
+	const dryRun = dryRunOption ?? isDryRun();
+	const debug = debugOption ?? false;
 	const logDir = configuredLogDir ?? ensureLibrettoRunnerLogDir(sessionName);
-	const pauseSignalDir =
-		configuredLogDir === undefined
-			? getLibrettoPauseSignalDir(sessionName)
-			: dirname(logDir);
-
-	// Set global config overrides
-	setDebugMode(debug);
-	setDryRun(dryRun);
 
 	return {
 		run: async (page: Page, steps: Step[]) => {
@@ -169,7 +162,10 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 						stepLogger.info("step:debug-bundle", { path: bundle.bundlePath });
 
 						// Pause for debugging
-						await debugPause(page, { signalDir: pauseSignalDir, sessionName });
+						await debugPause(page, {
+							enabled: debug,
+							sessionName,
+						});
 
 						throw firstError;
 					}

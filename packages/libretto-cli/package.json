@@ -3,8 +3,8 @@
 	"version": "0.0.1",
 	"type": "module",
 	"bin": {
-		"libretto-cli": "./dist/index.js",
-		"libretto": "./dist/index.js"
+		"libretto-cli": "./bin/libretto.mjs",
+		"libretto": "./bin/libretto.mjs"
 	},
 	"scripts": {
 		"build": "tsup",

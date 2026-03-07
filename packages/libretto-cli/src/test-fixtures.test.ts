@@ -67,7 +67,7 @@ describe("cli test fixtures", () => {
   });
 
   test(
-    "spawns CLI with workspace cwd",
+    "runs CLI with workspace cwd",
     async ({ librettoCli, workspacePath }) => {
       const result = await librettoCli("--help");
       expect(result.exitCode).toBe(0);

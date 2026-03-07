@@ -20,6 +20,7 @@ export type LibrettoWorkflowContext = {
 	integrationPath: string;
 	exportName: string;
 	headless: boolean;
+	debug: boolean;
 };
 
 export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
