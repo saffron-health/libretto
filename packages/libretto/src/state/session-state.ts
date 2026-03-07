@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const SESSION_STATE_VERSION = 1;
 
-export const SessionModeSchema = z.enum(["read-only", "interactive"]);
+export const SessionModeSchema = z.enum(["read-only", "full-access"]);
 export const SessionStateFileSchema = z.object({
 	version: z.literal(SESSION_STATE_VERSION),
 	port: z.number().int().min(0).max(65535),

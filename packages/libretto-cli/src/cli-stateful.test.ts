@@ -213,7 +213,7 @@ describe("state-driven CLI subprocess behavior", () => {
       session: "permissioned-session",
       port: 65534,
     });
-    await seedSessionPermission("permissioned-session", "interactive");
+    await seedSessionPermission("permissioned-session", "full-access");
 
     const result = await librettoCli(
       "exec \"return await page.title()\" --session permissioned-session",
@@ -231,7 +231,7 @@ describe("state-driven CLI subprocess behavior", () => {
     await seedSessionState({
       session: "interactive-session",
       port: 65534,
-      mode: "interactive",
+      mode: "full-access",
     });
 
     const result = await librettoCli(
@@ -250,7 +250,7 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     await seedSessionState({
       session: "flip-session",
-      mode: "interactive",
+      mode: "full-access",
     });
 
     const setReadOnly = await librettoCli(

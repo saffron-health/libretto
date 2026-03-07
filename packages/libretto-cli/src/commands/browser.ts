@@ -70,9 +70,9 @@ export function registerBrowserCommands(yargs: Argv): Argv {
       (cmd) => cmd.positional("mode", { type: "string" }),
       async (argv) => {
         const mode = argv.mode;
-        if (mode !== "read-only" && mode !== "interactive") {
+        if (mode !== "read-only" && mode !== "full-access") {
           throw new Error(
-            "Usage: libretto-cli session-mode <read-only|interactive> [--session <name>]",
+            "Usage: libretto-cli session-mode <read-only|full-access> [--session <name>]",
           );
         }
         runSessionMode(String(argv.session), mode);

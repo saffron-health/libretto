@@ -33,6 +33,7 @@ export { SESSION_STATE_VERSION };
 export type { SessionMode, SessionState };
 
 type SessionPermissions = {
+  defaultMode: SessionMode;
   sessions: Record<string, SessionMode>;
 };
 
@@ -181,7 +182,7 @@ function isSessionMode(value: unknown): value is SessionMode {
 
 export function readSessionPermissions(): SessionPermissions {
   if (!existsSync(LIBRETTO_CONFIG_PATH)) {
-    return { sessions: {} };
+    return { defaultMode: "read-only", sessions: {} };
   }
 
   try {
@@ -195,7 +196,7 @@ export function readSessionPermissions(): SessionPermissions {
 
     const rawPermissions = rawConfig.permissions;
     if (rawPermissions === undefined) {
-      return { sessions: {} };
+      return { defaultMode: "read-only", sessions: {} };
     }
     if (
       typeof rawPermissions !== "object" ||
@@ -206,24 +207,35 @@ export function readSessionPermissions(): SessionPermissions {
     }
 
     const typedPermissions = rawPermissions as Record<string, unknown>;
-    if (
-      typeof typedPermissions.sessions !== "object" ||
-      typedPermissions.sessions === null ||
-      Array.isArray(typedPermissions.sessions)
-    ) {
-      throw new Error("sessions must be an object");
-    }
 
-    const sessions = typedPermissions.sessions as Record<string, unknown>;
-    const normalized: Record<string, SessionMode> = {};
-    for (const [session, mode] of Object.entries(sessions)) {
-      if (!isSessionMode(mode)) {
-        throw new Error(`invalid mode for session "${session}"`);
+    let defaultMode: SessionMode = "read-only";
+    if (typedPermissions.defaultMode !== undefined) {
+      if (!isSessionMode(typedPermissions.defaultMode)) {
+        throw new Error("invalid defaultMode");
       }
-      normalized[session] = mode;
+      defaultMode = typedPermissions.defaultMode;
     }
 
-    return { sessions: normalized };
+    const normalized: Record<string, SessionMode> = {};
+    if (typedPermissions.sessions !== undefined) {
+      if (
+        typeof typedPermissions.sessions !== "object" ||
+        typedPermissions.sessions === null ||
+        Array.isArray(typedPermissions.sessions)
+      ) {
+        throw new Error("sessions must be an object");
+      }
+
+      const sessions = typedPermissions.sessions as Record<string, unknown>;
+      for (const [session, mode] of Object.entries(sessions)) {
+        if (!isSessionMode(mode)) {
+          throw new Error(`invalid mode for session "${session}"`);
+        }
+        normalized[session] = mode;
+      }
+    }
+
+    return { defaultMode, sessions: normalized };
   } catch {
     throw new Error(
       `Session permissions are invalid at ${LIBRETTO_CONFIG_PATH}.`,
@@ -272,7 +284,7 @@ export function writeSessionPermissions(permissions: SessionPermissions): void {
 
 export function getSessionPermissionMode(session: string): SessionMode {
   const permissions = readSessionPermissions();
-  return permissions.sessions[session] ?? "read-only";
+  return permissions.sessions[session] ?? permissions.defaultMode;
 }
 
 export function setSessionPermissionMode(
@@ -280,7 +292,7 @@ export function setSessionPermissionMode(
   mode: SessionMode,
 ): void {
   const permissions = readSessionPermissions();
-  if (mode === "read-only") {
+  if (mode === permissions.defaultMode) {
     delete permissions.sessions[session];
   } else {
     permissions.sessions[session] = mode;
@@ -291,7 +303,7 @@ export function setSessionPermissionMode(
 export function readOnlySessionError(session: string): string {
   return (
     `Session "${session}" is read-only. ` +
-    "Only a human can authorize interactive mode. " +
-    `If you want me to enable it, explicitly tell me to run: libretto-cli session-mode interactive --session ${session}`
+    "Only a human can authorize full-access mode. " +
+    `If you want me to enable it, explicitly tell me to run: libretto-cli session-mode full-access --session ${session}`
   );
 }

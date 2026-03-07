@@ -12,5 +12,8 @@
 	},
 	"devDependencies": {
 		"vitest": "^4.0.18"
+	},
+	"dependencies": {
+		"playwright": "^1.52.0"
 	}
 }
