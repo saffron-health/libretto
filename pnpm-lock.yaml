@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      playwright:
+        specifier: ^1.52.0
+        version: 1.58.2
     devDependencies:
       vitest:
         specifier: ^4.0.18

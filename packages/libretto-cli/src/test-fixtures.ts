@@ -22,7 +22,7 @@ type SeedHelpers = {
   seedSessionState: (state?: Partial<SessionState>) => Promise<SessionState>;
   seedSessionPermission: (
     session: string,
-    mode: "read-only" | "interactive",
+    mode: "read-only" | "full-access",
   ) => Promise<string>;
   seedSnapshotConfig: (config?: JsonRecord) => Promise<string>;
   seedNetworkLog: (session: string, entries: JsonRecord[]) => Promise<string>;
@@ -258,7 +258,7 @@ export const test = base.extend<CliFixtures>({
   },
 
   seedSessionPermission: async ({ workspacePath }, use) => {
-    await use(async (session: string, mode: "read-only" | "interactive") => {
+    await use(async (session: string, mode: "read-only" | "full-access") => {
       const dir = workspacePath(".libretto");
       const path = workspacePath(".libretto", "config.json");
       await mkdir(dir, { recursive: true });

@@ -137,7 +137,7 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
     seedSessionPermission,
   }) => {
-    await seedSessionPermission("default", "interactive");
+    await seedSessionPermission("default", "full-access");
     const result = await librettoCli("run ./integration.ts main");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("is read-only");
@@ -149,7 +149,7 @@ describe("basic CLI subprocess behavior", () => {
     seedSessionPermission,
     workspacePath,
   }) => {
-    await seedSessionPermission("default", "interactive");
+    await seedSessionPermission("default", "full-access");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -206,7 +206,7 @@ export async function main() {
     seedSessionPermission,
     workspacePath,
   }) => {
-    await seedSessionPermission("default", "interactive");
+    await seedSessionPermission("default", "full-access");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -239,7 +239,7 @@ export const main = {
       "../../libretto/src/workflow/workflow.ts",
       import.meta.url,
     ).href;
-    await seedSessionPermission("default", "interactive");
+    await seedSessionPermission("default", "full-access");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -281,7 +281,7 @@ export const main = workflow(
       "../../libretto/src/workflow/workflow.ts",
       import.meta.url,
     ).href;
-    await seedSessionPermission("default", "interactive");
+    await seedSessionPermission("default", "full-access");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -308,7 +308,7 @@ export const main = workflow({}, async () => "ok");
       "../../libretto/src/workflow/workflow.ts",
       import.meta.url,
     ).href;
-    await seedSessionPermission("default", "interactive");
+    await seedSessionPermission("default", "full-access");
     await writeFile(
       workspacePath("integration.ts"),
       `
@@ -373,7 +373,7 @@ export const main = workflow(
         sessions?: Record<string, string>;
       };
     };
-    expect(raw.permissions?.sessions?.consented).toBe("interactive");
+    expect(raw.permissions?.sessions?.consented).toBe("full-access");
   });
 
   test("session-mode read-only removes interactive permission", async ({

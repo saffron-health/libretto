@@ -112,7 +112,7 @@ async function runExec(
   const log = getLog();
   const sessionState = readSessionStateOrThrow(session);
   const mode = sessionState.mode ?? "read-only";
-  if (mode !== "interactive") {
+  if (mode !== "full-access") {
     throw new Error(readOnlySessionError(session));
   }
 
@@ -479,7 +479,7 @@ export function registerExecutionCommands(yargs: Argv): Argv {
             `--allow-actions is not supported for run. ${readOnlySessionError(session)}`,
           );
         }
-        if (getSessionPermissionMode(session) !== "interactive") {
+        if (getSessionPermissionMode(session) !== "full-access") {
           throw new Error(readOnlySessionError(session));
         }
 
