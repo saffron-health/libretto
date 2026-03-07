@@ -185,12 +185,6 @@ async function runIntegrationInternal(
   }
 }
 
-export async function runIntegrationFromFileInProcess(
-  args: RunIntegrationWorkerRequest,
-): Promise<RunIntegrationOutcome> {
-  return await runIntegrationInternal(args, { hangOnPause: false });
-}
-
 export async function runIntegrationFromFileInWorker(
   args: RunIntegrationWorkerRequest,
   onPaused: (details: RunDebugPauseDetails) => Promise<void> | void,
