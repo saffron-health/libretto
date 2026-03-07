@@ -13,23 +13,24 @@ Sessions start in **read-only mode** by default. **Every time you launch a brows
 
 ### Read-only mode (default)
 
-> **Session mode: READ-ONLY**
->
-> I've opened the browser in **read-only mode**. I can observe the page, take snapshots, and inspect network traffic, but I **cannot** click, type, fill forms, submit, or execute any actions that modify the page.
->
-> If you'd like me to interact with elements (clicking buttons, filling forms, submitting data, scrolling, or making network requests), let me know and I'll switch to **full-access mode**.
+🔒 **SESSION MODE: READ-ONLY** 🔒
+
+I've opened the browser in **read-only mode**. I can observe the page, take snapshots, and inspect network traffic, but I **cannot** click, type, fill forms, submit, or execute any actions that modify the page.
+
+If you'd like me to interact with elements (clicking buttons, filling forms, submitting data, scrolling, or making network requests), let me know and I'll switch to **full-access mode**.
 
 **Rules:**
+
 - Use ONLY read-only-safe commands (`snapshot`, `network`, `actions`) until the user explicitly grants full access.
 - Do NOT proceed with any `exec` or `run` commands until the user explicitly grants full access.
 
 ### Full-access mode (user-approved)
 
-> **Session mode: FULL-ACCESS**
->
-> I've opened the browser in **full-access mode**. I have full control to click, type, fill forms, navigate, scroll, make network requests, and execute Playwright commands on the page.
->
-> If you'd like me to switch to **read-only mode** (observe only, no page modifications), let me know.
+⚠️ **SESSION MODE: FULL-ACCESS** ⚠️
+
+I've opened the browser in **full-access mode**. I have full control to click, type, fill forms, navigate, scroll, make network requests, and execute Playwright commands on the page.
+
+If you'd like me to switch to **read-only mode** (observe only, no page modifications), let me know.
 
 ### Switching modes
 
@@ -67,6 +68,37 @@ Add `--visualize` to any `exec` command to show a ghost cursor and element highl
 `page`, `context`, `state`, `browser`, `networkLog({ last?, filter?, method? })`, `actionLog({ last?, filter?, action?, source? })`, `console`, `fetch`, `Buffer`, `URL`, `setTimeout`
 
 The `state` object persists across `exec` calls within the same session — use it to carry values between commands.
+
+## CRITICAL: No try/catch in exec
+
+**Never use try/catch or .catch() in exec code.** Let errors throw so they surface as exec failures. When an exec fails, you get the full error message (e.g., "intercepts pointer events", "Timeout 30000ms exceeded") — use that to diagnose the problemand write a corrected exec.
+
+**Why:** A try/catch inside exec hides failures from you. A click that times out takes 30 seconds — if you retry it in a loop with try/catch, you'll silently burn minutes on the same broken selector with no way to recover. Without try/catch, the error comes back immediately and you can reason about what went wrong.
+
+**Instead of try/catch, use check-first patterns:**
+
+```typescript
+// BAD — silently retries for minutes
+try {
+  await btn.click();
+} catch {
+  /* retry or ignore */
+}
+
+// GOOD — check first, fail fast
+if (await btn.isVisible()) await btn.click();
+
+// GOOD — check existence before acting
+if ((await page.locator(".cookie-banner").count()) > 0) {
+  await page.locator(".cookie-banner button").click();
+}
+```
+
+If an action fails despite an element being visible, you should not keep retrying it. Instead you can try the following debugging steps:
+
+1. Take a snapshot to inspect what's covering the element
+2. Try `{ force: true }` to bypass actionability checks
+3. Try a completely different approach (e.g., opening a dialog via a different button)
 
 ## Workflow: Browse and Interact
 
@@ -402,32 +434,20 @@ npx libretto exec "
 "
 ```
 
-### When to Generate the File
+### Generating Code
 
-After completing the interactive exploration (navigating pages, inspecting elements, confirming selectors work), **always generate the TypeScript workflow file before ending the session** — do not wait for the user to ask for it separately.
+After completing interactive exploration, **always generate the TypeScript workflow file before ending the session** — do not wait for the user to ask.
 
-**STOP AND ASK BEFORE GENERATING CODE.** Once the interactive workflow is figured out, you MUST pause and ask the user the following before writing any production code:
+**STOP AND ASK BEFORE GENERATING CODE.** Once the interactive workflow is figured out, pause and ask:
 
 1. "Are there any existing files or patterns in the codebase you want me to reference?"
 2. "Do you want me to incorporate any of your manual browser interactions from the actions log (`npx libretto actions --source user`) into the generated code?"
 3. "Any other guidance for how the production code should be structured?"
 
-Wait for the user's response. If they point you to files, read those first. If they say yes to the actions log, run `npx libretto actions --source user` and incorporate the relevant actions. If they give structural guidance, follow it. Only then proceed to generate.
+Wait for the user's response before proceeding. Then:
 
-After getting the user's input:
-
-1. Generate the workflow file using proper Playwright APIs (see rules below)
-2. Run the TypeScript type checker against the file and fix any errors before presenting it as done
-
-### Generating the Workflow File
-
-As you confirm each step works via `exec`, build up a TypeScript file in `apps/browser-agent/src/` (location depends on what the workflow does — new tasks go in `src/tasks/`, integration-specific logic in `src/integrations/`).
-
-For workflows that use network requests for data extraction or form submission, follow the API client class pattern: a shared class with one method per endpoint, `page.evaluate(() => fetch(...))` under the hood, no try-catch in API methods (errors handled in the orchestrator). See `apps/browser-agent/docs/full-network-iteration-doc.md` for the full pattern.
-
-### Code Rules for Generated Files
-
-Before writing any production code, read `code-generation-rules.md` (in this skill's directory) for the full rules on Playwright locator usage, `page.evaluate()` restrictions, network request patterns, and type checking requirements.
+1. **Read `code-generation-rules.md`** (in this skill's directory) — this is mandatory before writing any code. It contains the authoritative rules for Playwright locator usage, `page.evaluate()` restrictions, network request patterns, and type checking. Do not generate code from memory; always reference this file first.
+2. Run the TypeScript type checker against the file and fix any errors before presenting it as done.
 
 ## Patient Safety Warning
 

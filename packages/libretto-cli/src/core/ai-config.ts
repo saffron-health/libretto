@@ -18,10 +18,11 @@ export const AiConfigSchema = z
   .strict();
 export type AiConfig = z.infer<typeof AiConfigSchema>;
 
-const SessionModeSchema = z.enum(["read-only", "interactive"]);
+const SessionModeSchema = z.enum(["read-only", "full-access"]);
 const SessionPermissionsSchema = z
   .object({
-    sessions: z.record(SessionModeSchema),
+    defaultMode: SessionModeSchema.default("read-only"),
+    sessions: z.record(SessionModeSchema).default({}),
   })
   .strict();
 
