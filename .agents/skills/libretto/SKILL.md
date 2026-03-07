@@ -20,8 +20,8 @@ Sessions start in **read-only mode** by default. **Every time you launch a brows
 > If you'd like me to interact with elements (clicking buttons, filling forms, submitting data, scrolling, or making network requests), let me know and I'll switch to **interactive mode**.
 
 **Rules:**
-- Use ONLY read-only-safe commands (`snapshot`, `network`, `actions`) until the user explicitly grants full access.
-- Do NOT proceed with any `exec` or `run` commands until the user explicitly grants full access.
+- Use ONLY read-only-safe commands (`snapshot`, `network`, `actions`) until the user explicitly grants interactive access.
+- Do NOT proceed with any `exec` or `run` commands until the user explicitly grants interactive access.
 
 ### Interactive mode (user-approved)
 
@@ -47,7 +47,7 @@ If it's not obvious which element to click or what value to enter, **ask the use
 npx libretto open <url> [--headed]     # Launch browser and navigate (headless by default)
 npx libretto exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
 npx libretto run <integrationFile> <integrationExport> # Execute integration actions
-npx libretto resume                    # Resume a paused workflow in the current session
+npx libretto resume                    # Resume a paused workflow for the current session
 npx libretto session-mode <read-only|interactive> [--session <name>] # Set session mode explicitly
 npx libretto snapshot --objective "<what to find>" --context "<situational info>"
 npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto-cli/profiles/
@@ -67,11 +67,11 @@ Add `--visualize` to any `exec` command to show a ghost cursor and element highl
 
 Workflows pause from inside the workflow function by calling `await ctx.pause()`.
 
-- There are no pause options to pass at call sites. Pause is always session-scoped and resolved from the active session.
+- There are no pause options to pass at call sites. Pause is session-scoped and resolved from the active session.
 - `npx libretto run ...` waits until the workflow either completes or hits the next `ctx.pause()`.
 - On pause, the workflow process stays alive and keeps browser/session state.
 - `npx libretto resume --session <name>` sends resume signal and then waits until completion or the next pause.
-- `resume` should be called repeatedly for multi-pause workflows until completion.
+- For multi-pause workflows, call `resume` repeatedly until the workflow completes.
 
 ## Globals Available in `exec`
 
@@ -211,7 +211,7 @@ When the snapshot doesn't give you enough detail — why an element is hidden, w
 
 - **Never use `page.screenshot()` via `exec`.** Use `npx libretto snapshot` instead — it captures the viewport, sends the screenshot + HTML to a vision model, and returns actionable selectors. The `fullPage` option is especially dangerous — it scrolls the entire page to stitch a screenshot, which can crash JavaScript-heavy pages (especially EMR portals like eClinicalWorks).
 - **Never run `exec` commands in parallel.** Always wait for one `exec` to finish before starting the next. Do not use `run_in_background` for `exec` calls. Running simultaneous `exec` calls opens multiple CDP connections to the same page, which corrupts the page state and kills the browser.
-- `open` and `run` take control of the session. If the session already has an owner PID, it is terminated first and a warning is printed.
+- `open` and `run` take control of the session. If a session already has an owner PID, Libretto terminates it first and prints a warning.
 - Use `return <value>` in `exec` to print results. Strings print raw; objects print as JSON.
 - For iframe content, access via `page.locator('iframe[name="..."]').contentFrame()`.
 - Multiple sessions allow parallel browser instances: `--session test1`, `--session test2`.
