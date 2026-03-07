@@ -1,12 +1,12 @@
 import { mkdirSync } from "node:fs";
 import type { Argv } from "yargs";
-import { connect, disconnectBrowser } from "../core/browser";
-import { getLog, getSessionSnapshotRunDir } from "../core/context";
+import { connect, disconnectBrowser } from "../core/browser.js";
+import { getLog, getSessionSnapshotRunDir } from "../core/context.js";
 import {
   canAnalyzeSnapshots,
   runInterpret,
   type ScreenshotPair,
-} from "../core/snapshot-analyzer";
+} from "../core/snapshot-analyzer.js";
 
 function generateSnapshotTimestampId(): string {
   return new Date()
