@@ -27,6 +27,7 @@ import {
 const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 const AUTO_SESSION_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 const AUTO_SESSION_LENGTH = 5;
+const MAX_AUTO_SESSION_GENERATION_ATTEMPTS = 128;
 
 export const SESSION_DEV_SERVER = "dev-server";
 export const SESSION_BROWSER_AGENT = "browser-agent";
@@ -37,13 +38,30 @@ type SessionPermissions = {
   sessions: Record<string, SessionMode>;
 };
 
-export function generateSessionName(): string {
+function generateSessionNameCandidate(): string {
   let value = "";
   for (let i = 0; i < AUTO_SESSION_LENGTH; i += 1) {
     const index = Math.floor(Math.random() * AUTO_SESSION_CHARS.length);
     value += AUTO_SESSION_CHARS[index];
   }
   return value;
+}
+
+function hasSessionState(session: string): boolean {
+  return existsSync(getSessionStatePath(session));
+}
+
+export function generateSessionName(
+  sessionExists: (session: string) => boolean = hasSessionState,
+): string {
+  for (let attempt = 0; attempt < MAX_AUTO_SESSION_GENERATION_ATTEMPTS; attempt += 1) {
+    const candidate = generateSessionNameCandidate();
+    if (!sessionExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Failed to generate a unique session id.");
 }
 
 export function logFileForSession(session: string): string {

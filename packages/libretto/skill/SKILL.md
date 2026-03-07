@@ -130,7 +130,7 @@ npx libretto exec --session browser-agent "await page.locator('.dropdown-trigger
 
 ## Snapshot — The Primary Observation Tool
 
-The `snapshot` command captures a PNG screenshot + HTML, sends both to a vision model (Gemini Flash), and returns an analysis with Playwright-ready selectors. **Both `--objective` and `--context` are required.** This is the single way to understand what's on the page — use it any time you need to inspect page structure, find elements, or debug what's happening.
+The `snapshot` command captures a PNG screenshot + HTML, sends both to a vision model (Gemini Flash), and returns an analysis with Playwright-ready selectors when analysis flags are provided. If both `--objective` and `--context` are omitted, it still captures PNG + HTML without analysis. If one is provided, the other is required. This is the single way to understand what's on the page — use it any time you need to inspect page structure, find elements, or debug what's happening.
 
 **Never use `page.screenshot()` via `exec` to understand the page.** Use the `snapshot` command instead — it captures the screenshot, HTML, and sends both to a vision model that returns actionable selectors. Raw screenshots give you an image with no analysis; `snapshot` gives you the answer.
 
@@ -194,11 +194,11 @@ Network requests are captured automatically when a browser is opened via `npx li
 ### CLI: `npx libretto network`
 
 ```bash
-npx libretto network                              # show last 20 requests
-npx libretto network --last 50                    # show last 50
-npx libretto network --filter 'referral|patient'  # regex filter on URL
-npx libretto network --method POST                # filter by HTTP method
-npx libretto network --clear                      # truncate the log file
+npx libretto network --session <name>                              # show last 20 requests
+npx libretto network --session <name> --last 50                    # show last 50
+npx libretto network --session <name> --filter 'referral|patient'  # regex filter on URL
+npx libretto network --session <name> --method POST                # filter by HTTP method
+npx libretto network --session <name> --clear                      # truncate the log file
 ```
 
 ### In exec: `networkLog()`
@@ -220,13 +220,13 @@ Browser actions are captured automatically when a browser is opened via `npx lib
 ### CLI: `npx libretto actions`
 
 ```bash
-npx libretto actions                              # show last 20 actions
-npx libretto actions --last 50                    # show last 50
-npx libretto actions --filter 'button|input'      # regex filter on selector/value
-npx libretto actions --action click                # filter by action type
-npx libretto actions --source user                 # only manual user actions
-npx libretto actions --source agent                # only programmatic agent actions
-npx libretto actions --clear                       # truncate the log file
+npx libretto actions --session <name>                              # show last 20 actions
+npx libretto actions --session <name> --last 50                    # show last 50
+npx libretto actions --session <name> --filter 'button|input'      # regex filter on selector/value
+npx libretto actions --session <name> --action click               # filter by action type
+npx libretto actions --session <name> --source user                # only manual user actions
+npx libretto actions --session <name> --source agent               # only programmatic agent actions
+npx libretto actions --session <name> --clear                      # truncate the log file
 ```
 
 ### In exec: `actionLog()`
