@@ -64,15 +64,13 @@ async function main(): Promise<void> {
         sendMessage({ type: "paused", details });
       },
     );
-    if (outcome.status === "completed") {
-      sendMessage({ type: "completed" });
-      process.exit(0);
-      return;
+    if (outcome.status !== "completed") {
+      throw new Error(
+        "Invariant violation: worker returned paused outcome instead of hanging.",
+      );
     }
-
-    // Defensive fallback: worker mode should already hang on pause.
-    sendMessage({ type: "paused", details: outcome.details });
-    await new Promise<void>(() => {});
+    sendMessage({ type: "completed" });
+    process.exit(0);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     sendMessage({ type: "failed", message });
