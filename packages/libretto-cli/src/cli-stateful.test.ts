@@ -180,7 +180,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Session \"readonly-session\" is read-only. Only a human can authorize interactive mode.",
+      "Session \"readonly-session\" is read-only. Only a human can authorize full-access mode.",
     );
   });
 
@@ -197,14 +197,14 @@ describe("state-driven CLI subprocess behavior", () => {
     );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Session \"legacy-session\" is read-only. Only a human can authorize interactive mode.",
+      "Session \"legacy-session\" is read-only. Only a human can authorize full-access mode.",
     );
     expect(result.stderr).toContain(
-      "libretto-cli session-mode interactive --session legacy-session",
+      "libretto-cli session-mode full-access --session legacy-session",
     );
   });
 
-  test("rejects exec when session mode is missing even if permissioned interactive", async ({
+  test("rejects exec when session mode is missing even if permissioned full-access", async ({
     seedSessionState,
     seedSessionPermission,
     librettoCli,
@@ -220,7 +220,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Session \"permissioned-session\" is read-only. Only a human can authorize interactive mode.",
+      "Session \"permissioned-session\" is read-only. Only a human can authorize full-access mode.",
     );
   });
 
@@ -266,10 +266,10 @@ describe("state-driven CLI subprocess behavior", () => {
     );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Session \"flip-session\" is read-only. Only a human can authorize interactive mode.",
+      "Session \"flip-session\" is read-only. Only a human can authorize full-access mode.",
     );
     expect(result.stderr).toContain(
-      "libretto-cli session-mode interactive --session flip-session",
+      "libretto-cli session-mode full-access --session flip-session",
     );
   });
 
