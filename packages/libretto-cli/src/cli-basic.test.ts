@@ -18,6 +18,10 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("--help");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Usage: libretto-cli <command> [--session <name>]");
+    expect(result.stdout).toContain(
+      "session-mode <read-only|full-access> Set session execution mode",
+    );
+    expect(result.stdout).not.toContain("session-mode <read-only|interactive>");
     expect(result.stderr).toBe("");
   });
 
@@ -133,27 +137,43 @@ describe("basic CLI subprocess behavior", () => {
     seedSessionState,
   }) => {
     await seedSessionPermission("default", "full-access");
+    const owner = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      stdio: "ignore",
+    });
+    const pid = owner.pid;
+    expect(pid).toBeTypeOf("number");
+    if (!pid) {
+      throw new Error("Failed to spawn lock-owner test process.");
+    }
+
     await seedSessionState({
       session: "default",
       mode: "full-access",
-      pid: 54321,
+      pid,
       port: 9222,
+      status: "active",
     });
 
-    const blockedRun = await librettoCli("run ./integration.ts main");
-    expect(blockedRun.exitCode).toBe(1);
-    expect(blockedRun.stderr).toContain(
-      'Session "default" is already open and connected to http://127.0.0.1:9222 (pid 54321).',
-    );
+    try {
+      const blockedRun = await librettoCli("run ./integration.ts main");
+      expect(blockedRun.exitCode).toBe(1);
+      expect(blockedRun.stderr).toContain(
+        `Session "default" is already open and connected to http://127.0.0.1:9222 (pid ${pid}).`,
+      );
 
-    const closeResult = await librettoCli("close --session default");
-    expect(closeResult.exitCode).toBe(0);
-    expect(closeResult.stdout).toContain('Browser closed (session: default).');
+      const closeResult = await librettoCli("close --session default");
+      expect(closeResult.exitCode).toBe(0);
+      expect(closeResult.stdout).toContain('Browser closed (session: default).');
 
-    const retriedRun = await librettoCli("run ./integration.ts main");
-    expect(retriedRun.exitCode).toBe(1);
-    expect(retriedRun.stderr).not.toContain("already open and connected");
-    expect(retriedRun.stderr).toContain("Integration file does not exist:");
+      const retriedRun = await librettoCli("run ./integration.ts main");
+      expect(retriedRun.exitCode).toBe(1);
+      expect(retriedRun.stderr).not.toContain("already open and connected");
+      expect(retriedRun.stderr).toContain("Integration file does not exist:");
+    } finally {
+      if (isPidRunning(pid)) {
+        process.kill(pid, "SIGKILL");
+      }
+    }
   });
 
   test("allows run guard when session is permissioned full-access", async ({

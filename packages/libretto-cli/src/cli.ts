@@ -41,10 +41,10 @@ Commands:
   open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
   run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug]  Run an exported Libretto workflow from a file; pass --debug to enable pause-on-failure debugging (or --no-debug to disable)
-  session-mode <read-only|interactive> Set session execution mode
+  session-mode <read-only|full-access> Set session execution mode
   ai configure [preset] [-- <command prefix...>]  Configure AI runtime for analysis commands
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
-  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight; blocked until interactive)
+  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight; blocked until full-access)
   snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when both flags are provided
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
@@ -58,7 +58,7 @@ Options:
 Examples:
   libretto-cli open https://linkedin.com
   # default sessions are read-only; enable actions only after explicit human approval
-  libretto-cli session-mode interactive --session default
+  libretto-cli session-mode full-access --session default
 
   # ... manually log in ...
   libretto-cli save linkedin.com

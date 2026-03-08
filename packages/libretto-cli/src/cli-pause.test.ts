@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect } from "vitest";
 import { test } from "./test-fixtures";
 
@@ -211,4 +212,95 @@ export const main = workflow({}, async (ctx) => {
       await librettoCli("close --session default");
     }
   }, 60_000);
+
+  test("completed run preserves session logs and allows session reuse", async ({
+    librettoCli,
+    librettoRuntimePath,
+    seedSessionPermission,
+    writeWorkflowScript,
+    workspacePath,
+  }) => {
+    await seedSessionPermission("default", "full-access");
+    const integrationFilePath = await writeWorkflowScript(
+      "integration-complete-once.mjs",
+      `
+import { workflow } from "${
+  librettoRuntimePath
+}";
+
+export const main = workflow({}, async () => {
+  console.log("WORKFLOW_DONE");
+});
+`,
+    );
+
+    const runResult = await librettoCli(
+      `run "${integrationFilePath}" main --session default --headless --debug`,
+    );
+    expect(runResult.exitCode).toBe(0);
+    expect(runResult.stdout).toContain("WORKFLOW_DONE");
+    expect(runResult.stdout).toContain("Integration completed.");
+
+    const sessionDir = workspacePath(".libretto", "sessions", "default");
+    const statePath = workspacePath(".libretto", "sessions", "default", "state.json");
+    expect(existsSync(sessionDir)).toBe(true);
+    expect(existsSync(statePath)).toBe(true);
+    const state = JSON.parse(readFileSync(statePath, "utf8")) as { status?: string };
+    expect(state.status).toBe("completed");
+
+    const openAttempt = await librettoCli(
+      "open https://example.com --session default",
+      { PATH: "/definitely-not-real" },
+    );
+    expect(openAttempt.exitCode).toBe(1);
+    expect(openAttempt.stderr).toContain("Failed to launch browser child process:");
+    expect(openAttempt.stderr).not.toContain(
+      'Session "default" is already open and connected to',
+    );
+  }, 45_000);
+
+  test("failed run preserves session logs and allows session reuse", async ({
+    librettoCli,
+    librettoRuntimePath,
+    seedSessionPermission,
+    writeWorkflowScript,
+    workspacePath,
+  }) => {
+    await seedSessionPermission("default", "full-access");
+    const integrationFilePath = await writeWorkflowScript(
+      "integration-throw-once.mjs",
+      `
+import { workflow } from "${
+  librettoRuntimePath
+}";
+
+export const main = workflow({}, async () => {
+  throw new Error("INTENTIONAL_FAILURE");
+});
+`,
+    );
+
+    const runResult = await librettoCli(
+      `run "${integrationFilePath}" main --session default --headless --debug`,
+    );
+    expect(runResult.exitCode).toBe(1);
+    expect(runResult.stderr).toContain("INTENTIONAL_FAILURE");
+
+    const sessionDir = workspacePath(".libretto", "sessions", "default");
+    const statePath = workspacePath(".libretto", "sessions", "default", "state.json");
+    expect(existsSync(sessionDir)).toBe(true);
+    expect(existsSync(statePath)).toBe(true);
+    const state = JSON.parse(readFileSync(statePath, "utf8")) as { status?: string };
+    expect(state.status).toBe("failed");
+
+    const openAttempt = await librettoCli(
+      "open https://example.com --session default",
+      { PATH: "/definitely-not-real" },
+    );
+    expect(openAttempt.exitCode).toBe(1);
+    expect(openAttempt.stderr).toContain("Failed to launch browser child process:");
+    expect(openAttempt.stderr).not.toContain(
+      'Session "default" is already open and connected to',
+    );
+  }, 45_000);
 });
