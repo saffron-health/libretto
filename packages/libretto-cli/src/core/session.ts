@@ -172,66 +172,13 @@ export function clearSessionState(session: string): void {
   log.info("session-state-cleared", { session, stateFile });
 }
 
-function isPidRunning(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function waitForPidExit(pid: number, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!isPidRunning(pid)) return true;
-    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
-  }
-  return !isPidRunning(pid);
-}
-
-export async function takeOverSessionOwner(
-  session: string,
-  nextOwner: "open" | "run",
-): Promise<void> {
-  const log = getLog();
+export function assertSessionAvailableForStart(session: string): void {
   const existingState = readSessionState(session);
   if (!existingState) return;
-
-  const { pid, runId } = existingState;
-  if (pid === process.pid) {
-    log.warn("session-takeover-self-owner", { session, pid, nextOwner, runId });
-    return;
-  }
-  if (!isPidRunning(pid)) {
-    log.info("session-takeover-stale-owner", { session, pid, nextOwner, runId });
-    return;
-  }
-
-  log.warn("session-takeover-terminating-owner", {
-    session,
-    existingPid: pid,
-    existingRunId: runId,
-    nextOwner,
-  });
-  console.warn(
-    `Warning: session "${session}" is currently owned by pid ${pid}; terminating it before ${nextOwner}.`,
+  const endpoint = `http://127.0.0.1:${existingState.port}`;
+  throw new Error(
+    `Session "${session}" is already open and connected to ${endpoint} (pid ${existingState.pid}). Create a new session or close the current one with: libretto-cli close --session ${session}`,
   );
-
-  try {
-    process.kill(pid, "SIGTERM");
-  } catch (error) {
-    throw new Error(
-      `Could not take over session "${session}" from pid ${pid}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  const exited = await waitForPidExit(pid, 2_000);
-  if (!exited) {
-    throw new Error(
-      `Could not take over session "${session}": existing owner pid ${pid} did not exit after SIGTERM.`,
-    );
-  }
 }
 
 function ensureLibrettoDir(): void {

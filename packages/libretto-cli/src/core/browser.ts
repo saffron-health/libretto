@@ -13,13 +13,13 @@ import {
   setLogFile,
 } from "./context.js";
 import {
+  assertSessionAvailableForStart,
   clearSessionState,
   generateRunId,
   getSessionPermissionMode,
   readSessionStateOrThrow,
   logFileForSession,
   readSessionState,
-  takeOverSessionOwner,
   writeSessionState,
 } from "./session.js";
 
@@ -190,7 +190,7 @@ export async function runOpen(
   const sessionMode = getSessionPermissionMode(session);
   const url = normalizeUrl(rawUrl);
   log.info("open-start", { url, headed, session, sessionMode });
-  await takeOverSessionOwner(session, "open");
+  assertSessionAvailableForStart(session);
 
   const port = await pickFreePort();
   const runId = generateRunId();

@@ -6,11 +6,9 @@ describe("CLI pause behavior", () => {
     librettoCli,
     librettoRuntimePath,
     seedSessionPermission,
-    seedSessionState,
     writeWorkflowScript,
   }) => {
-    await seedSessionPermission("default", "interactive");
-    await seedSessionState({ session: "default", mode: "interactive" });
+    await seedSessionPermission("default", "full-access");
     const integrationFilePath = await writeWorkflowScript(
       "integration-pause-once.mjs",
       `
@@ -52,11 +50,9 @@ export const main = workflow({}, async (ctx) => {
     librettoCli,
     librettoRuntimePath,
     seedSessionPermission,
-    seedSessionState,
     writeWorkflowScript,
   }) => {
-    await seedSessionPermission("default", "interactive");
-    await seedSessionState({ session: "default", mode: "interactive" });
+    await seedSessionPermission("default", "full-access");
     const integrationFilePath = await writeWorkflowScript(
       "integration-pause-twice.mjs",
       `
@@ -99,11 +95,9 @@ export const main = workflow({}, async (ctx) => {
     librettoCli,
     librettoRuntimePath,
     seedSessionPermission,
-    seedSessionState,
     writeWorkflowScript,
   }) => {
-    await seedSessionPermission("default", "interactive");
-    await seedSessionState({ session: "default", mode: "interactive" });
+    await seedSessionPermission("default", "full-access");
     const integrationFilePath = await writeWorkflowScript(
       "integration-pause-multiple.mjs",
       `
@@ -161,9 +155,60 @@ export const main = workflow({}, async (ctx) => {
     librettoCli,
     seedSessionState,
   }) => {
-    await seedSessionState({ session: "default", mode: "interactive" });
+    await seedSessionState({ session: "default", mode: "full-access" });
     const result = await librettoCli("resume --session default");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain('Session "default" is not paused.');
   });
+
+  test("open fails while paused workflow session is active, then resume continues", async ({
+    librettoCli,
+    librettoRuntimePath,
+    seedSessionPermission,
+    writeWorkflowScript,
+  }) => {
+    await seedSessionPermission("default", "full-access");
+    const integrationFilePath = await writeWorkflowScript(
+      "integration-pause-stale-artifacts.mjs",
+      `
+import { workflow } from "${
+  librettoRuntimePath
+}";
+
+export const main = workflow({}, async (ctx) => {
+  console.log("WORKFLOW_PAUSE_POINT");
+  await ctx.pause();
+  console.log("WORKFLOW_AFTER_RESUME");
+});
+`,
+    );
+
+    try {
+      const runResult = await librettoCli(
+        `run "${integrationFilePath}" main --session default --headless --debug`,
+      );
+      expect(runResult.exitCode).toBe(0);
+      expect(runResult.stdout).toContain("WORKFLOW_PAUSE_POINT");
+      expect(runResult.stdout).toContain("Workflow paused.");
+
+      const openAttempt = await librettoCli(
+        "open https://example.com --session default",
+        { PATH: "/definitely-not-real" },
+      );
+      expect(openAttempt.exitCode).toBe(1);
+      expect(openAttempt.stderr).toContain(
+        'Session "default" is already open and connected to',
+      );
+      expect(openAttempt.stderr).toContain(
+        "Create a new session or close the current one with: libretto-cli close --session default",
+      );
+
+      const resumeResult = await librettoCli("resume --session default");
+      expect(resumeResult.exitCode).toBe(0);
+      expect(resumeResult.stdout).toContain("WORKFLOW_AFTER_RESUME");
+      expect(resumeResult.stdout).toContain("Integration completed.");
+    } finally {
+      await librettoCli("close --session default");
+    }
+  }, 60_000);
 });

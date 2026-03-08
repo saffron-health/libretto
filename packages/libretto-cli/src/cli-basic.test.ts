@@ -13,15 +13,6 @@ function isPidRunning(pid: number): boolean {
   }
 }
 
-async function waitForPidToExit(pid: number, timeoutMs: number = 4_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!isPidRunning(pid)) return;
-    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
-  }
-  throw new Error(`Timed out waiting for pid ${pid} to exit.`);
-}
-
 describe("basic CLI subprocess behavior", () => {
   test("prints usage for --help", async ({ librettoCli }) => {
     const result = await librettoCli("--help");
@@ -94,16 +85,16 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("run ./integration.ts main");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Session \"default\" is read-only. Only a human can authorize interactive mode.",
+      "Session \"default\" is read-only. Only a human can authorize full-access mode.",
     );
   });
 
-  test("run takes over existing session owner pid", async ({
+  test("run fails when session name is already active", async ({
     librettoCli,
     seedSessionPermission,
     seedSessionState,
   }) => {
-    await seedSessionPermission("default", "interactive");
+    await seedSessionPermission("default", "full-access");
     const owner = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
       stdio: "ignore",
     });
@@ -115,7 +106,7 @@ describe("basic CLI subprocess behavior", () => {
 
     await seedSessionState({
       session: "default",
-      mode: "interactive",
+      mode: "full-access",
       pid,
     });
 
@@ -123,9 +114,12 @@ describe("basic CLI subprocess behavior", () => {
       const result = await librettoCli("run ./integration.ts main");
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain(
-        `Warning: session \"default\" is currently owned by pid ${pid}; terminating it before run.`,
+        `Session "default" is already open and connected to http://127.0.0.1:9222 (pid ${pid}).`,
       );
-      await waitForPidToExit(pid);
+      expect(result.stderr).toContain(
+        "Create a new session or close the current one with: libretto-cli close --session default",
+      );
+      expect(isPidRunning(pid)).toBe(true);
     } finally {
       if (isPidRunning(pid)) {
         process.kill(pid, "SIGKILL");
@@ -133,7 +127,36 @@ describe("basic CLI subprocess behavior", () => {
     }
   });
 
-  test("allows run guard when session is permissioned interactive", async ({
+  test("close clears active session lock so run can be retried", async ({
+    librettoCli,
+    seedSessionPermission,
+    seedSessionState,
+  }) => {
+    await seedSessionPermission("default", "full-access");
+    await seedSessionState({
+      session: "default",
+      mode: "full-access",
+      pid: 54321,
+      port: 9222,
+    });
+
+    const blockedRun = await librettoCli("run ./integration.ts main");
+    expect(blockedRun.exitCode).toBe(1);
+    expect(blockedRun.stderr).toContain(
+      'Session "default" is already open and connected to http://127.0.0.1:9222 (pid 54321).',
+    );
+
+    const closeResult = await librettoCli("close --session default");
+    expect(closeResult.exitCode).toBe(0);
+    expect(closeResult.stdout).toContain('Browser closed (session: default).');
+
+    const retriedRun = await librettoCli("run ./integration.ts main");
+    expect(retriedRun.exitCode).toBe(1);
+    expect(retriedRun.stderr).not.toContain("already open and connected");
+    expect(retriedRun.stderr).toContain("Integration file does not exist:");
+  });
+
+  test("allows run guard when session is permissioned full-access", async ({
     librettoCli,
     seedSessionPermission,
   }) => {
@@ -165,7 +188,7 @@ export async function main() {
     expect(result.stderr).toContain("must be a Libretto workflow instance");
   });
 
-  test("open takes over existing session owner pid", async ({
+  test("open fails when session name is already active", async ({
     librettoCli,
     seedSessionState,
   }) => {
@@ -180,7 +203,7 @@ export async function main() {
 
     await seedSessionState({
       session: "default",
-      mode: "interactive",
+      mode: "full-access",
       pid,
     });
 
@@ -190,10 +213,12 @@ export async function main() {
       });
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain(
-        `Warning: session \"default\" is currently owned by pid ${pid}; terminating it before open.`,
+        `Session "default" is already open and connected to http://127.0.0.1:9222 (pid ${pid}).`,
       );
-      expect(result.stderr).toContain("Failed to launch browser child process:");
-      await waitForPidToExit(pid);
+      expect(result.stderr).toContain(
+        "Create a new session or close the current one with: libretto-cli close --session default",
+      );
+      expect(isPidRunning(pid)).toBe(true);
     } finally {
       if (isPidRunning(pid)) {
         process.kill(pid, "SIGKILL");
@@ -353,15 +378,15 @@ export const main = workflow(
     expect(result.stderr).toContain("--allow-actions is not supported for run.");
   });
 
-  test("session-mode interactive writes session permission", async ({
+  test("session-mode full-access writes session permission", async ({
     librettoCli,
     workspacePath,
   }) => {
     const result = await librettoCli(
-      "session-mode interactive --session consented",
+      "session-mode full-access --session consented",
     );
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Session \"consented\" is now interactive.");
+    expect(result.stdout).toContain("Session \"consented\" is now full-access.");
 
     const raw = JSON.parse(
       await readFile(
@@ -376,11 +401,11 @@ export const main = workflow(
     expect(raw.permissions?.sessions?.consented).toBe("full-access");
   });
 
-  test("session-mode read-only removes interactive permission", async ({
+  test("session-mode read-only removes full-access permission", async ({
     librettoCli,
     workspacePath,
   }) => {
-    await librettoCli("session-mode interactive --session toggled");
+    await librettoCli("session-mode full-access --session toggled");
     const result = await librettoCli("session-mode read-only --session toggled");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Session \"toggled\" is now read-only.");
@@ -402,7 +427,7 @@ export const main = workflow(
     const result = await librettoCli("session-mode maybe --session default");
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Usage: libretto-cli session-mode <read-only|interactive> [--session <name>]",
+      "Usage: libretto-cli session-mode <read-only|full-access> [--session <name>]",
     );
   });
 

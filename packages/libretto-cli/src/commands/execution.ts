@@ -11,8 +11,8 @@ import {
 import { getLog } from "../core/context.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
+  assertSessionAvailableForStart,
   getSessionPermissionMode,
-  takeOverSessionOwner,
   readSessionStateOrThrow,
   readOnlySessionError,
 } from "../core/session.js";
@@ -388,7 +388,7 @@ async function runResume(session: string): Promise<void> {
 }
 
 async function runIntegrationFromFile(args: RunIntegrationWorkerRequest): Promise<void> {
-  await takeOverSessionOwner(args.session, "run");
+  assertSessionAvailableForStart(args.session);
   const signalPaths = getPauseSignalPaths(args.session);
   clearSignalIfExists(signalPaths.pausedSignalPath);
   clearSignalIfExists(signalPaths.resumeSignalPath);
