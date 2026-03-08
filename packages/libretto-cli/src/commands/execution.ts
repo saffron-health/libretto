@@ -15,6 +15,7 @@ import {
   getSessionPermissionMode,
   readSessionStateOrThrow,
   readOnlySessionError,
+  setSessionStatus,
 } from "../core/session.js";
 import {
   readActionLog,
@@ -348,6 +349,7 @@ async function runResume(session: string): Promise<void> {
   clearSignalIfExists(outputSignalPath);
   clearSignalIfExists(completedSignalPath);
   clearSignalIfExists(failedSignalPath);
+  setSessionStatus(session, "active");
 
   writeFileSync(
     resumeSignalPath,
@@ -369,10 +371,12 @@ async function runResume(session: string): Promise<void> {
   });
 
   if (outcome.status === "completed") {
+    setSessionStatus(session, "completed");
     console.log("Integration completed.");
     return;
   }
   if (outcome.status === "failed") {
+    setSessionStatus(session, "failed");
     throw new Error(
       outcome.message
         ? `Workflow failed after resume: ${outcome.message}`
@@ -380,10 +384,12 @@ async function runResume(session: string): Promise<void> {
     );
   }
   if (outcome.status === "exited") {
+    setSessionStatus(session, "exited");
     throw new Error(
       `Workflow process for session "${session}" exited before reporting completion or pause.`,
     );
   }
+  setSessionStatus(session, "paused");
   console.log("Workflow paused.");
 }
 
@@ -412,17 +418,21 @@ async function runIntegrationFromFile(args: RunIntegrationWorkerRequest): Promis
     pid: worker.pid ?? 0,
   });
   if (outcome.status === "paused") {
+    setSessionStatus(args.session, "paused");
     console.log("Workflow paused.");
     return;
   }
   if (outcome.status === "failed") {
+    setSessionStatus(args.session, "failed");
     throw new Error(outcome.message ?? "Workflow failed during run.");
   }
   if (outcome.status === "exited") {
+    setSessionStatus(args.session, "exited");
     throw new Error(
       "Workflow process exited before reporting completion or pause during run.",
     );
   }
+  setSessionStatus(args.session, "completed");
 }
 
 export function registerExecutionCommands(yargs: Argv): Argv {

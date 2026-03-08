@@ -641,6 +641,7 @@ await new Promise(() => {});
         runId,
         startedAt: new Date().toISOString(),
         mode: sessionMode,
+        status: "active",
       });
       log.info("open-success", {
         url,
