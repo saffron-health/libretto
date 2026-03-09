@@ -1,6 +1,6 @@
 // Step runner
-export { step } from "./step/step.js";
-export { createRunner, type Runner } from "./step/runner.js";
+export { step } from "./runtime/step/step.js";
+export { createRunner, type Runner } from "./runtime/step/runner.js";
 export type {
 	Step,
 	StepOptions,
@@ -10,18 +10,18 @@ export type {
 	RunnerConfig,
 	StepHistoryEntry,
 	DebugBundle,
-} from "./step/types.js";
+} from "./runtime/step/types.js";
 
 // Logger
-export { Logger, type LoggerApi, type LoggerSink, type LogOptions } from "./logger/logger.js";
+export { Logger, type LoggerApi, type LoggerSink, type LogOptions } from "./shared/logger/logger.js";
 export {
 	createFileLogSink,
 	prettyConsoleSink,
 	jsonlConsoleSink,
-} from "./logger/sinks.js";
+} from "./shared/logger/sinks.js";
 
 // LLM client interface
-export type { LLMClient, Message, MessageContentPart } from "./llm/types.js";
+export type { LLMClient, Message, MessageContentPart } from "./shared/llm/types.js";
 export {
 	SESSION_STATE_VERSION,
 	SessionStatusSchema,
@@ -32,26 +32,26 @@ export {
 	type SessionStatus,
 	type SessionState,
 	type SessionStateFile,
-} from "./state/index.js";
+} from "./shared/state/index.js";
 
 // Recovery
-export { executeRecoveryAgent } from "./recovery/agent.js";
-export { attemptWithRecovery } from "./recovery/recovery.js";
+export { executeRecoveryAgent } from "./runtime/recovery/agent.js";
+export { attemptWithRecovery } from "./runtime/recovery/recovery.js";
 export {
 	detectSubmissionError,
 	type KnownSubmissionError,
 	type DetectedSubmissionError,
-} from "./recovery/errors.js";
+} from "./runtime/recovery/errors.js";
 
 // AI extraction
-export { extractFromPage, type ExtractOptions } from "./extract/extract.js";
+export { extractFromPage, type ExtractOptions } from "./runtime/extract/extract.js";
 
 // Network helpers
 export {
 	pageRequest,
 	type RequestConfig,
 	type PageRequestOptions,
-} from "./network/network.js";
+} from "./runtime/network/network.js";
 
 // Download helpers
 export {
@@ -60,7 +60,7 @@ export {
 	type DownloadResult,
 	type DownloadViaClickOptions,
 	type SaveDownloadOptions,
-} from "./download/download.js";
+} from "./runtime/download/download.js";
 
 // Debug
 export {
@@ -69,14 +69,14 @@ export {
 	isDebugPauseSignal,
 	type DebugPauseContext,
 	type DebugPauseDetails,
-} from "./debug/pause.js";
+} from "./shared/debug/pause.js";
 
 // Config
 export {
 	isDebugMode,
 	isDryRun,
 	shouldPauseBeforeMutation,
-} from "./config/config.js";
+} from "./shared/config/config.js";
 
 // Instrumentation
 export {
@@ -85,7 +85,7 @@ export {
 	instrumentContext,
 	type InstrumentationOptions,
 	type InstrumentedPage,
-} from "./instrumentation/instrument.js";
+} from "./shared/instrumentation/instrument.js";
 
 // Visualization
 export {
@@ -94,13 +94,13 @@ export {
 	ghostClick,
 	hideGhostCursor,
 	type GhostCursorOptions,
-} from "./visualization/ghost-cursor.js";
+} from "./shared/visualization/ghost-cursor.js";
 export {
 	ensureHighlightLayer,
 	showHighlight,
 	clearHighlights,
 	type HighlightOptions,
-} from "./visualization/highlight.js";
+} from "./shared/visualization/highlight.js";
 
 // Run helpers
 export {
@@ -112,7 +112,7 @@ export {
 	type DebugPauseDetails as RunDebugPauseDetails,
 	type LaunchBrowserArgs,
 	type BrowserSession,
-} from "./run/api.js";
+} from "./shared/run/api.js";
 
 // Workflow helpers
 export {
@@ -123,4 +123,4 @@ export {
 	type LibrettoWorkflowMetadata,
 	type LibrettoWorkflowContext,
 	type LibrettoWorkflowHandler,
-} from "./workflow/workflow.js";
+} from "./shared/workflow/workflow.js";
