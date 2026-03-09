@@ -10,7 +10,7 @@
 		"build": "tsup",
 		"type-check": "tsc --noEmit",
 		"dev": "tsx src/index.ts",
-		"test": "vitest run",
+		"test": "pnpm --filter libretto build && pnpm --filter libretto-cli build && vitest run",
 		"test:watch": "vitest"
 	},
 	"dependencies": {

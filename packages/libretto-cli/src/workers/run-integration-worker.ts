@@ -1,14 +1,19 @@
+import { writeFile } from "node:fs/promises";
 import type {
   RunIntegrationWorkerMessage,
   RunIntegrationWorkerRequest,
 } from "./run-integration-worker-protocol.js";
 import { runIntegrationFromFileInWorker } from "./run-integration-runtime.js";
 import { ensureLibrettoSetup, setLogFile } from "../core/context.js";
+import { getPauseSignalPaths } from "../core/pause-signals.js";
 import { logFileForSession } from "../core/session.js";
 
 function sendMessage(message: RunIntegrationWorkerMessage): void {
-  if (typeof process.send === "function") {
+  if (typeof process.send !== "function" || !process.connected) return;
+  try {
     process.send(message);
+  } catch {
+    // Parent may have disconnected after initial run returns on pause.
   }
 }
 
@@ -54,25 +59,36 @@ function parseWorkerRequest(argv: string[]): RunIntegrationWorkerRequest {
 }
 
 async function main(): Promise<void> {
+  let request: RunIntegrationWorkerRequest | null = null;
   try {
-    const request = parseWorkerRequest(process.argv);
+    request = parseWorkerRequest(process.argv);
     ensureLibrettoSetup();
     setLogFile(logFileForSession(request.session));
-    const outcome = await runIntegrationFromFileInWorker(
+    await runIntegrationFromFileInWorker(
       request,
       async (details) => {
         sendMessage({ type: "paused", details });
       },
     );
-    if (outcome.status !== "completed") {
-      throw new Error(
-        "Invariant violation: worker returned paused outcome instead of hanging.",
-      );
-    }
     sendMessage({ type: "completed" });
     process.exit(0);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (request) {
+      const { failedSignalPath } = getPauseSignalPaths(request.session);
+      await writeFile(
+        failedSignalPath,
+        JSON.stringify(
+          {
+            failedAt: new Date().toISOString(),
+            message,
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+    }
     sendMessage({ type: "failed", message });
     process.exit(1);
   }

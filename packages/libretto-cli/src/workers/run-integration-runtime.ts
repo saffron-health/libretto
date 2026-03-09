@@ -1,16 +1,17 @@
-import { existsSync } from "node:fs";
+import { appendFileSync, existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   launchBrowser,
-  isRunDebugPauseSignal,
   type LibrettoAuthProfile,
   type LibrettoWorkflowContext,
   type RunDebugPauseDetails,
 } from "libretto";
 import { getProfilePath, normalizeDomain } from "../core/browser.js";
-import { getLog } from "../core/context.js";
+import { getLog, getSessionDir } from "../core/context.js";
+import { getPauseSignalPaths, removeSignalIfExists } from "../core/pause-signals.js";
 import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol.js";
 
 const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
@@ -22,9 +23,58 @@ type LoadedLibrettoWorkflow = {
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
-type RunIntegrationOutcome =
-  | { status: "completed" }
-  | { status: "paused"; details: RunDebugPauseDetails };
+type RunIntegrationOutcome = { status: "completed" };
+
+const RESUME_POLL_INTERVAL_MS = 250;
+
+function mirrorStdoutToFile(filePath: string): () => void {
+  const stdout = process.stdout as NodeJS.WriteStream & {
+    write: (...args: any[]) => boolean;
+  };
+  const originalWrite = stdout.write.bind(stdout);
+
+  stdout.write = ((chunk: unknown, ...args: unknown[]) => {
+    try {
+      const buffer = Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(String(chunk), "utf8");
+      appendFileSync(filePath, buffer);
+    } catch {
+      // Ignore log mirroring failures; primary stdout should still flow.
+    }
+    return originalWrite(chunk, ...args);
+  }) as typeof stdout.write;
+
+  return () => {
+    stdout.write = originalWrite as typeof stdout.write;
+  };
+}
+
+async function waitForResumeSignal(args: {
+  signalPaths: ReturnType<typeof getPauseSignalPaths>;
+  session: string;
+  details: RunDebugPauseDetails;
+  onPaused?: (details: RunDebugPauseDetails) => Promise<void> | void;
+}): Promise<void> {
+  const { pausedSignalPath, resumeSignalPath } = args.signalPaths;
+  await mkdir(getSessionDir(args.session), { recursive: true });
+  await removeSignalIfExists(resumeSignalPath);
+  await writeFile(
+    pausedSignalPath,
+    JSON.stringify(args.details, null, 2),
+    "utf8",
+  );
+  await args.onPaused?.(args.details);
+
+  while (!existsSync(resumeSignalPath)) {
+    await new Promise((resolveWait) =>
+      setTimeout(resolveWait, RESUME_POLL_INTERVAL_MS),
+    );
+  }
+
+  await removeSignalIfExists(resumeSignalPath);
+  await removeSignalIfExists(pausedSignalPath);
+}
 
 function isLoadedLibrettoWorkflow(value: unknown): value is LoadedLibrettoWorkflow {
   if (!value || typeof value !== "object") return false;
@@ -115,13 +165,19 @@ async function loadWorkflowExport(
 async function runIntegrationInternal(
   args: RunIntegrationWorkerRequest,
   options: {
-    hangOnPause: boolean;
     onPaused?: (details: RunDebugPauseDetails) => Promise<void> | void;
   },
 ): Promise<RunIntegrationOutcome> {
   const log = getLog();
   const absolutePath = getAbsoluteIntegrationPath(args.integrationPath);
   const workflow = await loadWorkflowExport(absolutePath, args.exportName);
+  const signalPaths = getPauseSignalPaths(args.session);
+  await removeSignalIfExists(signalPaths.pausedSignalPath);
+  await removeSignalIfExists(signalPaths.resumeSignalPath);
+  await removeSignalIfExists(signalPaths.completedSignalPath);
+  await removeSignalIfExists(signalPaths.failedSignalPath);
+  await removeSignalIfExists(signalPaths.outputSignalPath);
+  const restoreStdout = mirrorStdoutToFile(signalPaths.outputSignalPath);
 
   console.log(
     `Running integration "${args.exportName}" from ${absolutePath} (${args.headless ? "headless" : "headed"})...`,
@@ -159,29 +215,52 @@ async function runIntegrationInternal(
     exportName: args.exportName,
     headless: args.headless,
     debug: args.debug,
+    pause: async () => {
+      const details: RunDebugPauseDetails = {
+        sessionName: args.session,
+        pausedAt: new Date().toISOString(),
+        url: browserSession.page.url(),
+      };
+      console.log(`[pause] Paused at ${details.url}`);
+      console.log("[pause] Waiting for resume signal...");
+      await waitForResumeSignal({
+        signalPaths,
+        session: args.session,
+        details,
+        onPaused: options.onPaused,
+      });
+      console.log("[pause] Resume signal received. Continuing workflow...");
+    },
   };
 
-  let pauseDetails: RunDebugPauseDetails | null = null;
   try {
     try {
       await workflow.run(workflowContext, args.params ?? {});
-      console.log("Integration completed.");
-      return { status: "completed" };
     } catch (error) {
-      if (!isRunDebugPauseSignal(error)) {
-        throw error;
-      }
-      pauseDetails = error.details;
-      await options.onPaused?.(pauseDetails);
-      if (options.hangOnPause) {
-        await new Promise<void>(() => {});
-      }
-      return { status: "paused", details: pauseDetails };
+      await writeFile(
+        signalPaths.failedSignalPath,
+        JSON.stringify(
+          {
+            failedAt: new Date().toISOString(),
+            message: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+      throw error;
     }
+    await writeFile(
+      signalPaths.completedSignalPath,
+      JSON.stringify({ completedAt: new Date().toISOString() }, null, 2),
+      "utf8",
+    );
+    console.log("Integration completed.");
+    return { status: "completed" };
   } finally {
-    if (!(options.hangOnPause && pauseDetails)) {
-      await browserSession.close();
-    }
+    restoreStdout();
+    await browserSession.close();
   }
 }
 
@@ -190,7 +269,6 @@ export async function runIntegrationFromFileInWorker(
   onPaused: (details: RunDebugPauseDetails) => Promise<void> | void,
 ): Promise<RunIntegrationOutcome> {
   return await runIntegrationInternal(args, {
-    hangOnPause: true,
     onPaused,
   });
 }

@@ -6,6 +6,6 @@ export {
 	debugPause,
 	DebugPauseSignal,
 	isDebugPauseSignal,
-	type DebugPauseOptions,
+	type DebugPauseContext,
 	type DebugPauseDetails,
 } from "../debug/pause.js";

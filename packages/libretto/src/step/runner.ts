@@ -161,11 +161,13 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 
 						stepLogger.info("step:debug-bundle", { path: bundle.bundlePath });
 
-						// Pause for debugging
-						await debugPause(page, {
-							enabled: debug,
-							sessionName,
-						});
+						// Pause for debugging only when debug mode is enabled.
+						if (debug) {
+							await debugPause({
+								page,
+								session: sessionName,
+							});
+						}
 
 						throw firstError;
 					}

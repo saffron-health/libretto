@@ -18,9 +18,11 @@ import {
 import {
   SESSION_STATE_VERSION,
   SessionModeSchema,
+  SessionStatusSchema,
   parseSessionStateContent,
   serializeSessionState,
   type SessionMode,
+  type SessionStatus,
   type SessionState,
 } from "libretto/state";
 
@@ -30,7 +32,7 @@ export const SESSION_DEFAULT = "default";
 export const SESSION_DEV_SERVER = "dev-server";
 export const SESSION_BROWSER_AGENT = "browser-agent";
 export { SESSION_STATE_VERSION };
-export type { SessionMode, SessionState };
+export type { SessionMode, SessionStatus, SessionState };
 
 type SessionPermissions = {
   defaultMode: SessionMode;
@@ -170,6 +172,51 @@ export function clearSessionState(session: string): void {
   }
   unlinkSync(stateFile);
   log.info("session-state-cleared", { session, stateFile });
+}
+
+function isSessionStatus(value: unknown): value is SessionStatus {
+  return SessionStatusSchema.safeParse(value).success;
+}
+
+function isPidRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function setSessionStatus(session: string, status: SessionStatus): void {
+  const state = readSessionState(session);
+  if (!state) return;
+  if (state.status === status) return;
+  writeSessionState({
+    ...state,
+    status,
+  });
+}
+
+export function assertSessionAvailableForStart(session: string): void {
+  const existingState = readSessionState(session);
+  if (!existingState) return;
+  if (isSessionStatus(existingState.status)) {
+    if (
+      existingState.status === "completed" ||
+      existingState.status === "failed" ||
+      existingState.status === "exited"
+    ) {
+      return;
+    }
+  }
+  if (!isPidRunning(existingState.pid)) {
+    setSessionStatus(session, "exited");
+    return;
+  }
+  const endpoint = `http://127.0.0.1:${existingState.port}`;
+  throw new Error(
+    `Session "${session}" is already open and connected to ${endpoint} (pid ${existingState.pid}). Create a new session or close the current one with: libretto-cli close --session ${session}`,
+  );
 }
 
 function ensureLibrettoDir(): void {

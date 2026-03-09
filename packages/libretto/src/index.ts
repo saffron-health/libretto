@@ -25,11 +25,13 @@ export type { LLMClient, Message, MessageContentPart } from "./llm/types.js";
 export {
 	SESSION_STATE_VERSION,
 	SessionModeSchema,
+	SessionStatusSchema,
 	SessionStateFileSchema,
 	parseSessionStateData,
 	parseSessionStateContent,
 	serializeSessionState,
 	type SessionMode,
+	type SessionStatus,
 	type SessionState,
 	type SessionStateFile,
 } from "./state/index.js";
@@ -67,7 +69,7 @@ export {
 	debugPause,
 	DebugPauseSignal,
 	isDebugPauseSignal,
-	type DebugPauseOptions,
+	type DebugPauseContext,
 	type DebugPauseDetails,
 } from "./debug/pause.js";
 
@@ -108,7 +110,7 @@ export {
 	debugPause as runDebugPause,
 	DebugPauseSignal as RunDebugPauseSignal,
 	isDebugPauseSignal as isRunDebugPauseSignal,
-	type DebugPauseOptions as RunDebugPauseOptions,
+	type DebugPauseContext as RunDebugPauseContext,
 	type DebugPauseDetails as RunDebugPauseDetails,
 	type LaunchBrowserArgs,
 	type BrowserSession,

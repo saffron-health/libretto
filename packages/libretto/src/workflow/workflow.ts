@@ -21,6 +21,7 @@ export type LibrettoWorkflowContext = {
 	exportName: string;
 	headless: boolean;
 	debug: boolean;
+	pause: () => Promise<void>;
 };
 
 export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (

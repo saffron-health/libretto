@@ -1,11 +1,7 @@
 import type { Page } from "playwright";
-import { isDebugMode } from "../config/config.js";
-
-export type DebugPauseOptions = {
-	/** Whether pause mode is enabled for this call. Defaults to env-based debug mode. */
-	enabled?: boolean;
-	/** Session name to include in pause metadata. Defaults to "libretto". */
-	sessionName?: string;
+export type DebugPauseContext = {
+	page: Page;
+	session: string;
 };
 
 export type DebugPauseDetails = {
@@ -13,10 +9,6 @@ export type DebugPauseDetails = {
 	pausedAt: string;
 	url: string;
 };
-
-function getSessionName(options?: DebugPauseOptions): string {
-	return options?.sessionName ?? "libretto";
-}
 
 export class DebugPauseSignal extends Error {
 	public readonly details: DebugPauseDetails;
@@ -48,18 +40,12 @@ export function isDebugPauseSignal(error: unknown): error is DebugPauseSignal {
 
 /**
  * Signals a workflow pause to the caller.
- * When enabled, this throws a typed signal that supervisors can intercept.
+ * This always throws a typed signal that supervisors can intercept.
  */
-export async function debugPause(
-	page: Page,
-	options?: DebugPauseOptions,
-): Promise<void> {
-	const enabled = options?.enabled ?? isDebugMode();
-	if (!enabled) return;
-
-	const url = page.url();
+export async function debugPause(context: DebugPauseContext): Promise<never> {
+	const url = context.page.url();
 	const details: DebugPauseDetails = {
-		sessionName: getSessionName(options),
+		sessionName: context.session,
 		pausedAt: new Date().toISOString(),
 		url,
 	};

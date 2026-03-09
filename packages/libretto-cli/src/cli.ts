@@ -27,6 +27,7 @@ const CLI_COMMANDS = new Set([
   "snapshot",
   "network",
   "actions",
+  "resume",
   "close",
   "--help",
   "-h",
@@ -40,13 +41,14 @@ Commands:
   open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
   run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug]  Run an exported Libretto workflow from a file; pass --debug to enable pause-on-failure debugging (or --no-debug to disable)
-  session-mode <read-only|interactive> Set session execution mode
+  session-mode <read-only|full-access> Set session execution mode
   ai configure [preset] [-- <command prefix...>]  Configure AI runtime for analysis commands
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
-  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight; blocked until interactive)
+  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight; blocked until full-access)
   snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when both flags are provided
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
+  resume                  Resume a paused workflow in the active session
   close                   Close the browser
 
 Options:
@@ -56,7 +58,7 @@ Options:
 Examples:
   libretto-cli open https://linkedin.com
   # default sessions are read-only; enable actions only after explicit human approval
-  libretto-cli session-mode interactive --session default
+  libretto-cli session-mode full-access --session default
 
   # ... manually log in ...
   libretto-cli save linkedin.com
@@ -70,6 +72,7 @@ Examples:
   libretto-cli ai configure <codex|claude|gemini> -- <command prefix...>
   libretto-cli snapshot
   libretto-cli snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
+  libretto-cli resume --session default
   libretto-cli close
 
   # Multiple sessions

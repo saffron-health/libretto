@@ -13,6 +13,7 @@ import {
   setLogFile,
 } from "./context.js";
 import {
+  assertSessionAvailableForStart,
   clearSessionState,
   generateRunId,
   getSessionPermissionMode,
@@ -89,30 +90,6 @@ async function tryConnectToPort(
     log.error("cdp-connect-error", { error: err, port, endpoint });
     return null;
   }
-}
-
-async function tryConnect(
-  session: string,
-  timeoutMs: number = 5000,
-): Promise<Browser | null> {
-  const log = getLog();
-  log.info("try-connect", { session, timeoutMs });
-  const state = readSessionState(session);
-  if (!state) {
-    log.info("try-connect-no-state", { session });
-    return null;
-  }
-  const browser = await tryConnectToPort(state.port, timeoutMs);
-  if (!browser) {
-    log.warn("try-connect-failed-clearing-state", {
-      session,
-      port: state.port,
-      pid: state.pid,
-    });
-    clearSessionState(session);
-    return null;
-  }
-  return browser;
 }
 
 export function disconnectBrowser(browser: Browser, session?: string): void {
@@ -213,26 +190,7 @@ export async function runOpen(
   const sessionMode = getSessionPermissionMode(session);
   const url = normalizeUrl(rawUrl);
   log.info("open-start", { url, headed, session, sessionMode });
-
-  const existing = await tryConnect(session);
-  if (existing) {
-    log.info("open-reuse-existing", { session });
-    try {
-      const page = existing.contexts()[0]?.pages()[0];
-      if (page) {
-        await page.goto(url);
-        const existingState = readSessionState(session);
-        if (existingState && existingState.mode !== sessionMode) {
-          writeSessionState({ ...existingState, mode: sessionMode });
-        }
-        log.info("open-navigated", { url, session });
-        console.log(`Navigated to: ${url}`);
-        return;
-      }
-    } finally {
-      disconnectBrowser(existing, session);
-    }
-  }
+  assertSessionAvailableForStart(session);
 
   const port = await pickFreePort();
   const runId = generateRunId();
@@ -683,6 +641,7 @@ await new Promise(() => {});
         runId,
         startedAt: new Date().toISOString(),
         mode: sessionMode,
+        status: "active",
       });
       log.info("open-success", {
         url,

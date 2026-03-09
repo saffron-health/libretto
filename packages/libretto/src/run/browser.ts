@@ -81,6 +81,7 @@ export async function launchBrowser({
           ? parsedExistingState.data.runId
           : `runtime-${Date.now()}`,
         startedAt: new Date().toISOString(),
+        status: "active",
         ...(parsedExistingState.success && parsedExistingState.data.mode
           ? { mode: parsedExistingState.data.mode }
           : {}),
