@@ -9,6 +9,8 @@ import {
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
 
+const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
+
 async function captureScreenshot(session: string): Promise<ScreenshotPair> {
   const log = getLog();
   log.info("screenshot-start", { session });
@@ -84,12 +86,6 @@ async function runSnapshot(
     );
   }
 
-  if (!normalizedContext) {
-    throw new Error(
-      "Couldn't run analysis: --context is required when using --objective.",
-    );
-  }
-
   if (!canAnalyzeSnapshots()) {
     throw new Error(
       "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini) to enable analysis.",
@@ -99,7 +95,7 @@ async function runSnapshot(
   await runInterpret({
     objective: normalizedObjective,
     session,
-    context: normalizedContext,
+    context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
     pngPath,
     htmlPath,
   });
@@ -108,7 +104,7 @@ async function runSnapshot(
 export function registerSnapshotCommands(yargs: Argv): Argv {
   return yargs.command(
     "snapshot",
-    "Capture PNG + HTML; analyze when objective/context provided",
+    "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
     (cmd) =>
       cmd
         .option("objective", { type: "string" })

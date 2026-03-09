@@ -501,7 +501,14 @@ export function registerExecutionCommands(yargs: Argv): Argv {
 
         const params = (() => {
           if (paramsFile) {
-            const content = readFileSync(paramsFile, "utf8");
+            let content: string;
+            try {
+              content = readFileSync(paramsFile, "utf8");
+            } catch {
+              throw new Error(
+                `Could not read --params-file "${paramsFile}". Ensure the file exists and is readable.`,
+              );
+            }
             return parseJsonArg("--params-file", content);
           }
           if (rawInlineParams) {

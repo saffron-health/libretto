@@ -45,7 +45,7 @@ Commands:
   ai configure [preset] [-- <command prefix...>]  Configure AI runtime for analysis commands
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
   exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight; blocked until full-access)
-  snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when both flags are provided
+  snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when objective is provided (context optional)
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
   resume                  Resume a paused workflow in the active session

@@ -11,6 +11,12 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain(
       "Usage: libretto-cli <command> [--session <name>]",
     );
+    expect(result.stdout).toContain(
+      "session-mode <read-only|full-access> Set session execution mode",
+    );
+    expect(result.stdout).toContain(
+      "Capture PNG + HTML; analyze when objective is provided (context optional)",
+    );
     expect(result.stderr).toBe("");
   });
 
@@ -96,6 +102,63 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("is read-only");
     expect(result.stderr).toContain("Integration file does not exist:");
+  });
+
+  test("fails run with invalid JSON in --params", async ({ librettoCli }) => {
+    await librettoCli("session-mode full-access --session default");
+    const result = await librettoCli(
+      "run ./integration.ts main --params \"{not-json}\"",
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Invalid JSON in --params:");
+  });
+
+  test("fails run with invalid JSON in --params-file", async ({
+    librettoCli,
+    workspaceDir,
+  }) => {
+    await librettoCli("session-mode full-access --session default");
+    const paramsPath = join(workspaceDir, "invalid-params.json");
+    await writeFile(paramsPath, "{not-json}", "utf8");
+
+    const result = await librettoCli(
+      `run ./integration.ts main --params-file "${paramsPath}"`,
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Invalid JSON in --params-file:");
+  });
+
+  test("fails run when --params and --params-file are both provided", async ({
+    librettoCli,
+    workspaceDir,
+  }) => {
+    await librettoCli("session-mode full-access --session default");
+    const paramsPath = join(workspaceDir, "params.json");
+    await writeFile(paramsPath, "{}", "utf8");
+
+    const result = await librettoCli(
+      `run ./integration.ts main --params "{}" --params-file "${paramsPath}"`,
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "Pass either --params or --params-file, not both.",
+    );
+  });
+
+  test("fails run with stable error when --params-file is missing", async ({
+    librettoCli,
+    workspaceDir,
+  }) => {
+    await librettoCli("session-mode full-access --session default");
+    const missingPath = join(workspaceDir, "missing-params.json");
+
+    const result = await librettoCli(
+      `run ./integration.ts main --params-file "${missingPath}"`,
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      `Could not read --params-file "${missingPath}". Ensure the file exists and is readable.`,
+    );
   });
 
   test("fails run when export is not a Libretto workflow instance", async ({
@@ -241,7 +304,7 @@ export const main = workflow(
     );
   });
 
-  test("returns paused status when workflow hits debugPause", async ({
+  test("returns paused status when workflow hits ctx.pause", async ({
     librettoCli,
     writeWorkflow,
   }) => {
@@ -251,11 +314,11 @@ export const main = workflow(
       `
 export const main = workflow({}, async (ctx) => {
   console.log("WORKFLOW_BEFORE_PAUSE");
-  await debugPause(ctx.page, { enabled: ctx.debug, sessionName: ctx.session });
+  await ctx.pause();
   console.log("WORKFLOW_AFTER_PAUSE");
 });
 `,
-      ["workflow", "debugPause"],
+      ["workflow"],
     );
 
     const result = await librettoCli(
