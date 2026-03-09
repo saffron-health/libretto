@@ -16,9 +16,7 @@ async function captureScreenshot(
   logger: LoggerApi,
 ): Promise<ScreenshotPair> {
   logger.info("screenshot-start", { session });
-  const snapshotRunId = `snapshot-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  const snapshotRunId = `snapshot-${Date.now()}`;
   const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);
   mkdirSync(snapshotRunDir, { recursive: true });
   const { browser, page } = await connect(session, logger);
