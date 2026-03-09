@@ -45,10 +45,11 @@ Do not report completion to the user until all required GitHub PR checks pass.
 
 After every push:
 
-1. Watch the PR checks with `gh pr checks --watch`.
-2. Wait for all required checks to complete.
-3. If any test or type-check command fails, inspect logs immediately, fix the issue, commit, push, and repeat this CI loop until checks pass.
-4. If checks are blocked on AI review bots, wait for bot completion and read all bot reviews before reporting completion.
+1. Watch PR checks with `gh pr checks --watch`.
+2. If GitHub returns `no checks reported`, treat it as possible propagation delay. Wait 15 seconds and retry `gh pr checks --watch`. Repeat up to 8 times (about 2 minutes total) before concluding there are no checks configured.
+3. Once checks appear, wait for all required checks to complete.
+4. If any test or type-check command fails, inspect logs immediately, fix the issue, commit, push, and repeat this CI loop until checks pass.
+5. If checks are blocked on AI review bots, wait for bot completion and read all bot reviews before reporting completion.
 
 AI review bot handling:
 
