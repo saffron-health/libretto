@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { cwd } from "node:process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { validateSessionName } from "./session.js";
 
 function getRepoRoot(): string {
   const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
@@ -28,7 +29,6 @@ const LIBRETTO_GITIGNORE_CONTENT = [
   "profiles/",
   "",
 ].join("\n");
-const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
 export function getSessionDir(session: string): string {
   return join(LIBRETTO_SESSIONS_DIR, session);
@@ -71,21 +71,8 @@ export function ensureLibrettoSetup(): void {
   }
 }
 
-function assertValidSessionNameForPath(session: string): void {
-  if (
-    !SESSION_NAME_PATTERN.test(session) ||
-    session.includes("..") ||
-    session.includes("/") ||
-    session.includes("\\")
-  ) {
-    throw new Error(
-      "Invalid session name. Use only letters, numbers, dots, underscores, and dashes.",
-    );
-  }
-}
-
 export function createLoggerForSession(session: string): Logger {
-  assertValidSessionNameForPath(session);
+  validateSessionName(session);
   const sessionDir = getSessionDir(session);
   mkdirSync(sessionDir, { recursive: true });
   const logFilePath = getSessionLogsPath(session);
