@@ -2,6 +2,50 @@
 
 These rules apply when generating production TypeScript files from interactive browser sessions. Read this file before writing any production code.
 
+## Workflow File Structure
+
+Generated files must export a `workflow()` instance so they can be run via `npx libretto run <file> <exportName>`. Import `workflow` and its types from `"libretto"`:
+
+```typescript
+import { workflow, type LibrettoWorkflowContext } from "libretto";
+
+type Input = {
+  // Define the expected input shape — passed via --params JSON
+  query: string;
+  maxResults?: number;
+};
+
+type Output = {
+  // Define what the workflow returns
+  results: Array<{ name: string; value: string }>;
+};
+
+export const myWorkflow = workflow<Input, Output>(
+  {
+    // If the site requires a saved login session:
+    authProfile: { type: "local", domain: "example.com" },
+    // Omit authProfile if no login is needed
+  },
+  async (ctx: LibrettoWorkflowContext, input: Input): Promise<Output> => {
+    const { page } = ctx;
+
+    // workflow logic here — use ctx.page, ctx.context, ctx.browser
+    await page.goto("https://example.com");
+    // ...
+
+    return { results: [] };
+  },
+);
+```
+
+**Key points:**
+
+- The named export (e.g., `myWorkflow`) is what you pass as the second arg to `npx libretto run ./file.ts myWorkflow`
+- `ctx` provides `page`, `context`, `browser`, `session`, `logger`, `headless`, `integrationPath`, `exportName`
+- `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
+- If `authProfile` is set with a domain, libretto loads the saved browser profile for that domain (created via `npx libretto save <domain>`)
+- The browser is launched and closed automatically by the CLI — do not launch or close it in the handler
+
 ## Playwright Locators for DOM Interaction
 
 Generated code must use Playwright locator APIs for all DOM interactions. Do not use `page.evaluate()` with `document.querySelector`, `querySelectorAll`, `textContent`, `click()`, or other DOM APIs when a Playwright locator can do the same thing.
@@ -122,6 +166,24 @@ class ApiClient {
 ```
 
 One method per endpoint. No try-catch in API methods — let errors propagate to the orchestrator. Parse XML/HTML inside `page.evaluate()` with `DOMParser`. Use string expressions for `page.evaluate()` to avoid DOM type errors.
+
+## Comments
+
+Add comments throughout generated code to explain what each logical block is doing. Comments should describe **intent**, not restate the code. Group related actions under a single comment rather than commenting every line.
+
+```typescript
+// Log in with credentials
+await page.locator('#username').fill(user);
+await page.locator('#password').fill(pass);
+await page.locator('#login').click();
+
+// Extract author and content from each feed post
+const posts = await page.locator('.post').all();
+for (const post of posts) {
+  const name = await post.locator('.name').textContent();
+  const content = await post.locator('.content').textContent();
+}
+```
 
 ## Type Checking
 

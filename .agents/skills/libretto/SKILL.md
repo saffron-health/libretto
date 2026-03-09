@@ -5,7 +5,7 @@ description: "Browser automation CLI for building integrations, with a network-f
 
 # Browser Integration with Libretto CLI
 
-Use the `npx libretto` CLI to automate web interactions, debug browser agent jobs, and prototype fixes interactively.
+Use the `npx libretto` CLI to automate web interactions, debug browser agent jobs, and prototype fixes with explicit full-access approval when needed.
 
 ## CRITICAL: Session Modes
 
@@ -17,25 +17,25 @@ Sessions start in **read-only mode** by default. **Every time you launch a brows
 >
 > I've opened the browser in **read-only mode**. I can observe the page, take snapshots, and inspect network traffic, but I **cannot** click, type, fill forms, submit, or execute any actions that modify the page.
 >
-> If you'd like me to interact with elements (clicking buttons, filling forms, submitting data, scrolling, or making network requests), let me know and I'll switch to **interactive mode**.
+> If you'd like me to interact with elements (clicking buttons, filling forms, submitting data, scrolling, or making network requests), let me know and I'll switch to **full-access mode**.
 
 **Rules:**
-- Use ONLY read-only-safe commands (`snapshot`, `network`, `actions`) until the user explicitly grants interactive access.
-- Do NOT proceed with any `exec` or `run` commands until the user explicitly grants interactive access.
+- Use ONLY read-only-safe commands (`snapshot`, `network`, `actions`) until the user explicitly grants full-access.
+- Do NOT proceed with any `exec` or `run` commands until the user explicitly grants full-access.
 
-### Interactive mode (user-approved)
+### Full-access mode (user-approved)
 
-> **Session mode: INTERACTIVE**
+> **Session mode: FULL-ACCESS**
 >
-> I've opened the browser in **interactive mode**. I have full control to click, type, fill forms, navigate, scroll, make network requests, and execute Playwright commands on the page.
+> I've opened the browser in **full-access mode**. I have full control to click, type, fill forms, navigate, scroll, make network requests, and execute Playwright commands on the page.
 >
 > If you'd like me to switch to **read-only mode** (observe only, no page modifications), let me know.
 
 ### Switching modes
 
-- When the user requests interactive mode, run `npx libretto session-mode interactive --session <name>` and then proceed with `exec`/`run`.
+- When the user requests full-access mode, run `npx libretto session-mode full-access --session <name>` and then proceed with `exec`/`run`.
 - Never change session mode unless the user explicitly approves.
-- If the user says something like "go ahead", "interact", "click around", or "do whatever you need" — that counts as granting interactive access. Switch the mode and confirm.
+- If the user says something like "go ahead", "interact", "click around", or "do whatever you need" — that counts as granting full-access. Switch the mode and confirm.
 
 ## Ask, Don't Guess
 
@@ -44,13 +44,13 @@ If it's not obvious which element to click or what value to enter, **ask the use
 ## Commands
 
 ```bash
-npx libretto open <url> [--headed]     # Launch browser and navigate (headless by default)
+npx libretto open <url> [--headless]   # Launch browser and navigate (headed by default)
 npx libretto exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
 npx libretto run <integrationFile> <integrationExport> # Execute integration actions
 npx libretto resume                    # Resume a paused workflow for the current session
-npx libretto session-mode <read-only|interactive> [--session <name>] # Set session mode explicitly
-npx libretto snapshot --objective "<what to find>" --context "<situational info>"
-npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto-cli/profiles/
+npx libretto session-mode <read-only|full-access> [--session <name>] # Set session mode explicitly
+npx libretto snapshot --objective "<what to find>" [--context "<situational info>"]
+npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto/profiles/
 npx libretto network                   # Show last 20 captured network requests
 npx libretto actions                   # Show last 20 captured user/agent actions
 npx libretto close                     # Close the browser
@@ -79,14 +79,45 @@ Workflows pause from inside the workflow function by calling `await ctx.pause()`
 
 The `state` object persists across `exec` calls within the same session — use it to carry values between commands.
 
+## CRITICAL: No try/catch in exec
+
+**Never use try/catch or .catch() in exec code.** Let errors throw so they surface as exec failures. When an exec fails, you get the full error message (e.g., "intercepts pointer events", "Timeout 30000ms exceeded") — use that to diagnose the problemand write a corrected exec.
+
+**Why:** A try/catch inside exec hides failures from you. A click that times out takes 30 seconds — if you retry it in a loop with try/catch, you'll silently burn minutes on the same broken selector with no way to recover. Without try/catch, the error comes back immediately and you can reason about what went wrong.
+
+**Instead of try/catch, use check-first patterns:**
+
+```typescript
+// BAD — silently retries for minutes
+try {
+  await btn.click();
+} catch {
+  /* retry or ignore */
+}
+
+// GOOD — check first, fail fast
+if (await btn.isVisible()) await btn.click();
+
+// GOOD — check existence before acting
+if ((await page.locator(".cookie-banner").count()) > 0) {
+  await page.locator(".cookie-banner button").click();
+}
+```
+
+If an action fails despite an element being visible, you should not keep retrying it. Instead you can try the following debugging steps:
+
+1. Take a snapshot to inspect what's covering the element
+2. Try `{ force: true }` to bypass actionability checks
+3. Try a completely different approach (e.g., opening a dialog via a different button)
+
 ## Workflow: Browse and Interact
 
 ```bash
 # Open a page (starts in read-only mode)
 npx libretto open https://example.com
 
-# When user grants interactive access:
-npx libretto session-mode interactive --session default
+# When user grants full-access:
+npx libretto session-mode full-access --session default
 
 # Interact with elements
 npx libretto exec "await page.locator('button:has-text(\"Sign in\")').click()"
@@ -108,7 +139,7 @@ npx libretto close
 
 ## Workflow: Save and Restore Login Sessions
 
-Profiles persist cookies and localStorage across browser launches. They are saved to `.libretto-cli/profiles/<domain>.json` (git-ignored) and loaded automatically on `open`.
+Profiles persist cookies and localStorage across browser launches. They are saved to `.libretto/profiles/<domain>.json` (git-ignored) and loaded automatically on `open`.
 
 ```bash
 # Open a site in headed mode so you can log in manually
@@ -130,8 +161,8 @@ When browser automation jobs fail (selectors timing out, clicks not working), us
 1. Add `page.pause()` before the problematic code section
 2. Start the job with `npx browser-agent start` (debug mode is always enabled locally)
 3. Wait ~60 seconds for the browser to hit the breakpoint
-4. Ask user if they approve interactive mode for `browser-agent`
-5. If approved, run `npx libretto session-mode interactive --session browser-agent`
+4. Ask user if they approve full-access mode for `browser-agent`
+5. If approved, run `npx libretto session-mode full-access --session browser-agent`
 6. Use `npx libretto exec` (with `--session browser-agent`) to inspect and prototype fixes
 7. Once the fix works, codify it in source files
 8. Restart the job to verify end-to-end
@@ -144,7 +175,7 @@ npx browser-agent start \
   --params '{"vendorName":"eClinicalWorks"}'
 
 # Inspect page state
-npx libretto session-mode interactive --session browser-agent
+npx libretto session-mode full-access --session browser-agent
 npx libretto exec --session browser-agent "return await page.url();"
 npx libretto snapshot --session browser-agent \
   --objective "Find dropdown menus and their current selections" \
@@ -159,7 +190,7 @@ npx libretto exec --session browser-agent "await page.locator('.dropdown-trigger
 
 ## Snapshot — The Primary Observation Tool
 
-The `snapshot` command captures a PNG screenshot + HTML, sends both to a vision model (Gemini Flash), and returns an analysis with Playwright-ready selectors. **Both `--objective` and `--context` are required.** This is the single way to understand what's on the page — use it any time you need to inspect page structure, find elements, or debug what's happening.
+The `snapshot` command captures a PNG screenshot + HTML, sends both to a vision model (Gemini Flash), and returns an analysis with Playwright-ready selectors. `--objective` is required for analysis, and `--context` is optional (but recommended for better results). This is the single way to understand what's on the page — use it any time you need to inspect page structure, find elements, or debug what's happening.
 
 **Never use `page.screenshot()` via `exec` to understand the page.** Use the `snapshot` command instead — it captures the screenshot, HTML, and sends both to a vision model that returns actionable selectors. Raw screenshots give you an image with no analysis; `snapshot` gives you the answer.
 
@@ -211,14 +242,14 @@ When the snapshot doesn't give you enough detail — why an element is hidden, w
 
 - **Never use `page.screenshot()` via `exec`.** Use `npx libretto snapshot` instead — it captures the viewport, sends the screenshot + HTML to a vision model, and returns actionable selectors. The `fullPage` option is especially dangerous — it scrolls the entire page to stitch a screenshot, which can crash JavaScript-heavy pages (especially EMR portals like eClinicalWorks).
 - **Never run `exec` commands in parallel.** Always wait for one `exec` to finish before starting the next. Do not use `run_in_background` for `exec` calls. Running simultaneous `exec` calls opens multiple CDP connections to the same page, which corrupts the page state and kills the browser.
-- `open` and `run` take control of the session. If a session already has an owner PID, Libretto terminates it first and prints a warning.
+- `open` and `run` require an available session. If the session is already active, Libretto fails fast and asks you to close the existing session or use a different `--session`.
 - Use `return <value>` in `exec` to print results. Strings print raw; objects print as JSON.
 - For iframe content, access via `page.locator('iframe[name="..."]').contentFrame()`.
 - Multiple sessions allow parallel browser instances: `--session test1`, `--session test2`.
 
 ## Network Logging
 
-Network requests are captured automatically when a browser is opened via `npx libretto open`. All non-static HTTP responses (excluding `.css`, `.js`, `.png`, `.jpg`, `.gif`, `.woff`, `.ico`, `.svg`, and `chrome-extension://` URLs) are logged to `tmp/libretto-cli/<runId>/network.jsonl`.
+Network requests are captured automatically when a browser is opened via `npx libretto open`. All non-static HTTP responses (excluding `.css`, `.js`, `.png`, `.jpg`, `.gif`, `.woff`, `.ico`, `.svg`, and `chrome-extension://` URLs) are logged to `.libretto/sessions/<session>/network.jsonl`.
 
 ### CLI: `npx libretto network`
 
@@ -244,7 +275,7 @@ Returns an array of objects with: `ts`, `method`, `url`, `status`, `contentType`
 
 ## Action Logging
 
-Browser actions are captured automatically when a browser is opened via `npx libretto open`. Both user interactions (manual clicks, typing in the headed browser window) and agent actions (programmatic Playwright API calls via `exec`) are logged to `tmp/libretto-cli/<runId>/actions.jsonl` with a `source` field of `'user'` or `'agent'` to distinguish the two.
+Browser actions are captured automatically when a browser is opened via `npx libretto open`. Both user interactions (manual clicks, typing in the headed browser window) and agent actions (programmatic Playwright API calls via `exec`) are logged to `.libretto/sessions/<session>/actions.jsonl` with a `source` field of `'user'` or `'agent'` to distinguish the two.
 
 ### CLI: `npx libretto actions`
 
@@ -413,32 +444,20 @@ npx libretto exec "
 "
 ```
 
-### When to Generate the File
+### Generating Code
 
-After completing the interactive exploration (navigating pages, inspecting elements, confirming selectors work), **always generate the TypeScript workflow file before ending the session** — do not wait for the user to ask for it separately.
+After completing interactive exploration, **always generate the TypeScript workflow file before ending the session** — do not wait for the user to ask.
 
-**STOP AND ASK BEFORE GENERATING CODE.** Once the interactive workflow is figured out, you MUST pause and ask the user the following before writing any production code:
+**STOP AND ASK BEFORE GENERATING CODE.** Once the interactive workflow is figured out, pause and ask:
 
 1. "Are there any existing files or patterns in the codebase you want me to reference?"
 2. "Do you want me to incorporate any of your manual browser interactions from the actions log (`npx libretto actions --source user`) into the generated code?"
 3. "Any other guidance for how the production code should be structured?"
 
-Wait for the user's response. If they point you to files, read those first. If they say yes to the actions log, run `npx libretto actions --source user` and incorporate the relevant actions. If they give structural guidance, follow it. Only then proceed to generate.
+Wait for the user's response before proceeding. Then:
 
-After getting the user's input:
-
-1. Generate the workflow file using proper Playwright APIs (see rules below)
-2. Run the TypeScript type checker against the file and fix any errors before presenting it as done
-
-### Generating the Workflow File
-
-As you confirm each step works via `exec`, build up a TypeScript file in `apps/browser-agent/src/` (location depends on what the workflow does — new tasks go in `src/tasks/`, integration-specific logic in `src/integrations/`).
-
-For workflows that use network requests for data extraction or form submission, follow the API client class pattern: a shared class with one method per endpoint, `page.evaluate(() => fetch(...))` under the hood, no try-catch in API methods (errors handled in the orchestrator). See `apps/browser-agent/docs/full-network-iteration-doc.md` for the full pattern.
-
-### Code Rules for Generated Files
-
-Before writing any production code, read `code-generation-rules.md` (in this skill's directory) for the full rules on Playwright locator usage, `page.evaluate()` restrictions, network request patterns, and type checking requirements.
+1. **Read `code-generation-rules.md`** (in this skill's directory) — this is mandatory before writing any code. It contains the authoritative rules for Playwright locator usage, `page.evaluate()` restrictions, network request patterns, and type checking. Do not generate code from memory; always reference this file first.
+2. Run the TypeScript type checker against the file and fix any errors before presenting it as done.
 
 ## Patient Safety Warning
 

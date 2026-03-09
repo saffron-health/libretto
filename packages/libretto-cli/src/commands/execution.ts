@@ -257,6 +257,19 @@ function readFailureMessage(path: string): string | null {
   return typeof message === "string" ? message : null;
 }
 
+async function waitForFailureMessage(
+  path: string,
+  timeoutMs = 1_000,
+): Promise<string | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const message = readFailureMessage(path);
+    if (message) return message;
+    await new Promise((resolveWait) => setTimeout(resolveWait, 25));
+  }
+  return readFailureMessage(path);
+}
+
 function streamOutputSince(path: string, offset: number): number {
   if (!existsSync(path)) return offset;
   const output = readFileSync(path);
@@ -298,7 +311,7 @@ async function waitForWorkflowOutcome(
 
     if (existsSync(signalPaths.failedSignalPath)) {
       outputOffset = streamOutputSince(signalPaths.outputSignalPath, outputOffset);
-      const message = readFailureMessage(signalPaths.failedSignalPath);
+      const message = await waitForFailureMessage(signalPaths.failedSignalPath);
       return { status: "failed", message: message ?? undefined };
     }
 
@@ -501,7 +514,14 @@ export function registerExecutionCommands(yargs: Argv): Argv {
 
         const params = (() => {
           if (paramsFile) {
-            const content = readFileSync(paramsFile, "utf8");
+            let content: string;
+            try {
+              content = readFileSync(paramsFile, "utf8");
+            } catch {
+              throw new Error(
+                `Could not read --params-file "${paramsFile}". Ensure the file exists and is readable.`,
+              );
+            }
             return parseJsonArg("--params-file", content);
           }
           if (rawInlineParams) {
