@@ -25,6 +25,7 @@ const CLI_COMMANDS = new Set([
   "snapshot",
   "network",
   "actions",
+  "pages",
   "resume",
   "close",
   "--help",
@@ -45,6 +46,7 @@ Commands:
   snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when objective is provided (context optional)
   network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
+  pages                   List open pages in the active session
   resume                  Resume a paused workflow in the active session
   close                   Close the browser
 

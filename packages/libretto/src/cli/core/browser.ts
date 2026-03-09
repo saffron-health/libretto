@@ -89,6 +89,11 @@ async function tryConnectToPort(
   }
 }
 
+function isOperationalPage(page: Page): boolean {
+  const url = page.url();
+  return !url.startsWith("devtools://") && !url.startsWith("chrome-error://");
+}
+
 export function disconnectBrowser(
   browser: Browser,
   logger: LoggerApi,
@@ -134,10 +139,7 @@ export async function connect(
   }
 
   const allPages = contexts.flatMap((c) => c.pages());
-  const pages = allPages.filter((p) => {
-    const url = p.url();
-    return !url.startsWith("devtools://") && !url.startsWith("chrome-error://");
-  });
+  const pages = allPages.filter(isOperationalPage);
 
   logger.info("connect-pages", {
     session,
@@ -179,6 +181,28 @@ export async function connect(
 
   logger.info("connect-success", { session, pageUrl: page.url() });
   return { browser, context, page };
+}
+
+export async function runPages(session: string, logger: LoggerApi): Promise<void> {
+  logger.info("pages-start", { session });
+  const { browser, page: activePage } = await connect(session, logger);
+
+  try {
+    const pages = browser.contexts().flatMap((ctx) => ctx.pages()).filter(isOperationalPage);
+    if (pages.length === 0) {
+      console.log("No pages found.");
+      return;
+    }
+
+    console.log("Open pages:");
+    pages.forEach((page, index) => {
+      const pageId = `page-${index + 1}`;
+      const activeSuffix = page === activePage ? " active=true" : "";
+      console.log(`  id=${pageId} url=${page.url()}${activeSuffix}`);
+    });
+  } finally {
+    disconnectBrowser(browser, logger, session);
+  }
 }
 
 export async function runOpen(
