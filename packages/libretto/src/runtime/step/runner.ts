@@ -184,7 +184,7 @@ export function createRunner(config: RunnerConfig = {}): Runner {
 				simulated: stepHistory.filter((s) => s.status === "simulated").length,
 			});
 
-			await logger.flush();
+			await logger.close();
 		},
 	};
 }

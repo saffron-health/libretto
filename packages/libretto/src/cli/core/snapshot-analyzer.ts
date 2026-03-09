@@ -8,6 +8,7 @@ import { extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { z } from "zod";
+import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   type AiConfig,
   formatCommandPrefix,
@@ -15,7 +16,6 @@ import {
 } from "./ai-config.js";
 import {
   getLLMClientFactory,
-  getLog,
 } from "./context.js";
 
 export type ScreenshotPair = {
@@ -441,9 +441,11 @@ function collectSelectorHints(html: string, limit = 120): string[] {
   return candidates;
 }
 
-export async function runInterpret(args: InterpretArgs): Promise<void> {
-  const log = getLog();
-  log.info("interpret-start", {
+export async function runInterpret(
+  args: InterpretArgs,
+  logger: LoggerApi,
+): Promise<void> {
+  logger.info("interpret-start", {
     objective: args.objective,
     pngPath: args.pngPath,
     htmlPath: args.htmlPath,
@@ -500,7 +502,7 @@ export async function runInterpret(args: InterpretArgs): Promise<void> {
   const configuredAgent = UserCodingAgent.getConfigured();
   if (configuredAgent) {
     const configuredAnalyzer = configuredAgent.snapshotAnalyzerConfig;
-    log.info("interpret-analyzer-config", {
+    logger.info("interpret-analyzer-config", {
       preset: configuredAnalyzer.preset,
       commandPrefix: configuredAnalyzer.commandPrefix,
     });
@@ -513,9 +515,9 @@ export async function runInterpret(args: InterpretArgs): Promise<void> {
       );
     }
 
-    log.info("interpret-analyzer-factory-fallback", {});
+    logger.info("interpret-analyzer-factory-fallback", {});
     const imageBase64 = readFileAsBase64(pngPath);
-    const client = await llmClientFactory(log, "google/gemini-3-flash-preview");
+    const client = await llmClientFactory(logger, "google/gemini-3-flash-preview");
     const result = await client.generateObjectFromMessages({
       schema: InterpretResultSchema,
       messages: [
@@ -535,7 +537,7 @@ export async function runInterpret(args: InterpretArgs): Promise<void> {
     parsed = InterpretResultSchema.parse(result);
   }
 
-  log.info("interpret-success", {
+  logger.info("interpret-success", {
     selectorCount: parsed.selectors.length,
     answer: parsed.answer.slice(0, 200),
   });

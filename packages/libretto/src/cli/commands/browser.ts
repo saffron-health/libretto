@@ -1,7 +1,13 @@
 import type { Argv } from "yargs";
-import { runClose, runOpen, runSave } from "../core/browser.js";
+import type { LoggerApi } from "../../shared/logger/index.js";
+import {
+  runClose as runCloseWithLogger,
+  runOpen,
+  runSave,
+} from "../core/browser.js";
+import { withSessionLogger } from "../core/context.js";
 
-export function registerBrowserCommands(yargs: Argv): Argv {
+export function registerBrowserCommands(yargs: Argv, logger: LoggerApi): Argv {
   return yargs
     .command(
       "open [url]",
@@ -29,7 +35,7 @@ export function registerBrowserCommands(yargs: Argv): Argv {
             "Usage: libretto-cli open <url> [--headless] [--session <name>]",
           );
         }
-        await runOpen(url, headed, String(argv.session));
+        await runOpen(url, headed, String(argv.session), logger);
       },
     )
     .command(
@@ -41,12 +47,16 @@ export function registerBrowserCommands(yargs: Argv): Argv {
         if (!urlOrDomain) {
           throw new Error("Usage: libretto-cli save <url|domain> [--session <name>]");
         }
-        await runSave(urlOrDomain, String(argv.session));
+        await runSave(urlOrDomain, String(argv.session), logger);
       },
     )
     .command("close", "Close the browser", (cmd) => cmd, async (argv) => {
-      await runClose(String(argv.session));
+      await runCloseWithLogger(String(argv.session), logger);
     });
 }
 
-export { runClose } from "../core/browser.js";
+export async function runClose(session: string): Promise<void> {
+  await withSessionLogger(session, async (logger) => {
+    await runCloseWithLogger(session, logger);
+  });
+}

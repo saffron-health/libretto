@@ -5,13 +5,11 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
+import type { LoggerApi } from "../../shared/logger/index.js";
 import {
-  getLog,
   getSessionActionsLogPath,
   getSessionNetworkLogPath,
   PROFILES_DIR,
-  REPO_ROOT,
-  setLogFile,
 } from "./context.js";
 import {
   assertSessionAvailableForStart,
@@ -64,11 +62,11 @@ export function hasProfile(domain: string): boolean {
 
 async function tryConnectToPort(
   port: number,
+  logger: LoggerApi,
   timeoutMs: number = 5000,
 ): Promise<Browser | null> {
-  const log = getLog();
   const endpoint = `http://localhost:${port}`;
-  log.info("cdp-connect-attempt", { port, endpoint, timeoutMs });
+  logger.info("cdp-connect-attempt", { port, endpoint, timeoutMs });
   try {
     const connectPromise = chromium.connectOverCDP(endpoint);
     const timeoutPromise = new Promise<null>((resolve) =>
@@ -76,59 +74,62 @@ async function tryConnectToPort(
     );
     const browser = await Promise.race([connectPromise, timeoutPromise]);
     if (browser) {
-      log.info("cdp-connect-success", {
+      logger.info("cdp-connect-success", {
         port,
         endpoint,
         contexts: browser.contexts().length,
       });
     } else {
-      log.warn("cdp-connect-timeout", { port, endpoint, timeoutMs });
+      logger.warn("cdp-connect-timeout", { port, endpoint, timeoutMs });
     }
     return browser;
   } catch (err) {
-    log.error("cdp-connect-error", { error: err, port, endpoint });
+    logger.error("cdp-connect-error", { error: err, port, endpoint });
     return null;
   }
 }
 
-export function disconnectBrowser(browser: Browser, session?: string): void {
-  const log = getLog();
-  log.info("cdp-disconnect", { session });
+export function disconnectBrowser(
+  browser: Browser,
+  logger: LoggerApi,
+  session?: string,
+): void {
+  logger.info("cdp-disconnect", { session });
   try {
     (browser as any)._connection?.close();
   } catch (err) {
-    log.warn("cdp-disconnect-already-closed", { error: err });
+    logger.warn("cdp-disconnect-already-closed", { error: err });
   }
 }
 
 export async function connect(
   session: string,
+  logger: LoggerApi,
   timeoutMs: number = 10000,
 ): Promise<{
   browser: Browser;
   context: BrowserContext;
   page: Page;
 }> {
-  const log = getLog();
-  log.info("connect", { session, timeoutMs });
+  logger.info("connect", { session, timeoutMs });
   const state = readSessionStateOrThrow(session);
-  const browser = await tryConnectToPort(state.port, timeoutMs);
+  const browser = await tryConnectToPort(state.port, logger, timeoutMs);
   if (!browser) {
-    log.error("connect-no-browser", {
+    logger.error("connect-no-browser", {
       session,
       port: state.port,
       pid: state.pid,
     });
-    clearSessionState(session);
+    clearSessionState(session, logger);
     throw new Error(
       `No browser running for session "${session}". Run 'libretto-cli open <url> --session ${session}' first.`,
     );
   }
 
   const contexts = browser.contexts();
-  log.info("connect-contexts", { session, contextCount: contexts.length });
+  logger.info("connect-contexts", { session, contextCount: contexts.length });
   if (contexts.length === 0) {
-    log.error("connect-no-contexts", { session });
+    logger.error("connect-no-contexts", { session });
     throw new Error("No browser context found.");
   }
 
@@ -138,7 +139,7 @@ export async function connect(
     return !url.startsWith("devtools://") && !url.startsWith("chrome-error://");
   });
 
-  log.info("connect-pages", {
+  logger.info("connect-pages", {
     session,
     totalPages: allPages.length,
     filteredPages: pages.length,
@@ -146,7 +147,7 @@ export async function connect(
   });
 
   if (pages.length === 0) {
-    log.error("connect-no-pages", {
+    logger.error("connect-no-pages", {
       session,
       allPageUrls: allPages.map((p) => p.url()),
     });
@@ -157,26 +158,26 @@ export async function connect(
   const context = page.context();
 
   page.on("close", () => {
-    log.error("page-closed-during-command", {
+    logger.error("page-closed-during-command", {
       session,
       url: page.url(),
       trace: new Error("page-closed-trace").stack,
     });
   });
   page.on("crash", () => {
-    log.error("page-crashed-during-command", {
+    logger.error("page-crashed-during-command", {
       session,
       url: page.url(),
     });
   });
   browser.on("disconnected", () => {
-    log.error("browser-disconnected-during-command", {
+    logger.error("browser-disconnected-during-command", {
       session,
       trace: new Error("browser-disconnected-trace").stack,
     });
   });
 
-  log.info("connect-success", { session, pageUrl: page.url() });
+  logger.info("connect-success", { session, pageUrl: page.url() });
   return { browser, context, page };
 }
 
@@ -184,26 +185,23 @@ export async function runOpen(
   rawUrl: string,
   headed: boolean,
   session: string,
+  logger: LoggerApi,
 ): Promise<void> {
-  let log = getLog();
   const url = normalizeUrl(rawUrl);
-  log.info("open-start", { url, headed, session });
-  assertSessionAvailableForStart(session);
+  logger.info("open-start", { url, headed, session });
+  assertSessionAvailableForStart(session, logger);
 
   const port = await pickFreePort();
   const runLogPath = logFileForSession(session);
   const networkLogPath = getSessionNetworkLogPath(session);
   const actionsLogPath = getSessionActionsLogPath(session);
 
-  setLogFile(runLogPath);
-  log = getLog();
-
   const browserMode = headed ? "headed" : "headless";
   const domain = normalizeDomain(url);
   const profilePath = getProfilePath(domain);
   const useProfile = hasProfile(domain);
 
-  log.info("open-launching", {
+  logger.info("open-launching", {
     url,
     mode: browserMode,
     session,
@@ -569,7 +567,7 @@ await new Promise(() => {});
   });
   child.unref();
 
-  log.info("open-child-spawned", { pid: child.pid, port, session });
+  logger.info("open-child-spawned", { pid: child.pid, port, session });
 
   let childSpawnError: Error | null = null;
   let childEarlyExit: { code: number | null; signal: NodeJS.Signals | null } | null =
@@ -577,12 +575,12 @@ await new Promise(() => {});
 
   child.on("error", (err) => {
     childSpawnError = err;
-    log.error("open-child-spawn-error", { error: err, session, port });
+    logger.error("open-child-spawn-error", { error: err, session, port });
   });
 
   child.on("exit", (code, signal) => {
     childEarlyExit = { code, signal };
-    log.warn("open-child-exited", {
+    logger.warn("open-child-exited", {
       code,
       signal,
       session,
@@ -624,7 +622,7 @@ await new Promise(() => {});
       .then(() => true)
       .catch(() => false);
     if (i > 0 && i % 5 === 0) {
-      log.info("open-waiting-for-cdp", { attempt: i, port, session });
+      logger.info("open-waiting-for-cdp", { attempt: i, port, session });
     }
     if (ready) {
       writeSessionState({
@@ -633,8 +631,8 @@ await new Promise(() => {});
         session,
         startedAt: new Date().toISOString(),
         status: "active",
-      });
-      log.info("open-success", {
+      }, logger);
+      logger.info("open-success", {
         url,
         mode: browserMode,
         session,
@@ -648,7 +646,7 @@ await new Promise(() => {});
     }
   }
 
-  log.error("open-timeout", {
+  logger.error("open-timeout", {
     session,
     port,
     pid: child.pid,
@@ -659,10 +657,13 @@ await new Promise(() => {});
   );
 }
 
-export async function runSave(urlOrDomain: string, session: string): Promise<void> {
-  const log = getLog();
-  log.info("save-start", { urlOrDomain, session });
-  const { browser, context, page } = await connect(session);
+export async function runSave(
+  urlOrDomain: string,
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
+  logger.info("save-start", { urlOrDomain, session });
+  const { browser, context, page } = await connect(session, logger);
 
   try {
     await new Promise((r) => setTimeout(r, 500));
@@ -721,7 +722,7 @@ export async function runSave(urlOrDomain: string, session: string): Promise<voi
     await fs.mkdir(dirname(profilePath), { recursive: true });
     await fs.writeFile(profilePath, JSON.stringify(state, null, 2));
 
-    log.info("save-success", {
+    logger.info("save-success", {
       domain,
       profilePath,
       cookieCount: cookies.length,
@@ -731,35 +732,34 @@ export async function runSave(urlOrDomain: string, session: string): Promise<voi
     console.log(`   Location: ${profilePath}`);
     console.log(`   Cookies: ${cookies.length}, Origins: ${origins.length}`);
   } catch (err) {
-    log.error("save-error", { error: err, urlOrDomain, session });
+    logger.error("save-error", { error: err, urlOrDomain, session });
     throw err;
   } finally {
-    disconnectBrowser(browser, session);
+    disconnectBrowser(browser, logger, session);
   }
 }
 
-export async function runClose(session: string): Promise<void> {
-  const log = getLog();
-  log.info("close-start", { session });
-  const state = readSessionState(session);
+export async function runClose(session: string, logger: LoggerApi): Promise<void> {
+  logger.info("close-start", { session });
+  const state = readSessionState(session, logger);
   if (!state) {
-    log.info("close-no-session", { session });
+    logger.info("close-no-session", { session });
     console.log(`No browser running for session "${session}".`);
     return;
   }
 
-  log.info("close-killing", { session, pid: state.pid, port: state.port });
+  logger.info("close-killing", { session, pid: state.pid, port: state.port });
 
   try {
     process.kill(state.pid, "SIGTERM");
   } catch (err) {
-    log.warn("close-kill-failed", { error: err, session, pid: state.pid });
+    logger.warn("close-kill-failed", { error: err, session, pid: state.pid });
   }
 
   await new Promise((r) => setTimeout(r, 1500));
 
-  clearSessionState(session);
-  log.info("close-success", { session });
+  clearSessionState(session, logger);
+  logger.info("close-success", { session });
   console.log(`Browser closed (session: ${session}).`);
 }
 

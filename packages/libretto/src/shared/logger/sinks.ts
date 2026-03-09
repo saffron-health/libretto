@@ -13,6 +13,9 @@ export function createFileLogSink({
 
 	return {
 		write: ({ id, scope, level, event, data, options }) => {
+			if (writeStream.destroyed || writeStream.writableEnded) {
+				return;
+			}
 			const timestamp = options?.timestamp || new Date();
 
 			const logEntry = {
@@ -26,16 +29,21 @@ export function createFileLogSink({
 
 			const jsonLine = JSON.stringify(logEntry) + "\n";
 
-			writeStream.write(jsonLine, (error) => {
-				if (error) {
-					console.error("Failed to write to log file:", error);
-					console[level]({ id, scope, event, data, timestamp });
-				}
-			});
+			try {
+				writeStream.write(jsonLine, (error) => {
+					if (error) {
+						console.error("Failed to write to log file:", error);
+						console[level]({ id, scope, event, data, timestamp });
+					}
+				});
+			} catch (error) {
+				console.error("Failed to write to log file:", error);
+				console[level]({ id, scope, event, data, timestamp });
+			}
 		},
 		flush: () =>
 			new Promise<void>((resolve, reject) => {
-				if (!writeStream.writable) {
+				if (!writeStream.writable || writeStream.writableEnded || writeStream.destroyed) {
 					resolve();
 					return;
 				}
@@ -46,6 +54,27 @@ export function createFileLogSink({
 						resolve();
 					}
 				});
+			}),
+		close: () =>
+			new Promise<void>((resolve) => {
+				if (writeStream.destroyed || writeStream.closed) {
+					resolve();
+					return;
+				}
+				let settled = false;
+				const done = () => {
+					if (settled) return;
+					settled = true;
+					resolve();
+				};
+				writeStream.once("finish", done);
+				writeStream.once("close", done);
+				writeStream.once("error", done);
+				try {
+					writeStream.end();
+				} catch {
+					done();
+				}
 			}),
 	};
 }

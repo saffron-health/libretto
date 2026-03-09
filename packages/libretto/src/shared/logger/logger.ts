@@ -59,7 +59,59 @@ export type LoggerSink = {
 		options?: LogOptions;
 	}) => void;
 	flush?: () => Promise<void>;
+	close?: () => Promise<void>;
 };
+
+type SinkLifecycleState = {
+	closed: boolean;
+	closing?: Promise<void>;
+};
+
+const sinkLifecycleState = new WeakMap<LoggerSink, SinkLifecycleState>();
+
+function getSinkLifecycleState(sink: LoggerSink): SinkLifecycleState {
+	const existingState = sinkLifecycleState.get(sink);
+	if (existingState) {
+		return existingState;
+	}
+
+	const initialState: SinkLifecycleState = { closed: false };
+	sinkLifecycleState.set(sink, initialState);
+	return initialState;
+}
+
+function isSinkClosedOrClosing(sink: LoggerSink): boolean {
+	const state = sinkLifecycleState.get(sink);
+	return Boolean(state?.closed || state?.closing);
+}
+
+async function closeSinkOnce(sink: LoggerSink): Promise<void> {
+	if (!sink.close) {
+		return;
+	}
+
+	const state = getSinkLifecycleState(sink);
+	if (state.closed) {
+		return;
+	}
+
+	if (state.closing) {
+		return state.closing;
+	}
+
+	state.closing = (async () => {
+		try {
+			await sink.close?.();
+		} catch {
+			// Ignore close errors - we're likely shutting down
+		} finally {
+			state.closed = true;
+			state.closing = undefined;
+		}
+	})();
+
+	return state.closing;
+}
 
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
@@ -91,7 +143,11 @@ export class Logger implements LoggerApi {
 		data?: Record<string, any>;
 		options?: LogOptions;
 	}) {
-		this.sinks.forEach((sink) =>
+		this.sinks.forEach((sink) => {
+			if (isSinkClosedOrClosing(sink)) {
+				return;
+			}
+
 			sink.write({
 				id: generateId(),
 				scope: this.prefix,
@@ -99,8 +155,8 @@ export class Logger implements LoggerApi {
 				event: entry.event,
 				data: removeUndefined({ ...this.scopeData, ...entry.data }),
 				options: entry.options,
-			}),
-		);
+			});
+		});
 	}
 
 	log(event: string, data?: Record<string, any>, options?: LogOptions) {
@@ -225,11 +281,21 @@ export class Logger implements LoggerApi {
 		for (let i = this.sinks.length - 1; i >= 0; i--) {
 			const sink = this.sinks[i];
 			if (!sink) continue;
+			if (isSinkClosedOrClosing(sink)) continue;
 			try {
 				await sink.flush?.();
 			} catch {
 				// Ignore flush errors - we're likely shutting down
 			}
+		}
+	}
+
+	async close(): Promise<void> {
+		await this.flush();
+		for (let i = this.sinks.length - 1; i >= 0; i--) {
+			const sink = this.sinks[i];
+			if (!sink) continue;
+			await closeSinkOnce(sink);
 		}
 	}
 }
