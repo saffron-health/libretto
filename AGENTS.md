@@ -4,16 +4,14 @@
 
 This repository is a pnpm monorepo for Libretto.
 
-- `packages/libretto` contains the runtime library.
-- `packages/libretto-cli` contains the CLI and its integration-style test suites.
-- The CLI depends on the local runtime package via workspace linking.
+- `packages/libretto` contains the runtime library, CLI, and integration-style test suites as a single package.
 
 ## Package Structure
 
 - Root scripts orchestrate package-level workflows.
-- Runtime build/type-check live in `packages/libretto/package.json`.
-- CLI build/type-check/test live in `packages/libretto-cli/package.json`.
-- CLI tests are in `packages/libretto-cli/src/*.test.ts`.
+- Runtime and CLI build/type-check/test live in `packages/libretto/package.json`.
+- CLI source is in `packages/libretto/src/cli/`.
+- Tests are in `packages/libretto/test/*.spec.ts`.
 
 ## Important Commands
 
@@ -26,13 +24,13 @@ pnpm type-check
 pnpm test
 ```
 
-Targeted (most common during CLI work):
+Targeted (most common during development):
 
 ```bash
-pnpm --filter libretto-cli type-check
-pnpm --filter libretto-cli test -- src/cli-basic.test.ts
-pnpm --filter libretto-cli test -- src/cli-pause.test.ts
-pnpm --filter libretto-cli test -- src/cli-stateful.test.ts
+pnpm --filter libretto type-check
+pnpm --filter libretto test -- test/basic.spec.ts
+pnpm --filter libretto test -- test/pause.spec.ts
+pnpm --filter libretto test -- test/stateful.spec.ts
 ```
 
 Local CLI invocation:
