@@ -2,7 +2,6 @@ import { mkdirSync } from "node:fs";
 import type { Argv } from "yargs";
 import { connect, disconnectBrowser } from "../core/browser.js";
 import { getLog, getSessionSnapshotRunDir } from "../core/context.js";
-import { generateRunId } from "../core/session.js";
 import {
   canAnalyzeSnapshots,
   runInterpret,
@@ -11,12 +10,14 @@ import {
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 
+function generateSnapshotRunId(): string {
+  return `snapshot-${Date.now()}`;
+}
+
 async function captureScreenshot(session: string): Promise<ScreenshotPair> {
   const log = getLog();
   log.info("screenshot-start", { session });
-  const snapshotRunId = `snapshot-${generateRunId()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  const snapshotRunId = generateSnapshotRunId();
   const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);
   mkdirSync(snapshotRunDir, { recursive: true });
   const { browser, page } = await connect(session);
