@@ -4,9 +4,11 @@ import type {
   RunIntegrationWorkerRequest,
 } from "./run-integration-worker-protocol.js";
 import { runIntegrationFromFileInWorker } from "./run-integration-runtime.js";
-import { ensureLibrettoSetup, setLogFile } from "../core/context.js";
+import {
+  ensureLibrettoSetup,
+  withSessionLogger,
+} from "../core/context.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
-import { logFileForSession } from "../core/session.js";
 
 function sendMessage(message: RunIntegrationWorkerMessage): void {
   if (typeof process.send !== "function" || !process.connected) return;
@@ -60,18 +62,21 @@ function parseWorkerRequest(argv: string[]): RunIntegrationWorkerRequest {
 
 async function main(): Promise<void> {
   let request: RunIntegrationWorkerRequest | null = null;
+  let exitCode = 0;
   try {
     request = parseWorkerRequest(process.argv);
+    const workerRequest = request;
     ensureLibrettoSetup();
-    setLogFile(logFileForSession(request.session));
-    await runIntegrationFromFileInWorker(
-      request,
-      async (details) => {
-        sendMessage({ type: "paused", details });
-      },
-    );
+    await withSessionLogger(workerRequest.session, async (logger) => {
+      await runIntegrationFromFileInWorker(
+        workerRequest,
+        logger,
+        async (details) => {
+          sendMessage({ type: "paused", details });
+        },
+      );
+    });
     sendMessage({ type: "completed" });
-    process.exit(0);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (request) {
@@ -90,8 +95,9 @@ async function main(): Promise<void> {
       );
     }
     sendMessage({ type: "failed", message });
-    process.exit(1);
+    exitCode = 1;
   }
+  process.exit(exitCode);
 }
 
 void main();

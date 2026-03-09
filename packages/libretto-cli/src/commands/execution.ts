@@ -4,11 +4,11 @@ import * as moduleBuiltin from "node:module";
 import { fileURLToPath } from "node:url";
 import type { Argv } from "yargs";
 import { installInstrumentation } from "libretto/instrumentation";
+import type { LoggerApi } from "libretto/logger";
 import {
   connect,
   disconnectBrowser,
 } from "../core/browser.js";
-import { getLog } from "../core/context.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
   assertSessionAvailableForStart,
@@ -106,18 +106,18 @@ function compileExecFunction(
 async function runExec(
   code: string,
   session: string,
+  logger: LoggerApi,
   visualize = false,
 ): Promise<void> {
-  const log = getLog();
   readSessionStateOrThrow(session);
 
-  log.info("exec-start", {
+  logger.info("exec-start", {
     session,
     codeLength: code.length,
     codePreview: code.slice(0, 200),
     visualize,
   });
-  const { browser, context, page } = await connect(session);
+  const { browser, context, page } = await connect(session, logger);
 
   const STALL_THRESHOLD_MS = 60_000;
   let lastActivityTs = Date.now();
@@ -128,7 +128,7 @@ async function runExec(
   const stallInterval = setInterval(() => {
     const silenceMs = Date.now() - lastActivityTs;
     if (silenceMs >= STALL_THRESHOLD_MS) {
-      log.warn("exec-stall-warning", {
+      logger.warn("exec-stall-warning", {
         session,
         silenceMs,
         codePreview: code.slice(0, 200),
@@ -141,7 +141,7 @@ async function runExec(
 
   const execStartTs = Date.now();
   const sigintHandler = () => {
-    log.info("exec-interrupted", {
+    logger.info("exec-interrupted", {
       session,
       duration: Date.now() - execStartTs,
       codePreview: code.slice(0, 200),
@@ -152,7 +152,7 @@ async function runExec(
   wrapPageForActionLogging(page, session, onActivity);
 
   if (visualize) {
-    await installInstrumentation(page, { visualize: true, logger: log });
+    await installInstrumentation(page, { visualize: true, logger });
   }
 
   try {
@@ -196,14 +196,14 @@ async function runExec(
     const fn = compileExecFunction(code, helperNames);
 
     const result = await fn(...Object.values(helpers));
-    log.info("exec-success", { session, hasResult: result !== undefined });
+    logger.info("exec-success", { session, hasResult: result !== undefined });
     if (result !== undefined) {
       console.log(
         typeof result === "string" ? result : JSON.stringify(result, null, 2),
       );
     }
   } catch (err) {
-    log.error("exec-error", {
+    logger.error("exec-error", {
       error: err,
       session,
       codePreview: code.slice(0, 200),
@@ -212,7 +212,7 @@ async function runExec(
   } finally {
     clearInterval(stallInterval);
     process.removeListener("SIGINT", sigintHandler);
-    disconnectBrowser(browser, session);
+    disconnectBrowser(browser, logger, session);
   }
 }
 
@@ -328,7 +328,7 @@ async function waitForWorkflowOutcome(
   }
 }
 
-async function runResume(session: string): Promise<void> {
+async function runResume(session: string, logger: LoggerApi): Promise<void> {
   const state = readSessionStateOrThrow(session);
   const {
     pausedSignalPath,
@@ -356,7 +356,7 @@ async function runResume(session: string): Promise<void> {
   clearSignalIfExists(outputSignalPath);
   clearSignalIfExists(completedSignalPath);
   clearSignalIfExists(failedSignalPath);
-  setSessionStatus(session, "active");
+  setSessionStatus(session, "active", logger);
 
   writeFileSync(
     resumeSignalPath,
@@ -378,12 +378,12 @@ async function runResume(session: string): Promise<void> {
   });
 
   if (outcome.status === "completed") {
-    setSessionStatus(session, "completed");
+    setSessionStatus(session, "completed", logger);
     console.log("Integration completed.");
     return;
   }
   if (outcome.status === "failed") {
-    setSessionStatus(session, "failed");
+    setSessionStatus(session, "failed", logger);
     throw new Error(
       outcome.message
         ? `Workflow failed after resume: ${outcome.message}`
@@ -391,17 +391,20 @@ async function runResume(session: string): Promise<void> {
     );
   }
   if (outcome.status === "exited") {
-    setSessionStatus(session, "exited");
+    setSessionStatus(session, "exited", logger);
     throw new Error(
       `Workflow process for session "${session}" exited before reporting completion or pause.`,
     );
   }
-  setSessionStatus(session, "paused");
+  setSessionStatus(session, "paused", logger);
   console.log("Workflow paused.");
 }
 
-async function runIntegrationFromFile(args: RunIntegrationWorkerRequest): Promise<void> {
-  assertSessionAvailableForStart(args.session);
+async function runIntegrationFromFile(
+  args: RunIntegrationWorkerRequest,
+  logger: LoggerApi,
+): Promise<void> {
+  assertSessionAvailableForStart(args.session, logger);
   const signalPaths = getPauseSignalPaths(args.session);
   clearSignalIfExists(signalPaths.pausedSignalPath);
   clearSignalIfExists(signalPaths.resumeSignalPath);
@@ -425,24 +428,24 @@ async function runIntegrationFromFile(args: RunIntegrationWorkerRequest): Promis
     pid: worker.pid ?? 0,
   });
   if (outcome.status === "paused") {
-    setSessionStatus(args.session, "paused");
+    setSessionStatus(args.session, "paused", logger);
     console.log("Workflow paused.");
     return;
   }
   if (outcome.status === "failed") {
-    setSessionStatus(args.session, "failed");
+    setSessionStatus(args.session, "failed", logger);
     throw new Error(outcome.message ?? "Workflow failed during run.");
   }
   if (outcome.status === "exited") {
-    setSessionStatus(args.session, "exited");
+    setSessionStatus(args.session, "exited", logger);
     throw new Error(
       "Workflow process exited before reporting completion or pause during run.",
     );
   }
-  setSessionStatus(args.session, "completed");
+  setSessionStatus(args.session, "completed", logger);
 }
 
-export function registerExecutionCommands(yargs: Argv): Argv {
+export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv {
   return yargs
     .command(
       "exec [code..]",
@@ -460,7 +463,7 @@ export function registerExecutionCommands(yargs: Argv): Argv {
             "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
           );
         }
-        await runExec(code, String(argv.session), Boolean(argv.visualize));
+        await runExec(code, String(argv.session), logger, Boolean(argv.visualize));
       },
     )
     .command(
@@ -532,7 +535,7 @@ export function registerExecutionCommands(yargs: Argv): Argv {
           params,
           headless: headlessMode ?? false,
           debug: debugMode,
-        });
+        }, logger);
       },
     )
     .command(
@@ -540,7 +543,7 @@ export function registerExecutionCommands(yargs: Argv): Argv {
       "Resume a paused workflow for the current session",
       (cmd) => cmd,
       async (argv) => {
-        await runResume(String(argv.session));
+        await runResume(String(argv.session), logger);
       },
     );
 }

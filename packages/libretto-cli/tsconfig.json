@@ -20,6 +20,6 @@
 			"libretto/run": ["../libretto/src/run/api.ts"]
 		}
 	},
-	"include": ["src/**/*.ts"],
+	"include": ["src/**/*.ts", "test/**/*.spec.ts"],
 	"exclude": ["node_modules", "dist"]
 }

@@ -6,8 +6,8 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
+import type { LoggerApi } from "libretto/logger";
 import {
-  getLog,
   getSessionDir,
   getSessionLogsPath,
   getSessionStatePath,
@@ -57,25 +57,27 @@ export function getStateFilePath(session: string): string {
   return getSessionStatePath(session);
 }
 
-export function readSessionState(session: string): SessionState | null {
-  const log = getLog();
+export function readSessionState(
+  session: string,
+  logger?: LoggerApi,
+): SessionState | null {
   const stateFile = getStateFilePath(session);
   if (!existsSync(stateFile)) {
-    log.info("session-state-not-found", { session, stateFile });
+    logger?.info("session-state-not-found", { session, stateFile });
     return null;
   }
 
   try {
     const content = readFileSync(stateFile, "utf-8");
     const state = parseSessionStateContent(content, stateFile);
-    log.info("session-state-read", {
+    logger?.info("session-state-read", {
       session,
       port: state.port,
       pid: state.pid,
     });
     return state;
   } catch (err) {
-    log.warn("session-state-parse-error", {
+    logger?.warn("session-state-parse-error", {
       error: err instanceof Error ? err.message : String(err),
       session,
       stateFile,
@@ -132,12 +134,14 @@ export function readSessionStateOrThrow(session: string): SessionState {
   }
 }
 
-export function writeSessionState(state: SessionState): void {
-  const log = getLog();
+export function writeSessionState(
+  state: SessionState,
+  logger?: LoggerApi,
+): void {
   const stateFile = getStateFilePath(state.session);
   const fileState = serializeSessionState(state);
   writeFileSync(stateFile, JSON.stringify(fileState, null, 2), "utf-8");
-  log.info("session-state-write", {
+  logger?.info("session-state-write", {
     session: state.session,
     stateFile,
     port: state.port,
@@ -145,15 +149,14 @@ export function writeSessionState(state: SessionState): void {
   });
 }
 
-export function clearSessionState(session: string): void {
-  const log = getLog();
+export function clearSessionState(session: string, logger?: LoggerApi): void {
   const stateFile = getStateFilePath(session);
   if (!existsSync(stateFile)) {
-    log.info("session-state-clear-missing", { session, stateFile });
+    logger?.info("session-state-clear-missing", { session, stateFile });
     return;
   }
   unlinkSync(stateFile);
-  log.info("session-state-cleared", { session, stateFile });
+  logger?.info("session-state-cleared", { session, stateFile });
 }
 
 function isSessionStatus(value: unknown): value is SessionStatus {
@@ -169,18 +172,25 @@ function isPidRunning(pid: number): boolean {
   }
 }
 
-export function setSessionStatus(session: string, status: SessionStatus): void {
-  const state = readSessionState(session);
+export function setSessionStatus(
+  session: string,
+  status: SessionStatus,
+  logger?: LoggerApi,
+): void {
+  const state = readSessionState(session, logger);
   if (!state) return;
   if (state.status === status) return;
   writeSessionState({
     ...state,
     status,
-  });
+  }, logger);
 }
 
-export function assertSessionAvailableForStart(session: string): void {
-  const existingState = readSessionState(session);
+export function assertSessionAvailableForStart(
+  session: string,
+  logger?: LoggerApi,
+): void {
+  const existingState = readSessionState(session, logger);
   if (!existingState) return;
   if (isSessionStatus(existingState.status)) {
     if (
@@ -192,7 +202,7 @@ export function assertSessionAvailableForStart(session: string): void {
     }
   }
   if (!isPidRunning(existingState.pid)) {
-    setSessionStatus(session, "exited");
+    setSessionStatus(session, "exited", logger);
     return;
   }
   const endpoint = `http://127.0.0.1:${existingState.port}`;

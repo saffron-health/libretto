@@ -1,7 +1,8 @@
 import { mkdirSync } from "node:fs";
 import type { Argv } from "yargs";
+import type { LoggerApi } from "libretto/logger";
 import { connect, disconnectBrowser } from "../core/browser.js";
-import { getLog, getSessionSnapshotRunDir } from "../core/context.js";
+import { getSessionSnapshotRunDir } from "../core/context.js";
 import {
   canAnalyzeSnapshots,
   runInterpret,
@@ -10,17 +11,15 @@ import {
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 
-function generateSnapshotRunId(): string {
-  return `snapshot-${Date.now()}`;
-}
-
-async function captureScreenshot(session: string): Promise<ScreenshotPair> {
-  const log = getLog();
-  log.info("screenshot-start", { session });
-  const snapshotRunId = generateSnapshotRunId();
+async function captureScreenshot(
+  session: string,
+  logger: LoggerApi,
+): Promise<ScreenshotPair> {
+  logger.info("screenshot-start", { session });
+  const snapshotRunId = `snapshot-${Date.now()}`;
   const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);
   mkdirSync(snapshotRunDir, { recursive: true });
-  const { browser, page } = await connect(session);
+  const { browser, page } = await connect(session, logger);
 
   try {
     const title = await page.title();
@@ -34,7 +33,7 @@ async function captureScreenshot(session: string): Promise<ScreenshotPair> {
     const fs = await import("node:fs/promises");
     await fs.writeFile(htmlPath, htmlContent);
 
-    log.info("screenshot-success", {
+    logger.info("screenshot-success", {
       session,
       pageUrl,
       title,
@@ -50,7 +49,7 @@ async function captureScreenshot(session: string): Promise<ScreenshotPair> {
       browserConnected = browser.isConnected();
       pageAlive = !page.isClosed();
     } catch {}
-    log.error("screenshot-error", {
+    logger.error("screenshot-error", {
       error: err,
       session,
       pageAlive,
@@ -59,16 +58,17 @@ async function captureScreenshot(session: string): Promise<ScreenshotPair> {
     });
     throw err;
   } finally {
-    disconnectBrowser(browser, session);
+    disconnectBrowser(browser, logger, session);
   }
 }
 
 async function runSnapshot(
   session: string,
+  logger: LoggerApi,
   objective?: string,
   context?: string,
 ): Promise<void> {
-  const { pngPath, htmlPath } = await captureScreenshot(session);
+  const { pngPath, htmlPath } = await captureScreenshot(session, logger);
 
   console.log("Screenshot saved:");
   console.log(`  PNG:  ${pngPath}`);
@@ -99,10 +99,10 @@ async function runSnapshot(
     context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
     pngPath,
     htmlPath,
-  });
+  }, logger);
 }
 
-export function registerSnapshotCommands(yargs: Argv): Argv {
+export function registerSnapshotCommands(yargs: Argv, logger: LoggerApi): Argv {
   return yargs.command(
     "snapshot",
     "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
@@ -113,6 +113,7 @@ export function registerSnapshotCommands(yargs: Argv): Argv {
     async (argv) => {
       await runSnapshot(
         String(argv.session),
+        logger,
         argv.objective as string | undefined,
         argv.context as string | undefined,
       );

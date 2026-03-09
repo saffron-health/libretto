@@ -1,9 +1,10 @@
-import { Logger, createFileLogSink } from "libretto/logger";
+import { Logger, createFileLogSink, type LoggerApi } from "libretto/logger";
 import type { LLMClient } from "libretto/llm";
 import { spawnSync } from "node:child_process";
 import { cwd } from "node:process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { validateSessionName } from "./session.js";
 
 function getRepoRoot(): string {
   const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
@@ -70,38 +71,43 @@ export function ensureLibrettoSetup(): void {
   }
 }
 
-let log: Logger | null = null;
-
-export function setLogFile(filePath: string): void {
-  log = new Logger(["libretto-cli"], [createFileLogSink({ filePath })]);
+export function createLoggerForSession(session: string): Logger {
+  validateSessionName(session);
+  const sessionDir = getSessionDir(session);
+  mkdirSync(sessionDir, { recursive: true });
+  const logFilePath = getSessionLogsPath(session);
+  return new Logger(["libretto-cli"], [createFileLogSink({ filePath: logFilePath })]);
 }
 
-export function getLog(): Logger {
-  if (!log) {
-    throw new Error(
-      "Logger is not initialized. Call setLogFile(...) before calling getLog().",
-    );
+export async function closeLogger(logger: Logger | null | undefined): Promise<void> {
+  if (!logger) return;
+  await logger.close();
+}
+
+export async function withSessionLogger<T>(
+  session: string,
+  run: (logger: Logger) => Promise<T>,
+): Promise<T> {
+  const logger = createLoggerForSession(session);
+  try {
+    return await run(logger);
+  } finally {
+    await closeLogger(logger);
   }
-  return log;
-}
-
-export async function flushLog(): Promise<void> {
-  if (!log) return;
-  await log.flush();
 }
 
 let llmClientFactory:
-  | ((logger: Logger, model: string) => Promise<LLMClient>)
+  | ((logger: LoggerApi, model: string) => Promise<LLMClient>)
   | null = null;
 
 export function setLLMClientFactory(
-  factory: (logger: Logger, model: string) => Promise<LLMClient>,
+  factory: (logger: LoggerApi, model: string) => Promise<LLMClient>,
 ): void {
   llmClientFactory = factory;
 }
 
 export function getLLMClientFactory():
-  | ((logger: Logger, model: string) => Promise<LLMClient>)
+  | ((logger: LoggerApi, model: string) => Promise<LLMClient>)
   | null {
   return llmClientFactory;
 }

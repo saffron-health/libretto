@@ -1,18 +1,17 @@
 import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
+import type { Logger } from "libretto/logger";
 import { registerAICommands } from "./commands/ai.js";
 import { registerBrowserCommands } from "./commands/browser.js";
 import { registerExecutionCommands } from "./commands/execution.js";
 import { registerLogCommands } from "./commands/logs.js";
 import { registerSnapshotCommands } from "./commands/snapshot.js";
 import {
+  closeLogger,
+  createLoggerForSession,
   ensureLibrettoSetup,
-  flushLog,
-  getLog,
-  setLogFile,
 } from "./core/context.js";
 import {
-  logFileForSession,
   SESSION_DEFAULT,
   validateSessionName,
 } from "./core/session.js";
@@ -131,19 +130,30 @@ function validateLegacySessionArg(rawArgs: string[]): void {
   validateSessionName(value);
 }
 
-function initializeLogger(rawArgs: string[]): void {
+function initializeLogger(rawArgs: string[]): Logger {
   const sessionForLog = parseSessionForLog(rawArgs);
-  const logFilePath = logFileForSession(sessionForLog);
-
-  setLogFile(logFilePath);
-  getLog().info("cli-start", {
+  const logger = createLoggerForSession(sessionForLog);
+  logger.info("cli-start", {
     args: rawArgs,
     cwd: process.cwd(),
     session: sessionForLog,
   });
+  return logger;
 }
 
-function createParser(): Argv {
+async function withCliLogger<T>(
+  rawArgs: string[],
+  run: (logger: Logger) => Promise<T>,
+): Promise<T> {
+  const logger = initializeLogger(rawArgs);
+  try {
+    return await run(logger);
+  } finally {
+    await closeLogger(logger);
+  }
+}
+
+function createParser(logger: Logger): Argv {
   let parser: Argv = (yargs(hideBin(process.argv)) as Argv)
     .scriptName("libretto-cli")
     .parserConfiguration({ "populate--": true })
@@ -164,11 +174,11 @@ function createParser(): Argv {
       throw new Error(msg || "Command failed");
     });
 
-  parser = registerBrowserCommands(parser);
-  parser = registerExecutionCommands(parser);
+  parser = registerBrowserCommands(parser, logger);
+  parser = registerExecutionCommands(parser, logger);
   parser = registerLogCommands(parser);
   parser = registerAICommands(parser);
-  parser = registerSnapshotCommands(parser);
+  parser = registerSnapshotCommands(parser, logger);
   parser = parser.command("help", "Show usage", () => {}, () => {
     printUsage();
   });
@@ -178,40 +188,36 @@ function createParser(): Argv {
 
 export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
+  let exitCode = 0;
   ensureLibrettoSetup();
-  initializeLogger(rawArgs);
-  const log = getLog();
+  await withCliLogger(rawArgs, async (logger) => {
+    try {
+      validateLegacySessionArg(rawArgs);
 
-  try {
-    validateLegacySessionArg(rawArgs);
+      const args = filterSessionArgs(rawArgs);
+      const command = args[0];
 
-    const args = filterSessionArgs(rawArgs);
-    const command = args[0];
+      if (!command || command === "--help" || command === "-h" || command === "help") {
+        printUsage();
+        return;
+      }
 
-    if (!command || command === "--help" || command === "-h" || command === "help") {
-      printUsage();
-      await flushLog();
-      process.exit(0);
+      if (!CLI_COMMANDS.has(command)) {
+        console.error(`Unknown command: ${command}\n`);
+        printUsage();
+        exitCode = 1;
+        return;
+      }
+
+      const parser = createParser(logger);
+      logger.info("cli-command", { command, args });
+      await parser.parseAsync();
+    } catch (err) {
+      logger.error("cli-error", { error: err, args: rawArgs });
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(message);
+      exitCode = 1;
     }
-
-    if (!CLI_COMMANDS.has(command)) {
-      console.error(`Unknown command: ${command}\n`);
-      printUsage();
-      await flushLog();
-      process.exit(1);
-    }
-
-    const parser = createParser();
-    log.info("cli-command", { command, args });
-    await parser.parseAsync();
-
-    await flushLog();
-    process.exit(0);
-  } catch (err) {
-    log.error("cli-error", { error: err, args: rawArgs });
-    await flushLog();
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(message);
-    process.exit(1);
-  }
+  });
+  process.exit(exitCode);
 }

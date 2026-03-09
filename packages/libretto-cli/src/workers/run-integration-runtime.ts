@@ -9,8 +9,9 @@ import {
   type LibrettoWorkflowContext,
   type RunDebugPauseDetails,
 } from "libretto";
+import type { LoggerApi } from "libretto/logger";
 import { getProfilePath, normalizeDomain } from "../core/browser.js";
-import { getLog, getSessionDir } from "../core/context.js";
+import { getSessionDir } from "../core/context.js";
 import { getPauseSignalPaths, removeSignalIfExists } from "../core/pause-signals.js";
 import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol.js";
 
@@ -165,10 +166,11 @@ async function loadWorkflowExport(
 async function runIntegrationInternal(
   args: RunIntegrationWorkerRequest,
   options: {
+    logger: LoggerApi;
     onPaused?: (details: RunDebugPauseDetails) => Promise<void> | void;
   },
 ): Promise<RunIntegrationOutcome> {
-  const log = getLog();
+  const { logger } = options;
   const absolutePath = getAbsoluteIntegrationPath(args.integrationPath);
   const workflow = await loadWorkflowExport(absolutePath, args.exportName);
   const signalPaths = getPauseSignalPaths(args.session);
@@ -183,7 +185,7 @@ async function runIntegrationInternal(
     `Running integration "${args.exportName}" from ${absolutePath} (${args.headless ? "headless" : "headed"})...`,
   );
 
-  const integrationLogger = log.withScope("integration-run", {
+  const integrationLogger = logger.withScope("integration-run", {
     integrationPath: absolutePath,
     integrationExport: args.exportName,
     session: args.session,
@@ -266,9 +268,11 @@ async function runIntegrationInternal(
 
 export async function runIntegrationFromFileInWorker(
   args: RunIntegrationWorkerRequest,
+  logger: LoggerApi,
   onPaused: (details: RunDebugPauseDetails) => Promise<void> | void,
 ): Promise<RunIntegrationOutcome> {
   return await runIntegrationInternal(args, {
+    logger,
     onPaused,
   });
 }
