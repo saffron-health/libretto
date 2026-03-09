@@ -11,17 +11,13 @@ import {
   getSessionDir,
   getSessionLogsPath,
   getSessionStatePath,
-  LIBRETTO_CONFIG_DIR,
-  LIBRETTO_CONFIG_PATH,
   LIBRETTO_SESSIONS_DIR,
 } from "./context.js";
 import {
   SESSION_STATE_VERSION,
-  SessionModeSchema,
   SessionStatusSchema,
   parseSessionStateContent,
   serializeSessionState,
-  type SessionMode,
   type SessionStatus,
   type SessionState,
 } from "libretto/state";
@@ -32,12 +28,7 @@ export const SESSION_DEFAULT = "default";
 export const SESSION_DEV_SERVER = "dev-server";
 export const SESSION_BROWSER_AGENT = "browser-agent";
 export { SESSION_STATE_VERSION };
-export type { SessionMode, SessionStatus, SessionState };
-
-type SessionPermissions = {
-  defaultMode: SessionMode;
-  sessions: Record<string, SessionMode>;
-};
+export type { SessionStatus, SessionState };
 
 export function generateRunId(): string {
   return new Date()
@@ -216,141 +207,5 @@ export function assertSessionAvailableForStart(session: string): void {
   const endpoint = `http://127.0.0.1:${existingState.port}`;
   throw new Error(
     `Session "${session}" is already open and connected to ${endpoint} (pid ${existingState.pid}). Create a new session or close the current one with: libretto-cli close --session ${session}`,
-  );
-}
-
-function ensureLibrettoDir(): void {
-  mkdirSync(LIBRETTO_CONFIG_DIR, { recursive: true });
-}
-
-function isSessionMode(value: unknown): value is SessionMode {
-  return SessionModeSchema.safeParse(value).success;
-}
-
-export function readSessionPermissions(): SessionPermissions {
-  if (!existsSync(LIBRETTO_CONFIG_PATH)) {
-    return { defaultMode: "read-only", sessions: {} };
-  }
-
-  try {
-    const rawConfig = JSON.parse(
-      readFileSync(LIBRETTO_CONFIG_PATH, "utf-8"),
-    ) as Record<string, unknown>;
-
-    if (rawConfig.version !== 1) {
-      throw new Error("unsupported version");
-    }
-
-    const rawPermissions = rawConfig.permissions;
-    if (rawPermissions === undefined) {
-      return { defaultMode: "read-only", sessions: {} };
-    }
-    if (
-      typeof rawPermissions !== "object" ||
-      rawPermissions === null ||
-      Array.isArray(rawPermissions)
-    ) {
-      throw new Error("permissions must be an object");
-    }
-
-    const typedPermissions = rawPermissions as Record<string, unknown>;
-
-    let defaultMode: SessionMode = "read-only";
-    if (typedPermissions.defaultMode !== undefined) {
-      if (!isSessionMode(typedPermissions.defaultMode)) {
-        throw new Error("invalid defaultMode");
-      }
-      defaultMode = typedPermissions.defaultMode;
-    }
-
-    const normalized: Record<string, SessionMode> = {};
-    if (typedPermissions.sessions !== undefined) {
-      if (
-        typeof typedPermissions.sessions !== "object" ||
-        typedPermissions.sessions === null ||
-        Array.isArray(typedPermissions.sessions)
-      ) {
-        throw new Error("sessions must be an object");
-      }
-
-      const sessions = typedPermissions.sessions as Record<string, unknown>;
-      for (const [session, mode] of Object.entries(sessions)) {
-        if (!isSessionMode(mode)) {
-          throw new Error(`invalid mode for session "${session}"`);
-        }
-        normalized[session] = mode;
-      }
-    }
-
-    return { defaultMode, sessions: normalized };
-  } catch {
-    throw new Error(
-      `Session permissions are invalid at ${LIBRETTO_CONFIG_PATH}.`,
-    );
-  }
-}
-
-export function writeSessionPermissions(permissions: SessionPermissions): void {
-  ensureLibrettoDir();
-  let rawConfig: Record<string, unknown> = { version: 1 };
-
-  if (existsSync(LIBRETTO_CONFIG_PATH)) {
-    try {
-      const parsed = JSON.parse(
-        readFileSync(LIBRETTO_CONFIG_PATH, "utf-8"),
-      ) as Record<string, unknown>;
-      if (
-        typeof parsed !== "object" ||
-        parsed === null ||
-        Array.isArray(parsed)
-      ) {
-        throw new Error("config must be an object");
-      }
-      rawConfig = parsed;
-    } catch {
-      throw new Error(
-        `Session permissions are invalid at ${LIBRETTO_CONFIG_PATH}.`,
-      );
-    }
-  }
-
-  if (rawConfig.version !== undefined && rawConfig.version !== 1) {
-    throw new Error(
-      `Session permissions are invalid at ${LIBRETTO_CONFIG_PATH}.`,
-    );
-  }
-
-  rawConfig.version = 1;
-  rawConfig.permissions = permissions;
-  writeFileSync(
-    LIBRETTO_CONFIG_PATH,
-    JSON.stringify(rawConfig, null, 2),
-    "utf-8",
-  );
-}
-
-export function getSessionPermissionMode(session: string): SessionMode {
-  const permissions = readSessionPermissions();
-  return permissions.sessions[session] ?? permissions.defaultMode;
-}
-
-export function setSessionPermissionMode(
-  session: string,
-  mode: SessionMode,
-): void {
-  const permissions = readSessionPermissions();
-  if (mode === permissions.defaultMode) {
-    delete permissions.sessions[session];
-  } else {
-    permissions.sessions[session] = mode;
-  }
-  writeSessionPermissions(permissions);
-}
-
-export function readOnlySessionError(session: string): string {
-  return (
-    `Session "${session}" is read-only. ` +
-    "Only a human can authorize full-access mode. " +
-    `If you want me to enable it, explicitly tell me to run: libretto-cli session-mode full-access --session ${session}`
   );
 }

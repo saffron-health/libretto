@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
@@ -10,9 +10,6 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain(
       "Usage: libretto-cli <command> [--session <name>]",
-    );
-    expect(result.stdout).toContain(
-      "session-mode <read-only|full-access> Set session execution mode",
     );
     expect(result.stdout).toContain(
       "Capture PNG + HTML; analyze when objective is provided (context optional)",
@@ -86,26 +83,15 @@ describe("basic CLI subprocess behavior", () => {
     );
   });
 
-  test("fails run by default in read-only session", async ({ librettoCli }) => {
-    const result = await librettoCli("run ./integration.ts main");
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain(
-      'Session "default" is read-only. Only a human can authorize full-access mode.',
-    );
-  });
-
-  test("allows run guard when session is permissioned full-access", async ({
+  test("fails run when integration file does not exist", async ({
     librettoCli,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     const result = await librettoCli("run ./integration.ts main");
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).not.toContain("is read-only");
     expect(result.stderr).toContain("Integration file does not exist:");
   });
 
   test("fails run with invalid JSON in --params", async ({ librettoCli }) => {
-    await librettoCli("session-mode full-access --session default");
     const result = await librettoCli(
       "run ./integration.ts main --params \"{not-json}\"",
     );
@@ -117,7 +103,6 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
     workspaceDir,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     const paramsPath = join(workspaceDir, "invalid-params.json");
     await writeFile(paramsPath, "{not-json}", "utf8");
 
@@ -132,7 +117,6 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
     workspaceDir,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     const paramsPath = join(workspaceDir, "params.json");
     await writeFile(paramsPath, "{}", "utf8");
 
@@ -149,7 +133,6 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
     workspaceDir,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     const missingPath = join(workspaceDir, "missing-params.json");
 
     const result = await librettoCli(
@@ -165,7 +148,6 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
     writeWorkflow,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     await writeWorkflow(
       "integration.ts",
       `
@@ -185,7 +167,6 @@ export async function main() {
     workspaceDir,
     writeWorkflow,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     await writeWorkflow(
       "integration.ts",
       `
@@ -215,7 +196,6 @@ export const main = {
     librettoCli,
     writeWorkflow,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     await writeWorkflow(
       "integration.ts",
       `
@@ -248,7 +228,6 @@ export const main = workflow(
     workspaceDir,
     writeWorkflow,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     await writeWorkflow(
       "integration.ts",
       `
@@ -273,7 +252,6 @@ export const main = workflow({}, async () => "ok");
     workspaceDir,
     writeWorkflow,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     await writeWorkflow(
       "integration.ts",
       `
@@ -308,7 +286,6 @@ export const main = workflow(
     librettoCli,
     writeWorkflow,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     const integrationFilePath = await writeWorkflow(
       "integration-pause.mjs",
       `
@@ -335,7 +312,6 @@ export const main = workflow({}, async (ctx) => {
     librettoCli,
     writeWorkflow,
   }) => {
-    await librettoCli("session-mode full-access --session default");
     const integrationFilePath = await writeWorkflow(
       "integration-complete.mjs",
       `
@@ -353,79 +329,6 @@ export const main = workflow({}, async () => {
     expect(result.stdout).toContain("Integration completed.");
     expect(result.stdout).not.toContain("Workflow paused.");
   }, 45_000);
-
-  test("fails open when deprecated --allow-actions flag is passed", async ({
-    librettoCli,
-  }) => {
-    const result = await librettoCli(
-      "open https://example.com --allow-actions",
-    );
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain(
-      "--allow-actions is not supported for open.",
-    );
-  });
-
-  test("fails run when deprecated --allow-actions flag is passed", async ({
-    librettoCli,
-  }) => {
-    const result = await librettoCli(
-      "run ./integration.ts main --allow-actions",
-    );
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain(
-      "--allow-actions is not supported for run.",
-    );
-  });
-
-  test("session-mode full-access writes session permission", async ({
-    librettoCli,
-    workspaceDir,
-  }) => {
-    const result = await librettoCli(
-      "session-mode full-access --session consented",
-    );
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('Session "consented" is now full-access.');
-
-    const raw = JSON.parse(
-      await readFile(join(workspaceDir, ".libretto", "config.json"), "utf8"),
-    ) as {
-      permissions?: {
-        sessions?: Record<string, string>;
-      };
-    };
-    expect(raw.permissions?.sessions?.consented).toBe("full-access");
-  });
-
-  test("session-mode read-only removes full-access permission", async ({
-    librettoCli,
-    workspaceDir,
-  }) => {
-    await librettoCli("session-mode full-access --session toggled");
-    const result = await librettoCli(
-      "session-mode read-only --session toggled",
-    );
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('Session "toggled" is now read-only.');
-
-    const raw = JSON.parse(
-      await readFile(join(workspaceDir, ".libretto", "config.json"), "utf8"),
-    ) as {
-      permissions?: {
-        sessions?: Record<string, string>;
-      };
-    };
-    expect(raw.permissions?.sessions?.toggled).toBeUndefined();
-  });
-
-  test("fails session-mode with invalid mode", async ({ librettoCli }) => {
-    const result = await librettoCli("session-mode maybe --session default");
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain(
-      "Usage: libretto-cli session-mode <read-only|full-access> [--session <name>]",
-    );
-  });
 
   test("fails save with missing target usage error", async ({
     librettoCli,

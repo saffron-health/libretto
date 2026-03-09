@@ -12,7 +12,6 @@ async function writeSessionState(
     port?: number;
     pid?: number;
     startedAt?: string;
-    mode?: "read-only" | "full-access";
   },
 ): Promise<string> {
   const dir = join(workspaceDir, ".libretto", "sessions", state.session);
@@ -26,7 +25,6 @@ async function writeSessionState(
     pid: state.pid ?? 12345,
     startedAt: state.startedAt ?? "2026-01-01T00:00:00.000Z",
   };
-  if (state.mode) payload.mode = state.mode;
   await writeFile(path, JSON.stringify(payload, null, 2), "utf8");
   return path;
 }
@@ -369,124 +367,28 @@ describe("state-driven CLI subprocess behavior", () => {
     ).toBe(true);
   });
 
-  test("blocks exec in read-only open sessions", async ({
+  test("exec ignores legacy mode fields and attempts to connect", async ({
     workspaceDir,
     librettoCli,
   }) => {
-    await writeSessionState(workspaceDir, {
-      session: "readonly-session",
-      mode: "read-only",
-    });
-
-    const result = await librettoCli(
-      "exec \"return await page.title()\" --session readonly-session",
-    );
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain(
-      "Session \"readonly-session\" is read-only. Only a human can authorize full-access mode.",
-    );
-  });
-
-  test("rejects exec when session mode is not specified", async ({
-    workspaceDir,
-    librettoCli,
-  }) => {
-    await writeSessionState(workspaceDir, {
-      session: "legacy-session",
-    });
-
-    const result = await librettoCli(
-      "exec \"return await page.title()\" --session legacy-session",
-    );
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain(
-      "Session \"legacy-session\" is read-only. Only a human can authorize full-access mode.",
-    );
-    expect(result.stderr).toContain(
-      "libretto-cli session-mode full-access --session legacy-session",
-    );
-  });
-
-  test("rejects exec when session mode is missing even if permissioned full-access", async ({
-    workspaceDir,
-    librettoCli,
-  }) => {
-    await writeSessionState(workspaceDir, {
-      session: "permissioned-session",
+    const statePath = await writeSessionState(workspaceDir, {
+      session: "legacy-mode-session",
       port: 65534,
     });
-    await mkdir(join(workspaceDir, ".libretto"), { recursive: true });
-    await writeFile(
-      join(workspaceDir, ".libretto", "config.json"),
-      JSON.stringify(
-        {
-          version: 1,
-          permissions: {
-            sessions: {
-              "permissioned-session": "full-access",
-            },
-          },
-        },
-        null,
-        2,
-      ),
-      "utf8",
-    );
+    const rawState = JSON.parse(await readFile(statePath, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    rawState.mode = "read-only";
+    await writeFile(statePath, JSON.stringify(rawState, null, 2), "utf8");
 
     const result = await librettoCli(
-      "exec \"return await page.title()\" --session permissioned-session",
+      "exec \"return await page.title()\" --session legacy-mode-session",
     );
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Session \"permissioned-session\" is read-only. Only a human can authorize full-access mode.",
+      "No browser running for session \"legacy-mode-session\".",
     );
-  });
-
-  test("does not apply read-only guard when session allows actions", async ({
-    workspaceDir,
-    librettoCli,
-  }) => {
-    await writeSessionState(workspaceDir, {
-      session: "interactive-session",
-      port: 65534,
-      mode: "full-access",
-    });
-
-    const result = await librettoCli(
-      "exec \"return await page.title()\" --session interactive-session",
-    );
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).not.toContain("is read-only");
-    expect(result.stderr).toContain(
-      "No browser running for session \"interactive-session\".",
-    );
-  });
-
-  test("rejects exec after session is switched back to read-only", async ({
-    workspaceDir,
-    librettoCli,
-  }) => {
-    await writeSessionState(workspaceDir, {
-      session: "flip-session",
-      mode: "full-access",
-    });
-
-    const setReadOnly = await librettoCli(
-      "session-mode read-only --session flip-session",
-    );
-    expect(setReadOnly.exitCode).toBe(0);
-    expect(setReadOnly.stdout).toContain(
-      "Session \"flip-session\" is now read-only.",
-    );
-
-    const result = await librettoCli(
-      "exec \"return await page.title()\" --session flip-session",
-    );
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain(
-      "Session \"flip-session\" is read-only. Only a human can authorize full-access mode.",
-    );
-    expect(result.stderr).toContain("libretto-cli session-mode full-access --session flip-session");
   });
 
   test("rejects session state files with unsupported version", async ({
