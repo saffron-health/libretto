@@ -8,7 +8,6 @@ async function writeSessionState(
   workspaceDir: string,
   state: {
     session: string;
-    runId?: string;
     port?: number;
     pid?: number;
     startedAt?: string;
@@ -20,7 +19,6 @@ async function writeSessionState(
   const payload: Record<string, unknown> = {
     version: 1,
     session: state.session,
-    runId: state.runId ?? "run-seeded",
     port: state.port ?? 9222,
     pid: state.pid ?? 12345,
     startedAt: state.startedAt ?? "2026-01-01T00:00:00.000Z",
@@ -277,7 +275,6 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     await writeSessionState(workspaceDir, {
       session: "net-session",
-      runId: "run-net",
     });
     const logPath = await writeJsonl(workspaceDir, "net-session", "network.jsonl", [
       {
@@ -325,7 +322,6 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     await writeSessionState(workspaceDir, {
       session: "actions-session",
-      runId: "run-actions",
     });
     const logPath = await writeJsonl(workspaceDir, "actions-session", "actions.jsonl", [
       {
@@ -404,7 +400,6 @@ describe("state-driven CLI subprocess behavior", () => {
         {
           version: 2,
           session,
-          runId: "run-invalid-version",
           port: 65534,
           pid: 12345,
           startedAt: "2026-01-01T00:00:00.000Z",
