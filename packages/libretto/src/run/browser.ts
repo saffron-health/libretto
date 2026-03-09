@@ -79,9 +79,6 @@ export async function launchBrowser({
         pid: process.pid,
         startedAt: new Date().toISOString(),
         status: "active",
-        ...(parsedExistingState.success && parsedExistingState.data.mode
-          ? { mode: parsedExistingState.data.mode }
-          : {}),
       },
       null,
       2,

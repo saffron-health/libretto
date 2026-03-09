@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const SESSION_STATE_VERSION = 1;
 
-export const SessionModeSchema = z.enum(["read-only", "full-access"]);
 export const SessionStatusSchema = z.enum([
 	"active",
 	"paused",
@@ -16,11 +15,9 @@ export const SessionStateFileSchema = z.object({
 	pid: z.number().int(),
 	session: z.string().min(1),
 	startedAt: z.string().datetime({ offset: true }),
-	mode: SessionModeSchema.optional(),
 	status: SessionStatusSchema.optional(),
 });
 
-export type SessionMode = z.infer<typeof SessionModeSchema>;
 export type SessionStatus = z.infer<typeof SessionStatusSchema>;
 export type SessionStateFile = z.infer<typeof SessionStateFileSchema>;
 export type SessionState = Omit<SessionStateFile, "version">;
