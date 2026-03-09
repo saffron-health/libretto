@@ -39,14 +39,6 @@ type SessionPermissions = {
   sessions: Record<string, SessionMode>;
 };
 
-export function generateRunId(): string {
-  return new Date()
-    .toISOString()
-    .replace(/[-:T]/g, "")
-    .replace(/\..+/, "")
-    .replace(/^(\d{8})(\d{6})$/, "$1-$2");
-}
-
 export function logFileForSession(session: string): string {
   validateSessionName(session);
   const dir = getSessionDir(session);
@@ -159,7 +151,6 @@ export function writeSessionState(state: SessionState): void {
     stateFile,
     port: state.port,
     pid: state.pid,
-    runId: state.runId,
   });
 }
 

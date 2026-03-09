@@ -15,7 +15,6 @@ export const SessionStateFileSchema = z.object({
 	port: z.number().int().min(0).max(65535),
 	pid: z.number().int(),
 	session: z.string().min(1),
-	runId: z.string().min(1),
 	startedAt: z.string().datetime({ offset: true }),
 	mode: SessionModeSchema.optional(),
 	status: SessionStatusSchema.optional(),
