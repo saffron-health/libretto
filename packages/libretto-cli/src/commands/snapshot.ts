@@ -3,7 +3,6 @@ import type { Argv } from "yargs";
 import type { LoggerApi } from "libretto/logger";
 import { connect, disconnectBrowser } from "../core/browser.js";
 import { getSessionSnapshotRunDir } from "../core/context.js";
-import { generateRunId } from "../core/session.js";
 import {
   canAnalyzeSnapshots,
   runInterpret,
@@ -17,7 +16,7 @@ async function captureScreenshot(
   logger: LoggerApi,
 ): Promise<ScreenshotPair> {
   logger.info("screenshot-start", { session });
-  const snapshotRunId = `snapshot-${generateRunId()}-${Math.random()
+  const snapshotRunId = `snapshot-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
   const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);
