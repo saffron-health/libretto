@@ -24,13 +24,11 @@ export {
 export type { LLMClient, Message, MessageContentPart } from "./llm/types.js";
 export {
 	SESSION_STATE_VERSION,
-	SessionModeSchema,
 	SessionStatusSchema,
 	SessionStateFileSchema,
 	parseSessionStateData,
 	parseSessionStateContent,
 	serializeSessionState,
-	type SessionMode,
 	type SessionStatus,
 	type SessionState,
 	type SessionStateFile,

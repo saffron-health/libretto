@@ -16,7 +16,6 @@ import {
   assertSessionAvailableForStart,
   clearSessionState,
   generateRunId,
-  getSessionPermissionMode,
   readSessionStateOrThrow,
   logFileForSession,
   readSessionState,
@@ -187,9 +186,8 @@ export async function runOpen(
   session: string,
 ): Promise<void> {
   let log = getLog();
-  const sessionMode = getSessionPermissionMode(session);
   const url = normalizeUrl(rawUrl);
-  log.info("open-start", { url, headed, session, sessionMode });
+  log.info("open-start", { url, headed, session });
   assertSessionAvailableForStart(session);
 
   const port = await pickFreePort();
@@ -209,7 +207,6 @@ export async function runOpen(
   log.info("open-launching", {
     url,
     mode: browserMode,
-    sessionMode,
     session,
     port,
     runId,
@@ -640,13 +637,11 @@ await new Promise(() => {});
         session,
         runId,
         startedAt: new Date().toISOString(),
-        mode: sessionMode,
         status: "active",
       });
       log.info("open-success", {
         url,
         mode: browserMode,
-        sessionMode,
         session,
         port,
         runId,

@@ -5,37 +5,16 @@ description: "Browser automation CLI for building integrations, with a network-f
 
 # Browser Integration with Libretto CLI
 
-Use the `npx libretto` CLI to automate web interactions, debug browser agent jobs, and prototype fixes with explicit full-access approval when needed.
+Use the `npx libretto` CLI to automate web interactions, debug browser agent jobs, and prototype fixes.
 
-## CRITICAL: Session Modes
+## CRITICAL: Session Access
 
-Sessions start in **read-only mode** by default. **Every time you launch a browser — whether via `open` or `run` — you MUST immediately announce the session mode.** This is non-negotiable. Do NOT skip the announcement. Do NOT abbreviate it.
-
-### Read-only mode (default)
-
-> **Session mode: READ-ONLY**
->
-> I've opened the browser in **read-only mode**. I can observe the page, take snapshots, and inspect network traffic, but I **cannot** click, type, fill forms, submit, or execute any actions that modify the page.
->
-> If you'd like me to interact with elements (clicking buttons, filling forms, submitting data, scrolling, or making network requests), let me know and I'll switch to **full-access mode**.
+Libretto sessions are **full-access by default**. You can use `exec` and `run` immediately after opening a session.
 
 **Rules:**
-- Use ONLY read-only-safe commands (`snapshot`, `network`, `actions`) until the user explicitly grants full-access.
-- Do NOT proceed with any `exec` or `run` commands until the user explicitly grants full-access.
-
-### Full-access mode (user-approved)
-
-> **Session mode: FULL-ACCESS**
->
-> I've opened the browser in **full-access mode**. I have full control to click, type, fill forms, navigate, scroll, make network requests, and execute Playwright commands on the page.
->
-> If you'd like me to switch to **read-only mode** (observe only, no page modifications), let me know.
-
-### Switching modes
-
-- When the user requests full-access mode, run `npx libretto session-mode full-access --session <name>` and then proceed with `exec`/`run`.
-- Never change session mode unless the user explicitly approves.
-- If the user says something like "go ahead", "interact", "click around", or "do whatever you need" — that counts as granting full-access. Switch the mode and confirm.
+- Always announce which session you opened and what page you are on.
+- Use `snapshot`, `network`, and `actions` first when debugging unknown page state.
+- Before any potentially mutating action (submit/save/delete, or non-idempotent API calls), describe what you are about to do and wait for explicit user confirmation.
 
 ## Ask, Don't Guess
 
@@ -48,7 +27,6 @@ npx libretto open <url> [--headless]   # Launch browser and navigate (headed by 
 npx libretto exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
 npx libretto run <integrationFile> <integrationExport> # Execute integration actions
 npx libretto resume                    # Resume a paused workflow for the current session
-npx libretto session-mode <read-only|full-access> [--session <name>] # Set session mode explicitly
 npx libretto snapshot --objective "<what to find>" [--context "<situational info>"]
 npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto/profiles/
 npx libretto network                   # Show last 20 captured network requests
@@ -113,11 +91,8 @@ If an action fails despite an element being visible, you should not keep retryin
 ## Workflow: Browse and Interact
 
 ```bash
-# Open a page (starts in read-only mode)
+# Open a page
 npx libretto open https://example.com
-
-# When user grants full-access:
-npx libretto session-mode full-access --session default
 
 # Interact with elements
 npx libretto exec "await page.locator('button:has-text(\"Sign in\")').click()"
@@ -161,11 +136,9 @@ When browser automation jobs fail (selectors timing out, clicks not working), us
 1. Add `page.pause()` before the problematic code section
 2. Start the job with `npx browser-agent start` (debug mode is always enabled locally)
 3. Wait ~60 seconds for the browser to hit the breakpoint
-4. Ask user if they approve full-access mode for `browser-agent`
-5. If approved, run `npx libretto session-mode full-access --session browser-agent`
-6. Use `npx libretto exec` (with `--session browser-agent`) to inspect and prototype fixes
-7. Once the fix works, codify it in source files
-8. Restart the job to verify end-to-end
+4. Use `npx libretto exec` (with `--session browser-agent`) to inspect and prototype fixes
+5. Once the fix works, codify it in source files
+6. Restart the job to verify end-to-end
 
 ```bash
 # Start job in background
@@ -175,7 +148,6 @@ npx browser-agent start \
   --params '{"vendorName":"eClinicalWorks"}'
 
 # Inspect page state
-npx libretto session-mode full-access --session browser-agent
 npx libretto exec --session browser-agent "return await page.url();"
 npx libretto snapshot --session browser-agent \
   --objective "Find dropdown menus and their current selections" \

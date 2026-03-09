@@ -12,9 +12,7 @@ import { getLog } from "../core/context.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
   assertSessionAvailableForStart,
-  getSessionPermissionMode,
   readSessionStateOrThrow,
-  readOnlySessionError,
   setSessionStatus,
 } from "../core/session.js";
 import {
@@ -111,11 +109,7 @@ async function runExec(
   visualize = false,
 ): Promise<void> {
   const log = getLog();
-  const sessionState = readSessionStateOrThrow(session);
-  const mode = sessionState.mode ?? "read-only";
-  if (mode !== "full-access") {
-    throw new Error(readOnlySessionError(session));
-  }
+  readSessionStateOrThrow(session);
 
   log.info("exec-start", {
     session,
@@ -478,11 +472,6 @@ export function registerExecutionCommands(yargs: Argv): Argv {
           .option("params-file", { type: "string" })
           .option("headed", { type: "boolean", default: false })
           .option("headless", { type: "boolean", default: false })
-          .option("allow-actions", {
-            type: "boolean",
-            default: false,
-            hidden: true,
-          })
           .option("debug", { type: "boolean" }),
       async (argv) => {
         const usage =
@@ -494,17 +483,6 @@ export function registerExecutionCommands(yargs: Argv): Argv {
         }
 
         const session = String(argv.session);
-        const allowActions = Boolean(
-          argv["allow-actions"] ?? (argv as { allowActions?: boolean }).allowActions,
-        );
-        if (allowActions) {
-          throw new Error(
-            `--allow-actions is not supported for run. ${readOnlySessionError(session)}`,
-          );
-        }
-        if (getSessionPermissionMode(session) !== "full-access") {
-          throw new Error(readOnlySessionError(session));
-        }
 
         const rawInlineParams = argv.params as string | undefined;
         const paramsFile = argv["params-file"] as string | undefined;
