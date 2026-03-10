@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { openSync, existsSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,7 @@ import {
   readSessionState,
   writeSessionState,
 } from "./session.js";
+import { installSessionTelemetry } from "./session-telemetry.js";
 
 async function pickFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
@@ -89,6 +90,11 @@ async function tryConnectToPort(
   }
 }
 
+function isOperationalPage(page: Page): boolean {
+  const url = page.url();
+  return !url.startsWith("devtools://") && !url.startsWith("chrome-error://");
+}
+
 export function disconnectBrowser(
   browser: Browser,
   logger: LoggerApi,
@@ -102,14 +108,80 @@ export function disconnectBrowser(
   }
 }
 
+function resolveOperationalPages(browser: Browser): Page[] {
+  return browser
+    .contexts()
+    .flatMap((context) => context.pages())
+    .filter(isOperationalPage);
+}
+
+type PageReference = {
+  id: string;
+  page: Page;
+};
+
+export type OpenPageSummary = {
+  id: string;
+  url: string;
+  active: boolean;
+};
+
+async function resolvePageId(page: Page): Promise<string> {
+  const cdpSession: CDPSession = await page.context().newCDPSession(page);
+  try {
+    const targetInfo = await cdpSession.send("Target.getTargetInfo");
+    const targetId = (targetInfo as { targetInfo?: { targetId?: unknown } })?.targetInfo
+      ?.targetId;
+    if (typeof targetId !== "string" || targetId.length === 0) {
+      throw new Error(`Could not resolve target id for page at URL "${page.url()}".`);
+    }
+    return targetId;
+  } finally {
+    await cdpSession.detach();
+  }
+}
+
+async function resolvePageReferences(pages: Page[]): Promise<PageReference[]> {
+  const refs = await Promise.all(
+    pages.map(async (page) => {
+      const id = await resolvePageId(page);
+      return { id, page };
+    }),
+  );
+  return refs;
+}
+
+export async function listOpenPages(
+  session: string,
+  logger: LoggerApi,
+): Promise<OpenPageSummary[]> {
+  const { browser, page: activePage } = await connect(session, logger);
+  try {
+    const pages = browser.contexts().flatMap((ctx) => ctx.pages()).filter(isOperationalPage);
+    const pageRefs = await resolvePageReferences(pages);
+    return pageRefs.map(({ id, page }) => ({
+      id,
+      url: page.url(),
+      active: page === activePage,
+    }));
+  } finally {
+    disconnectBrowser(browser, logger, session);
+  }
+}
+
 export async function connect(
   session: string,
   logger: LoggerApi,
   timeoutMs: number = 10000,
+  options?: {
+    pageId?: string;
+    requireSinglePage?: boolean;
+  },
 ): Promise<{
   browser: Browser;
   context: BrowserContext;
   page: Page;
+  pageId: string;
 }> {
   logger.info("connect", { session, timeoutMs });
   const state = readSessionStateOrThrow(session);
@@ -134,10 +206,7 @@ export async function connect(
   }
 
   const allPages = contexts.flatMap((c) => c.pages());
-  const pages = allPages.filter((p) => {
-    const url = p.url();
-    return !url.startsWith("devtools://") && !url.startsWith("chrome-error://");
-  });
+  const pages = resolveOperationalPages(browser);
 
   logger.info("connect-pages", {
     session,
@@ -154,7 +223,22 @@ export async function connect(
     throw new Error("No pages found.");
   }
 
-  const page = pages[pages.length - 1]!;
+  if (options?.requireSinglePage && !options.pageId && pages.length > 1) {
+    throw new Error(
+      `Multiple pages are open in session "${session}". Pass --page <id> to target a page (run "libretto-cli pages --session ${session}" to list ids).`,
+    );
+  }
+
+  const pageRefs = await resolvePageReferences(pages);
+  const pageRef = options?.pageId
+    ? (pageRefs.find((ref) => ref.id === options.pageId) ?? null)
+    : pageRefs[pageRefs.length - 1]!;
+  if (!pageRef) {
+    throw new Error(
+      `Page "${options?.pageId}" was not found in session "${session}". Run "libretto-cli pages --session ${session}" to list ids.`,
+    );
+  }
+  const page = pageRef.page;
   const context = page.context();
 
   page.on("close", () => {
@@ -178,7 +262,23 @@ export async function connect(
   });
 
   logger.info("connect-success", { session, pageUrl: page.url() });
-  return { browser, context, page };
+  return { browser, context, page, pageId: pageRef.id };
+}
+
+export async function runPages(session: string, logger: LoggerApi): Promise<void> {
+  logger.info("pages-start", { session });
+  const pageSummaries = await listOpenPages(session, logger);
+
+  if (pageSummaries.length === 0) {
+    console.log("No pages found.");
+    return;
+  }
+
+  console.log("Open pages:");
+  pageSummaries.forEach((pageSummary) => {
+    const activeSuffix = pageSummary.active ? " active=true" : "";
+    console.log(`  id=${pageSummary.id} url=${pageSummary.url}${activeSuffix}`);
+  });
 }
 
 export async function runOpen(
@@ -235,43 +335,21 @@ export async function runOpen(
   const launcherCode = `
 import { chromium } from 'playwright';
 import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 const LOG_FILE = '${escapedLogPath}';
 const NETWORK_LOG = '${escapedNetworkLogPath}';
 const ACTIONS_LOG = '${escapedActionsLogPath}';
-mkdirSync(NETWORK_LOG.replace(/\\/[^\\/]+$/, ''), { recursive: true });
+mkdirSync(dirname(NETWORK_LOG), { recursive: true });
 
-const STATIC_EXT_RE = /\\.(css|js|png|jpg|jpeg|gif|woff|woff2|ttf|ico|svg)(\\?|$)/i;
-async function logNetworkResponse(response) {
-	try {
-		const req = response.request();
-		const url = req.url();
-		if (STATIC_EXT_RE.test(url) || url.startsWith('chrome-extension://')) return;
-		let responseBody = null;
-		try {
-			const buf = await response.body();
-			responseBody = buf.toString('utf-8');
-		} catch {}
-		const entry = JSON.stringify({
-			ts: new Date().toISOString(),
-			method: req.method(),
-			url,
-			status: response.status(),
-			contentType: response.headers()['content-type'] || null,
-			postData: req.method() === 'POST' || req.method() === 'PUT' || req.method() === 'PATCH'
-				? (req.postData() || '').substring(0, 2000)
-				: undefined,
-			responseBody,
-		});
-		appendFileSync(NETWORK_LOG, entry + '\\n');
-	} catch {}
-}
+${installSessionTelemetry.toString()}
 
 function logAction(entry) {
-	try {
-		const record = { ts: new Date().toISOString(), ...entry };
-		appendFileSync(ACTIONS_LOG, JSON.stringify(record) + '\\n');
-	} catch {}
+	appendFileSync(ACTIONS_LOG, JSON.stringify(entry) + '\\n');
+}
+
+function logNetwork(entry) {
+	appendFileSync(NETWORK_LOG, JSON.stringify(entry) + '\\n');
 }
 
 function childLog(level, event, data = {}) {
@@ -286,185 +364,6 @@ function childLog(level, event, data = {}) {
 		});
 		appendFileSync(LOG_FILE, entry + '\\n');
 	} catch {}
-}
-
-async function setupActionTracking(p) {
-	await p.exposeFunction('__btActionLog', (jsonStr) => {
-		try { logAction({ ...JSON.parse(jsonStr), source: 'user' }); } catch {}
-	});
-
-	await p.addInitScript(() => {
-		if (window.__btDomListenersInstalled) return;
-		window.__btDomListenersInstalled = true;
-
-		function identify(el) {
-			if (!el || !el.tagName) return '';
-			var tid = el.getAttribute('data-testid');
-			if (tid) return '[data-testid="' + tid + '"]';
-			var role = el.getAttribute('role') || '';
-			var id = el.id;
-			if (role && id) return role + '#' + id;
-			var name = el.getAttribute('aria-label') || (el.textContent || '').trim().slice(0, 30) || '';
-			if (role && name) return role + ' "' + name + '"';
-			var tag = el.tagName.toLowerCase();
-			var cls = el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\\s+/).slice(0, 2).join('.') : '';
-			return tag + cls;
-		}
-
-		var clickTimer = null;
-		var pendingClick = null;
-
-		document.addEventListener('click', function(e) {
-			if (window.__btApiActionInProgress) return;
-			var target = e.target;
-			var sel = identify(target);
-			if (target.type === 'checkbox') {
-				if (typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: target.checked ? 'check' : 'uncheck', selector: sel, success: true }));
-				}
-				return;
-			}
-			pendingClick = { selector: sel };
-			if (clickTimer) clearTimeout(clickTimer);
-			clickTimer = setTimeout(function() {
-				if (pendingClick && typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: 'click', selector: pendingClick.selector, success: true }));
-				}
-				pendingClick = null;
-				clickTimer = null;
-			}, 200);
-		}, true);
-
-		document.addEventListener('dblclick', function(e) {
-			if (window.__btApiActionInProgress) return;
-			if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; pendingClick = null; }
-			var sel = identify(e.target);
-			if (typeof window.__btActionLog === 'function') {
-				window.__btActionLog(JSON.stringify({ action: 'dblclick', selector: sel, success: true }));
-			}
-		}, true);
-
-		var inputTimers = new WeakMap();
-		document.addEventListener('input', function(e) {
-			if (window.__btApiActionInProgress) return;
-			var target = e.target;
-			var sel = identify(target);
-			if (target.tagName === 'SELECT') {
-				if (typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: 'selectOption', selector: sel, value: target.value, success: true }));
-				}
-				return;
-			}
-			var existing = inputTimers.get(target);
-			if (existing) clearTimeout(existing);
-			inputTimers.set(target, setTimeout(function() {
-				inputTimers.delete(target);
-				if (typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: 'fill', selector: sel, value: (target.value || '').slice(0, 100), success: true }));
-				}
-			}, 500));
-		}, true);
-
-		var SPECIAL_KEYS = ['Enter','Escape','Tab','Backspace','Delete','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','PageUp','PageDown','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'];
-		document.addEventListener('keydown', function(e) {
-			if (window.__btApiActionInProgress) return;
-			var isShortcut = e.ctrlKey || e.metaKey || e.altKey;
-			if (!isShortcut && SPECIAL_KEYS.indexOf(e.key) === -1) return;
-			var sel = identify(e.target);
-			var keyDesc = (e.ctrlKey ? 'Ctrl+' : '') + (e.metaKey ? 'Meta+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + e.key;
-			if (typeof window.__btActionLog === 'function') {
-				window.__btActionLog(JSON.stringify({ action: 'press', selector: sel, value: keyDesc, success: true }));
-			}
-		}, true);
-
-		var scrollTimer = null;
-		document.addEventListener('scroll', function() {
-			if (window.__btApiActionInProgress) return;
-			if (scrollTimer) clearTimeout(scrollTimer);
-			scrollTimer = setTimeout(function() {
-				scrollTimer = null;
-				if (typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: 'scroll', selector: 'document', value: 'y=' + window.scrollY, success: true }));
-				}
-			}, 300);
-		}, true);
-	});
-
-	var PAGE_ACTIONS = ['click', 'dblclick', 'fill', 'type', 'press', 'check', 'uncheck', 'selectOption', 'hover', 'focus'];
-	var NAV_ACTIONS = ['goto', 'reload', 'goBack', 'goForward'];
-
-	for (var m of PAGE_ACTIONS) {
-		(function(method) {
-			var orig = p[method].bind(p);
-			p[method] = async function() {
-				var args = Array.from(arguments);
-				var start = Date.now();
-				try { await p.evaluate(function() { window.__btApiActionInProgress = true; }); } catch {}
-				try {
-					var result = await orig.apply(null, args);
-					logAction({ action: method, source: 'agent', selector: typeof args[0] === 'string' ? args[0] : undefined, value: args[1] !== undefined ? String(args[1]).slice(0, 100) : undefined, duration: Date.now() - start, success: true });
-					return result;
-				} catch (err) {
-					logAction({ action: method, source: 'agent', selector: typeof args[0] === 'string' ? args[0] : undefined, duration: Date.now() - start, success: false, error: err.message });
-					throw err;
-				} finally {
-					try { await p.evaluate(function() { window.__btApiActionInProgress = false; }); } catch {}
-				}
-			};
-		})(m);
-	}
-
-	for (var m of NAV_ACTIONS) {
-		(function(method) {
-			var orig = p[method].bind(p);
-			p[method] = async function() {
-				var args = Array.from(arguments);
-				var start = Date.now();
-				try {
-					var result = await orig.apply(null, args);
-					logAction({ action: method, source: 'agent', url: typeof args[0] === 'string' ? args[0] : p.url(), duration: Date.now() - start, success: true });
-					return result;
-				} catch (err) {
-					logAction({ action: method, source: 'agent', url: typeof args[0] === 'string' ? args[0] : undefined, duration: Date.now() - start, success: false, error: err.message });
-					throw err;
-				}
-			};
-		})(m);
-	}
-
-	var LOCATOR_FACTORIES = ['locator', 'getByRole', 'getByText', 'getByLabel', 'getByPlaceholder', 'getByAltText', 'getByTitle', 'getByTestId'];
-	for (var f of LOCATOR_FACTORIES) {
-		(function(factory) {
-			var orig = p[factory].bind(p);
-			p[factory] = function() {
-				var args = Array.from(arguments);
-				var locator = orig.apply(null, args);
-				var hint = factory + '(' + args.map(function(a) { return typeof a === 'string' ? a : JSON.stringify(a); }).join(', ') + ')';
-				for (var am of PAGE_ACTIONS) {
-					(function(actMethod) {
-						if (typeof locator[actMethod] !== 'function') return;
-						var origAct = locator[actMethod].bind(locator);
-						locator[actMethod] = async function() {
-							var actArgs = Array.from(arguments);
-							var start = Date.now();
-							try { await p.evaluate(function() { window.__btApiActionInProgress = true; }); } catch {}
-							try {
-								var result = await origAct.apply(null, actArgs);
-								logAction({ action: actMethod, source: 'agent', selector: hint, value: actArgs[0] !== undefined ? String(actArgs[0]).slice(0, 100) : undefined, duration: Date.now() - start, success: true });
-								return result;
-							} catch (err) {
-								logAction({ action: actMethod, source: 'agent', selector: hint, duration: Date.now() - start, success: false, error: err.message });
-								throw err;
-							} finally {
-								try { await p.evaluate(function() { window.__btApiActionInProgress = false; }); } catch {}
-							}
-						};
-					})(am);
-				}
-				return locator;
-			};
-		})(f);
-	}
 }
 
 const browser = await chromium.launch({
@@ -486,43 +385,12 @@ const page = await context.newPage();
 page.setDefaultTimeout(30000);
 page.setDefaultNavigationTimeout(45000);
 
-await setupActionTracking(page);
-
-page.on('crash', () => childLog('error', 'page-crash', { url: page.url() }));
-page.on('close', () => childLog('warn', 'page-close', { url: page.url(), trace: new Error('page-close-trace').stack }));
-page.on('pageerror', (err) => childLog('error', 'page-error', { message: err.message, stack: err.stack }));
-page.on('console', (msg) => {
-	if (msg.type() === 'error' || msg.type() === 'warning') {
-		childLog(msg.type() === 'error' ? 'error' : 'warn', 'console-' + msg.type(), { text: msg.text(), url: page.url() });
-	}
-});
-page.on('framenavigated', (frame) => {
-	if (frame === page.mainFrame()) {
-		childLog('info', 'page-navigated', { url: frame.url() });
-		logAction({ action: 'navigate', source: 'agent', url: frame.url(), success: true });
-	}
-});
-page.on('requestfailed', (req) => {
-	const failure = req.failure();
-	childLog('warn', 'request-failed', { url: req.url(), method: req.method(), errorText: failure?.errorText });
-});
-page.on('response', logNetworkResponse);
-page.on('popup', (popup) => logAction({ action: 'popup', source: 'agent', url: popup.url(), success: true }));
-page.on('dialog', (dialog) => logAction({ action: 'dialog', source: 'agent', value: dialog.type() + ': ' + dialog.message().slice(0, 500), success: true }));
-
-context.on('page', async (newPage) => {
-	childLog('info', 'new-page-created', { url: newPage.url() });
-	newPage.on('crash', () => childLog('error', 'page-crash', { url: newPage.url() }));
-	newPage.on('close', () => childLog('info', 'page-close', { url: newPage.url(), trace: new Error('page-close-trace').stack }));
-	newPage.on('response', logNetworkResponse);
-	newPage.on('popup', (popup) => logAction({ action: 'popup', source: 'agent', url: popup.url(), success: true }));
-	newPage.on('dialog', (dialog) => logAction({ action: 'dialog', source: 'agent', value: dialog.type() + ': ' + dialog.message().slice(0, 500), success: true }));
-	newPage.on('framenavigated', (frame) => {
-		if (frame === newPage.mainFrame()) logAction({ action: 'navigate', source: 'agent', url: frame.url(), success: true });
-	});
-	try { await setupActionTracking(newPage); } catch (err) {
-		childLog('warn', 'action-tracking-setup-failed', { url: newPage.url(), error: err.message });
-	}
+await installSessionTelemetry({
+	context,
+	initialPage: page,
+	includeUserDomActions: true,
+	logAction,
+	logNetwork,
 });
 
 

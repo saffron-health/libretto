@@ -3,6 +3,7 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   runClose as runCloseWithLogger,
   runOpen,
+  runPages,
   runSave,
 } from "../core/browser.js";
 import { withSessionLogger } from "../core/context.js";
@@ -50,6 +51,9 @@ export function registerBrowserCommands(yargs: Argv, logger: LoggerApi): Argv {
         await runSave(urlOrDomain, String(argv.session), logger);
       },
     )
+    .command("pages", "List open pages in the session", (cmd) => cmd, async (argv) => {
+      await runPages(String(argv.session), logger);
+    })
     .command("close", "Close the browser", (cmd) => cmd, async (argv) => {
       await runCloseWithLogger(String(argv.session), logger);
     });
