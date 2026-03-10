@@ -8,6 +8,7 @@ export {
 
 // LLM client interface
 export type { LLMClient, Message, MessageContentPart } from "./shared/llm/types.js";
+export { createLLMClientFromModel } from "./shared/llm/ai-sdk-adapter.js";
 export {
 	SESSION_STATE_VERSION,
 	SessionStatusSchema,

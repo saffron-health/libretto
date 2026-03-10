@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
@@ -10,11 +10,13 @@ import {
   type RunDebugPauseDetails,
 } from "../../index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
+import { parseSessionStateContent } from "../../shared/state/index.js";
 import { getProfilePath, normalizeDomain } from "../core/browser.js";
 import {
   getSessionActionsLogPath,
   getSessionDir,
   getSessionNetworkLogPath,
+  getSessionStatePath,
 } from "../core/context.js";
 import { getPauseSignalPaths, removeSignalIfExists } from "../core/pause-signals.js";
 import { installSessionTelemetry } from "../core/session-telemetry.js";
@@ -29,9 +31,12 @@ type LoadedLibrettoWorkflow = {
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
-type RunIntegrationOutcome = { status: "completed" };
+type RunIntegrationOutcome =
+  | { status: "completed" }
+  | { status: "failed-held" };
 
 const RESUME_POLL_INTERVAL_MS = 250;
+const FAILURE_HOLD_POLL_INTERVAL_MS = 250;
 
 function mirrorStdoutToFile(filePath: string): () => void {
   const stdout = process.stdout as NodeJS.WriteStream & {
@@ -60,7 +65,6 @@ async function waitForResumeSignal(args: {
   signalPaths: ReturnType<typeof getPauseSignalPaths>;
   session: string;
   details: RunDebugPauseDetails;
-  onPaused?: (details: RunDebugPauseDetails) => Promise<void> | void;
 }): Promise<void> {
   const { pausedSignalPath, resumeSignalPath } = args.signalPaths;
   await mkdir(getSessionDir(args.session), { recursive: true });
@@ -70,7 +74,6 @@ async function waitForResumeSignal(args: {
     JSON.stringify(args.details, null, 2),
     "utf8",
   );
-  await args.onPaused?.(args.details);
 
   while (!existsSync(resumeSignalPath)) {
     await new Promise((resolveWait) =>
@@ -80,6 +83,41 @@ async function waitForResumeSignal(args: {
 
   await removeSignalIfExists(resumeSignalPath);
   await removeSignalIfExists(pausedSignalPath);
+}
+
+function readSessionStatePid(session: string): number | null {
+  const statePath = getSessionStatePath(session);
+  if (!existsSync(statePath)) return null;
+
+  try {
+    return parseSessionStateContent(readFileSync(statePath, "utf8"), statePath).pid;
+  } catch {
+    return null;
+  }
+}
+
+async function waitForFailureSessionRelease(args: {
+  session: string;
+  expectedPid: number;
+  logger: LoggerApi;
+}): Promise<void> {
+  const { session, expectedPid, logger } = args;
+  logger.info("run-failure-session-hold", { session, expectedPid });
+
+  while (true) {
+    const currentPid = readSessionStatePid(session);
+    if (currentPid !== expectedPid) {
+      logger.info("run-failure-session-released", {
+        session,
+        expectedPid,
+        currentPid,
+      });
+      return;
+    }
+    await new Promise((resolveWait) =>
+      setTimeout(resolveWait, FAILURE_HOLD_POLL_INTERVAL_MS),
+    );
+  }
 }
 
 function isLoadedLibrettoWorkflow(value: unknown): value is LoadedLibrettoWorkflow {
@@ -172,7 +210,6 @@ async function runIntegrationInternal(
   args: RunIntegrationWorkerRequest,
   options: {
     logger: LoggerApi;
-    onPaused?: (details: RunDebugPauseDetails) => Promise<void> | void;
   },
 ): Promise<RunIntegrationOutcome> {
   const { logger } = options;
@@ -234,7 +271,6 @@ async function runIntegrationInternal(
     integrationPath: absolutePath,
     exportName: args.exportName,
     headless: args.headless,
-    debug: args.debug,
     pause: async () => {
       const details: RunDebugPauseDetails = {
         sessionName: args.session,
@@ -247,7 +283,6 @@ async function runIntegrationInternal(
         signalPaths,
         session: args.session,
         details,
-        onPaused: options.onPaused,
       });
       console.log("[pause] Resume signal received. Continuing workflow...");
     },
@@ -257,19 +292,25 @@ async function runIntegrationInternal(
     try {
       await workflow.run(workflowContext, args.params ?? {});
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       await writeFile(
         signalPaths.failedSignalPath,
         JSON.stringify(
           {
             failedAt: new Date().toISOString(),
-            message: error instanceof Error ? error.message : String(error),
+            message: errorMessage,
           },
           null,
           2,
         ),
         "utf8",
       );
-      throw error;
+      await waitForFailureSessionRelease({
+        session: args.session,
+        expectedPid: process.pid,
+        logger,
+      });
+      return { status: "failed-held" };
     }
     await writeFile(
       signalPaths.completedSignalPath,
@@ -287,10 +328,8 @@ async function runIntegrationInternal(
 export async function runIntegrationFromFileInWorker(
   args: RunIntegrationWorkerRequest,
   logger: LoggerApi,
-  onPaused: (details: RunDebugPauseDetails) => Promise<void> | void,
 ): Promise<RunIntegrationOutcome> {
   return await runIntegrationInternal(args, {
     logger,
-    onPaused,
   });
 }

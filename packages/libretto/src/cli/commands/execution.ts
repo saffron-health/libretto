@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { fork } from "node:child_process";
+import { spawn } from "node:child_process";
 import * as moduleBuiltin from "node:module";
 import { fileURLToPath } from "node:url";
 import type { Argv } from "yargs";
@@ -12,6 +12,8 @@ import {
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
   assertSessionAvailableForStart,
+  clearSessionState,
+  readSessionState,
   readSessionStateOrThrow,
   setSessionStatus,
 } from "../core/session.js";
@@ -246,6 +248,40 @@ function isProcessRunning(pid: number): boolean {
   }
 }
 
+async function stopExistingFailedRunSession(
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
+  const existingState = readSessionState(session, logger);
+  if (!existingState || existingState.status !== "failed") {
+    return;
+  }
+  logger.info("run-release-existing-failed-session", {
+    session,
+    pid: existingState.pid,
+    port: existingState.port,
+  });
+  clearSessionState(session, logger);
+
+  const stopDeadline = Date.now() + 3_000;
+  while (isProcessRunning(existingState.pid) && Date.now() < stopDeadline) {
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  if (isProcessRunning(existingState.pid)) {
+    logger.warn("run-release-existing-failed-session-timeout", {
+      session,
+      pid: existingState.pid,
+    });
+    console.warn(
+      `Existing failed workflow process for session "${session}" (pid ${existingState.pid}) is still shutting down; continuing.`,
+    );
+    return;
+  }
+  console.log(
+    `Closed existing failed workflow process for session "${session}" (pid ${existingState.pid}).`,
+  );
+}
+
 function readJsonFileIfExists(path: string): unknown {
   if (!existsSync(path)) return null;
   try {
@@ -415,6 +451,7 @@ async function runIntegrationFromFile(
   args: RunIntegrationWorkerRequest,
   logger: LoggerApi,
 ): Promise<void> {
+  await stopExistingFailedRunSession(args.session, logger);
   assertSessionAvailableForStart(args.session, logger);
   const signalPaths = getPauseSignalPaths(args.session);
   clearSignalIfExists(signalPaths.pausedSignalPath);
@@ -427,12 +464,11 @@ async function runIntegrationFromFile(
     new URL("../workers/run-integration-worker.js", import.meta.url),
   );
   const payload = JSON.stringify(args);
-  const worker = fork(workerEntryPath, [payload], {
+  const worker = spawn(process.execPath, [workerEntryPath, payload], {
     detached: true,
-    stdio: ["ignore", "ignore", "ignore", "ipc"],
+    stdio: "ignore",
     env: process.env,
   });
-  worker.disconnect();
   worker.unref();
   const outcome = await waitForWorkflowOutcome({
     session: args.session,
@@ -445,7 +481,9 @@ async function runIntegrationFromFile(
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
-    throw new Error(outcome.message ?? "Workflow failed during run.");
+    throw new Error(
+      `${outcome.message ?? "Workflow failed during run."}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`,
+    );
   }
   if (outcome.status === "exited") {
     setSessionStatus(args.session, "exited", logger);
@@ -494,13 +532,18 @@ export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv 
           .option("params", { type: "string" })
           .option("params-file", { type: "string" })
           .option("headed", { type: "boolean", default: false })
-          .option("headless", { type: "boolean", default: false })
-          .option("debug", { type: "boolean" }),
+          .option("headless", { type: "boolean", default: false }),
       async (argv) => {
         const usage =
-          "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug]";
+          "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]";
         const integrationPath = argv.integrationFile as string | undefined;
         const exportName = argv.integrationExport as string | undefined;
+        const legacyDebug = (argv as Record<string, unknown>).debug;
+        if (legacyDebug !== undefined) {
+          throw new Error(
+            "The --debug flag has been removed. Run the command without --debug.",
+          );
+        }
         if (!integrationPath || !exportName) {
           throw new Error(usage);
         }
@@ -542,19 +585,12 @@ export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv 
             ? true
             : undefined;
 
-        const debugFlag = argv.debug as boolean | undefined;
-        const debugMode =
-          debugFlag !== undefined
-            ? debugFlag
-            : process.env.LIBRETTO_DEBUG === "true";
-
         await runIntegrationFromFile({
           integrationPath,
           exportName,
           session,
           params,
           headless: headlessMode ?? false,
-          debug: debugMode,
         }, logger);
       },
     )

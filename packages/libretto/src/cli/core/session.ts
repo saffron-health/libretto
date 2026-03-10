@@ -15,7 +15,6 @@ import {
 } from "./context.js";
 import {
   SESSION_STATE_VERSION,
-  SessionStatusSchema,
   parseSessionStateContent,
   serializeSessionState,
   type SessionStatus,
@@ -170,10 +169,6 @@ export function clearSessionState(session: string, logger?: LoggerApi): void {
   logger?.info("session-state-cleared", { session, stateFile });
 }
 
-function isSessionStatus(value: unknown): value is SessionStatus {
-  return SessionStatusSchema.safeParse(value).success;
-}
-
 function isPidRunning(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -203,15 +198,6 @@ export function assertSessionAvailableForStart(
 ): void {
   const existingState = readSessionState(session, logger);
   if (!existingState) return;
-  if (isSessionStatus(existingState.status)) {
-    if (
-      existingState.status === "completed" ||
-      existingState.status === "failed" ||
-      existingState.status === "exited"
-    ) {
-      return;
-    }
-  }
   if (!isPidRunning(existingState.pid)) {
     setSessionStatus(session, "exited", logger);
     return;
