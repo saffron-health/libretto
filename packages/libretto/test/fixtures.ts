@@ -356,6 +356,21 @@ async function evaluateTextMatch(opts: {
   return { ...fresh, cached: false };
 }
 
+async function closeAllSessionsInWorkspace(workspaceDir: string): Promise<void> {
+  if (!existsSync(cliEntry)) return;
+  const closeAll = await execProcess(
+    process.execPath,
+    [cliEntry, "close", "--all"],
+    workspaceDir,
+  );
+  if (closeAll.exitCode === 0) return;
+  await execProcess(
+    process.execPath,
+    [cliEntry, "close", "--all", "--force"],
+    workspaceDir,
+  );
+}
+
 export const test = base.extend<CliFixtures>({
   workspaceDir: async ({ task }, use) => {
     const workspaceDir = workspaceDirForTask(task);
@@ -364,6 +379,11 @@ export const test = base.extend<CliFixtures>({
     try {
       await use(workspaceDir);
     } finally {
+      try {
+        await closeAllSessionsInWorkspace(workspaceDir);
+      } catch {
+        // Best-effort cleanup. Workspace removal still runs below.
+      }
       await rm(workspaceDir, { recursive: true, force: true });
     }
   },

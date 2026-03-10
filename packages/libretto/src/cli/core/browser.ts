@@ -14,12 +14,16 @@ import {
 import {
   assertSessionAvailableForStart,
   clearSessionState,
+  listSessionsWithStateFile,
   readSessionStateOrThrow,
   logFileForSession,
   readSessionState,
   writeSessionState,
 } from "./session.js";
 import { installSessionTelemetry } from "./session-telemetry.js";
+
+const CLOSE_WAIT_MS = 1_500;
+const FORCE_CLOSE_WAIT_MS = 300;
 
 async function pickFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
@@ -618,17 +622,173 @@ export async function runClose(session: string, logger: LoggerApi): Promise<void
 
   logger.info("close-killing", { session, pid: state.pid, port: state.port });
 
-  try {
-    process.kill(state.pid, "SIGTERM");
-  } catch (err) {
-    logger.warn("close-kill-failed", { error: err, session, pid: state.pid });
-  }
+  sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
 
-  await new Promise((r) => setTimeout(r, 1500));
+  await waitForCloseSignalWindow(CLOSE_WAIT_MS);
 
   clearSessionState(session, logger);
   logger.info("close-success", { session });
   console.log(`Browser closed (session: ${session}).`);
+}
+
+type ClosableSession = {
+  session: string;
+  pid: number;
+  port: number;
+};
+
+function waitForCloseSignalWindow(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function isPidRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sendSignalToProcessGroupOrPid(
+  pid: number,
+  signal: NodeJS.Signals,
+  logger: LoggerApi,
+  session: string,
+): void {
+  try {
+    process.kill(pid, signal);
+    logger.info("close-signal-pid", { session, pid, signal });
+  } catch (pidErr) {
+    const pidCode = (pidErr as NodeJS.ErrnoException).code;
+    if (pidCode !== "ESRCH") {
+      logger.warn("close-signal-pid-failed", {
+        session,
+        pid,
+        signal,
+        error: pidErr,
+      });
+    }
+  }
+}
+
+function formatSessionList(targets: ReadonlyArray<{ session: string }>): string {
+  return targets.map((target) => `"${target.session}"`).join(", ");
+}
+
+function resolveClosableSessions(logger: LoggerApi): {
+  closable: ClosableSession[];
+  clearedUnreadableStates: number;
+} {
+  const sessions = listSessionsWithStateFile();
+  const closable: ClosableSession[] = [];
+  let clearedUnreadableStates = 0;
+  for (const session of sessions) {
+    const state = readSessionState(session, logger);
+    if (!state) {
+      clearSessionState(session, logger);
+      clearedUnreadableStates += 1;
+      continue;
+    }
+    closable.push({
+      session,
+      pid: state.pid,
+      port: state.port,
+    });
+  }
+
+  return { closable, clearedUnreadableStates };
+}
+
+function clearStoppedSessionStates(
+  sessions: ReadonlyArray<ClosableSession>,
+  logger: LoggerApi,
+): number {
+  let cleared = 0;
+  for (const session of sessions) {
+    if (!isPidRunning(session.pid)) {
+      clearSessionState(session.session, logger);
+      cleared += 1;
+    }
+  }
+  return cleared;
+}
+
+export async function runCloseAll(
+  logger: LoggerApi,
+  options?: { force?: boolean },
+): Promise<void> {
+  const force = Boolean(options?.force);
+  logger.info("close-all-start", { force });
+  const { closable, clearedUnreadableStates } = resolveClosableSessions(logger);
+  if (closable.length === 0) {
+    if (clearedUnreadableStates > 0) {
+      console.log(
+        `Cleared ${clearedUnreadableStates} unreadable session state file(s).`,
+      );
+    }
+    console.log("No browser sessions found.");
+    return;
+  }
+
+  for (const target of closable) {
+    logger.info("close-all-sigterm", {
+      session: target.session,
+      pid: target.pid,
+      port: target.port,
+    });
+    sendSignalToProcessGroupOrPid(target.pid, "SIGTERM", logger, target.session);
+  }
+
+  await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+
+  let survivors = closable.filter((target) => isPidRunning(target.pid));
+  if (survivors.length > 0 && !force) {
+    const closed = clearStoppedSessionStates(closable, logger);
+
+    throw new Error(
+      [
+        `Failed to close ${survivors.length} session(s) gracefully: ${formatSessionList(survivors)}.`,
+        `Closed ${closed} session(s).`,
+        "Retry with: libretto-cli close --all --force",
+      ].join("\n"),
+    );
+  }
+
+  let forceKilled = 0;
+  if (survivors.length > 0) {
+    for (const survivor of survivors) {
+      logger.warn("close-all-sigkill", {
+        session: survivor.session,
+        pid: survivor.pid,
+      });
+      sendSignalToProcessGroupOrPid(survivor.pid, "SIGKILL", logger, survivor.session);
+      forceKilled += 1;
+    }
+    await waitForCloseSignalWindow(FORCE_CLOSE_WAIT_MS);
+    survivors = survivors.filter((target) => isPidRunning(target.pid));
+    if (survivors.length > 0) {
+      const closed = clearStoppedSessionStates(closable, logger);
+      throw new Error(
+        [
+          `Failed to force-close ${survivors.length} session(s): ${formatSessionList(survivors)}.`,
+          `Closed ${closed} session(s).`,
+        ].join("\n"),
+      );
+    }
+  }
+
+  clearStoppedSessionStates(closable, logger);
+
+  if (clearedUnreadableStates > 0) {
+    console.log(
+      `Cleared ${clearedUnreadableStates} unreadable session state file(s).`,
+    );
+  }
+  console.log(`Closed ${closable.length} session(s).`);
+  if (forceKilled > 0) {
+    console.log(`Force-killed ${forceKilled} session(s).`);
+  }
 }
 
 export function resolvePath(filePath: string): string {

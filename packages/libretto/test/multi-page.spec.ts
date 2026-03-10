@@ -27,7 +27,6 @@ describe("multi-page CLI behavior", () => {
     );
     expect(opened.exitCode).toBe(0);
 
-    try {
       const singlePageResult = await librettoCli(`pages --session ${session}`);
       expect(singlePageResult.exitCode).toBe(0);
       await evaluate(singlePageResult.stdout).toMatch(
@@ -44,9 +43,6 @@ describe("multi-page CLI behavior", () => {
       await evaluate(multiplePagesResult.stdout).toMatch(
         "Lists both example.com and multi-page-secondary pages with page ids.",
       );
-    } finally {
-      await librettoCli(`close --session ${session}`);
-    }
   }, 45_000);
 
   test("exec requires --page when multiple pages are open", async ({
@@ -59,7 +55,6 @@ describe("multi-page CLI behavior", () => {
     );
     expect(opened.exitCode).toBe(0);
 
-    try {
       const secondPageResult = await librettoCli(
         `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'); return context.pages().length;" --session ${session}`,
       );
@@ -72,9 +67,6 @@ describe("multi-page CLI behavior", () => {
       await evaluate(result.stderr).toMatch(
         "Explains multiple pages are open and requires passing --page.",
       );
-    } finally {
-      await librettoCli(`close --session ${session}`);
-    }
   }, 45_000);
 
   test("exec --page targets the requested page id", async ({
@@ -87,7 +79,6 @@ describe("multi-page CLI behavior", () => {
     );
     expect(opened.exitCode).toBe(0);
 
-    try {
       const secondPageResult = await librettoCli(
         `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'); return context.pages().length;" --session ${session}`,
       );
@@ -109,9 +100,6 @@ describe("multi-page CLI behavior", () => {
       await evaluate(result.stdout).toMatch(
         "Returns the URL for the targeted page and includes example.com.",
       );
-    } finally {
-      await librettoCli(`close --session ${session}`);
-    }
   }, 45_000);
 
   test("snapshot requires --page when multiple pages are open", async ({
@@ -124,7 +112,6 @@ describe("multi-page CLI behavior", () => {
     );
     expect(opened.exitCode).toBe(0);
 
-    try {
       const secondPageResult = await librettoCli(
         `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'); return context.pages().length;" --session ${session}`,
       );
@@ -135,9 +122,6 @@ describe("multi-page CLI behavior", () => {
       await evaluate(snapshot.stderr).toMatch(
         "Explains multiple pages are open and requires passing --page.",
       );
-    } finally {
-      await librettoCli(`close --session ${session}`);
-    }
   }, 45_000);
 
   test("actions and network commands filter correctly by page id", async ({
@@ -150,7 +134,6 @@ describe("multi-page CLI behavior", () => {
     );
     expect(opened.exitCode).toBe(0);
 
-    try {
       const secondPageOpened = await librettoCli(
         `exec "await page.evaluate(() => window.open('https://example.com/?tab=two', '_blank')); await page.waitForTimeout(1500); return context.pages().length;" --session ${session}`,
       );
@@ -209,9 +192,6 @@ describe("multi-page CLI behavior", () => {
       await evaluate(networkOrg.stdout).toMatch(
         "Shows network results for the tab=two page, includes request(s) shown, and does not include tab=one.",
       );
-    } finally {
-      await librettoCli(`close --session ${session}`);
-    }
   }, 60_000);
 
   test.todo("network --page includes requests from context.newPage pages");
@@ -227,7 +207,6 @@ describe("multi-page CLI behavior", () => {
     );
     expect(opened.exitCode).toBe(0);
 
-    try {
       const execResult = await librettoCli(
         `exec "return page.url()" --session ${session} --page ${missingPageId}`,
       );
@@ -259,9 +238,6 @@ describe("multi-page CLI behavior", () => {
       await evaluate(networkResult.stderr).toMatch(
         `Says page id ${missingPageId} was not found for this session.`,
       );
-    } finally {
-      await librettoCli(`close --session ${session}`);
-    }
   }, 45_000);
 
   test("closed page ids are rejected by page-targeted commands", async ({
@@ -274,7 +250,6 @@ describe("multi-page CLI behavior", () => {
     );
     expect(opened.exitCode).toBe(0);
 
-    try {
       const secondPageOpened = await librettoCli(
         `exec "await page.evaluate(() => window.open('https://example.com/?close=two', '_blank')); await page.waitForTimeout(1500); return context.pages().length;" --session ${session}`,
       );
@@ -306,9 +281,6 @@ describe("multi-page CLI behavior", () => {
       await evaluate(stalePageExec.stderr).toMatch(
         `Says page id ${closeTwoPage?.id ?? ""} was not found for this session.`,
       );
-    } finally {
-      await librettoCli(`close --session ${session}`);
-    }
   }, 60_000);
 
   test("run --debug supports page-scoped logs for multiple pages", async ({
@@ -341,7 +313,6 @@ export const main = workflow({}, async (ctx) => {
       "Includes text indicating the workflow paused.",
     );
 
-    try {
       const pagesResult = await librettoCli(`pages --session ${session}`);
       expect(pagesResult.exitCode).toBe(0);
       const pages = parsePagesOutput(pagesResult.stdout);
@@ -363,9 +334,5 @@ export const main = workflow({}, async (ctx) => {
       await evaluate(networkResult.stdout).toMatch(
         "Shows network results for the run=two page and includes request(s) shown.",
       );
-    } finally {
-      await librettoCli(`resume --session ${session}`);
-      await librettoCli(`close --session ${session}`);
-    }
   }, 90_000);
 });

@@ -2,6 +2,7 @@ import type { Argv } from "yargs";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   runClose as runCloseWithLogger,
+  runCloseAll as runCloseAllWithLogger,
   runOpen,
   runPages,
   runSave,
@@ -54,9 +55,34 @@ export function registerBrowserCommands(yargs: Argv, logger: LoggerApi): Argv {
     .command("pages", "List open pages in the session", (cmd) => cmd, async (argv) => {
       await runPages(String(argv.session), logger);
     })
-    .command("close", "Close the browser", (cmd) => cmd, async (argv) => {
-      await runCloseWithLogger(String(argv.session), logger);
-    });
+    .command(
+      "close",
+      "Close the browser",
+      (cmd) =>
+        cmd
+          .option("all", {
+            type: "boolean",
+            default: false,
+            describe: "Close all tracked sessions in this workspace",
+          })
+          .option("force", {
+            type: "boolean",
+            default: false,
+            describe: "Force kill sessions that ignore SIGTERM (requires --all)",
+          }),
+      async (argv) => {
+        const closeAll = Boolean(argv.all);
+        const force = Boolean(argv.force);
+        if (force && !closeAll) {
+          throw new Error("Usage: libretto-cli close --all [--force]");
+        }
+        if (closeAll) {
+          await runCloseAllWithLogger(logger, { force });
+          return;
+        }
+        await runCloseWithLogger(String(argv.session), logger);
+      },
+    );
 }
 
 export async function runClose(session: string): Promise<void> {
