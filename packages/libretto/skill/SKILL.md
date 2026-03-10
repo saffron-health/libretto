@@ -1,6 +1,10 @@
 ---
 name: libretto
 description: "Browser automation CLI for building integrations, with a network-first approach.\n\nWHEN TO USE THIS SKILL:\n- When building a new integration or data extraction workflow against a website\n- When you need to interact with a web page (click, fill, navigate) rather than just read it\n- When debugging browser agent job failures (selectors timing out, clicks not working, elements not found)\n- When you need to test or prototype Playwright interactions before codifying them\n- When you need to save or restore login sessions for authenticated pages\n- When you need to understand what's on a page (use the snapshot command)\n- When scraping dynamic content that requires JavaScript execution\n\nWHEN NOT TO USE THIS SKILL:\n- When you only need to read static web content (use read_web_page instead)\n- When you need to modify browser agent source code (edit files directly)\n- When you need to run a full browser agent job end-to-end (use npx browser-agent CLI)"
+license: MIT
+metadata:
+  author: saffron-health
+  version: "0.2.2"
 ---
 
 # Browser Integration with Libretto CLI
