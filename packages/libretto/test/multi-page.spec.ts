@@ -19,6 +19,7 @@ function parsePagesOutput(output: string): PageListEntry[] {
 describe("multi-page CLI behavior", () => {
   test("pages lists open pages with id and url", async ({
     librettoCli,
+    evaluate,
   }) => {
     const session = "multi-page-pages-command";
     const opened = await librettoCli(
@@ -32,7 +33,9 @@ describe("multi-page CLI behavior", () => {
       const singlePage = parsePagesOutput(singlePageResult.stdout);
       expect(singlePage.length).toBeGreaterThan(0);
       expect(singlePage.length).toBe(1);
-      expect(singlePage[0]?.url).toContain("example.com");
+      await evaluate(singlePageResult.stdout).toMatch(
+        "Lists exactly one open page and that page URL includes example.com.",
+      );
 
       const secondPageResult = await librettoCli(
         `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'); return context.pages().length;" --session ${session}`,
@@ -52,6 +55,9 @@ describe("multi-page CLI behavior", () => {
           entry.url.includes("multi-page-secondary"),
         ),
       ).toBe(true);
+      await evaluate(multiplePagesResult.stdout).toMatch(
+        "Lists both example.com and multi-page-secondary pages with page ids.",
+      );
     } finally {
       await librettoCli(`close --session ${session}`);
     }
@@ -59,6 +65,7 @@ describe("multi-page CLI behavior", () => {
 
   test("exec requires --page when multiple pages are open", async ({
     librettoCli,
+    evaluate,
   }) => {
     const session = "multi-page-exec-requires-page";
     const opened = await librettoCli(
@@ -76,8 +83,9 @@ describe("multi-page CLI behavior", () => {
         `exec "return await page.url()" --session ${session}`,
       );
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain("Multiple pages are open");
-      expect(result.stderr).toContain("--page");
+      await evaluate(result.stderr).toMatch(
+        "Explains multiple pages are open and requires passing --page.",
+      );
     } finally {
       await librettoCli(`close --session ${session}`);
     }
@@ -85,6 +93,7 @@ describe("multi-page CLI behavior", () => {
 
   test("exec --page targets the requested page id", async ({
     librettoCli,
+    evaluate,
   }) => {
     const session = "multi-page-exec-targeting";
     const opened = await librettoCli(
@@ -113,7 +122,9 @@ describe("multi-page CLI behavior", () => {
         `exec "return await page.url()" --page ${examplePage?.id} --session ${session}`,
       );
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("example.com");
+      await evaluate(result.stdout).toMatch(
+        "Returns the URL for the targeted page and includes example.com.",
+      );
     } finally {
       await librettoCli(`close --session ${session}`);
     }
@@ -121,6 +132,7 @@ describe("multi-page CLI behavior", () => {
 
   test("snapshot requires --page when multiple pages are open", async ({
     librettoCli,
+    evaluate,
   }) => {
     const session = "multi-page-snapshot-requires-page";
     const opened = await librettoCli(
@@ -136,8 +148,9 @@ describe("multi-page CLI behavior", () => {
 
       const snapshot = await librettoCli(`snapshot --session ${session}`);
       expect(snapshot.exitCode).toBe(1);
-      expect(snapshot.stderr).toContain("Multiple pages are open");
-      expect(snapshot.stderr).toContain("--page");
+      await evaluate(snapshot.stderr).toMatch(
+        "Explains multiple pages are open and requires passing --page.",
+      );
     } finally {
       await librettoCli(`close --session ${session}`);
     }
@@ -145,6 +158,7 @@ describe("multi-page CLI behavior", () => {
 
   test("actions and network commands filter correctly by page id", async ({
     librettoCli,
+    evaluate,
   }) => {
     const session = "multi-page-log-page-id";
     const opened = await librettoCli(
@@ -185,33 +199,33 @@ describe("multi-page CLI behavior", () => {
         `actions --session ${session} --page ${exampleComPage?.id} --action reload --last 20`,
       );
       expect(actionsCom.exitCode).toBe(0);
-      expect(actionsCom.stdout).toContain("action(s) shown.");
-      expect(actionsCom.stdout).toContain("tab=one");
-      expect(actionsCom.stdout).not.toContain("tab=two");
+      await evaluate(actionsCom.stdout).toMatch(
+        "Shows action results for the tab=one page, includes action(s) shown, and does not include tab=two.",
+      );
 
       const actionsOrg = await librettoCli(
         `actions --session ${session} --page ${exampleOrgPage?.id} --action reload --last 20`,
       );
       expect(actionsOrg.exitCode).toBe(0);
-      expect(actionsOrg.stdout).toContain("action(s) shown.");
-      expect(actionsOrg.stdout).toContain("tab=two");
-      expect(actionsOrg.stdout).not.toContain("tab=one");
+      await evaluate(actionsOrg.stdout).toMatch(
+        "Shows action results for the tab=two page, includes action(s) shown, and does not include tab=one.",
+      );
 
       const networkCom = await librettoCli(
         `network --session ${session} --page ${exampleComPage?.id} --last 20`,
       );
       expect(networkCom.exitCode).toBe(0);
-      expect(networkCom.stdout).toContain("request(s) shown.");
-      expect(networkCom.stdout).toContain("tab=one");
-      expect(networkCom.stdout).not.toContain("tab=two");
+      await evaluate(networkCom.stdout).toMatch(
+        "Shows network results for the tab=one page, includes request(s) shown, and does not include tab=two.",
+      );
 
       const networkOrg = await librettoCli(
         `network --session ${session} --page ${exampleOrgPage?.id} --last 20`,
       );
       expect(networkOrg.exitCode).toBe(0);
-      expect(networkOrg.stdout).toContain("request(s) shown.");
-      expect(networkOrg.stdout).toContain("tab=two");
-      expect(networkOrg.stdout).not.toContain("tab=one");
+      await evaluate(networkOrg.stdout).toMatch(
+        "Shows network results for the tab=two page, includes request(s) shown, and does not include tab=one.",
+      );
     } finally {
       await librettoCli(`close --session ${session}`);
     }
@@ -221,6 +235,7 @@ describe("multi-page CLI behavior", () => {
 
   test("commands fail with a clear error for unknown page ids", async ({
     librettoCli,
+    evaluate,
   }) => {
     const session = "multi-page-invalid-page-id";
     const missingPageId = "MISSING_PAGE_ID_FOR_TEST";
@@ -234,25 +249,33 @@ describe("multi-page CLI behavior", () => {
         `exec "return page.url()" --session ${session} --page ${missingPageId}`,
       );
       expect(execResult.exitCode).toBe(1);
-      expect(execResult.stderr).toContain(`Page "${missingPageId}" was not found`);
+      await evaluate(execResult.stderr).toMatch(
+        `Says page id ${missingPageId} was not found for this session.`,
+      );
 
       const snapshotResult = await librettoCli(
         `snapshot --session ${session} --page ${missingPageId}`,
       );
       expect(snapshotResult.exitCode).toBe(1);
-      expect(snapshotResult.stderr).toContain(`Page "${missingPageId}" was not found`);
+      await evaluate(snapshotResult.stderr).toMatch(
+        `Says page id ${missingPageId} was not found for this session.`,
+      );
 
       const actionsResult = await librettoCli(
         `actions --session ${session} --page ${missingPageId}`,
       );
       expect(actionsResult.exitCode).toBe(1);
-      expect(actionsResult.stderr).toContain(`Page "${missingPageId}" was not found`);
+      await evaluate(actionsResult.stderr).toMatch(
+        `Says page id ${missingPageId} was not found for this session.`,
+      );
 
       const networkResult = await librettoCli(
         `network --session ${session} --page ${missingPageId}`,
       );
       expect(networkResult.exitCode).toBe(1);
-      expect(networkResult.stderr).toContain(`Page "${missingPageId}" was not found`);
+      await evaluate(networkResult.stderr).toMatch(
+        `Says page id ${missingPageId} was not found for this session.`,
+      );
     } finally {
       await librettoCli(`close --session ${session}`);
     }
@@ -260,6 +283,7 @@ describe("multi-page CLI behavior", () => {
 
   test("closed page ids are rejected by page-targeted commands", async ({
     librettoCli,
+    evaluate,
   }) => {
     const session = "multi-page-closed-page-id";
     const opened = await librettoCli(
@@ -288,14 +312,16 @@ describe("multi-page CLI behavior", () => {
 
       const pagesAfterClose = await librettoCli(`pages --session ${session}`);
       expect(pagesAfterClose.exitCode).toBe(0);
-      expect(pagesAfterClose.stdout).not.toContain(closeTwoPage?.id ?? "");
+      await evaluate(pagesAfterClose.stdout).toMatch(
+        `Does not list the closed page id ${closeTwoPage?.id ?? ""}.`,
+      );
 
       const stalePageExec = await librettoCli(
         `exec "return page.url();" --session ${session} --page ${closeTwoPage?.id}`,
       );
       expect(stalePageExec.exitCode).toBe(1);
-      expect(stalePageExec.stderr).toContain(
-        `Page "${closeTwoPage?.id}" was not found`,
+      await evaluate(stalePageExec.stderr).toMatch(
+        `Says page id ${closeTwoPage?.id ?? ""} was not found for this session.`,
       );
     } finally {
       await librettoCli(`close --session ${session}`);
@@ -304,6 +330,7 @@ describe("multi-page CLI behavior", () => {
 
   test("run --debug supports page-scoped logs for multiple pages", async ({
     librettoCli,
+    evaluate,
     writeWorkflow,
   }) => {
     const session = "multi-page-run-debug-page-logs";
@@ -327,7 +354,9 @@ export const main = workflow({}, async (ctx) => {
       `run "${integrationFilePath}" main --session ${session} --headless --debug`,
     );
     expect(runResult.exitCode).toBe(0);
-    expect(runResult.stdout).toContain("Workflow paused.");
+    await evaluate(runResult.stdout).toMatch(
+      "Includes text indicating the workflow paused.",
+    );
 
     try {
       const pagesResult = await librettoCli(`pages --session ${session}`);
@@ -340,15 +369,17 @@ export const main = workflow({}, async (ctx) => {
         `actions --session ${session} --page ${runTwoPage?.id} --action reload --last 20`,
       );
       expect(actionsResult.exitCode).toBe(0);
-      expect(actionsResult.stdout).toContain("action(s) shown.");
-      expect(actionsResult.stdout).toContain("run=two");
+      await evaluate(actionsResult.stdout).toMatch(
+        "Shows action results for the run=two page and includes action(s) shown.",
+      );
 
       const networkResult = await librettoCli(
         `network --session ${session} --page ${runTwoPage?.id} --last 20`,
       );
       expect(networkResult.exitCode).toBe(0);
-      expect(networkResult.stdout).toContain("request(s) shown.");
-      expect(networkResult.stdout).toContain("run=two");
+      await evaluate(networkResult.stdout).toMatch(
+        "Shows network results for the run=two page and includes request(s) shown.",
+      );
     } finally {
       await librettoCli(`resume --session ${session}`);
       await librettoCli(`close --session ${session}`);
