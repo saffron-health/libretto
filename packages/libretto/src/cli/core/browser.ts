@@ -119,6 +119,12 @@ type PageReference = {
   page: Page;
 };
 
+export type OpenPageSummary = {
+  id: string;
+  url: string;
+  active: boolean;
+};
+
 async function resolvePageId(page: Page): Promise<string> {
   const cdpSession: CDPSession = await page.context().newCDPSession(page);
   try {
@@ -144,6 +150,24 @@ async function resolvePageReferences(pages: Page[]): Promise<PageReference[]> {
   return refs;
 }
 
+export async function listOpenPages(
+  session: string,
+  logger: LoggerApi,
+): Promise<OpenPageSummary[]> {
+  const { browser, page: activePage } = await connect(session, logger);
+  try {
+    const pages = browser.contexts().flatMap((ctx) => ctx.pages()).filter(isOperationalPage);
+    const pageRefs = await resolvePageReferences(pages);
+    return pageRefs.map(({ id, page }) => ({
+      id,
+      url: page.url(),
+      active: page === activePage,
+    }));
+  } finally {
+    disconnectBrowser(browser, logger, session);
+  }
+}
+
 export async function connect(
   session: string,
   logger: LoggerApi,
@@ -156,6 +180,7 @@ export async function connect(
   browser: Browser;
   context: BrowserContext;
   page: Page;
+  pageId: string;
 }> {
   logger.info("connect", { session, timeoutMs });
   const state = readSessionStateOrThrow(session);
@@ -204,14 +229,15 @@ export async function connect(
   }
 
   const pageRefs = await resolvePageReferences(pages);
-  const page = options?.pageId
-    ? (pageRefs.find((ref) => ref.id === options.pageId)?.page ?? null)
-    : pages[pages.length - 1]!;
-  if (!page) {
+  const pageRef = options?.pageId
+    ? (pageRefs.find((ref) => ref.id === options.pageId) ?? null)
+    : pageRefs[pageRefs.length - 1]!;
+  if (!pageRef) {
     throw new Error(
       `Page "${options?.pageId}" was not found in session "${session}". Run "libretto-cli pages --session ${session}" to list ids.`,
     );
   }
+  const page = pageRef.page;
   const context = page.context();
 
   page.on("close", () => {
@@ -235,29 +261,23 @@ export async function connect(
   });
 
   logger.info("connect-success", { session, pageUrl: page.url() });
-  return { browser, context, page };
+  return { browser, context, page, pageId: pageRef.id };
 }
 
 export async function runPages(session: string, logger: LoggerApi): Promise<void> {
   logger.info("pages-start", { session });
-  const { browser, page: activePage } = await connect(session, logger);
+  const pageSummaries = await listOpenPages(session, logger);
 
-  try {
-    const pages = browser.contexts().flatMap((ctx) => ctx.pages()).filter(isOperationalPage);
-    if (pages.length === 0) {
-      console.log("No pages found.");
-      return;
-    }
-    const pageRefs = await resolvePageReferences(pages);
-
-    console.log("Open pages:");
-    pageRefs.forEach(({ page, id: pageId }) => {
-      const activeSuffix = page === activePage ? " active=true" : "";
-      console.log(`  id=${pageId} url=${page.url()}${activeSuffix}`);
-    });
-  } finally {
-    disconnectBrowser(browser, logger, session);
+  if (pageSummaries.length === 0) {
+    console.log("No pages found.");
+    return;
   }
+
+  console.log("Open pages:");
+  pageSummaries.forEach((pageSummary) => {
+    const activeSuffix = pageSummary.active ? " active=true" : "";
+    console.log(`  id=${pageSummary.id} url=${pageSummary.url}${activeSuffix}`);
+  });
 }
 
 export async function runOpen(
@@ -321,11 +341,40 @@ const ACTIONS_LOG = '${escapedActionsLogPath}';
 mkdirSync(NETWORK_LOG.replace(/\\/[^\\/]+$/, ''), { recursive: true });
 
 const STATIC_EXT_RE = /\\.(css|js|png|jpg|jpeg|gif|woff|woff2|ttf|ico|svg)(\\?|$)/i;
+const pageIdCache = new WeakMap();
+async function resolvePageId(p) {
+	if (!p) return undefined;
+	let cdpSession = null;
+	try {
+		cdpSession = await context.newCDPSession(p);
+		const targetInfo = await cdpSession.send('Target.getTargetInfo');
+		const targetId = targetInfo && targetInfo.targetInfo ? targetInfo.targetInfo.targetId : undefined;
+		return typeof targetId === 'string' && targetId.length > 0 ? targetId : undefined;
+	} catch {
+		return undefined;
+	} finally {
+		try { if (cdpSession) await cdpSession.detach(); } catch {}
+	}
+}
+async function getPageId(p) {
+	if (!p) return undefined;
+	const cached = pageIdCache.get(p);
+	if (cached) return cached;
+	const resolved = await resolvePageId(p);
+	if (resolved) pageIdCache.set(p, resolved);
+	return resolved;
+}
 async function logNetworkResponse(response) {
 	try {
 		const req = response.request();
 		const url = req.url();
 		if (STATIC_EXT_RE.test(url) || url.startsWith('chrome-extension://')) return;
+		let pageId = undefined;
+		try {
+			const frame = response.frame();
+			const responsePage = frame ? frame.page() : null;
+			pageId = await getPageId(responsePage);
+		} catch {}
 		let responseBody = null;
 		try {
 			const buf = await response.body();
@@ -333,6 +382,7 @@ async function logNetworkResponse(response) {
 		} catch {}
 		const entry = JSON.stringify({
 			ts: new Date().toISOString(),
+			pageId,
 			method: req.method(),
 			url,
 			status: response.status(),
@@ -352,6 +402,10 @@ function logAction(entry) {
 		appendFileSync(ACTIONS_LOG, JSON.stringify(record) + '\\n');
 	} catch {}
 }
+async function logActionForPage(p, entry) {
+	const pageId = await getPageId(p);
+	logAction({ ...entry, pageId });
+}
 
 function childLog(level, event, data = {}) {
 	try {
@@ -368,8 +422,13 @@ function childLog(level, event, data = {}) {
 }
 
 async function setupActionTracking(p) {
-	await p.exposeFunction('__btActionLog', (jsonStr) => {
-		try { logAction({ ...JSON.parse(jsonStr), source: 'user' }); } catch {}
+	let pageId = await getPageId(p);
+	async function logTrackedAction(entry) {
+		if (!pageId) pageId = await getPageId(p);
+		logAction({ ...entry, pageId });
+	}
+	await p.exposeFunction('__btActionLog', async (jsonStr) => {
+		try { await logTrackedAction({ ...JSON.parse(jsonStr), source: 'user' }); } catch {}
 	});
 
 	await p.addInitScript(() => {
@@ -481,10 +540,10 @@ async function setupActionTracking(p) {
 				try { await p.evaluate(function() { window.__btApiActionInProgress = true; }); } catch {}
 				try {
 					var result = await orig.apply(null, args);
-					logAction({ action: method, source: 'agent', selector: typeof args[0] === 'string' ? args[0] : undefined, value: args[1] !== undefined ? String(args[1]).slice(0, 100) : undefined, duration: Date.now() - start, success: true });
+					await logTrackedAction({ action: method, source: 'agent', selector: typeof args[0] === 'string' ? args[0] : undefined, value: args[1] !== undefined ? String(args[1]).slice(0, 100) : undefined, duration: Date.now() - start, success: true });
 					return result;
 				} catch (err) {
-					logAction({ action: method, source: 'agent', selector: typeof args[0] === 'string' ? args[0] : undefined, duration: Date.now() - start, success: false, error: err.message });
+					await logTrackedAction({ action: method, source: 'agent', selector: typeof args[0] === 'string' ? args[0] : undefined, duration: Date.now() - start, success: false, error: err.message });
 					throw err;
 				} finally {
 					try { await p.evaluate(function() { window.__btApiActionInProgress = false; }); } catch {}
@@ -501,10 +560,10 @@ async function setupActionTracking(p) {
 				var start = Date.now();
 				try {
 					var result = await orig.apply(null, args);
-					logAction({ action: method, source: 'agent', url: typeof args[0] === 'string' ? args[0] : p.url(), duration: Date.now() - start, success: true });
+					await logTrackedAction({ action: method, source: 'agent', url: typeof args[0] === 'string' ? args[0] : p.url(), duration: Date.now() - start, success: true });
 					return result;
 				} catch (err) {
-					logAction({ action: method, source: 'agent', url: typeof args[0] === 'string' ? args[0] : undefined, duration: Date.now() - start, success: false, error: err.message });
+					await logTrackedAction({ action: method, source: 'agent', url: typeof args[0] === 'string' ? args[0] : undefined, duration: Date.now() - start, success: false, error: err.message });
 					throw err;
 				}
 			};
@@ -519,27 +578,27 @@ async function setupActionTracking(p) {
 				var args = Array.from(arguments);
 				var locator = orig.apply(null, args);
 				var hint = factory + '(' + args.map(function(a) { return typeof a === 'string' ? a : JSON.stringify(a); }).join(', ') + ')';
-				for (var am of PAGE_ACTIONS) {
-					(function(actMethod) {
-						if (typeof locator[actMethod] !== 'function') return;
-						var origAct = locator[actMethod].bind(locator);
-						locator[actMethod] = async function() {
-							var actArgs = Array.from(arguments);
-							var start = Date.now();
-							try { await p.evaluate(function() { window.__btApiActionInProgress = true; }); } catch {}
-							try {
-								var result = await origAct.apply(null, actArgs);
-								logAction({ action: actMethod, source: 'agent', selector: hint, value: actArgs[0] !== undefined ? String(actArgs[0]).slice(0, 100) : undefined, duration: Date.now() - start, success: true });
-								return result;
-							} catch (err) {
-								logAction({ action: actMethod, source: 'agent', selector: hint, duration: Date.now() - start, success: false, error: err.message });
-								throw err;
-							} finally {
-								try { await p.evaluate(function() { window.__btApiActionInProgress = false; }); } catch {}
-							}
-						};
-					})(am);
-				}
+					for (var am of PAGE_ACTIONS) {
+						(function(actMethod) {
+							if (typeof locator[actMethod] !== 'function') return;
+							var origAct = locator[actMethod].bind(locator);
+							locator[actMethod] = async function() {
+								var actArgs = Array.from(arguments);
+								var start = Date.now();
+								try { await p.evaluate(function() { window.__btApiActionInProgress = true; }); } catch {}
+								try {
+									var result = await origAct.apply(null, actArgs);
+									await logTrackedAction({ action: actMethod, source: 'agent', selector: hint, value: actArgs[0] !== undefined ? String(actArgs[0]).slice(0, 100) : undefined, duration: Date.now() - start, success: true });
+									return result;
+								} catch (err) {
+									await logTrackedAction({ action: actMethod, source: 'agent', selector: hint, duration: Date.now() - start, success: false, error: err.message });
+									throw err;
+								} finally {
+									try { await p.evaluate(function() { window.__btApiActionInProgress = false; }); } catch {}
+								}
+							};
+						})(am);
+					}
 				return locator;
 			};
 		})(f);
@@ -560,6 +619,7 @@ const context = await browser.newContext({
 	viewport: { width: 1366, height: 768 },
 	userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
 });
+context.on('response', logNetworkResponse);
 
 const page = await context.newPage();
 page.setDefaultTimeout(30000);
@@ -575,29 +635,28 @@ page.on('console', (msg) => {
 		childLog(msg.type() === 'error' ? 'error' : 'warn', 'console-' + msg.type(), { text: msg.text(), url: page.url() });
 	}
 });
-page.on('framenavigated', (frame) => {
+page.on('framenavigated', async (frame) => {
 	if (frame === page.mainFrame()) {
 		childLog('info', 'page-navigated', { url: frame.url() });
-		logAction({ action: 'navigate', source: 'agent', url: frame.url(), success: true });
+		await logActionForPage(page, { action: 'navigate', source: 'agent', url: frame.url(), success: true });
 	}
 });
 page.on('requestfailed', (req) => {
 	const failure = req.failure();
 	childLog('warn', 'request-failed', { url: req.url(), method: req.method(), errorText: failure?.errorText });
 });
-page.on('response', logNetworkResponse);
-page.on('popup', (popup) => logAction({ action: 'popup', source: 'agent', url: popup.url(), success: true }));
-page.on('dialog', (dialog) => logAction({ action: 'dialog', source: 'agent', value: dialog.type() + ': ' + dialog.message().slice(0, 500), success: true }));
+page.on('popup', async (popup) => await logActionForPage(page, { action: 'popup', source: 'agent', url: popup.url(), success: true }));
+page.on('dialog', async (dialog) => await logActionForPage(page, { action: 'dialog', source: 'agent', value: dialog.type() + ': ' + dialog.message().slice(0, 500), success: true }));
 
 context.on('page', async (newPage) => {
-	childLog('info', 'new-page-created', { url: newPage.url() });
+	const newPageId = await getPageId(newPage);
+	childLog('info', 'new-page-created', { url: newPage.url(), pageId: newPageId });
 	newPage.on('crash', () => childLog('error', 'page-crash', { url: newPage.url() }));
 	newPage.on('close', () => childLog('info', 'page-close', { url: newPage.url(), trace: new Error('page-close-trace').stack }));
-	newPage.on('response', logNetworkResponse);
-	newPage.on('popup', (popup) => logAction({ action: 'popup', source: 'agent', url: popup.url(), success: true }));
-	newPage.on('dialog', (dialog) => logAction({ action: 'dialog', source: 'agent', value: dialog.type() + ': ' + dialog.message().slice(0, 500), success: true }));
-	newPage.on('framenavigated', (frame) => {
-		if (frame === newPage.mainFrame()) logAction({ action: 'navigate', source: 'agent', url: frame.url(), success: true });
+	newPage.on('popup', async (popup) => await logActionForPage(newPage, { action: 'popup', source: 'agent', url: popup.url(), success: true }));
+	newPage.on('dialog', async (dialog) => await logActionForPage(newPage, { action: 'dialog', source: 'agent', value: dialog.type() + ': ' + dialog.message().slice(0, 500), success: true }));
+	newPage.on('framenavigated', async (frame) => {
+		if (frame === newPage.mainFrame()) await logActionForPage(newPage, { action: 'navigate', source: 'agent', url: frame.url(), success: true });
 	});
 	try { await setupActionTracking(newPage); } catch (err) {
 		childLog('warn', 'action-tracking-setup-failed', { url: newPage.url(), error: err.message });

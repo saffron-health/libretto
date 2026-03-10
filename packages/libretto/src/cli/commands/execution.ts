@@ -119,10 +119,15 @@ async function runExec(
     visualize,
     pageId,
   });
-  const { browser, context, page } = await connect(session, logger, 10000, {
-    pageId,
-    requireSinglePage: true,
-  });
+  const { browser, context, page, pageId: resolvedPageId } = await connect(
+    session,
+    logger,
+    10000,
+    {
+      pageId,
+      requireSinglePage: true,
+    },
+  );
 
   const STALL_THRESHOLD_MS = 60_000;
   let lastActivityTs = Date.now();
@@ -154,7 +159,7 @@ async function runExec(
   };
   process.on("SIGINT", sigintHandler);
 
-  wrapPageForActionLogging(page, session, onActivity);
+  wrapPageForActionLogging(page, session, resolvedPageId, onActivity);
 
   if (visualize) {
     await installInstrumentation(page, { visualize: true, logger });
@@ -164,7 +169,7 @@ async function runExec(
     const execState: Record<string, unknown> = {};
 
     const networkLog = (
-      opts: { last?: number; filter?: string; method?: string } = {},
+      opts: { last?: number; filter?: string; method?: string; pageId?: string } = {},
     ) => {
       return readNetworkLog(session, opts);
     };
@@ -175,6 +180,7 @@ async function runExec(
         filter?: string;
         action?: string;
         source?: string;
+        pageId?: string;
       } = {},
     ) => {
       return readActionLog(session, opts);
