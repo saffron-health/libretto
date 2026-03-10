@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import type { BrowserContext, Page } from "playwright";
 import {
   launchBrowser,
   type LibrettoAuthProfile,
@@ -11,8 +12,12 @@ import {
 } from "../../index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { getProfilePath, normalizeDomain } from "../core/browser.js";
-import { getSessionDir } from "../core/context.js";
+import {
+  getSessionDir,
+  getSessionNetworkLogPath,
+} from "../core/context.js";
 import { getPauseSignalPaths, removeSignalIfExists } from "../core/pause-signals.js";
+import { wrapPageForActionLogging } from "../core/telemetry.js";
 import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol.js";
 
 const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
@@ -27,6 +32,7 @@ type LoadedLibrettoWorkflow = {
 type RunIntegrationOutcome = { status: "completed" };
 
 const RESUME_POLL_INTERVAL_MS = 250;
+const STATIC_EXT_RE = /\.(css|js|png|jpg|jpeg|gif|woff|woff2|ttf|ico|svg)(\?|$)/i;
 
 function mirrorStdoutToFile(filePath: string): () => void {
   const stdout = process.stdout as NodeJS.WriteStream & {
@@ -126,6 +132,70 @@ function getAbsoluteIntegrationPath(integrationPath: string): string {
   return absolutePath;
 }
 
+async function resolvePageId(page: Page): Promise<string | undefined> {
+  const cdpSession = await page.context().newCDPSession(page);
+  try {
+    const targetInfo = await cdpSession.send("Target.getTargetInfo");
+    const targetId = (targetInfo as { targetInfo?: { targetId?: unknown } })?.targetInfo
+      ?.targetId;
+    return typeof targetId === "string" && targetId.length > 0 ? targetId : undefined;
+  } finally {
+    await cdpSession.detach();
+  }
+}
+
+async function installWorkflowTelemetry(
+  session: string,
+  context: BrowserContext,
+  page: Page,
+): Promise<void> {
+  const networkLogPath = getSessionNetworkLogPath(session);
+  const pageIdCache = new WeakMap<Page, string | undefined>();
+
+  const getPageId = async (targetPage: Page): Promise<string | undefined> => {
+    if (pageIdCache.has(targetPage)) {
+      return pageIdCache.get(targetPage);
+    }
+    const resolved = await resolvePageId(targetPage);
+    pageIdCache.set(targetPage, resolved);
+    return resolved;
+  };
+
+  const wrapPage = async (targetPage: Page): Promise<void> => {
+    const pageId = await getPageId(targetPage);
+    wrapPageForActionLogging(targetPage, session, pageId);
+    targetPage.on("response", async (response) => {
+      const request = response.request();
+      const url = request.url();
+      if (STATIC_EXT_RE.test(url) || url.startsWith("chrome-extension://")) return;
+
+      const entry = {
+        ts: new Date().toISOString(),
+        pageId,
+        method: request.method(),
+        url,
+        status: response.status(),
+        contentType: response.headers()["content-type"] ?? null,
+        postData:
+          request.method() === "POST" ||
+          request.method() === "PUT" ||
+          request.method() === "PATCH"
+            ? (request.postData() ?? "").substring(0, 2000)
+            : undefined,
+        responseBody: null,
+        size: null,
+        durationMs: null,
+      };
+      appendFileSync(networkLogPath, JSON.stringify(entry) + "\n");
+    });
+  };
+
+  await wrapPage(page);
+  context.on("page", (newPage) => {
+    void wrapPage(newPage);
+  });
+}
+
 async function loadWorkflowExport(
   absolutePath: string,
   exportName: string,
@@ -206,6 +276,11 @@ async function runIntegrationInternal(
     headless: args.headless,
     storageStatePath,
   });
+  await installWorkflowTelemetry(
+    args.session,
+    browserSession.context,
+    browserSession.page,
+  );
 
   const workflowContext: LibrettoWorkflowContext = {
     logger: integrationLogger,
