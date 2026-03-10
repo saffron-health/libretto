@@ -4,13 +4,14 @@ A TypeScript library for browser automation with AI-powered recovery and data ex
 
 ## Features
 
-- **Step-based workflows** — Define automation as named steps with built-in error handling and recovery
 - **AI-powered recovery** — Vision-based agent that automatically detects and dismisses popups or obstacles using an LLM
 - **Structured data extraction** — Extract typed data from web pages using AI vision + Zod schemas
 - **Error detection** — Classify form/submission errors against known patterns
-- **Debug bundles** — On failure, captures screenshots, DOM, logs, and step history for investigation
-- **Dry-run mode** — Run workflows in simulation without side effects
+- **In-browser network requests** — Execute authenticated fetch calls inside the page context with optional Zod validation
+- **File downloads** — Trigger and intercept file downloads via click, with optional save-to-disk
+- **Dry-run mode** — Skip mutations in development without side effects
 - **Pluggable LLM** — Bring your own LLM provider (Claude, GPT, etc.) via a simple interface
+- **Pluggable logging** — All runtime functions accept an optional logger; defaults to console output
 
 ## Installation
 
@@ -24,111 +25,138 @@ pnpm add libretto playwright zod
 
 ```typescript
 import { chromium } from "playwright";
-import { step, createRunner } from "libretto";
-
-const runner = createRunner({
-  llmClient: myLLMClient, // optional — enables AI recovery & extraction
-});
-
-const steps = [
-  step("navigate", async ({ page, logger }) => {
-    await page.goto("https://example.com/login");
-    logger.info("navigated to login page");
-  }),
-
-  step("login", async ({ page }) => {
-    await page.fill("#email", "user@example.com");
-    await page.fill("#password", "secret");
-    await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard");
-  }),
-
-  step("scrape-data", async ({ page, logger }) => {
-    const title = await page.textContent("h1");
-    logger.info("page title", { title });
-  }),
-];
+import { extractFromPage, attemptWithRecovery } from "libretto";
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
-await runner.run(page, steps);
+
+await page.goto("https://example.com/login");
+await page.fill("#email", "user@example.com");
+await page.fill("#password", "secret");
+
+// Automatically retry with AI popup recovery on failure
+await attemptWithRecovery(page, () => page.click('button[type="submit"]'));
+
 await browser.close();
 ```
 
-## Core Concepts
+## Runtime Functions
 
-### Steps
+### Recovery
 
-A step is a named unit of work. Create one with the `step()` factory:
+#### `attemptWithRecovery(page, fn, logger?, llmClient?)`
+
+Executes a function and, if it fails, uses AI vision to detect and dismiss popups before retrying once.
 
 ```typescript
-step("step-name", async ({ page, logger, config }) => {
-  // page:   Playwright Page instance
-  // logger: scoped logger for this step
-  // config: { dryRun, debug, logDir }
-});
+import { attemptWithRecovery } from "libretto";
+
+await attemptWithRecovery(page, async () => {
+  await page.click('button[type="submit"]');
+}, undefined, llmClient);
 ```
 
-### Step Options
+#### `executeRecoveryAgent(page, instruction, logger?, llmClient?)`
+
+Runs a multi-step vision-based recovery agent that takes screenshots and executes browser actions (click, type, scroll, etc.) to resolve obstacles.
 
 ```typescript
-step("submit-form", handler, {
-  dryRun: "skip",      // "skip" (default) | "execute" | "simulate"
-  simulate: async ({ logger }) => {
-    logger.info("simulated form submission");
+import { executeRecoveryAgent } from "libretto";
+
+await executeRecoveryAgent(
+  page,
+  "Close the cookie consent banner",
+  undefined,
+  llmClient,
+);
+```
+
+#### `detectSubmissionError(page, error, logContext, llmClient, knownErrors?, logger?)`
+
+Uses a screenshot + LLM vision to detect if an error occurred during a form submission. Matches against provided known error patterns.
+
+```typescript
+import { detectSubmissionError } from "libretto";
+
+try {
+  await page.click("#submit");
+} catch (error) {
+  const result = await detectSubmissionError(page, error, "checkout", llmClient, [
+    { id: "duplicate", errorPatterns: ["already exists"], userMessage: "Duplicate entry" },
+  ]);
+  console.log(result.errorId, result.message);
+}
+```
+
+### Data Extraction
+
+#### `extractFromPage(options)`
+
+Extract structured data from a page using AI vision + a Zod schema.
+
+```typescript
+import { extractFromPage } from "libretto";
+import { z } from "zod";
+
+const result = await extractFromPage({
+  page,
+  llmClient,
+  instruction: "Extract the product name and price",
+  schema: z.object({
+    name: z.string(),
+    price: z.number(),
+  }),
+  selector: ".product-card", // optional — scopes to a specific element
+});
+// result is typed as { name: string; price: number }
+```
+
+### Network
+
+#### `pageRequest(page, config, options?)`
+
+Executes a fetch call inside the browser context via `page.evaluate()`, inheriting the page's cookies and auth state. Supports optional Zod validation.
+
+```typescript
+import { pageRequest } from "libretto";
+import { z } from "zod";
+
+const data = await pageRequest(
+  page,
+  {
+    url: "https://example.com/api/profile",
+    method: "GET",
+    responseType: "json",
   },
-  recovery: {
-    "session-expired": async ({ page, logger }) => {
-      await page.click("#re-login");
-    },
+  {
+    schema: z.object({ name: z.string(), email: z.string() }),
   },
-});
+);
 ```
 
-- **`dryRun`** — Controls behavior when the runner is in dry-run mode:
-  - `"skip"` — Skip the step entirely
-  - `"execute"` — Run normally even in dry-run mode
-  - `"simulate"` — Call the `simulate` function instead
-- **`recovery`** — Named recovery handlers tried after AI recovery fails
+### Downloads
 
-### Extending Steps
+#### `downloadViaClick(page, selector, options?)`
 
-Use `step.extend()` to create a step factory with shared recovery handlers:
+Triggers a file download by clicking a DOM element and intercepts the result.
 
 ```typescript
-const myStep = step.extend({
-  recovery: {
-    "cookie-banner": async ({ page }) => {
-      await page.click("#accept-cookies");
-    },
-  },
-});
+import { downloadViaClick } from "libretto";
 
-// Every step created with myStep inherits the cookie-banner recovery
-myStep("checkout", async ({ page }) => { /* ... */ });
+const { buffer, filename } = await downloadViaClick(page, "#download-btn");
 ```
 
-### Runner
+#### `downloadAndSave(page, selector, options?)`
+
+Same as `downloadViaClick` but also writes the file to disk.
 
 ```typescript
-import { createRunner } from "libretto";
+import { downloadAndSave } from "libretto";
 
-const runner = createRunner({
-  llmClient,            // optional — enables AI recovery & extraction
-  dryRun: false,        // run in dry-run mode
-  debug: false,         // enable debug mode
-  logDir: "./logs",     // defaults to .libretto/sessions/<sessionName>/logs
+const { savedTo } = await downloadAndSave(page, "#export-csv", {
+  savePath: "./exports/report.csv",
 });
-
-await runner.run(page, steps);
 ```
-
-The runner executes steps sequentially. For each step it:
-1. Captures a start screenshot
-2. Runs the handler with automatic popup recovery (if `llmClient` provided)
-3. Falls back to custom recovery handlers on failure
-4. Generates a debug bundle if all recovery fails
-5. Captures an end screenshot
 
 ## LLM Client Interface
 
@@ -147,45 +175,14 @@ const myLLMClient: LLMClient = {
 };
 ```
 
-## Data Extraction
-
-Extract structured data from a page using AI vision:
-
-```typescript
-import { extractFromPage } from "libretto/extract";
-import { z } from "zod";
-
-const result = await extractFromPage(page, llmClient, {
-  prompt: "Extract the product name and price from this page",
-  schema: z.object({
-    name: z.string(),
-    price: z.number(),
-  }),
-});
-// result is typed as { name: string; price: number }
-```
-
-## Error Detection
-
-Detect and classify form submission errors:
-
-```typescript
-import { detectSubmissionError } from "libretto/recovery";
-
-const error = await detectSubmissionError(page, llmClient, [
-  { name: "duplicate-entry", description: "Record already exists" },
-  { name: "invalid-field", description: "A form field has a validation error" },
-]);
-
-if (error) {
-  console.log(error.name, error.details);
-}
-```
-
 ## Logging
 
+All runtime functions accept an optional `logger` parameter. When omitted, output goes to `console.log` with `[INFO]`, `[WARN]`, `[ERROR]` prefixes.
+
+For structured logging, use the built-in `Logger` class:
+
 ```typescript
-import { Logger, createFileLogSink, prettyConsoleSink } from "libretto/logger";
+import { Logger, createFileLogSink, prettyConsoleSink } from "libretto";
 
 const logger = new Logger()
   .withSink(createFileLogSink({ filePath: "./app.log" }))
@@ -200,25 +197,30 @@ scoped.error("login failed", { reason: "bad password" });
 
 Libretto provides granular imports:
 
-| Import                   | Contents                                      |
-| ------------------------ | --------------------------------------------- |
-| `libretto`               | Everything                                    |
-| `libretto/step`          | `step`, `createRunner`                        |
-| `libretto/logger`        | `Logger`, sinks                               |
-| `libretto/recovery`      | `attemptWithRecovery`, `detectSubmissionError` |
-| `libretto/extract`       | `extractFromPage`                             |
-| `libretto/network`       | `pageRequest`                                 |
-| `libretto/debug`         | `debugPause`                                  |
-| `libretto/config`        | `isDryRun`, `isDebugMode`, etc.               |
+| Import                   | Contents                                                  |
+| ------------------------ | --------------------------------------------------------- |
+| `libretto`               | Everything                                                |
+| `libretto/logger`        | `Logger`, `defaultLogger`, sinks                          |
+| `libretto/recovery`      | `attemptWithRecovery`, `executeRecoveryAgent`, `detectSubmissionError` |
+| `libretto/extract`       | `extractFromPage`                                         |
+| `libretto/network`       | `pageRequest`                                             |
+| `libretto/download`      | `downloadViaClick`, `downloadAndSave`                     |
+| `libretto/debug`         | `debugPause`                                              |
+| `libretto/config`        | `isDryRun`, `isDebugMode`, `shouldPauseBeforeMutation`    |
+| `libretto/instrumentation` | `instrumentPage`, `installInstrumentation`              |
+| `libretto/visualization` | Ghost cursor and highlight helpers                        |
+| `libretto/run`           | `launchBrowser`                                           |
+| `libretto/state`         | Session state serialization and parsing                   |
+| `libretto/llm`           | `LLMClient` type                                          |
 
 ## Configuration
 
-Runtime flags can be set via runner config or environment variables:
+Runtime flags via environment variables:
 
-| Env Variable          | Effect                   |
-| --------------------- | ------------------------ |
-| `LIBRETTO_DEBUG`      | Enable debug mode        |
-| `LIBRETTO_DRY_RUN`   | Enable dry-run mode      |
+| Env Variable          | Effect                                              |
+| --------------------- | --------------------------------------------------- |
+| `LIBRETTO_DEBUG`      | Enable debug mode                                   |
+| `LIBRETTO_DRY_RUN`   | Enable dry-run mode (defaults to `true` in development) |
 
 ## Development
 

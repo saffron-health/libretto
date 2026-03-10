@@ -6,6 +6,24 @@ export type LogOptions = {
 	timestamp?: Date;
 };
 
+/**
+ * Minimal logger interface accepted by public-facing runtime functions.
+ * Any logger with info/warn/error methods satisfies this — no need to
+ * implement withScope, withContext, flush, etc.
+ */
+export type MinimalLogger = {
+	info: (event: string, data?: Record<string, any>) => void;
+	warn: (event: string, data?: any) => void;
+	error: (event: string, data?: any) => any;
+};
+
+/** Default console logger used when callers omit the logger option. */
+export const defaultLogger: MinimalLogger = {
+	info(event, data) { console.log(`[INFO] ${event}`, data ?? ""); },
+	warn(event, data) { console.warn(`[WARN] ${event}`, data ?? ""); },
+	error(event, data) { console.error(`[ERROR] ${event}`, data ?? ""); },
+};
+
 export type LoggerApi = {
 	log: (
 		event: string,

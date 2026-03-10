@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import type { LoggerApi } from "../../shared/logger/logger.js";
+import { type MinimalLogger, defaultLogger } from "../../shared/logger/logger.js";
 import type { LLMClient } from "../../shared/llm/types.js";
 
 type BrowserAction =
@@ -57,7 +57,7 @@ function mapKeyName(key: string): string {
 async function executeBrowserAction(
 	page: Page,
 	action: BrowserAction,
-	logger: LoggerApi,
+	logger: MinimalLogger = defaultLogger,
 ): Promise<void> {
 	switch (action.type) {
 		case "click": {
@@ -177,10 +177,14 @@ const recoveryActionSchema = z.object({
 export async function executeRecoveryAgent(
 	page: Page,
 	instruction: string,
-	logger: LoggerApi,
-	llmClient: LLMClient,
+	logger?: MinimalLogger,
+	llmClient?: LLMClient,
 ): Promise<void> {
-	logger.info("Executing vision-based recovery agent", { instruction });
+	if (!llmClient) {
+		return;
+	}
+	const log = logger ?? defaultLogger;
+	log.info("Executing vision-based recovery agent", { instruction });
 
 	const viewport = page.viewportSize();
 	if (!viewport) {
@@ -193,7 +197,7 @@ export async function executeRecoveryAgent(
 			await page.screenshot({ fullPage: false, timeout: 10000 })
 		).toString("base64");
 	} catch (screenshotError) {
-		logger.warn("Failed to take screenshot for recovery agent, skipping", {
+		log.warn("Failed to take screenshot for recovery agent, skipping", {
 			screenshotError:
 				screenshotError instanceof Error
 					? screenshotError.message
@@ -229,17 +233,17 @@ Analyze the screenshot and decide what action to take. If the task is complete o
 			temperature: 0,
 		});
 
-		logger.info(`Recovery step ${step}/${maxSteps}`, {
+		log.info(`Recovery step ${step}/${maxSteps}`, {
 			reasoning: result.reasoning,
 			action: result.action,
 		});
 
 		if (result.action.type === "done") {
-			logger.info("Recovery agent completed - no more actions needed");
+			log.info("Recovery agent completed - no more actions needed");
 			break;
 		}
 
-		await executeBrowserAction(page, result.action, logger);
+		await executeBrowserAction(page, result.action, log);
 		await delay(2000);
 
 		// Take new screenshot for next iteration
@@ -248,5 +252,5 @@ Analyze the screenshot and decide what action to take. If the task is complete o
 		);
 	}
 
-	logger.info("Recovery agent execution completed");
+	log.info("Recovery agent execution completed");
 }

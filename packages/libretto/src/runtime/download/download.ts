@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Page, Download } from "playwright";
-import type { LoggerApi } from "../../shared/logger/logger.js";
+import type { MinimalLogger } from "../../shared/logger/logger.js";
 
 export type DownloadResult = {
 	/** The raw file contents. */
@@ -11,7 +11,7 @@ export type DownloadResult = {
 };
 
 export type DownloadViaClickOptions = {
-	logger?: LoggerApi;
+	logger?: MinimalLogger;
 	/** Timeout in milliseconds for waiting on the download event. Defaults to 30 000. */
 	timeout?: number;
 };

@@ -1,4 +1,4 @@
-import type { ZodType, infer as ZodInfer } from "zod";
+import type z from "zod";
 
 export type MessageContentPart =
 	| { type: "text"; text: string }
@@ -17,15 +17,15 @@ export type Message = {
  * recovery agents, and error detection.
  */
 export interface LLMClient {
-	generateObject<T extends ZodType>(opts: {
+	generateObject<T extends z.ZodType>(opts: {
 		prompt: string;
 		schema: T;
 		temperature?: number;
-	}): Promise<ZodInfer<T>>;
+	}): Promise<z.infer<T>>;
 
-	generateObjectFromMessages<T extends ZodType>(opts: {
+	generateObjectFromMessages<T extends z.ZodType>(opts: {
 		messages: Message[];
 		schema: T;
 		temperature?: number;
-	}): Promise<ZodInfer<T>>;
+	}): Promise<z.infer<T>>;
 }

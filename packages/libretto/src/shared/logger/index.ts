@@ -1,4 +1,4 @@
-export { Logger, type LoggerApi, type LoggerSink, type LogOptions } from "./logger.js";
+export { Logger, defaultLogger, type LoggerApi, type MinimalLogger, type LoggerSink, type LogOptions } from "./logger.js";
 export {
 	createFileLogSink,
 	prettyConsoleSink,

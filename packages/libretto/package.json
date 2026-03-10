@@ -25,11 +25,6 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./step": {
-      "types": "./dist/runtime/step/index.d.ts",
-      "import": "./dist/runtime/step/index.js",
-      "require": "./dist/runtime/step/index.cjs"
-    },
     "./logger": {
       "types": "./dist/shared/logger/index.d.ts",
       "import": "./dist/shared/logger/index.js",

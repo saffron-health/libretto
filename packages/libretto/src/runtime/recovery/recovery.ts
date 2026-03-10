@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import type { LoggerApi } from "../../shared/logger/logger.js";
+import { type MinimalLogger, defaultLogger } from "../../shared/logger/logger.js";
 import type { LLMClient } from "../../shared/llm/types.js";
 import { executeRecoveryAgent } from "./agent.js";
 
@@ -10,9 +10,10 @@ import { executeRecoveryAgent } from "./agent.js";
 export async function attemptWithRecovery<T>(
 	page: Page,
 	fn: () => Promise<T>,
-	logger: LoggerApi,
+	logger?: MinimalLogger,
 	llmClient?: LLMClient,
 ): Promise<T> {
+	const log = logger ?? defaultLogger;
 	try {
 		return await fn();
 	} catch (error) {
@@ -23,7 +24,7 @@ export async function attemptWithRecovery<T>(
 				error.message.includes("browser has been closed") ||
 				error.message.includes("context or browser has been closed"))
 		) {
-			logger.warn("Page/browser has been closed, cannot recover", {
+			log.warn("Page/browser has been closed, cannot recover", {
 				error: error.message,
 			});
 			throw error;
@@ -33,14 +34,14 @@ export async function attemptWithRecovery<T>(
 			throw error;
 		}
 
-		logger.info("Action failed, attempting popup recovery", {
+		log.info("Action failed, attempting popup recovery", {
 			error: error instanceof Error ? error.message : String(error),
 		});
 
 		await executeRecoveryAgent(
 			page,
 			"Look at the page to see if there is a popup blocking the screen. If so, close the popup.",
-			logger,
+			log,
 			llmClient,
 		);
 
