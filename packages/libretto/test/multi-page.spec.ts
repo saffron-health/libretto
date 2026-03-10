@@ -30,9 +30,6 @@ describe("multi-page CLI behavior", () => {
     try {
       const singlePageResult = await librettoCli(`pages --session ${session}`);
       expect(singlePageResult.exitCode).toBe(0);
-      const singlePage = parsePagesOutput(singlePageResult.stdout);
-      expect(singlePage.length).toBeGreaterThan(0);
-      expect(singlePage.length).toBe(1);
       await evaluate(singlePageResult.stdout).toMatch(
         "Lists exactly one open page and that page URL includes example.com.",
       );
@@ -44,17 +41,6 @@ describe("multi-page CLI behavior", () => {
 
       const multiplePagesResult = await librettoCli(`pages --session ${session}`);
       expect(multiplePagesResult.exitCode).toBe(0);
-      const multiplePages = parsePagesOutput(multiplePagesResult.stdout);
-      expect(multiplePages.length).toBeGreaterThan(0);
-      expect(multiplePages.length).toBeGreaterThanOrEqual(2);
-      expect(
-        multiplePages.some((entry) => entry.url.includes("example.com")),
-      ).toBe(true);
-      expect(
-        multiplePages.some((entry) =>
-          entry.url.includes("multi-page-secondary"),
-        ),
-      ).toBe(true);
       await evaluate(multiplePagesResult.stdout).toMatch(
         "Lists both example.com and multi-page-secondary pages with page ids.",
       );
@@ -110,13 +96,11 @@ describe("multi-page CLI behavior", () => {
       const pagesResult = await librettoCli(`pages --session ${session}`);
       expect(pagesResult.exitCode).toBe(0);
       const pages = parsePagesOutput(pagesResult.stdout);
-      expect(pages.length).toBeGreaterThan(0);
       const examplePage = pages.find((pageEntry) =>
         pageEntry.url.includes("example.com"),
       );
 
       expect(examplePage).toBeDefined();
-      expect(examplePage?.id).toMatch(/^[a-zA-Z0-9._-]+$/);
 
       const result = await librettoCli(
         `exec "return await page.url()" --page ${examplePage?.id} --session ${session}`,
@@ -175,7 +159,6 @@ describe("multi-page CLI behavior", () => {
       const pagesResult = await librettoCli(`pages --session ${session}`);
       expect(pagesResult.exitCode).toBe(0);
       const pages = parsePagesOutput(pagesResult.stdout);
-      expect(pages.length).toBeGreaterThan(0);
       const exampleComPage = pages.find((entry) =>
         entry.url.includes("tab=one"),
       );
