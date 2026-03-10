@@ -251,7 +251,7 @@ export const main = workflow({}, async (ctx) => {
     );
 
     const result = await librettoCli(
-      `run "${integrationFilePath}" main --session default --headless --debug`,
+      `run "${integrationFilePath}" main --session default --headless`,
     );
     await evaluate(result.stdout).toMatch(
       "Includes WORKFLOW_BEFORE_PAUSE and Workflow paused, and does not include WORKFLOW_AFTER_PAUSE or Integration completed.",
@@ -279,6 +279,41 @@ export const main = workflow({}, async () => {
       "Includes WORKFLOW_COMPLETES and Integration completed, and does not include Workflow paused.",
     );
   }, 45_000);
+
+  test("run prints failure guidance and keeps browser open for exec inspection", async ({
+    librettoCli,
+    evaluate,
+    writeWorkflow,
+  }) => {
+    const session = "debug-selector-error-guidance";
+    const integrationFilePath = await writeWorkflow(
+      "integration-selector-error-debug.mjs",
+      `
+export const main = workflow({}, async (ctx) => {
+  await ctx.page.goto("https://example.com");
+  await ctx.page.locator("[").click();
+});
+`,
+    );
+
+    try {
+      const runResult = await librettoCli(
+        `run "${integrationFilePath}" main --session ${session} --headless`,
+      );
+      await evaluate(runResult.stderr).toMatch(
+        "Includes the workflow error and also gives guidance that the browser is still open, to use exec for inspection, and to run run again to re-run the workflow.",
+      );
+
+      const rerunResult = await librettoCli(
+        `run "${integrationFilePath}" main --session ${session} --headless`,
+      );
+      await evaluate(rerunResult.stderr).toMatch(
+        "Includes the workflow error and the same casual guidance that browser stays open for exec and run can rerun, and does not say the session is already open and connected.",
+      );
+    } finally {
+      await librettoCli(`close --session ${session}`);
+    }
+  }, 60_000);
 
   test("fails save with missing target usage error", async ({
     librettoCli,

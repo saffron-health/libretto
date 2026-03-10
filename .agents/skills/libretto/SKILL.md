@@ -55,6 +55,14 @@ Workflows pause from inside the workflow function by calling `await ctx.pause()`
 - `npx libretto resume --session <name>` sends resume signal and then waits until completion or the next pause.
 - For multi-pause workflows, call `resume` repeatedly until the workflow completes.
 
+## Workflow Failures and Reruns
+
+- `npx libretto run` always uses the same failure-inspection behavior; no separate debug flag is needed.
+- On workflow failure, Libretto prints the workflow error and keeps the browser open for inspection.
+- After a failed run, use `npx libretto exec --session <name> "<code>"` to inspect or prototype fixes.
+- Re-running `npx libretto run ... --session <name>` re-runs the workflow for that session.
+- If the same session still has a failed workflow worker, Libretto releases that failed worker process before rerunning.
+
 ## Globals Available in `exec`
 
 `page`, `context`, `state`, `browser`, `networkLog({ last?, filter?, method? })`, `actionLog({ last?, filter?, action?, source? })`, `console`, `fetch`, `Buffer`, `URL`, `setTimeout`
@@ -218,7 +226,8 @@ When the snapshot doesn't give you enough detail — why an element is hidden, w
 
 - **Never use `page.screenshot()` via `exec`.** Use `npx libretto snapshot` instead — it captures the viewport, sends the screenshot + HTML to a vision model, and returns actionable selectors. The `fullPage` option is especially dangerous — it scrolls the entire page to stitch a screenshot, which can crash JavaScript-heavy pages (especially EMR portals like eClinicalWorks).
 - **Never run `exec` commands in parallel.** Always wait for one `exec` to finish before starting the next. Do not use `run_in_background` for `exec` calls. Running simultaneous `exec` calls opens multiple CDP connections to the same page, which corrupts the page state and kills the browser.
-- `open` and `run` require an available session. If the session is already active, Libretto fails fast and asks you to close the existing session or use a different `--session`.
+- `open` requires an available session. If the session is already active, Libretto fails fast and asks you to close the existing session or use a different `--session`.
+- `run` also requires an available session, except for the specific case of a prior failed `run` in the same session; in that case Libretto releases the failed worker and allows rerun.
 - Use `return <value>` in `exec` to print results. Strings print raw; objects print as JSON.
 - For iframe content, access via `page.locator('iframe[name="..."]').contentFrame()`.
 - Multiple sessions allow parallel browser instances: `--session test1`, `--session test2`.

@@ -283,7 +283,7 @@ describe("multi-page CLI behavior", () => {
       );
   }, 60_000);
 
-  test("run --debug supports page-scoped logs for multiple pages", async ({
+  test("run supports page-scoped logs for multiple pages", async ({
     librettoCli,
     evaluate,
     writeWorkflow,
@@ -306,7 +306,7 @@ export const main = workflow({}, async (ctx) => {
     );
 
     const runResult = await librettoCli(
-      `run "${integrationFilePath}" main --session ${session} --headless --debug`,
+      `run "${integrationFilePath}" main --session ${session} --headless`,
     );
     expect(runResult.exitCode).toBe(0);
     await evaluate(runResult.stdout).toMatch(

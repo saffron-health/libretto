@@ -42,7 +42,7 @@ Commands:
   init [--skip-browsers] Initialize libretto (copy skills, install browsers)
   open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
-  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug]  Run an exported Libretto workflow from a file; pass --debug to enable pause-on-failure debugging (or --no-debug to disable)
+  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]  Run an exported Libretto workflow from a file
   ai configure [preset] [-- <command prefix...>]  Configure AI runtime for analysis commands
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
   exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight)

@@ -21,7 +21,6 @@ export type LibrettoWorkflowContext = {
 	integrationPath: string;
 	exportName: string;
 	headless: boolean;
-	debug: boolean;
 	pause: () => Promise<void>;
 };
 
