@@ -1,7 +1,9 @@
 import { writeFile } from "node:fs/promises";
-import type {
-  RunIntegrationWorkerMessage,
-  RunIntegrationWorkerRequest,
+import { ZodError } from "zod";
+import {
+  RunIntegrationWorkerRequestSchema,
+  type RunIntegrationWorkerMessage,
+  type RunIntegrationWorkerRequest,
 } from "./run-integration-worker-protocol.js";
 import { runIntegrationFromFileInWorker } from "./run-integration-runtime.js";
 import {
@@ -34,28 +36,17 @@ function parseWorkerRequest(argv: string[]): RunIntegrationWorkerRequest {
     );
   }
 
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("Worker payload must be an object.");
+  try {
+    return RunIntegrationWorkerRequestSchema.parse(parsed);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const details = error.issues
+        .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
+        .join("; ");
+      throw new Error(`Worker payload is invalid: ${details}`);
+    }
+    throw error;
   }
-
-  const candidate = parsed as Record<string, unknown>;
-  if (
-    typeof candidate.integrationPath !== "string" ||
-    typeof candidate.exportName !== "string" ||
-    typeof candidate.session !== "string" ||
-    typeof candidate.headless !== "boolean" ||
-    !("params" in candidate)
-  ) {
-    throw new Error("Worker payload is missing required fields.");
-  }
-
-  return {
-    integrationPath: candidate.integrationPath,
-    exportName: candidate.exportName,
-    session: candidate.session,
-    headless: candidate.headless,
-    params: candidate.params,
-  };
 }
 
 async function main(): Promise<void> {
