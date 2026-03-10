@@ -98,7 +98,7 @@
     "build:cli": "tsup --config tsup.cli.config.ts",
     "type-check": "tsc --noEmit",
     "dev": "tsx src/cli/index.ts",
-    "test": "vitest run",
+    "test": "pnpm run build && vitest run",
     "test:watch": "vitest"
   },
   "peerDependencies": {
@@ -118,6 +118,7 @@
     "@ai-sdk/openai": "^3.0.39",
     "@types/node": "^25.3.3",
     "@types/yargs": "^17.0.33",
+    "openai": "^6.27.0",
     "tsup": "^8.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.0",

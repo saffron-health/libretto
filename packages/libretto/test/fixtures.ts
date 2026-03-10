@@ -1,12 +1,15 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import {
   execFile,
   spawnSync,
 } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import OpenAI from "openai";
+import { z } from "zod";
 import { test as base } from "vitest";
 import { SESSION_STATE_VERSION, type SessionState } from "../src/shared/state/index.js";
 
@@ -14,6 +17,17 @@ type SpawnResult = {
   exitCode: number;
   stdout: string;
   stderr: string;
+};
+
+type EvaluationResult = {
+  success: boolean;
+  reason: string;
+  cached: boolean;
+  model: string;
+};
+
+type EvaluateMatcher = {
+  toMatch: (assertion: string) => Promise<EvaluationResult>;
 };
 
 type CliFixtures = {
@@ -24,6 +38,7 @@ type CliFixtures = {
     command: string,
     env?: Record<string, string>,
   ) => Promise<SpawnResult>;
+  evaluate: (actual: string) => EvaluateMatcher;
   writeWorkflow: (
     fileName: string,
     source: string,
@@ -44,6 +59,42 @@ const cliEntry = resolve(packageRoot, "dist/cli/index.js");
 const librettoEntry = resolve(packageRoot, "dist/index.js");
 const librettoRuntimePath = new URL("../dist/index.js", import.meta.url)
   .href;
+const EVALUATE_GCP_PROJECT = "saffron-health";
+const EVALUATE_OPENAI_API_KEY_SECRET_NAME = "libretto-test-openai-api-key";
+const EVALUATE_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const EVALUATE_MODEL = "gpt-5-mini";
+const EVALUATE_CACHE_DIR = resolve(repoRoot, "temp/libretto-cli-evaluate-cache");
+const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-cli-test-workspaces");
+const EVALUATE_PROMPT_VERSION = 1;
+const EVALUATE_MAX_ACTUAL_CHARS = 12_000;
+const EvaluateVerdictSchema = z.object({
+  success: z.boolean(),
+  reason: z.string().trim().min(1),
+});
+const CachedEvaluationSchema = EvaluateVerdictSchema.extend({
+  model: z.string().min(1),
+});
+
+function getSecret(secretName: string): string {
+  const result = spawnSync(
+    "gcloud",
+    [
+      "secrets",
+      "versions",
+      "access",
+      "latest",
+      `--project=${EVALUATE_GCP_PROJECT}`,
+      `--secret=${secretName}`,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status === 0 && result.stdout.trim().length > 0) {
+    return result.stdout.trim();
+  }
+  return "";
+}
+
+const EVALUATE_OPENAI_API_KEY = getSecret(EVALUATE_OPENAI_API_KEY_SECRET_NAME);
 
 let didBuild = false;
 
@@ -166,9 +217,150 @@ function workflowImportHeader(imports?: string[]): string {
   return `import { ${names.join(", ")} } from "${librettoRuntimePath}";\n\n`;
 }
 
+function stableEvaluateHash(input: string): string {
+  return createHash("sha256").update(input).digest("hex");
+}
+
+function evaluateCachePath(cacheKey: string): string {
+  return join(EVALUATE_CACHE_DIR, `${stableEvaluateHash(cacheKey)}.json`);
+}
+
+function workspaceDirForTask(task: Readonly<{ fullName: string; file: { filepath: string } }>): string {
+  const stableId = stableEvaluateHash(`${task.file.filepath}::${task.fullName}`).slice(0, 16);
+  return join(DETERMINISTIC_WORKSPACE_ROOT, stableId);
+}
+
+async function readEvaluateCache(
+  cacheKey: string,
+): Promise<Omit<EvaluationResult, "cached"> | null> {
+  const path = evaluateCachePath(cacheKey);
+  if (!existsSync(path)) return null;
+  try {
+    const raw = JSON.parse(await readFile(path, "utf8"));
+    const parsed = CachedEvaluationSchema.safeParse(raw);
+    if (!parsed.success) {
+      return null;
+    }
+    return {
+      success: parsed.data.success,
+      reason: parsed.data.reason,
+      model: parsed.data.model,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function writeEvaluateCache(
+  cacheKey: string,
+  value: Omit<EvaluationResult, "cached">,
+): Promise<void> {
+  const path = evaluateCachePath(cacheKey);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(value, null, 2), "utf8");
+}
+
+function clipActualForPrompt(actual: string): string {
+  if (actual.length === 0) {
+    return "[Empty string]";
+  }
+  if (!Number.isFinite(EVALUATE_MAX_ACTUAL_CHARS) || EVALUATE_MAX_ACTUAL_CHARS < 200) {
+    return actual;
+  }
+  if (actual.length <= EVALUATE_MAX_ACTUAL_CHARS) return actual;
+  const tailNotice = `\n\n[truncated to first ${EVALUATE_MAX_ACTUAL_CHARS} chars]`;
+  return `${actual.slice(0, EVALUATE_MAX_ACTUAL_CHARS)}${tailNotice}`;
+}
+
+async function runEvaluateJudge(opts: {
+  actual: string;
+  assertion: string;
+}): Promise<Omit<EvaluationResult, "cached">> {
+  if (!EVALUATE_OPENAI_API_KEY) {
+    throw new Error(
+      `evaluate could not load OpenAI key from gcloud secret "${EVALUATE_OPENAI_API_KEY_SECRET_NAME}".`,
+    );
+  }
+
+  const client = new OpenAI({
+    apiKey: EVALUATE_OPENAI_API_KEY,
+    baseURL: EVALUATE_OPENAI_BASE_URL,
+  });
+  const completion = await client.chat.completions.create({
+    model: EVALUATE_MODEL,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a strict test assertion grader. Return only JSON with keys success:boolean and reason:string. Mark success=false when evidence is insufficient.",
+      },
+      {
+        role: "user",
+        content: [
+          "Decide whether ACTUAL_TEXT satisfies ASSERTION.",
+          "Ignore minor formatting differences unless ASSERTION explicitly depends on formatting.",
+          "Use one concise reason with direct evidence.",
+          "",
+          `ASSERTION:\n${opts.assertion}`,
+          "",
+          `ACTUAL_TEXT:\n${clipActualForPrompt(opts.actual)}`,
+        ].join("\n"),
+      },
+    ],
+  });
+
+  const content = completion.choices[0]?.message?.content;
+
+  if (typeof content !== "string" || content.trim().length === 0) {
+    throw new Error("evaluate received empty model content.");
+  }
+
+  let output: unknown;
+  try {
+    output = JSON.parse(content);
+  } catch {
+    throw new Error(`evaluate model output was not valid JSON: ${content.slice(0, 600)}`);
+  }
+
+  const parsedVerdict = EvaluateVerdictSchema.safeParse(output);
+  if (!parsedVerdict.success) {
+    throw new Error(
+      `evaluate model output failed schema validation: ${parsedVerdict.error.issues[0]?.message ?? "unknown schema error"}`,
+    );
+  }
+
+  return {
+    success: parsedVerdict.data.success,
+    reason: parsedVerdict.data.reason,
+    model: EVALUATE_MODEL,
+  };
+}
+
+async function evaluateTextMatch(opts: {
+  actual: string;
+  assertion: string;
+}): Promise<EvaluationResult> {
+  const cacheKey = JSON.stringify({
+    version: EVALUATE_PROMPT_VERSION,
+    model: EVALUATE_MODEL,
+    assertion: opts.assertion,
+    actual: opts.actual,
+  });
+  const cached = await readEvaluateCache(cacheKey);
+  if (cached) {
+    return { ...cached, cached: true };
+  }
+  const fresh = await runEvaluateJudge(opts);
+  await writeEvaluateCache(cacheKey, fresh);
+  return { ...fresh, cached: false };
+}
+
 export const test = base.extend<CliFixtures>({
-  workspaceDir: async ({}, use) => {
-    const workspaceDir = await mkdtemp(join(tmpdir(), "libretto-cli-test-"));
+  workspaceDir: async ({ task }, use) => {
+    const workspaceDir = workspaceDirForTask(task);
+    await rm(workspaceDir, { recursive: true, force: true });
+    await mkdir(workspaceDir, { recursive: true });
     try {
       await use(workspaceDir);
     } finally {
@@ -194,6 +386,21 @@ export const test = base.extend<CliFixtures>({
         env,
       );
     });
+  },
+
+  evaluate: async ({}, use) => {
+    await use((actual: string) => ({
+      async toMatch(assertion: string): Promise<EvaluationResult> {
+        const result = await evaluateTextMatch({
+          actual,
+          assertion,
+        });
+        if (!result.success) {
+          throw new Error(result.reason);
+        }
+        return result;
+      },
+    }));
   },
 
   writeWorkflow: async ({ workspaceDir }, use) => {
