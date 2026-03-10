@@ -316,9 +316,17 @@ function runEvaluateFallback(opts: {
     }
   }
 
-  const upperTokens = trimmedAssertion.match(/\b[A-Z][A-Z0-9_]{2,}\b/g) ?? [];
-  for (const token of upperTokens) {
-    if (/does not include/i.test(trimmedAssertion) && trimmedAssertion.includes(token)) {
+  for (const tokenMatch of trimmedAssertion.matchAll(/\b[A-Z][A-Z0-9_]{2,}\b/g)) {
+    const token = tokenMatch[0];
+    const index = tokenMatch.index ?? 0;
+    const prefix = trimmedAssertion
+      .slice(Math.max(0, index - 48), index)
+      .toLowerCase();
+    if (
+      prefix.includes("does not include") ||
+      prefix.includes("not include") ||
+      prefix.includes("without")
+    ) {
       forbidden.push(token);
       continue;
     }
