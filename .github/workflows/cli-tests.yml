@@ -24,6 +24,46 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Configure gcloud secret access for evaluator
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "OPENAI_API_KEY secret is required for evaluator tests." >&2
+            exit 1
+          fi
+
+          key_file="$RUNNER_TEMP/libretto-test-openai-api-key.txt"
+          printf '%s' "${OPENAI_API_KEY}" > "${key_file}"
+          chmod 600 "${key_file}"
+
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/gcloud" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          if [[ "\${1:-}" == "secrets" && "\${2:-}" == "versions" && "\${3:-}" == "access" && "\${4:-}" == "latest" ]]; then
+            secret=""
+            for arg in "\$@"; do
+              case "\$arg" in
+                --secret=*) secret="\${arg#--secret=}" ;;
+              esac
+            done
+            if [[ "\$secret" != "libretto-test-openai-api-key" ]]; then
+              echo "Unsupported secret request: \$secret" >&2
+              exit 1
+            fi
+            cat "${key_file}"
+            exit 0
+          fi
+
+          echo "Unsupported gcloud invocation: \$*" >&2
+          exit 1
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/gcloud"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
