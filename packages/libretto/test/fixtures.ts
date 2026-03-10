@@ -67,7 +67,6 @@ const EVALUATE_CACHE_DIR = resolve(repoRoot, "temp/libretto-cli-evaluate-cache")
 const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-cli-test-workspaces");
 const EVALUATE_PROMPT_VERSION = 1;
 const EVALUATE_MAX_ACTUAL_CHARS = 12_000;
-const EVALUATE_MODEL_FALLBACK = "fallback-no-model";
 const EvaluateVerdictSchema = z.object({
   success: z.boolean(),
   reason: z.string().trim().min(1),
@@ -273,108 +272,14 @@ function clipActualForPrompt(actual: string): string {
   return `${actual.slice(0, EVALUATE_MAX_ACTUAL_CHARS)}${tailNotice}`;
 }
 
-function lowercaseIncludes(haystack: string, needle: string): boolean {
-  return haystack.toLowerCase().includes(needle.toLowerCase());
-}
-
-function runEvaluateFallback(opts: {
-  actual: string;
-  assertion: string;
-}): Omit<EvaluationResult, "cached"> {
-  const trimmedAssertion = opts.assertion.trim();
-  const normalizedActual = opts.actual;
-
-  if (/^is empty\.?$/i.test(trimmedAssertion)) {
-    const success = normalizedActual.length === 0;
-    return {
-      success,
-      reason: success
-        ? "fallback check passed: output is empty."
-        : "fallback check failed: expected empty output.",
-      model: EVALUATE_MODEL_FALLBACK,
-    };
-  }
-
-  const required: string[] = [];
-  const forbidden: string[] = [];
-  for (const match of trimmedAssertion.matchAll(/"([^"]+)"/g)) {
-    const phrase = match[1]?.trim();
-    if (!phrase) continue;
-    const prefix = trimmedAssertion
-      .slice(Math.max(0, match.index - 48), match.index)
-      .toLowerCase();
-    if (
-      prefix.includes("does not") ||
-      prefix.includes("not include") ||
-      prefix.includes("not mention") ||
-      prefix.includes("not claim") ||
-      prefix.includes("without")
-    ) {
-      forbidden.push(phrase);
-    } else {
-      required.push(phrase);
-    }
-  }
-
-  for (const tokenMatch of trimmedAssertion.matchAll(/\b[A-Z][A-Z0-9_]{2,}\b/g)) {
-    const token = tokenMatch[0];
-    const index = tokenMatch.index ?? 0;
-    const prefix = trimmedAssertion
-      .slice(Math.max(0, index - 48), index)
-      .toLowerCase();
-    if (
-      prefix.includes("does not include") ||
-      prefix.includes("not include") ||
-      prefix.includes("without")
-    ) {
-      forbidden.push(token);
-      continue;
-    }
-    required.push(token);
-  }
-
-  for (const phrase of required) {
-    if (!lowercaseIncludes(normalizedActual, phrase)) {
-      return {
-        success: false,
-        reason: `fallback check failed: expected output to include "${phrase}".`,
-        model: EVALUATE_MODEL_FALLBACK,
-      };
-    }
-  }
-
-  for (const phrase of forbidden) {
-    if (lowercaseIncludes(normalizedActual, phrase)) {
-      return {
-        success: false,
-        reason: `fallback check failed: expected output to omit "${phrase}".`,
-        model: EVALUATE_MODEL_FALLBACK,
-      };
-    }
-  }
-
-  if (required.length === 0 && forbidden.length === 0) {
-    return {
-      success: true,
-      reason:
-        "fallback check passed: semantic evaluation skipped because API key is unavailable.",
-      model: EVALUATE_MODEL_FALLBACK,
-    };
-  }
-
-  return {
-    success: true,
-    reason: "fallback check passed.",
-    model: EVALUATE_MODEL_FALLBACK,
-  };
-}
-
 async function runEvaluateJudge(opts: {
   actual: string;
   assertion: string;
 }): Promise<Omit<EvaluationResult, "cached">> {
   if (!EVALUATE_OPENAI_API_KEY) {
-    return runEvaluateFallback(opts);
+    throw new Error(
+      `evaluate could not load OpenAI key from gcloud secret "${EVALUATE_OPENAI_API_KEY_SECRET_NAME}".`,
+    );
   }
 
   const client = new OpenAI({
