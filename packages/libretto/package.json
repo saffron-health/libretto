@@ -1,6 +1,6 @@
 {
   "name": "libretto",
-  "version": "0.0.1",
+  "version": "0.2.2",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
   "repository": {
@@ -13,7 +13,9 @@
   },
   "files": [
     "dist",
-    "bin"
+    "bin",
+    "scripts",
+    "skill"
   ],
   "bin": {
     "libretto": "./bin/libretto.mjs",
