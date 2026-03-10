@@ -64,6 +64,14 @@ jobs:
           chmod +x "$RUNNER_TEMP/bin/gcloud"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
+      - name: Restore evaluator cache
+        uses: actions/cache@v4
+        with:
+          path: temp/libretto-cli-evaluate-cache
+          key: libretto-evaluate-cache-${{ runner.os }}-${{ hashFiles('packages/libretto/test/fixtures.ts', 'packages/libretto/test/basic.spec.ts', 'packages/libretto/test/stateful.spec.ts') }}
+          restore-keys: |
+            libretto-evaluate-cache-${{ runner.os }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
