@@ -70,6 +70,13 @@ export function ensureLibrettoSetup(): void {
   if (!existsSync(LIBRETTO_GITIGNORE_PATH)) {
     writeFileSync(LIBRETTO_GITIGNORE_PATH, LIBRETTO_GITIGNORE_CONTENT, "utf-8");
   }
+
+  // Nudge users to run init if skills haven't been installed yet
+  const agentsSkillsDir = join(REPO_ROOT, ".agents", "skills", "libretto");
+  const claudeSkillsDir = join(REPO_ROOT, ".claude", "skills", "libretto");
+  if (!existsSync(agentsSkillsDir) && !existsSync(claudeSkillsDir)) {
+    console.log("[libretto] Skills not installed. Run 'npx libretto init' to complete setup.");
+  }
 }
 
 export function createLoggerForSession(session: string): Logger {

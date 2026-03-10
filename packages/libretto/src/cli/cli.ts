@@ -5,6 +5,7 @@ import { registerAICommands } from "./commands/ai.js";
 import { registerBrowserCommands } from "./commands/browser.js";
 import { registerExecutionCommands } from "./commands/execution.js";
 import { registerLogCommands } from "./commands/logs.js";
+import { registerInitCommand } from "./commands/init.js";
 import { registerSnapshotCommands } from "./commands/snapshot.js";
 import {
   closeLogger,
@@ -28,6 +29,7 @@ const CLI_COMMANDS = new Set([
   "pages",
   "resume",
   "close",
+  "init",
   "--help",
   "-h",
   "help",
@@ -37,6 +39,7 @@ function printUsage(): void {
   console.log(`Usage: libretto-cli <command> [--session <name>]
 
 Commands:
+  init [--skip-browsers] Initialize libretto (copy skills, install browsers)
   open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
   run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless] [--debug]  Run an exported Libretto workflow from a file; pass --debug to enable pause-on-failure debugging (or --no-debug to disable)
@@ -181,6 +184,7 @@ function createParser(logger: Logger): Argv {
   parser = registerLogCommands(parser);
   parser = registerAICommands(parser);
   parser = registerSnapshotCommands(parser, logger);
+  parser = registerInitCommand(parser);
   parser = parser.command("help", "Show usage", () => {}, () => {
     printUsage();
   });
