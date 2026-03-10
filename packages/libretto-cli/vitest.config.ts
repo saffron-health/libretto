@@ -36,5 +36,13 @@ export default defineConfig({
     environment: "node",
     include: ["test/**/*.spec.ts"],
     testTimeout: 30_000,
+    pool: "forks",
+    isolate: true,
+    fileParallelism: true,
+    maxWorkers: "100%",
+    maxConcurrency: 1_000,
+    sequence: {
+      concurrent: true,
+    },
   },
 });

@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -49,10 +49,12 @@ const cliEntry = resolve(repoRoot, "packages/libretto-cli/dist/index.js");
 const librettoEntry = resolve(repoRoot, "packages/libretto/dist/index.js");
 const librettoRuntimePath = new URL("../../libretto/dist/index.js", import.meta.url)
   .href;
+const EVALUATE_GCP_PROJECT = "saffron-health";
 const EVALUATE_OPENAI_API_KEY_SECRET_NAME = "libretto-test-openai-api-key";
 const EVALUATE_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const EVALUATE_MODEL = "gpt-5-mini";
 const EVALUATE_CACHE_DIR = resolve(repoRoot, "temp/libretto-cli-evaluate-cache");
+const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-cli-test-workspaces");
 const EVALUATE_PROMPT_VERSION = 1;
 const EVALUATE_MAX_ACTUAL_CHARS = 12_000;
 const EvaluateVerdictSchema = z.object({
@@ -66,7 +68,14 @@ const CachedEvaluationSchema = EvaluateVerdictSchema.extend({
 function getSecret(secretName: string): string {
   const result = spawnSync(
     "gcloud",
-    ["secrets", "versions", "access", "latest", `--secret=${secretName}`],
+    [
+      "secrets",
+      "versions",
+      "access",
+      "latest",
+      `--project=${EVALUATE_GCP_PROJECT}`,
+      `--secret=${secretName}`,
+    ],
     { encoding: "utf8" },
   );
   if (result.status === 0 && result.stdout.trim().length > 0) {
@@ -215,6 +224,11 @@ function evaluateCachePath(cacheKey: string): string {
   return join(EVALUATE_CACHE_DIR, `${stableEvaluateHash(cacheKey)}.json`);
 }
 
+function workspaceDirForTask(task: Readonly<{ fullName: string; file: { filepath: string } }>): string {
+  const stableId = stableEvaluateHash(`${task.file.filepath}::${task.fullName}`).slice(0, 16);
+  return join(DETERMINISTIC_WORKSPACE_ROOT, stableId);
+}
+
 async function readEvaluateCache(
   cacheKey: string,
 ): Promise<Omit<EvaluationResult, "cached"> | null> {
@@ -246,6 +260,9 @@ async function writeEvaluateCache(
 }
 
 function clipActualForPrompt(actual: string): string {
+  if (actual.length === 0) {
+    return "[Empty string]";
+  }
   if (!Number.isFinite(EVALUATE_MAX_ACTUAL_CHARS) || EVALUATE_MAX_ACTUAL_CHARS < 200) {
     return actual;
   }
@@ -270,7 +287,6 @@ async function runEvaluateJudge(opts: {
   });
   const completion = await client.chat.completions.create({
     model: EVALUATE_MODEL,
-    temperature: 0,
     response_format: { type: "json_object" },
     messages: [
       {
@@ -340,8 +356,10 @@ async function evaluateTextMatch(opts: {
 }
 
 export const test = base.extend<CliFixtures>({
-  workspaceDir: async ({}, use) => {
-    const workspaceDir = await mkdtemp(join(tmpdir(), "libretto-cli-test-"));
+  workspaceDir: async ({ task }, use) => {
+    const workspaceDir = workspaceDirForTask(task);
+    await rm(workspaceDir, { recursive: true, force: true });
+    await mkdir(workspaceDir, { recursive: true });
     try {
       await use(workspaceDir);
     } finally {
