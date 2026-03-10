@@ -65,7 +65,6 @@ async function waitForResumeSignal(args: {
   signalPaths: ReturnType<typeof getPauseSignalPaths>;
   session: string;
   details: RunDebugPauseDetails;
-  onPaused?: (details: RunDebugPauseDetails) => Promise<void> | void;
 }): Promise<void> {
   const { pausedSignalPath, resumeSignalPath } = args.signalPaths;
   await mkdir(getSessionDir(args.session), { recursive: true });
@@ -75,7 +74,6 @@ async function waitForResumeSignal(args: {
     JSON.stringify(args.details, null, 2),
     "utf8",
   );
-  await args.onPaused?.(args.details);
 
   while (!existsSync(resumeSignalPath)) {
     await new Promise((resolveWait) =>
@@ -212,7 +210,6 @@ async function runIntegrationInternal(
   args: RunIntegrationWorkerRequest,
   options: {
     logger: LoggerApi;
-    onPaused?: (details: RunDebugPauseDetails) => Promise<void> | void;
   },
 ): Promise<RunIntegrationOutcome> {
   const { logger } = options;
@@ -286,7 +283,6 @@ async function runIntegrationInternal(
         signalPaths,
         session: args.session,
         details,
-        onPaused: options.onPaused,
       });
       console.log("[pause] Resume signal received. Continuing workflow...");
     },
@@ -332,10 +328,8 @@ async function runIntegrationInternal(
 export async function runIntegrationFromFileInWorker(
   args: RunIntegrationWorkerRequest,
   logger: LoggerApi,
-  onPaused: (details: RunDebugPauseDetails) => Promise<void> | void,
 ): Promise<RunIntegrationOutcome> {
   return await runIntegrationInternal(args, {
     logger,
-    onPaused,
   });
 }

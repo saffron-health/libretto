@@ -2,7 +2,6 @@ import { writeFile } from "node:fs/promises";
 import { ZodError } from "zod";
 import {
   RunIntegrationWorkerRequestSchema,
-  type RunIntegrationWorkerMessage,
   type RunIntegrationWorkerRequest,
 } from "./run-integration-worker-protocol.js";
 import { runIntegrationFromFileInWorker } from "./run-integration-runtime.js";
@@ -11,15 +10,6 @@ import {
   withSessionLogger,
 } from "../core/context.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
-
-function sendMessage(message: RunIntegrationWorkerMessage): void {
-  if (typeof process.send !== "function" || !process.connected) return;
-  try {
-    process.send(message);
-  } catch {
-    // Parent may have disconnected after initial run returns on pause.
-  }
-}
 
 function parseWorkerRequest(argv: string[]): RunIntegrationWorkerRequest {
   const rawPayload = argv[2];
@@ -56,20 +46,9 @@ async function main(): Promise<void> {
     request = parseWorkerRequest(process.argv);
     const workerRequest = request;
     ensureLibrettoSetup();
-    let outcomeStatus: "completed" | "failed-held" = "completed";
     await withSessionLogger(workerRequest.session, async (logger) => {
-      const outcome = await runIntegrationFromFileInWorker(
-        workerRequest,
-        logger,
-        async (details) => {
-          sendMessage({ type: "paused", details });
-        },
-      );
-      outcomeStatus = outcome.status;
+      await runIntegrationFromFileInWorker(workerRequest, logger);
     });
-    if (outcomeStatus === "completed") {
-      sendMessage({ type: "completed" });
-    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (request) {
@@ -87,7 +66,6 @@ async function main(): Promise<void> {
         "utf8",
       );
     }
-    sendMessage({ type: "failed", message });
     exitCode = 1;
   }
   process.exit(exitCode);
