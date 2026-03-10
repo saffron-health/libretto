@@ -20,7 +20,7 @@ describe("basic CLI subprocess behavior", () => {
     await evaluate(result.stderr).toMatch("Is empty.");
   });
 
-  test("fails unknown command with non-zero exit code", async ({
+  test("fails unknown command with a clear error", async ({
     librettoCli,
     evaluate,
   }) => {
