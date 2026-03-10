@@ -11,8 +11,13 @@ import {
 } from "../../index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { getProfilePath, normalizeDomain } from "../core/browser.js";
-import { getSessionDir } from "../core/context.js";
+import {
+  getSessionActionsLogPath,
+  getSessionDir,
+  getSessionNetworkLogPath,
+} from "../core/context.js";
 import { getPauseSignalPaths, removeSignalIfExists } from "../core/pause-signals.js";
+import { installSessionTelemetry } from "../core/session-telemetry.js";
 import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol.js";
 
 const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
@@ -205,6 +210,19 @@ async function runIntegrationInternal(
     sessionName: args.session,
     headless: args.headless,
     storageStatePath,
+  });
+  const actionsLogPath = getSessionActionsLogPath(args.session);
+  const networkLogPath = getSessionNetworkLogPath(args.session);
+  await installSessionTelemetry({
+    context: browserSession.context,
+    initialPage: browserSession.page,
+    includeUserDomActions: true,
+    logAction: (entry) => {
+      appendFileSync(actionsLogPath, JSON.stringify(entry) + "\n");
+    },
+    logNetwork: (entry) => {
+      appendFileSync(networkLogPath, JSON.stringify(entry) + "\n");
+    },
   });
 
   const workflowContext: LibrettoWorkflowContext = {
