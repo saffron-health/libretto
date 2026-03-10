@@ -47,13 +47,14 @@ After every push:
 
 1. Watch PR checks with `gh pr checks --watch`.
 2. If GitHub returns `no checks reported`, treat it as possible propagation delay. Wait 15 seconds and retry `gh pr checks --watch`. Repeat up to 8 times (about 2 minutes total).
-3. If checks are still not reported after those retries, treat merge conflicts with `main` as a likely cause:
+3. If checks are still not reported after those retries, run one remediation pass and treat merge conflicts with `main` as a likely cause:
    - Pull and merge `main` into your branch.
    - If merge conflicts occur, resolve them by following the `fix-merge-conflicts` skill.
-   - Commit the conflict resolution if needed, push, and restart this CI loop.
-4. If checks appear, wait for all required checks to complete.
-5. If any test or type-check command fails, inspect logs immediately, fix the issue, commit, push, and repeat this CI loop until checks pass.
-6. If checks are blocked on AI review bots, wait for bot completion and read all bot reviews before reporting completion.
+   - Commit the conflict resolution if needed, push, and restart this CI loop once.
+4. If checks are still not reported after that remediation pass, conclude no required checks are configured for this PR.
+5. If checks appear, wait for all required checks to complete.
+6. If any test or type-check command fails, inspect logs immediately, fix the issue, commit, push, and repeat this CI loop until checks pass.
+7. If checks are blocked on AI review bots, wait for bot completion and read all bot reviews before reporting completion.
 
 AI review bot handling:
 
