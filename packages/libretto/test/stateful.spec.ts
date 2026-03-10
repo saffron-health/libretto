@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
@@ -39,6 +40,43 @@ async function writeJsonl(
   const body = entries.map((entry) => JSON.stringify(entry)).join("\n");
   await writeFile(filePath, body ? `${body}\n` : "", "utf8");
   return filePath;
+}
+
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function killProcessTree(pid: number): void {
+  try {
+    process.kill(-pid, "SIGKILL");
+    return;
+  } catch {
+    // Fall through to direct pid kill.
+  }
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {
+    // Ignore best-effort cleanup failures.
+  }
+}
+
+async function waitForProcessToStop(
+  pid: number,
+  timeoutMs: number = 3_000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isProcessRunning(pid)) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return !isProcessRunning(pid);
 }
 
 const SNAPSHOT_PRESETS = ["codex", "claude", "gemini"] as const;
@@ -268,6 +306,93 @@ describe("state-driven CLI subprocess behavior", () => {
       `No browser running for session "${session}".`,
     );
   });
+
+  test("prints no-op message when closing all sessions and none exist", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("close --all");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("No browser sessions found.");
+  });
+
+  test("rejects close --force without --all", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("close --force");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Usage: libretto-cli close --all [--force]");
+  });
+
+  test("close --all clears stale session state files", async ({
+    librettoCli,
+    workspaceDir,
+  }) => {
+    const firstStatePath = await writeSessionState(workspaceDir, {
+      session: "stale-one",
+      pid: 424_241,
+      port: 65531,
+    });
+    const secondStatePath = await writeSessionState(workspaceDir, {
+      session: "stale-two",
+      pid: 424_242,
+      port: 65532,
+    });
+
+    const result = await librettoCli("close --all");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Closed 2 session(s).");
+    expect(existsSync(firstStatePath)).toBe(false);
+    expect(existsSync(secondStatePath)).toBe(false);
+  });
+
+  test("close --all requires --force when a session ignores SIGTERM", async ({
+    librettoCli,
+    workspaceDir,
+  }) => {
+    const session = "stubborn-sigterm";
+    const stubbornChild = spawn(
+      process.execPath,
+      [
+        "-e",
+        "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);",
+      ],
+      {
+        detached: true,
+        stdio: "ignore",
+      },
+    );
+    stubbornChild.unref();
+    const pid = stubbornChild.pid;
+    expect(pid).toBeDefined();
+
+    const statePath = await writeSessionState(workspaceDir, {
+      session,
+      pid: pid!,
+      port: 65533,
+    });
+
+    try {
+      const graceful = await librettoCli("close --all");
+      expect(graceful.exitCode).toBe(1);
+      expect(graceful.stderr).toContain(
+        `Failed to close 1 session(s) gracefully: "${session}".`,
+      );
+      expect(graceful.stderr).toContain("Retry with: libretto-cli close --all --force");
+      expect(existsSync(statePath)).toBe(true);
+      expect(isProcessRunning(pid!)).toBe(true);
+
+      const forced = await librettoCli("close --all --force");
+      expect(forced.exitCode).toBe(0);
+      expect(forced.stdout).toContain("Closed 1 session(s).");
+      expect(forced.stdout).toContain("Force-killed 1 session(s).");
+      expect(existsSync(statePath)).toBe(false);
+      expect(await waitForProcessToStop(pid!, 5_000)).toBe(true);
+    } finally {
+      if (pid && isProcessRunning(pid)) {
+        killProcessTree(pid);
+      }
+    }
+  }, 20_000);
 
   test("reads and clears network logs from seeded run data", async ({
     librettoCli,

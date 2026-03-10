@@ -48,7 +48,7 @@ Commands:
   actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
   pages                   List open pages in the active session
   resume                  Resume a paused workflow in the active session
-  close                   Close the browser
+  close [--all] [--force]  Close the browser for the session, or all tracked sessions with --all
 
 Options:
   --session <name>        Use a named session (default: "default")
@@ -71,6 +71,8 @@ Examples:
   libretto-cli snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
   libretto-cli resume --session default
   libretto-cli close
+  libretto-cli close --all
+  libretto-cli close --all --force
 
   # Multiple sessions
   libretto-cli open https://site1.com --session test1
