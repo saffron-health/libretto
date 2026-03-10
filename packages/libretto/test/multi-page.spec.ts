@@ -148,13 +148,13 @@ describe("multi-page CLI behavior", () => {
   }) => {
     const session = "multi-page-log-page-id";
     const opened = await librettoCli(
-      `open https://example.com --headless --session ${session}`,
+      `open https://example.com/?tab=one --headless --session ${session}`,
     );
     expect(opened.exitCode).toBe(0);
 
     try {
       const secondPageOpened = await librettoCli(
-        `exec "const p = await context.newPage(); await p.goto('https://example.org'); return context.pages().length;" --session ${session}`,
+        `exec "await page.evaluate(() => window.open('https://example.com/?tab=two', '_blank')); await page.waitForTimeout(1500); return context.pages().length;" --session ${session}`,
       );
       expect(secondPageOpened.exitCode).toBe(0);
 
@@ -163,10 +163,10 @@ describe("multi-page CLI behavior", () => {
       const pages = parsePagesOutput(pagesResult.stdout);
       expect(pages.length).toBeGreaterThan(0);
       const exampleComPage = pages.find((entry) =>
-        entry.url.includes("example.com"),
+        entry.url.includes("tab=one"),
       );
       const exampleOrgPage = pages.find((entry) =>
-        entry.url.includes("example.org"),
+        entry.url.includes("tab=two"),
       );
       expect(exampleComPage).toBeDefined();
       expect(exampleOrgPage).toBeDefined();
@@ -182,36 +182,36 @@ describe("multi-page CLI behavior", () => {
       expect(reloadOrg.exitCode).toBe(0);
 
       const actionsCom = await librettoCli(
-        `actions --session ${session} --page ${exampleComPage?.id} --last 20`,
+        `actions --session ${session} --page ${exampleComPage?.id} --action reload --last 20`,
       );
       expect(actionsCom.exitCode).toBe(0);
       expect(actionsCom.stdout).toContain("action(s) shown.");
-      expect(actionsCom.stdout).toContain("example.com");
-      expect(actionsCom.stdout).not.toContain("example.org");
+      expect(actionsCom.stdout).toContain("tab=one");
+      expect(actionsCom.stdout).not.toContain("tab=two");
 
       const actionsOrg = await librettoCli(
-        `actions --session ${session} --page ${exampleOrgPage?.id} --last 20`,
+        `actions --session ${session} --page ${exampleOrgPage?.id} --action reload --last 20`,
       );
       expect(actionsOrg.exitCode).toBe(0);
       expect(actionsOrg.stdout).toContain("action(s) shown.");
-      expect(actionsOrg.stdout).toContain("example.org");
-      expect(actionsOrg.stdout).not.toContain("example.com");
+      expect(actionsOrg.stdout).toContain("tab=two");
+      expect(actionsOrg.stdout).not.toContain("tab=one");
 
       const networkCom = await librettoCli(
         `network --session ${session} --page ${exampleComPage?.id} --last 20`,
       );
       expect(networkCom.exitCode).toBe(0);
       expect(networkCom.stdout).toContain("request(s) shown.");
-      expect(networkCom.stdout).toContain("example.com");
-      expect(networkCom.stdout).not.toContain("example.org");
+      expect(networkCom.stdout).toContain("tab=one");
+      expect(networkCom.stdout).not.toContain("tab=two");
 
       const networkOrg = await librettoCli(
         `network --session ${session} --page ${exampleOrgPage?.id} --last 20`,
       );
       expect(networkOrg.exitCode).toBe(0);
       expect(networkOrg.stdout).toContain("request(s) shown.");
-      expect(networkOrg.stdout).toContain("example.org");
-      expect(networkOrg.stdout).not.toContain("example.com");
+      expect(networkOrg.stdout).toContain("tab=two");
+      expect(networkOrg.stdout).not.toContain("tab=one");
     } finally {
       await librettoCli(`close --session ${session}`);
     }

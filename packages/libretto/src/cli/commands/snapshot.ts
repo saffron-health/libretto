@@ -10,16 +10,23 @@ import {
 } from "../core/snapshot-analyzer.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
+function generateSnapshotRunId(): string {
+  return `snapshot-${Date.now()}`;
+}
 
 async function captureScreenshot(
   session: string,
   logger: LoggerApi,
+  pageId?: string,
 ): Promise<ScreenshotPair> {
-  logger.info("screenshot-start", { session });
-  const snapshotRunId = `snapshot-${Date.now()}`;
+  logger.info("screenshot-start", { session, pageId });
+  const snapshotRunId = generateSnapshotRunId();
   const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);
   mkdirSync(snapshotRunDir, { recursive: true });
-  const { browser, page } = await connect(session, logger);
+  const { browser, page } = await connect(session, logger, 10000, {
+    pageId,
+    requireSinglePage: true,
+  });
 
   try {
     const title = await page.title();
@@ -65,10 +72,11 @@ async function captureScreenshot(
 async function runSnapshot(
   session: string,
   logger: LoggerApi,
+  pageId?: string,
   objective?: string,
   context?: string,
 ): Promise<void> {
-  const { pngPath, htmlPath } = await captureScreenshot(session, logger);
+  const { pngPath, htmlPath } = await captureScreenshot(session, logger, pageId);
 
   console.log("Screenshot saved:");
   console.log(`  PNG:  ${pngPath}`);
@@ -108,12 +116,14 @@ export function registerSnapshotCommands(yargs: Argv, logger: LoggerApi): Argv {
     "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
     (cmd) =>
       cmd
+        .option("page", { type: "string" })
         .option("objective", { type: "string" })
         .option("context", { type: "string" }),
     async (argv) => {
       await runSnapshot(
         String(argv.session),
         logger,
+        argv.page ? String(argv.page) : undefined,
         argv.objective as string | undefined,
         argv.context as string | undefined,
       );

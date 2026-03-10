@@ -8,6 +8,7 @@ import { assertSessionStateExistsOrThrow } from "./session.js";
 
 export type NetworkLogEntry = {
   ts: string;
+  pageId?: string;
   method: string;
   url: string;
   status: number;
@@ -20,7 +21,7 @@ export type NetworkLogEntry = {
 
 export function readNetworkLog(
   session: string,
-  opts: { last?: number; filter?: string; method?: string } = {},
+  opts: { last?: number; filter?: string; method?: string; pageId?: string } = {},
 ): NetworkLogEntry[] {
   assertSessionStateExistsOrThrow(session);
   const logPath = getSessionNetworkLogPath(session);
@@ -41,6 +42,9 @@ export function readNetworkLog(
   if (opts.filter) {
     const re = new RegExp(opts.filter, "i");
     entries = entries.filter((e) => re.test(e.url));
+  }
+  if (opts.pageId) {
+    entries = entries.filter((e) => e.pageId === opts.pageId);
   }
 
   const last = opts.last ?? 20;
@@ -78,6 +82,7 @@ export function clearNetworkLog(session: string): void {
 
 export type ActionLogEntry = {
   ts: string;
+  pageId?: string;
   action: string;
   source: "user" | "agent";
   selector?: string;
@@ -105,6 +110,7 @@ export function readActionLog(
     filter?: string;
     action?: string;
     source?: string;
+    pageId?: string;
   } = {},
 ): ActionLogEntry[] {
   assertSessionStateExistsOrThrow(session);
@@ -136,6 +142,9 @@ export function readActionLog(
         re.test(e.value || "") ||
         re.test(e.url || ""),
     );
+  }
+  if (opts.pageId) {
+    entries = entries.filter((e) => e.pageId === opts.pageId);
   }
 
   const last = opts.last ?? 20;
@@ -228,6 +237,7 @@ function wrapLocator(
   hint: string,
   session: string,
   page: Page,
+  pageId?: string,
   onActivity?: () => void,
 ): any {
   if (locator.__librettoActionLogged) return locator;
@@ -246,6 +256,7 @@ function wrapLocator(
       try {
         const result = await origAct(...actArgs);
         parentLogAction(session, {
+          pageId,
           action: actMethod,
           source: "agent",
           selector: hint,
@@ -260,6 +271,7 @@ function wrapLocator(
         return result;
       } catch (err: any) {
         parentLogAction(session, {
+          pageId,
           action: actMethod,
           source: "agent",
           selector: hint,
@@ -288,7 +300,7 @@ function wrapLocator(
         args.length > 0
           ? `${hint}.${formatHint(method, args)}`
           : `${hint}.${method}()`;
-      return wrapLocator(child, childHint, session, page, onActivity);
+      return wrapLocator(child, childHint, session, page, pageId, onActivity);
     };
   }
 
@@ -297,7 +309,7 @@ function wrapLocator(
     locator.nth = (index: number) => {
       const child = origNth(index);
       const childHint = `${hint}.nth(${index})`;
-      return wrapLocator(child, childHint, session, page, onActivity);
+      return wrapLocator(child, childHint, session, page, pageId, onActivity);
     };
   }
 
@@ -307,7 +319,7 @@ function wrapLocator(
       const items: any[] = await origAll();
       return items.map((item: any, i: number) => {
         const childHint = `${hint}.all()[${i}]`;
-        return wrapLocator(item, childHint, session, page, onActivity);
+        return wrapLocator(item, childHint, session, page, pageId, onActivity);
       });
     };
   }
@@ -318,6 +330,7 @@ function wrapLocator(
 export function wrapPageForActionLogging(
   page: Page,
   session: string,
+  pageId?: string,
   onActivity?: () => void,
 ): void {
   const PAGE_ACTIONS = [
@@ -346,6 +359,7 @@ export function wrapPageForActionLogging(
       try {
         const result = await orig(...args);
         parentLogAction(session, {
+          pageId,
           action: method,
           source: "agent",
           selector: typeof args[0] === "string" ? args[0] : undefined,
@@ -358,6 +372,7 @@ export function wrapPageForActionLogging(
         return result;
       } catch (err: any) {
         parentLogAction(session, {
+          pageId,
           action: method,
           source: "agent",
           selector: typeof args[0] === "string" ? args[0] : undefined,
@@ -384,6 +399,7 @@ export function wrapPageForActionLogging(
       try {
         const result = await orig(...args);
         parentLogAction(session, {
+          pageId,
           action: method,
           source: "agent",
           url: typeof args[0] === "string" ? args[0] : page.url(),
@@ -394,6 +410,7 @@ export function wrapPageForActionLogging(
         return result;
       } catch (err: any) {
         parentLogAction(session, {
+          pageId,
           action: method,
           source: "agent",
           url: typeof args[0] === "string" ? args[0] : undefined,
@@ -423,7 +440,7 @@ export function wrapPageForActionLogging(
     (page as any)[factory] = (...factoryArgs: any[]) => {
       const locator = orig(...factoryArgs);
       const hint = formatHint(factory, factoryArgs);
-      return wrapLocator(locator, hint, session, page, onActivity);
+      return wrapLocator(locator, hint, session, page, pageId, onActivity);
     };
   }
 }
