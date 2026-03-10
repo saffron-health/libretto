@@ -657,22 +657,6 @@ function sendSignalToProcessGroupOrPid(
   session: string,
 ): void {
   try {
-    process.kill(-pid, signal);
-    logger.info("close-signal-process-group", { session, pid, signal });
-    return;
-  } catch (groupErr) {
-    const groupCode = (groupErr as NodeJS.ErrnoException).code;
-    if (groupCode !== "ESRCH") {
-      logger.warn("close-signal-process-group-failed", {
-        session,
-        pid,
-        signal,
-        error: groupErr,
-      });
-    }
-  }
-
-  try {
     process.kill(pid, signal);
     logger.info("close-signal-pid", { session, pid, signal });
   } catch (pidErr) {
@@ -716,6 +700,20 @@ function resolveClosableSessions(logger: LoggerApi): {
   return { closable, clearedUnreadableStates };
 }
 
+function clearStoppedSessionStates(
+  sessions: ReadonlyArray<ClosableSession>,
+  logger: LoggerApi,
+): number {
+  let cleared = 0;
+  for (const session of sessions) {
+    if (!isPidRunning(session.pid)) {
+      clearSessionState(session.session, logger);
+      cleared += 1;
+    }
+  }
+  return cleared;
+}
+
 export async function runCloseAll(
   logger: LoggerApi,
   options?: { force?: boolean },
@@ -746,12 +744,7 @@ export async function runCloseAll(
 
   let survivors = closable.filter((target) => isPidRunning(target.pid));
   if (survivors.length > 0 && !force) {
-    const closed = closable.length - survivors.length;
-    for (const target of closable) {
-      if (!isPidRunning(target.pid)) {
-        clearSessionState(target.session, logger);
-      }
-    }
+    const closed = clearStoppedSessionStates(closable, logger);
 
     throw new Error(
       [
@@ -775,15 +768,17 @@ export async function runCloseAll(
     await waitForCloseSignalWindow(FORCE_CLOSE_WAIT_MS);
     survivors = survivors.filter((target) => isPidRunning(target.pid));
     if (survivors.length > 0) {
+      const closed = clearStoppedSessionStates(closable, logger);
       throw new Error(
-        `Failed to force-close ${survivors.length} session(s): ${formatSessionList(survivors)}.`,
+        [
+          `Failed to force-close ${survivors.length} session(s): ${formatSessionList(survivors)}.`,
+          `Closed ${closed} session(s).`,
+        ].join("\n"),
       );
     }
   }
 
-  for (const target of closable) {
-    clearSessionState(target.session, logger);
-  }
+  clearStoppedSessionStates(closable, logger);
 
   if (clearedUnreadableStates > 0) {
     console.log(
