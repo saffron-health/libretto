@@ -43,8 +43,17 @@ export function createLLMClientFromModel(model: LanguageModel): LLMClient {
 				if (typeof msg.content === "string") {
 					return { role: msg.role, content: msg.content };
 				}
+				if (msg.role === "assistant") {
+					// AssistantContent only supports text parts (no images)
+					return {
+						role: "assistant" as const,
+						content: msg.content
+							.filter((part): part is typeof part & { type: "text" } => part.type === "text")
+							.map((part) => ({ type: "text" as const, text: part.text })),
+					};
+				}
 				return {
-					role: msg.role as "user",
+					role: "user" as const,
 					content: msg.content.map((part) =>
 						part.type === "text"
 							? { type: "text" as const, text: part.text }
