@@ -86,11 +86,22 @@ export function readSessionState(
   }
 }
 
-function listActiveSessions(): string[] {
+export function listSessionsWithStateFile(): string[] {
   if (!existsSync(LIBRETTO_SESSIONS_DIR)) return [];
-  return readdirSync(LIBRETTO_SESSIONS_DIR).filter((session) =>
-    existsSync(getSessionStatePath(session)),
-  );
+  return readdirSync(LIBRETTO_SESSIONS_DIR)
+    .filter((session) => {
+      try {
+        validateSessionName(session);
+      } catch {
+        return false;
+      }
+      return existsSync(getSessionStatePath(session));
+    })
+    .sort();
+}
+
+function listActiveSessions(): string[] {
+  return listSessionsWithStateFile();
 }
 
 function throwSessionNotFoundError(session: string): never {
