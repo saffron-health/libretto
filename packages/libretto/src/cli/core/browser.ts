@@ -19,6 +19,7 @@ import {
   readSessionState,
   writeSessionState,
 } from "./session.js";
+import { installSessionTelemetry } from "./session-telemetry.js";
 
 async function pickFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
@@ -334,77 +335,21 @@ export async function runOpen(
   const launcherCode = `
 import { chromium } from 'playwright';
 import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 const LOG_FILE = '${escapedLogPath}';
 const NETWORK_LOG = '${escapedNetworkLogPath}';
 const ACTIONS_LOG = '${escapedActionsLogPath}';
-mkdirSync(NETWORK_LOG.replace(/\\/[^\\/]+$/, ''), { recursive: true });
+mkdirSync(dirname(NETWORK_LOG), { recursive: true });
 
-const STATIC_EXT_RE = /\\.(css|js|png|jpg|jpeg|gif|woff|woff2|ttf|ico|svg)(\\?|$)/i;
-const pageIdCache = new WeakMap();
-async function resolvePageId(p) {
-	if (!p) return undefined;
-	let cdpSession = null;
-	try {
-		cdpSession = await context.newCDPSession(p);
-		const targetInfo = await cdpSession.send('Target.getTargetInfo');
-		const targetId = targetInfo && targetInfo.targetInfo ? targetInfo.targetInfo.targetId : undefined;
-		return typeof targetId === 'string' && targetId.length > 0 ? targetId : undefined;
-	} catch {
-		return undefined;
-	} finally {
-		try { if (cdpSession) await cdpSession.detach(); } catch {}
-	}
-}
-async function getPageId(p) {
-	if (!p) return undefined;
-	const cached = pageIdCache.get(p);
-	if (cached) return cached;
-	const resolved = await resolvePageId(p);
-	if (resolved) pageIdCache.set(p, resolved);
-	return resolved;
-}
-async function logNetworkResponse(response) {
-	try {
-		const req = response.request();
-		const url = req.url();
-		if (STATIC_EXT_RE.test(url) || url.startsWith('chrome-extension://')) return;
-		let pageId = undefined;
-		try {
-			const frame = response.frame();
-			const responsePage = frame ? frame.page() : null;
-			pageId = await getPageId(responsePage);
-		} catch {}
-		let responseBody = null;
-		try {
-			const buf = await response.body();
-			responseBody = buf.toString('utf-8');
-		} catch {}
-		const entry = JSON.stringify({
-			ts: new Date().toISOString(),
-			pageId,
-			method: req.method(),
-			url,
-			status: response.status(),
-			contentType: response.headers()['content-type'] || null,
-			postData: req.method() === 'POST' || req.method() === 'PUT' || req.method() === 'PATCH'
-				? (req.postData() || '').substring(0, 2000)
-				: undefined,
-			responseBody,
-		});
-		appendFileSync(NETWORK_LOG, entry + '\\n');
-	} catch {}
-}
+${installSessionTelemetry.toString()}
 
 function logAction(entry) {
-	try {
-		const record = { ts: new Date().toISOString(), ...entry };
-		appendFileSync(ACTIONS_LOG, JSON.stringify(record) + '\\n');
-	} catch {}
+	appendFileSync(ACTIONS_LOG, JSON.stringify(entry) + '\\n');
 }
-async function logActionForPage(p, entry) {
-	const pageId = await getPageId(p);
-	logAction({ ...entry, pageId });
+
+function logNetwork(entry) {
+	appendFileSync(NETWORK_LOG, JSON.stringify(entry) + '\\n');
 }
 
 function childLog(level, event, data = {}) {
@@ -421,190 +366,6 @@ function childLog(level, event, data = {}) {
 	} catch {}
 }
 
-async function setupActionTracking(p) {
-	let pageId = await getPageId(p);
-	async function logTrackedAction(entry) {
-		if (!pageId) pageId = await getPageId(p);
-		logAction({ ...entry, pageId });
-	}
-	await p.exposeFunction('__btActionLog', async (jsonStr) => {
-		try { await logTrackedAction({ ...JSON.parse(jsonStr), source: 'user' }); } catch {}
-	});
-
-	await p.addInitScript(() => {
-		if (window.__btDomListenersInstalled) return;
-		window.__btDomListenersInstalled = true;
-
-		function identify(el) {
-			if (!el || !el.tagName) return '';
-			var tid = el.getAttribute('data-testid');
-			if (tid) return '[data-testid="' + tid + '"]';
-			var role = el.getAttribute('role') || '';
-			var id = el.id;
-			if (role && id) return role + '#' + id;
-			var name = el.getAttribute('aria-label') || (el.textContent || '').trim().slice(0, 30) || '';
-			if (role && name) return role + ' "' + name + '"';
-			var tag = el.tagName.toLowerCase();
-			var cls = el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\\s+/).slice(0, 2).join('.') : '';
-			return tag + cls;
-		}
-
-		var clickTimer = null;
-		var pendingClick = null;
-
-		document.addEventListener('click', function(e) {
-			if (window.__btApiActionInProgress) return;
-			var target = e.target;
-			var sel = identify(target);
-			if (target.type === 'checkbox') {
-				if (typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: target.checked ? 'check' : 'uncheck', selector: sel, success: true }));
-				}
-				return;
-			}
-			pendingClick = { selector: sel };
-			if (clickTimer) clearTimeout(clickTimer);
-			clickTimer = setTimeout(function() {
-				if (pendingClick && typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: 'click', selector: pendingClick.selector, success: true }));
-				}
-				pendingClick = null;
-				clickTimer = null;
-			}, 200);
-		}, true);
-
-		document.addEventListener('dblclick', function(e) {
-			if (window.__btApiActionInProgress) return;
-			if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; pendingClick = null; }
-			var sel = identify(e.target);
-			if (typeof window.__btActionLog === 'function') {
-				window.__btActionLog(JSON.stringify({ action: 'dblclick', selector: sel, success: true }));
-			}
-		}, true);
-
-		var inputTimers = new WeakMap();
-		document.addEventListener('input', function(e) {
-			if (window.__btApiActionInProgress) return;
-			var target = e.target;
-			var sel = identify(target);
-			if (target.tagName === 'SELECT') {
-				if (typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: 'selectOption', selector: sel, value: target.value, success: true }));
-				}
-				return;
-			}
-			var existing = inputTimers.get(target);
-			if (existing) clearTimeout(existing);
-			inputTimers.set(target, setTimeout(function() {
-				inputTimers.delete(target);
-				if (typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: 'fill', selector: sel, value: (target.value || '').slice(0, 100), success: true }));
-				}
-			}, 500));
-		}, true);
-
-		var SPECIAL_KEYS = ['Enter','Escape','Tab','Backspace','Delete','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','PageUp','PageDown','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'];
-		document.addEventListener('keydown', function(e) {
-			if (window.__btApiActionInProgress) return;
-			var isShortcut = e.ctrlKey || e.metaKey || e.altKey;
-			if (!isShortcut && SPECIAL_KEYS.indexOf(e.key) === -1) return;
-			var sel = identify(e.target);
-			var keyDesc = (e.ctrlKey ? 'Ctrl+' : '') + (e.metaKey ? 'Meta+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + e.key;
-			if (typeof window.__btActionLog === 'function') {
-				window.__btActionLog(JSON.stringify({ action: 'press', selector: sel, value: keyDesc, success: true }));
-			}
-		}, true);
-
-		var scrollTimer = null;
-		document.addEventListener('scroll', function() {
-			if (window.__btApiActionInProgress) return;
-			if (scrollTimer) clearTimeout(scrollTimer);
-			scrollTimer = setTimeout(function() {
-				scrollTimer = null;
-				if (typeof window.__btActionLog === 'function') {
-					window.__btActionLog(JSON.stringify({ action: 'scroll', selector: 'document', value: 'y=' + window.scrollY, success: true }));
-				}
-			}, 300);
-		}, true);
-	});
-
-	var PAGE_ACTIONS = ['click', 'dblclick', 'fill', 'type', 'press', 'check', 'uncheck', 'selectOption', 'hover', 'focus'];
-	var NAV_ACTIONS = ['goto', 'reload', 'goBack', 'goForward'];
-
-	for (var m of PAGE_ACTIONS) {
-		(function(method) {
-			var orig = p[method].bind(p);
-			p[method] = async function() {
-				var args = Array.from(arguments);
-				var start = Date.now();
-				try { await p.evaluate(function() { window.__btApiActionInProgress = true; }); } catch {}
-				try {
-					var result = await orig.apply(null, args);
-					await logTrackedAction({ action: method, source: 'agent', selector: typeof args[0] === 'string' ? args[0] : undefined, value: args[1] !== undefined ? String(args[1]).slice(0, 100) : undefined, duration: Date.now() - start, success: true });
-					return result;
-				} catch (err) {
-					await logTrackedAction({ action: method, source: 'agent', selector: typeof args[0] === 'string' ? args[0] : undefined, duration: Date.now() - start, success: false, error: err.message });
-					throw err;
-				} finally {
-					try { await p.evaluate(function() { window.__btApiActionInProgress = false; }); } catch {}
-				}
-			};
-		})(m);
-	}
-
-	for (var m of NAV_ACTIONS) {
-		(function(method) {
-			var orig = p[method].bind(p);
-			p[method] = async function() {
-				var args = Array.from(arguments);
-				var start = Date.now();
-				try {
-					var result = await orig.apply(null, args);
-					await logTrackedAction({ action: method, source: 'agent', url: typeof args[0] === 'string' ? args[0] : p.url(), duration: Date.now() - start, success: true });
-					return result;
-				} catch (err) {
-					await logTrackedAction({ action: method, source: 'agent', url: typeof args[0] === 'string' ? args[0] : undefined, duration: Date.now() - start, success: false, error: err.message });
-					throw err;
-				}
-			};
-		})(m);
-	}
-
-	var LOCATOR_FACTORIES = ['locator', 'getByRole', 'getByText', 'getByLabel', 'getByPlaceholder', 'getByAltText', 'getByTitle', 'getByTestId'];
-	for (var f of LOCATOR_FACTORIES) {
-		(function(factory) {
-			var orig = p[factory].bind(p);
-			p[factory] = function() {
-				var args = Array.from(arguments);
-				var locator = orig.apply(null, args);
-				var hint = factory + '(' + args.map(function(a) { return typeof a === 'string' ? a : JSON.stringify(a); }).join(', ') + ')';
-					for (var am of PAGE_ACTIONS) {
-						(function(actMethod) {
-							if (typeof locator[actMethod] !== 'function') return;
-							var origAct = locator[actMethod].bind(locator);
-							locator[actMethod] = async function() {
-								var actArgs = Array.from(arguments);
-								var start = Date.now();
-								try { await p.evaluate(function() { window.__btApiActionInProgress = true; }); } catch {}
-								try {
-									var result = await origAct.apply(null, actArgs);
-									await logTrackedAction({ action: actMethod, source: 'agent', selector: hint, value: actArgs[0] !== undefined ? String(actArgs[0]).slice(0, 100) : undefined, duration: Date.now() - start, success: true });
-									return result;
-								} catch (err) {
-									await logTrackedAction({ action: actMethod, source: 'agent', selector: hint, duration: Date.now() - start, success: false, error: err.message });
-									throw err;
-								} finally {
-									try { await p.evaluate(function() { window.__btApiActionInProgress = false; }); } catch {}
-								}
-							};
-						})(am);
-					}
-				return locator;
-			};
-		})(f);
-	}
-}
-
 const browser = await chromium.launch({
 	headless: ${!headed},
 	args: ['--disable-blink-features=AutomationControlled', '--remote-debugging-port=${port}', '--remote-debugging-address=127.0.0.1', '--no-focus-on-check'],
@@ -619,48 +380,17 @@ const context = await browser.newContext({
 	viewport: { width: 1366, height: 768 },
 	userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
 });
-context.on('response', logNetworkResponse);
 
 const page = await context.newPage();
 page.setDefaultTimeout(30000);
 page.setDefaultNavigationTimeout(45000);
 
-await setupActionTracking(page);
-
-page.on('crash', () => childLog('error', 'page-crash', { url: page.url() }));
-page.on('close', () => childLog('warn', 'page-close', { url: page.url(), trace: new Error('page-close-trace').stack }));
-page.on('pageerror', (err) => childLog('error', 'page-error', { message: err.message, stack: err.stack }));
-page.on('console', (msg) => {
-	if (msg.type() === 'error' || msg.type() === 'warning') {
-		childLog(msg.type() === 'error' ? 'error' : 'warn', 'console-' + msg.type(), { text: msg.text(), url: page.url() });
-	}
-});
-page.on('framenavigated', async (frame) => {
-	if (frame === page.mainFrame()) {
-		childLog('info', 'page-navigated', { url: frame.url() });
-		await logActionForPage(page, { action: 'navigate', source: 'agent', url: frame.url(), success: true });
-	}
-});
-page.on('requestfailed', (req) => {
-	const failure = req.failure();
-	childLog('warn', 'request-failed', { url: req.url(), method: req.method(), errorText: failure?.errorText });
-});
-page.on('popup', async (popup) => await logActionForPage(page, { action: 'popup', source: 'agent', url: popup.url(), success: true }));
-page.on('dialog', async (dialog) => await logActionForPage(page, { action: 'dialog', source: 'agent', value: dialog.type() + ': ' + dialog.message().slice(0, 500), success: true }));
-
-context.on('page', async (newPage) => {
-	const newPageId = await getPageId(newPage);
-	childLog('info', 'new-page-created', { url: newPage.url(), pageId: newPageId });
-	newPage.on('crash', () => childLog('error', 'page-crash', { url: newPage.url() }));
-	newPage.on('close', () => childLog('info', 'page-close', { url: newPage.url(), trace: new Error('page-close-trace').stack }));
-	newPage.on('popup', async (popup) => await logActionForPage(newPage, { action: 'popup', source: 'agent', url: popup.url(), success: true }));
-	newPage.on('dialog', async (dialog) => await logActionForPage(newPage, { action: 'dialog', source: 'agent', value: dialog.type() + ': ' + dialog.message().slice(0, 500), success: true }));
-	newPage.on('framenavigated', async (frame) => {
-		if (frame === newPage.mainFrame()) await logActionForPage(newPage, { action: 'navigate', source: 'agent', url: frame.url(), success: true });
-	});
-	try { await setupActionTracking(newPage); } catch (err) {
-		childLog('warn', 'action-tracking-setup-failed', { url: newPage.url(), error: err.message });
-	}
+await installSessionTelemetry({
+	context,
+	initialPage: page,
+	includeUserDomActions: true,
+	logAction,
+	logNetwork,
 });
 
 
