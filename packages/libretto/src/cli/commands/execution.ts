@@ -256,51 +256,30 @@ async function stopExistingFailedRunSession(
   if (!existingState || existingState.status !== "failed") {
     return;
   }
-  if (!isProcessRunning(existingState.pid)) {
-    setSessionStatus(session, "exited", logger);
-    return;
-  }
-
-  logger.info("run-stop-existing-failed-session", {
+  logger.info("run-release-existing-failed-session", {
     session,
     pid: existingState.pid,
     port: existingState.port,
   });
-  console.log(
-    `Killed existing browser process for session "${session}" (pid ${existingState.pid}).`,
-  );
-  try {
-    process.kill(existingState.pid, "SIGTERM");
-  } catch (err) {
-    logger.warn("run-stop-existing-failed-session-sigterm-error", {
-      session,
-      pid: existingState.pid,
-      error: err,
-    });
-  }
+  clearSessionState(session, logger);
 
   const stopDeadline = Date.now() + 3_000;
   while (isProcessRunning(existingState.pid) && Date.now() < stopDeadline) {
     await new Promise((resolveWait) => setTimeout(resolveWait, 100));
   }
   if (isProcessRunning(existingState.pid)) {
-    try {
-      process.kill(existingState.pid, "SIGKILL");
-    } catch (err) {
-      logger.warn("run-stop-existing-failed-session-sigkill-error", {
-        session,
-        pid: existingState.pid,
-        error: err,
-      });
-    }
-  }
-
-  if (isProcessRunning(existingState.pid)) {
-    throw new Error(
-      `Could not stop existing failed run session "${session}" (pid ${existingState.pid}). Run "libretto-cli close --session ${session}" and try again.`,
+    logger.warn("run-release-existing-failed-session-timeout", {
+      session,
+      pid: existingState.pid,
+    });
+    console.warn(
+      `Existing failed workflow process for session "${session}" (pid ${existingState.pid}) is still shutting down; continuing.`,
     );
+    return;
   }
-  clearSessionState(session, logger);
+  console.log(
+    `Closed existing failed workflow process for session "${session}" (pid ${existingState.pid}).`,
+  );
 }
 
 function readJsonFileIfExists(path: string): unknown {
@@ -503,9 +482,8 @@ async function runIntegrationFromFile(
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
-    const baseMessage = outcome.message ?? "Workflow failed during run.";
     throw new Error(
-      `${baseMessage}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`,
+      `${outcome.message ?? "Workflow failed during run."}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`,
     );
   }
   if (outcome.status === "exited") {

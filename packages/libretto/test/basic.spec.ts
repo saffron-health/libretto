@@ -307,11 +307,8 @@ export const main = workflow({}, async (ctx) => {
       const rerunResult = await librettoCli(
         `run "${integrationFilePath}" main --session ${session} --headless`,
       );
-      await evaluate(rerunResult.stdout).toMatch(
-        `Mentions that an existing browser process for session ${session} was killed before rerunning.`,
-      );
       await evaluate(rerunResult.stderr).toMatch(
-        "Includes the workflow error and guidance text, and does not say the session is already open and connected.",
+        "Includes the workflow error and the same casual guidance that browser stays open for exec and run can rerun, and does not say the session is already open and connected.",
       );
     } finally {
       await librettoCli(`close --session ${session}`);
