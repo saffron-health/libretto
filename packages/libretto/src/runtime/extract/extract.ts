@@ -1,14 +1,14 @@
 import type { Page } from "playwright";
-import type { ZodType, infer as ZodInfer } from "zod";
-import type { LoggerApi } from "../../shared/logger/logger.js";
+import type z from "zod";
+import { type MinimalLogger, defaultLogger } from "../../shared/logger/logger.js";
 import type { LLMClient } from "../../shared/llm/types.js";
 
-export type ExtractOptions<T extends ZodType> = {
+export type ExtractOptions<T extends z.ZodType> = {
 	page: Page;
 	instruction: string;
 	schema: T;
 	llmClient: LLMClient;
-	logger: LoggerApi;
+	logger?: MinimalLogger;
 	/** Optional CSS selector to scope extraction to a specific element. */
 	selector?: string;
 };
@@ -19,10 +19,10 @@ export type ExtractOptions<T extends ZodType> = {
  * captures DOM content, and uses an LLM to extract structured data
  * matching the provided Zod schema.
  */
-export async function extractFromPage<T extends ZodType>(
+export async function extractFromPage<T extends z.ZodType>(
 	options: ExtractOptions<T>,
-): Promise<ZodInfer<T>> {
-	const { page, instruction, schema, selector, logger, llmClient } = options;
+): Promise<z.infer<T>> {
+	const { page, instruction, schema, selector, logger = defaultLogger, llmClient } = options;
 
 	let screenshot: string;
 	let domContent: string | undefined;

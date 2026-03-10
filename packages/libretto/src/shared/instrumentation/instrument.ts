@@ -1,5 +1,5 @@
 import type { Page, Locator, BrowserContext } from "playwright";
-import type { LoggerApi } from "../logger/logger.js";
+import type { MinimalLogger } from "../logger/logger.js";
 import type { GhostCursorOptions } from "../visualization/ghost-cursor.js";
 import type { HighlightOptions } from "../visualization/highlight.js";
 import {
@@ -18,7 +18,7 @@ import { enrichTimeoutError } from "./errors.js";
 
 export type InstrumentationOptions = {
 	visualize?: boolean;
-	logger?: LoggerApi;
+	logger?: MinimalLogger;
 	highlightBeforeActionMs?: number;
 	ghostCursor?: GhostCursorOptions;
 	highlight?: HighlightOptions;

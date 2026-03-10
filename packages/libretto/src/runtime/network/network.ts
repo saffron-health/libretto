@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
-import type { ZodType, infer as ZodInfer } from "zod";
-import type { LoggerApi } from "../../shared/logger/logger.js";
+import type z from "zod";
+import type { MinimalLogger } from "../../shared/logger/logger.js";
 
 export type RequestConfig = {
 	url: string;
@@ -13,14 +13,14 @@ export type RequestConfig = {
 	responseType?: "json" | "text" | "xml";
 };
 
-export type PageRequestOptions<T extends ZodType | undefined = undefined> = {
-	logger?: LoggerApi;
+export type PageRequestOptions<T extends z.ZodType | undefined = undefined> = {
+	logger?: MinimalLogger;
 	/** Optional Zod schema to validate the response body. */
 	schema?: T;
 };
 
-type PageRequestResult<T extends ZodType | undefined> = T extends ZodType
-	? ZodInfer<T>
+type PageRequestResult<T extends z.ZodType | undefined> = T extends z.ZodType
+	? z.infer<T>
 	: any;
 
 /**
@@ -28,7 +28,7 @@ type PageRequestResult<T extends ZodType | undefined> = T extends ZodType
  * Provides typed request config, automatic response parsing, optional Zod
  * validation, and logging.
  */
-export async function pageRequest<T extends ZodType | undefined = undefined>(
+export async function pageRequest<T extends z.ZodType | undefined = undefined>(
 	page: Page,
 	config: RequestConfig,
 	options?: PageRequestOptions<T>,

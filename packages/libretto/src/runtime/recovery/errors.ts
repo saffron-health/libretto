@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import type { LoggerApi } from "../../shared/logger/logger.js";
+import { type MinimalLogger, defaultLogger } from "../../shared/logger/logger.js";
 import type { LLMClient } from "../../shared/llm/types.js";
 import { z } from "zod";
 
@@ -42,12 +42,13 @@ const detectSubmissionErrorSchema = z.object({
  */
 export async function detectSubmissionError(
 	page: Page,
-	logger: LoggerApi,
 	error: unknown,
 	logContext: string,
 	llmClient: LLMClient,
 	knownErrors: KnownSubmissionError[] = [],
+	logger?: MinimalLogger,
 ): Promise<DetectedSubmissionError> {
+	const log = logger ?? defaultLogger;
 	// Capture screenshot using CDP to handle unresponsive pages
 	let screenshot: string;
 	let domSnapshot: string | undefined;
@@ -60,7 +61,7 @@ export async function detectSubmissionError(
 		});
 		screenshot = data;
 	} catch (screenshotError) {
-		logger.warn(
+		log.warn(
 			"Failed to take screenshot via CDP for error detection, skipping LLM analysis",
 			{ screenshotError, originalError: error },
 		);
@@ -75,7 +76,7 @@ export async function detectSubmissionError(
 				? htmlContent.slice(0, 50000) + "\n... [truncated]"
 				: htmlContent;
 	} catch (domError) {
-		logger.warn("Failed to capture DOM snapshot", {
+		log.warn("Failed to capture DOM snapshot", {
 			domError: domError instanceof Error ? domError.message : String(domError),
 		});
 	}
@@ -120,7 +121,7 @@ ${domSnapshot ? `<dom_snapshot>\n${domSnapshot}\n</dom_snapshot>` : ""}`;
 	});
 
 	if (!result.hasError) {
-		logger.info("No error detected by LLM", { result });
+		log.info("No error detected by LLM", { result });
 	}
 
 	// Check if it matches a known error
@@ -129,7 +130,7 @@ ${domSnapshot ? `<dom_snapshot>\n${domSnapshot}\n</dom_snapshot>` : ""}`;
 			(e) => e.id === result.matchedKnownErrorId,
 		);
 		if (knownError) {
-			logger.warn(logContext, {
+			log.warn(logContext, {
 				error,
 				browserError: result.errorMessage,
 				knownErrorId: result.matchedKnownErrorId,
@@ -143,7 +144,7 @@ ${domSnapshot ? `<dom_snapshot>\n${domSnapshot}\n</dom_snapshot>` : ""}`;
 	}
 
 	// Log and re-throw for unknown errors
-	logger.warn(logContext, {
+	log.warn(logContext, {
 		error,
 		browserError: result.errorMessage,
 	});
