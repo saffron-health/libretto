@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { RunDebugPauseDetails } from "../../index.js";
 
 export const RunIntegrationWorkerRequestSchema = z.object({
   integrationPath: z.string().min(1),
@@ -12,8 +11,3 @@ export const RunIntegrationWorkerRequestSchema = z.object({
 export type RunIntegrationWorkerRequest = z.infer<
   typeof RunIntegrationWorkerRequestSchema
 >;
-
-export type RunIntegrationWorkerMessage =
-  | { type: "completed" }
-  | { type: "paused"; details: RunDebugPauseDetails }
-  | { type: "failed"; message: string };

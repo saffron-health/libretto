@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { fork } from "node:child_process";
+import { spawn } from "node:child_process";
 import * as moduleBuiltin from "node:module";
 import { fileURLToPath } from "node:url";
 import type { Argv } from "yargs";
@@ -464,12 +464,11 @@ async function runIntegrationFromFile(
     new URL("../workers/run-integration-worker.js", import.meta.url),
   );
   const payload = JSON.stringify(args);
-  const worker = fork(workerEntryPath, [payload], {
+  const worker = spawn(process.execPath, [workerEntryPath, payload], {
     detached: true,
-    stdio: ["ignore", "ignore", "ignore", "ipc"],
+    stdio: "ignore",
     env: process.env,
   });
-  worker.disconnect();
   worker.unref();
   const outcome = await waitForWorkflowOutcome({
     session: args.session,
