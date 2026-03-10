@@ -44,7 +44,6 @@ function parseWorkerRequest(argv: string[]): RunIntegrationWorkerRequest {
     typeof candidate.exportName !== "string" ||
     typeof candidate.session !== "string" ||
     typeof candidate.headless !== "boolean" ||
-    typeof candidate.debug !== "boolean" ||
     !("params" in candidate)
   ) {
     throw new Error("Worker payload is missing required fields.");
@@ -55,7 +54,6 @@ function parseWorkerRequest(argv: string[]): RunIntegrationWorkerRequest {
     exportName: candidate.exportName,
     session: candidate.session,
     headless: candidate.headless,
-    debug: candidate.debug,
     params: candidate.params,
   };
 }
@@ -67,16 +65,20 @@ async function main(): Promise<void> {
     request = parseWorkerRequest(process.argv);
     const workerRequest = request;
     ensureLibrettoSetup();
+    let outcomeStatus: "completed" | "failed-held" = "completed";
     await withSessionLogger(workerRequest.session, async (logger) => {
-      await runIntegrationFromFileInWorker(
+      const outcome = await runIntegrationFromFileInWorker(
         workerRequest,
         logger,
         async (details) => {
           sendMessage({ type: "paused", details });
         },
       );
+      outcomeStatus = outcome.status;
     });
-    sendMessage({ type: "completed" });
+    if (outcomeStatus === "completed") {
+      sendMessage({ type: "completed" });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (request) {

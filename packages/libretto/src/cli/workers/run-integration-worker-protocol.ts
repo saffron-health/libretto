@@ -6,7 +6,6 @@ export type RunIntegrationWorkerRequest = {
   session: string;
   params: unknown;
   headless: boolean;
-  debug: boolean;
 };
 
 export type RunIntegrationWorkerMessage =
