@@ -17,6 +17,8 @@ import {
   validateSessionName,
 } from "./core/session.js";
 
+const AUTO_SESSION_COMMANDS = new Set(["open", "run"]);
+
 const CLI_COMMANDS = new Set([
   "open",
   "run",
@@ -54,7 +56,9 @@ Commands:
   close [--all] [--force]  Close the browser for the session, or all tracked sessions with --all
 
 Options:
-  --session <name>        Use a named session (default: "default")
+  --session <name>        Use a named session
+                          If omitted for open/run, a session id is auto-generated
+                          Other commands default to "default"
                           Built-in sessions: default, dev-server, browser-agent
 
 Examples:
@@ -123,6 +127,38 @@ function parseSessionForLog(rawArgs: string[]): string {
   } catch {
     return SESSION_DEFAULT;
   }
+}
+
+function hasExplicitSession(rawArgs: string[]): boolean {
+  return rawArgs.includes("--session");
+}
+
+function generateSessionId(command: string): string {
+  const timePart = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  return `${command}-${timePart}-${randomPart}`;
+}
+
+function resolveSessionArgs(rawArgs: string[]): {
+  args: string[];
+  generatedSession: string | null;
+} {
+  const filtered = filterSessionArgs(rawArgs);
+  const command = filtered[0];
+  if (!command) {
+    return { args: rawArgs, generatedSession: null };
+  }
+  if (!AUTO_SESSION_COMMANDS.has(command)) {
+    return { args: rawArgs, generatedSession: null };
+  }
+  if (hasExplicitSession(rawArgs)) {
+    return { args: rawArgs, generatedSession: null };
+  }
+  const generatedSession = generateSessionId(command);
+  return {
+    args: [...rawArgs, "--session", generatedSession],
+    generatedSession,
+  };
 }
 
 function validateLegacySessionArg(rawArgs: string[]): void {
@@ -196,13 +232,14 @@ function createParser(logger: Logger): Argv {
 
 export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
+  const { args: effectiveArgs, generatedSession } = resolveSessionArgs(rawArgs);
   let exitCode = 0;
   ensureLibrettoSetup();
-  await withCliLogger(rawArgs, async (logger) => {
+  await withCliLogger(effectiveArgs, async (logger) => {
     try {
       validateLegacySessionArg(rawArgs);
 
-      const args = filterSessionArgs(rawArgs);
+      const args = filterSessionArgs(effectiveArgs);
       const command = args[0];
 
       if (!command || command === "--help" || command === "-h" || command === "help") {
@@ -218,10 +255,14 @@ export async function runLibrettoCLI(): Promise<void> {
       }
 
       const parser = createParser(logger);
-      logger.info("cli-command", { command, args });
-      await parser.parseAsync();
+      logger.info("cli-command", {
+        command,
+        args,
+        generatedSession,
+      });
+      await parser.parseAsync(effectiveArgs);
     } catch (err) {
-      logger.error("cli-error", { error: err, args: rawArgs });
+      logger.error("cli-error", { error: err, args: rawArgs, effectiveArgs });
       const message = err instanceof Error ? err.message : String(err);
       console.error(message);
       exitCode = 1;

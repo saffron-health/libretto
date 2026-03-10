@@ -452,6 +452,7 @@ async function runIntegrationFromFile(
   logger: LoggerApi,
 ): Promise<void> {
   await stopExistingFailedRunSession(args.session, logger);
+  console.log(`Running workflow (session: ${args.session})...`);
   assertSessionAvailableForStart(args.session, logger);
   const signalPaths = getPauseSignalPaths(args.session);
   clearSignalIfExists(signalPaths.pausedSignalPath);
