@@ -1,6 +1,6 @@
 import type { Argv } from "yargs";
-import { existsSync, mkdirSync, cpSync, readdirSync } from "node:fs";
-import { join, dirname, delimiter } from "node:path";
+import { accessSync, constants, existsSync, mkdirSync, cpSync, readdirSync, statSync } from "node:fs";
+import { join, dirname, delimiter, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { REPO_ROOT } from "../core/context.js";
@@ -18,11 +18,33 @@ function getPresetCommand(preset: AIRuntimePreset): string {
 	return AI_CONFIG_PRESETS[preset][0] ?? "";
 }
 
+function isRunnableFile(filePath: string): boolean {
+	try {
+		const stats = statSync(filePath);
+		if (!stats.isFile()) return false;
+
+		if (process.platform === "win32") {
+			const pathExt = process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD";
+			const extensions = pathExt
+				.split(";")
+				.map((ext) => ext.trim().toUpperCase())
+				.filter(Boolean);
+			const fileExt = extname(filePath).toUpperCase();
+			return extensions.includes(fileExt);
+		}
+
+		accessSync(filePath, constants.X_OK);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 function isCommandDefined(command: string | undefined): boolean {
 	if (!command) return false;
 
 	if (command.includes("/") || command.includes("\\")) {
-		return existsSync(command);
+		return isRunnableFile(command);
 	}
 
 	const pathEnv = process.env.PATH ?? "";
@@ -43,11 +65,11 @@ function isCommandDefined(command: string | undefined): boolean {
 			);
 
 		return pathEntries.some((dir) =>
-			candidates.some((candidate) => existsSync(join(dir, candidate))),
+			candidates.some((candidate) => isRunnableFile(join(dir, candidate))),
 		);
 	}
 
-	return pathEntries.some((dir) => existsSync(join(dir, command)));
+	return pathEntries.some((dir) => isRunnableFile(join(dir, command)));
 }
 
 function detectAvailableAiRuntimeCommands(): AIRuntimePreset[] {
