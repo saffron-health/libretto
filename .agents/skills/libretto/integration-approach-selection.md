@@ -138,9 +138,9 @@ Extract data directly from the rendered page using selectors and `page.evaluate(
 | Site Profile | Primary Strategy | Supplement With |
 |---|---|---|
 | No bot protection, fetch not patched | **A** (`page.evaluate(fetch)`) | Playwright for navigation/auth |
-| No bot protection, fetch IS patched | **B** (`page.onResponse`) | Playwright for navigation; DOM extraction as fallback |
-| Bot protection detected, fetch not patched | **B** (`page.onResponse`) | Playwright for all navigation; cautious use of `page.evaluate(fetch)` only if needed |
-| Bot protection detected, fetch IS patched | **B** (`page.onResponse`) | Playwright for all navigation; DOM extraction as fallback |
+| No bot protection, fetch IS patched | **B** (`page.on('response', ...)`) | Playwright for navigation; DOM extraction as fallback |
+| Bot protection detected, fetch not patched | **B** (`page.on('response', ...)`) | Playwright for all navigation; cautious use of `page.evaluate(fetch)` only if needed |
+| Bot protection detected, fetch IS patched | **B** (`page.on('response', ...)`) | Playwright for all navigation; DOM extraction as fallback |
 | Server-rendered content (no API calls) | **C** (DOM extraction) | Playwright for all interaction |
 
 ---
