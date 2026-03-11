@@ -94,6 +94,7 @@
     "build:cli": "tsup --config tsup.cli.config.ts",
     "type-check": "tsc --noEmit",
     "test": "pnpm run build && vitest run",
+    "eval": "pnpm run build && vitest run --config vitest.evals.config.ts",
     "test:watch": "vitest",
     "cli": "tsx src/cli/index.ts",
     "prepack": "pnpm run build"
@@ -116,6 +117,7 @@
     }
   },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.73",
     "@ai-sdk/anthropic": "^3.0.53",
     "@ai-sdk/google-vertex": "^4.0.72",
     "@ai-sdk/openai": "^3.0.39",
