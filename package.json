@@ -14,12 +14,11 @@
   },
   "files": [
     "dist",
-    "bin",
     ".agents/skills/libretto"
   ],
   "bin": {
-    "libretto": "./bin/libretto.mjs",
-    "libretto-cli": "./bin/libretto.mjs"
+    "libretto": "./dist/cli/index.js",
+    "libretto-cli": "./dist/cli/index.js"
   },
   "exports": {
     ".": {
@@ -97,7 +96,7 @@
     "dev": "tsx src/cli/index.ts",
     "test": "pnpm run build && vitest run",
     "test:watch": "vitest",
-    "cli": "node bin/libretto.mjs",
+    "cli": "tsx src/cli/index.ts",
     "prepack": "pnpm run build"
   },
   "peerDependencies": {

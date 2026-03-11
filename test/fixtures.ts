@@ -55,7 +55,7 @@ type CliFixtures = {
 const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(here, "../../..");
 const packageRoot = resolve(here, "..");
-const cliEntry = resolve(packageRoot, "bin/libretto.mjs");
+const cliEntry = resolve(packageRoot, "dist/cli/index.js");
 const librettoEntry = resolve(packageRoot, "dist/index.js");
 const librettoRuntimePath = new URL("../dist/index.js", import.meta.url)
   .href;
