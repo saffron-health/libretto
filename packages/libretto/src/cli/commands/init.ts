@@ -1,6 +1,6 @@
 import type { Argv } from "yargs";
 import { existsSync, mkdirSync, cpSync, readdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, delimiter } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { REPO_ROOT } from "../core/context.js";
@@ -16,14 +16,41 @@ function isCommandDefined(command: string | undefined): boolean {
 		return existsSync(command);
 	}
 
-	const result = spawnSync("which", [command], { stdio: "ignore" });
-	return result.status === 0;
+	const pathEnv = process.env.PATH ?? "";
+	if (!pathEnv) return false;
+
+	const pathEntries = pathEnv.split(delimiter).filter(Boolean);
+	if (process.platform === "win32") {
+		const pathExt = process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD";
+		const extensions = pathExt
+			.split(";")
+			.map((ext) => ext.trim())
+			.filter(Boolean);
+		const hasExtension = /\.[^./\\]+$/.test(command);
+		const candidates = hasExtension
+			? [command]
+			: extensions.map((ext) =>
+				ext.startsWith(".") ? `${command}${ext}` : `${command}.${ext}`,
+			);
+
+		return pathEntries.some((dir) =>
+			candidates.some((candidate) => existsSync(join(dir, candidate))),
+		);
+	}
+
+	return pathEntries.some((dir) => existsSync(join(dir, command)));
 }
 
 function detectAvailableAiRuntimeCommands(): AIRuntimeCommand[] {
 	return AI_RUNTIME_COMMANDS.filter((command): command is AIRuntimeCommand =>
 		isCommandDefined(command),
 	);
+}
+
+function printAiConfigureCommands(prefix: string = "    "): void {
+	for (const command of AI_RUNTIME_COMMANDS) {
+		console.log(`${prefix}npx libretto ai configure ${command}`);
+	}
 }
 
 function getSkillSourceDir(): string {
@@ -76,10 +103,25 @@ function installBrowsers(): void {
 }
 
 function checkAiRuntimeConfiguration(): void {
-	const config = readAiConfig();
+	let config: ReturnType<typeof readAiConfig> = null;
+	let configReadError: string | null = null;
+
+	try {
+		config = readAiConfig();
+	} catch (error) {
+		configReadError = error instanceof Error ? error.message : String(error);
+	}
+
 	const availableCommands = detectAvailableAiRuntimeCommands();
 
 	console.log("\nAI runtime configuration:");
+	if (configReadError) {
+		console.log(`  \u2717 Could not read AI config: ${configReadError}`);
+		console.log("    Reconfigure with:");
+		printAiConfigureCommands("      ");
+		return;
+	}
+
 	if (config) {
 		const configuredCommand = config.commandPrefix[0];
 		if (!isCommandDefined(configuredCommand)) {
@@ -92,9 +134,7 @@ function checkAiRuntimeConfiguration(): void {
 				);
 			}
 			console.log("    Reconfigure with:");
-			console.log("      npx libretto ai configure codex");
-			console.log("      npx libretto ai configure claude");
-			console.log("      npx libretto ai configure gemini");
+			printAiConfigureCommands("      ");
 			return;
 		}
 
@@ -114,9 +154,7 @@ function checkAiRuntimeConfiguration(): void {
 		console.log("    codex, claude, and gemini are not currently available to configure.");
 	}
 	console.log("    Configure one with:");
-	console.log("      npx libretto ai configure codex");
-	console.log("      npx libretto ai configure claude");
-	console.log("      npx libretto ai configure gemini");
+	printAiConfigureCommands("      ");
 	console.log("    Optionally provide a custom command prefix with '-- ...'.");
 }
 
