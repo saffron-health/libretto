@@ -12,7 +12,7 @@ export type LogOptions = {
  * implement withScope, withContext, flush, etc.
  */
 export type MinimalLogger = {
-	info: (event: string, data?: Record<string, any>) => void;
+	info: (event: string, data?: any) => void;
 	warn: (event: string, data?: any) => void;
 	error: (event: string, data?: any) => any;
 };
@@ -47,7 +47,7 @@ export type LoggerApi = {
 	) => void;
 	info: (
 		event: string,
-		data?: Record<string, any>,
+		data?: Error | ({ error: Error } & Record<string, any>) | unknown,
 		options?: LogOptions,
 	) => void;
 
@@ -273,8 +273,41 @@ export class Logger implements LoggerApi {
 		});
 	}
 
-	info(event: string, data?: Record<string, any>, options?: LogOptions) {
-		this.entry({ level: "info", event, data, options });
+	info(
+		event: string,
+		dataOrError?: Error | ({ error: Error } & Record<string, any>) | unknown,
+		options?: LogOptions,
+	) {
+		const data =
+			dataOrError instanceof Error
+				? {
+						error: {
+							type: dataOrError.constructor.name,
+							message: dataOrError.message,
+							stack: dataOrError.stack || null,
+						},
+					}
+				: isObject(dataOrError) && dataOrError.error instanceof Error
+					? {
+							...dataOrError,
+							error: {
+								type: dataOrError.error.constructor.name,
+								message: dataOrError.error.message,
+								stack: dataOrError.error.stack || null,
+							},
+						}
+					: isObject(dataOrError)
+						? dataOrError
+						: dataOrError !== undefined
+							? { error: dataOrError }
+							: undefined;
+
+		this.entry({
+			level: "info",
+			event,
+			data: data as Record<string, any>,
+			options,
+		});
 	}
 
 	withScope(scope: string, context: Record<string, any> = {}): LoggerApi {
