@@ -43,6 +43,42 @@ export const myWorkflow = workflow<Input, Output>(
 - Use `await pause()` (imported from `"libretto"`) to pause the workflow for debugging. It is a no-op in production.
 - The browser is launched and closed automatically by the CLI — do not launch or close it in the handler
 
+## Passing Application Dependencies via Services
+
+Use the third generic on `workflow<Input, Output, Services>` to inject
+dependencies that exist in your application but not in libretto's runtime
+(DB transactions, API clients, caches, etc.):
+
+```typescript
+import { type Transaction } from "./db";
+
+type MyServices = { tx?: Transaction };
+
+export const myWorkflow = workflow<Input, Output, MyServices>(
+  {},
+  async (ctx, input) => {
+    if (ctx.services.tx) {
+      await ctx.services.tx.insert(/* ... */);
+    } else {
+      ctx.logger.info("No DB transaction — skipping write");
+    }
+    // ... browser automation ...
+  },
+);
+```
+
+In production, the caller passes services when invoking `.run()`:
+
+```typescript
+await myWorkflow.run(
+  { page, logger, services: { tx } },
+  input,
+);
+```
+
+When running standalone via `npx libretto run`, services defaults to `{}`,
+so mark fields optional for anything unavailable in that context.
+
 ## Playwright Locators for DOM Interaction
 
 Generated code must use Playwright locator APIs for all DOM interactions. Do not use `page.evaluate()` with `document.querySelector`, `querySelectorAll`, `textContent`, `click()`, or other DOM APIs when a Playwright locator can do the same thing.
