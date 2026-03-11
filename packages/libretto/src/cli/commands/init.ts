@@ -4,6 +4,27 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { REPO_ROOT } from "../core/context.js";
+import { formatCommandPrefix, readAiConfig } from "../core/ai-config.js";
+
+const AI_RUNTIME_COMMANDS = ["codex", "claude", "gemini"] as const;
+type AIRuntimeCommand = (typeof AI_RUNTIME_COMMANDS)[number];
+
+function isCommandDefined(command: string | undefined): boolean {
+	if (!command) return false;
+
+	if (command.includes("/") || command.includes("\\")) {
+		return existsSync(command);
+	}
+
+	const result = spawnSync("which", [command], { stdio: "ignore" });
+	return result.status === 0;
+}
+
+function detectAvailableAiRuntimeCommands(): AIRuntimeCommand[] {
+	return AI_RUNTIME_COMMANDS.filter((command): command is AIRuntimeCommand =>
+		isCommandDefined(command),
+	);
+}
 
 function getSkillSourceDir(): string {
 	// Resolve relative to this file's location in the package
@@ -54,26 +75,49 @@ function installBrowsers(): void {
 	}
 }
 
-function checkSnapshotLLM(): void {
-	const hasAnyCreds =
-		process.env.GOOGLE_CLOUD_PROJECT ||
-		process.env.GCLOUD_PROJECT ||
-		process.env.ANTHROPIC_API_KEY ||
-		process.env.OPENAI_API_KEY;
+function checkAiRuntimeConfiguration(): void {
+	const config = readAiConfig();
+	const availableCommands = detectAvailableAiRuntimeCommands();
 
-	console.log("\nSnapshot LLM configuration:");
-	if (hasAnyCreds) {
-		console.log("  \u2713 LLM credentials detected");
-	} else {
-		console.log("  \u2717 No LLM credentials found.");
-		console.log("    Set one of the following environment variables:");
-		console.log("      GOOGLE_CLOUD_PROJECT  (for Vertex AI / Gemini)");
-		console.log("      ANTHROPIC_API_KEY     (for Claude)");
-		console.log("      OPENAI_API_KEY        (for GPT)");
+	console.log("\nAI runtime configuration:");
+	if (config) {
+		const configuredCommand = config.commandPrefix[0];
+		if (!isCommandDefined(configuredCommand)) {
+			console.log(
+				`  \u2717 Configured command not found: ${configuredCommand ?? "(empty)"}`,
+			);
+			if (availableCommands.length > 0) {
+				console.log(
+					`    Detected available commands: ${availableCommands.join(", ")}`,
+				);
+			}
+			console.log("    Reconfigure with:");
+			console.log("      npx libretto ai configure codex");
+			console.log("      npx libretto ai configure claude");
+			console.log("      npx libretto ai configure gemini");
+			return;
+		}
+
 		console.log(
-			"    Then configure via: npx libretto ai configure <preset>",
+			`  \u2713 Configured (${config.preset}): ${formatCommandPrefix(config.commandPrefix)}`,
 		);
+		console.log("    Analysis commands are ready to use.");
+		return;
 	}
+
+	console.log("  \u2717 No AI config set.");
+	if (availableCommands.length > 0) {
+		console.log(
+			`    Detected available commands: ${availableCommands.join(", ")}`,
+		);
+	} else {
+		console.log("    codex, claude, and gemini are not currently available to configure.");
+	}
+	console.log("    Configure one with:");
+	console.log("      npx libretto ai configure codex");
+	console.log("      npx libretto ai configure claude");
+	console.log("      npx libretto ai configure gemini");
+	console.log("    Optionally provide a custom command prefix with '-- ...'.");
 }
 
 export function registerInitCommand(yargs: Argv): Argv {
@@ -104,7 +148,7 @@ export function registerInitCommand(yargs: Argv): Argv {
 				console.log("\nSkipping browser installation (--skip-browsers)");
 			}
 
-			checkSnapshotLLM();
+			checkAiRuntimeConfiguration();
 
 			console.log("\n\u2713 libretto init complete");
 		},
