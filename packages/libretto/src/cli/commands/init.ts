@@ -4,10 +4,19 @@ import { join, dirname, delimiter } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { REPO_ROOT } from "../core/context.js";
-import { formatCommandPrefix, readAiConfig } from "../core/ai-config.js";
+import {
+	AI_CONFIG_PRESETS,
+	AiPresetSchema,
+	formatCommandPrefix,
+	readAiConfig,
+} from "../core/ai-config.js";
 
-const AI_RUNTIME_COMMANDS = ["codex", "claude", "gemini"] as const;
-type AIRuntimeCommand = (typeof AI_RUNTIME_COMMANDS)[number];
+const AI_RUNTIME_PRESETS = AiPresetSchema.options;
+type AIRuntimePreset = (typeof AI_RUNTIME_PRESETS)[number];
+
+function getPresetCommand(preset: AIRuntimePreset): string {
+	return AI_CONFIG_PRESETS[preset][0] ?? "";
+}
 
 function isCommandDefined(command: string | undefined): boolean {
 	if (!command) return false;
@@ -41,15 +50,15 @@ function isCommandDefined(command: string | undefined): boolean {
 	return pathEntries.some((dir) => existsSync(join(dir, command)));
 }
 
-function detectAvailableAiRuntimeCommands(): AIRuntimeCommand[] {
-	return AI_RUNTIME_COMMANDS.filter((command): command is AIRuntimeCommand =>
-		isCommandDefined(command),
+function detectAvailableAiRuntimeCommands(): AIRuntimePreset[] {
+	return AI_RUNTIME_PRESETS.filter((preset): preset is AIRuntimePreset =>
+		isCommandDefined(getPresetCommand(preset)),
 	);
 }
 
 function printAiConfigureCommands(prefix: string = "    "): void {
-	for (const command of AI_RUNTIME_COMMANDS) {
-		console.log(`${prefix}npx libretto ai configure ${command}`);
+	for (const preset of AI_RUNTIME_PRESETS) {
+		console.log(`${prefix}npx libretto ai configure ${preset}`);
 	}
 }
 
