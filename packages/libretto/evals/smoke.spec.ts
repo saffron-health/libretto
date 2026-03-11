@@ -15,7 +15,7 @@ describe("eval harness smoke", () => {
       );
 
       expect(response.messages.length).toBeGreaterThan(0);
-      expect(response.text()).toContain("LIBRETTO_EVAL_SMOKE_OK");
+      expect(response.transcript).toContain("LIBRETTO_EVAL_SMOKE_OK");
 
       await response.evaluate(
         "The response explains that libretto is for browser automation, identifies snapshot as a command to inspect page contents, and includes LIBRETTO_EVAL_SMOKE_OK.",

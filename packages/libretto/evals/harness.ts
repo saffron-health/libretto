@@ -263,10 +263,6 @@ export class EvalResponse {
     this.model = opts.model;
   }
 
-  text(): string {
-    return this.transcript;
-  }
-
   async evaluate(assertion: string): Promise<EvaluationVerdict> {
     const verdict = await evaluateTranscript({
       assertion,

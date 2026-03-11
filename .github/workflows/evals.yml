@@ -3,6 +3,9 @@ name: Evals
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   evals:
     runs-on: ubuntu-latest
