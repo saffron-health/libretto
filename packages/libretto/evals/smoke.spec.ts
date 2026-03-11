@@ -21,6 +21,5 @@ describe("eval harness smoke", () => {
         "The response explains that libretto is for browser automation, identifies snapshot as a command to inspect page contents, and includes LIBRETTO_EVAL_SMOKE_OK.",
       );
     },
-    180_000,
   );
 });
