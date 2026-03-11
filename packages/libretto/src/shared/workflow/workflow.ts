@@ -1,55 +1,42 @@
-import type { Browser, BrowserContext, Page } from "playwright";
+import type { Page } from "playwright";
 import type { MinimalLogger } from "../logger/logger.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
-export type LibrettoAuthProfile = {
-	type: "local";
-	domain: string;
-};
+export type LibrettoWorkflowMetadata = {};
 
-export type LibrettoWorkflowMetadata = {
-	authProfile?: LibrettoAuthProfile;
-};
-
-export type LibrettoWorkflowContext = {
-	logger: MinimalLogger;
+export type LibrettoWorkflowContext<S = {}> = {
 	page: Page;
-	context: BrowserContext;
-	browser: Browser;
-	session: string;
-	integrationPath: string;
-	exportName: string;
-	headless: boolean;
-	pause: () => Promise<void>;
+	logger: MinimalLogger;
+	services: S;
 };
 
-export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
-	ctx: LibrettoWorkflowContext,
+export type LibrettoWorkflowHandler<Input = unknown, Output = unknown, S = {}> = (
+	ctx: LibrettoWorkflowContext<S>,
 	input: Input,
 ) => Promise<Output>;
 
-export class LibrettoWorkflow<Input = unknown, Output = unknown> {
+export class LibrettoWorkflow<Input = unknown, Output = unknown, S = {}> {
 	public readonly [LIBRETTO_WORKFLOW_BRAND] = true;
 	public readonly metadata: LibrettoWorkflowMetadata;
-	private readonly handler: LibrettoWorkflowHandler<Input, Output>;
+	private readonly handler: LibrettoWorkflowHandler<Input, Output, S>;
 
 	constructor(
 		metadata: LibrettoWorkflowMetadata,
-		handler: LibrettoWorkflowHandler<Input, Output>,
+		handler: LibrettoWorkflowHandler<Input, Output, S>,
 	) {
 		this.metadata = metadata;
 		this.handler = handler;
 	}
 
-	async run(ctx: LibrettoWorkflowContext, input: Input): Promise<Output> {
+	async run(ctx: LibrettoWorkflowContext<S>, input: Input): Promise<Output> {
 		return this.handler(ctx, input);
 	}
 }
 
-export function workflow<Input = unknown, Output = unknown>(
+export function workflow<Input = unknown, Output = unknown, S = {}>(
 	metadata: LibrettoWorkflowMetadata,
-	handler: LibrettoWorkflowHandler<Input, Output>,
-): LibrettoWorkflow<Input, Output> {
+	handler: LibrettoWorkflowHandler<Input, Output, S>,
+): LibrettoWorkflow<Input, Output, S> {
 	return new LibrettoWorkflow(metadata, handler);
 }
