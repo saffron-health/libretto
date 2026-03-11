@@ -192,14 +192,6 @@ function resolveSessionArgs(rawArgs: string[]): {
     };
   }
   if (!AUTO_SESSION_COMMANDS.has(command)) {
-    if (commandNeedsSession(command, rawArgs, filtered)) {
-      throw new Error(
-        [
-          `Missing required --session for "${command}".`,
-          "Pass --session <name>, or use open/run without --session to auto-create one.",
-        ].join("\n"),
-      );
-    }
     return {
       args: rawArgs,
       generatedSession: null,
@@ -214,18 +206,6 @@ function resolveSessionArgs(rawArgs: string[]): {
   };
 }
 
-function validateLegacySessionArg(rawArgs: string[]): void {
-  const idx = rawArgs.indexOf("--session");
-  if (idx < 0) return;
-  const value = rawArgs[idx + 1];
-  if (!value || value.startsWith("--") || CLI_COMMANDS.has(value)) {
-    throw new Error(
-      "Usage: libretto-cli <command> [--session <name>]\nMissing or invalid --session value.",
-    );
-  }
-  validateSessionName(value);
-}
-
 function createParser(logger: Logger): Argv {
   let parser: Argv = (yargs(hideBin(process.argv)) as Argv)
     .scriptName("libretto-cli")
@@ -234,6 +214,7 @@ function createParser(logger: Logger): Argv {
       type: "string",
       describe: "Use a named session",
       global: true,
+      requiresArg: true,
     })
     .middleware((argv) => {
       if (argv.session !== undefined) {
@@ -268,19 +249,11 @@ export async function runLibrettoCLI(): Promise<void> {
   let generatedSession: string | null = null;
   let resolvedSession: string | null = null;
 
-  try {
-    validateLegacySessionArg(rawArgs);
-    ({
-      args: effectiveArgs,
-      generatedSession,
-      resolvedSession,
-    } = resolveSessionArgs(rawArgs));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(message);
-    process.exit(1);
-    return;
-  }
+  ({
+    args: effectiveArgs,
+    generatedSession,
+    resolvedSession,
+  } = resolveSessionArgs(rawArgs));
 
   ensureLibrettoSetup();
   const args = filterSessionArgs(effectiveArgs);
@@ -295,6 +268,16 @@ export async function runLibrettoCLI(): Promise<void> {
   if (!CLI_COMMANDS.has(command)) {
     console.error(`Unknown command: ${command}\n`);
     printUsage();
+    process.exit(1);
+    return;
+  }
+  if (!hasExplicitSession(effectiveArgs) && commandNeedsSession(command, effectiveArgs, args)) {
+    console.error(
+      [
+        `Missing required --session for "${command}".`,
+        "Pass --session <name>, or use open/run without --session to auto-create one.",
+      ].join("\n"),
+    );
     process.exit(1);
     return;
   }

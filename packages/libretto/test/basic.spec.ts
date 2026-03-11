@@ -325,19 +325,16 @@ export const main = workflow({}, async (ctx) => {
     librettoCli,
     evaluate,
   }) => {
-    const result = await librettoCli("help --session");
+    const result = await librettoCli(`exec "return 1" --session`);
     await evaluate(result.stderr).toMatch(
-      "Reports missing or invalid --session value.",
+      "Reports that --session is missing its required value.",
     );
   });
 
-  test("fails when --session value is another command token", async ({
+  test("allows command-like --session values", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli("help --session open");
-    await evaluate(result.stderr).toMatch(
-      "Reports missing or invalid --session value.",
-    );
+    expect(result.stdout).toContain("Usage: libretto-cli");
   });
 });
