@@ -195,7 +195,7 @@ export const main = {
       "integration.ts",
       `
 export const main = workflow(
-  { authProfile: { type: "local", domain: "app.example.com" } },
+  {},
   async () => {
     return "ok";
   },
@@ -203,7 +203,7 @@ export const main = workflow(
 `,
     );
 
-    const result = await librettoCli("run ./integration.ts main");
+    const result = await librettoCli("run ./integration.ts main --auth-profile app.example.com");
     await evaluate(result.stderr).toMatch(
       'Explains local auth profile is missing for domain "app.example.com" and includes suggested open/save commands for that domain.',
     );
@@ -233,7 +233,7 @@ export const main = workflow({}, async () => "ok");
     );
   });
 
-  test("returns paused status when workflow hits ctx.pause", async ({
+  test("returns paused status when workflow hits standalone pause", async ({
     librettoCli,
     evaluate,
     writeWorkflow,
@@ -243,11 +243,11 @@ export const main = workflow({}, async () => "ok");
       `
 export const main = workflow({}, async (ctx) => {
   console.log("WORKFLOW_BEFORE_PAUSE");
-  await ctx.pause();
+  await pause();
   console.log("WORKFLOW_AFTER_PAUSE");
 });
 `,
-      ["workflow"],
+      ["workflow", "pause"],
     );
 
     const result = await librettoCli(

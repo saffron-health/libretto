@@ -1,7 +1,1 @@
-export {
-	debugPause,
-	DebugPauseSignal,
-	isDebugPauseSignal,
-	type DebugPauseContext,
-	type DebugPauseDetails,
-} from "./pause.js";
+export { pause, setSessionForPause } from "./pause.js";

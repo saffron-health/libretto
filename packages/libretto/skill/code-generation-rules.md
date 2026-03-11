@@ -7,7 +7,7 @@ These rules apply when generating production TypeScript files from interactive b
 Generated files must export a `workflow()` instance so they can be run via `npx libretto run <file> <exportName>`. Import `workflow` and its types from `"libretto"`:
 
 ```typescript
-import { workflow, type LibrettoWorkflowContext } from "libretto";
+import { workflow, pause, type LibrettoWorkflowContext } from "libretto";
 
 type Input = {
   // Define the expected input shape — passed via --params JSON
@@ -21,15 +21,11 @@ type Output = {
 };
 
 export const myWorkflow = workflow<Input, Output>(
-  {
-    // If the site requires a saved login session:
-    authProfile: { type: "local", domain: "example.com" },
-    // Omit authProfile if no login is needed
-  },
-  async (ctx: LibrettoWorkflowContext, input: Input): Promise<Output> => {
+  {},
+  async (ctx, input): Promise<Output> => {
     const { page } = ctx;
 
-    // workflow logic here — use ctx.page, ctx.context, ctx.browser
+    // workflow logic here — use ctx.page, ctx.logger, ctx.services
     await page.goto("https://example.com");
     // ...
 
@@ -41,9 +37,10 @@ export const myWorkflow = workflow<Input, Output>(
 **Key points:**
 
 - The named export (e.g., `myWorkflow`) is what you pass as the second arg to `npx libretto run ./file.ts myWorkflow`
-- `ctx` provides `page`, `context`, `browser`, `session`, `logger`, `headless`, `integrationPath`, `exportName`
+- `ctx` provides `page`, `logger`, and `services` (generic, default `{}`)
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
-- If `authProfile` is set with a domain, libretto loads the saved browser profile for that domain (created via `npx libretto save <domain>`)
+- If the site requires a saved login session, pass `--auth-profile <domain>` to the CLI (created via `npx libretto save <domain>`)
+- Use `await pause()` (imported from `"libretto"`) to pause the workflow for debugging. It is a no-op in production.
 - The browser is launched and closed automatically by the CLI — do not launch or close it in the handler
 
 ## Playwright Locators for DOM Interaction

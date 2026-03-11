@@ -5,10 +5,9 @@ import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   launchBrowser,
-  type LibrettoAuthProfile,
   type LibrettoWorkflowContext,
-  type RunDebugPauseDetails,
 } from "../../index.js";
+import { setSessionForPause } from "../../shared/debug/pause.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { parseSessionStateContent } from "../../shared/state/index.js";
 import { getProfilePath, normalizeDomain } from "../core/browser.js";
@@ -25,9 +24,7 @@ import type { RunIntegrationWorkerRequest } from "./run-integration-worker-proto
 const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
 type LoadedLibrettoWorkflow = {
-  metadata: {
-    authProfile?: LibrettoAuthProfile;
-  };
+  metadata: {};
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -35,7 +32,6 @@ type RunIntegrationOutcome =
   | { status: "completed" }
   | { status: "failed-held" };
 
-const RESUME_POLL_INTERVAL_MS = 250;
 const FAILURE_HOLD_POLL_INTERVAL_MS = 250;
 
 function mirrorStdoutToFile(filePath: string): () => void {
@@ -59,30 +55,6 @@ function mirrorStdoutToFile(filePath: string): () => void {
   return () => {
     stdout.write = originalWrite as typeof stdout.write;
   };
-}
-
-async function waitForResumeSignal(args: {
-  signalPaths: ReturnType<typeof getPauseSignalPaths>;
-  session: string;
-  details: RunDebugPauseDetails;
-}): Promise<void> {
-  const { pausedSignalPath, resumeSignalPath } = args.signalPaths;
-  await mkdir(getSessionDir(args.session), { recursive: true });
-  await removeSignalIfExists(resumeSignalPath);
-  await writeFile(
-    pausedSignalPath,
-    JSON.stringify(args.details, null, 2),
-    "utf8",
-  );
-
-  while (!existsSync(resumeSignalPath)) {
-    await new Promise((resolveWait) =>
-      setTimeout(resolveWait, RESUME_POLL_INTERVAL_MS),
-    );
-  }
-
-  await removeSignalIfExists(resumeSignalPath);
-  await removeSignalIfExists(pausedSignalPath);
 }
 
 function readSessionStatePid(session: string): number | null {
@@ -133,14 +105,6 @@ function isLoadedLibrettoWorkflow(value: unknown): value is LoadedLibrettoWorkfl
 
 function resolveLocalAuthProfilePath(domain: string): string {
   return getProfilePath(normalizeDomain(domain));
-}
-
-function resolveWorkflowStorageStatePath(workflow: LoadedLibrettoWorkflow): string | undefined {
-  const authProfile = workflow.metadata.authProfile;
-  if (authProfile?.type !== "local") {
-    return undefined;
-  }
-  return resolveLocalAuthProfilePath(authProfile.domain);
 }
 
 function getMissingLocalAuthProfileError(args: {
@@ -199,7 +163,24 @@ async function loadWorkflowExport(
 
   if (!isLoadedLibrettoWorkflow(targetExport)) {
     throw new Error(
-      `Export "${exportName}" in ${absolutePath} must be a Libretto workflow instance. Use workflow(...) from "libretto".`,
+      [
+        `Export "${exportName}" in ${absolutePath} is not a valid Libretto workflow.`,
+        "",
+        'A workflow must be created using the workflow() function from "libretto":',
+        "",
+        '  import { workflow } from "libretto";',
+        "",
+        `  export const ${exportName} = workflow<InputType, OutputType>(`,
+        "    {},",
+        "    async (ctx, input) => {",
+        "      // ctx.page     — Playwright Page instance",
+        "      // ctx.logger   — MinimalLogger",
+        "      // ctx.services — injected dependencies (generic, default {})",
+        "      // input        — JSON-serializable input matching InputType",
+        "      return output; // must match OutputType",
+        "    },",
+        "  );",
+      ].join("\n"),
     );
   }
 
@@ -232,12 +213,16 @@ async function runIntegrationInternal(
     integrationExport: args.exportName,
     session: args.session,
   });
-  const authProfile = workflow.metadata.authProfile;
-  const storageStatePath = resolveWorkflowStorageStatePath(workflow);
-  if (authProfile?.type === "local" && storageStatePath && !existsSync(storageStatePath)) {
+
+  // Resolve auth profile from CLI flag (--auth-profile <domain>)
+  const authProfileDomain = args.authProfileDomain;
+  const storageStatePath = authProfileDomain
+    ? resolveLocalAuthProfilePath(authProfileDomain)
+    : undefined;
+  if (authProfileDomain && storageStatePath && !existsSync(storageStatePath)) {
     throw new Error(
       getMissingLocalAuthProfileError({
-        domain: authProfile.domain,
+        domain: authProfileDomain,
         profilePath: storageStatePath,
         session: args.session,
       }),
@@ -262,30 +247,13 @@ async function runIntegrationInternal(
     },
   });
 
+  // Make session available to standalone pause() before running the workflow.
+  setSessionForPause(args.session);
+
   const workflowContext: LibrettoWorkflowContext = {
     logger: integrationLogger,
     page: browserSession.page,
-    context: browserSession.context,
-    browser: browserSession.browser,
-    session: args.session,
-    integrationPath: absolutePath,
-    exportName: args.exportName,
-    headless: args.headless,
-    pause: async () => {
-      const details: RunDebugPauseDetails = {
-        sessionName: args.session,
-        pausedAt: new Date().toISOString(),
-        url: browserSession.page.url(),
-      };
-      console.log(`[pause] Paused at ${details.url}`);
-      console.log("[pause] Waiting for resume signal...");
-      await waitForResumeSignal({
-        signalPaths,
-        session: args.session,
-        details,
-      });
-      console.log("[pause] Resume signal received. Continuing workflow...");
-    },
+    services: {},
   };
 
   try {

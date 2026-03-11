@@ -49,14 +49,8 @@ export {
 	type SaveDownloadOptions,
 } from "./runtime/download/download.js";
 
-// Debug
-export {
-	debugPause,
-	DebugPauseSignal,
-	isDebugPauseSignal,
-	type DebugPauseContext,
-	type DebugPauseDetails,
-} from "./shared/debug/pause.js";
+// Debug / Pause
+export { pause } from "./shared/debug/pause.js";
 
 // Config
 export {
@@ -92,11 +86,6 @@ export {
 // Run helpers
 export {
 	launchBrowser,
-	debugPause as runDebugPause,
-	DebugPauseSignal as RunDebugPauseSignal,
-	isDebugPauseSignal as isRunDebugPauseSignal,
-	type DebugPauseContext as RunDebugPauseContext,
-	type DebugPauseDetails as RunDebugPauseDetails,
 	type LaunchBrowserArgs,
 	type BrowserSession,
 } from "./shared/run/api.js";
@@ -106,7 +95,6 @@ export {
 	LibrettoWorkflow,
 	LIBRETTO_WORKFLOW_BRAND,
 	workflow,
-	type LibrettoAuthProfile,
 	type LibrettoWorkflowMetadata,
 	type LibrettoWorkflowContext,
 	type LibrettoWorkflowHandler,

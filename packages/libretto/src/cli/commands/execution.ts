@@ -387,7 +387,7 @@ async function runResume(session: string, logger: LoggerApi): Promise<void> {
 
   if (!existsSync(pausedSignalPath)) {
     throw new Error(
-      `Session "${session}" is not paused. Run "libretto-cli run ... --session ${session}" and call ctx.pause() first.`,
+      `Session "${session}" is not paused. Run "libretto-cli run ... --session ${session}" and call pause() first.`,
     );
   }
 
@@ -532,7 +532,8 @@ export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv 
           .option("params", { type: "string" })
           .option("params-file", { type: "string" })
           .option("headed", { type: "boolean", default: false })
-          .option("headless", { type: "boolean", default: false }),
+          .option("headless", { type: "boolean", default: false })
+          .option("auth-profile", { type: "string", describe: "Domain for local auth profile (e.g. apps.example.com)" }),
       async (argv) => {
         const usage =
           "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]";
@@ -585,12 +586,15 @@ export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv 
             ? true
             : undefined;
 
+        const authProfileDomain = argv["auth-profile"] as string | undefined;
+
         await runIntegrationFromFile({
           integrationPath,
           exportName,
           session,
           params,
           headless: headlessMode ?? false,
+          authProfileDomain,
         }, logger);
       },
     )
