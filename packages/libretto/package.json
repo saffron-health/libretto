@@ -96,6 +96,7 @@
     "type-check": "tsc --noEmit",
     "dev": "tsx src/cli/index.ts",
     "test": "pnpm run build && vitest run",
+    "eval": "pnpm run build && vitest run --config vitest.evals.config.ts",
     "test:watch": "vitest"
   },
   "peerDependencies": {
@@ -105,11 +106,18 @@
     "zod": ">=3.0.0"
   },
   "peerDependenciesMeta": {
-    "@ai-sdk/anthropic": { "optional": true },
-    "@ai-sdk/google-vertex": { "optional": true },
-    "@ai-sdk/openai": { "optional": true }
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google-vertex": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.73",
     "@ai-sdk/anthropic": "^3.0.53",
     "@ai-sdk/google-vertex": "^4.0.72",
     "@ai-sdk/openai": "^3.0.39",

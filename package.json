@@ -8,6 +8,7 @@
 		"cli": "pnpm --filter libretto exec node bin/libretto.mjs",
 		"dev": "pnpm --filter libretto build && pnpm --filter libretto exec node dist/cli/index.js",
 		"test": "pnpm --filter libretto test",
+		"eval": "pnpm --filter libretto eval",
 		"test:watch": "pnpm --filter libretto test:watch"
 	},
 	"devDependencies": {
