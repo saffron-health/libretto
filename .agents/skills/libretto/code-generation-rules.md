@@ -151,7 +151,7 @@ Use `page.evaluate()` only for operations that have no Playwright locator equiva
 
 A quick test: if the evaluate body contains `querySelector`, `querySelectorAll`, `textContent`, `click()`, `getAttribute()`, or iterates DOM elements, it should be rewritten with Playwright locators.
 
-When `page.evaluate()` is used for the acceptable cases above, use a string expression to avoid DOM type errors:
+When `page.evaluate()` is used for the acceptable cases above, keep the logic self-contained and return JSON-serializable values:
 
 ```typescript
 const data = (await page.evaluate(`(() => {
@@ -160,7 +160,7 @@ const data = (await page.evaluate(`(() => {
 })()`)) as string;
 ```
 
-Do not use `/// <reference lib="dom" />` or add `"dom"` to the tsconfig lib — this project's tsconfig intentionally excludes DOM types.
+Do not rely on broad DOM querying inside `page.evaluate()` for production flows when Playwright locators can express the same interaction.
 
 ## Network Request Methods
 
@@ -220,4 +220,4 @@ for (const post of posts) {
 
 ## Type Checking
 
-The generated file must pass `npx tsc --noEmit` before it's considered done. If there are DOM type errors (`document`, `HTMLElement`, `getComputedStyle`), convert to locator APIs or string-expression `page.evaluate()`.
+The generated file must pass `npx tsc --noEmit` before it's considered done. If there are type errors around DOM access, prefer locator APIs first, then use focused `page.evaluate()` only for browser-native APIs.
