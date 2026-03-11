@@ -65,6 +65,17 @@ describe("basic CLI subprocess behavior", () => {
     );
   });
 
+  test("fails exec with missing code usage error when only flags are passed", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const result = await librettoCli("exec --visualize");
+    await evaluate(result.stderr).toMatch(
+      "Shows usage for exec command requiring code with optional session and visualize flags.",
+    );
+    expect(result.stderr).not.toContain(`Missing required --session for "exec".`);
+  });
+
   test("fails run when integration file does not exist", async ({
     librettoCli,
     evaluate,

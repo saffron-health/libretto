@@ -154,6 +154,34 @@ function generateSessionId(): string {
   );
 }
 
+function hasExecCodeArg(filteredArgs: string[]): boolean {
+  for (let i = 1; i < filteredArgs.length; i += 1) {
+    const token = filteredArgs[i];
+    if (!token) continue;
+    if (token === "--") {
+      return filteredArgs.length > i + 1;
+    }
+    if (token === "--visualize") {
+      continue;
+    }
+    if (token === "--page") {
+      const maybeValue = filteredArgs[i + 1];
+      if (maybeValue && !maybeValue.startsWith("--")) {
+        i += 1;
+      }
+      continue;
+    }
+    if (token.startsWith("--page=")) {
+      continue;
+    }
+    if (token.startsWith("-")) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
 function commandNeedsSession(
   command: string,
   rawArgs: string[],
@@ -163,7 +191,7 @@ function commandNeedsSession(
   if (SESSION_OPTIONAL_COMMANDS.has(command)) return false;
   if (command === "close" && rawArgs.includes("--all")) return false;
   if (command === "close" && rawArgs.includes("--force")) return false;
-  if (command === "exec" && filteredArgs.length <= 1) return false;
+  if (command === "exec" && !hasExecCodeArg(filteredArgs)) return false;
   if (command === "save" && filteredArgs.length <= 1) return false;
   if (!CLI_COMMANDS.has(command)) return false;
   return true;
