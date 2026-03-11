@@ -17,7 +17,7 @@ import {
   validateSessionName,
 } from "./core/session.js";
 
-const AUTO_SESSION_COMMANDS = new Set(["open", "run", "connect"]);
+const AUTO_SESSION_COMMANDS = new Set(["open", "run"]);
 const SESSION_OPTIONAL_COMMANDS = new Set(["help", "--help", "-h", "init", "ai"]);
 
 const CLI_COMMANDS = new Set([
@@ -58,7 +58,7 @@ Commands:
 
 Options:
   --session <name>        Use a named session
-                          If omitted for open/run/connect, a session id is auto-generated
+                          If omitted for open/run, a session id is auto-generated
                           All other stateful commands require --session
                           Built-in sessions: default, dev-server, browser-agent
 
@@ -196,7 +196,7 @@ function resolveSessionArgs(rawArgs: string[]): {
       throw new Error(
         [
           `Missing required --session for "${command}".`,
-          "Pass --session <name>, or use open/run/connect without --session to auto-create one.",
+          "Pass --session <name>, or use open/run without --session to auto-create one.",
         ].join("\n"),
       );
     }
