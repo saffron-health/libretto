@@ -162,6 +162,7 @@ function commandNeedsSession(
   if (AUTO_SESSION_COMMANDS.has(command)) return false;
   if (SESSION_OPTIONAL_COMMANDS.has(command)) return false;
   if (command === "close" && rawArgs.includes("--all")) return false;
+  if (command === "close" && rawArgs.includes("--force")) return false;
   if (command === "exec" && filteredArgs.length <= 1) return false;
   if (command === "save" && filteredArgs.length <= 1) return false;
   if (!CLI_COMMANDS.has(command)) return false;
@@ -262,13 +263,25 @@ function createParser(logger: Logger): Argv {
 
 export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
-  validateLegacySessionArg(rawArgs);
-  const {
-    args: effectiveArgs,
-    generatedSession,
-    resolvedSession,
-  } = resolveSessionArgs(rawArgs);
   let exitCode = 0;
+  let effectiveArgs: string[] = rawArgs;
+  let generatedSession: string | null = null;
+  let resolvedSession: string | null = null;
+
+  try {
+    validateLegacySessionArg(rawArgs);
+    ({
+      args: effectiveArgs,
+      generatedSession,
+      resolvedSession,
+    } = resolveSessionArgs(rawArgs));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(message);
+    process.exit(1);
+    return;
+  }
+
   ensureLibrettoSetup();
   const args = filterSessionArgs(effectiveArgs);
   const command = args[0];
