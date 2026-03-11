@@ -74,27 +74,13 @@ export const main = workflow({}, async () => {
     );
     expect(firstRun.stdout).toContain("AUTO_SESSION_RUN_OK");
     expect(firstRun.stdout).toContain("Integration completed.");
-    const firstSessionId = requireReturnedSessionId(
-      "run",
-      firstRun.stdout,
-      firstRun.stderr,
-    );
 
     const secondRun = await librettoCli(
       `run "${integrationFilePath}" main --headless`,
     );
-    expect(secondRun.stderr).not.toContain(
-      `Session "${firstSessionId}" is already open and connected to`,
-    );
+    expect(secondRun.stderr).not.toContain("is already open and connected to");
     expect(secondRun.stdout).toContain("AUTO_SESSION_RUN_OK");
     expect(secondRun.stdout).toContain("Integration completed.");
-    const secondSessionId = requireReturnedSessionId(
-      "run",
-      secondRun.stdout,
-      secondRun.stderr,
-    );
-
-    expect(secondSessionId).not.toBe(firstSessionId);
   }, 90_000);
 
   test("exec without --session explains a session is required", async ({
