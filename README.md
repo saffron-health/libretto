@@ -8,8 +8,29 @@ It is designed for engineering teams that automate workflows in web apps and wan
 
 Install Libretto in your project:
 
+`npm`:
+```bash
+npm install libretto playwright zod
+```
+
+`yarn`:
+```bash
+yarn add libretto playwright zod
+```
+
+`bun`:
+```bash
+bun add libretto playwright zod
+```
+
+`pnpm`:
 ```bash
 pnpm add libretto playwright zod
+```
+
+Then initialize Libretto:
+
+```bash
 npx libretto init
 ```
 
