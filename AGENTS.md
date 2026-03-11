@@ -26,7 +26,7 @@ Targeted (most common during development):
 ```bash
 pnpm type-check
 pnpm test -- test/basic.spec.ts
-pnpm test -- test/pause.spec.ts
+pnpm test -- test/multi-page.spec.ts
 pnpm test -- test/stateful.spec.ts
 ```
 
