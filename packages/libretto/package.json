@@ -1,6 +1,6 @@
 {
   "name": "libretto",
-  "version": "0.2.4",
+  "version": "0.2.6",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
   "repository": {
@@ -105,9 +105,15 @@
     "zod": ">=3.0.0"
   },
   "peerDependenciesMeta": {
-    "@ai-sdk/anthropic": { "optional": true },
-    "@ai-sdk/google-vertex": { "optional": true },
-    "@ai-sdk/openai": { "optional": true }
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google-vertex": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.53",
