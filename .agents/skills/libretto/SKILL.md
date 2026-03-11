@@ -45,12 +45,12 @@ Built-in sessions: `default`, `dev-server`, `browser-agent`.
 
 Add `--visualize` to any `exec` command to show a ghost cursor and element highlight before each action executes. Use it when the user wants to see what will be clicked/filled before it happens.
 
-## Workflow Pause/Resume (`ctx.pause()`)
+## Workflow Pause/Resume (`pause()`)
 
-Workflows pause from inside the workflow function by calling `await ctx.pause()`.
+Workflows pause by calling `await pause()` (imported from `"libretto"`). In production (`NODE_ENV=production`) it is a no-op.
 
 - There are no pause options to pass at call sites. Pause is session-scoped and resolved from the active session.
-- `npx libretto run ...` waits until the workflow either completes or hits the next `ctx.pause()`.
+- `npx libretto run ...` waits until the workflow either completes or hits the next `pause()`.
 - On pause, the workflow process stays alive and keeps browser/session state.
 - `npx libretto resume --session <name>` sends resume signal and then waits until completion or the next pause.
 - For multi-pause workflows, call `resume` repeatedly until the workflow completes.
@@ -326,7 +326,7 @@ The browser stays open indefinitely until explicitly closed with `npx libretto c
 
 If the site requires login, ask the user how auth should work in the generated workflow:
 
-1. Save a local profile (recommended for local runs): open in `--headed`, have the user log in manually, run `npx libretto save <domain>`, and generate workflow metadata with `authProfile: { type: "local", domain: "<hostname>" }`.
+1. Save a local profile (recommended for local runs): open in `--headed`, have the user log in manually, run `npx libretto save <domain>`, and pass `--auth-profile <domain>` when running the workflow (e.g. `npx libretto run ./file.ts main --auth-profile example.com`).
 2. Use user-managed credential logic in Playwright code (no local profile dependency).
 
 If local profile is chosen, include this warning in your generated workflow guidance: local profiles are machine-local (other users/environments will not have them), and sessions can expire so re-login/re-save may be required.
