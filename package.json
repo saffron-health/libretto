@@ -25,66 +25,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./logger": {
-      "types": "./dist/shared/logger/index.d.ts",
-      "import": "./dist/shared/logger/index.js",
-      "require": "./dist/shared/logger/index.cjs"
-    },
-    "./recovery": {
-      "types": "./dist/runtime/recovery/index.d.ts",
-      "import": "./dist/runtime/recovery/index.js",
-      "require": "./dist/runtime/recovery/index.cjs"
-    },
-    "./extract": {
-      "types": "./dist/runtime/extract/index.d.ts",
-      "import": "./dist/runtime/extract/index.js",
-      "require": "./dist/runtime/extract/index.cjs"
-    },
-    "./network": {
-      "types": "./dist/runtime/network/index.d.ts",
-      "import": "./dist/runtime/network/index.js",
-      "require": "./dist/runtime/network/index.cjs"
-    },
-    "./download": {
-      "types": "./dist/runtime/download/index.d.ts",
-      "import": "./dist/runtime/download/index.js",
-      "require": "./dist/runtime/download/index.cjs"
-    },
-    "./debug": {
-      "types": "./dist/shared/debug/index.d.ts",
-      "import": "./dist/shared/debug/index.js",
-      "require": "./dist/shared/debug/index.cjs"
-    },
-    "./config": {
-      "types": "./dist/shared/config/index.d.ts",
-      "import": "./dist/shared/config/index.js",
-      "require": "./dist/shared/config/index.cjs"
-    },
-    "./instrumentation": {
-      "types": "./dist/shared/instrumentation/index.d.ts",
-      "import": "./dist/shared/instrumentation/index.js",
-      "require": "./dist/shared/instrumentation/index.cjs"
-    },
-    "./visualization": {
-      "types": "./dist/shared/visualization/index.d.ts",
-      "import": "./dist/shared/visualization/index.js",
-      "require": "./dist/shared/visualization/index.cjs"
-    },
-    "./llm": {
-      "types": "./dist/shared/llm/index.d.ts",
-      "import": "./dist/shared/llm/index.js",
-      "require": "./dist/shared/llm/index.cjs"
-    },
-    "./state": {
-      "types": "./dist/shared/state/index.d.ts",
-      "import": "./dist/shared/state/index.js",
-      "require": "./dist/shared/state/index.cjs"
-    },
-    "./run": {
-      "types": "./dist/shared/run/api.d.ts",
-      "import": "./dist/shared/run/api.js",
-      "require": "./dist/shared/run/api.cjs"
     }
   },
   "scripts": {
@@ -96,7 +36,7 @@
     "test": "pnpm run build && vitest run",
     "eval": "pnpm run build && vitest run --config vitest.evals.config.ts",
     "test:watch": "vitest",
-    "cli": "tsx src/cli/index.ts",
+    "cli": "node dist/index.js",
     "prepack": "pnpm run build"
   },
   "peerDependencies": {
