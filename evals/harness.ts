@@ -422,7 +422,6 @@ export class ClaudeEvalHarness {
   private readonly settingSources: SettingSource[];
   private readonly systemPromptAppend: string;
   private sessionId: string;
-  private lastResponse: EvalResponse | null = null;
   private hasStarted = false;
   private isClosed = false;
 
@@ -488,12 +487,7 @@ export class ClaudeEvalHarness {
       cwd: this.cwd,
       model: this.model,
     });
-    this.lastResponse = response;
     return response;
-  }
-
-  get transcript(): string {
-    return this.lastResponse?.transcript ?? "";
   }
 
   async close(): Promise<void> {
