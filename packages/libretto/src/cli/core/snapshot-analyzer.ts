@@ -1,9 +1,4 @@
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -14,13 +9,12 @@ import {
   formatCommandPrefix,
   readAiConfig,
 } from "./ai-config.js";
-import {
-  getLLMClientFactory,
-} from "./context.js";
+import { getLLMClientFactory } from "./context.js";
 
 export type ScreenshotPair = {
   pngPath: string;
   htmlPath: string;
+  condensedHtmlPath: string;
   baseName: string;
 };
 
@@ -30,6 +24,7 @@ export type InterpretArgs = {
   context: string;
   pngPath: string;
   htmlPath: string;
+  condensedHtmlPath: string;
 };
 
 const InterpretResultSchema = z.object({
@@ -93,6 +88,9 @@ abstract class UserCodingAgent {
     return this.config.commandPrefix.slice(1);
   }
 
+  /** Build extra CLI args from config.model, config.reasoning, config.allowedTools. */
+  protected abstract buildExtraArgs(): string[];
+
   protected screenshotHint(pngPath: string): string {
     return (
       `\n\nScreenshot file path: ${pngPath}\n` +
@@ -128,6 +126,19 @@ abstract class UserCodingAgent {
 }
 
 class CodexUserCodingAgent extends UserCodingAgent {
+  protected buildExtraArgs(): string[] {
+    const extra: string[] = [];
+    if (this.config.model) {
+      extra.push("--model", this.config.model);
+    }
+    if (this.config.reasoning !== undefined) {
+      // Codex uses --reasoning-effort <low|medium|high>
+      extra.push("--reasoning-effort", String(this.config.reasoning));
+    }
+    // Codex tool restriction is handled via --sandbox in commandPrefix
+    return extra;
+  }
+
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
@@ -139,6 +150,7 @@ class CodexUserCodingAgent extends UserCodingAgent {
     );
     const args = [
       ...this.baseArgs,
+      ...this.buildExtraArgs(),
       "--output-last-message",
       outputPath,
       "-i",
@@ -159,21 +171,57 @@ class CodexUserCodingAgent extends UserCodingAgent {
 }
 
 class ClaudeUserCodingAgent extends UserCodingAgent {
+  protected buildExtraArgs(): string[] {
+    const extra: string[] = [];
+    if (this.config.model) {
+      extra.push("--model", this.config.model);
+    }
+    if (this.config.reasoning !== undefined) {
+      // Claude uses --thinking-budget <number>
+      extra.push("--thinking-budget", String(this.config.reasoning));
+    }
+    if (this.config.allowedTools?.length) {
+      // Claude uses --tools "Read,Grep,Glob" to restrict available tools
+      extra.push("--tools", this.config.allowedTools.join(","));
+    }
+    return extra;
+  }
+
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
   ): Promise<InterpretResult> {
-    const args = [...this.baseArgs, `${prompt}${this.screenshotHint(pngPath)}`];
+    const args = [
+      ...this.baseArgs,
+      ...this.buildExtraArgs(),
+      `${prompt}${this.screenshotHint(pngPath)}`,
+    ];
     return await this.runAndParse(args);
   }
 }
 
 class GeminiUserCodingAgent extends UserCodingAgent {
+  protected buildExtraArgs(): string[] {
+    const extra: string[] = [];
+    if (this.config.model) {
+      extra.push("--model", this.config.model);
+    }
+    if (this.config.allowedTools?.length) {
+      // Gemini uses --allowed-tools "read_file,list_directory,search_file_content,glob"
+      extra.push("--allowed-tools", this.config.allowedTools.join(","));
+    }
+    return extra;
+  }
+
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
   ): Promise<InterpretResult> {
-    const args = [...this.baseArgs, `${prompt}${this.screenshotHint(pngPath)}`];
+    const args = [
+      ...this.baseArgs,
+      ...this.buildExtraArgs(),
+      `${prompt}${this.screenshotHint(pngPath)}`,
+    ];
     return await this.runAndParse(args);
   }
 }
@@ -441,37 +489,8 @@ function collectSelectorHints(html: string, limit = 120): string[] {
   return candidates;
 }
 
-export async function runInterpret(
-  args: InterpretArgs,
-  logger: LoggerApi,
-): Promise<void> {
-  logger.info("interpret-start", {
-    objective: args.objective,
-    pngPath: args.pngPath,
-    htmlPath: args.htmlPath,
-  });
-  process.env.NODE_ENV = "development";
-
-  const pngPath = resolvePath(args.pngPath);
-  const htmlPath = resolvePath(args.htmlPath);
-  if (!existsSync(pngPath)) {
-    throw new Error(`PNG file not found: ${pngPath}`);
-  }
-  if (!existsSync(htmlPath)) {
-    throw new Error(`HTML file not found: ${htmlPath}`);
-  }
-
-  const htmlContent = readFileSync(htmlPath, "utf-8");
-  const htmlCharLimit = 500_000;
-  const { text: trimmedHtml, truncated } = truncateText(
-    htmlContent,
-    htmlCharLimit,
-  );
-  const selectorHints = collectSelectorHints(htmlContent, 120);
-
-  let prompt = `# Objective\n${args.objective}\n\n`;
-  prompt += `# Context\n${args.context}\n\n`;
-  prompt += `# Instructions\n`;
+function buildInterpretInstructions(): string {
+  let prompt = `# Instructions\n`;
   prompt += `You are analyzing a screenshot and HTML snapshot of the same web page on behalf of an automation agent.\n`;
   prompt += `The agent needs to interact with this page programmatically using Playwright.\n\n`;
   prompt += `Based on the objective and context above:\n`;
@@ -482,25 +501,94 @@ export async function runInterpret(
   prompt += `Output JSON with this shape:\n`;
   prompt += `{"answer": string, "selectors": [{"label": string, "selector": string, "rationale": string}], "notes": string}\n\n`;
   prompt += `Selectors should prefer robust attributes: data-testid, data-test, aria-label, name, id, role. Avoid fragile class-based or positional selectors.\n`;
-  prompt += `Only include selectors that exist in the HTML snapshot.\n\n`;
+  prompt += `Only include selectors that exist in the HTML snapshot.\n`;
+  return prompt;
+}
+
+function buildFileAnalyzerPrompt(
+  args: InterpretArgs,
+  pngPath: string,
+  htmlPath: string,
+  condensedHtmlPath: string,
+): string {
+  let prompt = `# Objective\n${args.objective}\n\n`;
+  prompt += `# Context\n${args.context}\n\n`;
+  prompt += `# Snapshot Files\n`;
+  prompt += `The following snapshot files are available for your analysis. Use your file reading tools to access them.\n\n`;
+  prompt += `- **Screenshot (PNG):** ${pngPath}\n`;
+  prompt += `- **Condensed DOM (HTML):** ${condensedHtmlPath} — Start with this file. It is the primary HTML snapshot for analysis.\n`;
+  prompt += `- **Full DOM (HTML):** ${htmlPath} — Use this only if the condensed DOM is missing detail needed to answer the objective or verify a selector.\n\n`;
+  prompt += buildInterpretInstructions();
+  prompt += `\nReturn only a JSON object. Do not include markdown code fences or extra commentary.`;
+  return prompt;
+}
+
+function buildInlineHtmlPrompt(
+  args: InterpretArgs,
+  htmlContent: string,
+): string {
+  const htmlCharLimit = 500_000;
+  const { text: trimmedHtml, truncated } = truncateText(
+    htmlContent,
+    htmlCharLimit,
+  );
+  const selectorHints = collectSelectorHints(htmlContent, 120);
+
+  let prompt = `# Objective\n${args.objective}\n\n`;
+  prompt += `# Context\n${args.context}\n\n`;
+  prompt += buildInterpretInstructions();
 
   if (selectorHints.length > 0) {
-    prompt += `Selector hints from HTML attributes (use if relevant):\n`;
+    prompt += `\nSelector hints from HTML attributes (use if relevant):\n`;
     prompt += selectorHints.map((hint) => `- ${hint}`).join("\n");
-    prompt += "\n\n";
+    prompt += "\n";
   }
 
   if (truncated) {
-    prompt += `HTML content is truncated to fit token limits.\n\n`;
+    prompt += `\nHTML content is truncated to fit token limits.\n`;
   }
 
-  prompt += `HTML snapshot:\n\n${trimmedHtml}`;
+  prompt += `\nHTML snapshot (condensed DOM):\n\n${trimmedHtml}`;
   prompt +=
     "\n\nReturn only a JSON object. Do not include markdown code fences or extra commentary.";
+  return prompt;
+}
+
+export async function runInterpret(
+  args: InterpretArgs,
+  logger: LoggerApi,
+): Promise<void> {
+  logger.info("interpret-start", {
+    objective: args.objective,
+    pngPath: args.pngPath,
+    htmlPath: args.htmlPath,
+    condensedHtmlPath: args.condensedHtmlPath,
+  });
+  process.env.NODE_ENV = "development";
+
+  const pngPath = resolvePath(args.pngPath);
+  const htmlPath = resolvePath(args.htmlPath);
+  const condensedHtmlPath = resolvePath(args.condensedHtmlPath);
+
+  if (!existsSync(pngPath)) {
+    throw new Error(`PNG file not found: ${pngPath}`);
+  }
+  if (!existsSync(htmlPath)) {
+    throw new Error(`HTML file not found: ${htmlPath}`);
+  }
+  if (!existsSync(condensedHtmlPath)) {
+    throw new Error(`Condensed HTML file not found: ${condensedHtmlPath}`);
+  }
 
   let parsed: InterpretResult;
   const configuredAgent = UserCodingAgent.getConfigured();
   if (configuredAgent) {
+    const prompt = buildFileAnalyzerPrompt(
+      args,
+      pngPath,
+      htmlPath,
+      condensedHtmlPath,
+    );
     const configuredAnalyzer = configuredAgent.snapshotAnalyzerConfig;
     logger.info("interpret-analyzer-config", {
       preset: configuredAnalyzer.preset,
@@ -516,8 +604,13 @@ export async function runInterpret(
     }
 
     logger.info("interpret-analyzer-factory-fallback", {});
+    const condensedHtmlContent = readFileSync(condensedHtmlPath, "utf-8");
+    const prompt = buildInlineHtmlPrompt(args, condensedHtmlContent);
     const imageBase64 = readFileAsBase64(pngPath);
-    const client = await llmClientFactory(logger, "google/gemini-3-flash-preview");
+    const client = await llmClientFactory(
+      logger,
+      "google/gemini-3-flash-preview",
+    );
     const result = await client.generateObjectFromMessages({
       schema: InterpretResultSchema,
       messages: [
@@ -564,5 +657,7 @@ export async function runInterpret(
 }
 
 export function canAnalyzeSnapshots(): boolean {
-  return UserCodingAgent.getConfigured() !== null || getLLMClientFactory() !== null;
+  return (
+    UserCodingAgent.getConfigured() !== null || getLLMClientFactory() !== null
+  );
 }
