@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
@@ -164,6 +164,69 @@ export async function main() {
       "Says the selected export must be a Libretto workflow instance.",
     );
   });
+
+  test("run forwards --tsconfig to tsx for workflow imports", async ({
+    librettoCli,
+    evaluate,
+    workspacePath,
+    writeWorkflow,
+  }) => {
+    await mkdir(workspacePath("feature", "src"), { recursive: true });
+    await writeFile(
+      workspacePath("feature", "tsconfig.json"),
+      JSON.stringify(
+        {
+          compilerOptions: {
+            baseUrl: ".",
+            paths: {
+              "@/*": ["src/*"],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      workspacePath("feature", "src", "message.ts"),
+      'export default "TSCONFIG_ALIAS_OK";\n',
+      "utf8",
+    );
+    const integrationFilePath = await writeWorkflow(
+      "feature/integration.ts",
+      `
+import message from "@/message";
+
+export const main = workflow({}, async () => {
+  console.log(message);
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" main --tsconfig "${workspacePath("feature", "tsconfig.json")}" --session default --headless`,
+    );
+    await evaluate(result.stdout).toMatch(
+      "Includes TSCONFIG_ALIAS_OK and Integration completed.",
+    );
+  }, 45_000);
+
+  test("run compile failures mention --tsconfig guidance", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await writeFile(
+      workspacePath("integration-compile-error.ts"),
+      "const = 1;\n",
+      "utf8",
+    );
+    const result = await librettoCli(
+      'run "./integration-compile-error.ts" main --session default --headless',
+    );
+    expect(result.stderr).toContain("Transform failed with");
+    expect(result.stderr).toContain("--tsconfig <path>");
+  }, 45_000);
 
   test("accepts branded Libretto workflow contract across module boundaries", async ({
     librettoCli,

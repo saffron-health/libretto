@@ -59,6 +59,7 @@ async function main(): Promise<void> {
           {
             failedAt: new Date().toISOString(),
             message,
+            phase: "setup",
           },
           null,
           2,

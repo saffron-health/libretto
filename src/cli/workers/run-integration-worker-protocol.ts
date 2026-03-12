@@ -7,6 +7,7 @@ export const RunIntegrationWorkerRequestSchema = z.object({
   params: z.unknown(),
   headless: z.boolean(),
   authProfileDomain: z.string().optional(),
+  tsconfigPath: z.string().optional(),
 });
 
 export type RunIntegrationWorkerRequest = z.infer<

@@ -33,6 +33,16 @@ type RunIntegrationOutcome =
   | { status: "failed-held" };
 
 const FAILURE_HOLD_POLL_INTERVAL_MS = 250;
+const TSCONFIG_HINT =
+  "TypeScript compilation failed. Pass --tsconfig <path> to run against a specific tsconfig.";
+
+function isTsxCompileError(error: unknown): error is Error {
+  return (
+    error instanceof Error &&
+    (error.name === "TransformError" ||
+      error.message.startsWith("Cannot resolve tsconfig at path:"))
+  );
+}
 
 function mirrorStdoutToFile(filePath: string): () => void {
   const stdout = process.stdout as NodeJS.WriteStream & {
@@ -144,8 +154,10 @@ async function loadWorkflowExport(
       unknown
     >;
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const compileHint = isTsxCompileError(error) ? `\n${TSCONFIG_HINT}` : "";
     throw new Error(
-      `Failed to import integration module at ${absolutePath}: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to import integration module at ${absolutePath}: ${message}${compileHint}`,
     );
   }
 
@@ -201,7 +213,6 @@ async function runIntegrationInternal(
   await removeSignalIfExists(signalPaths.resumeSignalPath);
   await removeSignalIfExists(signalPaths.completedSignalPath);
   await removeSignalIfExists(signalPaths.failedSignalPath);
-  await removeSignalIfExists(signalPaths.outputSignalPath);
   const restoreStdout = mirrorStdoutToFile(signalPaths.outputSignalPath);
 
   console.log(
@@ -267,6 +278,7 @@ async function runIntegrationInternal(
           {
             failedAt: new Date().toISOString(),
             message: errorMessage,
+            phase: "workflow",
           },
           null,
           2,

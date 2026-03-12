@@ -36,6 +36,8 @@ type StripTypeScriptTypesFn = (
 const stripTypeScriptTypes = (
   moduleBuiltin as { stripTypeScriptTypes?: StripTypeScriptTypesFn }
 ).stripTypeScriptTypes;
+const require = moduleBuiltin.createRequire(import.meta.url);
+const tsxCliPath = require.resolve("tsx/cli");
 
 function withSuppressedStripTypeScriptWarning<T>(action: () => T): T {
   type EmitWarningFn = (...args: unknown[]) => void;
@@ -291,24 +293,36 @@ function readJsonFileIfExists(path: string): unknown {
   }
 }
 
-function readFailureMessage(path: string): string | null {
+type WorkflowFailurePhase = "setup" | "workflow";
+
+type WorkflowFailureSignal = {
+  message: string;
+  phase?: WorkflowFailurePhase;
+};
+
+function readFailureSignal(path: string): WorkflowFailureSignal | null {
   const raw = readJsonFileIfExists(path);
   if (!raw || typeof raw !== "object") return null;
   const message = (raw as { message?: unknown }).message;
-  return typeof message === "string" ? message : null;
+  if (typeof message !== "string") return null;
+  const phase = (raw as { phase?: unknown }).phase;
+  return {
+    message,
+    phase: phase === "setup" || phase === "workflow" ? phase : undefined,
+  };
 }
 
-async function waitForFailureMessage(
+async function waitForFailureSignal(
   path: string,
   timeoutMs = 1_000,
-): Promise<string | null> {
+): Promise<WorkflowFailureSignal | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const message = readFailureMessage(path);
-    if (message) return message;
+    const failure = readFailureSignal(path);
+    if (failure) return failure;
     await new Promise((resolveWait) => setTimeout(resolveWait, 25));
   }
-  return readFailureMessage(path);
+  return readFailureSignal(path);
 }
 
 function streamOutputSince(path: string, offset: number): number {
@@ -327,6 +341,7 @@ type WaitForWorkflowOutcomeArgs = {
 type WorkflowOutcome = {
   status: "completed" | "paused" | "failed" | "exited";
   message?: string;
+  failurePhase?: WorkflowFailurePhase;
 };
 
 function clearSignalIfExists(path: string): void {
@@ -352,8 +367,12 @@ async function waitForWorkflowOutcome(
 
     if (existsSync(signalPaths.failedSignalPath)) {
       outputOffset = streamOutputSince(signalPaths.outputSignalPath, outputOffset);
-      const message = await waitForFailureMessage(signalPaths.failedSignalPath);
-      return { status: "failed", message: message ?? undefined };
+      const failure = await waitForFailureSignal(signalPaths.failedSignalPath);
+      return {
+        status: "failed",
+        message: failure?.message,
+        failurePhase: failure?.phase,
+      };
     }
 
     if (existsSync(signalPaths.completedSignalPath)) {
@@ -464,7 +483,12 @@ async function runIntegrationFromFile(
     new URL("../workers/run-integration-worker.js", import.meta.url),
   );
   const payload = JSON.stringify(args);
-  const worker = spawn(process.execPath, [workerEntryPath, payload], {
+  const worker = spawn(process.execPath, [
+    tsxCliPath,
+    ...(args.tsconfigPath ? ["--tsconfig", args.tsconfigPath] : []),
+    workerEntryPath,
+    payload,
+  ], {
     detached: true,
     stdio: "ignore",
     env: process.env,
@@ -481,9 +505,13 @@ async function runIntegrationFromFile(
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
-    throw new Error(
-      `${outcome.message ?? "Workflow failed during run."}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`,
-    );
+    const message = outcome.message ?? "Workflow failed during run.";
+    if (outcome.failurePhase === "workflow") {
+      throw new Error(
+        `${message}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`,
+      );
+    }
+    throw new Error(message);
   }
   if (outcome.status === "exited") {
     setSessionStatus(args.session, "exited", logger);
@@ -531,12 +559,13 @@ export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv 
         cmd
           .option("params", { type: "string" })
           .option("params-file", { type: "string" })
+          .option("tsconfig", { type: "string" })
           .option("headed", { type: "boolean", default: false })
           .option("headless", { type: "boolean", default: false })
           .option("auth-profile", { type: "string", describe: "Domain for local auth profile (e.g. apps.example.com)" }),
       async (argv) => {
         const usage =
-          "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]";
+          "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless]";
         const integrationPath = argv.integrationFile as string | undefined;
         const exportName = argv.integrationExport as string | undefined;
         const legacyDebug = (argv as Record<string, unknown>).debug;
@@ -587,6 +616,7 @@ export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv 
             : undefined;
 
         const authProfileDomain = argv["auth-profile"] as string | undefined;
+        const tsconfigPath = argv.tsconfig as string | undefined;
 
         await runIntegrationFromFile({
           integrationPath,
@@ -595,6 +625,7 @@ export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv 
           params,
           headless: headlessMode ?? false,
           authProfileDomain,
+          tsconfigPath,
         }, logger);
       },
     )
