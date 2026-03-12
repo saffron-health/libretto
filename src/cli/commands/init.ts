@@ -1,9 +1,7 @@
 import type { Argv } from "yargs";
-import { accessSync, constants, existsSync, mkdirSync, cpSync, readdirSync, statSync } from "node:fs";
-import { join, dirname, delimiter, extname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { accessSync, constants, statSync } from "node:fs";
+import { join, delimiter, extname } from "node:path";
 import { spawnSync } from "node:child_process";
-import { REPO_ROOT } from "../core/context.js";
 import {
 	AI_CONFIG_PRESETS,
 	AiPresetSchema,
@@ -88,40 +86,6 @@ function printDifferentAnalyzerHint(prefix: string = "    "): void {
 	console.log(
 		`${prefix}Use npx libretto ai configure <gemini|claude|codex> to configure a different AI analyzer.`,
 	);
-}
-
-function getSkillSourceDir(): string {
-	// Resolve relative to this file's location in the package
-	const thisDir = dirname(fileURLToPath(import.meta.url));
-	// From dist/cli/commands/ -> package root
-	const pkgRoot = join(thisDir, "..", "..", "..");
-	const skillDir = join(pkgRoot, "skill");
-	if (existsSync(skillDir)) return skillDir;
-	const skillsDir = join(pkgRoot, "skills");
-	if (existsSync(skillsDir)) return skillsDir;
-	throw new Error(
-		"Could not find skill/ or skills/ directory in the libretto package.",
-	);
-}
-
-function copySkills(): void {
-	const src = getSkillSourceDir();
-	const files = readdirSync(src);
-	if (files.length === 0) {
-		console.log("  No skill files found to copy.");
-		return;
-	}
-
-	const targets = [
-		join(REPO_ROOT, ".agents", "skills", "libretto"),
-		join(REPO_ROOT, ".claude", "skills", "libretto"),
-	];
-
-	for (const target of targets) {
-		mkdirSync(target, { recursive: true });
-		cpSync(src, target, { recursive: true });
-		console.log(`  \u2713 Copied skill files to ${target}`);
-	}
 }
 
 function installBrowsers(): void {
@@ -219,21 +183,12 @@ export function registerInitCommand(yargs: Argv): Argv {
 				default: false,
 				describe: "Skip Playwright Chromium installation",
 			}),
-		(argv) => {
-			console.log("Initializing libretto...\n");
+			(argv) => {
+				console.log("Initializing libretto...\n");
 
-			console.log("Copying skill files...");
-			try {
-				copySkills();
-			} catch (err) {
-				console.error(
-					`  \u2717 ${err instanceof Error ? err.message : String(err)}`,
-				);
-			}
-
-			if (!argv["skip-browsers"]) {
-				installBrowsers();
-			} else {
+				if (!argv["skip-browsers"]) {
+					installBrowsers();
+				} else {
 				console.log("\nSkipping browser installation (--skip-browsers)");
 			}
 

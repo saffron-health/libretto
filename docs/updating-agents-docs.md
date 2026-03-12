@@ -12,7 +12,7 @@ Guidelines for updating AGENTS.md files based on learnings from the current sess
 
 Place docs in the deepest/lowest common ancestor:
 
-- Root `AGENTS.md`: repo-wide conventions (build commands, monorepo structure)
+- Root `AGENTS.md`: repo-wide conventions (build commands, package structure)
 - Package `AGENTS.md` (e.g., `apps/api/AGENTS.md`): package-specific patterns
 - Subdirectory `AGENTS.md` (e.g., `apps/api/src/sync/AGENTS.md`): feature-specific details
 - `docs/*.md`: detailed explanations, tutorials, or complex topics

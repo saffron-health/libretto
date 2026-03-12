@@ -62,7 +62,7 @@ Maintained by the team at [Saffron Health](https://saffron.health).
 
 ## Development
 
-For local development in this monorepo:
+For local development in this repository:
 
 ```bash
 pnpm i

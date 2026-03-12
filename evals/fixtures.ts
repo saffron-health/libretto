@@ -34,8 +34,8 @@ type EvalFixtures = {
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const packageRoot = resolve(here, "..");
-const repoRoot = resolve(packageRoot, "../..");
-const skillPath = resolve(packageRoot, "skill/SKILL.md");
+const repoRoot = packageRoot;
+const skillPath = resolve(packageRoot, ".agents/skills/libretto/SKILL.md");
 const referencesRoot = resolve(packageRoot, "evals/references");
 const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-eval-workspaces");
 
