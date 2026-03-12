@@ -14,6 +14,9 @@ importers:
       playwright:
         specifier: ^1.52.0
         version: 1.58.2
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
       yargs:
         specifier: ^17.7.2
         version: 17.7.2
@@ -42,9 +45,6 @@ importers:
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)
-      tsx:
-        specifier: ^4.19.2
-        version: 4.21.0
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

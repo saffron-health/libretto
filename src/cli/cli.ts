@@ -45,7 +45,7 @@ Commands:
   init [--skip-browsers] Initialize libretto (install browsers, check AI setup)
   open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
-  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]  Run an exported Libretto workflow from a file
+  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless]  Run an exported Libretto workflow from a file
   ai configure [preset] [-- <command prefix...>]  Configure AI runtime for analysis commands
   save <url|domain>       Save current browser session (cookies, localStorage, etc.)
   exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight)
