@@ -1,16 +1,8 @@
 import { describe } from "vitest";
 import { test } from "./fixtures.js";
+import type { TranscriptScore } from "./harness.js";
 
-type EvalScore = {
-  percent: number;
-  criteria: Array<{
-    criterion: string;
-    pass: boolean;
-    reason: string;
-  }>;
-};
-
-function assertPerfectScore(score: EvalScore): void {
+function assertPerfectScore(score: TranscriptScore): void {
   const failures = score.criteria
     .filter((criterion) => !criterion.pass)
     .map((criterion) => `- ${criterion.criterion}: ${criterion.reason}`);

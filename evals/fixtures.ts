@@ -28,7 +28,6 @@ type EvalFixtures = {
     sourceRelativePath: string,
     destinationRelativePath?: string,
   ) => Promise<string>;
-  writeEvalFile: (destinationRelativePath: string, source: string) => Promise<string>;
 };
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -119,17 +118,6 @@ export const test = base.extend<EvalFixtures>({
       return targetPath;
     });
   },
-
-  writeEvalFile: async ({ evalWorkspaceDir }, use) => {
-    await use(async (destinationRelativePath: string, source: string) => {
-      const destinationPath = resolve(evalWorkspaceDir, destinationRelativePath);
-      assertWithinRoot(evalWorkspaceDir, destinationPath, "Workspace write path");
-      await mkdir(dirname(destinationPath), { recursive: true });
-      await writeFile(destinationPath, source, "utf8");
-      return destinationPath;
-    });
-  },
-
   harness: async ({ evalWorkspaceDir }, use) => {
     ensureClaudeAuthConfigured();
     const harness = new ClaudeEvalHarness({
