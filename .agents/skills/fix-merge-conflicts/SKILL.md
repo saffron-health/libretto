@@ -7,13 +7,42 @@ Resolve conflicts by intent, not by line order.
 
 ## Workflow
 
-1. Identify conflicted files and candidate commits.
-2. Map each conflicting commit to its PR.
-3. Read PR title and description to extract intent.
-4. Detect intent divergence and request user intervention.
-5. Resolve conflicts to preserve both intents when compatible.
-6. Validate behavior with targeted checks.
-7. Summarize decisions and any tradeoffs.
+1. Run preflight conflict detection. If no local merge/rebase/cherry-pick conflicts are present, automatically fetch and merge `origin/main`.
+2. Identify conflicted files and candidate commits.
+3. Map each conflicting commit to its PR.
+4. Read PR title and description to extract intent.
+5. Detect intent divergence and request user intervention.
+6. Resolve conflicts to preserve both intents when compatible.
+7. Validate behavior with targeted checks.
+8. Summarize decisions and any tradeoffs.
+
+## 0) Preflight: Ensure a Conflict Exists
+
+If there are no active unmerged paths, proactively merge latest `origin/main` to surface conflicts:
+
+```bash
+git status --porcelain
+git diff --name-only --diff-filter=U
+```
+
+Decision rule:
+
+- If `git diff --name-only --diff-filter=U` returns files, skip auto-merge and continue to conflict analysis.
+- If it returns nothing, run:
+
+```bash
+git fetch origin
+git merge origin/main
+```
+
+Then re-check:
+
+```bash
+git diff --name-only --diff-filter=U
+```
+
+- If conflicts now exist, continue with the rest of this workflow.
+- If still no conflicts, report that no merge conflicts were detected and stop.
 
 ## 1) Identify Conflict Scope
 

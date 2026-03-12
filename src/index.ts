@@ -1,3 +1,5 @@
+import { normalize, sep } from "node:path";
+
 // Logger
 export { Logger, defaultLogger, type LoggerApi, type MinimalLogger, type LoggerSink, type LogOptions } from "./shared/logger/logger.js";
 export {
@@ -99,3 +101,21 @@ export {
 	type LibrettoWorkflowContext,
 	type LibrettoWorkflowHandler,
 } from "./shared/workflow/workflow.js";
+
+const isDistIndexEntrypoint = (): boolean => {
+	const entryArg = process.argv[1];
+	if (!entryArg) {
+		return false;
+	}
+	return normalize(entryArg).endsWith(`${sep}dist${sep}index.js`);
+};
+
+if (isDistIndexEntrypoint()) {
+	void import("./cli/index.js")
+		.then(({ runLibrettoCLI }) => runLibrettoCLI())
+		.catch((error: unknown) => {
+			const message = error instanceof Error ? error.stack ?? error.message : String(error);
+			process.stderr.write(`${message}\n`);
+			process.exitCode = 1;
+		});
+}
