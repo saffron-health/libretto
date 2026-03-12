@@ -10,8 +10,8 @@ type EvalFixtures = {
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const packageRoot = resolve(here, "..");
-const repoRoot = resolve(packageRoot, "../..");
-const skillPath = resolve(packageRoot, "skill/SKILL.md");
+const repoRoot = packageRoot;
+const skillPath = resolve(packageRoot, ".agents/skills/libretto/SKILL.md");
 
 let cachedSkillMarkdown: string | null = null;
 

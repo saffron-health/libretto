@@ -53,9 +53,9 @@ type CliFixtures = {
 };
 
 const here = fileURLToPath(new URL(".", import.meta.url));
-const repoRoot = resolve(here, "../../..");
-const packageRoot = resolve(here, "..");
-const cliEntry = resolve(packageRoot, "bin/libretto.mjs");
+const repoRoot = resolve(here, "..");
+const packageRoot = repoRoot;
+const cliEntry = resolve(packageRoot, "dist/cli/index.js");
 const librettoEntry = resolve(packageRoot, "dist/index.js");
 const librettoRuntimePath = new URL("../dist/index.js", import.meta.url)
   .href;
@@ -104,7 +104,7 @@ function ensureBuilt(): void {
     didBuild = true;
     return;
   }
-  const buildResult = spawnSync("pnpm", ["--filter", "libretto", "build"], {
+  const buildResult = spawnSync("pnpm", ["build"], {
     cwd: repoRoot,
     encoding: "utf8",
   });

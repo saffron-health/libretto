@@ -42,7 +42,7 @@ function printUsage(): void {
   console.log(`Usage: libretto-cli <command> [--session <name>]
 
 Commands:
-  init [--skip-browsers] Initialize libretto (copy skills, install browsers)
+  init [--skip-browsers] Initialize libretto (install browsers, check AI setup)
   open <url> [--headless] Launch browser and open URL (headed by default)
                           Automatically loads saved profile if available
   run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]  Run an exported Libretto workflow from a file
