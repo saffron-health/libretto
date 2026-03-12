@@ -15,6 +15,17 @@ const EvaluationVerdictSchema = z.object({
   success: z.boolean(),
   reason: z.string().trim().min(1),
 });
+const ScoredCriterionSchema = z.object({
+  criterion: z.string().trim().min(1),
+  pass: z.boolean(),
+  reason: z.string().trim().min(1),
+});
+const TranscriptScoreSchema = z.object({
+  criteria: z.array(ScoredCriterionSchema).min(1),
+  passed: z.number().int().nonnegative(),
+  total: z.number().int().positive(),
+  percent: z.number().min(0).max(100),
+});
 
 const EVAL_GCP_PROJECT = "saffron-health";
 const ANTHROPIC_API_KEY_SECRET_NAME = "anthropic-api-key";
@@ -24,6 +35,8 @@ let didAttemptSecretLoad = false;
 const MAX_TRANSCRIPT_CHARS = 20_000;
 
 type EvaluationVerdict = z.infer<typeof EvaluationVerdictSchema>;
+export type ScoredCriterion = z.infer<typeof ScoredCriterionSchema>;
+export type TranscriptScore = z.infer<typeof TranscriptScoreSchema>;
 
 function clip(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
@@ -217,6 +230,121 @@ async function evaluateTranscript(opts: {
   throw new Error(`Evaluation returned invalid schema output: ${result.result}`);
 }
 
+async function scoreTranscript(opts: {
+  criteria: string[];
+  transcript: string;
+  cwd: string;
+  model?: string;
+}): Promise<TranscriptScore> {
+  const normalizedCriteria = opts.criteria
+    .map((criterion) => criterion.trim())
+    .filter((criterion) => criterion.length > 0);
+  if (normalizedCriteria.length === 0) {
+    throw new Error("score() requires at least one non-empty criterion.");
+  }
+
+  const prompt = [
+    "Score whether TRANSCRIPT satisfies each criterion in CRITERIA.",
+    "Return only JSON with key `criteria` where each item is:",
+    "{ criterion: <exact criterion string>, pass: <boolean>, reason: <string> }",
+    "Use the exact criterion text; do not rewrite criterion names.",
+    "Be strict and mark pass=false when evidence is missing.",
+    "",
+    `CRITERIA:\n${JSON.stringify(normalizedCriteria, null, 2)}`,
+    "",
+    `TRANSCRIPT:\n${clip(opts.transcript, MAX_TRANSCRIPT_CHARS)}`,
+  ].join("\n");
+
+  const messages: SDKMessage[] = [];
+  for await (const message of query({
+    prompt,
+    options: {
+      cwd: opts.cwd,
+      model: opts.model,
+      tools: [],
+      maxTurns: 1,
+      persistSession: false,
+      permissionMode: "dontAsk",
+    },
+  })) {
+    messages.push(message);
+  }
+
+  const result = extractResultMessage(messages);
+  if (!result) {
+    throw new Error("Scoring failed: no result message from SDK.");
+  }
+  if (result.subtype !== "success") {
+    const details = result.errors.filter((err) => err.trim().length > 0).join("\n");
+    throw new Error(
+      [
+        `Scoring failed with subtype "${result.subtype}".`,
+        details || "No error details were provided by the SDK.",
+      ].join("\n"),
+    );
+  }
+
+  let parsedCriteria: ScoredCriterion[] | null = null;
+  try {
+    const raw = result.result.trim();
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    const candidate = start >= 0 && end >= start ? raw.slice(start, end + 1) : raw;
+    const parsed = JSON.parse(candidate) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "criteria" in parsed &&
+      Array.isArray((parsed as { criteria?: unknown }).criteria)
+    ) {
+      const schema = z.array(ScoredCriterionSchema);
+      const parsedArray = schema.safeParse((parsed as { criteria: unknown }).criteria);
+      if (parsedArray.success) {
+        parsedCriteria = parsedArray.data;
+      }
+    }
+  } catch {
+    parsedCriteria = null;
+  }
+
+  if (!parsedCriteria) {
+    throw new Error(`Scoring returned invalid schema output: ${result.result}`);
+  }
+
+  const byCriterion = new Map<string, ScoredCriterion>();
+  for (const item of parsedCriteria) {
+    if (!byCriterion.has(item.criterion)) {
+      byCriterion.set(item.criterion, item);
+    }
+  }
+
+  const criteria = normalizedCriteria.map((criterion) => {
+    const matched = byCriterion.get(criterion);
+    if (matched) {
+      return {
+        criterion,
+        pass: matched.pass,
+        reason: matched.reason,
+      };
+    }
+    return {
+      criterion,
+      pass: false,
+      reason: "No score returned for this criterion.",
+    };
+  });
+
+  const total = criteria.length;
+  const passed = criteria.filter((criterion) => criterion.pass).length;
+  const percent = Math.round((passed / total) * 100);
+  return TranscriptScoreSchema.parse({
+    criteria,
+    passed,
+    total,
+    percent,
+  });
+}
+
 export function ensureClaudeAuthConfigured(): void {
   ensureClaudeAuthEnvFromSecretIfNeeded();
   if (hasAnthropicApiKey()) return;
@@ -274,6 +402,15 @@ export class EvalResponse {
       throw new Error(verdict.reason);
     }
     return verdict;
+  }
+
+  async score(criteria: string[]): Promise<TranscriptScore> {
+    return await scoreTranscript({
+      criteria,
+      transcript: this.transcript,
+      cwd: this.cwd,
+      model: this.model,
+    });
   }
 }
 
@@ -343,13 +480,14 @@ export class ClaudeEvalHarness {
       this.hasStarted = true;
     }
 
-    return new EvalResponse({
+    const response = new EvalResponse({
       prompt,
       messages,
       sessionId: seenSessionId ?? this.sessionId,
       cwd: this.cwd,
       model: this.model,
     });
+    return response;
   }
 
   async close(): Promise<void> {
