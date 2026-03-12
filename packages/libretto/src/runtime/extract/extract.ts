@@ -2,6 +2,7 @@ import type { Page } from "playwright";
 import type z from "zod";
 import { type MinimalLogger, defaultLogger } from "../../shared/logger/logger.js";
 import type { LLMClient } from "../../shared/llm/types.js";
+import { condenseDom } from "../../cli/core/condense-dom.js";
 
 export type ExtractOptions<T extends z.ZodType> = {
 	page: Page;
@@ -35,10 +36,14 @@ export async function extractFromPage<T extends z.ZodType>(
 		screenshot = screenshotBuffer.toString("base64");
 
 		try {
-			domContent = await element.innerHTML();
-			if (domContent.length > 30000) {
-				domContent = domContent.slice(0, 30000) + "\n... [truncated]";
+			let rawDom = await element.innerHTML();
+			if (rawDom.length > 30000) {
+				rawDom = condenseDom(rawDom).html;
 			}
+			if (rawDom.length > 30000) {
+				rawDom = rawDom.slice(0, 30000) + "\n... [truncated]";
+			}
+			domContent = rawDom;
 		} catch {
 			domContent = undefined;
 		}
@@ -51,11 +56,14 @@ export async function extractFromPage<T extends z.ZodType>(
 		screenshot = data;
 
 		try {
-			const htmlContent = await page.content();
-			domContent =
-				htmlContent.length > 50000
-					? htmlContent.slice(0, 50000) + "\n... [truncated]"
-					: htmlContent;
+			let htmlContent = await page.content();
+			if (htmlContent.length > 50000) {
+				htmlContent = condenseDom(htmlContent).html;
+			}
+			if (htmlContent.length > 50000) {
+				htmlContent = htmlContent.slice(0, 50000) + "\n... [truncated]";
+			}
+			domContent = htmlContent;
 		} catch {
 			domContent = undefined;
 		}
