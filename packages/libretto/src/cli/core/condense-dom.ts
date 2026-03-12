@@ -154,55 +154,68 @@ export function condenseDom(html: string): CondenseDomResult {
   // ── Rule 7: SVG elements ─────────────────────────────────────────────
   // Collapse each <svg> to a single tag, preserving key attributes.
   // Extract <title>/<desc> text as aria-label if none exists.
+  // Iterate from innermost to outermost to handle nested SVGs correctly.
+  const svgPattern = /<svg\b([^>]*)>((?:(?!<svg\b)[\s\S])*?)<\/svg>/gi;
   result = track(
     "svg-collapse",
     result,
-    result.replace(
-      /<svg\b([^>]*)>([\s\S]*?)<\/svg>/gi,
-      (_match, attrs: string, inner: string) => {
-        // Extract attributes we want to keep
-        const keepAttrs: string[] = [];
-        const attrPatterns = [
-          "id",
-          "class",
-          "role",
-          "aria-label",
-          "aria-hidden",
-          "title",
-          "data-testid",
-        ];
-        for (const name of attrPatterns) {
-          const attrToken = findAttributeToken(attrs, name);
-          if (attrToken) keepAttrs.push(attrToken);
-        }
+    (() => {
+      let prev: string;
+      let current = result;
+      do {
+        prev = current;
+        current = current.replace(
+          svgPattern,
+          (_match, attrs: string, inner: string) => {
+            // Extract attributes we want to keep
+            const keepAttrs: string[] = [];
+            const attrPatterns = [
+              "id",
+              "class",
+              "role",
+              "aria-label",
+              "aria-hidden",
+              "title",
+              "data-testid",
+            ];
+            for (const name of attrPatterns) {
+              const attrToken = findAttributeToken(attrs, name);
+              if (attrToken) keepAttrs.push(attrToken);
+            }
 
-        // Extract <title> or <desc> text for aria-label if not already present
-        const hasAriaLabel = /aria-label\s*=/i.test(attrs);
-        if (!hasAriaLabel) {
-          const titleMatch = inner.match(
-            /<title[^>]*>([^<]+)<\/title>/i,
-          );
-          const descMatch = inner.match(
-            /<desc[^>]*>([^<]+)<\/desc>/i,
-          );
-          const labelText = titleMatch?.[1]?.trim() || descMatch?.[1]?.trim();
-          if (labelText) {
-            keepAttrs.push(
-              `aria-label="${escapeHtmlAttribute(labelText)}"`,
-            );
-          }
-        }
+            // Extract <title> or <desc> text for aria-label if not already present
+            const hasAriaLabel = /aria-label\s*=/i.test(attrs);
+            if (!hasAriaLabel) {
+              const titleMatch = inner.match(
+                /<title[^>]*>([^<]+)<\/title>/i,
+              );
+              const descMatch = inner.match(
+                /<desc[^>]*>([^<]+)<\/desc>/i,
+              );
+              const labelText =
+                titleMatch?.[1]?.trim() || descMatch?.[1]?.trim();
+              if (labelText) {
+                keepAttrs.push(
+                  `aria-label="${escapeHtmlAttribute(labelText)}"`,
+                );
+              }
+            }
 
-        const attrStr = keepAttrs.length > 0 ? ` ${keepAttrs.join(" ")}` : "";
-        return `<svg${attrStr}><!-- [icon] --></svg>`;
-      },
-    ),
+            const attrStr =
+              keepAttrs.length > 0 ? ` ${keepAttrs.join(" ")}` : "";
+            return `<svg${attrStr}><!-- [icon] --></svg>`;
+          },
+        );
+        svgPattern.lastIndex = 0;
+      } while (current !== prev);
+      return current;
+    })(),
   );
 
   // ── Rule 8: Inline style properties ──────────────────────────────────
   // Keep only layout-relevant properties.
   const layoutProps =
-    /(?:display|visibility|opacity|pointer-events|position|z-index|overflow)(?:-[a-z]+)?\s*:[^;"]*/gi;
+    /(?:^|;)\s*(?:display|visibility|opacity|pointer-events|position|z-index|overflow)(?:-[a-z]+)?\s*:[^;"]*/gi;
 
   result = track(
     "inline-styles",
@@ -214,7 +227,7 @@ export function condenseDom(html: string): CondenseDomResult {
         let propMatch: RegExpExecArray | null;
         layoutProps.lastIndex = 0;
         while ((propMatch = layoutProps.exec(value)) !== null) {
-          kept.push(propMatch[0].trim());
+          kept.push(propMatch[0].replace(/^[;\s]+/, "").trim());
         }
         if (kept.length === 0) return "";
         return ` style="${kept.join("; ")}"`;
@@ -290,8 +303,8 @@ function isObfuscatedClass(cls: string): boolean {
   // CSS module pattern: component_hash (single underscore + hash suffix)
   if (/^[a-z]+_[0-9a-f]{4,}$/i.test(cls)) return true;
 
-  // Very short random-looking (2-3 chars, not common abbreviations)
-  if (/^[a-z]{1,2}[0-9]+$/i.test(cls)) return true;
+  // Very short random-looking (2-3 chars + 2+ digits, avoids h1/p2/m3 utility classes)
+  if (/^[a-z]{1,2}[0-9]{2,}$/i.test(cls)) return true;
 
   // High ratio of digits to letters (hashes tend to mix digits in)
   const digits = (cls.match(/[0-9]/g) || []).length;
