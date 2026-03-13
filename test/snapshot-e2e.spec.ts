@@ -1,5 +1,5 @@
-import { readFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, existsSync, mkdirSync, copyFileSync } from "node:fs";
+import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
@@ -17,8 +17,8 @@ import { test } from "./fixtures";
  * - Saved profile in .libretto/profiles/linkedin.com.json for authenticated LinkedIn test.
  */
 
-const SNAPSHOT_TIMEOUT = 120_000;
-const PAGE_SETTLE_MS = 8_000;
+const SNAPSHOT_TIMEOUT = 180_000;
+const PAGE_SETTLE_MS = 15_000;
 
 /** Load API keys from repo root .env so the CLI subprocess can use them. */
 function loadEnvFile(): Record<string, string> {
@@ -61,8 +61,17 @@ async function sleep(ms: number): Promise<void> {
 describe("snapshot e2e – live site analysis", () => {
   test(
     "linkedin feed: identifies post content and poster name selectors",
-    async ({ librettoCli, evaluate }) => {
+    async ({ librettoCli, evaluate, workspaceDir }) => {
       const session = "snapshot-e2e-linkedin";
+
+      // Copy saved LinkedIn profile into test workspace so the browser loads authenticated state
+      const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
+      const srcProfile = resolve(repoRoot, ".libretto/profiles/linkedin.com.json");
+      if (existsSync(srcProfile)) {
+        const destDir = join(workspaceDir, ".libretto", "profiles");
+        mkdirSync(destDir, { recursive: true });
+        copyFileSync(srcProfile, join(destDir, "linkedin.com.json"));
+      }
 
       // Configure AI preset for snapshot analysis
       await librettoCli(`ai configure codex`, snapshotEnv);
@@ -81,13 +90,15 @@ describe("snapshot e2e – live site analysis", () => {
       );
       const snapshotDurationMs = Date.now() - snapshotStart;
       const snapshotSuccess = snapshot.exitCode === 0;
-      console.log(
-        `[linkedin] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`,
-      );
 
       await librettoCli(`close --session ${session}`);
 
       const output = snapshot.stdout + "\n" + snapshot.stderr;
+
+      console.log(
+        `[linkedin] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`,
+      );
+      console.log(`[linkedin] selectors output:\n${output}`);
 
       await evaluate(output).toMatch(
         "The output identifies CSS selectors for post content text AND poster names, AND explains the nesting structure for how to chain them. " +
