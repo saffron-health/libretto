@@ -516,6 +516,7 @@ async function runIntegrationFromFile(
     );
   }
   setSessionStatus(args.session, "completed", logger);
+  console.log("Integration completed.");
 }
 
 export const execInput = SimpleCLI.input({

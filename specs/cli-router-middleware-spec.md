@@ -32,7 +32,7 @@ In v1, framework output stays human-first. `SimpleCLI` will own rendering and st
 - Ensure each command is defined once in one module (route identity, description, input normalization, middleware, handler), with no duplicate command allowlists or secondary registration maps.
 - Ensure each command's input is defined once in one place using `{ positionals, named }` (no separate positional map + separate Zod object that can drift).
 - Auto-generate subcommand-scoped help from route descriptions and input metadata, with the most specific available description shown above usage.
-- Eliminate raw `argv` plumbing from command handlers in `packages/libretto/src/cli/commands/*`.
+- Eliminate raw `argv` plumbing from command handlers in `src/cli/commands/*`.
 - Make `SimpleCLI` the owner of command token parsing, route matching, `help`/`--help`, and `--` passthrough handling.
 - Support reusable middleware that runs after parsing/input normalization and before handlers.
 - Centralize session-related pre-handler logic in dedicated middleware used by `open`/`run` and commands that connect to an existing session.
@@ -61,25 +61,29 @@ In v1, framework output stays human-first. `SimpleCLI` will own rendering and st
 - Add command composition utilities for nested command groups (`ai configure`, future namespaces) with less boilerplate.
 - Add optional framework-level `--dry-run` support for mutating commands.
 - Add richer framework-provided failure context blocks when diagnostics quality needs to be improved.
+- Standardize human-facing error formatting behind a framework-owned summary/recovery/help template only if command-specific error handling becomes too inconsistent to maintain.
 
 ## Important files/docs/websites for implementation
 
-- `packages/libretto/src/cli/cli.ts` - CLI bootstrap, parser construction, usage output, and current manual pre-parse handling.
-- `packages/libretto/src/cli/commands/browser.ts` - `open/save/pages/close` handlers currently coupled to raw argv.
-- `packages/libretto/src/cli/commands/execution.ts` - most complex command parsing (`run`, `exec`, `resume`), JSON/file/flag validation.
-- `packages/libretto/src/cli/commands/logs.ts` - `network/actions` command parsing and page/session option handling.
-- `packages/libretto/src/cli/commands/snapshot.ts` - `snapshot` parsing and connect-path behavior.
-- `packages/libretto/src/cli/commands/ai.ts` - multi-token command (`ai configure`) and passthrough `--` handling.
-- `packages/libretto/src/cli/commands/init.ts` - command migration coverage for non-session commands.
-- `packages/libretto/src/cli/commands/shared.ts` - shared `SimpleCLI` input helpers for session/page/numeric options.
-- `packages/libretto/src/cli/router.ts` - full `SimpleCLI` route tree used by the CLI bootstrap.
-- `packages/libretto/src/cli/core/session.ts` - session validation and state primitives used by session middleware.
-- `packages/libretto/src/cli/core/context.ts` - logger initialization and `.libretto` setup; impacted by session resolution timing.
-- `packages/libretto/src/cli/framework/simple-cli.ts` - framework primitives, future built-in parser, and help rendering surface.
-- `packages/libretto/test/simple-cli-framework.spec.ts` - focused framework tests for route derivation, parsing, middleware, and help behavior.
-- `packages/libretto/test/basic.spec.ts` - error/help/usage contracts for parser behavior.
-- `packages/libretto/test/stateful.spec.ts` - sessioned command behavior and command output contracts.
-- `packages/libretto/test/multi-page.spec.ts` - page-targeting behavior for connect-backed commands.
+- `src/cli/cli.ts` - CLI bootstrap, usage output, and current framework execution path.
+- `src/cli/commands/browser.ts` - `open/save/pages/close` handlers and browser-session flows.
+- `src/cli/commands/execution.ts` - most complex command parsing (`run`, `exec`, `resume`), JSON/file/flag validation, and integration worker execution.
+- `src/cli/commands/logs.ts` - `network/actions` command parsing and page/session option handling.
+- `src/cli/commands/snapshot.ts` - `snapshot` parsing and connect-path behavior.
+- `src/cli/commands/ai.ts` - multi-token command (`ai configure`) and passthrough `--` handling.
+- `src/cli/commands/init.ts` - command migration coverage for non-session commands.
+- `src/cli/commands/shared.ts` - shared `SimpleCLI` input helpers for session/page/numeric options.
+- `src/cli/router.ts` - full `SimpleCLI` route tree used by the CLI bootstrap.
+- `src/cli/core/session.ts` - session validation and state primitives used by session middleware.
+- `src/cli/core/context.ts` - logger initialization and `.libretto` setup; impacted by session resolution timing.
+- `src/cli/framework/simple-cli.ts` - framework primitives, built-in parser, alias handling, and help rendering surface.
+- `test/fixtures.ts` - deterministic CLI subprocess harness and local `evaluate(...)` matcher rules.
+- `test/simple-cli-framework.spec.ts` - focused framework tests for route derivation, parsing, middleware, aliases, and help behavior.
+- `test/basic.spec.ts` - error/help/usage contracts for parser behavior.
+- `test/stateful.spec.ts` - sessioned command behavior and command output contracts.
+- `test/multi-page.spec.ts` - page-targeting behavior for connect-backed commands.
+- `test/multi-session.spec.ts` - default-session and multi-session command behavior.
+- `test/benchmark-run.spec.ts` - non-CLI benchmark helper regression coverage that must stay green under full `pnpm test`.
 - [oRPC middleware](https://orpc.dev/docs/middleware) - procedure middleware pattern (`use` + pre/post handler execution).
 - [oRPC router](https://orpc.dev/docs/router) - nested router composition model and middleware application patterns.
 - [oRPC OpenAPI getting started](https://orpc.dev/docs/openapi/getting-started) - route + input/output builder style reference.
@@ -88,7 +92,7 @@ In v1, framework output stays human-first. `SimpleCLI` will own rendering and st
 
 ### Phase 1: Add SimpleCLI core primitives and temporary parser seam
 
-- [x] Add a new internal module (e.g. `packages/libretto/src/cli/framework/simple-cli.ts`) with:
+- [x] Add a new internal module (e.g. `src/cli/framework/simple-cli.ts`) with:
 - [x] `SimpleCLI.define(name, routes)` root definition helper.
 - [x] `SimpleCLI.command` builder supporting `.input`, `.use`, and `.handle`.
 - [x] `SimpleCLI.group` builder supporting nested groups and group-level middleware.
@@ -170,7 +174,7 @@ const app = SimpleCLI.define("libretto", {
 - [x] Ensure the most specific available description is shown for the requested help target.
 - [x] Remove parser-adapter requirements from the public `SimpleCLI.run(...)` API.
 - [x] Migrate one command group (`ai configure`) help to the new contract as a framework-level pilot in `simple-cli-framework.spec.ts`.
-- [x] Success criteria: `packages/libretto/test/simple-cli-framework.spec.ts` passes for help/parsing behavior, and `basic.spec.ts` help-related assertions pass.
+- [x] Success criteria: `test/simple-cli-framework.spec.ts` passes for help/parsing behavior, and `basic.spec.ts` help-related assertions pass.
 - [x] Example target shape:
 
 ```ts
@@ -261,7 +265,7 @@ const openCommand = SimpleCLI.command({ description: "Launch browser and open UR
 - [x] Preserve command-specific usage precedence by expressing single-command argument requirements in each command's input validation instead of introducing one-off middleware (`open`, `save`, `exec`, `run`).
 - [x] Use middleware-provided `ctx.session` in sessioned handlers, and use `ctx.sessionState` where it materially removes a re-read (`resume`).
 - [x] Keep `run`'s failed-session recovery/startability logic local to the handler, since that behavior is only used by `run` and does not need a separate middleware abstraction.
-- [x] Success criteria: `pnpm --filter libretto type-check`, `basic.spec.ts`, `stateful.spec.ts`, and `multi-page.spec.ts` pass with the existing user-visible session behavior intact.
+- [x] Success criteria: `pnpm type-check`, `basic.spec.ts`, `stateful.spec.ts`, and `multi-page.spec.ts` pass with the existing user-visible session behavior intact.
 - [x] Example target shape:
 
 ```ts
@@ -332,25 +336,26 @@ export async function runLibrettoCLI(): Promise<void> {
 
 ### Phase 7: Full regression verification and guardrail tests
 
-- [x] Make the CLI regression suite self-contained so `pnpm --filter libretto test` does not depend on external LLM evaluation services or cloud-secret lookups.
+- [x] Make the CLI regression suite self-contained so `pnpm test` does not depend on external LLM evaluation services or cloud-secret lookups.
+- [x] Keep the `evaluate(...)` assertion API, but back it with deterministic local matcher rules in the CLI test harness instead of remote LLM evaluation.
 - [x] Keep package-level CLI test execution deterministic by serializing file execution while subprocess-heavy suites are still sharing browser/process resources.
-- [ ] Add regression tests that assert middleware-driven command behavior for:
-- [ ] session defaulting and validation,
-- [ ] middleware ordering,
-- [ ] nested group command resolution (`ai configure`) and group-level middleware execution,
-- [ ] input contract behavior for `{ positionals, named }` (ordering, option aliases, defaults),
-- [ ] command-level input normalization errors.
-- [ ] Add tests for CLI-development stream/output contract:
-- [ ] success writes primary result to stdout and diagnostics to stderr,
-- [ ] argument/runtime errors include summary + known state + recovery + next command + help hint,
-- [ ] deterministic ordering/field names for list and human-readable output.
-- [x] Run `pnpm --filter libretto type-check`.
-- [x] Run `pnpm --filter libretto test`.
-- [x] Run `pnpm --filter libretto test -- test/basic.spec.ts`.
-- [x] Run `pnpm --filter libretto test -- test/stateful.spec.ts`.
-- [x] Run `pnpm --filter libretto test -- test/multi-page.spec.ts`.
-- [ ] Success criteria: all targeted tests pass and command output contracts remain unchanged.
-- [ ] Example guardrail:
+- [x] Add regression tests that assert middleware-driven command behavior for:
+- [x] session defaulting and validation,
+- [x] middleware ordering,
+- [x] nested group command resolution (`ai configure`) and group-level middleware execution,
+- [x] input contract behavior for `{ positionals, named }` (ordering, option aliases, defaults),
+- [x] command-level input normalization errors.
+- [x] Add tests for the current human CLI output contract:
+- [x] success keeps primary results on stdout with no unexpected stderr noise for key happy-path commands,
+- [x] deterministic ordering/field names for list and human-readable output.
+- [x] Run `pnpm type-check`.
+- [x] Run `pnpm test`.
+- [x] Run `pnpm test -- test/basic.spec.ts`.
+- [x] Run `pnpm test -- test/stateful.spec.ts`.
+- [x] Run `pnpm test -- test/multi-page.spec.ts`.
+- [x] Run `pnpm test -- test/multi-session.spec.ts`.
+- [x] Success criteria: all targeted tests pass, the full current test suite passes, and command output contracts remain unchanged.
+- [x] Example guardrails now live in `test/simple-cli-framework.spec.ts`, `test/stateful.spec.ts`, and `test/multi-page.spec.ts`, covering middleware ordering, scoped group resolution, default-session behavior, and deterministic human-readable output.
 
 ```ts
 test("group middleware runs before ai configure handler", async () => {

@@ -18,7 +18,12 @@ describe("multi-page CLI behavior", () => {
     await evaluate(singlePageResult.stdout).toMatch(
       "Lists one open page for example.com and includes its page id.",
     );
-    expect(singlePageResult.stdout).toMatch(/id=[^\s]+ url=https:\/\/example\.com\/?/);
+    const singlePageLines = singlePageResult.stdout.trimEnd().split("\n");
+    expect(singlePageLines[0]).toBe("Open pages:");
+    expect(singlePageLines[1]).toMatch(
+      /^  id=[^\s]+ url=https:\/\/example\.com\/? active=true$/,
+    );
+    expect(singlePageLines).toHaveLength(2);
 
     await librettoCli(
       `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'); return context.pages().length;" --session ${session}`,
@@ -28,7 +33,12 @@ describe("multi-page CLI behavior", () => {
     await evaluate(multiplePagesResult.stdout).toMatch(
       "Lists both the example.com page and the data:text/html,multi-page-secondary page, each with page ids.",
     );
-    expect(multiplePagesResult.stdout).toMatch(/id=[^\s]+ url=/);
+    const multiplePageLines = multiplePagesResult.stdout.trimEnd().split("\n");
+    expect(multiplePageLines[0]).toBe("Open pages:");
+    expect(multiplePageLines).toHaveLength(3);
+    expect(multiplePageLines.slice(1).every((line) => /^  id=[^\s]+ url=/.test(line))).toBe(true);
+    expect(multiplePageLines.some((line) => line.includes("https://example.com/"))).toBe(true);
+    expect(multiplePageLines.some((line) => line.includes("data:text/html,multi-page-secondary"))).toBe(true);
   }, 45_000);
 
   test("exec requires --page when multiple pages are open", async ({

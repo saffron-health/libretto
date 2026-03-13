@@ -221,6 +221,61 @@ describe("SimpleCLI framework", () => {
     });
   });
 
+  test("parses named option aliases and applies defaults", async () => {
+    const openInput = SimpleCLI.input({
+      positionals: [
+        SimpleCLI.positional("url", z.string()),
+      ],
+      named: {
+        session: SimpleCLI.option(z.string().default("default"), {
+          aliases: ["s"],
+        }),
+        headless: SimpleCLI.flag({
+          aliases: ["x"],
+        }),
+      },
+    });
+
+    const app = SimpleCLI.define("libretto", {
+      open: SimpleCLI.command({ description: "open" })
+        .input(openInput)
+        .handle(async ({ input }) => input),
+    });
+
+    const result = await app.run(["open", "https://example.com", "-s", "debug", "-x"]);
+
+    expect(result).toEqual({
+      url: "https://example.com",
+      session: "debug",
+      headless: true,
+    });
+  });
+
+  test("surfaces command-level input normalization errors from run", async () => {
+    const openInput = SimpleCLI.input({
+      positionals: [
+        SimpleCLI.positional("url", z.string().optional()),
+      ],
+      named: {
+        headed: SimpleCLI.flag(),
+        headless: SimpleCLI.flag(),
+      },
+    })
+      .refine((input) => Boolean(input.url), "Usage: libretto-cli open <url>")
+      .refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
+
+    const app = SimpleCLI.define("libretto-cli", {
+      open: SimpleCLI.command({ description: "open" })
+        .input(openInput)
+        .handle(async () => {}),
+    });
+
+    await expect(app.run(["open"])).rejects.toThrow("Usage: libretto-cli open <url>");
+    await expect(app.run(["open", "https://example.com", "--headed", "--headless"])).rejects.toThrow(
+      "Cannot pass both --headed and --headless.",
+    );
+  });
+
   test("renders root and group help from route paths and descriptions", async () => {
     const noInput = SimpleCLI.input({ positionals: [], named: {} });
     const app = SimpleCLI.define("libretto-cli", {

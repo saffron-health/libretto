@@ -56,6 +56,7 @@ describe("state-driven CLI subprocess behavior", () => {
     await evaluate(result.stdout).toMatch(
       "Explains that no AI config is currently set.",
     );
+    expect(result.stderr).toBe("");
   });
 
   test("configures, shows, and clears AI config", async ({
@@ -66,21 +67,25 @@ describe("state-driven CLI subprocess behavior", () => {
     await evaluate(configure.stdout).toMatch(
       "Confirms the AI config was saved.",
     );
+    expect(configure.stderr).toBe("");
 
     const show = await librettoCli("ai configure");
     await evaluate(show.stdout).toMatch(
       "Shows that the configured AI preset is codex.",
     );
+    expect(show.stderr).toBe("");
 
     const clear = await librettoCli("ai configure --clear");
     await evaluate(clear.stdout).toMatch(
       "Confirms the AI config was cleared.",
     );
+    expect(clear.stderr).toBe("");
 
     const showAfterClear = await librettoCli("ai configure");
     await evaluate(showAfterClear.stdout).toMatch(
       "Explains that no AI config is currently set.",
     );
+    expect(showAfterClear.stderr).toBe("");
   });
 
   test("configures gemini AI preset", async ({ librettoCli, evaluate }) => {
@@ -270,6 +275,14 @@ describe("state-driven CLI subprocess behavior", () => {
     await evaluate(result.stderr).toMatch(
       'Explains that session "missing-session" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session missing-session.',
     );
+    expect(result.stderr.trimEnd().split("\n")).toEqual([
+      `No session "${session}" found.`,
+      "",
+      "No active sessions.",
+      "",
+      "Start one with:",
+      `  libretto-cli open <url> --session ${session}`,
+    ]);
   });
 
   test("prints no-op message when closing a session with no browser", async ({

@@ -209,6 +209,10 @@ function buildNamedArgHelpLabel(
   return `--${flagName} <value>`;
 }
 
+function normalizeNamedArgToken(token: string): string {
+  return token.replace(/^-{1,2}/, "");
+}
+
 export class SimpleCLIInput<TOutput> {
   constructor(
     private readonly normalize: (raw: SimpleCLIInputRaw) => unknown,
@@ -270,6 +274,7 @@ export type SimpleCLINamedArgDefinition<TSchema extends ZodTypeAny> = {
   schema: TSchema;
   help?: string;
   name?: string;
+  aliases?: readonly string[];
   source?: "--";
 };
 
@@ -539,7 +544,33 @@ export class SimpleCLIApp {
       }
 
       if (arg.startsWith("-")) {
-        throw new Error(`Unknown option: ${arg}`);
+        const [rawName, inlineValue] = splitNamedArg(arg.slice(1));
+        const namedEntry = namedSpecs.get(rawName);
+        if (!namedEntry) {
+          throw new Error(`Unknown option: ${arg}`);
+        }
+
+        const storeKey = buildNamedArgFlagName(namedEntry.key, namedEntry.spec);
+        if (namedEntry.spec.kind === "flag") {
+          named[storeKey] = inlineValue === undefined
+            ? true
+            : parseBooleanFlagValue(inlineValue, rawName);
+          continue;
+        }
+
+        if (inlineValue !== undefined) {
+          named[storeKey] = inlineValue;
+          continue;
+        }
+
+        const nextValue = args[index + 1];
+        if (nextValue === undefined) {
+          throw new Error(`Missing value for -${rawName}.`);
+        }
+
+        named[storeKey] = nextValue;
+        index += 1;
+        continue;
       }
 
       positionals.push(arg);
@@ -709,6 +740,11 @@ function buildNamedArgLookup(namedDefinition: SimpleCLINamedDefinition): Map<
     lookup.set(flagName, { key, spec });
     lookup.set(key, { key, spec });
     lookup.set(toCamelCase(flagName), { key, spec });
+    for (const alias of spec.aliases ?? []) {
+      const normalizedAlias = normalizeNamedArgToken(alias);
+      lookup.set(normalizedAlias, { key, spec });
+      lookup.set(toCamelCase(normalizedAlias), { key, spec });
+    }
   }
 
   return lookup;
@@ -854,6 +890,13 @@ function buildInputNormalizer<
       const normalizedCandidates = [
         sourceKey,
         spec.name ? toCamelCase(spec.name) : "",
+        ...(spec.aliases ?? []).flatMap((alias) => {
+          const normalizedAlias = normalizeNamedArgToken(alias);
+          return [
+            normalizedAlias,
+            toCamelCase(normalizedAlias),
+          ];
+        }),
         toKebabCase(key),
         key,
       ].filter((candidate) => candidate.length > 0);
@@ -908,25 +951,27 @@ function positional<TKey extends string, TSchema extends ZodTypeAny>(
 
 function option<TSchema extends ZodTypeAny>(
   schema: TSchema,
-  options?: { help?: string; name?: string; source?: "--" },
+  options?: { help?: string; name?: string; aliases?: readonly string[]; source?: "--" },
 ): SimpleCLINamedArgDefinition<TSchema> {
   return {
     kind: "option",
     schema,
     help: options?.help,
     name: options?.name,
+    aliases: options?.aliases,
     source: options?.source,
   };
 }
 
 function flag(
-  options?: { help?: string; name?: string },
+  options?: { help?: string; name?: string; aliases?: readonly string[] },
 ): SimpleCLINamedArgDefinition<z.ZodDefault<z.ZodBoolean>> {
   return {
     kind: "flag",
     schema: z.boolean().default(false),
     help: options?.help,
     name: options?.name,
+    aliases: options?.aliases,
   };
 }
 
