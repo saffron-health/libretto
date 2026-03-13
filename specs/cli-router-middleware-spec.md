@@ -9,10 +9,11 @@ The current bootstrap also does manual pre-parse behavior (`CLI_COMMANDS`, `filt
 Introduce an internal CLI framework called `SimpleCLI` that models commands as typed procedures and groups:
 
 - `SimpleCLI.define(name, router)` to register command routes.
-- `SimpleCLI.command.input(...).use(...).handle(...)` to define each command.
+- `SimpleCLI.command.input(...).use(middleware).handle(...)` to define each command.
 - `SimpleCLI.group({ description?, routes })` to define subcommand groups such as `ai configure`.
-- `SimpleCLI.middleware(...)` for reusable pre-handler logic.
+- Reusable pre-handler logic is defined as plain functions typed with `SimpleCLIMiddleware<...>` and passed directly to `.use(...)`.
 - `SimpleCLI.use(middleware).group({ description?, routes })` to apply middleware to a whole subcommand group.
+- `SimpleCLI.use(...)` and scoped `.use(...)` are single-middleware calls in v1; compose multiple middleware via chaining.
 - Command route identity is auto-derived from object keys (e.g. `ai.configure` => CLI path `ai configure`), not manually specified.
 - Command input is declared once as `SimpleCLI.input({ positionals: [...], named: {...} })`, then reused for parser binding + Zod validation + typed handler input.
 - `SimpleCLI.input(...)` is parse/validate only in v1; it does not provide an additional `.transform()` step.
@@ -46,7 +47,7 @@ In v1, framework output stays human-first. `SimpleCLI` will own rendering and st
 - No command UX copy rewrite beyond what is required to preserve current output contracts.
 - No plugin system or third-party extension API for CLI middleware in v1.
 - No manual per-command path strings in command definitions; route paths are derived from router/group keys.
-- No free-form/unstructured error printing from handlers; handlers return typed error/result objects and framework owns final rendering.
+- No framework-owned typed handler result envelopes in v1; keep command output handling lightweight until real command migration shows a concrete need.
 - No machine-mode (`--json`) output in v1.
 - No built-in `--dry-run` framework behavior in v1.
 - No mandatory failure-context middleware in v1.
@@ -56,7 +57,6 @@ In v1, framework output stays human-first. `SimpleCLI` will own rendering and st
 
 - Expose the internal CLI procedure builder as a public package API if external integrations need to register custom commands.
 - Add machine-mode output (`--json`) with command-level typed success/error payload schemas.
-- Add typed middleware input/output context propagation so middleware can enrich `ctx` for downstream middleware and handlers with compile-time types.
 - Revisit framework-owned handler result envelopes only if we need stronger centralized rendering later; avoid requiring commands to return structured payload objects by default.
 - Add command composition utilities for nested command groups (`ai configure`, future namespaces) with less boilerplate.
 - Add optional framework-level `--dry-run` support for mutating commands.
@@ -90,7 +90,7 @@ In v1, framework output stays human-first. `SimpleCLI` will own rendering and st
 - [x] `SimpleCLI.define(name, routes)` root definition helper.
 - [x] `SimpleCLI.command` builder supporting `.input`, `.use`, and `.handle`.
 - [x] `SimpleCLI.group` builder supporting nested groups and group-level middleware.
-- [x] `SimpleCLI.middleware` helper type for reusable middleware functions.
+- [x] Export a reusable `SimpleCLIMiddleware` type for middleware functions passed directly to `.use(...)`.
 - [x] `SimpleCLI.input({ positionals, named })` DSL with `SimpleCLI.positional`, `SimpleCLI.option`, and `SimpleCLI.flag`.
 - [x] Land an initial command config shape and route metadata model; Phase 2 will simplify this to description-driven help generation.
 - [x] Add a temporary parser adapter interface so routing/input work can land before parser ownership moves into `SimpleCLI`.
@@ -199,11 +199,39 @@ await app.run(["help", "ai", "configure"]);
 //   -- <args...>  Command prefix after --
 ```
 
-### Phase 3: Skip framework-owned handler envelopes for now
+### Phase 3: Add typed middleware context propagation
 
-- [ ] Do not require commands to return structured success/error envelopes.
-- [ ] Keep command return values and output handling lightweight until real command migration shows a concrete need for more framework-owned rendering.
-- [ ] Reassess renderer ownership after migrating a few real commands onto `SimpleCLI`.
+- [x] Make `SimpleCLIMiddleware` generic over middleware input and context in/out types.
+- [x] Make command and scope builders accumulate middleware-provided context in handler types.
+- [x] Treat middleware return values as the next full `ctx` object at runtime; the framework does not merge context patches.
+- [x] Preserve current middleware ordering and runtime behavior while strengthening compile-time types for downstream middleware and handlers.
+- [x] Add focused framework tests for typed context propagation and runtime context merging.
+- [x] Keep framework-owned handler envelopes out of scope; command return values stay lightweight for now.
+- [x] Success criteria: handlers can access middleware-provided context with strong types, and existing parsing/help tests continue to pass.
+- [x] Example target shape:
+
+```ts
+const validateSession: SimpleCLIMiddleware<
+  { session?: string },
+  {},
+  { sessionState: SessionState }
+> = async ({ input }) => {
+  const sessionState = await loadSessionState(input.session ?? "default");
+  return { sessionState };
+};
+
+const sessioned = SimpleCLI.use(validateSession);
+
+const app = SimpleCLI.define("libretto", {
+  open: sessioned.command({
+    description: "Launch browser and open URL (headed by default)",
+  })
+    .input(openInput)
+    .handle(async ({ input, ctx }) => {
+      await runOpen(input.url, ctx.sessionState);
+    }),
+});
+```
 
 ### Phase 4: Migrate command input contracts to `{ positionals, named }`
 
@@ -218,9 +246,8 @@ type OpenInput = SimpleCLI.InferInput<typeof openInput>;
 
 const openCommand = SimpleCLI.command({ description: "Launch browser and open URL (headed by default)" })
   .input(openInput)
-  .handle(async ({ input, logger }) => {
-    await runOpen(input.url, !input.headless, input.session, logger);
-    return { ok: true, message: `Browser open: ${input.url}` };
+  .handle(async ({ input }) => {
+    await runOpen(input.url, !input.headless, input.session);
   });
 ```
 
@@ -233,20 +260,19 @@ const openCommand = SimpleCLI.command({ description: "Launch browser and open UR
 - [ ] Example target shape:
 
 ```ts
-const autocreateSessionMiddleware = SimpleCLI.middleware(async ({ input, ctx }) => {
+const autocreateSessionMiddleware: SimpleCLIMiddleware<{ session?: string }, {}, { session: string }> = async ({ input, ctx }) => {
   const session = input.session ?? "default";
   validateSessionName(session);
   return { ...ctx, session };
-});
+};
 
-const sessionSetupMiddleware = SimpleCLI.middleware(async ({ ctx, command }) => {
+const sessionSetupMiddleware: SimpleCLIMiddleware<unknown, { session: string }> = async ({ ctx, command }) => {
   if (command.routeKey === "open" || command.routeKey === "run") {
     assertSessionAvailableForStart(ctx.session);
-    return ctx;
+    return;
   }
   readSessionStateOrThrow(ctx.session);
-  return ctx;
-});
+};
 ```
 
 ### Phase 6: Replace legacy CLI bootstrap parsing glue with router execution

@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import { SimpleCLI } from "../src/cli/framework/simple-cli.js";
+import {
+  SimpleCLI,
+  type SimpleCLIMiddleware,
+} from "../src/cli/framework/simple-cli.js";
 
 describe("SimpleCLI framework", () => {
   test("derives route keys and path tokens from tree keys", () => {
@@ -73,23 +76,38 @@ describe("SimpleCLI framework", () => {
     const executionOrder: string[] = [];
     let handlerContext: Record<string, unknown> | null = null;
 
-    const groupMiddleware = async ({ ctx }: { ctx: Record<string, unknown> }) => {
+    const groupMiddleware: SimpleCLIMiddleware<
+      unknown,
+      {},
+      { fromGroup: true }
+    > = async ({ ctx }) => {
       executionOrder.push("group");
       return { ...ctx, fromGroup: true };
     };
-    const commandMiddleware = async ({ ctx }: { ctx: Record<string, unknown> }) => {
+    const commandMiddleware: SimpleCLIMiddleware<
+      unknown,
+      { fromGroup: true },
+      { fromGroup: true; fromCommand: true }
+    > = async ({ ctx }) => {
       executionOrder.push("command");
+      const fromGroup: true = ctx.fromGroup;
+      expect(fromGroup).toBe(true);
       return { ...ctx, fromCommand: true };
     };
+    const ai = SimpleCLI.use(groupMiddleware);
 
     const app = SimpleCLI.define("libretto", {
-      ai: SimpleCLI.use(groupMiddleware).group({
+      ai: ai.group({
         routes: {
-          configure: SimpleCLI.command({ description: "configure" })
+          configure: ai.command({ description: "configure" })
             .input(noInput)
             .use(commandMiddleware)
             .handle(async ({ ctx }) => {
               executionOrder.push("handler");
+              const fromGroup: true = ctx.fromGroup;
+              const fromCommand: true = ctx.fromCommand;
+              expect(fromGroup).toBe(true);
+              expect(fromCommand).toBe(true);
               handlerContext = ctx;
             }),
         },
@@ -126,6 +144,36 @@ describe("SimpleCLI framework", () => {
       app.invoke("ai.configure", { positionals: [], named: {} }),
     ).rejects.toThrow("middleware failed");
     expect(handlerRan).toBe(false);
+  });
+
+  test("typed middleware context is available on scoped command handlers", async () => {
+    const noInput = SimpleCLI.input({ positionals: [], named: {} });
+    const validateSession: SimpleCLIMiddleware<
+      unknown,
+      {},
+      { sessionState: { id: string } }
+    > = async ({ ctx }) => ({
+        ...ctx,
+        sessionState: { id: "default" },
+      });
+    const withSession = SimpleCLI.use(validateSession);
+
+    let sessionId: string | null = null;
+    const app = SimpleCLI.define("libretto", {
+      open: withSession.command({ description: "open" })
+        .input(noInput)
+        .handle(async ({ ctx }) => {
+          const sessionIdFromContext: string = ctx.sessionState.id;
+          // @ts-expect-error scoped middleware should not inject unrelated keys
+          ctx.fromCommand;
+          expect(sessionIdFromContext).toBe("default");
+          sessionId = ctx.sessionState.id;
+        }),
+    });
+
+    await app.invoke("open", { positionals: [], named: {} });
+
+    expect(sessionId).toBe("default");
   });
 
   test("parses command args with built-in option and passthrough handling", async () => {
