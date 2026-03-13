@@ -117,6 +117,7 @@ export async function runApiInterpret(
 
   const imageBase64 = readFileAsBase64(args.pngPath);
   const imageMimeType = getMimeType(args.pngPath);
+  const imageBytes = Buffer.from(imageBase64, "base64");
 
   const client = createLLMClient(API_SNAPSHOT_MODEL);
 
@@ -129,7 +130,8 @@ export async function runApiInterpret(
           { type: "text", text: selection.prompt },
           {
             type: "image",
-            image: `data:${imageMimeType};base64,${imageBase64}`,
+            image: imageBytes,
+            mediaType: imageMimeType,
           },
         ],
       },
