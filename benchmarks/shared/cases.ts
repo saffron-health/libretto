@@ -7,6 +7,7 @@ import {
   EvalResponse,
   type ClaudeEvalHarness,
 } from "../../evals/harness.js";
+import type { ModelUsage, NonNullableUsage } from "@anthropic-ai/claude-agent-sdk";
 import {
   createClaudeBenchmarkHarness,
   getBenchmarkAnalyzerPath,
@@ -45,6 +46,9 @@ type BenchmarkRunArtifacts = {
   startedAt: string;
   finishedAt: string;
   durationMs: number;
+  totalCostUsd: number | null;
+  usage: NonNullableUsage | null;
+  modelUsage: Record<string, ModelUsage> | null;
   status: "running" | "passed" | "failed";
 };
 
@@ -498,6 +502,9 @@ async function persistArtifacts(
         startedAt: artifacts.startedAt,
         finishedAt: artifacts.finishedAt,
         durationMs: artifacts.durationMs,
+        totalCostUsd: artifacts.totalCostUsd,
+        usage: artifacts.usage,
+        modelUsage: artifacts.modelUsage,
         status: artifacts.status,
         completed,
         success,
@@ -522,6 +529,9 @@ async function persistArtifacts(
         startedAt: artifacts.startedAt,
         finishedAt: artifacts.finishedAt,
         durationMs: artifacts.durationMs,
+        totalCostUsd: artifacts.totalCostUsd,
+        usage: artifacts.usage,
+        modelUsage: artifacts.modelUsage,
         status: artifacts.status,
         completed,
         transcript,
@@ -552,6 +562,7 @@ async function persistArtifacts(
       `- Started: ${artifacts.startedAt}`,
       `- Finished: ${artifacts.finishedAt}`,
       `- Duration (ms): ${artifacts.durationMs}`,
+      `- Total Cost (USD): ${artifacts.totalCostUsd ?? "n/a"}`,
       "",
       "## Transcript",
       "",
@@ -578,6 +589,7 @@ async function persistArtifacts(
       startedAt: artifacts.startedAt,
       finishedAt: artifacts.finishedAt,
       durationMs: artifacts.durationMs,
+      totalCostUsd: artifacts.totalCostUsd,
       sessionId: artifacts.response?.sessionId ?? null,
       status: artifacts.status,
       completed,
@@ -652,6 +664,9 @@ class BenchmarkRunPersister {
       startedAt: this.startedAt.toISOString(),
       finishedAt: finishedAt.toISOString(),
       durationMs: finishedAt.getTime() - this.startedAt.getTime(),
+      totalCostUsd: this.response?.totalCostUsd ?? null,
+      usage: this.response?.usage ?? null,
+      modelUsage: this.response?.modelUsage ?? null,
       status: this.status,
     };
   }
