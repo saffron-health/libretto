@@ -27,7 +27,7 @@ export type InterpretArgs = {
   condensedHtmlPath: string;
 };
 
-const InterpretResultSchema = z.object({
+export const InterpretResultSchema = z.object({
   answer: z.string(),
   selectors: z
     .array(
@@ -632,7 +632,7 @@ function resolvePath(filePath: string): string {
   return isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
 }
 
-function getMimeType(filePath: string): string {
+export function getMimeType(filePath: string): string {
   const ext = extname(filePath).toLowerCase();
   if (ext === ".png") return "image/png";
   if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
@@ -641,7 +641,7 @@ function getMimeType(filePath: string): string {
   return "application/octet-stream";
 }
 
-function readFileAsBase64(filePath: string): string {
+export function readFileAsBase64(filePath: string): string {
   return readFileSync(filePath).toString("base64");
 }
 
@@ -833,7 +833,7 @@ function buildInlineHtmlPrompt(
   return prompt;
 }
 
-function buildInlinePromptSelection(
+export function buildInlinePromptSelection(
   args: InterpretArgs,
   fullHtmlContent: string,
   condensedHtmlContent: string,
