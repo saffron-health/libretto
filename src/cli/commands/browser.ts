@@ -50,7 +50,14 @@ export function registerBrowserCommands(yargs: Argv, logger: LoggerApi): Argv {
               "Invalid --viewport format. Expected WIDTHxHEIGHT (e.g. 1920x1080).",
             );
           }
-          viewport = { width: Number(match[1]), height: Number(match[2]) };
+          const w = Number(match[1]);
+          const h = Number(match[2]);
+          if (w < 1 || h < 1) {
+            throw new Error(
+              "Invalid --viewport dimensions. Width and height must be at least 1.",
+            );
+          }
+          viewport = { width: w, height: h };
         }
         await runOpen(url, headed, String(argv.session), logger, { viewport });
       },

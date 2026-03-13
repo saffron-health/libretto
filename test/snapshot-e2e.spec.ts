@@ -77,7 +77,7 @@ describe("snapshot e2e – live site analysis", () => {
       await librettoCli(`ai configure codex`, snapshotEnv);
 
       // Uses saved profile from .libretto/profiles/linkedin.com.json if available
-      const open = await librettoCli(
+      await librettoCli(
         `open https://www.linkedin.com/feed/ --session ${session}`,
       );
 
@@ -89,15 +89,12 @@ describe("snapshot e2e – live site analysis", () => {
         snapshotEnv,
       );
       const snapshotDurationMs = Date.now() - snapshotStart;
-      const snapshotSuccess = snapshot.exitCode === 0;
 
       await librettoCli(`close --session ${session}`);
 
       const output = snapshot.stdout + "\n" + snapshot.stderr;
 
-      console.log(
-        `[linkedin] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`,
-      );
+      console.log(`[linkedin] snapshot took ${snapshotDurationMs}ms`);
       console.log(`[linkedin] selectors output:\n${output}`);
 
       await evaluate(output).toMatch(
