@@ -58,6 +58,7 @@ const repoRoot = resolve(here, "..");
 const packageRoot = repoRoot;
 const cliEntry = resolve(packageRoot, "dist/cli/index.js");
 const sourceCliEntry = resolve(packageRoot, "src/cli/index.ts");
+const tsxBin = resolve(packageRoot, "node_modules/.bin/tsx");
 const librettoEntry = resolve(packageRoot, "dist/index.js");
 const librettoRuntimePath = new URL("../dist/index.js", import.meta.url)
   .href;
@@ -130,8 +131,8 @@ function resolveCliCommand(): {
   }
 
   return {
-    command: process.execPath,
-    args: ["--import", "tsx", sourceCliEntry],
+    command: tsxBin,
+    args: [sourceCliEntry],
   };
 }
 
