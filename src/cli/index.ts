@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { runLibrettoCLI } from "./cli.js";
 import {
   maybeConfigureLLMClientFactoryFromEnv,
