@@ -4,6 +4,8 @@ import {
   query,
   type Options,
   type PermissionMode,
+  type NonNullableUsage,
+  type ModelUsage,
   type SDKAssistantMessage,
   type SDKMessage,
   type SDKResultMessage,
@@ -423,6 +425,9 @@ export class EvalResponse {
   readonly sessionId: string | null;
   readonly transcript: string;
   readonly result: SDKResultMessage | null;
+  readonly totalCostUsd: number | null;
+  readonly usage: NonNullableUsage | null;
+  readonly modelUsage: Record<string, ModelUsage> | null;
   private readonly cwd: string;
   private readonly model?: string;
 
@@ -438,6 +443,12 @@ export class EvalResponse {
     this.sessionId = opts.sessionId;
     this.transcript = formatMessagesForEvaluation(opts.messages);
     this.result = extractResultMessage(opts.messages);
+    this.totalCostUsd =
+      this.result && typeof this.result.total_cost_usd === "number"
+        ? this.result.total_cost_usd
+        : null;
+    this.usage = this.result?.usage ?? null;
+    this.modelUsage = this.result?.modelUsage ?? null;
     this.cwd = opts.cwd;
     this.model = opts.model;
   }
