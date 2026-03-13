@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import type { Argv } from "yargs";
+import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { connect, disconnectBrowser } from "../core/browser.js";
 import { getSessionSnapshotRunDir } from "../core/context.js";
@@ -8,8 +8,11 @@ import {
   runInterpret,
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
+import { SimpleCLI } from "../framework/simple-cli.js";
+import { pageOption, sessionOption } from "./shared.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
+
 function generateSnapshotRunId(): string {
   return `snapshot-${Date.now()}`;
 }
@@ -110,23 +113,28 @@ async function runSnapshot(
   }, logger);
 }
 
-export function registerSnapshotCommands(yargs: Argv, logger: LoggerApi): Argv {
-  return yargs.command(
-    "snapshot",
-    "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
-    (cmd) =>
-      cmd
-        .option("page", { type: "string" })
-        .option("objective", { type: "string" })
-        .option("context", { type: "string" }),
-    async (argv) => {
+export const snapshotInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+    page: pageOption(),
+    objective: SimpleCLI.option(z.string().optional()),
+    context: SimpleCLI.option(z.string().optional()),
+  },
+});
+
+export function createSnapshotCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
+  })
+    .input(snapshotInput)
+    .handle(async ({ input }) => {
       await runSnapshot(
-        String(argv.session),
+        input.session,
         logger,
-        argv.page ? String(argv.page) : undefined,
-        argv.objective as string | undefined,
-        argv.context as string | undefined,
+        input.page,
+        input.objective,
+        input.context,
       );
-    },
-  );
+    });
 }

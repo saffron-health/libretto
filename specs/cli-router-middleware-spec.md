@@ -71,6 +71,8 @@ In v1, framework output stays human-first. `SimpleCLI` will own rendering and st
 - `packages/libretto/src/cli/commands/snapshot.ts` - `snapshot` parsing and connect-path behavior.
 - `packages/libretto/src/cli/commands/ai.ts` - multi-token command (`ai configure`) and passthrough `--` handling.
 - `packages/libretto/src/cli/commands/init.ts` - command migration coverage for non-session commands.
+- `packages/libretto/src/cli/commands/shared.ts` - shared `SimpleCLI` input helpers for session/page/numeric options.
+- `packages/libretto/src/cli/router.ts` - full `SimpleCLI` route tree used by the CLI bootstrap.
 - `packages/libretto/src/cli/core/session.ts` - session validation and state primitives used by session middleware.
 - `packages/libretto/src/cli/core/context.ts` - logger initialization and `.libretto` setup; impacted by session resolution timing.
 - `packages/libretto/src/cli/framework/simple-cli.ts` - framework primitives, future built-in parser, and help rendering surface.
@@ -238,7 +240,7 @@ const app = SimpleCLI.define("libretto", {
 - [x] Migrate `ai`, `init`, and one browser command (`open`) to `SimpleCLI.input(...)`.
 - [x] Preserve existing validation/error text for mutually exclusive flags and missing required arguments.
 - [x] Ensure handlers consume typed `input` and stop reading raw `argv`.
-- [x] Dispatch migrated commands through a partial `SimpleCLI` app from `cli.ts` while the remaining commands stay on yargs until the bootstrap migration phase.
+- [x] Use the migrated commands as the initial router-backed path in `cli.ts`; later phases can expand this to the full CLI router.
 - [x] Success criteria: migrated commands pass existing tests; command modules no longer require handler-time casts for migrated commands.
 - [x] Example target shape:
 
@@ -276,18 +278,22 @@ const sessionSetupMiddleware: SimpleCLIMiddleware<unknown, { session: string }> 
 
 ### Phase 6: Replace legacy CLI bootstrap parsing glue with router execution
 
-- [ ] Refactor `cli.ts` to execute `SimpleCLI.define(...)` directly from `process.argv.slice(2)` with grouped namespaces (including `ai.configure`) rather than `register*Commands(...)` factories.
-- [ ] Remove `filterSessionArgs`, parser-adapter plumbing, and command-token allowlists that duplicate parser responsibilities.
-- [ ] Keep top-level usage/help/unknown-command behavior stable (including `help`, `--help`, and unknown command flow).
-- [ ] Ensure logger initialization still works on early failures and writes to the expected session/default log path.
-- [ ] Success criteria: help/unknown/invalid-session tests in `basic.spec.ts` pass without output regressions, and command lookup/registration originates only from the router tree.
-- [ ] Example target shape:
+- [x] Migrate the remaining CLI commands (`save`, `pages`, `close`, `exec`, `run`, `resume`, `snapshot`, `network`, `actions`) onto `SimpleCLI` command definitions so bootstrap execution can use a single parser/runtime path.
+- [x] Refactor `cli.ts` to execute `SimpleCLI.define(...)` directly from `process.argv.slice(2)` with grouped namespaces (including `ai.configure`) rather than `register*Commands(...)` factories.
+- [x] Remove `filterSessionArgs`, parser-adapter plumbing, and yargs-specific command registration entirely.
+- [x] Keep top-level usage/help/unknown-command behavior stable (including `help`, `--help`, and unknown command flow).
+- [x] Keep early `--session` validation and logger initialization routed from metadata derived from the router tree, so session logs still land under the expected session/default path on early failures.
+- [x] Success criteria: `simple-cli-framework.spec.ts`, `basic.spec.ts`, `stateful.spec.ts`, and `multi-page.spec.ts` pass without output regressions; command lookup/registration originates only from the router tree.
+- [x] Example target shape:
 
 ```ts
 export async function runLibrettoCLI(): Promise<void> {
+  const rawArgs = process.argv.slice(2);
   ensureLibrettoSetup();
-  const app = buildLibrettoSimpleCLI();
-  await app.run(process.argv.slice(2));
+  await withCliLogger(rawArgs, async (logger) => {
+    const app = createCLIApp(logger);
+    await app.run(rawArgs);
+  });
 }
 ```
 

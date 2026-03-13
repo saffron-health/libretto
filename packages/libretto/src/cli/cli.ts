@@ -1,12 +1,4 @@
-import yargs, { type Argv } from "yargs";
-import { hideBin } from "yargs/helpers";
 import type { Logger } from "../shared/logger/index.js";
-import { aiCommands } from "./commands/ai.js";
-import { createOpenCommand, registerBrowserCommands } from "./commands/browser.js";
-import { registerExecutionCommands } from "./commands/execution.js";
-import { registerLogCommands } from "./commands/logs.js";
-import { initCommand } from "./commands/init.js";
-import { registerSnapshotCommands } from "./commands/snapshot.js";
 import {
   closeLogger,
   createLoggerForSession,
@@ -16,43 +8,10 @@ import {
   SESSION_DEFAULT,
   validateSessionName,
 } from "./core/session.js";
-import { SimpleCLI } from "./framework/simple-cli.js";
+import { createCLIApp, CLI_ROOT_COMMANDS } from "./router.js";
 
-const CLI_COMMANDS = new Set([
-  "open",
-  "run",
-  "ai",
-  "save",
-  "exec",
-  "snapshot",
-  "network",
-  "actions",
-  "pages",
-  "resume",
-  "close",
-  "init",
-  "--help",
-  "-h",
-  "help",
-]);
-
-function printUsage(): void {
-  console.log(`Usage: libretto-cli <command> [--session <name>]
-
-Commands:
-  init [--skip-browsers] Initialize libretto (copy skills, install browsers)
-  open <url> [--headless] Launch browser and open URL (headed by default)
-                          Automatically loads saved profile if available
-  run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]  Run an exported Libretto workflow from a file
-  ai configure [preset] [-- <command prefix...>]  Configure AI runtime for analysis commands
-  save <url|domain>       Save current browser session (cookies, localStorage, etc.)
-  exec <code> [--visualize]  Execute Playwright typescript code (--visualize enables ghost cursor + highlight)
-  snapshot [--objective <text> --context <text>]  Capture PNG + HTML; analyze when objective is provided (context optional)
-  network [--last N] [--filter regex] [--method M] [--clear]  View captured network requests
-  actions [--last N] [--filter regex] [--action TYPE] [--source SOURCE] [--clear]  View captured actions
-  pages                   List open pages in the active session
-  resume                  Resume a paused workflow in the active session
-  close [--all] [--force]  Close the browser for the session, or all tracked sessions with --all
+function renderUsage(app: ReturnType<typeof createCLIApp>): string {
+  return `${app.renderHelp()}
 
 Options:
   --session <name>        Use a named session (default: "default")
@@ -96,26 +55,14 @@ Sessions:
   Session state is stored in .libretto/sessions/<session>/state.json
   CLI logs are stored in .libretto/sessions/<session>/logs.jsonl
   Each session runs an isolated browser instance on a dynamic port.
-`);
-}
-
-function filterSessionArgs(args: string[]): string[] {
-  const result: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--session") {
-      i++;
-    } else {
-      result.push(args[i]!);
-    }
-  }
-  return result;
+`;
 }
 
 function parseSessionForLog(rawArgs: string[]): string {
   const idx = rawArgs.indexOf("--session");
   if (idx < 0) return SESSION_DEFAULT;
   const value = rawArgs[idx + 1];
-  if (!value || value.startsWith("--") || CLI_COMMANDS.has(value)) {
+  if (!value || value.startsWith("--") || CLI_ROOT_COMMANDS.includes(value)) {
     return SESSION_DEFAULT;
   }
   try {
@@ -130,37 +77,12 @@ function validateLegacySessionArg(rawArgs: string[]): void {
   const idx = rawArgs.indexOf("--session");
   if (idx < 0) return;
   const value = rawArgs[idx + 1];
-  if (!value || value.startsWith("--") || CLI_COMMANDS.has(value)) {
+  if (!value || value.startsWith("--") || CLI_ROOT_COMMANDS.includes(value)) {
     throw new Error(
       "Usage: libretto-cli <command> [--session <name>]\nMissing or invalid --session value.",
     );
   }
   validateSessionName(value);
-}
-
-function createMigratedSimpleCLI(logger: Logger) {
-  return SimpleCLI.define("libretto-cli", {
-    ai: aiCommands,
-    init: initCommand,
-    open: createOpenCommand(logger),
-  });
-}
-
-function shouldHandleWithSimpleCLI(
-  rawArgs: readonly string[],
-  filteredArgs: readonly string[],
-): boolean {
-  const command = filteredArgs[0];
-  if (command === "open" || command === "init" || command === "ai") {
-    return true;
-  }
-
-  if (rawArgs[0] === "help") {
-    const helpTarget = rawArgs[1];
-    return helpTarget === "open" || helpTarget === "init" || helpTarget === "ai";
-  }
-
-  return false;
 }
 
 function initializeLogger(rawArgs: string[]): Logger {
@@ -186,36 +108,10 @@ async function withCliLogger<T>(
   }
 }
 
-function createParser(logger: Logger): Argv {
-  let parser: Argv = (yargs(hideBin(process.argv)) as Argv)
-    .scriptName("libretto-cli")
-    .parserConfiguration({ "populate--": true })
-    .option("session", {
-      type: "string",
-      default: SESSION_DEFAULT,
-      describe: "Use a named session",
-      global: true,
-    })
-    .middleware((argv) => {
-      validateSessionName(String(argv.session));
-    })
-    .exitProcess(false)
-    .help(false)
-    .version(false)
-    .fail((msg, err) => {
-      if (err) throw err;
-      throw new Error(msg || "Command failed");
-    });
-
-  parser = registerBrowserCommands(parser, logger);
-  parser = registerExecutionCommands(parser, logger);
-  parser = registerLogCommands(parser);
-  parser = registerSnapshotCommands(parser, logger);
-  parser = parser.command("help", "Show usage", () => {}, () => {
-    printUsage();
-  });
-
-  return parser;
+function isRootHelpRequest(rawArgs: readonly string[]): boolean {
+  if (rawArgs.length === 0) return true;
+  if (rawArgs[0] === "--help" || rawArgs[0] === "-h") return true;
+  return rawArgs[0] === "help" && rawArgs.length === 1;
 }
 
 export async function runLibrettoCLI(): Promise<void> {
@@ -223,41 +119,30 @@ export async function runLibrettoCLI(): Promise<void> {
   let exitCode = 0;
   ensureLibrettoSetup();
   await withCliLogger(rawArgs, async (logger) => {
+    const app = createCLIApp(logger);
+
     try {
       validateLegacySessionArg(rawArgs);
 
-      const args = filterSessionArgs(rawArgs);
-      const command = args[0];
-
-      if (shouldHandleWithSimpleCLI(rawArgs, args)) {
-        const simpleCLI = createMigratedSimpleCLI(logger);
-        logger.info("cli-command", { command, args: rawArgs });
-        const result = await simpleCLI.run(rawArgs);
-        if (typeof result === "string") {
-          console.log(result);
-        }
+      if (isRootHelpRequest(rawArgs)) {
+        console.log(renderUsage(app));
         return;
       }
 
-      if (!command || command === "--help" || command === "-h" || command === "help") {
-        printUsage();
-        return;
+      logger.info("cli-command", { args: rawArgs });
+      const result = await app.run(rawArgs);
+      if (typeof result === "string") {
+        console.log(result);
       }
-
-      if (!CLI_COMMANDS.has(command)) {
-        console.error(`Unknown command: ${command}\n`);
-        printUsage();
-        exitCode = 1;
-        return;
-      }
-
-      const parser = createParser(logger);
-      logger.info("cli-command", { command, args });
-      await parser.parseAsync();
     } catch (err) {
       logger.error("cli-error", { error: err, args: rawArgs });
       const message = err instanceof Error ? err.message : String(err);
-      console.error(message);
+      if (message.startsWith("Unknown command: ")) {
+        console.error(`${message}\n`);
+        console.log(renderUsage(app));
+      } else {
+        console.error(message);
+      }
       exitCode = 1;
     }
   });
