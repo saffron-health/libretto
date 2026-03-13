@@ -33,7 +33,7 @@ on:
       random_seed:
         description: Seed for random sampling
         required: true
-        default: "20260313"
+        default: "0"
         type: string
 
 permissions:
