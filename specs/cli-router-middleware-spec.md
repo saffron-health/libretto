@@ -10,9 +10,9 @@ Introduce an internal CLI framework called `SimpleCLI` that models commands as t
 
 - `SimpleCLI.define(name, router)` to register command routes.
 - `SimpleCLI.command.input(...).use(...).handle(...)` to define each command.
-- `SimpleCLI.group({...})` to define subcommand groups such as `ai configure`.
+- `SimpleCLI.group({ description?, routes })` to define subcommand groups such as `ai configure`.
 - `SimpleCLI.middleware(...)` for reusable pre-handler logic.
-- `SimpleCLI.use(middleware).group({...})` to apply middleware to a whole subcommand group.
+- `SimpleCLI.use(middleware).group({ description?, routes })` to apply middleware to a whole subcommand group.
 - Command route identity is auto-derived from object keys (e.g. `ai.configure` => CLI path `ai configure`), not manually specified.
 - Command input is declared once as `SimpleCLI.input({ positionals: [...], named: {...} })`, then reused for parser binding + Zod validation + typed handler input.
 - `SimpleCLI.input(...)` is parse/validate only in v1; it does not provide an additional `.transform()` step.
@@ -27,7 +27,7 @@ In v1, framework output stays human-first. `SimpleCLI` will own rendering and st
 ## Goals
 
 - Define commands in a router/procedure style that is structurally similar to oRPC.
-- Support first-class subcommand groups with shared middleware (`const ai = SimpleCLI.use(aiMiddleware).group({ configure: ... })`).
+- Support first-class subcommand groups with shared middleware (`const ai = SimpleCLI.use(aiMiddleware).group({ routes: { configure: ... } })`).
 - Ensure each command is defined once in one module (route identity, description, input normalization, middleware, handler), with no duplicate command allowlists or secondary registration maps.
 - Ensure each command's input is defined once in one place using `{ positionals, named }` (no separate positional map + separate Zod object that can drift).
 - Auto-generate subcommand-scoped help from route descriptions and input metadata, with the most specific available description shown above usage.
@@ -139,33 +139,35 @@ const app = SimpleCLI.define("libretto", {
     .use(autocreateSessionMiddleware)
     .handle(runOpenCommand),
   ai: SimpleCLI.use(aiMiddleware).group({
-    configure: SimpleCLI.command({
-      description: "Configure AI runtime",
-    })
-      .input(aiConfigureInput)
-      .handle(runAiConfigureCommand),
+    routes: {
+      configure: SimpleCLI.command({
+        description: "Configure AI runtime",
+      })
+        .input(aiConfigureInput)
+        .handle(runAiConfigureCommand),
+    },
   }),
 });
 ```
 
 ### Phase 2: Replace the parser seam with a built-in SimpleCLI parser and auto-generated help
 
-- [ ] Replace the temporary parser adapter with an internal `SimpleCLI` parser that owns:
-- [ ] command path matching,
-- [ ] positional and named option parsing,
-- [ ] boolean flag parsing,
-- [ ] `--` passthrough collection,
-- [ ] `help`, `--help`, and `help <subcommand>` dispatch,
-- [ ] unknown command / unknown flag / missing value / missing required argument errors.
-- [ ] Generate help text from the command tree, route descriptions, and input parameter metadata:
-- [ ] root help stays high-level,
-- [ ] group help starts with the group description, then usage, then child commands,
-- [ ] command help starts with the command description, then usage, arguments, and options.
-- [ ] Ensure the most specific available description is shown for the requested help target.
-- [ ] Remove parser-adapter requirements from the public `SimpleCLI.run(...)` API.
-- [ ] Migrate one command group (`ai configure`) help to the new contract as a pilot.
-- [ ] Success criteria: `packages/libretto/test/simple-cli-framework.spec.ts` passes for help/parsing behavior, and `basic.spec.ts` help-related assertions pass.
-- [ ] Example target shape:
+- [x] Replace the temporary parser adapter with an internal `SimpleCLI` parser that owns:
+- [x] command path matching,
+- [x] positional and named option parsing,
+- [x] boolean flag parsing,
+- [x] `--` passthrough collection,
+- [x] `help`, `--help`, and `help <subcommand>` dispatch,
+- [x] unknown command / unknown flag / missing value / missing required argument errors.
+- [x] Generate help text from the command tree, route descriptions, and input parameter metadata:
+- [x] root help stays high-level,
+- [x] group help starts with the group description, then usage, then child commands,
+- [x] command help starts with the command description, then usage, arguments, and options.
+- [x] Ensure the most specific available description is shown for the requested help target.
+- [x] Remove parser-adapter requirements from the public `SimpleCLI.run(...)` API.
+- [x] Migrate one command group (`ai configure`) help to the new contract as a framework-level pilot in `simple-cli-framework.spec.ts`.
+- [x] Success criteria: `packages/libretto/test/simple-cli-framework.spec.ts` passes for help/parsing behavior, and `basic.spec.ts` help-related assertions pass.
+- [x] Example target shape:
 
 ```ts
 const app = SimpleCLI.define("libretto-cli", {

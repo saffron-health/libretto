@@ -1,29 +1,19 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import {
-  type SimpleCLIParserAdapter,
-  SimpleCLI,
-} from "../src/cli/framework/simple-cli.js";
-
-const group = <TRoutes extends Parameters<typeof SimpleCLI.group>[0]>(
-  config: { description: string },
-  routes: TRoutes,
-) =>
-  Object.assign(SimpleCLI.group(routes), config);
-
-const command = (config: { description: string }) =>
-  SimpleCLI.command(
-    config as unknown as Parameters<typeof SimpleCLI.command>[0],
-  );
+import { SimpleCLI } from "../src/cli/framework/simple-cli.js";
 
 describe("SimpleCLI framework", () => {
   test("derives route keys and path tokens from tree keys", () => {
     const noInput = SimpleCLI.input({ positionals: [], named: {} });
-    const noop = command({ description: "noop" }).input(noInput).handle(async () => {});
+    const noop = SimpleCLI.command({ description: "noop" })
+      .input(noInput)
+      .handle(async () => {});
 
     const app = SimpleCLI.define("libretto", {
       ai: SimpleCLI.group({
-        configure: noop,
+        routes: {
+          configure: noop,
+        },
       }),
       open: noop,
     });
@@ -94,13 +84,15 @@ describe("SimpleCLI framework", () => {
 
     const app = SimpleCLI.define("libretto", {
       ai: SimpleCLI.use(groupMiddleware).group({
-        configure: command({ description: "configure" })
-          .input(noInput)
-          .use(commandMiddleware)
-          .handle(async ({ ctx }) => {
-            executionOrder.push("handler");
-            handlerContext = ctx;
-          }),
+        routes: {
+          configure: SimpleCLI.command({ description: "configure" })
+            .input(noInput)
+            .use(commandMiddleware)
+            .handle(async ({ ctx }) => {
+              executionOrder.push("handler");
+              handlerContext = ctx;
+            }),
+        },
       }),
     });
 
@@ -120,11 +112,13 @@ describe("SimpleCLI framework", () => {
       ai: SimpleCLI.use(() => {
         throw new Error("middleware failed");
       }).group({
-        configure: command({ description: "configure" })
-          .input(noInput)
-          .handle(async () => {
-            handlerRan = true;
-          }),
+        routes: {
+          configure: SimpleCLI.command({ description: "configure" })
+            .input(noInput)
+            .handle(async () => {
+              handlerRan = true;
+            }),
+        },
       }),
     });
 
@@ -134,61 +128,70 @@ describe("SimpleCLI framework", () => {
     expect(handlerRan).toBe(false);
   });
 
-  test("runs through parser adapter seam", async () => {
-    const noInput = SimpleCLI.input({ positionals: [], named: {} });
-    const observed: { args: readonly string[]; routeKeys: string[] }[] = [];
-    const adapter: SimpleCLIParserAdapter = {
-      parse(args, commands) {
-        observed.push({
-          args,
-          routeKeys: commands.map((command) => command.routeKey),
-        });
-        return {
-          routeKey: "open",
-          positionals: [],
-          named: {},
-        };
+  test("parses command args with built-in option and passthrough handling", async () => {
+    const aiConfigureInput = SimpleCLI.input({
+      positionals: [
+        SimpleCLI.positional("preset", z.enum(["codex", "claude", "gemini"]).optional()),
+      ],
+      named: {
+        provider: SimpleCLI.option(z.string().optional()),
+        clear: SimpleCLI.flag(),
+        passthrough: SimpleCLI.option(z.array(z.string()).default([]), {
+          source: "--",
+        }),
       },
-    };
-
-    const app = SimpleCLI.define("libretto", {
-      open: command({ description: "open" })
-        .input(noInput)
-        .handle(async () => "ok"),
     });
 
-    const result = await app.run(["open"], adapter);
-    expect(result).toBe("ok");
-    expect(observed).toEqual([
-      {
-        args: ["open"],
-        routeKeys: ["open"],
-      },
+    const app = SimpleCLI.define("libretto", {
+      ai: SimpleCLI.group({
+        description: "AI commands",
+        routes: {
+          configure: SimpleCLI.command({ description: "Configure AI runtime" })
+            .input(aiConfigureInput)
+            .handle(async ({ input }) => input),
+        },
+      }),
+    });
+
+    const result = await app.run([
+      "ai",
+      "configure",
+      "codex",
+      "--provider",
+      "openai",
+      "--clear",
+      "--",
+      "node",
+      "./agent.js",
     ]);
+
+    expect(result).toEqual({
+      preset: "codex",
+      provider: "openai",
+      clear: true,
+      passthrough: ["node", "./agent.js"],
+    });
   });
 
   test("renders root and group help from route paths and descriptions", async () => {
     const noInput = SimpleCLI.input({ positionals: [], named: {} });
     const app = SimpleCLI.define("libretto-cli", {
-      ai: group({ description: "AI commands" }, {
-        configure: command({
-          description: "Configure AI runtime",
-        })
-          .input(noInput)
-          .handle(async () => {}),
+      ai: SimpleCLI.group({
+        description: "AI commands",
+        routes: {
+          configure: SimpleCLI.command({
+            description: "Configure AI runtime",
+          })
+            .input(noInput)
+            .handle(async () => {}),
+        },
       }),
-      open: command({ description: "Launch browser and open URL" })
+      open: SimpleCLI.command({ description: "Launch browser and open URL" })
         .input(noInput)
         .handle(async () => {}),
     });
 
-    const adapter: SimpleCLIParserAdapter = {
-      parse() {
-        throw new Error("help should bypass parser adapter");
-      },
-    };
-
-    const rootHelp = await app.run(["help"], adapter);
+    const rootHelp = await app.run(["help"]);
     expect(rootHelp).toBe(
       [
         "Usage: libretto-cli <command>",
@@ -199,7 +202,7 @@ describe("SimpleCLI framework", () => {
       ].join("\n"),
     );
 
-    const groupHelp = await app.run(["help", "ai"], adapter);
+    const groupHelp = await app.run(["help", "ai"]);
     expect(groupHelp).toBe(
       [
         "AI commands",
@@ -232,22 +235,19 @@ describe("SimpleCLI framework", () => {
     });
 
     const app = SimpleCLI.define("libretto-cli", {
-      ai: group({ description: "AI commands" }, {
-        configure: command({
-          description: "Configure AI runtime",
-        })
-          .input(aiConfigureInput)
-          .handle(async () => {}),
+      ai: SimpleCLI.group({
+        description: "AI commands",
+        routes: {
+          configure: SimpleCLI.command({
+            description: "Configure AI runtime",
+          })
+            .input(aiConfigureInput)
+            .handle(async () => {}),
+        },
       }),
     });
 
-    const adapter: SimpleCLIParserAdapter = {
-      parse() {
-        throw new Error("help should bypass parser adapter");
-      },
-    };
-
-    const helpFromCommand = await app.run(["help", "ai", "configure"], adapter);
+    const helpFromCommand = await app.run(["help", "ai", "configure"]);
     expect(helpFromCommand).toBe(
       [
         "Configure AI runtime",
@@ -264,7 +264,7 @@ describe("SimpleCLI framework", () => {
       ].join("\n"),
     );
 
-    const helpFromFlag = await app.run(["ai", "configure", "--help"], adapter);
+    const helpFromFlag = await app.run(["ai", "configure", "--help"]);
     expect(helpFromFlag).toBe(helpFromCommand);
   });
 });
