@@ -16,21 +16,23 @@ Introduce an internal CLI framework called `SimpleCLI` that models commands as t
 - Command route identity is auto-derived from object keys (e.g. `ai.configure` => CLI path `ai configure`), not manually specified.
 - Command input is declared once as `SimpleCLI.input({ positionals: [...], named: {...} })`, then reused for parser binding + Zod validation + typed handler input.
 - `SimpleCLI.input(...)` is parse/validate only in v1; it does not provide an additional `.transform()` step.
+- Help text is auto-generated from the most specific available route description plus parameter metadata; there is no separate help DSL.
 
-For v1, keep yargs as the parsing engine behind a parser adapter seam (no parser rewrite), but move command code to typed `input` objects and middleware context so raw `argv` is no longer plumbed through handlers. Add explicit session middlewares (`autocreateSessionMiddleware`, `sessionSetupMiddleware`) that run after parse/input validation and before handler execution.
+Phase 1 already landed the route tree, typed input DSL, middleware pipeline, and a temporary parser adapter seam so this work could start without rewriting the parser at the same time. The next step is to fold parsing into `SimpleCLI` itself so route matching, help dispatch, positional/named argument parsing, and `--` passthrough handling all live in one framework-owned execution path.
+
+In the steady state, `SimpleCLI` should own parsing end-to-end. Command definitions remain the only source of truth for route identity, descriptions, parameter metadata, middleware, and handlers. External parser adapters and yargs-specific registration should disappear from the public API.
 
 In v1, framework output stays human-first. `SimpleCLI` will own rendering and stream behavior for human mode only. Machine-mode output (`--json`) is deferred.
-
-Adapter rationale: the seam is not for abstraction-for-abstraction's-sake; it isolates parser-specific code to one module so we can migrate off yargs later without another full command refactor. Without that seam, parser replacement would require touching command definitions and bootstrap flow again.
 
 ## Goals
 
 - Define commands in a router/procedure style that is structurally similar to oRPC.
 - Support first-class subcommand groups with shared middleware (`const ai = SimpleCLI.use(aiMiddleware).group({ configure: ... })`).
-- Ensure each command is defined once in one module (route identity, input normalization, middleware, handler, help metadata), with no duplicate command allowlists or secondary registration maps.
+- Ensure each command is defined once in one module (route identity, description, input normalization, middleware, handler), with no duplicate command allowlists or secondary registration maps.
 - Ensure each command's input is defined once in one place using `{ positionals, named }` (no separate positional map + separate Zod object that can drift).
-- Enforce subcommand-scoped help contracts (purpose, usage, args, flags, examples) from framework metadata rather than ad-hoc per-command strings.
+- Auto-generate subcommand-scoped help from route descriptions and input metadata, with the most specific available description shown above usage.
 - Eliminate raw `argv` plumbing from command handlers in `packages/libretto/src/cli/commands/*`.
+- Make `SimpleCLI` the owner of command token parsing, route matching, `help`/`--help`, and `--` passthrough handling.
 - Support reusable middleware that runs after parsing/input normalization and before handlers.
 - Centralize session-related pre-handler logic in dedicated middleware used by `open`/`run` and commands that connect to an existing session.
 - Enforce deterministic output and stream conventions by default (`stdout` for result payloads, `stderr` for diagnostics/help/recovery).
@@ -40,7 +42,6 @@ Adapter rationale: the seam is not for abstraction-for-abstraction's-sake; it is
 ## Non-goals
 
 - No migrations or backfills.
-- No yargs removal in v1 implementation; parser replacement is intentionally deferred behind an adapter seam.
 - No behavior redesign of browser/runtime primitives (`runOpen`, `runIntegrationFromFile`, `connect`, etc.).
 - No command UX copy rewrite beyond what is required to preserve current output contracts.
 - No plugin system or third-party extension API for CLI middleware in v1.
@@ -56,7 +57,6 @@ Adapter rationale: the seam is not for abstraction-for-abstraction's-sake; it is
 - Expose the internal CLI procedure builder as a public package API if external integrations need to register custom commands.
 - Add machine-mode output (`--json`) with command-level typed success/error payload schemas.
 - Add command composition utilities for nested command groups (`ai configure`, future namespaces) with less boilerplate.
-- Evaluate replacing yargs once the router/group API is stable and fully covered by tests.
 - Add optional framework-level `--dry-run` support for mutating commands.
 - Add richer framework-provided failure context blocks when diagnostics quality needs to be improved.
 
@@ -71,17 +71,18 @@ Adapter rationale: the seam is not for abstraction-for-abstraction's-sake; it is
 - `packages/libretto/src/cli/commands/init.ts` - command migration coverage for non-session commands.
 - `packages/libretto/src/cli/core/session.ts` - session validation and state primitives used by session middleware.
 - `packages/libretto/src/cli/core/context.ts` - logger initialization and `.libretto` setup; impacted by session resolution timing.
+- `packages/libretto/src/cli/framework/simple-cli.ts` - framework primitives, future built-in parser, and help rendering surface.
+- `packages/libretto/test/simple-cli-framework.spec.ts` - focused framework tests for route derivation, parsing, middleware, and help behavior.
 - `packages/libretto/test/basic.spec.ts` - error/help/usage contracts for parser behavior.
 - `packages/libretto/test/stateful.spec.ts` - sessioned command behavior and command output contracts.
 - `packages/libretto/test/multi-page.spec.ts` - page-targeting behavior for connect-backed commands.
 - [oRPC middleware](https://orpc.dev/docs/middleware) - procedure middleware pattern (`use` + pre/post handler execution).
 - [oRPC router](https://orpc.dev/docs/router) - nested router composition model and middleware application patterns.
 - [oRPC OpenAPI getting started](https://orpc.dev/docs/openapi/getting-started) - route + input/output builder style reference.
-- [yargs command modules and middleware API](https://github.com/yargs/yargs/blob/main/docs/api.md) - parser primitives used under the new CLI layer.
 
 ## Implementation
 
-### Phase 1: Add SimpleCLI core primitives and parser adapter seam
+### Phase 1: Add SimpleCLI core primitives and temporary parser seam
 
 - [x] Add a new internal module (e.g. `packages/libretto/src/cli/framework/simple-cli.ts`) with:
 - [x] `SimpleCLI.define(name, routes)` root definition helper.
@@ -89,12 +90,12 @@ Adapter rationale: the seam is not for abstraction-for-abstraction's-sake; it is
 - [x] `SimpleCLI.group` builder supporting nested groups and group-level middleware.
 - [x] `SimpleCLI.middleware` helper type for reusable middleware functions.
 - [x] `SimpleCLI.input({ positionals, named })` DSL with `SimpleCLI.positional`, `SimpleCLI.option`, and `SimpleCLI.flag`.
-- [x] `SimpleCLI.help(...)` metadata model for subcommand-scoped help sections (purpose, usage, required args, optional flags, examples).
-- [x] Add a parser adapter interface (e.g. `SimpleCLIParserAdapter`) so `SimpleCLI` execution is decoupled from yargs-specific objects.
+- [x] Land an initial command config shape and route metadata model; Phase 2 will simplify this to description-driven help generation.
+- [x] Add a temporary parser adapter interface so routing/input work can land before parser ownership moves into `SimpleCLI`.
 - [x] Auto-derive command route metadata from router keys (`routeKey`, CLI tokens) and expose it to middleware/handlers.
 - [x] Auto-derive parser bindings and canonical Zod object schema from each command input definition.
 - [x] Implement deterministic middleware execution order (definition order) before handler invocation.
-- [x] Keep yargs-backed command/option registration in this phase via the adapter; only wrap execution flow.
+- [x] Keep parser concerns outside the framework only in this phase as scaffolding for the rest of the migration.
 - [x] Ensure router entries are the sole command source-of-truth consumed by parser registration (no manual command name set in bootstrap).
 - [x] Success criteria: focused tests prove route derivation, input parsing, and middleware ordering work independently of concrete command modules.
 - [x] Example target shape:
@@ -132,21 +133,14 @@ const aiConfigureInput = SimpleCLI.input({
 
 const app = SimpleCLI.define("libretto", {
   open: SimpleCLI.command({
-    help: SimpleCLI.help({
-      purpose: "Launch browser and open URL (headed by default)",
-      usage: "libretto-cli open <url> [--headless] [--session <name>]",
-      examples: [
-        "libretto-cli open https://example.com",
-        "libretto-cli open https://example.com --headless --session debug",
-      ],
-    }),
+    description: "Launch browser and open URL (headed by default)",
   })
     .input(openInput)
     .use(autocreateSessionMiddleware)
     .handle(runOpenCommand),
   ai: SimpleCLI.use(aiMiddleware).group({
     configure: SimpleCLI.command({
-      help: "Configure AI runtime",
+      description: "Configure AI runtime",
     })
       .input(aiConfigureInput)
       .handle(runAiConfigureCommand),
@@ -154,29 +148,51 @@ const app = SimpleCLI.define("libretto", {
 });
 ```
 
-### Phase 2: Add subcommand-scoped help rendering contract
+### Phase 2: Replace the parser seam with a built-in SimpleCLI parser and auto-generated help
 
-- [ ] Implement help renderer in `SimpleCLI` using `SimpleCLI.help(...)` metadata:
+- [ ] Replace the temporary parser adapter with an internal `SimpleCLI` parser that owns:
+- [ ] command path matching,
+- [ ] positional and named option parsing,
+- [ ] boolean flag parsing,
+- [ ] `--` passthrough collection,
+- [ ] `help`, `--help`, and `help <subcommand>` dispatch,
+- [ ] unknown command / unknown flag / missing value / missing required argument errors.
+- [ ] Generate help text from the command tree, route descriptions, and input parameter metadata:
 - [ ] root help stays high-level,
-- [ ] subcommand help includes purpose, usage, required args, optional flags, and examples.
-- [ ] Wire `help`, `--help`, and `help <subcommand>` into router-derived command tree.
+- [ ] group help starts with the group description, then usage, then child commands,
+- [ ] command help starts with the command description, then usage, arguments, and options.
+- [ ] Ensure the most specific available description is shown for the requested help target.
+- [ ] Remove parser-adapter requirements from the public `SimpleCLI.run(...)` API.
 - [ ] Migrate one command group (`ai configure`) help to the new contract as a pilot.
-- [ ] Success criteria: `basic.spec.ts` help-related assertions pass, and new tests verify subcommand help structure for `ai configure`.
+- [ ] Success criteria: `packages/libretto/test/simple-cli-framework.spec.ts` passes for help/parsing behavior, and `basic.spec.ts` help-related assertions pass.
 - [ ] Example target shape:
 
 ```ts
-SimpleCLI.command({
-  help: SimpleCLI.help({
-    purpose: "Configure AI runtime",
-    usage: "libretto-cli ai configure [preset] [-- <command prefix...>]",
-    requiredArgs: [],
-    optionalFlags: ["--clear"],
-    examples: [
-      "libretto-cli ai configure codex",
-      "libretto-cli ai configure codex -- node ./agent.js",
-    ],
+const app = SimpleCLI.define("libretto-cli", {
+  ai: SimpleCLI.group({
+    description: "AI commands",
+    routes: {
+      configure: SimpleCLI.command({
+        description: "Configure AI runtime",
+      })
+        .input(aiConfigureInput)
+        .handle(runAiConfigureCommand),
+    },
   }),
 });
+
+await app.run(["help", "ai", "configure"]);
+// =>
+// Configure AI runtime
+//
+// Usage: libretto-cli ai configure [preset] [options]
+//
+// Arguments:
+//   [preset]  AI preset
+//
+// Options:
+//   --clear  Clear existing AI config
+//   -- <args...>  Command prefix after --
 ```
 
 ### Phase 3: Add centralized human renderer and handler result contract
@@ -213,7 +229,7 @@ return {
 ```ts
 type OpenInput = SimpleCLI.InferInput<typeof openInput>;
 
-const openCommand = SimpleCLI.command({ help: "Launch browser and open URL (headed by default)" })
+const openCommand = SimpleCLI.command({ description: "Launch browser and open URL (headed by default)" })
   .input(openInput)
   .handle(async ({ input, logger }) => {
     await runOpen(input.url, !input.headless, input.session, logger);
@@ -248,8 +264,8 @@ const sessionSetupMiddleware = SimpleCLI.middleware(async ({ ctx, command }) => 
 
 ### Phase 6: Replace legacy CLI bootstrap parsing glue with router execution
 
-- [ ] Refactor `cli.ts` to build parser/commands from `SimpleCLI.define(...)` route tree with grouped namespaces (including `ai.configure`) rather than `register*Commands(...)` factories.
-- [ ] Remove `filterSessionArgs` and command-token allowlist plumbing that duplicates parser responsibilities.
+- [ ] Refactor `cli.ts` to execute `SimpleCLI.define(...)` directly from `process.argv.slice(2)` with grouped namespaces (including `ai.configure`) rather than `register*Commands(...)` factories.
+- [ ] Remove `filterSessionArgs`, parser-adapter plumbing, and command-token allowlists that duplicate parser responsibilities.
 - [ ] Keep top-level usage/help/unknown-command behavior stable (including `help`, `--help`, and unknown command flow).
 - [ ] Ensure logger initialization still works on early failures and writes to the expected session/default log path.
 - [ ] Success criteria: help/unknown/invalid-session tests in `basic.spec.ts` pass without output regressions, and command lookup/registration originates only from the router tree.
@@ -259,8 +275,7 @@ const sessionSetupMiddleware = SimpleCLI.middleware(async ({ ctx, command }) => 
 export async function runLibrettoCLI(): Promise<void> {
   ensureLibrettoSetup();
   const app = buildLibrettoSimpleCLI();
-  const parser = createYargsParserAdapter(process.argv.slice(2));
-  await app.run(parser);
+  await app.run(process.argv.slice(2));
 }
 ```
 
