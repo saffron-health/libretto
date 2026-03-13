@@ -76,7 +76,7 @@ describe("snapshot e2e – live site analysis", () => {
 
       // Uses saved profile from .libretto/profiles/linkedin.com.json if available
       await librettoCli(
-        `open https://www.linkedin.com/feed/ --session ${session}`,
+        `open https://www.linkedin.com/feed/ --headless --session ${session}`,
       );
 
       await sleep(PAGE_SETTLE_MS);
