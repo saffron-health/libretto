@@ -71,10 +71,14 @@ describe("snapshot e2e – live site analysis", () => {
       expect(exec.stdout).toContain("less-or-fewer");
 
       // 3. Snapshot with objective
+      const snapshotStart = Date.now();
       const snapshot = await librettoCli(
         `snapshot --session ${session} --objective "Read the full content about differences between fewer and less, including all examples of correct usage" --context "On the Cambridge Dictionary grammar page for less-or-fewer. Need to extract the key differences and example sentences."`,
         snapshotEnv,
       );
+      const snapshotDurationMs = Date.now() - snapshotStart;
+      const snapshotSuccess = snapshot.exitCode === 0;
+      console.log(`[cambridge] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`);
 
       await librettoCli(`close --session ${session}`);
 
@@ -87,60 +91,74 @@ describe("snapshot e2e – live site analysis", () => {
     SNAPSHOT_TIMEOUT,
   );
 
-  // test(
-  //   "linkedin feed: identifies post content and poster name selectors",
-  //   async ({ librettoCli, evaluate }) => {
-  //     const session = "snapshot-e2e-linkedin";
-  //
-  //     const open = await librettoCli(`open https://www.linkedin.com/feed/ --session ${session}`);
-  //     expect(open.exitCode).toBe(0);
-  //
-  //     await sleep(PAGE_SETTLE_MS);
-  //
-  //     const snapshot = await librettoCli(
-  //       `snapshot --session ${session} --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
-  //       snapshotEnv,
-  //     );
-  //
-  //     await librettoCli(`close --session ${session}`);
-  //
-  //     const output = snapshot.stdout + "\n" + snapshot.stderr;
-  //
-  //     await evaluate(output).toMatch(
-  //       "The output identifies CSS selectors for post content text within a LinkedIn feed AND CSS selectors for the poster's name. Both selectors must reference real HTML attributes or elements visible in a LinkedIn feed page.",
-  //     );
-  //   },
-  //   SNAPSHOT_TIMEOUT,
-  // );
+  test(
+    "linkedin feed: identifies post content and poster name selectors",
+    async ({ librettoCli, evaluate }) => {
+      const session = "snapshot-e2e-linkedin";
+
+      // Uses saved profile from .libretto/profiles/linkedin.com.json if available
+      const open = await librettoCli(`open https://www.linkedin.com/feed/ --session ${session}`);
+      expect(open.exitCode).toBe(0);
+
+      await sleep(PAGE_SETTLE_MS);
+
+      const snapshotStart = Date.now();
+      const snapshot = await librettoCli(
+        `snapshot --session ${session} --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
+        snapshotEnv,
+      );
+      const snapshotDurationMs = Date.now() - snapshotStart;
+      const snapshotSuccess = snapshot.exitCode === 0;
+      console.log(`[linkedin] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`);
+
+      await librettoCli(`close --session ${session}`);
+
+      const output = snapshot.stdout + "\n" + snapshot.stderr;
+
+      await evaluate(output).toMatch(
+        "The output identifies CSS selectors for post content text within a LinkedIn feed AND CSS selectors for the poster's name. Both selectors must reference real HTML attributes or elements visible in a LinkedIn feed page.",
+      );
+    },
+    SNAPSHOT_TIMEOUT,
+  );
+
+  test(
+    "amazon homepage: identifies product category selectors",
+    async ({ librettoCli, evaluate }) => {
+      const session = "snapshot-e2e-amazon";
+
+      // Uses saved profile from .libretto/profiles/amazon.com.json if available
+      const open = await librettoCli(`open https://www.amazon.com/ --session ${session}`);
+      expect(open.exitCode).toBe(0);
+
+      await sleep(PAGE_SETTLE_MS);
+
+      const snapshotStart = Date.now();
+      const snapshot = await librettoCli(
+        `snapshot --session ${session} --objective "Identify the different product categories visible on the Amazon homepage and provide CSS selectors that can be used to find or click each category."`,
+        snapshotEnv,
+      );
+      const snapshotDurationMs = Date.now() - snapshotStart;
+      const snapshotSuccess = snapshot.exitCode === 0;
+      console.log(`[amazon] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`);
+
+      await librettoCli(`close --session ${session}`);
+
+      const output = snapshot.stdout + "\n" + snapshot.stderr;
+
+      await evaluate(output).toMatch(
+        "The output identifies multiple distinct product categories from the Amazon homepage (e.g. Electronics, Books, Fashion, etc.) and provides CSS selectors for navigating to or clicking those categories.",
+      );
+    },
+    SNAPSHOT_TIMEOUT,
+  );
+
+  // --- Cloudflare challenge sites (commented out) ---
+  // These sites consistently trigger Cloudflare challenges/anti-bot protection,
+  // making them useful for testing challenge detection but unreliable for CI.
 
   // test(
-  //   "amazon homepage: identifies product category selectors",
-  //   async ({ librettoCli, evaluate }) => {
-  //     const session = "snapshot-e2e-amazon";
-  //
-  //     const open = await librettoCli(`open https://www.amazon.com/ --session ${session}`);
-  //     expect(open.exitCode).toBe(0);
-  //
-  //     await sleep(PAGE_SETTLE_MS);
-  //
-  //     const snapshot = await librettoCli(
-  //       `snapshot --session ${session} --objective "Identify the different product categories visible on the Amazon homepage and provide CSS selectors that can be used to find or click each category."`,
-  //       snapshotEnv,
-  //     );
-  //
-  //     await librettoCli(`close --session ${session}`);
-  //
-  //     const output = snapshot.stdout + "\n" + snapshot.stderr;
-  //
-  //     await evaluate(output).toMatch(
-  //       "The output identifies multiple distinct product categories from the Amazon homepage (e.g. Electronics, Books, Fashion, etc.) and provides CSS selectors for navigating to or clicking those categories.",
-  //     );
-  //   },
-  //   SNAPSHOT_TIMEOUT,
-  // );
-
-  // test(
-  //   "g2.com: identifies cloud challenge or anti-bot protection",
+  //   "g2.com: identifies cloudflare challenge or anti-bot protection",
   //   async ({ librettoCli, evaluate }) => {
   //     const session = "snapshot-e2e-g2";
   //
@@ -166,7 +184,7 @@ describe("snapshot e2e – live site analysis", () => {
   // );
 
   // test(
-  //   "nowsecure.nl: correctly identifies cloudflare challenge",
+  //   "nowsecure.nl: identifies cloudflare challenge",
   //   async ({ librettoCli, evaluate }) => {
   //     const session = "snapshot-e2e-nowsecure";
   //
@@ -192,7 +210,7 @@ describe("snapshot e2e – live site analysis", () => {
   // );
 
   // test(
-  //   "crunchbase: identifies cloud challenge or anti-bot protection",
+  //   "crunchbase: identifies cloudflare challenge or anti-bot protection",
   //   async ({ librettoCli, evaluate }) => {
   //     const session = "snapshot-e2e-crunchbase";
   //
