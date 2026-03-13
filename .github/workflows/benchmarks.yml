@@ -94,7 +94,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${RUN_MODE}" = "small-random" ] && [ "${BENCHMARK}" = "webVoyager" ]; then
+          effective_run_mode="${RUN_MODE}"
+          effective_sample_size="${SAMPLE_SIZE}"
+          effective_random_seed="${RANDOM_SEED}"
+          artifact_name="benchmark-${BENCHMARK}-${RUN_MODE}-transcripts"
+
+          if [ -n "${TEST_NAME_PATTERN}" ]; then
+            effective_run_mode="test-name-pattern"
+            effective_sample_size="ignored"
+            effective_random_seed="ignored"
+            artifact_name="benchmark-${BENCHMARK}-test-name-pattern-transcripts"
+            echo "test_name_pattern is set; ignoring run_mode/sample_size/random_seed selection knobs."
+          elif [ "${RUN_MODE}" = "small-random" ] && [ "${BENCHMARK}" = "webVoyager" ]; then
             export LIBRETTO_WEBVOYAGER_RANDOM_SAMPLE=1
             export LIBRETTO_WEBVOYAGER_RANDOM_SEED="${RANDOM_SEED}"
             export LIBRETTO_WEBVOYAGER_LIMIT="${SAMPLE_SIZE}"
@@ -115,15 +126,20 @@ jobs:
           set -e
 
           echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
+          echo "effective_run_mode=${effective_run_mode}" >> "$GITHUB_OUTPUT"
+          echo "effective_sample_size=${effective_sample_size}" >> "$GITHUB_OUTPUT"
+          echo "effective_random_seed=${effective_random_seed}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=${artifact_name}" >> "$GITHUB_OUTPUT"
 
       - name: Build benchmark summary
         if: always()
         env:
-          BENCHMARK_RUN_MODE: ${{ inputs.run_mode }}
-          BENCHMARK_SAMPLE_SIZE: ${{ inputs.sample_size }}
-          BENCHMARK_RANDOM_SEED: ${{ inputs.random_seed }}
+          BENCHMARK_RUN_MODE: ${{ steps.run_benchmark.outputs.effective_run_mode || inputs.run_mode }}
+          BENCHMARK_SAMPLE_SIZE: ${{ steps.run_benchmark.outputs.effective_sample_size || inputs.sample_size }}
+          BENCHMARK_RANDOM_SEED: ${{ steps.run_benchmark.outputs.effective_random_seed || inputs.random_seed }}
+          BENCHMARK_TEST_NAME_PATTERN: ${{ inputs.test_name_pattern }}
           BENCHMARK_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          BENCHMARK_ARTIFACT_NAME: benchmark-${{ inputs.benchmark }}-${{ inputs.run_mode }}-transcripts
+          BENCHMARK_ARTIFACT_NAME: ${{ steps.run_benchmark.outputs.artifact_name || format('benchmark-{0}-{1}-transcripts', inputs.benchmark, inputs.run_mode) }}
         run: |
           set -euo pipefail
           node benchmarks/summarize-results.mjs "${{ inputs.benchmark }}" benchmark-summary.md > /tmp/benchmark-summary.log
@@ -133,7 +149,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-${{ inputs.benchmark }}-${{ inputs.run_mode }}-transcripts
+          name: ${{ steps.run_benchmark.outputs.artifact_name || format('benchmark-{0}-{1}-transcripts', inputs.benchmark, inputs.run_mode) }}
           if-no-files-found: warn
           path: |
             benchmark-summary.md
