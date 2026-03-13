@@ -1,16 +1,23 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
-import { openSync, existsSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { openSync, existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import type { LoggerApi } from "../../shared/logger/index.js";
+import {
+  getSessionConnectionEndpoint,
+  getSessionOwnerPid,
+  isKernelSessionState,
+  isLocalSessionState,
+  type SessionState,
+} from "../../shared/state/index.js";
 import {
   getSessionActionsLogPath,
   getSessionNetworkLogPath,
   PROFILES_DIR,
 } from "./context.js";
+import { getConfiguredBrowserProvider } from "./browser-provider.js";
 import {
   assertSessionAvailableForStart,
   clearSessionState,
@@ -65,13 +72,12 @@ export function hasProfile(domain: string): boolean {
   return existsSync(getProfilePath(domain));
 }
 
-async function tryConnectToPort(
-  port: number,
+async function tryConnectToEndpoint(
+  endpoint: string,
   logger: LoggerApi,
   timeoutMs: number = 5000,
 ): Promise<Browser | null> {
-  const endpoint = `http://localhost:${port}`;
-  logger.info("cdp-connect-attempt", { port, endpoint, timeoutMs });
+  logger.info("cdp-connect-attempt", { endpoint, timeoutMs });
   try {
     const connectPromise = chromium.connectOverCDP(endpoint);
     const timeoutPromise = new Promise<null>((resolve) =>
@@ -80,16 +86,15 @@ async function tryConnectToPort(
     const browser = await Promise.race([connectPromise, timeoutPromise]);
     if (browser) {
       logger.info("cdp-connect-success", {
-        port,
         endpoint,
         contexts: browser.contexts().length,
       });
     } else {
-      logger.warn("cdp-connect-timeout", { port, endpoint, timeoutMs });
+      logger.warn("cdp-connect-timeout", { endpoint, timeoutMs });
     }
     return browser;
   } catch (err) {
-    logger.error("cdp-connect-error", { error: err, port, endpoint });
+    logger.error("cdp-connect-error", { error: err, endpoint });
     return null;
   }
 }
@@ -189,12 +194,14 @@ export async function connect(
 }> {
   logger.info("connect", { session, timeoutMs });
   const state = readSessionStateOrThrow(session);
-  const browser = await tryConnectToPort(state.port, logger, timeoutMs);
+  const endpoint = getSessionConnectionEndpoint(state);
+  const browser = await tryConnectToEndpoint(endpoint, logger, timeoutMs);
   if (!browser) {
     logger.error("connect-no-browser", {
       session,
-      port: state.port,
-      pid: state.pid,
+      endpoint,
+      pid: getSessionOwnerPid(state),
+      provider: state.provider,
     });
     clearSessionState(session, logger);
     throw new Error(
@@ -286,6 +293,21 @@ export async function runPages(session: string, logger: LoggerApi): Promise<void
 }
 
 export async function runOpen(
+  rawUrl: string,
+  headed: boolean,
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
+  const provider = getConfiguredBrowserProvider();
+  if (provider === "kernel") {
+    await runOpenKernel(rawUrl, headed, session, logger);
+    return;
+  }
+
+  await runOpenLocal(rawUrl, headed, session, logger);
+}
+
+async function runOpenLocal(
   rawUrl: string,
   headed: boolean,
   session: string,
@@ -502,6 +524,7 @@ await new Promise(() => {});
     }
     if (ready) {
       writeSessionState({
+        provider: "local",
         port,
         pid: child.pid!,
         session,
@@ -533,12 +556,162 @@ await new Promise(() => {});
   );
 }
 
+async function runOpenKernel(
+  rawUrl: string,
+  headed: boolean,
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
+  const url = normalizeUrl(rawUrl);
+  logger.info("open-start", {
+    url,
+    headed,
+    session,
+    provider: "kernel",
+  });
+  assertSessionAvailableForStart(session, logger);
+
+  const runLogPath = logFileForSession(session);
+  const networkLogPath = getSessionNetworkLogPath(session);
+  const actionsLogPath = getSessionActionsLogPath(session);
+  const browserMode = headed ? "headed" : "headless";
+  const workerEntryPath = fileURLToPath(
+    new URL("../workers/kernel-browser-session.js", import.meta.url),
+  );
+  const payload = JSON.stringify({
+    session,
+    url,
+    headless: !headed,
+    logFilePath: runLogPath,
+    networkLogPath,
+    actionsLogPath,
+  });
+
+  logger.info("open-launching", {
+    url,
+    mode: browserMode,
+    session,
+    provider: "kernel",
+  });
+  console.log(`Launching ${browserMode} browser (session: ${session})...`);
+
+  const childStderrFd = openSync(runLogPath, "a");
+  const child = spawn(process.execPath, [workerEntryPath, payload], {
+    detached: true,
+    stdio: ["ignore", "ignore", childStderrFd],
+    cwd: resolve(dirname(fileURLToPath(import.meta.url)), "../../.."),
+  });
+  child.unref();
+
+  logger.info("open-child-spawned", {
+    pid: child.pid,
+    session,
+    provider: "kernel",
+  });
+
+  let childSpawnError: Error | null = null;
+  let childEarlyExit: { code: number | null; signal: NodeJS.Signals | null } | null =
+    null;
+
+  child.on("error", (err) => {
+    childSpawnError = err;
+    logger.error("open-child-spawn-error", {
+      error: err,
+      session,
+      provider: "kernel",
+    });
+  });
+
+  child.on("exit", (code, signal) => {
+    childEarlyExit = { code, signal };
+    logger.warn("open-child-exited", {
+      code,
+      signal,
+      session,
+      pid: child.pid,
+      provider: "kernel",
+    });
+  });
+
+  const pollIntervalMs = 500;
+  const maxAttempts = 30;
+  const startupTimeoutMs = pollIntervalMs * maxAttempts;
+
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const spawnError = childSpawnError as Error | null;
+    if (spawnError) {
+      const errWithCode = spawnError as Error & { code?: string };
+      const hint =
+        errWithCode.code === "ENOENT"
+          ? " Ensure Node.js is available in PATH for child processes."
+          : "";
+      throw new Error(
+        `Failed to launch browser child process: ${spawnError.message}.${hint} Check logs: ${runLogPath}`,
+      );
+    }
+
+    const earlyExit = childEarlyExit as {
+      code: number | null;
+      signal: NodeJS.Signals | null;
+    } | null;
+    if (earlyExit) {
+      const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
+      throw new Error(
+        `Browser child process exited before startup (status: ${status}). Check logs: ${runLogPath}`,
+      );
+    }
+
+    await new Promise((resolveWait) => setTimeout(resolveWait, pollIntervalMs));
+    const state = readSessionState(session, logger);
+    if (state?.provider === "kernel" && state.pid === child.pid) {
+      logger.info("open-success", {
+        url,
+        mode: browserMode,
+        session,
+        pid: child.pid,
+        provider: "kernel",
+        sessionId: state.sessionId,
+      });
+      console.log(`Browser open (${browserMode}): ${url}`);
+      await new Promise((resolveWait) => setTimeout(resolveWait, 2_000));
+      return;
+    }
+
+    if (i > 0 && i % 5 === 0) {
+      logger.info("open-waiting-for-kernel", {
+        attempt: i,
+        session,
+      });
+    }
+  }
+
+  logger.error("open-timeout", {
+    session,
+    pid: child.pid,
+    attempts: maxAttempts,
+    provider: "kernel",
+  });
+  throw new Error(
+    `Failed to connect to browser after ${Math.ceil(startupTimeoutMs / 1000)}s. Check startup logs: ${runLogPath}`,
+  );
+}
+
 export async function runSave(
   urlOrDomain: string,
   session: string,
   logger: LoggerApi,
 ): Promise<void> {
   logger.info("save-start", { urlOrDomain, session });
+  const state = readSessionStateOrThrow(session);
+  if (isKernelSessionState(state)) {
+    throw new Error(
+      [
+        `Profile save is not supported for Kernel-backed session "${session}".`,
+        "Recovery: rerun benchmarks without Kernel-backed browser sessions if you need local profile save/load.",
+        "Help: libretto-cli help save",
+      ].join("\n"),
+    );
+  }
   const { browser, context, page } = await connect(session, logger);
 
   try {
@@ -624,9 +797,15 @@ export async function runClose(session: string, logger: LoggerApi): Promise<void
     return;
   }
 
-  logger.info("close-killing", { session, pid: state.pid, port: state.port });
+  logger.info("close-killing", {
+    session,
+    pid: getSessionOwnerPid(state),
+    provider: state.provider,
+    ...(isLocalSessionState(state) ? { port: state.port } : {}),
+    ...(isKernelSessionState(state) ? { sessionId: state.sessionId } : {}),
+  });
 
-  sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
+  sendSignalToProcessGroupOrPid(getSessionOwnerPid(state), "SIGTERM", logger, session);
 
   await waitForCloseSignalWindow(CLOSE_WAIT_MS);
 
@@ -638,7 +817,7 @@ export async function runClose(session: string, logger: LoggerApi): Promise<void
 type ClosableSession = {
   session: string;
   pid: number;
-  port: number;
+  provider: SessionState["provider"];
 };
 
 function waitForCloseSignalWindow(ms: number): Promise<void> {
@@ -696,8 +875,8 @@ function resolveClosableSessions(logger: LoggerApi): {
     }
     closable.push({
       session,
-      pid: state.pid,
-      port: state.port,
+      pid: getSessionOwnerPid(state),
+      provider: state.provider,
     });
   }
 
@@ -739,7 +918,7 @@ export async function runCloseAll(
     logger.info("close-all-sigterm", {
       session: target.session,
       pid: target.pid,
-      port: target.port,
+      provider: target.provider,
     });
     sendSignalToProcessGroupOrPid(target.pid, "SIGTERM", logger, target.session);
   }

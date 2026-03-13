@@ -3,6 +3,7 @@
 Benchmarks are live browser-agent tasks that run a coding agent with:
 
 - the repo-local Libretto CLI via `pnpm cli`
+- Kernel-backed browser sessions for benchmark `open` commands
 - the Libretto skill injected through the Claude eval harness
 - a preconfigured snapshot analyzer so `pnpm cli snapshot` works during the run
 - default benchmark models of `claude-opus-4-6` for the main agent and `claude-sonnet-4-6` for snapshot analysis
@@ -57,3 +58,8 @@ Model overrides:
 LIBRETTO_BENCHMARK_MODEL=claude-opus-4-6
 LIBRETTO_BENCHMARK_ANALYZER_MODEL=claude-sonnet-4-6
 ```
+
+Kernel auth:
+
+- Benchmarks require `BENCHMARKS_KERNEL_API_KEY` in the environment.
+- The generated benchmark workspace always runs the CLI in Kernel mode and forwards `BENCHMARKS_KERNEL_API_KEY` into `KERNEL_API_KEY` for each `pnpm cli` command.

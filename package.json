@@ -58,10 +58,10 @@
     }
   },
   "devDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.73",
     "@ai-sdk/anthropic": "^3.0.53",
     "@ai-sdk/google-vertex": "^4.0.72",
     "@ai-sdk/openai": "^3.0.39",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.73",
     "@types/node": "^25.3.3",
     "@types/yargs": "^17.0.33",
     "openai": "^6.27.0",
@@ -71,6 +71,7 @@
     "zod": "^3.25.0"
   },
   "dependencies": {
+    "@onkernel/sdk": "^0.43.0",
     "ai": "^6.0.110",
     "playwright": "^1.52.0",
     "tsx": "^4.19.2",
