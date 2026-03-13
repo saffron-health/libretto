@@ -69,8 +69,11 @@ function convertUserContentParts(parts: MessageContentPart[]) {
 		if (part.type === "text") {
 			return { type: "text" as const, text: part.text };
 		}
-		// Image parts: the AI SDK accepts data URIs directly
-		return { type: "image" as const, image: part.image };
+		return {
+			type: "image" as const,
+			image: part.image,
+			...(part.mediaType ? { mediaType: part.mediaType } : {}),
+		};
 	});
 }
 
