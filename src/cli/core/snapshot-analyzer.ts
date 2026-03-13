@@ -163,8 +163,10 @@ class ClaudeUserCodingAgent extends UserCodingAgent {
     prompt: string,
     pngPath: string,
   ): Promise<InterpretResult> {
-    const args = [...this.baseArgs, `${prompt}${this.screenshotHint(pngPath)}`];
-    return await this.runAndParse(args);
+    return await this.runAndParse(
+      [...this.baseArgs],
+      `${prompt}${this.screenshotHint(pngPath)}`,
+    );
   }
 }
 
@@ -173,8 +175,10 @@ class GeminiUserCodingAgent extends UserCodingAgent {
     prompt: string,
     pngPath: string,
   ): Promise<InterpretResult> {
-    const args = [...this.baseArgs, `${prompt}${this.screenshotHint(pngPath)}`];
-    return await this.runAndParse(args);
+    return await this.runAndParse(
+      [...this.baseArgs],
+      `${prompt}${this.screenshotHint(pngPath)}`,
+    );
   }
 }
 
