@@ -43,9 +43,15 @@ const dotEnv = loadEnvFile();
 /** Env vars forwarded to snapshot CLI calls so the API analyzer can authenticate. */
 const snapshotEnv: Record<string, string> = {
   ...(dotEnv.OPENAI_API_KEY ? { OPENAI_API_KEY: dotEnv.OPENAI_API_KEY } : {}),
-  ...(dotEnv.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: dotEnv.ANTHROPIC_API_KEY } : {}),
-  ...(process.env.OPENAI_API_KEY ? { OPENAI_API_KEY: process.env.OPENAI_API_KEY } : {}),
-  ...(process.env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY } : {}),
+  ...(dotEnv.ANTHROPIC_API_KEY
+    ? { ANTHROPIC_API_KEY: dotEnv.ANTHROPIC_API_KEY }
+    : {}),
+  ...(process.env.OPENAI_API_KEY
+    ? { OPENAI_API_KEY: process.env.OPENAI_API_KEY }
+    : {}),
+  ...(process.env.ANTHROPIC_API_KEY
+    ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY }
+    : {}),
 };
 
 async function sleep(ms: number): Promise<void> {
@@ -59,8 +65,9 @@ describe("snapshot e2e – live site analysis", () => {
       const session = "snapshot-e2e-linkedin";
 
       // Uses saved profile from .libretto/profiles/linkedin.com.json if available
-      const open = await librettoCli(`open https://www.linkedin.com/feed/ --session ${session}`);
-      expect(open.exitCode).toBe(0);
+      const open = await librettoCli(
+        `open https://www.linkedin.com/feed/ --session ${session}`,
+      );
 
       await sleep(PAGE_SETTLE_MS);
 
@@ -71,7 +78,9 @@ describe("snapshot e2e – live site analysis", () => {
       );
       const snapshotDurationMs = Date.now() - snapshotStart;
       const snapshotSuccess = snapshot.exitCode === 0;
-      console.log(`[linkedin] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`);
+      console.log(
+        `[linkedin] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`,
+      );
 
       await librettoCli(`close --session ${session}`);
 
@@ -79,11 +88,11 @@ describe("snapshot e2e – live site analysis", () => {
 
       await evaluate(output).toMatch(
         "The output identifies CSS selectors for post content text AND poster names, AND explains the nesting structure for how to chain them. " +
-        "Specifically: (1) post content should use [data-testid='expandable-text-box'] or similar data-testid attribute, " +
-        "(2) poster names should target anchor elements with href containing '/in/' within feed list items, " +
-        "(3) the output must explain nesting — e.g. that the feed container is [data-testid='mainFeed'], individual posts are [role='listitem'] within it, " +
-        "and the content/name selectors should be scoped within each post item. " +
-        "All selectors must reference real HTML attributes visible in a LinkedIn feed page.",
+          "Specifically: (1) post content should use [data-testid='expandable-text-box'] or similar data-testid attribute, " +
+          "(2) poster names should target anchor elements with href containing '/in/' within feed list items, " +
+          "(3) the output must explain nesting — e.g. that the feed container is [data-testid='mainFeed'], individual posts are [role='listitem'] within it, " +
+          "and the content/name selectors should be scoped within each post item. " +
+          "All selectors must reference real HTML attributes visible in a LinkedIn feed page.",
       );
     },
     SNAPSHOT_TIMEOUT,

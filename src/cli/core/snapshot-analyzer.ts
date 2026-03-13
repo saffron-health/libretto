@@ -367,6 +367,20 @@ async function runExternalCommand(
       });
     });
 
+    child.stdin.on("error", (err) => {
+      const errno = err as NodeJS.ErrnoException;
+      logger.warn("interpret-analyzer-stdin-pipe-error", {
+        command,
+        args,
+        code: errno.code ?? null,
+        message: err.message,
+        hint:
+          errno.code === "EPIPE"
+            ? "Child process exited before consuming all stdin data"
+            : "Unexpected stdin write error",
+      });
+    });
+
     if (stdinText !== undefined) {
       child.stdin.write(stdinText);
     }
