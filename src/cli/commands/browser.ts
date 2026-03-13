@@ -23,6 +23,10 @@ export function registerBrowserCommands(yargs: Argv, logger: LoggerApi): Argv {
           .option("headless", {
             type: "boolean",
             default: false,
+          })
+          .option("viewport", {
+            type: "string",
+            describe: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
           }),
       async (argv) => {
         const hasHeadedFlag = Boolean(argv.headed);
@@ -34,10 +38,28 @@ export function registerBrowserCommands(yargs: Argv, logger: LoggerApi): Argv {
         const url = argv.url as string | undefined;
         if (!url) {
           throw new Error(
-            "Usage: libretto-cli open <url> [--headless] [--session <name>]",
+            "Usage: libretto-cli open <url> [--headless] [--viewport WxH] [--session <name>]",
           );
         }
-        await runOpen(url, headed, String(argv.session), logger);
+        const viewportArg = argv.viewport as string | undefined;
+        let viewport: { width: number; height: number } | undefined;
+        if (viewportArg) {
+          const match = viewportArg.match(/^(\d+)x(\d+)$/i);
+          if (!match) {
+            throw new Error(
+              "Invalid --viewport format. Expected WIDTHxHEIGHT (e.g. 1920x1080).",
+            );
+          }
+          const w = Number(match[1]);
+          const h = Number(match[2]);
+          if (w < 1 || h < 1) {
+            throw new Error(
+              "Invalid --viewport dimensions. Width and height must be at least 1.",
+            );
+          }
+          viewport = { width: w, height: h };
+        }
+        await runOpen(url, headed, String(argv.session), logger, { viewport });
       },
     )
     .command(

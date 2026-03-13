@@ -2,7 +2,7 @@ import { createVertex } from "@ai-sdk/google-vertex";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject, type ModelMessage } from "ai";
-import type { ZodType } from "zod";
+import type { ZodType, output as ZodOutput } from "zod";
 import type { LLMClient, Message, MessageContentPart } from "./types.js";
 
 type Provider = "google" | "anthropic" | "openai";
@@ -112,28 +112,28 @@ export function createLLMClient(model: string): LLMClient {
 			prompt: string;
 			schema: T;
 			temperature?: number;
-		}) {
+		}): Promise<ZodOutput<T>> {
 			const result = await generateObject({
 				model: aiModel,
 				prompt: opts.prompt,
 				schema: opts.schema,
 				temperature: opts.temperature ?? 0,
 			});
-			return result.object;
+			return result.object as ZodOutput<T>;
 		},
 
 		async generateObjectFromMessages<T extends ZodType>(opts: {
 			messages: Message[];
 			schema: T;
 			temperature?: number;
-		}) {
+		}): Promise<ZodOutput<T>> {
 			const result = await generateObject({
 				model: aiModel,
 				messages: convertMessages(opts.messages),
 				schema: opts.schema,
 				temperature: opts.temperature ?? 0,
 			});
-			return result.object;
+			return result.object as ZodOutput<T>;
 		},
 	};
 }
