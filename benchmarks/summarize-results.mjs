@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, join, resolve } from "node:path";
 
@@ -94,6 +94,31 @@ export function getLatestBenchmarkRunRecord(root, benchmark) {
   return records[0] ?? null;
 }
 
+export function filterResultPathsForRunRecord(resultPaths, runRecord) {
+  if (
+    !runRecord ||
+    typeof runRecord.startedAt !== "string" ||
+    typeof runRecord.finishedAt !== "string"
+  ) {
+    return resultPaths;
+  }
+
+  const startedAtMs = Date.parse(runRecord.startedAt);
+  const finishedAtMs = Date.parse(runRecord.finishedAt);
+  if (!Number.isFinite(startedAtMs) || !Number.isFinite(finishedAtMs)) {
+    return resultPaths;
+  }
+
+  return resultPaths.filter((path) => {
+    try {
+      const stats = statSync(path);
+      return stats.mtimeMs >= startedAtMs && stats.mtimeMs <= finishedAtMs;
+    } catch {
+      return false;
+    }
+  });
+}
+
 function clip(text, maxChars = 120) {
   if (typeof text !== "string" || text.trim().length === 0) {
     return "n/a";
@@ -130,6 +155,10 @@ export function buildMarkdown({
   rows,
   runRecord,
 }) {
+  const resultFileCount =
+    typeof runRecord?.resultFileCount === "number"
+      ? runRecord.resultFileCount
+      : rows.length;
   const passed = rows.filter((row) => row.status === "passed").length;
   const failed = rows.filter((row) => row.status === "failed").length;
   const running = rows.filter((row) => row.status === "running").length;
@@ -137,7 +166,16 @@ export function buildMarkdown({
     const rowCostUsd = getRowCostUsd(row);
     return rowCostUsd == null ? sum : sum + rowCostUsd;
   }, 0);
-  const costTracked = rows.filter((row) => getRowCostUsd(row) != null).length;
+  const costTracked =
+    typeof runRecord?.costTrackedResultCount === "number"
+      ? runRecord.costTrackedResultCount
+      : rows.filter((row) => getRowCostUsd(row) != null).length;
+  const runTotalCostUsd =
+    typeof runRecord?.totalCostUsd === "number"
+      ? runRecord.totalCostUsd
+      : costTracked > 0
+        ? totalCostUsd
+        : null;
 
   const lines = [
     "# Benchmark Results",
@@ -146,12 +184,12 @@ export function buildMarkdown({
     `- Mode: \`${runMode}\``,
     `- Sample size: \`${sampleSize}\``,
     `- Seed: \`${randomSeed}\``,
-    `- Result files: \`${rows.length}\``,
+    `- Result files: \`${resultFileCount}\``,
     `- Passed: \`${passed}\``,
     `- Failed: \`${failed}\``,
     `- Incomplete: \`${running}\``,
     `- Cost tracked: \`${costTracked}\``,
-    `- Total cost: \`${costTracked > 0 ? formatCost(totalCostUsd) : "n/a"}\``,
+    `- Total cost: \`${formatCost(runTotalCostUsd)}\``,
   ];
 
   if (runUrl) {
@@ -165,7 +203,7 @@ export function buildMarkdown({
     "",
     "| Benchmark Run | Duration | Cost | Result files | Cost tracked |",
     "| --- | --- | --- | --- | --- |",
-    `| \`${benchmark}\` | \`${formatDuration(runRecord?.durationMs)}\` | \`${formatCost(runRecord?.totalCostUsd ?? (costTracked > 0 ? totalCostUsd : null))}\` | \`${rows.length}\` | \`${costTracked}\` |`,
+    `| \`${benchmark}\` | \`${formatDuration(runRecord?.durationMs)}\` | \`${formatCost(runTotalCostUsd)}\` | \`${resultFileCount}\` | \`${costTracked}\` |`,
   );
 
   lines.push(
@@ -206,9 +244,12 @@ function main() {
 
   const repoRoot = process.cwd();
   const runsRoot = resolve(repoRoot, "benchmarks", benchmark, "runs");
-  const resultPaths = walkResults(runsRoot);
-  const rows = resultPaths.map((path) => readJson(path));
   const runRecord = getLatestBenchmarkRunRecord(repoRoot, benchmark);
+  const resultPaths = filterResultPathsForRunRecord(
+    walkResults(runsRoot),
+    runRecord,
+  );
+  const rows = resultPaths.map((path) => readJson(path));
 
   rows.sort((a, b) => {
     const caseA = String(a.caseId ?? "");
