@@ -28,12 +28,17 @@ import { writeFileSync } from "node:fs";
 
 const preset = process.argv[2] ?? "unknown";
 const args = process.argv.slice(3);
+const stdinChunks = [];
+for await (const chunk of process.stdin) {
+  stdinChunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+}
+const stdinText = Buffer.concat(stdinChunks).toString("utf8");
 const outputIndex = args.indexOf("--output-last-message");
 const outputPath = outputIndex >= 0 ? args[outputIndex + 1] : undefined;
 const payload = JSON.stringify({
   answer: "snapshot-ok-" + preset,
   selectors: [],
-  notes: "",
+  notes: "stdin-has-objective=" + stdinText.includes("Find heading") + ";argv-has-objective=" + args.some((arg) => arg.includes("Find heading")),
 });
 
 if (outputPath) {
@@ -138,6 +143,31 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(snapshot.stdout).toContain("Interpretation:");
     expect(snapshot.stdout).toContain("Answer: snapshot-ok-objective-only");
   }, 45_000);
+
+  for (const preset of ["claude", "gemini"] as const) {
+    test(`${preset} snapshot analysis sends prompt via stdin instead of argv`, async ({
+      librettoCli,
+      workspaceDir,
+    }) => {
+      const session = `snapshot-${preset}-stdin`;
+      const analyzerPath = await writeFakeAnalyzer(workspaceDir);
+      await librettoCli(
+        `ai configure ${preset} -- "${process.execPath}" "${analyzerPath}" "${preset}"`,
+      );
+
+      const opened = await librettoCli(
+        `open https://example.com --headless --session ${session}`,
+      );
+      expect(opened.stdout).toContain("Browser open");
+
+      const snapshot = await librettoCli(
+        `snapshot --objective "Find heading" --context "${preset} stdin verification" --session ${session}`,
+      );
+      expect(snapshot.stdout).toContain("Interpretation:");
+      expect(snapshot.stdout).toContain("stdin-has-objective=true");
+      expect(snapshot.stdout).toContain("argv-has-objective=false");
+    }, 45_000);
+  }
 
   test("shows a clear error when --context is provided without --objective", async ({
     librettoCli,
