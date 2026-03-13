@@ -254,26 +254,59 @@ const openCommand = SimpleCLI.command({ description: "Launch browser and open UR
 
 ### Phase 5: Add session middlewares and migrate sessioned commands
 
-- [ ] Implement `autocreateSessionMiddleware` and `sessionSetupMiddleware`.
-- [ ] Apply these middlewares to `open`/`run` and connect-backed commands (`save`, `exec`, `snapshot`, `network`, `actions`, `pages`, `resume`).
-- [ ] Keep non-session commands (`ai configure`, `init`, `help`) out of session middleware.
-- [ ] Success criteria: existing session-related failures in integration tests keep current user-visible behavior.
-- [ ] Example target shape:
+- [x] Implement shared session middlewares in `commands/shared.ts`:
+- [x] `resolveSessionMiddleware` to normalize validated input into `ctx.session`,
+- [x] `loadSessionStateMiddleware` for commands that must connect to an existing session (`save`, `exec`, `snapshot`, `network`, `actions`, `pages`, `resume`).
+- [x] Keep non-session commands (`ai configure`, `init`, `help`) out of session middleware.
+- [x] Preserve command-specific usage precedence by expressing single-command argument requirements in each command's input validation instead of introducing one-off middleware (`open`, `save`, `exec`, `run`).
+- [x] Use middleware-provided `ctx.session` in sessioned handlers, and use `ctx.sessionState` where it materially removes a re-read (`resume`).
+- [x] Keep `run`'s failed-session recovery/startability logic local to the handler, since that behavior is only used by `run` and does not need a separate middleware abstraction.
+- [x] Success criteria: `pnpm --filter libretto type-check`, `basic.spec.ts`, `stateful.spec.ts`, and `multi-page.spec.ts` pass with the existing user-visible session behavior intact.
+- [x] Example target shape:
 
 ```ts
-const autocreateSessionMiddleware: SimpleCLIMiddleware<{ session?: string }, {}, { session: string }> = async ({ input, ctx }) => {
-  const session = input.session ?? "default";
-  validateSessionName(session);
-  return { ...ctx, session };
+const resolveSessionMiddleware: SimpleCLIMiddleware<
+  { session: string },
+  {},
+  { session: string }
+> = async ({ input, ctx }) => {
+  return { ...ctx, session: input.session };
 };
 
-const sessionSetupMiddleware: SimpleCLIMiddleware<unknown, { session: string }> = async ({ ctx, command }) => {
-  if (command.routeKey === "open" || command.routeKey === "run") {
-    assertSessionAvailableForStart(ctx.session);
-    return;
-  }
-  readSessionStateOrThrow(ctx.session);
+const loadSessionStateMiddleware: SimpleCLIMiddleware<
+  { session: string },
+  { session: string },
+  { session: string; sessionState: SessionState }
+> = async ({ ctx }) => {
+  return {
+    ...ctx,
+    sessionState: readSessionStateOrThrow(ctx.session),
+  };
 };
+
+const runInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("integrationFile", z.string().optional()),
+    SimpleCLI.positional("integrationExport", z.string().optional()),
+  ],
+  named: {
+    session: sessionOption(),
+  },
+})
+  .refine(
+    (input) => Boolean(input.integrationFile && input.integrationExport),
+    "Usage: libretto-cli run <integrationFile> <integrationExport> ...",
+  );
+
+const resumeCommand = SimpleCLI.command({
+  description: "Resume a paused workflow for the current session",
+})
+  .input(resumeInput)
+  .use(resolveSessionMiddleware)
+  .use(loadSessionStateMiddleware)
+  .handle(async ({ ctx }) => {
+    await runResume(ctx.session, logger, ctx.sessionState);
+  });
 ```
 
 ### Phase 6: Replace legacy CLI bootstrap parsing glue with router execution
@@ -299,6 +332,8 @@ export async function runLibrettoCLI(): Promise<void> {
 
 ### Phase 7: Full regression verification and guardrail tests
 
+- [x] Make the CLI regression suite self-contained so `pnpm --filter libretto test` does not depend on external LLM evaluation services or cloud-secret lookups.
+- [x] Keep package-level CLI test execution deterministic by serializing file execution while subprocess-heavy suites are still sharing browser/process resources.
 - [ ] Add regression tests that assert middleware-driven command behavior for:
 - [ ] session defaulting and validation,
 - [ ] middleware ordering,
@@ -309,10 +344,11 @@ export async function runLibrettoCLI(): Promise<void> {
 - [ ] success writes primary result to stdout and diagnostics to stderr,
 - [ ] argument/runtime errors include summary + known state + recovery + next command + help hint,
 - [ ] deterministic ordering/field names for list and human-readable output.
-- [ ] Run `pnpm --filter libretto type-check`.
-- [ ] Run `pnpm --filter libretto test -- test/basic.spec.ts`.
-- [ ] Run `pnpm --filter libretto test -- test/stateful.spec.ts`.
-- [ ] Run `pnpm --filter libretto test -- test/multi-page.spec.ts`.
+- [x] Run `pnpm --filter libretto type-check`.
+- [x] Run `pnpm --filter libretto test`.
+- [x] Run `pnpm --filter libretto test -- test/basic.spec.ts`.
+- [x] Run `pnpm --filter libretto test -- test/stateful.spec.ts`.
+- [x] Run `pnpm --filter libretto test -- test/multi-page.spec.ts`.
 - [ ] Success criteria: all targeted tests pass and command output contracts remain unchanged.
 - [ ] Example guardrail:
 

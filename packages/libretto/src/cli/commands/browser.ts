@@ -8,8 +8,13 @@ import {
   runSave,
 } from "../core/browser.js";
 import { withSessionLogger } from "../core/context.js";
+import { assertSessionAvailableForStart } from "../core/session.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
-import { sessionOption } from "./shared.js";
+import {
+  loadSessionStateMiddleware,
+  resolveSessionMiddleware,
+  sessionOption,
+} from "./shared.js";
 
 export const openInput = SimpleCLI.input({
   positionals: [
@@ -22,22 +27,20 @@ export const openInput = SimpleCLI.input({
     headed: SimpleCLI.flag({ help: "Run browser in headed mode" }),
     headless: SimpleCLI.flag({ help: "Run browser in headless mode" }),
   },
-}).refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
+})
+  .refine((input) => Boolean(input.url), "Usage: libretto-cli open <url> [--headless] [--session <name>]")
+  .refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
 
 export function createOpenCommand(logger: LoggerApi) {
   return SimpleCLI.command({
     description: "Launch browser and open URL (headed by default)",
   })
     .input(openInput)
-    .handle(async ({ input }) => {
-      if (!input.url) {
-        throw new Error(
-          "Usage: libretto-cli open <url> [--headless] [--session <name>]",
-        );
-      }
-
+    .use(resolveSessionMiddleware)
+    .handle(async ({ input, ctx }) => {
+      assertSessionAvailableForStart(ctx.session, logger);
       const headed = input.headed || !input.headless;
-      await runOpen(input.url, headed, input.session, logger);
+      await runOpen(input.url!, headed, ctx.session, logger);
     });
 }
 
@@ -50,18 +53,20 @@ export const saveInput = SimpleCLI.input({
   named: {
     session: sessionOption(),
   },
-});
+}).refine(
+  (input) => Boolean(input.urlOrDomain),
+  "Usage: libretto-cli save <url|domain> [--session <name>]",
+);
 
 export function createSaveCommand(logger: LoggerApi) {
   return SimpleCLI.command({
     description: "Save current browser session",
   })
     .input(saveInput)
-    .handle(async ({ input }) => {
-      if (!input.urlOrDomain) {
-        throw new Error("Usage: libretto-cli save <url|domain> [--session <name>]");
-      }
-      await runSave(input.urlOrDomain, input.session, logger);
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ input, ctx }) => {
+      await runSave(input.urlOrDomain!, ctx.session, logger);
     });
 }
 
@@ -77,8 +82,10 @@ export function createPagesCommand(logger: LoggerApi) {
     description: "List open pages in the session",
   })
     .input(pagesInput)
-    .handle(async ({ input }) => {
-      await runPages(input.session, logger);
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ ctx }) => {
+      await runPages(ctx.session, logger);
     });
 }
 
@@ -96,7 +103,8 @@ export function createCloseCommand(logger: LoggerApi) {
     description: "Close the browser",
   })
     .input(closeInput)
-    .handle(async ({ input }) => {
+    .use(resolveSessionMiddleware)
+    .handle(async ({ input, ctx }) => {
       if (input.force && !input.all) {
         throw new Error("Usage: libretto-cli close --all [--force]");
       }
@@ -104,7 +112,7 @@ export function createCloseCommand(logger: LoggerApi) {
         await runCloseAllWithLogger(logger, { force: input.force });
         return;
       }
-      await runCloseWithLogger(input.session, logger);
+      await runCloseWithLogger(ctx.session, logger);
     });
 }
 
