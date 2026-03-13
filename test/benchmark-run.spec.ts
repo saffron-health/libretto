@@ -121,6 +121,8 @@ describe("benchmark launcher history", () => {
       runRecord: {
         durationMs: 321_000,
         totalCostUsd: 1.2345,
+        resultFileCount: 3,
+        costTrackedResultCount: 2,
       },
       rows: [
         {
@@ -133,8 +135,11 @@ describe("benchmark launcher history", () => {
       ],
     });
 
+    expect(markdown).toContain("- Result files: `3`");
+    expect(markdown).toContain("- Cost tracked: `2`");
+    expect(markdown).toContain("- Total cost: `$1.2345`");
     expect(markdown).toContain("| Benchmark Run | Duration | Cost | Result files | Cost tracked |");
-    expect(markdown).toContain("| `webVoyager` | `5m 21s` | `$1.2345` | `1` | `1` |");
+    expect(markdown).toContain("| `webVoyager` | `5m 21s` | `$1.2345` | `3` | `2` |");
     expect(markdown).toContain("| `sample-case` | pass `passed` | `2m 03s` | `$0.4321` |");
   });
 
@@ -172,5 +177,34 @@ describe("benchmark launcher history", () => {
       durationMs: 123_000,
       totalCostUsd: 0.4321,
     });
+  });
+
+  test("summary scopes result files to the selected run window", async () => {
+    // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
+    const { filterResultPathsForRunRecord } = await import("../benchmarks/summarize-results.mjs");
+    const tempRoot = await mkdtemp(join(tmpdir(), "libretto-benchmark-results-"));
+    tempRoots.push(tempRoot);
+
+    const earlierPath = join(tempRoot, "earlier-results.json");
+    const currentPath = join(tempRoot, "current-results.json");
+    await writeFile(earlierPath, "{}", "utf8");
+    await writeFile(currentPath, "{}", "utf8");
+    await utimes(
+      earlierPath,
+      new Date("2026-03-12T19:59:00.000Z"),
+      new Date("2026-03-12T19:59:00.000Z"),
+    );
+    await utimes(
+      currentPath,
+      new Date("2026-03-12T20:01:00.000Z"),
+      new Date("2026-03-12T20:01:00.000Z"),
+    );
+
+    expect(
+      filterResultPathsForRunRecord([earlierPath, currentPath], {
+        startedAt: "2026-03-12T20:00:00.000Z",
+        finishedAt: "2026-03-12T20:02:00.000Z",
+      }),
+    ).toEqual([currentPath]);
   });
 });
