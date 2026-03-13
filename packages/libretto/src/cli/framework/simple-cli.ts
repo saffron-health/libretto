@@ -19,18 +19,29 @@ export type SimpleCLICommandMeta = {
   description: string;
 };
 
-export type SimpleCLIMiddlewareArgs<TInput> = {
+export type SimpleCLIMiddlewareArgs<
+  TInput,
+  TContext extends SimpleCLIContext,
+> = {
   input: TInput;
-  ctx: SimpleCLIContext;
+  ctx: TContext;
   command: SimpleCLICommandMeta;
 };
 
-export type SimpleCLIMiddleware<TInput = unknown> = (
-  args: SimpleCLIMiddlewareArgs<TInput>,
-) => void | SimpleCLIContext | Promise<void | SimpleCLIContext>;
+export type SimpleCLIMiddleware<
+  TInput = unknown,
+  TContextIn extends SimpleCLIContext = {},
+  TContextOut extends SimpleCLIContext = TContextIn,
+> = (
+  args: SimpleCLIMiddlewareArgs<TInput, TContextIn>,
+) => void | TContextOut | Promise<void | TContextOut>;
 
-export type SimpleCLIHandler<TInput = unknown, TResult = unknown> = (
-  args: SimpleCLIMiddlewareArgs<TInput>,
+export type SimpleCLIHandler<
+  TInput = unknown,
+  TContext extends SimpleCLIContext = {},
+  TResult = unknown,
+> = (
+  args: SimpleCLIMiddlewareArgs<TInput, TContext>,
 ) => TResult | Promise<TResult>;
 
 type SimpleCLIPositionalsDefinition = readonly SimpleCLIPositionalDefinition<
@@ -66,14 +77,24 @@ type InputObjectFor<
   TNamed extends SimpleCLINamedDefinition,
 > = Merge<InferPositionals<TPositionals>, InferNamed<TNamed>>;
 
-type NormalizedCommandDefinition<TInput, TResult> = {
+type AnySimpleCLIMiddleware = SimpleCLIMiddleware<any, any, any>;
+
+type NormalizedCommandDefinition<
+  TInput,
+  TContextIn extends SimpleCLIContext,
+  TContext extends SimpleCLIContext,
+  TResult,
+> = {
   config: SimpleCLICommandConfig;
   input?: SimpleCLIInput<TInput>;
-  middlewares: SimpleCLIMiddleware<TInput>[];
-  handler?: SimpleCLIHandler<TInput, TResult>;
+  middlewares: AnySimpleCLIMiddleware[];
+  handler?: SimpleCLIHandler<TInput, TContext, TResult>;
 };
 
-type SimpleCLIRouteTree = Record<string, SimpleCLIGroup | SimpleCLICommandBuilder<any, any>>;
+type SimpleCLIRouteTree<TContext extends SimpleCLIContext = {}> = Record<
+  string,
+  SimpleCLIGroup<TContext, any> | SimpleCLICommandBuilder<any, TContext, any, any>
+>;
 
 export type SimpleCLIResolvedCommand = {
   routeKey: string;
@@ -83,8 +104,8 @@ export type SimpleCLIResolvedCommand = {
 
 type InternalResolvedCommand = SimpleCLIResolvedCommand & {
   input?: SimpleCLIInput<unknown>;
-  middlewares: SimpleCLIMiddleware<unknown>[];
-  handler: SimpleCLIHandler<unknown, unknown>;
+  middlewares: AnySimpleCLIMiddleware[];
+  handler: SimpleCLIHandler<unknown, SimpleCLIContext, unknown>;
 };
 
 type InternalResolvedGroup = {
@@ -104,9 +125,9 @@ type ResolveRouteTreeResult = {
   routeEntries: InternalResolvedRouteEntry[];
 };
 
-type SimpleCLIGroupConfig = {
+type SimpleCLIGroupConfig<TContext extends SimpleCLIContext> = {
   description?: string;
-  routes: SimpleCLIRouteTree;
+  routes: SimpleCLIRouteTree<TContext>;
 };
 
 type ParsedInvocation = {
@@ -240,33 +261,51 @@ export type SimpleCLINamedArgDefinition<TSchema extends ZodTypeAny> = {
   source?: "--";
 };
 
-export class SimpleCLICommandBuilder<TInput, TResult> {
-  constructor(private readonly definition: NormalizedCommandDefinition<TInput, TResult>) {}
+export class SimpleCLICommandBuilder<
+  TInput,
+  TContextIn extends SimpleCLIContext,
+  TContext extends SimpleCLIContext,
+  TResult,
+> {
+  constructor(
+    private readonly definition: NormalizedCommandDefinition<TInput, TContextIn, TContext, TResult>,
+  ) {}
 
-  input<TNextInput>(input: SimpleCLIInput<TNextInput>): SimpleCLICommandBuilder<TNextInput, TResult> {
-    return new SimpleCLICommandBuilder<TNextInput, TResult>({
+  input<TNextInput>(
+    input: SimpleCLIInput<TNextInput>,
+  ): SimpleCLICommandBuilder<TNextInput, TContextIn, TContext, TResult> {
+    return new SimpleCLICommandBuilder<TNextInput, TContextIn, TContext, TResult>({
       config: this.definition.config,
       input,
-      middlewares: this.definition.middlewares as unknown as SimpleCLIMiddleware<TNextInput>[],
+      middlewares: this.definition.middlewares,
       handler: this.definition.handler as unknown as
-        | SimpleCLIHandler<TNextInput, TResult>
+        | SimpleCLIHandler<TNextInput, TContext, TResult>
         | undefined,
     });
   }
 
-  use(
-    middleware: SimpleCLIMiddleware<TInput>,
-  ): SimpleCLICommandBuilder<TInput, TResult> {
-    return new SimpleCLICommandBuilder<TInput, TResult>({
-      ...this.definition,
+  use<TContextOut extends SimpleCLIContext>(
+    middleware: SimpleCLIMiddleware<TInput, TContext, TContextOut>,
+  ): SimpleCLICommandBuilder<TInput, TContextIn, TContextOut, TResult> {
+    return new SimpleCLICommandBuilder<
+      TInput,
+      TContextIn,
+      TContextOut,
+      TResult
+    >({
+      config: this.definition.config,
+      input: this.definition.input,
       middlewares: [...this.definition.middlewares, middleware],
+      handler: this.definition.handler as unknown as
+        | SimpleCLIHandler<TInput, TContextOut, TResult>
+        | undefined,
     });
   }
 
   handle<TNextResult>(
-    handler: SimpleCLIHandler<TInput, TNextResult>,
-  ): SimpleCLICommandBuilder<TInput, TNextResult> {
-    return new SimpleCLICommandBuilder<TInput, TNextResult>({
+    handler: SimpleCLIHandler<TInput, TContext, TNextResult>,
+  ): SimpleCLICommandBuilder<TInput, TContextIn, TContext, TNextResult> {
+    return new SimpleCLICommandBuilder<TInput, TContextIn, TContext, TNextResult>({
       config: this.definition.config,
       input: this.definition.input,
       middlewares: this.definition.middlewares,
@@ -274,16 +313,21 @@ export class SimpleCLICommandBuilder<TInput, TResult> {
     });
   }
 
-  getDefinition(): NormalizedCommandDefinition<TInput, TResult> {
+  getDefinition(): NormalizedCommandDefinition<TInput, TContextIn, TContext, TResult> {
     return this.definition;
   }
 }
 
-export type SimpleCLIGroup = {
+export type SimpleCLIGroup<
+  TParentContext extends SimpleCLIContext,
+  TChildContext extends SimpleCLIContext = TParentContext,
+> = {
   kind: "group";
   description?: string;
-  routes: SimpleCLIRouteTree;
-  middlewares: SimpleCLIMiddleware[];
+  routes: SimpleCLIRouteTree<TChildContext>;
+  middlewares: AnySimpleCLIMiddleware[];
+  __parentContext?: TParentContext;
+  __childContext?: TChildContext;
 };
 
 export class SimpleCLIApp {
@@ -293,7 +337,7 @@ export class SimpleCLIApp {
 
   constructor(
     readonly name: string,
-    routes: SimpleCLIRouteTree,
+    routes: SimpleCLIRouteTree<{}>,
   ) {
     const resolution = resolveRouteTree(routes);
 
@@ -690,9 +734,9 @@ function validateRequiredNamedArgs(
 }
 
 function resolveRouteTree(
-  routes: SimpleCLIRouteTree,
+  routes: SimpleCLIRouteTree<any>,
   parentPath: readonly string[] = [],
-  parentMiddlewares: readonly SimpleCLIMiddleware[] = [],
+  parentMiddlewares: readonly AnySimpleCLIMiddleware[] = [],
 ): ResolveRouteTreeResult {
   const resolved: ResolveRouteTreeResult = {
     commands: [],
@@ -735,11 +779,12 @@ function resolveRouteTree(
       path,
       description: command.config.description,
       input: command.input,
-      middlewares: [
-        ...parentMiddlewares,
-        ...(command.middlewares as unknown as SimpleCLIMiddleware<unknown>[]),
-      ],
-      handler: command.handler as unknown as SimpleCLIHandler<unknown, unknown>,
+      middlewares: mergeInheritedMiddlewares(parentMiddlewares, command.middlewares),
+      handler: command.handler as unknown as SimpleCLIHandler<
+        unknown,
+        SimpleCLIContext,
+        unknown
+      >,
     });
     resolved.routeEntries.push({
       kind: "command",
@@ -750,8 +795,28 @@ function resolveRouteTree(
   return resolved;
 }
 
-function isGroup(value: SimpleCLIGroup | SimpleCLICommandBuilder<any, any>): value is SimpleCLIGroup {
-  return (value as SimpleCLIGroup).kind === "group";
+function mergeInheritedMiddlewares(
+  parentMiddlewares: readonly AnySimpleCLIMiddleware[],
+  commandMiddlewares: readonly AnySimpleCLIMiddleware[],
+): AnySimpleCLIMiddleware[] {
+  if (parentMiddlewares.length === 0) {
+    return [...commandMiddlewares];
+  }
+
+  if (
+    commandMiddlewares.length >= parentMiddlewares.length
+    && parentMiddlewares.every((middleware, index) => commandMiddlewares[index] === middleware)
+  ) {
+    return [...commandMiddlewares];
+  }
+
+  return [...parentMiddlewares, ...commandMiddlewares];
+}
+
+function isGroup(
+  value: SimpleCLIGroup<any, any> | SimpleCLICommandBuilder<any, any, any, any>,
+): value is SimpleCLIGroup<any, any> {
+  return (value as SimpleCLIGroup<any, any>).kind === "group";
 }
 
 function buildInputNormalizer<
@@ -867,9 +932,22 @@ function input<
   );
 }
 
+type SimpleCLIScope<
+  TParentContext extends SimpleCLIContext,
+  TContext extends SimpleCLIContext,
+> = {
+  use<TContextOut extends SimpleCLIContext>(
+    middleware: SimpleCLIMiddleware<unknown, TContext, TContextOut>
+  ): SimpleCLIScope<TParentContext, TContextOut>;
+  group(config: SimpleCLIGroupConfig<TContext>): SimpleCLIGroup<TParentContext, TContext>;
+  command(
+    config: SimpleCLICommandConfig,
+  ): SimpleCLICommandBuilder<unknown, TParentContext, TContext, unknown>;
+};
+
 function command(
   config: SimpleCLICommandConfig,
-): SimpleCLICommandBuilder<unknown, unknown> {
+): SimpleCLICommandBuilder<unknown, {}, {}, unknown> {
   return new SimpleCLICommandBuilder({
     config,
     middlewares: [],
@@ -877,43 +955,52 @@ function command(
 }
 
 function group(
-  config: SimpleCLIGroupConfig,
-): SimpleCLIGroup {
-  return {
-    kind: "group",
-    description: config.description,
-    routes: config.routes,
-    middlewares: [],
-  };
+  config: SimpleCLIGroupConfig<{}>,
+): SimpleCLIGroup<{}, {}> {
+  return createScope<{}, {}>([]).group(config);
 }
 
-function middleware<TInput>(
-  next: SimpleCLIMiddleware<TInput>,
-): SimpleCLIMiddleware<TInput> {
-  return next;
-}
-
-function use(...middlewares: SimpleCLIMiddleware[]) {
+function createScope<
+  TParentContext extends SimpleCLIContext,
+  TContext extends SimpleCLIContext,
+>(
+  middlewares: readonly AnySimpleCLIMiddleware[],
+): SimpleCLIScope<TParentContext, TContext> {
   return {
-    group(config: SimpleCLIGroupConfig): SimpleCLIGroup {
+    use<TContextOut extends SimpleCLIContext>(
+      middleware: SimpleCLIMiddleware<unknown, TContext, TContextOut>,
+    ): SimpleCLIScope<TParentContext, TContextOut> {
+      return createScope<TParentContext, TContextOut>([
+        ...middlewares,
+        middleware,
+      ]);
+    },
+    group(config: SimpleCLIGroupConfig<TContext>): SimpleCLIGroup<TParentContext, TContext> {
       return {
         kind: "group",
         description: config.description,
         routes: config.routes,
-        middlewares,
+        middlewares: [...middlewares],
       };
     },
-    command(config: SimpleCLICommandConfig): SimpleCLICommandBuilder<unknown, unknown> {
-      let next = command(config);
-      for (const current of middlewares) {
-        next = next.use(current);
-      }
-      return next;
+    command(
+      config: SimpleCLICommandConfig,
+    ): SimpleCLICommandBuilder<unknown, TParentContext, TContext, unknown> {
+      return new SimpleCLICommandBuilder({
+        config,
+        middlewares: [...middlewares],
+      });
     },
   };
 }
 
-function define(name: string, routes: SimpleCLIRouteTree): SimpleCLIApp {
+function use<TContextOut extends SimpleCLIContext>(
+  middleware: SimpleCLIMiddleware<unknown, {}, TContextOut>,
+): SimpleCLIScope<{}, TContextOut> {
+  return createScope<{}, TContextOut>([middleware]);
+}
+
+function define(name: string, routes: SimpleCLIRouteTree<{}>): SimpleCLIApp {
   return new SimpleCLIApp(name, routes);
 }
 
@@ -928,7 +1015,6 @@ export const SimpleCLI = {
   command,
   group,
   use,
-  middleware,
   input,
   positional,
   option,
