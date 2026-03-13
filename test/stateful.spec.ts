@@ -211,7 +211,7 @@ describe("state-driven CLI subprocess behavior", () => {
     }, 45_000);
   }
 
-  test("snapshot passes inline full DOM and direct image input to codex", async ({
+  test("snapshot passes file-based snapshot paths to codex", async ({
     librettoCli,
     workspaceDir,
   }) => {
@@ -251,23 +251,31 @@ describe("state-driven CLI subprocess behavior", () => {
         stdin: string;
       };
 
-      expect(record.args).toContain("--image");
+      expect(record.args).not.toContain("--image");
       expect(record.args).not.toContain("--output-format");
-      expect(record.stdin).toContain("Selected HTML snapshot: full DOM");
       expect(record.stdin).toContain(
-        "Full DOM is within 75% of the estimated context window",
+        "The following snapshot files are available for your analysis. Use your file reading tools to access them.",
       );
-      expect(record.stdin).toContain('componentkey="full-dom-marker"');
-      expect(record.stdin).toContain("HTML snapshot (full DOM):");
-      expect(record.stdin).not.toContain(
-        "The following snapshot files are available",
+      expect(record.stdin).toContain("Screenshot (PNG):");
+      expect(record.stdin).toContain("Full DOM (HTML):");
+      expect(record.stdin).toContain("Condensed DOM (HTML):");
+      expect(record.stdin).toContain(
+        "Recommended HTML source based on these estimates: Full DOM",
       );
+      expect(record.stdin).toContain(
+        "Always open this image file directly from disk and inspect it visually first.",
+      );
+      expect(record.stdin).toContain(
+        "You may grep, search, or read targeted sections instead of loading an entire file if that is more efficient.",
+      );
+      expect(record.stdin).not.toContain('componentkey="full-dom-marker"');
+      expect(record.stdin).not.toContain("HTML snapshot (full DOM):");
     } finally {
       await server.close();
     }
   }, 45_000);
 
-  test("snapshot passes structured image input to claude and uses condensed DOM when full DOM is too large", async ({
+  test("snapshot passes file-based snapshot paths to claude and recommends condensed DOM when full DOM is too large", async ({
     librettoCli,
     workspaceDir,
   }) => {
@@ -296,62 +304,35 @@ describe("state-driven CLI subprocess behavior", () => {
       const rawRecord = await readFile(recordPath, "utf8");
       const record = JSON.parse(rawRecord) as {
         args: string[];
-        lines: Array<{
-          type?: string;
-          message?: {
-            role?: string;
-            content?: Array<
-              | { type: "text"; text: string }
-              | {
-                  type: "image";
-                  source: {
-                    type: string;
-                    media_type: string;
-                    data: string;
-                  };
-                }
-            >;
-          };
-        }>;
+        stdin: string;
       };
 
+      expect(record.stdin).toBe("");
       expect(record.args).toEqual(
-        expect.arrayContaining([
-          "--verbose",
-          "--output-format",
-          "stream-json",
-          "--input-format",
-          "stream-json",
-        ]),
+        expect.arrayContaining(["--output-format", "json", "--tools", "Read,Grep,Glob"]),
+      );
+      expect(record.args).not.toEqual(
+        expect.arrayContaining(["--input-format", "stream-json", "--verbose"]),
       );
 
-      const userMessage = record.lines.find((line) => line.type === "user");
-      expect(userMessage?.message?.role).toBe("user");
-      expect(Array.isArray(userMessage?.message?.content)).toBe(true);
-
-      const contentBlocks = userMessage?.message?.content ?? [];
-      const textBlock = contentBlocks.find(
-        (block): block is { type: "text"; text: string } =>
-          block.type === "text",
+      const prompt = record.args.at(-1);
+      expect(prompt).toContain(
+        "The following snapshot files are available for your analysis. Use your file reading tools to access them.",
       );
-      const imageBlock = contentBlocks.find(
-        (block): block is {
-          type: "image";
-          source: { type: string; media_type: string; data: string };
-        } => block.type === "image",
+      expect(prompt).toContain("Screenshot (PNG):");
+      expect(prompt).toContain("Full DOM (HTML):");
+      expect(prompt).toContain("Condensed DOM (HTML):");
+      expect(prompt).toContain(
+        "Recommended HTML source based on these estimates: Condensed DOM",
       );
-
-      expect(textBlock?.text).toContain("Selected HTML snapshot: condensed DOM");
-      expect(textBlock?.text).toContain(
-        "Full DOM exceeds 75% of the estimated context window",
+      expect(prompt).toContain("Screenshot file path:");
+      expect(prompt).toContain(
+        "You may grep, search, or read targeted sections instead of loading an entire file if that is more efficient.",
       );
-      expect(textBlock?.text).toContain("HTML snapshot (condensed DOM):");
-      expect(textBlock?.text).not.toContain(
+      expect(prompt).not.toContain(
         'componentkey="removed-by-condense"',
       );
-      expect(imageBlock?.source.type).toBe("base64");
-      expect(imageBlock?.source.media_type).toBe("image/png");
-      expect(imageBlock?.source.data.length).toBeGreaterThan(100);
+      expect(prompt).not.toContain("HTML snapshot (condensed DOM):");
     } finally {
       await server.close();
     }

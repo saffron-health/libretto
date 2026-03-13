@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -60,35 +60,17 @@ type CodexTraceSummary = {
   fileCandidates: string[];
 };
 
-type SnapshotBudget = {
-  contextWindowTokens: number;
-  outputReserveTokens: number;
-  promptBudgetTokens: number;
-  source: string;
-};
-
-type SnapshotDomStats = {
+type SnapshotPromptStats = {
+  pngBytes: number;
   fullDomChars: number;
   fullDomEstimatedTokens: number;
   condensedDomChars: number;
   condensedDomEstimatedTokens: number;
   configuredModel: string;
+  estimatedContextWindowTokens: number | null;
+  safeReadBudgetTokens: number | null;
+  recommendedHtmlSource: "full" | "condensed";
 };
-
-type InlinePromptSelection = {
-  prompt: string;
-  domSource: "full" | "condensed";
-  domLabel: "full DOM" | "condensed DOM";
-  htmlChars: number;
-  htmlEstimatedTokens: number;
-  promptEstimatedTokens: number;
-  truncated: boolean;
-  selectionReason: string;
-  budget: SnapshotBudget;
-  stats: SnapshotDomStats;
-};
-
-const FULL_DOM_CONTEXT_WINDOW_RATIO = 0.75;
 
 abstract class UserCodingAgent {
   protected constructor(protected readonly config: AiConfig) {}
@@ -201,8 +183,6 @@ class CodexUserCodingAgent extends UserCodingAgent {
       "--json",
       "--output-last-message",
       outputPath,
-      "--image",
-      pngPath,
       "-",
     ];
     logger.info("interpret-analyzer-codex-start", {
@@ -252,6 +232,7 @@ class ClaudeUserCodingAgent extends UserCodingAgent {
       extra.push("--tools", this.config.allowedTools.join(","));
     }
     extra.push("--permission-mode", "bypassPermissions");
+    extra.push("--output-format", "json");
     return extra;
   }
 
@@ -263,13 +244,9 @@ class ClaudeUserCodingAgent extends UserCodingAgent {
     const args = [
       ...this.baseArgs,
       ...this.buildExtraArgs(),
-      "--verbose",
-      "--output-format",
-      "stream-json",
-      "--input-format",
-      "stream-json",
+      `${prompt}${this.screenshotHint(pngPath)}`,
     ];
-    return await this.runAndParse(args, logger, buildClaudeStreamJsonInput(prompt, pngPath));
+    return await this.runAndParse(args, logger);
   }
 }
 
@@ -707,7 +684,7 @@ function buildInterpretInstructions(): string {
   prompt += `{"answer": string, "selectors": [{"label": string, "selector": string, "rationale": string}], "notes": string, "debug"?: {"consultedFiles": string[], "analysisSteps": string[]}}\n\n`;
   prompt += `Selectors should prefer robust attributes: data-testid, data-test, aria-label, name, id, role. Avoid fragile class-based or positional selectors.\n`;
   prompt += `Only include selectors that exist in the HTML snapshot.\n`;
-  prompt += `When possible, include debug.consultedFiles with the snapshot inputs you actually used (for example inline:screenshot, inline:full-dom, inline:condensed-dom) and debug.analysisSteps with 2-5 short steps describing how you found the answer.\n`;
+  prompt += `When possible, include debug.consultedFiles with the snapshot file paths you actually used and debug.analysisSteps with 2-5 short steps describing how you found the answer.\n`;
   return prompt;
 }
 
@@ -715,13 +692,11 @@ function estimateTokensFromChars(chars: number): number {
   return Math.ceil(chars / 4);
 }
 
-function inferContextWindowTokens(
-  config: AiConfig,
-): { contextWindowTokens: number; source: string } {
+function estimateContextWindowTokens(config: AiConfig): number | null {
   const model = config.model?.trim().toLowerCase();
   if (model) {
     if (model.includes("claude")) {
-      return { contextWindowTokens: 200_000, source: "model:claude" };
+      return 200_000;
     }
     if (
       model.includes("gpt-5")
@@ -729,89 +704,107 @@ function inferContextWindowTokens(
       || model.includes("o4")
       || model.includes("codex")
     ) {
-      return { contextWindowTokens: 200_000, source: "model:openai" };
+      return 200_000;
     }
     if (model.includes("gemini")) {
-      return { contextWindowTokens: 1_000_000, source: "model:gemini" };
+      return 1_000_000;
     }
   }
 
   switch (config.preset) {
     case "claude":
-      return { contextWindowTokens: 200_000, source: "preset:claude" };
+      return 200_000;
     case "codex":
-      return { contextWindowTokens: 200_000, source: "preset:codex" };
+      return 200_000;
     case "gemini":
-      return { contextWindowTokens: 1_000_000, source: "preset:gemini" };
+      return 1_000_000;
   }
 }
 
-function buildSnapshotBudget(config: AiConfig): SnapshotBudget {
-  const { contextWindowTokens, source } = inferContextWindowTokens(config);
-  const outputReserveTokens = Math.min(
-    32_000,
-    Math.max(8_000, Math.floor(contextWindowTokens * 0.1)),
-  );
-  const promptBudgetTokens = Math.max(
-    8_000,
-    contextWindowTokens - outputReserveTokens - 2_000,
-  );
-
-  return {
-    contextWindowTokens,
-    outputReserveTokens,
-    promptBudgetTokens,
-    source,
-  };
-}
-
-function buildSnapshotDomStats(
-  fullHtmlContent: string,
-  condensedHtmlContent: string,
+function buildSnapshotPromptStats(
+  pngPath: string,
+  htmlPath: string,
+  condensedHtmlPath: string,
   config: AiConfig,
-): SnapshotDomStats {
-  const fullDomChars = fullHtmlContent.length;
-  const condensedDomChars = condensedHtmlContent.length;
+): SnapshotPromptStats {
+  const pngBytes = statSync(pngPath).size;
+  const fullDomChars = readFileSync(htmlPath, "utf-8").length;
+  const condensedDomChars = readFileSync(condensedHtmlPath, "utf-8").length;
   const fullDomEstimatedTokens = estimateTokensFromChars(fullDomChars);
   const condensedDomEstimatedTokens = estimateTokensFromChars(condensedDomChars);
+  const estimatedContextWindowTokens = estimateContextWindowTokens(config);
+  const safeReadBudgetTokens =
+    estimatedContextWindowTokens == null
+      ? null
+      : Math.floor(estimatedContextWindowTokens * 0.75);
+  const recommendedHtmlSource =
+    safeReadBudgetTokens != null && fullDomEstimatedTokens > safeReadBudgetTokens
+      ? "condensed"
+      : "full";
 
   return {
+    pngBytes,
     fullDomChars,
     fullDomEstimatedTokens,
     condensedDomChars,
     condensedDomEstimatedTokens,
     configuredModel: config.model ?? config.preset,
+    estimatedContextWindowTokens,
+    safeReadBudgetTokens,
+    recommendedHtmlSource,
   };
 }
 
-function getFullDomSelectionThresholdTokens(budget: SnapshotBudget): number {
-  return Math.floor(budget.contextWindowTokens * FULL_DOM_CONTEXT_WINDOW_RATIO);
+function buildFileAnalyzerPrompt(
+  args: InterpretArgs,
+  pngPath: string,
+  htmlPath: string,
+  condensedHtmlPath: string,
+  stats: SnapshotPromptStats,
+): string {
+  let prompt = `# Objective\n${args.objective}\n\n`;
+  prompt += `# Context\n${args.context}\n\n`;
+  prompt += `# Snapshot Files\n`;
+  prompt += `The following snapshot files are available for your analysis. Use your file reading tools to access them.\n\n`;
+  prompt += `- **Screenshot (PNG):** ${pngPath} — Always open this image file directly from disk and inspect it visually first.\n`;
+  prompt += `- **Full DOM (HTML):** ${htmlPath} — Raw page HTML. Use this when you need the complete DOM or want to verify details that may have been removed from the condensed snapshot.\n`;
+  prompt += `- **Condensed DOM (HTML):** ${condensedHtmlPath} — Reduced HTML intended for faster targeted analysis and selector discovery.\n\n`;
+  prompt += `# Snapshot Size Hints\n`;
+  prompt += `- Screenshot PNG size: ${stats.pngBytes.toLocaleString()} bytes\n`;
+  prompt += `- Full DOM size: ${stats.fullDomChars.toLocaleString()} chars (~${stats.fullDomEstimatedTokens.toLocaleString()} tokens)\n`;
+  prompt += `- Condensed DOM size: ${stats.condensedDomChars.toLocaleString()} chars (~${stats.condensedDomEstimatedTokens.toLocaleString()} tokens)\n`;
+  prompt += `- Configured model: ${stats.configuredModel}\n`;
+  if (stats.estimatedContextWindowTokens != null) {
+    prompt += `- Estimated model context window: ${stats.estimatedContextWindowTokens.toLocaleString()} tokens\n`;
+    prompt += `- Safe budget for reading one HTML artifact after prompt/response overhead: ~${stats.safeReadBudgetTokens!.toLocaleString()} tokens\n`;
+  } else {
+    prompt += `- Estimated model context window: unknown\n`;
+  }
+  prompt += `- Recommended HTML source based on these estimates: ${stats.recommendedHtmlSource === "full" ? "Full DOM" : "Condensed DOM"}\n\n`;
+  prompt += `# How To Use These Files\n`;
+  prompt += `1. Open the screenshot PNG first and inspect the image itself. Do not rely only on the file path text.\n`;
+  prompt += `2. Use the HTML files flexibly. You may grep, search, or read targeted sections instead of loading an entire file if that is more efficient.\n`;
+  prompt += `3. Prefer the recommended HTML source above as your starting point, but switch to the other HTML file if you need more detail or better coverage.\n`;
+  prompt += `4. The full DOM is the authoritative raw page snapshot. The condensed DOM is a smaller derived artifact that is often better for fast lookup and selector work.\n`;
+  prompt += `5. If both HTML files are too large to inspect safely, say so in your notes instead of pretending you read them.\n\n`;
+  prompt += buildInterpretInstructions();
+  prompt += `\nReturn only a JSON object. Do not include markdown code fences or extra commentary.`;
+  return prompt;
 }
 
 function buildInlineHtmlPrompt(
   args: InterpretArgs,
-  options: {
-    htmlContent: string;
-    domLabel: "full DOM" | "condensed DOM";
-    truncated: boolean;
-    selectionReason: string;
-    budget: SnapshotBudget;
-    stats: SnapshotDomStats;
-  },
+  htmlContent: string,
 ): string {
-  const selectorHints = collectSelectorHints(options.htmlContent, 120);
+  const htmlCharLimit = 500_000;
+  const { text: trimmedHtml, truncated } = truncateText(
+    htmlContent,
+    htmlCharLimit,
+  );
+  const selectorHints = collectSelectorHints(htmlContent, 120);
 
   let prompt = `# Objective\n${args.objective}\n\n`;
   prompt += `# Context\n${args.context}\n\n`;
-  prompt += `# Snapshot Selection\n`;
-  prompt += `- Configured model: ${options.stats.configuredModel}\n`;
-  prompt += `- Estimated context window: ${options.budget.contextWindowTokens.toLocaleString()} tokens (${options.budget.source})\n`;
-  prompt += `- Reserved output budget: ${options.budget.outputReserveTokens.toLocaleString()} tokens\n`;
-  prompt += `- Estimated prompt budget: ${options.budget.promptBudgetTokens.toLocaleString()} tokens\n`;
-  prompt += `- Full DOM size: ${options.stats.fullDomChars.toLocaleString()} chars (~${options.stats.fullDomEstimatedTokens.toLocaleString()} tokens)\n`;
-  prompt += `- Condensed DOM size: ${options.stats.condensedDomChars.toLocaleString()} chars (~${options.stats.condensedDomEstimatedTokens.toLocaleString()} tokens)\n`;
-  prompt += `- Selected HTML snapshot: ${options.domLabel}\n`;
-  prompt += `- Selection reason: ${options.selectionReason}\n\n`;
   prompt += buildInterpretInstructions();
 
   if (selectorHints.length > 0) {
@@ -820,122 +813,14 @@ function buildInlineHtmlPrompt(
     prompt += "\n";
   }
 
-  if (options.truncated) {
+  if (truncated) {
     prompt += `\nHTML content is truncated to fit token limits.\n`;
   }
 
-  prompt += `\nHTML snapshot (${options.domLabel}):\n\n${options.htmlContent}`;
+  prompt += `\nHTML snapshot (condensed DOM):\n\n${trimmedHtml}`;
   prompt +=
     "\n\nReturn only a JSON object. Do not include markdown code fences or extra commentary.";
   return prompt;
-}
-
-function buildInlinePromptSelection(
-  args: InterpretArgs,
-  fullHtmlContent: string,
-  condensedHtmlContent: string,
-  config: AiConfig,
-): InlinePromptSelection {
-  const budget = buildSnapshotBudget(config);
-  const stats = buildSnapshotDomStats(
-    fullHtmlContent,
-    condensedHtmlContent,
-    config,
-  );
-
-  const buildCandidate = (
-    domSource: "full" | "condensed",
-    htmlContent: string,
-    selectionReason: string,
-    truncated: boolean,
-  ): InlinePromptSelection => {
-    const domLabel = domSource === "full" ? "full DOM" : "condensed DOM";
-    const prompt = buildInlineHtmlPrompt(args, {
-      htmlContent,
-      domLabel,
-      truncated,
-      selectionReason,
-      budget,
-      stats,
-    });
-    return {
-      prompt,
-      domSource,
-      domLabel,
-      htmlChars: htmlContent.length,
-      htmlEstimatedTokens: estimateTokensFromChars(htmlContent.length),
-      promptEstimatedTokens: estimateTokensFromChars(prompt.length),
-      truncated,
-      selectionReason,
-      budget,
-      stats,
-    };
-  };
-
-  const fullDomSelectionThresholdTokens = getFullDomSelectionThresholdTokens(budget);
-  const selectedDomSource =
-    stats.fullDomEstimatedTokens > fullDomSelectionThresholdTokens
-      ? "condensed"
-      : "full";
-  const selectedHtmlContent =
-    selectedDomSource === "full" ? fullHtmlContent : condensedHtmlContent;
-  const selectedDomReason =
-    selectedDomSource === "full"
-      ? `Full DOM is within 75% of the estimated context window (${stats.fullDomEstimatedTokens.toLocaleString()} <= ${fullDomSelectionThresholdTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`
-      : `Full DOM exceeds 75% of the estimated context window (${stats.fullDomEstimatedTokens.toLocaleString()} > ${fullDomSelectionThresholdTokens.toLocaleString()} tokens), so the analyzer receives the condensed DOM instead.`;
-
-  const selectedCandidate = buildCandidate(
-    selectedDomSource,
-    selectedHtmlContent,
-    selectedDomReason,
-    false,
-  );
-  if (selectedCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
-    return selectedCandidate;
-  }
-
-  const basePrompt = buildInlineHtmlPrompt(args, {
-    htmlContent: "",
-    domLabel: selectedCandidate.domLabel,
-    truncated: true,
-    selectionReason:
-      `${selectedDomReason} The selected HTML snapshot still exceeds the estimated prompt budget, so it is truncated to fit.`,
-    budget,
-    stats,
-  });
-  const availableHtmlTokens = Math.max(
-    2_000,
-    budget.promptBudgetTokens - estimateTokensFromChars(basePrompt.length),
-  );
-  const truncatedHtml = truncateText(selectedHtmlContent, availableHtmlTokens * 4);
-
-  return buildCandidate(
-    selectedDomSource,
-    truncatedHtml.text,
-    `${selectedDomReason} The selected HTML snapshot still exceeds the estimated prompt budget, so it is truncated to fit.`,
-    truncatedHtml.truncated,
-  );
-}
-
-function buildClaudeStreamJsonInput(prompt: string, pngPath: string): string {
-  const imageBase64 = readFileAsBase64(pngPath);
-  return `${JSON.stringify({
-    type: "user",
-    message: {
-      role: "user",
-      content: [
-        { type: "text", text: prompt },
-        {
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: getMimeType(pngPath),
-            data: imageBase64,
-          },
-        },
-      ],
-    },
-  })}\n`;
 }
 
 export async function runInterpret(
@@ -965,36 +850,41 @@ export async function runInterpret(
   }
 
   let parsed: InterpretResult;
-  const fullHtmlContent = readFileSync(htmlPath, "utf-8");
-  const condensedHtmlContent = readFileSync(condensedHtmlPath, "utf-8");
   const configuredAgent = UserCodingAgent.getConfigured();
   if (configuredAgent) {
     const configuredAnalyzer = configuredAgent.snapshotAnalyzerConfig;
-    const selection = buildInlinePromptSelection(
-      args,
-      fullHtmlContent,
-      condensedHtmlContent,
+    const stats = buildSnapshotPromptStats(
+      pngPath,
+      htmlPath,
+      condensedHtmlPath,
       configuredAnalyzer,
+    );
+    if (
+      stats.safeReadBudgetTokens != null
+      && stats.condensedDomEstimatedTokens > stats.safeReadBudgetTokens
+    ) {
+      throw new Error(
+        `Snapshot HTML is too large for the configured analyzer budget. Full DOM is ~${stats.fullDomEstimatedTokens.toLocaleString()} tokens, condensed DOM is ~${stats.condensedDomEstimatedTokens.toLocaleString()} tokens, safe budget is ~${stats.safeReadBudgetTokens.toLocaleString()} tokens.`,
+      );
+    }
+    const prompt = buildFileAnalyzerPrompt(
+      args,
+      pngPath,
+      htmlPath,
+      condensedHtmlPath,
+      stats,
     );
     logger.info("interpret-analyzer-config", {
       preset: configuredAnalyzer.preset,
       commandPrefix: configuredAnalyzer.commandPrefix,
-      configuredModel: selection.stats.configuredModel,
-      fullDomEstimatedTokens: selection.stats.fullDomEstimatedTokens,
-      condensedDomEstimatedTokens: selection.stats.condensedDomEstimatedTokens,
-      contextWindowTokens: selection.budget.contextWindowTokens,
-      promptBudgetTokens: selection.budget.promptBudgetTokens,
-      selectedDom: selection.domSource,
-      selectedHtmlEstimatedTokens: selection.htmlEstimatedTokens,
-      selectedPromptEstimatedTokens: selection.promptEstimatedTokens,
-      selectionReason: selection.selectionReason,
-      truncated: selection.truncated,
+      configuredModel: stats.configuredModel,
+      estimatedContextWindowTokens: stats.estimatedContextWindowTokens,
+      safeReadBudgetTokens: stats.safeReadBudgetTokens,
+      fullDomEstimatedTokens: stats.fullDomEstimatedTokens,
+      condensedDomEstimatedTokens: stats.condensedDomEstimatedTokens,
+      recommendedHtmlSource: stats.recommendedHtmlSource,
     });
-    parsed = await configuredAgent.analyzeSnapshot(
-      selection.prompt,
-      pngPath,
-      logger,
-    );
+    parsed = await configuredAgent.analyzeSnapshot(prompt, pngPath, logger);
   } else {
     const llmClientFactory = getLLMClientFactory();
     if (!llmClientFactory) {
@@ -1004,17 +894,8 @@ export async function runInterpret(
     }
 
     logger.info("interpret-analyzer-factory-fallback", {});
-    const fallbackConfig: AiConfig = {
-      preset: "gemini",
-      commandPrefix: ["gemini"],
-      updatedAt: new Date(0).toISOString(),
-    };
-    const selection = buildInlinePromptSelection(
-      args,
-      fullHtmlContent,
-      condensedHtmlContent,
-      fallbackConfig,
-    );
+    const condensedHtmlContent = readFileSync(condensedHtmlPath, "utf-8");
+    const prompt = buildInlineHtmlPrompt(args, condensedHtmlContent);
     const imageBase64 = readFileAsBase64(pngPath);
     const client = await llmClientFactory(
       logger,
@@ -1026,7 +907,7 @@ export async function runInterpret(
         {
           role: "user",
           content: [
-            { type: "text", text: selection.prompt },
+            { type: "text", text: prompt },
             {
               type: "image",
               image: `data:${getMimeType(pngPath)};base64,${imageBase64}`,
