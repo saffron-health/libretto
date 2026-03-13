@@ -294,9 +294,12 @@ class GeminiUserCodingAgent extends UserCodingAgent {
     const args = [
       ...this.baseArgs,
       ...this.buildExtraArgs(),
-      `${prompt}${this.screenshotHint(pngPath)}`,
     ];
-    return await this.runAndParse(args, logger);
+    return await this.runAndParse(
+      args,
+      logger,
+      `${prompt}${this.screenshotHint(pngPath)}`,
+    );
   }
 }
 
