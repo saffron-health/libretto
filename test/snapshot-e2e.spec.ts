@@ -7,14 +7,16 @@ import { test } from "./fixtures";
 /**
  * End-to-end snapshot tests.
  *
- * Each test launches a headed browser to a real website, immediately runs
- * `snapshot --objective`, then uses the AI evaluator to verify the snapshot
- * output satisfies the stated success criteria.
+ * Tests cover:
+ * - Snapshot resilience against ad interstitials / blocked pages that collapse
+ *   the viewport (Cambridge vignette popup test).
+ * - Snapshot analysis on real sites with saved profiles (LinkedIn, Amazon).
  *
  * Requirements:
  * - ANTHROPIC_API_KEY or OPENAI_API_KEY must be set for snapshot analysis.
  * - Network access to the target sites.
  * - Playwright Chromium installed.
+ * - Saved profiles in .libretto/profiles/ for authenticated tests (LinkedIn, Amazon).
  */
 
 const SNAPSHOT_TIMEOUT = 120_000;
@@ -54,39 +56,44 @@ async function sleep(ms: number): Promise<void> {
 
 describe("snapshot e2e – live site analysis", () => {
   test(
-    "cambridge dictionary: navigate then snapshot grammar content",
-    async ({ librettoCli, evaluate }) => {
-      const session = "webvoyager-cambridge-dictionary-32";
+    "cambridge dictionary: snapshot survives ad interstitial / blocked page",
+    async ({ librettoCli }) => {
+      const session = "snapshot-e2e-cambridge-popup";
 
-      // 1. Open browser to the Cambridge Dictionary root
+      // Open directly to the vignette URL which triggers an ad interstitial
+      // that can collapse the viewport to 0px width.
+      // NOTE: This test is nondeterministic — the popup/interstitial does not
+      // always appear. The test still validates that the snapshot pipeline
+      // completes regardless of whether the popup is shown.
       const open = await librettoCli(
-        `open https://dictionary.cambridge.org/ --headless --session ${session}`,
+        `open https://dictionary.cambridge.org/grammar/british-grammar/less-or-fewer#google_vignette --headed --session ${session}`,
       );
       expect(open.exitCode).toBe(0);
 
-      // 2. Navigate to the specific grammar page and wait for it to settle
-      const exec = await librettoCli(
-        `exec --session ${session} "await page.goto('https://dictionary.cambridge.org/grammar/british-grammar/less-or-fewer'); await page.waitForTimeout(3000); return await page.url();"`,
-      );
-      expect(exec.stdout).toContain("less-or-fewer");
+      await sleep(PAGE_SETTLE_MS);
 
-      // 3. Snapshot with objective
+      // Snapshot should not crash with "Cannot take screenshot with 0 width"
+      // even if the page is blocked or showing an ad interstitial.
       const snapshotStart = Date.now();
       const snapshot = await librettoCli(
-        `snapshot --session ${session} --objective "Read the full content about differences between fewer and less, including all examples of correct usage" --context "On the Cambridge Dictionary grammar page for less-or-fewer. Need to extract the key differences and example sentences."`,
+        `snapshot --session ${session} --objective "Describe the current page state and whether it shows real content, an ad interstitial, or an error page." --context "This page may be showing an ad popup or interstitial that collapses the viewport."`,
         snapshotEnv,
       );
       const snapshotDurationMs = Date.now() - snapshotStart;
       const snapshotSuccess = snapshot.exitCode === 0;
-      console.log(`[cambridge] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`);
+      console.log(`[cambridge-popup] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`);
 
       await librettoCli(`close --session ${session}`);
 
       const output = snapshot.stdout + "\n" + snapshot.stderr;
 
-      await evaluate(output).toMatch(
-        "The output describes the differences between 'fewer' and 'less' and includes example sentences of correct usage, OR it identifies a Cloudflare challenge/block page. The answer must contain substantive grammar content or clearly state a challenge was encountered.",
-      );
+      // The snapshot pipeline must complete — PNG/HTML/condensed HTML saved.
+      expect(output).toContain("Snapshot saved:");
+      expect(output).toContain("page.png");
+      expect(output).toContain("page.html");
+      expect(output).toContain("page.condensed.html");
+      // Analysis must return an interpretation (doesn't matter what it says).
+      expect(output).toContain("Interpretation (via API):");
     },
     SNAPSHOT_TIMEOUT,
   );
@@ -116,7 +123,12 @@ describe("snapshot e2e – live site analysis", () => {
       const output = snapshot.stdout + "\n" + snapshot.stderr;
 
       await evaluate(output).toMatch(
-        "The output identifies CSS selectors for post content text within a LinkedIn feed AND CSS selectors for the poster's name. Both selectors must reference real HTML attributes or elements visible in a LinkedIn feed page.",
+        "The output identifies CSS selectors for post content text AND poster names, AND explains the nesting structure for how to chain them. " +
+        "Specifically: (1) post content should use [data-testid='expandable-text-box'] or similar data-testid attribute, " +
+        "(2) poster names should target anchor elements with href containing '/in/' within feed list items, " +
+        "(3) the output must explain nesting — e.g. that the feed container is [data-testid='mainFeed'], individual posts are [role='listitem'] within it, " +
+        "and the content/name selectors should be scoped within each post item. " +
+        "All selectors must reference real HTML attributes visible in a LinkedIn feed page.",
       );
     },
     SNAPSHOT_TIMEOUT,
@@ -153,85 +165,9 @@ describe("snapshot e2e – live site analysis", () => {
     SNAPSHOT_TIMEOUT,
   );
 
-  // --- Cloudflare challenge sites (commented out) ---
-  // These sites consistently trigger Cloudflare challenges/anti-bot protection,
-  // making them useful for testing challenge detection but unreliable for CI.
-
-  // test(
-  //   "g2.com: identifies cloudflare challenge or anti-bot protection",
-  //   async ({ librettoCli, evaluate }) => {
-  //     const session = "snapshot-e2e-g2";
-  //
-  //     const open = await librettoCli(`open https://www.g2.com/ --session ${session}`);
-  //     expect(open.exitCode).toBe(0);
-  //
-  //     await sleep(PAGE_SETTLE_MS);
-  //
-  //     const snapshot = await librettoCli(
-  //       `snapshot --session ${session} --objective "Determine if this page shows a Cloudflare challenge, CAPTCHA, anti-bot protection, or any blocking page. If so, identify the challenge type and any relevant selectors. If the page loaded normally, describe the main content."`,
-  //       snapshotEnv,
-  //     );
-  //
-  //     await librettoCli(`close --session ${session}`);
-  //
-  //     const output = snapshot.stdout + "\n" + snapshot.stderr;
-  //
-  //     await evaluate(output).toMatch(
-  //       "The output either (a) identifies a Cloudflare challenge, CAPTCHA, or anti-bot protection page and describes it, OR (b) describes the actual G2 homepage content if it loaded normally. The answer must clearly communicate whether a challenge/block was encountered.",
-  //     );
-  //   },
-  //   SNAPSHOT_TIMEOUT,
-  // );
-
-  // test(
-  //   "nowsecure.nl: identifies cloudflare challenge",
-  //   async ({ librettoCli, evaluate }) => {
-  //     const session = "snapshot-e2e-nowsecure";
-  //
-  //     const open = await librettoCli(`open https://nowsecure.nl/ --session ${session}`);
-  //     expect(open.exitCode).toBe(0);
-  //
-  //     await sleep(PAGE_SETTLE_MS);
-  //
-  //     const snapshot = await librettoCli(
-  //       `snapshot --session ${session} --objective "Determine if this page shows a Cloudflare challenge, verification, or 'checking your browser' page. Identify the type of challenge and any relevant page elements or selectors."`,
-  //       snapshotEnv,
-  //     );
-  //
-  //     await librettoCli(`close --session ${session}`);
-  //
-  //     const output = snapshot.stdout + "\n" + snapshot.stderr;
-  //
-  //     await evaluate(output).toMatch(
-  //       "The output identifies a Cloudflare challenge, browser verification, or 'checking your browser' page. The answer must clearly state that a Cloudflare protection mechanism was detected.",
-  //     );
-  //   },
-  //   SNAPSHOT_TIMEOUT,
-  // );
-
-  // test(
-  //   "crunchbase: identifies cloudflare challenge or anti-bot protection",
-  //   async ({ librettoCli, evaluate }) => {
-  //     const session = "snapshot-e2e-crunchbase";
-  //
-  //     const open = await librettoCli(`open https://www.crunchbase.com/ --session ${session}`);
-  //     expect(open.exitCode).toBe(0);
-  //
-  //     await sleep(PAGE_SETTLE_MS);
-  //
-  //     const snapshot = await librettoCli(
-  //       `snapshot --session ${session} --objective "Determine if this page shows a Cloudflare challenge, CAPTCHA, anti-bot protection, or any blocking page. If so, identify the challenge type and any relevant selectors. If the page loaded normally, describe the main content."`,
-  //       snapshotEnv,
-  //     );
-  //
-  //     await librettoCli(`close --session ${session}`);
-  //
-  //     const output = snapshot.stdout + "\n" + snapshot.stderr;
-  //
-  //     await evaluate(output).toMatch(
-  //       "The output either (a) identifies a Cloudflare challenge, CAPTCHA, or anti-bot protection page and describes it, OR (b) describes the actual Crunchbase homepage content if it loaded normally. The answer must clearly communicate whether a challenge/block was encountered.",
-  //     );
-  //   },
-  //   SNAPSHOT_TIMEOUT,
-  // );
+  // Not included in this PR: Cloudflare challenge detection tests for
+  // g2.com, nowsecure.nl, and crunchbase.com. These sites consistently
+  // trigger Cloudflare challenges/anti-bot protection, making them useful
+  // for testing challenge detection but unreliable for CI. They could be
+  // added in a future PR with appropriate retry/skip logic.
 });

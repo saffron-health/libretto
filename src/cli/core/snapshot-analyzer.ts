@@ -708,8 +708,9 @@ function buildInterpretInstructions(): string {
   prompt += `4. If elements are inside iframes, identify the iframe selector and the element selector within it\n\n`;
   prompt += `Output JSON with this shape:\n`;
   prompt += `{"answer": string, "selectors": [{"label": string, "selector": string, "rationale": string}], "notes": string, "debug"?: {"consultedFiles": string[], "analysisSteps": string[]}}\n\n`;
-  prompt += `Selectors should prefer robust attributes: data-testid, data-test, aria-label, name, id, role. Avoid fragile class-based or positional selectors.\n`;
+  prompt += `Selectors must be human-readable and use the minimum chain needed to uniquely identify the element. Prefer semantic attributes (data-testid, data-test, aria-label, name, id, role, href patterns) over bare tag or class selectors. Use descendant selectors (space) to skip intermediate elements that have no meaningful attributes — only use direct child selectors (>) when the direct parent-child relationship is semantically important.\n`;
   prompt += `Only include selectors that exist in the HTML snapshot.\n`;
+  prompt += `For each selector, explain its nesting context in the rationale. Start from the target element itself — note what makes it identifiable, then mention the nearest stable ancestor only if needed to disambiguate.\n`;
   prompt += `When possible, include debug.consultedFiles with the snapshot inputs you actually used (for example inline:screenshot, inline:full-dom, inline:condensed-dom) and debug.analysisSteps with 2-5 short steps describing how you found the answer.\n`;
   return prompt;
 }
