@@ -1,6 +1,5 @@
-import type { Argv } from "yargs";
-import type { LoggerApi } from "../../shared/logger/index.js";
 import { z } from "zod";
+import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   runClose as runCloseWithLogger,
   runCloseAll as runCloseAllWithLogger,
@@ -9,21 +8,8 @@ import {
   runSave,
 } from "../core/browser.js";
 import { withSessionLogger } from "../core/context.js";
-import { SESSION_DEFAULT, validateSessionName } from "../core/session.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
-
-function createSessionSchema() {
-  return z.string().default(SESSION_DEFAULT).superRefine((value, ctx) => {
-    try {
-      validateSessionName(value);
-    } catch (err) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  });
-}
+import { sessionOption } from "./shared.js";
 
 export const openInput = SimpleCLI.input({
   positionals: [
@@ -32,9 +18,7 @@ export const openInput = SimpleCLI.input({
     }),
   ],
   named: {
-    session: SimpleCLI.option(createSessionSchema(), {
-      help: "Use a named session",
-    }),
+    session: sessionOption(),
     headed: SimpleCLI.flag({ help: "Run browser in headed mode" }),
     headless: SimpleCLI.flag({ help: "Run browser in headless mode" }),
   },
@@ -57,51 +41,80 @@ export function createOpenCommand(logger: LoggerApi) {
     });
 }
 
-export function registerBrowserCommands(yargs: Argv, logger: LoggerApi): Argv {
-  return yargs
-    .command(
-      "save [urlOrDomain]",
-      "Save current browser session",
-      (cmd) => cmd,
-      async (argv) => {
-        const urlOrDomain = argv.urlOrDomain as string | undefined;
-        if (!urlOrDomain) {
-          throw new Error("Usage: libretto-cli save <url|domain> [--session <name>]");
-        }
-        await runSave(urlOrDomain, String(argv.session), logger);
-      },
-    )
-    .command("pages", "List open pages in the session", (cmd) => cmd, async (argv) => {
-      await runPages(String(argv.session), logger);
-    })
-    .command(
-      "close",
-      "Close the browser",
-      (cmd) =>
-        cmd
-          .option("all", {
-            type: "boolean",
-            default: false,
-            describe: "Close all tracked sessions in this workspace",
-          })
-          .option("force", {
-            type: "boolean",
-            default: false,
-            describe: "Force kill sessions that ignore SIGTERM (requires --all)",
-          }),
-      async (argv) => {
-        const closeAll = Boolean(argv.all);
-        const force = Boolean(argv.force);
-        if (force && !closeAll) {
-          throw new Error("Usage: libretto-cli close --all [--force]");
-        }
-        if (closeAll) {
-          await runCloseAllWithLogger(logger, { force });
-          return;
-        }
-        await runCloseWithLogger(String(argv.session), logger);
-      },
-    );
+export const saveInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("urlOrDomain", z.string().optional(), {
+      help: "URL or domain to save",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+  },
+});
+
+export function createSaveCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Save current browser session",
+  })
+    .input(saveInput)
+    .handle(async ({ input }) => {
+      if (!input.urlOrDomain) {
+        throw new Error("Usage: libretto-cli save <url|domain> [--session <name>]");
+      }
+      await runSave(input.urlOrDomain, input.session, logger);
+    });
+}
+
+export const pagesInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+  },
+});
+
+export function createPagesCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "List open pages in the session",
+  })
+    .input(pagesInput)
+    .handle(async ({ input }) => {
+      await runPages(input.session, logger);
+    });
+}
+
+export const closeInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+    all: SimpleCLI.flag({ help: "Close all tracked sessions in this workspace" }),
+    force: SimpleCLI.flag({ help: "Force kill sessions that ignore SIGTERM (requires --all)" }),
+  },
+});
+
+export function createCloseCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Close the browser",
+  })
+    .input(closeInput)
+    .handle(async ({ input }) => {
+      if (input.force && !input.all) {
+        throw new Error("Usage: libretto-cli close --all [--force]");
+      }
+      if (input.all) {
+        await runCloseAllWithLogger(logger, { force: input.force });
+        return;
+      }
+      await runCloseWithLogger(input.session, logger);
+    });
+}
+
+export function createBrowserCommands(logger: LoggerApi) {
+  return {
+    open: createOpenCommand(logger),
+    save: createSaveCommand(logger),
+    pages: createPagesCommand(logger),
+    close: createCloseCommand(logger),
+  };
 }
 
 export async function runClose(session: string): Promise<void> {

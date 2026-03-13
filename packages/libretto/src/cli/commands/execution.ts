@@ -2,7 +2,7 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import * as moduleBuiltin from "node:module";
 import { fileURLToPath } from "node:url";
-import type { Argv } from "yargs";
+import { z } from "zod";
 import { installInstrumentation } from "../../shared/instrumentation/index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import {
@@ -25,6 +25,8 @@ import {
 import type {
   RunIntegrationWorkerRequest,
 } from "../workers/run-integration-worker-protocol.js";
+import { SimpleCLI } from "../framework/simple-cli.js";
+import { pageOption, sessionOption } from "./shared.js";
 
 type ExecFunction = (...args: unknown[]) => Promise<unknown>;
 
@@ -494,116 +496,141 @@ async function runIntegrationFromFile(
   setSessionStatus(args.session, "completed", logger);
 }
 
-export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv {
-  return yargs
-    .command(
-      "exec [code..]",
-      "Execute Playwright TypeScript code",
-      (cmd) =>
-        cmd
-          .option("visualize", { type: "boolean", default: false })
-          .option("page", { type: "string" }),
-      async (argv) => {
-        const codeParts = Array.isArray(argv.code)
-          ? (argv.code as string[])
-          : argv.code
-            ? [String(argv.code)]
-            : [];
-        const code = codeParts.join(" ");
-        if (!code) {
-          throw new Error(
-            "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
-          );
-        }
-        await runExec(
-          code,
-          String(argv.session),
-          logger,
-          Boolean(argv.visualize),
-          argv.page ? String(argv.page) : undefined,
+export const execInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("code", z.string().optional(), {
+      help: "Playwright TypeScript code to execute",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+    visualize: SimpleCLI.flag({ help: "Enable ghost cursor + highlight visualization" }),
+    page: pageOption(),
+  },
+});
+
+export function createExecCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Execute Playwright TypeScript code",
+  })
+    .input(execInput)
+    .handle(async ({ input }) => {
+      if (!input.code) {
+        throw new Error(
+          "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
         );
-      },
-    )
-    .command(
-      "run [integrationFile] [integrationExport]",
-      "Run an exported Libretto workflow from a file",
-      (cmd) =>
-        cmd
-          .option("params", { type: "string" })
-          .option("params-file", { type: "string" })
-          .option("headed", { type: "boolean", default: false })
-          .option("headless", { type: "boolean", default: false })
-          .option("auth-profile", { type: "string", describe: "Domain for local auth profile (e.g. apps.example.com)" }),
-      async (argv) => {
-        const usage =
-          "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]";
-        const integrationPath = argv.integrationFile as string | undefined;
-        const exportName = argv.integrationExport as string | undefined;
-        const legacyDebug = (argv as Record<string, unknown>).debug;
-        if (legacyDebug !== undefined) {
-          throw new Error(
-            "The --debug flag has been removed. Run the command without --debug.",
-          );
-        }
-        if (!integrationPath || !exportName) {
-          throw new Error(usage);
-        }
+      }
+      await runExec(
+        input.code,
+        input.session,
+        logger,
+        input.visualize,
+        input.page,
+      );
+    });
+}
 
-        const session = String(argv.session);
+export const runInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("integrationFile", z.string().optional(), {
+      help: "Path to the integration file",
+    }),
+    SimpleCLI.positional("integrationExport", z.string().optional(), {
+      help: "Named workflow export to run",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+    params: SimpleCLI.option(z.string().optional(), {
+      help: "Inline JSON params",
+    }),
+    paramsFile: SimpleCLI.option(z.string().optional(), {
+      name: "params-file",
+      help: "Path to a JSON params file",
+    }),
+    headed: SimpleCLI.flag({ help: "Run in headed mode" }),
+    headless: SimpleCLI.flag({ help: "Run in headless mode" }),
+    authProfile: SimpleCLI.option(z.string().optional(), {
+      name: "auth-profile",
+      help: "Domain for local auth profile (e.g. apps.example.com)",
+    }),
+  },
+}).refine((input) => !(input.params && input.paramsFile), "Pass either --params or --params-file, not both.")
+  .refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
 
-        const rawInlineParams = argv.params as string | undefined;
-        const paramsFile = argv["params-file"] as string | undefined;
-        if (rawInlineParams && paramsFile) {
-          throw new Error("Pass either --params or --params-file, not both.");
-        }
+function resolveRunParams(
+  rawInlineParams: string | undefined,
+  paramsFile: string | undefined,
+): unknown {
+  if (paramsFile) {
+    let content: string;
+    try {
+      content = readFileSync(paramsFile, "utf8");
+    } catch {
+      throw new Error(
+        `Could not read --params-file "${paramsFile}". Ensure the file exists and is readable.`,
+      );
+    }
+    return parseJsonArg("--params-file", content);
+  }
+  if (rawInlineParams) {
+    return parseJsonArg("--params", rawInlineParams);
+  }
+  return {};
+}
 
-        const params = (() => {
-          if (paramsFile) {
-            let content: string;
-            try {
-              content = readFileSync(paramsFile, "utf8");
-            } catch {
-              throw new Error(
-                `Could not read --params-file "${paramsFile}". Ensure the file exists and is readable.`,
-              );
-            }
-            return parseJsonArg("--params-file", content);
-          }
-          if (rawInlineParams) {
-            return parseJsonArg("--params", rawInlineParams);
-          }
-          return {};
-        })();
+export function createRunCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Run an exported Libretto workflow from a file",
+  })
+    .input(runInput)
+    .handle(async ({ input }) => {
+      const usage =
+        "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]";
 
-        const hasHeadedFlag = Boolean(argv.headed);
-        const hasHeadlessFlag = Boolean(argv.headless);
-        if (hasHeadedFlag && hasHeadlessFlag) {
-          throw new Error("Cannot pass both --headed and --headless.");
-        }
-        const headlessMode = hasHeadedFlag
-          ? false
-          : hasHeadlessFlag
-            ? true
-            : undefined;
+      if (!input.integrationFile || !input.integrationExport) {
+        throw new Error(usage);
+      }
 
-        const authProfileDomain = argv["auth-profile"] as string | undefined;
+      const params = resolveRunParams(input.params, input.paramsFile);
+      const headlessMode = input.headed
+        ? false
+        : input.headless
+          ? true
+          : undefined;
 
-        await runIntegrationFromFile({
-          integrationPath,
-          exportName,
-          session,
-          params,
-          headless: headlessMode ?? false,
-          authProfileDomain,
-        }, logger);
-      },
-    )
-    .command(
-      "resume",
-      "Resume a paused workflow for the current session",
-      (cmd) => cmd,
-      async (argv) => {
-        await runResume(String(argv.session), logger);
-      },
-    );
+      await runIntegrationFromFile({
+        integrationPath: input.integrationFile,
+        exportName: input.integrationExport,
+        session: input.session,
+        params,
+        headless: headlessMode ?? false,
+        authProfileDomain: input.authProfile,
+      }, logger);
+    });
+}
+
+export const resumeInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+  },
+});
+
+export function createResumeCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Resume a paused workflow for the current session",
+  })
+    .input(resumeInput)
+    .handle(async ({ input }) => {
+      await runResume(input.session, logger);
+    });
+}
+
+export function createExecutionCommands(logger: LoggerApi) {
+  return {
+    exec: createExecCommand(logger),
+    run: createRunCommand(logger),
+    resume: createResumeCommand(logger),
+  };
 }

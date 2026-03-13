@@ -105,16 +105,21 @@
     "zod": ">=3.0.0"
   },
   "peerDependenciesMeta": {
-    "@ai-sdk/anthropic": { "optional": true },
-    "@ai-sdk/google-vertex": { "optional": true },
-    "@ai-sdk/openai": { "optional": true }
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google-vertex": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.53",
     "@ai-sdk/google-vertex": "^4.0.72",
     "@ai-sdk/openai": "^3.0.39",
     "@types/node": "^25.3.3",
-    "@types/yargs": "^17.0.33",
     "openai": "^6.27.0",
     "tsup": "^8.0.0",
     "tsx": "^4.19.2",
@@ -124,7 +129,6 @@
   },
   "dependencies": {
     "ai": "^6.0.110",
-    "playwright": "^1.52.0",
-    "yargs": "^17.7.2"
+    "playwright": "^1.52.0"
   }
 }
