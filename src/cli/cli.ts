@@ -7,7 +7,6 @@ import { registerExecutionCommands } from "./commands/execution.js";
 import { registerLogCommands } from "./commands/logs.js";
 import { registerInitCommand } from "./commands/init.js";
 import { registerSnapshotCommands } from "./commands/snapshot.js";
-import { registerApiSnapshotCommands } from "./commands/api-snapshot.js";
 import {
   closeLogger,
   createLoggerForSession,
@@ -28,7 +27,6 @@ const CLI_COMMANDS = new Set([
   "save",
   "exec",
   "snapshot",
-  "api-snapshot",
   "network",
   "actions",
   "pages",
@@ -264,7 +262,6 @@ function createParser(logger: Logger): Argv {
   parser = registerLogCommands(parser);
   parser = registerAICommands(parser);
   parser = registerSnapshotCommands(parser, logger);
-  parser = registerApiSnapshotCommands(parser, logger);
   parser = registerInitCommand(parser);
   parser = parser.command("help", "Show usage", () => {}, () => {
     printUsage();
