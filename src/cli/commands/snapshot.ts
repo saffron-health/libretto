@@ -7,6 +7,7 @@ import { condenseDom } from "../core/condense-dom.js";
 import { readSessionState } from "../core/session.js";
 import {
   canAnalyzeSnapshots,
+  runInterpret,
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
@@ -273,17 +274,34 @@ async function runSnapshot(
     );
   }
 
-  await runApiInterpret(
-    {
-      objective: normalizedObjective,
+  const interpretArgs = {
+    objective: normalizedObjective,
+    session,
+    context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
+    pngPath,
+    htmlPath,
+    condensedHtmlPath,
+  };
+
+  try {
+    await runApiInterpret(interpretArgs, logger);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const canFallback =
+      canAnalyzeSnapshots()
+      && message.includes("URL scheme must be http or https, got data:");
+
+    if (!canFallback) {
+      throw error;
+    }
+
+    logger.warn("snapshot-api-interpret-fallback", {
+      reason: "api-image-transport-error",
+      message,
       session,
-      context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
-      pngPath,
-      htmlPath,
-      condensedHtmlPath,
-    },
-    logger,
-  );
+    });
+    await runInterpret(interpretArgs, logger);
+  }
 }
 
 export function registerSnapshotCommands(yargs: Argv, logger: LoggerApi): Argv {
