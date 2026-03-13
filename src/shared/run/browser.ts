@@ -74,6 +74,7 @@ export async function launchBrowser({
         version: parsedExistingState.success
           ? parsedExistingState.data.version
           : SESSION_STATE_VERSION,
+        provider: "local",
         session: sessionName,
         port: debugPort,
         pid: process.pid,

@@ -5,6 +5,7 @@ import {
   ClaudeEvalHarness,
   ensureClaudeAuthConfigured,
 } from "../../evals/harness.js";
+import { requireBenchmarkKernelApiKey } from "./kernel.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const packageRoot = resolve(here, "../..");
@@ -44,6 +45,7 @@ export async function createClaudeBenchmarkHarness(
   cwd: string,
 ): Promise<ClaudeEvalHarness> {
   ensureClaudeAuthConfigured();
+  requireBenchmarkKernelApiKey();
   const librettoSkillMarkdown = await getBenchmarkSkillMarkdown();
   return new ClaudeEvalHarness({
     cwd,

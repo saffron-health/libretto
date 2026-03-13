@@ -11,7 +11,10 @@ import { fileURLToPath } from "node:url";
 import OpenAI from "openai";
 import { z } from "zod";
 import { test as base } from "vitest";
-import { SESSION_STATE_VERSION, type SessionState } from "../src/shared/state/index.js";
+import {
+  SESSION_STATE_VERSION,
+  type LocalSessionState,
+} from "../src/shared/state/index.js";
 
 type SpawnResult = {
   exitCode: number;
@@ -45,7 +48,7 @@ type CliFixtures = {
     imports?: string[],
   ) => Promise<string>;
   writeWorkflowScript: (fileName: string, source: string) => Promise<string>;
-  seedSessionState: (state?: Partial<SessionState>) => Promise<SessionState>;
+  seedSessionState: (state?: Partial<LocalSessionState>) => Promise<LocalSessionState>;
   seedSessionPermission: (
     session: string,
     mode: "read-only" | "full-access",
@@ -446,9 +449,10 @@ export const test = base.extend<CliFixtures>({
   },
 
   seedSessionState: async ({ workspacePath }, use) => {
-    await use(async (state?: Partial<SessionState>) => {
+    await use(async (state?: Partial<LocalSessionState>) => {
       const session = state?.session ?? "default";
-      const normalized: SessionState = {
+      const normalized: LocalSessionState = {
+        provider: "local",
         session,
         port: state?.port ?? 9222,
         pid: state?.pid ?? 12345,
