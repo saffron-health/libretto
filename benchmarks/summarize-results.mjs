@@ -150,6 +150,7 @@ export function buildMarkdown({
   runMode,
   sampleSize,
   randomSeed,
+  testNamePattern,
   runUrl,
   artifactName,
   rows,
@@ -194,6 +195,9 @@ export function buildMarkdown({
 
   if (runUrl) {
     lines.push(`- Workflow run: ${runUrl}`);
+  }
+  if (testNamePattern) {
+    lines.push(`- Test name pattern: \`${testNamePattern}\``);
   }
   if (artifactName) {
     lines.push(`- Artifact: \`${artifactName}\``);
@@ -262,6 +266,7 @@ function main() {
     runMode: process.env.BENCHMARK_RUN_MODE ?? "unknown",
     sampleSize: process.env.BENCHMARK_SAMPLE_SIZE ?? "n/a",
     randomSeed: process.env.BENCHMARK_RANDOM_SEED ?? "n/a",
+    testNamePattern: process.env.BENCHMARK_TEST_NAME_PATTERN ?? "",
     runUrl: process.env.BENCHMARK_RUN_URL ?? "",
     artifactName: process.env.BENCHMARK_ARTIFACT_NAME ?? "",
     rows,
