@@ -35,6 +35,11 @@ on:
         required: true
         default: "0"
         type: string
+      test_name_pattern:
+        description: Optional exact benchmark test name or Vitest name pattern
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -85,6 +90,7 @@ jobs:
           RUN_MODE: ${{ inputs.run_mode }}
           SAMPLE_SIZE: ${{ inputs.sample_size }}
           RANDOM_SEED: ${{ inputs.random_seed }}
+          TEST_NAME_PATTERN: ${{ inputs.test_name_pattern }}
         run: |
           set -euo pipefail
 
@@ -94,8 +100,17 @@ jobs:
             export LIBRETTO_WEBVOYAGER_LIMIT="${SAMPLE_SIZE}"
           fi
 
+          cmd=(pnpm benchmark "${BENCHMARK}")
+          if [ -n "${TEST_NAME_PATTERN}" ]; then
+            cmd+=(-- --testNamePattern "${TEST_NAME_PATTERN}")
+          fi
+
+          printf 'Running benchmark command:'
+          printf ' %q' "${cmd[@]}"
+          printf '\n'
+
           set +e
-          pnpm benchmark "${BENCHMARK}"
+          "${cmd[@]}"
           exit_code=$?
           set -e
 
