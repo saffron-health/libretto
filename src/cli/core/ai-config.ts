@@ -110,10 +110,11 @@ export function writeAiConfig(
 export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolean {
   const librettoConfig = readLibrettoConfig(configPath);
   if (!librettoConfig.ai) return false;
-  // Keep the top-level config file and version while removing only AI state.
+  // Keep all config fields except AI state.
+  const { ai: _ai, ...rest } = librettoConfig;
   writeLibrettoConfig(
     {
-      version: librettoConfig.version,
+      ...rest,
     },
     configPath,
   );
