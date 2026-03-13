@@ -1,5 +1,5 @@
-import { readFileSync, existsSync, mkdirSync, copyFileSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
@@ -61,16 +61,14 @@ async function sleep(ms: number): Promise<void> {
 describe("snapshot e2e – live site analysis", () => {
   test(
     "linkedin feed: identifies post content and poster name selectors",
-    async ({ librettoCli, evaluate, workspaceDir }) => {
+    async ({ librettoCli, evaluate, seedProfile }) => {
       const session = "snapshot-e2e-linkedin";
 
       // Copy saved LinkedIn profile into test workspace so the browser loads authenticated state
       const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
       const srcProfile = resolve(repoRoot, ".libretto/profiles/linkedin.com.json");
       if (existsSync(srcProfile)) {
-        const destDir = join(workspaceDir, ".libretto", "profiles");
-        mkdirSync(destDir, { recursive: true });
-        copyFileSync(srcProfile, join(destDir, "linkedin.com.json"));
+        await seedProfile("linkedin.com", srcProfile);
       }
 
       // Configure AI preset for snapshot analysis
