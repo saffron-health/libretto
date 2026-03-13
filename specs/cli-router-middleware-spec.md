@@ -15,6 +15,7 @@ Introduce an internal CLI framework called `SimpleCLI` that models commands as t
 - `SimpleCLI.use(middleware).group({...})` to apply middleware to a whole subcommand group.
 - Command route identity is auto-derived from object keys (e.g. `ai.configure` => CLI path `ai configure`), not manually specified.
 - Command input is declared once as `SimpleCLI.input({ positionals: [...], named: {...} })`, then reused for parser binding + Zod validation + typed handler input.
+- `SimpleCLI.input(...)` is parse/validate only in v1; it does not provide an additional `.transform()` step.
 
 For v1, keep yargs as the parsing engine behind a parser adapter seam (no parser rewrite), but move command code to typed `input` objects and middleware context so raw `argv` is no longer plumbed through handlers. Add explicit session middlewares (`autocreateSessionMiddleware`, `sessionSetupMiddleware`) that run after parse/input validation and before handler execution.
 
@@ -48,6 +49,7 @@ Adapter rationale: the seam is not for abstraction-for-abstraction's-sake; it is
 - No machine-mode (`--json`) output in v1.
 - No built-in `--dry-run` framework behavior in v1.
 - No mandatory failure-context middleware in v1.
+- No extra input-shaping modifier on `SimpleCLI.input(...)`; any derived reshaping happens in handlers or middleware.
 
 ## Future work
 
@@ -81,21 +83,21 @@ Adapter rationale: the seam is not for abstraction-for-abstraction's-sake; it is
 
 ### Phase 1: Add SimpleCLI core primitives and parser adapter seam
 
-- [ ] Add a new internal module (e.g. `packages/libretto/src/cli/framework/simple-cli.ts`) with:
-- [ ] `SimpleCLI.define(name, routes)` root definition helper.
-- [ ] `SimpleCLI.command` builder supporting `.input`, `.use`, and `.handle`.
-- [ ] `SimpleCLI.group` builder supporting nested groups and group-level middleware.
-- [ ] `SimpleCLI.middleware` helper type for reusable middleware functions.
-- [ ] `SimpleCLI.input({ positionals, named })` DSL with `SimpleCLI.positional`, `SimpleCLI.option`, and `SimpleCLI.flag`.
-- [ ] `SimpleCLI.help(...)` metadata model for subcommand-scoped help sections (purpose, usage, required args, optional flags, examples).
-- [ ] Add a parser adapter interface (e.g. `SimpleCLIParserAdapter`) so `SimpleCLI` execution is decoupled from yargs-specific objects.
-- [ ] Auto-derive command route metadata from router keys (`routeKey`, CLI tokens) and expose it to middleware/handlers.
-- [ ] Auto-derive parser bindings and canonical Zod object schema from each command input definition.
-- [ ] Implement deterministic middleware execution order (definition order) before handler invocation.
-- [ ] Keep yargs-backed command/option registration in this phase via the adapter; only wrap execution flow.
-- [ ] Ensure router entries are the sole command source-of-truth consumed by parser registration (no manual command name set in bootstrap).
-- [ ] Success criteria: focused tests prove route derivation, input parsing, and middleware ordering work independently of concrete command modules.
-- [ ] Example target shape:
+- [x] Add a new internal module (e.g. `packages/libretto/src/cli/framework/simple-cli.ts`) with:
+- [x] `SimpleCLI.define(name, routes)` root definition helper.
+- [x] `SimpleCLI.command` builder supporting `.input`, `.use`, and `.handle`.
+- [x] `SimpleCLI.group` builder supporting nested groups and group-level middleware.
+- [x] `SimpleCLI.middleware` helper type for reusable middleware functions.
+- [x] `SimpleCLI.input({ positionals, named })` DSL with `SimpleCLI.positional`, `SimpleCLI.option`, and `SimpleCLI.flag`.
+- [x] `SimpleCLI.help(...)` metadata model for subcommand-scoped help sections (purpose, usage, required args, optional flags, examples).
+- [x] Add a parser adapter interface (e.g. `SimpleCLIParserAdapter`) so `SimpleCLI` execution is decoupled from yargs-specific objects.
+- [x] Auto-derive command route metadata from router keys (`routeKey`, CLI tokens) and expose it to middleware/handlers.
+- [x] Auto-derive parser bindings and canonical Zod object schema from each command input definition.
+- [x] Implement deterministic middleware execution order (definition order) before handler invocation.
+- [x] Keep yargs-backed command/option registration in this phase via the adapter; only wrap execution flow.
+- [x] Ensure router entries are the sole command source-of-truth consumed by parser registration (no manual command name set in bootstrap).
+- [x] Success criteria: focused tests prove route derivation, input parsing, and middleware ordering work independently of concrete command modules.
+- [x] Example target shape:
 
 ```ts
 const openInput = SimpleCLI.input({
