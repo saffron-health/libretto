@@ -42,17 +42,6 @@ benchmarks/<benchmark>/runs/<test-name>/
 - overall wall-clock duration for the benchmark command
 - total benchmark cost for the invocation when Claude reports usage
 
-Per-case artifacts still live under:
-
-```text
-benchmarks/<benchmark>/runs/<test-name>/
-  logs/
-  workspace/
-  results.json
-  transcript.json
-  transcript.md
-```
-
 Each run gets its own isolated benchmark workspace. That workspace contains:
 
 - a copied `dist/` build of the Libretto CLI
