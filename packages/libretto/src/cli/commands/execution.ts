@@ -14,8 +14,8 @@ import {
   assertSessionAvailableForStart,
   clearSessionState,
   readSessionState,
-  readSessionStateOrThrow,
   setSessionStatus,
+  type SessionState,
 } from "../core/session.js";
 import {
   readActionLog,
@@ -26,7 +26,12 @@ import type {
   RunIntegrationWorkerRequest,
 } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
-import { pageOption, sessionOption } from "./shared.js";
+import {
+  loadSessionStateMiddleware,
+  pageOption,
+  resolveSessionMiddleware,
+  sessionOption,
+} from "./shared.js";
 
 type ExecFunction = (...args: unknown[]) => Promise<unknown>;
 
@@ -114,8 +119,6 @@ async function runExec(
   visualize = false,
   pageId?: string,
 ): Promise<void> {
-  readSessionStateOrThrow(session);
-
   logger.info("exec-start", {
     session,
     codeLength: code.length,
@@ -377,8 +380,11 @@ async function waitForWorkflowOutcome(
   }
 }
 
-async function runResume(session: string, logger: LoggerApi): Promise<void> {
-  const state = readSessionStateOrThrow(session);
+async function runResume(
+  session: string,
+  logger: LoggerApi,
+  sessionState: SessionState,
+): Promise<void> {
   const {
     pausedSignalPath,
     resumeSignalPath,
@@ -393,9 +399,9 @@ async function runResume(session: string, logger: LoggerApi): Promise<void> {
     );
   }
 
-  if (!isProcessRunning(state.pid)) {
+  if (!isProcessRunning(sessionState.pid)) {
     throw new Error(
-      `No active paused workflow found for session "${session}" (worker pid ${state.pid} is not running).`,
+      `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid} is not running).`,
     );
   }
 
@@ -423,7 +429,7 @@ async function runResume(session: string, logger: LoggerApi): Promise<void> {
 
   const outcome = await waitForWorkflowOutcome({
     session,
-    pid: state.pid,
+    pid: sessionState.pid,
   });
 
   if (outcome.status === "completed") {
@@ -454,7 +460,6 @@ async function runIntegrationFromFile(
   logger: LoggerApi,
 ): Promise<void> {
   await stopExistingFailedRunSession(args.session, logger);
-  assertSessionAvailableForStart(args.session, logger);
   const signalPaths = getPauseSignalPaths(args.session);
   clearSignalIfExists(signalPaths.pausedSignalPath);
   clearSignalIfExists(signalPaths.resumeSignalPath);
@@ -507,28 +512,31 @@ export const execInput = SimpleCLI.input({
     visualize: SimpleCLI.flag({ help: "Enable ghost cursor + highlight visualization" }),
     page: pageOption(),
   },
-});
+}).refine(
+  (input) => Boolean(input.code),
+  "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
+);
 
 export function createExecCommand(logger: LoggerApi) {
   return SimpleCLI.command({
     description: "Execute Playwright TypeScript code",
   })
     .input(execInput)
-    .handle(async ({ input }) => {
-      if (!input.code) {
-        throw new Error(
-          "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
-        );
-      }
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ input, ctx }) => {
       await runExec(
-        input.code,
-        input.session,
+        input.code!,
+        ctx.session,
         logger,
         input.visualize,
         input.page,
       );
     });
 }
+
+const runUsage =
+  "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]";
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -555,7 +563,12 @@ export const runInput = SimpleCLI.input({
       help: "Domain for local auth profile (e.g. apps.example.com)",
     }),
   },
-}).refine((input) => !(input.params && input.paramsFile), "Pass either --params or --params-file, not both.")
+})
+  .refine(
+    (input) => Boolean(input.integrationFile && input.integrationExport),
+    runUsage,
+  )
+  .refine((input) => !(input.params && input.paramsFile), "Pass either --params or --params-file, not both.")
   .refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
 
 function resolveRunParams(
@@ -584,13 +597,10 @@ export function createRunCommand(logger: LoggerApi) {
     description: "Run an exported Libretto workflow from a file",
   })
     .input(runInput)
-    .handle(async ({ input }) => {
-      const usage =
-        "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--headed|--headless]";
-
-      if (!input.integrationFile || !input.integrationExport) {
-        throw new Error(usage);
-      }
+    .use(resolveSessionMiddleware)
+    .handle(async ({ input, ctx }) => {
+      await stopExistingFailedRunSession(ctx.session, logger);
+      assertSessionAvailableForStart(ctx.session, logger);
 
       const params = resolveRunParams(input.params, input.paramsFile);
       const headlessMode = input.headed
@@ -600,9 +610,9 @@ export function createRunCommand(logger: LoggerApi) {
           : undefined;
 
       await runIntegrationFromFile({
-        integrationPath: input.integrationFile,
-        exportName: input.integrationExport,
-        session: input.session,
+        integrationPath: input.integrationFile!,
+        exportName: input.integrationExport!,
+        session: ctx.session,
         params,
         headless: headlessMode ?? false,
         authProfileDomain: input.authProfile,
@@ -622,8 +632,10 @@ export function createResumeCommand(logger: LoggerApi) {
     description: "Resume a paused workflow for the current session",
   })
     .input(resumeInput)
-    .handle(async ({ input }) => {
-      await runResume(input.session, logger);
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ ctx }) => {
+      await runResume(ctx.session, logger, ctx.sessionState);
     });
 }
 

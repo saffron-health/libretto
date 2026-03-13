@@ -217,7 +217,19 @@ export class SimpleCLIInput<TOutput> {
   ) {}
 
   parse(raw: SimpleCLIInputRaw): TOutput {
-    return this.schema.parse(this.normalize(raw));
+    try {
+      return this.schema.parse(this.normalize(raw));
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const messages = error.issues
+          .map((issue) => issue.message)
+          .filter((message) => message.length > 0);
+        if (messages.length > 0) {
+          throw new Error(messages.join("\n"));
+        }
+      }
+      throw error;
+    }
   }
 
   getDefinition(): SimpleCLIInputDefinition {

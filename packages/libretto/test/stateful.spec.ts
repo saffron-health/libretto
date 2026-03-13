@@ -211,7 +211,6 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("reads and clears network logs for a live session", async ({
     librettoCli,
-    evaluate,
   }) => {
     const session = "network-live-session";
     await librettoCli(`open https://example.com --headless --session ${session}`);
@@ -221,9 +220,8 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const view = await librettoCli(`network --session ${session} --last 5`);
-    await evaluate(view.stdout).toMatch(
-      "Shows at least one network request result for the session.",
-    );
+    expect(view.stdout).toContain("example.com/?network=one");
+    expect(view.stdout).toContain("request(s) shown.");
 
     const clear = await librettoCli(`network --session ${session} --clear`);
     expect(clear.stdout).toContain("Network log cleared.");
@@ -231,7 +229,6 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("reads and clears action logs for a live session", async ({
     librettoCli,
-    evaluate,
   }) => {
     const session = "actions-live-session";
     await librettoCli(`open https://example.com --headless --session ${session}`);
@@ -241,9 +238,9 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const view = await librettoCli(`actions --session ${session} --last 5`);
-    await evaluate(view.stdout).toMatch(
-      "Shows at least one action result for the session.",
-    );
+    expect(view.stdout).toContain("[AGENT]");
+    expect(view.stdout).toMatch(/(reload|goto)/);
+    expect(view.stdout).toContain("action(s) shown.");
 
     const clear = await librettoCli(`actions --session ${session} --clear`);
     expect(clear.stdout).toContain("Action log cleared.");

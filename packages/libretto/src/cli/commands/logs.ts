@@ -10,7 +10,13 @@ import {
   readNetworkLog,
 } from "../core/telemetry.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
-import { integerOption, pageOption, sessionOption } from "./shared.js";
+import {
+  integerOption,
+  loadSessionStateMiddleware,
+  pageOption,
+  resolveSessionMiddleware,
+  sessionOption,
+} from "./shared.js";
 
 async function resolvePageId(session: string, pageId?: string): Promise<string | undefined> {
   if (!pageId) return undefined;
@@ -42,15 +48,17 @@ export const networkCommand = SimpleCLI.command({
   description: "View captured network requests",
 })
   .input(networkInput)
-  .handle(async ({ input }) => {
+  .use(resolveSessionMiddleware)
+  .use(loadSessionStateMiddleware)
+  .handle(async ({ input, ctx }) => {
     if (input.clear) {
-      clearNetworkLog(input.session);
+      clearNetworkLog(ctx.session);
       console.log("Network log cleared.");
       return;
     }
 
-    const pageId = await resolvePageId(input.session, input.page);
-    const entries = readNetworkLog(input.session, {
+    const pageId = await resolvePageId(ctx.session, input.page);
+    const entries = readNetworkLog(ctx.session, {
       last: input.last,
       filter: input.filter,
       method: input.method,
@@ -85,15 +93,17 @@ export const actionsCommand = SimpleCLI.command({
   description: "View captured actions",
 })
   .input(actionsInput)
-  .handle(async ({ input }) => {
+  .use(resolveSessionMiddleware)
+  .use(loadSessionStateMiddleware)
+  .handle(async ({ input, ctx }) => {
     if (input.clear) {
-      clearActionLog(input.session);
+      clearActionLog(ctx.session);
       console.log("Action log cleared.");
       return;
     }
 
-    const pageId = await resolvePageId(input.session, input.page);
-    const entries = readActionLog(input.session, {
+    const pageId = await resolvePageId(ctx.session, input.page);
+    const entries = readActionLog(ctx.session, {
       last: input.last,
       filter: input.filter,
       action: input.action,

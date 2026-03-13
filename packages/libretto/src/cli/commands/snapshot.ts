@@ -9,7 +9,12 @@ import {
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
-import { pageOption, sessionOption } from "./shared.js";
+import {
+  loadSessionStateMiddleware,
+  pageOption,
+  resolveSessionMiddleware,
+  sessionOption,
+} from "./shared.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 
@@ -128,9 +133,11 @@ export function createSnapshotCommand(logger: LoggerApi) {
     description: "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
   })
     .input(snapshotInput)
-    .handle(async ({ input }) => {
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ input, ctx }) => {
       await runSnapshot(
-        input.session,
+        ctx.session,
         logger,
         input.page,
         input.objective,
