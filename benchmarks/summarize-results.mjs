@@ -54,6 +54,10 @@ function clip(text, maxChars = 120) {
   return `${trimmed.slice(0, maxChars - 1)}…`;
 }
 
+function escapeMarkdownTableCell(text) {
+  return String(text).replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+}
+
 function getStatusEmoji(status) {
   switch (status) {
     case "passed":
@@ -112,7 +116,7 @@ function buildMarkdown({
       row.error?.name ||
       "No final result recorded.";
     lines.push(
-      `| \`${row.caseId ?? basename(row.runRoot ?? "unknown")}\` | ${getStatusEmoji(row.status)} \`${row.status ?? "unknown"}\` | \`${formatDuration(row.durationMs)}\` | ${clip(summarySource).replace(/\|/g, "\\|")} |`,
+      `| \`${row.caseId ?? basename(row.runRoot ?? "unknown")}\` | ${getStatusEmoji(row.status)} \`${row.status ?? "unknown"}\` | \`${formatDuration(row.durationMs)}\` | ${escapeMarkdownTableCell(clip(summarySource))} |`,
     );
   }
 
