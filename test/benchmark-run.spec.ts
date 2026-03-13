@@ -137,4 +137,40 @@ describe("benchmark launcher history", () => {
     expect(markdown).toContain("| `webVoyager` | `5m 21s` | `$1.2345` | `1` | `1` |");
     expect(markdown).toContain("| `sample-case` | pass `passed` | `2m 03s` | `$0.4321` |");
   });
+
+  test("summary lookup ignores all-benchmark history entries", async () => {
+    // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
+    const { getLatestBenchmarkRunRecord } = await import("../benchmarks/summarize-results.mjs");
+    const tempRoot = await mkdtemp(join(tmpdir(), "libretto-benchmark-summary-"));
+    tempRoots.push(tempRoot);
+
+    await mkdir(join(tempRoot, "benchmarks"), { recursive: true });
+    await writeFile(
+      join(tempRoot, "benchmarks", "run-history.jsonl"),
+      [
+        JSON.stringify({
+          finishedAt: "2026-03-12T20:05:00.000Z",
+          scope: "selected",
+          benchmarks: ["webVoyager"],
+          durationMs: 123_000,
+          totalCostUsd: 0.4321,
+        }),
+        JSON.stringify({
+          finishedAt: "2026-03-12T20:06:00.000Z",
+          scope: "all",
+          benchmarks: ["onlineMind2Web", "webVoyager", "webBench"],
+          durationMs: 999_000,
+          totalCostUsd: 9.9999,
+        }),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+
+    expect(getLatestBenchmarkRunRecord(tempRoot, "webVoyager")).toMatchObject({
+      scope: "selected",
+      benchmarks: ["webVoyager"],
+      durationMs: 123_000,
+      totalCostUsd: 0.4321,
+    });
+  });
 });

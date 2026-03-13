@@ -77,7 +77,15 @@ export function readJsonl(path) {
 export function getLatestBenchmarkRunRecord(root, benchmark) {
   const historyPath = resolve(root, "benchmarks", "run-history.jsonl");
   const records = readJsonl(historyPath)
-    .filter((record) => Array.isArray(record.benchmarks) && record.benchmarks.includes(benchmark))
+    .filter((record) => {
+      if (!Array.isArray(record.benchmarks)) {
+        return false;
+      }
+      if (record.scope !== "selected") {
+        return false;
+      }
+      return record.benchmarks.length === 1 && record.benchmarks[0] === benchmark;
+    })
     .sort((a, b) => {
       const aFinished = typeof a.finishedAt === "string" ? Date.parse(a.finishedAt) : 0;
       const bFinished = typeof b.finishedAt === "string" ? Date.parse(b.finishedAt) : 0;
