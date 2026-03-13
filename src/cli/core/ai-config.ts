@@ -18,10 +18,17 @@ export const AiConfigSchema = z
   .strict();
 export type AiConfig = z.infer<typeof AiConfigSchema>;
 
+export const ViewportConfigSchema = z.object({
+  width: z.number().int().min(1),
+  height: z.number().int().min(1),
+});
+export type ViewportConfig = z.infer<typeof ViewportConfigSchema>;
+
 export const LibrettoConfigSchema = z
   .object({
     version: z.literal(CURRENT_CONFIG_VERSION),
     ai: AiConfigSchema.optional(),
+    viewport: ViewportConfigSchema.optional(),
   })
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
@@ -103,10 +110,11 @@ export function writeAiConfig(
 export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolean {
   const librettoConfig = readLibrettoConfig(configPath);
   if (!librettoConfig.ai) return false;
-  // Keep the top-level config file and version while removing only AI state.
+  // Keep all config fields except AI state.
+  const { ai: _ai, ...rest } = librettoConfig;
   writeLibrettoConfig(
     {
-      version: librettoConfig.version,
+      ...rest,
     },
     configPath,
   );

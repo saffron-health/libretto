@@ -16,6 +16,29 @@ import {
   sessionOption,
 } from "./shared.js";
 
+function parseViewportArg(
+  viewportArg: string | undefined,
+): { width: number; height: number } | undefined {
+  if (!viewportArg) return undefined;
+
+  const match = viewportArg.match(/^(\d+)x(\d+)$/i);
+  if (!match) {
+    throw new Error(
+      "Invalid --viewport format. Expected WIDTHxHEIGHT (e.g. 1920x1080).",
+    );
+  }
+
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (width < 1 || height < 1) {
+    throw new Error(
+      "Invalid --viewport dimensions. Width and height must be at least 1.",
+    );
+  }
+
+  return { width, height };
+}
+
 export const openInput = SimpleCLI.input({
   positionals: [
     SimpleCLI.positional("url", z.string().optional(), {
@@ -26,10 +49,19 @@ export const openInput = SimpleCLI.input({
     session: sessionOption(),
     headed: SimpleCLI.flag({ help: "Run browser in headed mode" }),
     headless: SimpleCLI.flag({ help: "Run browser in headless mode" }),
+    viewport: SimpleCLI.option(z.string().optional(), {
+      help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
+    }),
   },
 })
-  .refine((input) => Boolean(input.url), "Usage: libretto-cli open <url> [--headless] [--session <name>]")
-  .refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
+  .refine(
+    (input) => Boolean(input.url),
+    "Usage: libretto-cli open <url> [--headless] [--viewport WxH] [--session <name>]",
+  )
+  .refine(
+    (input) => !(input.headed && input.headless),
+    "Cannot pass both --headed and --headless.",
+  );
 
 export function createOpenCommand(logger: LoggerApi) {
   return SimpleCLI.command({
@@ -40,7 +72,8 @@ export function createOpenCommand(logger: LoggerApi) {
     .handle(async ({ input, ctx }) => {
       assertSessionAvailableForStart(ctx.session, logger);
       const headed = input.headed || !input.headless;
-      await runOpen(input.url!, headed, ctx.session, logger);
+      const viewport = parseViewportArg(input.viewport);
+      await runOpen(input.url!, headed, ctx.session, logger, { viewport });
     });
 }
 

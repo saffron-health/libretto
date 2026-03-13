@@ -11,6 +11,7 @@ import {
   getSessionNetworkLogPath,
   PROFILES_DIR,
 } from "./context.js";
+import { readLibrettoConfig } from "./ai-config.js";
 import {
   assertSessionAvailableForStart,
   clearSessionState,
@@ -285,14 +286,35 @@ export async function runPages(session: string, logger: LoggerApi): Promise<void
   });
 }
 
+const DEFAULT_VIEWPORT = { width: 1366, height: 768 } as const;
+
+function resolveViewport(
+  cliViewport: { width: number; height: number } | undefined,
+  logger: LoggerApi,
+): { width: number; height: number } {
+  if (cliViewport) {
+    logger.info("viewport-source", { source: "cli", viewport: cliViewport });
+    return cliViewport;
+  }
+  const config = readLibrettoConfig();
+  if (config.viewport) {
+    logger.info("viewport-source", { source: "config", viewport: config.viewport });
+    return config.viewport;
+  }
+  logger.info("viewport-source", { source: "default", viewport: DEFAULT_VIEWPORT });
+  return DEFAULT_VIEWPORT;
+}
+
 export async function runOpen(
   rawUrl: string,
   headed: boolean,
   session: string,
   logger: LoggerApi,
+  options?: { viewport?: { width: number; height: number } },
 ): Promise<void> {
   const url = normalizeUrl(rawUrl);
-  logger.info("open-start", { url, headed, session });
+  const viewport = resolveViewport(options?.viewport, logger);
+  logger.info("open-start", { url, headed, session, viewport });
   assertSessionAvailableForStart(session, logger);
 
   const port = await pickFreePort();
@@ -385,7 +407,7 @@ browser.on('disconnected', () => {
 
 const context = await browser.newContext({
 	${storageStateCode}
-	viewport: { width: 1366, height: 768 },
+	viewport: { width: ${viewport.width}, height: ${viewport.height} },
 	userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
 });
 
@@ -507,6 +529,7 @@ await new Promise(() => {});
         session,
         startedAt: new Date().toISOString(),
         status: "active",
+        viewport,
       }, logger);
       logger.info("open-success", {
         url,

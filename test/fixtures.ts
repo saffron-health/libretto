@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -48,6 +48,7 @@ type CliFixtures = {
     session: string,
     mode: "read-only" | "full-access",
   ) => Promise<string>;
+  seedProfile: (domain: string, sourcePath: string) => Promise<string>;
 };
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -647,6 +648,16 @@ export const test = base.extend<CliFixtures>({
       };
       await writeFile(path, JSON.stringify(payload, null, 2), "utf8");
       return path;
+    });
+  },
+
+  seedProfile: async ({ workspacePath }, use) => {
+    await use(async (domain: string, sourcePath: string) => {
+      const profileDir = workspacePath(".libretto", "profiles");
+      await mkdir(profileDir, { recursive: true });
+      const destPath = workspacePath(".libretto", "profiles", `${domain}.json`);
+      await copyFile(sourcePath, destPath);
+      return destPath;
     });
   },
 });

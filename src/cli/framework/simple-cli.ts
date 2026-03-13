@@ -216,7 +216,7 @@ function normalizeNamedArgToken(token: string): string {
 export class SimpleCLIInput<TOutput> {
   constructor(
     private readonly normalize: (raw: SimpleCLIInputRaw) => unknown,
-    private readonly schema: z.ZodType<TOutput, z.ZodTypeDef, unknown>,
+    private readonly schema: z.ZodType<TOutput, unknown>,
     private readonly definition: SimpleCLIInputDefinition,
   ) {}
 
@@ -923,7 +923,7 @@ function buildInputSchema<
     positionals: TPositionals;
     named: TNamed;
   },
-): z.ZodType<InputObjectFor<TPositionals, TNamed>, z.ZodTypeDef, unknown> {
+): z.ZodType<InputObjectFor<TPositionals, TNamed>, unknown> {
   const shape: Record<string, ZodTypeAny> = {};
 
   for (const positional of definition.positionals) {
@@ -933,7 +933,10 @@ function buildInputSchema<
     shape[key] = named.schema;
   }
 
-  return zodObjectFromShape(shape) as z.ZodType<InputObjectFor<TPositionals, TNamed>>;
+  return zodObjectFromShape(shape) as z.ZodType<
+    InputObjectFor<TPositionals, TNamed>,
+    unknown
+  >;
 }
 
 function positional<TKey extends string, TSchema extends ZodTypeAny>(
