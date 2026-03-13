@@ -3,6 +3,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
@@ -54,6 +55,11 @@ type ExternalCommandResult = {
   stderr: string;
 };
 
+type ExternalCommandInput = {
+  stdinText?: string;
+  stdinFilePath?: string;
+};
+
 abstract class UserCodingAgent {
   protected constructor(protected readonly config: AiConfig) {}
 
@@ -102,9 +108,9 @@ abstract class UserCodingAgent {
 
   protected async runAnalyzer(
     args: string[],
-    stdinText?: string,
+    input: ExternalCommandInput = {},
   ): Promise<ExternalCommandResult> {
-    const result = await runExternalCommand(this.command, args, stdinText);
+    const result = await runExternalCommand(this.command, args, input);
     if (result.exitCode !== 0) {
       throw new Error(
         `Analyzer command failed (${formatCommandPrefix([this.command, ...args])}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
@@ -115,10 +121,27 @@ abstract class UserCodingAgent {
 
   protected async runAndParse(
     args: string[],
-    stdinText?: string,
+    input: ExternalCommandInput = {},
   ): Promise<InterpretResult> {
-    const result = await this.runAnalyzer(args, stdinText);
+    const result = await this.runAnalyzer(args, input);
     return parseInterpretResultFromText(result.stdout);
+  }
+
+  protected async runAndParseFromTempPromptFile(
+    args: string[],
+    prompt: string,
+  ): Promise<InterpretResult> {
+    const tempDir = mkdtempSync(join(tmpdir(), "libretto-cli-analyzer-"));
+    const promptPath = join(
+      tempDir,
+      `snapshot-analyzer-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`,
+    );
+    writeFileSync(promptPath, prompt, "utf-8");
+    try {
+      return await this.runAndParse(args, { stdinFilePath: promptPath });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   }
 
   abstract analyzeSnapshot(
@@ -145,7 +168,7 @@ class CodexUserCodingAgent extends UserCodingAgent {
       pngPath,
       "-",
     ];
-    const result = await this.runAnalyzer(args, prompt);
+    const result = await this.runAnalyzer(args, { stdinText: prompt });
     let outputText = result.stdout;
     try {
       if (existsSync(outputPath)) {
@@ -163,8 +186,10 @@ class ClaudeUserCodingAgent extends UserCodingAgent {
     prompt: string,
     pngPath: string,
   ): Promise<InterpretResult> {
-    const args = [...this.baseArgs, `${prompt}${this.screenshotHint(pngPath)}`];
-    return await this.runAndParse(args);
+    return await this.runAndParseFromTempPromptFile(
+      [...this.baseArgs],
+      `${prompt}${this.screenshotHint(pngPath)}`,
+    );
   }
 }
 
@@ -173,15 +198,17 @@ class GeminiUserCodingAgent extends UserCodingAgent {
     prompt: string,
     pngPath: string,
   ): Promise<InterpretResult> {
-    const args = [...this.baseArgs, `${prompt}${this.screenshotHint(pngPath)}`];
-    return await this.runAndParse(args);
+    return await this.runAndParseFromTempPromptFile(
+      [...this.baseArgs],
+      `${prompt}${this.screenshotHint(pngPath)}`,
+    );
   }
 }
 
 async function runExternalCommand(
   command: string,
   args: string[],
-  stdinText?: string,
+  input: ExternalCommandInput = {},
 ): Promise<ExternalCommandResult> {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -220,8 +247,16 @@ async function runExternalCommand(
       });
     });
 
-    if (stdinText !== undefined) {
-      child.stdin.write(stdinText);
+    if (input.stdinText !== undefined && input.stdinFilePath !== undefined) {
+      reject(new Error("Analyzer input cannot use both stdinText and stdinFilePath."));
+      child.stdin.destroy();
+      return;
+    }
+
+    if (input.stdinFilePath !== undefined) {
+      child.stdin.write(readFileSync(input.stdinFilePath, "utf-8"));
+    } else if (input.stdinText !== undefined) {
+      child.stdin.write(input.stdinText);
     }
     child.stdin.end();
   });
