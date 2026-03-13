@@ -11,7 +11,7 @@ import { test } from "./fixtures";
  * - Snapshot analysis on real sites with saved profiles (LinkedIn).
  *
  * Requirements:
- * - ANTHROPIC_API_KEY or OPENAI_API_KEY must be set for snapshot analysis.
+ * - An AI preset must be configured (codex, claude, or gemini) for snapshot analysis.
  * - Network access to the target sites.
  * - Playwright Chromium installed.
  * - Saved profile in .libretto/profiles/linkedin.com.json for authenticated LinkedIn test.
@@ -63,6 +63,9 @@ describe("snapshot e2e – live site analysis", () => {
     "linkedin feed: identifies post content and poster name selectors",
     async ({ librettoCli, evaluate }) => {
       const session = "snapshot-e2e-linkedin";
+
+      // Configure AI preset for snapshot analysis
+      await librettoCli(`ai configure codex`, snapshotEnv);
 
       // Uses saved profile from .libretto/profiles/linkedin.com.json if available
       const open = await librettoCli(

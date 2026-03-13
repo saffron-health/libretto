@@ -5,8 +5,11 @@ import { connect, disconnectBrowser } from "../core/browser.js";
 import { getSessionSnapshotRunDir } from "../core/context.js";
 import { readSessionState } from "../core/session.js";
 import { condenseDom } from "../core/condense-dom.js";
-import { type ScreenshotPair } from "../core/snapshot-analyzer.js";
-import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
+import {
+  canAnalyzeSnapshots,
+  runInterpret,
+  type ScreenshotPair,
+} from "../core/snapshot-analyzer.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
@@ -243,10 +246,10 @@ async function runSnapshot(
 ): Promise<void> {
   const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(session, logger, pageId);
 
-  console.log("Snapshot saved:");
-  console.log(`  PNG:              ${pngPath}`);
-  console.log(`  HTML:             ${htmlPath}`);
-  console.log(`  Condensed HTML:   ${condensedHtmlPath}`);
+  console.log("Screenshot saved:");
+  console.log(`  PNG:  ${pngPath}`);
+  console.log(`  HTML: ${htmlPath}`);
+  console.log(`  Condensed HTML: ${condensedHtmlPath}`);
 
   const normalizedObjective = objective?.trim();
   const normalizedContext = context?.trim();
@@ -261,7 +264,13 @@ async function runSnapshot(
     );
   }
 
-  await runApiInterpret({
+  if (!canAnalyzeSnapshots()) {
+    throw new Error(
+      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini) to enable analysis.",
+    );
+  }
+
+  await runInterpret({
     objective: normalizedObjective,
     session,
     context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
