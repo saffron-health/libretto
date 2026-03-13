@@ -4,11 +4,8 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import { connect, disconnectBrowser } from "../core/browser.js";
 import { getSessionSnapshotRunDir } from "../core/context.js";
 import { condenseDom } from "../core/condense-dom.js";
-import {
-  canAnalyzeSnapshots,
-  runInterpret,
-  type ScreenshotPair,
-} from "../core/snapshot-analyzer.js";
+import { type ScreenshotPair } from "../core/snapshot-analyzer.js";
+import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 function generateSnapshotRunId(): string {
@@ -108,13 +105,7 @@ async function runSnapshot(
     );
   }
 
-  if (!canAnalyzeSnapshots()) {
-    throw new Error(
-      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini) to enable analysis.",
-    );
-  }
-
-  await runInterpret({
+  await runApiInterpret({
     objective: normalizedObjective,
     session,
     context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
