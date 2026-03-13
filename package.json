@@ -1,19 +1,77 @@
 {
-	"name": "libretto-monorepo",
-	"private": true,
-	"packageManager": "pnpm@9.15.4",
-	"scripts": {
-		"build": "pnpm -r build",
-		"type-check": "pnpm -r type-check",
-		"cli": "pnpm --filter libretto exec tsx src/cli/index.ts",
-		"dev": "pnpm --filter libretto build && pnpm --filter libretto exec node dist/cli/index.js",
-		"test": "pnpm --filter libretto test",
-		"test:watch": "pnpm --filter libretto test:watch"
-	},
-	"devDependencies": {
-		"vitest": "^4.0.18"
-	},
-	"dependencies": {
-		"playwright": "^1.52.0"
-	}
+  "name": "libretto",
+  "version": "0.3.1",
+  "description": "AI-powered browser automation library and CLI built on Playwright",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saffron-health/libretto"
+  },
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    ".agents/skills/libretto"
+  ],
+  "bin": {
+    "libretto": "./dist/cli/index.js",
+    "libretto-cli": "./dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "postinstall": "npx playwright install chromium",
+    "build": "pnpm run build:runtime && pnpm run build:cli",
+    "build:runtime": "tsup --config tsup.config.ts",
+    "build:cli": "tsup --config tsup.cli.config.ts",
+    "type-check": "tsc --noEmit",
+    "test": "pnpm run build && vitest run",
+    "eval": "pnpm run build && vitest run --config vitest.evals.config.ts",
+    "benchmark": "pnpm run build && tsx benchmarks/run.ts",
+    "test:watch": "vitest",
+    "cli": "node dist/index.js",
+    "prepack": "pnpm run build"
+  },
+  "peerDependencies": {
+    "@ai-sdk/anthropic": "^3.0.0",
+    "@ai-sdk/google-vertex": "^4.0.0",
+    "@ai-sdk/openai": "^3.0.0",
+    "zod": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google-vertex": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.73",
+    "@ai-sdk/anthropic": "^3.0.53",
+    "@ai-sdk/google-vertex": "^4.0.72",
+    "@ai-sdk/openai": "^3.0.39",
+    "@types/node": "^25.3.3",
+    "openai": "^6.27.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18",
+    "zod": "^3.25.0"
+  },
+  "dependencies": {
+    "ai": "^6.0.110",
+    "playwright": "^1.52.0",
+    "tsx": "^4.19.2"
+  }
 }

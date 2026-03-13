@@ -7,7 +7,7 @@ These rules apply when generating production TypeScript files from interactive b
 Generated files must export a `workflow()` instance so they can be run via `npx libretto run <file> <exportName>`. Import `workflow` and its types from `"libretto"`:
 
 ```typescript
-import { workflow, type LibrettoWorkflowContext } from "libretto";
+import { workflow, pause, type LibrettoWorkflowContext } from "libretto";
 
 type Input = {
   // Define the expected input shape — passed via --params JSON
@@ -21,15 +21,11 @@ type Output = {
 };
 
 export const myWorkflow = workflow<Input, Output>(
-  {
-    // If the site requires a saved login session:
-    authProfile: { type: "local", domain: "example.com" },
-    // Omit authProfile if no login is needed
-  },
-  async (ctx: LibrettoWorkflowContext, input: Input): Promise<Output> => {
+  {},
+  async (ctx, input): Promise<Output> => {
     const { page } = ctx;
 
-    // workflow logic here — use ctx.page, ctx.context, ctx.browser
+    // workflow logic here — use ctx.page, ctx.logger, ctx.services
     await page.goto("https://example.com");
     // ...
 
@@ -41,10 +37,47 @@ export const myWorkflow = workflow<Input, Output>(
 **Key points:**
 
 - The named export (e.g., `myWorkflow`) is what you pass as the second arg to `npx libretto run ./file.ts myWorkflow`
-- `ctx` provides `page`, `context`, `browser`, `session`, `logger`, `headless`, `integrationPath`, `exportName`
+- `ctx` provides `page`, `logger`, and `services` (generic, default `{}`)
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
-- If `authProfile` is set with a domain, libretto loads the saved browser profile for that domain (created via `npx libretto save <domain>`)
+- If the site requires a saved login session, pass `--auth-profile <domain>` to the CLI (created via `npx libretto save <domain>`)
+- Use `await pause()` (imported from `"libretto"`) to pause the workflow for debugging. It is a no-op in production.
 - The browser is launched and closed automatically by the CLI — do not launch or close it in the handler
+
+## Passing Application Dependencies via Services
+
+Use the third generic on `workflow<Input, Output, Services>` to inject
+dependencies that exist in your application but not in libretto's runtime
+(DB transactions, API clients, caches, etc.):
+
+```typescript
+import { type Transaction } from "./db";
+
+type MyServices = { tx?: Transaction };
+
+export const myWorkflow = workflow<Input, Output, MyServices>(
+  {},
+  async (ctx, input) => {
+    if (ctx.services.tx) {
+      await ctx.services.tx.insert(/* ... */);
+    } else {
+      ctx.logger.info("No DB transaction — skipping write");
+    }
+    // ... browser automation ...
+  },
+);
+```
+
+In production, the caller passes services when invoking `.run()`:
+
+```typescript
+await myWorkflow.run(
+  { page, logger, services: { tx } },
+  input,
+);
+```
+
+When running standalone via `npx libretto run`, services defaults to `{}`,
+so mark fields optional for anything unavailable in that context.
 
 ## Playwright Locators for DOM Interaction
 
@@ -118,7 +151,7 @@ Use `page.evaluate()` only for operations that have no Playwright locator equiva
 
 A quick test: if the evaluate body contains `querySelector`, `querySelectorAll`, `textContent`, `click()`, `getAttribute()`, or iterates DOM elements, it should be rewritten with Playwright locators.
 
-When `page.evaluate()` is used for the acceptable cases above, use a string expression to avoid DOM type errors:
+When `page.evaluate()` is used for the acceptable cases above, keep the logic self-contained and return JSON-serializable values:
 
 ```typescript
 const data = (await page.evaluate(`(() => {
@@ -127,7 +160,7 @@ const data = (await page.evaluate(`(() => {
 })()`)) as string;
 ```
 
-Do not use `/// <reference lib="dom" />` or add `"dom"` to the tsconfig lib — this project's tsconfig intentionally excludes DOM types.
+Do not rely on broad DOM querying inside `page.evaluate()` for production flows when Playwright locators can express the same interaction.
 
 ## Network Request Methods
 
@@ -187,4 +220,4 @@ for (const post of posts) {
 
 ## Type Checking
 
-The generated file must pass `npx tsc --noEmit` before it's considered done. If there are DOM type errors (`document`, `HTMLElement`, `getComputedStyle`), convert to locator APIs or string-expression `page.evaluate()`.
+The generated file must pass `npx tsc --noEmit` before it's considered done. If there are type errors around DOM access, prefer locator APIs first, then use focused `page.evaluate()` only for browser-native APIs.

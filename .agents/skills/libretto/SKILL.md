@@ -4,18 +4,19 @@ description: "Browser automation CLI for building integrations, with a network-f
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.2.2"
+  version: "0.2.4"
 ---
 
 # Browser Integration with Libretto CLI
 
 Use the `npx libretto` CLI to automate web interactions, debug browser agent jobs, and prototype fixes.
 
-## CRITICAL: Session Access
+## Session Access
 
-Libretto sessions are **full-access by default**. You can use `exec` and `run` immediately after opening a session.
+Libretto sessions are **full-access by default** (no approval prompts). You can use `exec` immediately after opening a session. `run` starts its own workflow browser process and requires the target session to be available.
 
 **Rules:**
+
 - Always announce which session you opened and what page you are on.
 - Use `snapshot`, `network`, and `actions` first when debugging unknown page state.
 - Before any potentially mutating action (submit/save/delete, or non-idempotent API calls), describe what you are about to do and wait for explicit user confirmation.
@@ -27,14 +28,15 @@ If it's not obvious which element to click or what value to enter, **ask the use
 ## Commands
 
 ```bash
-npx libretto open <url> [--headless]   # Launch browser and navigate (headed by default)
+npx libretto open <url> [--headed|--headless]   # Launch browser and navigate (headed by default)
 npx libretto exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
-npx libretto run <integrationFile> <integrationExport> # Execute integration actions
+npx libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--auth-profile <domain>] [--headed|--headless] # Execute integration actions
 npx libretto resume                    # Resume a paused workflow for the current session
 npx libretto snapshot --objective "<what to find>" [--context "<situational info>"]
 npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto/profiles/
 npx libretto network                   # Show last 20 captured network requests
 npx libretto actions                   # Show last 20 captured user/agent actions
+npx libretto pages                     # List open pages in the session
 npx libretto close                     # Close the browser
 ```
 
@@ -45,12 +47,12 @@ Built-in sessions: `default`, `dev-server`, `browser-agent`.
 
 Add `--visualize` to any `exec` command to show a ghost cursor and element highlight before each action executes. Use it when the user wants to see what will be clicked/filled before it happens.
 
-## Workflow Pause/Resume (`ctx.pause()`)
+## Workflow Pause/Resume (`pause()`)
 
-Workflows pause from inside the workflow function by calling `await ctx.pause()`.
+Workflows pause by calling `await pause()` (imported from `"libretto"`). In production (`NODE_ENV=production`) it is a no-op.
 
 - There are no pause options to pass at call sites. Pause is session-scoped and resolved from the active session.
-- `npx libretto run ...` waits until the workflow either completes or hits the next `ctx.pause()`.
+- `npx libretto run ...` waits until the workflow either completes or hits the next `pause()`.
 - On pause, the workflow process stays alive and keeps browser/session state.
 - `npx libretto resume --session <name>` sends resume signal and then waits until completion or the next pause.
 - For multi-pause workflows, call `resume` repeatedly until the workflow completes.
@@ -65,13 +67,13 @@ Workflows pause from inside the workflow function by calling `await ctx.pause()`
 
 ## Globals Available in `exec`
 
-`page`, `context`, `state`, `browser`, `networkLog({ last?, filter?, method? })`, `actionLog({ last?, filter?, action?, source? })`, `console`, `fetch`, `Buffer`, `URL`, `setTimeout`
+`page`, `context`, `state`, `browser`, `networkLog({ last?, filter?, method? })`, `actionLog({ last?, filter?, action?, source? })`, `console`, `fetch`, `Buffer`, `URL`, `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`
 
-The `state` object persists across `exec` calls within the same session — use it to carry values between commands.
+The `state` object is scoped to a single `exec` invocation and resets on the next call.
 
 ## CRITICAL: No try/catch in exec
 
-**Never use try/catch or .catch() in exec code.** Let errors throw so they surface as exec failures. When an exec fails, you get the full error message (e.g., "intercepts pointer events", "Timeout 30000ms exceeded") — use that to diagnose the problemand write a corrected exec.
+**Never use try/catch or .catch() in exec code.** Let errors throw so they surface as exec failures. When an exec fails, you get the full error message (e.g., "intercepts pointer events", "Timeout 30000ms exceeded") — use that to diagnose the problem and write a corrected exec.
 
 **Why:** A try/catch inside exec hides failures from you. A click that times out takes 30 seconds — if you retry it in a loop with try/catch, you'll silently burn minutes on the same broken selector with no way to recover. Without try/catch, the error comes back immediately and you can reason about what went wrong.
 
@@ -174,9 +176,9 @@ npx libretto exec --session browser-agent "await page.locator('.dropdown-trigger
 
 ## Snapshot — The Primary Observation Tool
 
-The `snapshot` command captures a PNG screenshot + HTML, sends both to a vision model (Gemini Flash), and returns an analysis with Playwright-ready selectors. `--objective` is required for analysis, and `--context` is optional (but recommended for better results). This is the single way to understand what's on the page — use it any time you need to inspect page structure, find elements, or debug what's happening.
+The `snapshot` command captures a PNG screenshot + HTML and (when `--objective` is provided) runs analysis through the configured AI runtime (`codex`, `claude`, or `gemini` via `npx libretto ai configure ...`). `--context` is optional (but recommended for better results). This is the single way to understand what's on the page — use it any time you need to inspect page structure, find elements, or debug what's happening.
 
-**Never use `page.screenshot()` via `exec` to understand the page.** Use the `snapshot` command instead — it captures the screenshot, HTML, and sends both to a vision model that returns actionable selectors. Raw screenshots give you an image with no analysis; `snapshot` gives you the answer.
+**Never use `page.screenshot()` via `exec` to understand the page.** Use the `snapshot` command instead — it captures the screenshot, HTML, and runs analysis with selectors. Raw screenshots give you an image with no analysis; `snapshot` gives you the answer.
 
 ### What to Put in `--objective`
 
@@ -224,7 +226,7 @@ When the snapshot doesn't give you enough detail — why an element is hidden, w
 
 ## Tips
 
-- **Never use `page.screenshot()` via `exec`.** Use `npx libretto snapshot` instead — it captures the viewport, sends the screenshot + HTML to a vision model, and returns actionable selectors. The `fullPage` option is especially dangerous — it scrolls the entire page to stitch a screenshot, which can crash JavaScript-heavy pages (especially EMR portals like eClinicalWorks).
+- **Never use `page.screenshot()` via `exec`.** Use `npx libretto snapshot` instead — it captures the viewport plus HTML and returns analyzed output with actionable selectors. The `fullPage` option is especially dangerous — it scrolls the entire page to stitch a screenshot, which can crash JavaScript-heavy pages (especially EMR portals like eClinicalWorks).
 - **Never run `exec` commands in parallel.** Always wait for one `exec` to finish before starting the next. Do not use `run_in_background` for `exec` calls. Running simultaneous `exec` calls opens multiple CDP connections to the same page, which corrupts the page state and kills the browser.
 - `open` requires an available session. If the session is already active, Libretto fails fast and asks you to close the existing session or use a different `--session`.
 - `run` also requires an available session, except for the specific case of a prior failed `run` in the same session; in that case Libretto releases the failed worker and allows rerun.
@@ -234,7 +236,7 @@ When the snapshot doesn't give you enough detail — why an element is hidden, w
 
 ## Network Logging
 
-Network requests are captured automatically when a browser is opened via `npx libretto open`. All non-static HTTP responses (excluding `.css`, `.js`, `.png`, `.jpg`, `.gif`, `.woff`, `.ico`, `.svg`, and `chrome-extension://` URLs) are logged to `.libretto/sessions/<session>/network.jsonl`.
+Network requests are captured automatically for Libretto-managed browser sessions (for example from `npx libretto open` and `npx libretto run`). Non-static HTTP responses are logged to `.libretto/sessions/<session>/network.jsonl`.
 
 ### CLI: `npx libretto network`
 
@@ -256,11 +258,11 @@ npx libretto exec "return await networkLog({ method: 'POST' })"
 
 Returns an array of objects with: `ts`, `method`, `url`, `status`, `contentType`, `postData` (POST/PUT/PATCH only, first 2000 chars), `size`, `durationMs`.
 
-**Note:** Network logging only works for sessions opened via `npx libretto open`. It does not capture requests for external sessions like `--session browser-agent`.
+**Note:** Network logging works for Libretto-managed sessions. It does not capture requests for external sessions like `--session browser-agent`.
 
 ## Action Logging
 
-Browser actions are captured automatically when a browser is opened via `npx libretto open`. Both user interactions (manual clicks, typing in the headed browser window) and agent actions (programmatic Playwright API calls via `exec`) are logged to `.libretto/sessions/<session>/actions.jsonl` with a `source` field of `'user'` or `'agent'` to distinguish the two.
+Browser actions are captured automatically for Libretto-managed browser sessions (for example from `npx libretto open` and `npx libretto run`). Both user interactions (manual clicks, typing in the headed browser window) and agent actions (programmatic Playwright API calls via `exec`) are logged to `.libretto/sessions/<session>/actions.jsonl` with a `source` field of `'user'` or `'agent'` to distinguish the two.
 
 ### CLI: `npx libretto actions`
 
@@ -284,7 +286,7 @@ npx libretto exec "return await actionLog({ action: 'click' })"
 
 Returns an array of objects with: `ts`, `action`, `source` (`'user'` | `'agent'`), `selector`, `value`, `url`, `duration`, `success`, `error`.
 
-**Note:** Action logging only works for sessions opened via `npx libretto open`. It does not capture actions for external sessions like `--session browser-agent`.
+**Note:** Action logging works for Libretto-managed sessions. It does not capture actions for external sessions like `--session browser-agent`.
 
 ## Workflow: Creating a New Integration
 
@@ -326,7 +328,7 @@ The browser stays open indefinitely until explicitly closed with `npx libretto c
 
 If the site requires login, ask the user how auth should work in the generated workflow:
 
-1. Save a local profile (recommended for local runs): open in `--headed`, have the user log in manually, run `npx libretto save <domain>`, and generate workflow metadata with `authProfile: { type: "local", domain: "<hostname>" }`.
+1. Save a local profile (recommended for local runs): open in `--headed`, have the user log in manually, run `npx libretto save <domain>`, and pass `--auth-profile <domain>` when running the workflow (e.g. `npx libretto run ./file.ts main --auth-profile example.com`).
 2. Use user-managed credential logic in Playwright code (no local profile dependency).
 
 If local profile is chosen, include this warning in your generated workflow guidance: local profiles are machine-local (other users/environments will not have them), and sessions can expire so re-login/re-save may be required.
@@ -436,7 +438,7 @@ After completing interactive exploration, **always generate the TypeScript workf
 **STOP AND ASK BEFORE GENERATING CODE.** Once the interactive workflow is figured out, pause and ask:
 
 1. "Are there any existing files or patterns in the codebase you want me to reference?"
-2. "Do you want me to incorporate any of your manual browser interactions from the actions log (`npx libretto actions --source user`) into the generated code?"
+2. Check the action log for user interactions by running `npx libretto actions --source user`. If there are any recorded user interactions, ask: "I see you performed some manual interactions in the browser (clicks, form fills, etc.). Would you like me to incorporate any of those into the generated code?" — and briefly list what you found. If there are no user interactions, skip this question entirely.
 3. "Any other guidance for how the production code should be structured?"
 
 Wait for the user's response before proceeding. Then:
@@ -446,6 +448,6 @@ Wait for the user's response before proceeding. Then:
 
 ## Patient Safety Warning
 
-Browser automation jobs process real patient health information. The `npx libretto` CLI executes arbitrary code with full page access. **Never** execute code that submits forms, sends referrals, deletes data, or modifies patient records.
+Browser automation jobs process real patient health information. The `npx libretto` CLI executes arbitrary code with full page access. **Never execute mutating actions without explicit user confirmation first** (submits, sends, deletes, updates, or other side effects).
 
-See `apps/browser-agent/docs/interactive-debugging-workflow.md` for the complete debugging guide.
+For debugging steps, see the "Workflow: Interactive Debugging" section in this file.

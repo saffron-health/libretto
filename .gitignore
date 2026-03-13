@@ -6,3 +6,5 @@ dist/
 .vscode/settings.json
 .env
 temp/
+benchmarks/**/runs/
+.libretto/
