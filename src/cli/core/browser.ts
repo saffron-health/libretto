@@ -336,17 +336,10 @@ export async function runOpen(
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'");
 
-  const launcherCode = `
+const launcherCode = `
 import { chromium } from 'playwright';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-
-const __name = (target, value) => {
-  try {
-    Object.defineProperty(target, 'name', { value, configurable: true });
-  } catch {}
-  return target;
-};
 
 const LOG_FILE = '${escapedLogPath}';
 const NETWORK_LOG = '${escapedNetworkLogPath}';
