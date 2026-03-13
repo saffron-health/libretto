@@ -18,10 +18,17 @@ export const AiConfigSchema = z
   .strict();
 export type AiConfig = z.infer<typeof AiConfigSchema>;
 
+export const ViewportConfigSchema = z.object({
+  width: z.number().int().min(1),
+  height: z.number().int().min(1),
+});
+export type ViewportConfig = z.infer<typeof ViewportConfigSchema>;
+
 export const LibrettoConfigSchema = z
   .object({
     version: z.literal(CURRENT_CONFIG_VERSION),
     ai: AiConfigSchema.optional(),
+    viewport: ViewportConfigSchema.optional(),
   })
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
