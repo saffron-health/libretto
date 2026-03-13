@@ -122,6 +122,7 @@ jobs:
           if-no-files-found: warn
           path: |
             benchmark-summary.md
+            benchmarks/run-history.jsonl
             benchmarks/${{ inputs.benchmark }}/runs/**/transcript.json
             benchmarks/${{ inputs.benchmark }}/runs/**/transcript.md
             benchmarks/${{ inputs.benchmark }}/runs/**/results.json

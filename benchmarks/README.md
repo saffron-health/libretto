@@ -25,6 +25,26 @@ Current status:
 Run artifacts are written to:
 
 ```text
+benchmarks/run-history.jsonl
+benchmarks/<benchmark>/runs/<test-name>/
+  logs/
+  workspace/
+  results.json
+  transcript.json
+  transcript.md
+```
+
+`benchmarks/run-history.jsonl` appends one entry per `pnpm benchmark ...` invocation, including:
+
+- requested benchmark selection
+- passthrough Vitest args
+- exit code
+- overall wall-clock duration for the benchmark command
+- total benchmark cost for the invocation when Claude reports usage
+
+Per-case artifacts still live under:
+
+```text
 benchmarks/<benchmark>/runs/<test-name>/
   logs/
   workspace/
@@ -39,6 +59,8 @@ Each run gets its own isolated benchmark workspace. That workspace contains:
 - a local `package.json` with `pnpm cli` pointing directly at `dist/cli/index.js`
 - a copied `.agents/skills/libretto/SKILL.md`
 - its own `.libretto/` runtime state and benchmark snapshot-analyzer config
+
+Each per-case `results.json` now also records Claude-reported usage and `totalCostUsd`, and the generated benchmark summary includes a run-level duration/cost table plus per-case duration and cost.
 
 Model overrides:
 

@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { basename, join, resolve } from "node:path";
 
-function walkResults(root) {
+export function walkResults(root) {
   const results = [];
   const stack = [root];
 
@@ -29,11 +30,11 @@ function walkResults(root) {
   return results.sort();
 }
 
-function readJson(path) {
+export function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function formatDuration(durationMs) {
+export function formatDuration(durationMs) {
   if (typeof durationMs !== "number" || !Number.isFinite(durationMs)) {
     return "n/a";
   }
@@ -41,6 +42,48 @@ function formatDuration(durationMs) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+export function formatCost(costUsd) {
+  if (typeof costUsd !== "number" || !Number.isFinite(costUsd)) {
+    return "n/a";
+  }
+  return `$${costUsd.toFixed(4)}`;
+}
+
+export function getRowCostUsd(row) {
+  if (typeof row.totalCostUsd === "number" && Number.isFinite(row.totalCostUsd)) {
+    return row.totalCostUsd;
+  }
+  if (typeof row.costUsd === "number" && Number.isFinite(row.costUsd)) {
+    return row.costUsd;
+  }
+  return null;
+}
+
+export function readJsonl(path) {
+  try {
+    const contents = readFileSync(path, "utf8");
+    return contents
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  } catch {
+    return [];
+  }
+}
+
+export function getLatestBenchmarkRunRecord(root, benchmark) {
+  const historyPath = resolve(root, "benchmarks", "run-history.jsonl");
+  const records = readJsonl(historyPath)
+    .filter((record) => Array.isArray(record.benchmarks) && record.benchmarks.includes(benchmark))
+    .sort((a, b) => {
+      const aFinished = typeof a.finishedAt === "string" ? Date.parse(a.finishedAt) : 0;
+      const bFinished = typeof b.finishedAt === "string" ? Date.parse(b.finishedAt) : 0;
+      return bFinished - aFinished;
+    });
+  return records[0] ?? null;
 }
 
 function clip(text, maxChars = 120) {
@@ -69,7 +112,7 @@ function getStatusEmoji(status) {
   }
 }
 
-function buildMarkdown({
+export function buildMarkdown({
   benchmark,
   runMode,
   sampleSize,
@@ -77,10 +120,16 @@ function buildMarkdown({
   runUrl,
   artifactName,
   rows,
+  runRecord,
 }) {
   const passed = rows.filter((row) => row.status === "passed").length;
   const failed = rows.filter((row) => row.status === "failed").length;
   const running = rows.filter((row) => row.status === "running").length;
+  const totalCostUsd = rows.reduce((sum, row) => {
+    const rowCostUsd = getRowCostUsd(row);
+    return rowCostUsd == null ? sum : sum + rowCostUsd;
+  }, 0);
+  const costTracked = rows.filter((row) => getRowCostUsd(row) != null).length;
 
   const lines = [
     "# Benchmark Results",
@@ -93,6 +142,8 @@ function buildMarkdown({
     `- Passed: \`${passed}\``,
     `- Failed: \`${failed}\``,
     `- Incomplete: \`${running}\``,
+    `- Cost tracked: \`${costTracked}\``,
+    `- Total cost: \`${costTracked > 0 ? formatCost(totalCostUsd) : "n/a"}\``,
   ];
 
   if (runUrl) {
@@ -102,10 +153,21 @@ function buildMarkdown({
     lines.push(`- Artifact: \`${artifactName}\``);
   }
 
-  lines.push("", "| Case | Status | Duration | Summary |", "| --- | --- | --- | --- |");
+  lines.push(
+    "",
+    "| Benchmark Run | Duration | Cost | Result files | Cost tracked |",
+    "| --- | --- | --- | --- | --- |",
+    `| \`${benchmark}\` | \`${formatDuration(runRecord?.durationMs)}\` | \`${formatCost(runRecord?.totalCostUsd ?? (costTracked > 0 ? totalCostUsd : null))}\` | \`${rows.length}\` | \`${costTracked}\` |`,
+  );
+
+  lines.push(
+    "",
+    "| Case | Status | Duration | Cost | Summary |",
+    "| --- | --- | --- | --- | --- |",
+  );
 
   if (rows.length === 0) {
-    lines.push("| n/a | n/a | n/a | No results.json files were generated. |");
+    lines.push("| n/a | n/a | n/a | n/a | No results.json files were generated. |");
     return lines.join("\n");
   }
 
@@ -116,7 +178,7 @@ function buildMarkdown({
       row.error?.name ||
       "No final result recorded.";
     lines.push(
-      `| \`${row.caseId ?? basename(row.runRoot ?? "unknown")}\` | ${getStatusEmoji(row.status)} \`${row.status ?? "unknown"}\` | \`${formatDuration(row.durationMs)}\` | ${escapeMarkdownTableCell(clip(summarySource))} |`,
+      `| \`${row.caseId ?? basename(row.runRoot ?? "unknown")}\` | ${getStatusEmoji(row.status)} \`${row.status ?? "unknown"}\` | \`${formatDuration(row.durationMs)}\` | \`${formatCost(getRowCostUsd(row))}\` | ${escapeMarkdownTableCell(clip(summarySource))} |`,
     );
   }
 
@@ -138,6 +200,7 @@ function main() {
   const runsRoot = resolve(repoRoot, "benchmarks", benchmark, "runs");
   const resultPaths = walkResults(runsRoot);
   const rows = resultPaths.map((path) => readJson(path));
+  const runRecord = getLatestBenchmarkRunRecord(repoRoot, benchmark);
 
   rows.sort((a, b) => {
     const caseA = String(a.caseId ?? "");
@@ -153,10 +216,20 @@ function main() {
     runUrl: process.env.BENCHMARK_RUN_URL ?? "",
     artifactName: process.env.BENCHMARK_ARTIFACT_NAME ?? "",
     rows,
+    runRecord,
   });
 
   writeFileSync(outputPath, markdown, "utf8");
   process.stdout.write(markdown);
 }
 
-main();
+function isExecutedAsScript() {
+  return (
+    typeof process.argv[1] === "string" &&
+    resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  );
+}
+
+if (isExecutedAsScript()) {
+  main();
+}
