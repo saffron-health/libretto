@@ -1,5 +1,5 @@
 import { generateObject, type LanguageModel } from "ai";
-import type { ZodType, infer as ZodInfer } from "zod";
+import type { ZodType, output as ZodOutput } from "zod";
 import type { LLMClient, Message } from "./types.js";
 
 /**
@@ -23,21 +23,21 @@ export function createLLMClientFromModel(model: LanguageModel): LLMClient {
 			prompt: string;
 			schema: T;
 			temperature?: number;
-		}): Promise<ZodInfer<T>> {
+		}): Promise<ZodOutput<T>> {
 			const { object } = await generateObject({
 				model,
 				schema: opts.schema,
 				prompt: opts.prompt,
 				temperature: opts.temperature ?? 0,
 			});
-			return object;
+			return object as ZodOutput<T>;
 		},
 
 		async generateObjectFromMessages<T extends ZodType>(opts: {
 			messages: Message[];
 			schema: T;
 			temperature?: number;
-		}): Promise<ZodInfer<T>> {
+		}): Promise<ZodOutput<T>> {
 			// Convert libretto Message format to AI SDK message format
 			const messages = opts.messages.map((msg) => {
 				if (typeof msg.content === "string") {
@@ -68,7 +68,7 @@ export function createLLMClientFromModel(model: LanguageModel): LLMClient {
 				messages,
 				temperature: opts.temperature ?? 0,
 			});
-			return object;
+			return object as ZodOutput<T>;
 		},
 	};
 }

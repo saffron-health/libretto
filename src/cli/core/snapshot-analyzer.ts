@@ -322,6 +322,7 @@ async function runExternalCommand(
 
     let stdout = "";
     let stderr = "";
+    let stdinError: NodeJS.ErrnoException | null = null;
 
     child.stdout.on("data", (chunk: Buffer | string) => {
       stdout += chunk.toString();
@@ -329,6 +330,20 @@ async function runExternalCommand(
 
     child.stderr.on("data", (chunk: Buffer | string) => {
       stderr += chunk.toString();
+    });
+
+    child.stdin.on("error", (err) => {
+      stdinError = err as NodeJS.ErrnoException;
+      logger.warn("interpret-analyzer-stdin-pipe-error", {
+        command,
+        args,
+        code: stdinError.code ?? null,
+        message: stdinError.message,
+        hint:
+          stdinError.code === "EPIPE"
+            ? "Child process exited before consuming all stdin data"
+            : "Unexpected stdin write error",
+      });
     });
 
     child.on("error", (err) => {
@@ -350,27 +365,45 @@ async function runExternalCommand(
     });
 
     child.on("close", (code) => {
+      const stdinNote = formatStdinError(stderr, stdinError);
+      const combinedStderr = `${stderr}${stdinNote}`;
       logger.info("interpret-analyzer-spawn-close", {
         command,
         args,
         exitCode: code ?? 1,
         durationMs: Date.now() - startedAt,
         stdoutChars: stdout.length,
-        stderrChars: stderr.length,
+        stderrChars: combinedStderr.length,
+        stdinErrorCode: stdinError?.code ?? null,
         stdoutPreview: summarizeForLog(stdout),
-        stderrPreview: summarizeForLog(stderr),
+        stderrPreview: summarizeForLog(combinedStderr),
       });
       resolve({
         exitCode: code ?? 1,
         stdout,
-        stderr,
+        stderr: combinedStderr,
       });
     });
 
-    if (stdinText !== undefined) {
-      child.stdin.write(stdinText);
+    try {
+      if (stdinText !== undefined) {
+        child.stdin.end(stdinText);
+      } else {
+        child.stdin.end();
+      }
+    } catch (err) {
+      stdinError = err as NodeJS.ErrnoException;
+      logger.warn("interpret-analyzer-stdin-write-error", {
+        command,
+        args,
+        code: stdinError.code ?? null,
+        message: stdinError.message,
+        hint:
+          stdinError.code === "EPIPE"
+            ? "Child process exited before consuming all stdin data"
+            : "Unexpected stdin write error",
+      });
     }
-    child.stdin.end();
   });
 }
 
@@ -386,6 +419,19 @@ function summarizeForLog(value: string, maxChars: number = 800): string {
   if (!cleaned) return "";
   if (cleaned.length <= maxChars) return cleaned;
   return `${cleaned.slice(0, maxChars)}… [truncated ${cleaned.length - maxChars} chars]`;
+}
+
+function formatStdinError(
+  stderr: string,
+  error: NodeJS.ErrnoException | null,
+): string {
+  if (!error) return "";
+  const detail =
+    error.code === "EPIPE"
+      ? "Analyzer closed stdin before Libretto finished sending the snapshot prompt."
+      : `Analyzer stdin error: ${error.message}`;
+  if (stderr.includes(detail)) return "";
+  return `${stderr.endsWith("\n") || stderr.length === 0 ? "" : "\n"}${detail}\n`;
 }
 
 function extractShellSnippet(command: string): string {

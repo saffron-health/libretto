@@ -8,7 +8,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { createLLMClient } from "../../shared/llm/client.js";
 import { REPO_ROOT } from "./context.js";
@@ -21,10 +21,32 @@ import {
 } from "./snapshot-analyzer.js";
 import type { AiConfig } from "./ai-config.js";
 
-/** Reads .env from the project root and sets any missing process.env entries. */
+function readWorktreeEnvPath(): string | null {
+  const gitPath = join(REPO_ROOT, ".git");
+  if (!existsSync(gitPath)) return null;
+
+  try {
+    const gitPointer = readFileSync(gitPath, "utf-8").trim();
+    const match = gitPointer.match(/^gitdir:\s*(.+)$/i);
+    if (!match?.[1]) return null;
+    const worktreeGitDir = resolve(REPO_ROOT, match[1].trim());
+    const commonGitDir = resolve(worktreeGitDir, "..", "..");
+    return join(dirname(commonGitDir), ".env");
+  } catch {
+    return null;
+  }
+}
+
+/** Reads .env from the current repo root, then falls back to the shared root for Git worktrees. */
 function loadDotEnv(): void {
-  const envPath = join(REPO_ROOT, ".env");
-  if (!existsSync(envPath)) return;
+  const envPathCandidates = [
+    join(REPO_ROOT, ".env"),
+    readWorktreeEnvPath(),
+  ].filter((value): value is string => Boolean(value));
+
+  const envPath = envPathCandidates.find((candidate) => existsSync(candidate));
+  if (!envPath) return;
+
   const lines = readFileSync(envPath, "utf-8").split("\n");
   for (const line of lines) {
     const trimmed = line.trim();
