@@ -102,9 +102,10 @@ abstract class UserCodingAgent {
 
   protected async runAnalyzer(
     args: string[],
+    logger: LoggerApi,
     stdinText?: string,
   ): Promise<ExternalCommandResult> {
-    const result = await runExternalCommand(this.command, args, stdinText);
+    const result = await runExternalCommand(this.command, args, logger, stdinText);
     if (result.exitCode !== 0) {
       throw new Error(
         `Analyzer command failed (${formatCommandPrefix([this.command, ...args])}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
@@ -115,15 +116,17 @@ abstract class UserCodingAgent {
 
   protected async runAndParse(
     args: string[],
+    logger: LoggerApi,
     stdinText?: string,
   ): Promise<InterpretResult> {
-    const result = await this.runAnalyzer(args, stdinText);
+    const result = await this.runAnalyzer(args, logger, stdinText);
     return parseInterpretResultFromText(result.stdout);
   }
 
   abstract analyzeSnapshot(
     prompt: string,
     pngPath: string,
+    logger: LoggerApi,
   ): Promise<InterpretResult>;
 }
 
@@ -131,6 +134,7 @@ class CodexUserCodingAgent extends UserCodingAgent {
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
+    logger: LoggerApi,
   ): Promise<InterpretResult> {
     const tempDir = mkdtempSync(join(tmpdir(), "libretto-cli-analyzer-"));
     const outputPath = join(
@@ -145,9 +149,21 @@ class CodexUserCodingAgent extends UserCodingAgent {
       pngPath,
       "-",
     ];
-    const result = await this.runAnalyzer(args, prompt);
+    logger.info("interpret-analyzer-codex-start", {
+      outputPath,
+      pngPath,
+      promptChars: prompt.length,
+      args,
+    });
+    const result = await this.runAnalyzer(args, logger, prompt);
     let outputText = result.stdout;
     try {
+      logger.info("interpret-analyzer-codex-finish", {
+        outputPath,
+        outputFileExists: existsSync(outputPath),
+        stdoutChars: result.stdout.length,
+        stderrChars: result.stderr.length,
+      });
       if (existsSync(outputPath)) {
         outputText = readFileSync(outputPath, "utf-8");
       }
@@ -162,9 +178,11 @@ class ClaudeUserCodingAgent extends UserCodingAgent {
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
+    logger: LoggerApi,
   ): Promise<InterpretResult> {
     return await this.runAndParse(
       [...this.baseArgs],
+      logger,
       `${prompt}${this.screenshotHint(pngPath)}`,
     );
   }
@@ -174,9 +192,11 @@ class GeminiUserCodingAgent extends UserCodingAgent {
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
+    logger: LoggerApi,
   ): Promise<InterpretResult> {
     return await this.runAndParse(
       [...this.baseArgs],
+      logger,
       `${prompt}${this.screenshotHint(pngPath)}`,
     );
   }
@@ -185,15 +205,23 @@ class GeminiUserCodingAgent extends UserCodingAgent {
 async function runExternalCommand(
   command: string,
   args: string[],
+  logger: LoggerApi,
   stdinText?: string,
 ): Promise<ExternalCommandResult> {
   return await new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    logger.info("interpret-analyzer-spawn-start", {
+      command,
+      args,
+      stdinChars: stdinText?.length ?? 0,
+    });
     const child = spawn(command, args, {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
     let stdout = "";
     let stderr = "";
+    let stdinError: NodeJS.ErrnoException | null = null;
 
     child.stdout.on("data", (chunk: Buffer | string) => {
       stdout += chunk.toString();
@@ -203,7 +231,22 @@ async function runExternalCommand(
       stderr += chunk.toString();
     });
 
+    child.stdin.on("error", (err) => {
+      stdinError = err as NodeJS.ErrnoException;
+      logger.error("interpret-analyzer-stdin-error", {
+        command,
+        args,
+        code: stdinError.code ?? null,
+        message: stdinError.message,
+      });
+    });
+
     child.on("error", (err) => {
+      logger.error("interpret-analyzer-spawn-error", {
+        command,
+        args,
+        error: err,
+      });
       const error = err as NodeJS.ErrnoException;
       if (error.code === "ENOENT") {
         reject(
@@ -217,17 +260,41 @@ async function runExternalCommand(
     });
 
     child.on("close", (code) => {
+      const stdinNote = formatStdinError(stderr, stdinError);
+      const combinedStderr = `${stderr}${stdinNote}`;
+      logger.info("interpret-analyzer-spawn-close", {
+        command,
+        args,
+        exitCode: code ?? 1,
+        durationMs: Date.now() - startedAt,
+        stdoutChars: stdout.length,
+        stderrChars: combinedStderr.length,
+        stdinErrorCode: stdinError?.code ?? null,
+        stdoutPreview: summarizeForLog(stdout),
+        stderrPreview: summarizeForLog(combinedStderr),
+      });
       resolve({
         exitCode: code ?? 1,
         stdout,
-        stderr,
+        stderr: combinedStderr,
       });
     });
 
-    if (stdinText !== undefined) {
-      child.stdin.write(stdinText);
+    try {
+      if (stdinText !== undefined) {
+        child.stdin.end(stdinText);
+      } else {
+        child.stdin.end();
+      }
+    } catch (err) {
+      stdinError = err as NodeJS.ErrnoException;
+      logger.error("interpret-analyzer-stdin-write-error", {
+        command,
+        args,
+        code: stdinError.code ?? null,
+        message: stdinError.message,
+      });
     }
-    child.stdin.end();
   });
 }
 
@@ -236,6 +303,26 @@ function stripAnsi(value: string): string {
     /\u001b\[[0-9;]*[A-Za-z]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g,
     "",
   );
+}
+
+function summarizeForLog(value: string, maxChars: number = 800): string {
+  const cleaned = stripAnsi(value).trim();
+  if (!cleaned) return "";
+  if (cleaned.length <= maxChars) return cleaned;
+  return `${cleaned.slice(0, maxChars)}… [truncated ${cleaned.length - maxChars} chars]`;
+}
+
+function formatStdinError(
+  stderr: string,
+  error: NodeJS.ErrnoException | null,
+): string {
+  if (!error) return "";
+  const detail =
+    error.code === "EPIPE"
+      ? "Analyzer closed stdin before Libretto finished sending the snapshot prompt."
+      : `Analyzer stdin error: ${error.message}`;
+  if (stderr.includes(detail)) return "";
+  return `${stderr.endsWith("\n") || stderr.length === 0 ? "" : "\n"}${detail}\n`;
 }
 
 function extractJsonObjectCandidates(text: string): string[] {
@@ -510,7 +597,7 @@ export async function runInterpret(
       preset: configuredAnalyzer.preset,
       commandPrefix: configuredAnalyzer.commandPrefix,
     });
-    parsed = await configuredAgent.analyzeSnapshot(prompt, pngPath);
+    parsed = await configuredAgent.analyzeSnapshot(prompt, pngPath, logger);
   } else {
     const llmClientFactory = getLLMClientFactory();
     if (!llmClientFactory) {
