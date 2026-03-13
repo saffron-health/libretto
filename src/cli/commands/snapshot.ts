@@ -3,11 +3,9 @@ import type { Argv } from "yargs";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { connect, disconnectBrowser } from "../core/browser.js";
 import { getSessionSnapshotRunDir } from "../core/context.js";
-import {
-  canAnalyzeSnapshots,
-  runInterpret,
-  type ScreenshotPair,
-} from "../core/snapshot-analyzer.js";
+import { condenseDom } from "../core/condense-dom.js";
+import { type ScreenshotPair } from "../core/snapshot-analyzer.js";
+import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 function generateSnapshotRunId(): string {
@@ -33,6 +31,7 @@ async function captureScreenshot(
     const pageUrl = page.url();
     const pngPath = `${snapshotRunDir}/page.png`;
     const htmlPath = `${snapshotRunDir}/page.html`;
+    const condensedHtmlPath = `${snapshotRunDir}/page.condensed.html`;
 
     await page.screenshot({ path: pngPath });
 
@@ -40,15 +39,25 @@ async function captureScreenshot(
     const fs = await import("node:fs/promises");
     await fs.writeFile(htmlPath, htmlContent);
 
+    // Write condensed DOM
+    const condenseResult = condenseDom(htmlContent);
+    await fs.writeFile(condensedHtmlPath, condenseResult.html);
+
     logger.info("screenshot-success", {
       session,
       pageUrl,
       title,
       pngPath,
       htmlPath,
+      condensedHtmlPath,
       snapshotRunId,
+      domCondenseStats: {
+        originalLength: condenseResult.originalLength,
+        condensedLength: condenseResult.condensedLength,
+        reductions: condenseResult.reductions,
+      },
     });
-    return { pngPath, htmlPath, baseName: snapshotRunId };
+    return { pngPath, htmlPath, condensedHtmlPath, baseName: snapshotRunId };
   } catch (err) {
     let pageAlive = false;
     let browserConnected = false;
@@ -76,11 +85,12 @@ async function runSnapshot(
   objective?: string,
   context?: string,
 ): Promise<void> {
-  const { pngPath, htmlPath } = await captureScreenshot(session, logger, pageId);
+  const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(session, logger, pageId);
 
-  console.log("Screenshot saved:");
-  console.log(`  PNG:  ${pngPath}`);
-  console.log(`  HTML: ${htmlPath}`);
+  console.log("Snapshot saved:");
+  console.log(`  PNG:              ${pngPath}`);
+  console.log(`  HTML:             ${htmlPath}`);
+  console.log(`  Condensed HTML:   ${condensedHtmlPath}`);
 
   const normalizedObjective = objective?.trim();
   const normalizedContext = context?.trim();
@@ -95,18 +105,13 @@ async function runSnapshot(
     );
   }
 
-  if (!canAnalyzeSnapshots()) {
-    throw new Error(
-      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini) to enable analysis.",
-    );
-  }
-
-  await runInterpret({
+  await runApiInterpret({
     objective: normalizedObjective,
     session,
     context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
     pngPath,
     htmlPath,
+    condensedHtmlPath,
   }, logger);
 }
 
