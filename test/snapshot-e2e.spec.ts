@@ -8,15 +8,13 @@ import { test } from "./fixtures";
  * End-to-end snapshot tests.
  *
  * Tests cover:
- * - Snapshot resilience against ad interstitials / blocked pages that collapse
- *   the viewport (Cambridge vignette popup test).
- * - Snapshot analysis on real sites with saved profiles (LinkedIn, Amazon).
+ * - Snapshot analysis on real sites with saved profiles (LinkedIn).
  *
  * Requirements:
  * - ANTHROPIC_API_KEY or OPENAI_API_KEY must be set for snapshot analysis.
  * - Network access to the target sites.
  * - Playwright Chromium installed.
- * - Saved profiles in .libretto/profiles/ for authenticated tests (LinkedIn, Amazon).
+ * - Saved profile in .libretto/profiles/linkedin.com.json for authenticated LinkedIn test.
  */
 
 const SNAPSHOT_TIMEOUT = 120_000;
@@ -56,49 +54,6 @@ async function sleep(ms: number): Promise<void> {
 
 describe("snapshot e2e – live site analysis", () => {
   test(
-    "cambridge dictionary: snapshot survives ad interstitial / blocked page",
-    async ({ librettoCli }) => {
-      const session = "snapshot-e2e-cambridge-popup";
-
-      // Open directly to the vignette URL which triggers an ad interstitial
-      // that can collapse the viewport to 0px width.
-      // NOTE: This test is nondeterministic — the popup/interstitial does not
-      // always appear. The test still validates that the snapshot pipeline
-      // completes regardless of whether the popup is shown.
-      const open = await librettoCli(
-        `open https://dictionary.cambridge.org/grammar/british-grammar/less-or-fewer#google_vignette --headed --session ${session}`,
-      );
-      expect(open.exitCode).toBe(0);
-
-      await sleep(PAGE_SETTLE_MS);
-
-      // Snapshot should not crash with "Cannot take screenshot with 0 width"
-      // even if the page is blocked or showing an ad interstitial.
-      const snapshotStart = Date.now();
-      const snapshot = await librettoCli(
-        `snapshot --session ${session} --objective "Describe the current page state and whether it shows real content, an ad interstitial, or an error page." --context "This page may be showing an ad popup or interstitial that collapses the viewport."`,
-        snapshotEnv,
-      );
-      const snapshotDurationMs = Date.now() - snapshotStart;
-      const snapshotSuccess = snapshot.exitCode === 0;
-      console.log(`[cambridge-popup] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`);
-
-      await librettoCli(`close --session ${session}`);
-
-      const output = snapshot.stdout + "\n" + snapshot.stderr;
-
-      // The snapshot pipeline must complete — PNG/HTML/condensed HTML saved.
-      expect(output).toContain("Snapshot saved:");
-      expect(output).toContain("page.png");
-      expect(output).toContain("page.html");
-      expect(output).toContain("page.condensed.html");
-      // Analysis must return an interpretation (doesn't matter what it says).
-      expect(output).toContain("Interpretation (via API):");
-    },
-    SNAPSHOT_TIMEOUT,
-  );
-
-  test(
     "linkedin feed: identifies post content and poster name selectors",
     async ({ librettoCli, evaluate }) => {
       const session = "snapshot-e2e-linkedin";
@@ -134,40 +89,13 @@ describe("snapshot e2e – live site analysis", () => {
     SNAPSHOT_TIMEOUT,
   );
 
-  test(
-    "amazon homepage: identifies product category selectors",
-    async ({ librettoCli, evaluate }) => {
-      const session = "snapshot-e2e-amazon";
-
-      // Uses saved profile from .libretto/profiles/amazon.com.json if available
-      const open = await librettoCli(`open https://www.amazon.com/ --session ${session}`);
-      expect(open.exitCode).toBe(0);
-
-      await sleep(PAGE_SETTLE_MS);
-
-      const snapshotStart = Date.now();
-      const snapshot = await librettoCli(
-        `snapshot --session ${session} --objective "Identify the different product categories visible on the Amazon homepage and provide CSS selectors that can be used to find or click each category."`,
-        snapshotEnv,
-      );
-      const snapshotDurationMs = Date.now() - snapshotStart;
-      const snapshotSuccess = snapshot.exitCode === 0;
-      console.log(`[amazon] snapshot took ${snapshotDurationMs}ms (success=${snapshotSuccess})`);
-
-      await librettoCli(`close --session ${session}`);
-
-      const output = snapshot.stdout + "\n" + snapshot.stderr;
-
-      await evaluate(output).toMatch(
-        "The output identifies multiple distinct product categories from the Amazon homepage (e.g. Electronics, Books, Fashion, etc.) and provides CSS selectors for navigating to or clicking those categories.",
-      );
-    },
-    SNAPSHOT_TIMEOUT,
-  );
-
-  // Not included in this PR: Cloudflare challenge detection tests for
-  // g2.com, nowsecure.nl, and crunchbase.com. These sites consistently
-  // trigger Cloudflare challenges/anti-bot protection, making them useful
-  // for testing challenge detection but unreliable for CI. They could be
-  // added in a future PR with appropriate retry/skip logic.
+  // Not included in this PR:
+  // - Cambridge Dictionary (dictionary.cambridge.org) — ad interstitial/popup
+  //   resilience test. Nondeterministic; popup doesn't always appear.
+  // - Amazon (amazon.com) — search result extraction test. Amazon's anti-bot
+  //   detection replaces the DOM with a CAPTCHA script, making the HTML
+  //   snapshot unreliable even though the screenshot renders correctly.
+  // - Cloudflare challenge sites: g2.com, nowsecure.nl, crunchbase.com.
+  //   Useful for testing challenge detection but unreliable for CI.
+  // These could be added in a future PR with appropriate handling.
 });
