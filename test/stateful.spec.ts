@@ -51,6 +51,19 @@ process.stdout.write(payload);
   return analyzerPath;
 }
 
+async function writeEarlyExitAnalyzer(workspaceDir: string): Promise<string> {
+  const analyzerPath = join(workspaceDir, "early-exit-analyzer.mjs");
+  await writeFile(
+    analyzerPath,
+    `
+process.stderr.write("simulated analyzer exit\\n");
+process.exit(1);
+`,
+    "utf8",
+  );
+  return analyzerPath;
+}
+
 describe("state-driven CLI subprocess behavior", () => {
   test("shows missing AI config", async ({ librettoCli }) => {
     const result = await librettoCli("ai configure");
@@ -142,6 +155,30 @@ describe("state-driven CLI subprocess behavior", () => {
     );
     expect(snapshot.stdout).toContain("Interpretation:");
     expect(snapshot.stdout).toContain("Answer: snapshot-ok-objective-only");
+  }, 45_000);
+
+  test("surfaces analyzer early exit without crashing on stdin pipe errors", async ({
+    librettoCli,
+    workspaceDir,
+  }) => {
+    const session = "snapshot-analyzer-early-exit";
+    const analyzerPath = await writeEarlyExitAnalyzer(workspaceDir);
+    await librettoCli(
+      `ai configure codex -- "${process.execPath}" "${analyzerPath}"`,
+    );
+
+    const opened = await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
+    expect(opened.stdout).toContain("Browser open");
+
+    const snapshot = await librettoCli(
+      `snapshot --objective "Find heading" --session ${session}`,
+    );
+    expect(snapshot.exitCode).toBe(1);
+    expect(snapshot.stderr).toContain("Analyzer command failed");
+    expect(snapshot.stderr).toContain("simulated analyzer exit");
+    expect(snapshot.stderr).not.toContain("Unhandled 'error' event");
   }, 45_000);
 
   for (const preset of ["claude", "gemini"] as const) {
