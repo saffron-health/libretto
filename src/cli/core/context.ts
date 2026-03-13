@@ -4,10 +4,15 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import { spawnSync } from "node:child_process";
 import { cwd } from "node:process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { validateSessionName } from "./session.js";
 
 function getRepoRoot(): string {
+  const override = process.env.LIBRETTO_REPO_ROOT?.trim();
+  if (override) {
+    return resolve(override);
+  }
+
   const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
     encoding: "utf-8",
   });

@@ -1,0 +1,217 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      benchmark:
+        description: Benchmark to run
+        required: true
+        default: webVoyager
+        type: choice
+        options:
+          - webVoyager
+          - onlineMind2Web
+          - webBench
+      run_mode:
+        description: Full benchmark or small random sample
+        required: true
+        default: small-random
+        type: choice
+        options:
+          - small-random
+          - full
+      sample_size:
+        description: Cases to run when using small random sample
+        required: true
+        default: "5"
+        type: choice
+        options:
+          - "1"
+          - "3"
+          - "5"
+          - "10"
+      random_seed:
+        description: Seed for random sampling
+        required: true
+        default: "20260313"
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LIBRETTO_BENCHMARK_MODEL: claude-opus-4-6
+      LIBRETTO_BENCHMARK_ANALYZER_MODEL: claude-sonnet-4-6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Validate benchmark credentials
+        run: |
+          set -euo pipefail
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "ANTHROPIC_API_KEY secret is required to run benchmarks." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium dependencies
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run benchmark
+        id: run_benchmark
+        env:
+          BENCHMARK: ${{ inputs.benchmark }}
+          RUN_MODE: ${{ inputs.run_mode }}
+          SAMPLE_SIZE: ${{ inputs.sample_size }}
+          RANDOM_SEED: ${{ inputs.random_seed }}
+        run: |
+          set -euo pipefail
+
+          if [ "${RUN_MODE}" = "small-random" ] && [ "${BENCHMARK}" = "webVoyager" ]; then
+            export LIBRETTO_WEBVOYAGER_RANDOM_SAMPLE=1
+            export LIBRETTO_WEBVOYAGER_RANDOM_SEED="${RANDOM_SEED}"
+            export LIBRETTO_WEBVOYAGER_LIMIT="${SAMPLE_SIZE}"
+          fi
+
+          set +e
+          pnpm benchmark "${BENCHMARK}"
+          exit_code=$?
+          set -e
+
+          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
+
+      - name: Build benchmark summary
+        if: always()
+        env:
+          BENCHMARK_RUN_MODE: ${{ inputs.run_mode }}
+          BENCHMARK_SAMPLE_SIZE: ${{ inputs.sample_size }}
+          BENCHMARK_RANDOM_SEED: ${{ inputs.random_seed }}
+          BENCHMARK_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BENCHMARK_ARTIFACT_NAME: benchmark-${{ inputs.benchmark }}-${{ inputs.run_mode }}-transcripts
+        run: |
+          set -euo pipefail
+          node benchmarks/summarize-results.mjs "${{ inputs.benchmark }}" benchmark-summary.md > /tmp/benchmark-summary.log
+          cat benchmark-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark transcripts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ inputs.benchmark }}-${{ inputs.run_mode }}-transcripts
+          if-no-files-found: warn
+          path: |
+            benchmark-summary.md
+            benchmarks/${{ inputs.benchmark }}/runs/**/transcript.json
+            benchmarks/${{ inputs.benchmark }}/runs/**/transcript.md
+            benchmarks/${{ inputs.benchmark }}/runs/**/results.json
+
+      - name: Post benchmark results comment
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          BENCHMARK_SUMMARY_PATH: benchmark-summary.md
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require("node:fs");
+
+            const marker = "<!-- libretto-benchmark-results -->";
+            const summary = fs.readFileSync(process.env.BENCHMARK_SUMMARY_PATH, "utf8").trim();
+            const body = `${marker}\n${summary}`;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const headRef = context.ref.replace("refs/heads/", "");
+
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: "open",
+              head: `${owner}:${headRef}`,
+              per_page: 100,
+            });
+
+            if (prs.length > 0) {
+              const issueNumber = prs[0].number;
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100,
+              });
+              const existing = comments.find((comment) =>
+                (comment.body ?? "").startsWith(marker),
+              );
+
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  body,
+                });
+              }
+              return;
+            }
+
+            const commitComments = await github.paginate(
+              github.rest.repos.listCommentsForCommit,
+              {
+                owner,
+                repo,
+                commit_sha: context.sha,
+                per_page: 100,
+              },
+            );
+            const existingCommitComment = commitComments.find((comment) =>
+              (comment.body ?? "").startsWith(marker),
+            );
+
+            if (existingCommitComment) {
+              await github.rest.repos.updateCommitComment({
+                owner,
+                repo,
+                comment_id: existingCommitComment.id,
+                body,
+              });
+            } else {
+              await github.rest.repos.createCommitComment({
+                owner,
+                repo,
+                commit_sha: context.sha,
+                body,
+              });
+            }
+
+      - name: Fail workflow if benchmark failed
+        if: always() && steps.run_benchmark.outputs.exit_code != '0'
+        run: |
+          echo "Benchmark command failed with exit code ${{ steps.run_benchmark.outputs.exit_code }}." >&2
+          exit 1

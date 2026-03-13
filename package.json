@@ -35,6 +35,7 @@
     "type-check": "tsc --noEmit",
     "test": "pnpm run build && vitest run",
     "eval": "pnpm run build && vitest run --config vitest.evals.config.ts",
+    "benchmark": "pnpm run build && tsx benchmarks/run.ts",
     "test:watch": "vitest",
     "cli": "node dist/index.js",
     "prepack": "pnpm run build"

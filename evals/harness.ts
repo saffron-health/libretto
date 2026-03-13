@@ -33,6 +33,7 @@ const ANTHROPIC_API_KEY_SECRET_NAME = "anthropic-api-key";
 let didAttemptSecretLoad = false;
 
 const MAX_TRANSCRIPT_CHARS = 20_000;
+const MAX_TOOL_RESULT_CHARS = 4_000;
 
 type EvaluationVerdict = z.infer<typeof EvaluationVerdictSchema>;
 export type ScoredCriterion = z.infer<typeof ScoredCriterionSchema>;
@@ -40,7 +41,15 @@ export type TranscriptScore = z.infer<typeof TranscriptScoreSchema>;
 
 function clip(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
-  return `${text.slice(0, maxChars)}\n\n[truncated to first ${maxChars} chars]`;
+  const headChars = Math.max(1, Math.floor(maxChars / 2));
+  const tailChars = Math.max(1, maxChars - headChars);
+  return [
+    text.slice(0, headChars),
+    "",
+    `[truncated: showing first ${headChars} chars and last ${tailChars} chars of ${text.length}]`,
+    "",
+    text.slice(-tailChars),
+  ].join("\n");
 }
 
 function asJson(value: unknown): string {
@@ -138,6 +147,37 @@ function extractAssistantText(message: SDKAssistantMessage): string {
   return parts.join("\n").trim();
 }
 
+function extractUserToolResultText(message: SDKMessage): string {
+  if (message.type !== "user") return "";
+  const content = message.message.content;
+  if (!Array.isArray(content)) return "";
+
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue;
+    const typedBlock = block as Record<string, unknown>;
+    if (typedBlock.type !== "tool_result") continue;
+
+    const contentValue = typedBlock.content;
+    if (typeof contentValue === "string" && contentValue.trim().length > 0) {
+      parts.push(clip(contentValue.trim(), MAX_TOOL_RESULT_CHARS));
+      continue;
+    }
+
+    if (Array.isArray(contentValue)) {
+      for (const item of contentValue) {
+        if (!item || typeof item !== "object") continue;
+        const typedItem = item as Record<string, unknown>;
+        if (typedItem.type === "text" && typeof typedItem.text === "string") {
+          parts.push(clip(typedItem.text.trim(), MAX_TOOL_RESULT_CHARS));
+        }
+      }
+    }
+  }
+
+  return parts.filter(Boolean).join("\n").trim();
+}
+
 function formatMessagesForEvaluation(messages: SDKMessage[]): string {
   const lines: string[] = [];
   for (const message of messages) {
@@ -146,6 +186,13 @@ function formatMessagesForEvaluation(messages: SDKMessage[]): string {
         const assistantText = extractAssistantText(message);
         if (assistantText) {
           lines.push(`assistant:\n${assistantText}`);
+        }
+        break;
+      }
+      case "user": {
+        const toolResultText = extractUserToolResultText(message);
+        if (toolResultText) {
+          lines.push(`tool_result:\n${toolResultText}`);
         }
         break;
       }
@@ -366,6 +413,10 @@ export type ClaudeEvalHarnessOptions = {
   settingSources?: SettingSource[];
 };
 
+export type ClaudeEvalHarnessSendOptions = {
+  onUpdate?: (response: EvalResponse) => void | Promise<void>;
+};
+
 export class EvalResponse {
   readonly prompt: string;
   readonly messages: SDKMessage[];
@@ -440,7 +491,10 @@ export class ClaudeEvalHarness {
     this.sessionId = randomUUID();
   }
 
-  async send(prompt: string): Promise<EvalResponse> {
+  async send(
+    prompt: string,
+    sendOptions: ClaudeEvalHarnessSendOptions = {},
+  ): Promise<EvalResponse> {
     if (this.isClosed) {
       throw new Error("Cannot send prompts after harness is closed.");
     }
@@ -472,6 +526,24 @@ export class ClaudeEvalHarness {
     const messages: SDKMessage[] = [];
     for await (const message of query({ prompt, options })) {
       messages.push(message);
+
+      const seenSessionId = extractSessionId(messages);
+      if (seenSessionId) {
+        this.sessionId = seenSessionId;
+        this.hasStarted = true;
+      }
+
+      if (sendOptions.onUpdate) {
+        await sendOptions.onUpdate(
+          new EvalResponse({
+            prompt,
+            messages: [...messages],
+            sessionId: seenSessionId ?? this.sessionId,
+            cwd: this.cwd,
+            model: this.model,
+          }),
+        );
+      }
     }
 
     const seenSessionId = extractSessionId(messages);
