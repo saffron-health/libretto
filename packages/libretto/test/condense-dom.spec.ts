@@ -21,3 +21,70 @@ describe("condenseDom SVG collapsing", () => {
     );
   });
 });
+
+describe("condenseDom attribute allowlist", () => {
+  it("drops unknown framework attrs while preserving trusted state and selector attrs", () => {
+    const result = condenseDom(
+      `<button componentkey="abc" data-view-tracking-scope="feed" data-testid="save-btn" aria-label="Save" tabindex="-1" disabled type="button">Save</button>`,
+    );
+
+    expect(result.html).toBe(
+      `<button data-testid="save-btn" aria-label="Save" tabindex="-1" disabled type="button">Save</button>`,
+    );
+  });
+
+  it("filters long class attributes instead of inventing placeholder values", () => {
+    const result = condenseDom(
+      `<div class="search-input ${"x".repeat(240)} a1b2c3d4">Hello</div>`,
+    );
+
+    expect(result.html).toBe(`<div class="search-input">Hello</div>`);
+    expect(result.html).not.toContain("[240 chars]");
+  });
+
+  it("drops class entirely when only obfuscated tokens remain", () => {
+    const result = condenseDom(`<div class="abc123 _2fde8c88">Hello</div>`);
+
+    expect(result.html).toBe(`<div>Hello</div>`);
+  });
+
+  it("normalizes very long URL attrs instead of deleting them", () => {
+    const longUrl =
+      "https://www.linkedin.com/feed/?trk=feed_main&" + "x=".repeat(120);
+
+    const result = condenseDom(`<a href="${longUrl}">Feed</a>`);
+
+    expect(result.html).toContain(
+      `href="https://www.linkedin.com/feed/?[query omitted]"`,
+    );
+  });
+
+  it("preserves existing html-escaped attribute values without double escaping", () => {
+    const result = condenseDom(
+      `<img src="https://example.com/image?x=1&amp;y=2" alt="Example &amp; more" />`,
+    );
+
+    expect(result.html).toBe(
+      `<img src="https://example.com/image?x=1&amp;y=2" alt="Example &amp; more" />`,
+    );
+    expect(result.html).not.toContain("&amp;amp;");
+  });
+
+  it("preserves hidden ui signals while dropping empty trusted attrs", () => {
+    const result = condenseDom(
+      `<dialog hidden aria-label="" aria-describedby="" title=""><button>Open</button></dialog>`,
+    );
+
+    expect(result.html).toBe(`<dialog hidden><button>Open</button></dialog>`);
+  });
+
+  it("keeps all aria attrs and autocomplete", () => {
+    const result = condenseDom(
+      `<input aria-current="page" aria-autocomplete="list" autocomplete="email" fetchpriority="high" />`,
+    );
+
+    expect(result.html).toBe(
+      `<input aria-current="page" aria-autocomplete="list" autocomplete="email" />`,
+    );
+  });
+});

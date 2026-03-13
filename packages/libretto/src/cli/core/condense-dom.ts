@@ -8,13 +8,13 @@
  * Rules applied in order:
  *   1.  Noscript blocks — remove entirely
  *   2.  HTML comments — remove (except IE conditionals)
- *   3.  Script contents — hollow out, keep tags + attributes
- *   4.  Style contents — hollow out, keep tags + attributes
+ *   3.  Script contents — hollow out, keep tags + useful attributes
+ *   4.  Style contents — hollow out, keep tags + useful attributes
  *   5.  Embedded binary data — replace base64 data URIs
- *   6.  Large opaque attribute values — truncate non-preserved attrs > 200 chars
+ *   6.  Attribute allowlist — keep trusted attrs, special-case class/style/URLs
  *   7.  SVG elements — collapse to single tag, extract title/desc
  *   8.  Inline style properties — keep only layout-relevant props
- *   9.  Non-semantic class names — strip obfuscated/hash-like classes
+ *   9.  Non-semantic class names — filter or delete class values
  *  10.  (Cross-reference IDs — preserved, no action needed)
  *  11.  Framework-internal and SVG visual attributes — remove
  *  12.  Whitespace — collapse (preserve <pre> content)
@@ -31,38 +31,98 @@ export type CondenseDomResult = {
   reductions: Record<string, number>;
 };
 
-/** Attributes exempt from Rule 6 truncation (the full selector-relevant preserve list). */
-const PRESERVED_ATTRS = new Set([
+type ParsedAttribute = {
+  name: string;
+  rawToken: string;
+  value: string | null;
+};
+
+const TEST_ATTRS = new Set(["data-testid", "data-test", "data-qa", "data-cy"]);
+const TRUSTED_ATTRS = new Set([
   "id",
   "name",
   "for",
-  "data-testid",
-  "data-test",
-  "data-qa",
-  "data-cy",
-  "aria-label",
-  "aria-labelledby",
-  "aria-describedby",
-  "aria-expanded",
-  "aria-selected",
-  "aria-checked",
-  "aria-disabled",
-  "aria-hidden",
-  "aria-haspopup",
-  "aria-controls",
-  "aria-owns",
-  "aria-live",
+  "tabindex",
+  "contenteditable",
   "role",
   "title",
   "alt",
   "type",
   "value",
   "placeholder",
+  "autocomplete",
   "href",
   "action",
   "method",
   "src",
 ]);
+const STATE_ATTRS = new Set([
+  "disabled",
+  "hidden",
+  "inert",
+  "readonly",
+  "required",
+  "checked",
+  "selected",
+  "open",
+  "multiple",
+]);
+const BOOLEAN_ATTRS = new Set([
+  ...STATE_ATTRS,
+  "async",
+  "defer",
+  "nomodule",
+]);
+const EMPTY_VALUE_DROP_ATTRS = new Set([
+  "alt",
+  "autocomplete",
+  "href",
+  "action",
+  "method",
+  "name",
+  "placeholder",
+  "src",
+  "tabindex",
+  "title",
+  "type",
+]);
+const URL_ATTRS = new Set(["href", "src", "action"]);
+const SCRIPT_ATTRS = new Set([
+  "src",
+  "type",
+  "id",
+  "defer",
+  "async",
+  "crossorigin",
+  "integrity",
+  "nomodule",
+  "referrerpolicy",
+]);
+const STYLE_TAG_ATTRS = new Set(["media", "type", "nonce", "title"]);
+const INTERACTIVE_TAGS = new Set([
+  "a",
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "form",
+  "details",
+  "dialog",
+  "label",
+]);
+const INTERACTIVE_ROLES = new Set([
+  "button",
+  "link",
+  "tab",
+  "menuitem",
+  "checkbox",
+  "radio",
+  "switch",
+  "slider",
+  "combobox",
+]);
+const OPEN_TAG_PATTERN =
+  /<([a-zA-Z][\w:-]*)(\s(?:[^"'<>/]|"[^"]*"|'[^']*')*)?\s*(\/?)>/g;
 
 export function condenseDom(html: string): CondenseDomResult {
   const originalLength = html.length;
@@ -137,19 +197,8 @@ export function condenseDom(html: string): CondenseDomResult {
     ),
   );
 
-  // ── Rule 6: Large opaque attribute values ────────────────────────────
-  // Truncate any attribute value > 200 chars that isn't on the preserve list.
-  result = track(
-    "large-attrs",
-    result,
-    result.replace(
-      /\s([\w-]+)\s*=\s*["']([^"']{200,})["']/gi,
-      (match, attr: string, value: string) => {
-        if (PRESERVED_ATTRS.has(attr.toLowerCase())) return match;
-        return ` ${attr}="[${value.length} chars]"`;
-      },
-    ),
-  );
+  // ── Rule 6: Attribute allowlist ──────────────────────────────────────
+  result = track("attribute-allowlist", result, rewriteTagAttributes(result));
 
   // ── Rule 7: SVG elements ─────────────────────────────────────────────
   // Collapse each <svg> to a single tag, preserving key attributes.
@@ -167,7 +216,6 @@ export function condenseDom(html: string): CondenseDomResult {
         current = current.replace(
           svgPattern,
           (_match, attrs: string, inner: string) => {
-            // Extract attributes we want to keep
             const keepAttrs: string[] = [];
             const attrPatterns = [
               "id",
@@ -183,7 +231,6 @@ export function condenseDom(html: string): CondenseDomResult {
               if (attrToken) keepAttrs.push(attrToken);
             }
 
-            // Extract <title> or <desc> text for aria-label if not already present
             const hasAriaLabel = /aria-label\s*=/i.test(attrs);
             if (!hasAriaLabel) {
               const titleMatch = inner.match(
@@ -242,10 +289,9 @@ export function condenseDom(html: string): CondenseDomResult {
     result.replace(
       /\sclass\s*=\s*["']([^"']*)["']/gi,
       (_match, value: string) => {
-        const classes = value.split(/\s+/).filter(Boolean);
-        const kept = classes.filter((cls) => !isObfuscatedClass(cls));
-        if (kept.length === 0) return "";
-        return ` class="${kept.join(" ")}"`;
+        const filtered = filterSemanticClasses(value);
+        if (!filtered) return "";
+        return ` class="${filtered}"`;
       },
     ),
   );
@@ -292,21 +338,145 @@ export function condenseDom(html: string): CondenseDomResult {
   };
 }
 
+function rewriteTagAttributes(html: string): string {
+  return html.replace(
+    OPEN_TAG_PATTERN,
+    (match, rawTagName: string, rawAttrs: string | undefined, selfClosing: string) => {
+      const tagName = rawTagName.toLowerCase();
+      if (!rawAttrs?.trim()) return match;
+
+      const attrs = parseAttributes(rawAttrs);
+      if (attrs.length === 0) return match;
+
+      const interactive = isInteractiveElement(tagName, attrs);
+      const kept = attrs
+        .map((attr) => keepAttribute(tagName, attr, interactive))
+        .filter((value): value is string => value !== null);
+
+      const attrStr = kept.length > 0 ? ` ${kept.join(" ")}` : "";
+      const closing = selfClosing ? " /" : "";
+      return `<${rawTagName}${attrStr}${closing}>`;
+    },
+  );
+}
+
+function keepAttribute(
+  tagName: string,
+  attr: ParsedAttribute,
+  interactive: boolean,
+): string | null {
+  const name = attr.name.toLowerCase();
+  const value = attr.value;
+
+  if (name === "class") {
+    if (!value?.trim()) return null;
+    const filtered = filterSemanticClasses(value);
+    if (!filtered) return null;
+    return serializeAttribute(attr.name, filtered);
+  }
+
+  if (name === "style") {
+    if (!value?.trim()) return null;
+    return serializeAttribute(attr.name, value);
+  }
+
+  if (name.startsWith("aria-")) {
+    if (!value?.trim()) return null;
+    return attr.rawToken;
+  }
+
+  if (TEST_ATTRS.has(name)) {
+    if (!value?.trim()) return null;
+    return attr.rawToken;
+  }
+
+  if (tagName === "script" && SCRIPT_ATTRS.has(name)) {
+    return serializePreservedAttribute(attr);
+  }
+
+  if (tagName === "style" && STYLE_TAG_ATTRS.has(name)) {
+    if (!value?.trim()) return null;
+    return attr.rawToken;
+  }
+
+  if (STATE_ATTRS.has(name)) {
+    return serializePreservedAttribute(attr);
+  }
+
+  if (URL_ATTRS.has(name)) {
+    if (!value?.trim()) return null;
+    const normalized = normalizeUrlValue(value);
+    if (normalized === value) return attr.rawToken;
+    return serializeAttribute(attr.name, normalized);
+  }
+
+  if (TRUSTED_ATTRS.has(name)) {
+    if (shouldDropEmptyValue(name, value)) return null;
+    return serializePreservedAttribute(attr);
+  }
+
+  if (shouldKeepCustomDataAttribute(tagName, name, value, interactive)) {
+    return attr.rawToken;
+  }
+
+  return null;
+}
+
+function serializePreservedAttribute(attr: ParsedAttribute): string | null {
+  if (BOOLEAN_ATTRS.has(attr.name.toLowerCase())) {
+    return attr.rawToken;
+  }
+  if (attr.value === null) return attr.rawToken;
+  return attr.rawToken;
+}
+
+function shouldDropEmptyValue(
+  name: string,
+  value: string | null,
+): boolean {
+  if (value === null) return false;
+  if (value.trim()) return false;
+  if (name.startsWith("aria-")) return true;
+  return EMPTY_VALUE_DROP_ATTRS.has(name);
+}
+
+function normalizeUrlValue(value: string): string {
+  if (value.length <= 160) return value;
+  if (value.startsWith("blob:")) return "blob:[omitted]";
+  if (value.startsWith("javascript:")) return "javascript:[omitted]";
+
+  try {
+    const isAbsolute = /^[a-z][a-z0-9+.-]*:/i.test(value);
+    const parsed = isAbsolute
+      ? new URL(value)
+      : new URL(value, "https://condensed.local");
+
+    const prefix = isAbsolute
+      ? `${parsed.protocol}//${parsed.host}${parsed.pathname}`
+      : `${parsed.pathname}${parsed.hash}`;
+    const query = parsed.search ? "?[query omitted]" : "";
+    return `${prefix}${query}`;
+  } catch {
+    return `${value.slice(0, 96)}[omitted]`;
+  }
+}
+
+function filterSemanticClasses(value: string): string {
+  const classes = value.split(/\s+/).filter(Boolean);
+  const kept = classes.filter((cls) => !isObfuscatedClass(cls));
+  return kept.join(" ");
+}
+
 /**
  * Heuristic: a class name is "obfuscated" if it looks like a hash or random ID
  * rather than a human-readable semantic name.
  */
 function isObfuscatedClass(cls: string): boolean {
-  // Pure hex-like: _2fde8c88, bf2ad191, a1b2c3d4
+  if (cls.length > 80) return true;
   if (/^_?[0-9a-f]{6,}$/i.test(cls)) return true;
-
-  // CSS module pattern: component_hash (single underscore + hash suffix)
   if (/^[a-z]+_[0-9a-f]{4,}$/i.test(cls)) return true;
-
-  // Very short random-looking (2-3 chars + 2+ digits, avoids h1/p2/m3 utility classes)
   if (/^[a-z]{1,2}[0-9]{2,}$/i.test(cls)) return true;
 
-  // High ratio of digits to letters (hashes tend to mix digits in)
   const digits = (cls.match(/[0-9]/g) || []).length;
   const letters = (cls.match(/[a-zA-Z]/g) || []).length;
   if (cls.length >= 6 && digits >= letters * 0.5 && digits >= 2) return true;
@@ -314,10 +484,85 @@ function isObfuscatedClass(cls: string): boolean {
   return false;
 }
 
+function parseAttributes(rawAttrs: string): ParsedAttribute[] {
+  const attrs: ParsedAttribute[] = [];
+  const attrPattern =
+    /([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+
+  let match: RegExpExecArray | null;
+  while ((match = attrPattern.exec(rawAttrs)) !== null) {
+    const name = match[1];
+    if (!name) continue;
+    attrs.push({
+      name,
+      rawToken: match[0]!.trim(),
+      value: match[2] ?? match[3] ?? match[4] ?? null,
+    });
+  }
+
+  return attrs;
+}
+
+function isInteractiveElement(
+  tagName: string,
+  attrs: ParsedAttribute[],
+): boolean {
+  if (INTERACTIVE_TAGS.has(tagName)) return true;
+
+  for (const attr of attrs) {
+    const name = attr.name.toLowerCase();
+    if (name === "tabindex" || name === "contenteditable") return true;
+    if (name !== "role") continue;
+
+    const role = attr.value?.trim().toLowerCase();
+    if (role && INTERACTIVE_ROLES.has(role)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function shouldKeepCustomDataAttribute(
+  tagName: string,
+  attrName: string,
+  value: string | null,
+  interactive: boolean,
+): boolean {
+  if (!interactive) return false;
+  if (!attrName.startsWith("data-")) return false;
+  if (TEST_ATTRS.has(attrName)) return false;
+  if (!value?.trim()) return false;
+  if (value.length > 80) return false;
+  if (tagName === "script" || tagName === "style") return false;
+
+  const key = attrName.slice("data-".length);
+  if (!looksMeaningfulToken(key)) return false;
+  if (!looksMeaningfulDataValue(value)) return false;
+
+  return true;
+}
+
+function looksMeaningfulToken(value: string): boolean {
+  if (!/^[a-z][a-z0-9-]{1,40}$/i.test(value)) return false;
+  if (!/[a-z]{3}/i.test(value)) return false;
+  if (/(track|metric|telemetry|analytics|component|display|loaded|token|dps|color|screen|strict|rehydr|fetch)/i.test(value)) {
+    return false;
+  }
+  return true;
+}
+
+function looksMeaningfulDataValue(value: string): boolean {
+  if (value.length > 80) return false;
+  if (/[<>]/.test(value)) return false;
+  if (/https?:\/\//i.test(value)) return false;
+  return /^[a-z0-9:_./ -]+$/i.test(value);
+}
+
 function findAttributeToken(attrs: string, name: string): string | null {
   const match = attrs.match(
     new RegExp(
-      `(?:^|\\s)(${escapeRegExp(name)}\\s*=\\s*(?:"[^"]*"|'[^']*'))`,
+      `(?:^|\\s)(${escapeRegExp(name)}(?:\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s"'=<>\\x60]+))?)`,
       "i",
     ),
   );
@@ -326,6 +571,10 @@ function findAttributeToken(attrs: string, name: string): string | null {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function serializeAttribute(name: string, value: string): string {
+  return `${name}="${escapeHtmlAttribute(value)}"`;
 }
 
 function escapeHtmlAttribute(value: string): string {

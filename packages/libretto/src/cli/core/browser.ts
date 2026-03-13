@@ -70,7 +70,7 @@ async function tryConnectToPort(
   logger: LoggerApi,
   timeoutMs: number = 5000,
 ): Promise<Browser | null> {
-  const endpoint = `http://localhost:${port}`;
+  const endpoint = `http://127.0.0.1:${port}`;
   logger.info("cdp-connect-attempt", { port, endpoint, timeoutMs });
   try {
     const connectPromise = chromium.connectOverCDP(endpoint);
@@ -340,6 +340,13 @@ export async function runOpen(
 import { chromium } from 'playwright';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+
+const __name = (target, value) => {
+  try {
+    Object.defineProperty(target, 'name', { value, configurable: true });
+  } catch {}
+  return target;
+};
 
 const LOG_FILE = '${escapedLogPath}';
 const NETWORK_LOG = '${escapedNetworkLogPath}';
