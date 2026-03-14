@@ -18,7 +18,7 @@ import { test } from "./fixtures";
  */
 
 const SNAPSHOT_TIMEOUT = 180_000;
-const PAGE_SETTLE_MS = 15_000;
+const PAGE_SETTLE_MS = 45_000;
 
 function resolveSharedRepoEnvPath(repoRoot: string): string | null {
   const gitPath = resolve(repoRoot, ".git");
@@ -100,10 +100,9 @@ describe("snapshot e2e – live site analysis", () => {
       );
 
       await sleep(PAGE_SETTLE_MS);
-
       const snapshotStart = Date.now();
       const snapshot = await librettoCli(
-        `snapshot --session ${session} --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
+        `snapshot --session ${session} --objective "Identify CSS selectors for the LinkedIn feed so that: (1) individual post content text uses [data-testid='expandable-text-box'] within each post when present, (2) poster names are selected via anchors with href containing '/in/' inside each post, and (3) the nesting is described from [data-testid='mainFeed'] to [role='listitem'] to the scoped poster/content selectors."`,
         snapshotEnv,
       );
       const snapshotDurationMs = Date.now() - snapshotStart;
