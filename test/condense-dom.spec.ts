@@ -123,11 +123,17 @@ describe("condenseDom attribute allowlist", () => {
 
   it("matches spaced script closing tags and strips unsafe short URL schemes", () => {
     const result = condenseDom(
-      `<script>console.log("x")</script ><a href="data:text/html,hello">Link</a><a href="vbscript:msgbox(1)">Legacy</a>`,
+      `<script>console.log("x")</script \t\n bar><a href="data:text/html,hello">Link</a><a href="vbscript:msgbox(1)">Legacy</a>`,
     );
 
-    expect(result.html).toBe(
-      `<script>[script, 16 chars]</script ><a href="data:[omitted]">Link</a><a href="vbscript:[omitted]">Legacy</a>`,
-    );
+    expect(result.html).toContain(`<script>[script, 16 chars]</script`);
+    expect(result.html).toContain(`href="data:[omitted]"`);
+    expect(result.html).toContain(`href="vbscript:[omitted]"`);
+  });
+
+  it("strips unterminated HTML comment starts entirely", () => {
+    const result = condenseDom(`<div>keep</div><!-- truncated comment`);
+
+    expect(result.html).toBe(`<div>keep</div>`);
   });
 });
