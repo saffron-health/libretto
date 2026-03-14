@@ -10,7 +10,10 @@ import {
   readAiConfig,
 } from "./ai-config.js";
 import { getLLMClientFactory } from "./context.js";
-import { resolveSnapshotApiModelOrThrow } from "./snapshot-api-config.js";
+import {
+  getFactoryFallbackSnapshotApiModelSelection,
+  resolveSnapshotApiModel,
+} from "./snapshot-api-config.js";
 
 export type ScreenshotPair = {
   pngPath: string;
@@ -1061,7 +1064,9 @@ export async function runInterpret(
     }
 
     logger.info("interpret-analyzer-factory-fallback", {});
-    const fallbackSelection = resolveSnapshotApiModelOrThrow(null);
+    const fallbackSelection =
+      resolveSnapshotApiModel(null)
+      ?? getFactoryFallbackSnapshotApiModelSelection();
     const fallbackConfig: AiConfig = {
       preset:
         fallbackSelection.provider === "openai"

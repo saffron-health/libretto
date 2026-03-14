@@ -29,6 +29,7 @@ export type SnapshotApiModelSelection = {
 	source:
 		| "env:LIBRETTO_SNAPSHOT_MODEL"
 		| "ai-config"
+		| "factory-fallback"
 		| "env:auto-openai"
 		| "env:auto-anthropic"
 		| "env:auto-google"
@@ -70,16 +71,42 @@ export function loadSnapshotEnv(): void {
 	if (!envPath) return;
 
 	for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-		const trimmed = line.trim();
-		if (!trimmed || trimmed.startsWith("#")) continue;
-		const eqIdx = trimmed.indexOf("=");
-		if (eqIdx < 1) continue;
-		const key = trimmed.slice(0, eqIdx).trim();
-		const value = trimmed.slice(eqIdx + 1).trim();
-		if (key && !(key in process.env)) {
-			process.env[key] = value;
+		const parsed = parseDotEnvAssignment(line);
+		if (!parsed) continue;
+		if (!(parsed.key in process.env)) {
+			process.env[parsed.key] = parsed.value;
 		}
 	}
+}
+
+function parseDotEnvAssignment(
+	line: string,
+): { key: string; value: string } | null {
+	const trimmed = line.trim();
+	if (!trimmed || trimmed.startsWith("#")) return null;
+
+	const withoutExport = trimmed.startsWith("export ")
+		? trimmed.slice("export ".length).trimStart()
+		: trimmed;
+	const eqIdx = withoutExport.indexOf("=");
+	if (eqIdx < 1) return null;
+
+	const key = withoutExport.slice(0, eqIdx).trim();
+	if (!key) return null;
+
+	let value = withoutExport.slice(eqIdx + 1).trim();
+	if (
+		(value.startsWith('"') && value.endsWith('"'))
+		|| (value.startsWith("'") && value.endsWith("'"))
+	) {
+		value = value.slice(1, -1);
+	}
+	value = value
+		.replace(/\\n/g, "\n")
+		.replace(/\\"/g, '"')
+		.replace(/\\'/g, "'");
+
+	return { key, value };
 }
 
 function providerToPreset(provider: Provider): AiConfig["preset"] {
@@ -228,4 +255,12 @@ export function buildSnapshotApiSelectionConfig(
 
 export function isSnapshotApiUnavailableError(error: unknown): boolean {
 	return error instanceof SnapshotApiUnavailableError;
+}
+
+export function getFactoryFallbackSnapshotApiModelSelection(): SnapshotApiModelSelection {
+	return {
+		model: DEFAULT_SNAPSHOT_MODELS.google,
+		provider: "google",
+		source: "factory-fallback",
+	};
 }

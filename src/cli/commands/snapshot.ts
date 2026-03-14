@@ -7,6 +7,7 @@ import { condenseDom } from "../core/condense-dom.js";
 import { readSessionState } from "../core/session.js";
 import {
   runInterpret,
+  type InterpretArgs,
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
@@ -282,8 +283,13 @@ async function runSnapshot(
   console.log(`  HTML:            ${htmlPath}`);
   console.log(`  Condensed HTML:  ${condensedHtmlPath}`);
 
-  const interpretArgs = {
-    objective: normalizedObjective,
+  const objectiveText = normalizedObjective;
+  if (!objectiveText) {
+    throw new Error("Couldn't run analysis: missing objective.");
+  }
+
+  const interpretArgs: InterpretArgs = {
+    objective: objectiveText,
     session,
     context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
     pngPath,

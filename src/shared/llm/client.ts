@@ -20,6 +20,7 @@ const SUPPORTED_PROVIDER_ALIASES = {
 	vertex: "vertex",
 	"google-vertex": "vertex",
 	anthropic: "anthropic",
+	codex: "openai",
 	openai: "openai",
 } as const satisfies Record<string, Provider>;
 
@@ -38,7 +39,7 @@ export function parseModel(model: string): { provider: Provider; modelId: string
 	const slashIndex = model.indexOf("/");
 	if (slashIndex === -1) {
 		throw new Error(
-			`Invalid model string "${model}". Expected format: "provider/model-id" (for example "openai/gpt-5-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash", or "vertex/gemini-2.5-flash").`,
+			`Invalid model string "${model}". Expected format: "provider/model-id" (for example "openai/gpt-5-mini", "codex/gpt-5-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash", or "vertex/gemini-2.5-flash").`,
 		);
 	}
 	const providerInput = model.slice(0, slashIndex).toLowerCase();
@@ -49,7 +50,7 @@ export function parseModel(model: string): { provider: Provider; modelId: string
 
 	if (!provider) {
 		throw new Error(
-			`Unsupported provider "${providerInput}". Supported providers: openai, anthropic, google (Gemini API), and vertex.`,
+			`Unsupported provider "${providerInput}". Supported providers: openai/codex, anthropic, google (Gemini API), and vertex.`,
 		);
 	}
 

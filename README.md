@@ -59,6 +59,7 @@ Snapshot analysis uses the API-based analyzer by default when supported credenti
 - `GOOGLE_CLOUD_PROJECT` (plus ADC credentials) for Vertex AI
 
 You can override the snapshot model explicitly with `LIBRETTO_SNAPSHOT_MODEL=provider/model-id`, for example `openai/gpt-5-mini`, `anthropic/claude-sonnet-4-6`, `google/gemini-2.5-flash`, or `vertex/gemini-2.5-flash`.
+`codex/gpt-5-mini` is also accepted as an alias for the OpenAI provider.
 
 ## Authors
 

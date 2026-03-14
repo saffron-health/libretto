@@ -57,9 +57,40 @@ describe("snapshot API model resolution", () => {
     expect(shouldUseApiSnapshotAnalyzer(config)).toBe(true);
   });
 
+  it("accepts codex model aliases in LIBRETTO_SNAPSHOT_MODEL", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
+    vi.stubEnv("LIBRETTO_SNAPSHOT_MODEL", "codex/gpt-5-mini");
+
+    expect(resolveSnapshotApiModel(null)).toMatchObject({
+      model: "codex/gpt-5-mini",
+      provider: "openai",
+      source: "env:LIBRETTO_SNAPSHOT_MODEL",
+    });
+  });
+
   it("maps the built-in gemini preset to Gemini API when GEMINI_API_KEY is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
     vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+
+    const config = makeConfig("gemini", [
+      "gemini",
+      "--sandbox",
+      "--yolo",
+      "--output-format",
+      "json",
+    ]);
+
+    expect(resolveSnapshotApiModel(config)).toMatchObject({
+      model: "google/gemini-2.5-flash",
+      provider: "google",
+      source: "ai-config",
+    });
+  });
+
+  it("maps the built-in gemini preset to Gemini API when GOOGLE_GENERATIVE_AI_API_KEY is present", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-gemini-key");
 
     const config = makeConfig("gemini", [
       "gemini",
