@@ -127,6 +127,20 @@ describe("snapshot API model resolution", () => {
     });
   });
 
+  it("treats the legacy built-in gemini command prefix as a standard preset", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+
+    const config = makeConfig("gemini", ["gemini", "--output-format", "json"]);
+
+    expect(shouldUseApiSnapshotAnalyzer(config)).toBe(true);
+    expect(resolveSnapshotApiModel(config)).toMatchObject({
+      model: "google/gemini-2.5-flash",
+      provider: "google",
+      source: "ai-config",
+    });
+  });
+
   it("does not override a custom CLI analyzer unless LIBRETTO_SNAPSHOT_MODEL is set", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");

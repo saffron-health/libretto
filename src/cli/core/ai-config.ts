@@ -65,6 +65,10 @@ export const AI_CONFIG_PRESETS: Record<AiPreset, Omit<AiConfig, "updatedAt">> = 
   },
 };
 
+const LEGACY_DEFAULT_COMMAND_PREFIXES: Partial<Record<AiPreset, string[][]>> = {
+  gemini: [["gemini", "--output-format", "json"]],
+};
+
 function arrayShallowEqual(left: string[], right: string[]): boolean {
   return (
     left.length === right.length
@@ -73,9 +77,12 @@ function arrayShallowEqual(left: string[], right: string[]): boolean {
 }
 
 export function isDefaultCommandPrefixForPreset(config: AiConfig): boolean {
-  return arrayShallowEqual(
-    config.commandPrefix,
+  const acceptedPrefixes = [
     AI_CONFIG_PRESETS[config.preset].commandPrefix,
+    ...(LEGACY_DEFAULT_COMMAND_PREFIXES[config.preset] ?? []),
+  ];
+  return acceptedPrefixes.some((prefix) =>
+    arrayShallowEqual(config.commandPrefix, prefix)
   );
 }
 
