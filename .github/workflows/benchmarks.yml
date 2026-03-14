@@ -52,6 +52,7 @@ jobs:
     timeout-minutes: 180
     env:
       ANTHROPIC_API_KEY: ${{ secrets.LIBRETTO_BENCHMARKS_ANTHROPIC_API_KEY }}
+      BENCHMARKS_KERNEL_API_KEY: ${{ secrets.BENCHMARKS_KERNEL_API_KEY }}
       LIBRETTO_BENCHMARK_MODEL: claude-opus-4-6
       LIBRETTO_BENCHMARK_ANALYZER_MODEL: claude-sonnet-4-6
     steps:
@@ -74,6 +75,10 @@ jobs:
           set -euo pipefail
           if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
             echo "LIBRETTO_BENCHMARKS_ANTHROPIC_API_KEY secret is required to run benchmarks." >&2
+            exit 1
+          fi
+          if [ -z "${BENCHMARKS_KERNEL_API_KEY:-}" ]; then
+            echo "BENCHMARKS_KERNEL_API_KEY secret is required to run benchmarks." >&2
             exit 1
           fi
 

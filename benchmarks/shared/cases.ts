@@ -68,6 +68,10 @@ export function formatBenchmarkSessionName(
   return slugify(`${benchmark}-${caseId}`);
 }
 
+export function getBenchmarkWorkspaceCliScript(): string {
+  return 'KERNEL_API_KEY="$BENCHMARKS_KERNEL_API_KEY" LIBRETTO_BROWSER_PROVIDER=kernel LIBRETTO_REPO_ROOT=. node ./dist/cli/index.js';
+}
+
 function deriveRunGroup(testCase: BrowserBenchmarkCase): string {
   if (testCase.runGroup?.trim()) {
     return slugify(testCase.runGroup);
@@ -159,6 +163,7 @@ function buildPrompt(testCase: BrowserBenchmarkCase): string {
     "Do not use curl, raw fetches, search engines, or non-Libretto browser tooling to solve the task.",
     `Use exactly one Libretto session named "${session}".`,
     `Open the site with: pnpm cli open ${testCase.startUrl} --headless --session ${session}`,
+    "If you encounter a CAPTCHA or Cloudflare challenge, wait for the page to finish resolving before taking further actions.",
     `Use pnpm cli snapshot --session ${session} --objective "<...>" at least once before your final answer.`,
     `Before finishing, run: pnpm cli exec --session ${session} "return { url: await page.url(), title: await page.title() }"`,
     `Then close the browser with: pnpm cli close --session ${session}`,
@@ -409,7 +414,7 @@ async function createWorkspacePackageJson(
         private: true,
         type: "module",
         scripts: {
-          cli: "LIBRETTO_REPO_ROOT=. node ./dist/cli/index.js",
+          cli: getBenchmarkWorkspaceCliScript(),
         },
         bin: {
           libretto: "./dist/cli/index.js",

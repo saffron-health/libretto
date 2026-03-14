@@ -24,13 +24,13 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Configure gcloud secret access for evaluator
+      - name: Configure test auth inputs
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           set -euo pipefail
           if [ -z "${OPENAI_API_KEY}" ]; then
-            echo "OPENAI_API_KEY secret is required for evaluator tests." >&2
+            echo "OPENAI_API_KEY secret is required for CLI tests." >&2
             exit 1
           fi
 
@@ -75,5 +75,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+
       - name: Run tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: pnpm test

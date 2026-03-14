@@ -14,6 +14,9 @@ import {
   LIBRETTO_SESSIONS_DIR,
 } from "./context.js";
 import {
+  getSessionConnectionEndpoint,
+  getSessionOwnerPid,
+  isLocalSessionState,
   SESSION_STATE_VERSION,
   parseSessionStateContent,
   serializeSessionState,
@@ -71,8 +74,9 @@ export function readSessionState(
     const state = parseSessionStateContent(content, stateFile);
     logger?.info("session-state-read", {
       session,
-      port: state.port,
-      pid: state.pid,
+      provider: state.provider,
+      pid: getSessionOwnerPid(state),
+      ...(isLocalSessionState(state) ? { port: state.port } : {}),
     });
     return state;
   } catch (err) {
@@ -154,8 +158,9 @@ export function writeSessionState(
   logger?.info("session-state-write", {
     session: state.session,
     stateFile,
-    port: state.port,
-    pid: state.pid,
+    provider: state.provider,
+    pid: getSessionOwnerPid(state),
+    ...(isLocalSessionState(state) ? { port: state.port } : {}),
   });
 }
 
@@ -198,12 +203,12 @@ export function assertSessionAvailableForStart(
 ): void {
   const existingState = readSessionState(session, logger);
   if (!existingState) return;
-  if (!isPidRunning(existingState.pid)) {
+  if (!isPidRunning(getSessionOwnerPid(existingState))) {
     setSessionStatus(session, "exited", logger);
     return;
   }
-  const endpoint = `http://127.0.0.1:${existingState.port}`;
+  const endpoint = getSessionConnectionEndpoint(existingState);
   throw new Error(
-    `Session "${session}" is already open and connected to ${endpoint} (pid ${existingState.pid}). Create a new session or close the current one with: libretto-cli close --session ${session}`,
+    `Session "${session}" is already open and connected to ${endpoint} (pid ${getSessionOwnerPid(existingState)}). Create a new session or close the current one with: libretto-cli close --session ${session}`,
   );
 }
