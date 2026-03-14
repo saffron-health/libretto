@@ -20,6 +20,13 @@ describe("condenseDom SVG collapsing", () => {
       `<svg aria-label="5&quot; widget &amp; more"><!-- [icon] --></svg>`,
     );
   });
+
+  it("preserves literal dollar sequences inside pre blocks", () => {
+    const html = '<pre>const sample = "$& $\' $` $$";</pre>';
+    const result = condenseDom(html);
+
+    expect(result.html).toBe(html);
+  });
 });
 
 describe("condenseDom attribute allowlist", () => {
