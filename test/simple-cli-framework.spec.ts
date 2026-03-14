@@ -251,6 +251,43 @@ describe("SimpleCLI framework", () => {
     });
   });
 
+  test("accepts global options before commands and injects them only when declared", async () => {
+    const noInput = SimpleCLI.input({ positionals: [], named: {} });
+    const openInput = SimpleCLI.input({
+      positionals: [
+        SimpleCLI.positional("url", z.string()),
+      ],
+      named: {
+        session: SimpleCLI.option(z.string().default("default")),
+      },
+    });
+
+    const app = SimpleCLI.define("libretto", {
+      ai: SimpleCLI.group({
+        routes: {
+          configure: SimpleCLI.command({ description: "configure" })
+            .input(noInput)
+            .handle(async () => "configured"),
+        },
+      }),
+      open: SimpleCLI.command({ description: "open" })
+        .input(openInput)
+        .handle(async ({ input }) => input),
+    }, {
+      globalNamed: {
+        session: SimpleCLI.option(z.string().default("default")),
+      },
+    });
+
+    await expect(app.run(["--session", "debug", "ai", "configure"])).resolves.toBe("configured");
+    await expect(
+      app.run(["--session", "debug", "open", "https://example.com"]),
+    ).resolves.toEqual({
+      url: "https://example.com",
+      session: "debug",
+    });
+  });
+
   test("surfaces command-level input normalization errors from run", async () => {
     const openInput = SimpleCLI.input({
       positionals: [
