@@ -29,6 +29,28 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
+  test("accepts global --session on non-session commands", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const result = await librettoCli("ai configure codex --session review-bot");
+    expect(result.stderr).toBe("");
+    await evaluate(result.stdout).toMatch(
+      "Confirms the AI config was saved.",
+    );
+  });
+
+  test("accepts global --session before the command path", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const result = await librettoCli("--session review-bot ai configure codex");
+    expect(result.stderr).toBe("");
+    await evaluate(result.stdout).toMatch(
+      "Confirms the AI config was saved.",
+    );
+  });
+
   test("fails unknown command with a clear error", async ({
     librettoCli,
   }) => {

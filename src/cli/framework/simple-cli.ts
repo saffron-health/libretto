@@ -56,6 +56,10 @@ type SimpleCLIInputDefinition = {
   named: SimpleCLINamedDefinition;
 };
 
+type SimpleCLIAppConfig = {
+  globalNamed?: SimpleCLINamedDefinition;
+};
+
 type InferPositionals<TDefs extends SimpleCLIPositionalsDefinition> = {
   [TDef in TDefs[number] as TDef["key"]]: z.output<TDef["schema"]>;
 };
@@ -133,6 +137,11 @@ type SimpleCLIGroupConfig<TContext extends SimpleCLIContext> = {
 type ParsedInvocation = {
   routeKey: string;
   rawInput: SimpleCLIInputRaw;
+};
+
+type ExtractedGlobalArgs = {
+  args: readonly string[];
+  named: Readonly<Record<string, unknown>>;
 };
 
 function toCamelCase(input: string): string {
@@ -351,12 +360,15 @@ export class SimpleCLIApp {
   private readonly resolvedCommands = new Map<string, InternalResolvedCommand>();
   private readonly resolvedGroups = new Map<string, InternalResolvedGroup>();
   private readonly routeEntries: InternalResolvedRouteEntry[];
+  private readonly globalNamed: SimpleCLINamedDefinition;
 
   constructor(
     readonly name: string,
     routes: SimpleCLIRouteTree<{}>,
+    config: SimpleCLIAppConfig = {},
   ) {
     const resolution = resolveRouteTree(routes);
+    this.globalNamed = config.globalNamed ?? {};
 
     for (const group of resolution.groups) {
       if (this.resolvedGroups.has(group.routeKey)) {
@@ -412,18 +424,27 @@ export class SimpleCLIApp {
   }
 
   async run(args: readonly string[]): Promise<unknown> {
-    const helpPath = this.resolveHelpPath(args);
+    const extractedGlobalArgs = this.extractGlobalArgs(args);
+    const normalizedArgs = extractedGlobalArgs.args;
+    const helpPath = this.resolveHelpPath(normalizedArgs);
     if (helpPath) {
       return this.renderHelp(helpPath);
     }
 
-    const exactGroup = this.findGroupByPath(args);
+    const exactGroup = this.findGroupByPath(normalizedArgs);
     if (exactGroup) {
       return this.renderGroupHelp(exactGroup);
     }
 
-    const parsed = this.parseInvocation(args);
-    return this.invoke(parsed.routeKey, parsed.rawInput);
+    const parsed = this.parseInvocation(normalizedArgs);
+    return this.invoke(
+      parsed.routeKey,
+      this.injectGlobalNamedArgs(
+        parsed.routeKey,
+        parsed.rawInput,
+        extractedGlobalArgs.named,
+      ),
+    );
   }
 
   renderHelp(path: readonly string[] = []): string {
@@ -521,25 +542,17 @@ export class SimpleCLIApp {
         }
 
         const storeKey = buildNamedArgFlagName(namedEntry.key, namedEntry.spec);
-        if (namedEntry.spec.kind === "flag") {
-          named[storeKey] = inlineValue === undefined
-            ? true
-            : parseBooleanFlagValue(inlineValue, rawName);
-          continue;
+        named[storeKey] = readNamedArgValue(
+          args,
+          index,
+          rawName,
+          `--${rawName}`,
+          namedEntry.spec,
+          inlineValue,
+        );
+        if (inlineValue === undefined && namedEntry.spec.kind !== "flag") {
+          index += 1;
         }
-
-        if (inlineValue !== undefined) {
-          named[storeKey] = inlineValue;
-          continue;
-        }
-
-        const nextValue = args[index + 1];
-        if (nextValue === undefined) {
-          throw new Error(`Missing value for --${rawName}.`);
-        }
-
-        named[storeKey] = nextValue;
-        index += 1;
         continue;
       }
 
@@ -551,25 +564,17 @@ export class SimpleCLIApp {
         }
 
         const storeKey = buildNamedArgFlagName(namedEntry.key, namedEntry.spec);
-        if (namedEntry.spec.kind === "flag") {
-          named[storeKey] = inlineValue === undefined
-            ? true
-            : parseBooleanFlagValue(inlineValue, rawName);
-          continue;
+        named[storeKey] = readNamedArgValue(
+          args,
+          index,
+          rawName,
+          `-${rawName}`,
+          namedEntry.spec,
+          inlineValue,
+        );
+        if (inlineValue === undefined && namedEntry.spec.kind !== "flag") {
+          index += 1;
         }
-
-        if (inlineValue !== undefined) {
-          named[storeKey] = inlineValue;
-          continue;
-        }
-
-        const nextValue = args[index + 1];
-        if (nextValue === undefined) {
-          throw new Error(`Missing value for -${rawName}.`);
-        }
-
-        named[storeKey] = nextValue;
-        index += 1;
         continue;
       }
 
@@ -581,6 +586,113 @@ export class SimpleCLIApp {
 
     return {
       positionals,
+      named,
+    };
+  }
+
+  private extractGlobalArgs(args: readonly string[]): ExtractedGlobalArgs {
+    if (Object.keys(this.globalNamed).length === 0) {
+      return {
+        args,
+        named: {},
+      };
+    }
+
+    const remainingArgs: string[] = [];
+    const named: Record<string, unknown> = {};
+    const namedSpecs = buildNamedArgLookup(this.globalNamed);
+
+    for (let index = 0; index < args.length; index += 1) {
+      const arg = args[index]!;
+
+      if (arg === "--") {
+        remainingArgs.push(...args.slice(index));
+        break;
+      }
+
+      if (arg.startsWith("--")) {
+        const [rawName, inlineValue] = splitNamedArg(arg.slice(2));
+        const namedEntry = namedSpecs.get(rawName);
+        if (!namedEntry) {
+          remainingArgs.push(arg);
+          continue;
+        }
+
+        named[namedEntry.key] = readNamedArgValue(
+          args,
+          index,
+          rawName,
+          `--${rawName}`,
+          namedEntry.spec,
+          inlineValue,
+        );
+        if (inlineValue === undefined && namedEntry.spec.kind !== "flag") {
+          index += 1;
+        }
+        continue;
+      }
+
+      if (arg.startsWith("-")) {
+        const [rawName, inlineValue] = splitNamedArg(arg.slice(1));
+        const namedEntry = namedSpecs.get(rawName);
+        if (!namedEntry) {
+          remainingArgs.push(arg);
+          continue;
+        }
+
+        named[namedEntry.key] = readNamedArgValue(
+          args,
+          index,
+          rawName,
+          `-${rawName}`,
+          namedEntry.spec,
+          inlineValue,
+        );
+        if (inlineValue === undefined && namedEntry.spec.kind !== "flag") {
+          index += 1;
+        }
+        continue;
+      }
+
+      remainingArgs.push(arg);
+    }
+
+    return {
+      args: remainingArgs,
+      named,
+    };
+  }
+
+  private injectGlobalNamedArgs(
+    routeKey: string,
+    rawInput: SimpleCLIInputRaw,
+    globalNamed: Readonly<Record<string, unknown>>,
+  ): SimpleCLIInputRaw {
+    if (Object.keys(globalNamed).length === 0) {
+      return rawInput;
+    }
+
+    const inputDefinition = this.resolvedCommands.get(routeKey)?.input?.getDefinition();
+    if (!inputDefinition) {
+      return rawInput;
+    }
+
+    const named = { ...(rawInput.named ?? {}) };
+    let changed = false;
+
+    for (const key of Object.keys(inputDefinition.named)) {
+      if (Object.prototype.hasOwnProperty.call(named, key)) continue;
+      if (!Object.prototype.hasOwnProperty.call(globalNamed, key)) continue;
+      named[key] = globalNamed[key];
+      changed = true;
+    }
+
+    if (!changed) {
+      return rawInput;
+    }
+
+    return {
+      positionals: rawInput.positionals ?? [],
       named,
     };
   }
@@ -726,6 +838,32 @@ function splitNamedArg(arg: string): [string, string | undefined] {
     arg.slice(0, separatorIndex),
     arg.slice(separatorIndex + 1),
   ];
+}
+
+function readNamedArgValue(
+  args: readonly string[],
+  index: number,
+  rawName: string,
+  displayName: string,
+  spec: SimpleCLINamedArgDefinition<ZodTypeAny>,
+  inlineValue: string | undefined,
+): unknown {
+  if (spec.kind === "flag") {
+    return inlineValue === undefined
+      ? true
+      : parseBooleanFlagValue(inlineValue, rawName);
+  }
+
+  if (inlineValue !== undefined) {
+    return inlineValue;
+  }
+
+  const nextValue = args[index + 1];
+  if (nextValue === undefined) {
+    throw new Error(`Missing value for ${displayName}.`);
+  }
+
+  return nextValue;
 }
 
 function buildNamedArgLookup(namedDefinition: SimpleCLINamedDefinition): Map<
@@ -1060,8 +1198,12 @@ function use<TContextOut extends SimpleCLIContext>(
   return createScope<{}, TContextOut>([middleware]);
 }
 
-function define(name: string, routes: SimpleCLIRouteTree<{}>): SimpleCLIApp {
-  return new SimpleCLIApp(name, routes);
+function define(
+  name: string,
+  routes: SimpleCLIRouteTree<{}>,
+  config?: SimpleCLIAppConfig,
+): SimpleCLIApp {
+  return new SimpleCLIApp(name, routes, config);
 }
 
 export type InferInput<TInput extends SimpleCLIInput<unknown>> = TInput extends SimpleCLIInput<

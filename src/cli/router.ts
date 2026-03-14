@@ -4,6 +4,7 @@ import { createBrowserCommands } from "./commands/browser.js";
 import { createExecutionCommands } from "./commands/execution.js";
 import { initCommand } from "./commands/init.js";
 import { logCommands } from "./commands/logs.js";
+import { sessionOption } from "./commands/shared.js";
 import { createSnapshotCommand } from "./commands/snapshot.js";
 import { SimpleCLI } from "./framework/simple-cli.js";
 
@@ -19,7 +20,9 @@ export function buildCLIRoutes(logger: Logger) {
 }
 
 export function createCLIApp(logger: Logger) {
-  return SimpleCLI.define("libretto-cli", buildCLIRoutes(logger));
+  return SimpleCLI.define("libretto-cli", buildCLIRoutes(logger), {
+    globalNamed: {
+      session: sessionOption(),
+    },
+  });
 }
-
-export const CLI_ROOT_COMMANDS = Object.keys(buildCLIRoutes({} as Logger));
