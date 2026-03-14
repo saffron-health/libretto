@@ -170,6 +170,17 @@ describe("basic CLI subprocess behavior", () => {
     );
   });
 
+  test("accepts hyphen-prefixed session values", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const result = await librettoCli("pages --session -dash");
+    await evaluate(result.stderr).toMatch(
+      'Explains that session "-dash" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session -dash.',
+    );
+    expect(result.stderr).not.toContain("Missing value for --session.");
+  });
+
   test("fails run with invalid JSON in --params-file", async ({
     librettoCli,
     evaluate,

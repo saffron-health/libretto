@@ -550,6 +550,7 @@ export class SimpleCLIApp {
           `--${rawName}`,
           namedEntry.spec,
           inlineValue,
+          namedSpecs,
         );
         if (inlineValue === undefined && namedEntry.spec.kind !== "flag") {
           index += 1;
@@ -572,6 +573,7 @@ export class SimpleCLIApp {
           `-${rawName}`,
           namedEntry.spec,
           inlineValue,
+          namedSpecs,
         );
         if (inlineValue === undefined && namedEntry.spec.kind !== "flag") {
           index += 1;
@@ -626,6 +628,7 @@ export class SimpleCLIApp {
           `--${rawName}`,
           namedEntry.spec,
           inlineValue,
+          namedSpecs,
         );
         if (inlineValue === undefined && namedEntry.spec.kind !== "flag") {
           index += 1;
@@ -648,6 +651,7 @@ export class SimpleCLIApp {
           `-${rawName}`,
           namedEntry.spec,
           inlineValue,
+          namedSpecs,
         );
         if (inlineValue === undefined && namedEntry.spec.kind !== "flag") {
           index += 1;
@@ -848,6 +852,7 @@ function readNamedArgValue(
   displayName: string,
   spec: SimpleCLINamedArgDefinition<ZodTypeAny>,
   inlineValue: string | undefined,
+  namedSpecs: ReadonlyMap<string, { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }>,
 ): unknown {
   if (spec.kind === "flag") {
     return inlineValue === undefined
@@ -863,12 +868,27 @@ function readNamedArgValue(
   if (
     nextValue === undefined
     || nextValue === "--"
-    || (nextValue.startsWith("-") && nextValue !== "-")
+    || isRecognizedNamedArgToken(nextValue, namedSpecs)
   ) {
     throw new Error(`Missing value for ${displayName}.`);
   }
 
   return nextValue;
+}
+
+function isRecognizedNamedArgToken(
+  token: string,
+  namedSpecs: ReadonlyMap<string, { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }>,
+): boolean {
+  if (token === "-" || !token.startsWith("-")) {
+    return false;
+  }
+
+  const normalizedToken = token.startsWith("--")
+    ? token.slice(2)
+    : token.slice(1);
+  const [rawName] = splitNamedArg(normalizedToken);
+  return namedSpecs.has(rawName);
 }
 
 function buildNamedArgLookup(namedDefinition: SimpleCLINamedDefinition): Map<

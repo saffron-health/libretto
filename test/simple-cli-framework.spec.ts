@@ -329,6 +329,27 @@ describe("SimpleCLI framework", () => {
     ).rejects.toThrow("Missing value for --filter.");
   });
 
+  test("allows hyphen-prefixed option values when they are not recognized flags", async () => {
+    const input = SimpleCLI.input({
+      positionals: [],
+      named: {
+        session: SimpleCLI.option(z.string()),
+      },
+    });
+
+    const app = SimpleCLI.define("libretto", {
+      pages: SimpleCLI.command({ description: "pages" })
+        .input(input)
+        .handle(async ({ input }) => input),
+    });
+
+    await expect(
+      app.run(["pages", "--session", "-dash"]),
+    ).resolves.toEqual({
+      session: "-dash",
+    });
+  });
+
   test("surfaces command-level input normalization errors from run", async () => {
     const openInput = SimpleCLI.input({
       positionals: [
