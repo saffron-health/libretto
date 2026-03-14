@@ -111,45 +111,62 @@ export async function createKernelBrowserSession(
 	const browserSession = await kernelClient.browsers.create(
 		buildKernelBrowserCreateParams(args.headless),
 	);
-	const browser = await chromiumClient.connectOverCDP(browserSession.cdp_ws_url);
-	const { context, page } = await resolveConnectedPage(browser);
-
-	page.setDefaultTimeout(30_000);
-	page.setDefaultNavigationTimeout(45_000);
-
-	await installSessionTelemetryImpl({
-		context,
-		initialPage: page,
-		includeUserDomActions: true,
-		logAction: args.logAction,
-		logNetwork: args.logNetwork,
-	});
-
-	await page.goto(args.url);
-
-	writeSessionStateImpl({
-		provider: "kernel",
-		session: args.session,
-		cdpWsUrl: browserSession.cdp_ws_url,
-		sessionId: browserSession.session_id,
-		pid: args.ownerPid ?? process.pid,
-		startedAt: (args.now?.() ?? new Date()).toISOString(),
-		status: "active",
-	});
-
+	let browser: Browser | null = null;
 	let cleanedUp = false;
-	return {
-		browser,
-		context,
-		page,
-		cdpWsUrl: browserSession.cdp_ws_url,
-		sessionId: browserSession.session_id,
-		cleanup: async () => {
-			if (cleanedUp) return;
-			cleanedUp = true;
+	const cleanup = async () => {
+		if (cleanedUp) return;
+		cleanedUp = true;
 
+		if (browser) {
 			disconnectCDPBrowser(browser);
-			await kernelClient.browsers.deleteByID(browserSession.session_id);
-		},
+		}
+		await kernelClient.browsers.deleteByID(browserSession.session_id);
 	};
+
+	try {
+		browser = await chromiumClient.connectOverCDP(browserSession.cdp_ws_url);
+		const { context, page } = await resolveConnectedPage(browser);
+
+		page.setDefaultTimeout(30_000);
+		page.setDefaultNavigationTimeout(45_000);
+
+		await installSessionTelemetryImpl({
+			context,
+			initialPage: page,
+			includeUserDomActions: true,
+			logAction: args.logAction,
+			logNetwork: args.logNetwork,
+		});
+
+		await page.goto(args.url);
+
+		writeSessionStateImpl({
+			provider: "kernel",
+			session: args.session,
+			cdpWsUrl: browserSession.cdp_ws_url,
+			sessionId: browserSession.session_id,
+			pid: args.ownerPid ?? process.pid,
+			startedAt: (args.now?.() ?? new Date()).toISOString(),
+			status: "active",
+		});
+
+		return {
+			browser,
+			context,
+			page,
+			cdpWsUrl: browserSession.cdp_ws_url,
+			sessionId: browserSession.session_id,
+			cleanup,
+		};
+	} catch (error) {
+		try {
+			await cleanup();
+		} catch (cleanupError) {
+			throw new AggregateError(
+				[error, cleanupError],
+				"Failed to initialize Kernel browser session and clean it up.",
+			);
+		}
+		throw error;
+	}
 }
