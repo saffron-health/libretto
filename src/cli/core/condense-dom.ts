@@ -7,7 +7,7 @@
  *
  * Rules applied in order:
  *   1.  Noscript blocks — remove entirely
- *   2.  HTML comments — remove (except IE conditionals)
+ *   2.  HTML comments — remove entirely
  *   3.  Script contents — hollow out, keep tags + useful attributes
  *   4.  Style contents — hollow out, keep tags + useful attributes
  *   5.  Embedded binary data — replace base64 data URIs
@@ -149,7 +149,7 @@ export function condenseDom(html: string): CondenseDomResult {
   result = track(
     "comments",
     result,
-    result.replace(/<!--[\s\S]*?-->/g, ""),
+    result.replace(/<!--[\s\S]*?(?:-->|$)/g, ""),
   );
 
   // ── Rule 3: Script contents ──────────────────────────────────────────
@@ -157,7 +157,7 @@ export function condenseDom(html: string): CondenseDomResult {
     "scripts",
     result,
     result.replace(
-      /(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>)/gi,
+      /(<script\b[^>]*>)([\s\S]*?)(<\/script(?:\s[^>]*)?>)/gi,
       (_match, open: string, content: string, close: string) => {
         if (!content.trim()) return `${open}${close}`;
         const isDataScript =
@@ -175,7 +175,7 @@ export function condenseDom(html: string): CondenseDomResult {
     "styles",
     result,
     result.replace(
-      /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi,
+      /(<style\b[^>]*>)([\s\S]*?)(<\/style(?:\s[^>]*)?>)/gi,
       (_match, open: string, content: string, close: string) => {
         if (!content.trim()) return `${open}${close}`;
         return `${open}[CSS, ${content.length} chars]${close}`;
