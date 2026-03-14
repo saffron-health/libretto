@@ -80,13 +80,24 @@ export function loadSnapshotEnv(): void {
 }
 
 function decodeDotEnvEscapes(value: string): string {
-	return value
-		.replace(/\\n/g, "\n")
-		.replace(/\\r/g, "\r")
-		.replace(/\\t/g, "\t")
-		.replace(/\\\\/g, "\\")
-		.replace(/\\"/g, '"')
-		.replace(/\\'/g, "'");
+	return value.replace(/\\([nrt\\'"])/g, (_match, escape: string) => {
+		switch (escape) {
+			case "n":
+				return "\n";
+			case "r":
+				return "\r";
+			case "t":
+				return "\t";
+			case "\\":
+				return "\\";
+			case '"':
+				return '"';
+			case "'":
+				return "'";
+			default:
+				return `\\${escape}`;
+		}
+	});
 }
 
 export function parseDotEnvAssignment(
