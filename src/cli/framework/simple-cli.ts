@@ -860,7 +860,11 @@ function readNamedArgValue(
   }
 
   const nextValue = args[index + 1];
-  if (nextValue === undefined) {
+  if (
+    nextValue === undefined
+    || nextValue === "--"
+    || (nextValue.startsWith("-") && nextValue !== "-")
+  ) {
     throw new Error(`Missing value for ${displayName}.`);
   }
 

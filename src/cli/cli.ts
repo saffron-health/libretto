@@ -64,10 +64,17 @@ function readSessionArgBeforePassthrough(
   for (let index = 0; index < rawArgs.length; index += 1) {
     const token = rawArgs[index];
     if (token === "--") return undefined;
-    if (token !== "--session") continue;
+    if (token === "--session") {
+      const value = rawArgs[index + 1];
+      if (!value || value === "--" || value.startsWith("--")) {
+        return null;
+      }
+      return value;
+    }
+    if (!token.startsWith("--session=")) continue;
 
-    const value = rawArgs[index + 1];
-    if (!value || value === "--" || value.startsWith("--")) {
+    const value = token.slice("--session=".length);
+    if (value.length === 0 || value === "--" || value.startsWith("--")) {
       return null;
     }
     return value;

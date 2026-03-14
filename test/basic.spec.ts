@@ -157,6 +157,19 @@ describe("basic CLI subprocess behavior", () => {
     );
   });
 
+  test("fails fast for invalid inline session names before command execution", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const result = await librettoCli(
+      "--session=../bad-name open https://example.com",
+    );
+    expect(result.stdout).toBe("");
+    await evaluate(result.stderr).toMatch(
+      "Reports that the provided session name is invalid and only allows letters, numbers, dots, underscores, and dashes.",
+    );
+  });
+
   test("fails run with invalid JSON in --params-file", async ({
     librettoCli,
     evaluate,

@@ -309,6 +309,26 @@ describe("SimpleCLI framework", () => {
     ).resolves.toBe("await page.goto('https://example.com')");
   });
 
+  test("throws a missing-value error when the next token is another flag", async () => {
+    const input = SimpleCLI.input({
+      positionals: [],
+      named: {
+        filter: SimpleCLI.option(z.string().optional()),
+        clear: SimpleCLI.flag(),
+      },
+    });
+
+    const app = SimpleCLI.define("libretto", {
+      network: SimpleCLI.command({ description: "network" })
+        .input(input)
+        .handle(async ({ input }) => input),
+    });
+
+    await expect(
+      app.run(["network", "--filter", "--clear"]),
+    ).rejects.toThrow("Missing value for --filter.");
+  });
+
   test("surfaces command-level input normalization errors from run", async () => {
     const openInput = SimpleCLI.input({
       positionals: [
