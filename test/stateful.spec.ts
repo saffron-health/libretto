@@ -5,6 +5,18 @@ import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
 const SNAPSHOT_PRESETS = ["codex", "claude", "gemini"] as const;
+const DISABLE_SNAPSHOT_API_ENV: Record<string, string> = {
+  LIBRETTO_DISABLE_DOTENV: "1",
+  LIBRETTO_SNAPSHOT_MODEL: "",
+  OPENAI_API_KEY: "",
+  ANTHROPIC_API_KEY: "",
+  GEMINI_API_KEY: "",
+  GOOGLE_GENERATIVE_AI_API_KEY: "",
+  GOOGLE_CLOUD_PROJECT: "",
+  GCLOUD_PROJECT: "",
+  GOOGLE_CLOUD_LOCATION: "",
+  GOOGLE_APPLICATION_CREDENTIALS: "",
+};
 
 function extractReturnedSessionId(output: string): string | null {
   const patterns = [
@@ -211,22 +223,25 @@ describe("state-driven CLI subprocess behavior", () => {
       const analyzerPath = await writeFakeAnalyzer(workspaceDir);
       await librettoCli(
         `ai configure ${preset} -- "${process.execPath}" "${analyzerPath}" "${preset}"`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
 
       const opened = await librettoCli(
         `open https://example.com --headless --session ${session}`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
       expect(opened.stdout).toContain("Browser open");
 
       const snapshot = await librettoCli(
         `snapshot --objective "Find heading" --context "Preset ${preset} snapshot smoke test" --session ${session}`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
       expect(snapshot.stdout).toContain("Interpretation:");
       expect(snapshot.stdout).toContain(`Answer: snapshot-ok-${preset}`);
     }, 45_000);
   }
 
-  test("snapshot passes inline full DOM and direct image input to codex", async ({
+  test("custom codex analyzer still receives inline full DOM and direct image input", async ({
     librettoCli,
     workspaceDir,
   }) => {
@@ -248,15 +263,18 @@ describe("state-driven CLI subprocess behavior", () => {
     try {
       await librettoCli(
         `ai configure codex -- "${process.execPath}" "${analyzerPath}" "codex" "${recordPath}"`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
 
       const opened = await librettoCli(
         `open ${server.url} --headless --session ${session}`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
       expect(opened.stdout).toContain("Browser open");
 
       const snapshot = await librettoCli(
         `snapshot --objective "Find the call to action button" --context "Codex inline snapshot regression" --session ${session}`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
       expect(snapshot.stdout).toContain("Answer: snapshot-ok-codex");
 
@@ -270,7 +288,7 @@ describe("state-driven CLI subprocess behavior", () => {
       expect(record.args).not.toContain("--output-format");
       expect(record.stdin).toContain("Selected HTML snapshot: full DOM");
       expect(record.stdin).toContain(
-        "Full DOM is within 75% of the estimated context window",
+        "Full DOM fits within the estimated prompt budget",
       );
       expect(record.stdin).toContain('componentkey="full-dom-marker"');
       expect(record.stdin).toContain("HTML snapshot (full DOM):");
@@ -282,7 +300,7 @@ describe("state-driven CLI subprocess behavior", () => {
     }
   }, 45_000);
 
-  test("snapshot passes structured image input to claude and uses condensed DOM when full DOM is too large", async ({
+  test("custom claude analyzer still receives structured image input and condensed DOM when full DOM is too large", async ({
     librettoCli,
     workspaceDir,
   }) => {
@@ -296,15 +314,18 @@ describe("state-driven CLI subprocess behavior", () => {
     try {
       await librettoCli(
         `ai configure claude -- "${process.execPath}" "${analyzerPath}" "claude" "${recordPath}"`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
 
       const opened = await librettoCli(
         `open ${server.url} --headless --session ${session}`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
       expect(opened.stdout).toContain("Browser open");
 
       const snapshot = await librettoCli(
         `snapshot --objective "Find the repeated card action button" --context "Claude inline snapshot regression" --session ${session}`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
       expect(snapshot.stdout).toContain("Answer: snapshot-ok-claude");
 
@@ -358,7 +379,7 @@ describe("state-driven CLI subprocess behavior", () => {
 
       expect(textBlock?.text).toContain("Selected HTML snapshot: condensed DOM");
       expect(textBlock?.text).toContain(
-        "Full DOM exceeds 75% of the estimated context window",
+        "Full DOM would exceed the estimated prompt budget",
       );
       expect(textBlock?.text).toContain("HTML snapshot (condensed DOM):");
       expect(textBlock?.text).not.toContain(
@@ -380,15 +401,18 @@ describe("state-driven CLI subprocess behavior", () => {
     const analyzerPath = await writeFakeAnalyzer(workspaceDir);
     await librettoCli(
       `ai configure codex -- "${process.execPath}" "${analyzerPath}" "objective-only"`,
+      DISABLE_SNAPSHOT_API_ENV,
     );
 
     const opened = await librettoCli(
       `open https://example.com --headless --session ${session}`,
+      DISABLE_SNAPSHOT_API_ENV,
     );
     expect(opened.stdout).toContain("Browser open");
 
     const snapshot = await librettoCli(
       `snapshot --objective "Find heading" --session ${session}`,
+      DISABLE_SNAPSHOT_API_ENV,
     );
     expect(snapshot.stdout).toContain("Interpretation:");
     expect(snapshot.stdout).toContain("Answer: snapshot-ok-objective-only");
@@ -402,15 +426,18 @@ describe("state-driven CLI subprocess behavior", () => {
     const analyzerPath = await writeEarlyExitAnalyzer(workspaceDir);
     await librettoCli(
       `ai configure codex -- "${process.execPath}" "${analyzerPath}"`,
+      DISABLE_SNAPSHOT_API_ENV,
     );
 
     const opened = await librettoCli(
       `open https://example.com --headless --session ${session}`,
+      DISABLE_SNAPSHOT_API_ENV,
     );
     expect(opened.stdout).toContain("Browser open");
 
     const snapshot = await librettoCli(
       `snapshot --objective "Find heading" --session ${session}`,
+      DISABLE_SNAPSHOT_API_ENV,
     );
     expect(snapshot.exitCode).toBe(1);
     expect(snapshot.stderr).toContain("Analyzer command failed");
@@ -427,15 +454,18 @@ describe("state-driven CLI subprocess behavior", () => {
       const analyzerPath = await writeFakeAnalyzer(workspaceDir);
       await librettoCli(
         `ai configure ${preset} -- "${process.execPath}" "${analyzerPath}" "${preset}"`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
 
       const opened = await librettoCli(
         `open https://example.com --headless --session ${session}`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
       expect(opened.stdout).toContain("Browser open");
 
       const snapshot = await librettoCli(
         `snapshot --objective "Find heading" --context "${preset} stdin verification" --session ${session}`,
+        DISABLE_SNAPSHOT_API_ENV,
       );
       expect(snapshot.stdout).toContain("Interpretation:");
       expect(snapshot.stdout).toContain("stdin-has-objective=true");

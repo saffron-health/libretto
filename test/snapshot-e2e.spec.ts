@@ -11,7 +11,7 @@ import { test } from "./fixtures";
  * - Snapshot analysis on real sites with saved profiles (LinkedIn).
  *
  * Requirements:
- * - An AI preset must be configured (codex, claude, or gemini) for snapshot analysis.
+ * - API credentials must be available for one supported snapshot provider.
  * - Network access to the target sites.
  * - Playwright Chromium installed.
  * - Saved profile in .libretto/profiles/linkedin.com.json for authenticated LinkedIn test.
@@ -19,6 +19,8 @@ import { test } from "./fixtures";
 
 const SNAPSHOT_TIMEOUT = 180_000;
 const PAGE_SETTLE_MS = 45_000;
+const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
+const linkedInProfilePath = resolve(repoRoot, ".libretto/profiles/linkedin.com.json");
 
 function resolveSharedRepoEnvPath(repoRoot: string): string | null {
   const gitPath = resolve(repoRoot, ".git");
@@ -38,7 +40,6 @@ function resolveSharedRepoEnvPath(repoRoot: string): string | null {
 
 /** Load API keys from repo root .env so the CLI subprocess can use them. */
 function loadEnvFile(): Record<string, string> {
-  const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
   const envPathCandidates = [
     resolve(repoRoot, ".env"),
     resolveSharedRepoEnvPath(repoRoot),
@@ -66,33 +67,79 @@ const snapshotEnv: Record<string, string> = {
   ...(dotEnv.ANTHROPIC_API_KEY
     ? { ANTHROPIC_API_KEY: dotEnv.ANTHROPIC_API_KEY }
     : {}),
+  ...(dotEnv.GEMINI_API_KEY ? { GEMINI_API_KEY: dotEnv.GEMINI_API_KEY } : {}),
+  ...(dotEnv.GOOGLE_GENERATIVE_AI_API_KEY
+    ? { GOOGLE_GENERATIVE_AI_API_KEY: dotEnv.GOOGLE_GENERATIVE_AI_API_KEY }
+    : {}),
+  ...(dotEnv.GOOGLE_CLOUD_PROJECT
+    ? { GOOGLE_CLOUD_PROJECT: dotEnv.GOOGLE_CLOUD_PROJECT }
+    : {}),
+  ...(dotEnv.GCLOUD_PROJECT
+    ? { GCLOUD_PROJECT: dotEnv.GCLOUD_PROJECT }
+    : {}),
+  ...(dotEnv.GOOGLE_CLOUD_LOCATION
+    ? { GOOGLE_CLOUD_LOCATION: dotEnv.GOOGLE_CLOUD_LOCATION }
+    : {}),
+  ...(dotEnv.GOOGLE_APPLICATION_CREDENTIALS
+    ? {
+        GOOGLE_APPLICATION_CREDENTIALS:
+          dotEnv.GOOGLE_APPLICATION_CREDENTIALS,
+      }
+    : {}),
   ...(process.env.OPENAI_API_KEY
     ? { OPENAI_API_KEY: process.env.OPENAI_API_KEY }
     : {}),
   ...(process.env.ANTHROPIC_API_KEY
     ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY }
     : {}),
+  ...(process.env.GEMINI_API_KEY
+    ? { GEMINI_API_KEY: process.env.GEMINI_API_KEY }
+    : {}),
+  ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    ? {
+        GOOGLE_GENERATIVE_AI_API_KEY:
+          process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      }
+    : {}),
+  ...(process.env.GOOGLE_CLOUD_PROJECT
+    ? { GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT }
+    : {}),
+  ...(process.env.GCLOUD_PROJECT
+    ? { GCLOUD_PROJECT: process.env.GCLOUD_PROJECT }
+    : {}),
+  ...(process.env.GOOGLE_CLOUD_LOCATION
+    ? { GOOGLE_CLOUD_LOCATION: process.env.GOOGLE_CLOUD_LOCATION }
+    : {}),
+  ...(process.env.GOOGLE_APPLICATION_CREDENTIALS
+    ? {
+        GOOGLE_APPLICATION_CREDENTIALS:
+          process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      }
+    : {}),
 };
+const hasSnapshotApiCredentials = Boolean(
+  snapshotEnv.OPENAI_API_KEY
+  || snapshotEnv.ANTHROPIC_API_KEY
+  || snapshotEnv.GEMINI_API_KEY
+  || snapshotEnv.GOOGLE_GENERATIVE_AI_API_KEY
+  || snapshotEnv.GOOGLE_CLOUD_PROJECT
+  || snapshotEnv.GCLOUD_PROJECT,
+);
+const liveSnapshotTest =
+  hasSnapshotApiCredentials && existsSync(linkedInProfilePath) ? test : test.skip;
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
 describe("snapshot e2e – live site analysis", () => {
-  test(
+  liveSnapshotTest(
     "linkedin feed: identifies post content and poster name selectors",
     async ({ librettoCli, evaluate, seedProfile }) => {
       const session = "snapshot-e2e-linkedin";
 
       // Copy saved LinkedIn profile into test workspace so the browser loads authenticated state
-      const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-      const srcProfile = resolve(repoRoot, ".libretto/profiles/linkedin.com.json");
-      if (existsSync(srcProfile)) {
-        await seedProfile("linkedin.com", srcProfile);
-      }
-
-      // Configure AI preset for snapshot analysis
-      await librettoCli(`ai configure codex`, snapshotEnv);
+      await seedProfile("linkedin.com", linkedInProfilePath);
 
       // Uses saved profile from .libretto/profiles/linkedin.com.json if available
       await librettoCli(

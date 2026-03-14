@@ -51,6 +51,15 @@ npx libretto help
 npx libretto run ./integration.ts main
 ```
 
+Snapshot analysis uses the API-based analyzer by default when supported credentials are available. Supported providers are:
+
+- `OPENAI_API_KEY` for OpenAI / Codex-style models
+- `ANTHROPIC_API_KEY` for Anthropic
+- `GEMINI_API_KEY` or `GOOGLE_GENERATIVE_AI_API_KEY` for Gemini API
+- `GOOGLE_CLOUD_PROJECT` (plus ADC credentials) for Vertex AI
+
+You can override the snapshot model explicitly with `LIBRETTO_SNAPSHOT_MODEL=provider/model-id`, for example `openai/gpt-5-mini`, `anthropic/claude-sonnet-4-6`, `google/gemini-2.5-flash`, or `vertex/gemini-2.5-flash`.
+
 ## Authors
 
 Maintained by the team at [Saffron Health](https://saffron.health).

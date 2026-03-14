@@ -6,11 +6,15 @@ import { getSessionSnapshotRunDir } from "../core/context.js";
 import { condenseDom } from "../core/condense-dom.js";
 import { readSessionState } from "../core/session.js";
 import {
-  canAnalyzeSnapshots,
   runInterpret,
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
+import { readAiConfig } from "../core/ai-config.js";
+import {
+  isSnapshotApiUnavailableError,
+  shouldUseApiSnapshotAnalyzer,
+} from "../core/snapshot-api-config.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
@@ -244,6 +248,29 @@ async function runSnapshot(
   objective?: string,
   context?: string,
 ): Promise<void> {
+  const normalizedObjective = objective?.trim();
+  const normalizedContext = context?.trim();
+  if (!normalizedObjective && normalizedContext) {
+    throw new Error(
+      "Couldn't run analysis: --objective is required when providing --context.",
+    );
+  }
+
+  if (!normalizedObjective && !normalizedContext) {
+    const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(
+      session,
+      logger,
+      pageId,
+    );
+
+    console.log("Screenshot saved:");
+    console.log(`  PNG:             ${pngPath}`);
+    console.log(`  HTML:            ${htmlPath}`);
+    console.log(`  Condensed HTML:  ${condensedHtmlPath}`);
+    console.log("Use --objective flag to analyze snapshots.");
+    return;
+  }
+
   const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(
     session,
     logger,
@@ -255,25 +282,6 @@ async function runSnapshot(
   console.log(`  HTML:            ${htmlPath}`);
   console.log(`  Condensed HTML:  ${condensedHtmlPath}`);
 
-  const normalizedObjective = objective?.trim();
-  const normalizedContext = context?.trim();
-  if (!normalizedObjective && !normalizedContext) {
-    console.log("Use --objective flag to analyze snapshots.");
-    return;
-  }
-
-  if (!normalizedObjective) {
-    throw new Error(
-      "Couldn't run analysis: --objective is required when providing --context.",
-    );
-  }
-
-  if (!canAnalyzeSnapshots()) {
-    throw new Error(
-      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini) to enable analysis.",
-    );
-  }
-
   const interpretArgs = {
     objective: normalizedObjective,
     session,
@@ -283,21 +291,22 @@ async function runSnapshot(
     condensedHtmlPath,
   };
 
+  const configuredAi = readAiConfig();
+  if (!shouldUseApiSnapshotAnalyzer(configuredAi)) {
+    await runInterpret(interpretArgs, logger);
+    return;
+  }
+
   try {
     await runApiInterpret(interpretArgs, logger);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const canFallback =
-      canAnalyzeSnapshots()
-      && message.includes("URL scheme must be http or https, got data:");
-
-    if (!canFallback) {
+    if (!configuredAi || !isSnapshotApiUnavailableError(error)) {
       throw error;
     }
 
     logger.warn("snapshot-api-interpret-fallback", {
-      reason: "api-image-transport-error",
-      message,
+      reason: "api-unavailable",
+      message: error instanceof Error ? error.message : String(error),
       session,
     });
     await runInterpret(interpretArgs, logger);

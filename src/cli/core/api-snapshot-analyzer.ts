@@ -2,16 +2,13 @@
  * API-based snapshot analyzer.
  *
  * Sends the DOM snapshot (condensed or full depending on sizing) and screenshot
- * directly to the Anthropic API via the Vercel AI SDK, without spawning a CLI process.
- *
- * Requires ANTHROPIC_API_KEY to be set (loaded from .env at project root if present).
+ * directly to a supported API provider via the Vercel AI SDK, without spawning
+ * a CLI process.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { createLLMClient } from "../../shared/llm/client.js";
-import { REPO_ROOT } from "./context.js";
 import {
   InterpretResultSchema,
   buildInlinePromptSelection,
@@ -19,107 +16,59 @@ import {
   readFileAsBase64,
   type InterpretArgs,
 } from "./snapshot-analyzer.js";
-import type { AiConfig } from "./ai-config.js";
-
-function readWorktreeEnvPath(): string | null {
-  const gitPath = join(REPO_ROOT, ".git");
-  if (!existsSync(gitPath)) return null;
-
-  try {
-    const gitPointer = readFileSync(gitPath, "utf-8").trim();
-    const match = gitPointer.match(/^gitdir:\s*(.+)$/i);
-    if (!match?.[1]) return null;
-    const worktreeGitDir = resolve(REPO_ROOT, match[1].trim());
-    const commonGitDir = resolve(worktreeGitDir, "..", "..");
-    return join(dirname(commonGitDir), ".env");
-  } catch {
-    return null;
-  }
-}
-
-/** Reads .env from the current repo root, then falls back to the shared root for Git worktrees. */
-function loadDotEnv(): void {
-  const envPathCandidates = [
-    join(REPO_ROOT, ".env"),
-    readWorktreeEnvPath(),
-  ].filter((value): value is string => Boolean(value));
-
-  const envPath = envPathCandidates.find((candidate) => existsSync(candidate));
-  if (!envPath) return;
-
-  const lines = readFileSync(envPath, "utf-8").split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx < 1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const value = trimmed.slice(eqIdx + 1).trim();
-    if (key && !(key in process.env)) {
-      process.env[key] = value;
-    }
-  }
-}
-
-/** Anthropic model used for API-based snapshot analysis. */
-const API_SNAPSHOT_MODEL = "anthropic/claude-sonnet-4-6";
-
-/** AiConfig stub used only for context-window and token-budget calculations. */
-const API_SNAPSHOT_CONFIG: AiConfig = {
-  preset: "claude",
-  commandPrefix: ["claude"],
-  model: "claude-sonnet-4-6",
-  updatedAt: new Date(0).toISOString(),
-};
+import { readAiConfig } from "./ai-config.js";
+import {
+  buildSnapshotApiSelectionConfig,
+  loadSnapshotEnv,
+  resolveSnapshotApiModelOrThrow,
+} from "./snapshot-api-config.js";
 
 export async function runApiInterpret(
   args: InterpretArgs,
   logger: LoggerApi,
 ): Promise<void> {
-  loadDotEnv();
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to the .env file at the project root or set it as an environment variable.",
-    );
-  }
+  loadSnapshotEnv();
+  const configuredAi = readAiConfig();
+  const selection = resolveSnapshotApiModelOrThrow(configuredAi);
+  const selectionConfig = buildSnapshotApiSelectionConfig(selection, configuredAi);
 
   logger.info("api-interpret-start", {
     objective: args.objective,
     pngPath: args.pngPath,
     htmlPath: args.htmlPath,
     condensedHtmlPath: args.condensedHtmlPath,
-    model: API_SNAPSHOT_MODEL,
+    model: selection.model,
+    modelSource: selection.source,
   });
 
   const fullHtmlContent = readFileSync(args.htmlPath, "utf-8");
   const condensedHtmlContent = readFileSync(args.condensedHtmlPath, "utf-8");
 
-  const selection = buildInlinePromptSelection(
+  const promptSelection = buildInlinePromptSelection(
     args,
     fullHtmlContent,
     condensedHtmlContent,
-    API_SNAPSHOT_CONFIG,
+    selectionConfig,
   );
 
   logger.info("api-interpret-dom-selection", {
-    configuredModel: selection.stats.configuredModel,
-    fullDomEstimatedTokens: selection.stats.fullDomEstimatedTokens,
-    condensedDomEstimatedTokens: selection.stats.condensedDomEstimatedTokens,
-    contextWindowTokens: selection.budget.contextWindowTokens,
-    promptBudgetTokens: selection.budget.promptBudgetTokens,
-    selectedDom: selection.domSource,
-    selectedHtmlEstimatedTokens: selection.htmlEstimatedTokens,
-    selectedPromptEstimatedTokens: selection.promptEstimatedTokens,
-    selectionReason: selection.selectionReason,
-    truncated: selection.truncated,
+    configuredModel: promptSelection.stats.configuredModel,
+    fullDomEstimatedTokens: promptSelection.stats.fullDomEstimatedTokens,
+    condensedDomEstimatedTokens: promptSelection.stats.condensedDomEstimatedTokens,
+    contextWindowTokens: promptSelection.budget.contextWindowTokens,
+    promptBudgetTokens: promptSelection.budget.promptBudgetTokens,
+    selectedDom: promptSelection.domSource,
+    selectedHtmlEstimatedTokens: promptSelection.htmlEstimatedTokens,
+    selectedPromptEstimatedTokens: promptSelection.promptEstimatedTokens,
+    selectionReason: promptSelection.selectionReason,
+    truncated: promptSelection.truncated,
   });
 
   const imageBase64 = readFileAsBase64(args.pngPath);
   const imageMimeType = getMimeType(args.pngPath);
   const imageBytes = Buffer.from(imageBase64, "base64");
 
-  const client = createLLMClient(API_SNAPSHOT_MODEL);
+  const client = createLLMClient(selection.model);
 
   const result = await client.generateObjectFromMessages({
     schema: InterpretResultSchema,
@@ -127,7 +76,7 @@ export async function runApiInterpret(
       {
         role: "user",
         content: [
-          { type: "text", text: selection.prompt },
+          { type: "text", text: promptSelection.prompt },
           {
             type: "image",
             image: imageBytes,
