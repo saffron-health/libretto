@@ -328,6 +328,72 @@ export async function runOpen(
   await runOpenLocal(rawUrl, headed, session, logger, options);
 }
 
+export async function abortSessionOwnerStartup(
+  pid: number | undefined,
+  session: string,
+  provider: SessionState["provider"],
+  logger: LoggerApi,
+): Promise<void> {
+  if (!pid) {
+    logger.warn("open-child-stop-missing-pid", {
+      session,
+      provider,
+    });
+    return;
+  }
+
+  if (!isPidRunning(pid)) {
+    logger.info("open-child-already-exited", {
+      session,
+      provider,
+      pid,
+    });
+    return;
+  }
+
+  logger.warn("open-child-stop-start", {
+    session,
+    provider,
+    pid,
+  });
+  sendSignalToProcessGroupOrPid(pid, "SIGTERM", logger, session);
+  await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+
+  if (!isPidRunning(pid)) {
+    logger.info("open-child-stop-complete", {
+      session,
+      provider,
+      pid,
+      signal: "SIGTERM",
+    });
+    return;
+  }
+
+  logger.warn("open-child-force-stop", {
+    session,
+    provider,
+    pid,
+  });
+  sendSignalToProcessGroupOrPid(pid, "SIGKILL", logger, session);
+  await waitForCloseSignalWindow(FORCE_CLOSE_WAIT_MS);
+
+  if (!isPidRunning(pid)) {
+    logger.info("open-child-stop-complete", {
+      session,
+      provider,
+      pid,
+      signal: "SIGKILL",
+    });
+    return;
+  }
+
+  logger.error("open-child-force-stop-failed", {
+    session,
+    provider,
+    pid,
+  });
+}
+
 async function runOpenLocal(
   rawUrl: string,
   headed: boolean,
@@ -660,64 +726,72 @@ async function runOpenKernel(
   const pollIntervalMs = 500;
   const maxAttempts = 30;
   const startupTimeoutMs = pollIntervalMs * maxAttempts;
+  try {
+    for (let i = 0; i < maxAttempts; i += 1) {
+      const spawnError = childSpawnError as Error | null;
+      if (spawnError) {
+        const errWithCode = spawnError as Error & { code?: string };
+        const hint =
+          errWithCode.code === "ENOENT"
+            ? " Ensure Node.js is available in PATH for child processes."
+            : "";
+        throw new Error(
+          `Failed to launch browser child process: ${spawnError.message}.${hint} Check logs: ${runLogPath}`,
+        );
+      }
 
-  for (let i = 0; i < maxAttempts; i += 1) {
-    const spawnError = childSpawnError as Error | null;
-    if (spawnError) {
-      const errWithCode = spawnError as Error & { code?: string };
-      const hint =
-        errWithCode.code === "ENOENT"
-          ? " Ensure Node.js is available in PATH for child processes."
-          : "";
-      throw new Error(
-        `Failed to launch browser child process: ${spawnError.message}.${hint} Check logs: ${runLogPath}`,
-      );
+      const earlyExit = childEarlyExit as {
+        code: number | null;
+        signal: NodeJS.Signals | null;
+      } | null;
+      if (earlyExit) {
+        const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
+        throw new Error(
+          `Browser child process exited before startup (status: ${status}). Check logs: ${runLogPath}`,
+        );
+      }
+
+      await new Promise((resolveWait) => setTimeout(resolveWait, pollIntervalMs));
+      const state = readSessionState(session, logger);
+      if (state?.provider === "kernel" && state.pid === child.pid) {
+        logger.info("open-success", {
+          url,
+          mode: browserMode,
+          session,
+          pid: child.pid,
+          provider: "kernel",
+          sessionId: state.sessionId,
+        });
+        console.log(`Browser open (${browserMode}): ${url}`);
+        await new Promise((resolveWait) => setTimeout(resolveWait, 2_000));
+        return;
+      }
+
+      if (i > 0 && i % 5 === 0) {
+        logger.info("open-waiting-for-kernel", {
+          attempt: i,
+          session,
+        });
+      }
     }
 
-    const earlyExit = childEarlyExit as {
-      code: number | null;
-      signal: NodeJS.Signals | null;
-    } | null;
-    if (earlyExit) {
-      const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
-      throw new Error(
-        `Browser child process exited before startup (status: ${status}). Check logs: ${runLogPath}`,
-      );
-    }
-
-    await new Promise((resolveWait) => setTimeout(resolveWait, pollIntervalMs));
+    logger.error("open-timeout", {
+      session,
+      pid: child.pid,
+      attempts: maxAttempts,
+      provider: "kernel",
+    });
+    throw new Error(
+      `Failed to connect to browser after ${Math.ceil(startupTimeoutMs / 1000)}s. Check startup logs: ${runLogPath}`,
+    );
+  } catch (error) {
+    await abortSessionOwnerStartup(child.pid, session, "kernel", logger);
     const state = readSessionState(session, logger);
     if (state?.provider === "kernel" && state.pid === child.pid) {
-      logger.info("open-success", {
-        url,
-        mode: browserMode,
-        session,
-        pid: child.pid,
-        provider: "kernel",
-        sessionId: state.sessionId,
-      });
-      console.log(`Browser open (${browserMode}): ${url}`);
-      await new Promise((resolveWait) => setTimeout(resolveWait, 2_000));
-      return;
+      clearSessionState(session, logger);
     }
-
-    if (i > 0 && i % 5 === 0) {
-      logger.info("open-waiting-for-kernel", {
-        attempt: i,
-        session,
-      });
-    }
+    throw error;
   }
-
-  logger.error("open-timeout", {
-    session,
-    pid: child.pid,
-    attempts: maxAttempts,
-    provider: "kernel",
-  });
-  throw new Error(
-    `Failed to connect to browser after ${Math.ceil(startupTimeoutMs / 1000)}s. Check startup logs: ${runLogPath}`,
-  );
 }
 
 export async function runSave(

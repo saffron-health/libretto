@@ -38,29 +38,25 @@ async function main(): Promise<void> {
 	mkdirSync(dirname(payload.networkLogPath), { recursive: true });
 	const logChild = childLogger(payload);
 
-	const browserSession = await createKernelBrowserSession({
-		session: payload.session,
-		url: payload.url,
-		headless: payload.headless,
-		logAction: (entry) => appendJsonl(payload.actionsLogPath, entry),
-		logNetwork: (entry) => appendJsonl(payload.networkLogPath, entry),
-	});
-
-	logChild("info", "kernel-child-launched", {
-		pid: process.pid,
-		session: payload.session,
-		sessionId: browserSession.sessionId,
-		cdpWsUrl: browserSession.cdpWsUrl,
-	});
-
+	let browserSession:
+		| Awaited<ReturnType<typeof createKernelBrowserSession>>
+		| null = null;
 	let shuttingDown = false;
-	const shutdown = async (
-		event: string,
-		exitCode: number,
-		error?: unknown,
-	): Promise<void> => {
-		if (shuttingDown) return;
-		shuttingDown = true;
+	let pendingShutdown:
+		| {
+				event: string;
+				exitCode: number;
+				error?: unknown;
+		  }
+		| null = null;
+
+	const completeShutdown = async (): Promise<void> => {
+		if (!pendingShutdown) {
+			return;
+		}
+
+		const { event, exitCode, error } = pendingShutdown;
+		pendingShutdown = null;
 
 		if (error) {
 			logChild("error", event, {
@@ -71,25 +67,41 @@ async function main(): Promise<void> {
 			logChild("info", event, {
 				pid: process.pid,
 				session: payload.session,
-				sessionId: browserSession.sessionId,
+				sessionId: browserSession?.sessionId,
 			});
 		}
 
-		try {
-			await browserSession.cleanup();
-		} catch (cleanupError) {
-			logChild("error", "kernel-child-cleanup-error", {
-				message:
-					cleanupError instanceof Error
-						? cleanupError.message
-						: String(cleanupError),
-				stack: cleanupError instanceof Error ? cleanupError.stack : undefined,
-			});
-			process.exit(1);
-			return;
+		if (browserSession) {
+			try {
+				await browserSession.cleanup();
+			} catch (cleanupError) {
+				logChild("error", "kernel-child-cleanup-error", {
+					message:
+						cleanupError instanceof Error
+							? cleanupError.message
+							: String(cleanupError),
+					stack:
+						cleanupError instanceof Error ? cleanupError.stack : undefined,
+				});
+				process.exit(1);
+				return;
+			}
 		}
 
 		process.exit(exitCode);
+	};
+
+	const shutdown = async (
+		event: string,
+		exitCode: number,
+		error?: unknown,
+	): Promise<void> => {
+		if (shuttingDown) return;
+		shuttingDown = true;
+		pendingShutdown = { event, exitCode, error };
+		if (browserSession) {
+			await completeShutdown();
+		}
 	};
 
 	process.on("SIGTERM", () => {
@@ -103,6 +115,41 @@ async function main(): Promise<void> {
 	});
 	process.on("unhandledRejection", (reason) => {
 		void shutdown("kernel-child-unhandled-rejection", 1, reason);
+	});
+
+	try {
+		browserSession = await createKernelBrowserSession({
+			session: payload.session,
+			url: payload.url,
+			headless: payload.headless,
+			logAction: (entry) => appendJsonl(payload.actionsLogPath, entry),
+			logNetwork: (entry) => appendJsonl(payload.networkLogPath, entry),
+		});
+	} catch (error) {
+		const pendingExitCode = (
+			pendingShutdown as { exitCode: number } | null
+		)?.exitCode;
+		if (pendingExitCode !== undefined) {
+			logChild("warn", "kernel-child-startup-aborted", {
+				message: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined,
+			});
+			process.exit(pendingExitCode);
+			return;
+		}
+		throw error;
+	}
+
+	if (pendingShutdown) {
+		await completeShutdown();
+		return;
+	}
+
+	logChild("info", "kernel-child-launched", {
+		pid: process.pid,
+		session: payload.session,
+		sessionId: browserSession.sessionId,
+		cdpWsUrl: browserSession.cdpWsUrl,
 	});
 
 	await new Promise(() => {});

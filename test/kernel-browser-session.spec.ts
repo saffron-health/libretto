@@ -151,4 +151,82 @@ describe("kernel browser session launcher", () => {
 		await result.cleanup();
 		expect(deleteByID).toHaveBeenCalledWith("sess_456");
 	});
+
+	test("startup cleanup deletes the kernel session and disconnects CDP when initialization fails", async () => {
+		const { browser, closeConnection } = createBrowserFixture();
+		const deleteByID = vi.fn(async () => undefined);
+		const writeSessionState = vi.fn();
+
+		await expect(
+			createKernelBrowserSession(
+				{
+					session: "bench-3",
+					url: "https://example.com/start",
+					headless: true,
+					logAction: vi.fn(),
+					logNetwork: vi.fn(),
+				},
+				{
+					kernelClient: {
+						browsers: {
+							create: vi.fn(async () => ({
+								cdp_ws_url: "wss://kernel.example/cdp/session-3",
+								session_id: "sess_789",
+							})),
+							deleteByID,
+						},
+					},
+					chromiumClient: {
+						connectOverCDP: vi.fn(
+							async () => browser as unknown as Browser,
+						) as unknown as (endpoint: string) => Promise<Browser>,
+					},
+					installSessionTelemetryImpl: vi.fn(async () => {
+						throw new Error("telemetry failed");
+					}),
+					writeSessionStateImpl: writeSessionState,
+				},
+			),
+		).rejects.toThrow("telemetry failed");
+
+		expect(closeConnection).toHaveBeenCalledTimes(1);
+		expect(deleteByID).toHaveBeenCalledWith("sess_789");
+		expect(writeSessionState).not.toHaveBeenCalled();
+	});
+
+	test("startup cleanup still deletes the kernel session when CDP connect fails", async () => {
+		const deleteByID = vi.fn(async () => undefined);
+
+		await expect(
+			createKernelBrowserSession(
+				{
+					session: "bench-4",
+					url: "https://example.com/start",
+					headless: true,
+					logAction: vi.fn(),
+					logNetwork: vi.fn(),
+				},
+				{
+					kernelClient: {
+						browsers: {
+							create: vi.fn(async () => ({
+								cdp_ws_url: "wss://kernel.example/cdp/session-4",
+								session_id: "sess_999",
+							})),
+							deleteByID,
+						},
+					},
+					chromiumClient: {
+						connectOverCDP: vi.fn(async () => {
+							throw new Error("cdp connect failed");
+						}) as unknown as (endpoint: string) => Promise<Browser>,
+					},
+					installSessionTelemetryImpl: vi.fn(async () => undefined),
+					writeSessionStateImpl: vi.fn(),
+				},
+			),
+		).rejects.toThrow("cdp connect failed");
+
+		expect(deleteByID).toHaveBeenCalledWith("sess_999");
+	});
 });
