@@ -65,6 +65,20 @@ export const AI_CONFIG_PRESETS: Record<AiPreset, Omit<AiConfig, "updatedAt">> = 
   },
 };
 
+function arrayShallowEqual(left: string[], right: string[]): boolean {
+  return (
+    left.length === right.length
+    && left.every((value, index) => value === right[index])
+  );
+}
+
+export function isDefaultCommandPrefixForPreset(config: AiConfig): boolean {
+  return arrayShallowEqual(
+    config.commandPrefix,
+    AI_CONFIG_PRESETS[config.preset].commandPrefix,
+  );
+}
+
 function invalidConfigError(configPath: string): Error {
   return new Error(
     `AI config is invalid at ${configPath}. Fix the file to match the expected schema or delete it.`,

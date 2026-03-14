@@ -10,6 +10,7 @@ import {
   readAiConfig,
 } from "./ai-config.js";
 import { getLLMClientFactory } from "./context.js";
+import { resolveSnapshotApiModelOrThrow } from "./snapshot-api-config.js";
 
 export type ScreenshotPair = {
   pngPath: string;
@@ -87,8 +88,6 @@ type InlinePromptSelection = {
   budget: SnapshotBudget;
   stats: SnapshotDomStats;
 };
-
-const FULL_DOM_CONTEXT_WINDOW_RATIO = 0.75;
 
 abstract class UserCodingAgent {
   protected constructor(protected readonly config: AiConfig) {}
@@ -833,10 +832,6 @@ function buildSnapshotDomStats(
   };
 }
 
-function getFullDomSelectionThresholdTokens(budget: SnapshotBudget): number {
-  return Math.floor(budget.contextWindowTokens * FULL_DOM_CONTEXT_WINDOW_RATIO);
-}
-
 function buildInlineHtmlPrompt(
   args: InterpretArgs,
   options: {
@@ -921,34 +916,47 @@ export function buildInlinePromptSelection(
     };
   };
 
-  const fullDomSelectionThresholdTokens = getFullDomSelectionThresholdTokens(budget);
-  const selectedDomSource =
-    stats.fullDomEstimatedTokens > fullDomSelectionThresholdTokens
-      ? "condensed"
-      : "full";
-  const selectedHtmlContent =
-    selectedDomSource === "full" ? fullHtmlContent : condensedHtmlContent;
-  const selectedDomReason =
-    selectedDomSource === "full"
-      ? `Full DOM is within 75% of the estimated context window (${stats.fullDomEstimatedTokens.toLocaleString()} <= ${fullDomSelectionThresholdTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`
-      : `Full DOM exceeds 75% of the estimated context window (${stats.fullDomEstimatedTokens.toLocaleString()} > ${fullDomSelectionThresholdTokens.toLocaleString()} tokens), so the analyzer receives the condensed DOM instead.`;
-
-  const selectedCandidate = buildCandidate(
-    selectedDomSource,
-    selectedHtmlContent,
-    selectedDomReason,
+  const fullCandidate = buildCandidate(
+    "full",
+    fullHtmlContent,
+    `Full DOM is small enough to fit within the estimated prompt budget, so the analyzer receives the uncondensed page HTML.`,
     false,
   );
-  if (selectedCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
-    return selectedCandidate;
+  if (fullCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
+    const selectionReason =
+      `Full DOM fits within the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} <= ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`;
+    const prompt = buildInlineHtmlPrompt(args, {
+      htmlContent: fullHtmlContent,
+      domLabel: "full DOM",
+      truncated: false,
+      selectionReason,
+      budget,
+      stats,
+    });
+    return {
+      ...fullCandidate,
+      selectionReason,
+      prompt,
+      promptEstimatedTokens: estimateTokensFromChars(prompt.length),
+    };
+  }
+
+  const condensedCandidate = buildCandidate(
+    "condensed",
+    condensedHtmlContent,
+    `Full DOM would exceed the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} > ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the condensed DOM instead.`,
+    false,
+  );
+  if (condensedCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
+    return condensedCandidate;
   }
 
   const basePrompt = buildInlineHtmlPrompt(args, {
     htmlContent: "",
-    domLabel: selectedCandidate.domLabel,
+    domLabel: condensedCandidate.domLabel,
     truncated: true,
     selectionReason:
-      `${selectedDomReason} The selected HTML snapshot still exceeds the estimated prompt budget, so it is truncated to fit.`,
+      `Both full and condensed DOM snapshots exceed the estimated prompt budget (full ~${fullCandidate.promptEstimatedTokens.toLocaleString()}, condensed ~${condensedCandidate.promptEstimatedTokens.toLocaleString()}, budget ${budget.promptBudgetTokens.toLocaleString()} tokens), so the condensed DOM is truncated to fit.`,
     budget,
     stats,
   });
@@ -956,12 +964,12 @@ export function buildInlinePromptSelection(
     2_000,
     budget.promptBudgetTokens - estimateTokensFromChars(basePrompt.length),
   );
-  const truncatedHtml = truncateText(selectedHtmlContent, availableHtmlTokens * 4);
+  const truncatedHtml = truncateText(condensedHtmlContent, availableHtmlTokens * 4);
 
   return buildCandidate(
-    selectedDomSource,
+    "condensed",
     truncatedHtml.text,
-    `${selectedDomReason} The selected HTML snapshot still exceeds the estimated prompt budget, so it is truncated to fit.`,
+    `Both full and condensed DOM snapshots exceed the estimated prompt budget (full ~${fullCandidate.promptEstimatedTokens.toLocaleString()}, condensed ~${condensedCandidate.promptEstimatedTokens.toLocaleString()}, budget ${budget.promptBudgetTokens.toLocaleString()} tokens), so the condensed DOM is truncated to fit.`,
     truncatedHtml.truncated,
   );
 }
@@ -1053,9 +1061,16 @@ export async function runInterpret(
     }
 
     logger.info("interpret-analyzer-factory-fallback", {});
+    const fallbackSelection = resolveSnapshotApiModelOrThrow(null);
     const fallbackConfig: AiConfig = {
-      preset: "gemini",
-      commandPrefix: ["gemini"],
+      preset:
+        fallbackSelection.provider === "openai"
+          ? "codex"
+          : fallbackSelection.provider === "anthropic"
+            ? "claude"
+            : "gemini",
+      commandPrefix: ["snapshot-api-fallback"],
+      model: fallbackSelection.model,
       updatedAt: new Date(0).toISOString(),
     };
     const selection = buildInlinePromptSelection(
@@ -1067,7 +1082,7 @@ export async function runInterpret(
     const imageBase64 = readFileAsBase64(pngPath);
     const client = await llmClientFactory(
       logger,
-      "google/gemini-3-flash-preview",
+      fallbackSelection.model,
     );
     const result = await client.generateObjectFromMessages({
       schema: InterpretResultSchema,

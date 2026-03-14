@@ -13,7 +13,7 @@ const AI_RUNTIME_PRESETS = AiPresetSchema.options;
 type AIRuntimePreset = (typeof AI_RUNTIME_PRESETS)[number];
 
 function getPresetCommand(preset: AIRuntimePreset): string {
-	return AI_CONFIG_PRESETS[preset][0] ?? "";
+	return AI_CONFIG_PRESETS[preset].commandPrefix[0] ?? "";
 }
 
 function isRunnableFile(filePath: string): boolean {
