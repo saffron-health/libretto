@@ -146,11 +146,10 @@ export function condenseDom(html: string): CondenseDomResult {
   );
 
   // ── Rule 2: HTML comments ────────────────────────────────────────────
-  // Keep IE conditional comments (<!--[if ...)
   result = track(
     "comments",
     result,
-    result.replace(/<!--(?!\[if\s)[\s\S]*?-->/g, ""),
+    result.replace(/<!--[\s\S]*?-->/g, ""),
   );
 
   // ── Rule 3: Script contents ──────────────────────────────────────────
@@ -158,15 +157,15 @@ export function condenseDom(html: string): CondenseDomResult {
     "scripts",
     result,
     result.replace(
-      /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi,
+      /(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>)/gi,
       (_match, open: string, content: string, close: string) => {
         if (!content.trim()) return `${open}${close}`;
         const isDataScript =
           /type\s*=\s*["']application\/(json|ld\+json)["']/i.test(open);
         if (isDataScript) {
-          return `${open}<!-- [JSON data, ${content.length} chars] -->${close}`;
+          return `${open}[JSON data, ${content.length} chars]${close}`;
         }
-        return `${open}<!-- [script, ${content.length} chars] -->${close}`;
+        return `${open}[script, ${content.length} chars]${close}`;
       },
     ),
   );
@@ -176,10 +175,10 @@ export function condenseDom(html: string): CondenseDomResult {
     "styles",
     result,
     result.replace(
-      /(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi,
+      /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi,
       (_match, open: string, content: string, close: string) => {
         if (!content.trim()) return `${open}${close}`;
-        return `${open}<!-- [CSS, ${content.length} chars] -->${close}`;
+        return `${open}[CSS, ${content.length} chars]${close}`;
       },
     ),
   );
@@ -443,9 +442,12 @@ function shouldDropEmptyValue(
 }
 
 function normalizeUrlValue(value: string): string {
+  const loweredValue = value.trim().toLowerCase();
+  if (loweredValue.startsWith("blob:")) return "blob:[omitted]";
+  if (loweredValue.startsWith("javascript:")) return "javascript:[omitted]";
+  if (loweredValue.startsWith("vbscript:")) return "vbscript:[omitted]";
+  if (loweredValue.startsWith("data:")) return "data:[omitted]";
   if (value.length <= 160) return value;
-  if (value.startsWith("blob:")) return "blob:[omitted]";
-  if (value.startsWith("javascript:")) return "javascript:[omitted]";
 
   try {
     const isAbsolute = /^[a-z][a-z0-9+.-]*:/i.test(value);

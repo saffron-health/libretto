@@ -27,6 +27,12 @@ describe("condenseDom SVG collapsing", () => {
 
     expect(result.html).toBe(html);
   });
+
+  it("removes HTML comments entirely", () => {
+    const result = condenseDom(`<div>Hello</div><!-- hidden --><span>World</span>`);
+
+    expect(result.html).toBe(`<div>Hello</div><span>World</span>`);
+  });
 });
 
 describe("condenseDom attribute allowlist", () => {
@@ -66,6 +72,15 @@ describe("condenseDom attribute allowlist", () => {
     );
   });
 
+  it("sanitizes dangerous URL schemes even when the URL is short", () => {
+    const result = condenseDom(
+      `<a href="javascript:alert(1)">Click</a><img src="data:text/plain,hello" />`,
+    );
+
+    expect(result.html).toContain(`href="javascript:[omitted]"`);
+    expect(result.html).toContain(`src="data:[omitted]"`);
+  });
+
   it("preserves existing html-escaped attribute values without double escaping", () => {
     const result = condenseDom(
       `<img src="https://example.com/image?x=1&amp;y=2" alt="Example &amp; more" />`,
@@ -92,6 +107,27 @@ describe("condenseDom attribute allowlist", () => {
 
     expect(result.html).toBe(
       `<input aria-current="page" aria-autocomplete="list" autocomplete="email" />`,
+    );
+  });
+
+  it("replaces script and style contents without emitting synthetic HTML comments", () => {
+    const result = condenseDom(
+      `<script type="application/json">{"x":"<!-- keep as text -->"}</script><style>.card { color: red; }</style>`,
+    );
+
+    expect(result.html).toBe(
+      `<script type="application/json">[JSON data, 8 chars]</script><style>[CSS, 21 chars]</style>`,
+    );
+    expect(result.html).not.toContain("<!--");
+  });
+
+  it("matches spaced script closing tags and strips unsafe short URL schemes", () => {
+    const result = condenseDom(
+      `<script>console.log("x")</script ><a href="data:text/html,hello">Link</a><a href="vbscript:msgbox(1)">Legacy</a>`,
+    );
+
+    expect(result.html).toBe(
+      `<script>[script, 16 chars]</script ><a href="data:[omitted]">Link</a><a href="vbscript:[omitted]">Legacy</a>`,
     );
   });
 });
