@@ -3,6 +3,7 @@ import type { Argv } from "yargs";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { connect, disconnectBrowser } from "../core/browser.js";
 import { getSessionSnapshotRunDir } from "../core/context.js";
+import { readSessionState } from "../core/session.js";
 import {
   canAnalyzeSnapshots,
   runInterpret,
@@ -10,8 +11,103 @@ import {
 } from "../core/snapshot-analyzer.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
+const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
+
 function generateSnapshotRunId(): string {
   return `snapshot-${Date.now()}`;
+}
+
+type SnapshotViewportMetrics = {
+  configuredWidth: number | null;
+  configuredHeight: number | null;
+  innerWidth: number | null;
+  innerHeight: number | null;
+};
+
+function isZeroViewport(value: number | null): boolean {
+  return typeof value === "number" && value <= 0;
+}
+
+function shouldForceSnapshotViewport(metrics: SnapshotViewportMetrics): boolean {
+  return (
+    isZeroViewport(metrics.configuredWidth)
+    || isZeroViewport(metrics.configuredHeight)
+    || isZeroViewport(metrics.innerWidth)
+    || isZeroViewport(metrics.innerHeight)
+  );
+}
+
+function isZeroWidthScreenshotError(error: unknown): boolean {
+  return (
+    error instanceof Error
+    && error.message.includes("Cannot take screenshot with 0 width")
+  );
+}
+
+async function readSnapshotViewportMetrics(
+  page: {
+    viewportSize(): { width: number; height: number } | null;
+    evaluate<T>(pageFunction: () => T | Promise<T>): Promise<T>;
+  },
+): Promise<SnapshotViewportMetrics> {
+  const configuredViewport = page.viewportSize();
+  let innerWidth: number | null = null;
+  let innerHeight: number | null = null;
+
+  try {
+    const innerViewport = await page.evaluate(() => ({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }));
+    innerWidth = innerViewport.width;
+    innerHeight = innerViewport.height;
+  } catch {}
+
+  return {
+    configuredWidth: configuredViewport?.width ?? null,
+    configuredHeight: configuredViewport?.height ?? null,
+    innerWidth,
+    innerHeight,
+  };
+}
+
+function resolveSnapshotViewport(
+  session: string,
+  logger: LoggerApi,
+): { width: number; height: number } {
+  const state = readSessionState(session, logger);
+  if (state?.viewport) {
+    logger.info("screenshot-viewport-from-session-state", {
+      session,
+      viewport: state.viewport,
+    });
+    return state.viewport;
+  }
+  logger.info("screenshot-viewport-fallback", {
+    session,
+    reason: "no viewport in session state",
+    viewport: FALLBACK_SNAPSHOT_VIEWPORT,
+  });
+  return FALLBACK_SNAPSHOT_VIEWPORT;
+}
+
+async function forceSnapshotViewport(
+  page: {
+    setViewportSize(size: { width: number; height: number }): Promise<void>;
+  },
+  viewport: { width: number; height: number },
+  logger: LoggerApi,
+  session: string,
+  pageId?: string,
+  reason?: string,
+): Promise<void> {
+  await page.setViewportSize(viewport);
+  logger.warn("screenshot-viewport-forced", {
+    session,
+    pageId,
+    reason,
+    viewport,
+  });
 }
 
 async function captureScreenshot(
@@ -29,12 +125,66 @@ async function captureScreenshot(
   });
 
   try {
-    const title = await page.title();
-    const pageUrl = page.url();
+    let title: string | null = null;
+    try {
+      title = await page.title();
+    } catch (error) {
+      logger.warn("screenshot-title-read-failed", {
+        session,
+        pageId,
+        error,
+      });
+    }
+
+    let pageUrl: string | null = null;
+    try {
+      pageUrl = page.url();
+    } catch (error) {
+      logger.warn("screenshot-url-read-failed", {
+        session,
+        pageId,
+        error,
+      });
+    }
+
     const pngPath = `${snapshotRunDir}/page.png`;
     const htmlPath = `${snapshotRunDir}/page.html`;
 
-    await page.screenshot({ path: pngPath });
+    const restoreViewport = resolveSnapshotViewport(session, logger);
+    const viewportMetrics = await readSnapshotViewportMetrics(page);
+    logger.info("screenshot-viewport-metrics", {
+      session,
+      pageId,
+      restoreViewport,
+      ...viewportMetrics,
+    });
+    await forceSnapshotViewport(
+      page,
+      restoreViewport,
+      logger,
+      session,
+      pageId,
+      shouldForceSnapshotViewport(viewportMetrics)
+        ? "preflight-invalid-viewport"
+        : "preflight-normalize-viewport",
+    );
+
+    try {
+      await page.screenshot({ path: pngPath });
+    } catch (error) {
+      if (!isZeroWidthScreenshotError(error)) {
+        throw error;
+      }
+      await forceSnapshotViewport(
+        page,
+        restoreViewport,
+        logger,
+        session,
+        pageId,
+        "retry-after-zero-width-screenshot-error",
+      );
+      await page.screenshot({ path: pngPath });
+    }
 
     const htmlContent = await page.content();
     const fs = await import("node:fs/promises");
@@ -61,7 +211,13 @@ async function captureScreenshot(
       session,
       pageAlive,
       browserConnected,
-      pageUrl: page.url(),
+      pageUrl: (() => {
+        try {
+          return page.url();
+        } catch {
+          return null;
+        }
+      })(),
     });
     throw err;
   } finally {

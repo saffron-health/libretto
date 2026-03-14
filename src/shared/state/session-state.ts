@@ -10,12 +10,18 @@ export const SessionStatusSchema = z.enum([
 	"failed",
 	"exited",
 ]);
+export const SessionViewportSchema = z.object({
+	width: z.number().int().min(1),
+	height: z.number().int().min(1),
+});
+
 const SessionStateBaseSchema = z.object({
 	version: z.literal(SESSION_STATE_VERSION),
 	pid: z.number().int(),
 	session: z.string().min(1),
 	startedAt: z.string().datetime({ offset: true }),
 	status: SessionStatusSchema.optional(),
+	viewport: SessionViewportSchema.optional(),
 });
 const LocalSessionStateBaseSchema = SessionStateBaseSchema.extend({
 	port: z.number().int().min(0).max(65535),
@@ -81,6 +87,7 @@ export function parseSessionStateData(
 		pid: parsed.data.pid,
 		startedAt: parsed.data.startedAt,
 		status: parsed.data.status,
+		viewport: parsed.data.viewport,
 	};
 }
 
