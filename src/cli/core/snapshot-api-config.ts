@@ -80,24 +80,46 @@ export function loadSnapshotEnv(): void {
 }
 
 function decodeDotEnvEscapes(value: string): string {
-	return value.replace(/\\([nrt\\'"])/g, (_match, escape: string) => {
-		switch (escape) {
-			case "n":
-				return "\n";
-			case "r":
-				return "\r";
-			case "t":
-				return "\t";
-			case "\\":
-				return "\\";
-			case '"':
-				return '"';
-			case "'":
-				return "'";
-			default:
-				return `\\${escape}`;
+	let decoded = "";
+	for (let index = 0; index < value.length; index += 1) {
+		const char = value[index]!;
+		if (char !== "\\") {
+			decoded += char;
+			continue;
 		}
-	});
+
+		const next = value[index + 1];
+		switch (next) {
+			case "n":
+				decoded += "\n";
+				index += 1;
+				break;
+			case "r":
+				decoded += "\r";
+				index += 1;
+				break;
+			case "t":
+				decoded += "\t";
+				index += 1;
+				break;
+			case "\\":
+				decoded += "\\";
+				index += 1;
+				break;
+			case '"':
+				decoded += '"';
+				index += 1;
+				break;
+			case "'":
+				decoded += "'";
+				index += 1;
+				break;
+			default:
+				decoded += char;
+				break;
+		}
+	}
+	return decoded;
 }
 
 export function parseDotEnvAssignment(
