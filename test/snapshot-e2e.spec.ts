@@ -19,11 +19,16 @@ import { test } from "./fixtures";
 
 const SNAPSHOT_TIMEOUT = 180_000;
 const PAGE_SETTLE_MS = 15_000;
+const REPO_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
+const LINKEDIN_PROFILE_PATH = resolve(
+  REPO_ROOT,
+  ".libretto/profiles/linkedin.com.json",
+);
+const liveSnapshotTest = existsSync(LINKEDIN_PROFILE_PATH) ? test : test.skip;
 
 /** Load API keys from repo root .env so the CLI subprocess can use them. */
 function loadEnvFile(): Record<string, string> {
-  const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-  const envPath = resolve(repoRoot, ".env");
+  const envPath = resolve(REPO_ROOT, ".env");
   const env: Record<string, string> = {};
   if (!existsSync(envPath)) return env;
   for (const line of readFileSync(envPath, "utf-8").split("\n")) {
@@ -59,17 +64,13 @@ async function sleep(ms: number): Promise<void> {
 }
 
 describe("snapshot e2e – live site analysis", () => {
-  test(
+  liveSnapshotTest(
     "linkedin feed: identifies post content and poster name selectors",
     async ({ librettoCli, evaluate, seedProfile }) => {
       const session = "snapshot-e2e-linkedin";
 
       // Copy saved LinkedIn profile into test workspace so the browser loads authenticated state
-      const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-      const srcProfile = resolve(repoRoot, ".libretto/profiles/linkedin.com.json");
-      if (existsSync(srcProfile)) {
-        await seedProfile("linkedin.com", srcProfile);
-      }
+      await seedProfile("linkedin.com", LINKEDIN_PROFILE_PATH);
 
       // Configure AI preset for snapshot analysis
       await librettoCli(`ai configure codex`, snapshotEnv);
