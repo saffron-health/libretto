@@ -453,7 +453,7 @@ process.on('exit', (code) => {
 
 childLog('info', 'child-launched', { port: ${port}, pid: process.pid, session: '${session}' });
 
-await new Promise(() => {});
+setInterval(() => {}, 1 << 30);
 `;
 
   const childStderrFd = openSync(runLogPath, "a");
