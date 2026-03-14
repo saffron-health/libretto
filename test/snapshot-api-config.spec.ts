@@ -173,6 +173,26 @@ describe("parseDotEnvAssignment", () => {
       value: "test-project",
     });
   });
+
+  it("preserves unknown backslashes in double-quoted values", () => {
+    expect(
+      parseDotEnvAssignment(
+        String.raw`GOOGLE_APPLICATION_CREDENTIALS="C:\\Users\\me\\key.json"`,
+      ),
+    ).toEqual({
+      key: "GOOGLE_APPLICATION_CREDENTIALS",
+      value: String.raw`C:\Users\me\key.json`,
+    });
+  });
+
+  it("does not decode escapes in unquoted values", () => {
+    expect(
+      parseDotEnvAssignment(String.raw`OPENAI_API_KEY=sk-test\nliteral`),
+    ).toEqual({
+      key: "OPENAI_API_KEY",
+      value: String.raw`sk-test\nliteral`,
+    });
+  });
 });
 
 describe("buildInlinePromptSelection", () => {

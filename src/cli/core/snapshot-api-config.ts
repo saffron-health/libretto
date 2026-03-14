@@ -82,6 +82,9 @@ export function loadSnapshotEnv(): void {
 function decodeDotEnvEscapes(value: string): string {
 	return value
 		.replace(/\\n/g, "\n")
+		.replace(/\\r/g, "\r")
+		.replace(/\\t/g, "\t")
+		.replace(/\\\\/g, "\\")
 		.replace(/\\"/g, '"')
 		.replace(/\\'/g, "'");
 }
@@ -106,8 +109,7 @@ export function parseDotEnvAssignment(
 		return { key, value: "" };
 	}
 
-	if (rawValue.startsWith('"') || rawValue.startsWith("'")) {
-		const quote = rawValue[0]!;
+	if (rawValue.startsWith('"')) {
 		let value = "";
 		let escaped = false;
 
@@ -118,11 +120,24 @@ export function parseDotEnvAssignment(
 				escaped = false;
 				continue;
 			}
-			if (quote === '"' && char === "\\") {
-				escaped = true;
+			if (char === "\\") {
+				const next = rawValue[i + 1];
+				if (
+					next === "\\"
+					|| next === '"'
+					|| next === "'"
+					|| next === "n"
+					|| next === "r"
+					|| next === "t"
+				) {
+					value += char;
+					escaped = true;
+					continue;
+				}
+				value += char;
 				continue;
 			}
-			if (char === quote) {
+			if (char === '"') {
 				return { key, value: decodeDotEnvEscapes(value) };
 			}
 			value += char;
@@ -131,12 +146,27 @@ export function parseDotEnvAssignment(
 		return { key, value: decodeDotEnvEscapes(rawValue.slice(1)) };
 	}
 
+	if (rawValue.startsWith("'")) {
+		const quote = rawValue[0]!;
+		let value = "";
+
+		for (let i = 1; i < rawValue.length; i += 1) {
+			const char = rawValue[i]!;
+			if (char === quote) {
+				return { key, value };
+			}
+			value += char;
+		}
+
+		return { key, value: rawValue.slice(1) };
+	}
+
 	const inlineCommentIndex = rawValue.search(/\s#/);
 	const value =
 		inlineCommentIndex >= 0
 			? rawValue.slice(0, inlineCommentIndex).trimEnd()
 			: rawValue.trim();
-	return { key, value: decodeDotEnvEscapes(value) };
+	return { key, value };
 }
 
 function providerToPreset(provider: Provider): AiConfig["preset"] {
