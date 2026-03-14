@@ -233,11 +233,15 @@ async function runExternalCommand(
 
     child.stdin.on("error", (err) => {
       stdinError = err as NodeJS.ErrnoException;
-      logger.error("interpret-analyzer-stdin-error", {
+      logger.warn("interpret-analyzer-stdin-pipe-error", {
         command,
         args,
         code: stdinError.code ?? null,
         message: stdinError.message,
+        hint:
+          stdinError.code === "EPIPE"
+            ? "Child process exited before consuming all stdin data"
+            : "Unexpected stdin write error",
       });
     });
 
@@ -288,11 +292,15 @@ async function runExternalCommand(
       }
     } catch (err) {
       stdinError = err as NodeJS.ErrnoException;
-      logger.error("interpret-analyzer-stdin-write-error", {
+      logger.warn("interpret-analyzer-stdin-write-error", {
         command,
         args,
         code: stdinError.code ?? null,
         message: stdinError.message,
+        hint:
+          stdinError.code === "EPIPE"
+            ? "Child process exited before consuming all stdin data"
+            : "Unexpected stdin write error",
       });
     }
   });
