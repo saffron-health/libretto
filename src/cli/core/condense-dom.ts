@@ -327,7 +327,9 @@ export function condenseDom(html: string): CondenseDomResult {
   );
 
   for (let i = 0; i < preBlocks.length; i++) {
-    result = result.replace(`__PRE_PLACEHOLDER_${i}__`, preBlocks[i]!);
+    const placeholder = `__PRE_PLACEHOLDER_${i}__`;
+    const preBlock = preBlocks[i]!;
+    result = result.replace(placeholder, () => preBlock);
   }
 
   return {

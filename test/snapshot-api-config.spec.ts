@@ -4,6 +4,7 @@ import {
   buildInlinePromptSelection,
 } from "../src/cli/core/snapshot-analyzer.js";
 import {
+  parseDotEnvAssignment,
   resolveSnapshotApiModel,
   shouldUseApiSnapshotAnalyzer,
 } from "../src/cli/core/snapshot-api-config.js";
@@ -141,6 +142,35 @@ describe("snapshot API model resolution", () => {
       model: "vertex/gemini-2.5-flash",
       provider: "vertex",
       source: "env:LIBRETTO_SNAPSHOT_MODEL",
+    });
+  });
+});
+
+describe("parseDotEnvAssignment", () => {
+  it("parses quoted values with trailing inline comments", () => {
+    expect(
+      parseDotEnvAssignment(`OPENAI_API_KEY="sk-test" # local note`),
+    ).toEqual({
+      key: "OPENAI_API_KEY",
+      value: "sk-test",
+    });
+  });
+
+  it("parses exported single-quoted values with trailing inline comments", () => {
+    expect(
+      parseDotEnvAssignment(`export GEMINI_API_KEY='gem-test' # local note`),
+    ).toEqual({
+      key: "GEMINI_API_KEY",
+      value: "gem-test",
+    });
+  });
+
+  it("strips inline comments from unquoted values", () => {
+    expect(
+      parseDotEnvAssignment(`GOOGLE_CLOUD_PROJECT=test-project # local note`),
+    ).toEqual({
+      key: "GOOGLE_CLOUD_PROJECT",
+      value: "test-project",
     });
   });
 });
