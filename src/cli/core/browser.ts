@@ -71,7 +71,7 @@ async function tryConnectToPort(
   logger: LoggerApi,
   timeoutMs: number = 5000,
 ): Promise<Browser | null> {
-  const endpoint = `http://localhost:${port}`;
+  const endpoint = `http://127.0.0.1:${port}`;
   logger.info("cdp-connect-attempt", { port, endpoint, timeoutMs });
   try {
     const connectPromise = chromium.connectOverCDP(endpoint);
@@ -358,7 +358,7 @@ export async function runOpen(
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'");
 
-  const launcherCode = `
+const launcherCode = `
 import { chromium } from 'playwright';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -453,7 +453,7 @@ process.on('exit', (code) => {
 
 childLog('info', 'child-launched', { port: ${port}, pid: process.pid, session: '${session}' });
 
-await new Promise(() => {});
+setInterval(() => {}, 1 << 30);
 `;
 
   const childStderrFd = openSync(runLogPath, "a");

@@ -2,6 +2,7 @@ import type { Page } from "playwright";
 import { type MinimalLogger, defaultLogger } from "../../shared/logger/logger.js";
 import type { LLMClient } from "../../shared/llm/types.js";
 import { z } from "zod";
+import { condenseDom } from "../../cli/core/condense-dom.js";
 
 /**
  * Known error type for classifying submission errors.
@@ -70,11 +71,14 @@ export async function detectSubmissionError(
 
 	// Capture DOM snapshot for additional context
 	try {
-		const htmlContent = await page.content();
-		domSnapshot =
-			htmlContent.length > 50000
-				? htmlContent.slice(0, 50000) + "\n... [truncated]"
-				: htmlContent;
+		let htmlContent = await page.content();
+		if (htmlContent.length > 50000) {
+			htmlContent = condenseDom(htmlContent).html;
+		}
+		if (htmlContent.length > 50000) {
+			htmlContent = htmlContent.slice(0, 50000) + "\n... [truncated]";
+		}
+		domSnapshot = htmlContent;
 	} catch (domError) {
 		log.warn("Failed to capture DOM snapshot", {
 			domError: domError instanceof Error ? domError.message : String(domError),

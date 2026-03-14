@@ -3,12 +3,19 @@ import type { Argv } from "yargs";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { connect, disconnectBrowser } from "../core/browser.js";
 import { getSessionSnapshotRunDir } from "../core/context.js";
+import { condenseDom } from "../core/condense-dom.js";
 import { readSessionState } from "../core/session.js";
 import {
-  canAnalyzeSnapshots,
   runInterpret,
+  type InterpretArgs,
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
+import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
+import { readAiConfig } from "../core/ai-config.js";
+import {
+  isSnapshotApiUnavailableError,
+  shouldUseApiSnapshotAnalyzer,
+} from "../core/snapshot-api-config.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
@@ -146,9 +153,9 @@ async function captureScreenshot(
         error,
       });
     }
-
     const pngPath = `${snapshotRunDir}/page.png`;
     const htmlPath = `${snapshotRunDir}/page.html`;
+    const condensedHtmlPath = `${snapshotRunDir}/page.condensed.html`;
 
     const restoreViewport = resolveSnapshotViewport(session, logger);
     const viewportMetrics = await readSnapshotViewportMetrics(page);
@@ -190,15 +197,25 @@ async function captureScreenshot(
     const fs = await import("node:fs/promises");
     await fs.writeFile(htmlPath, htmlContent);
 
+    // Write condensed DOM
+    const condenseResult = condenseDom(htmlContent);
+    await fs.writeFile(condensedHtmlPath, condenseResult.html);
+
     logger.info("screenshot-success", {
       session,
       pageUrl,
       title,
       pngPath,
       htmlPath,
+      condensedHtmlPath,
       snapshotRunId,
+      domCondenseStats: {
+        originalLength: condenseResult.originalLength,
+        condensedLength: condenseResult.condensedLength,
+        reductions: condenseResult.reductions,
+      },
     });
-    return { pngPath, htmlPath, baseName: snapshotRunId };
+    return { pngPath, htmlPath, condensedHtmlPath, baseName: snapshotRunId };
   } catch (err) {
     let pageAlive = false;
     let browserConnected = false;
@@ -232,38 +249,74 @@ async function runSnapshot(
   objective?: string,
   context?: string,
 ): Promise<void> {
-  const { pngPath, htmlPath } = await captureScreenshot(session, logger, pageId);
-
-  console.log("Screenshot saved:");
-  console.log(`  PNG:  ${pngPath}`);
-  console.log(`  HTML: ${htmlPath}`);
-
   const normalizedObjective = objective?.trim();
   const normalizedContext = context?.trim();
-  if (!normalizedObjective && !normalizedContext) {
-    console.log("Use --objective flag to analyze snapshots.");
-    return;
-  }
-
-  if (!normalizedObjective) {
+  if (!normalizedObjective && normalizedContext) {
     throw new Error(
       "Couldn't run analysis: --objective is required when providing --context.",
     );
   }
 
-  if (!canAnalyzeSnapshots()) {
-    throw new Error(
-      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini) to enable analysis.",
+  if (!normalizedObjective && !normalizedContext) {
+    const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(
+      session,
+      logger,
+      pageId,
     );
+
+    console.log("Screenshot saved:");
+    console.log(`  PNG:             ${pngPath}`);
+    console.log(`  HTML:            ${htmlPath}`);
+    console.log(`  Condensed HTML:  ${condensedHtmlPath}`);
+    console.log("Use --objective flag to analyze snapshots.");
+    return;
   }
 
-  await runInterpret({
-    objective: normalizedObjective,
+  const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(
+    session,
+    logger,
+    pageId,
+  );
+
+  console.log("Screenshot saved:");
+  console.log(`  PNG:             ${pngPath}`);
+  console.log(`  HTML:            ${htmlPath}`);
+  console.log(`  Condensed HTML:  ${condensedHtmlPath}`);
+
+  const objectiveText = normalizedObjective;
+  if (!objectiveText) {
+    throw new Error("Couldn't run analysis: missing objective.");
+  }
+
+  const interpretArgs: InterpretArgs = {
+    objective: objectiveText,
     session,
     context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
     pngPath,
     htmlPath,
-  }, logger);
+    condensedHtmlPath,
+  };
+
+  const configuredAi = readAiConfig();
+  if (!shouldUseApiSnapshotAnalyzer(configuredAi)) {
+    await runInterpret(interpretArgs, logger);
+    return;
+  }
+
+  try {
+    await runApiInterpret(interpretArgs, logger);
+  } catch (error) {
+    if (!configuredAi || !isSnapshotApiUnavailableError(error)) {
+      throw error;
+    }
+
+    logger.warn("snapshot-api-interpret-fallback", {
+      reason: "api-unavailable",
+      message: error instanceof Error ? error.message : String(error),
+      session,
+    });
+    await runInterpret(interpretArgs, logger);
+  }
 }
 
 export function registerSnapshotCommands(yargs: Argv, logger: LoggerApi): Argv {

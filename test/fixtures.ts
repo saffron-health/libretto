@@ -57,6 +57,8 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(here, "..");
 const packageRoot = repoRoot;
 const cliEntry = resolve(packageRoot, "dist/cli/index.js");
+const sourceCliEntry = resolve(packageRoot, "src/cli/index.ts");
+const tsxBin = resolve(packageRoot, "node_modules/.bin/tsx");
 const librettoEntry = resolve(packageRoot, "dist/index.js");
 const librettoRuntimePath = new URL("../dist/index.js", import.meta.url)
   .href;
@@ -115,6 +117,23 @@ function ensureBuilt(): void {
     );
   }
   didBuild = true;
+}
+
+function resolveCliCommand(): {
+  command: string;
+  args: string[];
+} {
+  if (existsSync(cliEntry)) {
+    return {
+      command: process.execPath,
+      args: [cliEntry],
+    };
+  }
+
+  return {
+    command: tsxBin,
+    args: [sourceCliEntry],
+  };
 }
 
 function parseCommandArgs(command: string): string[] {
@@ -358,16 +377,16 @@ async function evaluateTextMatch(opts: {
 }
 
 async function closeAllSessionsInWorkspace(workspaceDir: string): Promise<void> {
-  if (!existsSync(cliEntry)) return;
+  const cliCommand = resolveCliCommand();
   const closeAll = await execProcess(
-    process.execPath,
-    [cliEntry, "close", "--all"],
+    cliCommand.command,
+    [...cliCommand.args, "close", "--all"],
     workspaceDir,
   );
   if (closeAll.exitCode === 0) return;
   await execProcess(
-    process.execPath,
-    [cliEntry, "close", "--all", "--force"],
+    cliCommand.command,
+    [...cliCommand.args, "close", "--all", "--force"],
     workspaceDir,
   );
 }
@@ -400,9 +419,10 @@ export const test = base.extend<CliFixtures>({
   librettoCli: async ({ workspaceDir }, use) => {
     ensureBuilt();
     await use(async (command: string, env?: Record<string, string>) => {
+      const cliCommand = resolveCliCommand();
       return await execProcess(
-        process.execPath,
-        [cliEntry, ...parseCommandArgs(command)],
+        cliCommand.command,
+        [...cliCommand.args, ...parseCommandArgs(command)],
         workspaceDir,
         env,
       );

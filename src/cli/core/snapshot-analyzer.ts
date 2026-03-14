@@ -1,9 +1,4 @@
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -14,13 +9,16 @@ import {
   formatCommandPrefix,
   readAiConfig,
 } from "./ai-config.js";
+import { getLLMClientFactory } from "./context.js";
 import {
-  getLLMClientFactory,
-} from "./context.js";
+  getFactoryFallbackSnapshotApiModelSelection,
+  resolveSnapshotApiModel,
+} from "./snapshot-api-config.js";
 
 export type ScreenshotPair = {
   pngPath: string;
   htmlPath: string;
+  condensedHtmlPath: string;
   baseName: string;
 };
 
@@ -30,9 +28,10 @@ export type InterpretArgs = {
   context: string;
   pngPath: string;
   htmlPath: string;
+  condensedHtmlPath: string;
 };
 
-const InterpretResultSchema = z.object({
+export const InterpretResultSchema = z.object({
   answer: z.string(),
   selectors: z
     .array(
@@ -44,6 +43,12 @@ const InterpretResultSchema = z.object({
     )
     .default([]),
   notes: z.string().optional().default(""),
+  debug: z
+    .object({
+      consultedFiles: z.array(z.string()).optional().default([]),
+      analysisSteps: z.array(z.string()).optional().default([]),
+    })
+    .optional(),
 });
 
 type InterpretResult = z.infer<typeof InterpretResultSchema>;
@@ -52,6 +57,39 @@ type ExternalCommandResult = {
   exitCode: number;
   stdout: string;
   stderr: string;
+};
+
+type CodexTraceSummary = {
+  commandCount: number;
+  fileCandidates: string[];
+};
+
+type SnapshotBudget = {
+  contextWindowTokens: number;
+  outputReserveTokens: number;
+  promptBudgetTokens: number;
+  source: string;
+};
+
+type SnapshotDomStats = {
+  fullDomChars: number;
+  fullDomEstimatedTokens: number;
+  condensedDomChars: number;
+  condensedDomEstimatedTokens: number;
+  configuredModel: string;
+};
+
+type InlinePromptSelection = {
+  prompt: string;
+  domSource: "full" | "condensed";
+  domLabel: "full DOM" | "condensed DOM";
+  htmlChars: number;
+  htmlEstimatedTokens: number;
+  promptEstimatedTokens: number;
+  truncated: boolean;
+  selectionReason: string;
+  budget: SnapshotBudget;
+  stats: SnapshotDomStats;
 };
 
 abstract class UserCodingAgent {
@@ -93,6 +131,9 @@ abstract class UserCodingAgent {
     return this.config.commandPrefix.slice(1);
   }
 
+  /** Build extra CLI args from config.model, config.reasoning, config.allowedTools. */
+  protected abstract buildExtraArgs(): string[];
+
   protected screenshotHint(pngPath: string): string {
     return (
       `\n\nScreenshot file path: ${pngPath}\n` +
@@ -105,7 +146,12 @@ abstract class UserCodingAgent {
     logger: LoggerApi,
     stdinText?: string,
   ): Promise<ExternalCommandResult> {
-    const result = await runExternalCommand(this.command, args, logger, stdinText);
+    const result = await runExternalCommand(
+      this.command,
+      args,
+      logger,
+      stdinText,
+    );
     if (result.exitCode !== 0) {
       throw new Error(
         `Analyzer command failed (${formatCommandPrefix([this.command, ...args])}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
@@ -131,6 +177,16 @@ abstract class UserCodingAgent {
 }
 
 class CodexUserCodingAgent extends UserCodingAgent {
+  protected buildExtraArgs(): string[] {
+    const extra: string[] = [];
+    if (this.config.model) {
+      extra.push("--model", this.config.model);
+    }
+    // Codex tool restriction is handled via --sandbox in commandPrefix.
+    // Snapshot analysis does not currently set Codex reasoning effort.
+    return extra;
+  }
+
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
@@ -143,9 +199,11 @@ class CodexUserCodingAgent extends UserCodingAgent {
     );
     const args = [
       ...this.baseArgs,
+      ...this.buildExtraArgs(),
+      "--json",
       "--output-last-message",
       outputPath,
-      "-i",
+      "--image",
       pngPath,
       "-",
     ];
@@ -153,16 +211,21 @@ class CodexUserCodingAgent extends UserCodingAgent {
       outputPath,
       pngPath,
       promptChars: prompt.length,
+      command: this.command,
       args,
     });
     const result = await this.runAnalyzer(args, logger, prompt);
+    const trace = logCodexJsonTrace(result.stdout, logger);
     let outputText = result.stdout;
     try {
+      const outputFileExists = existsSync(outputPath);
       logger.info("interpret-analyzer-codex-finish", {
         outputPath,
-        outputFileExists: existsSync(outputPath),
+        outputFileExists,
         stdoutChars: result.stdout.length,
         stderrChars: result.stderr.length,
+        traceCommandCount: trace.commandCount,
+        traceFileCandidates: trace.fileCandidates,
       });
       if (existsSync(outputPath)) {
         outputText = readFileSync(outputPath, "utf-8");
@@ -175,27 +238,67 @@ class CodexUserCodingAgent extends UserCodingAgent {
 }
 
 class ClaudeUserCodingAgent extends UserCodingAgent {
+  protected buildExtraArgs(): string[] {
+    const extra: string[] = [];
+    if (this.config.model) {
+      extra.push("--model", this.config.model);
+    }
+    if (this.config.reasoning !== undefined) {
+      // Current Claude CLI exposes effort levels, not numeric thinking budgets.
+      if (typeof this.config.reasoning === "string") {
+        extra.push("--effort", this.config.reasoning);
+      }
+    }
+    if (this.config.allowedTools?.length) {
+      // Claude uses --tools "Read,Grep,Glob" to restrict available tools
+      extra.push("--tools", this.config.allowedTools.join(","));
+    }
+    extra.push("--permission-mode", "bypassPermissions");
+    return extra;
+  }
+
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
     logger: LoggerApi,
   ): Promise<InterpretResult> {
-    return await this.runAndParse(
-      [...this.baseArgs],
-      logger,
-      `${prompt}${this.screenshotHint(pngPath)}`,
-    );
+    const args = [
+      ...this.baseArgs,
+      ...this.buildExtraArgs(),
+      "--verbose",
+      "--output-format",
+      "stream-json",
+      "--input-format",
+      "stream-json",
+    ];
+    return await this.runAndParse(args, logger, buildClaudeStreamJsonInput(prompt, pngPath));
   }
 }
 
 class GeminiUserCodingAgent extends UserCodingAgent {
+  protected buildExtraArgs(): string[] {
+    const extra: string[] = [];
+    if (this.config.model) {
+      extra.push("--model", this.config.model);
+    }
+    if (this.config.allowedTools?.length) {
+      // Gemini uses --allowed-tools "read_file,list_directory,search_file_content,glob"
+      extra.push("--allowed-tools", this.config.allowedTools.join(","));
+    }
+    return extra;
+  }
+
   async analyzeSnapshot(
     prompt: string,
     pngPath: string,
     logger: LoggerApi,
   ): Promise<InterpretResult> {
+    const args = [
+      ...this.baseArgs,
+      ...this.buildExtraArgs(),
+    ];
     return await this.runAndParse(
-      [...this.baseArgs],
+      args,
       logger,
       `${prompt}${this.screenshotHint(pngPath)}`,
     );
@@ -247,9 +350,9 @@ async function runExternalCommand(
 
     child.on("error", (err) => {
       logger.error("interpret-analyzer-spawn-error", {
+        error: err,
         command,
         args,
-        error: err,
       });
       const error = err as NodeJS.ErrnoException;
       if (error.code === "ENOENT") {
@@ -331,6 +434,108 @@ function formatStdinError(
       : `Analyzer stdin error: ${error.message}`;
   if (stderr.includes(detail)) return "";
   return `${stderr.endsWith("\n") || stderr.length === 0 ? "" : "\n"}${detail}\n`;
+}
+
+function extractShellSnippet(command: string): string {
+  const dqMatch = command.match(/-lc\s+"([\s\S]*)"$/);
+  if (dqMatch?.[1]) {
+    return dqMatch[1];
+  }
+  const sqMatch = command.match(/-lc\s+'([\s\S]*)'$/);
+  if (sqMatch?.[1]) {
+    return sqMatch[1];
+  }
+  return command;
+}
+
+function extractPathCandidatesFromCommand(command: string): string[] {
+  const snippet = extractShellSnippet(command);
+  const candidates = new Set<string>();
+  const add = (value: string) => {
+    const cleaned = value.replace(/^[("'`]+|[)"'`;,:]+$/g, "");
+    if (!cleaned) return;
+    if (cleaned.startsWith("-")) return;
+    if (cleaned === "." || cleaned === "..") return;
+    candidates.add(cleaned);
+  };
+
+  const pathWithSlashRegex =
+    /(?:^|[\s("'`])((?:\/|\.{1,2}\/)[^\s"'`;)]+|[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = pathWithSlashRegex.exec(snippet)) !== null) {
+    if (match[1]) add(match[1]);
+  }
+
+  const fileRegex =
+    /(?:^|[\s("'`])([A-Za-z0-9_.-]+\.(?:html?|png|json|txt|md|ts|tsx|js|mjs|cjs|css|svg))/gi;
+  while ((match = fileRegex.exec(snippet)) !== null) {
+    if (match[1]) add(match[1]);
+  }
+
+  return Array.from(candidates);
+}
+
+function logCodexJsonTrace(
+  stdout: string,
+  logger: LoggerApi,
+): CodexTraceSummary {
+  let commandCount = 0;
+  const fileCandidates = new Set<string>();
+
+  for (const line of stdout.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+    try {
+      const parsed = JSON.parse(trimmed) as {
+        type?: string;
+        item?: {
+          type?: string;
+          command?: string;
+          aggregated_output?: string;
+          exit_code?: number | null;
+          status?: string;
+          text?: string;
+        };
+      };
+
+      if (
+        parsed.type === "item.completed" &&
+        parsed.item?.type === "command_execution"
+      ) {
+        commandCount += 1;
+        const command = parsed.item.command ?? "";
+        const paths = extractPathCandidatesFromCommand(command);
+        for (const path of paths) fileCandidates.add(path);
+        logger.info("interpret-analyzer-codex-command", {
+          command,
+          status: parsed.item.status ?? null,
+          exitCode: parsed.item.exit_code ?? null,
+          paths,
+          outputPreview: summarizeForLog(
+            parsed.item.aggregated_output ?? "",
+            300,
+          ),
+        });
+        continue;
+      }
+
+      if (
+        parsed.type === "item.completed" &&
+        parsed.item?.type === "agent_message"
+      ) {
+        logger.info("interpret-analyzer-codex-message", {
+          textPreview: summarizeForLog(parsed.item.text ?? "", 240),
+        });
+      }
+    } catch {}
+  }
+
+  const summary = {
+    commandCount,
+    fileCandidates: Array.from(fileCandidates),
+  };
+  logger.info("interpret-analyzer-codex-trace-summary", summary);
+  return summary;
 }
 
 function extractJsonObjectCandidates(text: string): string[] {
@@ -475,7 +680,7 @@ function resolvePath(filePath: string): string {
   return isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
 }
 
-function getMimeType(filePath: string): string {
+export function getMimeType(filePath: string): string {
   const ext = extname(filePath).toLowerCase();
   if (ext === ".png") return "image/png";
   if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
@@ -484,7 +689,7 @@ function getMimeType(filePath: string): string {
   return "application/octet-stream";
 }
 
-function readFileAsBase64(filePath: string): string {
+export function readFileAsBase64(filePath: string): string {
   return readFileSync(filePath).toString("base64");
 }
 
@@ -540,37 +745,8 @@ function collectSelectorHints(html: string, limit = 120): string[] {
   return candidates;
 }
 
-export async function runInterpret(
-  args: InterpretArgs,
-  logger: LoggerApi,
-): Promise<void> {
-  logger.info("interpret-start", {
-    objective: args.objective,
-    pngPath: args.pngPath,
-    htmlPath: args.htmlPath,
-  });
-  process.env.NODE_ENV = "development";
-
-  const pngPath = resolvePath(args.pngPath);
-  const htmlPath = resolvePath(args.htmlPath);
-  if (!existsSync(pngPath)) {
-    throw new Error(`PNG file not found: ${pngPath}`);
-  }
-  if (!existsSync(htmlPath)) {
-    throw new Error(`HTML file not found: ${htmlPath}`);
-  }
-
-  const htmlContent = readFileSync(htmlPath, "utf-8");
-  const htmlCharLimit = 500_000;
-  const { text: trimmedHtml, truncated } = truncateText(
-    htmlContent,
-    htmlCharLimit,
-  );
-  const selectorHints = collectSelectorHints(htmlContent, 120);
-
-  let prompt = `# Objective\n${args.objective}\n\n`;
-  prompt += `# Context\n${args.context}\n\n`;
-  prompt += `# Instructions\n`;
+function buildInterpretInstructions(): string {
+  let prompt = `# Instructions\n`;
   prompt += `You are analyzing a screenshot and HTML snapshot of the same web page on behalf of an automation agent.\n`;
   prompt += `The agent needs to interact with this page programmatically using Playwright.\n\n`;
   prompt += `Based on the objective and context above:\n`;
@@ -579,33 +755,306 @@ export async function runInterpret(
   prompt += `3. Note any relevant page state (loading indicators, error messages, disabled elements, modals/overlays)\n`;
   prompt += `4. If elements are inside iframes, identify the iframe selector and the element selector within it\n\n`;
   prompt += `Output JSON with this shape:\n`;
-  prompt += `{"answer": string, "selectors": [{"label": string, "selector": string, "rationale": string}], "notes": string}\n\n`;
+  prompt += `{"answer": string, "selectors": [{"label": string, "selector": string, "rationale": string}], "notes": string, "debug"?: {"consultedFiles": string[], "analysisSteps": string[]}}\n\n`;
   prompt += `Selectors should prefer robust attributes: data-testid, data-test, aria-label, name, id, role. Avoid fragile class-based or positional selectors.\n`;
-  prompt += `Only include selectors that exist in the HTML snapshot.\n\n`;
+  prompt += `Only include selectors that exist in the HTML snapshot.\n`;
+  prompt += `When possible, include debug.consultedFiles with the snapshot inputs you actually used (for example inline:screenshot, inline:full-dom, inline:condensed-dom) and debug.analysisSteps with 2-5 short steps describing how you found the answer.\n`;
+  return prompt;
+}
+
+function estimateTokensFromChars(chars: number): number {
+  return Math.ceil(chars / 4);
+}
+
+function inferContextWindowTokens(
+  config: AiConfig,
+): { contextWindowTokens: number; source: string } {
+  const model = config.model?.trim().toLowerCase();
+  if (model) {
+    if (model.includes("claude")) {
+      return { contextWindowTokens: 200_000, source: "model:claude" };
+    }
+    if (
+      model.includes("gpt-5")
+      || model.includes("o3")
+      || model.includes("o4")
+      || model.includes("codex")
+    ) {
+      return { contextWindowTokens: 200_000, source: "model:openai" };
+    }
+    if (model.includes("gemini")) {
+      return { contextWindowTokens: 1_000_000, source: "model:gemini" };
+    }
+  }
+
+  switch (config.preset) {
+    case "claude":
+      return { contextWindowTokens: 200_000, source: "preset:claude" };
+    case "codex":
+      return { contextWindowTokens: 200_000, source: "preset:codex" };
+    case "gemini":
+      return { contextWindowTokens: 1_000_000, source: "preset:gemini" };
+  }
+}
+
+function buildSnapshotBudget(config: AiConfig): SnapshotBudget {
+  const { contextWindowTokens, source } = inferContextWindowTokens(config);
+  const outputReserveTokens = Math.min(
+    32_000,
+    Math.max(8_000, Math.floor(contextWindowTokens * 0.1)),
+  );
+  const promptBudgetTokens = Math.max(
+    8_000,
+    contextWindowTokens - outputReserveTokens - 2_000,
+  );
+
+  return {
+    contextWindowTokens,
+    outputReserveTokens,
+    promptBudgetTokens,
+    source,
+  };
+}
+
+function buildSnapshotDomStats(
+  fullHtmlContent: string,
+  condensedHtmlContent: string,
+  config: AiConfig,
+): SnapshotDomStats {
+  const fullDomChars = fullHtmlContent.length;
+  const condensedDomChars = condensedHtmlContent.length;
+  const fullDomEstimatedTokens = estimateTokensFromChars(fullDomChars);
+  const condensedDomEstimatedTokens = estimateTokensFromChars(condensedDomChars);
+
+  return {
+    fullDomChars,
+    fullDomEstimatedTokens,
+    condensedDomChars,
+    condensedDomEstimatedTokens,
+    configuredModel: config.model ?? config.preset,
+  };
+}
+
+function buildInlineHtmlPrompt(
+  args: InterpretArgs,
+  options: {
+    htmlContent: string;
+    domLabel: "full DOM" | "condensed DOM";
+    truncated: boolean;
+    selectionReason: string;
+    budget: SnapshotBudget;
+    stats: SnapshotDomStats;
+  },
+): string {
+  const selectorHints = collectSelectorHints(options.htmlContent, 120);
+
+  let prompt = `# Objective\n${args.objective}\n\n`;
+  prompt += `# Context\n${args.context}\n\n`;
+  prompt += `# Snapshot Selection\n`;
+  prompt += `- Configured model: ${options.stats.configuredModel}\n`;
+  prompt += `- Estimated context window: ${options.budget.contextWindowTokens.toLocaleString()} tokens (${options.budget.source})\n`;
+  prompt += `- Reserved output budget: ${options.budget.outputReserveTokens.toLocaleString()} tokens\n`;
+  prompt += `- Estimated prompt budget: ${options.budget.promptBudgetTokens.toLocaleString()} tokens\n`;
+  prompt += `- Full DOM size: ${options.stats.fullDomChars.toLocaleString()} chars (~${options.stats.fullDomEstimatedTokens.toLocaleString()} tokens)\n`;
+  prompt += `- Condensed DOM size: ${options.stats.condensedDomChars.toLocaleString()} chars (~${options.stats.condensedDomEstimatedTokens.toLocaleString()} tokens)\n`;
+  prompt += `- Selected HTML snapshot: ${options.domLabel}\n`;
+  prompt += `- Selection reason: ${options.selectionReason}\n\n`;
+  prompt += buildInterpretInstructions();
 
   if (selectorHints.length > 0) {
-    prompt += `Selector hints from HTML attributes (use if relevant):\n`;
+    prompt += `\nSelector hints from HTML attributes (use if relevant):\n`;
     prompt += selectorHints.map((hint) => `- ${hint}`).join("\n");
-    prompt += "\n\n";
+    prompt += "\n";
   }
 
-  if (truncated) {
-    prompt += `HTML content is truncated to fit token limits.\n\n`;
+  if (options.truncated) {
+    prompt += `\nHTML content is truncated to fit token limits.\n`;
   }
 
-  prompt += `HTML snapshot:\n\n${trimmedHtml}`;
+  prompt += `\nHTML snapshot (${options.domLabel}):\n\n${options.htmlContent}`;
   prompt +=
     "\n\nReturn only a JSON object. Do not include markdown code fences or extra commentary.";
+  return prompt;
+}
+
+export function buildInlinePromptSelection(
+  args: InterpretArgs,
+  fullHtmlContent: string,
+  condensedHtmlContent: string,
+  config: AiConfig,
+): InlinePromptSelection {
+  const budget = buildSnapshotBudget(config);
+  const stats = buildSnapshotDomStats(
+    fullHtmlContent,
+    condensedHtmlContent,
+    config,
+  );
+
+  const buildCandidate = (
+    domSource: "full" | "condensed",
+    htmlContent: string,
+    selectionReason: string,
+    truncated: boolean,
+  ): InlinePromptSelection => {
+    const domLabel = domSource === "full" ? "full DOM" : "condensed DOM";
+    const prompt = buildInlineHtmlPrompt(args, {
+      htmlContent,
+      domLabel,
+      truncated,
+      selectionReason,
+      budget,
+      stats,
+    });
+    return {
+      prompt,
+      domSource,
+      domLabel,
+      htmlChars: htmlContent.length,
+      htmlEstimatedTokens: estimateTokensFromChars(htmlContent.length),
+      promptEstimatedTokens: estimateTokensFromChars(prompt.length),
+      truncated,
+      selectionReason,
+      budget,
+      stats,
+    };
+  };
+
+  const fullCandidate = buildCandidate(
+    "full",
+    fullHtmlContent,
+    `Full DOM is small enough to fit within the estimated prompt budget, so the analyzer receives the uncondensed page HTML.`,
+    false,
+  );
+  if (fullCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
+    const selectionReason =
+      `Full DOM fits within the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} <= ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`;
+    const prompt = buildInlineHtmlPrompt(args, {
+      htmlContent: fullHtmlContent,
+      domLabel: "full DOM",
+      truncated: false,
+      selectionReason,
+      budget,
+      stats,
+    });
+    return {
+      ...fullCandidate,
+      selectionReason,
+      prompt,
+      promptEstimatedTokens: estimateTokensFromChars(prompt.length),
+    };
+  }
+
+  const condensedCandidate = buildCandidate(
+    "condensed",
+    condensedHtmlContent,
+    `Full DOM would exceed the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} > ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the condensed DOM instead.`,
+    false,
+  );
+  if (condensedCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
+    return condensedCandidate;
+  }
+
+  const basePrompt = buildInlineHtmlPrompt(args, {
+    htmlContent: "",
+    domLabel: condensedCandidate.domLabel,
+    truncated: true,
+    selectionReason:
+      `Both full and condensed DOM snapshots exceed the estimated prompt budget (full ~${fullCandidate.promptEstimatedTokens.toLocaleString()}, condensed ~${condensedCandidate.promptEstimatedTokens.toLocaleString()}, budget ${budget.promptBudgetTokens.toLocaleString()} tokens), so the condensed DOM is truncated to fit.`,
+    budget,
+    stats,
+  });
+  const availableHtmlTokens = Math.max(
+    2_000,
+    budget.promptBudgetTokens - estimateTokensFromChars(basePrompt.length),
+  );
+  const truncatedHtml = truncateText(condensedHtmlContent, availableHtmlTokens * 4);
+
+  return buildCandidate(
+    "condensed",
+    truncatedHtml.text,
+    `Both full and condensed DOM snapshots exceed the estimated prompt budget (full ~${fullCandidate.promptEstimatedTokens.toLocaleString()}, condensed ~${condensedCandidate.promptEstimatedTokens.toLocaleString()}, budget ${budget.promptBudgetTokens.toLocaleString()} tokens), so the condensed DOM is truncated to fit.`,
+    truncatedHtml.truncated,
+  );
+}
+
+function buildClaudeStreamJsonInput(prompt: string, pngPath: string): string {
+  const imageBase64 = readFileAsBase64(pngPath);
+  return `${JSON.stringify({
+    type: "user",
+    message: {
+      role: "user",
+      content: [
+        { type: "text", text: prompt },
+        {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: getMimeType(pngPath),
+            data: imageBase64,
+          },
+        },
+      ],
+    },
+  })}\n`;
+}
+
+export async function runInterpret(
+  args: InterpretArgs,
+  logger: LoggerApi,
+): Promise<void> {
+  logger.info("interpret-start", {
+    objective: args.objective,
+    pngPath: args.pngPath,
+    htmlPath: args.htmlPath,
+    condensedHtmlPath: args.condensedHtmlPath,
+  });
+  process.env.NODE_ENV = "development";
+
+  const pngPath = resolvePath(args.pngPath);
+  const htmlPath = resolvePath(args.htmlPath);
+  const condensedHtmlPath = resolvePath(args.condensedHtmlPath);
+
+  if (!existsSync(pngPath)) {
+    throw new Error(`PNG file not found: ${pngPath}`);
+  }
+  if (!existsSync(htmlPath)) {
+    throw new Error(`HTML file not found: ${htmlPath}`);
+  }
+  if (!existsSync(condensedHtmlPath)) {
+    throw new Error(`Condensed HTML file not found: ${condensedHtmlPath}`);
+  }
 
   let parsed: InterpretResult;
+  const fullHtmlContent = readFileSync(htmlPath, "utf-8");
+  const condensedHtmlContent = readFileSync(condensedHtmlPath, "utf-8");
   const configuredAgent = UserCodingAgent.getConfigured();
   if (configuredAgent) {
     const configuredAnalyzer = configuredAgent.snapshotAnalyzerConfig;
+    const selection = buildInlinePromptSelection(
+      args,
+      fullHtmlContent,
+      condensedHtmlContent,
+      configuredAnalyzer,
+    );
     logger.info("interpret-analyzer-config", {
       preset: configuredAnalyzer.preset,
       commandPrefix: configuredAnalyzer.commandPrefix,
+      configuredModel: selection.stats.configuredModel,
+      fullDomEstimatedTokens: selection.stats.fullDomEstimatedTokens,
+      condensedDomEstimatedTokens: selection.stats.condensedDomEstimatedTokens,
+      contextWindowTokens: selection.budget.contextWindowTokens,
+      promptBudgetTokens: selection.budget.promptBudgetTokens,
+      selectedDom: selection.domSource,
+      selectedHtmlEstimatedTokens: selection.htmlEstimatedTokens,
+      selectedPromptEstimatedTokens: selection.promptEstimatedTokens,
+      selectionReason: selection.selectionReason,
+      truncated: selection.truncated,
     });
-    parsed = await configuredAgent.analyzeSnapshot(prompt, pngPath, logger);
+    parsed = await configuredAgent.analyzeSnapshot(
+      selection.prompt,
+      pngPath,
+      logger,
+    );
   } else {
     const llmClientFactory = getLLMClientFactory();
     if (!llmClientFactory) {
@@ -615,15 +1064,38 @@ export async function runInterpret(
     }
 
     logger.info("interpret-analyzer-factory-fallback", {});
+    const fallbackSelection =
+      resolveSnapshotApiModel(null)
+      ?? getFactoryFallbackSnapshotApiModelSelection();
+    const fallbackConfig: AiConfig = {
+      preset:
+        fallbackSelection.provider === "openai"
+          ? "codex"
+          : fallbackSelection.provider === "anthropic"
+            ? "claude"
+            : "gemini",
+      commandPrefix: ["snapshot-api-fallback"],
+      model: fallbackSelection.model,
+      updatedAt: new Date(0).toISOString(),
+    };
+    const selection = buildInlinePromptSelection(
+      args,
+      fullHtmlContent,
+      condensedHtmlContent,
+      fallbackConfig,
+    );
     const imageBase64 = readFileAsBase64(pngPath);
-    const client = await llmClientFactory(logger, "google/gemini-3-flash-preview");
+    const client = await llmClientFactory(
+      logger,
+      fallbackSelection.model,
+    );
     const result = await client.generateObjectFromMessages({
       schema: InterpretResultSchema,
       messages: [
         {
           role: "user",
           content: [
-            { type: "text", text: prompt },
+            { type: "text", text: selection.prompt },
             {
               type: "image",
               image: `data:${getMimeType(pngPath)};base64,${imageBase64}`,
@@ -639,6 +1111,7 @@ export async function runInterpret(
   logger.info("interpret-success", {
     selectorCount: parsed.selectors.length,
     answer: parsed.answer.slice(0, 200),
+    consultedFiles: parsed.debug?.consultedFiles ?? [],
   });
   const outputLines: string[] = [];
   outputLines.push("Interpretation:");
@@ -658,10 +1131,31 @@ export async function runInterpret(
     outputLines.push("");
     outputLines.push(`Notes: ${parsed.notes.trim()}`);
   }
+  if (
+    parsed.debug &&
+    (parsed.debug.consultedFiles.length > 0 ||
+      parsed.debug.analysisSteps.length > 0)
+  ) {
+    outputLines.push("");
+    outputLines.push("Debug:");
+    if (parsed.debug.consultedFiles.length > 0) {
+      outputLines.push(
+        `  consultedFiles: ${parsed.debug.consultedFiles.join(", ")}`,
+      );
+    }
+    if (parsed.debug.analysisSteps.length > 0) {
+      outputLines.push("  analysisSteps:");
+      parsed.debug.analysisSteps.forEach((step, index) => {
+        outputLines.push(`    ${index + 1}. ${step}`);
+      });
+    }
+  }
 
   console.log(outputLines.join("\n"));
 }
 
 export function canAnalyzeSnapshots(): boolean {
-  return UserCodingAgent.getConfigured() !== null || getLLMClientFactory() !== null;
+  return (
+    UserCodingAgent.getConfigured() !== null || getLLMClientFactory() !== null
+  );
 }

@@ -13,6 +13,21 @@ export const AiConfigSchema = z
   .object({
     preset: AiPresetSchema,
     commandPrefix: z.array(z.string()).min(1),
+    /** Model override for the sub-agent session (e.g. "claude-sonnet-4-6", "o4-mini"). */
+    model: z.string().optional(),
+    /**
+     * Reasoning / thinking configuration.
+     * - Claude: passed as --thinking-budget <number>
+     * - Codex:  passed as --reasoning-effort <"low"|"medium"|"high">
+     */
+    reasoning: z.union([z.string(), z.number()]).optional(),
+    /**
+     * Restrict which tools the sub-agent session can use.
+     * - Claude: passed as --tools "Read,Grep,Glob"
+     * - Codex:  enforced via --sandbox (read-only already in default preset)
+     * - Gemini: not supported (ignored)
+     */
+    allowedTools: z.array(z.string()).optional(),
     updatedAt: z.string(),
   })
   .strict();
@@ -33,11 +48,43 @@ export const LibrettoConfigSchema = z
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
 
-export const AI_CONFIG_PRESETS: Record<AiPreset, string[]> = {
-  codex: ["codex", "exec", "--skip-git-repo-check", "--sandbox", "read-only"],
-  claude: [join(homedir(), ".claude", "local", "claude"), "-p"],
-  gemini: ["gemini", "--output-format", "json"],
+export const AI_CONFIG_PRESETS: Record<AiPreset, Omit<AiConfig, "updatedAt">> = {
+  codex: {
+    preset: "codex",
+    commandPrefix: ["codex", "exec", "--skip-git-repo-check", "--sandbox", "read-only"],
+  },
+  claude: {
+    preset: "claude",
+    commandPrefix: [join(homedir(), ".claude", "local", "claude"), "-p"],
+    allowedTools: ["Read", "Grep", "Glob"],
+  },
+  gemini: {
+    preset: "gemini",
+    commandPrefix: ["gemini", "--sandbox", "--yolo", "--output-format", "json"],
+    allowedTools: ["read_file", "list_directory", "search_file_content", "glob"],
+  },
 };
+
+const LEGACY_DEFAULT_COMMAND_PREFIXES: Partial<Record<AiPreset, string[][]>> = {
+  gemini: [["gemini", "--output-format", "json"]],
+};
+
+function arrayShallowEqual(left: string[], right: string[]): boolean {
+  return (
+    left.length === right.length
+    && left.every((value, index) => value === right[index])
+  );
+}
+
+export function isDefaultCommandPrefixForPreset(config: AiConfig): boolean {
+  const acceptedPrefixes = [
+    AI_CONFIG_PRESETS[config.preset].commandPrefix,
+    ...(LEGACY_DEFAULT_COMMAND_PREFIXES[config.preset] ?? []),
+  ];
+  return acceptedPrefixes.some((prefix) =>
+    arrayShallowEqual(config.commandPrefix, prefix)
+  );
+}
 
 function invalidConfigError(configPath: string): Error {
   return new Error(
@@ -89,11 +136,13 @@ export function writeAiConfig(
   preset: AiPreset,
   commandPrefix: string[],
   configPath: string = LIBRETTO_CONFIG_PATH,
+  extra?: { model?: string; reasoning?: string | number; allowedTools?: string[] },
 ): AiConfig {
   const librettoConfig = readLibrettoConfig(configPath);
   const ai = AiConfigSchema.parse({
     preset,
     commandPrefix,
+    ...extra,
     updatedAt: new Date().toISOString(),
   });
   writeLibrettoConfig(
@@ -124,6 +173,9 @@ export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolea
 function printAiConfig(config: AiConfig, configPath: string): void {
   console.log(`AI preset: ${config.preset}`);
   console.log(`Command prefix: ${formatCommandPrefix(config.commandPrefix)}`);
+  if (config.model) console.log(`Model: ${config.model}`);
+  if (config.reasoning !== undefined) console.log(`Reasoning: ${config.reasoning}`);
+  if (config.allowedTools?.length) console.log(`Allowed tools: ${config.allowedTools.join(", ")}`);
   console.log(`Config file: ${configPath}`);
   console.log(`Updated at: ${config.updatedAt}`);
 }
@@ -187,12 +239,17 @@ export function runAiConfigure(
   }
 
   const preset = parsedPreset.data;
+  const presetDefaults = AI_CONFIG_PRESETS[preset];
   const commandPrefix =
     customPrefix.length > 0
       ? customPrefix
-      : AI_CONFIG_PRESETS[preset];
+      : presetDefaults.commandPrefix;
 
-  const config = writeAiConfig(preset, commandPrefix, configPath);
+  const config = writeAiConfig(preset, commandPrefix, configPath, {
+    model: presetDefaults.model,
+    reasoning: presetDefaults.reasoning,
+    allowedTools: presetDefaults.allowedTools,
+  });
   console.log("AI config saved.");
   printAiConfig(config, configPath);
 }
