@@ -10,11 +10,15 @@ It is designed for engineering teams that automate workflows in web apps and wan
 npm install --save-dev libretto
 ```
 
+This installs Libretto along with Playwright and Chromium. The Chromium browser binary is downloaded automatically via a `postinstall` script — this may take a minute on first install.
+
 Then initialize Libretto:
 
 ```bash
 npx libretto init
 ```
+
+This verifies your Chromium installation and optionally configures an AI runtime for snapshot analysis.
 
 ## Usage
 
@@ -50,6 +54,21 @@ You can also run workflows directly from the CLI:
 npx libretto help
 npx libretto run ./integration.ts main
 ```
+
+## The `.libretto/` directory
+
+Libretto stores local runtime state in a `.libretto/` directory at your project root. Add it to your `.gitignore`:
+
+```
+.libretto/
+```
+
+This directory contains:
+
+- **`profiles/<domain>.json`** — Saved browser sessions (cookies, localStorage) for authenticated sites. Created by `npx libretto save <domain>`. These are machine-local and should never be committed.
+- **`sessions/<name>/state.json`** — Active session metadata (debug port, PID, status). Each CLI session or `launchBrowser()` call creates one.
+- **`sessions/<name>/logs.jsonl`** — Session logs including captured network requests and user actions (clicks, fills, navigations). Useful for debugging and for converting browser automations to direct network calls.
+- **`ai.json`** — AI runtime configuration (which model/command to use for snapshot analysis).
 
 ## Authors
 
