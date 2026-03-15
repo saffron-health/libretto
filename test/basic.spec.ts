@@ -202,7 +202,6 @@ export async function main() {
 
   test("run forwards --tsconfig to tsx for workflow imports", async ({
     librettoCli,
-    evaluate,
     workspacePath,
     writeWorkflow,
   }) => {
@@ -242,9 +241,8 @@ export const main = workflow({}, async () => {
     const result = await librettoCli(
       `run "${integrationFilePath}" main --tsconfig "${workspacePath("feature", "tsconfig.json")}" --session default --headless`,
     );
-    await evaluate(result.stdout).toMatch(
-      "Includes TSCONFIG_ALIAS_OK and Integration completed.",
-    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("TSCONFIG_ALIAS_OK");
   }, 45_000);
 
   test("run compile failures mention --tsconfig guidance", async ({

@@ -2,7 +2,7 @@ import type { Page } from "playwright";
 import { type MinimalLogger, defaultLogger } from "../../shared/logger/logger.js";
 import type { LLMClient } from "../../shared/llm/types.js";
 import { z } from "zod";
-import { condenseDom } from "../../cli/core/condense-dom.js";
+import { condenseDom } from "../../shared/condense-dom/condense-dom.js";
 
 /**
  * Known error type for classifying submission errors.
