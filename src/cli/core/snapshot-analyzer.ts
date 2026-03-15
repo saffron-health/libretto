@@ -10,11 +10,6 @@ import {
   isDefaultCommandPrefixForPreset,
   readAiConfig,
 } from "./ai-config.js";
-import { getLLMClientFactory } from "./context.js";
-import {
-  getFactoryFallbackSnapshotApiModelSelection,
-  resolveSnapshotApiModel,
-} from "./snapshot-api-config.js";
 
 export type ScreenshotPair = {
   pngPath: string;
@@ -56,11 +51,6 @@ type ExternalCommandResult = {
   exitCode: number;
   stdout: string;
   stderr: string;
-};
-
-type CodexTraceSummary = {
-  commandCount: number;
-  fileCandidates: string[];
 };
 
 type SnapshotBudget = {
@@ -237,18 +227,8 @@ class CodexUserCodingAgent extends UserCodingAgent {
       args,
     });
     const result = await this.runAnalyzer(args, logger, prompt);
-    const trace = logCodexJsonTrace(result.stdout, logger);
     let outputText = result.stdout;
     try {
-      const outputFileExists = existsSync(outputPath);
-      logger.info("interpret-analyzer-codex-finish", {
-        outputPath,
-        outputFileExists,
-        stdoutChars: result.stdout.length,
-        stderrChars: result.stderr.length,
-        traceCommandCount: trace.commandCount,
-        traceFileCandidates: trace.fileCandidates,
-      });
       if (existsSync(outputPath)) {
         outputText = readFileSync(outputPath, "utf-8");
       }
@@ -456,108 +436,6 @@ function formatStdinError(
       : `Analyzer stdin error: ${error.message}`;
   if (stderr.includes(detail)) return "";
   return `${stderr.endsWith("\n") || stderr.length === 0 ? "" : "\n"}${detail}\n`;
-}
-
-function extractShellSnippet(command: string): string {
-  const dqMatch = command.match(/-lc\s+"([\s\S]*)"$/);
-  if (dqMatch?.[1]) {
-    return dqMatch[1];
-  }
-  const sqMatch = command.match(/-lc\s+'([\s\S]*)'$/);
-  if (sqMatch?.[1]) {
-    return sqMatch[1];
-  }
-  return command;
-}
-
-function extractPathCandidatesFromCommand(command: string): string[] {
-  const snippet = extractShellSnippet(command);
-  const candidates = new Set<string>();
-  const add = (value: string) => {
-    const cleaned = value.replace(/^[("'`]+|[)"'`;,:]+$/g, "");
-    if (!cleaned) return;
-    if (cleaned.startsWith("-")) return;
-    if (cleaned === "." || cleaned === "..") return;
-    candidates.add(cleaned);
-  };
-
-  const pathWithSlashRegex =
-    /(?:^|[\s("'`])((?:\/|\.{1,2}\/)[^\s"'`;)]+|[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+)/g;
-  let match: RegExpExecArray | null;
-  while ((match = pathWithSlashRegex.exec(snippet)) !== null) {
-    if (match[1]) add(match[1]);
-  }
-
-  const fileRegex =
-    /(?:^|[\s("'`])([A-Za-z0-9_.-]+\.(?:html?|png|json|txt|md|ts|tsx|js|mjs|cjs|css|svg))/gi;
-  while ((match = fileRegex.exec(snippet)) !== null) {
-    if (match[1]) add(match[1]);
-  }
-
-  return Array.from(candidates);
-}
-
-function logCodexJsonTrace(
-  stdout: string,
-  logger: LoggerApi,
-): CodexTraceSummary {
-  let commandCount = 0;
-  const fileCandidates = new Set<string>();
-
-  for (const line of stdout.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("{")) continue;
-    try {
-      const parsed = JSON.parse(trimmed) as {
-        type?: string;
-        item?: {
-          type?: string;
-          command?: string;
-          aggregated_output?: string;
-          exit_code?: number | null;
-          status?: string;
-          text?: string;
-        };
-      };
-
-      if (
-        parsed.type === "item.completed" &&
-        parsed.item?.type === "command_execution"
-      ) {
-        commandCount += 1;
-        const command = parsed.item.command ?? "";
-        const paths = extractPathCandidatesFromCommand(command);
-        for (const path of paths) fileCandidates.add(path);
-        logger.info("interpret-analyzer-codex-command", {
-          command,
-          status: parsed.item.status ?? null,
-          exitCode: parsed.item.exit_code ?? null,
-          paths,
-          outputPreview: summarizeForLog(
-            parsed.item.aggregated_output ?? "",
-            300,
-          ),
-        });
-        continue;
-      }
-
-      if (
-        parsed.type === "item.completed" &&
-        parsed.item?.type === "agent_message"
-      ) {
-        logger.info("interpret-analyzer-codex-message", {
-          textPreview: summarizeForLog(parsed.item.text ?? "", 240),
-        });
-      }
-    } catch {}
-  }
-
-  const summary = {
-    commandCount,
-    fileCandidates: Array.from(fileCandidates),
-  };
-  logger.info("interpret-analyzer-codex-trace-summary", summary);
-  return summary;
 }
 
 function extractJsonObjectCandidates(text: string): string[] {
@@ -1122,56 +1000,9 @@ export async function runInterpret(
       logger,
     );
   } else {
-    const llmClientFactory = getLLMClientFactory();
-    if (!llmClientFactory) {
-      throw new Error(
-        "No AI config set. Run 'npx libretto ai configure codex' (or claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
-      );
-    }
-
-    logger.info("interpret-analyzer-factory-fallback", {});
-    const fallbackSelection =
-      resolveSnapshotApiModel(null)
-      ?? getFactoryFallbackSnapshotApiModelSelection();
-    const fallbackConfig: AiConfig = {
-      preset:
-        fallbackSelection.provider === "openai"
-          ? "codex"
-          : fallbackSelection.provider === "anthropic"
-            ? "claude"
-            : "gemini",
-      commandPrefix: ["snapshot-api-fallback"],
-      model: fallbackSelection.model,
-      updatedAt: new Date(0).toISOString(),
-    };
-    const selection = buildInlinePromptSelection(
-      args,
-      fullHtmlContent,
-      condensedHtmlContent,
-      fallbackConfig,
+    throw new Error(
+      "No AI config set. Run 'npx libretto ai configure codex' (or claude/gemini), or set API credentials in your .env file for direct API analysis.",
     );
-    const imageBase64 = readFileAsBase64(pngPath);
-    const client = await llmClientFactory(
-      logger,
-      fallbackSelection.model,
-    );
-    const result = await client.generateObjectFromMessages({
-      schema: InterpretResultSchema,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: selection.prompt },
-            {
-              type: "image",
-              image: `data:${getMimeType(pngPath)};base64,${imageBase64}`,
-            },
-          ],
-        },
-      ],
-      temperature: 0.1,
-    });
-    parsed = InterpretResultSchema.parse(result);
   }
 
   logger.info("interpret-success", {

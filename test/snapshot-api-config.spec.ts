@@ -6,7 +6,6 @@ import {
 import {
   parseDotEnvAssignment,
   resolveSnapshotApiModel,
-  shouldUseApiSnapshotAnalyzer,
 } from "../src/cli/core/snapshot-api-config.js";
 
 function makeConfig(
@@ -55,7 +54,6 @@ describe("snapshot API model resolution", () => {
       provider: "openai",
       source: "ai-config",
     });
-    expect(shouldUseApiSnapshotAnalyzer(config)).toBe(true);
   });
 
   it("accepts codex model aliases in LIBRETTO_SNAPSHOT_MODEL", () => {
@@ -127,13 +125,35 @@ describe("snapshot API model resolution", () => {
     });
   });
 
+  it("honors an explicit Vertex model override on the gemini preset", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    vi.stubEnv("GOOGLE_CLOUD_PROJECT", "test-project");
+
+    const config = makeConfig(
+      "gemini",
+      [
+        "gemini",
+        "--sandbox",
+        "--yolo",
+        "--output-format",
+        "json",
+      ],
+      "vertex/gemini-2.5-flash",
+    );
+
+    expect(resolveSnapshotApiModel(config)).toMatchObject({
+      model: "vertex/gemini-2.5-flash",
+      provider: "vertex",
+      source: "ai-config",
+    });
+  });
+
   it("treats the legacy built-in gemini command prefix as a standard preset", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
     vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
 
     const config = makeConfig("gemini", ["gemini", "--output-format", "json"]);
 
-    expect(shouldUseApiSnapshotAnalyzer(config)).toBe(true);
     expect(resolveSnapshotApiModel(config)).toMatchObject({
       model: "google/gemini-2.5-flash",
       provider: "google",
@@ -147,11 +167,9 @@ describe("snapshot API model resolution", () => {
 
     const config = makeConfig("codex", [process.execPath, "/tmp/custom-analyzer.mjs"]);
 
-    expect(shouldUseApiSnapshotAnalyzer(config)).toBe(false);
     expect(resolveSnapshotApiModel(config)).toBeNull();
 
     vi.stubEnv("LIBRETTO_SNAPSHOT_MODEL", "vertex/gemini-2.5-flash");
-    expect(shouldUseApiSnapshotAnalyzer(config)).toBe(true);
     expect(resolveSnapshotApiModel(config)).toMatchObject({
       model: "vertex/gemini-2.5-flash",
       provider: "vertex",
