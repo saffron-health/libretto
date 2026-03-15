@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { condenseDom } from "../src/cli/core/condense-dom.js";
+import { condenseDom } from "../src/shared/condense-dom/condense-dom.js";
 
 describe("condenseDom SVG collapsing", () => {
   it("does not invent preserved attributes from similarly named attributes", () => {

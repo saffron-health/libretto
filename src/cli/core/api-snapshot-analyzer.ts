@@ -21,16 +21,15 @@ import {
 import { readAiConfig } from "./ai-config.js";
 import {
   buildSnapshotApiSelectionConfig,
-  loadSnapshotEnv,
   resolveSnapshotApiModelOrThrow,
 } from "./snapshot-api-config.js";
+import type { AiConfig } from "./ai-config.js";
 
 export async function runApiInterpret(
   args: InterpretArgs,
   logger: LoggerApi,
+  configuredAi: AiConfig | null = readAiConfig(),
 ): Promise<void> {
-  loadSnapshotEnv();
-  const configuredAi = readAiConfig();
   const selection = resolveSnapshotApiModelOrThrow(configuredAi);
   const selectionConfig = buildSnapshotApiSelectionConfig(selection, configuredAi);
 

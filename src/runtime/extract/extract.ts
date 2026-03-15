@@ -2,7 +2,7 @@ import type { Page } from "playwright";
 import type z from "zod";
 import { type MinimalLogger, defaultLogger } from "../../shared/logger/logger.js";
 import type { LLMClient } from "../../shared/llm/types.js";
-import { condenseDom } from "../../cli/core/condense-dom.js";
+import { condenseDom } from "../../shared/condense-dom/condense-dom.js";
 
 export type ExtractOptions<T extends z.ZodType> = {
 	page: Page;

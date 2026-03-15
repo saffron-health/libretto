@@ -3,7 +3,7 @@ import type { Argv } from "yargs";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { connect, disconnectBrowser } from "../core/browser.js";
 import { getSessionSnapshotRunDir } from "../core/context.js";
-import { condenseDom } from "../core/condense-dom.js";
+import { condenseDom } from "../../shared/condense-dom/condense-dom.js";
 import { readSessionState } from "../core/session.js";
 import {
   runInterpret,
@@ -14,7 +14,7 @@ import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readAiConfig } from "../core/ai-config.js";
 import {
   isSnapshotApiUnavailableError,
-  shouldUseApiSnapshotAnalyzer,
+  resolveSnapshotApiModel,
 } from "../core/snapshot-api-config.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
@@ -268,18 +268,6 @@ async function runSnapshot(
     );
   }
 
-  if (!normalizedObjective && !normalizedContext) {
-    const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(
-      session,
-      logger,
-      pageId,
-    );
-
-    printSnapshotPaths({ pngPath, htmlPath, condensedHtmlPath });
-    console.log("Use --objective flag to analyze snapshots.");
-    return;
-  }
-
   const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(
     session,
     logger,
@@ -288,13 +276,13 @@ async function runSnapshot(
 
   printSnapshotPaths({ pngPath, htmlPath, condensedHtmlPath });
 
-  const objectiveText = normalizedObjective;
-  if (!objectiveText) {
-    throw new Error("Couldn't run analysis: missing objective.");
+  if (!normalizedObjective) {
+    console.log("Use --objective flag to analyze snapshots.");
+    return;
   }
 
   const interpretArgs: InterpretArgs = {
-    objective: objectiveText,
+    objective: normalizedObjective,
     session,
     context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
     pngPath,
@@ -303,13 +291,13 @@ async function runSnapshot(
   };
 
   const configuredAi = readAiConfig();
-  if (!shouldUseApiSnapshotAnalyzer(configuredAi)) {
+  if (!resolveSnapshotApiModel(configuredAi)) {
     await runInterpret(interpretArgs, logger);
     return;
   }
 
   try {
-    await runApiInterpret(interpretArgs, logger);
+    await runApiInterpret(interpretArgs, logger, configuredAi);
   } catch (error) {
     if (!configuredAi || !isSnapshotApiUnavailableError(error)) {
       throw error;
