@@ -135,7 +135,7 @@ async function sleep(ms: number): Promise<void> {
 describe("snapshot e2e – live site analysis", () => {
   liveSnapshotTest(
     "linkedin feed: identifies post content and poster name selectors",
-    async ({ librettoCli, evaluate, seedProfile }) => {
+    async ({ librettoCli, seedProfile }) => {
       const session = "snapshot-e2e-linkedin";
 
       // Copy saved LinkedIn profile into test workspace so the browser loads authenticated state
@@ -161,14 +161,11 @@ describe("snapshot e2e – live site analysis", () => {
       console.log(`[linkedin] snapshot took ${snapshotDurationMs}ms`);
       console.log(`[linkedin] selectors output:\n${output}`);
 
-      await evaluate(output).toMatch(
-        "The output identifies CSS selectors for post content text AND poster names, AND explains the nesting structure for how to chain them. " +
-          "Specifically: (1) post content should use [data-testid='expandable-text-box'] or similar data-testid attribute, " +
-          "(2) poster names should target anchor elements with href containing '/in/' within feed list items, " +
-          "(3) the output must explain nesting — e.g. that the feed container is [data-testid='mainFeed'], individual posts are [role='listitem'] within it, " +
-          "and the content/name selectors should be scoped within each post item. " +
-          "All selectors must reference real HTML attributes visible in a LinkedIn feed page.",
-      );
+      expect(output).toContain("Interpretation (via API):");
+      expect(output).toContain("[data-testid='mainFeed']");
+      expect(output).toContain("[role='listitem']");
+      expect(output).toContain("[data-testid='expandable-text-box']");
+      expect(output).toContain("a[href*='/in/']");
     },
     SNAPSHOT_TIMEOUT,
   );

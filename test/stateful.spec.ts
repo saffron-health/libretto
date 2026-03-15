@@ -241,11 +241,11 @@ describe("state-driven CLI subprocess behavior", () => {
     }, 45_000);
   }
 
-  test("custom codex analyzer still receives inline full DOM and direct image input", async ({
+  test("custom analyzers keep a generic stdin contract instead of preset-specific transport flags", async ({
     librettoCli,
     workspaceDir,
   }) => {
-    const session = "snapshot-inline-codex";
+    const session = "snapshot-inline-custom";
     const { analyzerPath, recordPath } = await writeRecordingAnalyzer(workspaceDir);
     const server = await startStaticHtmlServer(
       [
@@ -262,7 +262,7 @@ describe("state-driven CLI subprocess behavior", () => {
 
     try {
       await librettoCli(
-        `ai configure codex -- "${process.execPath}" "${analyzerPath}" "codex" "${recordPath}"`,
+        `ai configure codex -- "${process.execPath}" "${analyzerPath}" "custom" "${recordPath}"`,
         DISABLE_SNAPSHOT_API_ENV,
       );
 
@@ -273,10 +273,10 @@ describe("state-driven CLI subprocess behavior", () => {
       expect(opened.stdout).toContain("Browser open");
 
       const snapshot = await librettoCli(
-        `snapshot --objective "Find the call to action button" --context "Codex inline snapshot regression" --session ${session}`,
+        `snapshot --objective "Find the call to action button" --context "Custom analyzer transport regression" --session ${session}`,
         DISABLE_SNAPSHOT_API_ENV,
       );
-      expect(snapshot.stdout).toContain("Answer: snapshot-ok-codex");
+      expect(snapshot.stdout).toContain("Answer: snapshot-ok-custom");
 
       const rawRecord = await readFile(recordPath, "utf8");
       const record = JSON.parse(rawRecord) as {
@@ -284,114 +284,22 @@ describe("state-driven CLI subprocess behavior", () => {
         stdin: string;
       };
 
-      expect(record.args).toContain("--image");
+      expect(record.args).not.toContain("--image");
+      expect(record.args).not.toContain("--json");
       expect(record.args).not.toContain("--output-format");
+      expect(record.args).not.toContain("--input-format");
+      expect(record.stdin).toContain("Screenshot file path:");
       expect(record.stdin).toContain("Selected HTML snapshot: full DOM");
       expect(record.stdin).toContain(
         "Full DOM fits within the estimated prompt budget",
       );
       expect(record.stdin).toContain('componentkey="full-dom-marker"');
       expect(record.stdin).toContain("HTML snapshot (full DOM):");
-      expect(record.stdin).not.toContain(
-        "The following snapshot files are available",
-      );
+      expect(record.stdin).toContain("Return only a JSON object.");
     } finally {
       await server.close();
     }
   }, 45_000);
-
-  test("custom claude analyzer still receives structured image input and condensed DOM when full DOM is too large", async ({
-    librettoCli,
-    workspaceDir,
-  }) => {
-    const session = "snapshot-inline-claude";
-    const { analyzerPath, recordPath } = await writeRecordingAnalyzer(workspaceDir);
-    const repeatedCard = `<section componentkey="removed-by-condense" class="card ${"x".repeat(180)}"><button data-testid="card-action" aria-label="Card action">Inspect</button></section>`;
-    const server = await startStaticHtmlServer(
-      `<!doctype html><html><body>${repeatedCard.repeat(5500)}</body></html>`,
-    );
-
-    try {
-      await librettoCli(
-        `ai configure claude -- "${process.execPath}" "${analyzerPath}" "claude" "${recordPath}"`,
-        DISABLE_SNAPSHOT_API_ENV,
-      );
-
-      const opened = await librettoCli(
-        `open ${server.url} --headless --session ${session}`,
-        DISABLE_SNAPSHOT_API_ENV,
-      );
-      expect(opened.stdout).toContain("Browser open");
-
-      const snapshot = await librettoCli(
-        `snapshot --objective "Find the repeated card action button" --context "Claude inline snapshot regression" --session ${session}`,
-        DISABLE_SNAPSHOT_API_ENV,
-      );
-      expect(snapshot.stdout).toContain("Answer: snapshot-ok-claude");
-
-      const rawRecord = await readFile(recordPath, "utf8");
-      const record = JSON.parse(rawRecord) as {
-        args: string[];
-        lines: Array<{
-          type?: string;
-          message?: {
-            role?: string;
-            content?: Array<
-              | { type: "text"; text: string }
-              | {
-                  type: "image";
-                  source: {
-                    type: string;
-                    media_type: string;
-                    data: string;
-                  };
-                }
-            >;
-          };
-        }>;
-      };
-
-      expect(record.args).toEqual(
-        expect.arrayContaining([
-          "--verbose",
-          "--output-format",
-          "stream-json",
-          "--input-format",
-          "stream-json",
-        ]),
-      );
-
-      const userMessage = record.lines.find((line) => line.type === "user");
-      expect(userMessage?.message?.role).toBe("user");
-      expect(Array.isArray(userMessage?.message?.content)).toBe(true);
-
-      const contentBlocks = userMessage?.message?.content ?? [];
-      const textBlock = contentBlocks.find(
-        (block): block is { type: "text"; text: string } =>
-          block.type === "text",
-      );
-      const imageBlock = contentBlocks.find(
-        (block): block is {
-          type: "image";
-          source: { type: string; media_type: string; data: string };
-        } => block.type === "image",
-      );
-
-      expect(textBlock?.text).toContain("Selected HTML snapshot: condensed DOM");
-      expect(textBlock?.text).toContain(
-        "Full DOM would exceed the estimated prompt budget",
-      );
-      expect(textBlock?.text).toContain("HTML snapshot (condensed DOM):");
-      expect(textBlock?.text).not.toContain(
-        'componentkey="removed-by-condense"',
-      );
-      expect(imageBlock?.source.type).toBe("base64");
-      expect(imageBlock?.source.media_type).toBe("image/png");
-      expect(imageBlock?.source.data.length).toBeGreaterThan(100);
-    } finally {
-      await server.close();
-    }
-  }, 60_000);
 
   test("runs snapshot analysis when only --objective is provided", async ({
     librettoCli,
@@ -571,7 +479,6 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("reads and clears network logs for a live session", async ({
     librettoCli,
-    evaluate,
   }) => {
     const session = "network-live-session";
     await librettoCli(`open https://example.com --headless --session ${session}`);
@@ -581,9 +488,8 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const view = await librettoCli(`network --session ${session} --last 5`);
-    await evaluate(view.stdout).toMatch(
-      "Shows at least one network request result for the session.",
-    );
+    expect(view.stdout).not.toContain("No network requests captured.");
+    expect(view.stdout).toMatch(/\brequest\(s\) shown\./);
 
     const clear = await librettoCli(`network --session ${session} --clear`);
     expect(clear.stdout).toContain("Network log cleared.");
@@ -591,7 +497,6 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("reads and clears action logs for a live session", async ({
     librettoCli,
-    evaluate,
   }) => {
     const session = "actions-live-session";
     await librettoCli(`open https://example.com --headless --session ${session}`);
@@ -601,9 +506,8 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const view = await librettoCli(`actions --session ${session} --last 5`);
-    await evaluate(view.stdout).toMatch(
-      "Shows at least one action result for the session.",
-    );
+    expect(view.stdout).not.toContain("No actions captured.");
+    expect(view.stdout).toMatch(/\baction\(s\) shown\./);
 
     const clear = await librettoCli(`actions --session ${session} --clear`);
     expect(clear.stdout).toContain("Action log cleared.");
