@@ -189,7 +189,7 @@ function printAiConfig(config: AiConfig, configPath: string): void {
 
 function printConfigureUsage(commandName: string): void {
   console.log(
-    `Usage: ${commandName} <${AI_CONFIG_PRESET_USAGE}> [-- <command prefix...>]
+    `Usage: ${commandName} <${AI_CONFIG_PRESET_USAGE}>
        ${commandName}
        ${commandName} --clear`,
   );
@@ -221,7 +221,6 @@ export function runAiConfigure(
   input: {
     preset?: string;
     clear?: boolean;
-    customPrefix?: string[];
   },
   options: {
     configureCommandName?: string;
@@ -233,9 +232,8 @@ export function runAiConfigure(
   const configPath = options.configPath ?? LIBRETTO_CONFIG_PATH;
 
   const presetArg = input.preset?.trim();
-  const customPrefix = (input.customPrefix ?? []).filter(Boolean);
 
-  if (!presetArg && customPrefix.length === 0 && !input.clear) {
+  if (!presetArg && !input.clear) {
     const config = readAiConfig(configPath);
     if (!config) {
       console.log(`No AI config set. Run '${configureCommandName} codex' to set one.`);
@@ -263,18 +261,10 @@ export function runAiConfigure(
     );
   }
 
-  if (input.customPrefix && input.customPrefix.length > 0 && customPrefix.length === 0) {
-    throw new Error("Custom command prefix cannot be empty.");
-  }
-
   const preset = resolvedPreset.preset;
   const presetDefaults = AI_CONFIG_PRESETS[preset];
-  const commandPrefix =
-    customPrefix.length > 0
-      ? customPrefix
-      : presetDefaults.commandPrefix;
 
-  const config = writeAiConfig(preset, commandPrefix, configPath, {
+  const config = writeAiConfig(preset, presetDefaults.commandPrefix, configPath, {
     model: resolvedPreset.model ?? presetDefaults.model,
     reasoning: presetDefaults.reasoning,
     allowedTools: presetDefaults.allowedTools,
