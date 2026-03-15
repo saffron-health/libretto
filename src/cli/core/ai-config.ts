@@ -8,6 +8,13 @@ export const CURRENT_CONFIG_VERSION = 1;
 
 export const AiPresetSchema = z.enum(["codex", "claude", "gemini"]);
 export type AiPreset = z.infer<typeof AiPresetSchema>;
+const AI_CONFIG_PRESET_INPUTS = ["codex", "claude", "gemini", "google-vertex-ai"] as const;
+const AI_CONFIG_PRESET_USAGE = AI_CONFIG_PRESET_INPUTS.join("|");
+
+type AiConfigurePresetResolution = {
+  preset: AiPreset;
+  model?: string;
+};
 
 export const AiConfigSchema = z
   .object({
@@ -182,10 +189,32 @@ function printAiConfig(config: AiConfig, configPath: string): void {
 
 function printConfigureUsage(commandName: string): void {
   console.log(
-    `Usage: ${commandName} <codex|claude|gemini> [-- <command prefix...>]
+    `Usage: ${commandName} <${AI_CONFIG_PRESET_USAGE}> [-- <command prefix...>]
        ${commandName}
        ${commandName} --clear`,
   );
+}
+
+function resolveAiConfigurePreset(
+  presetArg: string | undefined,
+): AiConfigurePresetResolution | null {
+  const normalizedPreset = presetArg?.trim();
+
+  switch (normalizedPreset) {
+    case "codex":
+      return { preset: "codex" };
+    case "claude":
+      return { preset: "claude" };
+    case "gemini":
+      return { preset: "gemini" };
+    case "google-vertex-ai":
+      return {
+        preset: "gemini",
+        model: "vertex/gemini-2.5-flash",
+      };
+    default:
+      return null;
+  }
 }
 
 export function runAiConfigure(
@@ -226,11 +255,11 @@ export function runAiConfigure(
     return;
   }
 
-  const parsedPreset = AiPresetSchema.safeParse(presetArg);
-  if (!parsedPreset.success) {
+  const resolvedPreset = resolveAiConfigurePreset(presetArg);
+  if (!resolvedPreset) {
     printConfigureUsage(configureCommandName);
     throw new Error(
-      "Missing or invalid preset. Use one of: codex, claude, gemini.",
+      `Missing or invalid preset. Use one of: ${AI_CONFIG_PRESET_INPUTS.join(", ")}.`,
     );
   }
 
@@ -238,7 +267,7 @@ export function runAiConfigure(
     throw new Error("Custom command prefix cannot be empty.");
   }
 
-  const preset = parsedPreset.data;
+  const preset = resolvedPreset.preset;
   const presetDefaults = AI_CONFIG_PRESETS[preset];
   const commandPrefix =
     customPrefix.length > 0
@@ -246,10 +275,13 @@ export function runAiConfigure(
       : presetDefaults.commandPrefix;
 
   const config = writeAiConfig(preset, commandPrefix, configPath, {
-    model: presetDefaults.model,
+    model: resolvedPreset.model ?? presetDefaults.model,
     reasoning: presetDefaults.reasoning,
     allowedTools: presetDefaults.allowedTools,
   });
   console.log("AI config saved.");
+  if (presetArg === "google-vertex-ai") {
+    console.log("Configured Google Vertex AI via the Gemini preset.");
+  }
   printAiConfig(config, configPath);
 }
