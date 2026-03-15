@@ -5,7 +5,6 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import {
   formatCommandPrefix,
-  isDefaultCommandPrefixForPreset,
   readAiConfig,
 } from "../core/ai-config.js";
 import { REPO_ROOT } from "../core/context.js";
@@ -190,21 +189,20 @@ async function runInteractiveApiSetup(): Promise<void> {
 function printCliFallbackSetup(): void {
   const config = readAiConfig();
 
-  console.log("\nCLI analyzer fallback:");
+  console.log("\nCLI agent fallback (spawns a coding agent process instead of a direct API call):");
   if (!config) {
-    console.log("  No custom CLI analyzer configured.");
+    console.log("  No CLI agent configured.");
     console.log(
       "  Optional: run `npx libretto ai configure <codex|claude|gemini|google-vertex-ai>` to set one up.",
     );
     return;
   }
 
-  const mode = isDefaultCommandPrefixForPreset(config) ? "built-in preset" : "custom";
   console.log(
-    `  \u2713 Configured (${mode}, ${config.preset}): ${formatCommandPrefix(config.commandPrefix)}`,
+    `  \u2713 ${config.preset}: ${formatCommandPrefix(config.commandPrefix)}`,
   );
   console.log(
-    "    Libretto will use this analyzer when the API path is unavailable or when you intentionally configure a custom analyzer workflow.",
+    "    Used as fallback when API credentials are unavailable.",
   );
 }
 

@@ -75,7 +75,6 @@ Examples:
   libretto-cli ai configure claude
   libretto-cli ai configure gemini
   libretto-cli ai configure google-vertex-ai
-  libretto-cli ai configure <codex|claude|gemini|google-vertex-ai> -- <command prefix...>
   libretto-cli snapshot
   libretto-cli snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
   libretto-cli resume --session default

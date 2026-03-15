@@ -7,7 +7,6 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   type AiConfig,
   formatCommandPrefix,
-  isDefaultCommandPrefixForPreset,
   readAiConfig,
 } from "./ai-config.js";
 
@@ -87,9 +86,6 @@ abstract class UserCodingAgent {
   protected constructor(protected readonly config: AiConfig) {}
 
   static resolveFromConfig(config: AiConfig): UserCodingAgent {
-    if (!isDefaultCommandPrefixForPreset(config)) {
-      return new GenericUserCodingAgent(config);
-    }
     switch (config.preset) {
       case "codex":
         return new CodexUserCodingAgent(config);
@@ -168,24 +164,6 @@ abstract class UserCodingAgent {
     pngPath: string,
     logger: LoggerApi,
   ): Promise<InterpretResult>;
-}
-
-class GenericUserCodingAgent extends UserCodingAgent {
-  protected buildExtraArgs(): string[] {
-    return [];
-  }
-
-  async analyzeSnapshot(
-    prompt: string,
-    pngPath: string,
-    logger: LoggerApi,
-  ): Promise<InterpretResult> {
-    return await this.runAndParse(
-      [...this.baseArgs],
-      logger,
-      `${prompt}${this.screenshotHint(pngPath)}`,
-    );
-  }
 }
 
 class CodexUserCodingAgent extends UserCodingAgent {

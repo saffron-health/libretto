@@ -161,21 +161,6 @@ describe("snapshot API model resolution", () => {
     });
   });
 
-  it("does not override a custom CLI analyzer unless LIBRETTO_SNAPSHOT_MODEL is set", () => {
-    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
-    vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
-
-    const config = makeConfig("codex", [process.execPath, "/tmp/custom-analyzer.mjs"]);
-
-    expect(resolveSnapshotApiModel(config)).toBeNull();
-
-    vi.stubEnv("LIBRETTO_SNAPSHOT_MODEL", "vertex/gemini-2.5-flash");
-    expect(resolveSnapshotApiModel(config)).toMatchObject({
-      model: "vertex/gemini-2.5-flash",
-      provider: "vertex",
-      source: "env:LIBRETTO_SNAPSHOT_MODEL",
-    });
-  });
 });
 
 describe("parseDotEnvAssignment", () => {
