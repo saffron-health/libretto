@@ -13,9 +13,8 @@ export function registerAICommands(yargs: Argv): Argv {
         preset: argv.preset as string | undefined,
         customPrefix,
       }, {
-        configureCommandName: "libretto-cli ai configure",
+        configureCommandName: "npx libretto ai configure",
       });
     },
   );
 }
-

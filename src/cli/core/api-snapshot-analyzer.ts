@@ -10,10 +10,12 @@ import { readFileSync } from "node:fs";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { createLLMClient } from "../../shared/llm/client.js";
 import {
+  formatInterpretationOutput,
   InterpretResultSchema,
   buildInlinePromptSelection,
   getMimeType,
   readFileAsBase64,
+  type InterpretResult,
   type InterpretArgs,
 } from "./snapshot-analyzer.js";
 import { readAiConfig } from "./ai-config.js";
@@ -88,7 +90,7 @@ export async function runApiInterpret(
     temperature: 0.1,
   });
 
-  const parsed = InterpretResultSchema.parse(result);
+  const parsed: InterpretResult = InterpretResultSchema.parse(result);
 
   logger.info("api-interpret-success", {
     selectorCount: parsed.selectors.length,
@@ -96,43 +98,5 @@ export async function runApiInterpret(
     consultedFiles: parsed.debug?.consultedFiles ?? [],
   });
 
-  const outputLines: string[] = [];
-  outputLines.push("Interpretation (via API):");
-  outputLines.push(`Answer: ${parsed.answer}`);
-  outputLines.push("");
-  if (parsed.selectors.length === 0) {
-    outputLines.push("Selectors: none found.");
-  } else {
-    outputLines.push("Selectors:");
-    parsed.selectors.forEach((selector, index) => {
-      outputLines.push(`  ${index + 1}. ${selector.label}`);
-      outputLines.push(`     selector: ${selector.selector}`);
-      outputLines.push(`     rationale: ${selector.rationale}`);
-    });
-  }
-  if (parsed.notes.trim()) {
-    outputLines.push("");
-    outputLines.push(`Notes: ${parsed.notes.trim()}`);
-  }
-  if (
-    parsed.debug &&
-    (parsed.debug.consultedFiles.length > 0 ||
-      parsed.debug.analysisSteps.length > 0)
-  ) {
-    outputLines.push("");
-    outputLines.push("Debug:");
-    if (parsed.debug.consultedFiles.length > 0) {
-      outputLines.push(
-        `  consultedFiles: ${parsed.debug.consultedFiles.join(", ")}`,
-      );
-    }
-    if (parsed.debug.analysisSteps.length > 0) {
-      outputLines.push("  analysisSteps:");
-      parsed.debug.analysisSteps.forEach((step, index) => {
-        outputLines.push(`    ${index + 1}. ${step}`);
-      });
-    }
-  }
-
-  console.log(outputLines.join("\n"));
+  console.log(formatInterpretationOutput(parsed, "Interpretation (via API):"));
 }

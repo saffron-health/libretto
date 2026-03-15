@@ -7,6 +7,7 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   type AiConfig,
   formatCommandPrefix,
+  isDefaultCommandPrefixForPreset,
   readAiConfig,
 } from "./ai-config.js";
 import { getLLMClientFactory } from "./context.js";
@@ -51,8 +52,6 @@ export const InterpretResultSchema = z.object({
     .optional(),
 });
 
-type InterpretResult = z.infer<typeof InterpretResultSchema>;
-
 type ExternalCommandResult = {
   exitCode: number;
   stdout: string;
@@ -92,10 +91,15 @@ type InlinePromptSelection = {
   stats: SnapshotDomStats;
 };
 
+export type InterpretResult = z.infer<typeof InterpretResultSchema>;
+
 abstract class UserCodingAgent {
   protected constructor(protected readonly config: AiConfig) {}
 
   static resolveFromConfig(config: AiConfig): UserCodingAgent {
+    if (!isDefaultCommandPrefixForPreset(config)) {
+      return new GenericUserCodingAgent(config);
+    }
     switch (config.preset) {
       case "codex":
         return new CodexUserCodingAgent(config);
@@ -174,6 +178,24 @@ abstract class UserCodingAgent {
     pngPath: string,
     logger: LoggerApi,
   ): Promise<InterpretResult>;
+}
+
+class GenericUserCodingAgent extends UserCodingAgent {
+  protected buildExtraArgs(): string[] {
+    return [];
+  }
+
+  async analyzeSnapshot(
+    prompt: string,
+    pngPath: string,
+    logger: LoggerApi,
+  ): Promise<InterpretResult> {
+    return await this.runAndParse(
+      [...this.baseArgs],
+      logger,
+      `${prompt}${this.screenshotHint(pngPath)}`,
+    );
+  }
 }
 
 class CodexUserCodingAgent extends UserCodingAgent {
@@ -358,7 +380,7 @@ async function runExternalCommand(
       if (error.code === "ENOENT") {
         reject(
           new Error(
-            `Command not found: ${command}. Configure AI with 'libretto-cli ai configure'.`,
+            `Command not found: ${command}. Configure AI with 'npx libretto ai configure'.`,
           ),
         );
         return;
@@ -998,6 +1020,50 @@ function buildClaudeStreamJsonInput(prompt: string, pngPath: string): string {
   })}\n`;
 }
 
+export function formatInterpretationOutput(
+  parsed: InterpretResult,
+  header: string = "Interpretation:",
+): string {
+  const outputLines: string[] = [];
+  outputLines.push(header);
+  outputLines.push(`Answer: ${parsed.answer}`);
+  outputLines.push("");
+  if (parsed.selectors.length === 0) {
+    outputLines.push("Selectors: none found.");
+  } else {
+    outputLines.push("Selectors:");
+    parsed.selectors.forEach((selector, index) => {
+      outputLines.push(`  ${index + 1}. ${selector.label}`);
+      outputLines.push(`     selector: ${selector.selector}`);
+      outputLines.push(`     rationale: ${selector.rationale}`);
+    });
+  }
+  if (parsed.notes.trim()) {
+    outputLines.push("");
+    outputLines.push(`Notes: ${parsed.notes.trim()}`);
+  }
+  if (
+    parsed.debug &&
+    (parsed.debug.consultedFiles.length > 0 ||
+      parsed.debug.analysisSteps.length > 0)
+  ) {
+    outputLines.push("");
+    outputLines.push("Debug:");
+    if (parsed.debug.consultedFiles.length > 0) {
+      outputLines.push(
+        `  consultedFiles: ${parsed.debug.consultedFiles.join(", ")}`,
+      );
+    }
+    if (parsed.debug.analysisSteps.length > 0) {
+      outputLines.push("  analysisSteps:");
+      parsed.debug.analysisSteps.forEach((step, index) => {
+        outputLines.push(`    ${index + 1}. ${step}`);
+      });
+    }
+  }
+  return outputLines.join("\n");
+}
+
 export async function runInterpret(
   args: InterpretArgs,
   logger: LoggerApi,
@@ -1059,7 +1125,7 @@ export async function runInterpret(
     const llmClientFactory = getLLMClientFactory();
     if (!llmClientFactory) {
       throw new Error(
-        "No AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
+        "No AI config set. Run 'npx libretto ai configure codex' (or claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
       );
     }
 
@@ -1113,49 +1179,5 @@ export async function runInterpret(
     answer: parsed.answer.slice(0, 200),
     consultedFiles: parsed.debug?.consultedFiles ?? [],
   });
-  const outputLines: string[] = [];
-  outputLines.push("Interpretation:");
-  outputLines.push(`Answer: ${parsed.answer}`);
-  outputLines.push("");
-  if (parsed.selectors.length === 0) {
-    outputLines.push("Selectors: none found.");
-  } else {
-    outputLines.push("Selectors:");
-    parsed.selectors.forEach((selector, index) => {
-      outputLines.push(`  ${index + 1}. ${selector.label}`);
-      outputLines.push(`     selector: ${selector.selector}`);
-      outputLines.push(`     rationale: ${selector.rationale}`);
-    });
-  }
-  if (parsed.notes.trim()) {
-    outputLines.push("");
-    outputLines.push(`Notes: ${parsed.notes.trim()}`);
-  }
-  if (
-    parsed.debug &&
-    (parsed.debug.consultedFiles.length > 0 ||
-      parsed.debug.analysisSteps.length > 0)
-  ) {
-    outputLines.push("");
-    outputLines.push("Debug:");
-    if (parsed.debug.consultedFiles.length > 0) {
-      outputLines.push(
-        `  consultedFiles: ${parsed.debug.consultedFiles.join(", ")}`,
-      );
-    }
-    if (parsed.debug.analysisSteps.length > 0) {
-      outputLines.push("  analysisSteps:");
-      parsed.debug.analysisSteps.forEach((step, index) => {
-        outputLines.push(`    ${index + 1}. ${step}`);
-      });
-    }
-  }
-
-  console.log(outputLines.join("\n"));
-}
-
-export function canAnalyzeSnapshots(): boolean {
-  return (
-    UserCodingAgent.getConfigured() !== null || getLLMClientFactory() !== null
-  );
+  console.log(formatInterpretationOutput(parsed));
 }

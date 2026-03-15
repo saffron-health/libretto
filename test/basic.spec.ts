@@ -20,6 +20,40 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
+  test("init explains snapshot API env setup when no credentials are configured", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("init --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "",
+      ANTHROPIC_API_KEY: "",
+      GEMINI_API_KEY: "",
+      GOOGLE_GENERATIVE_AI_API_KEY: "",
+      GOOGLE_CLOUD_PROJECT: "",
+      GCLOUD_PROJECT: "",
+    });
+
+    expect(result.stdout).toContain("Snapshot analysis:");
+    expect(result.stdout).toContain("No snapshot API credentials detected.");
+    expect(result.stdout).toContain("OPENAI_API_KEY=...");
+    expect(result.stdout).toContain("ANTHROPIC_API_KEY=...");
+    expect(result.stdout).toContain("GEMINI_API_KEY=...");
+    expect(result.stdout).toContain("npx libretto ai configure");
+  });
+
+  test("init reports when snapshot API credentials are already ready", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("init --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+
+    expect(result.stdout).toContain("Snapshot analysis:");
+    expect(result.stdout).toContain("Ready: openai/gpt-5-mini");
+    expect(result.stdout).toContain("No further action required.");
+  });
+
   test("fails unknown command with a clear error", async ({
     librettoCli,
     evaluate,
@@ -45,14 +79,15 @@ describe("basic CLI subprocess behavior", () => {
 
   test("fails open with actionable error when browser child spawn fails", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli("open https://example.com", {
       PATH: "/definitely-not-real",
     });
-    await evaluate(result.stderr).toMatch(
-      "States browser child process launch failed, advises ensuring Node.js is in PATH, and includes a logs hint.",
+    expect(result.stderr).toContain("Failed to launch browser child process:");
+    expect(result.stderr).toContain(
+      "Ensure Node.js is available in PATH for child processes.",
     );
+    expect(result.stderr).toContain("Check logs:");
   });
 
   test("fails exec with missing code usage error", async ({
@@ -230,7 +265,6 @@ export const main = workflow({}, async () => {
 
   test("accepts branded Libretto workflow contract across module boundaries", async ({
     librettoCli,
-    evaluate,
     workspaceDir,
     writeWorkflow,
   }) => {
@@ -255,14 +289,13 @@ export const main = {
         "missing-playwright-browsers",
       ),
     });
-    await evaluate(result.stderr).toMatch(
-      "Does not claim that the export must be a Libretto workflow instance.",
+    expect(result.stderr).not.toContain(
+      "must export a Libretto workflow instance",
     );
   });
 
   test("fails run when local auth profile is declared but missing", async ({
     librettoCli,
-    evaluate,
     writeWorkflow,
   }) => {
     await writeWorkflow(
@@ -278,9 +311,11 @@ export const main = workflow(
     );
 
     const result = await librettoCli("run ./integration.ts main --auth-profile app.example.com");
-    await evaluate(result.stderr).toMatch(
-      'Explains local auth profile is missing for domain "app.example.com" and includes suggested open/save commands for that domain.',
+    expect(result.stderr).toContain(
+      'Local auth profile not found for domain "app.example.com".',
     );
+    expect(result.stderr).toContain("libretto-cli open https://app.example.com");
+    expect(result.stderr).toContain("libretto-cli save app.example.com");
   });
 
   test("does not require local auth profile when auth metadata is absent", async ({

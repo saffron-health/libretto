@@ -200,7 +200,7 @@ export function runAiConfigure(
   } = {},
 ): void {
   const configureCommandName =
-    options.configureCommandName ?? "libretto-cli ai configure";
+    options.configureCommandName ?? "npx libretto ai configure";
   const configPath = options.configPath ?? LIBRETTO_CONFIG_PATH;
 
   const presetArg = input.preset?.trim();
