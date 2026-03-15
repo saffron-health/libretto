@@ -29,7 +29,6 @@ export type SnapshotApiModelSelection = {
 	source:
 		| "env:LIBRETTO_SNAPSHOT_MODEL"
 		| "ai-config"
-		| "factory-fallback"
 		| "env:auto-openai"
 		| "env:auto-anthropic"
 		| "env:auto-google"
@@ -317,22 +316,6 @@ export function resolveSnapshotApiModelOrThrow(
 	return selection;
 }
 
-export function shouldUseApiSnapshotAnalyzer(
-	config: AiConfig | null = readAiConfig(),
-): boolean {
-	loadSnapshotEnv();
-
-	if (process.env[SNAPSHOT_MODEL_ENV_VAR]?.trim()) {
-		return true;
-	}
-
-	if (!config) {
-		return inferAutoSnapshotModel() !== null;
-	}
-
-	return isDefaultCommandPrefixForPreset(config);
-}
-
 export function buildSnapshotApiSelectionConfig(
 	selection: SnapshotApiModelSelection,
 	config: AiConfig | null = readAiConfig(),
@@ -348,12 +331,4 @@ export function buildSnapshotApiSelectionConfig(
 
 export function isSnapshotApiUnavailableError(error: unknown): boolean {
 	return error instanceof SnapshotApiUnavailableError;
-}
-
-export function getFactoryFallbackSnapshotApiModelSelection(): SnapshotApiModelSelection {
-	return {
-		model: DEFAULT_SNAPSHOT_MODELS.google,
-		provider: "google",
-		source: "factory-fallback",
-	};
 }

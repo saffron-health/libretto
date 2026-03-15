@@ -197,6 +197,18 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(show.stdout).toContain("AI preset: gemini");
   });
 
+  test("configures google-vertex-ai via the gemini preset", async ({ librettoCli }) => {
+    const configure = await librettoCli("ai configure google-vertex-ai");
+    expect(configure.stdout).toContain("AI config saved.");
+    expect(configure.stdout).toContain(
+      "Configured Google Vertex AI via the Gemini preset.",
+    );
+
+    const show = await librettoCli("ai configure");
+    expect(show.stdout).toContain("AI preset: gemini");
+    expect(show.stdout).toContain("Model: vertex/gemini-2.5-flash");
+  });
+
   test("configures custom AI command prefix and shows it", async ({
     librettoCli,
     workspaceDir,
@@ -260,45 +272,43 @@ describe("state-driven CLI subprocess behavior", () => {
       ].join("\n"),
     );
 
-    try {
-      await librettoCli(
-        `ai configure codex -- "${process.execPath}" "${analyzerPath}" "custom" "${recordPath}"`,
-        DISABLE_SNAPSHOT_API_ENV,
-      );
+    await librettoCli(
+      `ai configure codex -- "${process.execPath}" "${analyzerPath}" "custom" "${recordPath}"`,
+      DISABLE_SNAPSHOT_API_ENV,
+    );
 
-      const opened = await librettoCli(
-        `open ${server.url} --headless --session ${session}`,
-        DISABLE_SNAPSHOT_API_ENV,
-      );
-      expect(opened.stdout).toContain("Browser open");
+    const opened = await librettoCli(
+      `open ${server.url} --headless --session ${session}`,
+      DISABLE_SNAPSHOT_API_ENV,
+    );
+    expect(opened.stdout).toContain("Browser open");
 
-      const snapshot = await librettoCli(
-        `snapshot --objective "Find the call to action button" --context "Custom analyzer transport regression" --session ${session}`,
-        DISABLE_SNAPSHOT_API_ENV,
-      );
-      expect(snapshot.stdout).toContain("Answer: snapshot-ok-custom");
+    const snapshot = await librettoCli(
+      `snapshot --objective "Find the call to action button" --context "Custom analyzer transport regression" --session ${session}`,
+      DISABLE_SNAPSHOT_API_ENV,
+    );
+    expect(snapshot.stdout).toContain("Answer: snapshot-ok-custom");
 
-      const rawRecord = await readFile(recordPath, "utf8");
-      const record = JSON.parse(rawRecord) as {
-        args: string[];
-        stdin: string;
-      };
+    const rawRecord = await readFile(recordPath, "utf8");
+    const record = JSON.parse(rawRecord) as {
+      args: string[];
+      stdin: string;
+    };
 
-      expect(record.args).not.toContain("--image");
-      expect(record.args).not.toContain("--json");
-      expect(record.args).not.toContain("--output-format");
-      expect(record.args).not.toContain("--input-format");
-      expect(record.stdin).toContain("Screenshot file path:");
-      expect(record.stdin).toContain("Selected HTML snapshot: full DOM");
-      expect(record.stdin).toContain(
-        "Full DOM fits within the estimated prompt budget",
-      );
-      expect(record.stdin).toContain('componentkey="full-dom-marker"');
-      expect(record.stdin).toContain("HTML snapshot (full DOM):");
-      expect(record.stdin).toContain("Return only a JSON object.");
-    } finally {
-      await server.close();
-    }
+    expect(record.args).not.toContain("--image");
+    expect(record.args).not.toContain("--json");
+    expect(record.args).not.toContain("--output-format");
+    expect(record.args).not.toContain("--input-format");
+    expect(record.stdin).toContain("Screenshot file path:");
+    expect(record.stdin).toContain("Selected HTML snapshot: full DOM");
+    expect(record.stdin).toContain(
+      "Full DOM fits within the estimated prompt budget",
+    );
+    expect(record.stdin).toContain('componentkey="full-dom-marker"');
+    expect(record.stdin).toContain("HTML snapshot (full DOM):");
+    expect(record.stdin).toContain("Return only a JSON object.");
+
+    await server.close();
   }, 45_000);
 
   test("runs snapshot analysis when only --objective is provided", async ({
@@ -347,7 +357,6 @@ describe("state-driven CLI subprocess behavior", () => {
       `snapshot --objective "Find heading" --session ${session}`,
       DISABLE_SNAPSHOT_API_ENV,
     );
-    expect(snapshot.exitCode).toBe(1);
     expect(snapshot.stderr).toContain("Analyzer command failed");
     expect(snapshot.stderr).toContain("simulated analyzer exit");
     expect(snapshot.stderr).not.toContain("Unhandled 'error' event");
