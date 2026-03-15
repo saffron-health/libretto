@@ -55,18 +55,16 @@ npx libretto run ./integration.ts main
 
 ## The `.libretto/` directory
 
-Libretto stores local runtime state in a `.libretto/` directory at your project root. Add it to your `.gitignore`:
+Libretto stores local runtime state in a `.libretto/` directory at your project root. Sensitive directories (`sessions/` and `profiles/`) are automatically git-ignored via `.libretto/.gitignore`.
 
-```
-.libretto/
-```
-
-This directory contains:
-
-- **`profiles/<domain>.json`** — Saved browser sessions (cookies, localStorage) for authenticated sites. Created by `npx libretto save <domain>`. These are machine-local and should never be committed.
-- **`sessions/<name>/state.json`** — Active session metadata (debug port, PID, status). Each CLI session or `launchBrowser()` call creates one.
-- **`sessions/<name>/logs.jsonl`** — Session logs including captured network requests and user actions (clicks, fills, navigations). Useful for debugging and for converting browser automations to direct network calls.
-- **`ai.json`** — AI runtime configuration (which model/command to use for snapshot analysis).
+- **`profiles/<domain>.json`** — Saved browser sessions (cookies, localStorage) for authenticated sites. Created via `npx libretto save <domain>`. Machine-local and never committed.
+- **`sessions/<name>/`** — Per-session runtime state:
+  - `state.json` — Session metadata (debug port, PID, status)
+  - `logs.jsonl` — Structured session logs
+  - `network.jsonl` — Captured network requests (URLs, methods, headers, response status)
+  - `actions.jsonl` — Recorded user actions (clicks, fills, navigations)
+  - `snapshots/` — Screenshot PNGs and HTML snapshots captured via `npx libretto snapshot`
+- **`ai.json`** — AI runtime configuration set via `npx libretto ai configure`.
 
 ## Authors
 
