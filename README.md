@@ -10,11 +10,13 @@ It is designed for engineering teams that automate workflows in web apps and wan
 npm install --save-dev libretto
 ```
 
-Then initialize Libretto:
+Chromium is downloaded automatically via a `postinstall` script. If postinstall scripts are disabled (e.g. `--ignore-scripts`, common in monorepos), run init manually:
 
 ```bash
 npx libretto init
 ```
+
+This installs the Chromium browser binary and optionally configures an AI subagent (Gemini, Claude, or Codex) that can analyze page snapshots without consuming the coding agent's context window.
 
 ## Usage
 
@@ -60,6 +62,19 @@ Snapshot analysis uses the API-based analyzer by default when supported credenti
 
 You can override the snapshot model explicitly with `LIBRETTO_SNAPSHOT_MODEL=provider/model-id`, for example `openai/gpt-5-mini`, `anthropic/claude-sonnet-4-6`, `google/gemini-2.5-flash`, or `vertex/gemini-2.5-flash`.
 `codex/gpt-5-mini` is also accepted as an alias for the OpenAI provider.
+
+## The `.libretto/` directory
+
+Libretto stores local runtime state in a `.libretto/` directory at your project root. Sensitive directories (`sessions/` and `profiles/`) are automatically git-ignored via `.libretto/.gitignore`.
+
+- **`profiles/<domain>.json`** — Saved browser sessions (cookies, localStorage) for authenticated sites. Created via `npx libretto save <domain>`. Machine-local and never committed.
+- **`sessions/<name>/`** — Per-session runtime state:
+  - `state.json` — Session metadata (debug port, PID, status)
+  - `logs.jsonl` — Structured session logs
+  - `network.jsonl` — Captured network requests (URLs, methods, headers, response status)
+  - `actions.jsonl` — Recorded user actions (clicks, fills, navigations)
+  - `snapshots/` — Screenshot PNGs and HTML snapshots captured via `npx libretto snapshot`
+- **`ai.json`** — AI runtime configuration set via `npx libretto ai configure`.
 
 ## Authors
 
