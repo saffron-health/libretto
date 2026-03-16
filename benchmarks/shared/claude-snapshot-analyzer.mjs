@@ -20,6 +20,10 @@ const ResultSchema = z.object({
 
 const SCREENSHOT_HINT =
   /\n*Screenshot file path: (?<pngPath>[^\n]+)\nUse the screenshot alongside the HTML snapshot context above\.\s*$/s;
+const HTML_SNAPSHOT_MARKER = "HTML snapshot:\n\n";
+const JSON_INSTRUCTION_MARKER =
+  "\n\nReturn only a JSON object. Do not include markdown code fences or extra commentary.";
+const MAX_HTML_SNAPSHOT_CHARS = 100_000;
 
 function extractPromptAndScreenshotPath(rawPrompt) {
   const match = rawPrompt.match(SCREENSHOT_HINT);
@@ -52,6 +56,49 @@ export async function readPromptInput({
   return stdinPrompt.trim();
 }
 
+function truncateMiddle(text, maxChars) {
+  if (text.length <= maxChars) {
+    return text;
+  }
+
+  const headChars = Math.max(1, Math.floor(maxChars * 0.6));
+  const tailChars = Math.max(1, maxChars - headChars);
+  return [
+    text.slice(0, headChars),
+    "",
+    `[truncated HTML snapshot: showing first ${headChars} chars and last ${tailChars} chars of ${text.length}]`,
+    "",
+    text.slice(-tailChars),
+  ].join("\n");
+}
+
+export function truncatePromptForBenchmarkAnalyzer(
+  prompt,
+  maxHtmlChars = MAX_HTML_SNAPSHOT_CHARS,
+) {
+  const htmlStart = prompt.indexOf(HTML_SNAPSHOT_MARKER);
+  if (htmlStart < 0) {
+    return prompt;
+  }
+
+  const htmlContentStart = htmlStart + HTML_SNAPSHOT_MARKER.length;
+  const htmlEnd = prompt.lastIndexOf(JSON_INSTRUCTION_MARKER);
+  if (htmlEnd <= htmlContentStart) {
+    return prompt;
+  }
+
+  const htmlSnapshot = prompt.slice(htmlContentStart, htmlEnd);
+  if (htmlSnapshot.length <= maxHtmlChars) {
+    return prompt;
+  }
+
+  return [
+    prompt.slice(0, htmlContentStart),
+    truncateMiddle(htmlSnapshot, maxHtmlChars),
+    prompt.slice(htmlEnd),
+  ].join("");
+}
+
 async function main() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -65,7 +112,8 @@ async function main() {
     );
   }
 
-  const { prompt, pngPath } = extractPromptAndScreenshotPath(rawPrompt);
+  const { prompt: extractedPrompt, pngPath } = extractPromptAndScreenshotPath(rawPrompt);
+  const prompt = truncatePromptForBenchmarkAnalyzer(extractedPrompt);
   const imageBuffer = await readFile(pngPath);
   const modelId =
     process.env.LIBRETTO_BENCHMARK_ANALYZER_MODEL?.trim() ||
