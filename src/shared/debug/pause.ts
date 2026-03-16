@@ -1,5 +1,8 @@
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
+import { getSessionDir } from "../../cli/core/context.js";
+import { getPauseSignalPaths, removeSignalIfExists } from "../../cli/core/pause-signals.js";
+import { listSessionsWithStateFile, readSessionState } from "../../cli/core/session.js";
 
 function isPidRunning(pid: number): boolean {
 	try {
@@ -10,18 +13,15 @@ function isPidRunning(pid: number): boolean {
 	}
 }
 
-async function getRunningSessions(): Promise<string[]> {
-	const { listSessionsWithStateFile, readSessionState } = await import(
-		"../../cli/core/session.js"
-	);
+function getRunningSessions(): string[] {
 	return listSessionsWithStateFile().filter((candidate) => {
 		const state = readSessionState(candidate);
 		return state !== null && isPidRunning(state.pid);
 	});
 }
 
-async function throwMissingSessionError(): Promise<never> {
-	const runningSessions = await getRunningSessions();
+function throwMissingSessionError(): never {
+	const runningSessions = getRunningSessions();
 	const lines = ["pause(session) requires a non-empty session ID."];
 
 	if (runningSessions.length > 0) {
@@ -49,15 +49,8 @@ export async function pause(session: string): Promise<void> {
 	}
 
 	if (typeof session !== "string" || session.trim().length === 0) {
-		await throwMissingSessionError();
+		throwMissingSessionError();
 	}
-
-	// Dynamically import pause-signals to avoid circular dependency issues.
-	// These are CLI-internal modules available in the worker process.
-	const { getPauseSignalPaths, removeSignalIfExists } = await import(
-		"../../cli/core/pause-signals.js"
-	);
-	const { getSessionDir } = await import("../../cli/core/context.js");
 
 	const signalPaths = getPauseSignalPaths(session);
 	const { pausedSignalPath, resumeSignalPath } = signalPaths;
