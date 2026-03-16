@@ -38,5 +38,5 @@ pnpm cli help
 
 ## Skill Documentation Source of Truth
 
-- Edit `.agents/skills/libretto/SKILL.md` directly.
-- `.agents/skills/libretto` is the source of truth for Libretto skill files.
+- Edit `skills/libretto/SKILL.md` directly.
+- `skills/libretto` is the source of truth for Libretto skill files.
