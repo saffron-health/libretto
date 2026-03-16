@@ -1,200 +1,240 @@
 import type { Argv } from "yargs";
-import { accessSync, constants, statSync } from "node:fs";
-import { join, delimiter, extname } from "node:path";
+import { createInterface } from "node:readline";
+import { existsSync, readFileSync, appendFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import {
-	AI_CONFIG_PRESETS,
-	AiPresetSchema,
-	formatCommandPrefix,
-	readAiConfig,
+  readAiConfig,
 } from "../core/ai-config.js";
+import { REPO_ROOT } from "../core/context.js";
+import {
+  loadSnapshotEnv,
+  resolveSnapshotApiModel,
+} from "../core/snapshot-api-config.js";
+import { hasProviderCredentials } from "../../shared/llm/client.js";
 
-const AI_RUNTIME_PRESETS = AiPresetSchema.options;
-type AIRuntimePreset = (typeof AI_RUNTIME_PRESETS)[number];
+type ProviderChoice = {
+  key: string;
+  label: string;
+  envVar: string;
+  envHint: string;
+};
 
-function getPresetCommand(preset: AIRuntimePreset): string {
-	return AI_CONFIG_PRESETS[preset][0] ?? "";
+const PROVIDER_CHOICES: ProviderChoice[] = [
+  {
+    key: "1",
+    label: "OpenAI",
+    envVar: "OPENAI_API_KEY",
+    envHint: "Get your key at https://platform.openai.com/api-keys",
+  },
+  {
+    key: "2",
+    label: "Anthropic",
+    envVar: "ANTHROPIC_API_KEY",
+    envHint: "Get your key at https://console.anthropic.com/settings/keys",
+  },
+  {
+    key: "3",
+    label: "Google Gemini",
+    envVar: "GEMINI_API_KEY",
+    envHint: "Get your key at https://aistudio.google.com/apikey",
+  },
+  {
+    key: "4",
+    label: "Google Vertex AI",
+    envVar: "GOOGLE_CLOUD_PROJECT",
+    envHint: "Requires gcloud auth application-default login and a GCP project ID",
+  },
+];
+
+function promptUser(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer.trim());
+    });
+  });
 }
 
-function isRunnableFile(filePath: string): boolean {
-	try {
-		const stats = statSync(filePath);
-		if (!stats.isFile()) return false;
-
-		if (process.platform === "win32") {
-			const pathExt = process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD";
-			const extensions = pathExt
-				.split(";")
-				.map((ext) => ext.trim().toUpperCase())
-				.filter(Boolean);
-			const fileExt = extname(filePath).toUpperCase();
-			return extensions.includes(fileExt);
-		}
-
-		accessSync(filePath, constants.X_OK);
-		return true;
-	} catch {
-		return false;
-	}
+function safeReadAiConfig(): ReturnType<typeof readAiConfig> {
+  try {
+    return readAiConfig();
+  } catch {
+    return null;
+  }
 }
 
-function isCommandDefined(command: string | undefined): boolean {
-	if (!command) return false;
+function printSnapshotApiStatus(): void {
+  const config = safeReadAiConfig();
+  const selection = resolveSnapshotApiModel(config);
+  const envPath = join(REPO_ROOT, ".env");
 
-	if (command.includes("/") || command.includes("\\")) {
-		return isRunnableFile(command);
-	}
+  console.log("\nSnapshot analysis:");
+  console.log(
+    "  Libretto uses direct API calls for snapshot analysis when supported credentials are available.",
+  );
+  console.log(`  Credentials are loaded from process env and ${envPath}.`);
 
-	const pathEnv = process.env.PATH ?? "";
-	if (!pathEnv) return false;
+  if (selection && hasProviderCredentials(selection.provider)) {
+    console.log(
+      `  \u2713 Ready: ${selection.model} (${selection.source})`,
+    );
+    console.log("    Snapshot objectives will use the API analyzer by default.");
+    console.log("    No further action required.");
+    return;
+  }
 
-	const pathEntries = pathEnv.split(delimiter).filter(Boolean);
-	if (process.platform === "win32") {
-		const pathExt = process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD";
-		const extensions = pathExt
-			.split(";")
-			.map((ext) => ext.trim())
-			.filter(Boolean);
-		const hasExtension = /\.[^./\\]+$/.test(command);
-		const candidates = hasExtension
-			? [command]
-			: extensions.map((ext) =>
-				ext.startsWith(".") ? `${command}${ext}` : `${command}.${ext}`,
-			);
-
-		return pathEntries.some((dir) =>
-			candidates.some((candidate) => isRunnableFile(join(dir, candidate))),
-		);
-	}
-
-	return pathEntries.some((dir) => isRunnableFile(join(dir, command)));
+  console.log("  \u2717 No snapshot API credentials detected.");
+  console.log("    Add one provider to .env:");
+  console.log("      OPENAI_API_KEY=...");
+  console.log("      ANTHROPIC_API_KEY=...");
+  console.log("      GEMINI_API_KEY=...  # or GOOGLE_GENERATIVE_AI_API_KEY");
+  console.log(
+    "      GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
+  );
+  console.log(
+    "    Or run `npx libretto ai configure <provider>` to set a specific model.",
+  );
+  console.log("    Run `npx libretto init` interactively to set up credentials.");
 }
 
-function detectAvailableAiRuntimeCommands(): AIRuntimePreset[] {
-	return AI_RUNTIME_PRESETS.filter((preset): preset is AIRuntimePreset =>
-		isCommandDefined(getPresetCommand(preset)),
-	);
-}
+async function runInteractiveApiSetup(): Promise<void> {
+  const config = safeReadAiConfig();
+  const selection = resolveSnapshotApiModel(config);
+  const envPath = join(REPO_ROOT, ".env");
 
-function printAiConfigureCommands(prefix: string = "    "): void {
-	for (const preset of AI_RUNTIME_PRESETS) {
-		console.log(`${prefix}npx libretto ai configure ${preset}`);
-	}
-}
+  console.log("\nSnapshot analysis setup:");
+  console.log(
+    "  Libretto uses direct API calls for snapshot analysis.",
+  );
+  console.log(`  Credentials are loaded from process env and ${envPath}.`);
 
-function printDifferentAnalyzerHint(prefix: string = "    "): void {
-	console.log(
-		`${prefix}Use npx libretto ai configure <gemini|claude|codex> to configure a different AI analyzer.`,
-	);
+  if (selection && hasProviderCredentials(selection.provider)) {
+    console.log(
+      `  \u2713 Ready: ${selection.model} (${selection.source})`,
+    );
+    console.log("    Snapshot objectives will use the API analyzer by default.");
+    return;
+  }
+
+  console.log("  \u2717 No snapshot API credentials detected.\n");
+
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  try {
+    console.log("  Which API provider would you like to use for snapshot analysis?\n");
+    for (const choice of PROVIDER_CHOICES) {
+      console.log(`    ${choice.key}) ${choice.label}`);
+    }
+    console.log("    s) Skip for now\n");
+
+    const answer = await promptUser(rl, "  Choice: ");
+
+    if (answer.toLowerCase() === "s" || !answer) {
+      console.log("\n  Skipped. You can set up API credentials later by rerunning `npx libretto init`.");
+      console.log("  Or add credentials directly to your .env file:");
+      console.log("    OPENAI_API_KEY=...");
+      console.log("    ANTHROPIC_API_KEY=...");
+      console.log("    GEMINI_API_KEY=...");
+      console.log(
+        "    Or run `npx libretto ai configure <provider>` to set a specific model.",
+      );
+      return;
+    }
+
+    const selected = PROVIDER_CHOICES.find((c) => c.key === answer);
+    if (!selected) {
+      console.log(`\n  Unknown choice "${answer}". Skipping API setup.`);
+      return;
+    }
+
+    console.log(`\n  ${selected.label} selected.`);
+    console.log(`  ${selected.envHint}\n`);
+
+    const apiKeyValue = await promptUser(rl, `  Enter your ${selected.envVar}: `);
+
+    if (!apiKeyValue) {
+      console.log("\n  No value entered. Skipping API key setup.");
+      return;
+    }
+
+    // Write to .env file
+    let envContent = "";
+    if (existsSync(envPath)) {
+      envContent = readFileSync(envPath, "utf-8");
+    }
+
+    const envLine = `${selected.envVar}=${apiKeyValue}`;
+    if (envContent.includes(`${selected.envVar}=`)) {
+      const updated = envContent.replace(
+        new RegExp(`^${selected.envVar}=.*$`, "m"),
+        () => envLine,
+      );
+      writeFileSync(envPath, updated);
+      console.log(`\n  \u2713 Updated ${selected.envVar} in ${envPath}`);
+    } else {
+      const separator = envContent && !envContent.endsWith("\n") ? "\n" : "";
+      appendFileSync(envPath, `${separator}${envLine}\n`);
+      console.log(`\n  \u2713 Added ${selected.envVar} to ${envPath}`);
+    }
+
+    // Reload env and verify
+    loadSnapshotEnv();
+    process.env[selected.envVar] = apiKeyValue;
+    const newSelection = resolveSnapshotApiModel(safeReadAiConfig());
+    if (newSelection && hasProviderCredentials(newSelection.provider)) {
+      console.log(`  \u2713 Snapshot API ready: ${newSelection.model}`);
+    }
+  } finally {
+    rl.close();
+  }
 }
 
 function installBrowsers(): void {
-	console.log("\nInstalling Playwright Chromium...");
-	const result = spawnSync("npx", ["playwright", "install", "chromium"], {
-		stdio: "inherit",
-		shell: true,
-	});
-	if (result.status === 0) {
-		console.log("  \u2713 Playwright Chromium installed");
-	} else {
-		console.error(
-			"  \u2717 Failed to install Playwright Chromium. Run manually: npx playwright install chromium",
-		);
-	}
-}
-
-function checkAiRuntimeConfiguration(): void {
-	let config: ReturnType<typeof readAiConfig> = null;
-	let configReadError: string | null = null;
-
-	try {
-		config = readAiConfig();
-	} catch (error) {
-		configReadError = error instanceof Error ? error.message : String(error);
-	}
-
-	const availableCommands = detectAvailableAiRuntimeCommands();
-
-	console.log("\nAI runtime configuration:");
-	console.log(
-		"  Libretto can use your coding agent as a subagent to analyze snapshots and other page signals.",
-	);
-	console.log(
-		"  This is optional, but it significantly improves page understanding and debugging performance.",
-	);
-	if (configReadError) {
-		console.log(`  \u2717 Could not read AI config: ${configReadError}`);
-		console.log("    Reconfigure with:");
-		printAiConfigureCommands("      ");
-		printDifferentAnalyzerHint("    ");
-		return;
-	}
-
-	if (config) {
-		const configuredCommand = config.commandPrefix[0];
-		if (!isCommandDefined(configuredCommand)) {
-			console.log(
-				`  \u2717 Configured command not found: ${configuredCommand ?? "(empty)"}`,
-			);
-			if (availableCommands.length > 0) {
-				console.log(
-					`    Detected available commands: ${availableCommands.join(", ")}`,
-				);
-			} else {
-				console.log(
-					"    No codex, claude, or gemini analyzer command was detected on PATH.",
-				);
-			}
-			console.log("    Reconfigure with:");
-			printAiConfigureCommands("      ");
-			printDifferentAnalyzerHint("    ");
-			return;
-		}
-
-		console.log(
-			`  \u2713 Configured (${config.preset}): ${formatCommandPrefix(config.commandPrefix)}`,
-		);
-		console.log("    Analysis commands are ready to use.");
-		printDifferentAnalyzerHint("    ");
-		return;
-	}
-
-	console.log("  \u2717 No AI config set.");
-	if (availableCommands.length > 0) {
-		console.log(
-			`    Detected available commands: ${availableCommands.join(", ")}`,
-		);
-	} else {
-		console.log("    No codex, claude, or gemini analyzer command was detected on PATH.");
-	}
-	console.log("    Configure one with:");
-	printAiConfigureCommands("      ");
-	printDifferentAnalyzerHint("    ");
-	console.log("    Optionally provide a custom command prefix with '-- ...'.");
+  console.log("\nInstalling Playwright Chromium...");
+  const result = spawnSync("npx", ["playwright", "install", "chromium"], {
+    stdio: "inherit",
+    shell: true,
+  });
+  if (result.status === 0) {
+    console.log("  \u2713 Playwright Chromium installed");
+  } else {
+    console.error(
+      "  \u2717 Failed to install Playwright Chromium. Run manually: npx playwright install chromium",
+    );
+  }
 }
 
 export function registerInitCommand(yargs: Argv): Argv {
-	return yargs.command(
-		"init",
-		"Initialize libretto in the current project",
-		(cmd) =>
-			cmd.option("skip-browsers", {
-				type: "boolean",
-				default: false,
-				describe: "Skip Playwright Chromium installation",
-			}),
-			(argv) => {
-				console.log("Initializing libretto...\n");
+  return yargs.command(
+    "init",
+    "Initialize libretto in the current project",
+    (cmd) =>
+      cmd.option("skip-browsers", {
+        type: "boolean",
+        default: false,
+        describe: "Skip Playwright Chromium installation",
+      }),
+    async (argv) => {
+      console.log("Initializing libretto...\n");
 
-				if (!argv["skip-browsers"]) {
-					installBrowsers();
-				} else {
-				console.log("\nSkipping browser installation (--skip-browsers)");
-			}
+      if (!argv["skip-browsers"]) {
+        installBrowsers();
+      } else {
+        console.log("\nSkipping browser installation (--skip-browsers)");
+      }
 
-			checkAiRuntimeConfiguration();
+      // Interactive setup only when stdin is a TTY (real terminal).
+      // In tests/CI/piped contexts, just print status.
+      if (process.stdin.isTTY) {
+        await runInteractiveApiSetup();
+      } else {
+        printSnapshotApiStatus();
+      }
 
-			console.log("\n\u2713 libretto init complete");
-		},
-	);
+      console.log("\n\u2713 libretto init complete");
+    },
+  );
 }

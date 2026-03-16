@@ -1,3 +1,16 @@
+/**
+ * CLI-agent-based snapshot analyzer (legacy path).
+ *
+ * This module spawns an external coding agent (codex, claude, or gemini CLI)
+ * as a child process to analyze snapshots. It is NOT currently used by the
+ * snapshot command — analysis now goes through the API path in
+ * api-snapshot-analyzer.ts. This code is preserved so we can switch back
+ * to the CLI-agent approach if needed.
+ *
+ * Shared types and utilities (InterpretResultSchema, buildInlinePromptSelection,
+ * formatInterpretationOutput, etc.) are still actively used by the API analyzer.
+ */
+
 import {
   existsSync,
   mkdtempSync,
@@ -9,18 +22,18 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
-import {
-  type AiConfig,
-  formatCommandPrefix,
-  readAiConfig,
-} from "./ai-config.js";
-import {
-  getLLMClientFactory,
-} from "./context.js";
+// Used by the legacy CLI-agent path (UserCodingAgent) which is preserved but
+// not wired into the snapshot command. The active config schema (ai-config.ts)
+// no longer has preset/commandPrefix — this type is kept for the legacy code.
+type LegacyAiConfig = {
+  preset: "codex" | "claude" | "gemini";
+  commandPrefix: string[];
+};
 
 export type ScreenshotPair = {
   pngPath: string;
   htmlPath: string;
+  condensedHtmlPath: string;
   baseName: string;
 };
 
@@ -30,23 +43,22 @@ export type InterpretArgs = {
   context: string;
   pngPath: string;
   htmlPath: string;
+  condensedHtmlPath: string;
 };
 
-const InterpretResultSchema = z.object({
+export const InterpretResultSchema = z.object({
   answer: z.string(),
-  selectors: z
-    .array(
-      z.object({
-        label: z.string(),
-        selector: z.string(),
-        rationale: z.string(),
-      }),
-    )
-    .default([]),
-  notes: z.string().optional().default(""),
+  selectors: z.array(
+    z.object({
+      label: z.string(),
+      selector: z.string(),
+      rationale: z.string(),
+    }),
+  ),
+  notes: z.string(),
 });
 
-type InterpretResult = z.infer<typeof InterpretResultSchema>;
+export type InterpretResult = z.infer<typeof InterpretResultSchema>;
 
 type ExternalCommandResult = {
   exitCode: number;
@@ -54,10 +66,38 @@ type ExternalCommandResult = {
   stderr: string;
 };
 
-abstract class UserCodingAgent {
-  protected constructor(protected readonly config: AiConfig) {}
+type SnapshotBudget = {
+  contextWindowTokens: number;
+  outputReserveTokens: number;
+  promptBudgetTokens: number;
+  source: string;
+};
 
-  static resolveFromConfig(config: AiConfig): UserCodingAgent {
+type SnapshotDomStats = {
+  fullDomChars: number;
+  fullDomEstimatedTokens: number;
+  condensedDomChars: number;
+  condensedDomEstimatedTokens: number;
+  configuredModel: string;
+};
+
+type InlinePromptSelection = {
+  prompt: string;
+  domSource: "full" | "condensed";
+  domLabel: "full DOM" | "condensed DOM";
+  htmlChars: number;
+  htmlEstimatedTokens: number;
+  promptEstimatedTokens: number;
+  truncated: boolean;
+  selectionReason: string;
+  budget: SnapshotBudget;
+  stats: SnapshotDomStats;
+};
+
+abstract class UserCodingAgent {
+  protected constructor(protected readonly config: LegacyAiConfig) {}
+
+  static resolveFromConfig(config: LegacyAiConfig): UserCodingAgent {
     switch (config.preset) {
       case "codex":
         return new CodexUserCodingAgent(config);
@@ -68,8 +108,10 @@ abstract class UserCodingAgent {
     }
   }
 
-  static readConfiguredConfig(): AiConfig | null {
-    return readAiConfig();
+  static readConfiguredConfig(): LegacyAiConfig | null {
+    // Legacy: this would read from the old config format. Not used in the
+    // current API-based analysis path.
+    return null;
   }
 
   static getConfigured(): UserCodingAgent | null {
@@ -77,7 +119,7 @@ abstract class UserCodingAgent {
     return config ? this.resolveFromConfig(config) : null;
   }
 
-  get snapshotAnalyzerConfig(): AiConfig {
+  get snapshotAnalyzerConfig(): LegacyAiConfig {
     return this.config;
   }
 
@@ -108,7 +150,7 @@ abstract class UserCodingAgent {
     const result = await runExternalCommand(this.command, args, logger, stdinText);
     if (result.exitCode !== 0) {
       throw new Error(
-        `Analyzer command failed (${formatCommandPrefix([this.command, ...args])}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
+        `Analyzer command failed (${[this.command, ...args].join(" ")}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
       );
     }
     return result;
@@ -475,7 +517,7 @@ function resolvePath(filePath: string): string {
   return isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
 }
 
-function getMimeType(filePath: string): string {
+export function getMimeType(filePath: string): string {
   const ext = extname(filePath).toLowerCase();
   if (ext === ".png") return "image/png";
   if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
@@ -484,7 +526,7 @@ function getMimeType(filePath: string): string {
   return "application/octet-stream";
 }
 
-function readFileAsBase64(filePath: string): string {
+export function readFileAsBase64(filePath: string): string {
   return readFileSync(filePath).toString("base64");
 }
 
@@ -540,37 +582,62 @@ function collectSelectorHints(html: string, limit = 120): string[] {
   return candidates;
 }
 
-export async function runInterpret(
-  args: InterpretArgs,
-  logger: LoggerApi,
-): Promise<void> {
-  logger.info("interpret-start", {
-    objective: args.objective,
-    pngPath: args.pngPath,
-    htmlPath: args.htmlPath,
-  });
-  process.env.NODE_ENV = "development";
+function estimateTokensFromChars(chars: number): number {
+  return Math.ceil(chars / 4);
+}
 
-  const pngPath = resolvePath(args.pngPath);
-  const htmlPath = resolvePath(args.htmlPath);
-  if (!existsSync(pngPath)) {
-    throw new Error(`PNG file not found: ${pngPath}`);
+function inferContextWindowTokens(
+  model: string,
+): { contextWindowTokens: number; source: string } {
+  const normalized = model.trim().toLowerCase();
+  if (normalized.includes("claude")) {
+    return { contextWindowTokens: 200_000, source: "model:claude" };
   }
-  if (!existsSync(htmlPath)) {
-    throw new Error(`HTML file not found: ${htmlPath}`);
+  if (
+    normalized.includes("gpt-5")
+    || normalized.includes("o3")
+    || normalized.includes("o4")
+  ) {
+    return { contextWindowTokens: 200_000, source: "model:openai" };
   }
+  if (normalized.includes("gemini")) {
+    return { contextWindowTokens: 1_000_000, source: "model:gemini" };
+  }
+  // Provider-based fallback from the provider/model-id format
+  if (normalized.startsWith("openai/") || normalized.startsWith("codex/")) {
+    return { contextWindowTokens: 200_000, source: "provider:openai" };
+  }
+  if (normalized.startsWith("anthropic/")) {
+    return { contextWindowTokens: 200_000, source: "provider:anthropic" };
+  }
+  if (normalized.startsWith("google/") || normalized.startsWith("vertex/")) {
+    return { contextWindowTokens: 1_000_000, source: "provider:google" };
+  }
+  // Conservative default
+  return { contextWindowTokens: 128_000, source: "default" };
+}
 
-  const htmlContent = readFileSync(htmlPath, "utf-8");
-  const htmlCharLimit = 500_000;
-  const { text: trimmedHtml, truncated } = truncateText(
-    htmlContent,
-    htmlCharLimit,
+function buildSnapshotBudget(model: string): SnapshotBudget {
+  const { contextWindowTokens, source } = inferContextWindowTokens(model);
+  const outputReserveTokens = Math.min(
+    32_000,
+    Math.max(8_000, Math.floor(contextWindowTokens * 0.1)),
   );
-  const selectorHints = collectSelectorHints(htmlContent, 120);
+  const promptBudgetTokens = Math.max(
+    8_000,
+    contextWindowTokens - outputReserveTokens - 2_000,
+  );
 
-  let prompt = `# Objective\n${args.objective}\n\n`;
-  prompt += `# Context\n${args.context}\n\n`;
-  prompt += `# Instructions\n`;
+  return {
+    contextWindowTokens,
+    outputReserveTokens,
+    promptBudgetTokens,
+    source,
+  };
+}
+
+function buildInterpretInstructions(): string {
+  let prompt = `# Instructions\n`;
   prompt += `You are analyzing a screenshot and HTML snapshot of the same web page on behalf of an automation agent.\n`;
   prompt += `The agent needs to interact with this page programmatically using Playwright.\n\n`;
   prompt += `Based on the objective and context above:\n`;
@@ -581,67 +648,158 @@ export async function runInterpret(
   prompt += `Output JSON with this shape:\n`;
   prompt += `{"answer": string, "selectors": [{"label": string, "selector": string, "rationale": string}], "notes": string}\n\n`;
   prompt += `Selectors should prefer robust attributes: data-testid, data-test, aria-label, name, id, role. Avoid fragile class-based or positional selectors.\n`;
-  prompt += `Only include selectors that exist in the HTML snapshot.\n\n`;
+  prompt += `Only include selectors that exist in the HTML snapshot.\n`;
+  return prompt;
+}
+
+function buildInlineHtmlPrompt(
+  args: InterpretArgs,
+  options: {
+    htmlContent: string;
+    domLabel: "full DOM" | "condensed DOM";
+    truncated: boolean;
+    selectionReason: string;
+    budget: SnapshotBudget;
+    stats: SnapshotDomStats;
+  },
+): string {
+  const selectorHints = collectSelectorHints(options.htmlContent, 120);
+
+  let prompt = `# Objective\n${args.objective}\n\n`;
+  prompt += `# Context\n${args.context}\n\n`;
+  prompt += `# Snapshot Selection\n`;
+  prompt += `- Selected HTML snapshot: ${options.domLabel}\n`;
+  prompt += `- Selection reason: ${options.selectionReason}\n\n`;
+  prompt += buildInterpretInstructions();
 
   if (selectorHints.length > 0) {
-    prompt += `Selector hints from HTML attributes (use if relevant):\n`;
+    prompt += `\nSelector hints from HTML attributes (use if relevant):\n`;
     prompt += selectorHints.map((hint) => `- ${hint}`).join("\n");
-    prompt += "\n\n";
+    prompt += "\n";
   }
 
-  if (truncated) {
-    prompt += `HTML content is truncated to fit token limits.\n\n`;
+  if (options.truncated) {
+    prompt += `\nHTML content is truncated to fit token limits.\n`;
   }
 
-  prompt += `HTML snapshot:\n\n${trimmedHtml}`;
+  prompt += `\nHTML snapshot (${options.domLabel}):\n\n${options.htmlContent}`;
   prompt +=
     "\n\nReturn only a JSON object. Do not include markdown code fences or extra commentary.";
+  return prompt;
+}
 
-  let parsed: InterpretResult;
-  const configuredAgent = UserCodingAgent.getConfigured();
-  if (configuredAgent) {
-    const configuredAnalyzer = configuredAgent.snapshotAnalyzerConfig;
-    logger.info("interpret-analyzer-config", {
-      preset: configuredAnalyzer.preset,
-      commandPrefix: configuredAnalyzer.commandPrefix,
-    });
-    parsed = await configuredAgent.analyzeSnapshot(prompt, pngPath, logger);
-  } else {
-    const llmClientFactory = getLLMClientFactory();
-    if (!llmClientFactory) {
-      throw new Error(
-        "No AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini). Library integrations can still set a factory via setLLMClientFactory().",
-      );
-    }
+export function buildInlinePromptSelection(
+  args: InterpretArgs,
+  fullHtmlContent: string,
+  condensedHtmlContent: string,
+  model: string,
+): InlinePromptSelection {
+  const budget = buildSnapshotBudget(model);
+  const stats: SnapshotDomStats = {
+    fullDomChars: fullHtmlContent.length,
+    fullDomEstimatedTokens: estimateTokensFromChars(fullHtmlContent.length),
+    condensedDomChars: condensedHtmlContent.length,
+    condensedDomEstimatedTokens: estimateTokensFromChars(condensedHtmlContent.length),
+    configuredModel: model,
+  };
 
-    logger.info("interpret-analyzer-factory-fallback", {});
-    const imageBase64 = readFileAsBase64(pngPath);
-    const client = await llmClientFactory(logger, "google/gemini-3-flash-preview");
-    const result = await client.generateObjectFromMessages({
-      schema: InterpretResultSchema,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            {
-              type: "image",
-              image: `data:${getMimeType(pngPath)};base64,${imageBase64}`,
-            },
-          ],
-        },
-      ],
-      temperature: 0.1,
+  const buildCandidate = (
+    domSource: "full" | "condensed",
+    htmlContent: string,
+    selectionReason: string,
+    truncated: boolean,
+  ): InlinePromptSelection => {
+    const domLabel = domSource === "full" ? "full DOM" : "condensed DOM";
+    const prompt = buildInlineHtmlPrompt(args, {
+      htmlContent,
+      domLabel,
+      truncated,
+      selectionReason,
+      budget,
+      stats,
     });
-    parsed = InterpretResultSchema.parse(result);
+    return {
+      prompt,
+      domSource,
+      domLabel,
+      htmlChars: htmlContent.length,
+      htmlEstimatedTokens: estimateTokensFromChars(htmlContent.length),
+      promptEstimatedTokens: estimateTokensFromChars(prompt.length),
+      truncated,
+      selectionReason,
+      budget,
+      stats,
+    };
+  };
+
+  // Try full DOM first
+  const fullCandidate = buildCandidate(
+    "full",
+    fullHtmlContent,
+    "placeholder",
+    false,
+  );
+  if (fullCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
+    const selectionReason =
+      `Full DOM fits within the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} <= ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`;
+    const prompt = buildInlineHtmlPrompt(args, {
+      htmlContent: fullHtmlContent,
+      domLabel: "full DOM",
+      truncated: false,
+      selectionReason,
+      budget,
+      stats,
+    });
+    return {
+      ...fullCandidate,
+      selectionReason,
+      prompt,
+      promptEstimatedTokens: estimateTokensFromChars(prompt.length),
+    };
   }
 
-  logger.info("interpret-success", {
-    selectorCount: parsed.selectors.length,
-    answer: parsed.answer.slice(0, 200),
+  // Fall back to condensed DOM
+  const condensedReason = `Full DOM would exceed the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} > ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the condensed DOM instead.`;
+  const condensedCandidate = buildCandidate(
+    "condensed",
+    condensedHtmlContent,
+    condensedReason,
+    false,
+  );
+  if (condensedCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
+    return condensedCandidate;
+  }
+
+  // Truncate condensed DOM as last resort
+  const truncateReason = `Both full and condensed DOM snapshots exceed the estimated prompt budget (full ~${fullCandidate.promptEstimatedTokens.toLocaleString()}, condensed ~${condensedCandidate.promptEstimatedTokens.toLocaleString()}, budget ${budget.promptBudgetTokens.toLocaleString()} tokens), so the condensed DOM is truncated to fit.`;
+  const basePrompt = buildInlineHtmlPrompt(args, {
+    htmlContent: "",
+    domLabel: "condensed DOM",
+    truncated: true,
+    selectionReason: truncateReason,
+    budget,
+    stats,
   });
+  const availableHtmlTokens = Math.max(
+    2_000,
+    budget.promptBudgetTokens - estimateTokensFromChars(basePrompt.length),
+  );
+  const truncatedHtml = truncateText(condensedHtmlContent, availableHtmlTokens * 4);
+
+  return buildCandidate(
+    "condensed",
+    truncatedHtml.text,
+    truncateReason,
+    truncatedHtml.truncated,
+  );
+}
+
+export function formatInterpretationOutput(
+  parsed: InterpretResult,
+  header: string = "Interpretation:",
+): string {
   const outputLines: string[] = [];
-  outputLines.push("Interpretation:");
+  outputLines.push(header);
   outputLines.push(`Answer: ${parsed.answer}`);
   outputLines.push("");
   if (parsed.selectors.length === 0) {
@@ -654,14 +812,64 @@ export async function runInterpret(
       outputLines.push(`     rationale: ${selector.rationale}`);
     });
   }
-  if (parsed.notes.trim()) {
+  if (parsed.notes && parsed.notes.trim()) {
     outputLines.push("");
     outputLines.push(`Notes: ${parsed.notes.trim()}`);
   }
+  return outputLines.join("\n");
+}
 
-  console.log(outputLines.join("\n"));
+export async function runInterpret(
+  args: InterpretArgs,
+  logger: LoggerApi,
+): Promise<void> {
+  logger.info("interpret-start", {
+    objective: args.objective,
+    pngPath: args.pngPath,
+    htmlPath: args.htmlPath,
+    condensedHtmlPath: args.condensedHtmlPath,
+  });
+  process.env.NODE_ENV = "development";
+
+  const pngPath = resolvePath(args.pngPath);
+  const htmlPath = resolvePath(args.htmlPath);
+  const condensedHtmlPath = resolvePath(args.condensedHtmlPath);
+
+  if (!existsSync(pngPath)) {
+    throw new Error(`PNG file not found: ${pngPath}`);
+  }
+  if (!existsSync(htmlPath)) {
+    throw new Error(`HTML file not found: ${htmlPath}`);
+  }
+  if (!existsSync(condensedHtmlPath)) {
+    throw new Error(`Condensed HTML file not found: ${condensedHtmlPath}`);
+  }
+
+  const fullHtmlContent = readFileSync(htmlPath, "utf-8");
+  const condensedHtmlContent = readFileSync(condensedHtmlPath, "utf-8");
+  const configuredAgent = UserCodingAgent.getConfigured();
+  if (!configuredAgent) {
+    throw new Error(
+      "No AI config set. Run 'npx libretto ai configure codex' (or claude/gemini), or set API credentials in your .env file for direct API analysis.",
+    );
+  }
+
+  const configuredAnalyzer = configuredAgent.snapshotAnalyzerConfig;
+  // Legacy CLI-agent path: requires a model string for prompt budget estimation.
+  // The active config format stores model directly; if this legacy path is
+  // re-enabled, the caller must supply a valid provider/model-id string.
+  throw new Error(
+    "The CLI-agent snapshot analysis path is not active. " +
+    "Update your config to the current format with `npx libretto ai configure <provider>`, " +
+    "or set API credentials in .env for direct API analysis.",
+  );
+
+  // Preserved for reference — to re-enable, remove the throw above and:
+  // const selection = buildInlinePromptSelection(args, fullHtmlContent, condensedHtmlContent, model);
+  // const parsed = await configuredAgent.analyzeSnapshot(selection.prompt, pngPath, logger);
+  // console.log(formatInterpretationOutput(parsed));
 }
 
 export function canAnalyzeSnapshots(): boolean {
-  return UserCodingAgent.getConfigured() !== null || getLLMClientFactory() !== null;
+  return UserCodingAgent.getConfigured() !== null;
 }
