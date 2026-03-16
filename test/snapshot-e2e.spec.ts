@@ -113,10 +113,17 @@ function hasProviderKeys(config: ProviderTestConfig): boolean {
   return config.envKeys.some((key) => Boolean(dotEnv[key] || process.env[key]));
 }
 
+const hasAnyProviderKey = ENV_KEYS.some((key) => Boolean(dotEnv[key] || process.env[key]));
+
 describe("snapshot e2e – live site analysis", () => {
   test(
     "linkedin feed: identifies selectors (auto-detected provider)",
     async ({ librettoCli, evaluate, seedProfile }) => {
+      if (!hasAnyProviderKey) {
+        console.log("[linkedin/auto] skipped: no API credentials available");
+        return;
+      }
+
       const session = "snapshot-e2e-linkedin-auto";
 
       if (hasLinkedInProfile) {
