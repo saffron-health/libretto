@@ -2,7 +2,7 @@ import type z from "zod";
 
 export type MessageContentPart =
 	| { type: "text"; text: string }
-	| { type: "image"; image: string };
+	| { type: "image"; image: string | Uint8Array; mediaType?: string };
 
 export type Message = {
 	role: "user" | "assistant";

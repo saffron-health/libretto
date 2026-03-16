@@ -1,4 +1,4 @@
-import type { Argv } from "yargs";
+import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   runClose as runCloseWithLogger,
@@ -8,103 +8,154 @@ import {
   runSave,
 } from "../core/browser.js";
 import { withSessionLogger } from "../core/context.js";
+import { assertSessionAvailableForStart } from "../core/session.js";
+import { SimpleCLI } from "../framework/simple-cli.js";
+import {
+  loadSessionStateMiddleware,
+  resolveSessionMiddleware,
+  sessionOption,
+} from "./shared.js";
 
-export function registerBrowserCommands(yargs: Argv, logger: LoggerApi): Argv {
-  return yargs
-    .command(
-      "open [url]",
-      "Launch browser and open URL (headed by default)",
-      (cmd) =>
-        cmd
-          .option("headed", {
-            type: "boolean",
-            default: false,
-          })
-          .option("headless", {
-            type: "boolean",
-            default: false,
-          })
-          .option("viewport", {
-            type: "string",
-            describe: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
-          }),
-      async (argv) => {
-        const hasHeadedFlag = Boolean(argv.headed);
-        const hasHeadlessFlag = Boolean(argv.headless);
-        if (hasHeadedFlag && hasHeadlessFlag) {
-          throw new Error("Cannot pass both --headed and --headless.");
-        }
-        const headed = hasHeadedFlag || !hasHeadlessFlag;
-        const url = argv.url as string | undefined;
-        if (!url) {
-          throw new Error(
-            "Usage: libretto-cli open <url> [--headless] [--viewport WxH] [--session <name>]",
-          );
-        }
-        const viewportArg = argv.viewport as string | undefined;
-        let viewport: { width: number; height: number } | undefined;
-        if (viewportArg) {
-          const match = viewportArg.match(/^(\d+)x(\d+)$/i);
-          if (!match) {
-            throw new Error(
-              "Invalid --viewport format. Expected WIDTHxHEIGHT (e.g. 1920x1080).",
-            );
-          }
-          const w = Number(match[1]);
-          const h = Number(match[2]);
-          if (w < 1 || h < 1) {
-            throw new Error(
-              "Invalid --viewport dimensions. Width and height must be at least 1.",
-            );
-          }
-          viewport = { width: w, height: h };
-        }
-        await runOpen(url, headed, String(argv.session), logger, { viewport });
-      },
-    )
-    .command(
-      "save [urlOrDomain]",
-      "Save current browser session",
-      (cmd) => cmd,
-      async (argv) => {
-        const urlOrDomain = argv.urlOrDomain as string | undefined;
-        if (!urlOrDomain) {
-          throw new Error("Usage: libretto-cli save <url|domain> [--session <name>]");
-        }
-        await runSave(urlOrDomain, String(argv.session), logger);
-      },
-    )
-    .command("pages", "List open pages in the session", (cmd) => cmd, async (argv) => {
-      await runPages(String(argv.session), logger);
-    })
-    .command(
-      "close",
-      "Close the browser",
-      (cmd) =>
-        cmd
-          .option("all", {
-            type: "boolean",
-            default: false,
-            describe: "Close all tracked sessions in this workspace",
-          })
-          .option("force", {
-            type: "boolean",
-            default: false,
-            describe: "Force kill sessions that ignore SIGTERM (requires --all)",
-          }),
-      async (argv) => {
-        const closeAll = Boolean(argv.all);
-        const force = Boolean(argv.force);
-        if (force && !closeAll) {
-          throw new Error("Usage: libretto-cli close --all [--force]");
-        }
-        if (closeAll) {
-          await runCloseAllWithLogger(logger, { force });
-          return;
-        }
-        await runCloseWithLogger(String(argv.session), logger);
-      },
+function parseViewportArg(
+  viewportArg: string | undefined,
+): { width: number; height: number } | undefined {
+  if (!viewportArg) return undefined;
+
+  const match = viewportArg.match(/^(\d+)x(\d+)$/i);
+  if (!match) {
+    throw new Error(
+      "Invalid --viewport format. Expected WIDTHxHEIGHT (e.g. 1920x1080).",
     );
+  }
+
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (width < 1 || height < 1) {
+    throw new Error(
+      "Invalid --viewport dimensions. Width and height must be at least 1.",
+    );
+  }
+
+  return { width, height };
+}
+
+export const openInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("url", z.string().optional(), {
+      help: "URL to open",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+    headed: SimpleCLI.flag({ help: "Run browser in headed mode" }),
+    headless: SimpleCLI.flag({ help: "Run browser in headless mode" }),
+    viewport: SimpleCLI.option(z.string().optional(), {
+      help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
+    }),
+  },
+})
+  .refine(
+    (input) => Boolean(input.url),
+    "Usage: libretto-cli open <url> [--headless] [--viewport WxH] [--session <name>]",
+  )
+  .refine(
+    (input) => !(input.headed && input.headless),
+    "Cannot pass both --headed and --headless.",
+  );
+
+export function createOpenCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Launch browser and open URL (headed by default)",
+  })
+    .input(openInput)
+    .use(resolveSessionMiddleware)
+    .handle(async ({ input, ctx }) => {
+      assertSessionAvailableForStart(ctx.session, logger);
+      const headed = input.headed || !input.headless;
+      const viewport = parseViewportArg(input.viewport);
+      await runOpen(input.url!, headed, ctx.session, logger, { viewport });
+    });
+}
+
+export const saveInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("urlOrDomain", z.string().optional(), {
+      help: "URL or domain to save",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+  },
+}).refine(
+  (input) => Boolean(input.urlOrDomain),
+  "Usage: libretto-cli save <url|domain> [--session <name>]",
+);
+
+export function createSaveCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Save current browser session",
+  })
+    .input(saveInput)
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ input, ctx }) => {
+      await runSave(input.urlOrDomain!, ctx.session, logger);
+    });
+}
+
+export const pagesInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+  },
+});
+
+export function createPagesCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "List open pages in the session",
+  })
+    .input(pagesInput)
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ ctx }) => {
+      await runPages(ctx.session, logger);
+    });
+}
+
+export const closeInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+    all: SimpleCLI.flag({ help: "Close all tracked sessions in this workspace" }),
+    force: SimpleCLI.flag({ help: "Force kill sessions that ignore SIGTERM (requires --all)" }),
+  },
+});
+
+export function createCloseCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Close the browser",
+  })
+    .input(closeInput)
+    .use(resolveSessionMiddleware)
+    .handle(async ({ input, ctx }) => {
+      if (input.force && !input.all) {
+        throw new Error("Usage: libretto-cli close --all [--force]");
+      }
+      if (input.all) {
+        await runCloseAllWithLogger(logger, { force: input.force });
+        return;
+      }
+      await runCloseWithLogger(ctx.session, logger);
+    });
+}
+
+export function createBrowserCommands(logger: LoggerApi) {
+  return {
+    open: createOpenCommand(logger),
+    save: createSaveCommand(logger),
+    pages: createPagesCommand(logger),
+    close: createCloseCommand(logger),
+  };
 }
 
 export async function runClose(session: string): Promise<void> {

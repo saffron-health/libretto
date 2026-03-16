@@ -2,7 +2,7 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import * as moduleBuiltin from "node:module";
 import { fileURLToPath } from "node:url";
-import type { Argv } from "yargs";
+import { z } from "zod";
 import { installInstrumentation } from "../../shared/instrumentation/index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import {
@@ -14,8 +14,8 @@ import {
   assertSessionAvailableForStart,
   clearSessionState,
   readSessionState,
-  readSessionStateOrThrow,
   setSessionStatus,
+  type SessionState,
 } from "../core/session.js";
 import {
   readActionLog,
@@ -25,6 +25,13 @@ import {
 import type {
   RunIntegrationWorkerRequest,
 } from "../workers/run-integration-worker-protocol.js";
+import { SimpleCLI } from "../framework/simple-cli.js";
+import {
+  loadSessionStateMiddleware,
+  pageOption,
+  resolveSessionMiddleware,
+  sessionOption,
+} from "./shared.js";
 
 type ExecFunction = (...args: unknown[]) => Promise<unknown>;
 type RunIntegrationCommandRequest = RunIntegrationWorkerRequest & {
@@ -117,8 +124,6 @@ async function runExec(
   visualize = false,
   pageId?: string,
 ): Promise<void> {
-  readSessionStateOrThrow(session);
-
   logger.info("exec-start", {
     session,
     codeLength: code.length,
@@ -296,36 +301,36 @@ function readJsonFileIfExists(path: string): unknown {
   }
 }
 
-type WorkflowFailurePhase = "setup" | "workflow";
-
-type WorkflowFailureSignal = {
-  message: string;
-  phase?: WorkflowFailurePhase;
-};
-
-function readFailureSignal(path: string): WorkflowFailureSignal | null {
+function readFailureDetails(path: string): {
+  message?: string;
+  phase?: "setup" | "workflow";
+} | null {
   const raw = readJsonFileIfExists(path);
   if (!raw || typeof raw !== "object") return null;
+
   const message = (raw as { message?: unknown }).message;
-  if (typeof message !== "string") return null;
   const phase = (raw as { phase?: unknown }).phase;
+
   return {
-    message,
+    message: typeof message === "string" ? message : undefined,
     phase: phase === "setup" || phase === "workflow" ? phase : undefined,
   };
 }
 
-async function waitForFailureSignal(
+async function waitForFailureDetails(
   path: string,
   timeoutMs = 1_000,
-): Promise<WorkflowFailureSignal | null> {
+): Promise<{
+  message?: string;
+  phase?: "setup" | "workflow";
+} | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const failure = readFailureSignal(path);
-    if (failure) return failure;
+    const details = readFailureDetails(path);
+    if (details?.message) return details;
     await new Promise((resolveWait) => setTimeout(resolveWait, 25));
   }
-  return readFailureSignal(path);
+  return readFailureDetails(path);
 }
 
 function streamOutputSince(path: string, offset: number): number {
@@ -344,7 +349,7 @@ type WaitForWorkflowOutcomeArgs = {
 type WorkflowOutcome = {
   status: "completed" | "paused" | "failed" | "exited";
   message?: string;
-  failurePhase?: WorkflowFailurePhase;
+  phase?: "setup" | "workflow";
 };
 
 function clearSignalIfExists(path: string): void {
@@ -370,11 +375,11 @@ async function waitForWorkflowOutcome(
 
     if (existsSync(signalPaths.failedSignalPath)) {
       outputOffset = streamOutputSince(signalPaths.outputSignalPath, outputOffset);
-      const failure = await waitForFailureSignal(signalPaths.failedSignalPath);
+      const failureDetails = await waitForFailureDetails(signalPaths.failedSignalPath);
       return {
         status: "failed",
-        message: failure?.message,
-        failurePhase: failure?.phase,
+        message: failureDetails?.message,
+        phase: failureDetails?.phase,
       };
     }
 
@@ -397,8 +402,11 @@ async function waitForWorkflowOutcome(
   }
 }
 
-async function runResume(session: string, logger: LoggerApi): Promise<void> {
-  const state = readSessionStateOrThrow(session);
+async function runResume(
+  session: string,
+  logger: LoggerApi,
+  sessionState: SessionState,
+): Promise<void> {
   const {
     pausedSignalPath,
     resumeSignalPath,
@@ -413,9 +421,9 @@ async function runResume(session: string, logger: LoggerApi): Promise<void> {
     );
   }
 
-  if (!isProcessRunning(state.pid)) {
+  if (!isProcessRunning(sessionState.pid)) {
     throw new Error(
-      `No active paused workflow found for session "${session}" (worker pid ${state.pid} is not running).`,
+      `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid} is not running).`,
     );
   }
 
@@ -443,7 +451,7 @@ async function runResume(session: string, logger: LoggerApi): Promise<void> {
 
   const outcome = await waitForWorkflowOutcome({
     session,
-    pid: state.pid,
+    pid: sessionState.pid,
   });
 
   if (outcome.status === "completed") {
@@ -474,7 +482,6 @@ async function runIntegrationFromFile(
   logger: LoggerApi,
 ): Promise<void> {
   await stopExistingFailedRunSession(args.session, logger);
-  assertSessionAvailableForStart(args.session, logger);
   const signalPaths = getPauseSignalPaths(args.session);
   clearSignalIfExists(signalPaths.pausedSignalPath);
   clearSignalIfExists(signalPaths.resumeSignalPath);
@@ -515,13 +522,12 @@ async function runIntegrationFromFile(
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
-    const message = outcome.message ?? "Workflow failed during run.";
-    if (outcome.failurePhase === "workflow") {
+    if (outcome.phase === "workflow") {
       throw new Error(
-        `${message}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`,
+        `${outcome.message ?? "Workflow failed during run."}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`,
       );
     }
-    throw new Error(message);
+    throw new Error(outcome.message ?? "Workflow failed during run.");
   }
   if (outcome.status === "exited") {
     setSessionStatus(args.session, "exited", logger);
@@ -530,121 +536,156 @@ async function runIntegrationFromFile(
     );
   }
   setSessionStatus(args.session, "completed", logger);
+  console.log("Integration completed.");
 }
 
-export function registerExecutionCommands(yargs: Argv, logger: LoggerApi): Argv {
-  return yargs
-    .command(
-      "exec [code..]",
-      "Execute Playwright TypeScript code",
-      (cmd) =>
-        cmd
-          .option("visualize", { type: "boolean", default: false })
-          .option("page", { type: "string" }),
-      async (argv) => {
-        const codeParts = Array.isArray(argv.code)
-          ? (argv.code as string[])
-          : argv.code
-            ? [String(argv.code)]
-            : [];
-        const code = codeParts.join(" ");
-        if (!code) {
-          throw new Error(
-            "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
-          );
-        }
-        await runExec(
-          code,
-          String(argv.session),
-          logger,
-          Boolean(argv.visualize),
-          argv.page ? String(argv.page) : undefined,
-        );
-      },
-    )
-    .command(
-      "run [integrationFile] [integrationExport]",
-      "Run an exported Libretto workflow from a file",
-      (cmd) =>
-        cmd
-          .option("params", { type: "string" })
-          .option("params-file", { type: "string" })
-          .option("tsconfig", { type: "string" })
-          .option("headed", { type: "boolean", default: false })
-          .option("headless", { type: "boolean", default: false })
-          .option("auth-profile", { type: "string", describe: "Domain for local auth profile (e.g. apps.example.com)" }),
-      async (argv) => {
-        const usage =
-          "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless]";
-        const integrationPath = argv.integrationFile as string | undefined;
-        const exportName = argv.integrationExport as string | undefined;
-        const legacyDebug = (argv as Record<string, unknown>).debug;
-        if (legacyDebug !== undefined) {
-          throw new Error(
-            "The --debug flag has been removed. Run the command without --debug.",
-          );
-        }
-        if (!integrationPath || !exportName) {
-          throw new Error(usage);
-        }
+export const execInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("codeParts", z.array(z.string()).default([]), {
+      help: "Playwright TypeScript code to execute",
+      variadic: true,
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+    visualize: SimpleCLI.flag({ help: "Enable ghost cursor + highlight visualization" }),
+    page: pageOption(),
+  },
+}).refine(
+  (input) => input.codeParts.length > 0,
+  "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
+);
 
-        const session = String(argv.session);
+export function createExecCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Execute Playwright TypeScript code",
+  })
+    .input(execInput)
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ input, ctx }) => {
+      await runExec(
+        input.codeParts.join(" "),
+        ctx.session,
+        logger,
+        input.visualize,
+        input.page,
+      );
+    });
+}
 
-        const rawInlineParams = argv.params as string | undefined;
-        const paramsFile = argv["params-file"] as string | undefined;
-        if (rawInlineParams && paramsFile) {
-          throw new Error("Pass either --params or --params-file, not both.");
-        }
+const runUsage =
+  "Usage: libretto-cli run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless]";
 
-        const params = (() => {
-          if (paramsFile) {
-            let content: string;
-            try {
-              content = readFileSync(paramsFile, "utf8");
-            } catch {
-              throw new Error(
-                `Could not read --params-file "${paramsFile}". Ensure the file exists and is readable.`,
-              );
-            }
-            return parseJsonArg("--params-file", content);
-          }
-          if (rawInlineParams) {
-            return parseJsonArg("--params", rawInlineParams);
-          }
-          return {};
-        })();
+export const runInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("integrationFile", z.string().optional(), {
+      help: "Path to the integration file",
+    }),
+    SimpleCLI.positional("integrationExport", z.string().optional(), {
+      help: "Named workflow export to run",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+    params: SimpleCLI.option(z.string().optional(), {
+      help: "Inline JSON params",
+    }),
+    paramsFile: SimpleCLI.option(z.string().optional(), {
+      name: "params-file",
+      help: "Path to a JSON params file",
+    }),
+    tsconfig: SimpleCLI.option(z.string().optional(), {
+      help: "Path to a tsconfig used for workflow module resolution",
+    }),
+    headed: SimpleCLI.flag({ help: "Run in headed mode" }),
+    headless: SimpleCLI.flag({ help: "Run in headless mode" }),
+    authProfile: SimpleCLI.option(z.string().optional(), {
+      name: "auth-profile",
+      help: "Domain for local auth profile (e.g. apps.example.com)",
+    }),
+  },
+})
+  .refine(
+    (input) => Boolean(input.integrationFile && input.integrationExport),
+    runUsage,
+  )
+  .refine((input) => !(input.params && input.paramsFile), "Pass either --params or --params-file, not both.")
+  .refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
 
-        const hasHeadedFlag = Boolean(argv.headed);
-        const hasHeadlessFlag = Boolean(argv.headless);
-        if (hasHeadedFlag && hasHeadlessFlag) {
-          throw new Error("Cannot pass both --headed and --headless.");
-        }
-        const headlessMode = hasHeadedFlag
-          ? false
-          : hasHeadlessFlag
-            ? true
-            : undefined;
+function resolveRunParams(
+  rawInlineParams: string | undefined,
+  paramsFile: string | undefined,
+): unknown {
+  if (paramsFile) {
+    let content: string;
+    try {
+      content = readFileSync(paramsFile, "utf8");
+    } catch {
+      throw new Error(
+        `Could not read --params-file "${paramsFile}". Ensure the file exists and is readable.`,
+      );
+    }
+    return parseJsonArg("--params-file", content);
+  }
+  if (rawInlineParams) {
+    return parseJsonArg("--params", rawInlineParams);
+  }
+  return {};
+}
 
-        const authProfileDomain = argv["auth-profile"] as string | undefined;
-        const tsconfigPath = argv.tsconfig as string | undefined;
+export function createRunCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Run an exported Libretto workflow from a file",
+  })
+    .input(runInput)
+    .use(resolveSessionMiddleware)
+    .handle(async ({ input, ctx }) => {
+      await stopExistingFailedRunSession(ctx.session, logger);
+      assertSessionAvailableForStart(ctx.session, logger);
 
-        await runIntegrationFromFile({
-          integrationPath,
-          exportName,
-          session,
-          params,
-          headless: headlessMode ?? false,
-          authProfileDomain,
-          tsconfigPath,
-        }, logger);
-      },
-    )
-    .command(
-      "resume",
-      "Resume a paused workflow for the current session",
-      (cmd) => cmd,
-      async (argv) => {
-        await runResume(String(argv.session), logger);
-      },
-    );
+      const params = resolveRunParams(input.params, input.paramsFile);
+      const headlessMode = input.headed
+        ? false
+        : input.headless
+          ? true
+          : undefined;
+
+      await runIntegrationFromFile({
+        integrationPath: input.integrationFile!,
+        exportName: input.integrationExport!,
+        session: ctx.session,
+        params,
+        tsconfigPath: input.tsconfig,
+        headless: headlessMode ?? false,
+        authProfileDomain: input.authProfile,
+      }, logger);
+    });
+}
+
+export const resumeInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+  },
+});
+
+export function createResumeCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Resume a paused workflow for the current session",
+  })
+    .input(resumeInput)
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ ctx }) => {
+      await runResume(ctx.session, logger, ctx.sessionState);
+    });
+}
+
+export function createExecutionCommands(logger: LoggerApi) {
+  return {
+    exec: createExecCommand(logger),
+    run: createRunCommand(logger),
+    resume: createResumeCommand(logger),
+  };
 }

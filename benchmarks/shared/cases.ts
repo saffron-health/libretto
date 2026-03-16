@@ -468,8 +468,7 @@ async function createWorkspaceFiles(
   await createWorkspaceAgentsFile(paths.workspaceDir);
 
   writeAiConfig(
-    "claude",
-    [process.execPath, getBenchmarkAnalyzerPath()],
+    "anthropic/claude-sonnet-4-6",
     join(paths.workspaceDir, ".libretto", "config.json"),
   );
 }

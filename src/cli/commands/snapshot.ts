@@ -1,14 +1,23 @@
 import { mkdirSync } from "node:fs";
-import type { Argv } from "yargs";
+import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { connect, disconnectBrowser } from "../core/browser.js";
 import { getSessionSnapshotRunDir } from "../core/context.js";
+import { condenseDom } from "../../shared/condense-dom/condense-dom.js";
 import { readSessionState } from "../core/session.js";
 import {
-  canAnalyzeSnapshots,
-  runInterpret,
+  type InterpretArgs,
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
+import { SimpleCLI } from "../framework/simple-cli.js";
+import {
+  loadSessionStateMiddleware,
+  pageOption,
+  resolveSessionMiddleware,
+  sessionOption,
+} from "./shared.js";
+import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
+import { readAiConfig } from "../core/ai-config.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
@@ -149,6 +158,7 @@ async function captureScreenshot(
 
     const pngPath = `${snapshotRunDir}/page.png`;
     const htmlPath = `${snapshotRunDir}/page.html`;
+    const condensedHtmlPath = `${snapshotRunDir}/page.condensed.html`;
 
     const restoreViewport = resolveSnapshotViewport(session, logger);
     const viewportMetrics = await readSnapshotViewportMetrics(page);
@@ -190,15 +200,25 @@ async function captureScreenshot(
     const fs = await import("node:fs/promises");
     await fs.writeFile(htmlPath, htmlContent);
 
+    // Write condensed DOM
+    const condenseResult = condenseDom(htmlContent);
+    await fs.writeFile(condensedHtmlPath, condenseResult.html);
+
     logger.info("screenshot-success", {
       session,
       pageUrl,
       title,
       pngPath,
       htmlPath,
+      condensedHtmlPath,
       snapshotRunId,
+      domCondenseStats: {
+        originalLength: condenseResult.originalLength,
+        condensedLength: condenseResult.condensedLength,
+        reductions: condenseResult.reductions,
+      },
     });
-    return { pngPath, htmlPath, baseName: snapshotRunId };
+    return { pngPath, htmlPath, condensedHtmlPath, baseName: snapshotRunId };
   } catch (err) {
     let pageAlive = false;
     let browserConnected = false;
@@ -232,57 +252,70 @@ async function runSnapshot(
   objective?: string,
   context?: string,
 ): Promise<void> {
-  const { pngPath, htmlPath } = await captureScreenshot(session, logger, pageId);
-
-  console.log("Screenshot saved:");
-  console.log(`  PNG:  ${pngPath}`);
-  console.log(`  HTML: ${htmlPath}`);
-
   const normalizedObjective = objective?.trim();
   const normalizedContext = context?.trim();
-  if (!normalizedObjective && !normalizedContext) {
-    console.log("Use --objective flag to analyze snapshots.");
-    return;
-  }
-
-  if (!normalizedObjective) {
+  if (!normalizedObjective && normalizedContext) {
     throw new Error(
       "Couldn't run analysis: --objective is required when providing --context.",
     );
   }
 
-  if (!canAnalyzeSnapshots()) {
-    throw new Error(
-      "Couldn't run analysis: no AI config set. Run 'libretto-cli ai configure codex' (or claude/gemini) to enable analysis.",
-    );
+  const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(
+    session,
+    logger,
+    pageId,
+  );
+
+  console.log("Screenshot saved:");
+  console.log(`  PNG:             ${pngPath}`);
+  console.log(`  HTML:            ${htmlPath}`);
+  console.log(`  Condensed HTML:  ${condensedHtmlPath}`);
+
+  if (!normalizedObjective) {
+    console.log("Use --objective flag to analyze snapshots.");
+    return;
   }
 
-  await runInterpret({
+  const interpretArgs: InterpretArgs = {
     objective: normalizedObjective,
     session,
     context: normalizedContext ?? DEFAULT_SNAPSHOT_CONTEXT,
     pngPath,
     htmlPath,
-  }, logger);
+    condensedHtmlPath,
+  };
+
+  // Analysis uses direct API calls via the Vercel AI SDK (see api-snapshot-analyzer.ts).
+  // The legacy CLI-agent path (spawning codex/claude/gemini as a subprocess) is preserved
+  // in snapshot-analyzer.ts — to switch back, replace this call with:
+  //   await runInterpret(interpretArgs, logger);
+  await runApiInterpret(interpretArgs, logger, readAiConfig());
 }
 
-export function registerSnapshotCommands(yargs: Argv, logger: LoggerApi): Argv {
-  return yargs.command(
-    "snapshot",
-    "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
-    (cmd) =>
-      cmd
-        .option("page", { type: "string" })
-        .option("objective", { type: "string" })
-        .option("context", { type: "string" }),
-    async (argv) => {
+export const snapshotInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+    page: pageOption(),
+    objective: SimpleCLI.option(z.string().optional()),
+    context: SimpleCLI.option(z.string().optional()),
+  },
+});
+
+export function createSnapshotCommand(logger: LoggerApi) {
+  return SimpleCLI.command({
+    description: "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
+  })
+    .input(snapshotInput)
+    .use(resolveSessionMiddleware)
+    .use(loadSessionStateMiddleware)
+    .handle(async ({ input, ctx }) => {
       await runSnapshot(
-        String(argv.session),
+        ctx.session,
         logger,
-        argv.page ? String(argv.page) : undefined,
-        argv.objective as string | undefined,
-        argv.context as string | undefined,
+        input.page,
+        input.objective,
+        input.context,
       );
-    },
-  );
+    });
 }

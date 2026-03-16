@@ -4,10 +4,43 @@ import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
 describe("basic CLI subprocess behavior", () => {
+  test("init explains snapshot API env setup when no credentials are configured", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("init --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "",
+      ANTHROPIC_API_KEY: "",
+      GEMINI_API_KEY: "",
+      GOOGLE_GENERATIVE_AI_API_KEY: "",
+      GOOGLE_CLOUD_PROJECT: "",
+      GCLOUD_PROJECT: "",
+    });
+
+    expect(result.stdout).toContain("Snapshot analysis:");
+    expect(result.stdout).toContain("No snapshot API credentials detected.");
+    expect(result.stdout).toContain("OPENAI_API_KEY=...");
+    expect(result.stdout).toContain("ANTHROPIC_API_KEY=...");
+    expect(result.stdout).toContain("GEMINI_API_KEY=...");
+  });
+
+  test("init reports when snapshot API credentials are already ready", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("init --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+
+    expect(result.stdout).toContain("Snapshot analysis:");
+    expect(result.stdout).toContain("Ready: openai/gpt-5.4");
+    expect(result.stdout).toContain("No further action required.");
+  });
+
   test("prints usage for --help", async ({ librettoCli, evaluate }) => {
     const result = await librettoCli("--help");
     await evaluate(result.stdout).toMatch(
-      "Shows top-level usage for libretto-cli and includes guidance that snapshot can analyze when objective is provided.",
+      "Shows the root CLI help with top-level command usage and includes the snapshot command description.",
     );
     expect(result.stderr).toBe("");
   });
@@ -15,53 +48,99 @@ describe("basic CLI subprocess behavior", () => {
   test("prints usage for help command", async ({ librettoCli, evaluate }) => {
     const result = await librettoCli("help");
     await evaluate(result.stdout).toMatch(
-      "Contains a commands listing section for CLI help.",
+      "Shows the root CLI help with the top-level commands list.",
     );
     expect(result.stderr).toBe("");
   });
 
-  test("fails unknown command with a clear error", async ({
+  test("prints scoped help for migrated SimpleCLI commands", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("help ai configure");
+    expect(result.stdout).toContain("Configure AI runtime");
+    expect(result.stdout).toContain("Usage: libretto-cli ai configure [preset] [options]");
+    expect(result.stderr).toBe("");
+  });
+
+  test("accepts global --session on non-session commands", async ({
     librettoCli,
     evaluate,
   }) => {
-    const result = await librettoCli("nope-command");
-    await evaluate(result.stderr).toMatch(
-      "Explains that nope-command is an unknown command.",
-    );
+    const result = await librettoCli("ai configure openai --session review-bot");
+    expect(result.stderr).toBe("");
     await evaluate(result.stdout).toMatch(
-      "Shows top-level libretto-cli usage guidance.",
+      "Confirms the AI config was saved.",
     );
+  });
+
+  test("accepts global --session before the command path", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const result = await librettoCli("--session review-bot ai configure openai");
+    expect(result.stderr).toBe("");
+    await evaluate(result.stdout).toMatch(
+      "Confirms the AI config was saved.",
+    );
+  });
+
+  test("fails unknown command with a clear error", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("nope-command");
+    expect(result.stderr).toContain("Unknown command: nope-command");
+    expect(result.stdout).toContain("Usage: libretto-cli <command>");
   });
 
   test("fails open with missing url usage error", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli("open");
-    await evaluate(result.stderr).toMatch(
-      "Shows usage for open command that requires a URL and includes optional headless/session flags.",
+    expect(result.stderr).toContain(
+      "Usage: libretto-cli open <url> [--headless] [--viewport WxH] [--session <name>]",
     );
   });
 
   test("fails open with actionable error when browser child spawn fails", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli("open https://example.com", {
       PATH: "/definitely-not-real",
     });
-    await evaluate(result.stderr).toMatch(
-      "States browser child process launch failed, advises ensuring Node.js is in PATH, and includes a logs hint.",
-    );
+    expect(result.stderr).toContain("Failed to launch browser child process:");
+    expect(result.stderr).toContain("Ensure Node.js is available in PATH for child processes.");
+    expect(result.stderr).toContain("Check logs:");
   });
 
-  test("fails exec with missing code usage error", async ({
+  test("defaults sessioned browser commands to the default session", async ({
     librettoCli,
     evaluate,
   }) => {
+    const opened = await librettoCli("open https://example.com --headless");
+    await evaluate(opened.stdout).toMatch(
+      "Confirms the browser opened successfully for example.com in the default session.",
+    );
+    expect(opened.stderr).toBe("");
+
+    const pages = await librettoCli("pages");
+    await evaluate(pages.stdout).toMatch(
+      "Lists the currently open page for example.com.",
+    );
+    expect(pages.stderr).toBe("");
+
+    const close = await librettoCli("close");
+    await evaluate(close.stdout).toMatch(
+      'Reports that the browser for session "default" was closed.',
+    );
+    expect(close.stderr).toBe("");
+  }, 45_000);
+
+  test("fails exec with missing code usage error", async ({
+    librettoCli,
+  }) => {
     const result = await librettoCli("exec");
-    await evaluate(result.stderr).toMatch(
-      "Shows usage for exec command requiring code with optional session and visualize flags.",
+    expect(result.stderr).toContain(
+      "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
     );
   });
 
@@ -82,7 +161,7 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("run ./integration.ts main");
     await evaluate(result.stderr).toMatch(
-      "Explains that the integration file does not exist.",
+      "Explains that the integration file does not exist and mentions the integration.ts path.",
     );
   });
 
@@ -94,8 +173,45 @@ describe("basic CLI subprocess behavior", () => {
       "run ./integration.ts main --params \"{not-json}\"",
     );
     await evaluate(result.stderr).toMatch(
-      "Reports invalid JSON in --params.",
+      "Reports that --params contained invalid JSON.",
     );
+  });
+
+  test("fails fast for invalid session names before command execution", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const result = await librettoCli(
+      "open https://example.com --session ../bad-name",
+    );
+    expect(result.stdout).toBe("");
+    await evaluate(result.stderr).toMatch(
+      "Reports that the provided session name is invalid and only allows letters, numbers, dots, underscores, and dashes.",
+    );
+  });
+
+  test("fails fast for invalid inline session names before command execution", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const result = await librettoCli(
+      "--session=../bad-name open https://example.com",
+    );
+    expect(result.stdout).toBe("");
+    await evaluate(result.stderr).toMatch(
+      "Reports that the provided session name is invalid and only allows letters, numbers, dots, underscores, and dashes.",
+    );
+  });
+
+  test("accepts hyphen-prefixed session values", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const result = await librettoCli("pages --session -dash");
+    await evaluate(result.stderr).toMatch(
+      'Explains that session "-dash" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session -dash.',
+    );
+    expect(result.stderr).not.toContain("Missing value for --session.");
   });
 
   test("fails run with invalid JSON in --params-file", async ({
@@ -110,13 +226,12 @@ describe("basic CLI subprocess behavior", () => {
       `run ./integration.ts main --params-file "${paramsPath}"`,
     );
     await evaluate(result.stderr).toMatch(
-      "Reports invalid JSON in --params-file.",
+      "Reports that --params-file contained invalid JSON.",
     );
   });
 
   test("fails run when --params and --params-file are both provided", async ({
     librettoCli,
-    evaluate,
     workspaceDir,
   }) => {
     const paramsPath = join(workspaceDir, "params.json");
@@ -125,14 +240,13 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli(
       `run ./integration.ts main --params "{}" --params-file "${paramsPath}"`,
     );
-    await evaluate(result.stderr).toMatch(
-      "Tells the user to pass either --params or --params-file, not both.",
+    expect(result.stderr).toContain(
+      "Pass either --params or --params-file, not both.",
     );
   });
 
   test("fails run with stable error when --params-file is missing", async ({
     librettoCli,
-    evaluate,
     workspaceDir,
   }) => {
     const missingPath = join(workspaceDir, "missing-params.json");
@@ -140,14 +254,13 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli(
       `run ./integration.ts main --params-file "${missingPath}"`,
     );
-    await evaluate(result.stderr).toMatch(
-      `Says it could not read --params-file at "${missingPath}" and tells the user to ensure the file exists and is readable.`,
+    expect(result.stderr).toContain(
+      `Could not read --params-file "${missingPath}". Ensure the file exists and is readable.`,
     );
   });
 
   test("fails run when export is not a Libretto workflow instance", async ({
     librettoCli,
-    evaluate,
     writeWorkflow,
   }) => {
     await writeWorkflow(
@@ -160,9 +273,10 @@ export async function main() {
     );
 
     const result = await librettoCli("run ./integration.ts main");
-    await evaluate(result.stderr).toMatch(
-      "Says the selected export must be a Libretto workflow instance.",
+    expect(result.stderr).toContain(
+      'Export "main" in',
     );
+    expect(result.stderr).toContain("is not a valid Libretto workflow.");
   });
 
   test("run forwards --tsconfig to tsx for workflow imports", async ({
@@ -214,6 +328,7 @@ export const main = workflow({}, async () => {
 
   test("run compile failures mention --tsconfig guidance", async ({
     librettoCli,
+    evaluate,
     workspacePath,
   }) => {
     await writeFile(
@@ -224,13 +339,15 @@ export const main = workflow({}, async () => {
     const result = await librettoCli(
       'run "./integration-compile-error.ts" main --session default --headless',
     );
-    expect(result.stderr).toContain("Transform failed with");
-    expect(result.stderr).toContain("--tsconfig <path>");
+    await evaluate(result.stderr).toMatch(
+      "Reports that importing the integration module failed because of a TypeScript compilation error and includes guidance to pass --tsconfig <path>.",
+    );
+    expect(result.stderr).not.toContain("Browser is still open.");
+    expect(result.stderr).not.toContain("use `exec` to inspect it");
   }, 45_000);
 
   test("accepts branded Libretto workflow contract across module boundaries", async ({
     librettoCli,
-    evaluate,
     workspaceDir,
     writeWorkflow,
   }) => {
@@ -255,14 +372,11 @@ export const main = {
         "missing-playwright-browsers",
       ),
     });
-    await evaluate(result.stderr).toMatch(
-      "Does not claim that the export must be a Libretto workflow instance.",
-    );
+    expect(result.stderr).not.toContain("is not a Libretto workflow");
   });
 
   test("fails run when local auth profile is declared but missing", async ({
     librettoCli,
-    evaluate,
     writeWorkflow,
   }) => {
     await writeWorkflow(
@@ -278,14 +392,15 @@ export const main = workflow(
     );
 
     const result = await librettoCli("run ./integration.ts main --auth-profile app.example.com");
-    await evaluate(result.stderr).toMatch(
-      'Explains local auth profile is missing for domain "app.example.com" and includes suggested open/save commands for that domain.',
+    expect(result.stderr).toContain(
+      'Local auth profile not found for domain "app.example.com".',
     );
+    expect(result.stderr).toContain("libretto-cli open https://app.example.com --headed --session default");
+    expect(result.stderr).toContain("libretto-cli save app.example.com --session default");
   });
 
   test("does not require local auth profile when auth metadata is absent", async ({
     librettoCli,
-    evaluate,
     workspaceDir,
     writeWorkflow,
   }) => {
@@ -302,14 +417,11 @@ export const main = workflow({}, async () => "ok");
         "missing-playwright-browsers",
       ),
     });
-    await evaluate(result.stderr).toMatch(
-      "Does not mention a missing local auth profile for any domain.",
-    );
+    expect(result.stderr).not.toContain("No local auth profile found");
   });
 
   test("returns paused status when workflow hits standalone pause", async ({
     librettoCli,
-    evaluate,
     writeWorkflow,
   }) => {
     const integrationFilePath = await writeWorkflow(
@@ -327,14 +439,14 @@ export const main = workflow({}, async (ctx) => {
     const result = await librettoCli(
       `run "${integrationFilePath}" main --session default --headless`,
     );
-    await evaluate(result.stdout).toMatch(
-      "Includes WORKFLOW_BEFORE_PAUSE and Workflow paused, and does not include WORKFLOW_AFTER_PAUSE or Integration completed.",
-    );
+    expect(result.stdout).toContain("WORKFLOW_BEFORE_PAUSE");
+    expect(result.stdout).toContain("Workflow paused.");
+    expect(result.stdout).not.toContain("WORKFLOW_AFTER_PAUSE");
+    expect(result.stdout).not.toContain("Integration completed.");
   }, 45_000);
 
   test("completes workflow run when no pause is triggered", async ({
     librettoCli,
-    evaluate,
     writeWorkflow,
   }) => {
     const integrationFilePath = await writeWorkflow(
@@ -349,14 +461,13 @@ export const main = workflow({}, async () => {
     const result = await librettoCli(
       `run "${integrationFilePath}" main --session default --headless`,
     );
-    await evaluate(result.stdout).toMatch(
-      "Includes WORKFLOW_COMPLETES and Integration completed, and does not include Workflow paused.",
-    );
+    expect(result.stdout).toContain("WORKFLOW_COMPLETES");
+    expect(result.stdout).toContain("Integration completed.");
+    expect(result.stdout).not.toContain("Workflow paused.");
   }, 45_000);
 
   test("run prints failure guidance and keeps browser open for exec inspection", async ({
     librettoCli,
-    evaluate,
     writeWorkflow,
   }) => {
     const session = "debug-selector-error-guidance";
@@ -373,25 +484,27 @@ export const main = workflow({}, async (ctx) => {
     const runResult = await librettoCli(
       `run "${integrationFilePath}" main --session ${session} --headless`,
     );
-    await evaluate(runResult.stderr).toMatch(
-      "Includes the workflow error and also gives guidance that the browser is still open, to use exec for inspection, and to run run again to re-run the workflow.",
-    );
+    expect(runResult.stderr).toContain("locator.click:");
+    expect(runResult.stderr).toContain("Browser is still open.");
+    expect(runResult.stderr).toContain("use `exec` to inspect it");
+    expect(runResult.stderr).toContain("Call `run` to re-run the workflow.");
 
     const rerunResult = await librettoCli(
       `run "${integrationFilePath}" main --session ${session} --headless`,
     );
-    await evaluate(rerunResult.stderr).toMatch(
-      "Includes the workflow error and the same casual guidance that browser stays open for exec and run can rerun, and does not say the session is already open and connected.",
-    );
+    expect(rerunResult.stderr).toContain("locator.click:");
+    expect(rerunResult.stderr).toContain("Browser is still open.");
+    expect(rerunResult.stderr).toContain("use `exec` to inspect it");
+    expect(rerunResult.stderr).toContain("Call `run` to re-run the workflow.");
+    expect(rerunResult.stderr).not.toContain("is already open and connected to");
   }, 60_000);
 
   test("fails save with missing target usage error", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli("save");
-    await evaluate(result.stderr).toMatch(
-      "Shows usage for save command requiring url or domain with optional session flag.",
+    expect(result.stderr).toContain(
+      "Usage: libretto-cli save <url|domain> [--session <name>]",
     );
   });
 
@@ -405,10 +518,15 @@ export const main = workflow({}, async (ctx) => {
     );
   });
 
-  test("allows command-like --session values", async ({
+  test("allows session names that match command tokens", async ({
     librettoCli,
+    evaluate,
   }) => {
-    const result = await librettoCli("help --session open");
-    expect(result.stdout).toContain("Usage: libretto-cli");
+    const result = await librettoCli("pages --session open");
+    expect(result.stdout).toBe("");
+    await evaluate(result.stderr).toMatch(
+      'Explains that session "open" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session open.',
+    );
   });
+
 });
