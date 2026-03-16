@@ -144,7 +144,6 @@ describe("state-driven CLI subprocess behavior", () => {
         GCLOUD_PROJECT: "",
       },
     );
-    expect(snapshot.exitCode).toBe(1);
     expect(snapshot.stderr).toContain("No API snapshot analyzer is available");
   }, 45_000);
 

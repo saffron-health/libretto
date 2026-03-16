@@ -163,7 +163,7 @@ async function runInteractiveApiSetup(): Promise<void> {
     if (envContent.includes(`${selected.envVar}=`)) {
       const updated = envContent.replace(
         new RegExp(`^${selected.envVar}=.*$`, "m"),
-        envLine,
+        () => envLine,
       );
       writeFileSync(envPath, updated);
       console.log(`\n  \u2713 Updated ${selected.envVar} in ${envPath}`);
