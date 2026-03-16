@@ -41,7 +41,6 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("OPENAI_API_KEY=...");
     expect(result.stdout).toContain("ANTHROPIC_API_KEY=...");
     expect(result.stdout).toContain("GEMINI_API_KEY=...");
-    expect(result.stdout).toContain("npx libretto ai configure");
   });
 
   test("init reports when snapshot API credentials are already ready", async ({

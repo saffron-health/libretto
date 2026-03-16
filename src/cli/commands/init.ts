@@ -4,7 +4,6 @@ import { existsSync, readFileSync, appendFileSync, writeFileSync } from "node:fs
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import {
-  formatCommandPrefix,
   readAiConfig,
 } from "../core/ai-config.js";
 import { REPO_ROOT } from "../core/context.js";
@@ -186,26 +185,6 @@ async function runInteractiveApiSetup(): Promise<void> {
   }
 }
 
-function printCliFallbackSetup(): void {
-  const config = readAiConfig();
-
-  console.log("\nCLI agent fallback (spawns a coding agent process instead of a direct API call):");
-  if (!config) {
-    console.log("  No CLI agent configured.");
-    console.log(
-      "  Optional: run `npx libretto ai configure <codex|claude|gemini|google-vertex-ai>` to set one up.",
-    );
-    return;
-  }
-
-  console.log(
-    `  \u2713 ${config.preset}: ${formatCommandPrefix(config.commandPrefix)}`,
-  );
-  console.log(
-    "    Used as fallback when API credentials are unavailable.",
-  );
-}
-
 function installBrowsers(): void {
   console.log("\nInstalling Playwright Chromium...");
   const result = spawnSync("npx", ["playwright", "install", "chromium"], {
@@ -247,8 +226,6 @@ export function registerInitCommand(yargs: Argv): Argv {
       } else {
         printSnapshotApiStatus();
       }
-
-      printCliFallbackSetup();
 
       console.log("\n\u2713 libretto init complete");
     },
