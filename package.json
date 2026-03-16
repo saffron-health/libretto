@@ -14,7 +14,8 @@
   },
   "files": [
     "dist",
-    "skills/libretto"
+    "skills/libretto",
+    "scripts/postinstall.mjs"
   ],
   "bin": {
     "libretto": "./dist/cli/index.js",
@@ -28,7 +29,7 @@
     }
   },
   "scripts": {
-    "postinstall": "playwright install chromium",
+    "postinstall": "node ./scripts/postinstall.mjs && playwright install chromium",
     "build": "pnpm run build:runtime && pnpm run build:cli",
     "build:runtime": "tsup --config tsup.config.ts",
     "build:cli": "tsup --config tsup.cli.config.ts",
