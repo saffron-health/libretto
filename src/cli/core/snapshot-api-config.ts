@@ -7,7 +7,6 @@ import {
 import { LIBRETTO_CONFIG_PATH, REPO_ROOT } from "./context.js";
 import {
 	hasProviderCredentials,
-	missingProviderCredentialsMessage,
 	parseModel,
 	type Provider,
 } from "../../shared/llm/client.js";
@@ -37,46 +36,16 @@ export class SnapshotApiUnavailableError extends Error {
 	}
 }
 
-function formatIndented(lines: readonly string[], indent = "  "): string {
-	return lines.map((line) => `${indent}${line}`).join("\n");
-}
-
-function configuredSourceDescription(
-	source: SnapshotApiModelSelection["source"],
-): string {
-	switch (source) {
-		case "config":
-			return LIBRETTO_CONFIG_PATH;
-		case "env:auto-openai":
-		case "env:auto-anthropic":
-		case "env:auto-google":
-		case "env:auto-vertex":
-			return "process env / .env auto-detection";
-	}
-}
-
-function providerSetupLines(provider: Provider): string[] {
+function providerSetupSentence(provider: Provider): string {
 	switch (provider) {
 		case "openai":
-			return [
-				"Set OPENAI_API_KEY in your shell or .env file.",
-				"Example: OPENAI_API_KEY=...",
-			];
+			return "Add OPENAI_API_KEY to .env or as a shell environment variable.";
 		case "anthropic":
-			return [
-				"Set ANTHROPIC_API_KEY in your shell or .env file.",
-				"Example: ANTHROPIC_API_KEY=...",
-			];
+			return "Add ANTHROPIC_API_KEY to .env or as a shell environment variable.";
 		case "google":
-			return [
-				"Set GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY in your shell or .env file.",
-				"Example: GEMINI_API_KEY=...",
-			];
+			return "Add GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY to .env or as a shell environment variable.";
 		case "vertex":
-			return [
-				"Set GOOGLE_CLOUD_PROJECT (or GCLOUD_PROJECT).",
-				"Then run: gcloud auth application-default login",
-			];
+			return "Add GOOGLE_CLOUD_PROJECT or GCLOUD_PROJECT to .env or as a shell environment variable, and make sure application default credentials are configured.";
 	}
 }
 
@@ -84,52 +53,39 @@ function defaultModelCommandLine(): string {
 	return "npx libretto ai configure openai | anthropic | gemini | vertex";
 }
 
+function providerMissingCredentialSummary(provider: Provider): string {
+	switch (provider) {
+		case "openai":
+			return "OPENAI_API_KEY is missing";
+		case "anthropic":
+			return "ANTHROPIC_API_KEY is missing";
+		case "google":
+			return "GEMINI_API_KEY and GOOGLE_GENERATIVE_AI_API_KEY are missing";
+		case "vertex":
+			return "GOOGLE_CLOUD_PROJECT and GCLOUD_PROJECT are missing";
+	}
+}
+
 function noSnapshotApiConfiguredMessage(): string {
 	return [
-		"No API snapshot analyzer is configured.",
-		"",
-		"Libretto checks for:",
-		formatIndented([
-			`a default model in ${LIBRETTO_CONFIG_PATH}`,
-			"provider credentials in process env or .env",
-		]),
-		"",
-		"To enable snapshot analysis:",
-		formatIndented([
-			"1. Add one provider credential:",
-			"   OPENAI_API_KEY=...",
-			"   ANTHROPIC_API_KEY=...",
-			"   GEMINI_API_KEY=...  # or GOOGLE_GENERATIVE_AI_API_KEY",
-			"   GOOGLE_CLOUD_PROJECT=...  # plus gcloud application-default login for Vertex",
-			"2. (Optional) Choose a default model:",
-			`   ${defaultModelCommandLine()}`,
-		]),
-		"",
-		"Then rerun:",
-		'  npx libretto snapshot --objective "<your objective>"',
-	].join("\n");
+		"Failed to analyze snapshot because no snapshot analyzer is configured.",
+		`Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_CLOUD_PROJECT to .env or as a shell environment variable, or choose a default model with \`${defaultModelCommandLine()}\`.`,
+		"For more info, run `npx libretto init`.",
+	].join(" ");
 }
 
 function missingProviderSnapshotMessage(
 	selection: SnapshotApiModelSelection,
 ): string {
+	const configuredSource =
+		selection.source === "config"
+			? ` in ${LIBRETTO_CONFIG_PATH}`
+			: " from process env or .env";
 	return [
-		`Snapshot analysis is configured to use ${selection.model} (${configuredSourceDescription(selection.source)}),`,
-		`but ${missingProviderCredentialsMessage(selection.provider)}`,
-		"",
-		"To fix it:",
-		formatIndented([
-			"1. Add the missing provider credential:",
-			...providerSetupLines(selection.provider).map((line) => `   ${line}`),
-			"2. Or switch the default model:",
-			`   ${defaultModelCommandLine()}`,
-			"3. Or clear the default model and rely on env auto-detection:",
-			"   npx libretto ai configure --clear",
-		]),
-		"",
-		"Then rerun:",
-		'  npx libretto snapshot --objective "<your objective>"',
-	].join("\n");
+		`Failed to analyze snapshot because ${selection.provider} is configured${configuredSource}, but ${providerMissingCredentialSummary(selection.provider)}.`,
+		providerSetupSentence(selection.provider),
+		"For more info, run `npx libretto init`.",
+	].join(" ");
 }
 
 function readWorktreeEnvPath(): string | null {

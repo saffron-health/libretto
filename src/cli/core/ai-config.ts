@@ -65,8 +65,22 @@ function formatConfigIssues(error: z.ZodError): string {
     .join("\n");
 }
 
-function formatExpectedConfigShape(): string {
-  return JSON.stringify(z.toJSONSchema(LibrettoConfigSchema), null, 2);
+function formatExpectedConfigExample(): string {
+  return JSON.stringify(
+    {
+      version: CURRENT_CONFIG_VERSION,
+      ai: {
+        model: "openai/gpt-5.4",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      viewport: {
+        width: 1280,
+        height: 800,
+      },
+    },
+    null,
+    2,
+  );
 }
 
 function invalidConfigError(configPath: string, detail?: string): Error {
@@ -74,12 +88,12 @@ function invalidConfigError(configPath: string, detail?: string): Error {
     [
       `AI config is invalid at ${configPath}.`,
       detail ? `Problems:\n${detail}` : null,
-      "Expected JSON schema:",
-      formatExpectedConfigShape(),
+      "Expected config example:",
+      formatExpectedConfigExample(),
       "Notes:",
       '  - "ai" and "viewport" are optional.',
       '  - "ai.model" must be a provider/model string like "openai/gpt-5.4" or "anthropic/claude-sonnet-4-6".',
-      "Fix the file to match this schema, or delete it and rerun:",
+      "Fix the file to match this shape, or delete it and rerun:",
       `  npx libretto ai configure ${formatConfigureProviders()}`,
     ].filter(Boolean).join("\n"),
   );
