@@ -429,7 +429,7 @@ export const main = workflow({}, async () => "ok");
       `
 export const main = workflow({}, async (ctx) => {
   console.log("WORKFLOW_BEFORE_PAUSE");
-  await pause();
+  await pause("default");
   console.log("WORKFLOW_AFTER_PAUSE");
 });
 `,
@@ -443,6 +443,30 @@ export const main = workflow({}, async (ctx) => {
     expect(result.stdout).toContain("Workflow paused.");
     expect(result.stdout).not.toContain("WORKFLOW_AFTER_PAUSE");
     expect(result.stdout).not.toContain("Integration completed.");
+  }, 45_000);
+
+  test("pause reports running sessions when session id is missing", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const integrationFilePath = await writeWorkflow(
+      "integration-pause-missing-session.mjs",
+      `
+export const main = workflow({}, async () => {
+  await pause("");
+});
+`,
+      ["workflow", "pause"],
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" main --session default --headless`,
+    );
+    expect(result.stderr).toContain(
+      "pause(session) requires a non-empty session ID.",
+    );
+    expect(result.stderr).toContain("Running sessions:");
+    expect(result.stderr).toContain("default");
   }, 45_000);
 
   test("completes workflow run when no pause is triggered", async ({

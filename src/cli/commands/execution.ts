@@ -417,7 +417,7 @@ async function runResume(
 
   if (!existsSync(pausedSignalPath)) {
     throw new Error(
-      `Session "${session}" is not paused. Run "libretto-cli run ... --session ${session}" and call pause() first.`,
+      `Session "${session}" is not paused. Run "libretto-cli run ... --session ${session}" and call pause("${session}") first.`,
     );
   }
 

@@ -7,7 +7,6 @@ import {
   launchBrowser,
   type LibrettoWorkflowContext,
 } from "../../index.js";
-import { setSessionForPause } from "../../shared/debug/pause.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { parseSessionStateContent } from "../../shared/state/index.js";
 import { getProfilePath, normalizeDomain } from "../core/browser.js";
@@ -257,9 +256,6 @@ async function runIntegrationInternal(
       appendFileSync(networkLogPath, JSON.stringify(entry) + "\n");
     },
   });
-
-  // Make session available to standalone pause() before running the workflow.
-  setSessionForPause(args.session);
 
   const workflowContext: LibrettoWorkflowContext = {
     logger: integrationLogger,
