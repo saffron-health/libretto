@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline";
-import { appendFileSync, cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -271,6 +271,10 @@ async function copySkills(): Promise<void> {
   }
 
   for (const { name, skillDest } of agentDirs) {
+    // Remove existing dir first so stale files from prior versions don't persist
+    if (existsSync(skillDest)) {
+      rmSync(skillDest, { recursive: true });
+    }
     cpSync(sourceDir, skillDest, { recursive: true });
     const fileCount = readdirSync(skillDest).length;
     console.log(`  ✓ Copied ${fileCount} skill files to ${name}/skills/libretto/`);
