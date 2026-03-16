@@ -2,7 +2,7 @@ import type z from "zod";
 
 export type MessageContentPart =
 	| { type: "text"; text: string }
-	| { type: "image"; image: string };
+	| { type: "image"; image: string | Uint8Array; mediaType?: string };
 
 export type Message = {
 	role: "user" | "assistant";
@@ -40,7 +40,7 @@ export interface LLMClient {
 		prompt: string;
 		schema: T;
 		temperature?: number;
-	}): Promise<z.infer<T>>;
+	}): Promise<z.output<T>>;
 
 	/**
 	 * Generate a structured object from a conversation-style message array.
@@ -59,5 +59,5 @@ export interface LLMClient {
 		messages: Message[];
 		schema: T;
 		temperature?: number;
-	}): Promise<z.infer<T>>;
+	}): Promise<z.output<T>>;
 }

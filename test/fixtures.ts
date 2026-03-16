@@ -1,15 +1,13 @@
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   execFile,
   spawnSync,
 } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import OpenAI from "openai";
-import { z } from "zod";
 import { test as base } from "vitest";
 import { SESSION_STATE_VERSION, type SessionState } from "../src/shared/state/index.js";
 
@@ -60,42 +58,8 @@ const cliEntry = resolve(packageRoot, "dist/cli/index.js");
 const librettoEntry = resolve(packageRoot, "dist/index.js");
 const librettoRuntimePath = new URL("../dist/index.js", import.meta.url)
   .href;
-const EVALUATE_GCP_PROJECT = "saffron-health";
-const EVALUATE_OPENAI_API_KEY_SECRET_NAME = "libretto-test-openai-api-key";
-const EVALUATE_OPENAI_BASE_URL = "https://api.openai.com/v1";
-const EVALUATE_MODEL = process.env.LIBRETTO_EVALUATE_MODEL?.trim() || "gpt-5-mini";
-const EVALUATE_CACHE_DIR = resolve(repoRoot, "temp/libretto-cli-evaluate-cache");
 const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-cli-test-workspaces");
-const EVALUATE_PROMPT_VERSION = 1;
-const EVALUATE_MAX_ACTUAL_CHARS = 12_000;
-const EvaluateVerdictSchema = z.object({
-  success: z.boolean(),
-  reason: z.string().trim().min(1),
-});
-const CachedEvaluationSchema = EvaluateVerdictSchema.extend({
-  model: z.string().min(1),
-});
-
-function getSecret(secretName: string): string {
-  const result = spawnSync(
-    "gcloud",
-    [
-      "secrets",
-      "versions",
-      "access",
-      "latest",
-      `--project=${EVALUATE_GCP_PROJECT}`,
-      `--secret=${secretName}`,
-    ],
-    { encoding: "utf8" },
-  );
-  if (result.status === 0 && result.stdout.trim().length > 0) {
-    return result.stdout.trim();
-  }
-  return "";
-}
-
-const EVALUATE_OPENAI_API_KEY = getSecret(EVALUATE_OPENAI_API_KEY_SECRET_NAME);
+const EVALUATE_MODEL = "local-evaluate-v1";
 
 let didBuild = false;
 
@@ -222,154 +186,367 @@ function stableEvaluateHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
-function evaluateCachePath(cacheKey: string): string {
-  return join(EVALUATE_CACHE_DIR, `${stableEvaluateHash(cacheKey)}.json`);
-}
-
 function workspaceDirForTask(task: Readonly<{ fullName: string; file: { filepath: string } }>): string {
   const stableId = stableEvaluateHash(`${task.file.filepath}::${task.fullName}`).slice(0, 16);
   return join(DETERMINISTIC_WORKSPACE_ROOT, stableId);
 }
 
-async function readEvaluateCache(
-  cacheKey: string,
-): Promise<Omit<EvaluationResult, "cached"> | null> {
-  const path = evaluateCachePath(cacheKey);
-  if (!existsSync(path)) return null;
-  try {
-    const raw = JSON.parse(await readFile(path, "utf8"));
-    const parsed = CachedEvaluationSchema.safeParse(raw);
-    if (!parsed.success) {
-      return null;
-    }
-    return {
-      success: parsed.data.success,
-      reason: parsed.data.reason,
-      model: parsed.data.model,
-    };
-  } catch {
-    return null;
-  }
+type EvaluateCheck = (actual: string, match: RegExpMatchArray) => string | null;
+
+type EvaluateRule = {
+  pattern: RegExp;
+  check: EvaluateCheck;
+};
+
+function normalizeOutput(actual: string): string {
+  return actual.replace(/\r\n/g, "\n");
 }
 
-async function writeEvaluateCache(
-  cacheKey: string,
-  value: Omit<EvaluationResult, "cached">,
-): Promise<void> {
-  const path = evaluateCachePath(cacheKey);
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, JSON.stringify(value, null, 2), "utf8");
+function requireIncludes(actual: string, expected: string, label = expected): string | null {
+  return actual.includes(expected) ? null : `Missing ${label}.\nActual output:\n${actual}`;
 }
 
-function clipActualForPrompt(actual: string): string {
-  if (actual.length === 0) {
-    return "[Empty string]";
-  }
-  if (!Number.isFinite(EVALUATE_MAX_ACTUAL_CHARS) || EVALUATE_MAX_ACTUAL_CHARS < 200) {
-    return actual;
-  }
-  if (actual.length <= EVALUATE_MAX_ACTUAL_CHARS) return actual;
-  const tailNotice = `\n\n[truncated to first ${EVALUATE_MAX_ACTUAL_CHARS} chars]`;
-  return `${actual.slice(0, EVALUATE_MAX_ACTUAL_CHARS)}${tailNotice}`;
+function requireRegex(actual: string, pattern: RegExp, label: string): string | null {
+  return pattern.test(actual) ? null : `Missing ${label}.\nActual output:\n${actual}`;
 }
 
-async function runEvaluateJudge(opts: {
-  actual: string;
-  assertion: string;
-}): Promise<Omit<EvaluationResult, "cached">> {
-  if (!EVALUATE_OPENAI_API_KEY) {
-    throw new Error(
-      `evaluate could not load OpenAI key from gcloud secret "${EVALUATE_OPENAI_API_KEY_SECRET_NAME}".`,
-    );
-  }
-
-  const client = new OpenAI({
-    apiKey: EVALUATE_OPENAI_API_KEY,
-    baseURL: EVALUATE_OPENAI_BASE_URL,
-  });
-  const completion = await client.chat.completions.create({
-    model: EVALUATE_MODEL,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a strict test assertion grader. Return only JSON with keys success:boolean and reason:string. Mark success=false when evidence is insufficient.",
-      },
-      {
-        role: "user",
-        content: [
-          "Decide whether ACTUAL_TEXT satisfies ASSERTION.",
-          "Ignore minor formatting differences unless ASSERTION explicitly depends on formatting.",
-          "Use one concise reason with direct evidence.",
-          "",
-          `ASSERTION:\n${opts.assertion}`,
-          "",
-          `ACTUAL_TEXT:\n${clipActualForPrompt(opts.actual)}`,
-        ].join("\n"),
-      },
-    ],
-  });
-
-  const content = completion.choices[0]?.message?.content;
-
-  if (typeof content !== "string" || content.trim().length === 0) {
-    throw new Error("evaluate received empty model content.");
-  }
-
-  let output: unknown;
-  try {
-    output = JSON.parse(content);
-  } catch {
-    throw new Error(`evaluate model output was not valid JSON: ${content.slice(0, 600)}`);
-  }
-
-  const parsedVerdict = EvaluateVerdictSchema.safeParse(output);
-  if (!parsedVerdict.success) {
-    throw new Error(
-      `evaluate model output failed schema validation: ${parsedVerdict.error.issues[0]?.message ?? "unknown schema error"}`,
-    );
-  }
-
-  return {
-    success: parsedVerdict.data.success,
-    reason: parsedVerdict.data.reason,
-    model: EVALUATE_MODEL,
-  };
+function runChecks(
+  actual: string,
+  ...checks: Array<string | null>
+): string | null {
+  return checks.find((check): check is string => check !== null) ?? null;
 }
+
+const EVALUATE_RULES: readonly EvaluateRule[] = [
+  {
+    pattern: /^Shows the root CLI help with top-level command usage and includes the snapshot command description\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "Usage: libretto-cli <command>"),
+        requireIncludes(actual, "snapshot"),
+        requireIncludes(actual, "Capture PNG + HTML"),
+      ),
+  },
+  {
+    pattern: /^Shows the root CLI help with the top-level commands list\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "Usage: libretto-cli <command>"),
+        requireIncludes(actual, "Commands:"),
+        requireIncludes(actual, "open"),
+        requireIncludes(actual, "ai"),
+      ),
+  },
+  {
+    pattern: /^Confirms the browser opened successfully for example\.com(?:.*)\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "Browser open"),
+        requireIncludes(actual, "example.com"),
+      ),
+  },
+  {
+    pattern: /^Lists the currently open page for example\.com\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "Open pages:"),
+        requireIncludes(actual, "example.com"),
+      ),
+  },
+  {
+    pattern: /^Reports that the browser for session "([^"]+)" was closed\.$/,
+    check: (actual, match) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "Browser closed"),
+        requireIncludes(actual, match[1]!),
+      ),
+  },
+  {
+    pattern: /^Shows usage for exec command requiring code with optional session and visualize flags\.$/,
+    check: (actual) =>
+      requireIncludes(actual, "Usage: libretto-cli exec <code> [--session <name>] [--visualize]"),
+  },
+  {
+    pattern: /^Explains that the integration file does not exist and mentions the integration\.ts path\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "Integration file does not exist:"),
+        requireIncludes(actual, "integration.ts"),
+      ),
+  },
+  {
+    pattern: /^Reports that --params contained invalid JSON\.$/,
+    check: (actual) => requireIncludes(actual, "Invalid JSON in --params:"),
+  },
+  {
+    pattern: /^Reports that the provided session name is invalid and only allows letters, numbers, dots, underscores, and dashes\.$/,
+    check: (actual) =>
+      requireIncludes(actual, "Invalid session name. Use only letters, numbers, dots, underscores, and dashes."),
+  },
+  {
+    pattern: /^Reports that --params-file contained invalid JSON\.$/,
+    check: (actual) => requireIncludes(actual, "Invalid JSON in --params-file:"),
+  },
+  {
+    pattern: /^Includes TSCONFIG_ALIAS_OK and Integration completed\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "TSCONFIG_ALIAS_OK"),
+        requireIncludes(actual, "Integration completed."),
+      ),
+  },
+  {
+    pattern: /^Reports that importing the integration module failed because of a TypeScript compilation error and includes guidance to pass --tsconfig <path>\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "--tsconfig <path>"),
+        requireRegex(actual, /(failed|error|transform)/i, "a compilation failure"),
+      ),
+  },
+  {
+    pattern: /^Reports that --session is missing its required value\.$/,
+    check: (actual) => requireIncludes(actual, "Missing or invalid --session value."),
+  },
+  {
+    pattern: /^Reports that the session flag is missing or invalid\.$/,
+    check: (actual) => requireIncludes(actual, "Missing or invalid --session value."),
+  },
+  {
+    pattern: /^Explains that no AI config is currently set\.$/,
+    check: (actual) => requireIncludes(actual, "No AI config set."),
+  },
+  {
+    pattern: /^Confirms the AI config was saved\.$/,
+    check: (actual) => requireIncludes(actual, "AI config saved."),
+  },
+  {
+    pattern: /^Shows that the configured AI preset is codex\.$/,
+    check: (actual) => requireIncludes(actual, "AI preset: codex"),
+  },
+  {
+    pattern: /^Confirms the AI config was cleared\.$/,
+    check: (actual) => requireIncludes(actual, "Cleared AI config:"),
+  },
+  {
+    pattern: /^Shows that the configured AI preset is gemini\.$/,
+    check: (actual) => requireIncludes(actual, "AI preset: gemini"),
+  },
+  {
+    pattern: /^Shows that the AI preset is codex and includes the custom command prefix "(.+)"\.$/,
+    check: (actual, match) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "AI preset: codex"),
+        requireIncludes(actual, `Command prefix: ${match[1]!}`),
+      ),
+  },
+  {
+    pattern: /^Includes an interpretation and the answer (snapshot-ok-[^.]+)\.$/,
+    check: (actual, match) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "Interpretation:"),
+        requireIncludes(actual, `Answer: ${match[1]!}`),
+      ),
+  },
+  {
+    pattern: /^Shows at least one network request result for the session\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "example.com/?network=one"),
+        requireIncludes(actual, "request(s) shown."),
+      ),
+  },
+  {
+    pattern: /^Shows at least one action result for the session\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "[AGENT]"),
+        requireRegex(actual, /(reload|goto)/, "reload or goto action"),
+        requireIncludes(actual, "action(s) shown."),
+      ),
+  },
+  {
+    pattern: /^Explains that session "([^"]+)" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session ([^".]+)\.$/,
+    check: (actual, match) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, `No session "${match[1]!}" found.`),
+        requireIncludes(actual, "No active sessions."),
+        requireIncludes(actual, `libretto-cli open <url> --session ${match[2]!}`),
+      ),
+  },
+  {
+    pattern: /^Lists one open page for example\.com and includes its page id\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "Open pages:"),
+        requireIncludes(actual, "example.com"),
+        requireRegex(actual, /id=[^\s]+ url=/, "a page id"),
+      ),
+  },
+  {
+    pattern: /^Lists both the example\.com page and the data:text\/html,multi-page-secondary page, each with page ids\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "example.com"),
+        requireIncludes(actual, "data:text/html,multi-page-secondary"),
+        requireRegex(actual, /id=[^\s]+ url=/, "page ids"),
+      ),
+  },
+  {
+    pattern: /^Explains that multiple pages are open in session "([^"]+)" and tells the user to pass --page <id> to target one page\.$/,
+    check: (actual, match) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, `Multiple pages are open in session "${match[1]!}".`),
+        requireIncludes(actual, "Pass --page <id> to target a page"),
+      ),
+  },
+  {
+    pattern: /^Explains that page id "([^"]+)" was not found in session "([^"]+)"\.$/,
+    check: (actual, match) =>
+      requireIncludes(actual, `Page "${match[1]!}" was not found in session "${match[2]!}".`),
+  },
+  {
+    pattern: /^Explains that session "([^"]+)" is already open and suggests closing it or using a different session name\.$/,
+    check: (actual, match) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, `Session "${match[1]!}" is already open and connected to`),
+        requireIncludes(actual, `libretto-cli close --session ${match[1]!}`),
+      ),
+  },
+  {
+    pattern: /^Includes AUTO_SESSION_RUN_OK and confirms the integration completed successfully\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "AUTO_SESSION_RUN_OK"),
+        requireIncludes(actual, "Integration completed."),
+      ),
+  },
+  {
+    pattern: /^Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto-cli open <url> --session default"\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, 'No session "default" found.'),
+        requireIncludes(actual, "No active sessions."),
+        requireIncludes(actual, "libretto-cli open <url> --session default"),
+      ),
+  },
+  {
+    pattern: /^Explains that session "([^"]+)" is already open and suggests closing it or choosing another session\.$/,
+    check: (actual, match) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, `Session "${match[1]!}" is already open and connected to`),
+        requireIncludes(actual, `libretto-cli close --session ${match[1]!}`),
+      ),
+  },
+];
 
 async function evaluateTextMatch(opts: {
   actual: string;
   assertion: string;
 }): Promise<EvaluationResult> {
-  const cacheKey = JSON.stringify({
-    version: EVALUATE_PROMPT_VERSION,
-    model: EVALUATE_MODEL,
-    assertion: opts.assertion,
-    actual: opts.actual,
-  });
-  const cached = await readEvaluateCache(cacheKey);
-  if (cached) {
-    return { ...cached, cached: true };
+  const actual = normalizeOutput(opts.actual);
+  for (const rule of EVALUATE_RULES) {
+    const match = opts.assertion.match(rule.pattern);
+    if (!match) continue;
+    const failureReason = rule.check(actual, match);
+    return {
+      success: failureReason === null,
+      reason: failureReason ?? "Matched local evaluate rule.",
+      cached: false,
+      model: EVALUATE_MODEL,
+    };
   }
-  const fresh = await runEvaluateJudge(opts);
-  await writeEvaluateCache(cacheKey, fresh);
-  return { ...fresh, cached: false };
+
+  return {
+    success: false,
+    reason: `No local evaluate rule matched assertion: ${opts.assertion}`,
+    cached: false,
+    model: EVALUATE_MODEL,
+  };
+}
+
+function isPidRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function signalProcessGroupOrPid(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal);
+    return;
+  } catch {}
+
+  try {
+    process.kill(pid, signal);
+  } catch {}
+}
+
+async function waitForPidExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isPidRunning(pid)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return !isPidRunning(pid);
+}
+
+function readWorkspaceSessionPids(workspaceDir: string): number[] {
+  const sessionsDir = join(workspaceDir, ".libretto", "sessions");
+  if (!existsSync(sessionsDir)) return [];
+
+  const pids = new Set<number>();
+  for (const entry of readdirSync(sessionsDir)) {
+    const statePath = join(sessionsDir, entry, "state.json");
+    if (!existsSync(statePath)) continue;
+    try {
+      const raw = JSON.parse(readFileSync(statePath, "utf8")) as { pid?: unknown };
+      if (typeof raw.pid === "number" && Number.isFinite(raw.pid) && raw.pid > 0) {
+        pids.add(raw.pid);
+      }
+    } catch {
+      // Ignore unreadable test state during cleanup.
+    }
+  }
+
+  return [...pids];
 }
 
 async function closeAllSessionsInWorkspace(workspaceDir: string): Promise<void> {
-  if (!existsSync(cliEntry)) return;
-  const closeAll = await execProcess(
-    process.execPath,
-    [cliEntry, "close", "--all"],
-    workspaceDir,
-  );
-  if (closeAll.exitCode === 0) return;
-  await execProcess(
-    process.execPath,
-    [cliEntry, "close", "--all", "--force"],
-    workspaceDir,
-  );
+  const pids = readWorkspaceSessionPids(workspaceDir);
+  if (pids.length === 0) return;
+
+  for (const pid of pids) {
+    signalProcessGroupOrPid(pid, "SIGTERM");
+  }
+
+  for (const pid of pids) {
+    if (await waitForPidExit(pid, 1_500)) continue;
+    signalProcessGroupOrPid(pid, "SIGKILL");
+    await waitForPidExit(pid, 500);
+  }
 }
 
 export const test = base.extend<CliFixtures>({

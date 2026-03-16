@@ -125,7 +125,9 @@ export function maybeConfigureLLMClientFactoryFromEnv(): void {
     process.env.GOOGLE_CLOUD_PROJECT ||
     process.env.GCLOUD_PROJECT ||
     process.env.ANTHROPIC_API_KEY ||
-    process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
   if (!hasAnyCreds) return;
 
