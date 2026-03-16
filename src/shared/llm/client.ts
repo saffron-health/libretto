@@ -38,7 +38,7 @@ export function parseModel(model: string): { provider: Provider; modelId: string
 	const slashIndex = model.indexOf("/");
 	if (slashIndex === -1) {
 		throw new Error(
-			`Invalid model string "${model}". Expected format: "provider/model-id" (for example "openai/gpt-5-mini", "codex/gpt-5-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash", or "vertex/gemini-2.5-flash").`,
+			`Invalid model string "${model}". Expected format: "provider/model-id" (for example "openai/gpt-5.4", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro", or "vertex/gemini-2.5-pro").`,
 		);
 	}
 	const providerInput = model.slice(0, slashIndex).toLowerCase();

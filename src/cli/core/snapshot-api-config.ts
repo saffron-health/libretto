@@ -17,10 +17,10 @@ import {
 export const SNAPSHOT_MODEL_ENV_VAR = "LIBRETTO_SNAPSHOT_MODEL";
 
 const DEFAULT_SNAPSHOT_MODELS = {
-	openai: "openai/gpt-5-mini",
+	openai: "openai/gpt-5.4",
 	anthropic: "anthropic/claude-sonnet-4-6",
-	google: "google/gemini-2.5-flash",
-	vertex: "vertex/gemini-2.5-flash",
+	google: "google/gemini-2.5-pro",
+	vertex: "vertex/gemini-2.5-pro",
 } as const satisfies Record<Provider, string>;
 
 export type SnapshotApiModelSelection = {

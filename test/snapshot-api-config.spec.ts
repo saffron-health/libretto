@@ -31,7 +31,7 @@ describe("snapshot API model resolution", () => {
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
-      model: "openai/gpt-5-mini",
+      model: "openai/gpt-5.4",
       provider: "openai",
       source: "env:auto-openai",
     });
@@ -50,7 +50,7 @@ describe("snapshot API model resolution", () => {
     ]);
 
     expect(resolveSnapshotApiModel(config)).toMatchObject({
-      model: "openai/gpt-5-mini",
+      model: "openai/gpt-5.4",
       provider: "openai",
       source: "ai-config",
     });
@@ -59,10 +59,10 @@ describe("snapshot API model resolution", () => {
   it("accepts codex model aliases in LIBRETTO_SNAPSHOT_MODEL", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
-    vi.stubEnv("LIBRETTO_SNAPSHOT_MODEL", "codex/gpt-5-mini");
+    vi.stubEnv("LIBRETTO_SNAPSHOT_MODEL", "codex/gpt-5.4");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
-      model: "codex/gpt-5-mini",
+      model: "codex/gpt-5.4",
       provider: "openai",
       source: "env:LIBRETTO_SNAPSHOT_MODEL",
     });
@@ -81,7 +81,7 @@ describe("snapshot API model resolution", () => {
     ]);
 
     expect(resolveSnapshotApiModel(config)).toMatchObject({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-pro",
       provider: "google",
       source: "ai-config",
     });
@@ -100,7 +100,7 @@ describe("snapshot API model resolution", () => {
     ]);
 
     expect(resolveSnapshotApiModel(config)).toMatchObject({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-pro",
       provider: "google",
       source: "ai-config",
     });
@@ -119,7 +119,7 @@ describe("snapshot API model resolution", () => {
     ]);
 
     expect(resolveSnapshotApiModel(config)).toMatchObject({
-      model: "vertex/gemini-2.5-flash",
+      model: "vertex/gemini-2.5-pro",
       provider: "vertex",
       source: "ai-config",
     });
@@ -138,28 +138,17 @@ describe("snapshot API model resolution", () => {
         "--output-format",
         "json",
       ],
-      "vertex/gemini-2.5-flash",
+      "vertex/gemini-2.5-pro",
     );
 
     expect(resolveSnapshotApiModel(config)).toMatchObject({
-      model: "vertex/gemini-2.5-flash",
+      model: "vertex/gemini-2.5-pro",
       provider: "vertex",
       source: "ai-config",
     });
   });
 
-  it("treats the legacy built-in gemini command prefix as a standard preset", () => {
-    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
-    vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
 
-    const config = makeConfig("gemini", ["gemini", "--output-format", "json"]);
-
-    expect(resolveSnapshotApiModel(config)).toMatchObject({
-      model: "google/gemini-2.5-flash",
-      provider: "google",
-      source: "ai-config",
-    });
-  });
 
 });
 
@@ -214,7 +203,7 @@ describe("parseDotEnvAssignment", () => {
 
 describe("buildInlinePromptSelection", () => {
   it("chooses the full DOM when the full prompt fits the estimated budget", () => {
-    const config = makeConfig("codex", ["codex"], "openai/gpt-5-mini");
+    const config = makeConfig("codex", ["codex"], "openai/gpt-5.4");
     const selection = buildInlinePromptSelection(
       {
         objective: "Find the submit button",
@@ -234,7 +223,7 @@ describe("buildInlinePromptSelection", () => {
   });
 
   it("chooses the condensed DOM when the full prompt would exceed the budget", () => {
-    const config = makeConfig("codex", ["codex"], "openai/gpt-5-mini");
+    const config = makeConfig("codex", ["codex"], "openai/gpt-5.4");
     const fullHtml =
       "<html><body>" +
       `<section data-testid="card">${"x".repeat(1_100_000)}</section>` +

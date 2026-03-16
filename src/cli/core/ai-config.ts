@@ -208,7 +208,7 @@ function resolveAiConfigurePreset(
     case "google-vertex-ai":
       return {
         preset: "gemini",
-        model: "vertex/gemini-2.5-flash",
+        model: "vertex/gemini-2.5-pro",
       };
     default:
       return null;
