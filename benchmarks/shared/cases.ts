@@ -163,7 +163,7 @@ function buildPrompt(testCase: BrowserBenchmarkCase): string {
     "Do not use curl, raw fetches, search engines, or non-Libretto browser tooling to solve the task.",
     `Use exactly one Libretto session named "${session}".`,
     `Open the site with: pnpm cli open ${testCase.startUrl} --headless --session ${session}`,
-    "If you encounter a CAPTCHA or Cloudflare challenge, wait for the page to finish resolving before taking further actions.",
+    "If you encounter a CAPTCHA or Cloudflare challenge, call the `solve-captcha` tool instead of waiting manually. Pass the session name and the URL/title substring you expect after the challenge, and do not click the challenge UI yourself.",
     `Use pnpm cli snapshot --session ${session} --objective "<...>" at least once before your final answer.`,
     `Before finishing, run: pnpm cli exec --session ${session} "return { url: await page.url(), title: await page.title() }"`,
     `Then close the browser with: pnpm cli close --session ${session}`,

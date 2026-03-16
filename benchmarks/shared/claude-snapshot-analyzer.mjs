@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
@@ -34,15 +35,34 @@ function extractPromptAndScreenshotPath(rawPrompt) {
   };
 }
 
+export async function readPromptInput({
+  argv = process.argv.slice(2),
+  stdin = process.stdin,
+} = {}) {
+  const argvPrompt = argv.join(" ").trim();
+  if (argvPrompt) {
+    return argvPrompt;
+  }
+
+  let stdinPrompt = "";
+  for await (const chunk of stdin) {
+    stdinPrompt += chunk.toString();
+  }
+
+  return stdinPrompt.trim();
+}
+
 async function main() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("Missing ANTHROPIC_API_KEY for benchmark snapshot analysis.");
   }
 
-  const rawPrompt = process.argv.slice(2).join(" ").trim();
+  const rawPrompt = await readPromptInput();
   if (!rawPrompt) {
-    throw new Error("Benchmark snapshot analyzer expected a prompt argument.");
+    throw new Error(
+      "Benchmark snapshot analyzer expected a prompt via argument or stdin.",
+    );
   }
 
   const { prompt, pngPath } = extractPromptAndScreenshotPath(rawPrompt);
@@ -82,8 +102,14 @@ async function main() {
   process.stdout.write(JSON.stringify(result.object));
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
-});
+const isMain =
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  main().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${message}\n`);
+    process.exit(1);
+  });
+}

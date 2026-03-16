@@ -52,6 +52,7 @@ describe("kernel browser session launcher", () => {
 		const connectOverCDP = vi.fn(async () => browser);
 		const installTelemetry = vi.fn(async () => undefined);
 		const writeSessionState = vi.fn();
+		const clearSessionState = vi.fn();
 
 		const result = await createKernelBrowserSession(
 			{
@@ -75,6 +76,7 @@ describe("kernel browser session launcher", () => {
 				},
 				installSessionTelemetryImpl: installTelemetry,
 				writeSessionStateImpl: writeSessionState,
+				clearSessionStateImpl: clearSessionState,
 			},
 		);
 
@@ -106,6 +108,10 @@ describe("kernel browser session launcher", () => {
 			startedAt: "2026-03-13T00:00:00.000Z",
 			status: "active",
 		});
+		expect(writeSessionState.mock.invocationCallOrder[0]).toBeLessThan(
+			goto.mock.invocationCallOrder[0],
+		);
+		expect(clearSessionState).not.toHaveBeenCalled();
 		expect(result.context).toBe(context);
 		expect(result.page).toBe(page);
 
@@ -156,6 +162,7 @@ describe("kernel browser session launcher", () => {
 		const { browser, closeConnection } = createBrowserFixture();
 		const deleteByID = vi.fn(async () => undefined);
 		const writeSessionState = vi.fn();
+		const clearSessionState = vi.fn();
 
 		await expect(
 			createKernelBrowserSession(
@@ -185,6 +192,7 @@ describe("kernel browser session launcher", () => {
 						throw new Error("telemetry failed");
 					}),
 					writeSessionStateImpl: writeSessionState,
+					clearSessionStateImpl: clearSessionState,
 				},
 			),
 		).rejects.toThrow("telemetry failed");
@@ -192,6 +200,7 @@ describe("kernel browser session launcher", () => {
 		expect(closeConnection).toHaveBeenCalledTimes(1);
 		expect(deleteByID).toHaveBeenCalledWith("sess_789");
 		expect(writeSessionState).not.toHaveBeenCalled();
+		expect(clearSessionState).not.toHaveBeenCalled();
 	});
 
 	test("startup cleanup still deletes the kernel session when CDP connect fails", async () => {
@@ -228,5 +237,49 @@ describe("kernel browser session launcher", () => {
 		).rejects.toThrow("cdp connect failed");
 
 		expect(deleteByID).toHaveBeenCalledWith("sess_999");
+	});
+
+	test("clears session state when initial navigation fails after the session is connected", async () => {
+		const { browser, closeConnection, goto } = createBrowserFixture();
+		goto.mockRejectedValueOnce(new Error("navigation failed"));
+		const deleteByID = vi.fn(async () => undefined);
+		const writeSessionState = vi.fn();
+		const clearSessionState = vi.fn();
+
+		await expect(
+			createKernelBrowserSession(
+				{
+					session: "bench-5",
+					url: "https://example.com/start",
+					headless: true,
+					logAction: vi.fn(),
+					logNetwork: vi.fn(),
+				},
+				{
+					kernelClient: {
+						browsers: {
+							create: vi.fn(async () => ({
+								cdp_ws_url: "wss://kernel.example/cdp/session-5",
+								session_id: "sess_111",
+							})),
+							deleteByID,
+						},
+					},
+					chromiumClient: {
+						connectOverCDP: vi.fn(
+							async () => browser as unknown as Browser,
+						) as unknown as (endpoint: string) => Promise<Browser>,
+					},
+					installSessionTelemetryImpl: vi.fn(async () => undefined),
+					writeSessionStateImpl: writeSessionState,
+					clearSessionStateImpl: clearSessionState,
+				},
+			),
+		).rejects.toThrow("navigation failed");
+
+		expect(writeSessionState).toHaveBeenCalledTimes(1);
+		expect(closeConnection).toHaveBeenCalledTimes(1);
+		expect(deleteByID).toHaveBeenCalledWith("sess_111");
+		expect(clearSessionState).toHaveBeenCalledWith("bench-5");
 	});
 });

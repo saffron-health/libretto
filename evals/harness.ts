@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   query,
+  type HookCallbackMatcher,
+  type HookEvent,
+  type McpServerConfig,
   type Options,
   type PermissionMode,
   type NonNullableUsage,
@@ -413,6 +416,8 @@ export type ClaudeEvalHarnessOptions = {
   maxTurns?: number;
   permissionMode?: PermissionMode;
   settingSources?: SettingSource[];
+  mcpServers?: Record<string, McpServerConfig>;
+  hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
 };
 
 export type ClaudeEvalHarnessSendOptions = {
@@ -483,6 +488,8 @@ export class ClaudeEvalHarness {
   private readonly permissionMode: PermissionMode;
   private readonly settingSources: SettingSource[];
   private readonly systemPromptAppend: string;
+  private readonly mcpServers?: Record<string, McpServerConfig>;
+  private readonly hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
   private sessionId: string;
   private hasStarted = false;
   private isClosed = false;
@@ -493,6 +500,8 @@ export class ClaudeEvalHarness {
     this.maxTurns = options.maxTurns ?? 20;
     this.permissionMode = options.permissionMode ?? "bypassPermissions";
     this.settingSources = options.settingSources ?? ["project"];
+    this.mcpServers = options.mcpServers;
+    this.hooks = options.hooks;
     this.systemPromptAppend = [
       "Use the following Libretto skill documentation as in-session guidance.",
       "<libretto_skill>",
@@ -517,6 +526,8 @@ export class ClaudeEvalHarness {
       tools: { type: "preset", preset: "claude_code" },
       settingSources: this.settingSources,
       permissionMode: this.permissionMode,
+      mcpServers: this.mcpServers,
+      hooks: this.hooks,
       systemPrompt: {
         type: "preset",
         preset: "claude_code",

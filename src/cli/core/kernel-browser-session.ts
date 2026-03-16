@@ -5,7 +5,7 @@ import {
 	type BrowserContext,
 	type Page,
 } from "playwright";
-import { writeSessionState } from "./session.js";
+import { clearSessionState, writeSessionState } from "./session.js";
 import { installSessionTelemetry } from "./session-telemetry.js";
 
 export const KERNEL_BENCHMARK_TIMEOUT_SECONDS = 1_800;
@@ -101,6 +101,7 @@ export async function createKernelBrowserSession(
 		chromiumClient?: ChromiumLike;
 		installSessionTelemetryImpl?: InstallSessionTelemetryLike;
 		writeSessionStateImpl?: typeof writeSessionState;
+		clearSessionStateImpl?: typeof clearSessionState;
 	},
 ): Promise<CreateKernelBrowserSessionResult> {
 	const kernelClient = deps?.kernelClient ?? new Kernel();
@@ -108,11 +109,14 @@ export async function createKernelBrowserSession(
 	const installSessionTelemetryImpl =
 		deps?.installSessionTelemetryImpl ?? installSessionTelemetry;
 	const writeSessionStateImpl = deps?.writeSessionStateImpl ?? writeSessionState;
+	const clearSessionStateImpl =
+		deps?.clearSessionStateImpl ?? clearSessionState;
 	const browserSession = await kernelClient.browsers.create(
 		buildKernelBrowserCreateParams(args.headless),
 	);
 	let browser: Browser | null = null;
 	let cleanedUp = false;
+	let wroteSessionState = false;
 	const cleanup = async () => {
 		if (cleanedUp) return;
 		cleanedUp = true;
@@ -138,8 +142,6 @@ export async function createKernelBrowserSession(
 			logNetwork: args.logNetwork,
 		});
 
-		await page.goto(args.url);
-
 		writeSessionStateImpl({
 			provider: "kernel",
 			session: args.session,
@@ -149,6 +151,9 @@ export async function createKernelBrowserSession(
 			startedAt: (args.now?.() ?? new Date()).toISOString(),
 			status: "active",
 		});
+		wroteSessionState = true;
+
+		await page.goto(args.url);
 
 		return {
 			browser,
@@ -166,6 +171,9 @@ export async function createKernelBrowserSession(
 				[error, cleanupError],
 				"Failed to initialize Kernel browser session and clean it up.",
 			);
+		}
+		if (wroteSessionState) {
+			clearSessionStateImpl(args.session);
 		}
 		throw error;
 	}
