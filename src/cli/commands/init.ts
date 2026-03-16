@@ -1,7 +1,9 @@
 import type { Argv } from "yargs";
-import { accessSync, constants, statSync } from "node:fs";
-import { join, delimiter, extname } from "node:path";
+import { accessSync, constants, statSync, existsSync, cpSync, readdirSync } from "node:fs";
+import { join, delimiter, extname, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 import {
 	AI_CONFIG_PRESETS,
 	AiPresetSchema,
@@ -173,6 +175,79 @@ function checkAiRuntimeConfiguration(): void {
 	console.log("    Optionally provide a custom command prefix with '-- ...'.");
 }
 
+function askYesNo(question: string): Promise<boolean> {
+	const rl = createInterface({ input: process.stdin, output: process.stdout });
+	return new Promise((resolve) => {
+		rl.question(`${question} (y/N) `, (answer) => {
+			rl.close();
+			resolve(answer.trim().toLowerCase() === "y");
+		});
+	});
+}
+
+function getPackageSkillsDir(): string {
+	const thisFile = fileURLToPath(import.meta.url);
+	// Walk up from dist/cli/commands/ to package root
+	let dir = dirname(thisFile);
+	while (dir !== dirname(dir)) {
+		if (existsSync(join(dir, "skills", "libretto"))) {
+			return join(dir, "skills", "libretto");
+		}
+		dir = dirname(dir);
+	}
+	throw new Error("Could not locate libretto skill files in package");
+}
+
+async function copySkills(): Promise<void> {
+	const cwd = process.cwd();
+	const agentDirs: { name: string; skillDest: string }[] = [];
+
+	// Detect existing coding agent directories
+	if (existsSync(join(cwd, ".agents"))) {
+		agentDirs.push({
+			name: ".agents",
+			skillDest: join(cwd, ".agents", "skills", "libretto"),
+		});
+	}
+	if (existsSync(join(cwd, ".claude"))) {
+		agentDirs.push({
+			name: ".claude",
+			skillDest: join(cwd, ".claude", "skills", "libretto"),
+		});
+	}
+
+	if (agentDirs.length === 0) {
+		console.log("\nSkills: No .agents/ or .claude/ directory found — skipping skill copy.");
+		return;
+	}
+
+	const dirNames = agentDirs.map((d) => d.name).join(" and ");
+	// Say "Overwrite" if skills already exist in ANY target dir — skills must
+	// be identical across coding agents, so we always copy to all of them.
+	const existing = agentDirs.filter((d) => existsSync(d.skillDest));
+	const verb = existing.length > 0 ? "Overwrite" : "Install";
+
+	const proceed = await askYesNo(`\n${verb} libretto skills in ${dirNames}?`);
+	if (!proceed) {
+		console.log("  Skipping skill copy.");
+		return;
+	}
+
+	let sourceDir: string;
+	try {
+		sourceDir = getPackageSkillsDir();
+	} catch (e) {
+		console.error(`  \u2717 ${e instanceof Error ? e.message : String(e)}`);
+		return;
+	}
+
+	for (const { name, skillDest } of agentDirs) {
+		cpSync(sourceDir, skillDest, { recursive: true });
+		const fileCount = readdirSync(skillDest).length;
+		console.log(`  \u2713 Copied ${fileCount} skill files to ${name}/skills/libretto/`);
+	}
+}
+
 export function registerInitCommand(yargs: Argv): Argv {
 	return yargs.command(
 		"init",
@@ -183,14 +258,16 @@ export function registerInitCommand(yargs: Argv): Argv {
 				default: false,
 				describe: "Skip Playwright Chromium installation",
 			}),
-			(argv) => {
-				console.log("Initializing libretto...\n");
+		async (argv) => {
+			console.log("Initializing libretto...\n");
 
-				if (!argv["skip-browsers"]) {
-					installBrowsers();
-				} else {
+			if (!argv["skip-browsers"]) {
+				installBrowsers();
+			} else {
 				console.log("\nSkipping browser installation (--skip-browsers)");
 			}
+
+			await copySkills();
 
 			checkAiRuntimeConfiguration();
 

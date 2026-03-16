@@ -14,7 +14,7 @@
   },
   "files": [
     "dist",
-    ".agents/skills/libretto"
+    "skills/libretto"
   ],
   "bin": {
     "libretto": "./dist/cli/index.js",
