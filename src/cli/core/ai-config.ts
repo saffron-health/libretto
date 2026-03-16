@@ -18,7 +18,7 @@ export const CURRENT_CONFIG_VERSION = 1;
  * command.
  */
 export const AiConfigSchema = z.object({
-  model: z.string().min(1).optional(),
+  model: z.string().min(1),
   updatedAt: z.string(),
 });
 export type AiConfig = z.infer<typeof AiConfigSchema>;
