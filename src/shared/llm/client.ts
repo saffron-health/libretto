@@ -38,7 +38,7 @@ export function parseModel(model: string): { provider: Provider; modelId: string
 	const slashIndex = model.indexOf("/");
 	if (slashIndex === -1) {
 		throw new Error(
-			`Invalid model string "${model}". Expected format: "provider/model-id" (for example "openai/gpt-5.4", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro", or "vertex/gemini-2.5-pro").`,
+			`Invalid model string "${model}". Expected format: "provider/model-id" (for example "openai/gpt-5.4", "anthropic/claude-sonnet-4-6", "google/gemini-3-flash-preview", or "vertex/gemini-2.5-pro").`,
 		);
 	}
 	const providerInput = model.slice(0, slashIndex).toLowerCase();
@@ -75,14 +75,14 @@ export function hasProviderCredentials(
 export function missingProviderCredentialsMessage(provider: Provider): string {
 	switch (provider) {
 		case "google":
-			return "Missing Gemini API key. Set GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY.";
+			return "Gemini API key is missing. Set GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY.";
 		case "vertex":
-			return "Missing Vertex AI project. Set GOOGLE_CLOUD_PROJECT (or GCLOUD_PROJECT) and ensure application default credentials are configured.";
+			return "Vertex AI project is missing. Set GOOGLE_CLOUD_PROJECT (or GCLOUD_PROJECT) and ensure application default credentials are configured.";
 		case "anthropic": {
-			return "Missing Anthropic API key. Set ANTHROPIC_API_KEY.";
+			return "Anthropic API key is missing. Set ANTHROPIC_API_KEY.";
 		}
 		case "openai": {
-			return "Missing OpenAI API key. Set OPENAI_API_KEY.";
+			return "OpenAI API key is missing. Set OPENAI_API_KEY.";
 		}
 	}
 }
