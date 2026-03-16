@@ -1,32 +1,37 @@
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 
-/**
- * Module-level session name, set by the CLI runtime before invoking the workflow.
- * Standalone `pause()` reads this to locate signal files.
- */
-let _sessionName: string | undefined;
-
-/**
- * Called by the CLI runtime to make the session name available to `pause()`.
- */
-export function setSessionForPause(session: string): void {
-	_sessionName = session;
-}
-
-function getSessionFromProcessArgs(): string | undefined {
-	const rawPayload = process.argv[2];
-	if (!rawPayload) return undefined;
+function isPidRunning(pid: number): boolean {
 	try {
-		const parsed = JSON.parse(rawPayload) as { session?: string };
-		return typeof parsed.session === "string" ? parsed.session : undefined;
+		process.kill(pid, 0);
+		return true;
 	} catch {
-		return undefined;
+		return false;
 	}
 }
 
-function resolveSession(): string | undefined {
-	return _sessionName ?? getSessionFromProcessArgs();
+async function getRunningSessions(): Promise<string[]> {
+	const { listSessionsWithStateFile, readSessionState } = await import(
+		"../../cli/core/session.js"
+	);
+	return listSessionsWithStateFile().filter((candidate) => {
+		const state = readSessionState(candidate);
+		return state !== null && isPidRunning(state.pid);
+	});
+}
+
+async function throwMissingSessionError(): Promise<never> {
+	const runningSessions = await getRunningSessions();
+	const lines = ["pause(session) requires a non-empty session ID."];
+
+	if (runningSessions.length > 0) {
+		lines.push("", "Running sessions:");
+		for (const runningSession of runningSessions) {
+			lines.push(`  ${runningSession}`);
+		}
+	}
+
+	throw new Error(lines.join("\n"));
 }
 
 /**
@@ -38,16 +43,13 @@ function resolveSession(): string | undefined {
  *
  * Import directly: `import { pause } from "libretto";`
  */
-export async function pause(): Promise<void> {
+export async function pause(session: string): Promise<void> {
 	if (process.env.NODE_ENV === "production") {
 		return;
 	}
 
-	const session = resolveSession();
-	if (!session) {
-		// No session context available — likely running outside the CLI runner.
-		// Behave as a no-op to avoid crashing the workflow.
-		return;
+	if (typeof session !== "string" || session.trim().length === 0) {
+		await throwMissingSessionError();
 	}
 
 	// Dynamically import pause-signals to avoid circular dependency issues.
