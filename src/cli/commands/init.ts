@@ -105,7 +105,7 @@ function printSnapshotApiStatus(): void {
     "      GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
   );
   console.log(
-    "    Or run `npx libretto ai configure <provider>` to set a specific model.",
+    "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
   );
   console.log("    Run `npx libretto init` interactively to set up credentials.");
 }
@@ -153,7 +153,7 @@ async function runInteractiveApiSetup(): Promise<void> {
       console.log("    ANTHROPIC_API_KEY=...");
       console.log("    GEMINI_API_KEY=...");
       console.log(
-        "    Or run `npx libretto ai configure <provider>` to set a specific model.",
+        "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
       );
       return;
     }

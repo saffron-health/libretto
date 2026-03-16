@@ -5,9 +5,10 @@ import {
 } from "../src/cli/core/snapshot-analyzer.js";
 import {
   parseDotEnvAssignment,
-  resolveSnapshotApiModel,
   resolveSnapshotApiModelOrThrow,
+  resolveSnapshotApiModel,
 } from "../src/cli/core/snapshot-api-config.js";
+import { LIBRETTO_CONFIG_PATH } from "../src/cli/core/context.js";
 
 function makeConfig(model: string): AiConfig {
   return {
@@ -32,6 +33,7 @@ function clearProviderEnv(): void {
 describe("snapshot API model resolution", () => {
   it("prefers OpenAI automatically when only OPENAI_API_KEY is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
@@ -43,6 +45,7 @@ describe("snapshot API model resolution", () => {
 
   it("uses config model when set", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
 
     const config = makeConfig("openai/gpt-5.4");
@@ -56,6 +59,7 @@ describe("snapshot API model resolution", () => {
 
   it("uses config model for anthropic", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
 
     const config = makeConfig("anthropic/claude-sonnet-4-6");
@@ -69,6 +73,7 @@ describe("snapshot API model resolution", () => {
 
   it("auto-detects Gemini when GEMINI_API_KEY is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
@@ -80,6 +85,7 @@ describe("snapshot API model resolution", () => {
 
   it("auto-detects Gemini when GOOGLE_GENERATIVE_AI_API_KEY is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-gemini-key");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
@@ -91,6 +97,7 @@ describe("snapshot API model resolution", () => {
 
   it("auto-detects Vertex when only GOOGLE_CLOUD_PROJECT is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("GOOGLE_CLOUD_PROJECT", "test-project");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
@@ -102,6 +109,7 @@ describe("snapshot API model resolution", () => {
 
   it("falls back to auto-detection even when config exists", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("OPENAI_API_KEY", "test-key");
 
     // Config with no model — should still auto-detect from env
@@ -126,7 +134,7 @@ describe("snapshot API model resolution", () => {
     clearProviderEnv();
 
     expect(() => resolveSnapshotApiModelOrThrow(makeConfig("openai/gpt-5.4"))).toThrowError(
-      "Failed to analyze snapshot because openai is configured in /Users/tanishqkancharla/.codex/worktrees/111e/libretto/.libretto/config.json, but OPENAI_API_KEY is missing. Add OPENAI_API_KEY to .env or as a shell environment variable. For more info, run `npx libretto init`.",
+      `Failed to analyze snapshot because openai is configured in ${LIBRETTO_CONFIG_PATH}, but OPENAI_API_KEY is missing. Add OPENAI_API_KEY to .env or as a shell environment variable. For more info, run \`npx libretto init\`.`,
     );
   });
 });
