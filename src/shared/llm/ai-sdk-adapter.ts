@@ -57,7 +57,11 @@ export function createLLMClientFromModel(model: LanguageModel): LLMClient {
 					content: msg.content.map((part) =>
 						part.type === "text"
 							? { type: "text" as const, text: part.text }
-							: { type: "image" as const, image: part.image },
+							: {
+								type: "image" as const,
+								image: part.image,
+								...(part.mediaType ? { mediaType: part.mediaType } : {}),
+							},
 					),
 				};
 			});

@@ -8,11 +8,20 @@ export const CURRENT_CONFIG_VERSION = 1;
 
 export const AiPresetSchema = z.enum(["codex", "claude", "gemini"]);
 export type AiPreset = z.infer<typeof AiPresetSchema>;
+const AI_CONFIG_PRESET_INPUTS = ["codex", "claude", "gemini", "google-vertex-ai"] as const;
+const AI_CONFIG_PRESET_USAGE = AI_CONFIG_PRESET_INPUTS.join("|");
+
+type AiConfigurePresetResolution = {
+  preset: AiPreset;
+  model?: string;
+};
 
 export const AiConfigSchema = z
   .object({
     preset: AiPresetSchema,
     commandPrefix: z.array(z.string()).min(1),
+    /** Model override for the sub-agent session (e.g. "claude-sonnet-4-6", "o4-mini"). */
+    model: z.string().optional(),
     updatedAt: z.string(),
   })
   .strict();
@@ -33,11 +42,28 @@ export const LibrettoConfigSchema = z
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
 
-export const AI_CONFIG_PRESETS: Record<AiPreset, string[]> = {
-  codex: ["codex", "exec", "--skip-git-repo-check", "--sandbox", "read-only"],
-  claude: [join(homedir(), ".claude", "local", "claude"), "-p"],
-  gemini: ["gemini", "--output-format", "json"],
+export const AI_CONFIG_PRESETS: Record<AiPreset, Omit<AiConfig, "updatedAt">> = {
+  codex: {
+    preset: "codex",
+    commandPrefix: ["codex", "exec", "--skip-git-repo-check", "--sandbox", "read-only"],
+  },
+  claude: {
+    preset: "claude",
+    commandPrefix: [join(homedir(), ".claude", "local", "claude"), "-p"],
+  },
+  gemini: {
+    preset: "gemini",
+    commandPrefix: ["gemini", "--output-format", "json"],
+  },
 };
+
+export function isDefaultCommandPrefixForPreset(config: AiConfig): boolean {
+  const expected = AI_CONFIG_PRESETS[config.preset].commandPrefix;
+  return (
+    config.commandPrefix.length === expected.length
+    && config.commandPrefix.every((value, index) => value === expected[index])
+  );
+}
 
 function invalidConfigError(configPath: string): Error {
   return new Error(
@@ -89,11 +115,13 @@ export function writeAiConfig(
   preset: AiPreset,
   commandPrefix: string[],
   configPath: string = LIBRETTO_CONFIG_PATH,
+  extra?: { model?: string },
 ): AiConfig {
   const librettoConfig = readLibrettoConfig(configPath);
   const ai = AiConfigSchema.parse({
     preset,
     commandPrefix,
+    ...extra,
     updatedAt: new Date().toISOString(),
   });
   writeLibrettoConfig(
@@ -110,7 +138,6 @@ export function writeAiConfig(
 export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolean {
   const librettoConfig = readLibrettoConfig(configPath);
   if (!librettoConfig.ai) return false;
-  // Keep all config fields except AI state.
   const { ai: _ai, ...rest } = librettoConfig;
   writeLibrettoConfig(
     {
@@ -124,16 +151,37 @@ export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolea
 function printAiConfig(config: AiConfig, configPath: string): void {
   console.log(`AI preset: ${config.preset}`);
   console.log(`Command prefix: ${formatCommandPrefix(config.commandPrefix)}`);
+  if (config.model) console.log(`Model: ${config.model}`);
   console.log(`Config file: ${configPath}`);
   console.log(`Updated at: ${config.updatedAt}`);
 }
 
 function printConfigureUsage(commandName: string): void {
   console.log(
-    `Usage: ${commandName} <codex|claude|gemini> [-- <command prefix...>]
+    `Usage: ${commandName} <${AI_CONFIG_PRESET_USAGE}>
        ${commandName}
        ${commandName} --clear`,
   );
+}
+
+function resolveAiConfigurePreset(
+  presetArg: string | undefined,
+): AiConfigurePresetResolution | null {
+  switch (presetArg?.trim()) {
+    case "codex":
+      return { preset: "codex" };
+    case "claude":
+      return { preset: "claude" };
+    case "gemini":
+      return { preset: "gemini" };
+    case "google-vertex-ai":
+      return {
+        preset: "gemini",
+        model: "vertex/gemini-2.5-pro",
+      };
+    default:
+      return null;
+  }
 }
 
 export function runAiConfigure(
@@ -148,13 +196,12 @@ export function runAiConfigure(
   } = {},
 ): void {
   const configureCommandName =
-    options.configureCommandName ?? "libretto-cli ai configure";
+    options.configureCommandName ?? "npx libretto ai configure";
   const configPath = options.configPath ?? LIBRETTO_CONFIG_PATH;
 
   const presetArg = input.preset?.trim();
-  const customPrefix = (input.customPrefix ?? []).filter(Boolean);
 
-  if (!presetArg && customPrefix.length === 0 && !input.clear) {
+  if (!presetArg && !input.clear) {
     const config = readAiConfig(configPath);
     if (!config) {
       console.log(`No AI config set. Run '${configureCommandName} codex' to set one.`);
@@ -174,25 +221,28 @@ export function runAiConfigure(
     return;
   }
 
-  const parsedPreset = AiPresetSchema.safeParse(presetArg);
-  if (!parsedPreset.success) {
+  const resolvedPreset = resolveAiConfigurePreset(presetArg);
+  if (!resolvedPreset) {
     printConfigureUsage(configureCommandName);
     throw new Error(
-      "Missing or invalid preset. Use one of: codex, claude, gemini.",
+      `Missing or invalid preset. Use one of: ${AI_CONFIG_PRESET_INPUTS.join(", ")}.`,
     );
   }
 
-  if (input.customPrefix && input.customPrefix.length > 0 && customPrefix.length === 0) {
-    throw new Error("Custom command prefix cannot be empty.");
-  }
-
-  const preset = parsedPreset.data;
+  const preset = resolvedPreset.preset;
+  const presetDefaults = AI_CONFIG_PRESETS[preset];
+  const customPrefix = input.customPrefix?.filter(Boolean);
   const commandPrefix =
-    customPrefix.length > 0
+    customPrefix && customPrefix.length > 0
       ? customPrefix
-      : AI_CONFIG_PRESETS[preset];
+      : presetDefaults.commandPrefix;
 
-  const config = writeAiConfig(preset, commandPrefix, configPath);
+  const config = writeAiConfig(preset, commandPrefix, configPath, {
+    model: resolvedPreset.model ?? presetDefaults.model,
+  });
   console.log("AI config saved.");
+  if (presetArg === "google-vertex-ai") {
+    console.log("Configured Google Vertex AI via the Gemini preset.");
+  }
   printAiConfig(config, configPath);
 }

@@ -3,8 +3,6 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
-const SNAPSHOT_PRESETS = ["codex", "claude", "gemini"] as const;
-
 function extractReturnedSessionId(output: string): string | null {
   const patterns = [
     /\(session:\s*([a-zA-Z0-9._-]+)\)/i,
@@ -51,19 +49,6 @@ process.stdout.write(payload);
   return analyzerPath;
 }
 
-async function writeEarlyExitAnalyzer(workspaceDir: string): Promise<string> {
-  const analyzerPath = join(workspaceDir, "early-exit-analyzer.mjs");
-  await writeFile(
-    analyzerPath,
-    `
-process.stderr.write("simulated analyzer exit\\n");
-process.exit(1);
-`,
-    "utf8",
-  );
-  return analyzerPath;
-}
-
 describe("state-driven CLI subprocess behavior", () => {
   test("shows missing AI config", async ({ librettoCli }) => {
     const result = await librettoCli("ai configure");
@@ -94,6 +79,16 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(show.stdout).toContain("AI preset: gemini");
   });
 
+  test("configures google-vertex-ai AI preset", async ({ librettoCli }) => {
+    const configure = await librettoCli("ai configure google-vertex-ai");
+    expect(configure.stdout).toContain("AI config saved.");
+    expect(configure.stdout).toContain("Configured Google Vertex AI via the Gemini preset.");
+
+    const show = await librettoCli("ai configure");
+    expect(show.stdout).toContain("AI preset: gemini");
+    expect(show.stdout).toContain("Model: vertex/gemini-2.5-pro");
+  });
+
   test("configures custom AI command prefix and shows it", async ({
     librettoCli,
     workspaceDir,
@@ -111,100 +106,47 @@ describe("state-driven CLI subprocess behavior", () => {
     );
   });
 
-  for (const preset of SNAPSHOT_PRESETS) {
-    test(`configures ${preset} and snapshot analysis works`, async ({
-      librettoCli,
-      workspaceDir,
-    }) => {
-      const session = `snapshot-${preset}`;
-      const analyzerPath = await writeFakeAnalyzer(workspaceDir);
-      await librettoCli(
-        `ai configure ${preset} -- "${process.execPath}" "${analyzerPath}" "${preset}"`,
-      );
-
-      const opened = await librettoCli(
-        `open https://example.com --headless --session ${session}`,
-      );
-      expect(opened.stdout).toContain("Browser open");
-
-      const snapshot = await librettoCli(
-        `snapshot --objective "Find heading" --context "Preset ${preset} snapshot smoke test" --session ${session}`,
-      );
-      expect(snapshot.stdout).toContain("Interpretation:");
-      expect(snapshot.stdout).toContain(`Answer: snapshot-ok-${preset}`);
-    }, 45_000);
-  }
-
-  test("runs snapshot analysis when only --objective is provided", async ({
+  test("snapshot without --objective captures files without analysis", async ({
     librettoCli,
-    workspaceDir,
   }) => {
-    const session = "snapshot-objective-only";
-    const analyzerPath = await writeFakeAnalyzer(workspaceDir);
+    const session = "snapshot-no-objective";
     await librettoCli(
-      `ai configure codex -- "${process.execPath}" "${analyzerPath}" "objective-only"`,
-    );
-
-    const opened = await librettoCli(
       `open https://example.com --headless --session ${session}`,
     );
-    expect(opened.stdout).toContain("Browser open");
 
     const snapshot = await librettoCli(
-      `snapshot --objective "Find heading" --session ${session}`,
+      `snapshot --session ${session}`,
     );
-    expect(snapshot.stdout).toContain("Interpretation:");
-    expect(snapshot.stdout).toContain("Answer: snapshot-ok-objective-only");
+    expect(snapshot.stdout).toContain("Screenshot saved:");
+    expect(snapshot.stdout).toContain("PNG:");
+    expect(snapshot.stdout).toContain("HTML:");
+    expect(snapshot.stdout).toContain("Condensed HTML:");
+    expect(snapshot.stdout).toContain("Use --objective flag to analyze snapshots.");
   }, 45_000);
 
-  test("surfaces analyzer early exit without crashing on stdin pipe errors", async ({
+  test("snapshot --objective requires API credentials", async ({
     librettoCli,
-    workspaceDir,
   }) => {
-    const session = "snapshot-analyzer-early-exit";
-    const analyzerPath = await writeEarlyExitAnalyzer(workspaceDir);
+    const session = "snapshot-no-creds";
     await librettoCli(
-      `ai configure codex -- "${process.execPath}" "${analyzerPath}"`,
-    );
-
-    const opened = await librettoCli(
       `open https://example.com --headless --session ${session}`,
     );
-    expect(opened.stdout).toContain("Browser open");
 
     const snapshot = await librettoCli(
       `snapshot --objective "Find heading" --session ${session}`,
+      {
+        LIBRETTO_DISABLE_DOTENV: "1",
+        OPENAI_API_KEY: "",
+        ANTHROPIC_API_KEY: "",
+        GEMINI_API_KEY: "",
+        GOOGLE_GENERATIVE_AI_API_KEY: "",
+        GOOGLE_CLOUD_PROJECT: "",
+        GCLOUD_PROJECT: "",
+      },
     );
     expect(snapshot.exitCode).toBe(1);
-    expect(snapshot.stderr).toContain("Analyzer command failed");
-    expect(snapshot.stderr).toContain("simulated analyzer exit");
-    expect(snapshot.stderr).not.toContain("Unhandled 'error' event");
+    expect(snapshot.stderr).toContain("No API snapshot analyzer is available");
   }, 45_000);
-
-  for (const preset of ["claude", "gemini"] as const) {
-    test(`${preset} snapshot analysis sends prompt via stdin instead of argv`, async ({
-      librettoCli,
-      workspaceDir,
-    }) => {
-      const session = `snapshot-${preset}-stdin`;
-      const analyzerPath = await writeFakeAnalyzer(workspaceDir);
-      await librettoCli(
-        `ai configure ${preset} -- "${process.execPath}" "${analyzerPath}" "${preset}"`,
-      );
-
-      const opened = await librettoCli(
-        `open https://example.com --headless --session ${session}`,
-      );
-      expect(opened.stdout).toContain("Browser open");
-
-      const snapshot = await librettoCli(
-        `snapshot --objective "Find heading" --context "${preset} stdin verification" --session ${session}`,
-      );
-      expect(snapshot.stdout).toContain("Interpretation:");
-      expect(snapshot.stdout).toContain("stdin-has-objective=true");
-      expect(snapshot.stdout).toContain("argv-has-objective=false");
-    }, 45_000);
-  }
 
   test("shows a clear error when --context is provided without --objective", async ({
     librettoCli,

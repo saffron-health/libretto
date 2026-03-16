@@ -11,11 +11,10 @@ export function registerAICommands(yargs: Argv): Argv {
       runAiConfigure({
         clear: Boolean(argv.clear),
         preset: argv.preset as string | undefined,
-        customPrefix,
+        customPrefix: customPrefix.length > 0 ? customPrefix : undefined,
       }, {
-        configureCommandName: "libretto-cli ai configure",
+        configureCommandName: "npx libretto ai configure",
       });
     },
   );
 }
-
