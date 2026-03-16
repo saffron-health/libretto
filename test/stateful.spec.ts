@@ -54,7 +54,7 @@ describe("state-driven CLI subprocess behavior", () => {
 
     const show = await librettoCli("ai configure");
     expect(show.stdout).toContain("AI preset: gemini");
-    expect(show.stdout).toContain("Model: vertex/gemini-2.5-flash");
+    expect(show.stdout).toContain("Model: vertex/gemini-2.5-pro");
   });
 
   test("shows a clear error when --context is provided without --objective", async ({

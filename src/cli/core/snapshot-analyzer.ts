@@ -37,13 +37,13 @@ export const InterpretResultSchema = z.object({
       }),
     )
     .default([]),
-  notes: z.string().optional().default(""),
+  notes: z.string().default(""),
   debug: z
     .object({
-      consultedFiles: z.array(z.string()).optional().default([]),
-      analysisSteps: z.array(z.string()).optional().default([]),
+      consultedFiles: z.array(z.string()),
+      analysisSteps: z.array(z.string()),
     })
-    .optional(),
+    .default({ consultedFiles: [], analysisSteps: [] }),
 });
 
 type ExternalCommandResult = {

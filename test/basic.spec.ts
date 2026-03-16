@@ -52,7 +52,7 @@ describe("basic CLI subprocess behavior", () => {
     });
 
     expect(result.stdout).toContain("Snapshot analysis:");
-    expect(result.stdout).toContain("Ready: openai/gpt-5-mini");
+    expect(result.stdout).toContain("Ready: openai/gpt-5.4");
     expect(result.stdout).toContain("No further action required.");
   });
 
