@@ -1,210 +1,121 @@
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
-const SNAPSHOT_PRESETS = ["codex", "claude", "gemini"] as const;
-
-function extractReturnedSessionId(output: string): string | null {
-  const patterns = [
-    /\(session:\s*([a-zA-Z0-9._-]+)\)/i,
-    /session id[:=]\s*([a-zA-Z0-9._-]+)/i,
-    /session[:=]\s*([a-zA-Z0-9._-]+)/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = output.match(pattern);
-    if (match?.[1]) return match[1];
-  }
-  return null;
-}
-
-async function writeFakeAnalyzer(workspaceDir: string): Promise<string> {
-  const analyzerPath = join(workspaceDir, "fake-analyzer.mjs");
-  await writeFile(
-    analyzerPath,
-    `
-import { writeFileSync } from "node:fs";
-
-const preset = process.argv[2] ?? "unknown";
-const args = process.argv.slice(3);
-const stdinChunks = [];
-for await (const chunk of process.stdin) {
-  stdinChunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-}
-const stdinText = Buffer.concat(stdinChunks).toString("utf8");
-const outputIndex = args.indexOf("--output-last-message");
-const outputPath = outputIndex >= 0 ? args[outputIndex + 1] : undefined;
-const payload = JSON.stringify({
-  answer: "snapshot-ok-" + preset,
-  selectors: [],
-  notes: "stdin-has-objective=" + stdinText.includes("Find heading") + ";argv-has-objective=" + args.some((arg) => arg.includes("Find heading")),
-});
-
-if (outputPath) {
-  writeFileSync(outputPath, payload, "utf8");
-}
-process.stdout.write(payload);
-`,
-    "utf8",
-  );
-  return analyzerPath;
-}
-
-async function writeEarlyExitAnalyzer(workspaceDir: string): Promise<string> {
-  const analyzerPath = join(workspaceDir, "early-exit-analyzer.mjs");
-  await writeFile(
-    analyzerPath,
-    `
-process.stderr.write("simulated analyzer exit\\n");
-process.exit(1);
-`,
-    "utf8",
-  );
-  return analyzerPath;
-}
-
 describe("state-driven CLI subprocess behavior", () => {
-  test("shows missing AI config", async ({ librettoCli }) => {
+  test("shows missing AI config", async ({ librettoCli, evaluate }) => {
     const result = await librettoCli("ai configure");
-    expect(result.stdout).toContain("No AI config set.");
+    await evaluate(result.stdout).toMatch(
+      "Explains that no AI config is currently set.",
+    );
+    expect(result.stderr).toBe("");
   });
 
   test("configures, shows, and clears AI config", async ({
     librettoCli,
+    evaluate,
   }) => {
-    const configure = await librettoCli("ai configure codex");
-    expect(configure.stdout).toContain("AI config saved.");
+    const configure = await librettoCli("ai configure openai");
+    await evaluate(configure.stdout).toMatch(
+      "Confirms the AI config was saved.",
+    );
+    expect(configure.stdout).toContain("Model: openai/gpt-5.4");
+    expect(configure.stderr).toBe("");
 
     const show = await librettoCli("ai configure");
-    expect(show.stdout).toContain("AI preset: codex");
+    expect(show.stdout).toContain("Model: openai/gpt-5.4");
+    expect(show.stderr).toBe("");
 
     const clear = await librettoCli("ai configure --clear");
-    expect(clear.stdout).toContain("Cleared AI config:");
+    await evaluate(clear.stdout).toMatch(
+      "Confirms the AI config was cleared.",
+    );
+    expect(clear.stderr).toBe("");
 
     const showAfterClear = await librettoCli("ai configure");
-    expect(showAfterClear.stdout).toContain("No AI config set.");
+    await evaluate(showAfterClear.stdout).toMatch(
+      "Explains that no AI config is currently set.",
+    );
+    expect(showAfterClear.stderr).toBe("");
   });
 
-  test("configures gemini AI preset", async ({ librettoCli }) => {
+  test("configures anthropic provider", async ({ librettoCli, evaluate }) => {
+    const configure = await librettoCli("ai configure anthropic");
+    await evaluate(configure.stdout).toMatch(
+      "Confirms the AI config was saved.",
+    );
+
+    const show = await librettoCli("ai configure");
+    expect(show.stdout).toContain("Model: anthropic/claude-sonnet-4-6");
+  });
+
+  test("configures gemini provider", async ({ librettoCli, evaluate }) => {
     const configure = await librettoCli("ai configure gemini");
-    expect(configure.stdout).toContain("AI config saved.");
+    await evaluate(configure.stdout).toMatch(
+      "Confirms the AI config was saved.",
+    );
 
     const show = await librettoCli("ai configure");
-    expect(show.stdout).toContain("AI preset: gemini");
+    expect(show.stdout).toContain("Model: google/gemini-2.5-flash");
   });
 
-  test("configures custom AI command prefix and shows it", async ({
-    librettoCli,
-    workspaceDir,
-  }) => {
-    const analyzerPath = await writeFakeAnalyzer(workspaceDir);
-    const configure = await librettoCli(
-      `ai configure codex -- "${process.execPath}" "${analyzerPath}" "custom-prefix"`,
+  test("configures vertex provider", async ({ librettoCli, evaluate }) => {
+    const configure = await librettoCli("ai configure vertex");
+    await evaluate(configure.stdout).toMatch(
+      "Confirms the AI config was saved.",
     );
-    expect(configure.stdout).toContain("AI config saved.");
 
     const show = await librettoCli("ai configure");
-    expect(show.stdout).toContain("AI preset: codex");
-    expect(show.stdout).toContain(
-      `Command prefix: ${process.execPath} ${analyzerPath} custom-prefix`,
-    );
+    expect(show.stdout).toContain("Model: vertex/gemini-2.5-pro");
   });
 
-  for (const preset of SNAPSHOT_PRESETS) {
-    test(`configures ${preset} and snapshot analysis works`, async ({
-      librettoCli,
-      workspaceDir,
-    }) => {
-      const session = `snapshot-${preset}`;
-      const analyzerPath = await writeFakeAnalyzer(workspaceDir);
-      await librettoCli(
-        `ai configure ${preset} -- "${process.execPath}" "${analyzerPath}" "${preset}"`,
-      );
+  test("configures custom model string", async ({ librettoCli, evaluate }) => {
+    const configure = await librettoCli("ai configure openai/gpt-4o");
+    await evaluate(configure.stdout).toMatch(
+      "Confirms the AI config was saved.",
+    );
 
-      const opened = await librettoCli(
-        `open https://example.com --headless --session ${session}`,
-      );
-      expect(opened.stdout).toContain("Browser open");
+    const show = await librettoCli("ai configure");
+    expect(show.stdout).toContain("Model: openai/gpt-4o");
+  });
 
-      const snapshot = await librettoCli(
-        `snapshot --objective "Find heading" --context "Preset ${preset} snapshot smoke test" --session ${session}`,
-      );
-      expect(snapshot.stdout).toContain("Interpretation:");
-      expect(snapshot.stdout).toContain(`Answer: snapshot-ok-${preset}`);
-    }, 45_000);
-  }
-
-  test("runs snapshot analysis when only --objective is provided", async ({
+  test("snapshot without --objective captures files without analysis", async ({
     librettoCli,
-    workspaceDir,
   }) => {
-    const session = "snapshot-objective-only";
-    const analyzerPath = await writeFakeAnalyzer(workspaceDir);
+    const session = "snapshot-no-objective";
     await librettoCli(
-      `ai configure codex -- "${process.execPath}" "${analyzerPath}" "objective-only"`,
-    );
-
-    const opened = await librettoCli(
       `open https://example.com --headless --session ${session}`,
     );
-    expect(opened.stdout).toContain("Browser open");
+
+    const snapshot = await librettoCli(`snapshot --session ${session}`);
+    expect(snapshot.stdout).toContain("Screenshot saved:");
+    expect(snapshot.stdout).toContain("PNG:");
+    expect(snapshot.stdout).toContain("HTML:");
+    expect(snapshot.stdout).toContain("Condensed HTML:");
+    expect(snapshot.stdout).toContain("Use --objective flag to analyze snapshots.");
+  }, 45_000);
+
+  test("snapshot --objective requires API credentials", async ({
+    librettoCli,
+  }) => {
+    const session = "snapshot-no-creds";
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     const snapshot = await librettoCli(
       `snapshot --objective "Find heading" --session ${session}`,
+      {
+        LIBRETTO_DISABLE_DOTENV: "1",
+        OPENAI_API_KEY: "",
+        ANTHROPIC_API_KEY: "",
+        GEMINI_API_KEY: "",
+        GOOGLE_GENERATIVE_AI_API_KEY: "",
+        GOOGLE_CLOUD_PROJECT: "",
+        GCLOUD_PROJECT: "",
+      },
     );
-    expect(snapshot.stdout).toContain("Interpretation:");
-    expect(snapshot.stdout).toContain("Answer: snapshot-ok-objective-only");
+    expect(snapshot.stderr).toContain("No API snapshot analyzer is available");
   }, 45_000);
-
-  test("surfaces analyzer early exit without crashing on stdin pipe errors", async ({
-    librettoCli,
-    workspaceDir,
-  }) => {
-    const session = "snapshot-analyzer-early-exit";
-    const analyzerPath = await writeEarlyExitAnalyzer(workspaceDir);
-    await librettoCli(
-      `ai configure codex -- "${process.execPath}" "${analyzerPath}"`,
-    );
-
-    const opened = await librettoCli(
-      `open https://example.com --headless --session ${session}`,
-    );
-    expect(opened.stdout).toContain("Browser open");
-
-    const snapshot = await librettoCli(
-      `snapshot --objective "Find heading" --session ${session}`,
-    );
-    expect(snapshot.exitCode).toBe(1);
-    expect(snapshot.stderr).toContain("Analyzer command failed");
-    expect(snapshot.stderr).toContain("simulated analyzer exit");
-    expect(snapshot.stderr).not.toContain("Unhandled 'error' event");
-  }, 45_000);
-
-  for (const preset of ["claude", "gemini"] as const) {
-    test(`${preset} snapshot analysis sends prompt via stdin instead of argv`, async ({
-      librettoCli,
-      workspaceDir,
-    }) => {
-      const session = `snapshot-${preset}-stdin`;
-      const analyzerPath = await writeFakeAnalyzer(workspaceDir);
-      await librettoCli(
-        `ai configure ${preset} -- "${process.execPath}" "${analyzerPath}" "${preset}"`,
-      );
-
-      const opened = await librettoCli(
-        `open https://example.com --headless --session ${session}`,
-      );
-      expect(opened.stdout).toContain("Browser open");
-
-      const snapshot = await librettoCli(
-        `snapshot --objective "Find heading" --context "${preset} stdin verification" --session ${session}`,
-      );
-      expect(snapshot.stdout).toContain("Interpretation:");
-      expect(snapshot.stdout).toContain("stdin-has-objective=true");
-      expect(snapshot.stdout).toContain("argv-has-objective=false");
-    }, 45_000);
-  }
 
   test("shows a clear error when --context is provided without --objective", async ({
     librettoCli,
@@ -222,15 +133,16 @@ describe("state-driven CLI subprocess behavior", () => {
     );
   }, 45_000);
 
-  test("open without --session returns a session id usable by snapshot", async ({
+  test("open without --session uses the default session", async ({
     librettoCli,
+    evaluate,
   }) => {
     const opened = await librettoCli("open https://example.com --headless");
-    expect(opened.stdout).toContain("Browser open");
-    const session = extractReturnedSessionId(`${opened.stdout}\n${opened.stderr}`);
-    expect(session).toMatch(/^ses-\d{4}$/);
+    await evaluate(opened.stdout).toMatch(
+      "Confirms the browser opened successfully for example.com using the default session.",
+    );
 
-    const snapshot = await librettoCli(`snapshot --session ${session}`);
+    const snapshot = await librettoCli("snapshot --session default");
     expect(snapshot.stdout).toContain("Screenshot saved:");
   }, 60_000);
 
@@ -250,6 +162,27 @@ describe("state-driven CLI subprocess behavior", () => {
       `libretto-cli close --session ${session}`,
     );
   }, 45_000);
+
+  test("shows recovery guidance when a session-backed command targets a missing session", async ({
+    librettoCli,
+    evaluate,
+  }) => {
+    const session = "missing-session";
+    const result = await librettoCli(`pages --session ${session}`);
+
+    expect(result.stdout).toBe("");
+    await evaluate(result.stderr).toMatch(
+      'Explains that session "missing-session" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session missing-session.',
+    );
+    expect(result.stderr.trimEnd().split("\n")).toEqual([
+      `No session "${session}" found.`,
+      "",
+      "No active sessions.",
+      "",
+      "Start one with:",
+      `  libretto-cli open <url> --session ${session}`,
+    ]);
+  });
 
   test("prints no-op message when closing a session with no browser", async ({
     librettoCli,

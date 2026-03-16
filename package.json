@@ -1,6 +1,6 @@
 {
   "name": "libretto",
-  "version": "0.3.1",
+  "version": "0.4.2",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
   "repository": {
@@ -14,7 +14,7 @@
   },
   "files": [
     "dist",
-    ".agents/skills/libretto"
+    "skills/libretto"
   ],
   "bin": {
     "libretto": "./dist/cli/index.js",
@@ -42,11 +42,15 @@
   },
   "peerDependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai": "^3.0.41"
   },
   "peerDependenciesMeta": {
     "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google": {
       "optional": true
     },
     "@ai-sdk/google-vertex": {
@@ -59,10 +63,10 @@
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.75",
     "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai": "^3.0.41",
     "@types/node": "^25.5.0",
-    "@types/yargs": "^17.0.35",
     "openai": "^6.29.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
@@ -73,7 +77,6 @@
     "ai": "^6.0.116",
     "playwright": "^1.58.2",
     "tsx": "^4.21.0",
-    "yargs": "^18.0.0",
     "zod": "^4.3.6"
   }
 }

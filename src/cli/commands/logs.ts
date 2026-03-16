@@ -1,4 +1,4 @@
-import type { Argv } from "yargs";
+import { z } from "zod";
 import { listOpenPages } from "../core/browser.js";
 import { withSessionLogger } from "../core/context.js";
 import {
@@ -9,6 +9,14 @@ import {
   readActionLog,
   readNetworkLog,
 } from "../core/telemetry.js";
+import { SimpleCLI } from "../framework/simple-cli.js";
+import {
+  integerOption,
+  loadSessionStateMiddleware,
+  pageOption,
+  resolveSessionMiddleware,
+  sessionOption,
+} from "./shared.js";
 
 async function resolvePageId(session: string, pageId?: string): Promise<string | undefined> {
   if (!pageId) return undefined;
@@ -24,88 +32,97 @@ async function resolvePageId(session: string, pageId?: string): Promise<string |
   return pageId;
 }
 
-export function registerLogCommands(yargs: Argv): Argv {
-  return yargs
-    .command(
-      "network",
-      "View captured network requests",
-      (cmd) =>
-        cmd
-          .option("last", { type: "number" })
-          .option("filter", { type: "string" })
-          .option("method", { type: "string" })
-          .option("page", { type: "string" })
-          .option("clear", { type: "boolean", default: false }),
-      async (argv) => {
-        const session = String(argv.session);
-        if (argv.clear) {
-          clearNetworkLog(session);
-          console.log("Network log cleared.");
-          return;
-        }
-        const pageId = await resolvePageId(
-          session,
-          argv.page ? String(argv.page) : undefined,
-        );
+export const networkInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+    last: integerOption(),
+    filter: SimpleCLI.option(z.string().optional()),
+    method: SimpleCLI.option(z.string().optional()),
+    page: pageOption(),
+    clear: SimpleCLI.flag(),
+  },
+});
 
-        const entries = readNetworkLog(session, {
-          last: typeof argv.last === "number" ? argv.last : undefined,
-          filter: argv.filter as string | undefined,
-          method: argv.method as string | undefined,
-          pageId,
-        });
+export const networkCommand = SimpleCLI.command({
+  description: "View captured network requests",
+})
+  .input(networkInput)
+  .use(resolveSessionMiddleware)
+  .use(loadSessionStateMiddleware)
+  .handle(async ({ input, ctx }) => {
+    if (input.clear) {
+      clearNetworkLog(ctx.session);
+      console.log("Network log cleared.");
+      return;
+    }
 
-        if (entries.length === 0) {
-          console.log("No network requests captured.");
-          return;
-        }
+    const pageId = await resolvePageId(ctx.session, input.page);
+    const entries = readNetworkLog(ctx.session, {
+      last: input.last,
+      filter: input.filter,
+      method: input.method,
+      pageId,
+    });
 
-        for (const entry of entries) {
-          console.log(formatNetworkEntry(entry));
-        }
-        console.log(`\n${entries.length} request(s) shown.`);
-      },
-    )
-    .command(
-      "actions",
-      "View captured actions",
-      (cmd) =>
-        cmd
-          .option("last", { type: "number" })
-          .option("filter", { type: "string" })
-          .option("action", { type: "string" })
-          .option("source", { type: "string" })
-          .option("page", { type: "string" })
-          .option("clear", { type: "boolean", default: false }),
-      async (argv) => {
-        const session = String(argv.session);
-        if (argv.clear) {
-          clearActionLog(session);
-          console.log("Action log cleared.");
-          return;
-        }
-        const pageId = await resolvePageId(
-          session,
-          argv.page ? String(argv.page) : undefined,
-        );
+    if (entries.length === 0) {
+      console.log("No network requests captured.");
+      return;
+    }
 
-        const entries = readActionLog(session, {
-          last: typeof argv.last === "number" ? argv.last : undefined,
-          filter: argv.filter as string | undefined,
-          action: argv.action as string | undefined,
-          source: argv.source as string | undefined,
-          pageId,
-        });
+    for (const entry of entries) {
+      console.log(formatNetworkEntry(entry));
+    }
+    console.log(`\n${entries.length} request(s) shown.`);
+  });
 
-        if (entries.length === 0) {
-          console.log("No actions captured.");
-          return;
-        }
+export const actionsInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    session: sessionOption(),
+    last: integerOption(),
+    filter: SimpleCLI.option(z.string().optional()),
+    action: SimpleCLI.option(z.string().optional()),
+    source: SimpleCLI.option(z.string().optional()),
+    page: pageOption(),
+    clear: SimpleCLI.flag(),
+  },
+});
 
-        for (const entry of entries) {
-          console.log(formatActionEntry(entry));
-        }
-        console.log(`\n${entries.length} action(s) shown.`);
-      },
-    );
-}
+export const actionsCommand = SimpleCLI.command({
+  description: "View captured actions",
+})
+  .input(actionsInput)
+  .use(resolveSessionMiddleware)
+  .use(loadSessionStateMiddleware)
+  .handle(async ({ input, ctx }) => {
+    if (input.clear) {
+      clearActionLog(ctx.session);
+      console.log("Action log cleared.");
+      return;
+    }
+
+    const pageId = await resolvePageId(ctx.session, input.page);
+    const entries = readActionLog(ctx.session, {
+      last: input.last,
+      filter: input.filter,
+      action: input.action,
+      source: input.source,
+      pageId,
+    });
+
+    if (entries.length === 0) {
+      console.log("No actions captured.");
+      return;
+    }
+
+    for (const entry of entries) {
+      console.log(formatActionEntry(entry));
+    }
+    console.log(`\n${entries.length} action(s) shown.`);
+  });
+
+export const logCommands = {
+  network: networkCommand,
+  actions: actionsCommand,
+};
