@@ -358,6 +358,25 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
+    pattern: /^Shows at least one network request result for the session\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "example.com/?network=one"),
+        requireIncludes(actual, "request(s) shown."),
+      ),
+  },
+  {
+    pattern: /^Shows at least one action result for the session\.$/,
+    check: (actual) =>
+      runChecks(
+        actual,
+        requireIncludes(actual, "[AGENT]"),
+        requireRegex(actual, /(reload|goto)/, "reload or goto action"),
+        requireIncludes(actual, "action(s) shown."),
+      ),
+  },
+  {
     pattern: /^Explains that session "([^"]+)" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session ([^".]+)\.$/,
     check: (actual, match) =>
       runChecks(

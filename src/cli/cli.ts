@@ -26,10 +26,11 @@ Examples:
 
   libretto-cli exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
   libretto-cli exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
-  libretto-cli ai configure codex
-  libretto-cli ai configure claude
+  libretto-cli ai configure openai
+  libretto-cli ai configure anthropic
   libretto-cli ai configure gemini
-  libretto-cli ai configure <codex|claude|gemini> -- <command prefix...>
+  libretto-cli ai configure vertex
+  libretto-cli ai configure openai/gpt-4o
   libretto-cli snapshot
   libretto-cli snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
   libretto-cli resume --session default

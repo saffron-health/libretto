@@ -4,6 +4,39 @@ import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
 describe("basic CLI subprocess behavior", () => {
+  test("init explains snapshot API env setup when no credentials are configured", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("init --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "",
+      ANTHROPIC_API_KEY: "",
+      GEMINI_API_KEY: "",
+      GOOGLE_GENERATIVE_AI_API_KEY: "",
+      GOOGLE_CLOUD_PROJECT: "",
+      GCLOUD_PROJECT: "",
+    });
+
+    expect(result.stdout).toContain("Snapshot analysis:");
+    expect(result.stdout).toContain("No snapshot API credentials detected.");
+    expect(result.stdout).toContain("OPENAI_API_KEY=...");
+    expect(result.stdout).toContain("ANTHROPIC_API_KEY=...");
+    expect(result.stdout).toContain("GEMINI_API_KEY=...");
+  });
+
+  test("init reports when snapshot API credentials are already ready", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("init --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+
+    expect(result.stdout).toContain("Snapshot analysis:");
+    expect(result.stdout).toContain("Ready: openai/gpt-5.4");
+    expect(result.stdout).toContain("No further action required.");
+  });
+
   test("prints usage for --help", async ({ librettoCli, evaluate }) => {
     const result = await librettoCli("--help");
     await evaluate(result.stdout).toMatch(
@@ -33,7 +66,7 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
     evaluate,
   }) => {
-    const result = await librettoCli("ai configure codex --session review-bot");
+    const result = await librettoCli("ai configure openai --session review-bot");
     expect(result.stderr).toBe("");
     await evaluate(result.stdout).toMatch(
       "Confirms the AI config was saved.",
@@ -44,7 +77,7 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
     evaluate,
   }) => {
-    const result = await librettoCli("--session review-bot ai configure codex");
+    const result = await librettoCli("--session review-bot ai configure openai");
     expect(result.stderr).toBe("");
     await evaluate(result.stdout).toMatch(
       "Confirms the AI config was saved.",
@@ -496,14 +529,4 @@ export const main = workflow({}, async (ctx) => {
     );
   });
 
-  test("ignores --session tokens after passthrough --", async ({
-    librettoCli,
-    evaluate,
-  }) => {
-    const result = await librettoCli('ai configure codex -- --session open');
-    expect(result.stderr).toBe("");
-    await evaluate(result.stdout).toMatch(
-      "Confirms the AI config was saved.",
-    );
-  });
 });

@@ -5,15 +5,11 @@ import { SimpleCLI } from "../framework/simple-cli.js";
 export const aiConfigureInput = SimpleCLI.input({
   positionals: [
     SimpleCLI.positional("preset", z.string().optional(), {
-      help: "AI preset",
+      help: "Provider shorthand or provider/model-id",
     }),
   ],
   named: {
     clear: SimpleCLI.flag({ help: "Clear existing AI config" }),
-    passthrough: SimpleCLI.option(z.array(z.string()).default([]), {
-      source: "--",
-      help: "Custom command prefix after --",
-    }),
   },
 });
 
@@ -29,7 +25,6 @@ export const aiCommands = SimpleCLI.group({
           {
             clear: input.clear,
             preset: input.preset,
-            customPrefix: input.passthrough,
           },
           {
             configureCommandName: "libretto-cli ai configure",
