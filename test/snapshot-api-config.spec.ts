@@ -57,18 +57,6 @@ describe("snapshot API model resolution", () => {
     });
   });
 
-  it("accepts codex model aliases in LIBRETTO_SNAPSHOT_MODEL", () => {
-    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
-    vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
-    vi.stubEnv("LIBRETTO_SNAPSHOT_MODEL", "codex/gpt-5.4");
-
-    expect(resolveSnapshotApiModel(null)).toMatchObject({
-      model: "codex/gpt-5.4",
-      provider: "openai",
-      source: "env:LIBRETTO_SNAPSHOT_MODEL",
-    });
-  });
-
   it("auto-detects Gemini when GEMINI_API_KEY is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
     vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
@@ -99,20 +87,6 @@ describe("snapshot API model resolution", () => {
       model: "vertex/gemini-2.5-pro",
       provider: "vertex",
       source: "env:auto-vertex",
-    });
-  });
-
-  it("LIBRETTO_SNAPSHOT_MODEL overrides config model", () => {
-    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
-    vi.stubEnv("OPENAI_API_KEY", "test-key");
-    vi.stubEnv("LIBRETTO_SNAPSHOT_MODEL", "anthropic/claude-sonnet-4-6");
-
-    const config = makeConfig("openai/gpt-5.4");
-
-    expect(resolveSnapshotApiModel(config)).toMatchObject({
-      model: "anthropic/claude-sonnet-4-6",
-      provider: "anthropic",
-      source: "env:LIBRETTO_SNAPSHOT_MODEL",
     });
   });
 

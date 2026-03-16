@@ -12,8 +12,6 @@ import {
 	type Provider,
 } from "../../shared/llm/client.js";
 
-export const SNAPSHOT_MODEL_ENV_VAR = "LIBRETTO_SNAPSHOT_MODEL";
-
 const DEFAULT_SNAPSHOT_MODELS = {
 	openai: "openai/gpt-5.4",
 	anthropic: "anthropic/claude-sonnet-4-6",
@@ -25,7 +23,6 @@ export type SnapshotApiModelSelection = {
 	model: string;
 	provider: Provider;
 	source:
-		| "env:LIBRETTO_SNAPSHOT_MODEL"
 		| "config"
 		| "env:auto-openai"
 		| "env:auto-anthropic"
@@ -144,24 +141,13 @@ function inferAutoSnapshotModel(): SnapshotApiModelSelection | null {
  * Resolve which API model to use for snapshot analysis.
  *
  * Priority:
- * 1. Explicit LIBRETTO_SNAPSHOT_MODEL env var
- * 2. Model from .libretto/config.json ai.model field
- * 3. Auto-detect from available API credentials in env
+ * 1. Model from .libretto/config.json ai.model field (set via `ai configure`)
+ * 2. Auto-detect from available API credentials in env
  */
 export function resolveSnapshotApiModel(
 	config: AiConfig | null = readAiConfig(),
 ): SnapshotApiModelSelection | null {
 	loadSnapshotEnv();
-
-	const explicitModel = process.env[SNAPSHOT_MODEL_ENV_VAR]?.trim();
-	if (explicitModel) {
-		const { provider } = parseModel(explicitModel);
-		return {
-			model: explicitModel,
-			provider,
-			source: "env:LIBRETTO_SNAPSHOT_MODEL",
-		};
-	}
 
 	if (config?.model) {
 		const { provider } = parseModel(config.model);
@@ -187,7 +173,7 @@ export function resolveSnapshotApiModelOrThrow(
 
 	if (!hasProviderCredentials(selection.provider)) {
 		throw new SnapshotApiUnavailableError(
-			`${missingProviderCredentialsMessage(selection.provider)} You can also override the snapshot model with ${SNAPSHOT_MODEL_ENV_VAR}=provider/model-id.`,
+			missingProviderCredentialsMessage(selection.provider),
 		);
 	}
 

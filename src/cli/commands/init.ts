@@ -8,7 +8,6 @@ import {
 } from "../core/ai-config.js";
 import { REPO_ROOT } from "../core/context.js";
 import {
-  SNAPSHOT_MODEL_ENV_VAR,
   loadSnapshotEnv,
   resolveSnapshotApiModel,
 } from "../core/snapshot-api-config.js";
@@ -93,7 +92,7 @@ function printSnapshotApiStatus(): void {
     "      GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
   );
   console.log(
-    `    Optional: set ${SNAPSHOT_MODEL_ENV_VAR}=provider/model-id to force a specific model.`,
+    "    Or run `npx libretto ai configure <provider>` to set a specific model.",
   );
   console.log("    Run `npx libretto init` interactively to set up credentials.");
 }
@@ -140,7 +139,7 @@ async function runInteractiveApiSetup(): Promise<void> {
       console.log("    ANTHROPIC_API_KEY=...");
       console.log("    GEMINI_API_KEY=...");
       console.log(
-        `  Optional: set ${SNAPSHOT_MODEL_ENV_VAR}=provider/model-id to force a specific model.`,
+        "    Or run `npx libretto ai configure <provider>` to set a specific model.",
       );
       return;
     }

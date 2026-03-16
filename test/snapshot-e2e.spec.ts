@@ -82,7 +82,6 @@ const hasLinkedInProfile = existsSync(linkedinProfilePath);
 
 type ProviderTestConfig = {
   name: string;
-  modelEnvVar: string;
   model: string;
   envKeys: string[];
 };
@@ -90,25 +89,21 @@ type ProviderTestConfig = {
 const PROVIDERS: ProviderTestConfig[] = [
   {
     name: "OpenAI",
-    modelEnvVar: "LIBRETTO_SNAPSHOT_MODEL",
     model: "openai/gpt-5.4",
     envKeys: ["OPENAI_API_KEY"],
   },
   {
     name: "Anthropic",
-    modelEnvVar: "LIBRETTO_SNAPSHOT_MODEL",
     model: "anthropic/claude-sonnet-4-6",
     envKeys: ["ANTHROPIC_API_KEY"],
   },
   {
     name: "Google Gemini",
-    modelEnvVar: "LIBRETTO_SNAPSHOT_MODEL",
     model: "google/gemini-2.5-flash",
     envKeys: ["GEMINI_API_KEY"],
   },
   {
     name: "Google Vertex AI",
-    modelEnvVar: "LIBRETTO_SNAPSHOT_MODEL",
     model: "vertex/gemini-2.5-pro",
     envKeys: ["GOOGLE_CLOUD_PROJECT"],
   },
@@ -170,16 +165,16 @@ describe("snapshot e2e – live site analysis", () => {
           await seedProfile("linkedin.com", linkedinProfilePath);
         }
 
+        // Configure the specific model via ai configure
+        await librettoCli(`ai configure ${provider.model}`);
+
         await librettoCli(
           `open https://www.linkedin.com/feed/ --headless --session ${session}`,
         );
 
         await sleep(PAGE_SETTLE_MS);
 
-        const providerEnv = {
-          ...buildProviderEnv(...provider.envKeys),
-          [provider.modelEnvVar]: provider.model,
-        };
+        const providerEnv = buildProviderEnv(...provider.envKeys);
 
         const snapshotStart = Date.now();
         const snapshot = await librettoCli(
