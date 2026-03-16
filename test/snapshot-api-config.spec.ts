@@ -6,6 +6,7 @@ import {
 import {
   parseDotEnvAssignment,
   resolveSnapshotApiModel,
+  resolveSnapshotApiModelOrThrow,
 } from "../src/cli/core/snapshot-api-config.js";
 
 function makeConfig(model: string): AiConfig {
@@ -18,6 +19,15 @@ function makeConfig(model: string): AiConfig {
 afterEach(() => {
   vi.unstubAllEnvs();
 });
+
+function clearProviderEnv(): void {
+  vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("ANTHROPIC_API_KEY", "");
+  vi.stubEnv("GEMINI_API_KEY", "");
+  vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "");
+  vi.stubEnv("GOOGLE_CLOUD_PROJECT", "");
+  vi.stubEnv("GCLOUD_PROJECT", "");
+}
 
 describe("snapshot API model resolution", () => {
   it("prefers OpenAI automatically when only OPENAI_API_KEY is present", () => {
@@ -100,6 +110,24 @@ describe("snapshot API model resolution", () => {
       provider: "openai",
       source: "env:auto-openai",
     });
+  });
+
+  it("explains how to configure snapshot analysis when no analyzer is available", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+
+    expect(() => resolveSnapshotApiModelOrThrow(null)).toThrowError(
+      "Failed to analyze snapshot because no snapshot analyzer is configured. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_CLOUD_PROJECT to .env or as a shell environment variable, or choose a default model with `npx libretto ai configure openai | anthropic | gemini | vertex`. For more info, run `npx libretto init`.",
+    );
+  });
+
+  it("explains how to fix a configured provider with missing credentials", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+
+    expect(() => resolveSnapshotApiModelOrThrow(makeConfig("openai/gpt-5.4"))).toThrowError(
+      "Failed to analyze snapshot because openai is configured in /Users/tanishqkancharla/.codex/worktrees/111e/libretto/.libretto/config.json, but OPENAI_API_KEY is missing. Add OPENAI_API_KEY to .env or as a shell environment variable. For more info, run `npx libretto init`.",
+    );
   });
 });
 
