@@ -17,12 +17,10 @@ export const CURRENT_CONFIG_VERSION = 1;
  * code is preserved in snapshot-analyzer.ts but is not wired into the snapshot
  * command.
  */
-export const AiConfigSchema = z
-  .object({
-    model: z.string().min(1),
-    updatedAt: z.string(),
-  })
-  .strict();
+export const AiConfigSchema = z.object({
+  model: z.string().min(1).optional(),
+  updatedAt: z.string(),
+});
 export type AiConfig = z.infer<typeof AiConfigSchema>;
 
 export const ViewportConfigSchema = z.object({
@@ -31,15 +29,11 @@ export const ViewportConfigSchema = z.object({
 });
 export type ViewportConfig = z.infer<typeof ViewportConfigSchema>;
 
-export const SkillDirsSchema = z.array(z.string().min(1));
-export type SkillDirs = z.infer<typeof SkillDirsSchema>;
-
 export const LibrettoConfigSchema = z
   .object({
     version: z.literal(CURRENT_CONFIG_VERSION),
     ai: AiConfigSchema.optional(),
     viewport: ViewportConfigSchema.optional(),
-    skillDirs: SkillDirsSchema.optional(),
   })
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
@@ -88,7 +82,9 @@ export function writeLibrettoConfig(
   return parsed;
 }
 
-export function readAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): AiConfig | null {
+export function readAiConfig(
+  configPath: string = LIBRETTO_CONFIG_PATH,
+): AiConfig | null {
   return readLibrettoConfig(configPath).ai ?? null;
 }
 
@@ -112,7 +108,9 @@ export function writeAiConfig(
   return ai;
 }
 
-export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolean {
+export function clearAiConfig(
+  configPath: string = LIBRETTO_CONFIG_PATH,
+): boolean {
   const librettoConfig = readLibrettoConfig(configPath);
   if (!librettoConfig.ai) return false;
   const { ai: _ai, ...rest } = librettoConfig;
@@ -123,27 +121,6 @@ export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolea
     configPath,
   );
   return true;
-}
-
-export function readSkillDirs(configPath: string = LIBRETTO_CONFIG_PATH): string[] | null {
-  return readLibrettoConfig(configPath).skillDirs ?? null;
-}
-
-export function writeSkillDirs(
-  dirs: string[],
-  configPath: string = LIBRETTO_CONFIG_PATH,
-): string[] {
-  const librettoConfig = readLibrettoConfig(configPath);
-  const skillDirs = SkillDirsSchema.parse(dirs);
-  writeLibrettoConfig(
-    {
-      ...librettoConfig,
-      version: CURRENT_CONFIG_VERSION,
-      skillDirs,
-    },
-    configPath,
-  );
-  return skillDirs;
 }
 
 function printAiConfig(config: AiConfig, configPath: string): void {
@@ -187,7 +164,9 @@ export function runAiConfigure(
   if (!presetArg && !input.clear) {
     const config = readAiConfig(configPath);
     if (!config) {
-      console.log(`No AI config set. Run '${configureCommandName} openai' to set one.`);
+      console.log(
+        `No AI config set. Run '${configureCommandName} openai' to set one.`,
+      );
       return;
     }
     printAiConfig(config, configPath);
@@ -208,8 +187,8 @@ export function runAiConfigure(
   if (!model) {
     console.log(
       `Usage: ${configureCommandName} <${CONFIGURE_PROVIDERS.join("|")}|provider/model-id>\n` +
-      `       ${configureCommandName}\n` +
-      `       ${configureCommandName} --clear`,
+        `       ${configureCommandName}\n` +
+        `       ${configureCommandName} --clear`,
     );
     throw new Error(
       `Invalid provider or model. Use one of: ${CONFIGURE_PROVIDERS.join(", ")}, or a full model string like "openai/gpt-4o".`,

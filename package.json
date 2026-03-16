@@ -1,6 +1,6 @@
 {
   "name": "libretto",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
   "repository": {
@@ -14,6 +14,7 @@
   },
   "files": [
     "dist",
+    "scripts",
     "skills/libretto"
   ],
   "bin": {
@@ -28,7 +29,7 @@
     }
   },
   "scripts": {
-    "postinstall": "playwright install chromium",
+    "postinstall": "node scripts/postinstall.mjs",
     "build": "pnpm run build:runtime && pnpm run build:cli",
     "build:runtime": "tsup --config tsup.config.ts",
     "build:cli": "tsup --config tsup.cli.config.ts",

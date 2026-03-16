@@ -1,9 +1,9 @@
 import { createInterface } from "node:readline";
 import { appendFileSync, cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readAiConfig, readSkillDirs, writeSkillDirs } from "../core/ai-config.js";
+import { readAiConfig } from "../core/ai-config.js";
 import { REPO_ROOT } from "../core/context.js";
 import {
   loadSnapshotEnv,
@@ -237,78 +237,22 @@ function detectAgentDirs(root: string): string[] {
   return dirs;
 }
 
-/**
- * Resolve the skill directories to copy into.
- * Uses saved config if available, otherwise auto-detects and prompts the user.
- */
-async function resolveSkillDirs(): Promise<string[] | null> {
-  const saved = readSkillDirs();
-  if (saved && saved.length > 0) {
-    // Validate saved dirs still exist
-    const valid = saved.filter((d) => existsSync(d));
-    if (valid.length > 0) return valid;
-    console.log("  Previously configured skill directories no longer exist.");
-  }
-
-  // Auto-detect from cwd
-  const cwd = process.cwd();
-  const detected = detectAgentDirs(cwd);
-
-  if (detected.length > 0) {
-    const names = detected.map((d) => d.replace(cwd + "/", "")).join(", ");
-    console.log(`  Detected agent directories: ${names}`);
-    const useDetected = await askYesNo("  Use these for skill installation?");
-    if (useDetected) {
-      writeSkillDirs(detected);
-      return detected;
-    }
-  }
-
-  // Prompt for custom path
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    const customRoot = await new Promise<string>((resolve) => {
-      rl.question(
-        "  Enter path to directory containing .agents/ and/or .claude/ (or press Enter to skip): ",
-        (answer) => resolve(answer.trim()),
-      );
-    });
-
-    if (!customRoot) return null;
-
-    const resolved = resolve(customRoot);
-    const found = detectAgentDirs(resolved);
-    if (found.length === 0) {
-      console.log(`  No .agents/ or .claude/ found in ${resolved} — skipping.`);
-      return null;
-    }
-
-    const names = found.map((d) => d.replace(resolved + "/", "")).join(", ");
-    console.log(`  Found: ${names}`);
-    writeSkillDirs(found);
-    return found;
-  } finally {
-    rl.close();
-  }
-}
-
 async function copySkills(): Promise<void> {
-  console.log("\nSkill installation:");
+  const agentDirs = detectAgentDirs(REPO_ROOT);
 
-  const skillDirs = await resolveSkillDirs();
-  if (!skillDirs || skillDirs.length === 0) {
-    console.log("  Skipping skill copy.");
+  if (agentDirs.length === 0) {
+    console.log("\nSkills: No .agents/ or .claude/ directory found in repo root — skipping.");
     return;
   }
 
-  const destinations = skillDirs.map((d) => join(d, "skills", "libretto"));
-  const dirNames = skillDirs.map((d) => basename(d)).join(" and ");
+  const destinations = agentDirs.map((d) => join(d, "skills", "libretto"));
+  const dirNames = agentDirs.map((d) => basename(d)).join(" and ");
   // Say "Overwrite" if skills already exist in ANY target dir — skills must
   // be identical across coding agents, so we always copy to all of them.
   const existing = destinations.filter((d) => existsSync(d));
   const verb = existing.length > 0 ? "Overwrite" : "Install";
 
-  const proceed = await askYesNo(`  ${verb} libretto skills in ${dirNames}?`);
+  const proceed = await askYesNo(`\n${verb} libretto skills in ${dirNames}?`);
   if (!proceed) {
     console.log("  Skipping skill copy.");
     return;
@@ -322,9 +266,9 @@ async function copySkills(): Promise<void> {
     return;
   }
 
-  for (let i = 0; i < skillDirs.length; i++) {
+  for (let i = 0; i < agentDirs.length; i++) {
     const skillDest = destinations[i];
-    const name = basename(skillDirs[i]);
+    const name = basename(agentDirs[i]);
     // Remove existing dir first so stale files from prior versions don't persist
     if (existsSync(skillDest)) {
       rmSync(skillDest, { recursive: true });
