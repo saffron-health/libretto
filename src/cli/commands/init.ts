@@ -1,7 +1,8 @@
 import { createInterface } from "node:readline";
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { readAiConfig } from "../core/ai-config.js";
 import { REPO_ROOT } from "../core/context.js";
 import {
@@ -52,6 +53,16 @@ function promptUser(
   return new Promise((resolve) => {
     rl.question(question, (answer) => {
       resolve(answer.trim());
+    });
+  });
+}
+
+function askYesNo(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(`${question} (y/N) `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === "y");
     });
   });
 }
@@ -203,6 +214,69 @@ function installBrowsers(): void {
   }
 }
 
+function getPackageSkillsDir(): string {
+  const thisFile = fileURLToPath(import.meta.url);
+  // Walk up from dist/cli/commands/ to package root
+  let dir = dirname(thisFile);
+  while (dir !== dirname(dir)) {
+    if (existsSync(join(dir, "skills", "libretto"))) {
+      return join(dir, "skills", "libretto");
+    }
+    dir = dirname(dir);
+  }
+  throw new Error("Could not locate libretto skill files in package");
+}
+
+async function copySkills(): Promise<void> {
+  const cwd = process.cwd();
+  const agentDirs: { name: string; skillDest: string }[] = [];
+
+  // Detect existing coding agent directories
+  if (existsSync(join(cwd, ".agents"))) {
+    agentDirs.push({
+      name: ".agents",
+      skillDest: join(cwd, ".agents", "skills", "libretto"),
+    });
+  }
+  if (existsSync(join(cwd, ".claude"))) {
+    agentDirs.push({
+      name: ".claude",
+      skillDest: join(cwd, ".claude", "skills", "libretto"),
+    });
+  }
+
+  if (agentDirs.length === 0) {
+    console.log("\nSkills: No .agents/ or .claude/ directory found — skipping skill copy.");
+    return;
+  }
+
+  const dirNames = agentDirs.map((d) => d.name).join(" and ");
+  // Say "Overwrite" if skills already exist in ANY target dir — skills must
+  // be identical across coding agents, so we always copy to all of them.
+  const existing = agentDirs.filter((d) => existsSync(d.skillDest));
+  const verb = existing.length > 0 ? "Overwrite" : "Install";
+
+  const proceed = await askYesNo(`\n${verb} libretto skills in ${dirNames}?`);
+  if (!proceed) {
+    console.log("  Skipping skill copy.");
+    return;
+  }
+
+  let sourceDir: string;
+  try {
+    sourceDir = getPackageSkillsDir();
+  } catch (e) {
+    console.error(`  ✗ ${e instanceof Error ? e.message : String(e)}`);
+    return;
+  }
+
+  for (const { name, skillDest } of agentDirs) {
+    cpSync(sourceDir, skillDest, { recursive: true });
+    const fileCount = readdirSync(skillDest).length;
+    console.log(`  ✓ Copied ${fileCount} skill files to ${name}/skills/libretto/`);
+  }
+}
+
 export const initInput = SimpleCLI.input({
   positionals: [],
   named: {
@@ -227,6 +301,7 @@ export const initCommand = SimpleCLI.command({
     }
 
     if (process.stdin.isTTY) {
+      await copySkills();
       await runInteractiveApiSetup();
     } else {
       printSnapshotApiStatus();
