@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
@@ -55,7 +56,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const show = await librettoCli("ai configure");
-    expect(show.stdout).toContain("Model: google/gemini-2.5-flash");
+    expect(show.stdout).toContain("Model: google/gemini-3-flash-preview");
   });
 
   test("configures vertex provider", async ({ librettoCli, evaluate }) => {
@@ -96,6 +97,7 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("snapshot --objective requires API credentials", async ({
     librettoCli,
+    workspacePath,
   }) => {
     const session = "snapshot-no-creds";
     await librettoCli(
@@ -114,7 +116,15 @@ describe("state-driven CLI subprocess behavior", () => {
         GCLOUD_PROJECT: "",
       },
     );
-    expect(snapshot.stderr).toContain("No API snapshot analyzer is available");
+    expect(snapshot.exitCode).not.toBe(0);
+    expect(snapshot.stdout).not.toContain("Screenshot saved:");
+    expect(snapshot.stderr).toContain(
+      "Failed to analyze snapshot because no snapshot analyzer is configured.",
+    );
+    expect(snapshot.stderr).toContain("For more info, run `npx libretto init`.");
+    expect(
+      existsSync(workspacePath(".libretto", "sessions", session, "snapshots")),
+    ).toBe(false);
   }, 45_000);
 
   test("shows a clear error when --context is provided without --objective", async ({

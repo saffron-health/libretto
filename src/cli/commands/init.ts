@@ -75,6 +75,18 @@ function safeReadAiConfig(): ReturnType<typeof readAiConfig> {
   }
 }
 
+function printInvalidAiConfigWarning(): void {
+  try {
+    readAiConfig();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log("  ! Existing AI config is invalid:");
+    for (const line of message.split("\n")) {
+      console.log(`    ${line}`);
+    }
+  }
+}
+
 function printSnapshotApiStatus(): void {
   const config = safeReadAiConfig();
   const selection = resolveSnapshotApiModel(config);
@@ -85,6 +97,7 @@ function printSnapshotApiStatus(): void {
     "  Libretto uses direct API calls for snapshot analysis when supported credentials are available.",
   );
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
+  printInvalidAiConfigWarning();
 
   if (selection && hasProviderCredentials(selection.provider)) {
     console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
@@ -102,7 +115,7 @@ function printSnapshotApiStatus(): void {
     "      GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
   );
   console.log(
-    "    Or run `npx libretto ai configure <provider>` to set a specific model.",
+    "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
   );
   console.log("    Run `npx libretto init` interactively to set up credentials.");
 }
@@ -115,6 +128,7 @@ async function runInteractiveApiSetup(): Promise<void> {
   console.log("\nSnapshot analysis setup:");
   console.log("  Libretto uses direct API calls for snapshot analysis.");
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
+  printInvalidAiConfigWarning();
 
   if (selection && hasProviderCredentials(selection.provider)) {
     console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
@@ -145,7 +159,7 @@ async function runInteractiveApiSetup(): Promise<void> {
       console.log("    ANTHROPIC_API_KEY=...");
       console.log("    GEMINI_API_KEY=...");
       console.log(
-        "    Or run `npx libretto ai configure <provider>` to set a specific model.",
+        "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
       );
       return;
     }
