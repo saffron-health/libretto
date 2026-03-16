@@ -1,9 +1,9 @@
 import { createInterface } from "node:readline";
 import { appendFileSync, cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readAiConfig } from "../core/ai-config.js";
+import { readAiConfig, readSkillDirs, writeSkillDirs } from "../core/ai-config.js";
 import { REPO_ROOT } from "../core/context.js";
 import {
   loadSnapshotEnv,
@@ -227,36 +227,88 @@ function getPackageSkillsDir(): string {
   throw new Error("Could not locate libretto skill files in package");
 }
 
-async function copySkills(): Promise<void> {
+/**
+ * Auto-detect .agents/ and .claude/ directories at a given root path.
+ */
+function detectAgentDirs(root: string): string[] {
+  const dirs: string[] = [];
+  if (existsSync(join(root, ".agents"))) dirs.push(join(root, ".agents"));
+  if (existsSync(join(root, ".claude"))) dirs.push(join(root, ".claude"));
+  return dirs;
+}
+
+/**
+ * Resolve the skill directories to copy into.
+ * Uses saved config if available, otherwise auto-detects and prompts the user.
+ */
+async function resolveSkillDirs(): Promise<string[] | null> {
+  const saved = readSkillDirs();
+  if (saved && saved.length > 0) {
+    // Validate saved dirs still exist
+    const valid = saved.filter((d) => existsSync(d));
+    if (valid.length > 0) return valid;
+    console.log("  Previously configured skill directories no longer exist.");
+  }
+
+  // Auto-detect from cwd
   const cwd = process.cwd();
-  const agentDirs: { name: string; skillDest: string }[] = [];
+  const detected = detectAgentDirs(cwd);
 
-  // Detect existing coding agent directories
-  if (existsSync(join(cwd, ".agents"))) {
-    agentDirs.push({
-      name: ".agents",
-      skillDest: join(cwd, ".agents", "skills", "libretto"),
-    });
-  }
-  if (existsSync(join(cwd, ".claude"))) {
-    agentDirs.push({
-      name: ".claude",
-      skillDest: join(cwd, ".claude", "skills", "libretto"),
-    });
+  if (detected.length > 0) {
+    const names = detected.map((d) => d.replace(cwd + "/", "")).join(", ");
+    console.log(`  Detected agent directories: ${names}`);
+    const useDetected = await askYesNo("  Use these for skill installation?");
+    if (useDetected) {
+      writeSkillDirs(detected);
+      return detected;
+    }
   }
 
-  if (agentDirs.length === 0) {
-    console.log("\nSkills: No .agents/ or .claude/ directory found — skipping skill copy.");
+  // Prompt for custom path
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const customRoot = await new Promise<string>((resolve) => {
+      rl.question(
+        "  Enter path to directory containing .agents/ and/or .claude/ (or press Enter to skip): ",
+        (answer) => resolve(answer.trim()),
+      );
+    });
+
+    if (!customRoot) return null;
+
+    const resolved = resolve(customRoot);
+    const found = detectAgentDirs(resolved);
+    if (found.length === 0) {
+      console.log(`  No .agents/ or .claude/ found in ${resolved} — skipping.`);
+      return null;
+    }
+
+    const names = found.map((d) => d.replace(resolved + "/", "")).join(", ");
+    console.log(`  Found: ${names}`);
+    writeSkillDirs(found);
+    return found;
+  } finally {
+    rl.close();
+  }
+}
+
+async function copySkills(): Promise<void> {
+  console.log("\nSkill installation:");
+
+  const skillDirs = await resolveSkillDirs();
+  if (!skillDirs || skillDirs.length === 0) {
+    console.log("  Skipping skill copy.");
     return;
   }
 
-  const dirNames = agentDirs.map((d) => d.name).join(" and ");
+  const destinations = skillDirs.map((d) => join(d, "skills", "libretto"));
+  const dirNames = skillDirs.map((d) => basename(d)).join(" and ");
   // Say "Overwrite" if skills already exist in ANY target dir — skills must
   // be identical across coding agents, so we always copy to all of them.
-  const existing = agentDirs.filter((d) => existsSync(d.skillDest));
+  const existing = destinations.filter((d) => existsSync(d));
   const verb = existing.length > 0 ? "Overwrite" : "Install";
 
-  const proceed = await askYesNo(`\n${verb} libretto skills in ${dirNames}?`);
+  const proceed = await askYesNo(`  ${verb} libretto skills in ${dirNames}?`);
   if (!proceed) {
     console.log("  Skipping skill copy.");
     return;
@@ -270,7 +322,9 @@ async function copySkills(): Promise<void> {
     return;
   }
 
-  for (const { name, skillDest } of agentDirs) {
+  for (let i = 0; i < skillDirs.length; i++) {
+    const skillDest = destinations[i];
+    const name = basename(skillDirs[i]);
     // Remove existing dir first so stale files from prior versions don't persist
     if (existsSync(skillDest)) {
       rmSync(skillDest, { recursive: true });
