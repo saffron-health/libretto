@@ -6,16 +6,11 @@ import { getSessionSnapshotRunDir } from "../core/context.js";
 import { condenseDom } from "../../shared/condense-dom/condense-dom.js";
 import { readSessionState } from "../core/session.js";
 import {
-  runInterpret,
   type InterpretArgs,
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readAiConfig } from "../core/ai-config.js";
-import {
-  isSnapshotApiUnavailableError,
-  resolveSnapshotApiModel,
-} from "../core/snapshot-api-config.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
@@ -290,26 +285,7 @@ async function runSnapshot(
     condensedHtmlPath,
   };
 
-  const configuredAi = readAiConfig();
-  if (!resolveSnapshotApiModel(configuredAi)) {
-    await runInterpret(interpretArgs, logger);
-    return;
-  }
-
-  try {
-    await runApiInterpret(interpretArgs, logger, configuredAi);
-  } catch (error) {
-    if (!configuredAi || !isSnapshotApiUnavailableError(error)) {
-      throw error;
-    }
-
-    logger.warn("snapshot-api-interpret-fallback", {
-      reason: "api-unavailable",
-      message: error instanceof Error ? error.message : String(error),
-      session,
-    });
-    await runInterpret(interpretArgs, logger);
-  }
+  await runApiInterpret(interpretArgs, logger, readAiConfig());
 }
 
 export function registerSnapshotCommands(yargs: Argv, logger: LoggerApi): Argv {
