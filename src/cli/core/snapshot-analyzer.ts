@@ -855,36 +855,19 @@ export async function runInterpret(
   }
 
   const configuredAnalyzer = configuredAgent.snapshotAnalyzerConfig;
-  // Legacy path: derive a model string from the preset for budget estimation
-  const legacyModelMap = { codex: "openai/gpt-5.4", claude: "anthropic/claude-sonnet-4-6", gemini: "google/gemini-2.5-flash" };
-  const legacyModel = legacyModelMap[configuredAnalyzer.preset] ?? "openai/gpt-5.4";
-  const selection = buildInlinePromptSelection(
-    args,
-    fullHtmlContent,
-    condensedHtmlContent,
-    legacyModel,
-  );
-  logger.info("interpret-analyzer-config", {
-    preset: configuredAnalyzer.preset,
-    commandPrefix: configuredAnalyzer.commandPrefix,
-    configuredModel: selection.stats.configuredModel,
-    selectedDom: selection.domSource,
-    selectedHtmlEstimatedTokens: selection.htmlEstimatedTokens,
-    selectedPromptEstimatedTokens: selection.promptEstimatedTokens,
-    selectionReason: selection.selectionReason,
-    truncated: selection.truncated,
-  });
-  const parsed = await configuredAgent.analyzeSnapshot(
-    selection.prompt,
-    pngPath,
-    logger,
+  // Legacy CLI-agent path: requires a model string for prompt budget estimation.
+  // The active config format stores model directly; if this legacy path is
+  // re-enabled, the caller must supply a valid provider/model-id string.
+  throw new Error(
+    "The CLI-agent snapshot analysis path is not active. " +
+    "Update your config to the current format with `npx libretto ai configure <provider>`, " +
+    "or set API credentials in .env for direct API analysis.",
   );
 
-  logger.info("interpret-success", {
-    selectorCount: parsed.selectors.length,
-    answer: parsed.answer.slice(0, 200),
-  });
-  console.log(formatInterpretationOutput(parsed));
+  // Preserved for reference — to re-enable, remove the throw above and:
+  // const selection = buildInlinePromptSelection(args, fullHtmlContent, condensedHtmlContent, model);
+  // const parsed = await configuredAgent.analyzeSnapshot(selection.prompt, pngPath, logger);
+  // console.log(formatInterpretationOutput(parsed));
 }
 
 export function canAnalyzeSnapshots(): boolean {
