@@ -26,6 +26,9 @@ export const AiConfigSchema = z
      * Reasoning / thinking configuration.
      * - Claude: passed as --thinking-budget <number>
      * - Codex:  passed as --reasoning-effort <"low"|"medium"|"high">
+     *
+     * CLI-agent-only: used by the CLI agent path (spawns a sub-agent process).
+     * Retained for potential future use; not consumed by the API-based analysis path.
      */
     reasoning: z.union([z.string(), z.number()]).optional(),
     /**
@@ -33,6 +36,9 @@ export const AiConfigSchema = z
      * - Claude: passed as --tools "Read,Grep,Glob"
      * - Codex:  enforced via --sandbox (read-only already in default preset)
      * - Gemini: not supported (ignored)
+     *
+     * CLI-agent-only: used by the CLI agent path (spawns a sub-agent process).
+     * Retained for potential future use; not consumed by the API-based analysis path.
      */
     allowedTools: z.array(z.string()).optional(),
     updatedAt: z.string(),
@@ -55,6 +61,11 @@ export const LibrettoConfigSchema = z
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
 
+/**
+ * CLI-agent-only presets: the commandPrefix arrays define the CLI commands used
+ * to spawn a sub-agent process for the agent-based analysis path.
+ * These are not used by the API-based analysis path.
+ */
 export const AI_CONFIG_PRESETS: Record<AiPreset, Omit<AiConfig, "updatedAt">> = {
   codex: {
     preset: "codex",

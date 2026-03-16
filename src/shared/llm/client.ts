@@ -18,7 +18,6 @@ const SUPPORTED_PROVIDER_ALIASES = {
 	google: "google",
 	gemini: "google",
 	vertex: "vertex",
-	"google-vertex": "vertex",
 	anthropic: "anthropic",
 	codex: "openai",
 	openai: "openai",

@@ -19,17 +19,6 @@ function generateSnapshotRunId(): string {
   return `snapshot-${Date.now()}`;
 }
 
-function printSnapshotPaths(paths: {
-  pngPath: string;
-  htmlPath: string;
-  condensedHtmlPath: string;
-}): void {
-  console.log("Screenshot saved:");
-  console.log(`  PNG:             ${paths.pngPath}`);
-  console.log(`  HTML:            ${paths.htmlPath}`);
-  console.log(`  Condensed HTML:  ${paths.condensedHtmlPath}`);
-}
-
 type SnapshotViewportMetrics = {
   configuredWidth: number | null;
   configuredHeight: number | null;
@@ -269,7 +258,10 @@ async function runSnapshot(
     pageId,
   );
 
-  printSnapshotPaths({ pngPath, htmlPath, condensedHtmlPath });
+  console.log("Screenshot saved:");
+  console.log(`  PNG:             ${pngPath}`);
+  console.log(`  HTML:            ${htmlPath}`);
+  console.log(`  Condensed HTML:  ${condensedHtmlPath}`);
 
   if (!normalizedObjective) {
     console.log("Use --objective flag to analyze snapshots.");
