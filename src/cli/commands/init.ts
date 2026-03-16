@@ -1,16 +1,14 @@
-import type { Argv } from "yargs";
 import { createInterface } from "node:readline";
-import { existsSync, readFileSync, appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import {
-  readAiConfig,
-} from "../core/ai-config.js";
+import { readAiConfig } from "../core/ai-config.js";
 import { REPO_ROOT } from "../core/context.js";
 import {
   loadSnapshotEnv,
   resolveSnapshotApiModel,
 } from "../core/snapshot-api-config.js";
+import { SimpleCLI } from "../framework/simple-cli.js";
 import { hasProviderCredentials } from "../../shared/llm/client.js";
 
 type ProviderChoice = {
@@ -47,7 +45,10 @@ const PROVIDER_CHOICES: ProviderChoice[] = [
   },
 ];
 
-function promptUser(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
+function promptUser(
+  rl: ReturnType<typeof createInterface>,
+  question: string,
+): Promise<string> {
   return new Promise((resolve) => {
     rl.question(question, (answer) => {
       resolve(answer.trim());
@@ -75,15 +76,13 @@ function printSnapshotApiStatus(): void {
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
 
   if (selection && hasProviderCredentials(selection.provider)) {
-    console.log(
-      `  \u2713 Ready: ${selection.model} (${selection.source})`,
-    );
+    console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
     console.log("    Snapshot objectives will use the API analyzer by default.");
     console.log("    No further action required.");
     return;
   }
 
-  console.log("  \u2717 No snapshot API credentials detected.");
+  console.log("  ✗ No snapshot API credentials detected.");
   console.log("    Add one provider to .env:");
   console.log("      OPENAI_API_KEY=...");
   console.log("      ANTHROPIC_API_KEY=...");
@@ -103,20 +102,16 @@ async function runInteractiveApiSetup(): Promise<void> {
   const envPath = join(REPO_ROOT, ".env");
 
   console.log("\nSnapshot analysis setup:");
-  console.log(
-    "  Libretto uses direct API calls for snapshot analysis.",
-  );
+  console.log("  Libretto uses direct API calls for snapshot analysis.");
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
 
   if (selection && hasProviderCredentials(selection.provider)) {
-    console.log(
-      `  \u2713 Ready: ${selection.model} (${selection.source})`,
-    );
+    console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
     console.log("    Snapshot objectives will use the API analyzer by default.");
     return;
   }
 
-  console.log("  \u2717 No snapshot API credentials detected.\n");
+  console.log("  ✗ No snapshot API credentials detected.\n");
 
   const rl = createInterface({
     input: process.stdin,
@@ -144,7 +139,7 @@ async function runInteractiveApiSetup(): Promise<void> {
       return;
     }
 
-    const selected = PROVIDER_CHOICES.find((c) => c.key === answer);
+    const selected = PROVIDER_CHOICES.find((choice) => choice.key === answer);
     if (!selected) {
       console.log(`\n  Unknown choice "${answer}". Skipping API setup.`);
       return;
@@ -153,14 +148,16 @@ async function runInteractiveApiSetup(): Promise<void> {
     console.log(`\n  ${selected.label} selected.`);
     console.log(`  ${selected.envHint}\n`);
 
-    const apiKeyValue = await promptUser(rl, `  Enter your ${selected.envVar}: `);
+    const apiKeyValue = await promptUser(
+      rl,
+      `  Enter your ${selected.envVar}: `,
+    );
 
     if (!apiKeyValue) {
       console.log("\n  No value entered. Skipping API key setup.");
       return;
     }
 
-    // Write to .env file
     let envContent = "";
     if (existsSync(envPath)) {
       envContent = readFileSync(envPath, "utf-8");
@@ -173,19 +170,18 @@ async function runInteractiveApiSetup(): Promise<void> {
         () => envLine,
       );
       writeFileSync(envPath, updated);
-      console.log(`\n  \u2713 Updated ${selected.envVar} in ${envPath}`);
+      console.log(`\n  ✓ Updated ${selected.envVar} in ${envPath}`);
     } else {
       const separator = envContent && !envContent.endsWith("\n") ? "\n" : "";
       appendFileSync(envPath, `${separator}${envLine}\n`);
-      console.log(`\n  \u2713 Added ${selected.envVar} to ${envPath}`);
+      console.log(`\n  ✓ Added ${selected.envVar} to ${envPath}`);
     }
 
-    // Reload env and verify
     loadSnapshotEnv();
     process.env[selected.envVar] = apiKeyValue;
     const newSelection = resolveSnapshotApiModel(safeReadAiConfig());
     if (newSelection && hasProviderCredentials(newSelection.provider)) {
-      console.log(`  \u2713 Snapshot API ready: ${newSelection.model}`);
+      console.log(`  ✓ Snapshot API ready: ${newSelection.model}`);
     }
   } finally {
     rl.close();
@@ -199,42 +195,42 @@ function installBrowsers(): void {
     shell: true,
   });
   if (result.status === 0) {
-    console.log("  \u2713 Playwright Chromium installed");
+    console.log("  ✓ Playwright Chromium installed");
   } else {
     console.error(
-      "  \u2717 Failed to install Playwright Chromium. Run manually: npx playwright install chromium",
+      "  ✗ Failed to install Playwright Chromium. Run manually: npx playwright install chromium",
     );
   }
 }
 
-export function registerInitCommand(yargs: Argv): Argv {
-  return yargs.command(
-    "init",
-    "Initialize libretto in the current project",
-    (cmd) =>
-      cmd.option("skip-browsers", {
-        type: "boolean",
-        default: false,
-        describe: "Skip Playwright Chromium installation",
-      }),
-    async (argv) => {
-      console.log("Initializing libretto...\n");
+export const initInput = SimpleCLI.input({
+  positionals: [],
+  named: {
+    skipBrowsers: SimpleCLI.flag({
+      name: "skip-browsers",
+      help: "Skip Playwright Chromium installation",
+    }),
+  },
+});
 
-      if (!argv["skip-browsers"]) {
-        installBrowsers();
-      } else {
-        console.log("\nSkipping browser installation (--skip-browsers)");
-      }
+export const initCommand = SimpleCLI.command({
+  description: "Initialize libretto in the current project",
+})
+  .input(initInput)
+  .handle(async ({ input }) => {
+    console.log("Initializing libretto...\n");
 
-      // Interactive setup only when stdin is a TTY (real terminal).
-      // In tests/CI/piped contexts, just print status.
-      if (process.stdin.isTTY) {
-        await runInteractiveApiSetup();
-      } else {
-        printSnapshotApiStatus();
-      }
+    if (!input.skipBrowsers) {
+      installBrowsers();
+    } else {
+      console.log("\nSkipping browser installation (--skip-browsers)");
+    }
 
-      console.log("\n\u2713 libretto init complete");
-    },
-  );
-}
+    if (process.stdin.isTTY) {
+      await runInteractiveApiSetup();
+    } else {
+      printSnapshotApiStatus();
+    }
+
+    console.log("\n✓ libretto init complete");
+  });

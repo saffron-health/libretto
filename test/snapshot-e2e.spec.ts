@@ -1,24 +1,17 @@
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
-/**
- * End-to-end snapshot tests.
- *
- * Tests cover:
- * - Snapshot analysis via each supported API provider (OpenAI, Anthropic, Gemini, Vertex).
- *
- * Requirements:
- * - API keys for each provider in .env (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, GOOGLE_CLOUD_PROJECT).
- * - Network access to the target sites.
- * - Playwright Chromium installed.
- * - Saved profile in .libretto/profiles/linkedin.com.json for authenticated LinkedIn test.
- */
-
 const SNAPSHOT_TIMEOUT = 180_000;
 const PAGE_SETTLE_MS = 15_000;
+const REPO_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
+const LINKEDIN_PROFILE_PATH = resolve(
+  REPO_ROOT,
+  ".libretto/profiles/linkedin.com.json",
+);
+const liveSnapshotTest = existsSync(LINKEDIN_PROFILE_PATH) ? test : test.skip;
 
 const ENV_KEYS = [
   "OPENAI_API_KEY",
@@ -29,10 +22,8 @@ const ENV_KEYS = [
   "GCLOUD_PROJECT",
 ] as const;
 
-/** Load API keys from repo root .env so the CLI subprocess can use them. */
 function loadEnvFile(): Record<string, string> {
-  const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-  const envPath = resolve(repoRoot, ".env");
+  const envPath = resolve(REPO_ROOT, ".env");
   const env: Record<string, string> = {};
   if (!existsSync(envPath)) return env;
   for (const line of readFileSync(envPath, "utf-8").split("\n")) {
@@ -49,25 +40,22 @@ function loadEnvFile(): Record<string, string> {
 
 const dotEnv = loadEnvFile();
 
-/** Build env that forwards only the specified keys (from .env and process.env). */
 function buildProviderEnv(...keys: string[]): Record<string, string> {
   const env: Record<string, string> = { LIBRETTO_DISABLE_DOTENV: "1" };
   for (const key of keys) {
     const value = dotEnv[key] || process.env[key];
     if (value) env[key] = value;
   }
-  // Blank out all other provider keys so auto-detection picks the right one
   for (const key of ENV_KEYS) {
     if (!(key in env)) env[key] = "";
   }
   return env;
 }
 
-/** All keys forwarded so auto-detection can pick whichever is available. */
 const allProviderEnv = buildProviderEnv(...ENV_KEYS);
 
 async function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
+  return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 }
 
 const LINKEDIN_SELECTOR_ASSERTION =
@@ -75,10 +63,6 @@ const LINKEDIN_SELECTOR_ASSERTION =
   "Specifically: (1) post content should use a data-testid attribute or similar robust selector, " +
   "(2) poster names should target elements within feed list items, " +
   "(3) all selectors must reference real HTML attributes visible in a LinkedIn feed page.";
-
-const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-const linkedinProfilePath = resolve(repoRoot, ".libretto/profiles/linkedin.com.json");
-const hasLinkedInProfile = existsSync(linkedinProfilePath);
 
 type ProviderTestConfig = {
   name: string;
@@ -116,7 +100,7 @@ function hasProviderKeys(config: ProviderTestConfig): boolean {
 const hasAnyProviderKey = ENV_KEYS.some((key) => Boolean(dotEnv[key] || process.env[key]));
 
 describe("snapshot e2e – live site analysis", () => {
-  test(
+  liveSnapshotTest(
     "linkedin feed: identifies selectors (auto-detected provider)",
     async ({ librettoCli, evaluate, seedProfile }) => {
       if (!hasAnyProviderKey) {
@@ -125,10 +109,7 @@ describe("snapshot e2e – live site analysis", () => {
       }
 
       const session = "snapshot-e2e-linkedin-auto";
-
-      if (hasLinkedInProfile) {
-        await seedProfile("linkedin.com", linkedinProfilePath);
-      }
+      await seedProfile("linkedin.com", LINKEDIN_PROFILE_PATH);
 
       await librettoCli(
         `open https://www.linkedin.com/feed/ --headless --session ${session}`,
@@ -145,7 +126,7 @@ describe("snapshot e2e – live site analysis", () => {
 
       await librettoCli(`close --session ${session}`);
 
-      const output = snapshot.stdout + "\n" + snapshot.stderr;
+      const output = `${snapshot.stdout}\n${snapshot.stderr}`;
 
       console.log(`[linkedin/auto] snapshot took ${snapshotDurationMs}ms`);
       console.log(`[linkedin/auto] output:\n${output}`);
@@ -156,25 +137,20 @@ describe("snapshot e2e – live site analysis", () => {
   );
 
   for (const provider of PROVIDERS) {
-    const skip = !hasProviderKeys(provider);
-
-    test(
+    liveSnapshotTest(
       `linkedin feed: identifies selectors via ${provider.name}`,
       async ({ librettoCli, evaluate, seedProfile }) => {
-        if (skip) {
-          console.log(`[linkedin/${provider.name}] skipped: missing ${provider.envKeys.join(", ")}`);
+        if (!hasProviderKeys(provider)) {
+          console.log(
+            `[linkedin/${provider.name}] skipped: missing ${provider.envKeys.join(", ")}`,
+          );
           return;
         }
 
         const session = `snapshot-e2e-linkedin-${provider.name.toLowerCase().replace(/\s+/g, "-")}`;
+        await seedProfile("linkedin.com", LINKEDIN_PROFILE_PATH);
 
-        if (hasLinkedInProfile) {
-          await seedProfile("linkedin.com", linkedinProfilePath);
-        }
-
-        // Configure the specific model via ai configure
         await librettoCli(`ai configure ${provider.model}`);
-
         await librettoCli(
           `open https://www.linkedin.com/feed/ --headless --session ${session}`,
         );
@@ -182,7 +158,6 @@ describe("snapshot e2e – live site analysis", () => {
         await sleep(PAGE_SETTLE_MS);
 
         const providerEnv = buildProviderEnv(...provider.envKeys);
-
         const snapshotStart = Date.now();
         const snapshot = await librettoCli(
           `snapshot --session ${session} --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
@@ -192,9 +167,11 @@ describe("snapshot e2e – live site analysis", () => {
 
         await librettoCli(`close --session ${session}`);
 
-        const output = snapshot.stdout + "\n" + snapshot.stderr;
+        const output = `${snapshot.stdout}\n${snapshot.stderr}`;
 
-        console.log(`[linkedin/${provider.name}] snapshot took ${snapshotDurationMs}ms`);
+        console.log(
+          `[linkedin/${provider.name}] snapshot took ${snapshotDurationMs}ms`,
+        );
         console.log(`[linkedin/${provider.name}] output:\n${output}`);
 
         expect(output).toContain("Interpretation (via API):");
