@@ -31,11 +31,15 @@ export const ViewportConfigSchema = z.object({
 });
 export type ViewportConfig = z.infer<typeof ViewportConfigSchema>;
 
+export const SkillDirsSchema = z.array(z.string().min(1));
+export type SkillDirs = z.infer<typeof SkillDirsSchema>;
+
 export const LibrettoConfigSchema = z
   .object({
     version: z.literal(CURRENT_CONFIG_VERSION),
     ai: AiConfigSchema.optional(),
     viewport: ViewportConfigSchema.optional(),
+    skillDirs: SkillDirsSchema.optional(),
   })
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
@@ -119,6 +123,27 @@ export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolea
     configPath,
   );
   return true;
+}
+
+export function readSkillDirs(configPath: string = LIBRETTO_CONFIG_PATH): string[] | null {
+  return readLibrettoConfig(configPath).skillDirs ?? null;
+}
+
+export function writeSkillDirs(
+  dirs: string[],
+  configPath: string = LIBRETTO_CONFIG_PATH,
+): string[] {
+  const librettoConfig = readLibrettoConfig(configPath);
+  const skillDirs = SkillDirsSchema.parse(dirs);
+  writeLibrettoConfig(
+    {
+      ...librettoConfig,
+      version: CURRENT_CONFIG_VERSION,
+      skillDirs,
+    },
+    configPath,
+  );
+  return skillDirs;
 }
 
 function printAiConfig(config: AiConfig, configPath: string): void {
