@@ -73,6 +73,8 @@ type SnapshotBudget = {
   source: string;
 };
 
+const DEFAULT_MAX_HTML_CHARS = 100_000;
+
 type SnapshotDomStats = {
   fullDomChars: number;
   fullDomEstimatedTokens: number;
@@ -586,6 +588,18 @@ function estimateTokensFromChars(chars: number): number {
   return Math.ceil(chars / 4);
 }
 
+function resolveMaxHtmlChars(): number {
+  const raw = process.env.LIBRETTO_SNAPSHOT_MAX_HTML_CHARS?.trim();
+  if (!raw) return DEFAULT_MAX_HTML_CHARS;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_MAX_HTML_CHARS;
+  }
+
+  return parsed;
+}
+
 function inferContextWindowTokens(
   model: string,
 ): { contextWindowTokens: number; source: string } {
@@ -695,6 +709,7 @@ export function buildInlinePromptSelection(
   model: string,
 ): InlinePromptSelection {
   const budget = buildSnapshotBudget(model);
+  const maxHtmlChars = resolveMaxHtmlChars();
   const stats: SnapshotDomStats = {
     fullDomChars: fullHtmlContent.length,
     fullDomEstimatedTokens: estimateTokensFromChars(fullHtmlContent.length),
@@ -740,38 +755,49 @@ export function buildInlinePromptSelection(
     false,
   );
   if (fullCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
-    const selectionReason =
-      `Full DOM fits within the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} <= ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`;
-    const prompt = buildInlineHtmlPrompt(args, {
-      htmlContent: fullHtmlContent,
-      domLabel: "full DOM",
-      truncated: false,
-      selectionReason,
-      budget,
-      stats,
-    });
-    return {
-      ...fullCandidate,
-      selectionReason,
-      prompt,
-      promptEstimatedTokens: estimateTokensFromChars(prompt.length),
-    };
+    if (fullHtmlContent.length <= maxHtmlChars) {
+      const selectionReason =
+        `Full DOM fits within the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} <= ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`;
+      const prompt = buildInlineHtmlPrompt(args, {
+        htmlContent: fullHtmlContent,
+        domLabel: "full DOM",
+        truncated: false,
+        selectionReason,
+        budget,
+        stats,
+      });
+      return {
+        ...fullCandidate,
+        selectionReason,
+        prompt,
+        promptEstimatedTokens: estimateTokensFromChars(prompt.length),
+      };
+    }
   }
 
   // Fall back to condensed DOM
-  const condensedReason = `Full DOM would exceed the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} > ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the condensed DOM instead.`;
+  const fullDomExceededBudget =
+    fullCandidate.promptEstimatedTokens > budget.promptBudgetTokens;
+  const condensedReason = fullDomExceededBudget
+    ? `Full DOM would exceed the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} > ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the condensed DOM instead.`
+    : `Full DOM exceeds the HTML size cap (${fullHtmlContent.length.toLocaleString()} > ${maxHtmlChars.toLocaleString()} chars), so the analyzer receives the condensed DOM instead.`;
   const condensedCandidate = buildCandidate(
     "condensed",
     condensedHtmlContent,
     condensedReason,
     false,
   );
-  if (condensedCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
+  if (
+    condensedCandidate.promptEstimatedTokens <= budget.promptBudgetTokens
+    && condensedHtmlContent.length <= maxHtmlChars
+  ) {
     return condensedCandidate;
   }
 
   // Truncate condensed DOM as last resort
-  const truncateReason = `Both full and condensed DOM snapshots exceed the estimated prompt budget (full ~${fullCandidate.promptEstimatedTokens.toLocaleString()}, condensed ~${condensedCandidate.promptEstimatedTokens.toLocaleString()}, budget ${budget.promptBudgetTokens.toLocaleString()} tokens), so the condensed DOM is truncated to fit.`;
+  const truncateReason = fullDomExceededBudget
+    ? `Both full and condensed DOM snapshots exceed the analyzer limits (full ~${fullCandidate.promptEstimatedTokens.toLocaleString()} tokens, condensed ~${condensedCandidate.promptEstimatedTokens.toLocaleString()} tokens / ${condensedHtmlContent.length.toLocaleString()} chars, budget ${budget.promptBudgetTokens.toLocaleString()} tokens, cap ${maxHtmlChars.toLocaleString()} chars), so the condensed DOM is truncated to fit.`
+    : `The full DOM exceeds the HTML size cap (${fullHtmlContent.length.toLocaleString()} > ${maxHtmlChars.toLocaleString()} chars), and the condensed DOM still exceeds the analyzer limits (~${condensedCandidate.promptEstimatedTokens.toLocaleString()} tokens / ${condensedHtmlContent.length.toLocaleString()} chars), so the condensed DOM is truncated to fit.`;
   const basePrompt = buildInlineHtmlPrompt(args, {
     htmlContent: "",
     domLabel: "condensed DOM",
@@ -784,7 +810,10 @@ export function buildInlinePromptSelection(
     2_000,
     budget.promptBudgetTokens - estimateTokensFromChars(basePrompt.length),
   );
-  const truncatedHtml = truncateText(condensedHtmlContent, availableHtmlTokens * 4);
+  const truncatedHtml = truncateText(
+    condensedHtmlContent,
+    Math.min(maxHtmlChars, availableHtmlTokens * 4),
+  );
 
   return buildCandidate(
     "condensed",
