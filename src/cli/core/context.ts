@@ -1,28 +1,12 @@
 import { Logger, createFileLogSink } from "../../shared/logger/index.js";
 import type { LLMClient } from "../../shared/llm/index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
-import { spawnSync } from "node:child_process";
-import { cwd } from "node:process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { resolveLibrettoRepoRoot } from "../../shared/paths/repo-root.js";
 import { validateSessionName } from "./session.js";
 
-function getRepoRoot(): string {
-  const override = process.env.LIBRETTO_REPO_ROOT?.trim();
-  if (override) {
-    return resolve(override);
-  }
-
-  const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
-    encoding: "utf-8",
-  });
-  if (result.status === 0 && result.stdout) {
-    return result.stdout.trim();
-  }
-  return cwd();
-}
-
-export const REPO_ROOT = getRepoRoot();
+export const REPO_ROOT = resolveLibrettoRepoRoot();
 export const LIBRETTO_CONFIG_DIR = join(REPO_ROOT, ".libretto");
 export const LIBRETTO_CONFIG_PATH = join(LIBRETTO_CONFIG_DIR, "config.json");
 export const PROFILES_DIR = join(LIBRETTO_CONFIG_DIR, "profiles");
