@@ -8,3 +8,4 @@ dist/
 temp/
 benchmarks/**/runs/
 .libretto/
+tmp/
