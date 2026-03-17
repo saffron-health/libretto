@@ -498,6 +498,7 @@ async function runIntegrationFromFile(
     session: args.session,
     params: args.params,
     headless: args.headless,
+    visualize: args.visualize,
     authProfileDomain: args.authProfileDomain,
   } satisfies RunIntegrationWorkerRequest);
   const worker = spawn(process.execPath, [
@@ -575,7 +576,7 @@ export function createExecCommand(logger: LoggerApi) {
 }
 
 const runUsage =
-  `Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless]`;
+  `Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -600,6 +601,10 @@ export const runInput = SimpleCLI.input({
     }),
     headed: SimpleCLI.flag({ help: "Run in headed mode" }),
     headless: SimpleCLI.flag({ help: "Run in headless mode" }),
+    noVisualize: SimpleCLI.flag({
+      name: "no-visualize",
+      help: "Disable ghost cursor + highlight visualization in headed mode",
+    }),
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
       help: "Domain for local auth profile (e.g. apps.example.com)",
@@ -650,6 +655,7 @@ export function createRunCommand(logger: LoggerApi) {
         : input.headless
           ? true
           : undefined;
+      const visualize = !input.noVisualize;
 
       await runIntegrationFromFile({
         integrationPath: input.integrationFile!,
@@ -658,6 +664,7 @@ export function createRunCommand(logger: LoggerApi) {
         params,
         tsconfigPath: input.tsconfig,
         headless: headlessMode ?? false,
+        visualize,
         authProfileDomain: input.authProfile,
       }, logger);
     });

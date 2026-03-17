@@ -62,6 +62,19 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
+  test("prints run help with explicit visualization disable flag", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("help run");
+    expect(result.stdout).toContain("Run an exported Libretto workflow from a file");
+    expect(result.stdout).toContain("Usage: libretto run [integrationFile] [integrationExport] [options]");
+    expect(result.stdout).toContain("--no-visualize");
+    expect(result.stdout).toContain(
+      "Disable ghost cursor + highlight visualization in headed mode",
+    );
+    expect(result.stderr).toBe("");
+  });
+
   test("accepts global --session on non-session commands", async ({
     librettoCli,
     evaluate,

@@ -1,9 +1,11 @@
+import type { BrowserContext } from "playwright";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+  instrumentContext,
   launchBrowser,
   type LibrettoWorkflowContext,
 } from "../../index.js";
@@ -198,6 +200,24 @@ async function loadWorkflowExport(
   return targetExport;
 }
 
+export async function installHeadedWorkflowVisualization(args: {
+  context: BrowserContext;
+  headless: boolean;
+  visualize?: boolean;
+  logger: LoggerApi;
+  instrument?: typeof instrumentContext;
+}): Promise<boolean> {
+  if (args.headless || args.visualize === false) {
+    return false;
+  }
+
+  await (args.instrument ?? instrumentContext)(args.context, {
+    visualize: true,
+    logger: args.logger,
+  });
+  return true;
+}
+
 async function runIntegrationInternal(
   args: RunIntegrationWorkerRequest,
   options: {
@@ -242,6 +262,12 @@ async function runIntegrationInternal(
     sessionName: args.session,
     headless: args.headless,
     storageStatePath,
+  });
+  await installHeadedWorkflowVisualization({
+    context: browserSession.context,
+    headless: args.headless,
+    visualize: args.visualize,
+    logger: integrationLogger,
   });
   const actionsLogPath = getSessionActionsLogPath(args.session);
   const networkLogPath = getSessionNetworkLogPath(args.session);
