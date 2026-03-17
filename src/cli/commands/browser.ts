@@ -8,7 +8,6 @@ import {
   runSave,
 } from "../core/browser.js";
 import { withSessionLogger } from "../core/context.js";
-import { assertSessionAvailableForStart } from "../core/session.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   loadSessionStateMiddleware,
@@ -70,7 +69,6 @@ export function createOpenCommand(logger: LoggerApi) {
     .input(openInput)
     .use(resolveSessionMiddleware)
     .handle(async ({ input, ctx }) => {
-      assertSessionAvailableForStart(ctx.session, logger);
       const headed = input.headed || !input.headless;
       const viewport = parseViewportArg(input.viewport);
       await runOpen(input.url!, headed, ctx.session, logger, { viewport });

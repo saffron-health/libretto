@@ -17,6 +17,7 @@ import {
   getSessionStatePath,
 } from "../core/context.js";
 import { getPauseSignalPaths, removeSignalIfExists } from "../core/pause-signals.js";
+import { clearSessionState } from "../core/session.js";
 import { installSessionTelemetry } from "../core/session-telemetry.js";
 import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol.js";
 
@@ -281,11 +282,33 @@ async function runIntegrationInternal(
         ),
         "utf8",
       );
-      await waitForFailureSessionRelease({
-        session: args.session,
-        expectedPid: process.pid,
-        logger,
+
+      const browserDisconnected = new Promise<"disconnected">((resolve) => {
+        if (!browserSession.browser.isConnected()) {
+          resolve("disconnected");
+          return;
+        }
+        browserSession.browser.on("disconnected", () =>
+          resolve("disconnected"),
+        );
       });
+
+      const releaseReason = await Promise.race([
+        waitForFailureSessionRelease({
+          session: args.session,
+          expectedPid: process.pid,
+          logger,
+        }).then(() => "released" as const),
+        browserDisconnected,
+      ]);
+
+      if (releaseReason === "disconnected") {
+        logger.info("run-failure-browser-disconnected", {
+          session: args.session,
+        });
+        clearSessionState(args.session, logger);
+      }
+
       return { status: "failed-held" };
     }
     await writeFile(

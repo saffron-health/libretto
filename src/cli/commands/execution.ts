@@ -11,8 +11,8 @@ import {
 } from "../core/browser.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
-  assertSessionAvailableForStart,
   clearSessionState,
+  ensureSessionAvailableForStart,
   readSessionState,
   setSessionStatus,
   type SessionState,
@@ -642,7 +642,7 @@ export function createRunCommand(logger: LoggerApi) {
     .use(resolveSessionMiddleware)
     .handle(async ({ input, ctx }) => {
       await stopExistingFailedRunSession(ctx.session, logger);
-      assertSessionAvailableForStart(ctx.session, logger);
+      await ensureSessionAvailableForStart(ctx.session, logger);
 
       const params = resolveRunParams(input.params, input.paramsFile);
       const headlessMode = input.headed

@@ -178,6 +178,136 @@ function isPidRunning(pid: number): boolean {
   }
 }
 
+export type SessionHealthStatus =
+  | "missing"
+  | "healthy"
+  | "stale-no-process"
+  | "stale-no-browser"
+  | "stale-no-pages";
+
+function isOperationalTarget(target: { type?: string; url?: string }): boolean {
+  return (
+    target.type === "page" &&
+    typeof target.url === "string" &&
+    !target.url.startsWith("devtools://") &&
+    !target.url.startsWith("chrome-error://")
+  );
+}
+
+export async function probeSessionHealth(
+  session: string,
+  logger?: LoggerApi,
+): Promise<{ status: SessionHealthStatus; state: SessionState | null }> {
+  const state = readSessionState(session, logger);
+  if (!state) return { status: "missing", state: null };
+
+  if (!isPidRunning(state.pid)) {
+    return { status: "stale-no-process", state };
+  }
+
+  try {
+    const versionRes = await fetch(
+      `http://127.0.0.1:${state.port}/json/version`,
+      { signal: AbortSignal.timeout(3000) },
+    );
+    if (!versionRes.ok) {
+      return { status: "stale-no-browser", state };
+    }
+  } catch {
+    return { status: "stale-no-browser", state };
+  }
+
+  try {
+    const listRes = await fetch(
+      `http://127.0.0.1:${state.port}/json/list`,
+      { signal: AbortSignal.timeout(3000) },
+    );
+    if (!listRes.ok) {
+      return { status: "stale-no-pages", state };
+    }
+    const targets = (await listRes.json()) as Array<{
+      type?: string;
+      url?: string;
+    }>;
+    const hasOperational = targets.some(isOperationalTarget);
+    return {
+      status: hasOperational ? "healthy" : "stale-no-pages",
+      state,
+    };
+  } catch {
+    return { status: "stale-no-pages", state };
+  }
+}
+
+export async function reclaimStaleSession(
+  session: string,
+  logger?: LoggerApi,
+): Promise<void> {
+  const state = readSessionState(session, logger);
+  if (!state) return;
+
+  logger?.info("session-reclaim-start", {
+    session,
+    pid: state.pid,
+    port: state.port,
+  });
+
+  if (isPidRunning(state.pid)) {
+    try {
+      process.kill(state.pid, "SIGTERM");
+    } catch {}
+    const deadline = Date.now() + 2000;
+    while (isPidRunning(state.pid) && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    if (isPidRunning(state.pid)) {
+      try {
+        process.kill(state.pid, "SIGKILL");
+      } catch {}
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+
+  clearSessionState(session, logger);
+  logger?.info("session-reclaim-complete", { session });
+}
+
+export async function ensureSessionAvailableForStart(
+  session: string,
+  logger?: LoggerApi,
+): Promise<void> {
+  const { status, state } = await probeSessionHealth(session, logger);
+
+  if (status === "missing") return;
+
+  if (status === "stale-no-process") {
+    logger?.info("session-reclaim-dead-process", {
+      session,
+      pid: state!.pid,
+    });
+    clearSessionState(session, logger);
+    return;
+  }
+
+  if (status === "stale-no-browser" || status === "stale-no-pages") {
+    logger?.info("session-reclaim-stale", {
+      session,
+      status,
+      pid: state!.pid,
+    });
+    console.log(
+      `Reclaiming stale session "${session}" (${status === "stale-no-browser" ? "browser unreachable" : "no open pages"}).`,
+    );
+    await reclaimStaleSession(session, logger);
+    return;
+  }
+
+  const endpoint = `http://127.0.0.1:${state!.port}`;
+  throw new Error(
+    `Session "${session}" is already open and connected to ${endpoint} (pid ${state!.pid}). Create a new session or close the current one with: libretto close --session ${session}`,
+  );
+}
+
 export function setSessionStatus(
   session: string,
   status: SessionStatus,
