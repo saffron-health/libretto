@@ -114,5 +114,5 @@ Target layout:
 - [ ] Update CLI fixtures/tests to seed/assert the new `.libretto` layout.
 - [ ] Add regression coverage that asserts commands do not create legacy temp runtime paths outside `.libretto/`.
 - [x] Update usage/help text and README references from old paths to `.libretto`.
-- [ ] Update root `.gitignore` policy to stop relying on `.libretto/` and `tmp/` for libretto runtime state; keep ignores aligned with new `.libretto/.gitignore`.
+- [ ] Update root `.gitignore` policy to stop relying on root-level `.libretto/` and `tmp/` ignore entries for libretto runtime state; keep ignores aligned with new `.libretto/.gitignore`.
 - [ ] Success criteria: `pnpm test` and `pnpm type-check` pass with updated path expectations.
