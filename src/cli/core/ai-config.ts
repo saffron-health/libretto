@@ -17,12 +17,10 @@ export const CURRENT_CONFIG_VERSION = 1;
  * code is preserved in snapshot-analyzer.ts but is not wired into the snapshot
  * command.
  */
-export const AiConfigSchema = z
-  .object({
-    model: z.string().min(1),
-    updatedAt: z.string(),
-  })
-  .strict();
+export const AiConfigSchema = z.object({
+  model: z.string().min(1),
+  updatedAt: z.string(),
+});
 export type AiConfig = z.infer<typeof AiConfigSchema>;
 
 export const ViewportConfigSchema = z.object({
@@ -136,7 +134,9 @@ export function writeLibrettoConfig(
   return parsed;
 }
 
-export function readAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): AiConfig | null {
+export function readAiConfig(
+  configPath: string = LIBRETTO_CONFIG_PATH,
+): AiConfig | null {
   return readLibrettoConfig(configPath).ai ?? null;
 }
 
@@ -160,7 +160,9 @@ export function writeAiConfig(
   return ai;
 }
 
-export function clearAiConfig(configPath: string = LIBRETTO_CONFIG_PATH): boolean {
+export function clearAiConfig(
+  configPath: string = LIBRETTO_CONFIG_PATH,
+): boolean {
   const librettoConfig = readLibrettoConfig(configPath);
   if (!librettoConfig.ai) return false;
   const { ai: _ai, ...rest } = librettoConfig;
@@ -239,8 +241,8 @@ export function runAiConfigure(
   if (!model) {
     console.log(
       `Usage: ${configureCommandName} <${CONFIGURE_PROVIDERS.join("|")}|provider/model-id>\n` +
-      `       ${configureCommandName}\n` +
-      `       ${configureCommandName} --clear`,
+        `       ${configureCommandName}\n` +
+        `       ${configureCommandName} --clear`,
     );
     throw new Error(
       `Invalid provider or model. Use one of: ${formatConfigureProviders()}, or a full model string like "openai/gpt-4o".`,

@@ -1,14 +1,7 @@
 {
   "version": 1,
   "ai": {
-    "preset": "codex",
-    "commandPrefix": [
-      "codex",
-      "exec",
-      "--skip-git-repo-check",
-      "--sandbox",
-      "read-only"
-    ],
-    "updatedAt": "2026-03-06T04:10:02.651Z"
+    "model": "openai/gpt-5.4",
+    "updatedAt": "2026-03-16T00:00:00.000Z"
   }
 }
