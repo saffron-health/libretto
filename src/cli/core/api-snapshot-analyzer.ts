@@ -56,6 +56,7 @@ export async function runApiInterpret(
     contextWindowTokens: promptSelection.budget.contextWindowTokens,
     promptBudgetTokens: promptSelection.budget.promptBudgetTokens,
     selectedDom: promptSelection.domSource,
+    selectedHtmlChars: promptSelection.htmlChars,
     selectedHtmlEstimatedTokens: promptSelection.htmlEstimatedTokens,
     selectedPromptEstimatedTokens: promptSelection.promptEstimatedTokens,
     selectionReason: promptSelection.selectionReason,

@@ -269,7 +269,7 @@ async function stopExistingFailedRunSession(
   logger.info("run-release-existing-failed-session", {
     session,
     pid: existingState.pid,
-    port: existingState.port,
+    provider: existingState.provider,
   });
   clearSessionState(session, logger);
 

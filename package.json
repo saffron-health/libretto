@@ -74,6 +74,7 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
+    "@onkernel/sdk": "^0.43.0",
     "ai": "^6.0.116",
     "playwright": "^1.58.2",
     "tsx": "^4.21.0",

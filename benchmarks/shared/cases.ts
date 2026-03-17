@@ -70,6 +70,10 @@ export function formatBenchmarkSessionName(
   return slugify(`${benchmark}-${caseId}`);
 }
 
+export function getBenchmarkWorkspaceCliScript(): string {
+  return 'KERNEL_API_KEY="$BENCHMARKS_KERNEL_API_KEY" LIBRETTO_BROWSER_PROVIDER=kernel LIBRETTO_REPO_ROOT=. node ./dist/cli/index.js';
+}
+
 export function getBenchmarkCliCommandPrefix(): string {
   return BENCHMARK_CLI_PREFIX;
 }
@@ -170,6 +174,8 @@ export function buildBrowserBenchmarkPrompt(
     "Do not inspect files under benchmarks/ to discover the answer.",
     `Use exactly one Libretto session named "${session}".`,
     `Open the site with: ${cli} open ${testCase.startUrl} --headless --session ${session}`,
+    "If you encounter a CAPTCHA or Cloudflare challenge, call the `solve-captcha` tool instead of waiting manually. Pass the session name and the URL/title substring you expect after the challenge, and do not click the challenge UI yourself.",
+    `Use ${cli} snapshot --session ${session} --objective "<...>" at least once before your final answer.`,
     `Before finishing, run: ${cli} exec --session ${session} "return { url: await page.url(), title: await page.title() }"`,
     `Then close the browser with: ${cli} close --session ${session}`,
     testCase.finalResultInstruction ??
@@ -422,7 +428,7 @@ async function createWorkspacePackageJson(
         private: true,
         type: "module",
         scripts: {
-          cli: "LIBRETTO_REPO_ROOT=. node ./dist/cli/index.js",
+          cli: getBenchmarkWorkspaceCliScript(),
         },
         bin: {
           libretto: "./dist/cli/index.js",

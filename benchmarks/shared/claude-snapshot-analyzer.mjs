@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
@@ -34,18 +35,21 @@ function extractPromptAndScreenshotPath(rawPrompt) {
   };
 }
 
-async function readPromptInput() {
-  const argvPrompt = process.argv.slice(2).join(" ").trim();
+export async function readPromptInput({
+  argv = process.argv.slice(2),
+  stdin = process.stdin,
+} = {}) {
+  const argvPrompt = argv.join(" ").trim();
   if (argvPrompt) {
     return argvPrompt;
   }
 
-  if (process.stdin.isTTY) {
+  if (stdin.isTTY) {
     return "";
   }
 
   let stdinPrompt = "";
-  for await (const chunk of process.stdin) {
+  for await (const chunk of stdin) {
     stdinPrompt += chunk.toString();
   }
   return stdinPrompt.trim();
@@ -59,7 +63,9 @@ async function main() {
 
   const rawPrompt = await readPromptInput();
   if (!rawPrompt) {
-    throw new Error("Benchmark snapshot analyzer expected a prompt on argv or stdin.");
+    throw new Error(
+      "Benchmark snapshot analyzer expected a prompt via argument or stdin.",
+    );
   }
 
   const { prompt, pngPath } = extractPromptAndScreenshotPath(rawPrompt);
@@ -99,8 +105,14 @@ async function main() {
   process.stdout.write(JSON.stringify(result.object));
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
-});
+const isMain =
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  main().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${message}\n`);
+    process.exit(1);
+  });
+}

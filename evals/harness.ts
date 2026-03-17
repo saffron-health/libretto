@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   query,
+  type HookCallbackMatcher,
+  type HookEvent,
+  type McpServerConfig,
   type Options,
   type PermissionMode,
   type NonNullableUsage,
@@ -421,6 +424,8 @@ export type ClaudeEvalHarnessOptions = {
   maxTurns?: number;
   permissionMode?: PermissionMode;
   settingSources?: SettingSource[];
+  mcpServers?: Record<string, McpServerConfig>;
+  hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
   allowedTools?: string[];
   stopOnFinalResult?: boolean;
 };
@@ -492,6 +497,8 @@ export class ClaudeEvalHarness {
   private readonly maxTurns: number;
   private readonly permissionMode: PermissionMode;
   private readonly settingSources: SettingSource[];
+  private readonly mcpServers?: Record<string, McpServerConfig>;
+  private readonly hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
   private readonly systemPromptAppend: string | null;
   private readonly allowedTools: string[];
   private readonly stopOnFinalResult: boolean;
@@ -504,10 +511,11 @@ export class ClaudeEvalHarness {
     this.maxTurns = options.maxTurns ?? 20;
     this.permissionMode = options.permissionMode ?? "bypassPermissions";
     this.settingSources = options.settingSources ?? ["project"];
+    this.mcpServers = options.mcpServers;
+    this.hooks = options.hooks;
     this.allowedTools = options.allowedTools ?? [];
     this.systemPromptAppend = options.systemPromptAppend?.trim() || null;
     this.stopOnFinalResult = options.stopOnFinalResult === true;
-
     this.sessionId = randomUUID();
   }
 
@@ -522,8 +530,18 @@ export class ClaudeEvalHarness {
       tools: { type: "preset", preset: "claude_code" },
       settingSources: this.settingSources,
       permissionMode: this.permissionMode,
+      mcpServers: this.mcpServers,
+      hooks: this.hooks,
       allowedTools: this.allowedTools,
     };
+
+    if (this.mcpServers) {
+      options.mcpServers = this.mcpServers;
+    }
+
+    if (this.hooks) {
+      options.hooks = this.hooks;
+    }
 
     if (this.systemPromptAppend) {
       options.systemPrompt = {
