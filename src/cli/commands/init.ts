@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline";
 import { appendFileSync, cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readAiConfig } from "../core/ai-config.js";
 import { REPO_ROOT } from "../core/context.js";
@@ -75,6 +75,18 @@ function safeReadAiConfig(): ReturnType<typeof readAiConfig> {
   }
 }
 
+function printInvalidAiConfigWarning(): void {
+  try {
+    readAiConfig();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log("  ! Existing AI config is invalid:");
+    for (const line of message.split("\n")) {
+      console.log(`    ${line}`);
+    }
+  }
+}
+
 function printSnapshotApiStatus(): void {
   const config = safeReadAiConfig();
   const selection = resolveSnapshotApiModel(config);
@@ -85,6 +97,7 @@ function printSnapshotApiStatus(): void {
     "  Libretto uses direct API calls for snapshot analysis when supported credentials are available.",
   );
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
+  printInvalidAiConfigWarning();
 
   if (selection && hasProviderCredentials(selection.provider)) {
     console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
@@ -102,7 +115,7 @@ function printSnapshotApiStatus(): void {
     "      GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
   );
   console.log(
-    "    Or run `npx libretto ai configure <provider>` to set a specific model.",
+    "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
   );
   console.log("    Run `npx libretto init` interactively to set up credentials.");
 }
@@ -115,6 +128,7 @@ async function runInteractiveApiSetup(): Promise<void> {
   console.log("\nSnapshot analysis setup:");
   console.log("  Libretto uses direct API calls for snapshot analysis.");
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
+  printInvalidAiConfigWarning();
 
   if (selection && hasProviderCredentials(selection.provider)) {
     console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
@@ -145,7 +159,7 @@ async function runInteractiveApiSetup(): Promise<void> {
       console.log("    ANTHROPIC_API_KEY=...");
       console.log("    GEMINI_API_KEY=...");
       console.log(
-        "    Or run `npx libretto ai configure <provider>` to set a specific model.",
+        "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
       );
       return;
     }
@@ -227,33 +241,29 @@ function getPackageSkillsDir(): string {
   throw new Error("Could not locate libretto skill files in package");
 }
 
-async function copySkills(): Promise<void> {
-  const cwd = process.cwd();
-  const agentDirs: { name: string; skillDest: string }[] = [];
+/**
+ * Auto-detect .agents/ and .claude/ directories at a given root path.
+ */
+function detectAgentDirs(root: string): string[] {
+  const dirs: string[] = [];
+  if (existsSync(join(root, ".agents"))) dirs.push(join(root, ".agents"));
+  if (existsSync(join(root, ".claude"))) dirs.push(join(root, ".claude"));
+  return dirs;
+}
 
-  // Detect existing coding agent directories
-  if (existsSync(join(cwd, ".agents"))) {
-    agentDirs.push({
-      name: ".agents",
-      skillDest: join(cwd, ".agents", "skills", "libretto"),
-    });
-  }
-  if (existsSync(join(cwd, ".claude"))) {
-    agentDirs.push({
-      name: ".claude",
-      skillDest: join(cwd, ".claude", "skills", "libretto"),
-    });
-  }
+async function copySkills(): Promise<void> {
+  const agentDirs = detectAgentDirs(REPO_ROOT);
 
   if (agentDirs.length === 0) {
-    console.log("\nSkills: No .agents/ or .claude/ directory found — skipping skill copy.");
+    console.log("\nSkills: No .agents/ or .claude/ directory found in repo root — skipping.");
     return;
   }
 
-  const dirNames = agentDirs.map((d) => d.name).join(" and ");
+  const destinations = agentDirs.map((d) => join(d, "skills", "libretto"));
+  const dirNames = agentDirs.map((d) => basename(d)).join(" and ");
   // Say "Overwrite" if skills already exist in ANY target dir — skills must
   // be identical across coding agents, so we always copy to all of them.
-  const existing = agentDirs.filter((d) => existsSync(d.skillDest));
+  const existing = destinations.filter((d) => existsSync(d));
   const verb = existing.length > 0 ? "Overwrite" : "Install";
 
   const proceed = await askYesNo(`\n${verb} libretto skills in ${dirNames}?`);
@@ -270,7 +280,9 @@ async function copySkills(): Promise<void> {
     return;
   }
 
-  for (const { name, skillDest } of agentDirs) {
+  for (let i = 0; i < agentDirs.length; i++) {
+    const skillDest = destinations[i];
+    const name = basename(agentDirs[i]);
     // Remove existing dir first so stale files from prior versions don't persist
     if (existsSync(skillDest)) {
       rmSync(skillDest, { recursive: true });

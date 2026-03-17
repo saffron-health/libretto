@@ -57,6 +57,14 @@ function clip(text: string, maxChars: number): string {
   ].join("\n");
 }
 
+function extractFinalResultLine(transcript: string): string | null {
+  const finalResultLine = transcript
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("FINAL_RESULT:"));
+  return finalResultLine ?? null;
+}
+
 function asJson(value: unknown): string {
   try {
     return JSON.stringify(value);
@@ -411,13 +419,15 @@ export function ensureClaudeAuthConfigured(): void {
 
 export type ClaudeEvalHarnessOptions = {
   cwd: string;
-  librettoSkillMarkdown: string;
+  systemPromptAppend?: string;
   model?: string;
   maxTurns?: number;
   permissionMode?: PermissionMode;
   settingSources?: SettingSource[];
   mcpServers?: Record<string, McpServerConfig>;
   hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
+  allowedTools?: string[];
+  stopOnFinalResult?: boolean;
 };
 
 export type ClaudeEvalHarnessSendOptions = {
@@ -487,12 +497,13 @@ export class ClaudeEvalHarness {
   private readonly maxTurns: number;
   private readonly permissionMode: PermissionMode;
   private readonly settingSources: SettingSource[];
-  private readonly systemPromptAppend: string;
   private readonly mcpServers?: Record<string, McpServerConfig>;
   private readonly hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
+  private readonly systemPromptAppend: string | null;
+  private readonly allowedTools: string[];
+  private readonly stopOnFinalResult: boolean;
   private sessionId: string;
   private hasStarted = false;
-  private isClosed = false;
 
   constructor(options: ClaudeEvalHarnessOptions) {
     this.cwd = options.cwd;
@@ -502,12 +513,9 @@ export class ClaudeEvalHarness {
     this.settingSources = options.settingSources ?? ["project"];
     this.mcpServers = options.mcpServers;
     this.hooks = options.hooks;
-    this.systemPromptAppend = [
-      "Use the following Libretto skill documentation as in-session guidance.",
-      "<libretto_skill>",
-      options.librettoSkillMarkdown,
-      "</libretto_skill>",
-    ].join("\n");
+    this.allowedTools = options.allowedTools ?? [];
+    this.systemPromptAppend = options.systemPromptAppend?.trim() || null;
+    this.stopOnFinalResult = options.stopOnFinalResult === true;
     this.sessionId = randomUUID();
   }
 
@@ -515,10 +523,6 @@ export class ClaudeEvalHarness {
     prompt: string,
     sendOptions: ClaudeEvalHarnessSendOptions = {},
   ): Promise<EvalResponse> {
-    if (this.isClosed) {
-      throw new Error("Cannot send prompts after harness is closed.");
-    }
-
     const options: Options = {
       cwd: this.cwd,
       model: this.model,
@@ -528,12 +532,24 @@ export class ClaudeEvalHarness {
       permissionMode: this.permissionMode,
       mcpServers: this.mcpServers,
       hooks: this.hooks,
-      systemPrompt: {
+      allowedTools: this.allowedTools,
+    };
+
+    if (this.mcpServers) {
+      options.mcpServers = this.mcpServers;
+    }
+
+    if (this.hooks) {
+      options.hooks = this.hooks;
+    }
+
+    if (this.systemPromptAppend) {
+      options.systemPrompt = {
         type: "preset",
         preset: "claude_code",
         append: this.systemPromptAppend,
-      },
-    };
+      };
+    }
 
     if (this.permissionMode === "bypassPermissions") {
       options.allowDangerouslySkipPermissions = true;
@@ -566,6 +582,15 @@ export class ClaudeEvalHarness {
           }),
         );
       }
+
+      if (
+        this.stopOnFinalResult &&
+        message.type === "result" &&
+        message.subtype === "success" &&
+        extractFinalResultLine(message.result) !== null
+      ) {
+        break;
+      }
     }
 
     const seenSessionId = extractSessionId(messages);
@@ -582,9 +607,5 @@ export class ClaudeEvalHarness {
       model: this.model,
     });
     return response;
-  }
-
-  async close(): Promise<void> {
-    this.isClosed = true;
   }
 }

@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import {
@@ -13,22 +12,22 @@ import {
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const packageRoot = resolve(here, "../..");
-const skillPath = resolve(packageRoot, ".agents/skills/libretto/SKILL.md");
+const skillSourcePath = resolve(packageRoot, ".agents/skills/libretto");
 const analyzerPath = resolve(
   packageRoot,
   "benchmarks/shared/claude-snapshot-analyzer.mjs",
 );
 const distPath = resolve(packageRoot, "dist");
 
-let cachedSkillMarkdown: string | null = null;
 const DEFAULT_BENCHMARK_MODEL = "claude-opus-4-6";
+const BENCHMARK_SKILL_TOOL_NAME = "Skill";
 
 export function getBenchmarkPackageRoot(): string {
   return packageRoot;
 }
 
-export function getBenchmarkSkillPath(): string {
-  return skillPath;
+export function getBenchmarkSkillSourcePath(): string {
+  return skillSourcePath;
 }
 
 export function getBenchmarkAnalyzerPath(): string {
@@ -39,10 +38,8 @@ export function getBenchmarkDistPath(): string {
   return distPath;
 }
 
-export async function getBenchmarkSkillMarkdown(): Promise<string> {
-  if (cachedSkillMarkdown !== null) return cachedSkillMarkdown;
-  cachedSkillMarkdown = await readFile(skillPath, "utf8");
-  return cachedSkillMarkdown;
+export function getBenchmarkWorkspaceSkillRelativePath(): string {
+  return ".claude/skills/libretto";
 }
 
 export async function createClaudeBenchmarkHarness(
@@ -50,16 +47,17 @@ export async function createClaudeBenchmarkHarness(
 ): Promise<ClaudeEvalHarness> {
   ensureClaudeAuthConfigured();
   requireBenchmarkKernelApiKey();
-  const librettoSkillMarkdown = await getBenchmarkSkillMarkdown();
   return new ClaudeEvalHarness({
     cwd,
     model:
       process.env.LIBRETTO_BENCHMARK_MODEL?.trim() ||
       process.env.LIBRETTO_EVAL_MODEL?.trim() ||
       DEFAULT_BENCHMARK_MODEL,
-    librettoSkillMarkdown,
     mcpServers: createSolveCaptchaMcpServer(),
     hooks: createSolveCaptchaHooks(),
     maxTurns: 30,
+    settingSources: ["project"],
+    allowedTools: [BENCHMARK_SKILL_TOOL_NAME],
+    stopOnFinalResult: true,
   });
 }
