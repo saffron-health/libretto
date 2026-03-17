@@ -4,7 +4,7 @@ description: "Browser automation CLI for inspecting live pages, prototyping inte
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.3.0"
+  version: "0.4.0"
 ---
 
 # Libretto
@@ -59,13 +59,15 @@ npx libretto exec --visualize "await page.locator('button:has-text(\"Continue\")
 ### `snapshot`
 
 - Use `snapshot` as the primary page observation tool.
-- Provide `--objective` unless you intentionally want capture-only output. Add `--context` when the current page state is not obvious.
+- When you want analysis, provide both `--objective` and `--context`.
 - If you only need the PNG and HTML files, omit `--objective`. That runs capture-only mode and skips AI analysis.
 - When using `--objective`, expect analysis to take time. Use a timeout of at least 2 minutes for shell-wrapped calls.
 
 ```bash
 npx libretto snapshot
-npx libretto snapshot --objective "Find the sign-in form and submit button"
+npx libretto snapshot \
+  --objective "Find the sign-in form and submit button" \
+  --context "I just opened the login page and need the email field, password field, and submit button."
 npx libretto snapshot \
   --objective "Explain why the table is empty" \
   --context "I opened the referrals page and expected rows after applying filters."
