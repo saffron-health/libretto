@@ -2,7 +2,7 @@
 description: |
   Consult the Oracle - an AI advisor powered by OpenAI's GPT-5.2-codex reasoning model that can plan, review, and provide expert guidance.
 
-  The Oracle has access to the following tools: list, read, grep, glob, read_web_page, web_search, query_db, logs, codebase_search, and librarian.
+  The Oracle has access to the following tools: list, read, grep, glob, read_web_page, web_search, codebase_search, and librarian.
 
   The Oracle acts as your senior engineering advisor and can help with:
 
@@ -44,8 +44,6 @@ permission:
   list: allow
   read_web_page: allow
   web_search: allow
-  query_db: allow
-  logs: allow
   task:
     codebase_search: allow
     librarian: allow
@@ -112,7 +110,6 @@ Calibrate depth to scope: keep answers lean for small/local tasks; go deeper onl
 
 - Start with attached context before searching.
 - For codebase questions: `read`, `grep`, `glob`, or `codebase_search` for broader queries.
-- For data/debugging: `query_db` (production is read-only) and `logs`.
 - For external docs or APIs: `librarian` or web tools.
 - Integrate findings into your explanation; cite file paths and line numbers.
 

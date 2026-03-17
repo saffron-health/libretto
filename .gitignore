@@ -9,3 +9,4 @@ temp/
 benchmarks/**/runs/
 benchmarks/run-history.jsonl
 .libretto/
+tmp/

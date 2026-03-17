@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { resolveLibrettoRepoRoot } from "./repo-root.js";
 
 const LIBRETTO_DIRNAME = ".libretto";
 const LIBRETTO_SESSIONS_DIRNAME = "sessions";
@@ -10,7 +11,7 @@ const PAUSED_SIGNAL_SUFFIX = "paused";
 const RESUME_SIGNAL_SUFFIX = "resume";
 
 function getLibrettoRoot(cwd: string = process.cwd()): string {
-	return join(cwd, LIBRETTO_DIRNAME);
+	return join(resolveLibrettoRepoRoot(cwd), LIBRETTO_DIRNAME);
 }
 
 function getLibrettoSessionsDir(cwd: string = process.cwd()): string {
