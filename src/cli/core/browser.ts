@@ -197,9 +197,15 @@ export async function connect(
       port: state.port,
       pid: state.pid,
     });
-    clearSessionState(session, logger);
+    if (!isPidRunning(state.pid)) {
+      clearSessionState(session, logger);
+      throw new Error(
+        `No browser running for session "${session}". Run 'libretto-cli open <url> --session ${session}' first.`,
+      );
+    }
+
     throw new Error(
-      `No browser running for session "${session}". Run 'libretto-cli open <url> --session ${session}' first.`,
+      `Could not connect to the browser for session "${session}" at http://127.0.0.1:${state.port}, but the session process (pid ${state.pid}) is still running. Try the command again, or close and reopen the session if it stays stuck.`,
     );
   }
 

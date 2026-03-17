@@ -9,6 +9,10 @@ import {
   getBenchmarkRunHistoryPath,
   parseBenchmarkArgs,
 } from "../benchmarks/run.js";
+import {
+  buildBrowserBenchmarkPrompt,
+  rewriteBenchmarkSkillCommands,
+} from "../benchmarks/shared/cases.js";
 
 const tempRoots: string[] = [];
 
@@ -21,6 +25,41 @@ afterEach(async () => {
 });
 
 describe("benchmark launcher history", () => {
+  test("benchmark prompt tells Claude to use the libretto skill", () => {
+    const prompt = buildBrowserBenchmarkPrompt({
+      benchmark: "webVoyager",
+      id: "sample-case",
+      title: "Sample benchmark case",
+      startUrl: "https://example.com",
+      instruction: "Inspect the page and report the final title.",
+      successAssertion:
+        "The transcript includes the final page URL and title in FINAL_RESULT format.",
+    }, "/tmp/libretto-benchmark-workspace");
+
+    expect(prompt).toContain("Use the libretto skill.");
+    expect(prompt).toContain("pnpm -s cli open https://example.com --headless --session webvoyager-sample-case");
+    expect(prompt).toContain("Current working directory: /tmp/libretto-benchmark-workspace");
+    expect(prompt).not.toContain("Run all commands from the current working directory");
+    expect(prompt).not.toContain(".claude/skills/libretto/SKILL.md");
+    expect(prompt).not.toContain(".agents/skills/libretto/SKILL.md");
+  });
+
+  test("rewrites copied benchmark skill commands to use the local cli script", () => {
+    const rewritten = rewriteBenchmarkSkillCommands(
+      [
+        "Use the `npx libretto` CLI.",
+        "",
+        "npx libretto open https://example.com",
+        "npx libretto snapshot --objective \"inspect\"",
+      ].join("\n"),
+    );
+
+    expect(rewritten).toContain("Use the `pnpm -s cli` CLI.");
+    expect(rewritten).toContain("pnpm -s cli open https://example.com");
+    expect(rewritten).toContain('pnpm -s cli snapshot --objective "inspect"');
+    expect(rewritten).not.toContain("npx libretto");
+  });
+
   test("defaults to all benchmarks when no benchmark filter is provided", () => {
     const parsed = parseBenchmarkArgs(["--testNamePattern", "FINAL_RESULT"]);
 

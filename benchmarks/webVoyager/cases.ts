@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   formatBenchmarkSessionName,
+  getBenchmarkCliCommandPrefix,
   type BrowserBenchmarkCase,
 } from "../shared/cases.js";
 
@@ -109,6 +110,7 @@ function readDatasetRows(): WebVoyagerRow[] {
 }
 
 export function getWebVoyagerCases(): BrowserBenchmarkCase[] {
+  const cli = getBenchmarkCliCommandPrefix();
   const rows = readDatasetRows();
   const sampledRows = parseBooleanEnv("LIBRETTO_WEBVOYAGER_RANDOM_SAMPLE")
     ? shuffleRows(rows, parseSeed())
@@ -127,7 +129,7 @@ export function getWebVoyagerCases(): BrowserBenchmarkCase[] {
       finalResultInstruction:
         'End with exactly one line in this format: FINAL_RESULT: <answer> | <url> | <title>',
       requiredTranscriptSnippets: [
-        `pnpm cli open ${row.web} --headless --session ${sessionName}`,
+        `${cli} open ${row.web} --headless --session ${sessionName}`,
         "FINAL_RESULT:",
       ],
       successAssertion: [

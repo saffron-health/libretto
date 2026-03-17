@@ -45,6 +45,15 @@ async function getSkillMarkdown(): Promise<string> {
   return cachedSkillMarkdown;
 }
 
+async function getInlineSkillSystemPrompt(): Promise<string> {
+  return [
+    "Use the following Libretto skill documentation as in-session guidance.",
+    "<libretto_skill>",
+    await getSkillMarkdown(),
+    "</libretto_skill>",
+  ].join("\n");
+}
+
 function stableHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
@@ -123,13 +132,9 @@ export const test = base.extend<EvalFixtures>({
     const harness = new ClaudeEvalHarness({
       cwd: evalWorkspaceDir,
       model: process.env.LIBRETTO_EVAL_MODEL?.trim() || undefined,
-      librettoSkillMarkdown: await getSkillMarkdown(),
+      systemPromptAppend: await getInlineSkillSystemPrompt(),
     });
-    try {
-      await use(harness);
-    } finally {
-      await harness.close();
-    }
+    await use(harness);
   },
 });
 
