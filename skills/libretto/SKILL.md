@@ -128,7 +128,7 @@ Assistant: I found the relevant requests. I'll recreate the workflow from those 
 Assistant: I'll reproduce the failure first so we can inspect the exact browser state it leaves behind.
 Assistant: [Runs `npx libretto run ./integration.ts main --session debug-flow --headed`]
 Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
-Assistant: [Runs `npx libretto snapshot --session debug-flow --objective "Find the blocking error or broken selector target"`]
+Assistant: [Runs `npx libretto snapshot --session debug-flow --objective "Find the blocking error or broken selector target" --context "The workflow just failed after trying to continue from the review step, and I need to identify the visible blocker on the current page."`]
 Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
 Assistant: I found the issue. I'll patch the workflow code, then rerun `npx libretto run ...` to verify the fix.
 </example>
