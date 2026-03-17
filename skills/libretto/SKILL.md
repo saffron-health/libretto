@@ -59,7 +59,7 @@ npx libretto exec --visualize "await page.locator('button:has-text(\"Continue\")
 ### `snapshot`
 
 - Use `snapshot` as the primary page observation tool.
-- Always give an `--objective`. Add `--context` when the current page state is not obvious.
+- Provide `--objective` unless you intentionally want capture-only output. Add `--context` when the current page state is not obvious.
 - If you only need the PNG and HTML files, omit `--objective`. That runs capture-only mode and skips AI analysis.
 - When using `--objective`, expect analysis to take time. Use a timeout of at least 2 minutes for shell-wrapped calls.
 
