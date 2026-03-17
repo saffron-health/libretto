@@ -1,5 +1,5 @@
-import { cp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve } from "node:path";
 import { expect } from "vitest";
 import { writeAiConfig } from "../../src/cli/core/ai-config.js";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
@@ -10,10 +10,10 @@ import {
 import type { ModelUsage, NonNullableUsage } from "@anthropic-ai/claude-agent-sdk";
 import {
   createClaudeBenchmarkHarness,
-  getBenchmarkAnalyzerPath,
   getBenchmarkDistPath,
   getBenchmarkPackageRoot,
-  getBenchmarkSkillPath,
+  getBenchmarkSkillSourcePath,
+  getBenchmarkWorkspaceSkillRelativePath,
 } from "./fixtures.js";
 
 export type BrowserBenchmarkCase = {
@@ -52,6 +52,8 @@ type BenchmarkRunArtifacts = {
   status: "running" | "passed" | "failed";
 };
 
+const BENCHMARK_CLI_PREFIX = "pnpm -s cli";
+
 function slugify(value: string): string {
   return value
     .trim()
@@ -66,6 +68,14 @@ export function formatBenchmarkSessionName(
   caseId: string,
 ): string {
   return slugify(`${benchmark}-${caseId}`);
+}
+
+export function getBenchmarkCliCommandPrefix(): string {
+  return BENCHMARK_CLI_PREFIX;
+}
+
+export function rewriteBenchmarkSkillCommands(markdown: string): string {
+  return markdown.replaceAll("npx libretto", BENCHMARK_CLI_PREFIX);
 }
 
 function deriveRunGroup(testCase: BrowserBenchmarkCase): string {
@@ -146,24 +156,27 @@ function extractFinalResultLine(transcript: string): string | null {
   return finalResultLine ?? null;
 }
 
-function buildPrompt(testCase: BrowserBenchmarkCase): string {
+export function buildBrowserBenchmarkPrompt(
+  testCase: BrowserBenchmarkCase,
+  currentWorkingDirectory?: string,
+): string {
   const session = getSessionName(testCase);
+  const cli = getBenchmarkCliCommandPrefix();
 
   return [
     `Run the ${testCase.benchmark} browser benchmark case "${testCase.title}".`,
     "Solve it by browsing the live website with the Libretto CLI installed in the current workspace.",
-    "The current workspace already contains the built Libretto CLI and the Libretto skill at .agents/skills/libretto/SKILL.md.",
-    "Do not change directories or reference any other libretto checkout.",
-    "Run all commands from the current working directory and use `pnpm cli ...` directly.",
+    "Use the libretto skill.",
     "Do not inspect files under benchmarks/ to discover the answer.",
-    "Do not use curl, raw fetches, search engines, or non-Libretto browser tooling to solve the task.",
     `Use exactly one Libretto session named "${session}".`,
-    `Open the site with: pnpm cli open ${testCase.startUrl} --headless --session ${session}`,
-    `Use pnpm cli snapshot --session ${session} --objective "<...>" at least once before your final answer.`,
-    `Before finishing, run: pnpm cli exec --session ${session} "return { url: await page.url(), title: await page.title() }"`,
-    `Then close the browser with: pnpm cli close --session ${session}`,
+    `Open the site with: ${cli} open ${testCase.startUrl} --headless --session ${session}`,
+    `Before finishing, run: ${cli} exec --session ${session} "return { url: await page.url(), title: await page.title() }"`,
+    `Then close the browser with: ${cli} close --session ${session}`,
     testCase.finalResultInstruction ??
       'End with exactly one line in this format: FINAL_RESULT: <url> | <title>',
+    ...(currentWorkingDirectory
+      ? [`Current working directory: ${currentWorkingDirectory}`]
+      : []),
     "",
     "Task:",
     testCase.instruction,
@@ -421,20 +434,33 @@ async function createWorkspacePackageJson(
     ),
     "utf8",
   );
+
+  // Suppress pnpm's misleading "node_modules missing" warning for failed script runs.
+  await mkdir(join(workspaceDir, "node_modules"), { recursive: true });
 }
 
 async function createWorkspaceAgentsFile(workspaceDir: string): Promise<void> {
+  const cli = getBenchmarkCliCommandPrefix();
   await writeFile(
     join(workspaceDir, "AGENTS.md"),
     [
       "# Benchmark Workspace Rules",
       "",
-      "- Stay in this workspace. Do not `cd` into any other directory or checkout.",
-      "- Use the local Libretto CLI via `pnpm cli ...` from this directory.",
-      "- Use the local Libretto skill at `.agents/skills/libretto/SKILL.md`.",
-      "- Do not rely on any external libretto checkout or globally installed repo copy.",
+      "- Use the libretto skill available in this workspace.",
+      `- Use the local Libretto CLI via \`${cli} ...\` from this directory.`,
+      "- Do not inspect files under benchmarks/ to discover the answer.",
       "",
     ].join("\n"),
+    "utf8",
+  );
+}
+
+async function rewriteWorkspaceSkillCommands(skillDestination: string): Promise<void> {
+  const skillPath = join(skillDestination, "SKILL.md");
+  const skillMarkdown = await readFile(skillPath, "utf8");
+  await writeFile(
+    skillPath,
+    rewriteBenchmarkSkillCommands(skillMarkdown),
     "utf8",
   );
 }
@@ -450,15 +476,13 @@ async function createWorkspaceFiles(
   const distDestination = join(paths.workspaceDir, "dist");
   const skillDestination = join(
     paths.workspaceDir,
-    ".agents",
-    "skills",
-    "libretto",
-    "SKILL.md",
+    getBenchmarkWorkspaceSkillRelativePath(),
   );
 
   await cp(getBenchmarkDistPath(), distDestination, { recursive: true });
   await mkdir(dirname(skillDestination), { recursive: true });
-  await cp(getBenchmarkSkillPath(), skillDestination);
+  await cp(getBenchmarkSkillSourcePath(), skillDestination, { recursive: true });
+  await rewriteWorkspaceSkillCommands(skillDestination);
   await createWorkspacePackageJson(paths.workspaceDir, testCase);
   await createWorkspaceAgentsFile(paths.workspaceDir);
 
@@ -676,18 +700,14 @@ async function withHarness<T>(
   run: (harness: ClaudeEvalHarness) => Promise<T>,
 ): Promise<T> {
   const harness = await createClaudeBenchmarkHarness(workspaceDir);
-  try {
-    return await run(harness);
-  } finally {
-    await harness.close();
-  }
+  return await run(harness);
 }
 
 export async function runBrowserBenchmarkCase(
   testCase: BrowserBenchmarkCase,
 ): Promise<EvalResponse> {
   const paths = getRunPaths(testCase);
-  const prompt = buildPrompt(testCase);
+  const prompt = buildBrowserBenchmarkPrompt(testCase, paths.workspaceDir);
   const startedAt = new Date();
 
   await createWorkspaceFiles(testCase, paths);

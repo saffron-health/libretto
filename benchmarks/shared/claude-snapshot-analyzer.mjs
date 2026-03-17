@@ -34,15 +34,32 @@ function extractPromptAndScreenshotPath(rawPrompt) {
   };
 }
 
+async function readPromptInput() {
+  const argvPrompt = process.argv.slice(2).join(" ").trim();
+  if (argvPrompt) {
+    return argvPrompt;
+  }
+
+  if (process.stdin.isTTY) {
+    return "";
+  }
+
+  let stdinPrompt = "";
+  for await (const chunk of process.stdin) {
+    stdinPrompt += chunk.toString();
+  }
+  return stdinPrompt.trim();
+}
+
 async function main() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("Missing ANTHROPIC_API_KEY for benchmark snapshot analysis.");
   }
 
-  const rawPrompt = process.argv.slice(2).join(" ").trim();
+  const rawPrompt = await readPromptInput();
   if (!rawPrompt) {
-    throw new Error("Benchmark snapshot analyzer expected a prompt argument.");
+    throw new Error("Benchmark snapshot analyzer expected a prompt on argv or stdin.");
   }
 
   const { prompt, pngPath } = extractPromptAndScreenshotPath(rawPrompt);
@@ -72,7 +89,7 @@ async function main() {
           },
           {
             type: "image",
-            image: `data:image/png;base64,${imageBuffer.toString("base64")}`,
+            image: imageBuffer,
           },
         ],
       },
