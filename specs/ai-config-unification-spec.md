@@ -1,6 +1,6 @@
 ## Problem overview
 
-The CLI currently stores analyzer configuration in a snapshot-specific file (`.libretto/snapshot-config.json`) and snapshot-specific code paths. That makes it hard to reuse the same model configuration for new commands like `analyze-media`, and it prevents future non-media AI workflows from sharing one stable runtime config.
+The CLI currently stores analyzer configuration in a snapshot-specific file name (`.libretto/snapshot-config.json`) and snapshot-specific code paths. That makes it hard to reuse the same model configuration for new commands like `analyze-media`, and it prevents future non-media AI workflows from sharing one stable runtime config.
 
 We need one generic config location and schema that is explicitly AI-focused, not snapshot-focused.
 

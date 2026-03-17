@@ -1,6 +1,6 @@
 ## Problem overview
 
-Libretto runtime state is currently split across multiple roots: `.libretto/`, `tmp/libretto/`, and `tmp/libretto/`. This makes state hard to inspect, hard to clean up, and inconsistent between CLI and library runtime behavior.
+Libretto runtime state is currently split across multiple roots: `.libretto/`, `tmp/libretto/`, and other legacy temp-state locations. This makes state hard to inspect, hard to clean up, and inconsistent between CLI and library runtime behavior.
 
 `main` already moved AI/snapshot analyzer config into `.libretto/config.json`, but session metadata, profiles, logs, telemetry, debug signals, and snapshot artifacts are still spread across the legacy locations.
 
@@ -39,7 +39,7 @@ Target layout:
 
 ## Non-goals
 
-- No migrations or backfills of old state from `.libretto/` or `tmp/`.
+- No migrations or backfills of old state from legacy runtime directories.
 - No compatibility shims that continue writing to old paths in parallel.
 - No schema/versioning redesign beyond what is needed to add session permission data to existing `.libretto/config.json`.
 - No changes to Playwright behavior, browser launch semantics, or command UX beyond path and storage location updates.
@@ -73,7 +73,7 @@ Target layout:
 - [x] Define canonical helpers for `.libretto` root, session directory resolution, and per-session file paths (`state.json`, `logs.jsonl`, `network.jsonl`, `actions.jsonl`, snapshot root).
 - [x] Invoke setup bootstrap from CLI startup and any runtime entry points that can write state before command handlers execute.
 - [x] Remove `.playwriter` and `.browser-tap` migration code from startup path handling.
-- [x] Success criteria: running `libretto --help` in a fresh repo creates `.libretto/.gitignore` and subdirectories without creating `.libretto/` or `tmp/libretto/`.
+- [x] Success criteria: running `libretto --help` in a fresh repo creates `.libretto/.gitignore` and subdirectories without creating any additional legacy runtime directories under `tmp/`.
 
 ### Phase 2: Move CLI session state and logs into per-session directories
 
@@ -112,7 +112,7 @@ Target layout:
 ### Phase 6: Tests, docs, and cleanup
 
 - [ ] Update CLI fixtures/tests to seed/assert the new `.libretto` layout.
-- [ ] Add regression coverage that asserts commands do not create `.libretto/` or `tmp/libretto/` paths.
+- [ ] Add regression coverage that asserts commands do not create legacy temp runtime paths outside `.libretto/`.
 - [x] Update usage/help text and README references from old paths to `.libretto`.
 - [ ] Update root `.gitignore` policy to stop relying on `.libretto/` and `tmp/` for libretto runtime state; keep ignores aligned with new `.libretto/.gitignore`.
-- [ ] Success criteria: `pnpm --filter libretto test`, `pnpm --filter libretto type-check`, and `pnpm --filter libretto type-check` pass with updated path expectations.
+- [ ] Success criteria: `pnpm test` and `pnpm type-check` pass with updated path expectations.
