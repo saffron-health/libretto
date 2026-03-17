@@ -31,12 +31,12 @@ Add a new `readonly-exec` CLI command that reuses the `exec` runtime pipeline bu
 
 ## Important files/docs/websites for implementation
 
-- `packages/libretto-cli/src/index.ts` — add `readonly-exec` command parsing and runtime.
-- `packages/libretto-cli/src/cli-basic.test.ts` — usage and argument behavior for the new command.
-- `packages/libretto-cli/src/cli-stateful.test.ts` — read-only session behavior tests.
-- `packages/libretto-cli/src/test-fixtures.ts` — seeded session and permission fixtures.
+- `packages/libretto/src/index.ts` — add `readonly-exec` command parsing and runtime.
+- `packages/libretto/src/cli-basic.test.ts` — usage and argument behavior for the new command.
+- `packages/libretto/src/cli-stateful.test.ts` — read-only session behavior tests.
+- `packages/libretto/src/test-fixtures.ts` — seeded session and permission fixtures.
 - `packages/libretto/skills/original-skill/SKILL.md` — switch read-only workflows from `exec` to `readonly-exec`.
-- `packages/libretto/skills/libretto-network-skill/SKILL.md` — same as above for `.bin/libretto-cli` workflow.
+- `packages/libretto/skills/libretto-network-skill/SKILL.md` — same as above for `.bin/libretto` workflow.
 
 ## Implementation
 

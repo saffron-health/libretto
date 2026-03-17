@@ -397,16 +397,16 @@ describe("SimpleCLI framework", () => {
         headless: SimpleCLI.flag(),
       },
     })
-      .refine((input) => Boolean(input.url), "Usage: libretto-cli open <url>")
+      .refine((input) => Boolean(input.url), "Usage: libretto open <url>")
       .refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
 
-    const app = SimpleCLI.define("libretto-cli", {
+    const app = SimpleCLI.define("libretto", {
       open: SimpleCLI.command({ description: "open" })
         .input(openInput)
         .handle(async () => {}),
     });
 
-    await expect(app.run(["open"])).rejects.toThrow("Usage: libretto-cli open <url>");
+    await expect(app.run(["open"])).rejects.toThrow("Usage: libretto open <url>");
     await expect(app.run(["open", "https://example.com", "--headed", "--headless"])).rejects.toThrow(
       "Cannot pass both --headed and --headless.",
     );
@@ -414,7 +414,7 @@ describe("SimpleCLI framework", () => {
 
   test("renders root and group help from route paths and descriptions", async () => {
     const noInput = SimpleCLI.input({ positionals: [], named: {} });
-    const app = SimpleCLI.define("libretto-cli", {
+    const app = SimpleCLI.define("libretto", {
       ai: SimpleCLI.group({
         description: "AI commands",
         routes: {
@@ -433,7 +433,7 @@ describe("SimpleCLI framework", () => {
     const rootHelp = await app.run(["help"]);
     expect(rootHelp).toBe(
       [
-        "Usage: libretto-cli <command>",
+        "Usage: libretto <command>",
         "",
         "Commands:",
         "  ai <subcommand>  AI commands",
@@ -446,7 +446,7 @@ describe("SimpleCLI framework", () => {
       [
         "AI commands",
         "",
-        "Usage: libretto-cli ai <subcommand>",
+        "Usage: libretto ai <subcommand>",
         "",
         "Commands:",
         "  configure  Configure AI runtime",
@@ -473,7 +473,7 @@ describe("SimpleCLI framework", () => {
       },
     });
 
-    const app = SimpleCLI.define("libretto-cli", {
+    const app = SimpleCLI.define("libretto", {
       ai: SimpleCLI.group({
         description: "AI commands",
         routes: {
@@ -491,7 +491,7 @@ describe("SimpleCLI framework", () => {
       [
         "Configure AI runtime",
         "",
-        "Usage: libretto-cli ai configure [preset] [options]",
+        "Usage: libretto ai configure [preset] [options]",
         "",
         "Arguments:",
         "  [preset]  AI preset",

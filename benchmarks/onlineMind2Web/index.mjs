@@ -342,26 +342,26 @@ async function runCommand(command, args, options = {}) {
   });
 }
 
-const LIBRETTO_CLI_DIST = resolve("packages", "libretto-cli", "dist", "index.js");
+const LIBRETTO_DIST = resolve("packages", "libretto", "dist", "index.js");
 
-async function ensureLibrettoCliBuilt() {
-  if (existsSync(LIBRETTO_CLI_DIST)) return;
+async function ensureLibrettoBuilt() {
+  if (existsSync(LIBRETTO_DIST)) return;
   const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-  const buildResult = await runCommand(pnpmBin, ["--filter", "libretto-cli", "build"]);
-  if (buildResult.exitCode !== 0 || !existsSync(LIBRETTO_CLI_DIST)) {
+  const buildResult = await runCommand(pnpmBin, ["--filter", "libretto", "build"]);
+  if (buildResult.exitCode !== 0 || !existsSync(LIBRETTO_DIST)) {
     throw new Error(
-      "libretto-cli dist build is missing and build failed. Run 'pnpm --filter libretto-cli build' manually.",
+      "libretto dist build is missing and build failed. Run 'pnpm --filter libretto build' manually.",
     );
   }
 }
 
-function getLibrettoCliArgs(command, ...rest) {
-  return ["--filter", "libretto-cli", "exec", "node", "dist/index.js", command, ...rest];
+function getLibrettoArgs(command, ...rest) {
+  return ["--filter", "libretto", "exec", "node", "dist/index.js", command, ...rest];
 }
 
 async function openSession({ startUrl, sessionName, headed }) {
   const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-  const args = getLibrettoCliArgs(
+  const args = getLibrettoArgs(
     "open",
     startUrl,
     "--session",
@@ -373,7 +373,7 @@ async function openSession({ startUrl, sessionName, headed }) {
 
 async function closeSession(sessionName) {
   const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-  const args = getLibrettoCliArgs("close", "--session", sessionName);
+  const args = getLibrettoArgs("close", "--session", sessionName);
   return await runCommand(pnpmBin, args, { captureOutput: true });
 }
 
@@ -562,7 +562,7 @@ export async function runOnlineMind2WebBenchmark(rawArgs) {
   });
 
   console.log(`Loading dataset: ${args.dataset}`);
-  await ensureLibrettoCliBuilt();
+  await ensureLibrettoBuilt();
   const datasetText = await readDatasetText(args.dataset);
   const rows = parseDataset(datasetText);
   if (rows.length === 0) {

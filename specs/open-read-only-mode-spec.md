@@ -1,6 +1,6 @@
 ## Problem overview
 
-`libretto-cli open` currently starts sessions that always allow `exec`, which means an agent can immediately run arbitrary Playwright code against live websites. That default is risky for sensitive workflows where accidental clicks, form submissions, or mutation requests are not acceptable.
+`libretto open` currently starts sessions that always allow `exec`, which means an agent can immediately run arbitrary Playwright code against live websites. That default is risky for sensitive workflows where accidental clicks, form submissions, or mutation requests are not acceptable.
 
 ## Solution overview
 
@@ -20,7 +20,7 @@ Make `open` sessions read-only by default and enforce the safety boundary in `ex
 
 - No migrations or backfills.
 - No AST-level parsing of `exec` code to allow a subset of read-only Playwright APIs.
-- No changes to browser-agent runtime semantics outside `libretto-cli` session state/guards.
+- No changes to browser-agent runtime semantics outside `libretto` session state/guards.
 
 ## Future work
 
@@ -29,10 +29,10 @@ Make `open` sessions read-only by default and enforce the safety boundary in `ex
 
 ## Important files/docs/websites for implementation
 
-- `packages/libretto-cli/src/index.ts` — Open/exec runtime behavior, usage text, and session state writes.
-- `packages/libretto-cli/src/cli-basic.test.ts` — Usage error assertions for CLI command help strings.
-- `packages/libretto-cli/src/cli-stateful.test.ts` — Seeded-state subprocess tests for mode-based exec behavior.
-- `packages/libretto-cli/src/test-fixtures.ts` — Session state fixture typing used by stateful tests.
+- `packages/libretto/src/index.ts` — Open/exec runtime behavior, usage text, and session state writes.
+- `packages/libretto/src/cli-basic.test.ts` — Usage error assertions for CLI command help strings.
+- `packages/libretto/src/cli-stateful.test.ts` — Seeded-state subprocess tests for mode-based exec behavior.
+- `packages/libretto/src/test-fixtures.ts` — Session state fixture typing used by stateful tests.
 - `README.md` — Top-level CLI documentation updates for default read-only behavior and explicit opt-in.
 
 ## Implementation
@@ -60,4 +60,4 @@ Make `open` sessions read-only by default and enforce the safety boundary in `ex
 - [x] Update top-level documentation to describe the new default and opt-in behavior.
 - [x] Update Libretto skill docs to require explicit user approval before running `session-mode`.
 - [x] Run the CLI Vitest suite to validate changes.
-- [x] Success criteria: `pnpm --filter libretto-cli test` passes.
+- [x] Success criteria: `pnpm --filter libretto test` passes.

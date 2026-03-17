@@ -126,9 +126,9 @@ function getMissingLocalAuthProfileError(args: {
     `Local auth profile not found for domain "${normalizedDomain}".`,
     `Expected profile file: ${args.profilePath}`,
     "To create it:",
-    `  1. libretto-cli open https://${normalizedDomain} --headed --session ${args.session}`,
+    `  1. libretto open https://${normalizedDomain} --headed --session ${args.session}`,
     "  2. Log in manually in the browser window.",
-    `  3. libretto-cli save ${normalizedDomain} --session ${args.session}`,
+    `  3. libretto save ${normalizedDomain} --session ${args.session}`,
   ].join("\n");
 }
 

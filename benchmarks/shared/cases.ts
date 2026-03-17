@@ -425,8 +425,7 @@ async function createWorkspacePackageJson(
           cli: "LIBRETTO_REPO_ROOT=. node ./dist/cli/index.js",
         },
         bin: {
-          libretto: "./dist/cli/index.js",
-          "libretto-cli": "./dist/cli/index.js",
+          "libretto": "./dist/cli/index.js",
         },
       },
       null,

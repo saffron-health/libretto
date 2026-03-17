@@ -27,7 +27,7 @@ export const aiCommands = SimpleCLI.group({
             preset: input.preset,
           },
           {
-            configureCommandName: "libretto-cli ai configure",
+            configureCommandName: `libretto ai configure`,
           },
         );
       }),

@@ -178,7 +178,7 @@ class CodexUserCodingAgent extends UserCodingAgent {
     pngPath: string,
     logger: LoggerApi,
   ): Promise<InterpretResult> {
-    const tempDir = mkdtempSync(join(tmpdir(), "libretto-cli-analyzer-"));
+    const tempDir = mkdtempSync(join(tmpdir(), "libretto-analyzer-"));
     const outputPath = join(
       tempDir,
       `snapshot-analyzer-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
@@ -297,7 +297,7 @@ async function runExternalCommand(
       if (error.code === "ENOENT") {
         reject(
           new Error(
-            `Command not found: ${command}. Configure AI with 'libretto-cli ai configure'.`,
+            `Command not found: ${command}. Configure AI with 'libretto ai configure'.`,
           ),
         );
         return;

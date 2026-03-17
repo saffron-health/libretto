@@ -26,7 +26,7 @@ async function resolvePageId(session: string, pageId?: string): Promise<string |
   const foundPage = pages.find((page) => page.id === pageId);
   if (!foundPage) {
     throw new Error(
-      `Page "${pageId}" was not found in session "${session}". Run "libretto-cli pages --session ${session}" to list ids.`,
+      `Page "${pageId}" was not found in session "${session}". Run "libretto pages --session ${session}" to list ids.`,
     );
   }
   return pageId;

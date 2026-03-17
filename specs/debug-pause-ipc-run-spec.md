@@ -1,18 +1,18 @@
 ## Problem overview
 
-`debugPause` currently blocks inside the same process that runs `libretto-cli run`, so `run` hangs indefinitely when a workflow hits `debugPause`. The current implementation also relies on `.paused/.resume` files, which are implementation-heavy and not aligned with the desired runtime contract.
+`debugPause` currently blocks inside the same process that runs `libretto run`, so `run` hangs indefinitely when a workflow hits `debugPause`. The current implementation also relies on `.paused/.resume` files, which are implementation-heavy and not aligned with the desired runtime contract.
 
-The desired behavior is: `libretto-cli run` starts workflow execution in a child process, waits until that child either completes or pauses, then returns immediately. `debugPause` should never block `libretto run`.
+The desired behavior is: `libretto run` starts workflow execution in a child process, waits until that child either completes or pauses, then returns immediately. `debugPause` should never block `libretto run`.
 
 ## Solution overview
 
 Move workflow execution for `run` into a dedicated worker child process and use Node IPC for status signaling (`completed`, `paused`, `failed`). Replace file-based `debugPause` behavior with an in-process pause signal (typed error) that the worker catches and reports to the parent via IPC, then keeps the worker alive in paused state.
 
-`libretto-cli run` becomes a supervisor: it launches the worker, streams worker stdout/stderr, and exits when it receives either completion or pause outcome. On pause, it exits successfully and prints a clear paused status message while the worker remains running (hung) at pause.
+`libretto run` becomes a supervisor: it launches the worker, streams worker stdout/stderr, and exits when it receives either completion or pause outcome. On pause, it exits successfully and prints a clear paused status message while the worker remains running (hung) at pause.
 
 ## Goals
 
-- `libretto-cli run ... --debug` returns instead of hanging when workflow code calls `debugPause(...)`.
+- `libretto run ... --debug` returns instead of hanging when workflow code calls `debugPause(...)`.
 - `debugPause` no longer uses `.paused/.resume` files.
 - `run` uses parent/child IPC to detect paused/completed/failed outcomes.
 - CLI output clearly indicates paused outcome (for example, `Workflow paused.`), while still surfacing workflow logs before the pause.
@@ -34,14 +34,14 @@ Move workflow execution for `run` into a dedicated worker child process and use 
 
 - `packages/libretto/src/debug/pause.ts` — current blocking, file-based pause implementation to replace.
 - `packages/libretto/src/debug/index.ts` — debug export surface.
-- `packages/libretto-cli/src/commands/execution.ts` — current inline `run` execution path; will become parent supervisor path.
-- `packages/libretto-cli/src/workers/run-integration-runtime.ts` — worker-owned workflow runtime and pause handling.
-- `packages/libretto-cli/src/workers/run-integration-worker.ts` — worker IPC entrypoint and lifecycle behavior.
-- `packages/libretto-cli/src/workers/run-integration-worker-protocol.ts` — parent/worker message contract.
-- `packages/libretto-cli/src/cli.ts` — run help text/output contract updates.
-- `packages/libretto-cli/src/cli-basic.test.ts` — add/adjust subprocess assertions for run paused/completed behavior.
-- `packages/libretto-cli/src/test-fixtures.ts` — CLI fixture contract used by subprocess tests.
-- `packages/libretto-cli/tsup.config.ts` — include worker entrypoint in build outputs.
+- `packages/libretto/src/commands/execution.ts` — current inline `run` execution path; will become parent supervisor path.
+- `packages/libretto/src/workers/run-integration-runtime.ts` — worker-owned workflow runtime and pause handling.
+- `packages/libretto/src/workers/run-integration-worker.ts` — worker IPC entrypoint and lifecycle behavior.
+- `packages/libretto/src/workers/run-integration-worker-protocol.ts` — parent/worker message contract.
+- `packages/libretto/src/cli.ts` — run help text/output contract updates.
+- `packages/libretto/src/cli-basic.test.ts` — add/adjust subprocess assertions for run paused/completed behavior.
+- `packages/libretto/src/test-fixtures.ts` — CLI fixture contract used by subprocess tests.
+- `packages/libretto/tsup.config.ts` — include worker entrypoint in build outputs.
 - [Node child_process.fork docs](https://nodejs.org/api/child_process.html#child_processforkmodulepath-args-options) — worker process creation with IPC.
 - [Node child process IPC/stdin/stdout docs](https://nodejs.org/api/child_process.html#optionsstdio) — required `stdio`/`ipc` wiring.
 - [Node process.send docs](https://nodejs.org/api/process.html#processsendmessage-sendhandle-options-callback) — child-to-parent messaging contract.
@@ -61,17 +61,17 @@ Move workflow execution for `run` into a dedicated worker child process and use 
 
 ### Phase 2: Add `run` worker entrypoint with IPC status messages
 
-- [x] Create a dedicated worker module in `packages/libretto-cli/src` for running one workflow invocation.
+- [x] Create a dedicated worker module in `packages/libretto/src` for running one workflow invocation.
 - [x] Move the existing inline workflow execution logic (import workflow export, launch browser, run handler, close browser) into worker-owned code.
 - [x] In worker, catch typed pause signal, send IPC `{ type: "paused", ... }` to parent, then deliberately stay alive in paused state (do not exit).
 - [x] Ensure paused-state worker keeps browser/context open for inspection while hung.
 - [x] In worker, send/emit failure details for non-pause errors and exit non-zero.
-- [x] Update `packages/libretto-cli/tsup.config.ts` to build this worker entry as a runnable output.
+- [x] Update `packages/libretto/tsup.config.ts` to build this worker entry as a runnable output.
 - [x] Success criteria: worker can be launched by Node with IPC and emits deterministic message payloads for paused/completed/failed paths, and paused path does not terminate worker.
 
 ### Phase 3: Convert `run` command into supervisor parent process
 
-- [x] In `packages/libretto-cli/src/commands/execution.ts`, replace direct `runIntegrationFromFile(...)` invocation with worker launch via `child_process.fork(...)` using IPC enabled stdio.
+- [x] In `packages/libretto/src/commands/execution.ts`, replace direct `runIntegrationFromFile(...)` invocation with worker launch via `child_process.fork(...)` using IPC enabled stdio.
 - [x] Stream worker stdout/stderr through parent stdout/stderr so existing logs remain visible.
 - [x] Handle worker outcomes:
   - on paused message: print `Workflow paused.` (or the chosen exact status string) and treat command as success,
@@ -79,15 +79,15 @@ Move workflow execution for `run` into a dedicated worker child process and use 
   - on failed outcome/non-zero exit: preserve actionable error path and non-zero CLI exit.
 - [x] Ensure parent does not hang waiting for a resume signal once paused is reported.
 - [x] Ensure parent pause-return path does not kill/cleanup the paused worker process.
-- [x] Success criteria: `pnpm --filter libretto-cli test -- src/cli-basic.test.ts` passes with paused and completion e2e coverage and no timeout occurs.
+- [x] Success criteria: `pnpm --filter libretto test -- src/cli-basic.test.ts` passes with paused and completion e2e coverage and no timeout occurs.
 
 ### Phase 4: Regression coverage and output contract updates
 
 - [x] Add/adjust `cli-basic.test.ts` e2e coverage so one run test asserts paused-status output in addition to `WORKFLOW_BEFORE_PAUSE`.
 - [x] Add/adjust a `cli-basic.test.ts` case verifying `run` still reports completion on a workflow with no pause signal.
-- [ ] Update help text/docs (`packages/libretto-cli/src/cli.ts` and relevant README snippets) so `--debug` behavior is described as returning paused status rather than blocking.
+- [ ] Update help text/docs (`packages/libretto/src/cli.ts` and relevant README snippets) so `--debug` behavior is described as returning paused status rather than blocking.
 - [x] Cleanup: remove obsolete file-pause API surface (`signalDir`, pause/resume file references) and update all dependent callsites; do not leave deprecated shims.
 - [ ] Success criteria:
-  - `pnpm --filter libretto-cli test -- src/cli-basic.test.ts`
-  - `pnpm --filter libretto-cli test`
-  - `pnpm --filter libretto-cli build`
+  - `pnpm --filter libretto test -- src/cli-basic.test.ts`
+  - `pnpm --filter libretto test`
+  - `pnpm --filter libretto build`
