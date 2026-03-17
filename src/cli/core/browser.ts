@@ -212,7 +212,7 @@ export async function connect(
     }
 
     throw new Error(
-      `Could not connect to the browser for session "${session}" at http://127.0.0.1:${state.port}, but the session process (pid ${state.pid}) is still running. Try the command again, or close and reopen the session if it stays stuck.`,
+      `Could not connect to the browser for session "${session}" at ${endpoint}, but the session process (pid ${state.pid}) is still running. Try the command again, or close and reopen the session if it stays stuck.`,
     );
   }
 

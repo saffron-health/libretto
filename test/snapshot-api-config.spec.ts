@@ -222,4 +222,36 @@ describe("buildInlinePromptSelection", () => {
     expect(selection.domSource).toBe("condensed");
     expect(selection.truncated).toBe(false);
   });
+
+  it("truncates the condensed DOM when the full DOM fits budget but exceeds the html cap", () => {
+    vi.stubEnv("LIBRETTO_SNAPSHOT_MAX_HTML_CHARS", "100000");
+
+    const fullHtml =
+      "<html><body>" +
+      `<section data-testid="card">${"x".repeat(220_000)}</section>` +
+      "</body></html>";
+    const condensedHtml =
+      "<html><body>" +
+      `<button data-testid="submit">${"y".repeat(110_000)}</button>` +
+      "</body></html>";
+
+    const selection = buildInlinePromptSelection(
+      {
+        objective: "Find the submit button",
+        session: "session",
+        context: "Large but compressible page",
+        pngPath: "/tmp/page.png",
+        htmlPath: "/tmp/page.html",
+        condensedHtmlPath: "/tmp/page.condensed.html",
+      },
+      fullHtml,
+      condensedHtml,
+      "anthropic/claude-sonnet-4-6",
+    );
+
+    expect(selection.domSource).toBe("condensed");
+    expect(selection.truncated).toBe(true);
+    expect(selection.htmlChars).toBeLessThan(condensedHtml.length);
+    expect(selection.selectionReason).toContain("HTML size cap");
+  });
 });
