@@ -5,8 +5,10 @@ import {
 } from "../src/cli/core/snapshot-analyzer.js";
 import {
   parseDotEnvAssignment,
+  resolveSnapshotApiModelOrThrow,
   resolveSnapshotApiModel,
 } from "../src/cli/core/snapshot-api-config.js";
+import { LIBRETTO_CONFIG_PATH } from "../src/cli/core/context.js";
 
 function makeConfig(model: string): AiConfig {
   return {
@@ -19,9 +21,19 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+function clearProviderEnv(): void {
+  vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("ANTHROPIC_API_KEY", "");
+  vi.stubEnv("GEMINI_API_KEY", "");
+  vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "");
+  vi.stubEnv("GOOGLE_CLOUD_PROJECT", "");
+  vi.stubEnv("GCLOUD_PROJECT", "");
+}
+
 describe("snapshot API model resolution", () => {
   it("prefers OpenAI automatically when only OPENAI_API_KEY is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
@@ -33,6 +45,7 @@ describe("snapshot API model resolution", () => {
 
   it("uses config model when set", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
 
     const config = makeConfig("openai/gpt-5.4");
@@ -46,6 +59,7 @@ describe("snapshot API model resolution", () => {
 
   it("uses config model for anthropic", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
 
     const config = makeConfig("anthropic/claude-sonnet-4-6");
@@ -59,10 +73,11 @@ describe("snapshot API model resolution", () => {
 
   it("auto-detects Gemini when GEMINI_API_KEY is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-3-flash-preview",
       provider: "google",
       source: "env:auto-google",
     });
@@ -70,10 +85,11 @@ describe("snapshot API model resolution", () => {
 
   it("auto-detects Gemini when GOOGLE_GENERATIVE_AI_API_KEY is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-gemini-key");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-3-flash-preview",
       provider: "google",
       source: "env:auto-google",
     });
@@ -81,6 +97,7 @@ describe("snapshot API model resolution", () => {
 
   it("auto-detects Vertex when only GOOGLE_CLOUD_PROJECT is present", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("GOOGLE_CLOUD_PROJECT", "test-project");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
@@ -92,6 +109,7 @@ describe("snapshot API model resolution", () => {
 
   it("falls back to auto-detection even when config exists", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
     vi.stubEnv("OPENAI_API_KEY", "test-key");
 
     // Config with no model — should still auto-detect from env
@@ -100,6 +118,24 @@ describe("snapshot API model resolution", () => {
       provider: "openai",
       source: "env:auto-openai",
     });
+  });
+
+  it("explains how to configure snapshot analysis when no analyzer is available", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+
+    expect(() => resolveSnapshotApiModelOrThrow(null)).toThrowError(
+      "Failed to analyze snapshot because no snapshot analyzer is configured. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_CLOUD_PROJECT to .env or as a shell environment variable, or choose a default model with `npx libretto ai configure openai | anthropic | gemini | vertex`. For more info, run `npx libretto init`.",
+    );
+  });
+
+  it("explains how to fix a configured provider with missing credentials", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+
+    expect(() => resolveSnapshotApiModelOrThrow(makeConfig("openai/gpt-5.4"))).toThrowError(
+      `Failed to analyze snapshot because openai is configured in ${LIBRETTO_CONFIG_PATH}, but OPENAI_API_KEY is missing. Add OPENAI_API_KEY to .env or as a shell environment variable. For more info, run \`npx libretto init\`.`,
+    );
   });
 });
 

@@ -44,11 +44,14 @@ export async function readPromptInput({
     return argvPrompt;
   }
 
+  if (stdin.isTTY) {
+    return "";
+  }
+
   let stdinPrompt = "";
   for await (const chunk of stdin) {
     stdinPrompt += chunk.toString();
   }
-
   return stdinPrompt.trim();
 }
 
@@ -92,7 +95,7 @@ async function main() {
           },
           {
             type: "image",
-            image: `data:image/png;base64,${imageBuffer.toString("base64")}`,
+            image: imageBuffer,
           },
         ],
       },

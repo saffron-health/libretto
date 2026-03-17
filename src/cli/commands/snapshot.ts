@@ -18,6 +18,7 @@ import {
 } from "./shared.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readAiConfig } from "../core/ai-config.js";
+import { resolveSnapshotApiModelOrThrow } from "../core/snapshot-api-config.js";
 
 const DEFAULT_SNAPSHOT_CONTEXT = "No additional user context provided.";
 const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
@@ -260,6 +261,11 @@ async function runSnapshot(
     );
   }
 
+  const configuredAi = normalizedObjective ? readAiConfig() : null;
+  if (normalizedObjective) {
+    resolveSnapshotApiModelOrThrow(configuredAi);
+  }
+
   const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(
     session,
     logger,
@@ -289,7 +295,7 @@ async function runSnapshot(
   // The legacy CLI-agent path (spawning codex/claude/gemini as a subprocess) is preserved
   // in snapshot-analyzer.ts — to switch back, replace this call with:
   //   await runInterpret(interpretArgs, logger);
-  await runApiInterpret(interpretArgs, logger, readAiConfig());
+  await runApiInterpret(interpretArgs, logger, configuredAi);
 }
 
 export const snapshotInput = SimpleCLI.input({

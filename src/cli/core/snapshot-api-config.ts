@@ -4,10 +4,9 @@ import {
 	type AiConfig,
 	readAiConfig,
 } from "./ai-config.js";
-import { REPO_ROOT } from "./context.js";
+import { LIBRETTO_CONFIG_PATH, REPO_ROOT } from "./context.js";
 import {
 	hasProviderCredentials,
-	missingProviderCredentialsMessage,
 	parseModel,
 	type Provider,
 } from "../../shared/llm/client.js";
@@ -15,7 +14,7 @@ import {
 const DEFAULT_SNAPSHOT_MODELS = {
 	openai: "openai/gpt-5.4",
 	anthropic: "anthropic/claude-sonnet-4-6",
-	google: "google/gemini-2.5-flash",
+	google: "google/gemini-3-flash-preview",
 	vertex: "vertex/gemini-2.5-pro",
 } as const satisfies Record<Provider, string>;
 
@@ -35,6 +34,58 @@ export class SnapshotApiUnavailableError extends Error {
 		super(message);
 		this.name = "SnapshotApiUnavailableError";
 	}
+}
+
+function providerSetupSentence(provider: Provider): string {
+	switch (provider) {
+		case "openai":
+			return "Add OPENAI_API_KEY to .env or as a shell environment variable.";
+		case "anthropic":
+			return "Add ANTHROPIC_API_KEY to .env or as a shell environment variable.";
+		case "google":
+			return "Add GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY to .env or as a shell environment variable.";
+		case "vertex":
+			return "Add GOOGLE_CLOUD_PROJECT or GCLOUD_PROJECT to .env or as a shell environment variable, and make sure application default credentials are configured.";
+	}
+}
+
+function defaultModelCommandLine(): string {
+	return "npx libretto ai configure openai | anthropic | gemini | vertex";
+}
+
+function providerMissingCredentialSummary(provider: Provider): string {
+	switch (provider) {
+		case "openai":
+			return "OPENAI_API_KEY is missing";
+		case "anthropic":
+			return "ANTHROPIC_API_KEY is missing";
+		case "google":
+			return "GEMINI_API_KEY and GOOGLE_GENERATIVE_AI_API_KEY are missing";
+		case "vertex":
+			return "GOOGLE_CLOUD_PROJECT and GCLOUD_PROJECT are missing";
+	}
+}
+
+function noSnapshotApiConfiguredMessage(): string {
+	return [
+		"Failed to analyze snapshot because no snapshot analyzer is configured.",
+		`Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_CLOUD_PROJECT to .env or as a shell environment variable, or choose a default model with \`${defaultModelCommandLine()}\`.`,
+		"For more info, run `npx libretto init`.",
+	].join(" ");
+}
+
+function missingProviderSnapshotMessage(
+	selection: SnapshotApiModelSelection,
+): string {
+	const configuredSource =
+		selection.source === "config"
+			? ` in ${LIBRETTO_CONFIG_PATH}`
+			: " from process env or .env";
+	return [
+		`Failed to analyze snapshot because ${selection.provider} is configured${configuredSource}, but ${providerMissingCredentialSummary(selection.provider)}.`,
+		providerSetupSentence(selection.provider),
+		"For more info, run `npx libretto init`.",
+	].join(" ");
 }
 
 function readWorktreeEnvPath(): string | null {
@@ -167,13 +218,13 @@ export function resolveSnapshotApiModelOrThrow(
 	const selection = resolveSnapshotApiModel(config);
 	if (!selection) {
 		throw new SnapshotApiUnavailableError(
-			"No API snapshot analyzer is available. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_CLOUD_PROJECT, or run `npx libretto ai configure <provider>` to set a default model.",
+			noSnapshotApiConfiguredMessage(),
 		);
 	}
 
 	if (!hasProviderCredentials(selection.provider)) {
 		throw new SnapshotApiUnavailableError(
-			missingProviderCredentialsMessage(selection.provider),
+			missingProviderSnapshotMessage(selection),
 		);
 	}
 

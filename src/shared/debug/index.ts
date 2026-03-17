@@ -1,1 +1,1 @@
-export { pause, setSessionForPause } from "./pause.js";
+export { pause } from "./pause.js";

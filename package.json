@@ -1,6 +1,6 @@
 {
   "name": "libretto",
-  "version": "0.4.2",
+  "version": "0.4.4",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
   "repository": {
@@ -14,8 +14,11 @@
   },
   "files": [
     "dist",
+    "src",
+    "scripts",
     "skills/libretto"
   ],
+  "types": "./dist/index.d.ts",
   "bin": {
     "libretto": "./dist/cli/index.js",
     "libretto-cli": "./dist/cli/index.js"
@@ -24,14 +27,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "postinstall": "playwright install chromium",
-    "build": "pnpm run build:runtime && pnpm run build:cli",
-    "build:runtime": "tsup --config tsup.config.ts",
-    "build:cli": "tsup --config tsup.cli.config.ts",
+    "postinstall": "node scripts/postinstall.mjs",
+    "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
     "test": "pnpm run build && vitest run",
     "eval": "pnpm run build && vitest run --config vitest.evals.config.ts",
