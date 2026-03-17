@@ -171,6 +171,7 @@ export function buildBrowserBenchmarkPrompt(
     `Run the ${testCase.benchmark} browser benchmark case "${testCase.title}".`,
     "Solve it by browsing the live website with the Libretto CLI installed in the current workspace.",
     "Use the libretto skill.",
+    "Run every `pnpm -s cli ...` command exactly from the current working directory. Do not prepend `cd`, do not switch directories, and do not run the CLI from the repo root.",
     "Do not inspect files under benchmarks/ to discover the answer.",
     `Use exactly one Libretto session named "${session}".`,
     `Open the site with: ${cli} open ${testCase.startUrl} --headless --session ${session}`,

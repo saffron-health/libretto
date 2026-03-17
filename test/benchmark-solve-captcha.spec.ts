@@ -1,7 +1,11 @@
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   SOLVE_CAPTCHA_TOOL_NAME,
   createSolveCaptchaHooks,
+  readSolveCaptchaSessionState,
   waitForSolveCaptchaTarget,
 } from "../benchmarks/shared/solve-captcha-tool.js";
 
@@ -23,6 +27,42 @@ function createPollingPage(states: Array<{ url: string; title: string }>) {
 }
 
 describe("benchmark solve-captcha tool", () => {
+  test("reads kernel session state from the benchmark workspace", () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "libretto-benchmark-solve-captcha-"));
+    const sessionDir = join(
+      workspaceDir,
+      ".libretto",
+      "sessions",
+      "webvoyager-cambridge-dictionary-32",
+    );
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, "state.json"),
+      JSON.stringify({
+        version: 1,
+        provider: "kernel",
+        session: "webvoyager-cambridge-dictionary-32",
+        pid: 123,
+        startedAt: "2026-03-17T00:00:00.000Z",
+        status: "active",
+        cdpWsUrl: "wss://example.com/browser/cdp",
+        sessionId: "kernel-session-id",
+      }),
+      "utf-8",
+    );
+
+    expect(
+      readSolveCaptchaSessionState(
+        "webvoyager-cambridge-dictionary-32",
+        workspaceDir,
+      ),
+    ).toMatchObject({
+      provider: "kernel",
+      cdpWsUrl: "wss://example.com/browser/cdp",
+      sessionId: "kernel-session-id",
+    });
+  });
+
   test("waits until the page reaches the requested URL/title target", async () => {
     const page = createPollingPage([
       {

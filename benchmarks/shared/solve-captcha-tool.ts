@@ -4,14 +4,15 @@ import {
   type HookCallbackMatcher,
   type McpServerConfig,
 } from "@anthropic-ai/claude-agent-sdk";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { chromium, type Browser } from "playwright";
 import { z } from "zod";
-import { connect, disconnectBrowser } from "../../src/cli/core/browser.js";
 import {
-  closeLogger,
-  createLoggerForSession,
-} from "../../src/cli/core/context.js";
-import { readSessionStateOrThrow } from "../../src/cli/core/session.js";
-import { isKernelSessionState } from "../../src/shared/state/index.js";
+  isKernelSessionState,
+  parseSessionStateContent,
+  type KernelSessionState,
+} from "../../src/shared/state/index.js";
 
 const DEFAULT_TIMEOUT_SECONDS = 60;
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
@@ -42,6 +43,14 @@ export type CaptchaWaitInput = {
 export type CaptchaWaitResult = {
   waitedMs: number;
   snapshot: CaptchaSnapshot;
+};
+
+type SolveCaptchaBrowser = Pick<Browser, "contexts"> & {
+  _connection?: { close(): void };
+};
+
+type SolveCaptchaChromiumClient = {
+  connectOverCDP(endpoint: string): Promise<SolveCaptchaBrowser>;
 };
 
 function normalizeMatchValue(value: string | undefined): string | null {
@@ -143,6 +152,79 @@ async function sleep(page: CaptchaPage, timeoutMs: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, timeoutMs));
 }
 
+function getBenchmarkSessionsDir(workspaceDir: string): string {
+  return join(workspaceDir, ".libretto", "sessions");
+}
+
+function getBenchmarkSessionStatePath(session: string, workspaceDir: string): string {
+  return join(getBenchmarkSessionsDir(workspaceDir), session, "state.json");
+}
+
+function listWorkspaceSessions(workspaceDir: string): string[] {
+  const sessionsDir = getBenchmarkSessionsDir(workspaceDir);
+  if (!existsSync(sessionsDir)) return [];
+
+  return readdirSync(sessionsDir).sort();
+}
+
+function throwWorkspaceSessionNotFoundError(
+  session: string,
+  workspaceDir: string,
+): never {
+  const active = listWorkspaceSessions(workspaceDir);
+  const lines = [`No session "${session}" found in benchmark workspace.`];
+  if (Array.isArray(active) && active.length > 0) {
+    lines.push("");
+    lines.push("Active benchmark sessions:");
+    for (const name of active) {
+      lines.push(`  ${name}`);
+    }
+  } else {
+    lines.push("");
+    lines.push("No active benchmark sessions.");
+  }
+  lines.push("");
+  lines.push(`Workspace: ${workspaceDir}`);
+  throw new Error(lines.join("\n"));
+}
+
+export function readSolveCaptchaSessionState(
+  session: string,
+  workspaceDir: string,
+): KernelSessionState {
+  const statePath = getBenchmarkSessionStatePath(session, workspaceDir);
+  if (!existsSync(statePath)) {
+    throwWorkspaceSessionNotFoundError(session, workspaceDir);
+  }
+
+  const state = parseSessionStateContent(readFileSync(statePath, "utf-8"), statePath);
+  if (!isKernelSessionState(state)) {
+    throw new Error("solve-captcha only supports Kernel-backed benchmark sessions.");
+  }
+  return state;
+}
+
+function resolveSolveCaptchaPage(browser: SolveCaptchaBrowser): CaptchaPage {
+  const page = browser
+    .contexts()
+    .flatMap((context) => context.pages())
+    .find((candidate) => !candidate.url().startsWith("devtools://"));
+
+  if (!page) {
+    throw new Error("Could not find an active page for solve-captcha.");
+  }
+
+  return page;
+}
+
+function disconnectSolveCaptchaBrowser(browser: SolveCaptchaBrowser): void {
+  try {
+    browser._connection?.close();
+  } catch {
+    // Ignore duplicate disconnects on already-closed CDP connections.
+  }
+}
+
 export async function waitForSolveCaptchaTarget(
   page: CaptchaPage,
   input: CaptchaWaitInput,
@@ -181,7 +263,10 @@ export async function waitForSolveCaptchaTarget(
   );
 }
 
-export function createSolveCaptchaTool() {
+export function createSolveCaptchaTool(
+  workspaceDir: string,
+  deps?: { chromiumClient?: SolveCaptchaChromiumClient },
+) {
   return tool(
     SOLVE_CAPTCHA_TOOL_NAME,
     "Wait for Kernel to auto-resolve a visible CAPTCHA or Cloudflare challenge in the current Libretto benchmark session. Use this instead of clicking the challenge UI yourself.",
@@ -193,49 +278,38 @@ export function createSolveCaptchaTool() {
       timeoutSeconds: z.number().int().min(1).max(DEFAULT_TIMEOUT_SECONDS).optional(),
     },
     async (input) => {
-      const logger = createLoggerForSession(input.session);
+      const chromiumClient = deps?.chromiumClient ?? chromium;
+      const sessionState = readSolveCaptchaSessionState(input.session, workspaceDir);
+      const browser = await chromiumClient.connectOverCDP(sessionState.cdpWsUrl);
       try {
-        const sessionState = readSessionStateOrThrow(input.session);
-
-        if (!isKernelSessionState(sessionState)) {
-          throw new Error(
-            "solve-captcha only supports Kernel-backed benchmark sessions.",
-          );
-        }
-
-        const { browser, page } = await connect(input.session, logger, 10_000, {
-          requireSinglePage: true,
-        });
-
-        try {
-          const result = await waitForSolveCaptchaTarget(page, input);
-          return {
-            content: [
-              {
-                type: "text",
-                text: [
-                  "<system-message>Bypassed captcha</system-message>",
-                  `Ready after ${Math.round(result.waitedMs / 1000)}s.`,
-                  `Current page: ${result.snapshot.title} | ${result.snapshot.url}`,
-                ].join("\n"),
-              },
-            ],
-          };
-        } finally {
-          disconnectBrowser(browser, logger, input.session);
-        }
+        const page = resolveSolveCaptchaPage(browser);
+        const result = await waitForSolveCaptchaTarget(page, input);
+        return {
+          content: [
+            {
+              type: "text",
+              text: [
+                "<system-message>Bypassed captcha</system-message>",
+                `Ready after ${Math.round(result.waitedMs / 1000)}s.`,
+                `Current page: ${result.snapshot.title} | ${result.snapshot.url}`,
+              ].join("\n"),
+            },
+          ],
+        };
       } finally {
-        await closeLogger(logger);
+        disconnectSolveCaptchaBrowser(browser);
       }
     },
   );
 }
 
-export function createSolveCaptchaMcpServer(): Record<string, McpServerConfig> {
+export function createSolveCaptchaMcpServer(
+  workspaceDir: string,
+): Record<string, McpServerConfig> {
   return {
     [SOLVE_CAPTCHA_TOOL_SERVER_NAME]: createSdkMcpServer({
       name: SOLVE_CAPTCHA_TOOL_SERVER_NAME,
-      tools: [createSolveCaptchaTool()],
+      tools: [createSolveCaptchaTool(workspaceDir)],
     }),
   };
 }

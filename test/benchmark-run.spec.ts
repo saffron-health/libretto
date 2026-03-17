@@ -39,7 +39,8 @@ describe("benchmark launcher history", () => {
     expect(prompt).toContain("Use the libretto skill.");
     expect(prompt).toContain("pnpm -s cli open https://example.com --headless --session webvoyager-sample-case");
     expect(prompt).toContain("Current working directory: /tmp/libretto-benchmark-workspace");
-    expect(prompt).not.toContain("Run all commands from the current working directory");
+    expect(prompt).toContain("Run every `pnpm -s cli ...` command exactly from the current working directory.");
+    expect(prompt).toContain("Do not prepend `cd`, do not switch directories, and do not run the CLI from the repo root.");
     expect(prompt).not.toContain(".claude/skills/libretto/SKILL.md");
     expect(prompt).not.toContain(".agents/skills/libretto/SKILL.md");
   });

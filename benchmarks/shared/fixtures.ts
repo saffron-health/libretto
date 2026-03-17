@@ -53,7 +53,7 @@ export async function createClaudeBenchmarkHarness(
       process.env.LIBRETTO_BENCHMARK_MODEL?.trim() ||
       process.env.LIBRETTO_EVAL_MODEL?.trim() ||
       DEFAULT_BENCHMARK_MODEL,
-    mcpServers: createSolveCaptchaMcpServer(),
+    mcpServers: createSolveCaptchaMcpServer(cwd),
     hooks: createSolveCaptchaHooks(),
     maxTurns: 30,
     settingSources: ["project"],
