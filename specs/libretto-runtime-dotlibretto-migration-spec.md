@@ -1,6 +1,6 @@
 ## Problem overview
 
-`packages/libretto` still writes default runtime state to `tmp/libretto`, even after the broader `.libretto` state centralization work in `libretto-cli`.
+`packages/libretto` still writes default runtime state to `tmp/libretto`, even after the broader `.libretto` state centralization work in `libretto`.
 
 Current gaps:
 - `run/browser.ts` writes browser metadata to `tmp/libretto/<session>.json`.
@@ -75,6 +75,6 @@ Use one shared internal path helper module in `packages/libretto` so `launchBrow
 
 - [ ] Update `packages/libretto/README.md` to document new `.libretto/sessions/<session>/...` defaults.
 - [ ] Mark corresponding Phase 5 checklist items in `specs/libretto-state-centralization-spec.md` as complete once implemented.
-- [ ] Run `pnpm --filter libretto type-check` and `pnpm --filter libretto-cli type-check`.
+- [ ] Run `pnpm --filter libretto type-check` and `pnpm --filter libretto type-check`.
 - [ ] Perform one local smoke run that exercises `launchBrowser`, `debugPause`, and runner logging defaults, then verify no new `tmp/libretto/*` files were created.
 - [ ] Success criteria: docs and runtime behavior are aligned on `.libretto` defaults and validation commands pass.

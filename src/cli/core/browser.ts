@@ -200,7 +200,7 @@ export async function connect(
     if (!isPidRunning(state.pid)) {
       clearSessionState(session, logger);
       throw new Error(
-        `No browser running for session "${session}". Run 'libretto-cli open <url> --session ${session}' first.`,
+        `No browser running for session "${session}". Run 'libretto open <url> --session ${session}' first.`,
       );
     }
 
@@ -236,7 +236,7 @@ export async function connect(
 
   if (options?.requireSinglePage && !options.pageId && pages.length > 1) {
     throw new Error(
-      `Multiple pages are open in session "${session}". Pass --page <id> to target a page (run "libretto-cli pages --session ${session}" to list ids).`,
+      `Multiple pages are open in session "${session}". Pass --page <id> to target a page (run "libretto pages --session ${session}" to list ids).`,
     );
   }
 
@@ -246,7 +246,7 @@ export async function connect(
     : pageRefs[pageRefs.length - 1]!;
   if (!pageRef) {
     throw new Error(
-      `Page "${options?.pageId}" was not found in session "${session}". Run "libretto-cli pages --session ${session}" to list ids.`,
+      `Page "${options?.pageId}" was not found in session "${session}". Run "libretto pages --session ${session}" to list ids.`,
     );
   }
   const page = pageRef.page;
@@ -394,7 +394,7 @@ function childLog(level, event, data = {}) {
 			timestamp: new Date().toISOString(),
 			id: Math.random().toString(36).slice(2, 10),
 			level,
-			scope: 'libretto-cli.child',
+			scope: 'libretto.child',
 			event,
 			data,
 		});
@@ -783,7 +783,7 @@ export async function runCloseAll(
       [
         `Failed to close ${survivors.length} session(s) gracefully: ${formatSessionList(survivors)}.`,
         `Closed ${closed} session(s).`,
-        "Retry with: libretto-cli close --all --force",
+        `Retry with: libretto close --all --force`,
       ].join("\n"),
     );
   }

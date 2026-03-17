@@ -8,7 +8,7 @@ The focus of this worktree is to establish reliable test infrastructure for CLI 
 
 Set up Vitest at the workspace level, add CLI-focused fixtures that isolate each test in its own workspace, and run the built CLI as a subprocess for black-box assertions.
 
-Do not refactor or edit `packages/libretto-cli/src/index.ts` in this spec. Tests should validate current behavior from the outside.
+Do not refactor or edit `packages/libretto/src/index.ts` in this spec. Tests should validate current behavior from the outside.
 
 ## Goals
 
@@ -21,7 +21,7 @@ Do not refactor or edit `packages/libretto-cli/src/index.ts` in this spec. Tests
 ## Non-goals
 
 - No migrations or backfills.
-- No edits to `packages/libretto-cli/src/index.ts` in this worktree.
+- No edits to `packages/libretto/src/index.ts` in this worktree.
 - No broad core-library test expansion in `packages/libretto` yet.
 - No real browser end-to-end automation against external websites.
 - No parser/helper extraction refactor for testability in this phase.
@@ -36,9 +36,9 @@ Do not refactor or edit `packages/libretto-cli/src/index.ts` in this spec. Tests
 
 - `package.json` — workspace scripts and shared dev dependencies.
 - `pnpm-workspace.yaml` — workspace package boundaries.
-- `packages/libretto-cli/package.json` — CLI package scripts and dependencies.
-- `packages/libretto-cli/vitest.config.ts` — package-local Vitest configuration for inline CLI tests.
-- `packages/libretto-cli/src/index.ts` — CLI runtime behavior under test (read-only for this spec).
+- `packages/libretto/package.json` — CLI package scripts and dependencies.
+- `packages/libretto/vitest.config.ts` — package-local Vitest configuration for inline CLI tests.
+- `packages/libretto/src/index.ts` — CLI runtime behavior under test (read-only for this spec).
 - `README.md` — top-level project context.
 
 ## Implementation
@@ -54,7 +54,7 @@ Do not refactor or edit `packages/libretto-cli/src/index.ts` in this spec. Tests
 ### Phase 2: Add scoped-workspace CLI fixtures
 
 - [x] Add a fixture that creates a unique temp workspace per test and switches subprocess cwd into it.
-- [x] Add seed helpers for `.libretto-cli` and `tmp/libretto-cli` state files and run directories.
+- [x] Add seed helpers for `.libretto` and `tmp/libretto` state files and run directories.
 - [x] Add a `spawnCli` fixture that executes the built CLI and captures `exitCode`, `stdout`, and `stderr`.
 - [x] Add teardown cleanup that removes temp workspace artifacts after each test.
 - [x] Success criteria: two tests can run in parallel without shared state collisions.

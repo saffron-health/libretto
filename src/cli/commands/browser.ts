@@ -56,7 +56,7 @@ export const openInput = SimpleCLI.input({
 })
   .refine(
     (input) => Boolean(input.url),
-    "Usage: libretto-cli open <url> [--headless] [--viewport WxH] [--session <name>]",
+    `Usage: libretto open <url> [--headless] [--viewport WxH] [--session <name>]`,
   )
   .refine(
     (input) => !(input.headed && input.headless),
@@ -88,7 +88,7 @@ export const saveInput = SimpleCLI.input({
   },
 }).refine(
   (input) => Boolean(input.urlOrDomain),
-  "Usage: libretto-cli save <url|domain> [--session <name>]",
+  `Usage: libretto save <url|domain> [--session <name>]`,
 );
 
 export function createSaveCommand(logger: LoggerApi) {
@@ -139,7 +139,7 @@ export function createCloseCommand(logger: LoggerApi) {
     .use(resolveSessionMiddleware)
     .handle(async ({ input, ctx }) => {
       if (input.force && !input.all) {
-        throw new Error("Usage: libretto-cli close --all [--force]");
+        throw new Error(`Usage: libretto close --all [--force]`);
       }
       if (input.all) {
         await runCloseAllWithLogger(logger, { force: input.force });

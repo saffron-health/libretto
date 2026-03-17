@@ -342,21 +342,21 @@ async function runCommand(command, args, options = {}) {
   });
 }
 
-const LIBRETTO_CLI_DIST = resolve("packages", "libretto-cli", "dist", "index.js");
+const LIBRETTO_CLI_DIST = resolve("packages", "libretto", "dist", "index.js");
 
 async function ensureLibrettoCliBuilt() {
   if (existsSync(LIBRETTO_CLI_DIST)) return;
   const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-  const buildResult = await runCommand(pnpmBin, ["--filter", "libretto-cli", "build"]);
+  const buildResult = await runCommand(pnpmBin, ["--filter", "libretto", "build"]);
   if (buildResult.exitCode !== 0 || !existsSync(LIBRETTO_CLI_DIST)) {
     throw new Error(
-      "libretto-cli dist build is missing and build failed. Run 'pnpm --filter libretto-cli build' manually.",
+      "libretto dist build is missing and build failed. Run 'pnpm --filter libretto build' manually.",
     );
   }
 }
 
 function getLibrettoCliArgs(command, ...rest) {
-  return ["--filter", "libretto-cli", "exec", "node", "dist/index.js", command, ...rest];
+  return ["--filter", "libretto", "exec", "node", "dist/index.js", command, ...rest];
 }
 
 async function openSession({ startUrl, sessionName, headed }) {

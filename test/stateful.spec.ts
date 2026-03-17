@@ -169,7 +169,7 @@ describe("state-driven CLI subprocess behavior", () => {
       `Session "${session}" is already open and connected to`,
     );
     expect(secondOpen.stderr).toContain(
-      `libretto-cli close --session ${session}`,
+      `libretto close --session ${session}`,
     );
   }, 45_000);
 
@@ -182,7 +182,7 @@ describe("state-driven CLI subprocess behavior", () => {
 
     expect(result.stdout).toBe("");
     await evaluate(result.stderr).toMatch(
-      'Explains that session "missing-session" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session missing-session.',
+      'Explains that session "missing-session" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session missing-session.',
     );
     expect(result.stderr.trimEnd().split("\n")).toEqual([
       `No session "${session}" found.`,
@@ -190,7 +190,7 @@ describe("state-driven CLI subprocess behavior", () => {
       "No active sessions.",
       "",
       "Start one with:",
-      `  libretto-cli open <url> --session ${session}`,
+      `  libretto open <url> --session ${session}`,
     ]);
   });
 
@@ -215,7 +215,7 @@ describe("state-driven CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const result = await librettoCli("close --force");
-    expect(result.stderr).toContain("Usage: libretto-cli close --all [--force]");
+    expect(result.stderr).toContain("Usage: libretto close --all [--force]");
   });
 
   test("close --all closes active sessions", async ({

@@ -58,7 +58,7 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("help ai configure");
     expect(result.stdout).toContain("Configure AI runtime");
-    expect(result.stdout).toContain("Usage: libretto-cli ai configure [preset] [options]");
+    expect(result.stdout).toContain("Usage: libretto ai configure [preset] [options]");
     expect(result.stderr).toBe("");
   });
 
@@ -89,7 +89,7 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("nope-command");
     expect(result.stderr).toContain("Unknown command: nope-command");
-    expect(result.stdout).toContain("Usage: libretto-cli <command>");
+    expect(result.stdout).toContain("Usage: libretto <command>");
   });
 
   test("fails open with missing url usage error", async ({
@@ -97,7 +97,7 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("open");
     expect(result.stderr).toContain(
-      "Usage: libretto-cli open <url> [--headless] [--viewport WxH] [--session <name>]",
+      "Usage: libretto open <url> [--headless] [--viewport WxH] [--session <name>]",
     );
   });
 
@@ -140,7 +140,7 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("exec");
     expect(result.stderr).toContain(
-      "Usage: libretto-cli exec <code> [--session <name>] [--visualize]",
+      "Usage: libretto exec <code> [--session <name>] [--visualize]",
     );
   });
 
@@ -209,7 +209,7 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("pages --session -dash");
     await evaluate(result.stderr).toMatch(
-      'Explains that session "-dash" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session -dash.',
+      'Explains that session "-dash" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session -dash.',
     );
     expect(result.stderr).not.toContain("Missing value for --session.");
   });
@@ -395,8 +395,8 @@ export const main = workflow(
     expect(result.stderr).toContain(
       'Local auth profile not found for domain "app.example.com".',
     );
-    expect(result.stderr).toContain("libretto-cli open https://app.example.com --headed --session default");
-    expect(result.stderr).toContain("libretto-cli save app.example.com --session default");
+    expect(result.stderr).toContain("libretto open https://app.example.com --headed --session default");
+    expect(result.stderr).toContain("libretto save app.example.com --session default");
   });
 
   test("does not require local auth profile when auth metadata is absent", async ({
@@ -528,7 +528,7 @@ export const main = workflow({}, async (ctx) => {
   }) => {
     const result = await librettoCli("save");
     expect(result.stderr).toContain(
-      "Usage: libretto-cli save <url|domain> [--session <name>]",
+      "Usage: libretto save <url|domain> [--session <name>]",
     );
   });
 
@@ -549,7 +549,7 @@ export const main = workflow({}, async (ctx) => {
     const result = await librettoCli("pages --session open");
     expect(result.stdout).toBe("");
     await evaluate(result.stderr).toMatch(
-      'Explains that session "open" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session open.',
+      'Explains that session "open" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session open.',
     );
   });
 

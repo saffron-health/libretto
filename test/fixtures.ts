@@ -58,7 +58,7 @@ const cliEntry = resolve(packageRoot, "dist/cli/index.js");
 const librettoEntry = resolve(packageRoot, "dist/index.js");
 const librettoRuntimePath = new URL("../dist/index.js", import.meta.url)
   .href;
-const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-cli-test-workspaces");
+const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-test-workspaces");
 const EVALUATE_MODEL = "local-evaluate-v1";
 
 let didBuild = false;
@@ -223,7 +223,7 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
     check: (actual) =>
       runChecks(
         actual,
-        requireIncludes(actual, "Usage: libretto-cli <command>"),
+        requireIncludes(actual, "Usage: libretto <command>"),
         requireIncludes(actual, "snapshot"),
         requireIncludes(actual, "Capture PNG + HTML"),
       ),
@@ -233,7 +233,7 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
     check: (actual) =>
       runChecks(
         actual,
-        requireIncludes(actual, "Usage: libretto-cli <command>"),
+        requireIncludes(actual, "Usage: libretto <command>"),
         requireIncludes(actual, "Commands:"),
         requireIncludes(actual, "open"),
         requireIncludes(actual, "ai"),
@@ -269,7 +269,7 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
   {
     pattern: /^Shows usage for exec command requiring code with optional session and visualize flags\.$/,
     check: (actual) =>
-      requireIncludes(actual, "Usage: libretto-cli exec <code> [--session <name>] [--visualize]"),
+      requireIncludes(actual, "Usage: libretto exec <code> [--session <name>] [--visualize]"),
   },
   {
     pattern: /^Explains that the integration file does not exist and mentions the integration\.ts path\.$/,
@@ -377,13 +377,13 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Explains that session "([^"]+)" does not exist, no active sessions are available, and suggests opening a session with libretto-cli open <url> --session ([^".]+)\.$/,
+    pattern: /^Explains that session "([^"]+)" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session ([^".]+)\.$/,
     check: (actual, match) =>
       runChecks(
         actual,
         requireIncludes(actual, `No session "${match[1]!}" found.`),
         requireIncludes(actual, "No active sessions."),
-        requireIncludes(actual, `libretto-cli open <url> --session ${match[2]!}`),
+        requireIncludes(actual, `libretto open <url> --session ${match[2]!}`),
       ),
   },
   {
@@ -426,7 +426,7 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       runChecks(
         actual,
         requireIncludes(actual, `Session "${match[1]!}" is already open and connected to`),
-        requireIncludes(actual, `libretto-cli close --session ${match[1]!}`),
+        requireIncludes(actual, `libretto close --session ${match[1]!}`),
       ),
   },
   {
@@ -439,13 +439,13 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto-cli open <url> --session default"\.$/,
+    pattern: /^Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto open <url> --session default"\.$/,
     check: (actual) =>
       runChecks(
         actual,
         requireIncludes(actual, 'No session "default" found.'),
         requireIncludes(actual, "No active sessions."),
-        requireIncludes(actual, "libretto-cli open <url> --session default"),
+        requireIncludes(actual, "libretto open <url> --session default"),
       ),
   },
   {
@@ -454,7 +454,7 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       runChecks(
         actual,
         requireIncludes(actual, `Session "${match[1]!}" is already open and connected to`),
-        requireIncludes(actual, `libretto-cli close --session ${match[1]!}`),
+        requireIncludes(actual, `libretto close --session ${match[1]!}`),
       ),
   },
 ];

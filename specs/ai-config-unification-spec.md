@@ -1,6 +1,6 @@
 ## Problem overview
 
-The CLI currently stores analyzer configuration in a snapshot-specific file (`.libretto-cli/snapshot-config.json`) and snapshot-specific code paths. That makes it hard to reuse the same model configuration for new commands like `analyze-media`, and it prevents future non-media AI workflows from sharing one stable runtime config.
+The CLI currently stores analyzer configuration in a snapshot-specific file (`.libretto/snapshot-config.json`) and snapshot-specific code paths. That makes it hard to reuse the same model configuration for new commands like `analyze-media`, and it prevents future non-media AI workflows from sharing one stable runtime config.
 
 We need one generic config location and schema that is explicitly AI-focused, not snapshot-focused.
 
@@ -22,7 +22,7 @@ Snapshot analysis will consume shared AI config, but this spec only covers AI co
 ## Non-goals
 
 - No migrations or backfills.
-- No compatibility read path for legacy `.libretto-cli/snapshot-config.json`.
+- No compatibility read path for legacy `.libretto/snapshot-config.json`.
 - No scope/profile system (global AI config only).
 - No changes to prompt design for snapshot or future analyze-media features.
 - No implementation of analyze-media command behavior in this spec.
@@ -35,12 +35,12 @@ Snapshot analysis will consume shared AI config, but this spec only covers AI co
 
 ## Important files/docs/websites for implementation
 
-- `packages/libretto-cli/src/core/context.ts` — currently defines `.libretto-cli` paths; must be updated to `.libretto/config.json` constants.
-- `packages/libretto-cli/src/core/snapshot-analyzer.ts` — currently owns snapshot-specific config schema and IO; AI config logic should be extracted from here.
-- `packages/libretto-cli/src/commands/snapshot.ts` — currently exposes `snapshot configure`; should be rewired to shared AI config handlers or alias behavior.
-- `packages/libretto-cli/src/cli.ts` — root usage text and command registration; add/adjust AI command help text.
-- `packages/libretto-cli/src/cli-stateful.test.ts` — stateful config tests must move from snapshot wording/path to AI wording/path.
-- `packages/libretto-cli/src/test-fixtures.ts` — fixture helper currently seeds `snapshot-config.json`; must seed `.libretto/config.json`.
+- `packages/libretto/src/core/context.ts` — currently defines `.libretto` paths; must be updated to `.libretto/config.json` constants.
+- `packages/libretto/src/core/snapshot-analyzer.ts` — currently owns snapshot-specific config schema and IO; AI config logic should be extracted from here.
+- `packages/libretto/src/commands/snapshot.ts` — currently exposes `snapshot configure`; should be rewired to shared AI config handlers or alias behavior.
+- `packages/libretto/src/cli.ts` — root usage text and command registration; add/adjust AI command help text.
+- `packages/libretto/src/cli-stateful.test.ts` — stateful config tests must move from snapshot wording/path to AI wording/path.
+- `packages/libretto/src/test-fixtures.ts` — fixture helper currently seeds `snapshot-config.json`; must seed `.libretto/config.json`.
 - `README.md` — user-facing docs currently snapshot-specific; update to generic AI config instructions.
 - [yargs command API](https://yargs.js.org/docs/#api-reference-commandcmd-desc-builder-handler) — reference for adding `ai` command surface cleanly.
 
@@ -75,10 +75,10 @@ Move configuration behavior out of snapshot-specific code and into shared AI han
 Add a first-class `ai` command entry point so users configure model behavior in one obvious place. This phase is focused on discoverable CLI UX, not analyzer internals.
 
 - [x] Add `ai configure [preset]` command in CLI registration with `--clear` and optional custom prefix via `--` separator.
-- [x] Update root usage text/examples to show `libretto-cli ai configure ...`.
+- [x] Update root usage text/examples to show `libretto ai configure ...`.
 - [x] Keep command behavior deterministic and aligned with existing configure UX semantics.
 - [x] Decide whether to keep `snapshot configure` as temporary alias in this phase; if kept, ensure help text labels it as compatibility behavior.
-- [x] Success criteria: `libretto-cli ai configure codex`, bare `libretto-cli ai configure` (show), and `--clear` all run successfully with expected stdout and exit code `0`.
+- [x] Success criteria: `libretto ai configure codex`, bare `libretto ai configure` (show), and `--clear` all run successfully with expected stdout and exit code `0`.
 
 ### Phase 4: Rewire snapshot analyzer to shared AI config resolver
 
@@ -86,7 +86,7 @@ Switch snapshot analysis to consume the new shared AI config path and helpers. B
 
 - [x] Replace snapshot-specific config reads in `snapshot-analyzer.ts` with shared AI config resolver calls.
 - [x] Keep existing analyzer execution adapters (`codex`, `opencode`, `claude`, `gemini`) but source their command prefix from shared AI config.
-- [x] Update missing-config and command-not-found error strings to point users to `libretto-cli ai configure ...`.
+- [x] Update missing-config and command-not-found error strings to point users to `libretto ai configure ...`.
 - [x] Do not change prompt/schema generation logic for snapshot interpretation in this phase.
 - [x] Success criteria: snapshot analysis still works when AI config exists and fails with actionable `ai configure` guidance when missing.
 
@@ -97,5 +97,5 @@ Finalize the contract by updating automated coverage and user documentation. Thi
 - [x] Update `cli-stateful.test.ts` config tests from snapshot-specific command/path terminology to AI command/path terminology.
 - [x] Update `test-fixtures.ts` seed helper to write `.libretto/config.json` with the new schema.
 - [x] Update README section from “snapshot analyzer configuration” to generic “AI configuration”.
-- [x] Run `pnpm --filter libretto-cli test` and ensure all CLI tests pass with the new config path and messages.
+- [x] Run `pnpm --filter libretto test` and ensure all CLI tests pass with the new config path and messages.
 - [x] Success criteria: test suite passes and docs/examples consistently reference `.libretto/config.json` and `ai configure`.

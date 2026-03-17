@@ -18,30 +18,30 @@ Options:
                           Built-in sessions: default, dev-server, browser-agent
 
 Examples:
-  libretto-cli open https://linkedin.com
+  libretto open https://linkedin.com
 
   # ... manually log in ...
-  libretto-cli save linkedin.com
+  libretto save linkedin.com
   # Next time you open linkedin.com, you'll be logged in automatically
 
-  libretto-cli exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
-  libretto-cli exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
-  libretto-cli ai configure openai
-  libretto-cli ai configure anthropic
-  libretto-cli ai configure gemini
-  libretto-cli ai configure vertex
-  libretto-cli ai configure openai/gpt-4o
-  libretto-cli snapshot
-  libretto-cli snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
-  libretto-cli resume --session default
-  libretto-cli close
-  libretto-cli close --all
-  libretto-cli close --all --force
+  libretto exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
+  libretto exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
+  libretto ai configure openai
+  libretto ai configure anthropic
+  libretto ai configure gemini
+  libretto ai configure vertex
+  libretto ai configure openai/gpt-4o
+  libretto snapshot
+  libretto snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
+  libretto resume --session default
+  libretto close
+  libretto close --all
+  libretto close --all --force
 
   # Multiple sessions
-  libretto-cli open https://site1.com --session test1
-  libretto-cli open https://site2.com --session test2
-  libretto-cli exec "return await page.title()" --session test1
+  libretto open https://site1.com --session test1
+  libretto open https://site2.com --session test2
+  libretto exec "return await page.title()" --session test1
 
 Available in exec:
   page, context, state, browser, networkLog, actionLog
@@ -102,7 +102,7 @@ function validateLegacySessionArg(rawArgs: string[]): void {
   if (value === undefined) return;
   if (value === null) {
     throw new Error(
-      "Usage: libretto-cli <command> [--session <name>]\nMissing or invalid --session value.",
+      `Usage: libretto <command> [--session <name>]\nMissing or invalid --session value.`,
     );
   }
   validateSessionName(value);

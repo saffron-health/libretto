@@ -82,7 +82,7 @@ function buildTaskPrompt(options) {
     "- Do not modify repository source files or docs.",
     "- Do not ask user questions.",
     "- Solve from current page state only.",
-    "- For CLI commands in this repo, use prefix: pnpm --filter libretto-cli exec node dist/index.js",
+    "- For CLI commands in this repo, use prefix: pnpm --filter libretto exec node dist/index.js",
     "- Useful commands: snapshot, exec, actions, network.",
     `- Max meaningful browser actions: ${options.maxSteps}`,
     modelLine,
