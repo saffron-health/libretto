@@ -14,15 +14,24 @@ spawnSync("npx", ["playwright", "install", "chromium"], {
   shell: true,
 });
 
-// Find git repo root
+const installCwd = process.env.INIT_CWD?.trim() || null;
+if (!installCwd) {
+  console.warn(
+    "libretto: automatic skill install failed because INIT_CWD is not set. Run `npx skills add saffron-health/libretto` to add the skills manually.",
+  );
+  process.exit(0);
+}
+
+// Resolve the consuming project's repo root from the original install cwd,
+// not pnpm's content-addressable store path.
 const gitResult = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+  cwd: installCwd,
   encoding: "utf-8",
   stdio: ["pipe", "pipe", "pipe"],
 });
 const repoRoot = gitResult.status === 0 && gitResult.stdout
   ? gitResult.stdout.trim()
-  : null;
-if (!repoRoot) process.exit(0);
+  : installCwd;
 
 // Sync skills to any agent dirs at repo root
 const sourceDir = join(packageRoot, "skills", "libretto");
