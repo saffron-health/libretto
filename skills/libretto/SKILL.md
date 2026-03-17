@@ -16,13 +16,13 @@ Use `npx libretto` to inspect live browser state, prototype interactions, and ru
 - Use this skill when the truth is on the page.
 - Prefer Libretto when you need to see what the browser is doing, not when you only need to edit source files.
 - Treat Libretto as a session-based workflow: open a page, inspect it, try a focused action, then turn what you learned into code outside the CLI.
+- When building a new integration, prefer reverse-engineering network requests first. Fall back to browser automation when the request path is unclear, too fragile, or blocked by anti-bot systems.
 
 ## Setup
 
 - Ask the user to set up snapshot analysis before relying on `snapshot` for page understanding.
 - Use `npx libretto init` for first-time setup.
 - If they already have credentials, `npx libretto ai configure openai|anthropic|gemini|vertex` is enough.
-- If snapshot analysis is not configured, you can still use `snapshot` as capture-only output, but call that out explicitly.
 
 ## Rules
 
@@ -60,8 +60,11 @@ npx libretto exec --visualize "await page.locator('button:has-text(\"Continue\")
 
 - Use `snapshot` as the primary page observation tool.
 - Always give an `--objective`. Add `--context` when the current page state is not obvious.
+- If you only need the PNG and HTML files, omit `--objective`. That runs capture-only mode and skips AI analysis.
+- When using `--objective`, expect analysis to take time. Use a timeout of at least 2 minutes for shell-wrapped calls.
 
 ```bash
+npx libretto snapshot
 npx libretto snapshot --objective "Find the sign-in form and submit button"
 npx libretto snapshot \
   --objective "Explain why the table is empty" \
@@ -92,10 +95,11 @@ npx libretto run ./integration.ts main --auth-profile app.example.com --headed
 [Context: The user wants to build a new browser workflow and does not yet know the page structure]
 Assistant: Let me open the target page in headed mode so we can inspect the real workflow.
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
+Assistant: I'll first determine whether this flow can be built from captured network requests instead of UI-only automation.
 Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page."`]
-Assistant: I found the form and the likely next action. If that matches what you expect, I'll prototype it with `exec`.
-Assistant: [Runs `npx libretto exec "...focused interaction..."`]
-Assistant: The interaction works. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
+Assistant: If the page exposes a clear and stable request path, I'll prioritize that. If the request path is unclear, fragile, or heavily defended, I'll fall back to browser automation.
+Assistant: [Uses `network`, `snapshot`, and `exec` as needed to prove the approach]
+Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
 </example>
 ```
 
