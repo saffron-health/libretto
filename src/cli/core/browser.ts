@@ -13,8 +13,8 @@ import {
 } from "./context.js";
 import { readLibrettoConfig } from "./ai-config.js";
 import {
-  assertSessionAvailableForStart,
   clearSessionState,
+  ensureSessionAvailableForStart,
   listSessionsWithStateFile,
   readSessionStateOrThrow,
   logFileForSession,
@@ -231,7 +231,17 @@ export async function connect(
       session,
       allPageUrls: allPages.map((p) => p.url()),
     });
-    throw new Error("No pages found.");
+    disconnectBrowser(browser, logger, session);
+    throw new Error(
+      [
+        `Session "${session}" has no open pages.`,
+        "",
+        "This usually happens when the browser window was closed manually.",
+        "To recover, close and re-open the session:",
+        `  libretto close --session ${session}`,
+        `  libretto open <url> --session ${session}`,
+      ].join("\n"),
+    );
   }
 
   if (options?.requireSinglePage && !options.pageId && pages.length > 1) {
@@ -321,7 +331,7 @@ export async function runOpen(
   const url = normalizeUrl(rawUrl);
   const viewport = resolveViewport(options?.viewport, logger);
   logger.info("open-start", { url, headed, session, viewport });
-  assertSessionAvailableForStart(session, logger);
+  await ensureSessionAvailableForStart(session, logger);
 
   const port = await pickFreePort();
   const runLogPath = logFileForSession(session);
@@ -409,6 +419,7 @@ const browser = await chromium.launch({
 
 browser.on('disconnected', () => {
 	childLog('warn', 'browser-disconnected', { port: ${port} });
+	process.exit(0);
 });
 
 const context = await browser.newContext({
@@ -431,6 +442,29 @@ await installSessionTelemetry({
 
 
 await page.goto('${escapedUrl}');
+
+function checkRemainingPages() {
+	const remaining = context.pages().filter(p => {
+		const u = p.url();
+		return !u.startsWith('devtools://') && !u.startsWith('chrome-error://');
+	});
+	if (remaining.length === 0) {
+		childLog('info', 'all-pages-closed', { port: ${port} });
+		browser.close().then(() => process.exit(0)).catch(() => process.exit(1));
+	}
+}
+
+context.on('page', (newPage) => {
+	newPage.on('close', () => {
+		childLog('info', 'page-closed', { url: newPage.url() });
+		setTimeout(checkRemainingPages, 200);
+	});
+});
+
+page.on('close', () => {
+	childLog('info', 'initial-page-closed');
+	setTimeout(checkRemainingPages, 200);
+});
 
 process.on('SIGTERM', async () => {
 	childLog('info', 'child-sigterm');

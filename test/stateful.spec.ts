@@ -284,4 +284,98 @@ describe("state-driven CLI subprocess behavior", () => {
     const clear = await librettoCli(`actions --session ${session} --clear`);
     expect(clear.stdout).toContain("Action log cleared.");
   }, 60_000);
+
+  test("open self-heals when session state references a dead process", async ({
+    librettoCli,
+    seedSessionState,
+  }) => {
+    const session = "stale-dead-pid";
+    await seedSessionState({
+      session,
+      pid: 999999,
+      port: 19222,
+    });
+
+    const result = await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
+    expect(result.stdout).toContain("Browser open");
+    expect(result.stdout).toContain("example.com");
+    expect(result.stderr).toBe("");
+  }, 45_000);
+
+  test("run self-heals when session state references a dead process", async ({
+    librettoCli,
+    seedSessionState,
+    writeWorkflow,
+  }) => {
+    const session = "stale-dead-pid-run";
+    await seedSessionState({
+      session,
+      pid: 999999,
+      port: 19222,
+    });
+
+    const integrationFilePath = await writeWorkflow(
+      "integration-stale-run.mjs",
+      `
+export const main = workflow({}, async () => {
+  console.log("STALE_RUN_OK");
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" main --session ${session} --headless`,
+    );
+    expect(result.stdout).toContain("STALE_RUN_OK");
+    expect(result.stdout).toContain("Integration completed.");
+    expect(result.stderr).toBe("");
+  }, 45_000);
+
+  test("exec shows stale-session guidance when session has no open pages", async ({
+    librettoCli,
+    seedSessionState,
+  }) => {
+    const session = "stale-no-pages-exec";
+    await seedSessionState({
+      session,
+      pid: 999999,
+      port: 19222,
+    });
+
+    const result = await librettoCli(
+      `exec "return 1" --session ${session}`,
+    );
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain(
+      `No browser running for session "${session}".`,
+    );
+    expect(result.stderr).toContain(
+      `libretto open <url> --session ${session}`,
+    );
+  });
+
+  test("snapshot shows stale-session guidance when session has no open pages", async ({
+    librettoCli,
+    seedSessionState,
+  }) => {
+    const session = "stale-no-pages-snapshot";
+    await seedSessionState({
+      session,
+      pid: 999999,
+      port: 19222,
+    });
+
+    const result = await librettoCli(
+      `snapshot --session ${session}`,
+    );
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain(
+      `No browser running for session "${session}".`,
+    );
+    expect(result.stderr).toContain(
+      `libretto open <url> --session ${session}`,
+    );
+  });
 });
