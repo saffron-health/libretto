@@ -394,7 +394,7 @@ function createDiffBootScript(moduleUrl, diffStyle) {
   return `<script type="module">
 const moduleUrl = ${JSON.stringify(moduleUrl)};
 const defaults = {
-  diffStyle: "unified",
+  diffStyle: ${JSON.stringify(diffStyle)},
   overflow: "wrap",
   diffIndicators: "none",
   lineDiffType: "word-alt",
