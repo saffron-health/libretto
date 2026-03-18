@@ -64,12 +64,13 @@
     }
   },
   "devDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.75",
     "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai": "^3.0.41",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.75",
     "@types/node": "^25.5.0",
+    "glimpseui": "^0.5.1",
     "openai": "^6.29.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",

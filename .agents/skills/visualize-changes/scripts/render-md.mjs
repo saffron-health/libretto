@@ -1,119 +1,43 @@
 #!/usr/bin/env node
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, extname, join, resolve } from "node:path";
-import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import process from "node:process";
+import { open } from "glimpseui";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const skillDir = resolve(scriptDir, "..");
-const assetsDir = resolve(skillDir, "assets");
-const requireFromCwd = createRequire(join(process.cwd(), "package.json"));
+const skillDir = dirname(scriptDir);
+const assetsDir = join(skillDir, "assets");
 const DEFAULT_DIFFS_MODULE_URL = "https://esm.sh/@pierre/diffs@1.1.1?bundle";
-const DIFF_STYLES = new Set(["split", "unified"]);
+const DEFAULT_DIFFS_SSR_MODULE_URL = "https://esm.sh/@pierre/diffs@1.1.1/ssr?bundle";
+const DEFAULT_WIDTH = 1240;
+const DEFAULT_HEIGHT = 920;
 
 function printUsage() {
-  console.log(`render-md.mjs [file|-] [options]
+  console.log(`render-md.mjs [markdown]
 
-Render a Markdown document into a Critique-styled HTML page and optionally
-open it with Glimpse.
-
-Options:
-  --title <title>            Override the page title
-  --out <path>               Write HTML to this path
-  --no-open                  Generate HTML only
-  --diffs-module-url <url>   Browser module URL for @pierre/diffs
-  --diff-style <style>       Render diffs as split or unified (default: split)
-  --glimpse-module <path>    Absolute or relative path to glimpse.mjs
-  --glimpse-repo <path>      Path to a Glimpse checkout or install root
-  --critique-repo <path>     Path to a Critique checkout for theme tokens
-  --width <px>               Glimpse window width (default: 1240)
-  --height <px>              Glimpse window height (default: 920)
-  --help                     Show this message
+Render Markdown into a Critique-styled HTML page, open it in Glimpse, and use
+Diffs.com for fenced diff blocks.
 
 Input:
-  - Pass a file path as the first argument, or
+  - Pass a single inline Markdown argument, or
   - pipe Markdown over stdin.
 `);
 }
 
-function parseArgs(argv) {
-  const options = {
-    inputPath: null,
-    title: null,
-    outPath: null,
-    noOpen: false,
-    diffsModuleUrl: DEFAULT_DIFFS_MODULE_URL,
-    diffStyle: "split",
-    glimpseModule: null,
-    glimpseRepo: process.env.GLIMPSE_REPO || null,
-    critiqueRepo: process.env.CRITIQUE_REPO || null,
-    width: 1240,
-    height: 920,
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === "--help" || arg === "-h") {
-      printUsage();
-      process.exit(0);
-    }
-    if (arg === "--title") {
-      options.title = argv[++index] ?? null;
-      continue;
-    }
-    if (arg === "--out") {
-      options.outPath = argv[++index] ?? null;
-      continue;
-    }
-    if (arg === "--no-open") {
-      options.noOpen = true;
-      continue;
-    }
-    if (arg === "--diffs-module-url") {
-      options.diffsModuleUrl = argv[++index] ?? options.diffsModuleUrl;
-      continue;
-    }
-    if (arg === "--diff-style") {
-      const diffStyle = argv[++index] ?? options.diffStyle;
-      if (!DIFF_STYLES.has(diffStyle)) {
-        throw new Error(`Invalid diff style: ${diffStyle}`);
-      }
-      options.diffStyle = diffStyle;
-      continue;
-    }
-    if (arg === "--glimpse-module") {
-      options.glimpseModule = argv[++index] ?? null;
-      continue;
-    }
-    if (arg === "--glimpse-repo") {
-      options.glimpseRepo = argv[++index] ?? null;
-      continue;
-    }
-    if (arg === "--critique-repo") {
-      options.critiqueRepo = argv[++index] ?? null;
-      continue;
-    }
-    if (arg === "--width") {
-      options.width = Number(argv[++index] ?? options.width);
-      continue;
-    }
-    if (arg === "--height") {
-      options.height = Number(argv[++index] ?? options.height);
-      continue;
-    }
-    if (arg.startsWith("--")) {
-      throw new Error(`Unknown option: ${arg}`);
-    }
-    if (options.inputPath) {
-      throw new Error(`Unexpected extra argument: ${arg}`);
-    }
-    options.inputPath = arg;
+function parseInput(argv) {
+  if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) {
+    printUsage();
+    process.exit(0);
   }
 
-  return options;
+  if (argv.length > 1) {
+    throw new Error("Expected a single inline Markdown argument or stdin.");
+  }
+
+  return argv[0] ?? null;
 }
 
 async function readStdin() {
@@ -145,6 +69,77 @@ function encodeBase64Utf8(value) {
   return Buffer.from(value, "utf8").toString("base64");
 }
 
+function formatUnifiedRange(start, count) {
+  if (count === 1) return `${start}`;
+  if (count === 0) return `${start},0`;
+  return `${start},${count}`;
+}
+
+function isValidUnifiedHunkHeader(line) {
+  return /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/.test(line);
+}
+
+function isMalformedHunkHeader(line) {
+  return /^@@(?:\s.*)?$/.test(line) && !isValidUnifiedHunkHeader(line);
+}
+
+function normalizePatchForDiffs(patch) {
+  const lines = patch.replace(/\r\n/g, "\n").split("\n");
+  const normalized = [];
+  let index = 0;
+  let oldStart = 1;
+  let newStart = 1;
+
+  while (index < lines.length) {
+    const line = lines[index];
+
+    if (line.startsWith("diff --git ")) {
+      oldStart = 1;
+      newStart = 1;
+      normalized.push(line);
+      index += 1;
+      continue;
+    }
+
+    if (!isMalformedHunkHeader(line)) {
+      normalized.push(line);
+      index += 1;
+      continue;
+    }
+
+    const hunkLines = [];
+    index += 1;
+    while (index < lines.length) {
+      const next = lines[index];
+      if (next.startsWith("diff --git ") || next.startsWith("@@")) break;
+      hunkLines.push(next);
+      index += 1;
+    }
+
+    let oldCount = 0;
+    let newCount = 0;
+    for (const hunkLine of hunkLines) {
+      if (hunkLine.startsWith("+") && !hunkLine.startsWith("+++")) {
+        newCount += 1;
+      } else if (hunkLine.startsWith("-") && !hunkLine.startsWith("---")) {
+        oldCount += 1;
+      } else {
+        oldCount += 1;
+        newCount += 1;
+      }
+    }
+
+    normalized.push(
+      `@@ -${formatUnifiedRange(oldStart, oldCount)} +${formatUnifiedRange(newStart, newCount)} @@`,
+    );
+    normalized.push(...hunkLines);
+    oldStart += oldCount;
+    newStart += newCount;
+  }
+
+  return normalized.join("\n");
+}
+
 function parseInline(text) {
   const codeSpans = [];
   const withPlaceholders = text.replace(/`([^`]+)`/g, (_, code) => {
@@ -172,7 +167,7 @@ function parseInline(text) {
 }
 
 function renderDiffBlock(code) {
-  const patchBase64 = encodeBase64Utf8(code);
+  const patchBase64 = encodeBase64Utf8(normalizePatchForDiffs(code));
 
   return `<div class="diff-shell" data-diff-shell data-diff-patch="${patchBase64}">
     <div class="diff-mount" data-diff-hosts></div>
@@ -196,6 +191,22 @@ function renderCodeBlock(code, language) {
   return renderPlainCodeBlock(code, language);
 }
 
+function parseFenceOpen(trimmed) {
+  const match = /^(`{3,}|~{3,})(.*)$/.exec(trimmed);
+  if (!match) return null;
+
+  return {
+    markerChar: match[1][0],
+    markerLength: match[1].length,
+    language: match[2].trim(),
+  };
+}
+
+function isFenceClose(trimmed, opener) {
+  const close = new RegExp(`^${opener.markerChar}{${opener.markerLength},}\\s*$`);
+  return close.test(trimmed);
+}
+
 function renderMarkdown(markdown) {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const html = [];
@@ -205,7 +216,7 @@ function renderMarkdown(markdown) {
   const isBlockBoundary = (line) =>
     line.trim() === "" ||
     /^#{1,6}\s+/.test(line) ||
-    /^```/.test(line) ||
+    /^(`{3,}|~{3,})/.test(line) ||
     /^>\s?/.test(line) ||
     /^[-*+]\s+/.test(line) ||
     /^\d+\.\s+/.test(line) ||
@@ -231,17 +242,16 @@ function renderMarkdown(markdown) {
       continue;
     }
 
-    const fenceMatch = /^```([^`]*)$/.exec(trimmed);
-    if (fenceMatch) {
-      const language = fenceMatch[1].trim();
+    const fenceOpen = parseFenceOpen(trimmed);
+    if (fenceOpen) {
       const buffer = [];
       index += 1;
-      while (index < lines.length && !/^```/.test(lines[index].trim())) {
+      while (index < lines.length && !isFenceClose(lines[index].trim(), fenceOpen)) {
         buffer.push(lines[index]);
         index += 1;
       }
       if (index < lines.length) index += 1;
-      html.push(renderCodeBlock(buffer.join("\n"), language));
+      html.push(renderCodeBlock(buffer.join("\n"), fenceOpen.language));
       continue;
     }
 
@@ -321,55 +331,6 @@ function getEmbeddedCritiqueTheme() {
   };
 }
 
-function resolveThemeValue(value, defs) {
-  if (typeof value === "string") {
-    if (value.startsWith("#")) return value;
-    return defs[value] || value;
-  }
-  if (value && typeof value === "object") {
-    return resolveThemeValue(value.light, defs);
-  }
-  return value;
-}
-
-function loadCritiqueTheme(repoPath) {
-  if (!repoPath) return getEmbeddedCritiqueTheme();
-
-  const themePath = resolve(repoPath, "cli", "src", "themes", "github.json");
-  if (!existsSync(themePath)) return getEmbeddedCritiqueTheme();
-
-  const json = JSON.parse(readFileSync(themePath, "utf8"));
-  const defs = json.defs || {};
-  const theme = json.theme || {};
-
-  return {
-    primary: resolveThemeValue(theme.primary, defs),
-    secondary: resolveThemeValue(theme.secondary, defs),
-    accent: resolveThemeValue(theme.accent, defs),
-    text: resolveThemeValue(theme.text, defs),
-    textMuted: resolveThemeValue(theme.textMuted, defs),
-    background: resolveThemeValue(theme.background, defs),
-    backgroundPanel: resolveThemeValue(theme.backgroundPanel, defs),
-    backgroundElement: resolveThemeValue(theme.backgroundElement, defs),
-    border: resolveThemeValue(theme.border, defs),
-    borderActive: resolveThemeValue(theme.borderActive, defs),
-    borderSubtle: resolveThemeValue(theme.borderSubtle, defs),
-    diffAdded: resolveThemeValue(theme.diffAdded, defs),
-    diffRemoved: resolveThemeValue(theme.diffRemoved, defs),
-    diffContext: resolveThemeValue(theme.diffContext, defs),
-    diffHunkHeader: resolveThemeValue(theme.diffHunkHeader, defs),
-    diffAddedBg: resolveThemeValue(theme.diffAddedBg, defs),
-    diffRemovedBg: resolveThemeValue(theme.diffRemovedBg, defs),
-    diffContextBg: resolveThemeValue(theme.diffContextBg, defs),
-    diffLineNumber: resolveThemeValue(theme.diffLineNumber, defs),
-    markdownHeading: resolveThemeValue(theme.markdownHeading, defs),
-    markdownLink: resolveThemeValue(theme.markdownLink, defs),
-    markdownCode: resolveThemeValue(theme.markdownCode, defs),
-    markdownBlockQuote: resolveThemeValue(theme.markdownBlockQuote, defs),
-    markdownHorizontalRule: resolveThemeValue(theme.markdownHorizontalRule, defs),
-  };
-}
-
 function loadCssAssets() {
   return {
     baseCss: readFileSync(join(assetsDir, "critique-base.css"), "utf8"),
@@ -390,20 +351,21 @@ function loadFontFaceCss() {
 }`;
 }
 
-function createDiffBootScript(moduleUrl, diffStyle) {
+function createDiffBootScript(moduleUrl, ssrModuleUrl) {
   return `<script type="module">
 const moduleUrl = ${JSON.stringify(moduleUrl)};
+const ssrModuleUrl = ${JSON.stringify(ssrModuleUrl)};
 const defaults = {
-  diffStyle: ${JSON.stringify(diffStyle)},
+  diffStyle: "split",
   overflow: "wrap",
-  diffIndicators: "none",
+  diffIndicators: "classic",
   lineDiffType: "word-alt",
   hunkSeparators: "line-info",
   showLineNumbers: true,
   showBackground: false,
   showFileHeader: false,
-  unifiedWidth: 70,
-  splitPaneWidth: 70,
+  unifiedWidth: 90,
+  splitPaneWidth: 90,
   viewportCap: 60,
   maxHeight: 60,
 };
@@ -424,10 +386,11 @@ const diffUnsafeCss = \`
   font-variant-numeric: inherit !important;
 }
 
-[data-line],
-[data-no-newline] {
-  padding-left: 0 !important;
-  padding-right: 0 !important;
+[data-separator],
+[data-separator-wrapper],
+[data-separator-content],
+[data-unmodified-lines] {
+  display: none !important;
 }
 \`;
 
@@ -460,52 +423,53 @@ function createViewOptions(state) {
   };
 }
 
-function renderShell(shellState, FileDiff, DIFFS_TAG_NAME, state) {
-  shellState.views.forEach((view) => {
-    try {
-      view.cleanUp(true);
-    } catch {}
-  });
-  shellState.views = [];
+async function renderShell(shellState, preloadPatchFile, renderHTML, state) {
   shellState.mount.replaceChildren();
+  shellState.shell.dataset.renderState = "pending";
 
-  if (shellState.fileDiffs.length === 0) {
+  const files = await preloadPatchFile({
+    patch: shellState.patch,
+    options: createViewOptions(state),
+  });
+  if (files.length === 0) {
     shellState.shell.dataset.renderState = "empty";
     return;
   }
 
-  const viewOptions = createViewOptions(state);
-  for (const fileDiff of shellState.fileDiffs) {
+  for (const file of files) {
     const wrapper = document.createElement("div");
     wrapper.className = "diff-file-block";
 
-    if (!state.showFileHeader) {
-      const pathLabel = document.createElement("div");
-      pathLabel.className = "diff-path-label";
-      pathLabel.textContent = fileDiff.name || fileDiff.prevName || "file";
-      wrapper.append(pathLabel);
-    }
+    const headerRow = document.createElement("div");
+    headerRow.className = "diff-header-row";
+
+    const pathLabel = document.createElement("div");
+    pathLabel.className = "diff-path-label";
+    pathLabel.textContent = file.fileDiff?.name || file.fileDiff?.prevName || "file";
+    headerRow.append(pathLabel);
+    wrapper.append(headerRow);
 
     const scroll = document.createElement("div");
     scroll.className = "diff-scroll";
-
-    const host = document.createElement(DIFFS_TAG_NAME);
+    const host = document.createElement("div");
     host.className = "diffs-host";
+    host.innerHTML = Array.isArray(file.prerenderedHTML)
+      ? renderHTML(file.prerenderedHTML)
+      : String(file.prerenderedHTML || "");
     scroll.append(host);
     wrapper.append(scroll);
     shellState.mount.append(wrapper);
-
-    const view = new FileDiff(viewOptions);
-    view.render({ fileDiff, fileContainer: host });
-    shellState.views.push(view);
   }
-
   shellState.shell.dataset.renderState = "ready";
 }
 
 try {
-  const mod = await import(moduleUrl);
-  const { DIFFS_TAG_NAME, FileDiff, parsePatchFiles } = mod;
+  const [mod, ssrMod] = await Promise.all([
+    import(moduleUrl),
+    import(ssrModuleUrl),
+  ]);
+  const { parsePatchFiles } = mod;
+  const { preloadPatchFile, renderHTML } = ssrMod;
   const state = { ...defaults };
 
   applyLayoutState(state);
@@ -526,7 +490,7 @@ try {
         shell,
         mount,
         fileDiffs,
-        views: [],
+        patch,
       });
     } catch (error) {
       shell.dataset.renderState = "error";
@@ -535,7 +499,7 @@ try {
   }
 
   for (const shellState of shellStates) {
-    renderShell(shellState, FileDiff, DIFFS_TAG_NAME, state);
+    await renderShell(shellState, preloadPatchFile, renderHTML, state);
   }
 } catch (error) {
   console.error("Failed to load @pierre/diffs.", error);
@@ -543,10 +507,14 @@ try {
 </script>`;
 }
 
-function renderDocument({ bodyHtml, title, sourceLabel, theme, diffsModuleUrl, diffStyle }) {
+function renderDocument({ bodyHtml, title, sourceLabel }) {
   const { baseCss, markdownCss } = loadCssAssets();
   const fontFaceCss = loadFontFaceCss();
-  const diffBootScript = createDiffBootScript(diffsModuleUrl, diffStyle);
+  const diffBootScript = createDiffBootScript(
+    DEFAULT_DIFFS_MODULE_URL,
+    DEFAULT_DIFFS_SSR_MODULE_URL,
+  );
+  const theme = getEmbeddedCritiqueTheme();
 
   return `<!doctype html>
 <html lang="en">
@@ -588,7 +556,7 @@ ${baseCss}
 ${markdownCss}
     </style>
   </head>
-  <body data-diff-style="${escapeHtml(diffStyle)}">
+  <body data-diff-style="split">
     <div id="content">
       <div class="review-shell">
         <main class="markdown-body">
@@ -604,30 +572,10 @@ ${diffBootScript}
 </html>`;
 }
 
-function resolveGlimpseModule(options) {
-  if (options.glimpseModule) {
-    return resolve(options.glimpseModule);
-  }
-  if (options.glimpseRepo) {
-    return resolve(options.glimpseRepo, "src", "glimpse.mjs");
-  }
-  try {
-    return requireFromCwd.resolve("glimpseui");
-  } catch {
-    return null;
-  }
-}
-
-async function openWithGlimpse(options, html, title) {
-  const modulePath = resolveGlimpseModule(options);
-  if (!modulePath) {
-    throw new Error("Could not resolve Glimpse. Pass --glimpse-module or --glimpse-repo.");
-  }
-
-  const { open } = await import(pathToFileURL(modulePath).href);
+async function openWithGlimpse(html, title) {
   const win = open(html, {
-    width: options.width,
-    height: options.height,
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
     title,
     openLinks: true,
   });
@@ -642,14 +590,14 @@ async function openWithGlimpse(options, html, title) {
 }
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
+  const inlineMarkdown = parseInput(process.argv.slice(2));
 
   let markdown = "";
   let sourceLabel = "stdin";
-  if (options.inputPath && options.inputPath !== "-") {
-    const inputPath = resolve(options.inputPath);
-    markdown = readFileSync(inputPath, "utf8");
-    sourceLabel = inputPath;
+
+  if (inlineMarkdown !== null) {
+    markdown = inlineMarkdown;
+    sourceLabel = "inline argument";
   } else if (!process.stdin.isTTY) {
     markdown = await readStdin();
   } else {
@@ -659,30 +607,19 @@ async function main() {
 
   const { html: bodyHtml, headings } = renderMarkdown(markdown);
   const firstHeading = headings.find((heading) => heading.level === 1)?.text || null;
-  const defaultTitle = firstHeading
-    || (options.inputPath && options.inputPath !== "-" ? basename(options.inputPath, extname(options.inputPath)) : "Markdown Preview");
-  const title = options.title || defaultTitle;
-  const theme = loadCritiqueTheme(options.critiqueRepo);
+  const title = firstHeading || "Markdown Preview";
   const documentHtml = renderDocument({
     bodyHtml,
     title,
     sourceLabel,
-    theme,
-    diffsModuleUrl: options.diffsModuleUrl,
-    diffStyle: options.diffStyle,
   });
-  const outPath = options.outPath
-    ? resolve(options.outPath)
-    : join(tmpdir(), `${slugify(title)}.html`);
+  const outPath = join(tmpdir(), `${slugify(title)}.html`);
 
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, documentHtml, "utf8");
 
-  console.log(JSON.stringify({ htmlPath: outPath, title, opened: !options.noOpen }));
-
-  if (!options.noOpen) {
-    await openWithGlimpse(options, documentHtml, title);
-  }
+  console.log(JSON.stringify({ htmlPath: outPath, title, opened: true }));
+  await openWithGlimpse(documentHtml, title);
 }
 
 main().catch((error) => {
