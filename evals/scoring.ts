@@ -1,13 +1,16 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { TranscriptScore } from "./harness.js";
+import type { ScoredCriterion, TranscriptScore } from "./harness.js";
 
-type EvalScoreRecord = {
+type EvalFailureRecord = Pick<ScoredCriterion, "criterion" | "reason">;
+
+export type EvalScoreRecord = {
   name: string;
   passed: number;
   total: number;
   percent: number;
+  failures: EvalFailureRecord[];
 };
 
 function getScoreDir(): string | null {
@@ -23,12 +26,24 @@ function toRecord(name: string, score: TranscriptScore): EvalScoreRecord {
     passed: score.passed,
     total: score.total,
     percent: score.percent,
+    failures: score.criteria
+      .filter((criterion) => !criterion.pass)
+      .map(({ criterion, reason }) => ({ criterion, reason })),
   };
 }
 
-export function recordScore(name: string, score: TranscriptScore): void {
+function shouldEnforcePerfectScore(): boolean {
+  const value = process.env.LIBRETTO_EVAL_STRICT;
+  if (value === undefined) return true;
+
+  const normalized = value.trim().toLowerCase();
+  return !["0", "false", "no", "off"].includes(normalized);
+}
+
+export function recordScore(name: string, score: TranscriptScore): EvalScoreRecord {
+  const record = toRecord(name, score);
   const scoreDir = getScoreDir();
-  if (!scoreDir) return;
+  if (!scoreDir) return record;
 
   mkdirSync(scoreDir, { recursive: true });
 
@@ -39,24 +54,30 @@ export function recordScore(name: string, score: TranscriptScore): void {
 
   writeFileSync(
     join(scoreDir, `${stableId}.json`),
-    `${JSON.stringify(toRecord(name, score), null, 2)}\n`,
+    `${JSON.stringify(record, null, 2)}\n`,
     "utf8",
   );
+
+  return record;
 }
 
-export function assertPerfectScore(name: string, score: TranscriptScore): void {
-  recordScore(name, score);
+export function assertPerfectScore(name: string, score: TranscriptScore): EvalScoreRecord {
+  const record = recordScore(name, score);
 
-  const failures = score.criteria
-    .filter((criterion) => !criterion.pass)
-    .map((criterion) => `- ${criterion.criterion}: ${criterion.reason}`);
+  if (!shouldEnforcePerfectScore()) {
+    return record;
+  }
 
-  if (score.percent === 100 && failures.length === 0) return;
+  if (record.percent === 100 && record.failures.length === 0) {
+    return record;
+  }
 
   throw new Error(
     [
-      `Expected 100% score, got ${score.percent}%.`,
-      failures.length > 0 ? failures.join("\n") : "No failed criteria were returned.",
+      `Expected 100% score, got ${record.percent}%.`,
+      record.failures.length > 0
+        ? record.failures.map((failure) => `- ${failure.criterion}: ${failure.reason}`).join("\n")
+        : "No failed criteria were returned.",
     ].join("\n"),
   );
 }
