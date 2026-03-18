@@ -16,7 +16,7 @@ import {
   sessionOption,
 } from "./shared.js";
 
-function parseViewportArg(
+export function parseViewportArg(
   viewportArg: string | undefined,
 ): { width: number; height: number } | undefined {
   if (!viewportArg) return undefined;
