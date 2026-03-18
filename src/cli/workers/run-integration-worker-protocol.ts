@@ -6,6 +6,7 @@ export const RunIntegrationWorkerRequestSchema = z.object({
   session: z.string().min(1),
   params: z.unknown(),
   headless: z.boolean(),
+  visualize: z.boolean().default(true),
   authProfileDomain: z.string().optional(),
 });
 

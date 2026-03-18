@@ -1,9 +1,11 @@
+import type { BrowserContext } from "playwright";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+  instrumentContext,
   launchBrowser,
   type LibrettoWorkflowContext,
 } from "../../index.js";
@@ -126,9 +128,9 @@ function getMissingLocalAuthProfileError(args: {
     `Local auth profile not found for domain "${normalizedDomain}".`,
     `Expected profile file: ${args.profilePath}`,
     "To create it:",
-    `  1. libretto-cli open https://${normalizedDomain} --headed --session ${args.session}`,
+    `  1. libretto open https://${normalizedDomain} --headed --session ${args.session}`,
     "  2. Log in manually in the browser window.",
-    `  3. libretto-cli save ${normalizedDomain} --session ${args.session}`,
+    `  3. libretto save ${normalizedDomain} --session ${args.session}`,
   ].join("\n");
 }
 
@@ -198,6 +200,17 @@ async function loadWorkflowExport(
   return targetExport;
 }
 
+export async function installHeadedWorkflowVisualization(args: {
+  context: BrowserContext;
+  logger: LoggerApi;
+  instrument?: typeof instrumentContext;
+}): Promise<void> {
+  await (args.instrument ?? instrumentContext)(args.context, {
+    visualize: true,
+    logger: args.logger,
+  });
+}
+
 async function runIntegrationInternal(
   args: RunIntegrationWorkerRequest,
   options: {
@@ -243,6 +256,12 @@ async function runIntegrationInternal(
     headless: args.headless,
     storageStatePath,
   });
+  if (!args.headless && args.visualize !== false) {
+    await installHeadedWorkflowVisualization({
+      context: browserSession.context,
+      logger: integrationLogger,
+    });
+  }
   const actionsLogPath = getSessionActionsLogPath(args.session);
   const networkLogPath = getSessionNetworkLogPath(args.session);
   await installSessionTelemetry({

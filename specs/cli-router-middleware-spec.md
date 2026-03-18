@@ -178,7 +178,7 @@ const app = SimpleCLI.define("libretto", {
 - [x] Example target shape:
 
 ```ts
-const app = SimpleCLI.define("libretto-cli", {
+const app = SimpleCLI.define("libretto", {
   ai: SimpleCLI.group({
     description: "AI commands",
     routes: {
@@ -195,7 +195,7 @@ await app.run(["help", "ai", "configure"]);
 // =>
 // Configure AI runtime
 //
-// Usage: libretto-cli ai configure [preset] [options]
+// Usage: libretto ai configure [preset] [options]
 //
 // Arguments:
 //   [preset]  AI preset
@@ -299,7 +299,7 @@ const runInput = SimpleCLI.input({
 })
   .refine(
     (input) => Boolean(input.integrationFile && input.integrationExport),
-    "Usage: libretto-cli run <integrationFile> <integrationExport> ...",
+    "Usage: libretto run <integrationFile> <integrationExport> ...",
   );
 
 const resumeCommand = SimpleCLI.command({

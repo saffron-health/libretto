@@ -2,12 +2,34 @@ name: Evals
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "package.json"
+      - "evals/**"
+      - "scripts/summarize-evals.mjs"
+      - ".github/workflows/evals.yml"
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
 
 permissions:
   contents: read
+  actions: read
+  issues: write
 
 jobs:
   evals:
+    if: |
+      github.event_name != 'pull_request' ||
+      startsWith(github.head_ref, 'tk-release-v') ||
+      startsWith(github.event.pull_request.title, 'release:')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,6 +60,91 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run evals
+        id: run_evals
+        continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: pnpm eval
+          LIBRETTO_EVAL_SCORE_DIR: ${{ runner.temp }}/eval-scores
+          LIBRETTO_EVAL_STRICT: "false"
+        run: |
+          mkdir -p "${LIBRETTO_EVAL_SCORE_DIR}"
+          pnpm eval
+
+      - name: Summarize eval scores
+        if: always()
+        run: |
+          node scripts/summarize-evals.mjs \
+            "${RUNNER_TEMP}/eval-scores" \
+            "${RUNNER_TEMP}/eval-summary.json" \
+            > "${RUNNER_TEMP}/eval-summary.md"
+          cat "${RUNNER_TEMP}/eval-summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload eval summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-summary
+          path: |
+            ${{ runner.temp }}/eval-summary.json
+            ${{ runner.temp }}/eval-summary.md
+
+      - name: Post sticky eval summary comment
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          EVAL_SUMMARY_PATH: ${{ runner.temp }}/eval-summary.md
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require("node:fs");
+
+            const marker = "<!-- libretto-eval-results -->";
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.payload.pull_request.number;
+            const summary = fs.readFileSync(process.env.EVAL_SUMMARY_PATH, "utf8").trim();
+            const body = [
+              marker,
+              "# Eval Report",
+              "",
+              `Run: ${process.env.RUN_URL}`,
+              "",
+              summary,
+            ].join("\n");
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+
+            const existing = comments
+              .filter((comment) => (comment.body ?? "").startsWith(marker))
+              .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0];
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body,
+              });
+            }
+
+      - name: Enforce eval success
+        if: always()
+        run: |
+          if [ "${{ steps.run_evals.outcome }}" != "success" ]; then
+            echo "Eval run failed. See logs and the eval summary for details." >&2
+            exit 1
+          fi

@@ -30,10 +30,10 @@ Keep user-visible behavior stable: same usage/error text where currently asserte
 
 ## Important files/docs/websites for implementation
 
-- `packages/libretto-cli/src/cli.ts` — current command bootstrap, usage printing, and pre-parse argument handling.
-- `packages/libretto-cli/src/commands/browser.ts` — current browser command registration factory to convert.
-- `packages/libretto-cli/src/cli-basic.test.ts` — assertions on error/help behavior that must remain stable.
-- `packages/libretto-cli/src/cli-stateful.test.ts` — stateful command assertions to guard regressions.
+- `packages/libretto/src/cli.ts` — current command bootstrap, usage printing, and pre-parse argument handling.
+- `packages/libretto/src/commands/browser.ts` — current browser command registration factory to convert.
+- `packages/libretto/src/cli-basic.test.ts` — assertions on error/help behavior that must remain stable.
+- `packages/libretto/src/cli-stateful.test.ts` — stateful command assertions to guard regressions.
 - [yargs command modules](https://yargs.js.org/docs/#api-reference-commandmodule) — canonical pattern for exporting command objects.
 - [yargs command API](https://yargs.js.org/docs/#api-reference-commandcmd-desc-builder-handler) — details for command registration and handlers.
 
@@ -44,7 +44,7 @@ Keep user-visible behavior stable: same usage/error text where currently asserte
 - [ ] Remove `filterSessionArgs` and replace it with a cleaner command-token derivation approach that does not mutate argv arrays manually.
 - [ ] Keep `validateLegacySessionArg` semantics for the existing `--session` error contract.
 - [ ] Ensure help/unknown-command fast paths continue to print the same root usage text and exit codes.
-- [ ] Success criteria: `pnpm --filter libretto-cli test` still passes `cli-basic.test.ts` assertions for `--help`, `help`, unknown command, and invalid `--session` cases.
+- [ ] Success criteria: `pnpm --filter libretto test` still passes `cli-basic.test.ts` assertions for `--help`, `help`, unknown command, and invalid `--session` cases.
 
 ### Phase 2: Convert browser commands to direct command modules
 
@@ -55,7 +55,7 @@ Keep user-visible behavior stable: same usage/error text where currently asserte
 
 ### Phase 3: Validation and regression guardrails
 
-- [ ] Run `pnpm --filter libretto-cli type-check`.
-- [ ] Run `pnpm --filter libretto-cli test`.
-- [ ] Run `pnpm --filter libretto-cli build`.
+- [ ] Run `pnpm --filter libretto type-check`.
+- [ ] Run `pnpm --filter libretto test`.
+- [ ] Run `pnpm --filter libretto build`.
 - [ ] Success criteria: all three commands pass with no new test failures and no output-contract changes in existing tests.

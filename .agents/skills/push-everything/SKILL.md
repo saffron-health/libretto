@@ -19,6 +19,22 @@ Stage and commit ALL the changes in the git repo (not just the ones in this sess
 
 Ignore developer tooling changes (e.g. changes to .gitignore, or agent skills, or anything in dev-tools or .bin) in the commit message or PR title/description, unless the PR is solely about those changes.
 
+### Release note labels
+
+When creating or updating a PR in this repo, make sure it has a changelog label so GitHub Releases can categorize it correctly.
+
+Prefer one of:
+
+- `enhancement`
+- `bug`
+- `documentation`
+
+If the correct label is unclear, prefer `enhancement`.
+
+If the PR should be excluded from release notes, use `skip-changelog`.
+
+Use `skip-changelog` for PRs focused only on developer tooling changes, such as agent skills, workflow plumbing, local tooling, or similar maintenance that should not appear in user-facing release notes.
+
 ### PR body formatting
 
 When the PR body contains Markdown code spans/backticks, parentheses, angle brackets, or shell-sensitive characters, do not pass it directly via `--body "..."` because shells can mangle it.

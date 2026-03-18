@@ -432,8 +432,7 @@ async function createWorkspacePackageJson(
           cli: getBenchmarkWorkspaceCliScript(),
         },
         bin: {
-          libretto: "./dist/cli/index.js",
-          "libretto-cli": "./dist/cli/index.js",
+          "libretto": "./dist/cli/index.js",
         },
       },
       null,

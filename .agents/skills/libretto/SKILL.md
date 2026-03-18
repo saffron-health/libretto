@@ -4,7 +4,7 @@ description: "Browser automation CLI for inspecting live pages, prototyping inte
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.3.0"
+  version: "0.4.0"
 ---
 
 # Libretto
@@ -16,6 +16,7 @@ Use `npx libretto` to inspect live browser state, prototype interactions, and ru
 - Use this skill when the truth is on the page.
 - Prefer Libretto when you need to see what the browser is doing, not when you only need to edit source files.
 - Treat Libretto as a session-based workflow: open a page, inspect it, try a focused action, then turn what you learned into code outside the CLI.
+- When building a new integration, prefer reverse-engineering network requests first. Fall back to browser automation when the request path is unclear, too fragile, or blocked by anti-bot systems.
 
 ## Setup
 
@@ -59,10 +60,15 @@ npx libretto exec --visualize "await page.locator('button:has-text(\"Continue\")
 ### `snapshot`
 
 - Use `snapshot` as the primary page observation tool.
-- Always give an `--objective`. Add `--context` when the current page state is not obvious.
+- When you want analysis, provide both `--objective` and `--context`.
+- If you only need the PNG and HTML files, omit `--objective`. That runs capture-only mode and skips AI analysis.
+- When using `--objective`, expect analysis to take time. Use a timeout of at least 2 minutes for shell-wrapped calls.
 
 ```bash
-npx libretto snapshot --objective "Find the sign-in form and submit button"
+npx libretto snapshot
+npx libretto snapshot \
+  --objective "Find the sign-in form and submit button" \
+  --context "I just opened the login page and need the email field, password field, and submit button."
 npx libretto snapshot \
   --objective "Explain why the table is empty" \
   --context "I opened the referrals page and expected rows after applying filters."
@@ -71,8 +77,9 @@ npx libretto snapshot \
 ### `run`
 
 - Use `run` to execute an existing Libretto workflow.
-- If the workflow fails, inspect the live session with `snapshot` and `exec`.
-- If it pauses, resume it with `npx libretto resume --session <name>`.
+- If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
+- If the workflow pauses, resume it with `npx libretto resume --session <name>`.
+- Re-run the same workflow after each fix to verify the browser behavior end to end.
 
 ```bash
 npx libretto run ./integration.ts main
@@ -91,10 +98,11 @@ npx libretto run ./integration.ts main --auth-profile app.example.com --headed
 [Context: The user wants to build a new browser workflow and does not yet know the page structure]
 Assistant: Let me open the target page in headed mode so we can inspect the real workflow.
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
+Assistant: I'll first determine whether this flow can be built from captured network requests instead of UI-only automation.
 Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page."`]
-Assistant: I found the form and the likely next action. If that matches what you expect, I'll prototype it with `exec`.
-Assistant: [Runs `npx libretto exec "...focused interaction..."`]
-Assistant: The interaction works. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
+Assistant: If the page exposes a clear and stable request path, I'll prioritize that. If the request path is unclear, fragile, or heavily defended, I'll fall back to browser automation.
+Assistant: [Uses `network`, `snapshot`, and `exec` as needed to prove the approach]
+Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
 </example>
 ```
 
@@ -121,7 +129,7 @@ Assistant: I found the relevant requests. I'll recreate the workflow from those 
 Assistant: I'll reproduce the failure first so we can inspect the exact browser state it leaves behind.
 Assistant: [Runs `npx libretto run ./integration.ts main --session debug-flow --headed`]
 Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
-Assistant: [Runs `npx libretto snapshot --session debug-flow --objective "Find the blocking error or broken selector target"`]
+Assistant: [Runs `npx libretto snapshot --session debug-flow --objective "Find the blocking error or broken selector target" --context "The workflow just failed after trying to continue from the review step, and I need to identify the visible blocker on the current page."`]
 Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
 Assistant: I found the issue. I'll patch the workflow code, then rerun `npx libretto run ...` to verify the fix.
 </example>
@@ -132,3 +140,4 @@ Assistant: I found the issue. I'll patch the workflow code, then rerun `npx libr
 - For reverse-engineering captured requests, read `references/reverse-engineering-network-requests.md`.
 - For incorporating manual browser steps the user performed, read `references/user-action-log.md`.
 - For saving and reusing login state, read `references/auth-profiles.md`.
+- For multiple open pages and page targeting, read `references/pages-and-page-targeting.md`.

@@ -24,7 +24,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Configure test auth inputs
+      - name: Check skill mirror parity
+        run: node scripts/check-skills-sync.mjs
+
+      - name: Configure gcloud secret access for evaluator
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |

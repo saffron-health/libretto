@@ -1,19 +1,6 @@
 import { describe } from "vitest";
 import { test } from "./fixtures.js";
-import type { TranscriptScore } from "./harness.js";
-
-function assertPerfectScore(score: TranscriptScore): void {
-  const failures = score.criteria
-    .filter((criterion) => !criterion.pass)
-    .map((criterion) => `- ${criterion.criterion}: ${criterion.reason}`);
-  if (score.percent === 100 && failures.length === 0) return;
-  throw new Error(
-    [
-      `Expected 100% score, got ${score.percent}%.`,
-      failures.length > 0 ? failures.join("\n") : "No failed criteria were returned.",
-    ].join("\n"),
-  );
-}
+import { assertPerfectScore } from "./scoring.js";
 
 describe("basic eval scenarios", () => {
   test(
@@ -37,7 +24,7 @@ describe("basic eval scenarios", () => {
         "The workflow targets first 10 LinkedIn posts and includes content, author, reaction count, first 25 comments, and first 25 reposts.",
         "The assistant attempted at least one headless run command with auth profile linkedin.com for this workflow.",
       ]);
-      assertPerfectScore(createScore);
+      assertPerfectScore("linkedin scrape generation", createScore);
 
       const amendResponse = await harness.send(
         [
@@ -53,7 +40,7 @@ describe("basic eval scenarios", () => {
         "The updated workflow includes post author tagline extraction and commenter profile tagline extraction for the first 10 commenters.",
         "The assistant attempted at least one rerun command for the amended workflow.",
       ]);
-      assertPerfectScore(amendScore);
+      assertPerfectScore("linkedin scrape amendment", amendScore);
     },
   );
 
@@ -80,7 +67,7 @@ describe("basic eval scenarios", () => {
         "The assistant reran the workflow after the fix.",
         "The rerun produced success evidence with non-empty or meaningful search-result output.",
       ]);
-      assertPerfectScore(score);
+      assertPerfectScore("broken selector debugging", score);
     },
   );
 
@@ -107,7 +94,7 @@ describe("basic eval scenarios", () => {
         "The assistant attempted at least one run command for the updated workflow.",
         "The workflow still returns state and alerts with equivalent output semantics.",
       ]);
-      assertPerfectScore(score);
+      assertPerfectScore("network conversion", score);
     },
   );
 });

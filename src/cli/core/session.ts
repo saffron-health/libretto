@@ -122,7 +122,7 @@ function throwSessionNotFoundError(session: string): never {
   }
   lines.push("");
   lines.push("Start one with:");
-  lines.push(`  libretto-cli open <url> --session ${session}`);
+  lines.push(`  libretto open <url> --session ${session}`);
   throw new Error(lines.join("\n"));
 }
 
@@ -209,6 +209,6 @@ export function assertSessionAvailableForStart(
   }
   const endpoint = getSessionConnectionEndpoint(existingState);
   throw new Error(
-    `Session "${session}" is already open and connected to ${endpoint} (pid ${getSessionOwnerPid(existingState)}). Create a new session or close the current one with: libretto-cli close --session ${session}`,
+    `Session "${session}" is already open and connected to ${endpoint} (pid ${getSessionOwnerPid(existingState)}). Create a new session or close the current one with: libretto close --session ${session}`,
   );
 }

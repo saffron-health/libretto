@@ -88,7 +88,7 @@ export const main = workflow({}, async () => {
   }) => {
     const result = await librettoCli(`exec "return 1"`);
     await evaluate(result.stderr).toMatch(
-      'Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto-cli open <url> --session default".',
+      'Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto open <url> --session default".',
     );
   });
 
@@ -98,7 +98,7 @@ export const main = workflow({}, async () => {
   }) => {
     const result = await librettoCli("exec await page.title()");
     await evaluate(result.stderr).toMatch(
-      'Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto-cli open <url> --session default".',
+      'Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto open <url> --session default".',
     );
     expect(result.stderr).not.toContain("Unexpected arguments for exec.");
   });

@@ -20,7 +20,7 @@ export function buildCLIRoutes(logger: Logger) {
 }
 
 export function createCLIApp(logger: Logger) {
-  return SimpleCLI.define("libretto-cli", buildCLIRoutes(logger), {
+  return SimpleCLI.define("libretto", buildCLIRoutes(logger), {
     globalNamed: {
       session: sessionOption(),
     },

@@ -1,6 +1,6 @@
 {
   "name": "libretto",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
   "repository": {
@@ -20,8 +20,7 @@
   ],
   "types": "./dist/index.d.ts",
   "bin": {
-    "libretto": "./dist/cli/index.js",
-    "libretto-cli": "./dist/cli/index.js"
+    "libretto": "./dist/cli/index.js"
   },
   "exports": {
     ".": {
@@ -32,6 +31,7 @@
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",
+    "check:skills": "node scripts/check-skills-sync.mjs",
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
     "test": "pnpm run build && vitest run",
@@ -39,6 +39,7 @@
     "benchmark": "pnpm run build && tsx benchmarks/run.ts",
     "test:watch": "vitest",
     "cli": "node dist/index.js",
+    "prepare-release": "bash ./scripts/prepare-release.sh",
     "prepack": "pnpm run build"
   },
   "peerDependencies": {
