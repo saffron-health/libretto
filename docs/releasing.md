@@ -42,9 +42,9 @@ GitHub release notes are auto-generated from merged pull requests. The release n
 Run one of these from a clean working tree:
 
 ```bash
-pnpm release:prepare -- patch
-pnpm release:prepare -- minor
-pnpm release:prepare -- major
+pnpm prepare-release -- patch
+pnpm prepare-release -- minor
+pnpm prepare-release -- major
 ```
 
 The script in `scripts/prepare-release.sh` does the following:
