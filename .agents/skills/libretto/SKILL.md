@@ -4,7 +4,7 @@ description: "Browser automation CLI for building, maintaining, and running brow
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.4.0"
+  version: "0.4.1"
 ---
 
 # Libretto
@@ -21,6 +21,7 @@ Use `npx libretto` to build or debug automations by inspecting live browser stat
 - For a new automation, make the workflow file a required deliverable before you finish the task, even if you inspect the site first.
 - If the user does not provide a workflow path, choose a reasonable filename in the current workspace and create it yourself.
 - When building a new integration, prefer reverse-engineering network requests first. Fall back to browser automation when the request path is unclear, too fragile, or blocked by anti-bot systems.
+- Before replaying captured requests, run the security preflight in `references/reverse-engineering-network-requests.md` to assess whether direct browser `fetch` is safe to try.
 
 ## Setup
 
@@ -109,8 +110,8 @@ Assistant: I'll inspect the real site first if needed, but before I finish I'll 
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
 Assistant: I'll first determine whether this flow can be built from captured network requests instead of UI-only automation.
 Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page."`]
-Assistant: If the page exposes a clear and stable request path, I'll prioritize that. If the request path is unclear, fragile, or heavily defended, I'll fall back to browser automation.
-Assistant: [Uses `network`, `snapshot`, and `exec` as needed to prove the approach]
+Assistant: I'll inspect the site's request path and security posture before deciding whether direct request replay is safe.
+Assistant: [Uses `network`, `actions`, `snapshot`, and `exec` as needed to produce a site assessment]
 Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
 </example>
 ```
