@@ -102,7 +102,18 @@ npx libretto exec "return await page.evaluate(() => ({
 }))"
 npx libretto exec "return await page.evaluate(() => ({
   fetchSource: window.fetch.toString(),
-  fetchDescriptor: Object.getOwnPropertyDescriptor(window, 'fetch'),
+  fetchDescriptor: (() => {
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'fetch');
+    return descriptor
+      ? {
+          writable: descriptor.writable ?? null,
+          enumerable: descriptor.enumerable ?? null,
+          configurable: descriptor.configurable ?? null,
+          hasGetter: typeof descriptor.get === 'function',
+          hasSetter: typeof descriptor.set === 'function',
+        }
+      : null;
+  })(),
   fetchHasPrototype: Object.prototype.hasOwnProperty.call(window.fetch, 'prototype'),
   xhrOpenSource: XMLHttpRequest.prototype.open.toString(),
 }))"
