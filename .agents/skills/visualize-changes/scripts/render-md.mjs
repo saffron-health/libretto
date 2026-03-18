@@ -362,7 +362,7 @@ const defaults = {
   lineDiffType: "word-alt",
   hunkSeparators: "line-info",
   showLineNumbers: true,
-  showBackground: false,
+  showBackground: true,
   showFileHeader: false,
   unifiedWidth: 90,
   splitPaneWidth: 90,

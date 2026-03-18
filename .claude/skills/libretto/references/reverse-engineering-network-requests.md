@@ -43,6 +43,7 @@ These are examples, not a complete checklist.
 - Read the network log after the relevant step.
 - Identify the smallest set of requests that actually carries the data or performs the action.
 - Complete the security review before replaying any request or choosing direct browser `fetch`.
+- Present the website security assessment and your recommended approach before implementation unless the task is already unambiguous enough to proceed.
 - Confirm with the user before replaying any request that could mutate data.
 - If direct browser `fetch` looks safe, recreate a key request with `page.evaluate(() => fetch(...))`.
 - If direct browser `fetch` is unsafe or does not work, keep using captured responses and UI automation for the triggering steps.
