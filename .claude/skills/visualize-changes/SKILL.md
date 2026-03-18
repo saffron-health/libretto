@@ -43,7 +43,7 @@ When using the renderer from an agent session:
 
 - `scripts/render-md.mjs` opens the page in Glimpse automatically with the `glimpseui` package.
 - The renderer always uses Diffs.com's `@pierre/diffs` browser module for fenced `diff` blocks.
-- The renderer defaults to unified layout and includes a split/unified toggle inline with each file path.
+- The renderer defaults to split layout for fenced `diff` blocks.
 - `scripts/render-md.mjs` uses the bundled Critique-like theme assets directly.
 - `assets/critique-base.css` is copied from Critique's web renderer defaults in `cli/src/ansi-html.ts`.
 - `assets/critique-markdown.css` provides the Markdown layout and host-level styling for the embedded diff renderer.

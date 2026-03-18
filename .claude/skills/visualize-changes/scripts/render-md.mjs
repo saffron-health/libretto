@@ -579,14 +579,24 @@ async function openWithGlimpse(html, title) {
     title,
     openLinks: true,
   });
+  let closed = false;
+  win.once("closed", () => {
+    closed = true;
+  });
 
   await new Promise((resolvePromise, rejectPromise) => {
     win.once("ready", resolvePromise);
     win.once("error", rejectPromise);
-    win.once("closed", resolvePromise);
   });
 
-  win.once("closed", () => process.exit(0));
+  if (closed) {
+    process.exit(0);
+  }
+
+  await new Promise((resolvePromise) => {
+    win.once("closed", resolvePromise);
+  });
+  process.exit(0);
 }
 
 async function main() {
