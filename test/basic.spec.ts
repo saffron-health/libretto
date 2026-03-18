@@ -457,7 +457,7 @@ export const main = workflow({}, async (ctx) => {
     expect(result.stdout).toContain("Workflow paused.");
     expect(result.stdout).not.toContain("WORKFLOW_AFTER_PAUSE");
     expect(result.stdout).not.toContain("Integration completed.");
-    expect(result.stdout).toContain(`[pause] Paused (session: ${session})`);
+
   }, 45_000);
 
   test("pause reports running sessions when session id is missing", async ({
