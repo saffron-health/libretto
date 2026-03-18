@@ -478,10 +478,9 @@ try {
     try {
       const patch = decodeBase64Utf8(shell.dataset.diffPatch || "");
       const patchFiles = parsePatchFiles(patch);
-      const fileDiffs = patchFiles.flatMap((entry) => entry.files || []);
       const mount = shell.querySelector("[data-diff-hosts]");
 
-      if (!mount || fileDiffs.length === 0) {
+      if (!mount || patchFiles.every((entry) => (entry.files || []).length === 0)) {
         shell.dataset.renderState = "empty";
         continue;
       }
@@ -489,7 +488,6 @@ try {
       shellStates.push({
         shell,
         mount,
-        fileDiffs,
         patch,
       });
     } catch (error) {
@@ -579,23 +577,23 @@ async function openWithGlimpse(html, title) {
     title,
     openLinks: true,
   });
-  let closed = false;
-  win.once("closed", () => {
-    closed = true;
+  const closedPromise = new Promise((resolvePromise) => {
+    win.once("closed", resolvePromise);
   });
 
-  await new Promise((resolvePromise, rejectPromise) => {
-    win.once("ready", resolvePromise);
-    win.once("error", rejectPromise);
-  });
+  const firstEvent = await Promise.race([
+    closedPromise.then(() => "closed"),
+    new Promise((resolvePromise, rejectPromise) => {
+      win.once("ready", () => resolvePromise("ready"));
+      win.once("error", rejectPromise);
+    }),
+  ]);
 
-  if (closed) {
+  if (firstEvent === "closed") {
     process.exit(0);
   }
 
-  await new Promise((resolvePromise) => {
-    win.once("closed", resolvePromise);
-  });
+  await closedPromise;
   process.exit(0);
 }
 

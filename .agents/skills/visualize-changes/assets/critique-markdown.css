@@ -219,49 +219,6 @@ body[data-diff-style="unified"] .diff-shell {
   text-overflow: ellipsis;
 }
 
-.diff-style-toggle {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--panel);
-}
-
-.diff-style-button {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  line-height: 1;
-  padding: 6px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.diff-style-button:hover {
-  color: var(--text);
-}
-
-.diff-style-button[aria-pressed="true"] {
-  background: var(--bg);
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
-}
-
-.diff-style-icon {
-  display: inline-block;
-  min-width: 1.2em;
-  text-align: center;
-}
-
-.diff-style-label {
-  display: inline-block;
-}
-
 .diff-scroll {
   max-height: var(--diff-shell-max-height);
   overflow: auto;
