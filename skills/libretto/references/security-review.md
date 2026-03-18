@@ -147,7 +147,7 @@ Trade-off: Slower, fragile against DOM changes, and you only get data the UI ren
 
 ## Output: Website Security Assessment Summary
 
-After running the probes, produce a summary in this format. Do NOT include a final strategy recommendation. The security assessment determines which approaches are safe to use, not which approach will definitely work. Present this to the user for input, then use the safe approaches as you build the integration, adapting if specific endpoints do not work as expected (see "Handling Approach Mismatches" in `SKILL.md`).
+After running the probes, produce a summary in this format. Do NOT include the final strategy recommendation inside the assessment block. The security assessment determines which approaches are safe to use, not which approach will definitely work. Present the completed assessment to the user up front, pair it with a separate recommendation about the approach to implement, and note any relevant codebase conventions before you start building (see "Handling Approach Mismatches" in `SKILL.md`).
 
 ```
 ## Website Security Assessment: [site URL]
@@ -171,4 +171,4 @@ After running the probes, produce a summary in this format. Do NOT include a fin
 - Interaction notes: [any behavioral precautions — natural mouse movements, typing delays, etc.]
 ```
 
-Important: This assessment tells you which tools are in your toolbox. Present it to the user, get their input, then start building the integration using the safe approaches.
+Important: This assessment tells you which tools are in your toolbox. Present it to the user together with your recommended implementation path and any relevant codebase conventions before you start building.

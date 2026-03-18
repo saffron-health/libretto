@@ -17,9 +17,10 @@ Use `npx libretto` to build or debug automations by inspecting live browser stat
 - Use this skill when the truth is on the page.
 - Prefer Libretto when you need to build, maintain, or debug a browser automation script against the live site.
 - Treat Libretto as a script-authoring workflow: choose or create a workflow file, inspect the page, try focused actions, then update code outside the CLI and verify it with `run`.
+- For a new script request, start with an analysis phase unless the user's prompt is already unambiguous enough to proceed directly. In that phase, run the security review, search the package for related automation files and browser automation helpers, and determine the codebase conventions to follow.
 - If the user asks for a new automation or scrape and no workflow file exists yet, create one in the workspace instead of stopping at interactive exploration.
 - For a new automation, make the workflow file a required deliverable before you finish the task, even if you inspect the site first.
-- If the user does not provide a workflow path, choose a reasonable filename in the current workspace and create it yourself.
+- If the user does not provide a workflow path, determine a reasonable file location and filename from the package conventions during the analysis phase.
 - When building a new integration, prefer reverse-engineering network requests first, but always complete the security review in `references/security-review.md` before pursuing the network-request path.
 - Fall back to browser automation when the request path is unclear, too fragile, or blocked by anti-bot systems.
 
@@ -33,11 +34,15 @@ Use `npx libretto` to build or debug automations by inspecting live browser stat
 
 - Announce which session you are using and what page you are on.
 - When the task is to build or change an automation, create or update the workflow file and use Libretto commands to gather the information needed for that code change.
+- For a new script request, begin by producing a short analysis for the user: the Website Security Assessment, the recommended extraction approach, and the codebase conventions you plan to follow while building the script.
+- In that analysis, confirm the expected file location, language when it is non-obvious, and any existing helpers or related automation files you plan to reuse.
 - For a new automation, you may use `open`, `snapshot`, or `exec` first to learn the page, but do not finish or reply as if the task is complete until the workflow file exists.
 - Treat scrape and integration requests as requests for reusable automation code by default, not as requests to manually collect the final data in the live session.
 - Ask instead of guessing when it is unclear what to click, type, or submit.
 - Use `snapshot` to understand unknown page state before trying multiple selectors.
 - Before pursuing the network-request approach, read `references/security-review.md` and produce a website security assessment that identifies which extraction paths are safe to try.
+- Present that assessment and your recommended approach before implementation unless the user's original prompt is already unambiguous enough.
+- If your environment provides a tool for asking the user structured follow-up questions, use it for the confirmation step.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
 - Keep the browser session open until the user says the session is done.
@@ -107,14 +112,15 @@ npx libretto run ./integration.ts main --auth-profile app.example.com --headed
 ```text
 <example>
 [Context: The user wants to build a new browser workflow and does not yet know the page structure]
-Assistant: I'll inspect the real site first if needed, but before I finish I'll create `./target-workflow.mjs` so the task produces reusable automation code.
+Assistant: I'll start with a short analysis phase: I'll inspect the live site enough to run the security review, search the package for related automation code and helpers, and then recommend an approach before I implement the script.
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
-Assistant: I'll first determine whether this flow can be built from captured network requests instead of UI-only automation.
-Assistant: I'll run the security review before I pursue the network-request path.
 Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page."`]
-Assistant: If the page exposes a clear and stable request path, I'll prioritize that. If the request path is unclear, fragile, or heavily defended, I'll fall back to browser automation.
 Assistant: [Reads `references/security-review.md` and uses `network`, `snapshot`, and `exec` as needed to assess the safe approaches]
-Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
+Assistant: [Searches the package for existing workflow files, browser automation helpers, and local file-placement conventions]
+Assistant: Here's the analysis: direct network requests look viable on this site, I recommend starting there, and the existing package pattern suggests placing this in `./integration.ts` and reusing the local helper I found for pagination.
+Assistant: [Uses a structured question tool if available, otherwise asks the user to confirm the recommended approach and conventions]
+User: Sounds good. Use that approach.
+Assistant: I'll now continue exploring the page as needed, create or update the workflow file outside Libretto, and verify it with `npx libretto run ...`.
 </example>
 ```
 
@@ -123,14 +129,19 @@ Assistant: I found the working path. I'll now update the workflow file outside L
 ```text
 <example>
 [Context: The user wants to build an integration using network requests]
+Assistant: I'll start by validating whether network requests are actually the right approach here and by checking the package for an existing integration I should extend.
 Assistant: [Reads `references/reverse-engineering-network-requests.md`]
 Assistant: [Reads `references/security-review.md`]
-Assistant: Let me open the page in headed mode. Perform the workflow and I'll use the network log to recreate it.
+Assistant: Let me open the page in headed mode. Perform the workflow and I'll use the network log to analyze the request path.
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
 [User performs workflow]
 User: I've completed the workflow
 Assistant: [Runs `npx libretto network --method POST --last 20`]
-Assistant: I found the relevant requests and completed the security review. I'll recreate the workflow from the safe request path, then test the resulting script with `npx libretto run ...`.
+Assistant: [Searches the package for an existing integration file, workflow pattern, and browser automation helpers]
+Assistant: Here's the analysis: the captured requests look safe enough to drive from browser-context fetch, I recommend that path, and the package already has a matching TypeScript integration pattern and auth helper to reuse.
+Assistant: [Uses a structured question tool if available, otherwise asks the user to confirm the recommended approach and conventions]
+User: Proceed with that.
+Assistant: I'll recreate the workflow from the confirmed request path, test the resulting script with `npx libretto run ...`, and then finish the rest of the implementation.
 </example>
 ```
 
