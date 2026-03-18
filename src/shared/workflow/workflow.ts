@@ -6,6 +6,7 @@ export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 export type LibrettoWorkflowMetadata = {};
 
 export type LibrettoWorkflowContext<S = {}> = {
+	session: string;
 	page: Page;
 	logger: MinimalLogger;
 	services: S;

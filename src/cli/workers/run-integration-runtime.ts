@@ -186,6 +186,7 @@ async function loadWorkflowExport(
         `  export const ${exportName} = workflow<InputType, OutputType>(`,
         "    {},",
         "    async (ctx, input) => {",
+        "      // ctx.session  — libretto session name",
         "      // ctx.page     — Playwright Page instance",
         "      // ctx.logger   — MinimalLogger",
         "      // ctx.services — injected dependencies (generic, default {})",
@@ -255,6 +256,7 @@ async function runIntegrationInternal(
     sessionName: args.session,
     headless: args.headless,
     storageStatePath,
+    viewport: args.viewport,
   });
   if (!args.headless && args.visualize !== false) {
     await installHeadedWorkflowVisualization({
@@ -277,6 +279,7 @@ async function runIntegrationInternal(
   });
 
   const workflowContext: LibrettoWorkflowContext = {
+    session: args.session,
     logger: integrationLogger,
     page: browserSession.page,
     services: {},

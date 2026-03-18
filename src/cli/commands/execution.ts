@@ -8,7 +8,9 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   connect,
   disconnectBrowser,
+  resolveViewport,
 } from "../core/browser.js";
+import { parseViewportArg } from "./browser.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
   assertSessionAvailableForStart,
@@ -500,6 +502,7 @@ async function runIntegrationFromFile(
     headless: args.headless,
     visualize: args.visualize,
     authProfileDomain: args.authProfileDomain,
+    viewport: args.viewport,
   } satisfies RunIntegrationWorkerRequest);
   const worker = spawn(process.execPath, [
     tsxCliPath,
@@ -576,7 +579,7 @@ export function createExecCommand(logger: LoggerApi) {
 }
 
 const runUsage =
-  `Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize]`;
+  `Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -608,6 +611,9 @@ export const runInput = SimpleCLI.input({
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
       help: "Domain for local auth profile (e.g. apps.example.com)",
+    }),
+    viewport: SimpleCLI.option(z.string().optional(), {
+      help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
   },
 })
@@ -656,6 +662,7 @@ export function createRunCommand(logger: LoggerApi) {
           ? true
           : undefined;
       const visualize = !input.noVisualize;
+      const viewport = resolveViewport(parseViewportArg(input.viewport), logger);
 
       await runIntegrationFromFile({
         integrationPath: input.integrationFile!,
@@ -666,6 +673,7 @@ export function createRunCommand(logger: LoggerApi) {
         headless: headlessMode ?? false,
         visualize,
         authProfileDomain: input.authProfile,
+        viewport,
       }, logger);
     });
 }
