@@ -502,6 +502,7 @@ async function runIntegrationFromFile(
     headless: args.headless,
     visualize: args.visualize,
     authProfileDomain: args.authProfileDomain,
+    viewport: args.viewport,
   } satisfies RunIntegrationWorkerRequest);
   const worker = spawn(process.execPath, [
     tsxCliPath,
