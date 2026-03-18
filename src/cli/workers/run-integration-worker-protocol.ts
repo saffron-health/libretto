@@ -8,6 +8,7 @@ export const RunIntegrationWorkerRequestSchema = z.object({
   headless: z.boolean(),
   visualize: z.boolean().default(true),
   authProfileDomain: z.string().optional(),
+  viewport: z.object({ width: z.number(), height: z.number() }).optional(),
 });
 
 export type RunIntegrationWorkerRequest = z.infer<
