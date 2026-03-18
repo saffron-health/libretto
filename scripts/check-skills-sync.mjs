@@ -19,6 +19,5 @@ for (const issue of result.issues) {
   console.error(`- ${issue}`);
 }
 console.error("");
-console.error("Run `pnpm sync:skills` to resync the mirrors.");
-console.error("In this repo, `pnpm i` also runs the sync during postinstall.");
+console.error("Run `pnpm i` to resync the mirrors in this repository.");
 process.exit(1);

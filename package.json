@@ -31,7 +31,6 @@
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",
-    "sync:skills": "node scripts/sync-skills.mjs",
     "check:skills": "node scripts/check-skills-sync.mjs",
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",

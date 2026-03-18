@@ -82,4 +82,4 @@ pnpm type-check
 pnpm test
 ```
 
-If the mirrored Libretto skill copies drift, run `pnpm sync:skills`. In this repository, `pnpm i` also resyncs them during `postinstall`.
+If the mirrored Libretto skill copies drift, run `pnpm i`. In this repository, `postinstall` resyncs them.
