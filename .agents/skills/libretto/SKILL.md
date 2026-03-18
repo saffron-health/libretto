@@ -1,453 +1,142 @@
 ---
 name: libretto
-description: "Browser automation CLI for building integrations, with a network-first approach.\n\nWHEN TO USE THIS SKILL:\n- When building a new integration or data extraction workflow against a website\n- When you need to interact with a web page (click, fill, navigate) rather than just read it\n- When debugging browser agent job failures (selectors timing out, clicks not working, elements not found)\n- When you need to test or prototype Playwright interactions before codifying them\n- When you need to save or restore login sessions for authenticated pages\n- When you need to understand what's on a page (use the snapshot command)\n- When scraping dynamic content that requires JavaScript execution\n\nWHEN NOT TO USE THIS SKILL:\n- When you only need to read static web content (use read_web_page instead)\n- When you need to modify browser agent source code (edit files directly)\n- When you need to run a full browser agent job end-to-end (use npx browser-agent CLI)"
+description: "Browser automation CLI for inspecting live pages, prototyping interactions, and running browser workflows."
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.2.4"
+  version: "0.4.0"
 ---
 
-# Browser Integration with Libretto CLI
+# Libretto
 
-Use the `npx libretto` CLI to automate web interactions, debug browser agent jobs, and prototype fixes.
+Use `npx libretto` to inspect live browser state, prototype interactions, and run existing browser workflows.
 
-## Session Access
+## Intro
 
-Libretto sessions are **full-access by default** (no approval prompts). You can use `exec` immediately after opening a session. `run` starts its own workflow browser process and requires the target session to be available.
+- Use this skill when the truth is on the page.
+- Prefer Libretto when you need to see what the browser is doing, not when you only need to edit source files.
+- Treat Libretto as a session-based workflow: open a page, inspect it, try a focused action, then turn what you learned into code outside the CLI.
+- When building a new integration, prefer reverse-engineering network requests first. Fall back to browser automation when the request path is unclear, too fragile, or blocked by anti-bot systems.
 
-**Rules:**
+## Setup
 
-- Always announce which session you opened and what page you are on.
-- Use `snapshot`, `network`, and `actions` first when debugging unknown page state.
-- Before any potentially mutating action (submit/save/delete, or non-idempotent API calls), describe what you are about to do and wait for explicit user confirmation.
+- Ask the user to set up snapshot analysis before relying on `snapshot` for page understanding.
+- Use `npx libretto init` for first-time setup.
+- If they already have credentials, `npx libretto ai configure openai|anthropic|gemini|vertex` is enough.
 
-## Ask, Don't Guess
+## Rules
 
-If it's not obvious which element to click or what value to enter, **ask the user** — don't try multiple things hoping one works. Present what you see on the page and let the user tell you where to go. One question is faster than a 30-second timeout from a wrong guess.
+- Announce which session you are using and what page you are on.
+- Ask instead of guessing when it is unclear what to click, type, or submit.
+- Use `snapshot` to understand unknown page state before trying multiple selectors.
+- Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
+- Never run multiple `exec` commands at the same time.
+- Keep the browser session open until the user says the session is done.
 
 ## Commands
 
-```bash
-npx libretto open <url> [--headed|--headless]   # Launch browser and navigate (headed by default)
-npx libretto exec <code> [--visualize] # Execute Playwright TypeScript code (--visualize enables ghost cursor + highlight)
-npx libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--auth-profile <domain>] [--headed|--headless] # Execute integration actions
-npx libretto resume                    # Resume a paused workflow for the current session
-npx libretto snapshot --objective "<what to find>" [--context "<situational info>"]
-npx libretto save <url|domain>         # Save session (cookies, localStorage) to .libretto/profiles/
-npx libretto network                   # Show last 20 captured network requests
-npx libretto actions                   # Show last 20 captured user/agent actions
-npx libretto pages                     # List open pages in the session
-npx libretto close                     # Close the browser
-```
+### `open`
 
-All commands accept `--session <name>` for isolated browser instances (default: `default`).
-Built-in sessions: `default`, `dev-server`, `browser-agent`.
-
-## Visualize Mode (`--visualize`)
-
-Add `--visualize` to any `exec` command to show a ghost cursor and element highlight before each action executes. Use it when the user wants to see what will be clicked/filled before it happens.
-
-## Workflow Pause/Resume (`pause()`)
-
-Workflows pause by calling `await pause()` (imported from `"libretto"`). In production (`NODE_ENV=production`) it is a no-op.
-
-- There are no pause options to pass at call sites. Pause is session-scoped and resolved from the active session.
-- `npx libretto run ...` waits until the workflow either completes or hits the next `pause()`.
-- On pause, the workflow process stays alive and keeps browser/session state.
-- `npx libretto resume --session <name>` sends resume signal and then waits until completion or the next pause.
-- For multi-pause workflows, call `resume` repeatedly until the workflow completes.
-
-## Workflow Failures and Reruns
-
-- `npx libretto run` always uses the same failure-inspection behavior; no separate debug flag is needed.
-- On workflow failure, Libretto prints the workflow error and keeps the browser open for inspection.
-- After a failed run, use `npx libretto exec --session <name> "<code>"` to inspect or prototype fixes.
-- Re-running `npx libretto run ... --session <name>` re-runs the workflow for that session.
-- If the same session still has a failed workflow worker, Libretto releases that failed worker process before rerunning.
-
-## Globals Available in `exec`
-
-`page`, `context`, `state`, `browser`, `networkLog({ last?, filter?, method? })`, `actionLog({ last?, filter?, action?, source? })`, `console`, `fetch`, `Buffer`, `URL`, `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`
-
-The `state` object is scoped to a single `exec` invocation and resets on the next call.
-
-## CRITICAL: No try/catch in exec
-
-**Never use try/catch or .catch() in exec code.** Let errors throw so they surface as exec failures. When an exec fails, you get the full error message (e.g., "intercepts pointer events", "Timeout 30000ms exceeded") — use that to diagnose the problem and write a corrected exec.
-
-**Why:** A try/catch inside exec hides failures from you. A click that times out takes 30 seconds — if you retry it in a loop with try/catch, you'll silently burn minutes on the same broken selector with no way to recover. Without try/catch, the error comes back immediately and you can reason about what went wrong.
-
-**Instead of try/catch, use check-first patterns:**
-
-```typescript
-// BAD — silently retries for minutes
-try {
-  await btn.click();
-} catch {
-  /* retry or ignore */
-}
-
-// GOOD — check first, fail fast
-if (await btn.isVisible()) await btn.click();
-
-// GOOD — check existence before acting
-if ((await page.locator(".cookie-banner").count()) > 0) {
-  await page.locator(".cookie-banner button").click();
-}
-```
-
-If an action fails despite an element being visible, you should not keep retrying it. Instead you can try the following debugging steps:
-
-1. Take a snapshot to inspect what's covering the element
-2. Try `{ force: true }` to bypass actionability checks
-3. Try a completely different approach (e.g., opening a dialog via a different button)
-
-## Workflow: Browse and Interact
+- Open a page before using `exec` or `snapshot`.
+- Use headed mode when the user needs to log in or watch the workflow.
 
 ```bash
-# Open a page
-npx libretto open https://example.com
+npx libretto open https://example.com --headed
+npx libretto open https://example.com --headless --session debug-example
+```
 
-# Interact with elements
-npx libretto exec "await page.locator('button:has-text(\"Sign in\")').click()"
-npx libretto exec "await page.fill('input[name=\"email\"]', 'user@example.com')"
+### `exec`
 
-# Understand the page — always provide objective and context
+- Use `exec` for focused inspection and short-lived interaction experiments.
+- Let failures throw. Do not hide `exec` failures with `try/catch`.
+
+```bash
+npx libretto exec "return await page.url()"
+npx libretto exec "return await page.locator('button').count()"
+npx libretto exec --visualize "await page.locator('button:has-text(\"Continue\")').click()"
+```
+
+### `snapshot`
+
+- Use `snapshot` as the primary page observation tool.
+- When you want analysis, provide both `--objective` and `--context`.
+- If you only need the PNG and HTML files, omit `--objective`. That runs capture-only mode and skips AI analysis.
+- When using `--objective`, expect analysis to take time. Use a timeout of at least 2 minutes for shell-wrapped calls.
+
+```bash
+npx libretto snapshot
 npx libretto snapshot \
-  --objective "Find the sign-in form fields and submit button" \
-  --context "Navigated to example.com login page. Expecting email/password inputs and a submit button."
-
-# Include relevant network calls in context when debugging API interactions
+  --objective "Find the sign-in form and submit button" \
+  --context "I just opened the login page and need the email field, password field, and submit button."
 npx libretto snapshot \
-  --objective "Find why the referral list is empty" \
-  --context "Logged into eClinicalWorks. Clicked Open Referrals tab. Table appears but shows no rows. Recent POST to /servlet/AjaxServlet returned 200 but with empty body."
-
-# Done
-npx libretto close
+  --objective "Explain why the table is empty" \
+  --context "I opened the referrals page and expected rows after applying filters."
 ```
 
-## Workflow: Save and Restore Login Sessions
+### `run`
 
-Profiles persist cookies and localStorage across browser launches. They are saved to `.libretto/profiles/<domain>.json` (git-ignored) and loaded automatically on `open`.
+- Use `run` to execute an existing Libretto workflow.
+- If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
+- If the workflow pauses, resume it with `npx libretto resume --session <name>`.
+- Re-run the same workflow after each fix to verify the browser behavior end to end.
 
 ```bash
-# Open a site in headed mode so you can log in manually
-npx libretto open https://portal.example.com --headed
-
-# ... manually log in in the browser window ...
-
-# Save the session
-npx libretto save portal.example.com
-
-# Next time you open this domain, you'll be logged in automatically
-npx libretto open https://portal.example.com
+npx libretto run ./integration.ts main
+npx libretto run ./integration.ts main --params '{"status":"open"}'
+npx libretto run ./integration.ts main --auth-profile app.example.com --headed
 ```
 
-## Workflow: Interactive Debugging
+## Examples
 
-When browser automation jobs fail (selectors timing out, clicks not working), use the interactive debugging workflow instead of edit-restart cycles. This reduces iteration time from 5-10 minutes to ~30 seconds.
+### Building new browser automation workflows
 
-1. Add `page.pause()` before the problematic code section
-2. Start the job with `npx browser-agent start` (debug mode is always enabled locally)
-3. Wait ~60 seconds for the browser to hit the breakpoint
-4. Use `npx libretto exec` (with `--session browser-agent`) to inspect and prototype fixes
-5. Once the fix works, codify it in source files
-6. Restart the job to verify end-to-end
+#### Interactive building
 
-```bash
-# Start job in background
-npx browser-agent start \
-  --job-type pull-open-referrals \
-  --tenant-slug hhb \
-  --params '{"vendorName":"eClinicalWorks"}'
-
-# Inspect page state
-npx libretto exec --session browser-agent "return await page.url();"
-npx libretto snapshot --session browser-agent \
-  --objective "Find dropdown menus and their current selections" \
-  --context "Browser agent hit breakpoint during pull-open-referrals job. Need to inspect dropdown state."
-
-# List dropdown options
-npx libretto exec --session browser-agent "return await page.locator('option').allTextContents();"
-
-# Test a fix
-npx libretto exec --session browser-agent "await page.locator('.dropdown-trigger').click(); return 'clicked';"
+```text
+<example>
+[Context: The user wants to build a new browser workflow and does not yet know the page structure]
+Assistant: Let me open the target page in headed mode so we can inspect the real workflow.
+Assistant: [Runs `npx libretto open https://target.example.com --headed`]
+Assistant: I'll first determine whether this flow can be built from captured network requests instead of UI-only automation.
+Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page."`]
+Assistant: If the page exposes a clear and stable request path, I'll prioritize that. If the request path is unclear, fragile, or heavily defended, I'll fall back to browser automation.
+Assistant: [Uses `network`, `snapshot`, and `exec` as needed to prove the approach]
+Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
+</example>
 ```
 
-## Snapshot — The Primary Observation Tool
+#### Network requests
 
-The `snapshot` command captures a PNG screenshot + HTML and (when `--objective` is provided) runs analysis through the configured AI runtime (`codex`, `claude`, or `gemini` via `npx libretto ai configure ...`). `--context` is optional (but recommended for better results). This is the single way to understand what's on the page — use it any time you need to inspect page structure, find elements, or debug what's happening.
-
-**Never use `page.screenshot()` via `exec` to understand the page.** Use the `snapshot` command instead — it captures the screenshot, HTML, and runs analysis with selectors. Raw screenshots give you an image with no analysis; `snapshot` gives you the answer.
-
-### What to Put in `--objective`
-
-The objective tells the vision agent what you're looking for. Be specific:
-
-- "Find the referral status column in the table"
-- "Find the error message or alert preventing form submission"
-- "Identify all dropdown menus on the page and their current selections"
-
-### What to Put in `--context`
-
-Context gives the vision agent situational awareness. Include:
-
-1. **Where you are** — page, step, state (e.g., "On the eClinicalWorks referral list page")
-2. **What you did** — actions taken (e.g., "Clicked 'Open Referrals' tab, selected department 'Cardiology'")
-3. **What you expect** — desired state (e.g., "Expecting a table of open referrals with patient names")
-4. **Relevant selectors** — any CSS selectors, data-testids, or element identifiers you already know about
-5. **Task context** — what the automation is trying to accomplish overall
-6. **Network calls** — any relevant HTTP requests/responses (e.g., "POST /api/referrals returned 200 with empty array")
-
-```bash
-npx libretto snapshot \
-  --objective "Find the referral status column in the table" \
-  --context "Logged into eClinicalWorks as admin. Navigated to Referrals > Open Referrals tab. Expecting a table of open referrals with columns for patient name, provider, and status."
-
-# Debugging example
-npx libretto snapshot \
-  --objective "Find the error message or alert" \
-  --context "Clicked Submit on the new referral form after filling in all required fields. Expected to see a success confirmation, but the page appears to still be on the form."
+```text
+<example>
+[Context: The user wants to build an integration using network requests]
+Assistant: [Reads `references/reverse-engineering-network-requests.md`]
+Assistant: Let me open the page in headed mode. Perform the workflow and I'll use the network log to recreate it.
+Assistant: [Runs `npx libretto open https://target.example.com --headed`]
+[User performs workflow]
+User: I've completed the workflow
+Assistant: [Runs `npx libretto network --method POST --last 20`]
+Assistant: I found the relevant requests. I'll recreate the workflow from those requests, then test the resulting script with `npx libretto run ...`.
+</example>
 ```
 
-## Inspecting Raw DOM with `exec`
+### Debugging existing workflows
 
-When the snapshot doesn't give you enough detail — why an element is hidden, what directives or event handlers it has, how it's styled — use `exec` with `page.evaluate` to query the raw DOM directly.
-
-- **`outerHTML`** — See the complete markup of an element including all attributes.
-  ```bash
-  npx libretto exec "const el = await page.locator('#myElement').elementHandle(); return await page.evaluate(el => el.outerHTML.substring(0, 500), el);"
-  ```
-- **Computed styles / parent chain** — Debug why Playwright can't click an element.
-  ```bash
-  npx libretto exec "const el = await page.locator('#myElement').elementHandle(); return await page.evaluate(el => { const chain = []; let n = el; for (let i = 0; i < 8 && n; i++) { const s = getComputedStyle(n); chain.push({ tag: n.tagName, id: n.id, display: s.display, visibility: s.visibility }); n = n.parentElement; } return chain; }, el);"
-  ```
-- **Any DOM property** — `page.evaluate` gives you full access: `getBoundingClientRect()`, `dataset`, `children`, `classList`, attached event listeners, etc.
-
-## Tips
-
-- **Never use `page.screenshot()` via `exec`.** Use `npx libretto snapshot` instead — it captures the viewport plus HTML and returns analyzed output with actionable selectors. The `fullPage` option is especially dangerous — it scrolls the entire page to stitch a screenshot, which can crash JavaScript-heavy pages (especially EMR portals like eClinicalWorks).
-- **Never run `exec` commands in parallel.** Always wait for one `exec` to finish before starting the next. Do not use `run_in_background` for `exec` calls. Running simultaneous `exec` calls opens multiple CDP connections to the same page, which corrupts the page state and kills the browser.
-- `open` requires an available session. If the session is already active, Libretto fails fast and asks you to close the existing session or use a different `--session`.
-- `run` also requires an available session, except for the specific case of a prior failed `run` in the same session; in that case Libretto releases the failed worker and allows rerun.
-- Use `return <value>` in `exec` to print results. Strings print raw; objects print as JSON.
-- For iframe content, access via `page.locator('iframe[name="..."]').contentFrame()`.
-- Multiple sessions allow parallel browser instances: `--session test1`, `--session test2`.
-
-## Network Logging
-
-Network requests are captured automatically for Libretto-managed browser sessions (for example from `npx libretto open` and `npx libretto run`). Non-static HTTP responses are logged to `.libretto/sessions/<session>/network.jsonl`.
-
-### CLI: `npx libretto network`
-
-```bash
-npx libretto network                              # show last 20 requests
-npx libretto network --last 50                    # show last 50
-npx libretto network --filter 'referral|patient'  # regex filter on URL
-npx libretto network --method POST                # filter by HTTP method
-npx libretto network --clear                      # truncate the log file
+```text
+<example>
+[Context: The user has an existing Libretto workflow that is failing]
+Assistant: I'll reproduce the failure first so we can inspect the exact browser state it leaves behind.
+Assistant: [Runs `npx libretto run ./integration.ts main --session debug-flow --headed`]
+Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
+Assistant: [Runs `npx libretto snapshot --session debug-flow --objective "Find the blocking error or broken selector target" --context "The workflow just failed after trying to continue from the review step, and I need to identify the visible blocker on the current page."`]
+Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
+Assistant: I found the issue. I'll patch the workflow code, then rerun `npx libretto run ...` to verify the fix.
+</example>
 ```
 
-### In exec: `networkLog()`
-
-```bash
-npx libretto exec "return await networkLog()"
-npx libretto exec "return await networkLog({ filter: 'servlet', last: 5 })"
-npx libretto exec "return await networkLog({ method: 'POST' })"
-```
-
-Returns an array of objects with: `ts`, `method`, `url`, `status`, `contentType`, `postData` (POST/PUT/PATCH only, first 2000 chars), `size`, `durationMs`.
-
-**Note:** Network logging works for Libretto-managed sessions. It does not capture requests for external sessions like `--session browser-agent`.
-
-## Action Logging
-
-Browser actions are captured automatically for Libretto-managed browser sessions (for example from `npx libretto open` and `npx libretto run`). Both user interactions (manual clicks, typing in the headed browser window) and agent actions (programmatic Playwright API calls via `exec`) are logged to `.libretto/sessions/<session>/actions.jsonl` with a `source` field of `'user'` or `'agent'` to distinguish the two.
-
-### CLI: `npx libretto actions`
-
-```bash
-npx libretto actions                              # show last 20 actions
-npx libretto actions --last 50                    # show last 50
-npx libretto actions --filter 'button|input'      # regex filter on selector/value
-npx libretto actions --action click                # filter by action type
-npx libretto actions --source user                 # only manual user actions
-npx libretto actions --source agent                # only programmatic agent actions
-npx libretto actions --clear                       # truncate the log file
-```
-
-### In exec: `actionLog()`
-
-```bash
-npx libretto exec "return await actionLog()"
-npx libretto exec "return await actionLog({ source: 'user', last: 5 })"
-npx libretto exec "return await actionLog({ action: 'click' })"
-```
-
-Returns an array of objects with: `ts`, `action`, `source` (`'user'` | `'agent'`), `selector`, `value`, `url`, `duration`, `success`, `error`.
-
-**Note:** Action logging works for Libretto-managed sessions. It does not capture actions for external sessions like `--session browser-agent`.
-
-## Workflow: Creating a New Integration
-
-Use Libretto CLI interactively to build a brand new integration from scratch. Navigate the real site with the user, discover the network endpoints, and codify the data extraction into a reusable TypeScript script.
-
-**IMPORTANT:** Do NOT explore the codebase or research existing code before starting. This skill file and the CLI commands below contain everything you need. Jump straight into using the CLI interactively — ask the user for the URL, open the browser, and start working. The only exception is if the user mentions a specific file or piece of code to reference — then read that specific file first, but nothing more.
-
-### Approach Selection
-
-By default, use the **preferred ordering of approaches**: try the network-first approach (`page.evaluate(fetch(...))`) first, then fall back to Playwright DOM automation if that doesn't work (see "Integration Approaches" below).
-
-**If the user explicitly specifies an approach**, use it instead.
-
-As part of starting the session, silently run a **security posture review** using the probes from `integration-approach-selection.md` (in this skill's directory) to assess the site's bot detection, fetch interception, and security posture. This tells you:
-
-- Whether `page.evaluate(fetch(...))` is safe (fetch not patched, no aggressive bot detection)
-- Whether `page.on('response', ...)` interception is viable
-- Whether you need to restrict to DOM-only extraction
-
-If the security review reveals that the default network-first approach won't work (e.g., fetch is monkey-patched, aggressive bot detection), **adapt your approach accordingly and tell the user what you found and which approach you're switching to.** You don't need to ask permission to switch — just explain what you discovered and proceed.
-
-The user may also share context during the session that changes the approach (e.g., they know the site blocks direct fetch). Adapt as needed.
-
-### Handling Approach Mismatches
-
-The security review tells you what's _safe_, but not necessarily what _works_ for every endpoint or data source on the site. As you build the integration, you may find that the recommended approach doesn't produce usable data for a specific part of the workflow. When this happens, **explain what you found, adapt your approach** for that specific part, and keep going.
-
-Common mismatches:
-
-- **Unparseable response format** — The fetch call succeeds but returns a proprietary format (RSC wire protocol, protobuf, encrypted payloads) instead of parseable JSON/XML/HTML.
-- **Data not in API responses** — The data is server-rendered into HTML or computed client-side; no network response contains it.
-- **Endpoint requires unpredictable parameters** — CSRF tokens, request signatures, or session values that rotate and aren't easily extractable.
-
-These can surface at any point — the first endpoint you try or the fifteenth. Different parts of the same integration often need different approaches.
-
-### Starting the Session
-
-The browser stays open indefinitely until explicitly closed with `npx libretto close` or by the user closing the window. **Do not** set any timeouts, auto-close timers, or call `close` until the user says the workflow session is done. Ensure that you open the browser in `--headed` mode so the user can see what's happening.
-
-If the site requires login, ask the user how auth should work in the generated workflow:
-
-1. Save a local profile (recommended for local runs): open in `--headed`, have the user log in manually, run `npx libretto save <domain>`, and pass `--auth-profile <domain>` when running the workflow (e.g. `npx libretto run ./file.ts main --auth-profile example.com`).
-2. Use user-managed credential logic in Playwright code (no local profile dependency).
-
-If local profile is chosen, include this warning in your generated workflow guidance: local profiles are machine-local (other users/environments will not have them), and sessions can expire so re-login/re-save may be required.
-
-### Integration Approaches
-
-There are two main approaches for building an integration. **Try the network-first approach first** — it's faster, more reliable, and less brittle. Fall back to Playwright automation if it doesn't work. Be flexible — different parts of the same integration may use different approaches, and a single workflow often mixes them. The user can also explicitly tell you which approach to use.
-
-#### Approach 1: Network-First — `page.evaluate(() => fetch(...))` (Try First)
-
-Use `page.evaluate(() => fetch(...))` to make requests directly in the browser's JavaScript context — for both extracting data and performing actions (form submissions, API calls, etc.). The requests share the browser's TLS fingerprint, cookies, and origin, so they look identical to requests the site's own JS would make.
-
-**Why this is preferred:** Maximum control and reliability. You call exactly the endpoints you want with the parameters you want, skip fragile UI rendering, and get structured data back. No brittle DOM selectors, no multi-step UI sequences that break when the site changes its layout.
-
-**How to try it:**
-
-1. Use Playwright to navigate the site normally. Network requests are captured automatically.
-2. Check the network log (`npx libretto network` or `networkLog()`) to find API endpoints the site uses.
-3. Recreate a key request with `page.evaluate(() => fetch(...))` and confirm it works.
-
-If the fetch call succeeds, this is your approach. You'll still use Playwright for navigation, login, and session setup — but data extraction and actions go through direct fetch calls.
-
-**When it won't work:** If `fetch` is monkey-patched, the site detects non-app-originated requests, or the API uses request signatures you can't replicate.
-
-#### Approach 2: Playwright Automation (Fallback)
-
-If direct fetch calls don't work, fall back to driving the UI with Playwright — clicking elements, filling forms, reading text from the DOM.
-
-**How to try it:**
-
-1. Navigate to the page.
-2. Use `npx libretto snapshot` to find selectors.
-3. Drive the UI with Playwright locators (`page.locator(...).click()`, `.fill()`, `.textContent()`, etc.).
-
-This works regardless of the site's architecture but is slower and more fragile against layout changes.
-
-**Supplementing with `page.on('response', ...)`:** When using Playwright automation, you can optionally listen to network responses the browser makes as you navigate — `page.on('response', ...)` lets you capture API data that flows through the site's own code without making extra requests. This is useful when the site has API endpoints but blocks direct fetch calls. Set up listeners before the navigation that triggers the requests. Not all sites will have useful responses to intercept — some are entirely server-rendered.
-
-**The workflow for form submissions and data-heavy actions:**
-
-1. Use Playwright to fill out the form, select dropdowns, check boxes — whatever the UI requires
-2. **Ask the user for confirmation before submitting** — describe what you're about to submit and wait for approval
-3. Submit the form — network requests are captured automatically (see "Network Logging" above)
-4. Check the captured requests with `npx libretto network --method POST` or `networkLog()`
-5. Inspect the captured request (URL, method, headers, body) to understand the payload structure
-6. Test recreating that request directly via `page.evaluate(() => fetch(...))` — confirm with the user before sending
-7. In the generated production code, skip the form-filling steps and fire the network request directly, parameterized with the relevant input values
-
-### Discovering Network Endpoints
-
-Network requests are captured automatically in the background (see "Network Logging" above). Use the network log to discover endpoints instead of manually attaching listeners.
-
-```bash
-# Fill out a form
-npx libretto exec "await page.locator('#department').selectOption('Cardiology'); return 'selected';"
-npx libretto exec "await page.locator('#status').selectOption('Open'); return 'selected';"
-
-# ASK THE USER before submitting — describe what will be submitted
-# Then submit and check what requests fired
-npx libretto exec "await page.locator('#submitBtn').click(); await page.waitForTimeout(3000); return 'submitted';"
-npx libretto network --method POST --last 5
-
-# Or query the log programmatically
-npx libretto exec "return await networkLog({ method: 'POST', last: 5 })"
-```
-
-For page-load requests (data fetched during navigation), just navigate and then check the log:
-
-```bash
-npx libretto exec "await page.goto('https://portal.example.com/encounters'); await page.waitForTimeout(3000); return 'loaded';"
-npx libretto network --last 20
-```
-
-### Testing a Captured Endpoint
-
-**Before making any `fetch()` call (GET or POST), always confirm with the user first.** These hit real server endpoints with real session auth — a wrong request could submit data, modify records, or trigger side effects. Describe the URL, method, and parameters you want to test and wait for approval.
-
-Note: `page.evaluate(() => fetch(...))` works for replaying both fetch-based and XHR-based endpoints — you're making a new request, not replaying the original mechanism.
-
-```bash
-# Recreate the captured request directly — confirm with user first
-npx libretto exec "
-  const resp = await page.evaluate(async () => {
-    const r = await fetch('/servlet/AjaxServlet', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'action=getReferrals&department=Cardiology&status=Open'
-    });
-    return await r.text();
-  });
-  return resp.substring(0, 1000);
-"
-
-# Extract session variables (safe — reads window properties, no server call)
-npx libretto exec "
-  return await page.evaluate(() => ({
-    sessionDID: (window as any).sessionDID,
-    userId: (window as any).TrUserId
-  }));
-"
-```
-
-### Generating Code
-
-After completing interactive exploration, **always generate the TypeScript workflow file before ending the session** — do not wait for the user to ask.
-
-**STOP AND ASK BEFORE GENERATING CODE.** Once the interactive workflow is figured out, pause and ask:
-
-1. "Are there any existing files or patterns in the codebase you want me to reference?"
-2. Check the action log for user interactions by running `npx libretto actions --source user`. If there are any recorded user interactions, ask: "I see you performed some manual interactions in the browser (clicks, form fills, etc.). Would you like me to incorporate any of those into the generated code?" — and briefly list what you found. If there are no user interactions, skip this question entirely.
-3. "Any other guidance for how the production code should be structured?"
-
-Wait for the user's response before proceeding. Then:
-
-1. **Read `code-generation-rules.md`** (in this skill's directory) — this is mandatory before writing any code. It contains the authoritative rules for Playwright locator usage, `page.evaluate()` restrictions, network request patterns, and type checking. Do not generate code from memory; always reference this file first.
-2. Run the TypeScript type checker against the file and fix any errors before presenting it as done.
-
-## Patient Safety Warning
-
-Browser automation jobs process real patient health information. The `npx libretto` CLI executes arbitrary code with full page access. **Never execute mutating actions without explicit user confirmation first** (submits, sends, deletes, updates, or other side effects).
-
-For debugging steps, see the "Workflow: Interactive Debugging" section in this file.
+## References
+
+- For reverse-engineering captured requests, read `references/reverse-engineering-network-requests.md`.
+- For incorporating manual browser steps the user performed, read `references/user-action-log.md`.
+- For saving and reusing login state, read `references/auth-profiles.md`.
+- For multiple open pages and page targeting, read `references/pages-and-page-targeting.md`.
