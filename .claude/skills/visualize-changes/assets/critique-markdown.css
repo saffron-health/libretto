@@ -1,6 +1,6 @@
 :root {
-  --diff-unified-width: 70ch;
-  --diff-split-pane-width: 70ch;
+  --diff-unified-width: 90ch;
+  --diff-split-pane-width: 90ch;
   --diff-shell-vw-cap: 60vw;
   --diff-shell-max-height: 60vh;
   --diff-split-shell-width: calc((var(--diff-split-pane-width) * 2) + 8ch);
@@ -72,12 +72,12 @@
   padding-bottom: 0;
   border-bottom: 0;
   font-size: 1em;
-  margin-top: 1.7em;
+  margin-top: 1.25em;
 }
 
 .markdown-body h3 {
   font-size: 1em;
-  margin-top: 1.7em;
+  margin-top: 1.25em;
 }
 
 .markdown-body p,
@@ -113,16 +113,32 @@
 
 .markdown-body code {
   font-family: "JetBrains Mono Nerd", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  color: var(--inline-code);
+  color: inherit;
 }
 
 .markdown-body p > code,
 .markdown-body li > code,
-.markdown-body blockquote > code {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+.markdown-body blockquote > code,
+.markdown-body h1 > code,
+.markdown-body h2 > code,
+.markdown-body h3 > code,
+.markdown-body h4 > code,
+.markdown-body h5 > code,
+.markdown-body h6 > code {
+  padding: 0 0.28em;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.35em;
+  background: var(--panel);
+  color: var(--text);
+  display: inline;
+  width: auto;
+  max-width: none;
+  vertical-align: baseline;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  white-space: normal;
 }
 
 .markdown-body blockquote {
@@ -150,11 +166,13 @@
   transform: translateX(-50%);
 }
 
-.diff-shell {
+.markdown-body .diff-shell {
   max-width: calc(100vw - 32px);
   position: relative;
   left: 50%;
   transform: translateX(-50%);
+  margin-top: 3.4em;
+  margin-bottom: 3.4em;
 }
 
 body[data-diff-style="split"] .diff-shell {
@@ -172,12 +190,12 @@ body[data-diff-style="unified"] .diff-shell {
 
 .diff-workbench {
   width: 100%;
-  margin: 0 0 2.55em;
+  margin: 0 0 3.4em;
 }
 
 .diff-mount {
   display: grid;
-  gap: 1.25em;
+  gap: 1.7em;
 }
 
 .diff-file-block {
@@ -185,7 +203,15 @@ body[data-diff-style="unified"] .diff-shell {
   gap: 0.85em;
 }
 
+.diff-header-row {
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+}
+
 .diff-path-label {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--muted);
   line-height: 1.7;
   white-space: nowrap;
@@ -296,6 +322,15 @@ body[data-diff-style="unified"] .diff-shell {
   .code-block {
     max-width: 100%;
     min-width: 0;
+  }
+
+  .diff-header-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .diff-style-toggle {
+    margin-left: auto;
   }
 
   .code-shell,
