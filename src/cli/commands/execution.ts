@@ -8,7 +8,9 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   connect,
   disconnectBrowser,
+  resolveViewport,
 } from "../core/browser.js";
+import { parseViewportArg } from "./browser.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
   assertSessionAvailableForStart,
@@ -609,6 +611,9 @@ export const runInput = SimpleCLI.input({
       name: "auth-profile",
       help: "Domain for local auth profile (e.g. apps.example.com)",
     }),
+    viewport: SimpleCLI.option(z.string().optional(), {
+      help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
+    }),
   },
 })
   .refine(
@@ -656,6 +661,7 @@ export function createRunCommand(logger: LoggerApi) {
           ? true
           : undefined;
       const visualize = !input.noVisualize;
+      const viewport = resolveViewport(parseViewportArg(input.viewport), logger);
 
       await runIntegrationFromFile({
         integrationPath: input.integrationFile!,
@@ -666,6 +672,7 @@ export function createRunCommand(logger: LoggerApi) {
         headless: headlessMode ?? false,
         visualize,
         authProfileDomain: input.authProfile,
+        viewport,
       }, logger);
     });
 }
