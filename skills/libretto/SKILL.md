@@ -20,8 +20,8 @@ Use `npx libretto` to build or debug automations by inspecting live browser stat
 - If the user asks for a new automation or scrape and no workflow file exists yet, create one in the workspace instead of stopping at interactive exploration.
 - For a new automation, make the workflow file a required deliverable before you finish the task, even if you inspect the site first.
 - If the user does not provide a workflow path, choose a reasonable filename in the current workspace and create it yourself.
-- When building a new integration, prefer reverse-engineering network requests first. Fall back to browser automation when the request path is unclear, too fragile, or blocked by anti-bot systems.
-- Before replaying captured requests, run the security preflight in `references/reverse-engineering-network-requests.md` to assess whether direct browser `fetch` is safe to try.
+- When building a new integration, prefer reverse-engineering network requests first, but always complete the security review in `references/security-review.md` before pursuing the network-request path.
+- Fall back to browser automation when the request path is unclear, too fragile, or blocked by anti-bot systems.
 
 ## Setup
 
@@ -37,6 +37,7 @@ Use `npx libretto` to build or debug automations by inspecting live browser stat
 - Treat scrape and integration requests as requests for reusable automation code by default, not as requests to manually collect the final data in the live session.
 - Ask instead of guessing when it is unclear what to click, type, or submit.
 - Use `snapshot` to understand unknown page state before trying multiple selectors.
+- Before pursuing the network-request approach, read `references/security-review.md` and produce a website security assessment that identifies which extraction paths are safe to try.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
 - Keep the browser session open until the user says the session is done.
@@ -109,9 +110,10 @@ npx libretto run ./integration.ts main --auth-profile app.example.com --headed
 Assistant: I'll inspect the real site first if needed, but before I finish I'll create `./target-workflow.mjs` so the task produces reusable automation code.
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
 Assistant: I'll first determine whether this flow can be built from captured network requests instead of UI-only automation.
+Assistant: I'll run the security review before I pursue the network-request path.
 Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page."`]
-Assistant: I'll inspect the site's request path and security posture before deciding whether direct request replay is safe.
-Assistant: [Uses `network`, `actions`, `snapshot`, and `exec` as needed to produce a site assessment]
+Assistant: If the page exposes a clear and stable request path, I'll prioritize that. If the request path is unclear, fragile, or heavily defended, I'll fall back to browser automation.
+Assistant: [Reads `references/security-review.md` and uses `network`, `snapshot`, and `exec` as needed to assess the safe approaches]
 Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
 </example>
 ```
@@ -122,12 +124,13 @@ Assistant: I found the working path. I'll now update the workflow file outside L
 <example>
 [Context: The user wants to build an integration using network requests]
 Assistant: [Reads `references/reverse-engineering-network-requests.md`]
+Assistant: [Reads `references/security-review.md`]
 Assistant: Let me open the page in headed mode. Perform the workflow and I'll use the network log to recreate it.
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
 [User performs workflow]
 User: I've completed the workflow
 Assistant: [Runs `npx libretto network --method POST --last 20`]
-Assistant: I found the relevant requests. I'll recreate the workflow from those requests, then test the resulting script with `npx libretto run ...`.
+Assistant: I found the relevant requests and completed the security review. I'll recreate the workflow from the safe request path, then test the resulting script with `npx libretto run ...`.
 </example>
 ```
 
@@ -145,9 +148,17 @@ Assistant: I found the issue. I'll patch the workflow code, then rerun `npx libr
 </example>
 ```
 
+## Handling Approach Mismatches
+
+- Treat the security review as a safety filter, not as proof that a specific extraction path will work end to end.
+- If the review says direct browser `fetch` is unsafe, do not start with it. Use passive capture plus UI automation instead.
+- If the review says direct browser `fetch` looks safe but the endpoint still depends on signatures, rotating tokens, opaque responses, or other fragile state, switch to passive capture plus UI automation for that step.
+- If the request path is not usable after inspection, fall back to browser automation or DOM extraction and continue building the workflow.
+
 ## References
 
 - For reverse-engineering captured requests, read `references/reverse-engineering-network-requests.md`.
+- For a dedicated site security assessment before deciding how to extract data, read `references/security-review.md`.
 - For incorporating manual browser steps the user performed, read `references/user-action-log.md`.
 - For saving and reusing login state, read `references/auth-profiles.md`.
 - For multiple open pages and page targeting, read `references/pages-and-page-targeting.md`.
