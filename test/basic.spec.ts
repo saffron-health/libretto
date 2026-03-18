@@ -433,16 +433,17 @@ export const main = workflow({}, async () => "ok");
     expect(result.stderr).not.toContain("No local auth profile found");
   });
 
-  test("returns paused status when workflow hits standalone pause", async ({
+  test("returns paused status when workflow pauses with ctx.session", async ({
     librettoCli,
     writeWorkflow,
   }) => {
+    const session = "pause-from-workflow-context";
     const integrationFilePath = await writeWorkflow(
       "integration-pause.mjs",
       `
 export const main = workflow({}, async (ctx) => {
   console.log("WORKFLOW_BEFORE_PAUSE");
-  await pause("default");
+  await pause(ctx.session);
   console.log("WORKFLOW_AFTER_PAUSE");
 });
 `,
@@ -450,12 +451,13 @@ export const main = workflow({}, async (ctx) => {
     );
 
     const result = await librettoCli(
-      `run "${integrationFilePath}" main --session default --headless`,
+      `run "${integrationFilePath}" main --session ${session} --headless`,
     );
     expect(result.stdout).toContain("WORKFLOW_BEFORE_PAUSE");
     expect(result.stdout).toContain("Workflow paused.");
     expect(result.stdout).not.toContain("WORKFLOW_AFTER_PAUSE");
     expect(result.stdout).not.toContain("Integration completed.");
+    expect(result.stdout).toContain(`[pause] Paused (session: ${session})`);
   }, 45_000);
 
   test("pause reports running sessions when session id is missing", async ({
