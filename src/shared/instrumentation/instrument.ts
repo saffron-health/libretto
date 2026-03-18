@@ -1,4 +1,4 @@
-import type { Page, Locator, BrowserContext } from "playwright";
+import type { Page, Locator, FrameLocator, BrowserContext } from "playwright";
 import type { MinimalLogger } from "../logger/logger.js";
 import type { GhostCursorOptions } from "../visualization/ghost-cursor.js";
 import type { HighlightOptions } from "../visualization/highlight.js";
@@ -44,6 +44,8 @@ const LOCATOR_ACTIONS = [
 const NAV_ACTIONS = ["goto", "reload", "goBack", "goForward"] as const;
 
 const POINTER_ACTIONS = new Set<string>(["click", "dblclick", "hover"]);
+
+const instrumentedTargets = new WeakSet<object>();
 
 // Per-page serialization queue so overlapping visualization actions don't glitch
 const pageQueues = new WeakMap<Page, Promise<void>>();
@@ -143,6 +145,109 @@ function wrapLocatorActions(
 	}
 }
 
+const LOCATOR_FACTORY_METHODS = [
+	"locator",
+	"getByRole",
+	"getByText",
+	"getByLabel",
+	"getByPlaceholder",
+	"getByAltText",
+	"getByTitle",
+	"getByTestId",
+	"filter",
+	"and",
+	"or",
+	"first",
+	"last",
+	"nth",
+] as const;
+
+const FRAME_LOCATOR_FACTORY_METHODS = [
+	"locator",
+	"getByRole",
+	"getByText",
+	"getByLabel",
+	"getByPlaceholder",
+	"getByAltText",
+	"getByTitle",
+	"getByTestId",
+	"owner",
+	"first",
+	"last",
+	"nth",
+] as const;
+
+type InstrumentationRuntimeOptions =
+	Required<Pick<InstrumentationOptions, "visualize" | "highlightBeforeActionMs">> &
+	InstrumentationOptions;
+
+function instrumentLocator(
+	locator: Locator,
+	page: Page,
+	opts: InstrumentationRuntimeOptions,
+): Locator {
+	const target = locator as object;
+	if (instrumentedTargets.has(target)) {
+		return locator;
+	}
+	instrumentedTargets.add(target);
+
+	wrapLocatorActions(locator, page, opts);
+
+	for (const method of LOCATOR_FACTORY_METHODS) {
+		if (typeof (locator as any)[method] !== "function") continue;
+		const orig = (locator as any)[method].bind(locator);
+		(locator as any)[method] = (...args: any[]) => {
+			const nextLocator = orig(...args);
+			return instrumentLocator(nextLocator, page, opts);
+		};
+	}
+
+	if (typeof (locator as any).contentFrame === "function") {
+		const origContentFrame = (locator as any).contentFrame.bind(locator);
+		(locator as any).contentFrame = (...args: any[]) => {
+			const frameLocator = origContentFrame(...args);
+			return instrumentFrameLocator(frameLocator, page, opts);
+		};
+	}
+
+	return locator;
+}
+
+function instrumentFrameLocator(
+	frameLocator: FrameLocator,
+	page: Page,
+	opts: InstrumentationRuntimeOptions,
+): FrameLocator {
+	const target = frameLocator as object;
+	if (instrumentedTargets.has(target)) {
+		return frameLocator;
+	}
+	instrumentedTargets.add(target);
+
+	for (const method of FRAME_LOCATOR_FACTORY_METHODS) {
+		if (typeof (frameLocator as any)[method] !== "function") continue;
+		const orig = (frameLocator as any)[method].bind(frameLocator);
+		(frameLocator as any)[method] = (...args: any[]) => {
+			const result = orig(...args);
+			if (method === "first" || method === "last" || method === "nth") {
+				return instrumentFrameLocator(result, page, opts);
+			}
+			return instrumentLocator(result, page, opts);
+		};
+	}
+
+	if (typeof (frameLocator as any).frameLocator === "function") {
+		const origFrameLocator = (frameLocator as any).frameLocator.bind(frameLocator);
+		(frameLocator as any).frameLocator = (...args: any[]) => {
+			const nestedFrameLocator = origFrameLocator(...args);
+			return instrumentFrameLocator(nestedFrameLocator, page, opts);
+		};
+	}
+
+	return frameLocator;
+}
+
 function isTimeoutError(err: any): boolean {
 	if (!err || typeof err.message !== "string") return false;
 	return (
@@ -152,7 +257,7 @@ function isTimeoutError(err: any): boolean {
 	);
 }
 
-const LOCATOR_FACTORIES = [
+const PAGE_LOCATOR_FACTORIES = [
 	"locator",
 	"getByRole",
 	"getByText",
@@ -162,6 +267,8 @@ const LOCATOR_FACTORIES = [
 	"getByTitle",
 	"getByTestId",
 ] as const;
+
+const PAGE_FRAME_LOCATOR_FACTORIES = ["frameLocator"] as const;
 
 /**
  * In-place patching of a Page object to add visualization and error enrichment.
@@ -233,13 +340,21 @@ export async function installInstrumentation(
 	}
 
 	// Wrap locator factories to instrument returned locators
-	for (const factory of LOCATOR_FACTORIES) {
+	for (const factory of PAGE_LOCATOR_FACTORIES) {
 		if (typeof (page as any)[factory] !== "function") continue;
 		const origFactory = (page as any)[factory].bind(page);
 		(page as any)[factory] = (...factoryArgs: any[]) => {
 			const locator = origFactory(...factoryArgs);
-			wrapLocatorActions(locator, page, mergedOpts);
-			return locator;
+			return instrumentLocator(locator, page, mergedOpts);
+		};
+	}
+
+	for (const factory of PAGE_FRAME_LOCATOR_FACTORIES) {
+		if (typeof (page as any)[factory] !== "function") continue;
+		const origFactory = (page as any)[factory].bind(page);
+		(page as any)[factory] = (...factoryArgs: any[]) => {
+			const frameLocator = origFactory(...factoryArgs);
+			return instrumentFrameLocator(frameLocator, page, mergedOpts);
 		};
 	}
 }

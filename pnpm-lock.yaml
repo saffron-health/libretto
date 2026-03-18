@@ -39,6 +39,9 @@ importers:
       '@types/node':
         specifier: ^25.5.0
         version: 25.5.0
+      glimpseui:
+        specifier: ^0.5.1
+        version: 0.5.1
       openai:
         specifier: ^6.29.0
         version: 6.29.0(zod@4.3.6)
@@ -742,6 +745,12 @@ packages:
 
   get-tsconfig@4.13.6:
     resolution: {integrity: sha512-shZT/QMiSHc/YBLxxOkMtgSid5HFoauqCE3/exfsEcwg1WkeqjG+V40yBbBrsD+jW2HDXcs28xOfcbm2jI8Ddw==}
+
+  glimpseui@0.5.1:
+    resolution: {integrity: sha512-1tfkWJbSkgYp3XoedWa1Rk9ZH5GxDn5ITT7inUOBw1m7vRuX4au4pLE8Xcokviie2cHUDbOe6Xv1kiyz5lJOFA==}
+    engines: {node: '>=18'}
+    os: [darwin, linux, win32]
+    hasBin: true
 
   glob@10.5.0:
     resolution: {integrity: sha512-DfXN8DfhJ7NH3Oe7cFmu3NCu1wKbkReJ8TorzSAFbSKrlNaQSKfIzqYqVY8zlbs2NLBbWpRiU52GX2PbaBVNkg==}
@@ -1708,6 +1717,8 @@ snapshots:
   get-tsconfig@4.13.6:
     dependencies:
       resolve-pkg-maps: 1.0.0
+
+  glimpseui@0.5.1: {}
 
   glob@10.5.0:
     dependencies:

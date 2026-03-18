@@ -294,7 +294,7 @@ export async function runPages(session: string, logger: LoggerApi): Promise<void
 
 const DEFAULT_VIEWPORT = { width: 1366, height: 768 } as const;
 
-function resolveViewport(
+export function resolveViewport(
   cliViewport: { width: number; height: number } | undefined,
   logger: LoggerApi,
 ): { width: number; height: number } {
