@@ -39,6 +39,7 @@
     "benchmark": "pnpm run build && tsx benchmarks/run.ts",
     "test:watch": "vitest",
     "cli": "node dist/index.js",
+    "prepare-release": "bash ./scripts/prepare-release.sh",
     "prepack": "pnpm run build"
   },
   "peerDependencies": {

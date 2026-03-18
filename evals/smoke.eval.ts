@@ -1,5 +1,6 @@
 import { describe } from "vitest";
 import { expect, test } from "./fixtures.js";
+import { assertPerfectScore } from "./scoring.js";
 
 describe("eval harness smoke", () => {
   test(
@@ -17,9 +18,10 @@ describe("eval harness smoke", () => {
       expect(response.messages.length).toBeGreaterThan(0);
       expect(response.transcript).toContain("LIBRETTO_EVAL_SMOKE_OK");
 
-      await response.evaluate(
+      const score = await response.score([
         "The response explains that libretto is for browser automation, identifies snapshot as a command to inspect page contents, and includes LIBRETTO_EVAL_SMOKE_OK.",
-      );
+      ]);
+      assertPerfectScore("eval harness smoke", score);
     },
   );
 });

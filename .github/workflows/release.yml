@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Resolve release version
+        id: version
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Check release state
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          release_exists=false
+          npm_exists=false
+
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            release_exists=true
+          fi
+
+          if npm view "libretto@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
+            npm_exists=true
+          fi
+
+          echo "release_exists=${release_exists}" >> "$GITHUB_OUTPUT"
+          echo "npm_exists=${npm_exists}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip already published version
+        if: steps.state.outputs.release_exists == 'true' && steps.state.outputs.npm_exists == 'true'
+        run: |
+          echo "Version ${{ steps.version.outputs.version }} is already published to npm and GitHub."
+
+      - name: Configure gcloud secret access for evaluator
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OPENAI_API_KEY:-}" ]; then
+            echo "OPENAI_API_KEY secret is required for evaluator tests." >&2
+            exit 1
+          fi
+
+          key_file="$RUNNER_TEMP/libretto-test-openai-api-key.txt"
+          printf '%s' "${OPENAI_API_KEY}" > "${key_file}"
+          chmod 600 "${key_file}"
+
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/gcloud" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          if [[ "\${1:-}" == "secrets" && "\${2:-}" == "versions" && "\${3:-}" == "access" && "\${4:-}" == "latest" ]]; then
+            secret=""
+            for arg in "\$@"; do
+              case "\$arg" in
+                --secret=*) secret="\${arg#--secret=}" ;;
+              esac
+            done
+            if [[ "\$secret" != "libretto-test-openai-api-key" ]]; then
+              echo "Unsupported secret request: \$secret" >&2
+              exit 1
+            fi
+            cat "${key_file}"
+            exit 0
+          fi
+
+          echo "Unsupported gcloud invocation: \$*" >&2
+          exit 1
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/gcloud"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Restore evaluator cache
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        uses: actions/cache@v4
+        with:
+          path: temp/libretto-cli-evaluate-cache
+          key: libretto-evaluate-cache-${{ runner.os }}-${{ hashFiles('test/fixtures.ts', 'test/basic.spec.ts', 'test/stateful.spec.ts') }}
+          restore-keys: |
+            libretto-evaluate-cache-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release build
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        run: |
+          pnpm type-check
+          pnpm test
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      release_exists: ${{ steps.state.outputs.release_exists }}
+      npm_exists: ${{ steps.state.outputs.npm_exists }}
+
+  release:
+    needs: verify
+    if: needs.verify.outputs.release_exists != 'true' || needs.verify.outputs.npm_exists != 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build publish artifacts
+        run: pnpm build
+
+      - name: Publish to npm with trusted publishing
+        if: needs.verify.outputs.npm_exists != 'true'
+        run: npm publish --access public
+
+      - name: Create GitHub release
+        if: needs.verify.outputs.release_exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ needs.verify.outputs.tag }}" >/dev/null 2>&1; then
+            gh release create "${{ needs.verify.outputs.tag }}" --generate-notes
+          else
+            gh release create "${{ needs.verify.outputs.tag }}" \
+              --target "${GITHUB_SHA}" \
+              --generate-notes
+          fi
