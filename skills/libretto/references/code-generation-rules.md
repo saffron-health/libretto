@@ -2,7 +2,7 @@
 
 These rules apply when generating production TypeScript files from interactive browser sessions. Read this file before writing any production code.
 
-**Follow the user's existing codebase conventions, abstractions, and patterns whenever possible. Do not introduce a new style unless the codebase does not already have a suitable one.**
+Follow the user's existing codebase conventions, abstractions, and patterns whenever possible. Do not introduce a new style unless the codebase does not already have a suitable one.
 
 ## Workflow File Structure
 
@@ -88,22 +88,6 @@ so mark fields optional for anything unavailable in that context.
 Generated code must use Playwright locator APIs for all DOM interactions. Do not use `page.evaluate()` with `document.querySelector`, `querySelectorAll`, `textContent`, `click()`, or other DOM APIs when a Playwright locator can do the same thing.
 
 During the interactive `exec` phase, `page.evaluate` is fine for quick prototyping. In generated production code, translate those patterns into Playwright locators.
-
-### Translation Table
-
-| Operation        | Interactive (`exec`)                                        | Production file                                                                                           |
-| ---------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Click            | `page.evaluate(() => document.getElementById('x').click())` | `page.locator('#x').click()`                                                                              |
-| Check state      | `page.evaluate(() => el.checked)`                           | `page.locator('#x').isChecked()`                                                                          |
-| Read text        | `page.evaluate(() => el.textContent)`                       | `page.locator('#x').textContent()`                                                                        |
-| Read all text    | `querySelectorAll(...).map(e => e.textContent)`             | `page.locator('.items').allTextContents()`                                                                |
-| Element position | `el.getBoundingClientRect()`                                | `page.locator('#x').boundingBox()`                                                                        |
-| Inline styles    | `el.style.top`                                              | `page.locator('#x').getAttribute('style')`                                                                |
-| Count elements   | `querySelectorAll(...).length`                              | `page.locator('.items').count()`                                                                          |
-| Select dropdown  | `selectEl.value = '...'`                                    | `page.locator('select').selectOption('...')`                                                              |
-| Iterate elements | `querySelectorAll(...).forEach(...)`                        | `const items = await locator.all(); for (const item of items) { ... }`                                    |
-| Scoped query     | `parent.querySelector('.child')`                            | `parentLocator.locator('.child').textContent()`                                                           |
-| Batch extraction | `querySelectorAll('.item').forEach(e => { ... })`           | `for (const item of await locator.all()) { const text = await item.locator('.text').textContent(); ... }` |
 
 ### Anti-Patterns
 

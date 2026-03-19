@@ -16,14 +16,20 @@ metadata:
 ## Default Integration Approach
 
 - Prefer network requests first for new integrations.
-- Read `site-security-review.md` before committing to a network-first approach on a new site.
+- Read `references/site-security-review.md` before committing to a network-first approach on a new site.
 - Fall back to passive interception or Playwright-driven UI automation when the security review rules network requests out, the request path is not workable, or the user explicitly asks for Playwright.
+
+## Setup
+
+- Ask the user to set up snapshot analysis before relying on `snapshot` for page understanding.
+- Use `npx libretto init` for first-time workspace setup.
+- If credentials are already available, `npx libretto ai configure openai|anthropic|gemini|vertex` is usually enough.
 
 ## Working Rules
 
 - Announce which session you are using and what page you are on.
 - Ask instead of guessing when it is unclear what to click, type, or submit.
-- Read and follow guidelines in `code-generation-rules.md` before generating or editing production workflow code.
+- Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code.
 - After interactive exploration and code generation, test key logic with `exec`, then verify the workflow file with `run --headless`.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
@@ -155,13 +161,12 @@ npx libretto close --all
 ```text
 <example>
 [Context: The user wants to build a new browser workflow and does not yet know the page structure]
-Assistant: I'll inspect the real site first if needed, but before I finish I'll create `./target-workflow.mjs` so the task produces reusable automation code.
+Assistant: I'll inspect the real site first if needed, but before I finish I'll create `target-workflow.ts` so the task produces reusable automation code.
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
-Assistant: [Reads `references/setup.md` if snapshot analysis is not ready]
-Assistant: [Reads `site-security-review.md` before choosing between network-first and Playwright-first]
+Assistant: [Reads `references/site-security-review.md` before choosing between passive network inspection, direct browser fetch calls, and Playwright-first automation]
 Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page and need the first meaningful step."`]
 Assistant: [Uses `network`, `snapshot`, and `exec` as needed to understand the site and decide the implementation path]
-Assistant: [Reads `code-generation-rules.md` before writing production workflow code]
+Assistant: [Reads `references/code-generation-rules.md` before writing production workflow code]
 Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
 </example>
 ```
@@ -176,15 +181,15 @@ Assistant: [Runs `npx libretto run ./integration.ts main --session debug-flow --
 Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
 Assistant: [Runs `npx libretto snapshot --session debug-flow --objective "Find the blocking error or broken selector target" --context "The workflow just failed after trying to continue from the review step, and I need to identify the visible blocker on the current page."`]
 Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
-Assistant: [Reads `code-generation-rules.md` before patching the workflow file]
+Assistant: [Reads `references/code-generation-rules.md` before patching the workflow file]
 Assistant: I found the issue. I'll patch the workflow code, then rerun `npx libretto run ...` to verify the fix.
 </example>
 ```
 
 ## References
 
-- Read `references/setup.md` before first use in a workspace or before relying on `snapshot` analysis.
-- Read `site-security-review.md` before reviewing the site's security posture and deciding whether to lead with network requests, passive interception, or Playwright DOM automation on a new site.
-- Read `code-generation-rules.md` before writing or editing production workflow files.
+- Read `references/configuration-file-reference.md` when you need to inspect or change `.libretto/config.json` for snapshot model selection or viewport defaults.
+- Read `references/site-security-review.md` before reviewing the site's security posture and deciding whether to lead with network requests, passive interception, or Playwright DOM automation on a new site.
+- Read `references/code-generation-rules.md` before writing or editing production workflow files.
 - Read `references/auth-profiles.md` when the site requires login and the simplest path is to save local browser state.
 - Read `references/pages-and-page-targeting.md` when a session has multiple open pages or you need `--page`.

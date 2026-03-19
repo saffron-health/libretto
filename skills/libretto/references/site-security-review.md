@@ -1,6 +1,6 @@
 # Site Security Review
 
-Purpose: You are connected to a live Chrome session on a target website. Your job is to review the site's bot-detection and security posture before committing to an integration strategy. Probe for bot protection, fetch interception, challenge flows, and behavioral monitoring, then use that review to decide which integration approaches are safe and which one to try first for this site.
+Purpose: You are connected to a live Chrome session on a target website. Your job is to review the site's bot-detection and security posture before committing to an integration strategy. Probe for bot protection, fetch interception, and challenge flows, then use that review to decide which integration approaches are safe and which one to try first for this site.
 
 After completing the probes below, produce a Site Assessment Summary (see the output format at the end of this document).
 
@@ -53,19 +53,6 @@ window.fetch.hasOwnProperty('prototype')
 ```
 
 Important: some sites use `Proxy` to wrap fetch, which makes `toString()` still return `"[native code]"`. The prototype check is a heuristic, not definitive. If you see any sign of fetch interception, treat it as patched.
-
-### Probe 3: Behavioral Monitoring
-
-Look for signs that the site collects behavioral telemetry (mouse movements, keystrokes, scroll patterns). Heavy monitoring means you should use natural, human-like interaction patterns when driving the UI.
-
-Things to check:
-
-- Unusually large numbers of event listeners on `document` or `body` for `mousemove`, `keydown`, `scroll`, `touchstart`, `click`
-- Known telemetry collection scripts
-- `MutationObserver` instances watching the DOM for injected elements
-- `requestAnimationFrame` loops that are not tied to visible animations
-
-If you are in a DevTools context, `getEventListeners(document)` is the quickest way to assess this. Otherwise, use heuristics. Heavy behavioral monitoring usually correlates with enterprise bot protection from Probe 1.
 
 ## Choosing a Data Capture Strategy
 
@@ -140,7 +127,6 @@ After running the probes, produce a summary in this format. This assessment tell
 ### Bot Detection Profile
 - Enterprise bot protection: [None detected / Detected — describe what you found]
 - Fetch/XHR interception: [Native (not patched) / Patched — describe what you found]
-- Behavioral monitoring: [None detected / Light / Heavy — describe indicators]
 - Challenge pages: [None / Present — describe type]
 - Overall security posture: [None / Low / Moderate / High / Very High]
 
