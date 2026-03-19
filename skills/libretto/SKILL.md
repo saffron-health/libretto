@@ -11,7 +11,7 @@ metadata:
 
 - Libretto is a CLI for exploring live websites and building or debugging reusable browser automation scripts.
 - Use Libretto to inspect the real site first: open pages, observe state, inspect requests, and prototype interactions before writing code.
-- Libretto work must end in script changes. Create or edit the workflow file, then verify the result with `run` instead of stopping at interactive exploration.
+- Libretto work must end in script changes. Create or edit the workflow file instead of stopping at interactive exploration.
 
 ## Default Integration Approach
 
