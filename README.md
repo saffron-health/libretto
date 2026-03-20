@@ -13,7 +13,7 @@ npm install --save-dev libretto
 npx libretto init
 
 # Configure snapshot analysis model (see Configuration section below)
-npx libretto ai configure openai | anthropic | gemini | vertex
+npx libretto ai configure <openai | anthropic | gemini | vertex>
 ```
 
 ## Use cases
@@ -82,16 +82,12 @@ All Libretto state lives in a `.libretto/` directory at your project root. Confi
 }
 ```
 
-The `ai` field configures which model Libretto uses for snapshot analysis — extracting selectors, identifying interactive elements, or diagnosing why a step failed. This keeps heavy visual context out of your coding agent's context window. Snapshot analysis is optional but results are significantly better with it.
+The `ai` field configures which model Libretto uses for snapshot analysis — extracting selectors, identifying interactive elements, or diagnosing why a step failed. This keeps heavy visual context out of your coding agent's context window. Snapshot analysis is required.
 
 The easiest way to set the model is through the CLI:
 
 ```bash
-npx libretto ai configure openai        # uses openai/gpt-5.4
-npx libretto ai configure anthropic     # uses anthropic/claude-sonnet-4-6
-npx libretto ai configure gemini        # uses google/gemini-3-flash-preview
-npx libretto ai configure vertex        # uses vertex/gemini-2.5-pro
-npx libretto ai configure openai/gpt-4o # or pass a specific model
+npx libretto ai configure <openai | anthropic | gemini | vertex>
 ```
 
 Provider credentials are read from environment variables or a `.env` file at your project root: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`, or `GOOGLE_CLOUD_PROJECT` for Vertex.
@@ -112,11 +108,6 @@ Each Libretto session gets its own directory under `.libretto/sessions/<name>/` 
 
 Profiles save browser sessions (cookies, localStorage) so you can reuse authenticated state across runs. They are stored in `.libretto/profiles/<domain>.json`, created via `npx libretto save <domain>`. Profiles are machine-local and git-ignored.
 
-### Environment variables
-
-- `LIBRETTO_REPO_ROOT` — override project root detection
-- `LIBRETTO_DEBUG` — set to `true` for debug logging
-- `LIBRETTO_DRY_RUN` — set to `true` to enable dry-run mode (also on by default when `NODE_ENV=development`)
 
 ## Authors
 
@@ -124,14 +115,19 @@ Maintained by the team at [Saffron Health](https://saffron.health).
 
 ## Development
 
-For local development in this repository:
-
 ```bash
 pnpm i
-pnpm check:skills
 pnpm build
 pnpm type-check
 pnpm test
 ```
 
-If the mirrored Libretto skill copies drift, run `pnpm i`. In this repository, `postinstall` resyncs them.
+Source layout:
+
+- `src/cli/` — CLI commands
+- `src/runtime/` — browser runtime (network, recovery, downloads, extraction)
+- `src/shared/` — shared utilities (config, LLM client, logging, state)
+- `test/` — test files (`*.spec.ts`)
+- `skills/libretto/` — source of truth for the Libretto skill; mirrors are synced on `pnpm i`
+
+To check that skill mirrors are in sync without fixing them, run `pnpm check:skills`. To release, run `pnpm prepare-release`.

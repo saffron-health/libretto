@@ -1,7 +1,0 @@
-{
-  "defaultProvider": "anthropic",
-  "defaultThinkingLevel": "medium",
-  "packages": [
-    "npm:pi-subagents"
-  ]
-}
