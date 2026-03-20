@@ -108,7 +108,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(show.stdout).toContain("Model: openai/gpt-4o");
   });
 
-  test("snapshot without --objective captures files without analysis", async ({
+  test("snapshot without --objective shows a clear error", async ({
     librettoCli,
   }) => {
     const session = "snapshot-no-objective";
@@ -117,11 +117,8 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const snapshot = await librettoCli(`snapshot --session ${session}`);
-    expect(snapshot.stdout).toContain("Screenshot saved:");
-    expect(snapshot.stdout).toContain("PNG:");
-    expect(snapshot.stdout).toContain("HTML:");
-    expect(snapshot.stdout).toContain("Condensed HTML:");
-    expect(snapshot.stdout).toContain("Use --objective flag to analyze snapshots.");
+    expect(snapshot.exitCode).not.toBe(0);
+    expect(snapshot.stderr).toContain("Missing required option --objective.");
   }, 45_000);
 
   test("snapshot --objective requires API credentials", async ({
@@ -134,7 +131,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const snapshot = await librettoCli(
-      `snapshot --objective "Find heading" --session ${session}`,
+      `snapshot --objective "Find heading" --context "Testing credentials" --session ${session}`,
       {
         LIBRETTO_DISABLE_DOTENV: "1",
         OPENAI_API_KEY: "",
@@ -167,9 +164,8 @@ describe("state-driven CLI subprocess behavior", () => {
     const snapshot = await librettoCli(
       `snapshot --context "extra context only" --session ${session}`,
     );
-    expect(snapshot.stderr).toContain(
-      "Couldn't run analysis: --objective is required when providing --context.",
-    );
+    expect(snapshot.exitCode).not.toBe(0);
+    expect(snapshot.stderr).toContain("Missing required option --objective.");
   }, 45_000);
 
   test("open without --session auto-generates a session", async ({
@@ -182,7 +178,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
     const sessionId = requireReturnedSessionId("open", opened.stdout, opened.stderr);
 
-    const snapshot = await librettoCli(`snapshot --session ${sessionId}`);
+    const snapshot = await librettoCli(`snapshot --objective "Describe the page" --context "Auto-session test" --session ${sessionId}`);
     expect(snapshot.stdout).toContain("Screenshot saved:");
   }, 60_000);
 

@@ -91,7 +91,7 @@ describe("multi-page CLI behavior", () => {
       `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'); return context.pages().length;" --session ${session}`,
     );
 
-    const snapshot = await librettoCli(`snapshot --session ${session}`);
+    const snapshot = await librettoCli(`snapshot --objective "Describe the page" --context "Multi-page test" --session ${session}`);
     await evaluate(snapshot.stderr).toMatch(
       `Explains that multiple pages are open in session "${session}" and tells the user to pass --page <id> to target one page.`,
     );
@@ -115,7 +115,7 @@ describe("multi-page CLI behavior", () => {
     );
 
     const snapshotResult = await librettoCli(
-      `snapshot --session ${session} --page ${missingPageId}`,
+      `snapshot --objective "Describe the page" --context "Missing page test" --session ${session} --page ${missingPageId}`,
     );
     await evaluate(snapshotResult.stderr).toMatch(
       `Explains that page id "${missingPageId}" was not found in session "${session}".`,
