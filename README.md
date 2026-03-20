@@ -7,7 +7,7 @@ Libretto is a toolkit for building robust web integrations. It gives your coding
 - Record user actions and replay them as automation scripts
 - Debug broken workflows interactively against the real site
 
-We at (Saffron Health)[https://saffron.health] built Libretto to help us maintain our browser integrations to common healthcare software. We're open-sourcing it so other teams have an easier time doing the same thing.
+We at [Saffron Health](https://saffron.health) built Libretto to help us maintain our browser integrations to common healthcare software. We're open-sourcing it so other teams have an easier time doing the same thing.
 
 ## Installation
 
