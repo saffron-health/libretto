@@ -20,6 +20,7 @@ Include:
 
 - A short title and summary of the session.
 - File-level sections that explain what changed and why it matters.
+- Command diffs using `!\`git diff -- path/to/file\`` to show changes inline.
 - Short representative snippets instead of full patches.
 - Risks, follow-up work, or open questions when they are relevant.
 
@@ -49,7 +50,9 @@ When using the renderer from an agent session:
 - `assets/critique-markdown.css` provides the Markdown layout and host-level styling for the embedded diff renderer.
 - Fenced `diff` blocks are rendered with `@pierre/diffs` from Diffs.com.
 - Diff blocks are capped to about `60%` of the viewport and scroll inside the page when they exceed that size.
-- Prefer Markdown sections with fenced `diff` blocks so the renderer can mount the real diff component.
+- Prefer command diffs (`!\`git diff ...\``) over pasting raw diff content into fenced blocks.
+- Command diffs execute at render time and always reflect the current state of the working tree.
+- Fenced `diff` blocks with literal patch content are still supported as a fallback.
 
 ## Rules
 
