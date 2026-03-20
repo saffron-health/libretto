@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "glimpse-changes": {
+      "source": "tanishqkancharla/glimpse-changes",
+      "sourceType": "github",
+      "computedHash": "838d3b9485ab8bfb8ca5c6b1280f25f06eab19cd33be963f24826a7d75c95a7c"
+    },
+    "visualize-changes": {
+      "source": "tanishqkancharla/glimpse-changes",
+      "sourceType": "github",
+      "computedHash": "5969895583eee17c3412daef2782432a02f6f9a4f81026abd73ade7ec6981afd"
+    }
+  }
+}
