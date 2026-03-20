@@ -21,8 +21,7 @@ metadata:
 
 ## Setup
 
-- Ask the user to set up snapshot analysis before relying on `snapshot` for page understanding.
-- Use `npx libretto init` for first-time workspace setup.
+- Use `npx libretto init` for first-time workspace setup (sets up config file and snapshot command).
 - If credentials are already available, `npx libretto ai configure openai|anthropic|gemini|vertex` is usually enough.
 
 ## Working Rules
