@@ -1,8 +1,13 @@
 # Libretto
 
-Libretto gives your coding agent superpowers for building, debugging, and maintaining browser RPA integrations.
+Libretto is a toolkit for building robust web integrations. It gives your coding agent a live browser and a token-efficient CLI to:
 
-It is designed for engineering teams that automate workflows in web apps and want to move from brittle browser-only scripts to faster, more reliable network-first integrations.
+- Inspect live pages with minimal context overhead
+- Capture network traffic to reverse-engineer site APIs
+- Record user actions and replay them as automation scripts
+- Debug broken workflows interactively against the real site
+
+We at (Saffron Health)[https://saffron.health] built Libretto to help us maintain our browser integrations to common healthcare software. We're open-sourcing it so other teams have an easier time doing the same thing.
 
 ## Installation
 
@@ -107,7 +112,6 @@ Each Libretto session gets its own directory under `.libretto/sessions/<name>/` 
 ### Profiles
 
 Profiles save browser sessions (cookies, localStorage) so you can reuse authenticated state across runs. They are stored in `.libretto/profiles/<domain>.json`, created via `npx libretto save <domain>`. Profiles are machine-local and git-ignored.
-
 
 ## Authors
 
