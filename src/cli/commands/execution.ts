@@ -29,10 +29,10 @@ import type {
 } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
-  loadSessionStateMiddleware,
   pageOption,
-  resolveSessionMiddleware,
   sessionOption,
+  withAutoSession,
+  withRequiredSession,
 } from "./shared.js";
 
 type ExecFunction = (...args: unknown[]) => Promise<unknown>;
@@ -560,23 +560,20 @@ export const execInput = SimpleCLI.input({
   `Usage: libretto exec <code> [--session <name>] [--visualize]`,
 );
 
-export function createExecCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Execute Playwright TypeScript code",
-  })
-    .input(execInput)
-    .use(resolveSessionMiddleware)
-    .use(loadSessionStateMiddleware)
-    .handle(async ({ input, ctx }) => {
-      await runExec(
-        input.codeParts.join(" "),
-        ctx.session,
-        logger,
-        input.visualize,
-        input.page,
-      );
-    });
-}
+export const execCommand = SimpleCLI.command({
+  description: "Execute Playwright TypeScript code",
+})
+  .input(execInput)
+  .use(withRequiredSession())
+  .handle(async ({ input, ctx }) => {
+    await runExec(
+      input.codeParts.join(" "),
+      ctx.session,
+      ctx.logger,
+      input.visualize,
+      input.page,
+    );
+  });
 
 const runUsage =
   `Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
@@ -645,38 +642,36 @@ function resolveRunParams(
   return {};
 }
 
-export function createRunCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Run an exported Libretto workflow from a file",
-  })
-    .input(runInput)
-    .use(resolveSessionMiddleware)
-    .handle(async ({ input, ctx }) => {
-      await stopExistingFailedRunSession(ctx.session, logger);
-      assertSessionAvailableForStart(ctx.session, logger);
+export const runCommand = SimpleCLI.command({
+  description: "Run an exported Libretto workflow from a file",
+})
+  .input(runInput)
+  .use(withAutoSession())
+  .handle(async ({ input, ctx }) => {
+    await stopExistingFailedRunSession(ctx.session, ctx.logger);
+    assertSessionAvailableForStart(ctx.session, ctx.logger);
 
-      const params = resolveRunParams(input.params, input.paramsFile);
-      const headlessMode = input.headed
-        ? false
-        : input.headless
-          ? true
-          : undefined;
-      const visualize = !input.noVisualize;
-      const viewport = resolveViewport(parseViewportArg(input.viewport), logger);
+    const params = resolveRunParams(input.params, input.paramsFile);
+    const headlessMode = input.headed
+      ? false
+      : input.headless
+        ? true
+        : undefined;
+    const visualize = !input.noVisualize;
+    const viewport = resolveViewport(parseViewportArg(input.viewport), ctx.logger);
 
-      await runIntegrationFromFile({
-        integrationPath: input.integrationFile!,
-        exportName: input.integrationExport!,
-        session: ctx.session,
-        params,
-        tsconfigPath: input.tsconfig,
-        headless: headlessMode ?? false,
-        visualize,
-        authProfileDomain: input.authProfile,
-        viewport,
-      }, logger);
-    });
-}
+    await runIntegrationFromFile({
+      integrationPath: input.integrationFile!,
+      exportName: input.integrationExport!,
+      session: ctx.session,
+      params,
+      tsconfigPath: input.tsconfig,
+      headless: headlessMode ?? false,
+      visualize,
+      authProfileDomain: input.authProfile,
+      viewport,
+    }, ctx.logger);
+  });
 
 export const resumeInput = SimpleCLI.input({
   positionals: [],
@@ -685,22 +680,17 @@ export const resumeInput = SimpleCLI.input({
   },
 });
 
-export function createResumeCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Resume a paused workflow for the current session",
-  })
-    .input(resumeInput)
-    .use(resolveSessionMiddleware)
-    .use(loadSessionStateMiddleware)
-    .handle(async ({ ctx }) => {
-      await runResume(ctx.session, logger, ctx.sessionState);
-    });
-}
+export const resumeCommand = SimpleCLI.command({
+  description: "Resume a paused workflow for the current session",
+})
+  .input(resumeInput)
+  .use(withRequiredSession())
+  .handle(async ({ ctx }) => {
+    await runResume(ctx.session, ctx.logger, ctx.sessionState);
+  });
 
-export function createExecutionCommands(logger: LoggerApi) {
-  return {
-    exec: createExecCommand(logger),
-    run: createRunCommand(logger),
-    resume: createResumeCommand(logger),
-  };
-}
+export const executionCommands = {
+  exec: execCommand,
+  run: runCommand,
+  resume: resumeCommand,
+};
