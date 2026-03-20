@@ -26,9 +26,17 @@ import {
 
 const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
-export const SESSION_DEFAULT = "default";
 export const SESSION_DEV_SERVER = "dev-server";
 export const SESSION_BROWSER_AGENT = "browser-agent";
+
+export function generateSessionName(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "";
+  for (let i = 0; i < 4; i++) {
+    id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return `ses-${id}`;
+}
 export { SESSION_STATE_VERSION };
 export type { SessionStatus, SessionState };
 

@@ -55,12 +55,7 @@ export {
 // Debug / Pause
 export { pause } from "./shared/debug/pause.js";
 
-// Config
-export {
-	isDebugMode,
-	isDryRun,
-	shouldPauseBeforeMutation,
-} from "./shared/config/config.js";
+
 
 // Instrumentation
 export {
