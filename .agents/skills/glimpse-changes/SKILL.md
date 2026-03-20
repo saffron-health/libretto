@@ -6,7 +6,7 @@ metadata:
   version: "1.0.0"
 ---
 
-# Visualize Changes
+# Glimpse Changes
 
 Use this skill when the user wants a visual explanation of the changes made in the current session.
 
