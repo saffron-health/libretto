@@ -11,10 +11,9 @@ import {
 } from "../core/snapshot-analyzer.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
-  loadSessionStateMiddleware,
   pageOption,
-  resolveSessionMiddleware,
   sessionOption,
+  withRequiredSession,
 } from "./shared.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readAiConfig } from "../core/ai-config.js";
@@ -308,20 +307,17 @@ export const snapshotInput = SimpleCLI.input({
   },
 });
 
-export function createSnapshotCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
-  })
-    .input(snapshotInput)
-    .use(resolveSessionMiddleware)
-    .use(loadSessionStateMiddleware)
-    .handle(async ({ input, ctx }) => {
-      await runSnapshot(
-        ctx.session,
-        logger,
-        input.page,
-        input.objective,
-        input.context,
-      );
-    });
-}
+export const snapshotCommand = SimpleCLI.command({
+  description: "Capture PNG + HTML; analyze when --objective is provided (--context optional)",
+})
+  .input(snapshotInput)
+  .use(withRequiredSession())
+  .handle(async ({ input, ctx }) => {
+    await runSnapshot(
+      ctx.session,
+      ctx.logger,
+      input.page,
+      input.objective,
+      input.context,
+    );
+  });

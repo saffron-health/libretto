@@ -1,7 +1,6 @@
 :root {
-  --diff-unified-width: 90ch;
-  --diff-split-pane-width: 90ch;
-  --diff-shell-vw-cap: 60vw;
+  --diff-unified-width: 80ch;
+  --diff-split-pane-width: 70ch;
   --diff-shell-max-height: 60vh;
   --diff-split-shell-width: calc((var(--diff-split-pane-width) * 2) + 8ch);
 }
@@ -141,6 +140,42 @@
   white-space: normal;
 }
 
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  margin-top: 0;
+  margin-bottom: 1.7em;
+  overflow-x: auto;
+  display: table;
+}
+
+.markdown-body thead {
+  border-bottom: 2px solid var(--border);
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 0.4em 1.2ch;
+  border: 1px solid var(--border-subtle);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.markdown-body th {
+  font-weight: 600;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.markdown-body td {
+  background: var(--bg);
+}
+
+.markdown-body tbody tr:nth-child(even) td {
+  background: var(--panel);
+}
+
 .markdown-body blockquote {
   margin-left: auto;
   margin-right: auto;
@@ -176,7 +211,7 @@
 }
 
 body[data-diff-style="split"] .diff-shell {
-  width: min(var(--diff-shell-vw-cap), var(--diff-split-shell-width), calc(100vw - 32px));
+  width: min(var(--diff-split-shell-width), calc(100vw - 32px));
 }
 
 body[data-diff-style="unified"] .diff-shell {
@@ -213,6 +248,7 @@ body[data-diff-style="unified"] .diff-shell {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--muted);
+  font-size: 12px;
   line-height: 1.7;
   white-space: nowrap;
   overflow: hidden;
@@ -228,6 +264,7 @@ body[data-diff-style="unified"] .diff-shell {
 .diffs-host {
   display: block;
   width: 100%;
+  font-size: 12px;
   max-width: 100%;
   --diffs-font-family: "JetBrains Mono Nerd", "JetBrains Mono", "Fira Code", Monaco, Menlo, "Ubuntu Mono", Consolas, monospace;
   --diffs-header-font-family: "JetBrains Mono Nerd", "JetBrains Mono", "Fira Code", Monaco, Menlo, "Ubuntu Mono", Consolas, monospace;
@@ -245,7 +282,7 @@ body[data-diff-style="unified"] .diff-shell {
   --diffs-addition-base: var(--diff-add);
   --diffs-deletion-base: var(--diff-remove);
   --diffs-modified-base: var(--diff-hunk);
-  --diffs-font-size: 1em;
+  --diffs-font-size: 0.85em;
   --diffs-line-height: 1.7;
   --diffs-gap-inline: 8px;
   --diffs-gap-block: 8px;

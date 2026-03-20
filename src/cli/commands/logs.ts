@@ -12,10 +12,9 @@ import {
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   integerOption,
-  loadSessionStateMiddleware,
   pageOption,
-  resolveSessionMiddleware,
   sessionOption,
+  withRequiredSession,
 } from "./shared.js";
 
 async function resolvePageId(session: string, pageId?: string): Promise<string | undefined> {
@@ -48,8 +47,7 @@ export const networkCommand = SimpleCLI.command({
   description: "View captured network requests",
 })
   .input(networkInput)
-  .use(resolveSessionMiddleware)
-  .use(loadSessionStateMiddleware)
+  .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
     if (input.clear) {
       clearNetworkLog(ctx.session);
@@ -93,8 +91,7 @@ export const actionsCommand = SimpleCLI.command({
   description: "View captured actions",
 })
   .input(actionsInput)
-  .use(resolveSessionMiddleware)
-  .use(loadSessionStateMiddleware)
+  .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
     if (input.clear) {
       clearActionLog(ctx.session);

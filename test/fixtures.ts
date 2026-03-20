@@ -313,11 +313,7 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
   },
   {
     pattern: /^Reports that --session is missing its required value\.$/,
-    check: (actual) => requireIncludes(actual, "Missing or invalid --session value."),
-  },
-  {
-    pattern: /^Reports that the session flag is missing or invalid\.$/,
-    check: (actual) => requireIncludes(actual, "Missing or invalid --session value."),
+    check: (actual) => requireIncludes(actual, "Missing value for --session."),
   },
   {
     pattern: /^Explains that no AI config is currently set\.$/,
@@ -436,16 +432,6 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
         actual,
         requireIncludes(actual, "AUTO_SESSION_RUN_OK"),
         requireIncludes(actual, "Integration completed."),
-      ),
-  },
-  {
-    pattern: /^Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto open <url> --session default"\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, 'No session "default" found.'),
-        requireIncludes(actual, "No active sessions."),
-        requireIncludes(actual, "libretto open <url> --session default"),
       ),
   },
   {
@@ -625,7 +611,7 @@ export const test = base.extend<CliFixtures>({
 
   seedSessionState: async ({ workspacePath }, use) => {
     await use(async (state?: Partial<SessionState>) => {
-      const session = state?.session ?? "default";
+      const session = state?.session ?? "test-session";
       const normalized: SessionState = {
         session,
         port: state?.port ?? 9222,

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -12,7 +14,7 @@ const skillDir = dirname(scriptDir);
 const assetsDir = join(skillDir, "assets");
 const DEFAULT_DIFFS_MODULE_URL = "https://esm.sh/@pierre/diffs@1.1.1?bundle";
 const DEFAULT_DIFFS_SSR_MODULE_URL = "https://esm.sh/@pierre/diffs@1.1.1/ssr?bundle";
-const DEFAULT_WIDTH = 1240;
+const DEFAULT_WIDTH = 1600;
 const DEFAULT_HEIGHT = 920;
 
 function printUsage() {
@@ -179,6 +181,23 @@ function renderPlainCodeBlock(code, language) {
   return `<div class="code-shell"><div class="code-label">${escapeHtml(lang || "text")}</div><pre class="code-block"><code>${escapeHtml(code.replace(/\n$/, ""))}</code></pre></div>`;
 }
 
+function executeCommand(command) {
+  try {
+    return execSync(command, { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
+  } catch (error) {
+    if (error.stdout) return error.stdout;
+    throw new Error(`Command failed: ${command}\n${error.message}`);
+  }
+}
+
+function renderCommandDiff(command) {
+  const output = executeCommand(command);
+  if (!output.trim()) {
+    return `<div class="code-shell"><div class="code-label">$ ${escapeHtml(command)}</div><pre class="code-block"><code>(no output)</code></pre></div>`;
+  }
+  return renderDiffBlock(output);
+}
+
 function renderCodeBlock(code, language) {
   const lang = (language || "").trim().toLowerCase();
   const lines = code.replace(/\n$/, "").split("\n");
@@ -217,10 +236,12 @@ function renderMarkdown(markdown) {
     line.trim() === "" ||
     /^#{1,6}\s+/.test(line) ||
     /^(`{3,}|~{3,})/.test(line) ||
+    /^!\`[^`]+\`\s*$/.test(line.trim()) ||
     /^>\s?/.test(line) ||
     /^[-*+]\s+/.test(line) ||
     /^\d+\.\s+/.test(line) ||
-    /^([-*_])\1{2,}\s*$/.test(line);
+    /^([-*_])\1{2,}\s*$/.test(line) ||
+    /^\|(.+)\|/.test(line.trim());
 
   while (index < lines.length) {
     const line = lines[index];
@@ -238,6 +259,14 @@ function renderMarkdown(markdown) {
       const id = slugify(text);
       if (level <= 3) headings.push({ level, text, id });
       html.push(`<h${level} id="${id}">${parseInline(text)}</h${level}>`);
+      index += 1;
+      continue;
+    }
+
+    const commandMatch = /^!\`([^`]+)\`\s*$/.exec(trimmed);
+    if (commandMatch) {
+      const command = commandMatch[1];
+      html.push(renderCommandDiff(command));
       index += 1;
       continue;
     }
@@ -288,6 +317,35 @@ function renderMarkdown(markdown) {
         index += 1;
       }
       html.push(`<ol>${items.map((item) => `<li>${parseInline(item)}</li>`).join("")}</ol>`);
+      continue;
+    }
+
+    if (/^\|(.+)\|/.test(trimmed) && index + 1 < lines.length && /^\|[\s:]*-+[\s:]*/.test(lines[index + 1].trim())) {
+      const tableRows = [];
+      while (index < lines.length && /^\|(.+)\|/.test(lines[index].trim())) {
+        tableRows.push(lines[index].trim());
+        index += 1;
+      }
+      if (tableRows.length >= 2) {
+        const parseRow = (row) =>
+          row.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+        const headerCells = parseRow(tableRows[0]);
+        const separatorCells = parseRow(tableRows[1]);
+        const alignments = separatorCells.map((cell) => {
+          const left = cell.startsWith(":");
+          const right = cell.endsWith(":");
+          if (left && right) return "center";
+          if (right) return "right";
+          return "left";
+        });
+        const thead = `<thead><tr>${headerCells.map((cell, i) => `<th align="${alignments[i] || "left"}">${parseInline(cell)}</th>`).join("")}</tr></thead>`;
+        const bodyRows = tableRows.slice(2).map((row) => {
+          const cells = parseRow(row);
+          return `<tr>${cells.map((cell, i) => `<td align="${alignments[i] || "left"}">${parseInline(cell)}</td>`).join("")}</tr>`;
+        });
+        const tbody = bodyRows.length > 0 ? `<tbody>${bodyRows.join("")}</tbody>` : "";
+        html.push(`<table>${thead}${tbody}</table>`);
+      }
       continue;
     }
 
@@ -358,15 +416,14 @@ const ssrModuleUrl = ${JSON.stringify(ssrModuleUrl)};
 const defaults = {
   diffStyle: "split",
   overflow: "wrap",
-  diffIndicators: "classic",
+  diffIndicators: "none",
   lineDiffType: "word-alt",
   hunkSeparators: "line-info",
   showLineNumbers: true,
-  showBackground: false,
+  showBackground: true,
   showFileHeader: false,
-  unifiedWidth: 90,
-  splitPaneWidth: 90,
-  viewportCap: 60,
+  unifiedWidth: 80,
+  splitPaneWidth: 70,
   maxHeight: 60,
 };
 const shellStates = [];
@@ -404,7 +461,6 @@ function applyLayoutState(state) {
   document.body.dataset.diffStyle = state.diffStyle;
   document.documentElement.style.setProperty("--diff-unified-width", \`\${state.unifiedWidth}ch\`);
   document.documentElement.style.setProperty("--diff-split-pane-width", \`\${state.splitPaneWidth}ch\`);
-  document.documentElement.style.setProperty("--diff-shell-vw-cap", \`\${state.viewportCap}vw\`);
   document.documentElement.style.setProperty("--diff-shell-max-height", \`\${state.maxHeight}vh\`);
 }
 
@@ -570,13 +626,19 @@ ${diffBootScript}
 </html>`;
 }
 
-async function openWithGlimpse(html, title) {
+async function openWithGlimpse(html, title, sessionFile) {
   const win = open(html, {
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT,
     title,
     openLinks: true,
   });
+
+  win.on("message", (data) => {
+    const line = JSON.stringify({ ...data, ts: Date.now() }) + "\n";
+    appendFileSync(sessionFile, line, "utf8");
+  });
+
   const closedPromise = new Promise((resolvePromise) => {
     win.once("closed", resolvePromise);
   });
@@ -621,13 +683,16 @@ async function main() {
     title,
     sourceLabel,
   });
+  const sessionId = randomBytes(6).toString("hex");
   const outPath = join(tmpdir(), `${slugify(title)}.html`);
+  const sessionFile = join(tmpdir(), `glimpse-session-${sessionId}.jsonl`);
 
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, documentHtml, "utf8");
+  writeFileSync(sessionFile, "", "utf8");
 
-  console.log(JSON.stringify({ htmlPath: outPath, title, opened: true }));
-  await openWithGlimpse(documentHtml, title);
+  console.log(JSON.stringify({ htmlPath: outPath, sessionFile, title, opened: true }));
+  await openWithGlimpse(documentHtml, title, sessionFile);
 }
 
 main().catch((error) => {

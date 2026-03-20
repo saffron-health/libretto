@@ -2,6 +2,35 @@ import { existsSync } from "node:fs";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
+function extractReturnedSessionId(output: string): string | null {
+  const patterns = [
+    /\(session:\s*([a-zA-Z0-9._-]+)\)/i,
+    /session id[:=]\s*([a-zA-Z0-9._-]+)/i,
+    /session[:=]\s*([a-zA-Z0-9._-]+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = output.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
+function requireReturnedSessionId(
+  command: string,
+  stdout: string,
+  stderr: string,
+): string {
+  const combined = `${stdout}\n${stderr}`;
+  const sessionId = extractReturnedSessionId(combined);
+  if (!sessionId) {
+    throw new Error(
+      `Could not find a returned session id for "${command}".\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+    );
+  }
+  return sessionId;
+}
+
 describe("state-driven CLI subprocess behavior", () => {
   test("shows missing AI config", async ({ librettoCli, evaluate }) => {
     const result = await librettoCli("ai configure");
@@ -143,16 +172,17 @@ describe("state-driven CLI subprocess behavior", () => {
     );
   }, 45_000);
 
-  test("open without --session uses the default session", async ({
+  test("open without --session auto-generates a session", async ({
     librettoCli,
     evaluate,
   }) => {
     const opened = await librettoCli("open https://example.com --headless");
     await evaluate(opened.stdout).toMatch(
-      "Confirms the browser opened successfully for example.com using the default session.",
+      "Confirms the browser opened successfully for example.com.",
     );
+    const sessionId = requireReturnedSessionId("open", opened.stdout, opened.stderr);
 
-    const snapshot = await librettoCli("snapshot --session default");
+    const snapshot = await librettoCli(`snapshot --session ${sessionId}`);
     expect(snapshot.stdout).toContain("Screenshot saved:");
   }, 60_000);
 

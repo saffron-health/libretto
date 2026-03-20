@@ -31,25 +31,30 @@ function requireReturnedSessionId(
 }
 
 describe("multi-session CLI behavior", () => {
-  test("open without --session uses the default session and blocks a second open", async ({
+  test("open without --session auto-generates distinct sessions", async ({
     librettoCli,
     evaluate,
   }) => {
     const firstOpen = await librettoCli("open https://example.com --headless");
     await evaluate(firstOpen.stdout).toMatch(
-      'Confirms the browser opened successfully for example.com in session "default".',
+      'Confirms the browser opened successfully for example.com.',
     );
     const firstSessionId = requireReturnedSessionId(
       "open",
       firstOpen.stdout,
       firstOpen.stderr,
     );
-    expect(firstSessionId).toBe("default");
 
     const secondOpen = await librettoCli("open https://example.com --headless");
-    await evaluate(secondOpen.stderr).toMatch(
-      'Explains that session "default" is already open and suggests closing it or using a different session name.',
+    await evaluate(secondOpen.stdout).toMatch(
+      'Confirms the browser opened successfully for example.com.',
     );
+    const secondSessionId = requireReturnedSessionId(
+      "open",
+      secondOpen.stdout,
+      secondOpen.stderr,
+    );
+    expect(firstSessionId).not.toBe(secondSessionId);
   }, 60_000);
 
   test("run twice without --session creates distinct sessions", async ({
@@ -82,23 +87,20 @@ export const main = workflow({}, async () => {
     expect(secondRun.stderr).not.toContain("is already open and connected to");
   }, 90_000);
 
-  test("exec without --session targets the default session and explains recovery when it is missing", async ({
+  test("exec without --session shows missing session error", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli(`exec "return 1"`);
-    await evaluate(result.stderr).toMatch(
-      'Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto open <url> --session default".',
-    );
+    expect(result.stderr).toContain("Missing required option --session.");
   });
 
   test("exec accepts unquoted multi-token code", async ({
     librettoCli,
     evaluate,
   }) => {
-    const result = await librettoCli("exec await page.title()");
+    const result = await librettoCli("exec await page.title() --session test-session");
     await evaluate(result.stderr).toMatch(
-      'Explains that the default session is missing, that no active sessions exist, and suggests starting one with "libretto open <url> --session default".',
+      'Explains that session "test-session" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session test-session.',
     );
     expect(result.stderr).not.toContain("Unexpected arguments for exec.");
   });
