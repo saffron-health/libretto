@@ -10,7 +10,6 @@ import { readFileSync } from "node:fs";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { createLLMClient } from "../../shared/llm/client.js";
 import {
-  formatInterpretationOutput,
   InterpretResultSchema,
   buildInlinePromptSelection,
   getMimeType,
@@ -93,5 +92,18 @@ export async function runApiInterpret(
     answer: parsed.answer.slice(0, 200),
   });
 
-  console.log(formatInterpretationOutput(parsed, "Interpretation (via API):"));
+  console.log("");
+  console.log("Analysis:");
+  console.log(parsed.answer);
+  if (parsed.selectors.length > 0) {
+    console.log("");
+    console.log("Selectors:");
+    parsed.selectors.forEach((selector, index) => {
+      console.log(`  ${index + 1}. ${selector.label}: ${selector.selector}`);
+    });
+  }
+  if (parsed.notes?.trim()) {
+    console.log("");
+    console.log(`Notes: ${parsed.notes.trim()}`);
+  }
 }
