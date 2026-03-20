@@ -220,7 +220,8 @@ function renderMarkdown(markdown) {
     /^>\s?/.test(line) ||
     /^[-*+]\s+/.test(line) ||
     /^\d+\.\s+/.test(line) ||
-    /^([-*_])\1{2,}\s*$/.test(line);
+    /^([-*_])\1{2,}\s*$/.test(line) ||
+    /^\|(.+)\|/.test(line.trim());
 
   while (index < lines.length) {
     const line = lines[index];
@@ -288,6 +289,35 @@ function renderMarkdown(markdown) {
         index += 1;
       }
       html.push(`<ol>${items.map((item) => `<li>${parseInline(item)}</li>`).join("")}</ol>`);
+      continue;
+    }
+
+    if (/^\|(.+)\|/.test(trimmed) && index + 1 < lines.length && /^\|[\s:]*-+[\s:]*/.test(lines[index + 1].trim())) {
+      const tableRows = [];
+      while (index < lines.length && /^\|(.+)\|/.test(lines[index].trim())) {
+        tableRows.push(lines[index].trim());
+        index += 1;
+      }
+      if (tableRows.length >= 2) {
+        const parseRow = (row) =>
+          row.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+        const headerCells = parseRow(tableRows[0]);
+        const separatorCells = parseRow(tableRows[1]);
+        const alignments = separatorCells.map((cell) => {
+          const left = cell.startsWith(":");
+          const right = cell.endsWith(":");
+          if (left && right) return "center";
+          if (right) return "right";
+          return "left";
+        });
+        const thead = `<thead><tr>${headerCells.map((cell, i) => `<th align="${alignments[i] || "left"}">${parseInline(cell)}</th>`).join("")}</tr></thead>`;
+        const bodyRows = tableRows.slice(2).map((row) => {
+          const cells = parseRow(row);
+          return `<tr>${cells.map((cell, i) => `<td align="${alignments[i] || "left"}">${parseInline(cell)}</td>`).join("")}</tr>`;
+        });
+        const tbody = bodyRows.length > 0 ? `<tbody>${bodyRows.join("")}</tbody>` : "";
+        html.push(`<table>${thead}${tbody}</table>`);
+      }
       continue;
     }
 
