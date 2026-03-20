@@ -51,7 +51,7 @@ You can also use Libretto directly from the command line. All commands accept `-
 ```bash
 npx libretto init                          # initialize libretto in the current project
 npx libretto open <url>                    # launch browser and open a URL (headed by default)
-npx libretto snapshot --objective "..."    # capture PNG + HTML and analyze with an LLM
+npx libretto snapshot --objective "..." --context "..."  # capture PNG + HTML and analyze with an LLM
 npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page
 npx libretto run <file> <export>           # run an exported workflow from a file
 npx libretto resume                        # resume a paused workflow
