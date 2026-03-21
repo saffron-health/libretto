@@ -31,7 +31,7 @@ metadata:
 - Defer repo/code review until you begin generating code, unless the user explicitly asks for it earlier.
 - Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code.
 - Validation requires a successful clean `run --headless` with confirmation of the actual returned output, not just process success. If the user wants to watch the finished workflow, do a final headed `run` after headless validation succeeds.
-- Treat exploration sessions as disposable unless the user explicitly wants one kept open.
+- Keep Libretto sessions tidy: close unneeded sessions when you are done with them and before starting new ones, unless the user explicitly wants a session kept open.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
 
