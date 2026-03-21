@@ -124,9 +124,9 @@ async function runExec(
   visualize = false,
   pageId?: string,
 ): Promise<void> {
-  const catchPattern = /\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g;
+  const catchPattern = /\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g;
   const hadCatch = catchPattern.test(code);
-  const cleanedCode = code.replace(/\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g, "");
+  const cleanedCode = code.replace(/\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g, "");
   if (hadCatch) {
     console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
   }
