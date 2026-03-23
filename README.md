@@ -33,7 +33,7 @@ Your coding agent will open a window for you to log into LinkedIn, and then auto
 
 ### Interactive script building
 
-> I'm gonna show you a workflow in the eclinicalworks EHR to get a patient's primary insurance ID. Use libretto skill to turn it into a playwright script that takes patient name and dob as input to get back the insurance ID. URL is <url>
+> I'm gonna show you a workflow in the eclinicalworks EHR to get a patient's primary insurance ID. Use libretto skill to turn it into a playwright script that takes patient name and dob as input to get back the insurance ID. URL is ...
 
 Libretto can read your actions you perform in the browser, so you can perform a workflow, then ask it to use your actions to rebuild the workflow.
 
