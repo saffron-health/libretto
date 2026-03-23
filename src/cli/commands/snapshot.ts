@@ -159,7 +159,7 @@ async function captureScreenshot(
     const htmlPath = `${snapshotRunDir}/page.html`;
     const condensedHtmlPath = `${snapshotRunDir}/page.condensed.html`;
 
-    const RENDER_SETTLE_TIMEOUT_MS = 20_000;
+    const RENDER_SETTLE_TIMEOUT_MS = 10_000;
     await Promise.race([
       page.waitForLoadState("networkidle").catch(() => {}),
       new Promise((resolve) => setTimeout(resolve, RENDER_SETTLE_TIMEOUT_MS)),
