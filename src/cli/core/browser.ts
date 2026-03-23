@@ -1,4 +1,10 @@
-import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type CDPSession,
+  type Page,
+} from "playwright";
 import { openSync, existsSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -135,10 +141,12 @@ async function resolvePageId(page: Page): Promise<string> {
   const cdpSession: CDPSession = await page.context().newCDPSession(page);
   try {
     const targetInfo = await cdpSession.send("Target.getTargetInfo");
-    const targetId = (targetInfo as { targetInfo?: { targetId?: unknown } })?.targetInfo
-      ?.targetId;
+    const targetId = (targetInfo as { targetInfo?: { targetId?: unknown } })
+      ?.targetInfo?.targetId;
     if (typeof targetId !== "string" || targetId.length === 0) {
-      throw new Error(`Could not resolve target id for page at URL "${page.url()}".`);
+      throw new Error(
+        `Could not resolve target id for page at URL "${page.url()}".`,
+      );
     }
     return targetId;
   } finally {
@@ -162,7 +170,10 @@ export async function listOpenPages(
 ): Promise<OpenPageSummary[]> {
   const { browser, page: activePage } = await connect(session, logger);
   try {
-    const pages = browser.contexts().flatMap((ctx) => ctx.pages()).filter(isOperationalPage);
+    const pages = browser
+      .contexts()
+      .flatMap((ctx) => ctx.pages())
+      .filter(isOperationalPage);
     const pageRefs = await resolvePageReferences(pages);
     return pageRefs.map(({ id, page }) => ({
       id,
@@ -276,7 +287,10 @@ export async function connect(
   return { browser, context, page, pageId: pageRef.id };
 }
 
-export async function runPages(session: string, logger: LoggerApi): Promise<void> {
+export async function runPages(
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
   logger.info("pages-start", { session });
   const pageSummaries = await listOpenPages(session, logger);
 
@@ -304,10 +318,16 @@ export function resolveViewport(
   }
   const config = readLibrettoConfig();
   if (config.viewport) {
-    logger.info("viewport-source", { source: "config", viewport: config.viewport });
+    logger.info("viewport-source", {
+      source: "config",
+      viewport: config.viewport,
+    });
     return config.viewport;
   }
-  logger.info("viewport-source", { source: "default", viewport: DEFAULT_VIEWPORT });
+  logger.info("viewport-source", {
+    source: "default",
+    viewport: DEFAULT_VIEWPORT,
+  });
   return DEFAULT_VIEWPORT;
 }
 
@@ -474,8 +494,10 @@ await new Promise(() => {});
   logger.info("open-child-spawned", { pid: child.pid, port, session });
 
   let childSpawnError: Error | null = null;
-  let childEarlyExit: { code: number | null; signal: NodeJS.Signals | null } | null =
-    null;
+  let childEarlyExit: {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+  } | null = null;
 
   child.on("error", (err) => {
     childSpawnError = err;
@@ -529,14 +551,17 @@ await new Promise(() => {});
       logger.info("open-waiting-for-cdp", { attempt: i, port, session });
     }
     if (ready) {
-      writeSessionState({
-        port,
-        pid: child.pid!,
-        session,
-        startedAt: new Date().toISOString(),
-        status: "active",
-        viewport,
-      }, logger);
+      writeSessionState(
+        {
+          port,
+          pid: child.pid!,
+          session,
+          startedAt: new Date().toISOString(),
+          status: "active",
+          viewport,
+        },
+        logger,
+      );
       logger.info("open-success", {
         url,
         mode: browserMode,
@@ -644,7 +669,10 @@ export async function runSave(
   }
 }
 
-export async function runClose(session: string, logger: LoggerApi): Promise<void> {
+export async function runClose(
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
   logger.info("close-start", { session });
   const state = readSessionState(session, logger);
   if (!state) {
@@ -705,7 +733,9 @@ function sendSignalToProcessGroupOrPid(
   }
 }
 
-function formatSessionList(targets: ReadonlyArray<{ session: string }>): string {
+function formatSessionList(
+  targets: ReadonlyArray<{ session: string }>,
+): string {
   return targets.map((target) => `"${target.session}"`).join(", ");
 }
 
@@ -770,7 +800,12 @@ export async function runCloseAll(
       pid: target.pid,
       port: target.port,
     });
-    sendSignalToProcessGroupOrPid(target.pid, "SIGTERM", logger, target.session);
+    sendSignalToProcessGroupOrPid(
+      target.pid,
+      "SIGTERM",
+      logger,
+      target.session,
+    );
   }
 
   await waitForCloseSignalWindow(CLOSE_WAIT_MS);
@@ -795,7 +830,12 @@ export async function runCloseAll(
         session: survivor.session,
         pid: survivor.pid,
       });
-      sendSignalToProcessGroupOrPid(survivor.pid, "SIGKILL", logger, survivor.session);
+      sendSignalToProcessGroupOrPid(
+        survivor.pid,
+        "SIGKILL",
+        logger,
+        survivor.session,
+      );
       forceKilled += 1;
     }
     await waitForCloseSignalWindow(FORCE_CLOSE_WAIT_MS);

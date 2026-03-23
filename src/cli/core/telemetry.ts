@@ -1,4 +1,9 @@
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import type { Page } from "playwright";
 import {
   getSessionActionsLogPath,
@@ -21,7 +26,12 @@ export type NetworkLogEntry = {
 
 export function readNetworkLog(
   session: string,
-  opts: { last?: number; filter?: string; method?: string; pageId?: string } = {},
+  opts: {
+    last?: number;
+    filter?: string;
+    method?: string;
+    pageId?: string;
+  } = {},
 ): NetworkLogEntry[] {
   assertSessionStateExistsOrThrow(session);
   const logPath = getSessionNetworkLogPath(session);
@@ -99,7 +109,10 @@ export function parentLogAction(
 ): void {
   try {
     const record = { ts: new Date().toISOString(), ...entry };
-    appendFileSync(getSessionActionsLogPath(session), JSON.stringify(record) + "\n");
+    appendFileSync(
+      getSessionActionsLogPath(session),
+      JSON.stringify(record) + "\n",
+    );
   } catch {}
 }
 

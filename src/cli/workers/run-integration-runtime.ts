@@ -18,7 +18,10 @@ import {
   getSessionNetworkLogPath,
   getSessionStatePath,
 } from "../core/context.js";
-import { getPauseSignalPaths, removeSignalIfExists } from "../core/pause-signals.js";
+import {
+  getPauseSignalPaths,
+  removeSignalIfExists,
+} from "../core/pause-signals.js";
 import { installSessionTelemetry } from "../core/session-telemetry.js";
 import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol.js";
 
@@ -73,7 +76,8 @@ function readSessionStatePid(session: string): number | null {
   if (!existsSync(statePath)) return null;
 
   try {
-    return parseSessionStateContent(readFileSync(statePath, "utf8"), statePath).pid;
+    return parseSessionStateContent(readFileSync(statePath, "utf8"), statePath)
+      .pid;
   } catch {
     return null;
   }
@@ -103,7 +107,9 @@ async function waitForFailureSessionRelease(args: {
   }
 }
 
-function isLoadedLibrettoWorkflow(value: unknown): value is LoadedLibrettoWorkflow {
+function isLoadedLibrettoWorkflow(
+  value: unknown,
+): value is LoadedLibrettoWorkflow {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<PropertyKey, unknown>;
   return (
@@ -289,7 +295,8 @@ async function runIntegrationInternal(
     try {
       await workflow.run(workflowContext, args.params ?? {});
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       await writeFile(
         signalPaths.failedSignalPath,
         JSON.stringify(

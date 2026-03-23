@@ -49,8 +49,14 @@ describe("SimpleCLI framework", () => {
         headless: SimpleCLI.flag(),
       },
     })
-      .refine((value) => !(value.params && value.paramsFile), "Pass either --params or --params-file, not both.")
-      .refine((value) => !(value.headed && value.headless), "Cannot pass both --headed and --headless.");
+      .refine(
+        (value) => !(value.params && value.paramsFile),
+        "Pass either --params or --params-file, not both.",
+      )
+      .refine(
+        (value) => !(value.headed && value.headless),
+        "Cannot pass both --headed and --headless.",
+      );
 
     const parsed = runInput.parse({
       positionals: ["./integration.ts", "main"],
@@ -99,7 +105,8 @@ describe("SimpleCLI framework", () => {
     const app = SimpleCLI.define("libretto", {
       ai: ai.group({
         routes: {
-          configure: ai.command({ description: "configure" })
+          configure: ai
+            .command({ description: "configure" })
             .input(noInput)
             .use(commandMiddleware)
             .handle(async ({ ctx }) => {
@@ -153,14 +160,15 @@ describe("SimpleCLI framework", () => {
       {},
       { sessionState: { id: string } }
     > = async ({ ctx }) => ({
-        ...ctx,
-        sessionState: { id: "default" },
-      });
+      ...ctx,
+      sessionState: { id: "default" },
+    });
     const withSession = SimpleCLI.use(validateSession);
 
     let sessionId: string | null = null;
     const app = SimpleCLI.define("libretto", {
-      open: withSession.command({ description: "open" })
+      open: withSession
+        .command({ description: "open" })
         .input(noInput)
         .handle(async ({ ctx }) => {
           const sessionIdFromContext: string = ctx.sessionState.id;
@@ -179,7 +187,10 @@ describe("SimpleCLI framework", () => {
   test("parses command args with built-in option and passthrough handling", async () => {
     const aiConfigureInput = SimpleCLI.input({
       positionals: [
-        SimpleCLI.positional("preset", z.enum(["codex", "claude", "gemini"]).optional()),
+        SimpleCLI.positional(
+          "preset",
+          z.enum(["codex", "claude", "gemini"]).optional(),
+        ),
       ],
       named: {
         provider: SimpleCLI.option(z.string().optional()),
@@ -223,9 +234,7 @@ describe("SimpleCLI framework", () => {
 
   test("does not treat help flags after passthrough as CLI help", async () => {
     const aiConfigureInput = SimpleCLI.input({
-      positionals: [
-        SimpleCLI.positional("preset", z.string().optional()),
-      ],
+      positionals: [SimpleCLI.positional("preset", z.string().optional())],
       named: {
         passthrough: SimpleCLI.option(z.array(z.string()).default([]), {
           source: "--",
@@ -244,13 +253,7 @@ describe("SimpleCLI framework", () => {
       }),
     });
 
-    const result = await app.run([
-      "ai",
-      "configure",
-      "openai",
-      "--",
-      "--help",
-    ]);
+    const result = await app.run(["ai", "configure", "openai", "--", "--help"]);
 
     expect(result).toEqual({
       preset: "openai",
@@ -260,9 +263,7 @@ describe("SimpleCLI framework", () => {
 
   test("parses named option aliases and applies defaults", async () => {
     const openInput = SimpleCLI.input({
-      positionals: [
-        SimpleCLI.positional("url", z.string()),
-      ],
+      positionals: [SimpleCLI.positional("url", z.string())],
       named: {
         session: SimpleCLI.option(z.string().default("default"), {
           aliases: ["s"],
@@ -279,7 +280,13 @@ describe("SimpleCLI framework", () => {
         .handle(async ({ input }) => input),
     });
 
-    const result = await app.run(["open", "https://example.com", "-s", "debug", "-x"]);
+    const result = await app.run([
+      "open",
+      "https://example.com",
+      "-s",
+      "debug",
+      "-x",
+    ]);
 
     expect(result).toEqual({
       url: "https://example.com",
@@ -291,32 +298,36 @@ describe("SimpleCLI framework", () => {
   test("accepts global options before commands and injects them only when declared", async () => {
     const noInput = SimpleCLI.input({ positionals: [], named: {} });
     const openInput = SimpleCLI.input({
-      positionals: [
-        SimpleCLI.positional("url", z.string()),
-      ],
+      positionals: [SimpleCLI.positional("url", z.string())],
       named: {
         session: SimpleCLI.option(z.string().default("default")),
       },
     });
 
-    const app = SimpleCLI.define("libretto", {
-      ai: SimpleCLI.group({
-        routes: {
-          configure: SimpleCLI.command({ description: "configure" })
-            .input(noInput)
-            .handle(async () => "configured"),
-        },
-      }),
-      open: SimpleCLI.command({ description: "open" })
-        .input(openInput)
-        .handle(async ({ input }) => input),
-    }, {
-      globalNamed: {
-        session: SimpleCLI.option(z.string().default("default")),
+    const app = SimpleCLI.define(
+      "libretto",
+      {
+        ai: SimpleCLI.group({
+          routes: {
+            configure: SimpleCLI.command({ description: "configure" })
+              .input(noInput)
+              .handle(async () => "configured"),
+          },
+        }),
+        open: SimpleCLI.command({ description: "open" })
+          .input(openInput)
+          .handle(async ({ input }) => input),
       },
-    });
+      {
+        globalNamed: {
+          session: SimpleCLI.option(z.string().default("default")),
+        },
+      },
+    );
 
-    await expect(app.run(["--session", "debug", "ai", "configure"])).resolves.toBe("configured");
+    await expect(
+      app.run(["--session", "debug", "ai", "configure"]),
+    ).resolves.toBe("configured");
     await expect(
       app.run(["--session", "debug", "open", "https://example.com"]),
     ).resolves.toEqual({
@@ -333,7 +344,10 @@ describe("SimpleCLI framework", () => {
         }),
       ],
       named: {},
-    }).refine((input) => input.codeParts.length > 0, "Usage: libretto exec <code>");
+    }).refine(
+      (input) => input.codeParts.length > 0,
+      "Usage: libretto exec <code>",
+    );
 
     const app = SimpleCLI.define("libretto", {
       exec: SimpleCLI.command({ description: "exec" })
@@ -361,9 +375,9 @@ describe("SimpleCLI framework", () => {
         .handle(async ({ input }) => input),
     });
 
-    await expect(
-      app.run(["network", "--filter", "--clear"]),
-    ).rejects.toThrow("Missing value for --filter.");
+    await expect(app.run(["network", "--filter", "--clear"])).rejects.toThrow(
+      "Missing value for --filter.",
+    );
   });
 
   test("allows hyphen-prefixed option values when they are not recognized flags", async () => {
@@ -380,25 +394,24 @@ describe("SimpleCLI framework", () => {
         .handle(async ({ input }) => input),
     });
 
-    await expect(
-      app.run(["pages", "--session", "-dash"]),
-    ).resolves.toEqual({
+    await expect(app.run(["pages", "--session", "-dash"])).resolves.toEqual({
       session: "-dash",
     });
   });
 
   test("surfaces command-level input normalization errors from run", async () => {
     const openInput = SimpleCLI.input({
-      positionals: [
-        SimpleCLI.positional("url", z.string().optional()),
-      ],
+      positionals: [SimpleCLI.positional("url", z.string().optional())],
       named: {
         headed: SimpleCLI.flag(),
         headless: SimpleCLI.flag(),
       },
     })
       .refine((input) => Boolean(input.url), "Usage: libretto open <url>")
-      .refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
+      .refine(
+        (input) => !(input.headed && input.headless),
+        "Cannot pass both --headed and --headless.",
+      );
 
     const app = SimpleCLI.define("libretto", {
       open: SimpleCLI.command({ description: "open" })
@@ -406,10 +419,12 @@ describe("SimpleCLI framework", () => {
         .handle(async () => {}),
     });
 
-    await expect(app.run(["open"])).rejects.toThrow("Usage: libretto open <url>");
-    await expect(app.run(["open", "https://example.com", "--headed", "--headless"])).rejects.toThrow(
-      "Cannot pass both --headed and --headless.",
+    await expect(app.run(["open"])).rejects.toThrow(
+      "Usage: libretto open <url>",
     );
+    await expect(
+      app.run(["open", "https://example.com", "--headed", "--headless"]),
+    ).rejects.toThrow("Cannot pass both --headed and --headless.");
   });
 
   test("renders root and group help from route paths and descriptions", async () => {
@@ -457,9 +472,13 @@ describe("SimpleCLI framework", () => {
   test("renders command help from the route path description and parameters", async () => {
     const aiConfigureInput = SimpleCLI.input({
       positionals: [
-        SimpleCLI.positional("preset", z.enum(["codex", "claude", "gemini"]).optional(), {
-          help: "AI preset",
-        }),
+        SimpleCLI.positional(
+          "preset",
+          z.enum(["codex", "claude", "gemini"]).optional(),
+          {
+            help: "AI preset",
+          },
+        ),
       ],
       named: {
         provider: SimpleCLI.option(z.string().optional(), {

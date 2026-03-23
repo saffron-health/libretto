@@ -1,5 +1,5 @@
 export {
-	pageRequest,
-	type RequestConfig,
-	type PageRequestOptions,
+  pageRequest,
+  type RequestConfig,
+  type PageRequestOptions,
 } from "./network.js";

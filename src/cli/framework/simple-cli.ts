@@ -49,7 +49,10 @@ type SimpleCLIPositionalsDefinition = readonly SimpleCLIPositionalDefinition<
   ZodTypeAny
 >[];
 
-type SimpleCLINamedDefinition = Record<string, SimpleCLINamedArgDefinition<ZodTypeAny>>;
+type SimpleCLINamedDefinition = Record<
+  string,
+  SimpleCLINamedArgDefinition<ZodTypeAny>
+>;
 
 type SimpleCLIInputDefinition = {
   positionals: SimpleCLIPositionalsDefinition;
@@ -97,7 +100,8 @@ type NormalizedCommandDefinition<
 
 type SimpleCLIRouteTree<TContext extends SimpleCLIContext = {}> = Record<
   string,
-  SimpleCLIGroup<TContext, any> | SimpleCLICommandBuilder<any, TContext, any, any>
+  | SimpleCLIGroup<TContext, any>
+  | SimpleCLICommandBuilder<any, TContext, any, any>
 >;
 
 export type SimpleCLIResolvedCommand = {
@@ -295,13 +299,23 @@ export class SimpleCLICommandBuilder<
   TResult,
 > {
   constructor(
-    private readonly definition: NormalizedCommandDefinition<TInput, TContextIn, TContext, TResult>,
+    private readonly definition: NormalizedCommandDefinition<
+      TInput,
+      TContextIn,
+      TContext,
+      TResult
+    >,
   ) {}
 
   input<TNextInput>(
     input: SimpleCLIInput<TNextInput>,
   ): SimpleCLICommandBuilder<TNextInput, TContextIn, TContext, TResult> {
-    return new SimpleCLICommandBuilder<TNextInput, TContextIn, TContext, TResult>({
+    return new SimpleCLICommandBuilder<
+      TNextInput,
+      TContextIn,
+      TContext,
+      TResult
+    >({
       config: this.definition.config,
       input,
       middlewares: this.definition.middlewares,
@@ -332,7 +346,12 @@ export class SimpleCLICommandBuilder<
   handle<TNextResult>(
     handler: SimpleCLIHandler<TInput, TContext, TNextResult>,
   ): SimpleCLICommandBuilder<TInput, TContextIn, TContext, TNextResult> {
-    return new SimpleCLICommandBuilder<TInput, TContextIn, TContext, TNextResult>({
+    return new SimpleCLICommandBuilder<
+      TInput,
+      TContextIn,
+      TContext,
+      TNextResult
+    >({
       config: this.definition.config,
       input: this.definition.input,
       middlewares: this.definition.middlewares,
@@ -340,7 +359,12 @@ export class SimpleCLICommandBuilder<
     });
   }
 
-  getDefinition(): NormalizedCommandDefinition<TInput, TContextIn, TContext, TResult> {
+  getDefinition(): NormalizedCommandDefinition<
+    TInput,
+    TContextIn,
+    TContext,
+    TResult
+  > {
     return this.definition;
   }
 }
@@ -358,7 +382,10 @@ export type SimpleCLIGroup<
 };
 
 export class SimpleCLIApp {
-  private readonly resolvedCommands = new Map<string, InternalResolvedCommand>();
+  private readonly resolvedCommands = new Map<
+    string,
+    InternalResolvedCommand
+  >();
   private readonly resolvedGroups = new Map<string, InternalResolvedGroup>();
   private readonly routeEntries: InternalResolvedRouteEntry[];
   private readonly globalNamed: SimpleCLINamedDefinition;
@@ -485,7 +512,9 @@ export class SimpleCLIApp {
       return [];
     }
 
-    const helpFlagIndex = argsBeforePassthrough.findIndex((arg) => isHelpFlag(arg));
+    const helpFlagIndex = argsBeforePassthrough.findIndex((arg) =>
+      isHelpFlag(arg),
+    );
     if (helpFlagIndex >= 0) {
       return argsBeforePassthrough.slice(0, helpFlagIndex);
     }
@@ -503,7 +532,10 @@ export class SimpleCLIApp {
       throw new Error(`Unknown command: ${args.join(" ")}`);
     }
 
-    const rawInput = this.parseCommandInput(command, args.slice(command.path.length));
+    const rawInput = this.parseCommandInput(
+      command,
+      args.slice(command.path.length),
+    );
     return {
       routeKey: command.routeKey,
       rawInput,
@@ -517,7 +549,9 @@ export class SimpleCLIApp {
     const inputDefinition = command.input?.getDefinition();
     if (!inputDefinition) {
       if (args.length > 0) {
-        throw new Error(`Unexpected arguments for ${this.name} ${command.path.join(" ")}.`);
+        throw new Error(
+          `Unexpected arguments for ${this.name} ${command.path.join(" ")}.`,
+        );
       }
       return {
         positionals: [],
@@ -537,7 +571,9 @@ export class SimpleCLIApp {
 
       if (arg === "--") {
         if (!passthroughEntry) {
-          throw new Error(`Unexpected "--" for ${this.name} ${command.path.join(" ")}.`);
+          throw new Error(
+            `Unexpected "--" for ${this.name} ${command.path.join(" ")}.`,
+          );
         }
         named["--"] = args.slice(index + 1);
         break;
@@ -592,7 +628,11 @@ export class SimpleCLIApp {
       positionals.push(arg);
     }
 
-    validateParsedPositionals(command, inputDefinition.positionals, positionals);
+    validateParsedPositionals(
+      command,
+      inputDefinition.positionals,
+      positionals,
+    );
     validateRequiredNamedArgs(inputDefinition.named, named);
 
     return {
@@ -685,7 +725,9 @@ export class SimpleCLIApp {
       return rawInput;
     }
 
-    const inputDefinition = this.resolvedCommands.get(routeKey)?.input?.getDefinition();
+    const inputDefinition = this.resolvedCommands
+      .get(routeKey)
+      ?.input?.getDefinition();
     if (!inputDefinition) {
       return rawInput;
     }
@@ -756,8 +798,9 @@ export class SimpleCLIApp {
       lines.push(...argumentLines);
     }
 
-    const optionLines = Object.entries(inputDefinition.named).map(([key, spec]) =>
-      formatListEntry(buildNamedArgHelpLabel(key, spec), spec.help),
+    const optionLines = Object.entries(inputDefinition.named).map(
+      ([key, spec]) =>
+        formatListEntry(buildNamedArgHelpLabel(key, spec), spec.help),
     );
 
     if (optionLines.length > 0) {
@@ -819,7 +862,9 @@ export class SimpleCLIApp {
     return entries;
   }
 
-  private findBestMatchingCommand(args: readonly string[]): InternalResolvedCommand | null {
+  private findBestMatchingCommand(
+    args: readonly string[],
+  ): InternalResolvedCommand | null {
     let bestMatch: InternalResolvedCommand | null = null;
 
     for (const command of this.resolvedCommands.values()) {
@@ -833,12 +878,16 @@ export class SimpleCLIApp {
     return bestMatch;
   }
 
-  private findCommandByPath(path: readonly string[]): InternalResolvedCommand | null {
+  private findCommandByPath(
+    path: readonly string[],
+  ): InternalResolvedCommand | null {
     const routeKey = pathToRouteKey(path);
     return this.resolvedCommands.get(routeKey) ?? null;
   }
 
-  private findGroupByPath(path: readonly string[]): InternalResolvedGroup | null {
+  private findGroupByPath(
+    path: readonly string[],
+  ): InternalResolvedGroup | null {
     const routeKey = pathToRouteKey(path);
     return this.resolvedGroups.get(routeKey) ?? null;
   }
@@ -847,10 +896,7 @@ export class SimpleCLIApp {
 function splitNamedArg(arg: string): [string, string | undefined] {
   const separatorIndex = arg.indexOf("=");
   if (separatorIndex < 0) return [arg, undefined];
-  return [
-    arg.slice(0, separatorIndex),
-    arg.slice(separatorIndex + 1),
-  ];
+  return [arg.slice(0, separatorIndex), arg.slice(separatorIndex + 1)];
 }
 
 function readNamedArgValue(
@@ -860,7 +906,10 @@ function readNamedArgValue(
   displayName: string,
   spec: SimpleCLINamedArgDefinition<ZodTypeAny>,
   inlineValue: string | undefined,
-  namedSpecs: ReadonlyMap<string, { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }>,
+  namedSpecs: ReadonlyMap<
+    string,
+    { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }
+  >,
 ): unknown {
   if (spec.kind === "flag") {
     return inlineValue === undefined
@@ -874,9 +923,9 @@ function readNamedArgValue(
 
   const nextValue = args[index + 1];
   if (
-    nextValue === undefined
-    || nextValue === "--"
-    || isRecognizedNamedArgToken(nextValue, namedSpecs)
+    nextValue === undefined ||
+    nextValue === "--" ||
+    isRecognizedNamedArgToken(nextValue, namedSpecs)
   ) {
     throw new Error(`Missing value for ${displayName}.`);
   }
@@ -886,7 +935,10 @@ function readNamedArgValue(
 
 function isRecognizedNamedArgToken(
   token: string,
-  namedSpecs: ReadonlyMap<string, { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }>,
+  namedSpecs: ReadonlyMap<
+    string,
+    { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }
+  >,
 ): boolean {
   if (token === "-" || !token.startsWith("-")) {
     return false;
@@ -899,11 +951,13 @@ function isRecognizedNamedArgToken(
   return namedSpecs.has(rawName);
 }
 
-function buildNamedArgLookup(namedDefinition: SimpleCLINamedDefinition): Map<
-  string,
-  { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }
-> {
-  const lookup = new Map<string, { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }>();
+function buildNamedArgLookup(
+  namedDefinition: SimpleCLINamedDefinition,
+): Map<string, { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }> {
+  const lookup = new Map<
+    string,
+    { key: string; spec: SimpleCLINamedArgDefinition<ZodTypeAny> }
+  >();
 
   for (const [key, spec] of Object.entries(namedDefinition)) {
     if (spec.source === "--") continue;
@@ -926,7 +980,9 @@ function validateParsedPositionals(
   definitions: SimpleCLIPositionalsDefinition,
   positionals: readonly string[],
 ): void {
-  const variadicDefinition = definitions.find((definition) => definition.variadic);
+  const variadicDefinition = definitions.find(
+    (definition) => definition.variadic,
+  );
   if (!variadicDefinition && positionals.length > definitions.length) {
     throw new Error(`Unexpected arguments for ${command.path.join(" ")}.`);
   }
@@ -935,17 +991,22 @@ function validateParsedPositionals(
     const value = definition.variadic
       ? positionals.slice(index)
       : positionals[index];
-    if (value !== undefined && (!Array.isArray(value) || value.length > 0)) return;
+    if (value !== undefined && (!Array.isArray(value) || value.length > 0))
+      return;
     if (schemaAcceptsUndefined(definition.schema)) return;
     throw new Error(`Missing required argument <${definition.key}>.`);
   });
 }
 
 function validateInputDefinition(definition: SimpleCLIInputDefinition): void {
-  const variadicIndex = definition.positionals.findIndex((positional) => positional.variadic);
+  const variadicIndex = definition.positionals.findIndex(
+    (positional) => positional.variadic,
+  );
   if (variadicIndex < 0) return;
   if (variadicIndex !== definition.positionals.length - 1) {
-    throw new Error("Variadic positional arguments must be the last positional.");
+    throw new Error(
+      "Variadic positional arguments must be the last positional.",
+    );
   }
 }
 
@@ -955,7 +1016,8 @@ function validateRequiredNamedArgs(
 ): void {
   for (const [key, spec] of Object.entries(definitions)) {
     if (schemaAcceptsUndefined(spec.schema)) continue;
-    const flagName = spec.source === "--" ? "--" : buildNamedArgFlagName(key, spec);
+    const flagName =
+      spec.source === "--" ? "--" : buildNamedArgFlagName(key, spec);
     if (Object.prototype.hasOwnProperty.call(named, flagName)) continue;
     if (spec.source === "--") {
       throw new Error(`Missing required passthrough arguments after --.`);
@@ -988,11 +1050,10 @@ function resolveRouteTree(
         path: groupPath,
       });
 
-      const nested = resolveRouteTree(
-        routeValue.routes,
-        groupPath,
-        [...parentMiddlewares, ...routeValue.middlewares],
-      );
+      const nested = resolveRouteTree(routeValue.routes, groupPath, [
+        ...parentMiddlewares,
+        ...routeValue.middlewares,
+      ]);
       resolved.commands.push(...nested.commands);
       resolved.groups.push(...nested.groups);
       resolved.routeEntries.push(...nested.routeEntries);
@@ -1001,7 +1062,9 @@ function resolveRouteTree(
 
     const command = routeValue.getDefinition();
     if (!command.handler) {
-      throw new Error(`Command "${[...parentPath, token].join(" ")}" is missing a handler.`);
+      throw new Error(
+        `Command "${[...parentPath, token].join(" ")}" is missing a handler.`,
+      );
     }
 
     const path = [...parentPath, token];
@@ -1010,7 +1073,10 @@ function resolveRouteTree(
       path,
       description: command.config.description,
       input: command.input,
-      middlewares: mergeInheritedMiddlewares(parentMiddlewares, command.middlewares),
+      middlewares: mergeInheritedMiddlewares(
+        parentMiddlewares,
+        command.middlewares,
+      ),
       handler: command.handler as unknown as SimpleCLIHandler<
         unknown,
         SimpleCLIContext,
@@ -1035,8 +1101,10 @@ function mergeInheritedMiddlewares(
   }
 
   if (
-    commandMiddlewares.length >= parentMiddlewares.length
-    && parentMiddlewares.every((middleware, index) => commandMiddlewares[index] === middleware)
+    commandMiddlewares.length >= parentMiddlewares.length &&
+    parentMiddlewares.every(
+      (middleware, index) => commandMiddlewares[index] === middleware,
+    )
   ) {
     return [...commandMiddlewares];
   }
@@ -1053,12 +1121,10 @@ function isGroup(
 function buildInputNormalizer<
   TPositionals extends SimpleCLIPositionalsDefinition,
   TNamed extends SimpleCLINamedDefinition,
->(
-  definition: {
-    positionals: TPositionals;
-    named: TNamed;
-  },
-): (raw: SimpleCLIInputRaw) => InputObjectFor<TPositionals, TNamed> {
+>(definition: {
+  positionals: TPositionals;
+  named: TNamed;
+}): (raw: SimpleCLIInputRaw) => InputObjectFor<TPositionals, TNamed> {
   return (raw) => {
     const output: RecordUnknown = {};
     const positionals = raw.positionals ?? [];
@@ -1077,10 +1143,7 @@ function buildInputNormalizer<
         spec.name ? toCamelCase(spec.name) : "",
         ...(spec.aliases ?? []).flatMap((alias) => {
           const normalizedAlias = normalizeNamedArgToken(alias);
-          return [
-            normalizedAlias,
-            toCamelCase(normalizedAlias),
-          ];
+          return [normalizedAlias, toCamelCase(normalizedAlias)];
         }),
         toKebabCase(key),
         key,
@@ -1103,12 +1166,10 @@ function buildInputNormalizer<
 function buildInputSchema<
   TPositionals extends SimpleCLIPositionalsDefinition,
   TNamed extends SimpleCLINamedDefinition,
->(
-  definition: {
-    positionals: TPositionals;
-    named: TNamed;
-  },
-): z.ZodType<InputObjectFor<TPositionals, TNamed>, unknown> {
+>(definition: {
+  positionals: TPositionals;
+  named: TNamed;
+}): z.ZodType<InputObjectFor<TPositionals, TNamed>, unknown> {
   const shape: Record<string, ZodTypeAny> = {};
 
   for (const positional of definition.positionals) {
@@ -1140,7 +1201,12 @@ function positional<TKey extends string, TSchema extends ZodTypeAny>(
 
 function option<TSchema extends ZodTypeAny>(
   schema: TSchema,
-  options?: { help?: string; name?: string; aliases?: readonly string[]; source?: "--" },
+  options?: {
+    help?: string;
+    name?: string;
+    aliases?: readonly string[];
+    source?: "--";
+  },
 ): SimpleCLINamedArgDefinition<TSchema> {
   return {
     kind: "option",
@@ -1152,9 +1218,11 @@ function option<TSchema extends ZodTypeAny>(
   };
 }
 
-function flag(
-  options?: { help?: string; name?: string; aliases?: readonly string[] },
-): SimpleCLINamedArgDefinition<z.ZodDefault<z.ZodBoolean>> {
+function flag(options?: {
+  help?: string;
+  name?: string;
+  aliases?: readonly string[];
+}): SimpleCLINamedArgDefinition<z.ZodDefault<z.ZodBoolean>> {
   return {
     kind: "flag",
     schema: z.boolean().default(false),
@@ -1184,9 +1252,11 @@ type SimpleCLIScope<
   TContext extends SimpleCLIContext,
 > = {
   use<TContextOut extends SimpleCLIContext>(
-    middleware: SimpleCLIMiddleware<unknown, TContext, TContextOut>
+    middleware: SimpleCLIMiddleware<unknown, TContext, TContextOut>,
   ): SimpleCLIScope<TParentContext, TContextOut>;
-  group(config: SimpleCLIGroupConfig<TContext>): SimpleCLIGroup<TParentContext, TContext>;
+  group(
+    config: SimpleCLIGroupConfig<TContext>,
+  ): SimpleCLIGroup<TParentContext, TContext>;
   command(
     config: SimpleCLICommandConfig,
   ): SimpleCLICommandBuilder<unknown, TParentContext, TContext, unknown>;
@@ -1201,9 +1271,7 @@ function command(
   });
 }
 
-function group(
-  config: SimpleCLIGroupConfig<{}>,
-): SimpleCLIGroup<{}, {}> {
+function group(config: SimpleCLIGroupConfig<{}>): SimpleCLIGroup<{}, {}> {
   return createScope<{}, {}>([]).group(config);
 }
 
@@ -1222,7 +1290,9 @@ function createScope<
         middleware,
       ]);
     },
-    group(config: SimpleCLIGroupConfig<TContext>): SimpleCLIGroup<TParentContext, TContext> {
+    group(
+      config: SimpleCLIGroupConfig<TContext>,
+    ): SimpleCLIGroup<TParentContext, TContext> {
       return {
         kind: "group",
         description: config.description,
@@ -1255,11 +1325,8 @@ function define(
   return new SimpleCLIApp(name, routes, config);
 }
 
-export type InferInput<TInput extends SimpleCLIInput<unknown>> = TInput extends SimpleCLIInput<
-  infer TOutput
->
-  ? TOutput
-  : never;
+export type InferInput<TInput extends SimpleCLIInput<unknown>> =
+  TInput extends SimpleCLIInput<infer TOutput> ? TOutput : never;
 
 export const SimpleCLI = {
   define,

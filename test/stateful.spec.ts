@@ -56,9 +56,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(show.stderr).toBe("");
 
     const clear = await librettoCli("ai configure --clear");
-    await evaluate(clear.stdout).toMatch(
-      "Confirms the AI config was cleared.",
-    );
+    await evaluate(clear.stdout).toMatch("Confirms the AI config was cleared.");
     expect(clear.stderr).toBe("");
 
     const showAfterClear = await librettoCli("ai configure");
@@ -147,7 +145,9 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(snapshot.stderr).toContain(
       "Failed to analyze snapshot because no snapshot analyzer is configured.",
     );
-    expect(snapshot.stderr).toContain("For more info, run `npx libretto init`.");
+    expect(snapshot.stderr).toContain(
+      "For more info, run `npx libretto init`.",
+    );
     expect(
       existsSync(workspacePath(".libretto", "sessions", session, "snapshots")),
     ).toBe(false);
@@ -176,7 +176,11 @@ describe("state-driven CLI subprocess behavior", () => {
     await evaluate(opened.stdout).toMatch(
       "Confirms the browser opened successfully for example.com.",
     );
-    const sessionId = requireReturnedSessionId("open", opened.stdout, opened.stderr);
+    const sessionId = requireReturnedSessionId(
+      "open",
+      opened.stdout,
+      opened.stderr,
+    );
     expect(sessionId).toBeTruthy();
   }, 60_000);
 
@@ -184,7 +188,9 @@ describe("state-driven CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const session = "already-open";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     const secondOpen = await librettoCli(
       `open https://example.com --headless --session ${session}`,
@@ -192,9 +198,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(secondOpen.stderr).toContain(
       `Session "${session}" is already open and connected to`,
     );
-    expect(secondOpen.stderr).toContain(
-      `libretto close --session ${session}`,
-    );
+    expect(secondOpen.stderr).toContain(`libretto close --session ${session}`);
   }, 45_000);
 
   test("shows recovery guidance when a session-backed command targets a missing session", async ({
@@ -235,16 +239,12 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(result.stdout).toContain("No browser sessions found.");
   });
 
-  test("rejects close --force without --all", async ({
-    librettoCli,
-  }) => {
+  test("rejects close --force without --all", async ({ librettoCli }) => {
     const result = await librettoCli("close --force");
     expect(result.stderr).toContain("Usage: libretto close --all [--force]");
   });
 
-  test("close --all closes active sessions", async ({
-    librettoCli,
-  }) => {
+  test("close --all closes active sessions", async ({ librettoCli }) => {
     const sessionOne = "close-all-session-one";
     const sessionTwo = "close-all-session-two";
 
@@ -274,7 +274,9 @@ describe("state-driven CLI subprocess behavior", () => {
     evaluate,
   }) => {
     const session = "network-live-session";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     await librettoCli(
       `exec "await page.goto('https://example.com/?network=one'); return await page.url();" --session ${session}`,
@@ -294,7 +296,9 @@ describe("state-driven CLI subprocess behavior", () => {
     evaluate,
   }) => {
     const session = "actions-live-session";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     await librettoCli(
       `exec "await page.reload(); return await page.url();" --session ${session}`,

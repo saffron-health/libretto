@@ -17,7 +17,10 @@ import {
   withRequiredSession,
 } from "./shared.js";
 
-async function resolvePageId(session: string, pageId?: string): Promise<string | undefined> {
+async function resolvePageId(
+  session: string,
+  pageId?: string,
+): Promise<string | undefined> {
   if (!pageId) return undefined;
   const pages = await withSessionLogger(session, async (logger) =>
     listOpenPages(session, logger),

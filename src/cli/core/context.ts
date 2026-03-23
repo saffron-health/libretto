@@ -66,10 +66,15 @@ export function createLoggerForSession(session: string): Logger {
   const sessionDir = getSessionDir(session);
   mkdirSync(sessionDir, { recursive: true });
   const logFilePath = getSessionLogsPath(session);
-  return new Logger(["libretto"], [createFileLogSink({ filePath: logFilePath })]);
+  return new Logger(
+    ["libretto"],
+    [createFileLogSink({ filePath: logFilePath })],
+  );
 }
 
-export async function closeLogger(logger: Logger | null | undefined): Promise<void> {
+export async function closeLogger(
+  logger: Logger | null | undefined,
+): Promise<void> {
   if (!logger) return;
   await logger.close();
 }

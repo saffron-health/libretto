@@ -87,7 +87,9 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("help ai configure");
     expect(result.stdout).toContain("Configure AI runtime");
-    expect(result.stdout).toContain("Usage: libretto ai configure [preset] [options]");
+    expect(result.stdout).toContain(
+      "Usage: libretto ai configure [preset] [options]",
+    );
     expect(result.stderr).toBe("");
   });
 
@@ -95,8 +97,12 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const result = await librettoCli("help run");
-    expect(result.stdout).toContain("Run an exported Libretto workflow from a file");
-    expect(result.stdout).toContain("Usage: libretto run [integrationFile] [integrationExport] [options]");
+    expect(result.stdout).toContain(
+      "Run an exported Libretto workflow from a file",
+    );
+    expect(result.stdout).toContain(
+      "Usage: libretto run [integrationFile] [integrationExport] [options]",
+    );
     expect(result.stdout).toContain("--no-visualize");
     expect(result.stdout).toContain(
       "Disable ghost cursor + highlight visualization in headed mode",
@@ -104,17 +110,13 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  test("fails unknown command with a clear error", async ({
-    librettoCli,
-  }) => {
+  test("fails unknown command with a clear error", async ({ librettoCli }) => {
     const result = await librettoCli("nope-command");
     expect(result.stderr).toContain("Unknown command: nope-command");
     expect(result.stdout).toContain("Usage: libretto <command>");
   });
 
-  test("fails open with missing url usage error", async ({
-    librettoCli,
-  }) => {
+  test("fails open with missing url usage error", async ({ librettoCli }) => {
     const result = await librettoCli("open");
     expect(result.stderr).toContain(
       "Usage: libretto open <url> [--headless] [--viewport WxH] [--session <name>]",
@@ -128,7 +130,9 @@ describe("basic CLI subprocess behavior", () => {
       PATH: "/definitely-not-real",
     });
     expect(result.stderr).toContain("Failed to launch browser child process:");
-    expect(result.stderr).toContain("Ensure Node.js is available in PATH for child processes.");
+    expect(result.stderr).toContain(
+      "Ensure Node.js is available in PATH for child processes.",
+    );
     expect(result.stderr).toContain("Check logs:");
   });
 
@@ -141,7 +145,11 @@ describe("basic CLI subprocess behavior", () => {
       "Confirms the browser opened successfully for example.com.",
     );
     expect(opened.stderr).toBe("");
-    const session = requireReturnedSessionId("open", opened.stdout, opened.stderr);
+    const session = requireReturnedSessionId(
+      "open",
+      opened.stdout,
+      opened.stderr,
+    );
 
     const pages = await librettoCli(`pages --session ${session}`);
     await evaluate(pages.stdout).toMatch(
@@ -156,9 +164,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(close.stderr).toBe("");
   }, 45_000);
 
-  test("fails exec with missing code usage error", async ({
-    librettoCli,
-  }) => {
+  test("fails exec with missing code usage error", async ({ librettoCli }) => {
     const result = await librettoCli("exec --session test");
     expect(result.stderr).toContain(
       "Usage: libretto exec <code> [--session <name>] [--visualize]",
@@ -173,7 +179,9 @@ describe("basic CLI subprocess behavior", () => {
     await evaluate(result.stderr).toMatch(
       "Shows usage for exec command requiring code with optional session and visualize flags.",
     );
-    expect(result.stderr).not.toContain(`Missing required --session for "exec".`);
+    expect(result.stderr).not.toContain(
+      `Missing required --session for "exec".`,
+    );
   });
 
   test("fails run when integration file does not exist", async ({
@@ -191,7 +199,7 @@ describe("basic CLI subprocess behavior", () => {
     evaluate,
   }) => {
     const result = await librettoCli(
-      "run ./integration.ts main --params \"{not-json}\"",
+      'run ./integration.ts main --params "{not-json}"',
     );
     await evaluate(result.stderr).toMatch(
       "Reports that --params contained invalid JSON.",
@@ -294,9 +302,7 @@ export async function main() {
     );
 
     const result = await librettoCli("run ./integration.ts main");
-    expect(result.stderr).toContain(
-      'Export "main" in',
-    );
+    expect(result.stderr).toContain('Export "main" in');
     expect(result.stderr).toContain("is not a valid Libretto workflow.");
   });
 
@@ -412,11 +418,15 @@ export const main = workflow(
 `,
     );
 
-    const result = await librettoCli("run ./integration.ts main --auth-profile app.example.com");
+    const result = await librettoCli(
+      "run ./integration.ts main --auth-profile app.example.com",
+    );
     expect(result.stderr).toContain(
       'Local auth profile not found for domain "app.example.com".',
     );
-    expect(result.stderr).toContain("libretto open https://app.example.com --headed --session");
+    expect(result.stderr).toContain(
+      "libretto open https://app.example.com --headed --session",
+    );
     expect(result.stderr).toContain("libretto save app.example.com --session");
   });
 
@@ -465,7 +475,6 @@ export const main = workflow({}, async (ctx) => {
     expect(result.stdout).toContain("Workflow paused.");
     expect(result.stdout).not.toContain("WORKFLOW_AFTER_PAUSE");
     expect(result.stdout).not.toContain("Integration completed.");
-
   }, 45_000);
 
   test("pause reports running sessions when session id is missing", async ({
@@ -543,7 +552,9 @@ export const main = workflow({}, async (ctx) => {
     expect(rerunResult.stderr).toContain("Browser is still open.");
     expect(rerunResult.stderr).toContain("use `exec` to inspect it");
     expect(rerunResult.stderr).toContain("Call `run` to re-run the workflow.");
-    expect(rerunResult.stderr).not.toContain("is already open and connected to");
+    expect(rerunResult.stderr).not.toContain(
+      "is already open and connected to",
+    );
   }, 60_000);
 
   test("fails save with missing target usage error", async ({
@@ -575,5 +586,4 @@ export const main = workflow({}, async (ctx) => {
       'Explains that session "open" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session open.',
     );
   });
-
 });

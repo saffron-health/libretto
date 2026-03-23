@@ -1,5 +1,8 @@
 import type { Page } from "playwright";
-import { type MinimalLogger, defaultLogger } from "../../shared/logger/logger.js";
+import {
+  type MinimalLogger,
+  defaultLogger,
+} from "../../shared/logger/logger.js";
 import type { LLMClient } from "../../shared/llm/types.js";
 import { z } from "zod";
 
@@ -9,27 +12,27 @@ import { z } from "zod";
  * userMessage is the friendly message returned when matched.
  */
 export type KnownSubmissionError = {
-	id: string;
-	errorPatterns: string[];
-	userMessage: string;
+  id: string;
+  errorPatterns: string[];
+  userMessage: string;
 };
 
 export type DetectedSubmissionError = {
-	matched: true;
-	errorId: string;
-	message: string;
+  matched: true;
+  errorId: string;
+  message: string;
 };
 
 const detectSubmissionErrorSchema = z.object({
-	hasError: z.boolean().describe("Whether an error is visible on the page"),
-	matchedKnownErrorId: z
-		.string()
-		.nullable()
-		.describe("The ID of the matched known error, or null if no match"),
-	errorMessage: z
-		.string()
-		.nullable()
-		.describe("The error message visible on screen, or null if no error"),
+  hasError: z.boolean().describe("Whether an error is visible on the page"),
+  matchedKnownErrorId: z
+    .string()
+    .nullable()
+    .describe("The ID of the matched known error, or null if no match"),
+  errorMessage: z
+    .string()
+    .nullable()
+    .describe("The error message visible on screen, or null if no error"),
 });
 
 /**
@@ -41,52 +44,52 @@ const detectSubmissionErrorSchema = z.object({
  * @throws The original error if no known error matches
  */
 export async function detectSubmissionError(
-	page: Page,
-	error: unknown,
-	logContext: string,
-	llmClient: LLMClient,
-	knownErrors: KnownSubmissionError[] = [],
-	logger?: MinimalLogger,
+  page: Page,
+  error: unknown,
+  logContext: string,
+  llmClient: LLMClient,
+  knownErrors: KnownSubmissionError[] = [],
+  logger?: MinimalLogger,
 ): Promise<DetectedSubmissionError> {
-	const log = logger ?? defaultLogger;
-	// Capture screenshot using CDP to handle unresponsive pages
-	let screenshot: string;
-	let domSnapshot: string | undefined;
+  const log = logger ?? defaultLogger;
+  // Capture screenshot using CDP to handle unresponsive pages
+  let screenshot: string;
+  let domSnapshot: string | undefined;
 
-	try {
-		const cdpClient = await page.context().newCDPSession(page);
-		await cdpClient.send("Page.enable");
-		const { data } = await cdpClient.send("Page.captureScreenshot", {
-			format: "png",
-		});
-		screenshot = data;
-	} catch (screenshotError) {
-		log.warn(
-			"Failed to take screenshot via CDP for error detection, skipping LLM analysis",
-			{ screenshotError, originalError: error },
-		);
-		throw error;
-	}
+  try {
+    const cdpClient = await page.context().newCDPSession(page);
+    await cdpClient.send("Page.enable");
+    const { data } = await cdpClient.send("Page.captureScreenshot", {
+      format: "png",
+    });
+    screenshot = data;
+  } catch (screenshotError) {
+    log.warn(
+      "Failed to take screenshot via CDP for error detection, skipping LLM analysis",
+      { screenshotError, originalError: error },
+    );
+    throw error;
+  }
 
-	// Capture DOM snapshot for additional context
-	try {
-		const htmlContent = await page.content();
-		domSnapshot =
-			htmlContent.length > 50000
-				? htmlContent.slice(0, 50000) + "\n... [truncated]"
-				: htmlContent;
-	} catch (domError) {
-		log.warn("Failed to capture DOM snapshot", {
-			domError: domError instanceof Error ? domError.message : String(domError),
-		});
-	}
+  // Capture DOM snapshot for additional context
+  try {
+    const htmlContent = await page.content();
+    domSnapshot =
+      htmlContent.length > 50000
+        ? htmlContent.slice(0, 50000) + "\n... [truncated]"
+        : htmlContent;
+  } catch (domError) {
+    log.warn("Failed to capture DOM snapshot", {
+      domError: domError instanceof Error ? domError.message : String(domError),
+    });
+  }
 
-	const knownErrorsDescription =
-		knownErrors.length > 0
-			? `\nKnown error patterns to look for:\n${knownErrors.map((e, i) => `${i + 1}. ID: "${e.id}" - Patterns: ${e.errorPatterns.join(", ")}`).join("\n")}\n`
-			: "";
+  const knownErrorsDescription =
+    knownErrors.length > 0
+      ? `\nKnown error patterns to look for:\n${knownErrors.map((e, i) => `${i + 1}. ID: "${e.id}" - Patterns: ${e.errorPatterns.join(", ")}`).join("\n")}\n`
+      : "";
 
-	const prompt = `You are analyzing a screenshot and DOM of a web page to detect if an error occurred during a browser automation process.
+  const prompt = `You are analyzing a screenshot and DOM of a web page to detect if an error occurred during a browser automation process.
 
 Context: ${logContext}
 
@@ -106,47 +109,47 @@ IMPORTANT:
 
 ${domSnapshot ? `<dom_snapshot>\n${domSnapshot}\n</dom_snapshot>` : ""}`;
 
-	const result = await llmClient.generateObjectFromMessages({
-		schema: detectSubmissionErrorSchema,
-		messages: [
-			{
-				role: "user",
-				content: [
-					{ type: "text", text: prompt },
-					{ type: "image", image: `data:image/png;base64,${screenshot}` },
-				],
-			},
-		],
-		temperature: 0,
-	});
+  const result = await llmClient.generateObjectFromMessages({
+    schema: detectSubmissionErrorSchema,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image", image: `data:image/png;base64,${screenshot}` },
+        ],
+      },
+    ],
+    temperature: 0,
+  });
 
-	if (!result.hasError) {
-		log.info("No error detected by LLM", { result });
-	}
+  if (!result.hasError) {
+    log.info("No error detected by LLM", { result });
+  }
 
-	// Check if it matches a known error
-	if (result.matchedKnownErrorId) {
-		const knownError = knownErrors.find(
-			(e) => e.id === result.matchedKnownErrorId,
-		);
-		if (knownError) {
-			log.warn(logContext, {
-				error,
-				browserError: result.errorMessage,
-				knownErrorId: result.matchedKnownErrorId,
-			});
-			return {
-				matched: true,
-				errorId: knownError.id,
-				message: knownError.userMessage,
-			};
-		}
-	}
+  // Check if it matches a known error
+  if (result.matchedKnownErrorId) {
+    const knownError = knownErrors.find(
+      (e) => e.id === result.matchedKnownErrorId,
+    );
+    if (knownError) {
+      log.warn(logContext, {
+        error,
+        browserError: result.errorMessage,
+        knownErrorId: result.matchedKnownErrorId,
+      });
+      return {
+        matched: true,
+        errorId: knownError.id,
+        message: knownError.userMessage,
+      };
+    }
+  }
 
-	// Log and re-throw for unknown errors
-	log.warn(logContext, {
-		error,
-		browserError: result.errorMessage,
-	});
-	throw error;
+  // Log and re-throw for unknown errors
+  log.warn(logContext, {
+    error,
+    browserError: result.errorMessage,
+  });
+  throw error;
 }

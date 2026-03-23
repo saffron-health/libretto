@@ -18,9 +18,7 @@ import {
   type InterpretArgs,
 } from "./snapshot-analyzer.js";
 import { readAiConfig, type AiConfig } from "./ai-config.js";
-import {
-  resolveSnapshotApiModelOrThrow,
-} from "./snapshot-api-config.js";
+import { resolveSnapshotApiModelOrThrow } from "./snapshot-api-config.js";
 
 export async function runApiInterpret(
   args: InterpretArgs,
@@ -51,7 +49,8 @@ export async function runApiInterpret(
   logger.info("api-interpret-dom-selection", {
     configuredModel: promptSelection.stats.configuredModel,
     fullDomEstimatedTokens: promptSelection.stats.fullDomEstimatedTokens,
-    condensedDomEstimatedTokens: promptSelection.stats.condensedDomEstimatedTokens,
+    condensedDomEstimatedTokens:
+      promptSelection.stats.condensedDomEstimatedTokens,
     contextWindowTokens: promptSelection.budget.contextWindowTokens,
     promptBudgetTokens: promptSelection.budget.promptBudgetTokens,
     selectedDom: promptSelection.domSource,

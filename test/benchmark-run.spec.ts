@@ -1,4 +1,11 @@
-import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
@@ -18,28 +25,37 @@ const tempRoots: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    tempRoots.splice(0).map((root) =>
-      rm(root, { recursive: true, force: true }),
-    ),
+    tempRoots
+      .splice(0)
+      .map((root) => rm(root, { recursive: true, force: true })),
   );
 });
 
 describe("benchmark launcher history", () => {
   test("benchmark prompt tells Claude to use the libretto skill", () => {
-    const prompt = buildBrowserBenchmarkPrompt({
-      benchmark: "webVoyager",
-      id: "sample-case",
-      title: "Sample benchmark case",
-      startUrl: "https://example.com",
-      instruction: "Inspect the page and report the final title.",
-      successAssertion:
-        "The transcript includes the final page URL and title in FINAL_RESULT format.",
-    }, "/tmp/libretto-benchmark-workspace");
+    const prompt = buildBrowserBenchmarkPrompt(
+      {
+        benchmark: "webVoyager",
+        id: "sample-case",
+        title: "Sample benchmark case",
+        startUrl: "https://example.com",
+        instruction: "Inspect the page and report the final title.",
+        successAssertion:
+          "The transcript includes the final page URL and title in FINAL_RESULT format.",
+      },
+      "/tmp/libretto-benchmark-workspace",
+    );
 
     expect(prompt).toContain("Use the libretto skill.");
-    expect(prompt).toContain("pnpm -s cli open https://example.com --headless --session webvoyager-sample-case");
-    expect(prompt).toContain("Current working directory: /tmp/libretto-benchmark-workspace");
-    expect(prompt).not.toContain("Run all commands from the current working directory");
+    expect(prompt).toContain(
+      "pnpm -s cli open https://example.com --headless --session webvoyager-sample-case",
+    );
+    expect(prompt).toContain(
+      "Current working directory: /tmp/libretto-benchmark-workspace",
+    );
+    expect(prompt).not.toContain(
+      "Run all commands from the current working directory",
+    );
     expect(prompt).not.toContain(".claude/skills/libretto/SKILL.md");
     expect(prompt).not.toContain(".agents/skills/libretto/SKILL.md");
   });
@@ -50,7 +66,7 @@ describe("benchmark launcher history", () => {
         "Use the `npx libretto` CLI.",
         "",
         "npx libretto open https://example.com",
-        "npx libretto snapshot --objective \"inspect\"",
+        'npx libretto snapshot --objective "inspect"',
       ].join("\n"),
     );
 
@@ -148,8 +164,9 @@ describe("benchmark launcher history", () => {
   });
 
   test("summary includes run-level duration and cost table", async () => {
-    // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
-    const { buildMarkdown } = await import("../benchmarks/summarize-results.mjs");
+    const { buildMarkdown } =
+      // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
+      await import("../benchmarks/summarize-results.mjs");
     const markdown = buildMarkdown({
       benchmark: "webVoyager",
       runMode: "small-random",
@@ -177,15 +194,24 @@ describe("benchmark launcher history", () => {
     expect(markdown).toContain("- Result files: `3`");
     expect(markdown).toContain("- Cost tracked: `2`");
     expect(markdown).toContain("- Total cost: `$1.2345`");
-    expect(markdown).toContain("| Benchmark Run | Duration | Cost | Result files | Cost tracked |");
-    expect(markdown).toContain("| `webVoyager` | `5m 21s` | `$1.2345` | `3` | `2` |");
-    expect(markdown).toContain("| `sample-case` | pass `passed` | `2m 03s` | `$0.4321` |");
+    expect(markdown).toContain(
+      "| Benchmark Run | Duration | Cost | Result files | Cost tracked |",
+    );
+    expect(markdown).toContain(
+      "| `webVoyager` | `5m 21s` | `$1.2345` | `3` | `2` |",
+    );
+    expect(markdown).toContain(
+      "| `sample-case` | pass `passed` | `2m 03s` | `$0.4321` |",
+    );
   });
 
   test("summary lookup ignores all-benchmark history entries", async () => {
-    // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
-    const { getLatestBenchmarkRunRecord } = await import("../benchmarks/summarize-results.mjs");
-    const tempRoot = await mkdtemp(join(tmpdir(), "libretto-benchmark-summary-"));
+    const { getLatestBenchmarkRunRecord } =
+      // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
+      await import("../benchmarks/summarize-results.mjs");
+    const tempRoot = await mkdtemp(
+      join(tmpdir(), "libretto-benchmark-summary-"),
+    );
     tempRoots.push(tempRoot);
 
     await mkdir(join(tempRoot, "benchmarks"), { recursive: true });
@@ -219,9 +245,12 @@ describe("benchmark launcher history", () => {
   });
 
   test("summary scopes result files to the selected run window", async () => {
-    // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
-    const { filterResultPathsForRunRecord } = await import("../benchmarks/summarize-results.mjs");
-    const tempRoot = await mkdtemp(join(tmpdir(), "libretto-benchmark-results-"));
+    const { filterResultPathsForRunRecord } =
+      // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
+      await import("../benchmarks/summarize-results.mjs");
+    const tempRoot = await mkdtemp(
+      join(tmpdir(), "libretto-benchmark-results-"),
+    );
     tempRoots.push(tempRoot);
 
     const earlierPath = join(tempRoot, "earlier-results.json");

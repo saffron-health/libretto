@@ -97,7 +97,9 @@ function hasProviderKeys(config: ProviderTestConfig): boolean {
   return config.envKeys.some((key) => Boolean(dotEnv[key] || process.env[key]));
 }
 
-const hasAnyProviderKey = ENV_KEYS.some((key) => Boolean(dotEnv[key] || process.env[key]));
+const hasAnyProviderKey = ENV_KEYS.some((key) =>
+  Boolean(dotEnv[key] || process.env[key]),
+);
 
 describe("snapshot e2e – live site analysis", () => {
   liveSnapshotTest(
