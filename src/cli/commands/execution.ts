@@ -117,6 +117,75 @@ function compileExecFunction(
   return new AsyncFunction(...helperNames, code);
 }
 
+/**
+ * Strip `.catch(() => {})` / `?.catch(() => {})` from executable code,
+ * skipping occurrences inside string literals (single, double, backtick)
+ * and single-line / multi-line comments so we never corrupt non-code text.
+ */
+function stripEmptyCatchHandlers(code: string): { cleaned: string; strippedCount: number } {
+  const catchRe = /\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g;
+  let strippedCount = 0;
+  let result = "";
+  let i = 0;
+
+  while (i < code.length) {
+    // Single-line comment
+    if (code[i] === "/" && code[i + 1] === "/") {
+      const end = code.indexOf("\n", i);
+      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 1);
+      result += slice;
+      i += slice.length;
+      continue;
+    }
+    // Multi-line comment
+    if (code[i] === "/" && code[i + 1] === "*") {
+      const end = code.indexOf("*/", i + 2);
+      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 2);
+      result += slice;
+      i += slice.length;
+      continue;
+    }
+    // String literals
+    if (code[i] === '"' || code[i] === "'" || code[i] === "`") {
+      const quote = code[i];
+      let j = i + 1;
+      while (j < code.length) {
+        if (code[j] === "\\" && quote !== "`") { j += 2; continue; }
+        if (code[j] === "\\" && quote === "`") { j += 2; continue; }
+        if (code[j] === quote) { j++; break; }
+        // Template literal interpolation — skip nested braces
+        if (quote === "`" && code[j] === "$" && code[j + 1] === "{") {
+          let depth = 1;
+          j += 2;
+          while (j < code.length && depth > 0) {
+            if (code[j] === "{") depth++;
+            else if (code[j] === "}") depth--;
+            j++;
+          }
+          continue;
+        }
+        j++;
+      }
+      result += code.slice(i, j);
+      i = j;
+      continue;
+    }
+    // Try to match the catch pattern at the current position
+    catchRe.lastIndex = i;
+    const match = catchRe.exec(code);
+    if (match && match.index === i) {
+      strippedCount++;
+      i += match[0].length;
+      continue;
+    }
+    // Regular character
+    result += code[i];
+    i++;
+  }
+
+  return { cleaned: result, strippedCount };
+}
+
 async function runExec(
   code: string,
   session: string,
@@ -124,10 +193,8 @@ async function runExec(
   visualize = false,
   pageId?: string,
 ): Promise<void> {
-  const catchPattern = /\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g;
-  const hadCatch = catchPattern.test(code);
-  const cleanedCode = code.replace(/\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g, "");
-  if (hadCatch) {
+  const { cleaned: cleanedCode, strippedCount } = stripEmptyCatchHandlers(code);
+  if (strippedCount > 0) {
     console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
   }
   logger.info("exec-start", {
