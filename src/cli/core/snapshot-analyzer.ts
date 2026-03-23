@@ -8,7 +8,7 @@
  * to the CLI-agent approach if needed.
  *
  * Shared types and utilities (InterpretResultSchema, buildInlinePromptSelection,
- * formatInterpretationOutput, etc.) are still actively used by the API analyzer.
+ * etc.) are still actively used by the API analyzer.
  */
 
 import {
@@ -794,31 +794,6 @@ export function buildInlinePromptSelection(
   );
 }
 
-export function formatInterpretationOutput(
-  parsed: InterpretResult,
-  header: string = "Interpretation:",
-): string {
-  const outputLines: string[] = [];
-  outputLines.push(header);
-  outputLines.push(`Answer: ${parsed.answer}`);
-  outputLines.push("");
-  if (parsed.selectors.length === 0) {
-    outputLines.push("Selectors: none found.");
-  } else {
-    outputLines.push("Selectors:");
-    parsed.selectors.forEach((selector, index) => {
-      outputLines.push(`  ${index + 1}. ${selector.label}`);
-      outputLines.push(`     selector: ${selector.selector}`);
-      outputLines.push(`     rationale: ${selector.rationale}`);
-    });
-  }
-  if (parsed.notes && parsed.notes.trim()) {
-    outputLines.push("");
-    outputLines.push(`Notes: ${parsed.notes.trim()}`);
-  }
-  return outputLines.join("\n");
-}
-
 export async function runInterpret(
   args: InterpretArgs,
   logger: LoggerApi,
@@ -867,7 +842,7 @@ export async function runInterpret(
   // Preserved for reference — to re-enable, remove the throw above and:
   // const selection = buildInlinePromptSelection(args, fullHtmlContent, condensedHtmlContent, model);
   // const parsed = await configuredAgent.analyzeSnapshot(selection.prompt, pngPath, logger);
-  // console.log(formatInterpretationOutput(parsed));
+  // console.log(parsed.answer);
 }
 
 export function canAnalyzeSnapshots(): boolean {
