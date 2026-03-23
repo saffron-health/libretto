@@ -1,8 +1,6 @@
 import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
-import {
-  createLoggerForSession,
-} from "../core/context.js";
+import { createLoggerForSession } from "../core/context.js";
 import {
   generateSessionName,
   readSessionStateOrThrow,
@@ -35,18 +33,31 @@ export type SessionStateContext = SessionContext & {
   sessionState: SessionState;
 };
 
-export function withRequiredSession(): SimpleCLIMiddleware<{ session?: string }, {}, SessionStateContext> {
+export function withRequiredSession(): SimpleCLIMiddleware<
+  { session?: string },
+  {},
+  SessionStateContext
+> {
   return async ({ input, ctx }) => {
     if (!input.session) {
       throw new Error("Missing required option --session.");
     }
     validateSessionName(input.session);
     const logger = createLoggerForSession(input.session);
-    return { ...ctx, session: input.session, logger, sessionState: readSessionStateOrThrow(input.session) };
+    return {
+      ...ctx,
+      session: input.session,
+      logger,
+      sessionState: readSessionStateOrThrow(input.session),
+    };
   };
 }
 
-export function withAutoSession(): SimpleCLIMiddleware<{ session?: string }, {}, SessionContext> {
+export function withAutoSession(): SimpleCLIMiddleware<
+  { session?: string },
+  {},
+  SessionContext
+> {
   return async ({ input, ctx }) => {
     const session = input.session ?? generateSessionName();
     if (input.session) {

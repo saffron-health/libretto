@@ -29,7 +29,9 @@ describe("condenseDom SVG collapsing", () => {
   });
 
   it("removes HTML comments entirely", () => {
-    const result = condenseDom(`<div>Hello</div><!-- hidden --><span>World</span>`);
+    const result = condenseDom(
+      `<div>Hello</div><!-- hidden --><span>World</span>`,
+    );
 
     expect(result.html).toBe(`<div>Hello</div><span>World</span>`);
   });

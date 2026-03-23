@@ -6,11 +6,11 @@ import {
   runPages,
   runSave,
 } from "../core/browser.js";
+import { createLoggerForSession, withSessionLogger } from "../core/context.js";
 import {
-  createLoggerForSession,
-  withSessionLogger,
-} from "../core/context.js";
-import { assertSessionAvailableForStart, validateSessionName } from "../core/session.js";
+  assertSessionAvailableForStart,
+  validateSessionName,
+} from "../core/session.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   sessionOption,
@@ -120,8 +120,12 @@ export const closeInput = SimpleCLI.input({
   positionals: [],
   named: {
     session: sessionOption(),
-    all: SimpleCLI.flag({ help: "Close all tracked sessions in this workspace" }),
-    force: SimpleCLI.flag({ help: "Force kill sessions that ignore SIGTERM (requires --all)" }),
+    all: SimpleCLI.flag({
+      help: "Close all tracked sessions in this workspace",
+    }),
+    force: SimpleCLI.flag({
+      help: "Force kill sessions that ignore SIGTERM (requires --all)",
+    }),
   },
 }).refine(
   (input) => input.all || input.session,

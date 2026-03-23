@@ -5,10 +5,7 @@ import {
   type RunIntegrationWorkerRequest,
 } from "./run-integration-worker-protocol.js";
 import { runIntegrationFromFileInWorker } from "./run-integration-runtime.js";
-import {
-  ensureLibrettoSetup,
-  withSessionLogger,
-} from "../core/context.js";
+import { ensureLibrettoSetup, withSessionLogger } from "../core/context.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 
 function parseWorkerRequest(argv: string[]): RunIntegrationWorkerRequest {

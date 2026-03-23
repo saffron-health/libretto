@@ -122,7 +122,10 @@ function compileExecFunction(
  * skipping occurrences inside string literals (single, double, backtick)
  * and single-line / multi-line comments so we never corrupt non-code text.
  */
-function stripEmptyCatchHandlers(code: string): { cleaned: string; strippedCount: number } {
+function stripEmptyCatchHandlers(code: string): {
+  cleaned: string;
+  strippedCount: number;
+} {
   const catchRe = /\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g;
   let strippedCount = 0;
   let result = "";
@@ -150,9 +153,18 @@ function stripEmptyCatchHandlers(code: string): { cleaned: string; strippedCount
       const quote = code[i];
       let j = i + 1;
       while (j < code.length) {
-        if (code[j] === "\\" && quote !== "`") { j += 2; continue; }
-        if (code[j] === "\\" && quote === "`") { j += 2; continue; }
-        if (code[j] === quote) { j++; break; }
+        if (code[j] === "\\" && quote !== "`") {
+          j += 2;
+          continue;
+        }
+        if (code[j] === "\\" && quote === "`") {
+          j += 2;
+          continue;
+        }
+        if (code[j] === quote) {
+          j++;
+          break;
+        }
         // Template literal interpolation — skip nested braces
         if (quote === "`" && code[j] === "$" && code[j + 1] === "{") {
           let depth = 1;

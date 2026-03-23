@@ -13,7 +13,8 @@ type InstallSessionTelemetryOptions = {
 export async function installSessionTelemetry(
   options: InstallSessionTelemetryOptions,
 ): Promise<void> {
-  const STATIC_EXT_RE = /\.(css|js|png|jpg|jpeg|gif|woff|woff2|ttf|ico|svg)(\?|$)/i;
+  const STATIC_EXT_RE =
+    /\.(css|js|png|jpg|jpeg|gif|woff|woff2|ttf|ico|svg)(\?|$)/i;
   const { context, initialPage, logAction, logNetwork } = options;
   const includeUserDomActions = options.includeUserDomActions ?? false;
   const pageIdCache = new WeakMap<Page, string>();
@@ -25,10 +26,12 @@ export async function installSessionTelemetry(
     const cdpSession = await context.newCDPSession(page);
     try {
       const targetInfo = await cdpSession.send("Target.getTargetInfo");
-      const targetId = (targetInfo as { targetInfo?: { targetId?: unknown } })?.targetInfo
-        ?.targetId;
+      const targetId = (targetInfo as { targetInfo?: { targetId?: unknown } })
+        ?.targetInfo?.targetId;
       if (typeof targetId !== "string" || targetId.length === 0) {
-        throw new Error(`Could not resolve target id for page at URL "${page.url()}".`);
+        throw new Error(
+          `Could not resolve target id for page at URL "${page.url()}".`,
+        );
       }
       pageIdCache.set(page, targetId);
       return targetId;
@@ -51,7 +54,10 @@ export async function installSessionTelemetry(
     });
   };
 
-  const markApiActionInProgress = async (page: Page, inProgress: boolean): Promise<void> => {
+  const markApiActionInProgress = async (
+    page: Page,
+    inProgress: boolean,
+  ): Promise<void> => {
     await page.evaluate((flag) => {
       (window as any).__btApiActionInProgress = flag;
     }, inProgress);
@@ -180,7 +186,10 @@ export async function installSessionTelemetry(
     return locator;
   };
 
-  const installUserDomTracking = async (page: Page, pageId: string): Promise<void> => {
+  const installUserDomTracking = async (
+    page: Page,
+    pageId: string,
+  ): Promise<void> => {
     if (exposedPages.has(page)) return;
     exposedPages.add(page);
 
@@ -425,7 +434,8 @@ export async function installSessionTelemetry(
             action: method,
             source: "agent",
             selector: typeof args[0] === "string" ? args[0] : undefined,
-            value: args[1] !== undefined ? String(args[1]).slice(0, 100) : undefined,
+            value:
+              args[1] !== undefined ? String(args[1]).slice(0, 100) : undefined,
             duration: Date.now() - start,
             success: true,
           });
@@ -497,7 +507,8 @@ export async function installSessionTelemetry(
     page.on("response", async (response) => {
       const request = response.request();
       const url = request.url();
-      if (STATIC_EXT_RE.test(url) || url.startsWith("chrome-extension://")) return;
+      if (STATIC_EXT_RE.test(url) || url.startsWith("chrome-extension://"))
+        return;
       emitNetwork({
         pageId,
         method: request.method(),

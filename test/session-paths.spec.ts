@@ -11,15 +11,25 @@ describe("session path resolution", () => {
     const repoRoot = await mkdtemp(join(tmpdir(), "libretto-monorepo-"));
     const nestedPackageDir = join(repoRoot, "apps", "browser-agent");
     mkdirSync(nestedPackageDir, { recursive: true });
-    await writeFile(join(repoRoot, "package.json"), '{"name":"repo-root"}\n', "utf8");
+    await writeFile(
+      join(repoRoot, "package.json"),
+      '{"name":"repo-root"}\n',
+      "utf8",
+    );
 
     execFileSync("git", ["init"], {
       cwd: repoRoot,
       stdio: "ignore",
     });
 
-    const statePath = ensureLibrettoSessionStatePath("browser-agent", nestedPackageDir);
-    const resolvedStatePath = join(await realpath(dirname(statePath)), "state.json");
+    const statePath = ensureLibrettoSessionStatePath(
+      "browser-agent",
+      nestedPackageDir,
+    );
+    const resolvedStatePath = join(
+      await realpath(dirname(statePath)),
+      "state.json",
+    );
     const resolvedRepoRoot = await realpath(repoRoot);
     const resolvedNestedPackageDir = await realpath(nestedPackageDir);
 

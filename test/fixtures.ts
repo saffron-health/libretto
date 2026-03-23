@@ -2,14 +2,14 @@ import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import {
-  execFile,
-  spawnSync,
-} from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { test as base } from "vitest";
-import { SESSION_STATE_VERSION, type SessionState } from "../src/shared/state/index.js";
+import {
+  SESSION_STATE_VERSION,
+  type SessionState,
+} from "../src/shared/state/index.js";
 
 type SpawnResult = {
   exitCode: number;
@@ -56,8 +56,7 @@ const repoRoot = resolve(here, "..");
 const packageRoot = repoRoot;
 const cliEntry = resolve(packageRoot, "dist/cli/index.js");
 const librettoEntry = resolve(packageRoot, "dist/index.js");
-const librettoRuntimePath = new URL("../dist/index.js", import.meta.url)
-  .href;
+const librettoRuntimePath = new URL("../dist/index.js", import.meta.url).href;
 const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-test-workspaces");
 const EVALUATE_MODEL = "local-evaluate-v1";
 
@@ -186,8 +185,12 @@ function stableEvaluateHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
-function workspaceDirForTask(task: Readonly<{ fullName: string; file: { filepath: string } }>): string {
-  const stableId = stableEvaluateHash(`${task.file.filepath}::${task.fullName}`).slice(0, 16);
+function workspaceDirForTask(
+  task: Readonly<{ fullName: string; file: { filepath: string } }>,
+): string {
+  const stableId = stableEvaluateHash(
+    `${task.file.filepath}::${task.fullName}`,
+  ).slice(0, 16);
   return join(DETERMINISTIC_WORKSPACE_ROOT, stableId);
 }
 
@@ -202,12 +205,24 @@ function normalizeOutput(actual: string): string {
   return actual.replace(/\r\n/g, "\n");
 }
 
-function requireIncludes(actual: string, expected: string, label = expected): string | null {
-  return actual.includes(expected) ? null : `Missing ${label}.\nActual output:\n${actual}`;
+function requireIncludes(
+  actual: string,
+  expected: string,
+  label = expected,
+): string | null {
+  return actual.includes(expected)
+    ? null
+    : `Missing ${label}.\nActual output:\n${actual}`;
 }
 
-function requireRegex(actual: string, pattern: RegExp, label: string): string | null {
-  return pattern.test(actual) ? null : `Missing ${label}.\nActual output:\n${actual}`;
+function requireRegex(
+  actual: string,
+  pattern: RegExp,
+  label: string,
+): string | null {
+  return pattern.test(actual)
+    ? null
+    : `Missing ${label}.\nActual output:\n${actual}`;
 }
 
 function runChecks(
@@ -219,7 +234,8 @@ function runChecks(
 
 const EVALUATE_RULES: readonly EvaluateRule[] = [
   {
-    pattern: /^Shows the root CLI help with top-level command usage and includes the snapshot command description\.$/,
+    pattern:
+      /^Shows the root CLI help with top-level command usage and includes the snapshot command description\.$/,
     check: (actual) =>
       runChecks(
         actual,
@@ -240,7 +256,8 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Confirms the browser opened successfully for example\.com(?:.*)\.$/,
+    pattern:
+      /^Confirms the browser opened successfully for example\.com(?:.*)\.$/,
     check: (actual) =>
       runChecks(
         actual,
@@ -267,12 +284,17 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Shows usage for exec command requiring code with optional session and visualize flags\.$/,
+    pattern:
+      /^Shows usage for exec command requiring code with optional session and visualize flags\.$/,
     check: (actual) =>
-      requireIncludes(actual, "Usage: libretto exec <code> [--session <name>] [--visualize]"),
+      requireIncludes(
+        actual,
+        "Usage: libretto exec <code> [--session <name>] [--visualize]",
+      ),
   },
   {
-    pattern: /^Explains that the integration file does not exist and mentions the integration\.ts path\.$/,
+    pattern:
+      /^Explains that the integration file does not exist and mentions the integration\.ts path\.$/,
     check: (actual) =>
       runChecks(
         actual,
@@ -285,13 +307,18 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
     check: (actual) => requireIncludes(actual, "Invalid JSON in --params:"),
   },
   {
-    pattern: /^Reports that the provided session name is invalid and only allows letters, numbers, dots, underscores, and dashes\.$/,
+    pattern:
+      /^Reports that the provided session name is invalid and only allows letters, numbers, dots, underscores, and dashes\.$/,
     check: (actual) =>
-      requireIncludes(actual, "Invalid session name. Use only letters, numbers, dots, underscores, and dashes."),
+      requireIncludes(
+        actual,
+        "Invalid session name. Use only letters, numbers, dots, underscores, and dashes.",
+      ),
   },
   {
     pattern: /^Reports that --params-file contained invalid JSON\.$/,
-    check: (actual) => requireIncludes(actual, "Invalid JSON in --params-file:"),
+    check: (actual) =>
+      requireIncludes(actual, "Invalid JSON in --params-file:"),
   },
   {
     pattern: /^Includes TSCONFIG_ALIAS_OK and Integration completed\.$/,
@@ -303,12 +330,17 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Reports that importing the integration module failed because of a TypeScript compilation error and includes guidance to pass --tsconfig <path>\.$/,
+    pattern:
+      /^Reports that importing the integration module failed because of a TypeScript compilation error and includes guidance to pass --tsconfig <path>\.$/,
     check: (actual) =>
       runChecks(
         actual,
         requireIncludes(actual, "--tsconfig <path>"),
-        requireRegex(actual, /(failed|error|transform)/i, "a compilation failure"),
+        requireRegex(
+          actual,
+          /(failed|error|transform)/i,
+          "a compilation failure",
+        ),
       ),
   },
   {
@@ -336,7 +368,8 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
     check: (actual) => requireIncludes(actual, "AI preset: gemini"),
   },
   {
-    pattern: /^Shows that the AI preset is codex and includes the custom command prefix "(.+)"\.$/,
+    pattern:
+      /^Shows that the AI preset is codex and includes the custom command prefix "(.+)"\.$/,
     check: (actual, match) =>
       runChecks(
         actual,
@@ -345,7 +378,8 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Includes an interpretation and the answer (snapshot-ok-[^.]+)\.$/,
+    pattern:
+      /^Includes an interpretation and the answer (snapshot-ok-[^.]+)\.$/,
     check: (actual, match) =>
       runChecks(
         actual,
@@ -373,7 +407,8 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Explains that session "([^"]+)" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session ([^".]+)\.$/,
+    pattern:
+      /^Explains that session "([^"]+)" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session ([^".]+)\.$/,
     check: (actual, match) =>
       runChecks(
         actual,
@@ -383,7 +418,8 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Lists one open page for example\.com and includes its page id\.$/,
+    pattern:
+      /^Lists one open page for example\.com and includes its page id\.$/,
     check: (actual) =>
       runChecks(
         actual,
@@ -393,7 +429,8 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Lists both the example\.com page and the data:text\/html,multi-page-secondary page, each with page ids\.$/,
+    pattern:
+      /^Lists both the example\.com page and the data:text\/html,multi-page-secondary page, each with page ids\.$/,
     check: (actual) =>
       runChecks(
         actual,
@@ -403,30 +440,43 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Explains that multiple pages are open in session "([^"]+)" and tells the user to pass --page <id> to target one page\.$/,
+    pattern:
+      /^Explains that multiple pages are open in session "([^"]+)" and tells the user to pass --page <id> to target one page\.$/,
     check: (actual, match) =>
       runChecks(
         actual,
-        requireIncludes(actual, `Multiple pages are open in session "${match[1]!}".`),
+        requireIncludes(
+          actual,
+          `Multiple pages are open in session "${match[1]!}".`,
+        ),
         requireIncludes(actual, "Pass --page <id> to target a page"),
       ),
   },
   {
-    pattern: /^Explains that page id "([^"]+)" was not found in session "([^"]+)"\.$/,
+    pattern:
+      /^Explains that page id "([^"]+)" was not found in session "([^"]+)"\.$/,
     check: (actual, match) =>
-      requireIncludes(actual, `Page "${match[1]!}" was not found in session "${match[2]!}".`),
+      requireIncludes(
+        actual,
+        `Page "${match[1]!}" was not found in session "${match[2]!}".`,
+      ),
   },
   {
-    pattern: /^Explains that session "([^"]+)" is already open and suggests closing it or using a different session name\.$/,
+    pattern:
+      /^Explains that session "([^"]+)" is already open and suggests closing it or using a different session name\.$/,
     check: (actual, match) =>
       runChecks(
         actual,
-        requireIncludes(actual, `Session "${match[1]!}" is already open and connected to`),
+        requireIncludes(
+          actual,
+          `Session "${match[1]!}" is already open and connected to`,
+        ),
         requireIncludes(actual, `libretto close --session ${match[1]!}`),
       ),
   },
   {
-    pattern: /^Includes AUTO_SESSION_RUN_OK and confirms the integration completed successfully\.$/,
+    pattern:
+      /^Includes AUTO_SESSION_RUN_OK and confirms the integration completed successfully\.$/,
     check: (actual) =>
       runChecks(
         actual,
@@ -435,11 +485,15 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
       ),
   },
   {
-    pattern: /^Explains that session "([^"]+)" is already open and suggests closing it or choosing another session\.$/,
+    pattern:
+      /^Explains that session "([^"]+)" is already open and suggests closing it or choosing another session\.$/,
     check: (actual, match) =>
       runChecks(
         actual,
-        requireIncludes(actual, `Session "${match[1]!}" is already open and connected to`),
+        requireIncludes(
+          actual,
+          `Session "${match[1]!}" is already open and connected to`,
+        ),
         requireIncludes(actual, `libretto close --session ${match[1]!}`),
       ),
   },
@@ -490,7 +544,10 @@ function signalProcessGroupOrPid(pid: number, signal: NodeJS.Signals): void {
   } catch {}
 }
 
-async function waitForPidExit(pid: number, timeoutMs: number): Promise<boolean> {
+async function waitForPidExit(
+  pid: number,
+  timeoutMs: number,
+): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (!isPidRunning(pid)) return true;
@@ -508,8 +565,14 @@ function readWorkspaceSessionPids(workspaceDir: string): number[] {
     const statePath = join(sessionsDir, entry, "state.json");
     if (!existsSync(statePath)) continue;
     try {
-      const raw = JSON.parse(readFileSync(statePath, "utf8")) as { pid?: unknown };
-      if (typeof raw.pid === "number" && Number.isFinite(raw.pid) && raw.pid > 0) {
+      const raw = JSON.parse(readFileSync(statePath, "utf8")) as {
+        pid?: unknown;
+      };
+      if (
+        typeof raw.pid === "number" &&
+        Number.isFinite(raw.pid) &&
+        raw.pid > 0
+      ) {
         pids.add(raw.pid);
       }
     } catch {
@@ -520,7 +583,9 @@ function readWorkspaceSessionPids(workspaceDir: string): number[] {
   return [...pids];
 }
 
-async function closeAllSessionsInWorkspace(workspaceDir: string): Promise<void> {
+async function closeAllSessionsInWorkspace(
+  workspaceDir: string,
+): Promise<void> {
   const pids = readWorkspaceSessionPids(workspaceDir);
   if (pids.length === 0) return;
 
@@ -643,7 +708,10 @@ export const test = base.extend<CliFixtures>({
       await mkdir(dir, { recursive: true });
       let payload: Record<string, unknown> = { version: 1 };
       if (existsSync(path)) {
-        payload = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+        payload = JSON.parse(await readFile(path, "utf8")) as Record<
+          string,
+          unknown
+        >;
       }
       payload.version = 1;
       payload.permissions = {

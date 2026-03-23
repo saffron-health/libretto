@@ -11,12 +11,7 @@
  * etc.) are still actively used by the API analyzer.
  */
 
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -147,7 +142,12 @@ abstract class UserCodingAgent {
     logger: LoggerApi,
     stdinText?: string,
   ): Promise<ExternalCommandResult> {
-    const result = await runExternalCommand(this.command, args, logger, stdinText);
+    const result = await runExternalCommand(
+      this.command,
+      args,
+      logger,
+      stdinText,
+    );
     if (result.exitCode !== 0) {
       throw new Error(
         `Analyzer command failed (${[this.command, ...args].join(" ")}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
@@ -586,17 +586,18 @@ function estimateTokensFromChars(chars: number): number {
   return Math.ceil(chars / 4);
 }
 
-function inferContextWindowTokens(
-  model: string,
-): { contextWindowTokens: number; source: string } {
+function inferContextWindowTokens(model: string): {
+  contextWindowTokens: number;
+  source: string;
+} {
   const normalized = model.trim().toLowerCase();
   if (normalized.includes("claude")) {
     return { contextWindowTokens: 200_000, source: "model:claude" };
   }
   if (
-    normalized.includes("gpt-5")
-    || normalized.includes("o3")
-    || normalized.includes("o4")
+    normalized.includes("gpt-5") ||
+    normalized.includes("o3") ||
+    normalized.includes("o4")
   ) {
     return { contextWindowTokens: 200_000, source: "model:openai" };
   }
@@ -699,7 +700,9 @@ export function buildInlinePromptSelection(
     fullDomChars: fullHtmlContent.length,
     fullDomEstimatedTokens: estimateTokensFromChars(fullHtmlContent.length),
     condensedDomChars: condensedHtmlContent.length,
-    condensedDomEstimatedTokens: estimateTokensFromChars(condensedHtmlContent.length),
+    condensedDomEstimatedTokens: estimateTokensFromChars(
+      condensedHtmlContent.length,
+    ),
     configuredModel: model,
   };
 
@@ -740,8 +743,7 @@ export function buildInlinePromptSelection(
     false,
   );
   if (fullCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
-    const selectionReason =
-      `Full DOM fits within the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} <= ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`;
+    const selectionReason = `Full DOM fits within the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} <= ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`;
     const prompt = buildInlineHtmlPrompt(args, {
       htmlContent: fullHtmlContent,
       domLabel: "full DOM",
@@ -784,7 +786,10 @@ export function buildInlinePromptSelection(
     2_000,
     budget.promptBudgetTokens - estimateTokensFromChars(basePrompt.length),
   );
-  const truncatedHtml = truncateText(condensedHtmlContent, availableHtmlTokens * 4);
+  const truncatedHtml = truncateText(
+    condensedHtmlContent,
+    availableHtmlTokens * 4,
+  );
 
   return buildCandidate(
     "condensed",
@@ -835,8 +840,8 @@ export async function runInterpret(
   // re-enabled, the caller must supply a valid provider/model-id string.
   throw new Error(
     "The CLI-agent snapshot analysis path is not active. " +
-    "Update your config to the current format with `npx libretto ai configure <provider>`, " +
-    "or set API credentials in .env for direct API analysis.",
+      "Update your config to the current format with `npx libretto ai configure <provider>`, " +
+      "or set API credentials in .env for direct API analysis.",
   );
 
   // Preserved for reference — to re-enable, remove the throw above and:

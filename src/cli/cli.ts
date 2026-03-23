@@ -1,6 +1,4 @@
-import {
-  ensureLibrettoSetup,
-} from "./core/context.js";
+import { ensureLibrettoSetup } from "./core/context.js";
 import { createCLIApp } from "./router.js";
 
 function renderUsage(app: ReturnType<typeof createCLIApp>): string {

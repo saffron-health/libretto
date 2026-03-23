@@ -37,7 +37,7 @@ describe("multi-session CLI behavior", () => {
   }) => {
     const firstOpen = await librettoCli("open https://example.com --headless");
     await evaluate(firstOpen.stdout).toMatch(
-      'Confirms the browser opened successfully for example.com.',
+      "Confirms the browser opened successfully for example.com.",
     );
     const firstSessionId = requireReturnedSessionId(
       "open",
@@ -47,7 +47,7 @@ describe("multi-session CLI behavior", () => {
 
     const secondOpen = await librettoCli("open https://example.com --headless");
     await evaluate(secondOpen.stdout).toMatch(
-      'Confirms the browser opened successfully for example.com.',
+      "Confirms the browser opened successfully for example.com.",
     );
     const secondSessionId = requireReturnedSessionId(
       "open",
@@ -98,7 +98,9 @@ export const main = workflow({}, async () => {
     librettoCli,
     evaluate,
   }) => {
-    const result = await librettoCli("exec await page.title() --session test-session");
+    const result = await librettoCli(
+      "exec await page.title() --session test-session",
+    );
     await evaluate(result.stderr).toMatch(
       'Explains that session "test-session" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session test-session.',
     );
@@ -107,13 +109,18 @@ export const main = workflow({}, async () => {
 
   test("close --all works without --session", async ({ librettoCli }) => {
     await librettoCli("open https://example.com --headless");
-    await librettoCli("open https://example.com --headless --session close-all-second");
+    await librettoCli(
+      "open https://example.com --headless --session close-all-second",
+    );
 
     const closeAll = await librettoCli("close --all");
     expect(closeAll.stdout).toContain("Closed 2 session(s).");
   }, 60_000);
 
-  test("explicit --session is used as-is", async ({ librettoCli, evaluate }) => {
+  test("explicit --session is used as-is", async ({
+    librettoCli,
+    evaluate,
+  }) => {
     const session = "explicit-session-e2e";
     const opened = await librettoCli(
       `open https://example.com --headless --session ${session}`,

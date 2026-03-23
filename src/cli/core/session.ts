@@ -144,7 +144,10 @@ export function readSessionStateOrThrow(session: string): SessionState {
   }
 
   try {
-    return parseSessionStateContent(readFileSync(stateFile, "utf-8"), stateFile);
+    return parseSessionStateContent(
+      readFileSync(stateFile, "utf-8"),
+      stateFile,
+    );
   } catch (err) {
     throw new Error(
       `Could not read session state for "${session}": ${err instanceof Error ? err.message : String(err)}`,
@@ -194,10 +197,13 @@ export function setSessionStatus(
   const state = readSessionState(session, logger);
   if (!state) return;
   if (state.status === status) return;
-  writeSessionState({
-    ...state,
-    status,
-  }, logger);
+  writeSessionState(
+    {
+      ...state,
+      status,
+    },
+    logger,
+  );
 }
 
 export function assertSessionAvailableForStart(

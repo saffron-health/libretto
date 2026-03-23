@@ -18,61 +18,64 @@ import type { LLMClient, Message } from "./types.js";
  * ```
  */
 export function createLLMClientFromModel(model: LanguageModel): LLMClient {
-	return {
-		async generateObject<T extends ZodType>(opts: {
-			prompt: string;
-			schema: T;
-			temperature?: number;
-		}): Promise<ZodOutput<T>> {
-			const { object } = await generateObject({
-				model,
-				schema: opts.schema,
-				prompt: opts.prompt,
-				temperature: opts.temperature ?? 0,
-			});
-			return object as ZodOutput<T>;
-		},
+  return {
+    async generateObject<T extends ZodType>(opts: {
+      prompt: string;
+      schema: T;
+      temperature?: number;
+    }): Promise<ZodOutput<T>> {
+      const { object } = await generateObject({
+        model,
+        schema: opts.schema,
+        prompt: opts.prompt,
+        temperature: opts.temperature ?? 0,
+      });
+      return object as ZodOutput<T>;
+    },
 
-		async generateObjectFromMessages<T extends ZodType>(opts: {
-			messages: Message[];
-			schema: T;
-			temperature?: number;
-		}): Promise<ZodOutput<T>> {
-			// Convert libretto Message format to AI SDK message format
-			const messages = opts.messages.map((msg) => {
-				if (typeof msg.content === "string") {
-					return { role: msg.role, content: msg.content };
-				}
-				if (msg.role === "assistant") {
-					// AssistantContent only supports text parts (no images)
-					return {
-						role: "assistant" as const,
-						content: msg.content
-							.filter((part): part is typeof part & { type: "text" } => part.type === "text")
-							.map((part) => ({ type: "text" as const, text: part.text })),
-					};
-				}
-				return {
-					role: "user" as const,
-					content: msg.content.map((part) =>
-						part.type === "text"
-							? { type: "text" as const, text: part.text }
-							: {
-								type: "image" as const,
-								image: part.image,
-								...(part.mediaType ? { mediaType: part.mediaType } : {}),
-							},
-					),
-				};
-			});
+    async generateObjectFromMessages<T extends ZodType>(opts: {
+      messages: Message[];
+      schema: T;
+      temperature?: number;
+    }): Promise<ZodOutput<T>> {
+      // Convert libretto Message format to AI SDK message format
+      const messages = opts.messages.map((msg) => {
+        if (typeof msg.content === "string") {
+          return { role: msg.role, content: msg.content };
+        }
+        if (msg.role === "assistant") {
+          // AssistantContent only supports text parts (no images)
+          return {
+            role: "assistant" as const,
+            content: msg.content
+              .filter(
+                (part): part is typeof part & { type: "text" } =>
+                  part.type === "text",
+              )
+              .map((part) => ({ type: "text" as const, text: part.text })),
+          };
+        }
+        return {
+          role: "user" as const,
+          content: msg.content.map((part) =>
+            part.type === "text"
+              ? { type: "text" as const, text: part.text }
+              : {
+                  type: "image" as const,
+                  image: part.image,
+                  ...(part.mediaType ? { mediaType: part.mediaType } : {}),
+                },
+          ),
+        };
+      });
 
-			const { object } = await generateObject({
-				model,
-				schema: opts.schema,
-				messages,
-				temperature: opts.temperature ?? 0,
-			});
-			return object as ZodOutput<T>;
-		},
-	};
+      const { object } = await generateObject({
+        model,
+        schema: opts.schema,
+        messages,
+        temperature: opts.temperature ?? 0,
+      });
+      return object as ZodOutput<T>;
+    },
+  };
 }

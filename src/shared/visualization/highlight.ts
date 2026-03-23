@@ -1,19 +1,19 @@
 import type { Page } from "playwright";
 
 export type HighlightOptions = {
-	color?: string;
-	zIndex?: number;
+  color?: string;
+  zIndex?: number;
 };
 
 const HIGHLIGHT_DEFAULTS = {
-	color: "rgba(59, 130, 246, 0.25)",
-	zIndex: 2147483645,
+  color: "rgba(59, 130, 246, 0.25)",
+  zIndex: 2147483645,
 };
 
 const LAYER_ID = "__libretto_highlight_layer__";
 
 function buildHighlightInitScript(opts: { zIndex: number }): string {
-	return `
+  return `
 (function() {
 	if (document.getElementById("${LAYER_ID}")) return;
 	var el = document.createElement("div");
@@ -27,59 +27,59 @@ function buildHighlightInitScript(opts: { zIndex: number }): string {
 const installedPages = new WeakSet<Page>();
 
 export async function ensureHighlightLayer(
-	page: Page,
-	options?: HighlightOptions,
+  page: Page,
+  options?: HighlightOptions,
 ): Promise<void> {
-	const existingOpts = (page as any).__librettoHighlightOpts as
-		| { color: string; zIndex: number }
-		| undefined;
-	const zIndex =
-		options?.zIndex ?? existingOpts?.zIndex ?? HIGHLIGHT_DEFAULTS.zIndex;
-	const initScript = buildHighlightInitScript({ zIndex });
+  const existingOpts = (page as any).__librettoHighlightOpts as
+    | { color: string; zIndex: number }
+    | undefined;
+  const zIndex =
+    options?.zIndex ?? existingOpts?.zIndex ?? HIGHLIGHT_DEFAULTS.zIndex;
+  const initScript = buildHighlightInitScript({ zIndex });
 
-	if (!installedPages.has(page)) {
-		installedPages.add(page);
-		await page.addInitScript({ content: initScript });
-	}
+  if (!installedPages.has(page)) {
+    installedPages.add(page);
+    await page.addInitScript({ content: initScript });
+  }
 
-	// Store/refresh options for later.
-	(page as any).__librettoHighlightOpts = {
-		color: options?.color ?? existingOpts?.color ?? HIGHLIGHT_DEFAULTS.color,
-		zIndex,
-	};
+  // Store/refresh options for later.
+  (page as any).__librettoHighlightOpts = {
+    color: options?.color ?? existingOpts?.color ?? HIGHLIGHT_DEFAULTS.color,
+    zIndex,
+  };
 
-	// Re-run in-page installer so overlays recover after page.setContent() or DOM resets.
-	try {
-		await page.evaluate(new Function(initScript) as () => void);
-	} catch {
-		// Page may not be ready
-	}
+  // Re-run in-page installer so overlays recover after page.setContent() or DOM resets.
+  try {
+    await page.evaluate(new Function(initScript) as () => void);
+  } catch {
+    // Page may not be ready
+  }
 }
 
 export type ShowHighlightParams = {
-	box: { x: number; y: number; width: number; height: number };
-	label?: string;
-	color?: string;
-	durationMs?: number;
+  box: { x: number; y: number; width: number; height: number };
+  label?: string;
+  color?: string;
+  durationMs?: number;
 };
 
 export async function showHighlight(
-	page: Page,
-	params: ShowHighlightParams,
+  page: Page,
+  params: ShowHighlightParams,
 ): Promise<void> {
-	const opts = (page as any).__librettoHighlightOpts ?? HIGHLIGHT_DEFAULTS;
-	const color = params.color ?? opts.color;
-	const durationMs = params.durationMs ?? 350;
+  const opts = (page as any).__librettoHighlightOpts ?? HIGHLIGHT_DEFAULTS;
+  const color = params.color ?? opts.color;
+  const durationMs = params.durationMs ?? 350;
 
-	try {
-		await page.evaluate(
-			({ layerId, box, color, label, durationMs }) => {
-				const layer = document.getElementById(layerId);
-				if (!layer) return;
+  try {
+    await page.evaluate(
+      ({ layerId, box, color, label, durationMs }) => {
+        const layer = document.getElementById(layerId);
+        if (!layer) return;
 
-				const rect = document.createElement("div");
-				rect.className = "__libretto_highlight_rect__";
-				rect.style.cssText = `
+        const rect = document.createElement("div");
+        rect.className = "__libretto_highlight_rect__";
+        rect.style.cssText = `
 					position:absolute;
 					left:${box.x}px;
 					top:${box.y}px;
@@ -93,10 +93,10 @@ export async function showHighlight(
 					opacity:1;
 				`;
 
-				if (label) {
-					const labelEl = document.createElement("div");
-					labelEl.textContent = label;
-					labelEl.style.cssText = `
+        if (label) {
+          const labelEl = document.createElement("div");
+          labelEl.textContent = label;
+          labelEl.style.cssText = `
 						position:absolute;
 						top:-22px;
 						left:0;
@@ -108,39 +108,42 @@ export async function showHighlight(
 						white-space:nowrap;
 						pointer-events:none;
 					`;
-					rect.appendChild(labelEl);
-				}
+          rect.appendChild(labelEl);
+        }
 
-				layer.appendChild(rect);
+        layer.appendChild(rect);
 
-				// Auto-fade after duration
-				setTimeout(() => {
-					rect.style.opacity = "0";
-					setTimeout(() => rect.remove(), 250);
-				}, durationMs);
-			},
-			{
-				layerId: LAYER_ID,
-				box: params.box,
-				color,
-				label: params.label,
-				durationMs,
-			},
-		);
-	} catch {
-		// Best-effort
-	}
+        // Auto-fade after duration
+        setTimeout(() => {
+          rect.style.opacity = "0";
+          setTimeout(() => rect.remove(), 250);
+        }, durationMs);
+      },
+      {
+        layerId: LAYER_ID,
+        box: params.box,
+        color,
+        label: params.label,
+        durationMs,
+      },
+    );
+  } catch {
+    // Best-effort
+  }
 }
 
 export async function clearHighlights(page: Page): Promise<void> {
-	try {
-		await page.evaluate(({ layerId }) => {
-			const layer = document.getElementById(layerId);
-			if (!layer) return;
-			const rects = layer.querySelectorAll(".__libretto_highlight_rect__");
-			rects.forEach((r) => r.remove());
-		}, { layerId: LAYER_ID });
-	} catch {
-		// Best-effort
-	}
+  try {
+    await page.evaluate(
+      ({ layerId }) => {
+        const layer = document.getElementById(layerId);
+        if (!layer) return;
+        const rects = layer.querySelectorAll(".__libretto_highlight_rect__");
+        rects.forEach((r) => r.remove());
+      },
+      { layerId: LAYER_ID },
+    );
+  } catch {
+    // Best-effort
+  }
 }

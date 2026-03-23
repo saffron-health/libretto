@@ -10,7 +10,9 @@ const repoRoot = join(__dirname, "..");
 const result = compareSkillDirs(repoRoot);
 
 if (result.ok) {
-  console.log(`libretto: verified identical skill mirrors across ${SKILL_DIRS.join(", ")}`);
+  console.log(
+    `libretto: verified identical skill mirrors across ${SKILL_DIRS.join(", ")}`,
+  );
   process.exit(0);
 }
 

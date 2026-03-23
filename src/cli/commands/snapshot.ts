@@ -10,11 +10,7 @@ import {
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
-import {
-  pageOption,
-  sessionOption,
-  withRequiredSession,
-} from "./shared.js";
+import { pageOption, sessionOption, withRequiredSession } from "./shared.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readAiConfig } from "../core/ai-config.js";
 import { resolveSnapshotApiModelOrThrow } from "../core/snapshot-api-config.js";
@@ -36,28 +32,28 @@ function isZeroViewport(value: number | null): boolean {
   return typeof value === "number" && value <= 0;
 }
 
-function shouldForceSnapshotViewport(metrics: SnapshotViewportMetrics): boolean {
+function shouldForceSnapshotViewport(
+  metrics: SnapshotViewportMetrics,
+): boolean {
   return (
-    isZeroViewport(metrics.configuredWidth)
-    || isZeroViewport(metrics.configuredHeight)
-    || isZeroViewport(metrics.innerWidth)
-    || isZeroViewport(metrics.innerHeight)
+    isZeroViewport(metrics.configuredWidth) ||
+    isZeroViewport(metrics.configuredHeight) ||
+    isZeroViewport(metrics.innerWidth) ||
+    isZeroViewport(metrics.innerHeight)
   );
 }
 
 function isZeroWidthScreenshotError(error: unknown): boolean {
   return (
-    error instanceof Error
-    && error.message.includes("Cannot take screenshot with 0 width")
+    error instanceof Error &&
+    error.message.includes("Cannot take screenshot with 0 width")
   );
 }
 
-async function readSnapshotViewportMetrics(
-  page: {
-    viewportSize(): { width: number; height: number } | null;
-    evaluate<T>(pageFunction: () => T | Promise<T>): Promise<T>;
-  },
-): Promise<SnapshotViewportMetrics> {
+async function readSnapshotViewportMetrics(page: {
+  viewportSize(): { width: number; height: number } | null;
+  evaluate<T>(pageFunction: () => T | Promise<T>): Promise<T>;
+}): Promise<SnapshotViewportMetrics> {
   const configuredViewport = page.viewportSize();
   let innerWidth: number | null = null;
   let innerHeight: number | null = null;

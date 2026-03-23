@@ -67,12 +67,7 @@ const STATE_ATTRS = new Set([
   "open",
   "multiple",
 ]);
-const BOOLEAN_ATTRS = new Set([
-  ...STATE_ATTRS,
-  "async",
-  "defer",
-  "nomodule",
-]);
+const BOOLEAN_ATTRS = new Set([...STATE_ATTRS, "async", "defer", "nomodule"]);
 const EMPTY_VALUE_DROP_ATTRS = new Set([
   "alt",
   "autocomplete",
@@ -232,12 +227,8 @@ export function condenseDom(html: string): CondenseDomResult {
 
             const hasAriaLabel = /aria-label\s*=/i.test(attrs);
             if (!hasAriaLabel) {
-              const titleMatch = inner.match(
-                /<title[^>]*>([^<]+)<\/title>/i,
-              );
-              const descMatch = inner.match(
-                /<desc[^>]*>([^<]+)<\/desc>/i,
-              );
+              const titleMatch = inner.match(/<title[^>]*>([^<]+)<\/title>/i);
+              const descMatch = inner.match(/<desc[^>]*>([^<]+)<\/desc>/i);
               const labelText =
                 titleMatch?.[1]?.trim() || descMatch?.[1]?.trim();
               if (labelText) {
@@ -342,7 +333,12 @@ export function condenseDom(html: string): CondenseDomResult {
 function rewriteTagAttributes(html: string): string {
   return html.replace(
     OPEN_TAG_PATTERN,
-    (match, rawTagName: string, rawAttrs: string | undefined, selfClosing: string) => {
+    (
+      match,
+      rawTagName: string,
+      rawAttrs: string | undefined,
+      selfClosing: string,
+    ) => {
       const tagName = rawTagName.toLowerCase();
       if (!rawAttrs?.trim()) return match;
 
@@ -431,10 +427,7 @@ function serializePreservedAttribute(attr: ParsedAttribute): string | null {
   return attr.rawToken;
 }
 
-function shouldDropEmptyValue(
-  name: string,
-  value: string | null,
-): boolean {
+function shouldDropEmptyValue(name: string, value: string | null): boolean {
   if (value === null) return false;
   if (value.trim()) return false;
   if (name.startsWith("aria-")) return true;
@@ -550,7 +543,11 @@ function shouldKeepCustomDataAttribute(
 function looksMeaningfulToken(value: string): boolean {
   if (!/^[a-z][a-z0-9-]{1,40}$/i.test(value)) return false;
   if (!/[a-z]{3}/i.test(value)) return false;
-  if (/(track|metric|telemetry|analytics|component|display|loaded|token|dps|color|screen|strict|rehydr|fetch)/i.test(value)) {
+  if (
+    /(track|metric|telemetry|analytics|component|display|loaded|token|dps|color|screen|strict|rehydr|fetch)/i.test(
+      value,
+    )
+  ) {
     return false;
   }
   return true;

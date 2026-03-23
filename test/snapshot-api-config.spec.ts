@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AiConfig } from "../src/cli/core/ai-config.js";
-import {
-  buildInlinePromptSelection,
-} from "../src/cli/core/snapshot-analyzer.js";
+import { buildInlinePromptSelection } from "../src/cli/core/snapshot-analyzer.js";
 import {
   parseDotEnvAssignment,
   resolveSnapshotApiModelOrThrow,
@@ -133,7 +131,9 @@ describe("snapshot API model resolution", () => {
     vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
     clearProviderEnv();
 
-    expect(() => resolveSnapshotApiModelOrThrow(makeConfig("openai/gpt-5.4"))).toThrowError(
+    expect(() =>
+      resolveSnapshotApiModelOrThrow(makeConfig("openai/gpt-5.4")),
+    ).toThrowError(
       `Failed to analyze snapshot because openai is configured in ${LIBRETTO_CONFIG_PATH}, but OPENAI_API_KEY is missing. Add OPENAI_API_KEY to .env or as a shell environment variable. For more info, run \`npx libretto init\`.`,
     );
   });
@@ -188,8 +188,8 @@ describe("buildInlinePromptSelection", () => {
         htmlPath: "/tmp/page.html",
         condensedHtmlPath: "/tmp/page.condensed.html",
       },
-      "<html><body><button data-testid=\"submit\">Submit</button></body></html>",
-      "<html><body><button data-testid=\"submit\">Submit</button></body></html>",
+      '<html><body><button data-testid="submit">Submit</button></body></html>',
+      '<html><body><button data-testid="submit">Submit</button></body></html>',
       "openai/gpt-5.4",
     );
 
@@ -203,7 +203,7 @@ describe("buildInlinePromptSelection", () => {
       `<section data-testid="card">${"x".repeat(1_100_000)}</section>` +
       "</body></html>";
     const condensedHtml =
-      "<html><body><button data-testid=\"submit\">Submit</button></body></html>";
+      '<html><body><button data-testid="submit">Submit</button></body></html>';
 
     const selection = buildInlinePromptSelection(
       {
