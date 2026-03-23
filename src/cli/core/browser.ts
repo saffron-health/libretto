@@ -208,7 +208,7 @@ export async function connect(
       port: state.port,
       pid: state.pid,
     });
-    if (!isPidRunning(state.pid)) {
+    if (state.pid == null || !isPidRunning(state.pid)) {
       clearSessionState(session, logger);
       throw new Error(
         `No browser running for session "${session}". Run 'libretto open <url> --session ${session}' first.`,
@@ -683,9 +683,10 @@ export async function runClose(
 
   logger.info("close-killing", { session, pid: state.pid, port: state.port });
 
-  sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
-
-  await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+  if (state.pid != null) {
+    sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
+    await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+  }
 
   clearSessionState(session, logger);
   logger.info("close-success", { session });
@@ -694,7 +695,7 @@ export async function runClose(
 
 type ClosableSession = {
   session: string;
-  pid: number;
+  pid?: number;
   port: number;
 };
 
@@ -769,7 +770,7 @@ function clearStoppedSessionStates(
 ): number {
   let cleared = 0;
   for (const session of sessions) {
-    if (!isPidRunning(session.pid)) {
+    if (session.pid == null || !isPidRunning(session.pid)) {
       clearSessionState(session.session, logger);
       cleared += 1;
     }
@@ -800,17 +801,21 @@ export async function runCloseAll(
       pid: target.pid,
       port: target.port,
     });
-    sendSignalToProcessGroupOrPid(
-      target.pid,
-      "SIGTERM",
-      logger,
-      target.session,
-    );
+    if (target.pid != null) {
+      sendSignalToProcessGroupOrPid(
+        target.pid,
+        "SIGTERM",
+        logger,
+        target.session,
+      );
+    }
   }
 
   await waitForCloseSignalWindow(CLOSE_WAIT_MS);
 
-  let survivors = closable.filter((target) => isPidRunning(target.pid));
+  let survivors = closable.filter(
+    (target) => target.pid != null && isPidRunning(target.pid),
+  );
   if (survivors.length > 0 && !force) {
     const closed = clearStoppedSessionStates(closable, logger);
 
@@ -830,16 +835,20 @@ export async function runCloseAll(
         session: survivor.session,
         pid: survivor.pid,
       });
-      sendSignalToProcessGroupOrPid(
-        survivor.pid,
-        "SIGKILL",
-        logger,
-        survivor.session,
-      );
+      if (survivor.pid != null) {
+        sendSignalToProcessGroupOrPid(
+          survivor.pid,
+          "SIGKILL",
+          logger,
+          survivor.session,
+        );
+      }
       forceKilled += 1;
     }
     await waitForCloseSignalWindow(FORCE_CLOSE_WAIT_MS);
-    survivors = survivors.filter((target) => isPidRunning(target.pid));
+    survivors = survivors.filter(
+      (target) => target.pid != null && isPidRunning(target.pid),
+    );
     if (survivors.length > 0) {
       const closed = clearStoppedSessionStates(closable, logger);
       throw new Error(
@@ -861,6 +870,78 @@ export async function runCloseAll(
   console.log(`Closed ${closable.length} session(s).`);
   if (forceKilled > 0) {
     console.log(`Force-killed ${forceKilled} session(s).`);
+  }
+}
+
+export async function runConnect(
+  cdpUrl: string,
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
+  logger.info("connect-start", { cdpUrl, session });
+  assertSessionAvailableForStart(session, logger);
+
+  const parsedUrl = new URL(cdpUrl);
+  const port = parsedUrl.port
+    ? Number(parsedUrl.port)
+    : parsedUrl.protocol === "https:"
+      ? 443
+      : 80;
+
+  console.log(
+    `Connecting to CDP endpoint at ${cdpUrl} (session: ${session})...`,
+  );
+
+  // Verify the CDP endpoint is reachable
+  const versionUrl = `${parsedUrl.protocol}//${parsedUrl.host}/json/version`;
+  try {
+    const resp = await fetch(versionUrl);
+    const versionInfo = await resp.json();
+    logger.info("connect-version-ok", { versionUrl, versionInfo });
+  } catch (err) {
+    logger.error("connect-version-failed", { versionUrl, error: err });
+    throw new Error(
+      `Cannot reach CDP endpoint at ${versionUrl}. Make sure the target is running with --remote-debugging-port=${port}.`,
+    );
+  }
+
+  // Connect via CDP to validate it works
+  const browser = await tryConnectToPort(port, logger, 10_000);
+  if (!browser) {
+    throw new Error(
+      `CDP endpoint at ${cdpUrl} is reachable but Playwright could not connect. Check that the port is a Chrome DevTools Protocol endpoint.`,
+    );
+  }
+
+  const pages = resolveOperationalPages(browser);
+  logger.info("connect-pages", {
+    session,
+    pageCount: pages.length,
+    urls: pages.map((p) => p.url()),
+  });
+
+  disconnectBrowser(browser, logger, session);
+
+  writeSessionState(
+    {
+      port,
+      session,
+      startedAt: new Date().toISOString(),
+      status: "active",
+    },
+    logger,
+  );
+
+  logger.info("connect-success", { cdpUrl, session, port });
+  console.log(`Connected to ${cdpUrl} (session: ${session})`);
+  console.log(`  Pages found: ${pages.length}`);
+  if (pages.length > 0) {
+    for (const p of pages.slice(0, 5)) {
+      console.log(`    ${p.url()}`);
+    }
+    if (pages.length > 5) {
+      console.log(`    ... and ${pages.length - 5} more`);
+    }
   }
 }
 

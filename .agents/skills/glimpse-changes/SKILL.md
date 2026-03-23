@@ -3,10 +3,10 @@ name: glimpse-changes
 description: Create a visual explanation of the current session diff as a single HTML page and show it in a native Glimpse window. Use when the user wants a visual walkthrough of local code changes instead of a plain text diff.
 metadata:
   author: tanishqkancharla
-  version: "1.0.0"
+  version: "1.2.0"
 ---
 
-# Visualize Changes
+# Glimpse Changes
 
 Use this skill when the user wants a visual explanation of the changes made in the current session.
 
@@ -14,8 +14,7 @@ Use this skill when the user wants a visual explanation of the changes made in t
 
 1. Inspect the current session changes with `git status --short`, `git diff --stat`, `git diff --cached --stat`, and focused `git diff --unified=5 -- <files>` calls.
 2. Write a Markdown explanation of the diff, usually in `/tmp/session-diff-report.md`.
-3. Render that Markdown with `npx glimpse-changes`.
-4. Launch the renderer in a long-lived background terminal session and leave that process running while the Glimpse window is open.
+3. Run `npx glimpse-changes` to render and open the Glimpse window.
 
 ## Page Content
 
@@ -38,11 +37,7 @@ npx glimpse-changes "# Session diff\n\n- Summary"
 cat /tmp/session-diff-report.md | npx glimpse-changes
 ```
 
-When using the renderer from an agent session:
-
-- do not wrap it in a short timeout
-- run it in a background terminal/PTY session
-- leave that session alive until the user is done viewing the Glimpse window
+The CLI detaches the Glimpse window into a background process and exits immediately.
 
 ## Rendering
 
@@ -53,6 +48,8 @@ When using the renderer from an agent session:
 - Diff blocks are capped to about `60%` of the viewport and scroll inside the page when they exceed that size.
 - Prefer command diffs (`!\`git diff ...\``) over pasting raw diff content into fenced blocks.
 - Command diffs execute at render time and always reflect the current state of the working tree.
+- Command diffs **must** start with `git diff`; any other command will be rejected.
+- Command diff output **must** contain valid unified diff hunks (with `diff --git` headers or `@@ ... @@` hunk headers); otherwise the renderer will throw an error.
 - Fenced `diff` blocks with literal patch content are still supported as a fallback.
 
 ## Rules
@@ -60,4 +57,4 @@ When using the renderer from an agent session:
 - Do not use `pnpm cli` or `libretto open` for this workflow.
 - Prefer `npx glimpse-changes` for display and Git for diff inspection.
 - If the diff is large, summarize repeated edits and show only the most informative snippets.
-- Keep the renderer process alive in a background terminal while the Glimpse window is open, or the window may close with the parent process.
+- The CLI exits immediately after launching the Glimpse window in the background.

@@ -212,7 +212,7 @@ export function assertSessionAvailableForStart(
 ): void {
   const existingState = readSessionState(session, logger);
   if (!existingState) return;
-  if (!isPidRunning(existingState.pid)) {
+  if (existingState.pid == null || !isPidRunning(existingState.pid)) {
     setSessionStatus(session, "exited", logger);
     return;
   }

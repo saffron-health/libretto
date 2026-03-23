@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   runClose as runCloseWithLogger,
   runCloseAll as runCloseAllWithLogger,
+  runConnect as runConnectWithLogger,
   runOpen,
   runPages,
   runSave,
@@ -75,6 +76,29 @@ export const openCommand = SimpleCLI.command({
     const headed = input.headed || !input.headless;
     const viewport = parseViewportArg(input.viewport);
     await runOpen(input.url!, headed, ctx.session, ctx.logger, { viewport });
+  });
+
+export const connectInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("cdpUrl", z.string().optional(), {
+      help: "CDP endpoint URL (e.g. http://127.0.0.1:9222)",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+  },
+}).refine(
+  (input) => Boolean(input.cdpUrl),
+  `Usage: libretto connect <cdp-url> --session <name>`,
+);
+
+export const connectCommand = SimpleCLI.command({
+  description: "Connect to an existing Chrome DevTools Protocol (CDP) endpoint",
+})
+  .input(connectInput)
+  .use(withAutoSession())
+  .handle(async ({ input, ctx }) => {
+    await runConnectWithLogger(input.cdpUrl!, ctx.session, ctx.logger);
   });
 
 export const saveInput = SimpleCLI.input({
@@ -152,6 +176,7 @@ export const closeCommand = SimpleCLI.command({
 
 export const browserCommands = {
   open: openCommand,
+  connect: connectCommand,
   save: saveCommand,
   pages: pagesCommand,
   close: closeCommand,

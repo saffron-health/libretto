@@ -76,8 +76,10 @@ function readSessionStatePid(session: string): number | null {
   if (!existsSync(statePath)) return null;
 
   try {
-    return parseSessionStateContent(readFileSync(statePath, "utf8"), statePath)
-      .pid;
+    return (
+      parseSessionStateContent(readFileSync(statePath, "utf8"), statePath)
+        .pid ?? null
+    );
   } catch {
     return null;
   }

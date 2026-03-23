@@ -22,7 +22,7 @@ function isPidRunning(pid: number): boolean {
 function getRunningSessions(): string[] {
   return listSessionsWithStateFile().filter((candidate) => {
     const state = readSessionState(candidate);
-    return state !== null && isPidRunning(state.pid);
+    return state !== null && state.pid != null && isPidRunning(state.pid);
   });
 }
 

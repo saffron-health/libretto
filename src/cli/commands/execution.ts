@@ -365,6 +365,8 @@ async function stopExistingFailedRunSession(
   });
   clearSessionState(session, logger);
 
+  if (existingState.pid == null) return;
+
   const stopDeadline = Date.now() + 3_000;
   while (isProcessRunning(existingState.pid) && Date.now() < stopDeadline) {
     await new Promise((resolveWait) => setTimeout(resolveWait, 100));
@@ -530,9 +532,9 @@ async function runResume(
     );
   }
 
-  if (!isProcessRunning(sessionState.pid)) {
+  if (sessionState.pid == null || !isProcessRunning(sessionState.pid)) {
     throw new Error(
-      `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid} is not running).`,
+      `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid ?? "unknown"} is not running).`,
     );
   }
 
@@ -560,7 +562,7 @@ async function runResume(
 
   const outcome = await waitForWorkflowOutcome({
     session,
-    pid: sessionState.pid,
+    pid: sessionState.pid!,
   });
 
   if (outcome.status === "completed") {

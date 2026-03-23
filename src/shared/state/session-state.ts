@@ -17,7 +17,7 @@ export const SessionViewportSchema = z.object({
 export const SessionStateFileSchema = z.object({
   version: z.literal(SESSION_STATE_VERSION),
   port: z.number().int().min(0).max(65535),
-  pid: z.number().int(),
+  pid: z.number().int().optional(),
   session: z.string().min(1),
   startedAt: z.string().datetime({ offset: true }),
   status: SessionStatusSchema.optional(),
