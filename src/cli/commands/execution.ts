@@ -656,6 +656,15 @@ async function runIntegrationFromFile(
   console.log("Integration completed.");
 }
 
+function readStdinSync(): string | null {
+  if (process.stdin.isTTY) return null;
+  try {
+    return readFileSync("/dev/stdin", "utf8");
+  } catch {
+    return null;
+  }
+}
+
 export const execInput = SimpleCLI.input({
   positionals: [
     SimpleCLI.positional("codeParts", z.array(z.string()).default([]), {
@@ -670,10 +679,7 @@ export const execInput = SimpleCLI.input({
     }),
     page: pageOption(),
   },
-}).refine(
-  (input) => input.codeParts.length > 0,
-  `Usage: libretto exec <code> [--session <name>] [--visualize]`,
-);
+});
 
 export const execCommand = SimpleCLI.command({
   description: "Execute Playwright TypeScript code",
@@ -681,13 +687,19 @@ export const execCommand = SimpleCLI.command({
   .input(execInput)
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
-    await runExec(
-      input.codeParts.join(" "),
-      ctx.session,
-      ctx.logger,
-      input.visualize,
-      input.page,
-    );
+    let code: string;
+    if (input.codeParts.length > 0) {
+      code = input.codeParts.join(" ");
+    } else {
+      const stdinCode = readStdinSync();
+      if (!stdinCode || stdinCode.trim().length === 0) {
+        throw new Error(
+          `Usage: libretto exec <code> [--session <name>] [--visualize]\n       echo '<code>' | libretto exec [--session <name>] [--visualize]`,
+        );
+      }
+      code = stdinCode;
+    }
+    await runExec(code, ctx.session, ctx.logger, input.visualize, input.page);
   });
 
 const runUsage = `Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
