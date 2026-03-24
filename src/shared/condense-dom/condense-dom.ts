@@ -20,6 +20,14 @@
  *  12.  Whitespace — collapse (preserve <pre> content)
  */
 
+import {
+  filterSemanticClasses,
+  INTERACTIVE_ROLE_NAMES,
+  INTERACTIVE_TAG_NAMES,
+  TEST_ATTRIBUTE_NAMES,
+  TRUSTED_ATTRIBUTE_NAMES,
+} from "../dom-semantics.js";
+
 export type CondenseDomResult = {
   /** The condensed HTML string. Valid, parseable HTML. */
   html: string;
@@ -37,25 +45,8 @@ type ParsedAttribute = {
   value: string | null;
 };
 
-const TEST_ATTRS = new Set(["data-testid", "data-test", "data-qa", "data-cy"]);
-const TRUSTED_ATTRS = new Set([
-  "id",
-  "name",
-  "for",
-  "tabindex",
-  "contenteditable",
-  "role",
-  "title",
-  "alt",
-  "type",
-  "value",
-  "placeholder",
-  "autocomplete",
-  "href",
-  "action",
-  "method",
-  "src",
-]);
+const TEST_ATTRS: Set<string> = new Set(TEST_ATTRIBUTE_NAMES);
+const TRUSTED_ATTRS: Set<string> = new Set(TRUSTED_ATTRIBUTE_NAMES);
 const STATE_ATTRS = new Set([
   "disabled",
   "hidden",
@@ -94,28 +85,8 @@ const SCRIPT_ATTRS = new Set([
   "referrerpolicy",
 ]);
 const STYLE_TAG_ATTRS = new Set(["media", "type", "nonce", "title"]);
-const INTERACTIVE_TAGS = new Set([
-  "a",
-  "button",
-  "input",
-  "select",
-  "textarea",
-  "form",
-  "details",
-  "dialog",
-  "label",
-]);
-const INTERACTIVE_ROLES = new Set([
-  "button",
-  "link",
-  "tab",
-  "menuitem",
-  "checkbox",
-  "radio",
-  "switch",
-  "slider",
-  "combobox",
-]);
+const INTERACTIVE_TAGS: Set<string> = new Set(INTERACTIVE_TAG_NAMES);
+const INTERACTIVE_ROLES: Set<string> = new Set(INTERACTIVE_ROLE_NAMES);
 const OPEN_TAG_PATTERN =
   /<([a-zA-Z][\w:-]*)(\s(?:[^"'<>/]|"[^"]*"|'[^']*')*)?\s*(\/?)>/g;
 
@@ -456,29 +427,6 @@ function normalizeUrlValue(value: string): string {
   } catch {
     return `${value.slice(0, 96)}[omitted]`;
   }
-}
-
-function filterSemanticClasses(value: string): string {
-  const classes = value.split(/\s+/).filter(Boolean);
-  const kept = classes.filter((cls) => !isObfuscatedClass(cls));
-  return kept.join(" ");
-}
-
-/**
- * Heuristic: a class name is "obfuscated" if it looks like a hash or random ID
- * rather than a human-readable semantic name.
- */
-function isObfuscatedClass(cls: string): boolean {
-  if (cls.length > 80) return true;
-  if (/^_?[0-9a-f]{6,}$/i.test(cls)) return true;
-  if (/^[a-z]+_[0-9a-f]{4,}$/i.test(cls)) return true;
-  if (/^[a-z]{1,2}[0-9]{2,}$/i.test(cls)) return true;
-
-  const digits = (cls.match(/[0-9]/g) || []).length;
-  const letters = (cls.match(/[a-zA-Z]/g) || []).length;
-  if (cls.length >= 6 && digits >= letters * 0.5 && digits >= 2) return true;
-
-  return false;
 }
 
 function parseAttributes(rawAttrs: string): ParsedAttribute[] {

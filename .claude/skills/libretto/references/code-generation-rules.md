@@ -23,10 +23,6 @@ type Output = {
 };
 
 export const myWorkflow = workflow<Input, Output>(
-<<<<<<< HEAD
-  {},
-=======
->>>>>>> origin/main
   async (ctx, input): Promise<Output> => {
     const { session, page, logger } = ctx;
 
@@ -42,18 +38,11 @@ export const myWorkflow = workflow<Input, Output>(
 Key points:
 
 - The named export (e.g., `myWorkflow`) is what you pass as the second arg to `npx libretto run ./file.ts myWorkflow`
-<<<<<<< HEAD
-- `workflow(metadata, handler)` returns a branded workflow object with a `.run(ctx, input)` method. The CLI expects that contract.
-- `metadata` is currently an object and is typically `{}` in generated files.
-- `ctx` provides `session`, `page`, `logger`, and `services` (generic, default `{}`)
-- `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
-=======
 - `workflow(handler)` returns a branded workflow object with a `.run(ctx, input)` method. The CLI expects that contract.
 - `ctx` provides `session`, `page`, `logger`, and `services` (generic, default `{}`)
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
-- If the site requires a saved login session, pass `--auth-profile <domain>` to the CLI (created via `npx libretto save <domain>`)
->>>>>>> origin/main
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.
+- After validation is complete and the workflow is confirmed working end to end, remove all `pause()` calls and pause-only workflow params unless the user explicitly says to keep them.
 - The browser is launched and closed automatically by the CLI. Do not launch or close it in the handler.
 
 ## Passing Application Dependencies via Services
@@ -68,10 +57,6 @@ import { type Transaction } from "./db";
 type MyServices = { tx?: Transaction };
 
 export const myWorkflow = workflow<Input, Output, MyServices>(
-<<<<<<< HEAD
-  {},
-=======
->>>>>>> origin/main
   async (ctx, input) => {
     if (ctx.services.tx) {
       await ctx.services.tx.insert(/* ... */);
@@ -95,11 +80,13 @@ await myWorkflow.run(
 When running standalone via `npx libretto run`, services defaults to `{}`,
 so mark fields optional for anything unavailable in that context.
 
-## Playwright Locators for DOM Interaction
+## Playwright DOM Interaction Rules
 
 Generated code must use Playwright locator APIs for all DOM interactions. Do not use `page.evaluate()` with `document.querySelector`, `querySelectorAll`, `textContent`, `click()`, or other DOM APIs when a Playwright locator can do the same thing.
 
 During the interactive `exec` phase, `page.evaluate` is fine for quick prototyping. In generated production code, translate those patterns into Playwright locators.
+
+Before extracting data (for example text, rows, or field values), wait for the target content itself to be ready, not just its container.
 
 ### Anti-Patterns
 

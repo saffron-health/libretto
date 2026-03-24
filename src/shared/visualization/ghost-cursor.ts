@@ -25,7 +25,6 @@ const DEFAULTS: Required<GhostCursorOptions> = {
 };
 
 const CURSOR_ID = "__libretto_ghost_cursor__";
-const AI_FLOAT_KEYFRAMES = "__libretto_ghost_cursor_ai_float__";
 
 function buildCursorSvg(
   style: GhostCursorStyle,
@@ -44,37 +43,22 @@ function buildCursorSvg(
 	</svg>`;
 }
 
-function buildAgentBadge(size: number, color: string): string {
-  const badgeHeight = Math.max(12, Math.round(size * 0.54));
-  const fontSize = Math.max(8, Math.round(size * 0.28));
-  const minWidth = Math.max(28, Math.round(size * 1.28));
-  const paddingX = Math.max(5, Math.round(size * 0.2));
-  const left = Math.round(size * 0.84);
-  const top = Math.round(size * 0.74);
-
-  return `<div aria-hidden="true" style="position:absolute;left:${left}px;top:${top}px;display:flex;align-items:center;justify-content:center;min-width:${minWidth}px;height:${badgeHeight}px;padding:0 ${paddingX}px;border-radius:${badgeHeight}px;background:${color};color:rgba(255,255,255,0.96);font:700 ${fontSize}px/1 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.02em;white-space:nowrap;border:1px solid rgba(0,0,0,0.16);box-shadow:0 4px 12px rgba(0,0,0,0.14);transform-origin:left center;animation:${AI_FLOAT_KEYFRAMES} 1.8s ease-in-out infinite;">Agent</div>`;
-}
-
 function buildCursorMarkup(
   style: GhostCursorStyle,
   color: string,
   size: number,
 ): string {
   const cursor = buildCursorSvg(style, color, size);
-  const badge = buildAgentBadge(size, color);
+  const badgeHeight = Math.max(12, Math.round(size * 0.54));
+  const fontSize = Math.max(8, Math.round(size * 0.28));
+  const minWidth = Math.max(28, Math.round(size * 1.28));
+  const paddingX = Math.max(5, Math.round(size * 0.2));
+  const left = Math.round(size * 0.84);
+  const top = Math.round(size * 0.74);
   const width = Math.round(size * 2.4);
   const height = Math.round(size * 1.95);
-
-  return `<style>
-@keyframes ${AI_FLOAT_KEYFRAMES} {
-	0%, 100% { transform: translate3d(0, 0, 0) rotate(-2deg); }
-	50% { transform: translate3d(0, -2px, 0) rotate(2deg); }
-}
-</style>
-<div style="position:relative;width:${width}px;height:${height}px;overflow:visible;">
-	${cursor}
-	${badge}
-</div>`;
+  const badge = `<div aria-hidden="true" style="position:absolute;left:${left}px;top:${top}px;display:flex;align-items:center;justify-content:center;min-width:${minWidth}px;height:${badgeHeight}px;padding:0 ${paddingX}px;border-radius:${badgeHeight}px;background:${color};color:rgba(255,255,255,0.96);font:700 ${fontSize}px/1 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.02em;white-space:nowrap;border:1px solid rgba(0,0,0,0.16);box-shadow:0 4px 12px rgba(0,0,0,0.14);transform-origin:left center;">Agent</div>`;
+  return `<div style="position:relative;width:${width}px;height:${height}px;overflow:visible;">${cursor}${badge}</div>`;
 }
 
 function buildInitScript(opts: Required<GhostCursorOptions>): string {

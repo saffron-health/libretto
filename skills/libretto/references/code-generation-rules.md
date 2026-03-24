@@ -38,8 +38,7 @@ export const myWorkflow = workflow<Input, Output>(
 Key points:
 
 - The named export (e.g., `myWorkflow`) is what you pass as the second arg to `npx libretto run ./file.ts myWorkflow`
-- `workflow(metadata, handler)` returns a branded workflow object with a `.run(ctx, input)` method. The CLI expects that contract.
-- `metadata` is currently an object and is typically `{}` in generated files.
+- `workflow(handler)` returns a branded workflow object with a `.run(ctx, input)` method. The CLI expects that contract.
 - `ctx` provides `session`, `page`, `logger`, and `services` (generic, default `{}`)
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.

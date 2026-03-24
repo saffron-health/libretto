@@ -13,6 +13,13 @@ import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import {
+  filterSemanticClasses,
+  INTERACTIVE_ROLE_NAMES,
+  INTERACTIVE_TAG_NAMES,
+  TEST_ATTRIBUTE_NAMES,
+  TRUSTED_ATTRIBUTE_NAMES,
+} from "../../shared/dom-semantics.js";
+import {
   getSessionActionsLogPath,
   getSessionNetworkLogPath,
   PROFILES_DIR,
@@ -452,14 +459,20 @@ const ACTIONS_LOG = '${escapedActionsLogPath}';
 mkdirSync(dirname(NETWORK_LOG), { recursive: true });
 
 // tsx/esbuild may emit __name() wrappers in Function#toString output.
-const __name = (target, value) =>
-	Object.defineProperty(target, 'name', { value, configurable: true });
+	const __name = (target, value) =>
+		Object.defineProperty(target, 'name', { value, configurable: true });
 
-${installSessionTelemetry.toString()}
+	const TEST_ATTRIBUTE_NAMES = ${JSON.stringify([...TEST_ATTRIBUTE_NAMES])};
+	const TRUSTED_ATTRIBUTE_NAMES = ${JSON.stringify([...TRUSTED_ATTRIBUTE_NAMES])};
+	const INTERACTIVE_TAG_NAMES = ${JSON.stringify([...INTERACTIVE_TAG_NAMES])};
+	const INTERACTIVE_ROLE_NAMES = ${JSON.stringify([...INTERACTIVE_ROLE_NAMES])};
+	const filterSemanticClasses = ${filterSemanticClasses.toString()};
 
-function logAction(entry) {
-	appendFileSync(ACTIONS_LOG, JSON.stringify(entry) + '\\n');
-}
+	${installSessionTelemetry.toString()}
+
+	function logAction(entry) {
+		appendFileSync(ACTIONS_LOG, JSON.stringify(entry) + '\\n');
+	}
 
 function logNetwork(entry) {
 	appendFileSync(NETWORK_LOG, JSON.stringify(entry) + '\\n');
