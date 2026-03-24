@@ -57,7 +57,6 @@ import { type Transaction } from "./db";
 type MyServices = { tx?: Transaction };
 
 export const myWorkflow = workflow<Input, Output, MyServices>(
-  {},
   async (ctx, input) => {
     if (ctx.services.tx) {
       await ctx.services.tx.insert(/* ... */);

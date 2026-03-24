@@ -1,6 +1,6 @@
 import { workflow } from "libretto";
 
-export const collectWeatherAlertsFromDom = workflow({}, async ({ page }, input) => {
+export const collectWeatherAlertsFromDom = workflow(async ({ page }, input) => {
   const requestedState =
     typeof input?.state === "string" && input.state.trim().length > 0
       ? input.state.trim().toUpperCase()
