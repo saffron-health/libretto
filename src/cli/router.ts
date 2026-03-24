@@ -1,26 +1,20 @@
-import type { Logger } from "../shared/logger/index.js";
 import { aiCommands } from "./commands/ai.js";
-import { createBrowserCommands } from "./commands/browser.js";
-import { createExecutionCommands } from "./commands/execution.js";
+import { browserCommands } from "./commands/browser.js";
+import { executionCommands } from "./commands/execution.js";
 import { initCommand } from "./commands/init.js";
-import { sessionOption } from "./commands/shared.js";
-import { createSnapshotCommand } from "./commands/snapshot.js";
+import { logCommands } from "./commands/logs.js";
+import { snapshotCommand } from "./commands/snapshot.js";
 import { SimpleCLI } from "./framework/simple-cli.js";
 
-export function buildCLIRoutes(logger: Logger) {
-  return {
-    ...createBrowserCommands(logger),
-    ...createExecutionCommands(logger),
-    ai: aiCommands,
-    init: initCommand,
-    snapshot: createSnapshotCommand(logger),
-  };
-}
+export const cliRoutes = {
+  ...browserCommands,
+  ...executionCommands,
+  ...logCommands,
+  ai: aiCommands,
+  init: initCommand,
+  snapshot: snapshotCommand,
+};
 
-export function createCLIApp(logger: Logger) {
-  return SimpleCLI.define("libretto", buildCLIRoutes(logger), {
-    globalNamed: {
-      session: sessionOption(),
-    },
-  });
+export function createCLIApp() {
+  return SimpleCLI.define("libretto", cliRoutes);
 }

@@ -78,25 +78,6 @@ describe("multi-page CLI behavior", () => {
     );
   }, 45_000);
 
-  test("snapshot requires --page when multiple pages are open", async ({
-    librettoCli,
-    evaluate,
-  }) => {
-    const session = "multi-page-snapshot-requires-page";
-    await librettoCli(
-      `open https://example.com --headless --session ${session}`,
-    );
-
-    await librettoCli(
-      `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'); return context.pages().length;" --session ${session}`,
-    );
-
-    const snapshot = await librettoCli(`snapshot --session ${session}`);
-    await evaluate(snapshot.stderr).toMatch(
-      `Explains that multiple pages are open in session "${session}" and tells the user to pass --page <id> to target one page.`,
-    );
-  }, 45_000);
-
   test("commands fail with a clear error for unknown page ids", async ({
     librettoCli,
     evaluate,
@@ -114,12 +95,18 @@ describe("multi-page CLI behavior", () => {
       `Explains that page id "${missingPageId}" was not found in session "${session}".`,
     );
 
-    const snapshotResult = await librettoCli(
-      `snapshot --session ${session} --page ${missingPageId}`,
+    const actionsResult = await librettoCli(
+      `actions --session ${session} --page ${missingPageId}`,
     );
-    await evaluate(snapshotResult.stderr).toMatch(
+    await evaluate(actionsResult.stderr).toMatch(
       `Explains that page id "${missingPageId}" was not found in session "${session}".`,
     );
 
+    const networkResult = await librettoCli(
+      `network --session ${session} --page ${missingPageId}`,
+    );
+    await evaluate(networkResult.stderr).toMatch(
+      `Explains that page id "${missingPageId}" was not found in session "${session}".`,
+    );
   }, 45_000);
 });

@@ -8,15 +8,10 @@
  * to the CLI-agent approach if needed.
  *
  * Shared types and utilities (InterpretResultSchema, buildInlinePromptSelection,
- * formatInterpretationOutput, etc.) are still actively used by the API analyzer.
+ * etc.) are still actively used by the API analyzer.
  */
 
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { extname, isAbsolute, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -147,7 +142,12 @@ abstract class UserCodingAgent {
     logger: LoggerApi,
     stdinText?: string,
   ): Promise<ExternalCommandResult> {
-    const result = await runExternalCommand(this.command, args, logger, stdinText);
+    const result = await runExternalCommand(
+      this.command,
+      args,
+      logger,
+      stdinText,
+    );
     if (result.exitCode !== 0) {
       throw new Error(
         `Analyzer command failed (${[this.command, ...args].join(" ")}).\n${stripAnsi(result.stderr).trim() || stripAnsi(result.stdout).trim() || "No error output."}`,
@@ -586,17 +586,18 @@ function estimateTokensFromChars(chars: number): number {
   return Math.ceil(chars / 4);
 }
 
-function inferContextWindowTokens(
-  model: string,
-): { contextWindowTokens: number; source: string } {
+function inferContextWindowTokens(model: string): {
+  contextWindowTokens: number;
+  source: string;
+} {
   const normalized = model.trim().toLowerCase();
   if (normalized.includes("claude")) {
     return { contextWindowTokens: 200_000, source: "model:claude" };
   }
   if (
-    normalized.includes("gpt-5")
-    || normalized.includes("o3")
-    || normalized.includes("o4")
+    normalized.includes("gpt-5") ||
+    normalized.includes("o3") ||
+    normalized.includes("o4")
   ) {
     return { contextWindowTokens: 200_000, source: "model:openai" };
   }
@@ -644,8 +645,7 @@ function buildInterpretInstructions(): string {
   prompt += `1. Answer the objective concisely\n`;
   prompt += `2. Identify ALL interactive elements relevant to the objective and provide Playwright-ready CSS selectors\n`;
   prompt += `3. Note any relevant page state (loading indicators, error messages, disabled elements, modals/overlays)\n`;
-  prompt += `4. Identify the topmost interactable surface and any blockers intercepting interaction, such as modals, overlays, backdrops, loaders, or iframes, and explain how to circumvent them\n`;
-  prompt += `5. If elements are inside iframes, identify the iframe selector and the element selector within it\n\n`;
+  prompt += `4. If elements are inside iframes, identify the iframe selector and the element selector within it\n\n`;
   prompt += `Output JSON with this shape:\n`;
   prompt += `{"answer": string, "selectors": [{"label": string, "selector": string, "rationale": string}], "notes": string}\n\n`;
   prompt += `Selectors should prefer robust attributes: data-testid, data-test, aria-label, name, id, role. Avoid fragile class-based or positional selectors.\n`;
@@ -700,7 +700,9 @@ export function buildInlinePromptSelection(
     fullDomChars: fullHtmlContent.length,
     fullDomEstimatedTokens: estimateTokensFromChars(fullHtmlContent.length),
     condensedDomChars: condensedHtmlContent.length,
-    condensedDomEstimatedTokens: estimateTokensFromChars(condensedHtmlContent.length),
+    condensedDomEstimatedTokens: estimateTokensFromChars(
+      condensedHtmlContent.length,
+    ),
     configuredModel: model,
   };
 
@@ -741,8 +743,7 @@ export function buildInlinePromptSelection(
     false,
   );
   if (fullCandidate.promptEstimatedTokens <= budget.promptBudgetTokens) {
-    const selectionReason =
-      `Full DOM fits within the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} <= ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`;
+    const selectionReason = `Full DOM fits within the estimated prompt budget (~${fullCandidate.promptEstimatedTokens.toLocaleString()} <= ${budget.promptBudgetTokens.toLocaleString()} tokens), so the analyzer receives the uncondensed page HTML.`;
     const prompt = buildInlineHtmlPrompt(args, {
       htmlContent: fullHtmlContent,
       domLabel: "full DOM",
@@ -785,7 +786,10 @@ export function buildInlinePromptSelection(
     2_000,
     budget.promptBudgetTokens - estimateTokensFromChars(basePrompt.length),
   );
-  const truncatedHtml = truncateText(condensedHtmlContent, availableHtmlTokens * 4);
+  const truncatedHtml = truncateText(
+    condensedHtmlContent,
+    availableHtmlTokens * 4,
+  );
 
   return buildCandidate(
     "condensed",
@@ -793,31 +797,6 @@ export function buildInlinePromptSelection(
     truncateReason,
     truncatedHtml.truncated,
   );
-}
-
-export function formatInterpretationOutput(
-  parsed: InterpretResult,
-  header: string = "Interpretation:",
-): string {
-  const outputLines: string[] = [];
-  outputLines.push(header);
-  outputLines.push(`Answer: ${parsed.answer}`);
-  outputLines.push("");
-  if (parsed.selectors.length === 0) {
-    outputLines.push("Selectors: none found.");
-  } else {
-    outputLines.push("Selectors:");
-    parsed.selectors.forEach((selector, index) => {
-      outputLines.push(`  ${index + 1}. ${selector.label}`);
-      outputLines.push(`     selector: ${selector.selector}`);
-      outputLines.push(`     rationale: ${selector.rationale}`);
-    });
-  }
-  if (parsed.notes && parsed.notes.trim()) {
-    outputLines.push("");
-    outputLines.push(`Notes: ${parsed.notes.trim()}`);
-  }
-  return outputLines.join("\n");
 }
 
 export async function runInterpret(
@@ -861,14 +840,14 @@ export async function runInterpret(
   // re-enabled, the caller must supply a valid provider/model-id string.
   throw new Error(
     "The CLI-agent snapshot analysis path is not active. " +
-    "Update your config to the current format with `npx libretto ai configure <provider>`, " +
-    "or set API credentials in .env for direct API analysis.",
+      "Update your config to the current format with `npx libretto ai configure <provider>`, " +
+      "or set API credentials in .env for direct API analysis.",
   );
 
   // Preserved for reference — to re-enable, remove the throw above and:
   // const selection = buildInlinePromptSelection(args, fullHtmlContent, condensedHtmlContent, model);
   // const parsed = await configuredAgent.analyzeSnapshot(selection.prompt, pngPath, logger);
-  // console.log(formatInterpretationOutput(parsed));
+  // console.log(parsed.answer);
 }
 
 export function canAnalyzeSnapshots(): boolean {

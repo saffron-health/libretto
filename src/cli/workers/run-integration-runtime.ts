@@ -18,14 +18,16 @@ import {
   getSessionNetworkLogPath,
   getSessionStatePath,
 } from "../core/context.js";
-import { getPauseSignalPaths, removeSignalIfExists } from "../core/pause-signals.js";
-import { installSessionOwnerTelemetry } from "../core/session-telemetry.js";
+import {
+  getPauseSignalPaths,
+  removeSignalIfExists,
+} from "../core/pause-signals.js";
+import { installSessionTelemetry } from "../core/session-telemetry.js";
 import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol.js";
 
 const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
 type LoadedLibrettoWorkflow = {
-  metadata: {};
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -73,7 +75,10 @@ function readSessionStatePid(session: string): number | null {
   if (!existsSync(statePath)) return null;
 
   try {
-    return parseSessionStateContent(readFileSync(statePath, "utf8"), statePath).pid;
+    return (
+      parseSessionStateContent(readFileSync(statePath, "utf8"), statePath)
+        .pid ?? null
+    );
   } catch {
     return null;
   }
@@ -103,14 +108,14 @@ async function waitForFailureSessionRelease(args: {
   }
 }
 
-function isLoadedLibrettoWorkflow(value: unknown): value is LoadedLibrettoWorkflow {
+function isLoadedLibrettoWorkflow(
+  value: unknown,
+): value is LoadedLibrettoWorkflow {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<PropertyKey, unknown>;
   return (
     candidate[LIBRETTO_WORKFLOW_BRAND] === true &&
-    typeof candidate.run === "function" &&
-    !!candidate.metadata &&
-    typeof candidate.metadata === "object"
+    typeof candidate.run === "function"
   );
 }
 
@@ -184,7 +189,6 @@ async function loadWorkflowExport(
         '  import { workflow } from "libretto";',
         "",
         `  export const ${exportName} = workflow<InputType, OutputType>(`,
-        "    {},",
         "    async (ctx, input) => {",
         "      // ctx.session  — libretto session name",
         "      // ctx.page     — Playwright Page instance",
@@ -266,7 +270,7 @@ async function runIntegrationInternal(
   }
   const actionsLogPath = getSessionActionsLogPath(args.session);
   const networkLogPath = getSessionNetworkLogPath(args.session);
-  await installSessionOwnerTelemetry({
+  await installSessionTelemetry({
     context: browserSession.context,
     initialPage: browserSession.page,
     includeUserDomActions: true,
@@ -289,7 +293,8 @@ async function runIntegrationInternal(
     try {
       await workflow.run(workflowContext, args.params ?? {});
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       await writeFile(
         signalPaths.failedSignalPath,
         JSON.stringify(

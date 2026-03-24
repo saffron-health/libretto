@@ -20,14 +20,6 @@
  *  12.  Whitespace — collapse (preserve <pre> content)
  */
 
-import {
-  filterSemanticClasses,
-  INTERACTIVE_ROLE_NAMES,
-  INTERACTIVE_TAG_NAMES,
-  TEST_ATTRIBUTE_NAMES,
-  TRUSTED_ATTRIBUTE_NAMES,
-} from "../dom-semantics.js";
-
 export type CondenseDomResult = {
   /** The condensed HTML string. Valid, parseable HTML. */
   html: string;
@@ -45,8 +37,25 @@ type ParsedAttribute = {
   value: string | null;
 };
 
-const TEST_ATTRS: Set<string> = new Set(TEST_ATTRIBUTE_NAMES);
-const TRUSTED_ATTRS: Set<string> = new Set(TRUSTED_ATTRIBUTE_NAMES);
+const TEST_ATTRS = new Set(["data-testid", "data-test", "data-qa", "data-cy"]);
+const TRUSTED_ATTRS = new Set([
+  "id",
+  "name",
+  "for",
+  "tabindex",
+  "contenteditable",
+  "role",
+  "title",
+  "alt",
+  "type",
+  "value",
+  "placeholder",
+  "autocomplete",
+  "href",
+  "action",
+  "method",
+  "src",
+]);
 const STATE_ATTRS = new Set([
   "disabled",
   "hidden",
@@ -58,12 +67,7 @@ const STATE_ATTRS = new Set([
   "open",
   "multiple",
 ]);
-const BOOLEAN_ATTRS = new Set([
-  ...STATE_ATTRS,
-  "async",
-  "defer",
-  "nomodule",
-]);
+const BOOLEAN_ATTRS = new Set([...STATE_ATTRS, "async", "defer", "nomodule"]);
 const EMPTY_VALUE_DROP_ATTRS = new Set([
   "alt",
   "autocomplete",
@@ -90,8 +94,28 @@ const SCRIPT_ATTRS = new Set([
   "referrerpolicy",
 ]);
 const STYLE_TAG_ATTRS = new Set(["media", "type", "nonce", "title"]);
-const INTERACTIVE_TAGS: Set<string> = new Set(INTERACTIVE_TAG_NAMES);
-const INTERACTIVE_ROLES: Set<string> = new Set(INTERACTIVE_ROLE_NAMES);
+const INTERACTIVE_TAGS = new Set([
+  "a",
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "form",
+  "details",
+  "dialog",
+  "label",
+]);
+const INTERACTIVE_ROLES = new Set([
+  "button",
+  "link",
+  "tab",
+  "menuitem",
+  "checkbox",
+  "radio",
+  "switch",
+  "slider",
+  "combobox",
+]);
 const OPEN_TAG_PATTERN =
   /<([a-zA-Z][\w:-]*)(\s(?:[^"'<>/]|"[^"]*"|'[^']*')*)?\s*(\/?)>/g;
 
@@ -203,12 +227,8 @@ export function condenseDom(html: string): CondenseDomResult {
 
             const hasAriaLabel = /aria-label\s*=/i.test(attrs);
             if (!hasAriaLabel) {
-              const titleMatch = inner.match(
-                /<title[^>]*>([^<]+)<\/title>/i,
-              );
-              const descMatch = inner.match(
-                /<desc[^>]*>([^<]+)<\/desc>/i,
-              );
+              const titleMatch = inner.match(/<title[^>]*>([^<]+)<\/title>/i);
+              const descMatch = inner.match(/<desc[^>]*>([^<]+)<\/desc>/i);
               const labelText =
                 titleMatch?.[1]?.trim() || descMatch?.[1]?.trim();
               if (labelText) {
@@ -313,7 +333,12 @@ export function condenseDom(html: string): CondenseDomResult {
 function rewriteTagAttributes(html: string): string {
   return html.replace(
     OPEN_TAG_PATTERN,
-    (match, rawTagName: string, rawAttrs: string | undefined, selfClosing: string) => {
+    (
+      match,
+      rawTagName: string,
+      rawAttrs: string | undefined,
+      selfClosing: string,
+    ) => {
       const tagName = rawTagName.toLowerCase();
       if (!rawAttrs?.trim()) return match;
 
@@ -402,10 +427,7 @@ function serializePreservedAttribute(attr: ParsedAttribute): string | null {
   return attr.rawToken;
 }
 
-function shouldDropEmptyValue(
-  name: string,
-  value: string | null,
-): boolean {
+function shouldDropEmptyValue(name: string, value: string | null): boolean {
   if (value === null) return false;
   if (value.trim()) return false;
   if (name.startsWith("aria-")) return true;
@@ -434,6 +456,29 @@ function normalizeUrlValue(value: string): string {
   } catch {
     return `${value.slice(0, 96)}[omitted]`;
   }
+}
+
+function filterSemanticClasses(value: string): string {
+  const classes = value.split(/\s+/).filter(Boolean);
+  const kept = classes.filter((cls) => !isObfuscatedClass(cls));
+  return kept.join(" ");
+}
+
+/**
+ * Heuristic: a class name is "obfuscated" if it looks like a hash or random ID
+ * rather than a human-readable semantic name.
+ */
+function isObfuscatedClass(cls: string): boolean {
+  if (cls.length > 80) return true;
+  if (/^_?[0-9a-f]{6,}$/i.test(cls)) return true;
+  if (/^[a-z]+_[0-9a-f]{4,}$/i.test(cls)) return true;
+  if (/^[a-z]{1,2}[0-9]{2,}$/i.test(cls)) return true;
+
+  const digits = (cls.match(/[0-9]/g) || []).length;
+  const letters = (cls.match(/[a-zA-Z]/g) || []).length;
+  if (cls.length >= 6 && digits >= letters * 0.5 && digits >= 2) return true;
+
+  return false;
 }
 
 function parseAttributes(rawAttrs: string): ParsedAttribute[] {
@@ -498,7 +543,11 @@ function shouldKeepCustomDataAttribute(
 function looksMeaningfulToken(value: string): boolean {
   if (!/^[a-z][a-z0-9-]{1,40}$/i.test(value)) return false;
   if (!/[a-z]{3}/i.test(value)) return false;
-  if (/(track|metric|telemetry|analytics|component|display|loaded|token|dps|color|screen|strict|rehydr|fetch)/i.test(value)) {
+  if (
+    /(track|metric|telemetry|analytics|component|display|loaded|token|dps|color|screen|strict|rehydr|fetch)/i.test(
+      value,
+    )
+  ) {
     return false;
   }
   return true;

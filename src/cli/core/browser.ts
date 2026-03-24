@@ -1,4 +1,10 @@
-import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type CDPSession,
+  type Page,
+} from "playwright";
 import { openSync, existsSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,14 +27,7 @@ import {
   readSessionState,
   writeSessionState,
 } from "./session.js";
-import { installSessionOwnerTelemetry } from "./session-telemetry.js";
-import {
-  filterSemanticClasses,
-  INTERACTIVE_ROLE_NAMES,
-  INTERACTIVE_TAG_NAMES,
-  TEST_ATTRIBUTE_NAMES,
-  TRUSTED_ATTRIBUTE_NAMES,
-} from "../../shared/dom-semantics.js";
+import { installSessionTelemetry } from "./session-telemetry.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const FORCE_CLOSE_WAIT_MS = 300;
@@ -73,13 +72,12 @@ export function hasProfile(domain: string): boolean {
   return existsSync(getProfilePath(domain));
 }
 
-async function tryConnectToPort(
-  port: number,
+async function tryConnectToCDP(
+  endpoint: string,
   logger: LoggerApi,
   timeoutMs: number = 5000,
 ): Promise<Browser | null> {
-  const endpoint = `http://localhost:${port}`;
-  logger.info("cdp-connect-attempt", { port, endpoint, timeoutMs });
+  logger.info("cdp-connect-attempt", { endpoint, timeoutMs });
   try {
     const connectPromise = chromium.connectOverCDP(endpoint);
     const timeoutPromise = new Promise<null>((resolve) =>
@@ -88,16 +86,15 @@ async function tryConnectToPort(
     const browser = await Promise.race([connectPromise, timeoutPromise]);
     if (browser) {
       logger.info("cdp-connect-success", {
-        port,
         endpoint,
         contexts: browser.contexts().length,
       });
     } else {
-      logger.warn("cdp-connect-timeout", { port, endpoint, timeoutMs });
+      logger.warn("cdp-connect-timeout", { endpoint, timeoutMs });
     }
     return browser;
   } catch (err) {
-    logger.error("cdp-connect-error", { error: err, port, endpoint });
+    logger.error("cdp-connect-error", { error: err, endpoint });
     return null;
   }
 }
@@ -142,10 +139,12 @@ async function resolvePageId(page: Page): Promise<string> {
   const cdpSession: CDPSession = await page.context().newCDPSession(page);
   try {
     const targetInfo = await cdpSession.send("Target.getTargetInfo");
-    const targetId = (targetInfo as { targetInfo?: { targetId?: unknown } })?.targetInfo
-      ?.targetId;
+    const targetId = (targetInfo as { targetInfo?: { targetId?: unknown } })
+      ?.targetInfo?.targetId;
     if (typeof targetId !== "string" || targetId.length === 0) {
-      throw new Error(`Could not resolve target id for page at URL "${page.url()}".`);
+      throw new Error(
+        `Could not resolve target id for page at URL "${page.url()}".`,
+      );
     }
     return targetId;
   } finally {
@@ -169,7 +168,10 @@ export async function listOpenPages(
 ): Promise<OpenPageSummary[]> {
   const { browser, page: activePage } = await connect(session, logger);
   try {
-    const pages = browser.contexts().flatMap((ctx) => ctx.pages()).filter(isOperationalPage);
+    const pages = browser
+      .contexts()
+      .flatMap((ctx) => ctx.pages())
+      .filter(isOperationalPage);
     const pageRefs = await resolvePageReferences(pages);
     return pageRefs.map(({ id, page }) => ({
       id,
@@ -197,14 +199,15 @@ export async function connect(
 }> {
   logger.info("connect", { session, timeoutMs });
   const state = readSessionStateOrThrow(session);
-  const browser = await tryConnectToPort(state.port, logger, timeoutMs);
+  const endpoint = state.cdpEndpoint ?? `http://localhost:${state.port}`;
+  const browser = await tryConnectToCDP(endpoint, logger, timeoutMs);
   if (!browser) {
     logger.error("connect-no-browser", {
       session,
-      port: state.port,
+      endpoint,
       pid: state.pid,
     });
-    if (!isPidRunning(state.pid)) {
+    if (state.pid == null || !isPidRunning(state.pid)) {
       clearSessionState(session, logger);
       throw new Error(
         `No browser running for session "${session}". Run 'libretto open <url> --session ${session}' first.`,
@@ -212,7 +215,7 @@ export async function connect(
     }
 
     throw new Error(
-      `Could not connect to the browser for session "${session}" at http://127.0.0.1:${state.port}, but the session process (pid ${state.pid}) is still running. Try the command again, or close and reopen the session if it stays stuck.`,
+      `Could not connect to the browser for session "${session}" at ${endpoint}, but the session process (pid ${state.pid}) is still running. Try the command again, or close and reopen the session if it stays stuck.`,
     );
   }
 
@@ -283,7 +286,10 @@ export async function connect(
   return { browser, context, page, pageId: pageRef.id };
 }
 
-export async function runPages(session: string, logger: LoggerApi): Promise<void> {
+export async function runPages(
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
   logger.info("pages-start", { session });
   const pageSummaries = await listOpenPages(session, logger);
 
@@ -311,10 +317,16 @@ export function resolveViewport(
   }
   const config = readLibrettoConfig();
   if (config.viewport) {
-    logger.info("viewport-source", { source: "config", viewport: config.viewport });
+    logger.info("viewport-source", {
+      source: "config",
+      viewport: config.viewport,
+    });
     return config.viewport;
   }
-  logger.info("viewport-source", { source: "default", viewport: DEFAULT_VIEWPORT });
+  logger.info("viewport-source", {
+    source: "default",
+    viewport: DEFAULT_VIEWPORT,
+  });
   return DEFAULT_VIEWPORT;
 }
 
@@ -443,13 +455,7 @@ mkdirSync(dirname(NETWORK_LOG), { recursive: true });
 const __name = (target, value) =>
 	Object.defineProperty(target, 'name', { value, configurable: true });
 
-const TEST_ATTRIBUTE_NAMES = ${JSON.stringify([...TEST_ATTRIBUTE_NAMES])};
-const TRUSTED_ATTRIBUTE_NAMES = ${JSON.stringify([...TRUSTED_ATTRIBUTE_NAMES])};
-const INTERACTIVE_TAG_NAMES = ${JSON.stringify([...INTERACTIVE_TAG_NAMES])};
-const INTERACTIVE_ROLE_NAMES = ${JSON.stringify([...INTERACTIVE_ROLE_NAMES])};
-${filterSemanticClasses.toString()}
-
-${installSessionOwnerTelemetry.toString()}
+${installSessionTelemetry.toString()}
 
 function logAction(entry) {
 	appendFileSync(ACTIONS_LOG, JSON.stringify(entry) + '\\n');
@@ -493,7 +499,7 @@ ${windowBoundsSetupCode}
 page.setDefaultTimeout(30000);
 page.setDefaultNavigationTimeout(45000);
 
-await installSessionOwnerTelemetry({
+await installSessionTelemetry({
 	context,
 	initialPage: page,
 	includeUserDomActions: true,
@@ -546,8 +552,10 @@ await new Promise(() => {});
   logger.info("open-child-spawned", { pid: child.pid, port, session });
 
   let childSpawnError: Error | null = null;
-  let childEarlyExit: { code: number | null; signal: NodeJS.Signals | null } | null =
-    null;
+  let childEarlyExit: {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+  } | null = null;
 
   child.on("error", (err) => {
     childSpawnError = err;
@@ -601,14 +609,17 @@ await new Promise(() => {});
       logger.info("open-waiting-for-cdp", { attempt: i, port, session });
     }
     if (ready) {
-      writeSessionState({
-        port,
-        pid: child.pid!,
-        session,
-        startedAt: new Date().toISOString(),
-        status: "active",
-        viewport,
-      }, logger);
+      writeSessionState(
+        {
+          port,
+          pid: child.pid!,
+          session,
+          startedAt: new Date().toISOString(),
+          status: "active",
+          viewport,
+        },
+        logger,
+      );
       logger.info("open-success", {
         url,
         mode: browserMode,
@@ -716,7 +727,10 @@ export async function runSave(
   }
 }
 
-export async function runClose(session: string, logger: LoggerApi): Promise<void> {
+export async function runClose(
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
   logger.info("close-start", { session });
   const state = readSessionState(session, logger);
   if (!state) {
@@ -727,9 +741,10 @@ export async function runClose(session: string, logger: LoggerApi): Promise<void
 
   logger.info("close-killing", { session, pid: state.pid, port: state.port });
 
-  sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
-
-  await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+  if (state.pid != null) {
+    sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
+    await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+  }
 
   clearSessionState(session, logger);
   logger.info("close-success", { session });
@@ -738,7 +753,7 @@ export async function runClose(session: string, logger: LoggerApi): Promise<void
 
 type ClosableSession = {
   session: string;
-  pid: number;
+  pid?: number;
   port: number;
 };
 
@@ -777,7 +792,9 @@ function sendSignalToProcessGroupOrPid(
   }
 }
 
-function formatSessionList(targets: ReadonlyArray<{ session: string }>): string {
+function formatSessionList(
+  targets: ReadonlyArray<{ session: string }>,
+): string {
   return targets.map((target) => `"${target.session}"`).join(", ");
 }
 
@@ -811,7 +828,7 @@ function clearStoppedSessionStates(
 ): number {
   let cleared = 0;
   for (const session of sessions) {
-    if (!isPidRunning(session.pid)) {
+    if (session.pid == null || !isPidRunning(session.pid)) {
       clearSessionState(session.session, logger);
       cleared += 1;
     }
@@ -842,12 +859,21 @@ export async function runCloseAll(
       pid: target.pid,
       port: target.port,
     });
-    sendSignalToProcessGroupOrPid(target.pid, "SIGTERM", logger, target.session);
+    if (target.pid != null) {
+      sendSignalToProcessGroupOrPid(
+        target.pid,
+        "SIGTERM",
+        logger,
+        target.session,
+      );
+    }
   }
 
   await waitForCloseSignalWindow(CLOSE_WAIT_MS);
 
-  let survivors = closable.filter((target) => isPidRunning(target.pid));
+  let survivors = closable.filter(
+    (target) => target.pid != null && isPidRunning(target.pid),
+  );
   if (survivors.length > 0 && !force) {
     const closed = clearStoppedSessionStates(closable, logger);
 
@@ -867,11 +893,20 @@ export async function runCloseAll(
         session: survivor.session,
         pid: survivor.pid,
       });
-      sendSignalToProcessGroupOrPid(survivor.pid, "SIGKILL", logger, survivor.session);
+      if (survivor.pid != null) {
+        sendSignalToProcessGroupOrPid(
+          survivor.pid,
+          "SIGKILL",
+          logger,
+          survivor.session,
+        );
+      }
       forceKilled += 1;
     }
     await waitForCloseSignalWindow(FORCE_CLOSE_WAIT_MS);
-    survivors = survivors.filter((target) => isPidRunning(target.pid));
+    survivors = survivors.filter(
+      (target) => target.pid != null && isPidRunning(target.pid),
+    );
     if (survivors.length > 0) {
       const closed = clearStoppedSessionStates(closable, logger);
       throw new Error(
@@ -893,6 +928,95 @@ export async function runCloseAll(
   console.log(`Closed ${closable.length} session(s).`);
   if (forceKilled > 0) {
     console.log(`Force-killed ${forceKilled} session(s).`);
+  }
+}
+
+export async function runConnect(
+  cdpUrl: string,
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
+  logger.info("connect-start", { cdpUrl, session });
+  assertSessionAvailableForStart(session, logger);
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(cdpUrl);
+  } catch {
+    throw new Error(
+      [
+        `Invalid CDP URL: ${cdpUrl}`,
+        ``,
+        `Expected an HTTP URL pointing to a Chrome DevTools Protocol endpoint, for example:`,
+        `  libretto connect http://127.0.0.1:9222`,
+        `  libretto connect http://remote-host:9222`,
+        `  libretto connect http://remote-host:9222/devtools/browser/<id>`,
+      ].join("\n"),
+    );
+  }
+
+  const endpoint = parsedUrl.href;
+  const port = parsedUrl.port
+    ? Number(parsedUrl.port)
+    : parsedUrl.protocol === "https:"
+      ? 443
+      : 80;
+
+  console.log(
+    `Connecting to CDP endpoint at ${endpoint} (session: ${session})...`,
+  );
+
+  // Verify the CDP endpoint is reachable
+  const versionUrl = `${parsedUrl.protocol}//${parsedUrl.host}/json/version`;
+  try {
+    const resp = await fetch(versionUrl);
+    const versionInfo = await resp.json();
+    logger.info("connect-version-ok", { versionUrl, versionInfo });
+  } catch (err) {
+    logger.error("connect-version-failed", { versionUrl, error: err });
+    throw new Error(
+      `Cannot reach CDP endpoint at ${versionUrl}. Make sure the target is running and accessible at ${parsedUrl.host}.`,
+    );
+  }
+
+  // Connect via CDP using the full endpoint URL
+  const browser = await tryConnectToCDP(endpoint, logger, 10_000);
+  if (!browser) {
+    throw new Error(
+      `CDP endpoint at ${endpoint} is reachable but Playwright could not connect. Check that the URL is a Chrome DevTools Protocol endpoint.`,
+    );
+  }
+
+  const pages = resolveOperationalPages(browser);
+  logger.info("connect-pages", {
+    session,
+    pageCount: pages.length,
+    urls: pages.map((p) => p.url()),
+  });
+
+  disconnectBrowser(browser, logger, session);
+
+  writeSessionState(
+    {
+      port,
+      cdpEndpoint: endpoint,
+      session,
+      startedAt: new Date().toISOString(),
+      status: "active",
+    },
+    logger,
+  );
+
+  logger.info("connect-success", { cdpUrl: endpoint, session, port });
+  console.log(`Connected to ${endpoint} (session: ${session})`);
+  console.log(`  Pages found: ${pages.length}`);
+  if (pages.length > 0) {
+    for (const p of pages.slice(0, 5)) {
+      console.log(`    ${p.url()}`);
+    }
+    if (pages.length > 5) {
+      console.log(`    ... and ${pages.length - 5} more`);
+    }
   }
 }
 

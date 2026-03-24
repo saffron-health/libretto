@@ -1,6 +1,10 @@
 import { workflow } from "libretto";
 
+<<<<<<< HEAD
 export const extractUsaGovTopic = workflow({}, async ({ page }, input) => {
+=======
+export const extractUsaGovTopic = workflow(async ({ page }, input) => {
+>>>>>>> origin/main
   const query =
     typeof input?.query === "string" && input.query.trim().length > 0
       ? input.query.trim()

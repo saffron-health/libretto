@@ -1,21 +1,11 @@
-import type { Logger } from "../shared/logger/index.js";
-import {
-  closeLogger,
-  createLoggerForSession,
-  ensureLibrettoSetup,
-} from "./core/context.js";
-import {
-  SESSION_DEFAULT,
-  validateSessionName,
-} from "./core/session.js";
+import { ensureLibrettoSetup } from "./core/context.js";
 import { createCLIApp } from "./router.js";
 
 function renderUsage(app: ReturnType<typeof createCLIApp>): string {
   return `${app.renderHelp()}
 
 Options:
-  --session <name>        Use a named session (default: "default")
-                          Built-in sessions: default, dev-server, browser-agent
+  --session <name>        Use a named session (auto-generated for open/run if omitted)
 
 Examples:
   libretto open https://linkedin.com
@@ -33,7 +23,7 @@ Examples:
   libretto ai configure openai/gpt-4o
   libretto snapshot
   libretto snapshot --objective "Find the submit button" --context "Submitting a referral form, already filled in patient details"
-  libretto resume --session default
+  libretto resume --session my-session
   libretto close
   libretto close --all
   libretto close --all --force
@@ -59,78 +49,6 @@ Sessions:
 `;
 }
 
-function readSessionArgBeforePassthrough(
-  rawArgs: readonly string[],
-): string | null | undefined {
-  for (let index = 0; index < rawArgs.length; index += 1) {
-    const token = rawArgs[index];
-    if (token === "--") return undefined;
-    if (token === "--session") {
-      const value = rawArgs[index + 1];
-      if (!value || value === "--" || value.startsWith("--")) {
-        return null;
-      }
-      return value;
-    }
-    if (!token.startsWith("--session=")) continue;
-
-    const value = token.slice("--session=".length);
-    if (value.length === 0 || value === "--" || value.startsWith("--")) {
-      return null;
-    }
-    return value;
-  }
-
-  return undefined;
-}
-
-function parseSessionForLog(rawArgs: string[]): string {
-  const value = readSessionArgBeforePassthrough(rawArgs);
-  if (value === undefined || value === null) {
-    return SESSION_DEFAULT;
-  }
-  try {
-    validateSessionName(value);
-    return value;
-  } catch {
-    return SESSION_DEFAULT;
-  }
-}
-
-function validateLegacySessionArg(rawArgs: string[]): void {
-  const value = readSessionArgBeforePassthrough(rawArgs);
-  if (value === undefined) return;
-  if (value === null) {
-    throw new Error(
-      `Usage: libretto <command> [--session <name>]\nMissing or invalid --session value.`,
-    );
-  }
-  validateSessionName(value);
-}
-
-function initializeLogger(rawArgs: string[]): Logger {
-  const sessionForLog = parseSessionForLog(rawArgs);
-  const logger = createLoggerForSession(sessionForLog);
-  logger.info("cli-start", {
-    args: rawArgs,
-    cwd: process.cwd(),
-    session: sessionForLog,
-  });
-  return logger;
-}
-
-async function withCliLogger<T>(
-  rawArgs: string[],
-  run: (logger: Logger) => Promise<T>,
-): Promise<T> {
-  const logger = initializeLogger(rawArgs);
-  try {
-    return await run(logger);
-  } finally {
-    await closeLogger(logger);
-  }
-}
-
 function isRootHelpRequest(rawArgs: readonly string[]): boolean {
   if (rawArgs.length === 0) return true;
   if (rawArgs[0] === "--help" || rawArgs[0] === "-h") return true;
@@ -141,33 +59,28 @@ export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   let exitCode = 0;
   ensureLibrettoSetup();
-  await withCliLogger(rawArgs, async (logger) => {
-    const app = createCLIApp(logger);
+  const app = createCLIApp();
 
-    try {
-      validateLegacySessionArg(rawArgs);
-
-      if (isRootHelpRequest(rawArgs)) {
-        console.log(renderUsage(app));
-        return;
-      }
-
-      logger.info("cli-command", { args: rawArgs });
-      const result = await app.run(rawArgs);
-      if (typeof result === "string") {
-        console.log(result);
-      }
-    } catch (err) {
-      logger.error("cli-error", { error: err, args: rawArgs });
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.startsWith("Unknown command: ")) {
-        console.error(`${message}\n`);
-        console.log(renderUsage(app));
-      } else {
-        console.error(message);
-      }
-      exitCode = 1;
+  try {
+    if (isRootHelpRequest(rawArgs)) {
+      console.log(renderUsage(app));
+      return;
     }
-  });
+
+    const result = await app.run(rawArgs);
+    if (typeof result === "string") {
+      console.log(result);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.startsWith("Unknown command: ")) {
+      console.error(`${message}\n`);
+      console.log(renderUsage(app));
+    } else {
+      console.error(message);
+    }
+    exitCode = 1;
+  }
+
   process.exit(exitCode);
 }

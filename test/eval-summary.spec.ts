@@ -8,13 +8,18 @@ const tempRoots: string[] = [];
 
 afterEach(async () => {
   delete process.env.LIBRETTO_EVAL_STRICT;
-  await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    tempRoots
+      .splice(0)
+      .map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 describe("eval summary scripts", () => {
   test("summary reports aggregate score and failed eval details", async () => {
-    // @ts-expect-error -- helper is authored as plain .mjs
-    const { buildSummary, buildMarkdown, loadScoreRecords } = await import("../scripts/summarize-evals.mjs");
+    const { buildSummary, buildMarkdown, loadScoreRecords } =
+      // @ts-expect-error -- helper is authored as plain .mjs
+      await import("../scripts/summarize-evals.mjs");
     const tempRoot = await mkdtemp(join(tmpdir(), "libretto-eval-summary-"));
     tempRoots.push(tempRoot);
 
@@ -48,13 +53,18 @@ describe("eval summary scripts", () => {
 
     const records = loadScoreRecords(tempRoot);
     const summary = buildSummary(records);
-    const markdown = buildMarkdown(summary, join(tempRoot, "eval-summary.json"));
+    const markdown = buildMarkdown(
+      summary,
+      join(tempRoot, "eval-summary.json"),
+    );
 
     expect(summary.percent).toBe(92.86);
     expect(summary.failingRecordCount).toBe(1);
     expect(markdown).toContain("Overall score: `92.86%`");
     expect(markdown).toContain("### `noisy eval`");
-    expect(markdown).toContain("The rerun produced useful output.: Only a success banner was shown.");
+    expect(markdown).toContain(
+      "The rerun produced useful output.: Only a success banner was shown.",
+    );
   });
 
   test("assertPerfectScore throws by default for local strict runs", () => {

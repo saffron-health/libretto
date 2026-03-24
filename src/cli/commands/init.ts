@@ -1,5 +1,13 @@
 import { createInterface } from "node:readline";
-import { appendFileSync, cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  cpSync,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,7 +50,8 @@ const PROVIDER_CHOICES: ProviderChoice[] = [
     key: "4",
     label: "Google Vertex AI",
     envVar: "GOOGLE_CLOUD_PROJECT",
-    envHint: "Requires gcloud auth application-default login and a GCP project ID",
+    envHint:
+      "Requires gcloud auth application-default login and a GCP project ID",
   },
 ];
 
@@ -101,7 +110,9 @@ function printSnapshotApiStatus(): void {
 
   if (selection && hasProviderCredentials(selection.provider)) {
     console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
-    console.log("    Snapshot objectives will use the API analyzer by default.");
+    console.log(
+      "    Snapshot objectives will use the API analyzer by default.",
+    );
     console.log("    No further action required.");
     return;
   }
@@ -117,7 +128,9 @@ function printSnapshotApiStatus(): void {
   console.log(
     "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
   );
-  console.log("    Run `npx libretto init` interactively to set up credentials.");
+  console.log(
+    "    Run `npx libretto init` interactively to set up credentials.",
+  );
 }
 
 async function runInteractiveApiSetup(): Promise<void> {
@@ -132,7 +145,9 @@ async function runInteractiveApiSetup(): Promise<void> {
 
   if (selection && hasProviderCredentials(selection.provider)) {
     console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
-    console.log("    Snapshot objectives will use the API analyzer by default.");
+    console.log(
+      "    Snapshot objectives will use the API analyzer by default.",
+    );
     return;
   }
 
@@ -144,7 +159,9 @@ async function runInteractiveApiSetup(): Promise<void> {
   });
 
   try {
-    console.log("  Which API provider would you like to use for snapshot analysis?\n");
+    console.log(
+      "  Which API provider would you like to use for snapshot analysis?\n",
+    );
     for (const choice of PROVIDER_CHOICES) {
       console.log(`    ${choice.key}) ${choice.label}`);
     }
@@ -153,7 +170,9 @@ async function runInteractiveApiSetup(): Promise<void> {
     const answer = await promptUser(rl, "  Choice: ");
 
     if (answer.toLowerCase() === "s" || !answer) {
-      console.log("\n  Skipped. You can set up API credentials later by rerunning `npx libretto init`.");
+      console.log(
+        "\n  Skipped. You can set up API credentials later by rerunning `npx libretto init`.",
+      );
       console.log("  Or add credentials directly to your .env file:");
       console.log("    OPENAI_API_KEY=...");
       console.log("    ANTHROPIC_API_KEY=...");
@@ -255,7 +274,9 @@ async function copySkills(): Promise<void> {
   const agentDirs = detectAgentDirs(REPO_ROOT);
 
   if (agentDirs.length === 0) {
-    console.log("\nSkills: No .agents/ or .claude/ directory found in repo root — skipping.");
+    console.log(
+      "\nSkills: No .agents/ or .claude/ directory found in repo root — skipping.",
+    );
     return;
   }
 
@@ -289,7 +310,9 @@ async function copySkills(): Promise<void> {
     }
     cpSync(sourceDir, skillDest, { recursive: true });
     const fileCount = readdirSync(skillDest).length;
-    console.log(`  ✓ Copied ${fileCount} skill files to ${name}/skills/libretto/`);
+    console.log(
+      `  ✓ Copied ${fileCount} skill files to ${name}/skills/libretto/`,
+    );
   }
 }
 

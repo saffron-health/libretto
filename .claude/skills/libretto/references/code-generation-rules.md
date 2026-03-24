@@ -23,7 +23,10 @@ type Output = {
 };
 
 export const myWorkflow = workflow<Input, Output>(
+<<<<<<< HEAD
   {},
+=======
+>>>>>>> origin/main
   async (ctx, input): Promise<Output> => {
     const { session, page, logger } = ctx;
 
@@ -39,10 +42,17 @@ export const myWorkflow = workflow<Input, Output>(
 Key points:
 
 - The named export (e.g., `myWorkflow`) is what you pass as the second arg to `npx libretto run ./file.ts myWorkflow`
+<<<<<<< HEAD
 - `workflow(metadata, handler)` returns a branded workflow object with a `.run(ctx, input)` method. The CLI expects that contract.
 - `metadata` is currently an object and is typically `{}` in generated files.
 - `ctx` provides `session`, `page`, `logger`, and `services` (generic, default `{}`)
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
+=======
+- `workflow(handler)` returns a branded workflow object with a `.run(ctx, input)` method. The CLI expects that contract.
+- `ctx` provides `session`, `page`, `logger`, and `services` (generic, default `{}`)
+- `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
+- If the site requires a saved login session, pass `--auth-profile <domain>` to the CLI (created via `npx libretto save <domain>`)
+>>>>>>> origin/main
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.
 - The browser is launched and closed automatically by the CLI. Do not launch or close it in the handler.
 
@@ -58,7 +68,10 @@ import { type Transaction } from "./db";
 type MyServices = { tx?: Transaction };
 
 export const myWorkflow = workflow<Input, Output, MyServices>(
+<<<<<<< HEAD
   {},
+=======
+>>>>>>> origin/main
   async (ctx, input) => {
     if (ctx.services.tx) {
       await ctx.services.tx.insert(/* ... */);

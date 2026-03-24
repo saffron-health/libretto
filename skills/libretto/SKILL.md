@@ -49,6 +49,17 @@ npx libretto open https://example.com --headed
 npx libretto open https://example.com --headless --session debug-example
 ```
 
+### `connect`
+
+- Use `connect` to attach to any existing Chrome DevTools Protocol (CDP) endpoint — a browser started with `--remote-debugging-port`, an Electron app, or any other CDP-compatible target.
+- After connecting, `exec`, `snapshot`, `pages`, and all other session commands work normally.
+- Libretto does not manage the connected process's lifecycle. `close` clears the session but does not terminate the remote process.
+
+```bash
+npx libretto connect http://127.0.0.1:9222 --session my-session
+npx libretto connect http://127.0.0.1:9223 --session another-session
+```
+
 ### `snapshot`
 
 - Use `snapshot` as the primary page observation tool.
@@ -72,19 +83,20 @@ npx libretto snapshot \
 
 - Use `exec` for focused inspection and short-lived interaction experiments.
 - Use `exec` to validate selectors, inspect data, or prototype a step before you encode it in the workflow file.
+- Available globals: `page`, `context`, `browser`, `state`, `fetch`, `Buffer`.
 - Let failures throw. Do not hide `exec` failures with `try/catch` or `.catch()`.
 - Do not run multiple `exec` commands in parallel.
 
 ```bash
 npx libretto exec "return await page.url()"
 npx libretto exec "return await page.locator('button').count()"
-npx libretto exec --visualize "await page.locator('button:has-text(\"Continue\")').click()"
+npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
 ```
 
 ### `pages`
 
 - Use `pages` when a popup, new tab, or second page appears.
-- If `exec` or `snapshot` complains about multiple pages, list page ids first and then pass `--page`.
+- If `exec`, `snapshot`, `network`, or `actions` complains about multiple pages, list page ids first and then pass `--page`.
 
 ```bash
 npx libretto pages --session debug-example
@@ -107,8 +119,9 @@ npx libretto run ./integration.ts main --auth-profile app.example.com
 
 ### `resume`
 
-- Workflows pause by calling `await pause()` in the workflow file.
-- Use `resume` when a workflow hit `await pause()`.
+- Workflows pause by calling `await pause("session-name")` in the workflow file. Import `pause` from `"libretto"`.
+- `pause(session)` is a no-op when `NODE_ENV === "production"`.
+- Use `resume` when a workflow hit a `pause()` call.
 - Keep resuming the same session until the workflow completes or pauses again.
 
 ```bash
@@ -133,10 +146,17 @@ npx libretto close --session debug-example
 npx libretto close --all
 ```
 
-## Logs
+## Session Logs
 
-Session logs are JSONL files at `.libretto/sessions/<session>/`. Use `jq` to query them directly — for any filtering, slicing, or inspection task.
-There are no dedicated `network` or `actions` CLI commands.
+Session state is stored in `.libretto/sessions/<session>/state.json`.
+
+Session logs are JSONL files at `.libretto/sessions/<session>/`:
+
+- CLI logs are in `.libretto/sessions/<session>/logs.jsonl`.
+- Action logs are in `.libretto/sessions/<session>/actions.jsonl`.
+- Network logs are in `.libretto/sessions/<session>/network.jsonl`.
+
+Use `jq` to query jsonl logs directly — for any filtering, slicing, or inspection task.
 
 ```bash
 # Last 20 action entries
@@ -155,6 +175,40 @@ Read `references/action-logs.md` for full field descriptions and user-vs-agent e
 ### Network log (`network.jsonl`)
 
 Key fields: `ts` (ISO timestamp), `method` (HTTP method, e.g. `GET`, `POST`), `url` (request URL), `status` (HTTP status code), `contentType` (response content type), `responseBody` (response body string, may be null).
+
+## Examples
+
+### Building new browser automation workflows
+
+#### Interactive building
+
+```text
+<example>
+[Context: The user wants to build a new browser workflow and does not yet know the page structure]
+Assistant: I'll inspect the real site first if needed, but before I finish I'll create `target-workflow.ts` so the task produces reusable automation code.
+Assistant: [Runs `npx libretto open https://target.example.com --headed`]
+Assistant: [Reads `references/site-security-review.md` before choosing between passive network inspection, direct browser fetch calls, and Playwright-first automation]
+Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page and need the first meaningful step."`]
+Assistant: [Uses `network`, `snapshot`, and `exec` as needed to understand the site and decide the implementation path]
+Assistant: [Reads `references/code-generation-rules.md` before writing production workflow code]
+Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
+</example>
+```
+
+### Debugging existing workflows
+
+```text
+<example>
+[Context: The user has an existing Libretto workflow that is failing]
+Assistant: I'll reproduce the failure first so we can inspect the exact browser state it leaves behind.
+Assistant: [Runs `npx libretto run ./integration.ts main --session debug-flow --headed`]
+Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
+Assistant: [Runs `npx libretto snapshot --session debug-flow --objective "Find the blocking error or broken selector target" --context "The workflow just failed after trying to continue from the review step, and I need to identify the visible blocker on the current page."`]
+Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
+Assistant: [Reads `references/code-generation-rules.md` before patching the workflow file]
+Assistant: I found the issue. I'll patch the workflow code, then rerun `npx libretto run ...` to verify the fix.
+</example>
+```
 
 ## References
 

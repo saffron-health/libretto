@@ -97,7 +97,9 @@ function hasProviderKeys(config: ProviderTestConfig): boolean {
   return config.envKeys.some((key) => Boolean(dotEnv[key] || process.env[key]));
 }
 
-const hasAnyProviderKey = ENV_KEYS.some((key) => Boolean(dotEnv[key] || process.env[key]));
+const hasAnyProviderKey = ENV_KEYS.some((key) =>
+  Boolean(dotEnv[key] || process.env[key]),
+);
 
 describe("snapshot e2e – live site analysis", () => {
   liveSnapshotTest(
@@ -119,7 +121,7 @@ describe("snapshot e2e – live site analysis", () => {
 
       const snapshotStart = Date.now();
       const snapshot = await librettoCli(
-        `snapshot --session ${session} --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
+        `snapshot --session ${session} --context "LinkedIn feed scraping" --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
         allProviderEnv,
       );
       const snapshotDurationMs = Date.now() - snapshotStart;
@@ -160,7 +162,7 @@ describe("snapshot e2e – live site analysis", () => {
         const providerEnv = buildProviderEnv(...provider.envKeys);
         const snapshotStart = Date.now();
         const snapshot = await librettoCli(
-          `snapshot --session ${session} --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
+          `snapshot --session ${session} --context "LinkedIn feed scraping" --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
           providerEnv,
         );
         const snapshotDurationMs = Date.now() - snapshotStart;

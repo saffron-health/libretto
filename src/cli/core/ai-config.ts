@@ -58,7 +58,12 @@ const PROVIDER_ALIASES: Record<string, string> = {
   google: DEFAULT_MODELS.gemini,
 };
 
-const CONFIGURE_PROVIDERS = ["openai", "anthropic", "gemini", "vertex"] as const;
+const CONFIGURE_PROVIDERS = [
+  "openai",
+  "anthropic",
+  "gemini",
+  "vertex",
+] as const;
 
 function formatConfigureProviders(separator = " | "): string {
   return CONFIGURE_PROVIDERS.join(separator);
@@ -104,7 +109,9 @@ function invalidConfigError(configPath: string, detail?: string): Error {
       '  - "ai.model" must be a provider/model string like "openai/gpt-5.4" or "anthropic/claude-sonnet-4-6".',
       "Fix the file to match this shape, or delete it and rerun:",
       `  npx libretto ai configure ${formatConfigureProviders()}`,
-    ].filter(Boolean).join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n"),
   );
 }
 
@@ -231,7 +238,9 @@ export function runAiConfigure(
       console.log(
         `No AI config set. Choose a default model: ${configureCommandName} ${formatConfigureProviders()}`,
       );
-      console.log("Provider credentials still come from your shell or .env file.");
+      console.log(
+        "Provider credentials still come from your shell or .env file.",
+      );
       return;
     }
     printAiConfig(config, configPath);

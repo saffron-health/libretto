@@ -1,6 +1,8 @@
 import { z } from "zod";
+import type { LoggerApi } from "../../shared/logger/index.js";
+import { createLoggerForSession } from "../core/context.js";
 import {
-  SESSION_DEFAULT,
+  generateSessionName,
   readSessionStateOrThrow,
   type SessionState,
   validateSessionName,
@@ -10,21 +12,8 @@ import {
   type SimpleCLIMiddleware,
 } from "../framework/simple-cli.js";
 
-export function createSessionSchema() {
-  return z.string().default(SESSION_DEFAULT).superRefine((value, ctx) => {
-    try {
-      validateSessionName(value);
-    } catch (err) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  });
-}
-
-export function sessionOption(help = "Use a named session") {
-  return SimpleCLI.option(createSessionSchema(), { help });
+export function sessionOption(help = "Session name") {
+  return SimpleCLI.option(z.string().optional(), { help });
 }
 
 export function pageOption(help = "Target a specific page id") {
@@ -35,36 +24,46 @@ export function integerOption(help?: string) {
   return SimpleCLI.option(z.coerce.number().int().optional(), { help });
 }
 
-export type SessionInput = {
-  session: string;
-};
-
 export type SessionContext = {
   session: string;
+  logger: LoggerApi;
 };
 
 export type SessionStateContext = SessionContext & {
   sessionState: SessionState;
 };
 
-export const resolveSessionMiddleware: SimpleCLIMiddleware<
-  SessionInput,
+export function withRequiredSession(): SimpleCLIMiddleware<
+  { session?: string },
+  {},
+  SessionStateContext
+> {
+  return async ({ input, ctx }) => {
+    if (!input.session) {
+      throw new Error("Missing required option --session.");
+    }
+    validateSessionName(input.session);
+    const logger = createLoggerForSession(input.session);
+    return {
+      ...ctx,
+      session: input.session,
+      logger,
+      sessionState: readSessionStateOrThrow(input.session),
+    };
+  };
+}
+
+export function withAutoSession(): SimpleCLIMiddleware<
+  { session?: string },
   {},
   SessionContext
-> = async ({ input, ctx }) => {
-  return {
-    ...ctx,
-    session: input.session,
+> {
+  return async ({ input, ctx }) => {
+    const session = input.session ?? generateSessionName();
+    if (input.session) {
+      validateSessionName(input.session);
+    }
+    const logger = createLoggerForSession(session);
+    return { ...ctx, session, logger };
   };
-};
-
-export const loadSessionStateMiddleware: SimpleCLIMiddleware<
-  SessionInput,
-  SessionContext,
-  SessionStateContext
-> = async ({ ctx }) => {
-  return {
-    ...ctx,
-    sessionState: readSessionStateOrThrow(ctx.session),
-  };
-};
+}

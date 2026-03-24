@@ -23,7 +23,6 @@ type Output = {
 };
 
 export const myWorkflow = workflow<Input, Output>(
-  {},
   async (ctx, input): Promise<Output> => {
     const { session, page, logger } = ctx;
 
@@ -43,7 +42,7 @@ Key points:
 - `metadata` is currently an object and is typically `{}` in generated files.
 - `ctx` provides `session`, `page`, `logger`, and `services` (generic, default `{}`)
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
-- Use `await pause(ctx.session)` (or `await pause(session)`) for debugging when needed.
+- Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.
 - After validation is complete and the workflow is confirmed working end to end, remove all `pause()` calls and pause-only workflow params unless the user explicitly says to keep them.
 - The browser is launched and closed automatically by the CLI. Do not launch or close it in the handler.
 
@@ -59,7 +58,6 @@ import { type Transaction } from "./db";
 type MyServices = { tx?: Transaction };
 
 export const myWorkflow = workflow<Input, Output, MyServices>(
-  {},
   async (ctx, input) => {
     if (ctx.services.tx) {
       await ctx.services.tx.insert(/* ... */);

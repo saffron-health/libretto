@@ -22,17 +22,15 @@ import {
 import {
   readActionLog,
   readNetworkLog,
-  installExecAttachedPageActionLogging,
+  wrapPageForActionLogging,
 } from "../core/telemetry.js";
-import type {
-  RunIntegrationWorkerRequest,
-} from "../workers/run-integration-worker-protocol.js";
+import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
-  loadSessionStateMiddleware,
   pageOption,
-  resolveSessionMiddleware,
   sessionOption,
+  withAutoSession,
+  withRequiredSession,
 } from "./shared.js";
 
 type ExecFunction = (...args: unknown[]) => Promise<unknown>;
@@ -119,6 +117,87 @@ function compileExecFunction(
   return new AsyncFunction(...helperNames, code);
 }
 
+/**
+ * Strip `.catch(() => {})` / `?.catch(() => {})` from executable code,
+ * skipping occurrences inside string literals (single, double, backtick)
+ * and single-line / multi-line comments so we never corrupt non-code text.
+ */
+function stripEmptyCatchHandlers(code: string): {
+  cleaned: string;
+  strippedCount: number;
+} {
+  const catchRe = /\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g;
+  let strippedCount = 0;
+  let result = "";
+  let i = 0;
+
+  while (i < code.length) {
+    // Single-line comment
+    if (code[i] === "/" && code[i + 1] === "/") {
+      const end = code.indexOf("\n", i);
+      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 1);
+      result += slice;
+      i += slice.length;
+      continue;
+    }
+    // Multi-line comment
+    if (code[i] === "/" && code[i + 1] === "*") {
+      const end = code.indexOf("*/", i + 2);
+      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 2);
+      result += slice;
+      i += slice.length;
+      continue;
+    }
+    // String literals
+    if (code[i] === '"' || code[i] === "'" || code[i] === "`") {
+      const quote = code[i];
+      let j = i + 1;
+      while (j < code.length) {
+        if (code[j] === "\\" && quote !== "`") {
+          j += 2;
+          continue;
+        }
+        if (code[j] === "\\" && quote === "`") {
+          j += 2;
+          continue;
+        }
+        if (code[j] === quote) {
+          j++;
+          break;
+        }
+        // Template literal interpolation — skip nested braces
+        if (quote === "`" && code[j] === "$" && code[j + 1] === "{") {
+          let depth = 1;
+          j += 2;
+          while (j < code.length && depth > 0) {
+            if (code[j] === "{") depth++;
+            else if (code[j] === "}") depth--;
+            j++;
+          }
+          continue;
+        }
+        j++;
+      }
+      result += code.slice(i, j);
+      i = j;
+      continue;
+    }
+    // Try to match the catch pattern at the current position
+    catchRe.lastIndex = i;
+    const match = catchRe.exec(code);
+    if (match && match.index === i) {
+      strippedCount++;
+      i += match[0].length;
+      continue;
+    }
+    // Regular character
+    result += code[i];
+    i++;
+  }
+
+  return { cleaned: result, strippedCount };
+}
+
 async function runExec(
   code: string,
   session: string,
@@ -126,22 +205,26 @@ async function runExec(
   visualize = false,
   pageId?: string,
 ): Promise<void> {
+  const { cleaned: cleanedCode, strippedCount } = stripEmptyCatchHandlers(code);
+  if (strippedCount > 0) {
+    console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
+  }
   logger.info("exec-start", {
     session,
-    codeLength: code.length,
-    codePreview: code.slice(0, 200),
+    codeLength: cleanedCode.length,
+    codePreview: cleanedCode.slice(0, 200),
     visualize,
     pageId,
   });
-  const { browser, context, page, pageId: resolvedPageId } = await connect(
-    session,
-    logger,
-    10000,
-    {
-      pageId,
-      requireSinglePage: true,
-    },
-  );
+  const {
+    browser,
+    context,
+    page,
+    pageId: resolvedPageId,
+  } = await connect(session, logger, 10000, {
+    pageId,
+    requireSinglePage: true,
+  });
 
   const STALL_THRESHOLD_MS = 60_000;
   let lastActivityTs = Date.now();
@@ -155,10 +238,10 @@ async function runExec(
       logger.warn("exec-stall-warning", {
         session,
         silenceMs,
-        codePreview: code.slice(0, 200),
+        codePreview: cleanedCode.slice(0, 200),
       });
       console.warn(
-        `[stall-warning] No Playwright activity for ${Math.round(silenceMs / 1000)}s — exec may be hung (code: ${code.slice(0, 100)}...)`,
+        `[stall-warning] No Playwright activity for ${Math.round(silenceMs / 1000)}s — exec may be hung (code: ${cleanedCode.slice(0, 100)}...)`,
       );
     }
   }, STALL_THRESHOLD_MS);
@@ -168,17 +251,12 @@ async function runExec(
     logger.info("exec-interrupted", {
       session,
       duration: Date.now() - execStartTs,
-      codePreview: code.slice(0, 200),
+      codePreview: cleanedCode.slice(0, 200),
     });
   };
   process.on("SIGINT", sigintHandler);
 
-  installExecAttachedPageActionLogging(
-    page,
-    session,
-    resolvedPageId,
-    onActivity,
-  );
+  wrapPageForActionLogging(page, session, resolvedPageId, onActivity);
 
   if (visualize) {
     await installInstrumentation(page, { visualize: true, logger });
@@ -188,7 +266,12 @@ async function runExec(
     const execState: Record<string, unknown> = {};
 
     const networkLog = (
-      opts: { last?: number; filter?: string; method?: string; pageId?: string } = {},
+      opts: {
+        last?: number;
+        filter?: string;
+        method?: string;
+        pageId?: string;
+      } = {},
     ) => {
       return readNetworkLog(session, opts);
     };
@@ -223,7 +306,7 @@ async function runExec(
     };
 
     const helperNames = Object.keys(helpers);
-    const fn = compileExecFunction(code, helperNames);
+    const fn = compileExecFunction(cleanedCode, helperNames);
 
     const result = await fn(...Object.values(helpers));
     logger.info("exec-success", { session, hasResult: result !== undefined });
@@ -231,12 +314,14 @@ async function runExec(
       console.log(
         typeof result === "string" ? result : JSON.stringify(result, null, 2),
       );
+    } else {
+      console.log("Executed successfully");
     }
   } catch (err) {
     logger.error("exec-error", {
       error: err,
       session,
-      codePreview: code.slice(0, 200),
+      codePreview: cleanedCode.slice(0, 200),
     });
     throw err;
   } finally {
@@ -279,6 +364,8 @@ async function stopExistingFailedRunSession(
     port: existingState.port,
   });
   clearSessionState(session, logger);
+
+  if (existingState.pid == null) return;
 
   const stopDeadline = Date.now() + 3_000;
   while (isProcessRunning(existingState.pid) && Date.now() < stopDeadline) {
@@ -378,11 +465,19 @@ async function waitForWorkflowOutcome(
   let outputOffset = 0;
 
   while (true) {
-    outputOffset = streamOutputSince(signalPaths.outputSignalPath, outputOffset);
+    outputOffset = streamOutputSince(
+      signalPaths.outputSignalPath,
+      outputOffset,
+    );
 
     if (existsSync(signalPaths.failedSignalPath)) {
-      outputOffset = streamOutputSince(signalPaths.outputSignalPath, outputOffset);
-      const failureDetails = await waitForFailureDetails(signalPaths.failedSignalPath);
+      outputOffset = streamOutputSince(
+        signalPaths.outputSignalPath,
+        outputOffset,
+      );
+      const failureDetails = await waitForFailureDetails(
+        signalPaths.failedSignalPath,
+      );
       return {
         status: "failed",
         message: failureDetails?.message,
@@ -391,17 +486,26 @@ async function waitForWorkflowOutcome(
     }
 
     if (existsSync(signalPaths.completedSignalPath)) {
-      outputOffset = streamOutputSince(signalPaths.outputSignalPath, outputOffset);
+      outputOffset = streamOutputSince(
+        signalPaths.outputSignalPath,
+        outputOffset,
+      );
       return { status: "completed" };
     }
 
     if (existsSync(signalPaths.pausedSignalPath)) {
-      outputOffset = streamOutputSince(signalPaths.outputSignalPath, outputOffset);
+      outputOffset = streamOutputSince(
+        signalPaths.outputSignalPath,
+        outputOffset,
+      );
       return { status: "paused" };
     }
 
     if (!isProcessRunning(args.pid)) {
-      outputOffset = streamOutputSince(signalPaths.outputSignalPath, outputOffset);
+      outputOffset = streamOutputSince(
+        signalPaths.outputSignalPath,
+        outputOffset,
+      );
       return { status: "exited" };
     }
 
@@ -428,9 +532,9 @@ async function runResume(
     );
   }
 
-  if (!isProcessRunning(sessionState.pid)) {
+  if (sessionState.pid == null || !isProcessRunning(sessionState.pid)) {
     throw new Error(
-      `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid} is not running).`,
+      `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid ?? "unknown"} is not running).`,
     );
   }
 
@@ -458,7 +562,7 @@ async function runResume(
 
   const outcome = await waitForWorkflowOutcome({
     session,
-    pid: sessionState.pid,
+    pid: sessionState.pid!,
   });
 
   if (outcome.status === "completed") {
@@ -509,16 +613,20 @@ async function runIntegrationFromFile(
     authProfileDomain: args.authProfileDomain,
     viewport: args.viewport,
   } satisfies RunIntegrationWorkerRequest);
-  const worker = spawn(process.execPath, [
-    tsxCliPath,
-    ...(args.tsconfigPath ? ["--tsconfig", args.tsconfigPath] : []),
-    workerEntryPath,
-    payload,
-  ], {
-    detached: true,
-    stdio: "ignore",
-    env: process.env,
-  });
+  const worker = spawn(
+    process.execPath,
+    [
+      tsxCliPath,
+      ...(args.tsconfigPath ? ["--tsconfig", args.tsconfigPath] : []),
+      workerEntryPath,
+      payload,
+    ],
+    {
+      detached: true,
+      stdio: "ignore",
+      env: process.env,
+    },
+  );
   worker.unref();
   const outcome = await waitForWorkflowOutcome({
     session: args.session,
@@ -557,7 +665,9 @@ export const execInput = SimpleCLI.input({
   ],
   named: {
     session: sessionOption(),
-    visualize: SimpleCLI.flag({ help: "Enable ghost cursor + highlight visualization" }),
+    visualize: SimpleCLI.flag({
+      help: "Enable ghost cursor + highlight visualization",
+    }),
     page: pageOption(),
   },
 }).refine(
@@ -565,26 +675,22 @@ export const execInput = SimpleCLI.input({
   `Usage: libretto exec <code> [--session <name>] [--visualize]`,
 );
 
-export function createExecCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Execute Playwright TypeScript code",
-  })
-    .input(execInput)
-    .use(resolveSessionMiddleware)
-    .use(loadSessionStateMiddleware)
-    .handle(async ({ input, ctx }) => {
-      await runExec(
-        input.codeParts.join(" "),
-        ctx.session,
-        logger,
-        input.visualize,
-        input.page,
-      );
-    });
-}
+export const execCommand = SimpleCLI.command({
+  description: "Execute Playwright TypeScript code",
+})
+  .input(execInput)
+  .use(withRequiredSession())
+  .handle(async ({ input, ctx }) => {
+    await runExec(
+      input.codeParts.join(" "),
+      ctx.session,
+      ctx.logger,
+      input.visualize,
+      input.page,
+    );
+  });
 
-const runUsage =
-  `Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
+const runUsage = `Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -626,8 +732,14 @@ export const runInput = SimpleCLI.input({
     (input) => Boolean(input.integrationFile && input.integrationExport),
     runUsage,
   )
-  .refine((input) => !(input.params && input.paramsFile), "Pass either --params or --params-file, not both.")
-  .refine((input) => !(input.headed && input.headless), "Cannot pass both --headed and --headless.");
+  .refine(
+    (input) => !(input.params && input.paramsFile),
+    "Pass either --params or --params-file, not both.",
+  )
+  .refine(
+    (input) => !(input.headed && input.headless),
+    "Cannot pass both --headed and --headless.",
+  );
 
 function resolveRunParams(
   rawInlineParams: string | undefined,
@@ -650,26 +762,29 @@ function resolveRunParams(
   return {};
 }
 
-export function createRunCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Run an exported Libretto workflow from a file",
-  })
-    .input(runInput)
-    .use(resolveSessionMiddleware)
-    .handle(async ({ input, ctx }) => {
-      await stopExistingFailedRunSession(ctx.session, logger);
-      assertSessionAvailableForStart(ctx.session, logger);
+export const runCommand = SimpleCLI.command({
+  description: "Run an exported Libretto workflow from a file",
+})
+  .input(runInput)
+  .use(withAutoSession())
+  .handle(async ({ input, ctx }) => {
+    await stopExistingFailedRunSession(ctx.session, ctx.logger);
+    assertSessionAvailableForStart(ctx.session, ctx.logger);
 
-      const params = resolveRunParams(input.params, input.paramsFile);
-      const headlessMode = input.headed
-        ? false
-        : input.headless
-          ? true
-          : undefined;
-      const visualize = !input.noVisualize;
-      const viewport = resolveViewport(parseViewportArg(input.viewport), logger);
+    const params = resolveRunParams(input.params, input.paramsFile);
+    const headlessMode = input.headed
+      ? false
+      : input.headless
+        ? true
+        : undefined;
+    const visualize = !input.noVisualize;
+    const viewport = resolveViewport(
+      parseViewportArg(input.viewport),
+      ctx.logger,
+    );
 
-      await runIntegrationFromFile({
+    await runIntegrationFromFile(
+      {
         integrationPath: input.integrationFile!,
         exportName: input.integrationExport!,
         session: ctx.session,
@@ -679,9 +794,10 @@ export function createRunCommand(logger: LoggerApi) {
         visualize,
         authProfileDomain: input.authProfile,
         viewport,
-      }, logger);
-    });
-}
+      },
+      ctx.logger,
+    );
+  });
 
 export const resumeInput = SimpleCLI.input({
   positionals: [],
@@ -690,22 +806,17 @@ export const resumeInput = SimpleCLI.input({
   },
 });
 
-export function createResumeCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Resume a paused workflow for the current session",
-  })
-    .input(resumeInput)
-    .use(resolveSessionMiddleware)
-    .use(loadSessionStateMiddleware)
-    .handle(async ({ ctx }) => {
-      await runResume(ctx.session, logger, ctx.sessionState);
-    });
-}
+export const resumeCommand = SimpleCLI.command({
+  description: "Resume a paused workflow for the current session",
+})
+  .input(resumeInput)
+  .use(withRequiredSession())
+  .handle(async ({ ctx }) => {
+    await runResume(ctx.session, ctx.logger, ctx.sessionState);
+  });
 
-export function createExecutionCommands(logger: LoggerApi) {
-  return {
-    exec: createExecCommand(logger),
-    run: createRunCommand(logger),
-    resume: createResumeCommand(logger),
-  };
-}
+export const executionCommands = {
+  exec: execCommand,
+  run: runCommand,
+  resume: resumeCommand,
+};

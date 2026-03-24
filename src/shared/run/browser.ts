@@ -1,8 +1,16 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "playwright";
 import { createServer } from "node:net";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { ensureLibrettoSessionStatePath } from "../paths/paths.js";
-import { SESSION_STATE_VERSION, SessionStateFileSchema } from "../state/session-state.js";
+import {
+  SESSION_STATE_VERSION,
+  SessionStateFileSchema,
+} from "../state/session-state.js";
 import { readLibrettoConfig } from "../../cli/core/ai-config.js";
 
 async function pickFreePort(): Promise<number> {
@@ -116,7 +124,8 @@ export async function launchBrowser({
     ? (JSON.parse(readFileSync(metadataPath, "utf-8")) as unknown)
     : undefined;
 
-  const parsedExistingState = SessionStateFileSchema.safeParse(existingStateRaw);
+  const parsedExistingState =
+    SessionStateFileSchema.safeParse(existingStateRaw);
 
   writeFileSync(
     metadataPath,

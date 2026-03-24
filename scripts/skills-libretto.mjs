@@ -18,7 +18,11 @@ export const SKILL_DIRS = [
 
 function walkFiles(dir, baseDir = dir) {
   const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+<<<<<<< HEAD
     a.name.localeCompare(b.name)
+=======
+    a.name.localeCompare(b.name),
+>>>>>>> origin/main
   );
   const files = [];
 
@@ -89,7 +93,13 @@ export function compareSkillDirs(repoRoot) {
       if (!existsSync(targetPath)) continue;
       const actualContent = readFileSync(targetPath);
       if (!expectedContent.equals(actualContent)) {
+<<<<<<< HEAD
         mismatches.push(`${root.label} differs from ${roots[0].label}: ${file}`);
+=======
+        mismatches.push(
+          `${root.label} differs from ${roots[0].label}: ${file}`,
+        );
+>>>>>>> origin/main
       }
     }
   }

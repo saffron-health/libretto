@@ -1,19 +1,22 @@
 import { z } from "zod";
-import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   runClose as runCloseWithLogger,
   runCloseAll as runCloseAllWithLogger,
+  runConnect as runConnectWithLogger,
   runOpen,
   runPages,
   runSave,
 } from "../core/browser.js";
-import { withSessionLogger } from "../core/context.js";
-import { assertSessionAvailableForStart } from "../core/session.js";
+import { createLoggerForSession, withSessionLogger } from "../core/context.js";
+import {
+  assertSessionAvailableForStart,
+  validateSessionName,
+} from "../core/session.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
-  loadSessionStateMiddleware,
-  resolveSessionMiddleware,
   sessionOption,
+  withAutoSession,
+  withRequiredSession,
 } from "./shared.js";
 
 export function parseViewportArg(
@@ -63,19 +66,40 @@ export const openInput = SimpleCLI.input({
     "Cannot pass both --headed and --headless.",
   );
 
-export function createOpenCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Launch browser and open URL (headed by default)",
-  })
-    .input(openInput)
-    .use(resolveSessionMiddleware)
-    .handle(async ({ input, ctx }) => {
-      assertSessionAvailableForStart(ctx.session, logger);
-      const headed = input.headed || !input.headless;
-      const viewport = parseViewportArg(input.viewport);
-      await runOpen(input.url!, headed, ctx.session, logger, { viewport });
-    });
-}
+export const openCommand = SimpleCLI.command({
+  description: "Launch browser and open URL (headed by default)",
+})
+  .input(openInput)
+  .use(withAutoSession())
+  .handle(async ({ input, ctx }) => {
+    assertSessionAvailableForStart(ctx.session, ctx.logger);
+    const headed = input.headed || !input.headless;
+    const viewport = parseViewportArg(input.viewport);
+    await runOpen(input.url!, headed, ctx.session, ctx.logger, { viewport });
+  });
+
+export const connectInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("cdpUrl", z.string().optional(), {
+      help: "CDP endpoint URL (e.g. http://127.0.0.1:9222)",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+  },
+}).refine(
+  (input) => Boolean(input.cdpUrl),
+  `Usage: libretto connect <cdp-url> --session <name>`,
+);
+
+export const connectCommand = SimpleCLI.command({
+  description: "Connect to an existing Chrome DevTools Protocol (CDP) endpoint",
+})
+  .input(connectInput)
+  .use(withAutoSession())
+  .handle(async ({ input, ctx }) => {
+    await runConnectWithLogger(input.cdpUrl!, ctx.session, ctx.logger);
+  });
 
 export const saveInput = SimpleCLI.input({
   positionals: [
@@ -88,20 +112,17 @@ export const saveInput = SimpleCLI.input({
   },
 }).refine(
   (input) => Boolean(input.urlOrDomain),
-  `Usage: libretto save <url|domain> [--session <name>]`,
+  `Usage: libretto save <url|domain> --session <name>`,
 );
 
-export function createSaveCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Save current browser session",
-  })
-    .input(saveInput)
-    .use(resolveSessionMiddleware)
-    .use(loadSessionStateMiddleware)
-    .handle(async ({ input, ctx }) => {
-      await runSave(input.urlOrDomain!, ctx.session, logger);
-    });
-}
+export const saveCommand = SimpleCLI.command({
+  description: "Save current browser session",
+})
+  .input(saveInput)
+  .use(withRequiredSession())
+  .handle(async ({ input, ctx }) => {
+    await runSave(input.urlOrDomain!, ctx.session, ctx.logger);
+  });
 
 export const pagesInput = SimpleCLI.input({
   positionals: [],
@@ -110,53 +131,56 @@ export const pagesInput = SimpleCLI.input({
   },
 });
 
-export function createPagesCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "List open pages in the session",
-  })
-    .input(pagesInput)
-    .use(resolveSessionMiddleware)
-    .use(loadSessionStateMiddleware)
-    .handle(async ({ ctx }) => {
-      await runPages(ctx.session, logger);
-    });
-}
+export const pagesCommand = SimpleCLI.command({
+  description: "List open pages in the session",
+})
+  .input(pagesInput)
+  .use(withRequiredSession())
+  .handle(async ({ ctx }) => {
+    await runPages(ctx.session, ctx.logger);
+  });
 
 export const closeInput = SimpleCLI.input({
   positionals: [],
   named: {
     session: sessionOption(),
-    all: SimpleCLI.flag({ help: "Close all tracked sessions in this workspace" }),
-    force: SimpleCLI.flag({ help: "Force kill sessions that ignore SIGTERM (requires --all)" }),
+    all: SimpleCLI.flag({
+      help: "Close all tracked sessions in this workspace",
+    }),
+    force: SimpleCLI.flag({
+      help: "Force kill sessions that ignore SIGTERM (requires --all)",
+    }),
   },
-});
+}).refine(
+  (input) => input.all || input.session,
+  `Usage: libretto close --session <name>\nUsage: libretto close --all [--force]`,
+);
 
-export function createCloseCommand(logger: LoggerApi) {
-  return SimpleCLI.command({
-    description: "Close the browser",
-  })
-    .input(closeInput)
-    .use(resolveSessionMiddleware)
-    .handle(async ({ input, ctx }) => {
-      if (input.force && !input.all) {
-        throw new Error(`Usage: libretto close --all [--force]`);
-      }
-      if (input.all) {
-        await runCloseAllWithLogger(logger, { force: input.force });
-        return;
-      }
-      await runCloseWithLogger(ctx.session, logger);
-    });
-}
+export const closeCommand = SimpleCLI.command({
+  description: "Close the browser",
+})
+  .input(closeInput)
+  .handle(async ({ input }) => {
+    if (input.force && !input.all) {
+      throw new Error(`Usage: libretto close --all [--force]`);
+    }
+    if (input.all) {
+      const logger = createLoggerForSession("cli");
+      await runCloseAllWithLogger(logger, { force: input.force });
+      return;
+    }
+    validateSessionName(input.session!);
+    const logger = createLoggerForSession(input.session!);
+    await runCloseWithLogger(input.session!, logger);
+  });
 
-export function createBrowserCommands(logger: LoggerApi) {
-  return {
-    open: createOpenCommand(logger),
-    save: createSaveCommand(logger),
-    pages: createPagesCommand(logger),
-    close: createCloseCommand(logger),
-  };
-}
+export const browserCommands = {
+  open: openCommand,
+  connect: connectCommand,
+  save: saveCommand,
+  pages: pagesCommand,
+  close: closeCommand,
+};
 
 export async function runClose(session: string): Promise<void> {
   await withSessionLogger(session, async (logger) => {

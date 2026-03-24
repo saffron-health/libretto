@@ -31,9 +31,16 @@ const gitResult = spawnSync("git", ["rev-parse", "--show-toplevel"], {
   encoding: "utf-8",
   stdio: ["pipe", "pipe", "pipe"],
 });
+<<<<<<< HEAD
 const repoRoot = gitResult.status === 0 && gitResult.stdout
   ? gitResult.stdout.trim()
   : installCwd;
+=======
+const repoRoot =
+  gitResult.status === 0 && gitResult.stdout
+    ? gitResult.stdout.trim()
+    : installCwd;
+>>>>>>> origin/main
 
 const sourceDir = join(packageRoot, "skills", "libretto");
 if (!existsSync(sourceDir)) process.exit(0);

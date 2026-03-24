@@ -1,6 +1,35 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
+
+function extractReturnedSessionId(output: string): string | null {
+  const patterns = [
+    /\(session:\s*([a-zA-Z0-9._-]+)\)/i,
+    /session id[:=]\s*([a-zA-Z0-9._-]+)/i,
+    /session[:=]\s*([a-zA-Z0-9._-]+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = output.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
+function requireReturnedSessionId(
+  command: string,
+  stdout: string,
+  stderr: string,
+): string {
+  const combined = `${stdout}\n${stderr}`;
+  const sessionId = extractReturnedSessionId(combined);
+  if (!sessionId) {
+    throw new Error(
+      `Could not find a returned session id for "${command}".\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+    );
+  }
+  return sessionId;
+}
 
 describe("state-driven CLI subprocess behavior", () => {
   test("shows missing AI config", async ({ librettoCli, evaluate }) => {
@@ -27,9 +56,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(show.stderr).toBe("");
 
     const clear = await librettoCli("ai configure --clear");
-    await evaluate(clear.stdout).toMatch(
-      "Confirms the AI config was cleared.",
-    );
+    await evaluate(clear.stdout).toMatch("Confirms the AI config was cleared.");
     expect(clear.stderr).toBe("");
 
     const showAfterClear = await librettoCli("ai configure");
@@ -79,7 +106,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(show.stdout).toContain("Model: openai/gpt-4o");
   });
 
-  test("snapshot without --objective captures files without analysis", async ({
+  test("snapshot without --objective shows a clear error", async ({
     librettoCli,
   }) => {
     const session = "snapshot-no-objective";
@@ -88,11 +115,8 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const snapshot = await librettoCli(`snapshot --session ${session}`);
-    expect(snapshot.stdout).toContain("Screenshot saved:");
-    expect(snapshot.stdout).toContain("PNG:");
-    expect(snapshot.stdout).toContain("HTML:");
-    expect(snapshot.stdout).toContain("Condensed HTML:");
-    expect(snapshot.stdout).toContain("Use --objective flag to analyze snapshots.");
+    expect(snapshot.exitCode).not.toBe(0);
+    expect(snapshot.stderr).toContain("Missing required option --objective.");
   }, 45_000);
 
   test("snapshot --objective requires API credentials", async ({
@@ -105,7 +129,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const snapshot = await librettoCli(
-      `snapshot --objective "Find heading" --session ${session}`,
+      `snapshot --objective "Find heading" --context "Testing credentials" --session ${session}`,
       {
         LIBRETTO_DISABLE_DOTENV: "1",
         OPENAI_API_KEY: "",
@@ -121,7 +145,9 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(snapshot.stderr).toContain(
       "Failed to analyze snapshot because no snapshot analyzer is configured.",
     );
-    expect(snapshot.stderr).toContain("For more info, run `npx libretto init`.");
+    expect(snapshot.stderr).toContain(
+      "For more info, run `npx libretto init`.",
+    );
     expect(
       existsSync(workspacePath(".libretto", "sessions", session, "snapshots")),
     ).toBe(false);
@@ -138,29 +164,33 @@ describe("state-driven CLI subprocess behavior", () => {
     const snapshot = await librettoCli(
       `snapshot --context "extra context only" --session ${session}`,
     );
-    expect(snapshot.stderr).toContain(
-      "Couldn't run analysis: --objective is required when providing --context.",
-    );
+    expect(snapshot.exitCode).not.toBe(0);
+    expect(snapshot.stderr).toContain("Missing required option --objective.");
   }, 45_000);
 
-  test("open without --session uses the default session", async ({
+  test("open without --session auto-generates a session", async ({
     librettoCli,
     evaluate,
   }) => {
     const opened = await librettoCli("open https://example.com --headless");
     await evaluate(opened.stdout).toMatch(
-      "Confirms the browser opened successfully for example.com using the default session.",
+      "Confirms the browser opened successfully for example.com.",
     );
-
-    const snapshot = await librettoCli("snapshot --session default");
-    expect(snapshot.stdout).toContain("Screenshot saved:");
+    const sessionId = requireReturnedSessionId(
+      "open",
+      opened.stdout,
+      opened.stderr,
+    );
+    expect(sessionId).toBeTruthy();
   }, 60_000);
 
   test("shows a clear error when opening an already active session", async ({
     librettoCli,
   }) => {
     const session = "already-open";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     const secondOpen = await librettoCli(
       `open https://example.com --headless --session ${session}`,
@@ -168,9 +198,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(secondOpen.stderr).toContain(
       `Session "${session}" is already open and connected to`,
     );
-    expect(secondOpen.stderr).toContain(
-      `libretto close --session ${session}`,
-    );
+    expect(secondOpen.stderr).toContain(`libretto close --session ${session}`);
   }, 45_000);
 
   test("shows recovery guidance when a session-backed command targets a missing session", async ({
@@ -211,16 +239,12 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(result.stdout).toContain("No browser sessions found.");
   });
 
-  test("rejects close --force without --all", async ({
-    librettoCli,
-  }) => {
+  test("rejects close --force without --all", async ({ librettoCli }) => {
     const result = await librettoCli("close --force");
     expect(result.stderr).toContain("Usage: libretto close --all [--force]");
   });
 
-  test("close --all closes active sessions", async ({
-    librettoCli,
-  }) => {
+  test("close --all closes active sessions", async ({ librettoCli }) => {
     const sessionOne = "close-all-session-one";
     const sessionTwo = "close-all-session-two";
 
@@ -245,126 +269,47 @@ describe("state-driven CLI subprocess behavior", () => {
     );
   }, 45_000);
 
-  test("writes network logs for a live session", async ({
+  test("reads and clears network logs for a live session", async ({
     librettoCli,
-    workspacePath,
+    evaluate,
   }) => {
     const session = "network-live-session";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     await librettoCli(
       `exec "await page.goto('https://example.com/?network=one'); return await page.url();" --session ${session}`,
     );
 
-    const logPath = workspacePath(
-      ".libretto",
-      "sessions",
-      session,
-      "network.jsonl",
+    const view = await librettoCli(`network --session ${session} --last 5`);
+    await evaluate(view.stdout).toMatch(
+      "Shows at least one network request result for the session.",
     );
-    expect(existsSync(logPath)).toBe(true);
 
-    const entries = readFileSync(logPath, "utf8")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as { url?: string; method?: string });
-
-    expect(
-      entries.some(
-        (entry) =>
-          entry.method === "GET" &&
-          entry.url?.includes("https://example.com/?network=one"),
-      ),
-    ).toBe(true);
+    const clear = await librettoCli(`network --session ${session} --clear`);
+    expect(clear.stdout).toContain("Network log cleared.");
   }, 60_000);
 
-  test("writes action logs for a live session", async ({
+  test("reads and clears action logs for a live session", async ({
     librettoCli,
-    workspacePath,
+    evaluate,
   }) => {
     const session = "actions-live-session";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     await librettoCli(
       `exec "await page.reload(); return await page.url();" --session ${session}`,
     );
 
-    const logPath = workspacePath(
-      ".libretto",
-      "sessions",
-      session,
-      "actions.jsonl",
-    );
-    expect(existsSync(logPath)).toBe(true);
-
-    const entries = readFileSync(logPath, "utf8")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map(
-        (line) =>
-          JSON.parse(line) as { action?: string; source?: string; url?: string },
-      );
-
-    expect(
-      entries.some(
-        (entry) =>
-          entry.source === "agent" &&
-          /^(reload|goto)$/.test(entry.action ?? "") &&
-          entry.url?.includes("example.com"),
-      ),
-    ).toBe(true);
-  }, 60_000);
-
-  test("logs richer user action selectors for nested click targets", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    const session = "actions-rich-user-log";
-    const html = encodeURIComponent(
-      `<button id="saveBtn" aria-label="Save record"><span>Save</span></button>`,
-    );
-    await librettoCli(`open https://example.com --headless --session ${session}`);
-
-    await librettoCli(
-      `exec "await page.goto('data:text/html,${html}'); return await page.url();" --session ${session}`,
-    );
-    await librettoCli(
-      `exec "await page.evaluate(() => { const target = document.querySelector('#saveBtn span'); if (!(target instanceof HTMLElement)) throw new Error('Missing nested span target'); target.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 42, clientY: 24 })); });" --session ${session}`,
+    const view = await librettoCli(`actions --session ${session} --last 5`);
+    await evaluate(view.stdout).toMatch(
+      "Shows at least one action result for the session.",
     );
 
-    const logPath = workspacePath(
-      ".libretto",
-      "sessions",
-      session,
-      "actions.jsonl",
-    );
-    const entries = readFileSync(logPath, "utf8")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map(
-        (line) =>
-          JSON.parse(line) as {
-            action?: string;
-            source?: string;
-            bestSemanticSelector?: string;
-            targetSelector?: string;
-            nearbyText?: string;
-            coordinates?: { x?: number; y?: number };
-          },
-      );
-
-    const entry = entries.find(
-      (candidate) =>
-        candidate.source === "user" && candidate.action === "dblclick",
-    );
-
-    expect(entry).toBeDefined();
-    expect(entry?.bestSemanticSelector).toContain("button#saveBtn");
-    expect(entry?.targetSelector).toBe("span");
-    expect(entry?.nearbyText).toContain("Save");
-    expect(entry?.coordinates).toEqual({ x: 42, y: 24 });
+    const clear = await librettoCli(`actions --session ${session} --clear`);
+    expect(clear.stdout).toContain("Action log cleared.");
   }, 60_000);
 });
