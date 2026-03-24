@@ -83,6 +83,7 @@ npx libretto snapshot \
 
 - Use `exec` for focused inspection and short-lived interaction experiments.
 - Use `exec` to validate selectors, inspect data, or prototype a step before you encode it in the workflow file.
+- Use `exec -` to run multi-line scripts from stdin, especially when the code is too long or complex for a command line argument.
 - Available globals: `page`, `context`, `browser`, `state`, `fetch`, `Buffer`.
 - Let failures throw. Do not hide `exec` failures with `try/catch` or `.catch()`.
 - Do not run multiple `exec` commands in parallel.
@@ -91,6 +92,7 @@ npx libretto snapshot \
 npx libretto exec "return await page.url()"
 npx libretto exec "return await page.locator('button').count()"
 npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
+echo "return await page.url()" | npx libretto exec - --session debug-example
 ```
 
 ### `pages`

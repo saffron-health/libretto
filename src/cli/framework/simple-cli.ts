@@ -579,6 +579,11 @@ export class SimpleCLIApp {
         break;
       }
 
+      if (arg === "-") {
+        positionals.push(arg);
+        continue;
+      }
+
       if (arg.startsWith("--")) {
         const [rawName, inlineValue] = splitNamedArg(arg.slice(2));
         const namedEntry = namedSpecs.get(rawName);

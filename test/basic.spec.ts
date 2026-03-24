@@ -209,7 +209,7 @@ describe("basic CLI subprocess behavior", () => {
   test("fails exec with missing code usage error", async ({ librettoCli }) => {
     const result = await librettoCli("exec --session test");
     expect(result.stderr).toContain(
-      "Usage: libretto exec <code> [--session <name>] [--visualize]",
+      "Usage: libretto exec <code|-> [--session <name>] [--visualize]",
     );
   });
 
@@ -224,6 +224,29 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).not.toContain(
       `Missing required --session for "exec".`,
     );
+  });
+
+  test("exec with hyphen requires stdin input", async ({ librettoCli }) => {
+    const session = "exec-stdin-requires-input";
+    await librettoCli(`open https://example.com --headless --session ${session}`);
+
+    const result = await librettoCli(`exec - --session ${session}`);
+    expect(result.stderr).toContain("Missing stdin input for `exec -`.");
+  });
+
+  test("exec with hyphen executes code piped through stdin", async ({
+    librettoCli,
+  }) => {
+    const session = "exec-stdin-with-input";
+    await librettoCli(`open https://example.com --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec - --session ${session}`,
+      undefined,
+      "return 1;",
+    );
+    expect(result.stdout).toContain("1");
+    expect(result.stderr).toBe("");
   });
 
   test("fails run when integration file does not exist", async ({

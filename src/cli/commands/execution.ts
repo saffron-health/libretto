@@ -656,11 +656,20 @@ async function runIntegrationFromFile(
   console.log("Integration completed.");
 }
 
+function readStdinSync(): string | null {
+  if (process.stdin.isTTY === true) return null;
+  try {
+    const content = readFileSync(0, "utf8");
+    return content.trim().length > 0 ? content : null;
+  } catch {
+    return null;
+  }
+}
+
 export const execInput = SimpleCLI.input({
   positionals: [
-    SimpleCLI.positional("codeParts", z.array(z.string()).default([]), {
+    SimpleCLI.positional("code", z.string().optional(), {
       help: "Playwright TypeScript code to execute",
-      variadic: true,
     }),
   ],
   named: {
@@ -671,8 +680,8 @@ export const execInput = SimpleCLI.input({
     page: pageOption(),
   },
 }).refine(
-  (input) => input.codeParts.length > 0,
-  `Usage: libretto exec <code> [--session <name>] [--visualize]`,
+  (input) => input.code !== undefined,
+  `Usage: libretto exec <code|-> [--session <name>] [--visualize]\n       echo '<code>' | libretto exec - [--session <name>] [--visualize]`,
 );
 
 export const execCommand = SimpleCLI.command({
@@ -681,8 +690,15 @@ export const execCommand = SimpleCLI.command({
   .input(execInput)
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
+    const code = input.code!;
+    const codeFromArgsOrStdin = code === "-" ? readStdinSync() : code;
+    if (codeFromArgsOrStdin === null) {
+      throw new Error(
+        "Missing stdin input for `exec -`. Pipe Playwright code into stdin.",
+      );
+    }
     await runExec(
-      input.codeParts.join(" "),
+      codeFromArgsOrStdin,
       ctx.session,
       ctx.logger,
       input.visualize,
