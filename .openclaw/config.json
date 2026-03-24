@@ -1,0 +1,4 @@
+{
+  "description": "OpenClaw configuration for Libretto skill",
+  "skill_path": "../skills/libretto"
+}

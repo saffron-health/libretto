@@ -72,6 +72,19 @@ npx libretto close                         # close the browser
 npx libretto ai configure <provider>       # configure snapshot analysis model
 ```
 
+
+## Multi-Agent Support
+
+Libretto supports multiple coding agents out of the box:
+
+- **Claude Code** (`.claude/`)
+- **OpenCode** (`.opencode/`)
+- **Pi** (`.pi/`)
+- **OpenClaw** (`.openclaw/`)
+- **Generic agents** (`.agents/`)
+
+The Libretto skill works consistently across all agents. Simply install the skill in your preferred agent and use the same commands and workflows.
+
 ## Configuration
 
 All Libretto state lives in a `.libretto/` directory at your project root. Configuration is stored in `.libretto/config.json`.
