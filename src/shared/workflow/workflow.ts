@@ -3,8 +3,6 @@ import type { MinimalLogger } from "../logger/logger.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
-export type LibrettoWorkflowMetadata = {};
-
 export type LibrettoWorkflowContext<S = {}> = {
   session: string;
   page: Page;
@@ -20,14 +18,9 @@ export type LibrettoWorkflowHandler<
 
 export class LibrettoWorkflow<Input = unknown, Output = unknown, S = {}> {
   public readonly [LIBRETTO_WORKFLOW_BRAND] = true;
-  public readonly metadata: LibrettoWorkflowMetadata;
   private readonly handler: LibrettoWorkflowHandler<Input, Output, S>;
 
-  constructor(
-    metadata: LibrettoWorkflowMetadata,
-    handler: LibrettoWorkflowHandler<Input, Output, S>,
-  ) {
-    this.metadata = metadata;
+  constructor(handler: LibrettoWorkflowHandler<Input, Output, S>) {
     this.handler = handler;
   }
 
@@ -37,8 +30,7 @@ export class LibrettoWorkflow<Input = unknown, Output = unknown, S = {}> {
 }
 
 export function workflow<Input = unknown, Output = unknown, S = {}>(
-  metadata: LibrettoWorkflowMetadata,
   handler: LibrettoWorkflowHandler<Input, Output, S>,
 ): LibrettoWorkflow<Input, Output, S> {
-  return new LibrettoWorkflow(metadata, handler);
+  return new LibrettoWorkflow(handler);
 }

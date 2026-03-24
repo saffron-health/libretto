@@ -339,7 +339,7 @@ export async function main() {
       `
 import message from "@/message";
 
-export const main = workflow({}, async () => {
+export const main = workflow(async () => {
   console.log(message);
 });
 `,
@@ -385,7 +385,6 @@ const brand = Symbol.for("libretto.workflow");
 
 export const main = {
   [brand]: true,
-  metadata: {},
   async run() {
     return "ok";
   },
@@ -409,12 +408,9 @@ export const main = {
     await writeWorkflow(
       "integration.ts",
       `
-export const main = workflow(
-  {},
-  async () => {
-    return "ok";
-  },
-);
+export const main = workflow(async () => {
+  return "ok";
+});
 `,
     );
 
@@ -438,7 +434,7 @@ export const main = workflow(
     await writeWorkflow(
       "integration.ts",
       `
-export const main = workflow({}, async () => "ok");
+export const main = workflow(async () => "ok");
 `,
     );
 
@@ -459,7 +455,7 @@ export const main = workflow({}, async () => "ok");
     const integrationFilePath = await writeWorkflow(
       "integration-pause.mjs",
       `
-export const main = workflow({}, async (ctx) => {
+export const main = workflow(async (ctx) => {
   console.log("WORKFLOW_BEFORE_PAUSE");
   await pause(ctx.session);
   console.log("WORKFLOW_AFTER_PAUSE");
@@ -484,7 +480,7 @@ export const main = workflow({}, async (ctx) => {
     const integrationFilePath = await writeWorkflow(
       "integration-pause-missing-session.mjs",
       `
-export const main = workflow({}, async () => {
+export const main = workflow(async () => {
   await pause("");
 });
 `,
@@ -508,7 +504,7 @@ export const main = workflow({}, async () => {
     const integrationFilePath = await writeWorkflow(
       "integration-complete.mjs",
       `
-export const main = workflow({}, async () => {
+export const main = workflow(async () => {
   console.log("WORKFLOW_COMPLETES");
 });
 `,
@@ -530,7 +526,7 @@ export const main = workflow({}, async () => {
     const integrationFilePath = await writeWorkflow(
       "integration-selector-error-debug.mjs",
       `
-export const main = workflow({}, async (ctx) => {
+export const main = workflow(async (ctx) => {
   await ctx.page.goto("https://example.com");
   await ctx.page.locator("[").click();
 });

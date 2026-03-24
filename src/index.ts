@@ -105,7 +105,6 @@ export {
   LibrettoWorkflow,
   LIBRETTO_WORKFLOW_BRAND,
   workflow,
-  type LibrettoWorkflowMetadata,
   type LibrettoWorkflowContext,
   type LibrettoWorkflowHandler,
 } from "./shared/workflow/workflow.js";

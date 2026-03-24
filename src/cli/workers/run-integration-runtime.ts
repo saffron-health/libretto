@@ -28,7 +28,6 @@ import type { RunIntegrationWorkerRequest } from "./run-integration-worker-proto
 const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
 type LoadedLibrettoWorkflow = {
-  metadata: {};
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -116,9 +115,7 @@ function isLoadedLibrettoWorkflow(
   const candidate = value as Record<PropertyKey, unknown>;
   return (
     candidate[LIBRETTO_WORKFLOW_BRAND] === true &&
-    typeof candidate.run === "function" &&
-    !!candidate.metadata &&
-    typeof candidate.metadata === "object"
+    typeof candidate.run === "function"
   );
 }
 
@@ -192,7 +189,6 @@ async function loadWorkflowExport(
         '  import { workflow } from "libretto";',
         "",
         `  export const ${exportName} = workflow<InputType, OutputType>(`,
-        "    {},",
         "    async (ctx, input) => {",
         "      // ctx.session  — libretto session name",
         "      // ctx.page     — Playwright Page instance",
