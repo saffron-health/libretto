@@ -35,6 +35,7 @@ type CliFixtures = {
   librettoCli: (
     command: string,
     env?: Record<string, string>,
+    stdinText?: string,
   ) => Promise<SpawnResult>;
   evaluate: (actual: string) => EvaluateMatcher;
   writeWorkflow: (
@@ -132,9 +133,10 @@ async function execProcess(
   args: string[],
   cwd: string,
   env?: Record<string, string>,
+  stdinText?: string,
 ): Promise<SpawnResult> {
   return await new Promise<SpawnResult>((resolveResult, reject) => {
-    execFile(
+    const child = execFile(
       command,
       args,
       {
@@ -167,6 +169,10 @@ async function execProcess(
         });
       },
     );
+
+    if (stdinText !== undefined) {
+      child.stdin?.end(stdinText);
+    }
   });
 }
 
@@ -627,14 +633,21 @@ export const test = base.extend<CliFixtures>({
 
   librettoCli: async ({ workspaceDir }, use) => {
     ensureBuilt();
-    await use(async (command: string, env?: Record<string, string>) => {
-      return await execProcess(
-        process.execPath,
-        [cliEntry, ...parseCommandArgs(command)],
-        workspaceDir,
-        env,
-      );
-    });
+    await use(
+      async (
+        command: string,
+        env?: Record<string, string>,
+        stdinText?: string,
+      ) => {
+        return await execProcess(
+          process.execPath,
+          [cliEntry, ...parseCommandArgs(command)],
+          workspaceDir,
+          env,
+          stdinText,
+        );
+      },
+    );
   },
 
   evaluate: async ({}, use) => {

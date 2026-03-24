@@ -234,6 +234,21 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toContain("Missing stdin input for `exec -`.");
   });
 
+  test("exec with hyphen executes code piped through stdin", async ({
+    librettoCli,
+  }) => {
+    const session = "exec-stdin-with-input";
+    await librettoCli(`open https://example.com --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec - --session ${session}`,
+      undefined,
+      "return 1;",
+    );
+    expect(result.stdout).toContain("1");
+    expect(result.stderr).toBe("");
+  });
+
   test("fails run when integration file does not exist", async ({
     librettoCli,
     evaluate,

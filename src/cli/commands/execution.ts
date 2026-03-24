@@ -657,9 +657,9 @@ async function runIntegrationFromFile(
 }
 
 function readStdinSync(): string | null {
-  if (process.stdin.isTTY) return null;
+  if (process.stdin.isTTY === true) return null;
   try {
-    const content = readFileSync("/dev/stdin", "utf8");
+    const content = readFileSync(0, "utf8");
     return content.trim().length > 0 ? content : null;
   } catch {
     return null;
