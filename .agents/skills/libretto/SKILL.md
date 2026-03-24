@@ -83,8 +83,7 @@ npx libretto snapshot \
 
 - Use `exec` for focused inspection and short-lived interaction experiments.
 - Use `exec` to validate selectors, inspect data, or prototype a step before you encode it in the workflow file.
-- Pass code as one argument (usually quoted). Unquoted multi-token code is rejected.
-- Use `exec -` only when you intentionally want to read code from stdin.
+- Use `exec -` to run multi-line scripts from stdin, especially when the code is too long or complex for a command line argument.
 - Available globals: `page`, `context`, `browser`, `state`, `fetch`, `Buffer`.
 - Let failures throw. Do not hide `exec` failures with `try/catch` or `.catch()`.
 - Do not run multiple `exec` commands in parallel.
