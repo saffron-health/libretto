@@ -1,12 +1,11 @@
 # Auth Profiles
 
-Use this reference when the target site requires login and the user wants to reuse local authenticated browser state.
+Use this reference only when the user explicitly asks to save or reuse local authenticated browser state.
 
 ## When to Use This
 
 - The site requires manual login.
 - The user is running workflows locally.
-- Reusing a saved session is simpler than building credential-handling logic into the workflow.
 
 ## Workflow
 

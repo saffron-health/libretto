@@ -16,7 +16,7 @@ export type GhostCursorOptions = {
 const DEFAULTS: Required<GhostCursorOptions> = {
   style: "minimal",
   color: "rgba(255, 70, 70, 0.9)",
-  size: 20,
+  size: 23,
   zIndex: 2147483646,
   easing: "cubic-bezier(0.16, 1, 0.3, 1)",
   minDurationMs: 100,
@@ -38,20 +38,38 @@ function buildCursorSvg(
     return `<div style="width:${size * 1.4}px;height:${size * 1.4}px;border-radius:50%;background:${color};box-shadow:0 0 ${size * 0.6}px ${color};opacity:0.7;"></div>`;
   }
   // minimal: default arrow-like SVG cursor
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 2px 6px rgba(15,23,42,0.22));">
 		<path d="M5 3L19 12L12 13L9 20L5 3Z" fill="${color}" stroke="rgba(0,0,0,0.3)" stroke-width="1"/>
 	</svg>`;
 }
 
+function buildCursorMarkup(
+  style: GhostCursorStyle,
+  color: string,
+  size: number,
+): string {
+  const cursor = buildCursorSvg(style, color, size);
+  const badgeHeight = Math.max(12, Math.round(size * 0.54));
+  const fontSize = Math.max(8, Math.round(size * 0.28));
+  const minWidth = Math.max(28, Math.round(size * 1.28));
+  const paddingX = Math.max(5, Math.round(size * 0.2));
+  const left = Math.round(size * 0.84);
+  const top = Math.round(size * 0.74);
+  const width = Math.round(size * 2.4);
+  const height = Math.round(size * 1.95);
+  const badge = `<div aria-hidden="true" style="position:absolute;left:${left}px;top:${top}px;display:flex;align-items:center;justify-content:center;min-width:${minWidth}px;height:${badgeHeight}px;padding:0 ${paddingX}px;border-radius:${badgeHeight}px;background:${color};color:rgba(255,255,255,0.96);font:700 ${fontSize}px/1 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.02em;white-space:nowrap;border:1px solid rgba(0,0,0,0.16);box-shadow:0 4px 12px rgba(0,0,0,0.14);transform-origin:left center;">Agent</div>`;
+  return `<div style="position:relative;width:${width}px;height:${height}px;overflow:visible;">${cursor}${badge}</div>`;
+}
+
 function buildInitScript(opts: Required<GhostCursorOptions>): string {
-  const svg = buildCursorSvg(opts.style, opts.color, opts.size);
+  const markup = buildCursorMarkup(opts.style, opts.color, opts.size);
   return `
 (function() {
 	if (document.getElementById("${CURSOR_ID}")) return;
 	var el = document.createElement("div");
 	el.id = "${CURSOR_ID}";
 	el.style.cssText = "position:fixed;top:0;left:0;z-index:${opts.zIndex};pointer-events:none;transform:translate3d(-100px,-100px,0);transition:none;will-change:transform,opacity;opacity:0;";
-	el.innerHTML = ${JSON.stringify(svg)};
+	el.innerHTML = ${JSON.stringify(markup)};
 	document.documentElement.appendChild(el);
 })();
 `;

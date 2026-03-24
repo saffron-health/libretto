@@ -13,15 +13,17 @@ Libretto is a toolkit for building robust web integrations. It gives your coding
 
 We at [Saffron Health](https://saffron.health) built Libretto to help us maintain our browser integrations to common healthcare software. We're open-sourcing it so other teams have an easier time doing the same thing.
 
+https://github.com/user-attachments/assets/9b9a0ab3-5133-4b20-b3be-459943349d18
+
 ## Installation
 
 ```bash
-npm install --save-dev libretto
+npm install libretto
 
 # Install skill, download Chromium if not already installed, configure snapshot analysis
 npx libretto init
 
-# Configure snapshot analysis model (see Configuration section below)
+# Configure or change the snapshot analysis model (see Configuration section below). `npx libretto init` sets this up the first time.
 npx libretto ai configure <openai | anthropic | gemini | vertex>
 ```
 
@@ -58,7 +60,7 @@ Agents can use Libretto to reproduce the failure, pause the workflow at any poin
 You can also use Libretto directly from the command line. All commands accept `--session <name>` to target a specific session.
 
 ```bash
-npx libretto init                          # initialize libretto in the current project
+npx libretto init                          # interactive; run yourself, not through an agent
 npx libretto open <url>                    # launch browser and open a URL (headed by default)
 npx libretto snapshot --objective "..." --context "..."  # capture PNG + HTML and analyze with an LLM
 npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page
@@ -133,6 +135,8 @@ Found a bug? Please [open an issue](https://github.com/saffron-health/libretto/i
 Maintained by the team at [Saffron Health](https://saffron.health).
 
 ## Development
+
+For local development in this repository:
 
 ```bash
 pnpm i

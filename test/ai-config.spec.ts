@@ -33,7 +33,31 @@ describe("ai config validation output", () => {
       expect(message).toContain('"model": "openai/gpt-5.4"');
       expect(message).toContain('"updatedAt": "2026-01-01T00:00:00.000Z"');
       expect(message).toContain('"viewport": {');
+      expect(message).toContain('"windowPosition": {');
       expect(message).not.toContain('"$schema"');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts windowPosition in config", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "libretto-ai-config-"));
+    const configPath = join(tempDir, "config.json");
+
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          version: 1,
+          windowPosition: {
+            x: 2380,
+            y: 190,
+          },
+        }),
+      );
+
+      const config = readLibrettoConfig(configPath);
+      expect(config.windowPosition).toEqual({ x: 2380, y: 190 });
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

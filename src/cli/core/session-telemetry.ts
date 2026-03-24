@@ -1,4 +1,12 @@
 import type { BrowserContext, Page } from "playwright";
+import {
+  filterSemanticClasses,
+  INTERACTIVE_ROLE_NAMES,
+  INTERACTIVE_TAG_NAMES,
+  isObfuscatedClass,
+  TEST_ATTRIBUTE_NAMES,
+  TRUSTED_ATTRIBUTE_NAMES,
+} from "../../shared/dom-semantics.js";
 
 type TelemetryEntry = Record<string, unknown>;
 
@@ -186,6 +194,428 @@ export async function installSessionTelemetry(
     return locator;
   };
 
+  const createUserDomTrackingInitScript = (): string => {
+    const selectorAttributeNames = [
+      "id",
+      ...TEST_ATTRIBUTE_NAMES,
+      "name",
+      "for",
+      "role",
+      "aria-label",
+      "title",
+      "placeholder",
+      "alt",
+      "href",
+      "type",
+    ];
+
+    return `
+(() => {
+  if (window.__btDomListenersInstalled) return;
+  window.__btDomListenersInstalled = true;
+
+  const TEST_ATTRS = new Set(${JSON.stringify([...TEST_ATTRIBUTE_NAMES])});
+  const TRUSTED_ATTRS = new Set(${JSON.stringify([...TRUSTED_ATTRIBUTE_NAMES])});
+  const INTERACTIVE_TAGS = new Set(${JSON.stringify([...INTERACTIVE_TAG_NAMES])});
+  const INTERACTIVE_ROLES = new Set(${JSON.stringify([...INTERACTIVE_ROLE_NAMES])});
+  const SELECTOR_ATTRS = ${JSON.stringify(selectorAttributeNames)};
+
+  ${filterSemanticClasses.toString()}
+  ${isObfuscatedClass.toString()}
+
+  const normalizeWhitespace = (value) =>
+    String(value || "").replace(/\\s+/g, " ").trim();
+
+  const clipText = (value, limit = 120) => {
+    const normalized = normalizeWhitespace(value);
+    if (!normalized) return "";
+    return normalized.length > limit
+      ? \`\${normalized.slice(0, limit - 1)}…\`
+      : normalized;
+  };
+
+  const cssEscape = (value) => {
+    if (globalThis.CSS && typeof globalThis.CSS.escape === "function") {
+      return globalThis.CSS.escape(String(value));
+    }
+    return String(value).replace(/[^a-zA-Z0-9_-]/g, (char) => {
+      const hex = char.charCodeAt(0).toString(16);
+      return \`\\\\\${hex} \`;
+    });
+  };
+
+  const quoteAttrValue = (value) =>
+    String(value).replace(/\\\\/g, "\\\\\\\\").replace(/"/g, '\\\\"');
+
+  const isElementNode = (value) => value instanceof Element;
+
+  const isInteractiveElement = (el) => {
+    if (!el || !el.tagName) return false;
+    const tagName = el.tagName.toLowerCase();
+    if (INTERACTIVE_TAGS.has(tagName)) return true;
+    if (el.hasAttribute("tabindex") || el.hasAttribute("contenteditable")) {
+      return true;
+    }
+    const role = normalizeWhitespace(el.getAttribute("role")).toLowerCase();
+    return Boolean(role) && INTERACTIVE_ROLES.has(role);
+  };
+
+  const getFilteredClassSelector = (el) => {
+    const className =
+      typeof el.className === "string"
+        ? filterSemanticClasses(el.className)
+        : "";
+    const classes = className
+      .split(/\\s+/)
+      .filter(Boolean)
+      .slice(0, 2);
+    if (classes.length === 0) return "";
+    return classes.map((cls) => \`.\${cssEscape(cls)}\`).join("");
+  };
+
+  const getMeaningfulAttrValue = (el, attrName) => {
+    if (!el.hasAttribute(attrName)) return "";
+    const value = clipText(el.getAttribute(attrName) || "", 80);
+    if (!value) return "";
+    if (attrName === "href" && value.startsWith("javascript:")) return "";
+    return value;
+  };
+
+  const buildSelectorForElement = (el) => {
+    if (!isElementNode(el)) return "";
+    const tagName = el.tagName.toLowerCase();
+    const id = clipText(el.id || "", 80);
+    if (id) {
+      return \`\${tagName}#\${cssEscape(id)}\`;
+    }
+
+    for (const attrName of SELECTOR_ATTRS) {
+      if (attrName === "id") continue;
+      const value = getMeaningfulAttrValue(el, attrName);
+      if (!value) continue;
+      if (attrName.startsWith("data-")) {
+        return \`\${tagName}[\${attrName}="\${quoteAttrValue(value)}"]\`;
+      }
+      return \`\${tagName}[\${attrName}="\${quoteAttrValue(value)}"]\`;
+    }
+
+    const classSelector = getFilteredClassSelector(el);
+    if (classSelector) {
+      return \`\${tagName}\${classSelector}\`;
+    }
+
+    return tagName;
+  };
+
+  const getElementSummary = (el) => {
+    if (!isElementNode(el)) return "";
+    const selector = buildSelectorForElement(el);
+    const role = clipText(el.getAttribute("role") || "", 40);
+    const text = getElementText(el);
+    const suffix = [];
+    if (role) suffix.push(\`role=\${role}\`);
+    if (text) suffix.push(\`text="\${text}"\`);
+    return suffix.length > 0 ? \`\${selector} [\${suffix.join(", ")}]\` : selector;
+  };
+
+  const getElementText = (el) => {
+    if (!isElementNode(el)) return "";
+    const tagName = el.tagName.toLowerCase();
+    if (tagName === "input") {
+      const inputType = normalizeWhitespace(el.getAttribute("type")).toLowerCase();
+      if (inputType === "password") return "";
+      const value = clipText(el.value || el.getAttribute("value") || "", 80);
+      if (value) return value;
+    }
+
+    const attrCandidates = [
+      el.getAttribute("aria-label"),
+      el.getAttribute("title"),
+      el.getAttribute("placeholder"),
+      el.getAttribute("alt"),
+      el.textContent,
+    ];
+
+    for (const candidate of attrCandidates) {
+      const text = clipText(candidate || "", 120);
+      if (text.length >= 2) return text;
+    }
+
+    return "";
+  };
+
+  const isMeaningfulAncestor = (el) => {
+    if (!isElementNode(el)) return false;
+    const tagName = el.tagName.toLowerCase();
+    if (isInteractiveElement(el)) return true;
+    if (
+      [
+        "tr",
+        "li",
+        "td",
+        "th",
+        "label",
+        "section",
+        "article",
+        "dialog",
+        "fieldset",
+        "summary",
+      ].includes(tagName)
+    ) {
+      return true;
+    }
+    if (el.id) return true;
+    for (const attrName of TEST_ATTRS) {
+      if (el.hasAttribute(attrName)) return true;
+    }
+    const role = normalizeWhitespace(el.getAttribute("role")).toLowerCase();
+    return Boolean(role);
+  };
+
+  const hasStrongSelectorSignal = (el, selector) => {
+    if (!isElementNode(el)) return false;
+    if (!selector) return false;
+    const tagName = el.tagName.toLowerCase();
+    if (el.id) return true;
+    if (isInteractiveElement(el)) return true;
+    if (getFilteredClassSelector(el)) return true;
+    for (const attrName of SELECTOR_ATTRS) {
+      if (attrName === "id") continue;
+      if (getMeaningfulAttrValue(el, attrName)) return true;
+    }
+    return selector !== tagName;
+  };
+
+  const getAncestorSelectors = (target) => {
+    const selectors = [];
+    let current = isElementNode(target) ? target : null;
+    let depth = 0;
+    while (current && depth < 7) {
+      const selector = buildSelectorForElement(current);
+      if (
+        selector &&
+        !selectors.includes(selector) &&
+        (
+          (depth === 0 && hasStrongSelectorSignal(current, selector)) ||
+          isMeaningfulAncestor(current)
+        )
+      ) {
+        selectors.push(selector);
+      }
+      current = current.parentElement;
+      depth += 1;
+    }
+    if (selectors.length === 0 && isElementNode(target)) {
+      selectors.push(buildSelectorForElement(target));
+    }
+    return selectors;
+  };
+
+  const getNearbyText = (target) => {
+    let current = isElementNode(target) ? target : null;
+    let depth = 0;
+    while (current && depth < 6) {
+      const text = getElementText(current);
+      if (text.length >= 2) return text;
+      current = current.parentElement;
+      depth += 1;
+    }
+    return "";
+  };
+
+  const getComposedPathSummary = (event) => {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    return path
+      .filter((entry) => isElementNode(entry))
+      .slice(0, 6)
+      .map((entry) => getElementSummary(entry));
+  };
+
+  const getCoordinates = (event) => {
+    if (!(event instanceof MouseEvent)) return undefined;
+    return {
+      x: Math.round(event.clientX),
+      y: Math.round(event.clientY),
+    };
+  };
+
+  const buildActionPayload = (event, action, extra = {}) => {
+    const target = isElementNode(event.target) ? event.target : null;
+    const ancestorSelectors = getAncestorSelectors(target);
+    const bestSemanticSelector = ancestorSelectors[0] || "";
+    const targetSelector = target ? buildSelectorForElement(target) : "";
+    return {
+      action,
+      bestSemanticSelector: bestSemanticSelector || undefined,
+      targetSelector: targetSelector || undefined,
+      ancestorSelectors: ancestorSelectors.length > 0 ? ancestorSelectors : undefined,
+      nearbyText: getNearbyText(target) || undefined,
+      composedPath: getComposedPathSummary(event),
+      coordinates: getCoordinates(event),
+      success: true,
+      ...extra,
+    };
+  };
+
+  let clickTimer = null;
+  let pendingClick = null;
+
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (window.__btApiActionInProgress) return;
+      const target = isElementNode(event.target) ? event.target : null;
+      if (target?.type === "checkbox") {
+        window.__btActionLog(
+          JSON.stringify(
+            buildActionPayload(event, target.checked ? "check" : "uncheck"),
+          ),
+        );
+        return;
+      }
+
+      pendingClick = buildActionPayload(event, "click");
+      if (clickTimer) clearTimeout(clickTimer);
+      clickTimer = setTimeout(() => {
+        if (pendingClick) {
+          window.__btActionLog(JSON.stringify(pendingClick));
+        }
+        pendingClick = null;
+        clickTimer = null;
+      }, 200);
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "dblclick",
+    (event) => {
+      if (window.__btApiActionInProgress) return;
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        pendingClick = null;
+      }
+      window.__btActionLog(
+        JSON.stringify(buildActionPayload(event, "dblclick")),
+      );
+    },
+    true,
+  );
+
+  const inputTimers = new WeakMap();
+  document.addEventListener(
+    "input",
+    (event) => {
+      if (window.__btApiActionInProgress) return;
+      const target = isElementNode(event.target) ? event.target : null;
+      if (!target) return;
+
+      if (target.tagName === "SELECT") {
+        window.__btActionLog(
+          JSON.stringify(
+            buildActionPayload(event, "selectOption", {
+              value: target.value,
+            }),
+          ),
+        );
+        return;
+      }
+
+      const existing = inputTimers.get(target);
+      if (existing) clearTimeout(existing);
+      inputTimers.set(
+        target,
+        setTimeout(() => {
+          inputTimers.delete(target);
+          window.__btActionLog(
+            JSON.stringify(
+              buildActionPayload(event, "fill", {
+                value: String(target.value || "").slice(0, 100),
+              }),
+            ),
+          );
+        }, 500),
+      );
+    },
+    true,
+  );
+
+  const specialKeys = new Set([
+    "Enter",
+    "Escape",
+    "Tab",
+    "Backspace",
+    "Delete",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8",
+    "F9",
+    "F10",
+    "F11",
+    "F12",
+  ]);
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (window.__btApiActionInProgress) return;
+      const isShortcut = event.ctrlKey || event.metaKey || event.altKey;
+      if (!isShortcut && !specialKeys.has(event.key)) return;
+      const keyDesc =
+        (event.ctrlKey ? "Ctrl+" : "") +
+        (event.metaKey ? "Meta+" : "") +
+        (event.altKey ? "Alt+" : "") +
+        (event.shiftKey ? "Shift+" : "") +
+        event.key;
+      window.__btActionLog(
+        JSON.stringify(
+          buildActionPayload(event, "press", {
+            value: keyDesc,
+          }),
+        ),
+      );
+    },
+    true,
+  );
+
+  let scrollTimer = null;
+  document.addEventListener(
+    "scroll",
+    () => {
+      if (window.__btApiActionInProgress) return;
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        scrollTimer = null;
+        window.__btActionLog(
+          JSON.stringify({
+            action: "scroll",
+            bestSemanticSelector: "document",
+            success: true,
+            value: \`y=\${window.scrollY}\`,
+          }),
+        );
+      }, 300);
+    },
+    true,
+  );
+})();
+`;
+  };
+
   const installUserDomTracking = async (
     page: Page,
     pageId: string,
@@ -202,196 +632,7 @@ export async function installSessionTelemetry(
       });
     });
 
-    await page.addInitScript(() => {
-      if ((window as any).__btDomListenersInstalled) return;
-      (window as any).__btDomListenersInstalled = true;
-
-      const identify = (el: any): string => {
-        if (!el || !el.tagName) return "";
-        const testId = el.getAttribute("data-testid");
-        if (testId) return `[data-testid="${testId}"]`;
-        const role = el.getAttribute("role") || "";
-        const id = el.id;
-        if (role && id) return `${role}#${id}`;
-        const label =
-          el.getAttribute("aria-label") ||
-          (el.textContent || "").trim().slice(0, 30) ||
-          "";
-        if (role && label) return `${role} "${label}"`;
-        const tag = el.tagName.toLowerCase();
-        const cls =
-          el.className && typeof el.className === "string"
-            ? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
-            : "";
-        return `${tag}${cls}`;
-      };
-
-      let clickTimer: ReturnType<typeof setTimeout> | null = null;
-      let pendingClick: { selector: string } | null = null;
-
-      document.addEventListener(
-        "click",
-        (event) => {
-          if ((window as any).__btApiActionInProgress) return;
-          const target = event.target as any;
-          const selector = identify(target);
-          if (target?.type === "checkbox") {
-            (window as any).__btActionLog(
-              JSON.stringify({
-                action: target.checked ? "check" : "uncheck",
-                selector,
-                success: true,
-              }),
-            );
-            return;
-          }
-          pendingClick = { selector };
-          if (clickTimer) clearTimeout(clickTimer);
-          clickTimer = setTimeout(() => {
-            if (pendingClick) {
-              (window as any).__btActionLog(
-                JSON.stringify({
-                  action: "click",
-                  selector: pendingClick.selector,
-                  success: true,
-                }),
-              );
-            }
-            pendingClick = null;
-            clickTimer = null;
-          }, 200);
-        },
-        true,
-      );
-
-      document.addEventListener(
-        "dblclick",
-        (event) => {
-          if ((window as any).__btApiActionInProgress) return;
-          if (clickTimer) {
-            clearTimeout(clickTimer);
-            clickTimer = null;
-            pendingClick = null;
-          }
-          const selector = identify(event.target);
-          (window as any).__btActionLog(
-            JSON.stringify({ action: "dblclick", selector, success: true }),
-          );
-        },
-        true,
-      );
-
-      const inputTimers = new WeakMap<any, ReturnType<typeof setTimeout>>();
-      document.addEventListener(
-        "input",
-        (event) => {
-          if ((window as any).__btApiActionInProgress) return;
-          const target = event.target as any;
-          const selector = identify(target);
-          if (target.tagName === "SELECT") {
-            (window as any).__btActionLog(
-              JSON.stringify({
-                action: "selectOption",
-                selector,
-                value: target.value,
-                success: true,
-              }),
-            );
-            return;
-          }
-          const existing = inputTimers.get(target);
-          if (existing) clearTimeout(existing);
-          inputTimers.set(
-            target,
-            setTimeout(() => {
-              inputTimers.delete(target);
-              (window as any).__btActionLog(
-                JSON.stringify({
-                  action: "fill",
-                  selector,
-                  value: (target.value || "").slice(0, 100),
-                  success: true,
-                }),
-              );
-            }, 500),
-          );
-        },
-        true,
-      );
-
-      const specialKeys = new Set([
-        "Enter",
-        "Escape",
-        "Tab",
-        "Backspace",
-        "Delete",
-        "ArrowUp",
-        "ArrowDown",
-        "ArrowLeft",
-        "ArrowRight",
-        "Home",
-        "End",
-        "PageUp",
-        "PageDown",
-        "F1",
-        "F2",
-        "F3",
-        "F4",
-        "F5",
-        "F6",
-        "F7",
-        "F8",
-        "F9",
-        "F10",
-        "F11",
-        "F12",
-      ]);
-      document.addEventListener(
-        "keydown",
-        (event) => {
-          if ((window as any).__btApiActionInProgress) return;
-          const isShortcut = event.ctrlKey || event.metaKey || event.altKey;
-          if (!isShortcut && !specialKeys.has(event.key)) return;
-          const selector = identify(event.target);
-          const keyDesc =
-            (event.ctrlKey ? "Ctrl+" : "") +
-            (event.metaKey ? "Meta+" : "") +
-            (event.altKey ? "Alt+" : "") +
-            (event.shiftKey ? "Shift+" : "") +
-            event.key;
-          (window as any).__btActionLog(
-            JSON.stringify({
-              action: "press",
-              selector,
-              value: keyDesc,
-              success: true,
-            }),
-          );
-        },
-        true,
-      );
-
-      let scrollTimer: ReturnType<typeof setTimeout> | null = null;
-      document.addEventListener(
-        "scroll",
-        () => {
-          if ((window as any).__btApiActionInProgress) return;
-          if (scrollTimer) clearTimeout(scrollTimer);
-          scrollTimer = setTimeout(() => {
-            scrollTimer = null;
-            (window as any).__btActionLog(
-              JSON.stringify({
-                action: "scroll",
-                selector: "document",
-                value: `y=${window.scrollY}`,
-                success: true,
-              }),
-            );
-          }, 300);
-        },
-        true,
-      );
-    });
+    await page.addInitScript({ content: createUserDomTrackingInitScript() });
   };
 
   const wrapPageActions = (page: Page, pageId: string): void => {

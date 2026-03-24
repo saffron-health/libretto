@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
@@ -64,6 +65,47 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Snapshot analysis:");
     expect(result.stdout).toContain("Ready: openai/gpt-5.4");
     expect(result.stdout).toContain("No further action required.");
+  });
+
+  test("init copies skill files without confirmation when agent dirs exist", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".agents", "skills", "libretto"), {
+      recursive: true,
+    });
+    await mkdir(workspacePath(".claude"), { recursive: true });
+    await writeFile(
+      workspacePath(".agents", "skills", "libretto", "stale.txt"),
+      "stale",
+      "utf8",
+    );
+
+    const result = await librettoCli("init --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "",
+      ANTHROPIC_API_KEY: "",
+      GEMINI_API_KEY: "",
+      GOOGLE_GENERATIVE_AI_API_KEY: "",
+      GOOGLE_CLOUD_PROJECT: "",
+      GCLOUD_PROJECT: "",
+    });
+
+    expect(result.stdout).toContain(".agents/skills/libretto/");
+    expect(result.stdout).toContain(".claude/skills/libretto/");
+    await expect(
+      readFile(workspacePath(".agents", "skills", "libretto", "SKILL.md"), {
+        encoding: "utf8",
+      }),
+    ).resolves.toContain("name: libretto");
+    await expect(
+      readFile(workspacePath(".claude", "skills", "libretto", "SKILL.md"), {
+        encoding: "utf8",
+      }),
+    ).resolves.toContain("name: libretto");
+    expect(
+      existsSync(workspacePath(".agents", "skills", "libretto", "stale.txt")),
+    ).toBe(false);
   });
 
   test("prints usage for --help", async ({ librettoCli, evaluate }) => {

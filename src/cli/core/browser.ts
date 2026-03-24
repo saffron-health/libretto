@@ -13,6 +13,14 @@ import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import {
+  filterSemanticClasses,
+  INTERACTIVE_ROLE_NAMES,
+  INTERACTIVE_TAG_NAMES,
+  isObfuscatedClass,
+  TEST_ATTRIBUTE_NAMES,
+  TRUSTED_ATTRIBUTE_NAMES,
+} from "../../shared/dom-semantics.js";
+import {
   getSessionActionsLogPath,
   getSessionNetworkLogPath,
   PROFILES_DIR,
@@ -330,6 +338,20 @@ export function resolveViewport(
   return DEFAULT_VIEWPORT;
 }
 
+function resolveWindowPosition(
+  logger: LoggerApi,
+): { x: number; y: number } | undefined {
+  const config = readLibrettoConfig();
+  if (config.windowPosition) {
+    logger.info("window-position-source", {
+      source: "config",
+      windowPosition: config.windowPosition,
+    });
+    return config.windowPosition;
+  }
+  return undefined;
+}
+
 export async function runOpen(
   rawUrl: string,
   headed: boolean,
@@ -339,7 +361,8 @@ export async function runOpen(
 ): Promise<void> {
   const url = normalizeUrl(rawUrl);
   const viewport = resolveViewport(options?.viewport, logger);
-  logger.info("open-start", { url, headed, session, viewport });
+  const windowPosition = headed ? resolveWindowPosition(logger) : undefined;
+  logger.info("open-start", { url, headed, session, viewport, windowPosition });
   assertSessionAvailableForStart(session, logger);
 
   const port = await pickFreePort();
@@ -382,6 +405,49 @@ export async function runOpen(
   const escapedActionsLogPath = actionsLogPath
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'");
+  const windowPositionArg = windowPosition
+    ? `, '--window-position=${windowPosition.x},${windowPosition.y}'`
+    : "";
+  const windowBoundsSetupCode = windowPosition
+    ? `
+const requestedWindowBounds = { left: ${windowPosition.x}, top: ${windowPosition.y}, windowState: 'normal' };
+const pageCdp = await context.newCDPSession(page);
+let browserCdp;
+try {
+	const targetInfo = await pageCdp.send('Target.getTargetInfo');
+	const targetId = targetInfo?.targetInfo?.targetId;
+	browserCdp = await browser.newBrowserCDPSession();
+	const windowResult = await browserCdp.send(
+		'Browser.getWindowForTarget',
+		targetId ? { targetId } : {},
+	);
+	await browserCdp.send('Browser.setWindowBounds', {
+		windowId: windowResult.windowId,
+		bounds: requestedWindowBounds,
+	});
+	await new Promise((resolve) => setTimeout(resolve, 250));
+	const actualWindow = await browserCdp.send('Browser.getWindowBounds', {
+		windowId: windowResult.windowId,
+	});
+	childLog('info', 'window-bounds-set', {
+		windowId: windowResult.windowId,
+		requestedBounds: requestedWindowBounds,
+		actualBounds: actualWindow.bounds,
+	});
+} catch (error) {
+	childLog('warn', 'window-bounds-set-failed', {
+		requestedBounds: requestedWindowBounds,
+		message: error instanceof Error ? error.message : String(error),
+		stack: error instanceof Error ? error.stack : undefined,
+	});
+} finally {
+	await pageCdp.detach().catch(() => {});
+	if (browserCdp) {
+		await browserCdp.detach().catch(() => {});
+	}
+}
+`
+    : "";
 
   const launcherCode = `
 import { chromium } from 'playwright';
@@ -394,14 +460,21 @@ const ACTIONS_LOG = '${escapedActionsLogPath}';
 mkdirSync(dirname(NETWORK_LOG), { recursive: true });
 
 // tsx/esbuild may emit __name() wrappers in Function#toString output.
-const __name = (target, value) =>
-	Object.defineProperty(target, 'name', { value, configurable: true });
+	const __name = (target, value) =>
+		Object.defineProperty(target, 'name', { value, configurable: true });
 
-${installSessionTelemetry.toString()}
+	const TEST_ATTRIBUTE_NAMES = ${JSON.stringify([...TEST_ATTRIBUTE_NAMES])};
+	const TRUSTED_ATTRIBUTE_NAMES = ${JSON.stringify([...TRUSTED_ATTRIBUTE_NAMES])};
+	const INTERACTIVE_TAG_NAMES = ${JSON.stringify([...INTERACTIVE_TAG_NAMES])};
+	const INTERACTIVE_ROLE_NAMES = ${JSON.stringify([...INTERACTIVE_ROLE_NAMES])};
+	const filterSemanticClasses = ${filterSemanticClasses.toString()};
+	const isObfuscatedClass = ${isObfuscatedClass.toString()};
 
-function logAction(entry) {
-	appendFileSync(ACTIONS_LOG, JSON.stringify(entry) + '\\n');
-}
+	${installSessionTelemetry.toString()}
+
+	function logAction(entry) {
+		appendFileSync(ACTIONS_LOG, JSON.stringify(entry) + '\\n');
+	}
 
 function logNetwork(entry) {
 	appendFileSync(NETWORK_LOG, JSON.stringify(entry) + '\\n');
@@ -423,7 +496,7 @@ function childLog(level, event, data = {}) {
 
 const browser = await chromium.launch({
 	headless: ${!headed},
-	args: ['--disable-blink-features=AutomationControlled', '--remote-debugging-port=${port}', '--remote-debugging-address=127.0.0.1', '--no-focus-on-check'],
+	args: ['--disable-blink-features=AutomationControlled', '--remote-debugging-port=${port}', '--remote-debugging-address=127.0.0.1', '--no-focus-on-check'${windowPositionArg}],
 });
 
 browser.on('disconnected', () => {
@@ -437,6 +510,7 @@ const context = await browser.newContext({
 });
 
 const page = await context.newPage();
+${windowBoundsSetupCode}
 page.setDefaultTimeout(30000);
 page.setDefaultNavigationTimeout(45000);
 

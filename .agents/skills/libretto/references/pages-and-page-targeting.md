@@ -26,4 +26,4 @@ npx libretto snapshot --session debug-flow --page <page-id> --objective "Find th
 
 - A session can contain more than one page.
 - When multiple pages are open, think about page targeting first before debugging selectors.
-- Use `pages` to resolve the correct page id, then pass `--page` to `exec`, `snapshot`, `network`, or `actions` when needed.
+- Use `pages` to resolve the correct page id, then pass `--page` to `exec` or `snapshot` when needed.

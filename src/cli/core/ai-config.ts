@@ -29,11 +29,18 @@ export const ViewportConfigSchema = z.object({
 });
 export type ViewportConfig = z.infer<typeof ViewportConfigSchema>;
 
+export const WindowPositionConfigSchema = z.object({
+  x: z.number().int(),
+  y: z.number().int(),
+});
+export type WindowPositionConfig = z.infer<typeof WindowPositionConfigSchema>;
+
 export const LibrettoConfigSchema = z
   .object({
     version: z.literal(CURRENT_CONFIG_VERSION),
     ai: AiConfigSchema.optional(),
     viewport: ViewportConfigSchema.optional(),
+    windowPosition: WindowPositionConfigSchema.optional(),
   })
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
@@ -80,6 +87,10 @@ function formatExpectedConfigExample(): string {
         width: 1280,
         height: 800,
       },
+      windowPosition: {
+        x: 1600,
+        y: 120,
+      },
     },
     null,
     2,
@@ -94,7 +105,7 @@ function invalidConfigError(configPath: string, detail?: string): Error {
       "Expected config example:",
       formatExpectedConfigExample(),
       "Notes:",
-      '  - "ai" and "viewport" are optional.',
+      '  - "ai", "viewport", and "windowPosition" are optional.',
       '  - "ai.model" must be a provider/model string like "openai/gpt-5.4" or "anthropic/claude-sonnet-4-6".',
       "Fix the file to match this shape, or delete it and rerun:",
       `  npx libretto ai configure ${formatConfigureProviders()}`,

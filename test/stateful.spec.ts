@@ -312,4 +312,32 @@ describe("state-driven CLI subprocess behavior", () => {
     const clear = await librettoCli(`actions --session ${session} --clear`);
     expect(clear.stdout).toContain("Action log cleared.");
   }, 60_000);
+
+  test("logs richer user action selectors for nested click targets", async ({
+    librettoCli,
+  }) => {
+    const session = "actions-rich-user-log";
+    const html = encodeURIComponent(
+      `<button id="saveBtn" aria-label="Save record"><span>Save</span></button>`,
+    );
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
+
+    await librettoCli(
+      `exec "await page.goto('data:text/html,${html}'); return await page.url();" --session ${session}`,
+    );
+    await librettoCli(
+      `exec "await page.evaluate(() => { const target = document.querySelector('#saveBtn span'); if (!(target instanceof HTMLElement)) throw new Error('Missing nested span target'); target.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 42, clientY: 24 })); });" --session ${session}`,
+    );
+
+    const view = await librettoCli(
+      `actions --session ${session} --action dblclick --source user --last 5`,
+    );
+    expect(view.stdout).toContain("dblclick");
+    expect(view.stdout).toContain("button#saveBtn");
+    expect(view.stdout).toContain("target=span");
+    expect(view.stdout).toContain('text="Save"');
+    expect(view.stdout).toContain("@(42,24)");
+  }, 60_000);
 });
