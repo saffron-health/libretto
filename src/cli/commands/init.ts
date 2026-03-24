@@ -17,8 +17,8 @@ import {
   loadSnapshotEnv,
   resolveSnapshotApiModel,
 } from "../core/snapshot-api-config.js";
-import { SimpleCLI } from "../framework/simple-cli.js";
 import { hasProviderCredentials } from "../../shared/llm/client.js";
+import { SimpleCLI } from "../framework/simple-cli.js";
 
 type ProviderChoice = {
   key: string;
@@ -62,16 +62,6 @@ function promptUser(
   return new Promise((resolve) => {
     rl.question(question, (answer) => {
       resolve(answer.trim());
-    });
-  });
-}
-
-function askYesNo(question: string): Promise<boolean> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(`${question} (y/N) `, (answer) => {
-      rl.close();
-      resolve(answer.trim().toLowerCase() === "y");
     });
   });
 }
@@ -270,7 +260,7 @@ function detectAgentDirs(root: string): string[] {
   return dirs;
 }
 
-async function copySkills(): Promise<void> {
+function copySkills(): void {
   const agentDirs = detectAgentDirs(REPO_ROOT);
 
   if (agentDirs.length === 0) {
@@ -281,17 +271,6 @@ async function copySkills(): Promise<void> {
   }
 
   const destinations = agentDirs.map((d) => join(d, "skills", "libretto"));
-  const dirNames = agentDirs.map((d) => basename(d)).join(" and ");
-  // Say "Overwrite" if skills already exist in ANY target dir — skills must
-  // be identical across coding agents, so we always copy to all of them.
-  const existing = destinations.filter((d) => existsSync(d));
-  const verb = existing.length > 0 ? "Overwrite" : "Install";
-
-  const proceed = await askYesNo(`\n${verb} libretto skills in ${dirNames}?`);
-  if (!proceed) {
-    console.log("  Skipping skill copy.");
-    return;
-  }
 
   let sourceDir: string;
   try {
@@ -339,10 +318,12 @@ export const initCommand = SimpleCLI.command({
       console.log("\nSkipping browser installation (--skip-browsers)");
     }
 
+    copySkills();
+
     if (process.stdin.isTTY) {
-      await copySkills();
       await runInteractiveApiSetup();
     } else {
+      loadSnapshotEnv();
       printSnapshotApiStatus();
     }
 
