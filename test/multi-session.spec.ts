@@ -94,17 +94,11 @@ export const main = workflow(async () => {
     expect(result.stderr).toContain("Missing required option --session.");
   });
 
-  test("exec accepts unquoted multi-token code", async ({
-    librettoCli,
-    evaluate,
-  }) => {
+  test("exec rejects unquoted multi-token code", async ({ librettoCli }) => {
     const result = await librettoCli(
       "exec await page.title() --session test-session",
     );
-    await evaluate(result.stderr).toMatch(
-      'Explains that session "test-session" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session test-session.',
-    );
-    expect(result.stderr).not.toContain("Unexpected arguments for exec.");
+    expect(result.stderr).toContain("Unexpected arguments for exec.");
   });
 
   test("close --all works without --session", async ({ librettoCli }) => {

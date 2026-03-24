@@ -666,20 +666,10 @@ function readStdinSync(): string | null {
   }
 }
 
-/** Eagerly read stdin once at parse time so the refinement can validate. */
-let _cachedStdin: string | null | undefined;
-function getStdinCode(): string | null {
-  if (_cachedStdin === undefined) {
-    _cachedStdin = readStdinSync();
-  }
-  return _cachedStdin;
-}
-
 export const execInput = SimpleCLI.input({
   positionals: [
-    SimpleCLI.positional("codeParts", z.array(z.string()).default([]), {
+    SimpleCLI.positional("code", z.string().optional(), {
       help: "Playwright TypeScript code to execute",
-      variadic: true,
     }),
   ],
   named: {
@@ -690,8 +680,8 @@ export const execInput = SimpleCLI.input({
     page: pageOption(),
   },
 }).refine(
-  (input) => input.codeParts.length > 0 || getStdinCode() !== null,
-  `Usage: libretto exec <code> [--session <name>] [--visualize]\n       echo '<code>' | libretto exec [--session <name>] [--visualize]`,
+  (input) => input.code !== undefined,
+  `Usage: libretto exec <code|-> [--session <name>] [--visualize]\n       echo '<code>' | libretto exec - [--session <name>] [--visualize]`,
 );
 
 export const execCommand = SimpleCLI.command({
@@ -700,9 +690,20 @@ export const execCommand = SimpleCLI.command({
   .input(execInput)
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
-    const code =
-      input.codeParts.length > 0 ? input.codeParts.join(" ") : getStdinCode()!;
-    await runExec(code, ctx.session, ctx.logger, input.visualize, input.page);
+    const code = input.code!;
+    const codeFromArgsOrStdin = code === "-" ? readStdinSync() : code;
+    if (codeFromArgsOrStdin === null) {
+      throw new Error(
+        "Missing stdin input for `exec -`. Pipe Playwright code into stdin.",
+      );
+    }
+    await runExec(
+      codeFromArgsOrStdin,
+      ctx.session,
+      ctx.logger,
+      input.visualize,
+      input.page,
+    );
   });
 
 const runUsage = `Usage: libretto run <integrationFile> <integrationExport> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;

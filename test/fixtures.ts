@@ -289,7 +289,7 @@ const EVALUATE_RULES: readonly EvaluateRule[] = [
     check: (actual) =>
       requireIncludes(
         actual,
-        "Usage: libretto exec <code> [--session <name>] [--visualize]",
+        "Usage: libretto exec <code|-> [--session <name>] [--visualize]",
       ),
   },
   {
