@@ -659,10 +659,20 @@ async function runIntegrationFromFile(
 function readStdinSync(): string | null {
   if (process.stdin.isTTY) return null;
   try {
-    return readFileSync("/dev/stdin", "utf8");
+    const content = readFileSync("/dev/stdin", "utf8");
+    return content.trim().length > 0 ? content : null;
   } catch {
     return null;
   }
+}
+
+/** Eagerly read stdin once at parse time so the refinement can validate. */
+let _cachedStdin: string | null | undefined;
+function getStdinCode(): string | null {
+  if (_cachedStdin === undefined) {
+    _cachedStdin = readStdinSync();
+  }
+  return _cachedStdin;
 }
 
 export const execInput = SimpleCLI.input({
@@ -679,7 +689,10 @@ export const execInput = SimpleCLI.input({
     }),
     page: pageOption(),
   },
-});
+}).refine(
+  (input) => input.codeParts.length > 0 || getStdinCode() !== null,
+  `Usage: libretto exec <code> [--session <name>] [--visualize]\n       echo '<code>' | libretto exec [--session <name>] [--visualize]`,
+);
 
 export const execCommand = SimpleCLI.command({
   description: "Execute Playwright TypeScript code",
@@ -687,18 +700,8 @@ export const execCommand = SimpleCLI.command({
   .input(execInput)
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
-    let code: string;
-    if (input.codeParts.length > 0) {
-      code = input.codeParts.join(" ");
-    } else {
-      const stdinCode = readStdinSync();
-      if (!stdinCode || stdinCode.trim().length === 0) {
-        throw new Error(
-          `Usage: libretto exec <code> [--session <name>] [--visualize]\n       echo '<code>' | libretto exec [--session <name>] [--visualize]`,
-        );
-      }
-      code = stdinCode;
-    }
+    const code =
+      input.codeParts.length > 0 ? input.codeParts.join(" ") : getStdinCode()!;
     await runExec(code, ctx.session, ctx.logger, input.visualize, input.page);
   });
 
