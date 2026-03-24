@@ -49,21 +49,8 @@ export const INTERACTIVE_ROLE_NAMES = [
 ] as const;
 
 export function filterSemanticClasses(value: string): string {
-  const classLooksObfuscated = (cls: string): boolean => {
-    if (cls.length > 80) return true;
-    if (/^_?[0-9a-f]{6,}$/i.test(cls)) return true;
-    if (/^[a-z]+_[0-9a-f]{4,}$/i.test(cls)) return true;
-    if (/^[a-z]{1,2}[0-9]{2,}$/i.test(cls)) return true;
-
-    const digits = (cls.match(/[0-9]/g) || []).length;
-    const letters = (cls.match(/[a-zA-Z]/g) || []).length;
-    if (cls.length >= 6 && digits >= letters * 0.5 && digits >= 2) return true;
-
-    return false;
-  };
-
   const classes = value.split(/\s+/).filter(Boolean);
-  const kept = classes.filter((cls) => !classLooksObfuscated(cls));
+  const kept = classes.filter((cls) => !isObfuscatedClass(cls));
   return kept.join(" ");
 }
 
