@@ -1,13 +1,21 @@
-import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { expect } from "vitest";
 import { writeAiConfig } from "../../src/cli/core/ai-config.js";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import {
-  EvalResponse,
-  type ClaudeEvalHarness,
-} from "../../evals/harness.js";
-import type { ModelUsage, NonNullableUsage } from "@anthropic-ai/claude-agent-sdk";
+import { EvalResponse, type ClaudeEvalHarness } from "../../evals/harness.js";
+import type {
+  ModelUsage,
+  NonNullableUsage,
+} from "@anthropic-ai/claude-agent-sdk";
 import {
   createClaudeBenchmarkHarness,
   getBenchmarkDistPath,
@@ -87,8 +95,9 @@ function deriveRunGroup(testCase: BrowserBenchmarkCase): string {
     return slugify(testCase.runGroup);
   }
 
-  const titlePrefix =
-    testCase.title.includes(":") ? testCase.title.split(":")[0]?.trim() : null;
+  const titlePrefix = testCase.title.includes(":")
+    ? testCase.title.split(":")[0]?.trim()
+    : null;
   if (titlePrefix) {
     return slugify(titlePrefix);
   }
@@ -164,29 +173,10 @@ export function buildBrowserBenchmarkPrompt(
   testCase: BrowserBenchmarkCase,
   currentWorkingDirectory?: string,
 ): string {
-  const session = getSessionName(testCase);
-  const cli = getBenchmarkCliCommandPrefix();
-
   return [
-    `Run the ${testCase.benchmark} browser benchmark case "${testCase.title}".`,
-    "Solve it by browsing the live website with the Libretto CLI installed in the current workspace.",
-    "Use the libretto skill.",
-    "Run every `pnpm -s cli ...` command exactly from the current working directory. Do not prepend `cd`, do not switch directories, and do not run the CLI from the repo root.",
-    "Do not inspect files under benchmarks/ to discover the answer.",
-    `Use exactly one Libretto session named "${session}".`,
-    `Open the site with: ${cli} open ${testCase.startUrl} --headless --session ${session}`,
-    "If you encounter a CAPTCHA or Cloudflare challenge, call the `solve-captcha` tool instead of waiting manually. Pass the session name and the URL/title substring you expect after the challenge, and do not click the challenge UI yourself.",
-    `Use ${cli} snapshot --session ${session} --objective "<...>" at least once before your final answer.`,
-    `Before finishing, run: ${cli} exec --session ${session} "return { url: await page.url(), title: await page.title() }"`,
-    `Then close the browser with: ${cli} close --session ${session}`,
-    testCase.finalResultInstruction ??
-      'End with exactly one line in this format: FINAL_RESULT: <url> | <title>',
-    ...(currentWorkingDirectory
-      ? [`Current working directory: ${currentWorkingDirectory}`]
-      : []),
-    "",
-    "Task:",
     testCase.instruction,
+    "Use the Libretto skill and CLI complete the task",
+    "If you encounter a CAPTCHA or Cloudflare challenge, call the `solve-captcha` tool instead of waiting manually. Pass the session name and the URL/title substring you expect after the challenge, and do not click the challenge UI yourself.",
   ].join("\n");
 }
 
@@ -259,10 +249,7 @@ function formatToolBlock(
   output: string,
   isError: boolean,
 ): string {
-  const sections = [
-    `[${toolName}:`,
-    JSON.stringify(input ?? {}, null, 2),
-  ];
+  const sections = [`[${toolName}:`, JSON.stringify(input ?? {}, null, 2)];
 
   if (output.trim().length > 0) {
     sections.push("");
@@ -274,7 +261,10 @@ function formatToolBlock(
   return sections.join("\n");
 }
 
-function formatTranscriptMarkdown(prompt: string, messages: SDKMessage[]): string {
+function formatTranscriptMarkdown(
+  prompt: string,
+  messages: SDKMessage[],
+): string {
   const blocks: string[] = [`User:\n${prompt}`];
   const pendingToolUses = new Map<string, PendingToolUse>();
 
@@ -394,7 +384,10 @@ async function walkFiles(root: string): Promise<string[]> {
   return files;
 }
 
-async function copyJsonlLogs(workspaceDir: string, logsDir: string): Promise<void> {
+async function copyJsonlLogs(
+  workspaceDir: string,
+  logsDir: string,
+): Promise<void> {
   const sessionsRoot = join(workspaceDir, ".libretto", "sessions");
   try {
     const rootStats = await stat(sessionsRoot);
@@ -432,7 +425,7 @@ async function createWorkspacePackageJson(
           cli: getBenchmarkWorkspaceCliScript(),
         },
         bin: {
-          "libretto": "./dist/cli/index.js",
+          libretto: "./dist/cli/index.js",
         },
       },
       null,
@@ -461,7 +454,9 @@ async function createWorkspaceAgentsFile(workspaceDir: string): Promise<void> {
   );
 }
 
-async function rewriteWorkspaceSkillCommands(skillDestination: string): Promise<void> {
+async function rewriteWorkspaceSkillCommands(
+  skillDestination: string,
+): Promise<void> {
   const skillPath = join(skillDestination, "SKILL.md");
   const skillMarkdown = await readFile(skillPath, "utf8");
   await writeFile(
@@ -487,7 +482,9 @@ async function createWorkspaceFiles(
 
   await cp(getBenchmarkDistPath(), distDestination, { recursive: true });
   await mkdir(dirname(skillDestination), { recursive: true });
-  await cp(getBenchmarkSkillSourcePath(), skillDestination, { recursive: true });
+  await cp(getBenchmarkSkillSourcePath(), skillDestination, {
+    recursive: true,
+  });
   await rewriteWorkspaceSkillCommands(skillDestination);
   await createWorkspacePackageJson(paths.workspaceDir, testCase);
   await createWorkspaceAgentsFile(paths.workspaceDir);
@@ -626,7 +623,7 @@ async function persistArtifacts(
       error:
         artifacts.error instanceof Error
           ? artifacts.error.message
-          : artifacts.error ?? null,
+          : (artifacts.error ?? null),
     },
   ]);
 

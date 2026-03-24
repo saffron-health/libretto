@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   SOLVE_CAPTCHA_TOOL_NAME,
-  createSolveCaptchaHooks,
+  solveCaptchaHooks,
   readSolveCaptchaSessionState,
   waitForSolveCaptchaTarget,
 } from "../benchmarks/shared/solve-captcha-tool.js";
@@ -28,7 +28,9 @@ function createPollingPage(states: Array<{ url: string; title: string }>) {
 
 describe("benchmark solve-captcha tool", () => {
   test("reads kernel session state from the benchmark workspace", () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), "libretto-benchmark-solve-captcha-"));
+    const workspaceDir = mkdtempSync(
+      join(tmpdir(), "libretto-benchmark-solve-captcha-"),
+    );
     const sessionDir = join(
       workspaceDir,
       ".libretto",
@@ -82,7 +84,9 @@ describe("benchmark solve-captcha tool", () => {
       timeoutSeconds: 2,
     });
 
-    expect(result.snapshot.url).toContain("/grammar/british-grammar/fewer-or-less");
+    expect(result.snapshot.url).toContain(
+      "/grammar/british-grammar/fewer-or-less",
+    );
     expect(result.snapshot.title).toContain("Cambridge Dictionary");
   });
 
@@ -108,8 +112,8 @@ describe("benchmark solve-captcha tool", () => {
   });
 
   test("failure hook stops the harness on solve-captcha timeout", async () => {
-    const hooks = createSolveCaptchaHooks();
-    const callback = hooks.PostToolUseFailure[0]!.hooks[0]!;
+    const hooks = solveCaptchaHooks;
+    const callback = hooks.PostToolUseFailure![0]!.hooks[0]!;
 
     const output = await callback(
       {

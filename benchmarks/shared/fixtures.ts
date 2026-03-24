@@ -6,9 +6,9 @@ import {
 } from "../../evals/harness.js";
 import { requireBenchmarkKernelApiKey } from "./kernel.js";
 import {
-  createSolveCaptchaHooks,
   createSolveCaptchaMcpServer,
 } from "./solve-captcha-tool.js";
+import { benchmarkHooks } from "./hooks.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const packageRoot = resolve(here, "../..");
@@ -54,7 +54,7 @@ export async function createClaudeBenchmarkHarness(
       process.env.LIBRETTO_EVAL_MODEL?.trim() ||
       DEFAULT_BENCHMARK_MODEL,
     mcpServers: createSolveCaptchaMcpServer(cwd),
-    hooks: createSolveCaptchaHooks(),
+    hooks: benchmarkHooks,
     maxTurns: 30,
     settingSources: ["project"],
     allowedTools: [BENCHMARK_SKILL_TOOL_NAME],

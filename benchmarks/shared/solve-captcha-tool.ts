@@ -2,6 +2,7 @@ import {
   createSdkMcpServer,
   tool,
   type HookCallbackMatcher,
+  type HookEvent,
   type McpServerConfig,
 } from "@anthropic-ai/claude-agent-sdk";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -314,34 +315,32 @@ export function createSolveCaptchaMcpServer(
   };
 }
 
-export function createSolveCaptchaHooks(): {
-  PostToolUseFailure: HookCallbackMatcher[];
-} {
-  return {
-    PostToolUseFailure: [
-      {
-        hooks: [
-          async (input) => {
-            if (input.hook_event_name !== "PostToolUseFailure") {
-              return {};
-            }
+type BenchmarkHookSet = Partial<Record<HookEvent, HookCallbackMatcher[]>>;
 
-            if (input.tool_name !== SOLVE_CAPTCHA_TOOL_NAME) {
-              return {};
-            }
+export const solveCaptchaHooks: BenchmarkHookSet = {
+  PostToolUseFailure: [
+    {
+      hooks: [
+        async (input) => {
+          if (input.hook_event_name !== "PostToolUseFailure") {
+            return {};
+          }
 
-            if (!input.error.includes("Stuck on Captcha")) {
-              return {};
-            }
+          if (input.tool_name !== SOLVE_CAPTCHA_TOOL_NAME) {
+            return {};
+          }
 
-            return {
-              continue: false,
-              stopReason: "Stuck on Captcha",
-              systemMessage: "<system-message>Stuck on Captcha</system-message>",
-            };
-          },
-        ],
-      },
-    ],
-  };
-}
+          if (!input.error.includes("Stuck on Captcha")) {
+            return {};
+          }
+
+          return {
+            continue: false,
+            stopReason: "Stuck on Captcha",
+            systemMessage: "<system-message>Stuck on Captcha</system-message>",
+          };
+        },
+      ],
+    },
+  ],
+};
