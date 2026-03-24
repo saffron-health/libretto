@@ -48,6 +48,17 @@ npx libretto open https://example.com --headed
 npx libretto open https://example.com --headless --session debug-example
 ```
 
+### `connect`
+
+- Use `connect` to attach to any existing Chrome DevTools Protocol (CDP) endpoint — a browser started with `--remote-debugging-port`, an Electron app, or any other CDP-compatible target.
+- After connecting, `exec`, `snapshot`, `pages`, and all other session commands work normally.
+- Libretto does not manage the connected process's lifecycle. `close` clears the session but does not terminate the remote process.
+
+```bash
+npx libretto connect http://127.0.0.1:9222 --session my-session
+npx libretto connect http://127.0.0.1:9223 --session another-session
+```
+
 ### `snapshot`
 
 - Use `snapshot` as the primary page observation tool.
