@@ -55,7 +55,7 @@ export async function createClaudeBenchmarkHarness(
       DEFAULT_BENCHMARK_MODEL,
     mcpServers: createSolveCaptchaMcpServer(cwd),
     hooks: benchmarkHooks,
-    maxTurns: 30,
+    maxTurns: 200,
     settingSources: ["project"],
     allowedTools: [BENCHMARK_SKILL_TOOL_NAME],
   });
