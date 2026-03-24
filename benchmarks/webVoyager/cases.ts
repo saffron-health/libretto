@@ -1,8 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  formatBenchmarkSessionName,
-  getBenchmarkCliCommandPrefix,
   type BrowserBenchmarkCase,
 } from "../shared/cases.js";
 
@@ -110,7 +108,6 @@ function readDatasetRows(): WebVoyagerRow[] {
 }
 
 export function getWebVoyagerCases(): BrowserBenchmarkCase[] {
-  const cli = getBenchmarkCliCommandPrefix();
   const rows = readDatasetRows();
   const sampledRows = parseBooleanEnv("LIBRETTO_WEBVOYAGER_RANDOM_SAMPLE")
     ? shuffleRows(rows, parseSeed())
@@ -119,19 +116,12 @@ export function getWebVoyagerCases(): BrowserBenchmarkCase[] {
   const limit = parseLimit(sampledRows.length);
 
   return sampledRows.slice(offset, offset + limit).map((row) => {
-    const sessionName = formatBenchmarkSessionName("webVoyager", row.id);
     return {
       benchmark: "webVoyager",
       id: row.id,
       title: `${row.web_name ?? row.web}: ${row.ques}`,
       startUrl: row.web,
       instruction: row.ques,
-      finalResultInstruction:
-        'End with exactly one line in this format: FINAL_RESULT: <answer> | <url> | <title>',
-      requiredTranscriptSnippets: [
-        `${cli} open ${row.web} --headless --session ${sessionName}`,
-        "FINAL_RESULT:",
-      ],
       successAssertion: [
         `Evaluate whether the transcript shows successful completion of this WebVoyager task: "${row.ques}"`,
         "Success requires that the agent uses the Libretto CLI to browse the live target website, reaches a relevant page state, and provides a concrete final answer that satisfies the task.",

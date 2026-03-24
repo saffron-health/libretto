@@ -32,8 +32,6 @@ export type BrowserBenchmarkCase = {
   instruction: string;
   successAssertion: string;
   runGroup?: string;
-  requiredTranscriptSnippets?: string[];
-  finalResultInstruction?: string;
 };
 
 type BenchmarkRunPaths = {
@@ -161,12 +159,49 @@ function normalizeError(error: unknown): unknown {
   return error ?? null;
 }
 
-function extractFinalResultLine(transcript: string): string | null {
-  const finalResultLine = transcript
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line.startsWith("FINAL_RESULT:"));
-  return finalResultLine ?? null;
+function extractAssistantTextContent(message: SDKMessage): string {
+  if (message.type !== "assistant") {
+    return "";
+  }
+
+  const content = message.message.content;
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  const blocks: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+
+    const typedBlock = block as { type?: unknown; text?: unknown };
+    if (
+      typedBlock.type === "text" &&
+      typeof typedBlock.text === "string" &&
+      typedBlock.text.trim().length > 0
+    ) {
+      blocks.push(typedBlock.text.trim());
+    }
+  }
+
+  return blocks.join("\n").trim();
+}
+
+function extractRecordedFinalResult(response?: EvalResponse): string | null {
+  if (!response) {
+    return null;
+  }
+
+  for (let i = response.messages.length - 1; i >= 0; i -= 1) {
+    const text = extractAssistantTextContent(response.messages[i]!);
+    if (text) {
+      return text;
+    }
+  }
+
+  const resultText = response.result?.result?.trim();
+  return resultText ? resultText : null;
 }
 
 export function buildBrowserBenchmarkPrompt(
@@ -534,7 +569,7 @@ async function persistArtifacts(
         status: artifacts.status,
         completed,
         success,
-        finalResult: extractFinalResultLine(transcript),
+        finalResult: extractRecordedFinalResult(artifacts.response),
         error: normalizedError,
       },
       null,
@@ -584,7 +619,7 @@ async function persistArtifacts(
       `- Session ID: ${artifacts.response?.sessionId ?? "n/a"}`,
       `- Status: ${artifacts.status}`,
       `- Success: ${success === null ? "n/a" : success}`,
-      `- Final Result: ${extractFinalResultLine(transcript) ?? "n/a"}`,
+      `- Final Result: ${extractRecordedFinalResult(artifacts.response) ?? "n/a"}`,
       `- Started: ${artifacts.startedAt}`,
       `- Finished: ${artifacts.finishedAt}`,
       `- Duration (ms): ${artifacts.durationMs}`,
@@ -736,11 +771,6 @@ export async function runBrowserBenchmarkCase(
       response = agentResponse;
 
       expect(agentResponse.messages.length).toBeGreaterThan(0);
-      expect(agentResponse.transcript).toContain("FINAL_RESULT:");
-
-      for (const snippet of testCase.requiredTranscriptSnippets ?? []) {
-        expect(agentResponse.transcript).toContain(snippet);
-      }
 
       await agentResponse.evaluate(testCase.successAssertion);
       return agentResponse;

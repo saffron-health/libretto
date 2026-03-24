@@ -33,16 +33,12 @@ describe("benchmark launcher history", () => {
       startUrl: "https://example.com",
       instruction: "Inspect the page and report the final title.",
       successAssertion:
-        "The transcript includes the final page URL and title in FINAL_RESULT format.",
+        "The transcript includes the final page URL and title.",
     }, "/tmp/libretto-benchmark-workspace");
 
-    expect(prompt).toContain("Use the libretto skill.");
-    expect(prompt).toContain("pnpm -s cli open https://example.com --headless --session webvoyager-sample-case");
-    expect(prompt).toContain("Current working directory: /tmp/libretto-benchmark-workspace");
-    expect(prompt).toContain("Run every `pnpm -s cli ...` command exactly from the current working directory.");
-    expect(prompt).toContain("Do not prepend `cd`, do not switch directories, and do not run the CLI from the repo root.");
-    expect(prompt).not.toContain(".claude/skills/libretto/SKILL.md");
-    expect(prompt).not.toContain(".agents/skills/libretto/SKILL.md");
+    expect(prompt).toContain("Inspect the page and report the final title.");
+    expect(prompt).toContain("Use the Libretto skill and CLI complete the task");
+    expect(prompt).toContain("solve-captcha");
   });
 
   test("rewrites copied benchmark skill commands to use the local cli script", () => {
@@ -62,18 +58,14 @@ describe("benchmark launcher history", () => {
   });
 
   test("defaults to all benchmarks when no benchmark filter is provided", () => {
-    const parsed = parseBenchmarkArgs(["--testNamePattern", "FINAL_RESULT"]);
+    const parsed = parseBenchmarkArgs(["--testNamePattern", "Cambridge"]);
 
     expect(parsed.benchmarkFilters).toEqual([]);
     expect(parsed.passthroughArgs).toEqual([
       "--testNamePattern",
-      "FINAL_RESULT",
+      "Cambridge",
     ]);
-    expect(parsed.benchmarks).toEqual([
-      "onlineMind2Web",
-      "webVoyager",
-      "webBench",
-    ]);
+    expect(parsed.benchmarks).toEqual(["webVoyager"]);
     expect(parsed.isAllBenchmarks).toBe(true);
   });
 
@@ -109,7 +101,7 @@ describe("benchmark launcher history", () => {
       "webVoyager",
       "--",
       "--testNamePattern",
-      "FINAL_RESULT",
+      "Cambridge",
     ]);
     const results = collectRunBenchmarkResults({
       root: tempRoot,
@@ -118,7 +110,7 @@ describe("benchmark launcher history", () => {
       finishedAt: new Date("2026-03-12T20:02:03.000Z"),
     });
     const record = buildBenchmarkRunRecord({
-      requestedArgs: ["webVoyager", "--", "--testNamePattern", "FINAL_RESULT"],
+      requestedArgs: ["webVoyager", "--", "--testNamePattern", "Cambridge"],
       parsedArgs: parsed,
       startedAt: new Date("2026-03-12T20:00:00.000Z"),
       finishedAt: new Date("2026-03-12T20:02:03.000Z"),
@@ -142,8 +134,8 @@ describe("benchmark launcher history", () => {
       benchmarks: ["webVoyager"],
       resultFileCount: 1,
       costTrackedResultCount: 1,
-      passthroughArgs: ["--testNamePattern", "FINAL_RESULT"],
-      requestedArgs: ["webVoyager", "--", "--testNamePattern", "FINAL_RESULT"],
+      passthroughArgs: ["--testNamePattern", "Cambridge"],
+      requestedArgs: ["webVoyager", "--", "--testNamePattern", "Cambridge"],
       scope: "selected",
     });
   });
@@ -170,7 +162,7 @@ describe("benchmark launcher history", () => {
           status: "passed",
           durationMs: 123_000,
           totalCostUsd: 0.4321,
-          finalResult: "FINAL_RESULT: https://example.com | Example",
+          finalResult: "https://example.com | Example",
         },
       ],
     });
@@ -203,7 +195,7 @@ describe("benchmark launcher history", () => {
         JSON.stringify({
           finishedAt: "2026-03-12T20:06:00.000Z",
           scope: "all",
-          benchmarks: ["onlineMind2Web", "webVoyager", "webBench"],
+          benchmarks: ["webVoyager"],
           durationMs: 999_000,
           totalCostUsd: 9.9999,
         }),

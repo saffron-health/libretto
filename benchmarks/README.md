@@ -12,16 +12,12 @@ Usage:
 
 ```bash
 pnpm benchmark
-pnpm benchmark onlineMind2Web
 pnpm benchmark webVoyager
-pnpm benchmark webBench
 ```
 
 Current status:
 
-- `onlineMind2Web/` is wired end-to-end with one hardcoded published example task.
 - `webVoyager/` uses a browser-use-derived dataset with impossible tasks removed and stale date-based prompts updated. It runs the full local file by default, with optional env vars for bounded or seeded-random slices.
-- `webBench/` is scaffolded for follow-up tasks.
 
 Run artifacts are written to:
 

@@ -14,19 +14,9 @@ const repoRoot = resolve(here, "..");
 
 const BENCHMARK_DEFINITIONS = [
   {
-    name: "onlineMind2Web",
-    path: "benchmarks/onlineMind2Web",
-    aliases: ["onlineMind2Web", "onlinemind2web"],
-  },
-  {
     name: "webVoyager",
     path: "benchmarks/webVoyager",
     aliases: ["webVoyager", "webvoyager"],
-  },
-  {
-    name: "webBench",
-    path: "benchmarks/webBench",
-    aliases: ["webBench", "webbench"],
   },
 ] as const;
 
@@ -81,12 +71,12 @@ function pushUnique(values: string[], value: string): void {
 function printUsage(): void {
   console.log(
     [
-      "Usage: pnpm benchmark [onlineMind2Web|webVoyager|webBench] [vitest args...]",
+      "Usage: pnpm benchmark [webVoyager] [vitest args...]",
       "",
       "Examples:",
       "  pnpm benchmark",
-      "  pnpm benchmark onlineMind2Web",
-      "  pnpm benchmark -- --testNamePattern FINAL_RESULT",
+      "  pnpm benchmark webVoyager",
+      "  pnpm benchmark -- --testNamePattern Cambridge",
     ].join("\n"),
   );
 }

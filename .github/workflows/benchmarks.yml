@@ -10,8 +10,6 @@ on:
         type: choice
         options:
           - webVoyager
-          - onlineMind2Web
-          - webBench
       run_mode:
         description: Full benchmark or small random sample
         required: true
