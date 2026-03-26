@@ -40,6 +40,7 @@
     "benchmark": "pnpm run build && tsx benchmarks/run.ts",
     "test:watch": "vitest",
     "cli": "node dist/index.js",
+    "generate-changelog": "tsx scripts/generate-changelog.ts",
     "prepare-release": "bash ./scripts/prepare-release.sh",
     "prepack": "pnpm run build"
   },
@@ -69,6 +70,9 @@
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai": "^3.0.41",
     "@anthropic-ai/claude-agent-sdk": "^0.2.75",
+    "@mariozechner/pi-agent-core": "^0.62.0",
+    "@mariozechner/pi-ai": "^0.62.0",
+    "@sinclair/typebox": "^0.34.48",
     "@types/node": "^25.5.0",
     "glimpseui": "^0.5.1",
     "openai": "^6.29.0",

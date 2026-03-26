@@ -17,6 +17,8 @@ If on a non-main branch where the existing PR is already merged, the uncommitted
 
 Commit the changes. Use gh cli to check if a PR exists for this branch. If no PR exists, create one with an appropriate title and description. If a PR exists, query its current title and description and update them if the new changes warrant it. Push the changes.
 
+When writing or updating a PR title and description, always base them on the **full diff against `main`** (`git diff main...HEAD`), not just the most recent commits. The title and description should accurately summarize the entire set of changes in the PR.
+
 ### Release note labels
 
 When creating or updating a PR in this repo, make sure it has a changelog label so GitHub Releases can categorize it correctly.

@@ -1,5 +1,17 @@
 # Releasing Libretto
 
+## For people
+
+1. Run `pnpm prepare-release patch` (or `minor`/`major`). This will pull `main`, run tests, bump the version, and open a release PR.
+2. Wait for CI and evals to finish on the PR. Review the eval summary comment.
+3. Merge the PR. GitHub Actions will automatically publish to npm and create the GitHub release.
+
+Only admins with merge access to `main` can trigger a release. The release workflow runs on push to `main`, so branch protection is the access control — there is no separate approval step.
+
+---
+
+## For agents
+
 Libretto uses a simple release flow:
 
 1. Create a release PR from `main`.
@@ -14,7 +26,7 @@ GitHub Actions needs these repository secrets:
 
 - `OPENAI_API_KEY`: used by the existing test suite during the release workflow.
 
-The release workflow uses a GitHub Actions environment named `release`. Configure that environment in the repository settings and require approval from the maintainers who are allowed to publish. Enable `Prevent self-review` if you want a second maintainer to approve every release.
+The release workflow uses a GitHub Actions environment named `release`. Create that environment in the repository settings (no required reviewers — access is controlled by branch protection on `main` instead).
 
 On npm, configure `libretto` to trust this repository and workflow for publishing. The trusted publisher fields should match:
 
@@ -42,9 +54,9 @@ GitHub release notes are auto-generated from merged pull requests. The release n
 Run one of these from a clean working tree:
 
 ```bash
-pnpm prepare-release -- patch
-pnpm prepare-release -- minor
-pnpm prepare-release -- major
+pnpm prepare-release patch
+pnpm prepare-release minor
+pnpm prepare-release major
 ```
 
 The script in `scripts/prepare-release.sh` does the following:
@@ -53,9 +65,9 @@ The script in `scripts/prepare-release.sh` does the following:
 2. Updates local `main` from `origin/main`.
 3. Runs `pnpm install --frozen-lockfile`, `pnpm type-check`, and `pnpm test`.
 4. Bumps the version in `package.json`.
-5. Creates a branch named `tk-release-vX.Y.Z`.
+5. Creates a release branch.
 6. Commits the version bump.
-7. Pushes the branch and opens a PR to `main`.
+7. Pushes the branch and opens a PR to `main` with the `release` label.
 
 Release PRs also run the eval workflow. That workflow compares the current eval score against the latest successful `main` baseline and fails if the score drifts by more than 5 percentage points in either direction.
 
@@ -68,9 +80,8 @@ The workflow:
 1. Reads the version from `package.json`.
 2. Checks whether that version already exists on npm and in GitHub Releases.
 3. Runs install, type-check, and tests in a verification job.
-4. Waits for approval on the `release` environment before the publish job can access release permissions.
-5. Publishes `libretto@X.Y.Z` to npm with trusted publishing if it is not already published.
-6. Creates GitHub release `vX.Y.Z` with generated release notes if it does not already exist.
+4. Publishes `libretto@X.Y.Z` to npm with trusted publishing if it is not already published.
+5. Creates GitHub release `vX.Y.Z` with generated release notes if it does not already exist.
 
 This makes the workflow safe to re-run after partial failures. For example, if npm publish succeeds but GitHub release creation fails, a re-run will skip npm and only create the missing release.
 
@@ -100,7 +111,7 @@ To keep release notes readable, use clear PR titles and apply one of those label
 
 ## Notes
 
-- Protect `main` in GitHub settings. The release environment protects publishing, but branch protection is still the control that limits who can merge release-triggering commits into `main`.
+- Protect `main` in GitHub settings. Branch protection is the primary control that limits who can merge release-triggering commits into `main`. Restrict merge access to admins.
 - Only merge a release PR when `main` is ready to ship.
 - Do not create git tags in the PR branch. Tags are created by the release workflow after merge.
 - If you need richer release notes later, keep this flow and replace `--generate-notes` with a more explicit changelog step.

@@ -162,6 +162,12 @@ jobs:
         if: needs.verify.outputs.npm_exists != 'true'
         run: npm publish --access public
 
+      - name: Generate changelog
+        if: needs.verify.outputs.release_exists != 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: pnpm generate-changelog "${{ needs.verify.outputs.tag }}" > "$RUNNER_TEMP/changelog.md"
+
       - name: Create GitHub release
         if: needs.verify.outputs.release_exists != 'true'
         env:
@@ -169,9 +175,9 @@ jobs:
         run: |
           set -euo pipefail
           if git ls-remote --exit-code --tags origin "refs/tags/${{ needs.verify.outputs.tag }}" >/dev/null 2>&1; then
-            gh release create "${{ needs.verify.outputs.tag }}" --generate-notes
+            gh release create "${{ needs.verify.outputs.tag }}" --notes-file "$RUNNER_TEMP/changelog.md"
           else
             gh release create "${{ needs.verify.outputs.tag }}" \
               --target "${GITHUB_SHA}" \
-              --generate-notes
+              --notes-file "$RUNNER_TEMP/changelog.md"
           fi

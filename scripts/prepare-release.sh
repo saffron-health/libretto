@@ -61,7 +61,7 @@ else next = [major, minor, patch + 1]
 
 process.stdout.write(next.join("."))
 ' "$current_version" "$bump")"
-branch_name="tk-release-v${next_version}"
+branch_name="release-v${next_version}"
 
 if git show-ref --verify --quiet "refs/heads/${branch_name}"; then
   echo "Local branch ${branch_name} already exists." >&2
@@ -84,6 +84,7 @@ gh pr create \
   --base main \
   --head "$branch_name" \
   --title "release: v${next_version}" \
+  --label release \
   --body "$(cat <<EOF
 ## Summary
 

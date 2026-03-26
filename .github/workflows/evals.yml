@@ -18,18 +18,18 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - labeled
 
 permissions:
   contents: read
   actions: read
-  issues: write
+  pull-requests: write
 
 jobs:
   evals:
     if: |
       github.event_name != 'pull_request' ||
-      startsWith(github.head_ref, 'tk-release-v') ||
-      startsWith(github.event.pull_request.title, 'release:')
+      contains(github.event.pull_request.labels.*.name, 'release')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
