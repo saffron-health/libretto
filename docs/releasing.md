@@ -114,4 +114,4 @@ To keep release notes readable, use clear PR titles and apply one of those label
 - Protect `main` in GitHub settings. Branch protection is the primary control that limits who can merge release-triggering commits into `main`. Restrict merge access to admins.
 - Only merge a release PR when `main` is ready to ship.
 - Do not create git tags in the PR branch. Tags are created by the release workflow after merge.
-- If you need richer release notes later, keep this flow and replace `--generate-notes` with a more explicit changelog step.
+- Release notes are AI-generated from merged PRs by `scripts/generate-changelog.ts`.

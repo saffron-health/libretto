@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { Agent, type AgentTool, type AgentEvent } from "@mariozechner/pi-agent-core";
 import { getModel } from "@mariozechner/pi-ai";
 import { Type } from "@sinclair/typebox";
@@ -15,7 +15,8 @@ if (!process.env.ANTHROPIC_API_KEY) {
   process.exit(1);
 }
 
-const ALLOWED_GH_SUBCOMMANDS = new Set(["pr", "release", "api", "repo", "issue"]);
+const ALLOWED_GH_SUBCOMMANDS = new Set(["pr", "release", "repo", "issue"]);
+const ALLOWED_ACTIONS = new Set(["list", "view", "diff", "status", "checks"]);
 
 const ghTool: AgentTool = {
   name: "gh",
@@ -39,14 +40,13 @@ const ghTool: AgentTool = {
       throw new Error(`Subcommand '${subcommand}' is not allowed. Allowed: ${[...ALLOWED_GH_SUBCOMMANDS].join(", ")}`);
     }
 
-    const MUTATING = new Set(["create", "merge", "close", "reopen", "edit", "delete", "comment", "review"]);
     const action = parts[1];
-    if (action && MUTATING.has(action)) {
-      throw new Error(`Mutating action '${action}' is not allowed. Only read operations are permitted.`);
+    if (!action || !ALLOWED_ACTIONS.has(action)) {
+      throw new Error(`Action '${action}' is not allowed. Allowed: ${[...ALLOWED_ACTIONS].join(", ")}`);
     }
 
     try {
-      const output = execSync(`gh ${args}`, {
+      const output = execFileSync("gh", parts, {
         encoding: "utf8",
         timeout: 300_000,
         maxBuffer: 1024 * 1024,
