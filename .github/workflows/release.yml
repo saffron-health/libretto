@@ -33,7 +33,9 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          version="$(node -p "require('./package.json').version")"
+          package_name="$(node -p "require('./packages/libretto/package.json').name")"
+          version="$(node -p "require('./packages/libretto/package.json').version")"
+          echo "package_name=${package_name}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tag=v${version}" >> "$GITHUB_OUTPUT"
 
@@ -51,7 +53,7 @@ jobs:
             release_exists=true
           fi
 
-          if npm view "libretto@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
+          if npm view "${{ steps.version.outputs.package_name }}@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
             npm_exists=true
           fi
 
@@ -109,7 +111,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: temp/libretto-cli-evaluate-cache
-          key: libretto-evaluate-cache-${{ runner.os }}-${{ hashFiles('test/fixtures.ts', 'test/basic.spec.ts', 'test/stateful.spec.ts') }}
+          key: libretto-evaluate-cache-${{ runner.os }}-${{ hashFiles('packages/libretto/test/fixtures.ts', 'packages/libretto/test/basic.spec.ts', 'packages/libretto/test/stateful.spec.ts') }}
           restore-keys: |
             libretto-evaluate-cache-${{ runner.os }}-
 
@@ -120,8 +122,8 @@ jobs:
       - name: Verify release build
         if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
         run: |
-          pnpm type-check
-          pnpm test
+          pnpm --filter libretto type-check
+          pnpm --filter libretto test
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -156,16 +158,18 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build publish artifacts
-        run: pnpm build
+        run: pnpm --filter libretto build
 
       - name: Publish to npm with trusted publishing
         if: needs.verify.outputs.npm_exists != 'true'
+        working-directory: packages/libretto
         run: npm publish --access public
 
       - name: Generate changelog
         if: needs.verify.outputs.release_exists != 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        working-directory: packages/libretto
         run: pnpm generate-changelog "${{ needs.verify.outputs.tag }}" > "$RUNNER_TEMP/changelog.md"
 
       - name: Create GitHub release

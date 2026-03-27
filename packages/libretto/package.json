@@ -39,7 +39,6 @@
     "test:watch": "vitest",
     "cli": "node dist/index.js",
     "generate-changelog": "tsx scripts/generate-changelog.ts",
-    "prepare-release": "bash ./scripts/prepare-release.sh",
     "prepack": "pnpm run build"
   },
   "peerDependencies": {

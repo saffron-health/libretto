@@ -2,7 +2,7 @@
 
 ## For people
 
-1. Run `pnpm prepare-release patch` (or `minor`/`major`). This will pull `main`, run tests, bump the version, and open a release PR.
+1. From the repository root, run `pnpm prepare-release patch` (or `minor`/`major`). This pulls `main`, runs tests, bumps `packages/libretto/package.json`, and opens a release PR.
 2. Wait for CI and evals to finish on the PR. Review the eval summary comment.
 3. Merge the PR. GitHub Actions will automatically publish to npm and create the GitHub release.
 
@@ -59,12 +59,12 @@ pnpm prepare-release minor
 pnpm prepare-release major
 ```
 
-The script in `scripts/prepare-release.sh` does the following:
+The root `scripts/prepare-release.sh` script does the following:
 
 1. Checks that the working tree is clean.
 2. Updates local `main` from `origin/main`.
-3. Runs `pnpm install --frozen-lockfile`, `pnpm type-check`, and `pnpm test`.
-4. Bumps the version in `package.json`.
+3. Runs `pnpm install --frozen-lockfile`, `pnpm --filter libretto type-check`, and `pnpm --filter libretto test`.
+4. Bumps the version in `packages/libretto/package.json`.
 5. Creates a release branch.
 6. Commits the version bump.
 7. Pushes the branch and opens a PR to `main` with the `release` label.
@@ -77,10 +77,10 @@ After the release PR merges, `.github/workflows/release.yml` runs on `main`.
 
 The workflow:
 
-1. Reads the version from `package.json`.
+1. Reads the version from `packages/libretto/package.json`.
 2. Checks whether that version already exists on npm and in GitHub Releases.
-3. Runs install, type-check, and tests in a verification job.
-4. Publishes `libretto@X.Y.Z` to npm with trusted publishing if it is not already published.
+3. Runs install, type-check, and tests for the `libretto` package in a verification job.
+4. Publishes `libretto@X.Y.Z` to npm from `packages/libretto` with trusted publishing if it is not already published.
 5. Creates GitHub release `vX.Y.Z` with generated release notes if it does not already exist.
 
 This makes the workflow safe to re-run after partial failures. For example, if npm publish succeeds but GitHub release creation fails, a re-run will skip npm and only create the missing release.

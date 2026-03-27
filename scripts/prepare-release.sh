@@ -5,12 +5,14 @@ usage() {
   cat <<'EOF'
 Usage: scripts/prepare-release.sh [patch|minor|major]
 
-Creates a release PR branch from main, bumps package.json, pushes the branch,
-and opens a pull request targeting main.
+Creates a release PR branch from main, bumps packages/libretto/package.json,
+pushes the branch, and opens a pull request targeting main.
 EOF
 }
 
 bump="${1:-patch}"
+package_json_path="packages/libretto/package.json"
+package_dir="packages/libretto"
 
 case "$bump" in
   patch|minor|major)
@@ -46,10 +48,10 @@ git checkout main
 git pull --ff-only origin main
 
 pnpm install --frozen-lockfile
-pnpm type-check
-pnpm test
+pnpm --filter libretto type-check
+pnpm --filter libretto test
 
-current_version="$(node -p "require('./package.json').version")"
+current_version="$(node -p "require('./${package_json_path}').version")"
 next_version="$(node -e '
 const [major, minor, patch] = process.argv[1].split(".").map(Number)
 const bump = process.argv[2]
@@ -73,10 +75,13 @@ if git ls-remote --exit-code --heads origin "${branch_name}" >/dev/null 2>&1; th
   exit 1
 fi
 
-npm version "$next_version" --no-git-tag-version >/dev/null
+(
+  cd "$package_dir"
+  npm version "$next_version" --no-git-tag-version >/dev/null
+)
 
 git checkout -b "$branch_name"
-git add package.json
+git add "$package_json_path"
 git commit -m "release: v${next_version}"
 git push -u origin "$branch_name"
 
@@ -92,7 +97,7 @@ gh pr create \
 
 ## Verification
 
-- pnpm type-check
-- pnpm test
+- pnpm --filter libretto type-check
+- pnpm --filter libretto test
 EOF
 )"
