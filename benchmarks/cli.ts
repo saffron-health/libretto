@@ -29,7 +29,7 @@ Examples:
 }
 
 export function createBenchmarksCLIApp() {
-  return SimpleCLI.define("pnpm benchmarks", {
+  return SimpleCLI.define("benchmarks", {
     webVoyager: webVoyagerCommands,
   });
 }

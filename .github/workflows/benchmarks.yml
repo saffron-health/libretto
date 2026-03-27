@@ -41,8 +41,6 @@ jobs:
     timeout-minutes: 180
     env:
       ANTHROPIC_API_KEY: ${{ secrets.LIBRETTO_BENCHMARKS_ANTHROPIC_API_KEY }}
-      LIBRETTO_BENCHMARK_MODEL: claude-opus-4-6
-      LIBRETTO_BENCHMARK_EVALUATOR_MODEL: claude-sonnet-4-6
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -114,8 +112,6 @@ jobs:
             printf -- '- Offset: `%s`\n' "${{ inputs.offset }}"
             printf -- '- Count: `%s`\n' "${{ inputs.count }}"
             printf -- '- Random seed: `%s`\n' "${{ inputs.random_seed }}"
-            printf -- '- Benchmark model: `%s`\n' "${LIBRETTO_BENCHMARK_MODEL}"
-            printf -- '- Evaluator model: `%s`\n' "${LIBRETTO_BENCHMARK_EVALUATOR_MODEL}"
             printf -- '- Exit code: `%s`\n' "${{ steps.run_benchmark.outputs.exit_code }}"
           } >> "$GITHUB_STEP_SUMMARY"
 

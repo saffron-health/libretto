@@ -13,7 +13,7 @@ describe("benchmarks cli", () => {
     const help = await app.run(["help", "webVoyager", "run"]);
 
     expect(help).toContain("Run WebVoyager benchmark cases");
-    expect(help).toContain("Usage: pnpm benchmarks webVoyager run [options]");
+    expect(help).toContain("Usage: benchmarks webVoyager run [options]");
     expect(help).toContain("--offset <value>");
     expect(help).toContain("--count <value>");
     expect(help).toContain("--seed <value>");

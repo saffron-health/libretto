@@ -49,26 +49,6 @@ type ToolStartRecord = {
   args: unknown;
 };
 
-type TranscriptJsonlEntry =
-  | {
-      ts: string;
-      type: "user_prompt";
-      text: string;
-    }
-  | {
-      ts: string;
-      type: "assistant_message";
-      text: string;
-    }
-  | {
-      ts: string;
-      type: "tool_execution";
-      toolName: string;
-      args: unknown;
-      isError: boolean;
-      output: string;
-    };
-
 type EvaluationResult = {
   success: boolean;
   reason: string;
@@ -76,10 +56,14 @@ type EvaluationResult = {
 
 const BENCHMARK_NAME = "webVoyager";
 const DEFAULT_RANDOM_SEED = 1;
-const DEFAULT_BENCHMARK_MODEL = "claude-opus-4-6";
-const DEFAULT_EVALUATOR_MODEL = "anthropic/claude-sonnet-4-6";
+const BENCHMARK_MODEL_PROVIDER = "anthropic";
+const BENCHMARK_MODEL_ID = "claude-opus-4-6";
+const EVALUATOR_MODEL = "anthropic/claude-sonnet-4-6";
 const DEFAULT_GCP_PROJECT = "saffron-health";
 const DEFAULT_ANTHROPIC_SECRET_NAME = "anthropic-api-key";
+
+const MARKDOWN_ARGS_LIMIT = 2_000;
+const MARKDOWN_OUTPUT_LIMIT = 8_000;
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 const webVoyagerCasesPath = resolve(import.meta.dirname, "cases.jsonl");
@@ -129,26 +113,6 @@ function shuffleRows(rows: WebVoyagerRow[], seed: number): WebVoyagerRow[] {
   }
 
   return shuffled;
-}
-
-function normalizeAnthropicModelId(model: string): string {
-  return model.startsWith("anthropic/")
-    ? model.slice("anthropic/".length)
-    : model;
-}
-
-function getBenchmarkModelId(): string {
-  return normalizeAnthropicModelId(
-    process.env.LIBRETTO_BENCHMARK_MODEL?.trim() || DEFAULT_BENCHMARK_MODEL,
-  );
-}
-
-function getEvaluatorModel(): string {
-  const configured = process.env.LIBRETTO_BENCHMARK_EVALUATOR_MODEL?.trim();
-  if (!configured) {
-    return DEFAULT_EVALUATOR_MODEL;
-  }
-  return configured.includes("/") ? configured : `anthropic/${configured}`;
 }
 
 function formatCaseLabel(row: WebVoyagerRow): string {
@@ -345,6 +309,22 @@ function formatToolOutput(result: unknown): string {
     .trim();
 }
 
+function stringifyForMarkdown(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return JSON.stringify(value, null, 2);
+}
+
+function truncateForMarkdown(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, maxLength)}\n… [truncated ${text.length - maxLength} chars]`;
+}
+
 async function accessSecretVersion(args: {
   projectId: string;
   secretName: string;
@@ -469,7 +449,7 @@ async function evaluateFinalMessage(
     };
   }
 
-  const client = createLLMClient(getEvaluatorModel());
+  const client = createLLMClient(EVALUATOR_MODEL);
   return await client.generateObject({
     schema: EvaluationSchema,
     temperature: 0,
@@ -520,10 +500,11 @@ async function runWebVoyagerCase(
     throw new Error("Failed to load the local libretto skill into the benchmark workspace.");
   }
 
-  const modelId = getBenchmarkModelId();
-  const model = modelRegistry.find("anthropic", modelId);
+  const model = modelRegistry.find(BENCHMARK_MODEL_PROVIDER, BENCHMARK_MODEL_ID);
   if (!model) {
-    throw new Error(`Unknown Pi model: anthropic/${modelId}`);
+    throw new Error(
+      `Unknown Pi model: ${BENCHMARK_MODEL_PROVIDER}/${BENCHMARK_MODEL_ID}`,
+    );
   }
 
   const { session } = await createAgentSession({
@@ -539,7 +520,7 @@ async function runWebVoyagerCase(
   });
 
   const transcriptEntries: string[] = [];
-  const transcriptLog: TranscriptJsonlEntry[] = [
+  const transcriptLog: unknown[] = [
     {
       ts: startedAt.toISOString(),
       type: "user_prompt",
@@ -566,15 +547,12 @@ async function runWebVoyagerCase(
 
         finalMessage = messageText;
         transcriptEntries.push(`Assistant:\n${messageText}`);
-        transcriptLog.push({
-          ts: new Date().toISOString(),
-          type: "assistant_message",
-          text: messageText,
-        });
+        transcriptLog.push(event);
         process.stdout.write("\n");
         break;
       }
       case "tool_execution_start": {
+        transcriptLog.push(event);
         pendingToolStarts.set(event.toolCallId, {
           toolName: event.toolName,
           args: event.args,
@@ -585,26 +563,29 @@ async function runWebVoyagerCase(
         const start = pendingToolStarts.get(event.toolCallId);
         const toolName = start?.toolName ?? event.toolName;
         const output = formatToolOutput(event.result);
+        const markdownArgs =
+          typeof start?.args === "undefined"
+            ? ""
+            : truncateForMarkdown(
+                stringifyForMarkdown(start.args),
+                MARKDOWN_ARGS_LIMIT,
+              );
+        const markdownOutput = output
+          ? truncateForMarkdown(output, MARKDOWN_OUTPUT_LIMIT)
+          : "";
 
         transcriptEntries.push(
           [
             `[${toolName}]`,
-            typeof start?.args === "undefined"
-              ? ""
-              : `Args:\n${JSON.stringify(start.args, null, 2)}`,
-            output ? `${event.isError ? "Error" : "Output"}:\n${output}` : "",
+            markdownArgs ? `Args:\n${markdownArgs}` : "",
+            markdownOutput
+              ? `${event.isError ? "Error" : "Output"}:\n${markdownOutput}`
+              : "",
           ]
             .filter(Boolean)
             .join("\n\n"),
         );
-        transcriptLog.push({
-          ts: new Date().toISOString(),
-          type: "tool_execution",
-          toolName,
-          args: start?.args ?? null,
-          isError: event.isError,
-          output,
-        });
+        transcriptLog.push(event);
         pendingToolStarts.delete(event.toolCallId);
         break;
       }
