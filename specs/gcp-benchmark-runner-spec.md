@@ -90,11 +90,11 @@ gs://libretto-benchmarks/
 
 Create a one-time setup script that provisions the GCS bucket, Artifact Registry repository, and Cloud Run Job shell. This is run once manually and is idempotent.
 
-- [ ] Create `benchmarks/infra/setup.sh` with idempotent `gcloud` commands:
+- [x] Create `benchmarks/infra/setup.sh` with idempotent `gcloud` commands:
   - `gcloud storage buckets create gs://libretto-benchmarks --location=us-central1` (with `|| true` for idempotency)
   - `gcloud artifacts repositories create libretto-benchmarks --repository-format=docker --location=us-central1`
   - Create the Cloud Run Job shell: `gcloud run jobs create webvoyager-bench --region=us-central1 --image=us-central1-docker.pkg.dev/saffron-health/libretto-benchmarks/webvoyager:latest --task-timeout=7200s --max-retries=1 --cpu=4 --memory=8Gi --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest`
-- [ ] Run `bash benchmarks/infra/setup.sh` successfully (or verify resources exist if already created)
+- [x] Run `bash benchmarks/infra/setup.sh` successfully (or verify resources exist if already created)
 
 ### Phase 2: Dockerfile
 
