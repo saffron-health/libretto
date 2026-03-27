@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { SimpleCLI } from "../src/cli/framework/simple-cli.js";
-import { webVoyagerCommands } from "./webVoyager/webVoyager.js";
+import { webVoyagerCommands } from "./webVoyager/commands.js";
 
 type BenchmarksCLIResult =
   | void

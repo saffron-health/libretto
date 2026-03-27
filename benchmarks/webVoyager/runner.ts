@@ -13,27 +13,20 @@ import {
   type AgentSessionEvent,
 } from "@mariozechner/pi-coding-agent";
 import { z } from "zod";
-import { SimpleCLI } from "../../src/cli/framework/simple-cli.js";
 import { createLLMClient } from "../../src/shared/llm/client.js";
+import {
+  formatSelectionSummary,
+  readWebVoyagerRows,
+  selectWebVoyagerRows,
+  type WebVoyagerRow,
+} from "./dataset.js";
+import {
+  buildWebVoyagerPrompt,
+  getRunName,
+  rewriteBenchmarkSkillCommands,
+} from "./prompt.js";
 
-export type WebVoyagerRow = {
-  id: string;
-  web: string;
-  ques: string;
-  web_name?: string;
-};
-
-export type WebVoyagerSelection = {
-  mode: "slice" | "random";
-  offset: number;
-  count: number | null;
-  seed: number | null;
-  totalCaseCount: number;
-  selectedCaseCount: number;
-  rows: WebVoyagerRow[];
-};
-
-export type WebVoyagerCaseResult = {
+type WebVoyagerCaseResult = {
   caseId: string;
   runDir: string;
   status: "passed" | "failed";
@@ -51,7 +44,6 @@ type EvaluationResult = {
 };
 
 const BENCHMARK_NAME = "webVoyager";
-const DEFAULT_RANDOM_SEED = 1;
 const BENCHMARK_MODEL_PROVIDER = "anthropic";
 const BENCHMARK_MODEL_ID = "claude-opus-4-6";
 const EVALUATOR_MODEL = "anthropic/claude-sonnet-4-6";
@@ -59,7 +51,6 @@ const DEFAULT_GCP_PROJECT = "saffron-health";
 const DEFAULT_ANTHROPIC_SECRET_NAME = "anthropic-api-key";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
-const webVoyagerCasesPath = resolve(import.meta.dirname, "cases.jsonl");
 const librettoSkillSourcePath = resolve(repoRoot, "skills", "libretto");
 const distSourcePath = resolve(repoRoot, "dist");
 
@@ -67,191 +58,6 @@ const EvaluationSchema = z.object({
   success: z.boolean(),
   reason: z.string().trim().min(1),
 });
-
-let anthropicApiKeyPromise: Promise<string> | null = null;
-
-function slugify(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 120);
-}
-
-function formatSessionName(caseId: string): string {
-  return slugify(`${BENCHMARK_NAME}-${caseId}`);
-}
-
-function createSeededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function shuffleRows(rows: WebVoyagerRow[], seed: number): WebVoyagerRow[] {
-  const random = createSeededRandom(seed);
-  const shuffled = [...rows];
-
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(random() * (index + 1));
-    [shuffled[index], shuffled[swapIndex]] = [
-      shuffled[swapIndex],
-      shuffled[index],
-    ];
-  }
-
-  return shuffled;
-}
-
-function formatCaseLabel(row: WebVoyagerRow): string {
-  return `${row.id}: ${row.web_name ?? row.web}: ${row.ques}`;
-}
-
-function getRunName(row: WebVoyagerRow): string {
-  const siteSlug = slugify(row.web_name ?? new URL(row.web).hostname);
-  return slugify(`${siteSlug}-${row.id}`);
-}
-
-export function getWebVoyagerCasesPath(): string {
-  return webVoyagerCasesPath;
-}
-
-export function parseWebVoyagerRows(jsonl: string): WebVoyagerRow[] {
-  const lines = jsonl
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return lines.map((line) => {
-    const parsed = JSON.parse(line) as Partial<WebVoyagerRow>;
-    if (
-      typeof parsed.id !== "string" ||
-      typeof parsed.web !== "string" ||
-      typeof parsed.ques !== "string"
-    ) {
-      throw new Error(`Invalid WebVoyager row: ${line}`);
-    }
-
-    return {
-      id: parsed.id,
-      web: parsed.web,
-      ques: parsed.ques,
-      web_name: typeof parsed.web_name === "string" ? parsed.web_name : undefined,
-    };
-  });
-}
-
-export function readWebVoyagerRows(
-  filePath: string = getWebVoyagerCasesPath(),
-): WebVoyagerRow[] {
-  return parseWebVoyagerRows(readFileSync(filePath, "utf8"));
-}
-
-export function selectWebVoyagerRows(
-  rows: WebVoyagerRow[],
-  options: {
-    offset?: number;
-    count?: number;
-    seed?: number;
-    random?: boolean;
-  },
-): WebVoyagerSelection {
-  const totalCaseCount = rows.length;
-  const offset = options.offset ?? 0;
-  const count = options.count ?? null;
-  const seed = options.seed ?? DEFAULT_RANDOM_SEED;
-  const mode = options.random ? "random" : "slice";
-
-  if (totalCaseCount === 0) {
-    throw new Error("WebVoyager cases.jsonl is empty.");
-  }
-
-  if (offset < 0) {
-    throw new Error(`--offset must be non-negative. Received: ${offset}`);
-  }
-
-  if (count != null && count <= 0) {
-    throw new Error(`--count must be positive. Received: ${count}`);
-  }
-
-  if (mode === "random") {
-    const sampleCount = count ?? totalCaseCount;
-    if (sampleCount > totalCaseCount) {
-      throw new Error(
-        `Cannot randomly select ${sampleCount} case(s) from ${totalCaseCount} available WebVoyager cases.`,
-      );
-    }
-
-    const selectedRows = shuffleRows(rows, seed).slice(0, sampleCount);
-    return {
-      mode,
-      offset: 0,
-      count: sampleCount,
-      seed,
-      totalCaseCount,
-      selectedCaseCount: selectedRows.length,
-      rows: selectedRows,
-    };
-  }
-
-  if (offset >= totalCaseCount) {
-    throw new Error(
-      `--offset ${offset} is out of range for ${totalCaseCount} WebVoyager cases.`,
-    );
-  }
-
-  const selectedRows = rows.slice(offset, count == null ? undefined : offset + count);
-  return {
-    mode,
-    offset,
-    count,
-    seed: null,
-    totalCaseCount,
-    selectedCaseCount: selectedRows.length,
-    rows: selectedRows,
-  };
-}
-
-export function rewriteBenchmarkSkillCommands(markdown: string): string {
-  return markdown.replaceAll("npx libretto", "pnpm -s cli");
-}
-
-export function buildWebVoyagerPrompt(row: WebVoyagerRow, runDir: string): string {
-  const sessionName = formatSessionName(row.id);
-
-  return [
-    `Run the ${BENCHMARK_NAME} benchmark case \"${formatCaseLabel(row)}\".`,
-    `Current working directory: ${runDir}`,
-    "Use the libretto skill available in this workspace.",
-    "Use the local Libretto CLI via `pnpm -s cli ...`.",
-    `Use exactly one Libretto session named \"${sessionName}\".`,
-    `Open the site with: pnpm -s cli open ${row.web} --headless --session ${sessionName}`,
-    `Before finishing, run: pnpm -s cli exec --session ${sessionName} \"return { url: await page.url(), title: await page.title() }\"`,
-    `Then close the browser with: pnpm -s cli close --session ${sessionName}`,
-    "Do not inspect sibling benchmark files or parent benchmark directories to discover the answer.",
-    "Your final message should directly answer the task. If you are blocked, explain the blocker clearly in the final message.",
-    "",
-    "Task:",
-    row.ques,
-  ].join("\n");
-}
-
-function formatSelectionSummary(selection: WebVoyagerSelection): string {
-  if (selection.mode === "random") {
-    return `random sample of ${selection.selectedCaseCount} case(s) from ${selection.totalCaseCount} total (seed ${selection.seed ?? DEFAULT_RANDOM_SEED})`;
-  }
-
-  if (selection.count == null) {
-    return `slice from offset ${selection.offset} through the remaining ${selection.selectedCaseCount} case(s) of ${selection.totalCaseCount}`;
-  }
-
-  return `slice of ${selection.selectedCaseCount} case(s) from offset ${selection.offset} (requested count ${selection.count}) out of ${selection.totalCaseCount}`;
-}
 
 function extractAssistantText(message: unknown): string {
   if (!message || typeof message !== "object") {
@@ -262,7 +68,10 @@ function extractAssistantText(message: unknown): string {
     role?: string;
     content?: Array<{ type?: string; text?: string }>;
   };
-  if (typedMessage.role !== "assistant" || !Array.isArray(typedMessage.content)) {
+  if (
+    typedMessage.role !== "assistant" ||
+    !Array.isArray(typedMessage.content)
+  ) {
     return "";
   }
 
@@ -308,37 +117,39 @@ async function accessSecretVersion(args: {
 }
 
 async function ensureAnthropicApiKey(): Promise<string> {
-  anthropicApiKeyPromise ??= (async () => {
-    const existing = process.env.ANTHROPIC_API_KEY?.trim();
-    if (existing) {
-      return existing;
-    }
+  const existing = process.env.ANTHROPIC_API_KEY?.trim();
+  if (existing) {
+    return existing;
+  }
 
-    const auth = new GoogleAuth({
-      scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-    });
-    const projectId =
-      process.env.LIBRETTO_BENCHMARK_GCP_PROJECT?.trim() ||
-      (await auth.getProjectId()) ||
-      DEFAULT_GCP_PROJECT;
-    const secretName =
-      process.env.LIBRETTO_BENCHMARK_ANTHROPIC_SECRET_NAME?.trim() ||
-      DEFAULT_ANTHROPIC_SECRET_NAME;
-    const apiKey = await accessSecretVersion({ projectId, secretName });
+  const auth = new GoogleAuth({
+    scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+  });
+  const projectId =
+    process.env.LIBRETTO_BENCHMARK_GCP_PROJECT?.trim() ||
+    (await auth.getProjectId()) ||
+    DEFAULT_GCP_PROJECT;
+  const secretName =
+    process.env.LIBRETTO_BENCHMARK_ANTHROPIC_SECRET_NAME?.trim() ||
+    DEFAULT_ANTHROPIC_SECRET_NAME;
+  const apiKey = await accessSecretVersion({ projectId, secretName });
 
-    process.env.ANTHROPIC_API_KEY = apiKey;
-    process.env.GOOGLE_CLOUD_PROJECT ??= projectId;
-    process.env.GCLOUD_PROJECT ??= projectId;
-    return apiKey;
-  })();
-
-  return anthropicApiKeyPromise;
+  process.env.ANTHROPIC_API_KEY = apiKey;
+  process.env.GOOGLE_CLOUD_PROJECT ??= projectId;
+  process.env.GCLOUD_PROJECT ??= projectId;
+  return apiKey;
 }
 
 async function prepareRunWorkspace(
   row: WebVoyagerRow,
 ): Promise<{ runDir: string; prompt: string }> {
-  const runDir = resolve(repoRoot, "benchmarks", BENCHMARK_NAME, "runs", getRunName(row));
+  const runDir = resolve(
+    repoRoot,
+    "benchmarks",
+    BENCHMARK_NAME,
+    "runs",
+    getRunName(row),
+  );
   const skillDestination = join(runDir, ".agents", "skills", "libretto");
   const prompt = buildWebVoyagerPrompt(row, runDir);
 
@@ -358,7 +169,7 @@ async function prepareRunWorkspace(
     join(runDir, "package.json"),
     JSON.stringify(
       {
-        name: `libretto-benchmark-${slugify(row.id)}`,
+        name: `libretto-benchmark-${getRunName(row)}`,
         private: true,
         type: "module",
         scripts: {
@@ -426,7 +237,7 @@ async function runWebVoyagerCase(
   const startedAt = new Date();
   const { runDir, prompt } = await prepareRunWorkspace(row);
   const anthropicApiKey = await ensureAnthropicApiKey();
-  const agentDir = join(runDir, ".pi-agent");
+  const agentDir = join(runDir, ".pi");
   const authStorage = AuthStorage.create(join(agentDir, "auth.json"));
   authStorage.setRuntimeApiKey("anthropic", anthropicApiKey);
 
@@ -448,11 +259,20 @@ async function runWebVoyagerCase(
   });
   await resourceLoader.reload();
 
-  if (!resourceLoader.getSkills().skills.some((skill) => skill.name === "libretto")) {
-    throw new Error("Failed to load the local libretto skill into the benchmark workspace.");
+  if (
+    !resourceLoader
+      .getSkills()
+      .skills.some((skill) => skill.name === "libretto")
+  ) {
+    throw new Error(
+      "Failed to load the local libretto skill into the benchmark workspace.",
+    );
   }
 
-  const model = modelRegistry.find(BENCHMARK_MODEL_PROVIDER, BENCHMARK_MODEL_ID);
+  const model = modelRegistry.find(
+    BENCHMARK_MODEL_PROVIDER,
+    BENCHMARK_MODEL_ID,
+  );
   if (!model) {
     throw new Error(
       `Unknown Pi model: ${BENCHMARK_MODEL_PROVIDER}/${BENCHMARK_MODEL_ID}`,
@@ -488,12 +308,6 @@ async function runWebVoyagerCase(
     transcriptStream.write(`${JSON.stringify(event)}\n`);
 
     switch (event.type) {
-      case "message_update": {
-        if (event.assistantMessageEvent.type === "text_delta") {
-          process.stdout.write(event.assistantMessageEvent.delta);
-        }
-        break;
-      }
       case "message_end": {
         const messageText = extractAssistantText(event.message);
         if (!messageText) {
@@ -501,7 +315,6 @@ async function runWebVoyagerCase(
         }
 
         finalMessage = messageText;
-        process.stdout.write("\n");
         break;
       }
     }
@@ -572,13 +385,19 @@ export async function runWebVoyagerBenchmark(args: {
   );
 
   for (const [index, row] of selection.rows.entries()) {
-    console.log(`[${index + 1}/${selection.rows.length}] ${formatCaseLabel(row)}`);
+    console.log(
+      `[${index + 1}/${selection.rows.length}] ${row.id}: ${row.web_name ?? row.web}: ${row.ques}`,
+    );
     const result = await runWebVoyagerCase(row);
     results.push(result);
-    console.log(`${result.status === "passed" ? "Passed" : "Failed"} ${row.id}: ${result.evaluationReason}`);
+    console.log(
+      `${result.status === "passed" ? "Passed" : "Failed"} ${row.id}: ${result.evaluationReason}`,
+    );
   }
 
-  const failedCount = results.filter((result) => result.status === "failed").length;
+  const failedCount = results.filter(
+    (result) => result.status === "failed",
+  ).length;
   const passedCount = results.length - failedCount;
   const exitCode = failedCount > 0 ? 1 : 0;
 
@@ -596,47 +415,3 @@ export async function runWebVoyagerBenchmark(args: {
     ].join("\n"),
   };
 }
-
-const webVoyagerRunInput = SimpleCLI.input({
-  positionals: [],
-  named: {
-    offset: SimpleCLI.option(z.coerce.number().int().nonnegative().optional(), {
-      help: "Start at this case index for contiguous runs",
-    }),
-    count: SimpleCLI.option(z.coerce.number().int().positive().optional(), {
-      help: "Number of cases to run",
-    }),
-    seed: SimpleCLI.option(z.coerce.number().int().optional(), {
-      help: "Seed for random selection (default: 1)",
-    }),
-    random: SimpleCLI.flag({
-      help: "Select a seeded random sample instead of a contiguous slice",
-    }),
-  },
-})
-  .refine(
-    (input) => !input.random || input.offset == null,
-    "--offset cannot be used with --random.",
-  )
-  .refine(
-    (input) => input.random || input.seed == null,
-    "--seed requires --random.",
-  );
-
-export const webVoyagerCommands = SimpleCLI.group({
-  description: "WebVoyager benchmark commands",
-  routes: {
-    run: SimpleCLI.command({
-      description: "Run WebVoyager benchmark cases",
-    })
-      .input(webVoyagerRunInput)
-      .handle(async ({ input }) =>
-        runWebVoyagerBenchmark({
-          offset: input.offset,
-          count: input.count,
-          seed: input.seed,
-          random: input.random,
-        }),
-      ),
-  },
-});
