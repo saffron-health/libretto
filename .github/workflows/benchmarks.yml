@@ -124,7 +124,6 @@ jobs:
           path: |
             benchmarks/webVoyager/runs/**/prompt.md
             benchmarks/webVoyager/runs/**/transcript.jsonl
-            benchmarks/webVoyager/runs/**/transcript.md
             benchmarks/webVoyager/runs/**/result.json
 
       - name: Fail workflow if benchmark failed

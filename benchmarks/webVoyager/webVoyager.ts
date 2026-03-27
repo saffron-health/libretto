@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { createWriteStream, readFileSync } from "node:fs";
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { finished } from "node:stream/promises";
 import { GoogleAuth } from "google-auth-library";
 import {
   AuthStorage,
@@ -44,11 +45,6 @@ export type WebVoyagerCaseResult = {
   error: string | null;
 };
 
-type ToolStartRecord = {
-  toolName: string;
-  args: unknown;
-};
-
 type EvaluationResult = {
   success: boolean;
   reason: string;
@@ -61,9 +57,6 @@ const BENCHMARK_MODEL_ID = "claude-opus-4-6";
 const EVALUATOR_MODEL = "anthropic/claude-sonnet-4-6";
 const DEFAULT_GCP_PROJECT = "saffron-health";
 const DEFAULT_ANTHROPIC_SECRET_NAME = "anthropic-api-key";
-
-const MARKDOWN_ARGS_LIMIT = 2_000;
-const MARKDOWN_OUTPUT_LIMIT = 8_000;
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 const webVoyagerCasesPath = resolve(import.meta.dirname, "cases.jsonl");
@@ -284,47 +277,6 @@ function extractAssistantText(message: unknown): string {
     .trim();
 }
 
-function formatToolOutput(result: unknown): string {
-  if (!result || typeof result !== "object") {
-    return String(result ?? "");
-  }
-
-  const content = (result as { content?: unknown }).content;
-  if (!Array.isArray(content)) {
-    return JSON.stringify(result, null, 2);
-  }
-
-  return content
-    .map((part) => {
-      if (!part || typeof part !== "object") {
-        return JSON.stringify(part);
-      }
-      const typedPart = part as { type?: string; text?: string };
-      if (typedPart.type === "text" && typeof typedPart.text === "string") {
-        return typedPart.text;
-      }
-      return JSON.stringify(part, null, 2);
-    })
-    .join("\n\n")
-    .trim();
-}
-
-function stringifyForMarkdown(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  return JSON.stringify(value, null, 2);
-}
-
-function truncateForMarkdown(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return `${text.slice(0, maxLength)}\n… [truncated ${text.length - maxLength} chars]`;
-}
-
 async function accessSecretVersion(args: {
   projectId: string;
   secretName: string;
@@ -519,19 +471,22 @@ async function runWebVoyagerCase(
     settingsManager,
   });
 
-  const transcriptEntries: string[] = [];
-  const transcriptLog: unknown[] = [
-    {
+  const transcriptPath = join(runDir, "transcript.jsonl");
+  const transcriptStream = createWriteStream(transcriptPath, { flags: "w" });
+  transcriptStream.write(
+    `${JSON.stringify({
       ts: startedAt.toISOString(),
       type: "user_prompt",
       text: prompt,
-    },
-  ];
-  const pendingToolStarts = new Map<string, ToolStartRecord>();
+    })}\n`,
+  );
+
   let finalMessage: string | null = null;
   let thrownError: unknown;
 
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
+    transcriptStream.write(`${JSON.stringify(event)}\n`);
+
     switch (event.type) {
       case "message_update": {
         if (event.assistantMessageEvent.type === "text_delta") {
@@ -546,47 +501,7 @@ async function runWebVoyagerCase(
         }
 
         finalMessage = messageText;
-        transcriptEntries.push(`Assistant:\n${messageText}`);
-        transcriptLog.push(event);
         process.stdout.write("\n");
-        break;
-      }
-      case "tool_execution_start": {
-        transcriptLog.push(event);
-        pendingToolStarts.set(event.toolCallId, {
-          toolName: event.toolName,
-          args: event.args,
-        });
-        break;
-      }
-      case "tool_execution_end": {
-        const start = pendingToolStarts.get(event.toolCallId);
-        const toolName = start?.toolName ?? event.toolName;
-        const output = formatToolOutput(event.result);
-        const markdownArgs =
-          typeof start?.args === "undefined"
-            ? ""
-            : truncateForMarkdown(
-                stringifyForMarkdown(start.args),
-                MARKDOWN_ARGS_LIMIT,
-              );
-        const markdownOutput = output
-          ? truncateForMarkdown(output, MARKDOWN_OUTPUT_LIMIT)
-          : "";
-
-        transcriptEntries.push(
-          [
-            `[${toolName}]`,
-            markdownArgs ? `Args:\n${markdownArgs}` : "",
-            markdownOutput
-              ? `${event.isError ? "Error" : "Output"}:\n${markdownOutput}`
-              : "",
-          ]
-            .filter(Boolean)
-            .join("\n\n"),
-        );
-        transcriptLog.push(event);
-        pendingToolStarts.delete(event.toolCallId);
         break;
       }
     }
@@ -599,6 +514,8 @@ async function runWebVoyagerCase(
   } finally {
     unsubscribe();
     session.dispose();
+    transcriptStream.end();
+    await finished(transcriptStream);
   }
 
   const evaluation = await evaluateFinalMessage(row, finalMessage);
@@ -635,32 +552,6 @@ async function runWebVoyagerCase(
       null,
       2,
     ),
-    "utf8",
-  );
-  await writeFile(
-    join(runDir, "transcript.jsonl"),
-    transcriptLog.map((entry) => JSON.stringify(entry)).join("\n") + (transcriptLog.length ? "\n" : ""),
-    "utf8",
-  );
-  await writeFile(
-    join(runDir, "transcript.md"),
-    [
-      "# WebVoyager Benchmark Run",
-      "",
-      `- Case ID: ${row.id}`,
-      `- Website: ${row.web}`,
-      `- Status: ${status}`,
-      `- Started: ${result.startedAt}`,
-      `- Finished: ${result.finishedAt}`,
-      `- Duration (ms): ${durationMs}`,
-      `- Final Message: ${finalMessage ?? "n/a"}`,
-      `- Evaluation: ${evaluation.reason}`,
-      ...(errorMessage ? [`- Error: ${errorMessage}`] : []),
-      "",
-      "## Transcript",
-      "",
-      transcriptEntries.join("\n\n---\n\n") || "No transcript content recorded.",
-    ].join("\n"),
     "utf8",
   );
 
