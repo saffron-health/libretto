@@ -6,6 +6,10 @@ import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
 import { GitHubStarIcon } from "./icons";
 
+const REPO_URL = "https://github.com/saffron-health/libretto";
+const DISCUSSIONS_URL = `${REPO_URL}/discussions`;
+const RELEASES_URL = `${REPO_URL}/releases`;
+
 function useGitHubStars(repo: string) {
   const [stars, setStars] = useState<number | null>(null);
   useEffect(() => {
@@ -41,12 +45,22 @@ function Navbar() {
             </Text>
           </a>
           <div className="absolute left-1/2 -translate-x-1/2 flex gap-7">
-            <a href="#" className="no-underline">
+            <a
+              href={DISCUSSIONS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="no-underline"
+            >
               <Text size="sm" className="font-medium text-ink">
                 Forum
               </Text>
             </a>
-            <a href="#" className="no-underline">
+            <a
+              href={RELEASES_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="no-underline"
+            >
               <Text size="sm" className="font-medium text-ink">
                 Changelog
               </Text>
@@ -55,7 +69,7 @@ function Navbar() {
         </div>
         <div className="flex items-center gap-4">
           <a
-            href="https://github.com/saffron-health/libretto"
+            href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-ink/70 hover:text-ink transition-colors"
@@ -66,8 +80,11 @@ function Navbar() {
             )}
           </a>
           <Button
+            href={REPO_URL}
             size="sm"
-            className="rounded-full bg-ink border-ink px-5 py-2.5 text-cream hover:bg-ink/90"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full bg-ink border-ink px-5 py-2.5 text-cream hover:bg-ink/90 no-underline"
           >
             Go to docs
           </Button>
@@ -122,7 +139,12 @@ function Hero() {
         </Text>
         <InstallSnippet />
         <div className="flex items-center justify-center gap-6 mb-16">
-          <Button className="rounded-full bg-ink border-ink px-7 py-3 text-cream hover:bg-ink/90">
+          <Button
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full bg-ink border-ink px-7 py-3 text-cream hover:bg-ink/90 no-underline"
+          >
             Go to docs
           </Button>
         </div>

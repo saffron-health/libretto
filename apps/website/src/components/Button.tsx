@@ -10,21 +10,32 @@ const sizeClasses: Record<ButtonSize, string> = {
   sm: "h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:h-7",
 };
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  size?: ButtonSize;
-}
+type ButtonAsButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  href?: undefined;
+};
 
+type ButtonAsAnchorProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+  href: string;
+};
+
+type ButtonProps = (ButtonAsButtonProps | ButtonAsAnchorProps) & {
+  size?: ButtonSize;
+};
+
+export function Button(props: ButtonAsButtonProps & { size?: ButtonSize }): React.ReactElement;
+export function Button(props: ButtonAsAnchorProps & { size?: ButtonSize }): React.ReactElement;
 export function Button({
   className = "",
   size = "default",
-  type = "button",
   ...props
 }: ButtonProps): React.ReactElement {
-  return (
-    <button
-      className={[base, sizeClasses[size], className].filter(Boolean).join(" ")}
-      type={type}
-      {...props}
-    />
-  );
+  const classes = [base, sizeClasses[size], className].filter(Boolean).join(" ");
+
+  if (typeof props.href === "string") {
+    const anchorProps = props as ButtonAsAnchorProps;
+    return <a className={classes} {...anchorProps} />;
+  }
+
+  const buttonProps = props as ButtonAsButtonProps;
+  return <button className={classes} type={buttonProps.type ?? "button"} {...buttonProps} />;
 }
