@@ -1,0 +1,11 @@
+{
+  "name": "libretto-benchmarks",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "^0.62.0",
+    "google-auth-library": "^10.6.1",
+    "tsx": "^4.21.0",
+    "zod": "^4.3.6"
+  }
+}
