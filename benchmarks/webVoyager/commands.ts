@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SimpleCLI } from "../../packages/libretto/src/cli/framework/simple-cli.js";
+import { SimpleCLI } from "../libretto-internals.js";
 import { runWebVoyagerBenchmark } from "./runner.js";
 
 const webVoyagerRunInput = SimpleCLI.input({

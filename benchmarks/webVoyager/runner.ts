@@ -13,7 +13,7 @@ import {
   type AgentSessionEvent,
 } from "@mariozechner/pi-coding-agent";
 import { z } from "zod";
-import { createLLMClient } from "../../packages/libretto/src/shared/llm/client.js";
+import { createLLMClient } from "../libretto-internals.js";
 import {
   formatSelectionSummary,
   readWebVoyagerRows,
