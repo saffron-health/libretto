@@ -3,25 +3,21 @@ name: Benchmarks
 on:
   workflow_dispatch:
     inputs:
-      benchmark:
-        description: Benchmark to run
+      selection_mode:
+        description: Selection mode for WebVoyager
         required: true
-        default: webVoyager
+        default: random
         type: choice
         options:
-          - webVoyager
-          - onlineMind2Web
-          - webBench
-      run_mode:
-        description: Full benchmark or small random sample
+          - slice
+          - random
+      offset:
+        description: Start offset for slice runs
         required: true
-        default: small-random
-        type: choice
-        options:
-          - small-random
-          - full
-      sample_size:
-        description: Cases to run when using small random sample
+        default: "0"
+        type: string
+      count:
+        description: Number of cases to run
         required: true
         default: "5"
         type: choice
@@ -33,18 +29,11 @@ on:
       random_seed:
         description: Seed for random sampling
         required: true
-        default: "0"
-        type: string
-      test_name_pattern:
-        description: Optional exact benchmark test name or Vitest name pattern
-        required: false
-        default: ""
+        default: "1"
         type: string
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
 
 jobs:
   benchmark:
@@ -86,35 +75,21 @@ jobs:
       - name: Run benchmark
         id: run_benchmark
         env:
-          BENCHMARK: ${{ inputs.benchmark }}
-          RUN_MODE: ${{ inputs.run_mode }}
-          SAMPLE_SIZE: ${{ inputs.sample_size }}
+          SELECTION_MODE: ${{ inputs.selection_mode }}
+          OFFSET: ${{ inputs.offset }}
+          COUNT: ${{ inputs.count }}
           RANDOM_SEED: ${{ inputs.random_seed }}
-          TEST_NAME_PATTERN: ${{ inputs.test_name_pattern }}
         run: |
           set -euo pipefail
 
-          effective_run_mode="${RUN_MODE}"
-          effective_sample_size="${SAMPLE_SIZE}"
-          effective_random_seed="${RANDOM_SEED}"
-          artifact_name="benchmark-${BENCHMARK}-${RUN_MODE}-transcripts"
-
-          if [ -n "${TEST_NAME_PATTERN}" ]; then
-            effective_run_mode="test-name-pattern"
-            effective_sample_size="ignored"
-            effective_random_seed="ignored"
-            artifact_name="benchmark-${BENCHMARK}-test-name-pattern-transcripts"
-            echo "test_name_pattern is set; ignoring run_mode/sample_size/random_seed selection knobs."
-          elif [ "${RUN_MODE}" = "small-random" ] && [ "${BENCHMARK}" = "webVoyager" ]; then
-            export LIBRETTO_WEBVOYAGER_RANDOM_SAMPLE=1
-            export LIBRETTO_WEBVOYAGER_RANDOM_SEED="${RANDOM_SEED}"
-            export LIBRETTO_WEBVOYAGER_LIMIT="${SAMPLE_SIZE}"
+          cmd=(pnpm benchmarks webVoyager run --count "${COUNT}")
+          if [ "${SELECTION_MODE}" = "random" ]; then
+            cmd+=(--random --seed "${RANDOM_SEED}")
+          else
+            cmd+=(--offset "${OFFSET}")
           fi
 
-          cmd=(pnpm benchmark "${BENCHMARK}")
-          if [ -n "${TEST_NAME_PATTERN}" ]; then
-            cmd+=(-- --testNamePattern "${TEST_NAME_PATTERN}")
-          fi
+          artifact_name="benchmark-webVoyager-${SELECTION_MODE}-transcripts"
 
           printf 'Running benchmark command:'
           printf ' %q' "${cmd[@]}"
@@ -126,121 +101,32 @@ jobs:
           set -e
 
           echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
-          echo "effective_run_mode=${effective_run_mode}" >> "$GITHUB_OUTPUT"
-          echo "effective_sample_size=${effective_sample_size}" >> "$GITHUB_OUTPUT"
-          echo "effective_random_seed=${effective_random_seed}" >> "$GITHUB_OUTPUT"
           echo "artifact_name=${artifact_name}" >> "$GITHUB_OUTPUT"
 
-      - name: Build benchmark summary
+      - name: Add workflow summary
         if: always()
-        env:
-          BENCHMARK_RUN_MODE: ${{ steps.run_benchmark.outputs.effective_run_mode || inputs.run_mode }}
-          BENCHMARK_SAMPLE_SIZE: ${{ steps.run_benchmark.outputs.effective_sample_size || inputs.sample_size }}
-          BENCHMARK_RANDOM_SEED: ${{ steps.run_benchmark.outputs.effective_random_seed || inputs.random_seed }}
-          BENCHMARK_TEST_NAME_PATTERN: ${{ inputs.test_name_pattern }}
-          BENCHMARK_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          BENCHMARK_ARTIFACT_NAME: ${{ steps.run_benchmark.outputs.artifact_name || format('benchmark-{0}-{1}-transcripts', inputs.benchmark, inputs.run_mode) }}
         run: |
           set -euo pipefail
-          node benchmarks/summarize-results.mjs "${{ inputs.benchmark }}" benchmark-summary.md > /tmp/benchmark-summary.log
-          cat benchmark-summary.md >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "# WebVoyager Benchmark"
+            echo
+            printf -- '- Selection mode: `%s`\n' "${{ inputs.selection_mode }}"
+            printf -- '- Offset: `%s`\n' "${{ inputs.offset }}"
+            printf -- '- Count: `%s`\n' "${{ inputs.count }}"
+            printf -- '- Random seed: `%s`\n' "${{ inputs.random_seed }}"
+            printf -- '- Exit code: `%s`\n' "${{ steps.run_benchmark.outputs.exit_code }}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload benchmark transcripts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.run_benchmark.outputs.artifact_name || format('benchmark-{0}-{1}-transcripts', inputs.benchmark, inputs.run_mode) }}
+          name: ${{ steps.run_benchmark.outputs.artifact_name || format('benchmark-webVoyager-{0}-transcripts', inputs.selection_mode) }}
           if-no-files-found: warn
           path: |
-            benchmark-summary.md
-            benchmarks/run-history.jsonl
-            benchmarks/${{ inputs.benchmark }}/runs/**/transcript.json
-            benchmarks/${{ inputs.benchmark }}/runs/**/transcript.md
-            benchmarks/${{ inputs.benchmark }}/runs/**/results.json
-
-      - name: Post benchmark results comment
-        if: always()
-        uses: actions/github-script@v7
-        env:
-          BENCHMARK_SUMMARY_PATH: benchmark-summary.md
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const fs = require("node:fs");
-
-            const marker = "<!-- libretto-benchmark-results -->";
-            const summary = fs.readFileSync(process.env.BENCHMARK_SUMMARY_PATH, "utf8").trim();
-            const body = `${marker}\n${summary}`;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const headRef = context.ref.replace("refs/heads/", "");
-
-            const prs = await github.paginate(github.rest.pulls.list, {
-              owner,
-              repo,
-              state: "open",
-              head: `${owner}:${headRef}`,
-              per_page: 100,
-            });
-
-            if (prs.length > 0) {
-              const issueNumber = prs[0].number;
-              const comments = await github.paginate(github.rest.issues.listComments, {
-                owner,
-                repo,
-                issue_number: issueNumber,
-                per_page: 100,
-              });
-              const existing = comments.find((comment) =>
-                (comment.body ?? "").startsWith(marker),
-              );
-
-              if (existing) {
-                await github.rest.issues.updateComment({
-                  owner,
-                  repo,
-                  comment_id: existing.id,
-                  body,
-                });
-              } else {
-                await github.rest.issues.createComment({
-                  owner,
-                  repo,
-                  issue_number: issueNumber,
-                  body,
-                });
-              }
-              return;
-            }
-
-            const commitComments = await github.paginate(
-              github.rest.repos.listCommentsForCommit,
-              {
-                owner,
-                repo,
-                commit_sha: context.sha,
-                per_page: 100,
-              },
-            );
-            const existingCommitComment = commitComments.find((comment) =>
-              (comment.body ?? "").startsWith(marker),
-            );
-
-            if (existingCommitComment) {
-              await github.rest.repos.updateCommitComment({
-                owner,
-                repo,
-                comment_id: existingCommitComment.id,
-                body,
-              });
-            } else {
-              await github.rest.repos.createCommitComment({
-                owner,
-                repo,
-                commit_sha: context.sha,
-                body,
-              });
-            }
+            benchmarks/webVoyager/runs/**/transcript.jsonl
+            benchmarks/webVoyager/runs/**/transcript.md
+            benchmarks/webVoyager/runs/**/result.json
 
       - name: Fail workflow if benchmark failed
         if: always() && steps.run_benchmark.outputs.exit_code != '0'

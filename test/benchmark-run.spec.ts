@@ -1,66 +1,85 @@
+import { describe, expect, test } from "vitest";
+import { createBenchmarksCLIApp } from "../benchmarks/cli.js";
 import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  utimes,
-  writeFile,
-} from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { afterEach, describe, expect, test } from "vitest";
-import {
-  appendBenchmarkRunRecord,
-  buildBenchmarkRunRecord,
-  collectRunBenchmarkResults,
-  getBenchmarkRunHistoryPath,
-  parseBenchmarkArgs,
-} from "../benchmarks/run.js";
-import {
-  buildBrowserBenchmarkPrompt,
+  buildWebVoyagerPrompt,
+  parseWebVoyagerRows,
   rewriteBenchmarkSkillCommands,
-} from "../benchmarks/shared/cases.js";
+  selectWebVoyagerRows,
+} from "../benchmarks/webVoyager/webVoyager.js";
 
-const tempRoots: string[] = [];
+describe("benchmarks cli", () => {
+  test("renders scoped help for webVoyager run", async () => {
+    const app = createBenchmarksCLIApp();
+    const help = await app.run(["help", "webVoyager", "run"]);
 
-afterEach(async () => {
-  await Promise.all(
-    tempRoots
-      .splice(0)
-      .map((root) => rm(root, { recursive: true, force: true })),
-  );
+    expect(help).toContain("Run WebVoyager benchmark cases");
+    expect(help).toContain("Usage: pnpm benchmarks webVoyager run [options]");
+    expect(help).toContain("--offset <value>");
+    expect(help).toContain("--count <value>");
+    expect(help).toContain("--seed <value>");
+    expect(help).toContain("--random");
+  });
 });
 
-describe("benchmark launcher history", () => {
-  test("benchmark prompt tells Claude to use the libretto skill", () => {
-    const prompt = buildBrowserBenchmarkPrompt(
-      {
-        benchmark: "webVoyager",
-        id: "sample-case",
-        title: "Sample benchmark case",
-        startUrl: "https://example.com",
-        instruction: "Inspect the page and report the final title.",
-        successAssertion:
-          "The transcript includes the final page URL and title in FINAL_RESULT format.",
-      },
-      "/tmp/libretto-benchmark-workspace",
+describe("webVoyager dataset helpers", () => {
+  test("parses jsonl rows", () => {
+    const rows = parseWebVoyagerRows(
+      [
+        JSON.stringify({ id: "a", web: "https://a.test", ques: "Task A" }),
+        JSON.stringify({ id: "b", web: "https://b.test", ques: "Task B", web_name: "B" }),
+      ].join("\n"),
     );
 
-    expect(prompt).toContain("Use the libretto skill.");
-    expect(prompt).toContain(
-      "pnpm -s cli open https://example.com --headless --session webvoyager-sample-case",
-    );
-    expect(prompt).toContain(
-      "Current working directory: /tmp/libretto-benchmark-workspace",
-    );
-    expect(prompt).not.toContain(
-      "Run all commands from the current working directory",
-    );
-    expect(prompt).not.toContain(".claude/skills/libretto/SKILL.md");
-    expect(prompt).not.toContain(".agents/skills/libretto/SKILL.md");
+    expect(rows).toEqual([
+      { id: "a", web: "https://a.test", ques: "Task A", web_name: undefined },
+      { id: "b", web: "https://b.test", ques: "Task B", web_name: "B" },
+    ]);
   });
 
-  test("rewrites copied benchmark skill commands to use the local cli script", () => {
+  test("selects a contiguous slice from offset", () => {
+    const rows = [
+      { id: "a", web: "https://a.test", ques: "Task A" },
+      { id: "b", web: "https://b.test", ques: "Task B" },
+      { id: "c", web: "https://c.test", ques: "Task C" },
+    ];
+
+    const selection = selectWebVoyagerRows(rows, { offset: 1, count: 2 });
+
+    expect(selection).toMatchObject({
+      mode: "slice",
+      offset: 1,
+      count: 2,
+      seed: null,
+      totalCaseCount: 3,
+      selectedCaseCount: 2,
+    });
+    expect(selection.rows.map((row) => row.id)).toEqual(["b", "c"]);
+  });
+
+  test("selects a deterministic random sample", () => {
+    const rows = [
+      { id: "a", web: "https://a.test", ques: "Task A" },
+      { id: "b", web: "https://b.test", ques: "Task B" },
+      { id: "c", web: "https://c.test", ques: "Task C" },
+      { id: "d", web: "https://d.test", ques: "Task D" },
+    ];
+
+    const first = selectWebVoyagerRows(rows, { random: true, count: 2, seed: 7 });
+    const second = selectWebVoyagerRows(rows, { random: true, count: 2, seed: 7 });
+
+    expect(first.rows.map((row) => row.id)).toEqual(second.rows.map((row) => row.id));
+    expect(first).toMatchObject({
+      mode: "random",
+      count: 2,
+      seed: 7,
+      totalCaseCount: 4,
+      selectedCaseCount: 2,
+    });
+  });
+});
+
+describe("webVoyager prompt and skill helpers", () => {
+  test("rewrites copied skill commands to use the local cli script", () => {
     const rewritten = rewriteBenchmarkSkillCommands(
       [
         "Use the `npx libretto` CLI.",
@@ -76,203 +95,22 @@ describe("benchmark launcher history", () => {
     expect(rewritten).not.toContain("npx libretto");
   });
 
-  test("defaults to all benchmarks when no benchmark filter is provided", () => {
-    const parsed = parseBenchmarkArgs(["--testNamePattern", "FINAL_RESULT"]);
-
-    expect(parsed.benchmarkFilters).toEqual([]);
-    expect(parsed.passthroughArgs).toEqual([
-      "--testNamePattern",
-      "FINAL_RESULT",
-    ]);
-    expect(parsed.benchmarks).toEqual([
-      "onlineMind2Web",
-      "webVoyager",
-      "webBench",
-    ]);
-    expect(parsed.isAllBenchmarks).toBe(true);
-  });
-
-  test("writes one jsonl record per benchmark invocation", async () => {
-    const tempRoot = await mkdtemp(join(tmpdir(), "libretto-benchmark-run-"));
-    tempRoots.push(tempRoot);
-
-    const resultPath = join(
-      tempRoot,
-      "benchmarks",
-      "webVoyager",
-      "runs",
-      "sample-case",
-      "results.json",
-    );
-    await mkdir(dirname(resultPath), { recursive: true });
-    await writeFile(
-      resultPath,
-      JSON.stringify({
-        benchmark: "webVoyager",
-        caseId: "sample-case",
-        totalCostUsd: 0.4321,
-      }),
-      "utf8",
-    );
-    await utimes(
-      resultPath,
-      new Date("2026-03-12T20:01:00.000Z"),
-      new Date("2026-03-12T20:01:00.000Z"),
-    );
-
-    const parsed = parseBenchmarkArgs([
-      "webVoyager",
-      "--",
-      "--testNamePattern",
-      "FINAL_RESULT",
-    ]);
-    const results = collectRunBenchmarkResults({
-      root: tempRoot,
-      benchmarks: parsed.benchmarks,
-      startedAt: new Date("2026-03-12T20:00:00.000Z"),
-      finishedAt: new Date("2026-03-12T20:02:03.000Z"),
-    });
-    const record = buildBenchmarkRunRecord({
-      requestedArgs: ["webVoyager", "--", "--testNamePattern", "FINAL_RESULT"],
-      parsedArgs: parsed,
-      startedAt: new Date("2026-03-12T20:00:00.000Z"),
-      finishedAt: new Date("2026-03-12T20:02:03.000Z"),
-      exitCode: 0,
-      results,
-    });
-
-    appendBenchmarkRunRecord(tempRoot, record);
-
-    const historyPath = getBenchmarkRunHistoryPath(tempRoot);
-    const contents = await readFile(historyPath, "utf8");
-    expect(contents).toBe(`${JSON.stringify(record)}\n`);
-
-    const persisted = JSON.parse(contents.trim());
-    expect(persisted).toMatchObject({
-      durationMs: 123_000,
-      durationText: "2m 03s",
-      exitCode: 0,
-      totalCostUsd: 0.4321,
-      benchmarkFilters: ["benchmarks/webVoyager"],
-      benchmarks: ["webVoyager"],
-      resultFileCount: 1,
-      costTrackedResultCount: 1,
-      passthroughArgs: ["--testNamePattern", "FINAL_RESULT"],
-      requestedArgs: ["webVoyager", "--", "--testNamePattern", "FINAL_RESULT"],
-      scope: "selected",
-    });
-  });
-
-  test("summary includes run-level duration and cost table", async () => {
-    const { buildMarkdown } =
-      // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
-      await import("../benchmarks/summarize-results.mjs");
-    const markdown = buildMarkdown({
-      benchmark: "webVoyager",
-      runMode: "small-random",
-      sampleSize: "3",
-      randomSeed: "20260313",
-      runUrl: "",
-      artifactName: "",
-      runRecord: {
-        durationMs: 321_000,
-        totalCostUsd: 1.2345,
-        resultFileCount: 3,
-        costTrackedResultCount: 2,
+  test("prompt asks for a direct final answer instead of FINAL_RESULT", () => {
+    const prompt = buildWebVoyagerPrompt(
+      {
+        id: "sample-case",
+        web: "https://example.com",
+        ques: "Inspect the page and report the final title.",
+        web_name: "Example",
       },
-      rows: [
-        {
-          caseId: "sample-case",
-          status: "passed",
-          durationMs: 123_000,
-          totalCostUsd: 0.4321,
-          finalResult: "FINAL_RESULT: https://example.com | Example",
-        },
-      ],
-    });
-
-    expect(markdown).toContain("- Result files: `3`");
-    expect(markdown).toContain("- Cost tracked: `2`");
-    expect(markdown).toContain("- Total cost: `$1.2345`");
-    expect(markdown).toContain(
-      "| Benchmark Run | Duration | Cost | Result files | Cost tracked |",
-    );
-    expect(markdown).toContain(
-      "| `webVoyager` | `5m 21s` | `$1.2345` | `3` | `2` |",
-    );
-    expect(markdown).toContain(
-      "| `sample-case` | pass `passed` | `2m 03s` | `$0.4321` |",
-    );
-  });
-
-  test("summary lookup ignores all-benchmark history entries", async () => {
-    const { getLatestBenchmarkRunRecord } =
-      // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
-      await import("../benchmarks/summarize-results.mjs");
-    const tempRoot = await mkdtemp(
-      join(tmpdir(), "libretto-benchmark-summary-"),
-    );
-    tempRoots.push(tempRoot);
-
-    await mkdir(join(tempRoot, "benchmarks"), { recursive: true });
-    await writeFile(
-      join(tempRoot, "benchmarks", "run-history.jsonl"),
-      [
-        JSON.stringify({
-          finishedAt: "2026-03-12T20:05:00.000Z",
-          scope: "selected",
-          benchmarks: ["webVoyager"],
-          durationMs: 123_000,
-          totalCostUsd: 0.4321,
-        }),
-        JSON.stringify({
-          finishedAt: "2026-03-12T20:06:00.000Z",
-          scope: "all",
-          benchmarks: ["onlineMind2Web", "webVoyager", "webBench"],
-          durationMs: 999_000,
-          totalCostUsd: 9.9999,
-        }),
-      ].join("\n") + "\n",
-      "utf8",
+      "/tmp/libretto-benchmark-workspace",
     );
 
-    expect(getLatestBenchmarkRunRecord(tempRoot, "webVoyager")).toMatchObject({
-      scope: "selected",
-      benchmarks: ["webVoyager"],
-      durationMs: 123_000,
-      totalCostUsd: 0.4321,
-    });
-  });
-
-  test("summary scopes result files to the selected run window", async () => {
-    const { filterResultPathsForRunRecord } =
-      // @ts-expect-error -- benchmark summary helper is authored as plain .mjs
-      await import("../benchmarks/summarize-results.mjs");
-    const tempRoot = await mkdtemp(
-      join(tmpdir(), "libretto-benchmark-results-"),
+    expect(prompt).toContain("Use the libretto skill available in this workspace.");
+    expect(prompt).toContain(
+      "pnpm -s cli open https://example.com --headless --session webvoyager-sample-case",
     );
-    tempRoots.push(tempRoot);
-
-    const earlierPath = join(tempRoot, "earlier-results.json");
-    const currentPath = join(tempRoot, "current-results.json");
-    await writeFile(earlierPath, "{}", "utf8");
-    await writeFile(currentPath, "{}", "utf8");
-    await utimes(
-      earlierPath,
-      new Date("2026-03-12T19:59:00.000Z"),
-      new Date("2026-03-12T19:59:00.000Z"),
-    );
-    await utimes(
-      currentPath,
-      new Date("2026-03-12T20:01:00.000Z"),
-      new Date("2026-03-12T20:01:00.000Z"),
-    );
-
-    expect(
-      filterResultPathsForRunRecord([earlierPath, currentPath], {
-        startedAt: "2026-03-12T20:00:00.000Z",
-        finishedAt: "2026-03-12T20:02:00.000Z",
-      }),
-    ).toEqual([currentPath]);
+    expect(prompt).toContain("Your final message should directly answer the task.");
+    expect(prompt).not.toContain("FINAL_RESULT");
   });
 });
