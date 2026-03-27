@@ -11,11 +11,13 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "website:build": "pnpm --dir ./apps/website build",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "prepare-release": "bash ./scripts/prepare-release.sh",
     "evals": "turbo run evals --filter=libretto-evals --",
     "benchmarks": "turbo run benchmarks --filter=libretto-benchmarks --",
-    "cli": "pnpm --filter libretto cli"
+    "cli": "pnpm --filter libretto cli",
+    "website:dev": "pnpm --dir ./apps/website dev"
   }
 }

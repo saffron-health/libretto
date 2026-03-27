@@ -1,0 +1,34 @@
+{
+  "name": "libretto-website",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "tsc --noEmit && vp build",
+    "type-check": "tsc --noEmit",
+    "preview": "vp preview",
+    "lint": "vp lint",
+    "check": "vp check",
+    "knip": "knip --cache --files --exports"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "classnames": "^2.5.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.2.2"
+  },
+  "devDependencies": {
+    "@ai-sdk/google-vertex": "^4.0.95",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "agentation": "^3.0.2",
+    "knip": "^6.0.6",
+    "libretto": "workspace:*",
+    "typescript": "~5.9.3",
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vite-plus": "latest"
+  }
+}
