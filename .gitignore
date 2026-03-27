@@ -7,5 +7,4 @@ dist/
 .env
 temp/
 benchmarks/**/runs/
-.libretto/
 tmp/
