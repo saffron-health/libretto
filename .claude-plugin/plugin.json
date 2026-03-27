@@ -1,0 +1,5 @@
+{
+  "name": "libretto",
+  "description": "Browser automation CLI for building, maintaining, and running browser automation workflows by inspecting live pages and prototyping interactions.",
+  "version": "0.5.2"
+}

@@ -141,7 +141,7 @@ function extractAssistantText(message: SDKAssistantMessage): string {
   const parts: string[] = [];
   for (const block of content) {
     if (!block || typeof block !== "object") continue;
-    const typedBlock = block as Record<string, unknown>;
+        const typedBlock = block as unknown as Record<string, unknown>;
     if (typedBlock.type === "text" && typeof typedBlock.text === "string") {
       parts.push(typedBlock.text);
       continue;
@@ -165,7 +165,7 @@ function extractUserToolResultText(message: SDKMessage): string {
   const parts: string[] = [];
   for (const block of content) {
     if (!block || typeof block !== "object") continue;
-    const typedBlock = block as Record<string, unknown>;
+      const typedBlock = block as unknown as Record<string, unknown>;
     if (typedBlock.type !== "tool_result") continue;
 
     const contentValue = typedBlock.content;
