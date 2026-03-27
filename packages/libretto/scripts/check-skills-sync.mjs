@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { compareSkillDirs, SKILL_DIRS } from "./skills-libretto.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(__dirname, "..");
+const repoRoot = join(__dirname, "..", "..", "..");
 const result = compareSkillDirs(repoRoot);
 
 if (result.ok) {

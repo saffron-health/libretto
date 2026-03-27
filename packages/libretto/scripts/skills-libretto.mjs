@@ -11,7 +11,7 @@ import {
 import { relative, resolve, join } from "node:path";
 
 export const SKILL_DIRS = [
-  "skills/libretto",
+  "packages/libretto/skills/libretto",
   ".agents/skills/libretto",
   ".claude/skills/libretto",
 ];

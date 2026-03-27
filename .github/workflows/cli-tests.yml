@@ -28,7 +28,7 @@ jobs:
           cache: pnpm
 
       - name: Check skill mirror parity
-        run: node scripts/check-skills-sync.mjs
+        run: pnpm --filter libretto check:skills
 
       - name: Configure gcloud secret access for evaluator
         env:
@@ -74,7 +74,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: temp/libretto-cli-evaluate-cache
-          key: libretto-evaluate-cache-${{ runner.os }}-${{ hashFiles('test/fixtures.ts', 'test/basic.spec.ts', 'test/stateful.spec.ts') }}
+          key: libretto-evaluate-cache-${{ runner.os }}-${{ hashFiles('packages/libretto/test/fixtures.ts', 'packages/libretto/test/basic.spec.ts', 'packages/libretto/test/stateful.spec.ts') }}
           restore-keys: |
             libretto-evaluate-cache-${{ runner.os }}-
 
