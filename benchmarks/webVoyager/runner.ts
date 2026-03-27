@@ -51,8 +51,13 @@ const DEFAULT_GCP_PROJECT = "saffron-health";
 const DEFAULT_ANTHROPIC_SECRET_NAME = "anthropic-api-key";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
-const librettoSkillSourcePath = resolve(repoRoot, "skills", "libretto");
-const distSourcePath = resolve(repoRoot, "dist");
+const librettoPackageRoot = resolve(repoRoot, "packages", "libretto");
+const librettoSkillSourcePath = resolve(
+  librettoPackageRoot,
+  "skills",
+  "libretto",
+);
+const distSourcePath = resolve(librettoPackageRoot, "dist");
 
 const EvaluationSchema = z.object({
   success: z.boolean(),
