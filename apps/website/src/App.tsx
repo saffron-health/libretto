@@ -66,7 +66,6 @@ function Navbar() {
             )}
           </a>
           <Button
-            variant="default"
             size="sm"
             className="rounded-full bg-ink border-ink px-5 py-2.5 text-cream hover:bg-ink/90"
           >
@@ -123,10 +122,7 @@ function Hero() {
         </Text>
         <InstallSnippet />
         <div className="flex items-center justify-center gap-6 mb-16">
-          <Button
-            variant="default"
-            className="rounded-full bg-ink border-ink px-7 py-3 text-cream hover:bg-ink/90"
-          >
+          <Button className="rounded-full bg-ink border-ink px-7 py-3 text-cream hover:bg-ink/90">
             Go to docs
           </Button>
         </div>

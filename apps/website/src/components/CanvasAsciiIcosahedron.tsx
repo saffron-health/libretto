@@ -899,94 +899,78 @@ export function CanvasAsciiIcosahedron({
       context.textBaseline = "middle";
       context.lineJoin = "round";
 
-      context.save();
-      context.scale(glyphScaleX, 1);
-      context.globalCompositeOperation = "lighter";
+      const resolveGlyphCell = (col: number, row: number, index: number) => {
+        const originalShade = borderedShadeBuffer[index];
+        if (originalShade < 0) {
+          return null;
+        }
 
-      for (let row = minY; row <= maxY; row += 1) {
-        const rowOffset = row * COLS;
+        const baseX = (col + 0.5) * cellWidth;
+        const baseY = (row + 0.5) * cellHeight;
+        const flow = sampleFlow(baseX, baseY);
+        const sourceCol = col - flow.x * 1.08;
+        const sourceRow = row - flow.y * 1.08;
+        let sampledShade = sampleBuffer(borderedShadeBuffer, sourceCol, sourceRow);
+        let sampledOwner = sampleBuffer(ownerBuffer, sourceCol, sourceRow);
 
-        for (let col = minX; col <= maxX; col += 1) {
-          const index = rowOffset + col;
-          const originalShade = borderedShadeBuffer[index];
-          if (originalShade < 0) {
-            continue;
+        if (sampledShade < 0) {
+          const distortion = Math.hypot(flow.x, flow.y);
+          if (distortion < 0.7) {
+            sampledShade = originalShade;
+            sampledOwner = ownerBuffer[index];
+          } else {
+            return null;
           }
+        }
 
-          const baseX = (col + 0.5) * cellWidth;
-          const baseY = (row + 0.5) * cellHeight;
-          const flow = sampleFlow(baseX, baseY);
-          const sourceCol = col - flow.x * 1.08;
-          const sourceRow = row - flow.y * 1.08;
-          let sampledShade = sampleBuffer(borderedShadeBuffer, sourceCol, sourceRow);
-          let sampledOwner = sampleBuffer(ownerBuffer, sourceCol, sourceRow);
+        return {
+          baseX,
+          baseY,
+          flow,
+          sampledShade,
+          sampledOwner,
+        };
+      };
 
-          if (sampledShade < 0) {
-            const distortion = Math.hypot(flow.x, flow.y);
-            if (distortion < 0.7) {
-              sampledShade = originalShade;
-              sampledOwner = ownerBuffer[index];
-            } else {
+      const drawGlyphPass = (
+        compositeOperation: GlobalCompositeOperation | null,
+        xOffset: number,
+        yOffset: number,
+        alphaFor: (shadeFactor: number, glow: number) => number,
+      ) => {
+        context.save();
+        context.scale(glyphScaleX, 1);
+
+        if (compositeOperation) {
+          context.globalCompositeOperation = compositeOperation;
+        }
+
+        for (let row = minY; row <= maxY; row += 1) {
+          const rowOffset = row * COLS;
+
+          for (let col = minX; col <= maxX; col += 1) {
+            const glyph = resolveGlyphCell(col, row, rowOffset + col);
+            if (!glyph) {
               continue;
             }
+
+            const drawX = glyph.baseX + glyph.flow.x * cellWidth * xOffset;
+            const drawY = glyph.baseY + glyph.flow.y * cellHeight * yOffset;
+            const shadeFactor = glyph.sampledShade / LAST_SHADE_INDEX;
+            const char = getShadeCharacter(glyph.sampledShade, glyph.sampledOwner);
+
+            context.fillStyle = withAlpha(glyphColor, alphaFor(shadeFactor, glyph.flow.glow));
+            context.fillText(char, drawX / glyphScaleX, drawY);
           }
-
-          const shadeFactor = sampledShade / LAST_SHADE_INDEX;
-          const drawX = baseX + flow.x * cellWidth * 0.34;
-          const drawY = baseY + flow.y * cellHeight * 0.26;
-          const char = getShadeCharacter(sampledShade, sampledOwner);
-          const blurAlpha = 0.05 + shadeFactor * 0.08 + flow.glow * 0.03;
-
-          context.fillStyle = withAlpha(glyphColor, blurAlpha);
-          context.fillText(char, drawX / glyphScaleX, drawY);
         }
-      }
 
-      context.restore();
+        context.restore();
+      };
 
-      context.save();
-      context.scale(glyphScaleX, 1);
-
-      for (let row = minY; row <= maxY; row += 1) {
-        const rowOffset = row * COLS;
-
-        for (let col = minX; col <= maxX; col += 1) {
-          const index = rowOffset + col;
-          const originalShade = borderedShadeBuffer[index];
-          if (originalShade < 0) {
-            continue;
-          }
-
-          const baseX = (col + 0.5) * cellWidth;
-          const baseY = (row + 0.5) * cellHeight;
-          const flow = sampleFlow(baseX, baseY);
-          const sourceCol = col - flow.x * 1.08;
-          const sourceRow = row - flow.y * 1.08;
-          let sampledShade = sampleBuffer(borderedShadeBuffer, sourceCol, sourceRow);
-          let sampledOwner = sampleBuffer(ownerBuffer, sourceCol, sourceRow);
-
-          if (sampledShade < 0) {
-            const distortion = Math.hypot(flow.x, flow.y);
-            if (distortion < 0.7) {
-              sampledShade = originalShade;
-              sampledOwner = ownerBuffer[index];
-            } else {
-              continue;
-            }
-          }
-
-          const drawX = baseX + flow.x * cellWidth * 0.22;
-          const drawY = baseY + flow.y * cellHeight * 0.18;
-          const char = getShadeCharacter(sampledShade, sampledOwner);
-          const shadeFactor = sampledShade / LAST_SHADE_INDEX;
-          const alpha = clamp(0.26 + shadeFactor * 0.7 + flow.glow * 0.04, 0, 1);
-
-          context.fillStyle = withAlpha(glyphColor, alpha);
-          context.fillText(char, drawX / glyphScaleX, drawY);
-        }
-      }
-
-      context.restore();
+      drawGlyphPass("lighter", 0.34, 0.26, (shadeFactor, glow) => 0.05 + shadeFactor * 0.08 + glow * 0.03);
+      drawGlyphPass(null, 0.22, 0.18, (shadeFactor, glow) =>
+        clamp(0.26 + shadeFactor * 0.7 + glow * 0.04, 0, 1),
+      );
 
       frameId = window.requestAnimationFrame(renderFrame);
     };
