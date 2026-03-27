@@ -31,10 +31,15 @@ type EvalFixtures = {
 };
 
 const here = fileURLToPath(new URL(".", import.meta.url));
-const packageRoot = resolve(here, "..");
-const repoRoot = packageRoot;
-const skillPath = resolve(packageRoot, ".agents/skills/libretto/SKILL.md");
-const referencesRoot = resolve(packageRoot, "evals/references");
+const repoRoot = resolve(here, "..");
+const librettoPackageRoot = resolve(repoRoot, "packages", "libretto");
+const skillPath = resolve(
+  librettoPackageRoot,
+  "skills",
+  "libretto",
+  "SKILL.md",
+);
+const referencesRoot = resolve(repoRoot, "evals", "references");
 const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-eval-workspaces");
 
 let cachedSkillMarkdown: string | null = null;
@@ -87,7 +92,7 @@ async function setupWorkspacePackage(workspaceDir: string): Promise<void> {
   const librettoLinkPath = join(nodeModulesPath, "libretto");
   await mkdir(nodeModulesPath, { recursive: true });
   await rm(librettoLinkPath, { recursive: true, force: true });
-  await symlink(packageRoot, librettoLinkPath, "dir");
+  await symlink(librettoPackageRoot, librettoLinkPath, "dir");
 }
 
 export const test = base.extend<EvalFixtures>({

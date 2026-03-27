@@ -12,8 +12,9 @@
     "build": "pnpm --filter libretto build",
     "type-check": "pnpm --filter libretto type-check",
     "test": "pnpm --filter libretto test",
-    "eval": "pnpm --filter libretto build && vitest run --config vitest.evals.config.ts",
-    "benchmarks": "tsx benchmarks/cli.ts",
+    "eval": "pnpm evals",
+    "evals": "pnpm --filter libretto build && pnpm --filter libretto-evals exec vitest run --config vitest.config.ts",
+    "benchmarks": "pnpm --filter libretto build && pnpm --filter libretto-benchmarks exec tsx cli.ts",
     "cli": "pnpm --filter libretto cli"
   }
 }
