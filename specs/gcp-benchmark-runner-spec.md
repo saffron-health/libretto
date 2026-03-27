@@ -131,10 +131,10 @@ async function countCompletedCases(runId: string): Promise<CaseStatusSummary> { 
 async function downloadResults(runId: string): Promise<CaseResult[]> { ... }
 ```
 
-- [ ] Add `@google-cloud/storage` to `benchmarks/package.json`
-- [ ] Create `benchmarks/webVoyager/gcs.ts` with: `uploadRunDirectory`, `writeManifest`, `readManifest`, `listRunIds`, `countCompletedCases`, `downloadResults`
-- [ ] `uploadRunDirectory` walks a local directory recursively and uploads each file preserving relative paths
-- [ ] Verify `pnpm --filter libretto-benchmarks exec tsx -e "import './webVoyager/gcs.js'"` loads without errors
+- [x] Add `@google-cloud/storage` to `benchmarks/package.json`
+- [x] Create `benchmarks/webVoyager/gcs.ts` with: `uploadRunDirectory`, `writeManifest`, `readManifest`, `listRunIds`, `countCompletedCases`, `downloadResults`
+- [x] `uploadRunDirectory` walks a local directory recursively and uploads each file preserving relative paths
+- [x] Verify `pnpm --filter libretto-benchmarks exec tsx -e "import './webVoyager/gcs.ts'"` loads without errors
 
 ### Phase 4: Cloud Run task entrypoint
 
