@@ -2,7 +2,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
-import { assertPerfectScore } from "../evals/scoring.js";
+// @ts-ignore -- evals live at repo root, outside this package's rootDir
+import { assertPerfectScore } from "../../evals/scoring.js";
 
 const tempRoots: string[] = [];
 

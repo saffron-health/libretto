@@ -1,91 +1,19 @@
 {
-  "name": "libretto",
-  "version": "0.5.2",
-  "description": "AI-powered browser automation library and CLI built on Playwright",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/saffron-health/libretto"
-  },
-  "type": "module",
+  "name": "libretto-monorepo",
+  "private": true,
   "packageManager": "pnpm@9.15.4",
-  "publishConfig": {
-    "access": "public"
-  },
-  "files": [
-    "dist",
-    "src",
-    "scripts",
-    "skills/libretto"
-  ],
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "libretto": "./dist/cli/index.js"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  },
-  "scripts": {
-    "postinstall": "node scripts/postinstall.mjs",
-    "sync-skills": "node scripts/sync-skills.mjs",
-    "check:skills": "node scripts/check-skills-sync.mjs",
-    "build": "tsup --config tsup.config.ts",
-    "type-check": "tsc --noEmit",
-    "test": "pnpm run build && vitest run",
-    "eval": "pnpm run build && vitest run --config vitest.evals.config.ts",
-    "benchmarks": "pnpm run build && tsx benchmarks/cli.ts",
-    "test:watch": "vitest",
-    "cli": "node dist/index.js",
-    "generate-changelog": "tsx scripts/generate-changelog.ts",
-    "prepare-release": "bash ./scripts/prepare-release.sh",
-    "prepack": "pnpm run build"
-  },
-  "peerDependencies": {
+  "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai": "^3.0.41"
   },
-  "peerDependenciesMeta": {
-    "@ai-sdk/anthropic": {
-      "optional": true
-    },
-    "@ai-sdk/google": {
-      "optional": true
-    },
-    "@ai-sdk/google-vertex": {
-      "optional": true
-    },
-    "@ai-sdk/openai": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@ai-sdk/anthropic": "^3.0.58",
-    "@ai-sdk/google": "^3.0.51",
-    "@ai-sdk/google-vertex": "^4.0.80",
-    "@ai-sdk/openai": "^3.0.41",
-    "@anthropic-ai/claude-agent-sdk": "^0.2.75",
-    "@mariozechner/pi-agent-core": "^0.62.0",
-    "@mariozechner/pi-ai": "^0.62.0",
-    "@mariozechner/pi-coding-agent": "^0.62.0",
-    "@sinclair/typebox": "^0.34.48",
-    "@types/node": "^25.5.0",
-    "glimpseui": "^0.5.1",
-    "google-auth-library": "^10.6.1",
-    "openai": "^6.29.0",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.0"
-  },
-  "dependencies": {
-    "ai": "^6.0.116",
-    "playwright": "^1.58.2",
-    "tsx": "^4.21.0",
-    "zod": "^4.3.6"
+  "scripts": {
+    "build": "pnpm --filter libretto build",
+    "type-check": "pnpm --filter libretto type-check",
+    "test": "pnpm --filter libretto test",
+    "eval": "pnpm --filter libretto build && vitest run --config vitest.evals.config.ts",
+    "benchmarks": "tsx benchmarks/cli.ts",
+    "cli": "pnpm --filter libretto cli"
   }
 }

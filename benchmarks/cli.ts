@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { SimpleCLI } from "../src/cli/framework/simple-cli.js";
+import { SimpleCLI } from "../packages/libretto/src/cli/framework/simple-cli.js";
 import { webVoyagerCommands } from "./webVoyager/commands.js";
 
 type BenchmarksCLIResult =
@@ -34,7 +34,9 @@ export function createBenchmarksCLIApp() {
   });
 }
 
-export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
+export async function main(
+  argv: string[] = process.argv.slice(2),
+): Promise<number> {
   const app = createBenchmarksCLIApp();
   let exitCode = 0;
 
