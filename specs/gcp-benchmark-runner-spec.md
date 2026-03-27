@@ -46,7 +46,7 @@ _Added during implementation, not during initial spec creation._
 - Cloud Run Executions API: https://cloud.google.com/run/docs/reference/rest/v2/projects.locations.jobs.executions
 - `@google-cloud/run` npm package: `JobsClient`, `ExecutionsClient` from `v2`
 - `@google-cloud/storage` npm package: `Storage`, `Bucket`, `File`
-- Microsoft Playwright Docker images: `mcr.microsoft.com/playwright:v1.52.0-noble`
+- Microsoft Playwright Docker images: `mcr.microsoft.com/playwright:v1.58.2-noble` (must match repo's Playwright version)
 
 ## GCS layout
 
@@ -100,13 +100,13 @@ Create a one-time setup script that provisions the GCS bucket, Artifact Registry
 
 Build a Docker image that contains the full repo with built libretto, Playwright Chromium, and the benchmark entrypoint. Based on Microsoft's Playwright container.
 
-- [ ] Create `benchmarks/Dockerfile`:
-  - Base: `mcr.microsoft.com/playwright:v1.52.0-noble`
+- [x] Create `benchmarks/Dockerfile`:
+  - Base: `mcr.microsoft.com/playwright:v1.58.2-noble` (matches repo's resolved Playwright version)
   - Install pnpm via corepack
-  - Copy repo, `pnpm install --frozen-lockfile`, `pnpm build`
+  - Copy package manifests + libretto scripts/skills first for layer caching, then `pnpm install --frozen-lockfile`, copy rest, `pnpm build`
   - `ENTRYPOINT ["npx", "tsx", "benchmarks/webVoyager/cloud-entrypoint.ts"]`
-- [ ] Create a `.dockerignore` in `benchmarks/` (or repo root) excluding `node_modules`, `.git`, `benchmarks/webVoyager/runs/`
-- [ ] Verify `docker build -f benchmarks/Dockerfile -t webvoyager-test .` succeeds locally
+- [x] Create a `.dockerignore` in repo root excluding `node_modules`, `.git`, `benchmarks/webVoyager/runs/`
+- [x] Verify `docker build -f benchmarks/Dockerfile -t webvoyager-test .` succeeds locally
 
 ### Phase 3: GCS storage module
 
