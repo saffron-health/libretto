@@ -6,15 +6,15 @@
     "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.80",
-    "@ai-sdk/openai": "^3.0.41"
+    "@ai-sdk/openai": "^3.0.41",
+    "turbo": "^2.8.20"
   },
   "scripts": {
-    "build": "pnpm --filter libretto build",
-    "type-check": "pnpm --filter libretto type-check",
-    "test": "pnpm --filter libretto test",
-    "eval": "pnpm evals",
-    "evals": "pnpm --filter libretto build && pnpm --filter libretto-evals run evals",
-    "benchmarks": "pnpm --filter libretto build && pnpm --filter libretto-benchmarks exec tsx cli.ts",
+    "build": "turbo run build",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "evals": "turbo run evals --filter=libretto-evals",
+    "benchmarks": "turbo run benchmarks --filter=libretto-benchmarks --",
     "cli": "pnpm --filter libretto cli"
   }
 }

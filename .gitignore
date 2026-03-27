@@ -8,3 +8,4 @@ dist/
 temp/
 benchmarks/**/runs/
 tmp/
+.turbo/
