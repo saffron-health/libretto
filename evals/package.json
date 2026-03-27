@@ -2,6 +2,9 @@
   "name": "libretto-evals",
   "private": true,
   "type": "module",
+  "scripts": {
+    "evals": "vitest run --config vitest.config.ts"
+  },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.75",
     "vitest": "^4.1.0",
