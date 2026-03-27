@@ -17,6 +17,12 @@ const webVoyagerRunInput = SimpleCLI.input({
     random: SimpleCLI.flag({
       help: "Select a seeded random sample instead of a contiguous slice",
     }),
+    parallelize: SimpleCLI.option(
+      z.coerce.number().int().positive().optional(),
+      {
+        help: "Run up to N cases in parallel (default: sequential)",
+      },
+    ),
   },
 })
   .refine(
@@ -41,6 +47,7 @@ export const webVoyagerCommands = SimpleCLI.group({
           count: input.count,
           seed: input.seed,
           random: input.random,
+          parallelize: input.parallelize,
         }),
       ),
   },
