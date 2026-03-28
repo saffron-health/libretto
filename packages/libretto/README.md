@@ -75,8 +75,6 @@ npx libretto close                         # close the browser
 npx libretto ai configure <provider>       # configure snapshot analysis model
 ```
 
-`libretto run` discovers workflows from the integration module's exports. Export `workflow(name, handler)` directly, or group workflows under `export const workflows = { ... }`.
-
 ## Configuration
 
 All Libretto state lives in a `.libretto/` directory at your project root. Configuration is stored in `.libretto/config.json`.
