@@ -792,9 +792,13 @@ export const runCommand = SimpleCLI.command({
     assertSessionAvailableForStart(ctx.session, ctx.logger);
 
     const params = resolveRunParams(input.params, input.paramsFile);
-    const credentials: Record<string, unknown> | undefined = input.credentials
-      ? (parseJsonArg("--credentials", input.credentials) as Record<string, unknown>)
+    const rawCredentials = input.credentials
+      ? parseJsonArg("--credentials", input.credentials)
       : undefined;
+    if (rawCredentials !== undefined && (typeof rawCredentials !== "object" || rawCredentials === null || Array.isArray(rawCredentials))) {
+      throw new Error("--credentials must be a JSON object (e.g., '{\"key\": \"value\"}').");
+    }
+    const credentials = rawCredentials as Record<string, unknown> | undefined;
     const headlessMode = input.headed
       ? false
       : input.headless
