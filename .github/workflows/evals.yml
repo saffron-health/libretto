@@ -8,7 +8,7 @@ on:
     paths:
       - "package.json"
       - "evals/**"
-      - "scripts/summarize-evals.mjs"
+      - "packages/libretto/scripts/summarize-evals.mjs"
       - ".github/workflows/evals.yml"
   pull_request:
     branches:
@@ -73,7 +73,7 @@ jobs:
       - name: Summarize eval scores
         if: always()
         run: |
-          node scripts/summarize-evals.mjs \
+          node packages/libretto/scripts/summarize-evals.mjs \
             "${RUNNER_TEMP}/eval-scores" \
             "${RUNNER_TEMP}/eval-summary.json" \
             > "${RUNNER_TEMP}/eval-summary.md"
