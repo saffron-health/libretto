@@ -1,5 +1,6 @@
 import { aiCommands } from "./commands/ai.js";
 import { browserCommands } from "./commands/browser.js";
+import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
 import { initCommand } from "./commands/init.js";
 import { logCommands } from "./commands/logs.js";
@@ -13,6 +14,7 @@ export const cliRoutes = {
   ai: aiCommands,
   init: initCommand,
   snapshot: snapshotCommand,
+  deploy: deployCommand,
 };
 
 export function createCLIApp() {
