@@ -17,19 +17,6 @@ export type LibrettoWorkflowHandler<
   S = {},
 > = (ctx: LibrettoWorkflowContext<S>, input: Input) => Promise<Output>;
 
-type WorkflowFactory = {
-  <Input = unknown, Output = unknown, S = {}>(
-    name: string,
-    handler: LibrettoWorkflowHandler<Input, Output, S>,
-  ): LibrettoWorkflow<Input, Output, S>;
-  withServices<S>(
-    services: S,
-  ): <Input = unknown, Output = unknown>(
-    name: string,
-    handler: LibrettoWorkflowHandler<Input, Output, S>,
-  ) => LibrettoWorkflow<Input, Output, Partial<S>>;
-};
-
 export class LibrettoWorkflow<Input = unknown, Output = unknown, S = {}> {
   public readonly [LIBRETTO_WORKFLOW_BRAND] = true;
   public readonly name: string;
@@ -45,20 +32,6 @@ export class LibrettoWorkflow<Input = unknown, Output = unknown, S = {}> {
 
   async run(ctx: LibrettoWorkflowContext<S>, input: Input): Promise<Output> {
     return this.handler(ctx, input);
-  }
-
-  withServices(services: S): LibrettoWorkflow<Input, Output, Partial<S>> {
-    return new LibrettoWorkflow<Input, Output, Partial<S>>(
-      this.name,
-      async (ctx, input) =>
-        await this.handler(
-          {
-            ...ctx,
-            services: Object.assign({}, services, ctx.services) as S,
-          },
-          input,
-        ),
-    );
   }
 }
 
@@ -141,22 +114,9 @@ export function getWorkflowFromModuleExports(
   return null;
 }
 
-function createWorkflow<Input = unknown, Output = unknown, S = {}>(
+export function workflow<Input = unknown, Output = unknown, S = {}>(
   name: string,
   handler: LibrettoWorkflowHandler<Input, Output, S>,
 ): LibrettoWorkflow<Input, Output, S> {
   return new LibrettoWorkflow(name, handler);
 }
-
-export const workflow: WorkflowFactory = Object.assign(createWorkflow, {
-  withServices<S>(services: S) {
-    return function workflowWithServices<Input = unknown, Output = unknown>(
-      name: string,
-      handler: LibrettoWorkflowHandler<Input, Output, S>,
-    ): LibrettoWorkflow<Input, Output, Partial<S>> {
-      return createWorkflow<Input, Output, S>(name, handler).withServices(
-        services,
-      );
-    };
-  },
-});

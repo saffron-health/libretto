@@ -556,33 +556,6 @@ export const main = workflow("main", async () => "ok");
     expect(result.stderr).not.toContain("No local auth profile found");
   });
 
-  test("run uses services bound with workflow.withServices", async ({
-    librettoCli,
-    writeWorkflow,
-  }) => {
-    const integrationFilePath = await writeWorkflow(
-      "integration-with-services.mjs",
-      `
-const defineWorkflow = workflow.withServices({
-  provider: "bound-provider",
-  retries: 2,
-});
-
-export const main = defineWorkflow("main", async (ctx) => {
-  console.log(JSON.stringify(ctx.services));
-});
-`,
-    );
-
-    const result = await librettoCli(
-      `run "${integrationFilePath}" main --session with-services-test --headless`,
-    );
-    expect(result.stdout).toContain(
-      '{"provider":"bound-provider","retries":2}',
-    );
-    expect(result.stdout).toContain("Integration completed.");
-  }, 45_000);
-
   test("returns paused status when workflow pauses with ctx.session", async ({
     librettoCli,
     writeWorkflow,
