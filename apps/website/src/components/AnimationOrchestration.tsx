@@ -1,11 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useMemo,
-  type PropsWithChildren,
-} from "react";
 import { useAnimate, stagger } from "motion/react";
-import { useEffect, useCallback } from "react";
+import { useEffect, type PropsWithChildren } from "react";
 
 /**
  * Central orchestrator for the hero entrance animation.
@@ -17,39 +11,23 @@ import { useEffect, useCallback } from "react";
  *  4. Icosahedron fades in + scales down from 1.15→1
  */
 
-/** Animation target names — use as `data-animate={ANIM.xxx}` */
-export const ANIM = {
-  titleWord: "title-word",
-  content: "content",
-  navbar: "navbar",
-  icosahedron: "icosahedron",
+/** Animation target names — use as `data-animate={AnimationTarget.xxx}` */
+export const AnimationTarget = {
+  TitleWord: "title-word",
+  Content: "content",
+  Navbar: "navbar",
+  Icosahedron: "icosahedron",
 } as const;
 
-const sel = (name: string) => `[data-animate='${name}']`;
-
-interface OrchestrationContext {
-  /** Ref callback — attach to the scoped container that holds all animated elements */
-  scopeRef: (node: HTMLElement | null) => void;
-}
-
-const Ctx = createContext<OrchestrationContext>({
-  scopeRef: () => {},
-});
-
-export function useOrchestration() {
-  return useContext(Ctx);
-}
-
-export function OrchestrationProvider({ children }: PropsWithChildren) {
+/**
+ * Scoped container that runs the entrance animation sequence.
+ * Renders a `<div>` and targets children via `data-animate` attributes.
+ */
+export function OrchestrationContainer({
+  children,
+  className,
+}: PropsWithChildren<{ className?: string }>) {
   const [scope, animate] = useAnimate<HTMLDivElement>();
-  const scopeRef = useCallback(
-    (node: HTMLElement | null) => {
-      // Forward to motion's scope ref
-      (scope as React.MutableRefObject<HTMLDivElement | null>).current =
-        node as HTMLDivElement | null;
-    },
-    [scope],
-  );
 
   useEffect(() => {
     if (!scope.current) return;
@@ -57,9 +35,11 @@ export function OrchestrationProvider({ children }: PropsWithChildren) {
     let cancelled = false;
 
     async function run() {
+      const selector = (name: string) => `[data-animate='${name}']`;
+
       // ── 1. Title: word-by-word ──
       await animate(
-        sel(ANIM.titleWord),
+        selector(AnimationTarget.TitleWord),
         { opacity: [0, 1], y: [12, 0], filter: ["blur(4px)", "blur(0px)"] },
         {
           duration: 0.45,
@@ -70,7 +50,7 @@ export function OrchestrationProvider({ children }: PropsWithChildren) {
 
       // ── 2. Content elements fade in together ──
       animate(
-        sel(ANIM.content),
+        selector(AnimationTarget.Content),
         { opacity: [0, 1], y: [18, 0] },
         {
           duration: 0.45,
@@ -81,14 +61,14 @@ export function OrchestrationProvider({ children }: PropsWithChildren) {
 
       // Navbar slides down
       animate(
-        sel(ANIM.navbar),
+        selector(AnimationTarget.Navbar),
         { opacity: [0, 1], y: [-20, 0] },
         { duration: 0.5, delay: 0.1, ease: "easeOut" },
       );
 
       // Icosahedron fades in + scales down
       await animate(
-        sel(ANIM.icosahedron),
+        selector(AnimationTarget.Icosahedron),
         {
           opacity: [0, 0.1],
           scale: [1.15, 1],
@@ -105,7 +85,9 @@ export function OrchestrationProvider({ children }: PropsWithChildren) {
     };
   }, [scope, animate]);
 
-  const value = useMemo(() => ({ scopeRef }), [scopeRef]);
-
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <div ref={scope} className={className}>
+      {children}
+    </div>
+  );
 }

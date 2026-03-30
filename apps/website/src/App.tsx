@@ -6,9 +6,8 @@ import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
 import { GitHubStarIcon } from "./icons";
 import {
-  OrchestrationProvider,
-  useOrchestration,
-  ANIM,
+  OrchestrationContainer,
+  AnimationTarget,
 } from "./components/AnimationOrchestration";
 import { AnimatedTitle } from "./components/AnimatedTitle";
 
@@ -39,7 +38,7 @@ function Navbar() {
 
   return (
     <nav
-      data-animate={ANIM.navbar}
+      data-animate={AnimationTarget.Navbar}
       style={{ opacity: 0 }}
       className="px-8 pt-6"
     >
@@ -97,7 +96,7 @@ function Hero() {
     >
       {/* Interactive ASCII icosahedron background */}
       <div
-        data-animate={ANIM.icosahedron}
+        data-animate={AnimationTarget.Icosahedron}
         style={{ opacity: 0 }}
         className="pointer-events-none absolute inset-0 flex items-center justify-center -translate-y-24 select-none"
       >
@@ -128,7 +127,7 @@ function Hero() {
         <Text
           as="p"
           size="lg"
-          data-animate={ANIM.content}
+          data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
           className="mb-8 max-w-[560px] mx-auto text-center leading-relaxed text-muted"
         >
@@ -136,11 +135,11 @@ function Hero() {
           reverse-engineers network requests, and ships production-ready
           integration workflows.
         </Text>
-        <div data-animate={ANIM.content} style={{ opacity: 0 }}>
+        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
           <InstallSnippet />
         </div>
         <div
-          data-animate={ANIM.content}
+          data-animate={AnimationTarget.Content}
           style={{ opacity: 0 }}
           className="flex items-center justify-center gap-6 mb-16"
         >
@@ -148,7 +147,7 @@ function Hero() {
             Go to docs
           </Button>
         </div>
-        <div data-animate={ANIM.content} style={{ opacity: 0 }}>
+        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
           <TerminalDemo />
         </div>
       </div>
@@ -156,21 +155,11 @@ function Hero() {
   );
 }
 
-function AppInner() {
-  const { scopeRef } = useOrchestration();
-
-  return (
-    <div ref={scopeRef} className="min-h-screen bg-cream text-ink">
-      <Navbar />
-      <Hero />
-    </div>
-  );
-}
-
 export function App() {
   return (
-    <OrchestrationProvider>
-      <AppInner />
-    </OrchestrationProvider>
+    <OrchestrationContainer className="min-h-screen bg-cream text-ink">
+      <Navbar />
+      <Hero />
+    </OrchestrationContainer>
   );
 }

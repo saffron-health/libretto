@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { ANIM } from "./AnimationOrchestration";
+import { AnimationTarget } from "./AnimationOrchestration";
 
 /**
  * Splits children text into individual words, each wrapped with
@@ -24,7 +24,7 @@ export function AnimatedTitle({
       {words.map((word, i) => (
         <span
           key={i}
-          data-animate={ANIM.titleWord}
+          data-animate={AnimationTarget.TitleWord}
           style={{ display: "inline-block", opacity: 0 }}
         >
           {word}
