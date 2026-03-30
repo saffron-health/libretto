@@ -55,10 +55,6 @@ const BENCHMARK_MODEL_ID = "claude-opus-4-6";
 const DEFAULT_GCP_PROJECT = "saffron-health";
 const DEFAULT_ANTHROPIC_SECRET_NAME = "anthropic-api-key";
 
-// Reserved: the pi agent framework does not yet expose a step/turn limit,
-// but we read the env var so it can be wired in when support lands.
-const _AGENT_EVAL_MAX_STEPS = Number(process.env.AGENT_EVAL_MAX_STEPS) || 50;
-
 const repoRoot = resolve(import.meta.dirname, "../..");
 const librettoPackageRoot = resolve(repoRoot, "packages", "libretto");
 const librettoSkillSourcePath = resolve(
