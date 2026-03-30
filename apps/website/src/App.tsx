@@ -134,7 +134,7 @@ function Hero() {
 
 export function App() {
   return (
-    <div className="h-screen overflow-hidden bg-cream text-ink">
+    <div className="min-h-screen bg-cream text-ink">
       <Navbar />
       <Hero />
     </div>
