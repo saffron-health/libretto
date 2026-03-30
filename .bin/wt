@@ -13,6 +13,7 @@ usage() {
     echo "Commands:"
     echo "  new <branch-name>   Create a new worktree and cd into it"
     echo "  list                List all worktrees with last updated date"
+    echo "  close [--force]     Close the current worktree (must have no uncommitted changes)"
     echo "  prune [--force]     Remove worktrees for branches merged into main"
     exit 1
 }
@@ -106,15 +107,33 @@ cmd_list() {
     echo ""
 }
 
+# Check if a branch was squash-merged via GitHub PR.
+# Returns 0 if merged, 1 otherwise.
+is_squash_merged() {
+    local branch="$1"
+    local pr_state
+    pr_state=$(gh pr list --head "$branch" --state merged --json state --jq '.[0].state' 2>/dev/null || true)
+    [ "$pr_state" = "MERGED" ]
+}
+
 cmd_prune() {
     local force=false
     if [ "$1" = "--force" ] || [ "$1" = "-f" ]; then
         force=true
     fi
 
+    # Check for gh CLI (needed for squash-merge detection)
+    local has_gh=true
+    if ! command -v gh &>/dev/null; then
+        has_gh=false
+        echo "Warning: 'gh' CLI not found. Squash-merged branches won't be detected."
+        echo "  Install it: https://cli.github.com/"
+        echo ""
+    fi
+
     git fetch origin main
 
-    # Get branches merged into origin/main
+    # Get branches merged into origin/main (detects regular merges)
     local merged
     merged=$(git branch --merged origin/main | sed 's/^[* ] //' | grep -v '^\(main\|master\)$' || true)
 
@@ -127,6 +146,42 @@ cmd_prune() {
     local current_path=""
     local current_branch=""
 
+    _try_prune_entry() {
+        local wt_path="$1"
+        local branch="$2"
+        if [[ "$wt_path" != *".worktrees"* ]] || [ -z "$branch" ]; then
+            return
+        fi
+
+        local is_merged=false
+        # Check regular merge first
+        if echo "$merged" | grep -qx "$branch"; then
+            is_merged=true
+        # Fall back to squash-merge detection via gh
+        elif $has_gh && is_squash_merged "$branch"; then
+            is_merged=true
+        fi
+
+        if $is_merged; then
+            echo "Pruning: $branch"
+            local remove_args=("worktree" "remove")
+            if $force; then
+                remove_args+=("--force")
+            fi
+            remove_args+=("$wt_path")
+            if git "${remove_args[@]}" 2>/dev/null; then
+                git branch -D "$branch" 2>/dev/null || true
+                ((pruned++))
+            else
+                echo "  Failed to remove worktree: $branch"
+                if ! $force; then
+                    echo "  Try 'wt prune --force' to remove anyway."
+                fi
+                ((failed++))
+            fi
+        fi
+    }
+
     while IFS= read -r line; do
         if [[ "$line" == "worktree "* ]]; then
             current_path="${line#worktree }"
@@ -134,36 +189,70 @@ cmd_prune() {
         elif [[ "$line" == "branch refs/heads/"* ]]; then
             current_branch="${line#branch refs/heads/}"
         elif [ -z "$line" ] && [ -n "$current_path" ]; then
-            if [[ "$current_path" == *".worktrees"* ]] && [ -n "$current_branch" ]; then
-                if echo "$merged" | grep -qx "$current_branch"; then
-                    echo "Pruning: $current_branch"
-                    local remove_args=("worktree" "remove")
-                    if $force; then
-                        remove_args+=("--force")
-                    fi
-                    remove_args+=("$current_path")
-                    if git "${remove_args[@]}" 2>/dev/null; then
-                        git branch -d "$current_branch" 2>/dev/null || true
-                        ((pruned++))
-                    else
-                        echo "  Failed to remove worktree: $current_branch"
-                        if ! $force; then
-                            echo "  Try 'wt prune --force' to remove anyway."
-                        fi
-                        ((failed++))
-                    fi
-                fi
-            fi
+            _try_prune_entry "$current_path" "$current_branch"
             current_path=""
             current_branch=""
         fi
     done <<< "$worktrees"
+    # Handle last entry (porcelain output may not end with blank line)
+    if [ -n "$current_path" ]; then
+        _try_prune_entry "$current_path" "$current_branch"
+    fi
 
     if [ $pruned -eq 0 ] && [ $failed -eq 0 ]; then
         echo "No merged worktrees to prune."
     else
         [ $pruned -gt 0 ] && echo "Pruned $pruned worktree(s)."
         [ $failed -gt 0 ] && echo "Failed to prune $failed worktree(s)."
+    fi
+}
+
+cmd_close() {
+    local force=false
+    if [ "$1" = "--force" ] || [ "$1" = "-f" ]; then
+        force=true
+    fi
+
+    # Must be inside a .worktrees/ directory
+    local cwd
+    cwd=$(pwd)
+    if [[ "$cwd" != *".worktrees"* ]]; then
+        echo "Error: Not inside a worktree. Run this from within a .worktrees/ directory."
+        exit 1
+    fi
+
+    # Check for uncommitted changes
+    if ! $force; then
+        if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+            echo "Error: Worktree has uncommitted changes."
+            echo "  Commit or stash them first, or use 'wt close --force' to discard."
+            exit 1
+        fi
+    fi
+
+    # Get the worktree path and branch
+    local wt_path
+    wt_path=$(git rev-parse --show-toplevel)
+    local branch
+    branch=$(git rev-parse --abbrev-ref HEAD)
+
+    # Move back to the main repo root
+    cd "$ROOT_DIR"
+
+    # Remove the worktree
+    local remove_args=("worktree" "remove")
+    if $force; then
+        remove_args+=("--force")
+    fi
+    remove_args+=("$wt_path")
+
+    if git "${remove_args[@]}"; then
+        echo "Closed worktree: $branch"
+        # Start a new shell at the repo root so the caller's shell isn't left in a deleted dir
+        exec "$SHELL"
+    else
+        echo "Failed to remove worktree: $branch"
+        exit 1
     fi
 }
 
@@ -174,6 +263,9 @@ case "${1:-}" in
         ;;
     list|ls)
         cmd_list
+        ;;
+    close)
+        cmd_close "$2"
         ;;
     prune)
         cmd_prune "$2"

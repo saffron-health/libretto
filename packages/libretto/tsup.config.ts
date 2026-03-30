@@ -13,25 +13,25 @@ function ensureCliShebang(): void {
 }
 
 export default defineConfig([
-	{
-		entry: ["src/**/*.ts", "!src/cli/**", "!src/**/*.test.ts"],
-		format: ["esm"],
-		dts: true,
-		bundle: false,
-		minify: false,
-		clean: true,
-		outDir: "dist",
-	},
-	{
-		entry: ["src/cli/**/*.ts", "!src/cli/**/*.test.ts"],
-		format: ["esm"],
-		dts: false,
-		bundle: false,
-		minify: false,
-		clean: false,
-		outDir: "dist/cli",
-		onSuccess: async () => {
-			ensureCliShebang();
-		},
-	},
+  {
+    entry: ["src/**/*.ts", "!src/cli/**", "!src/**/*.test.ts"],
+    format: ["esm"],
+    dts: true,
+    bundle: false,
+    minify: false,
+    clean: true,
+    outDir: "dist",
+  },
+  {
+    entry: ["src/cli/**/*.ts", "!src/cli/**/*.test.ts"],
+    format: ["esm"],
+    dts: false,
+    bundle: false,
+    minify: false,
+    clean: false,
+    outDir: "dist/cli",
+    onSuccess: async () => {
+      ensureCliShebang();
+    },
+  },
 ]);
