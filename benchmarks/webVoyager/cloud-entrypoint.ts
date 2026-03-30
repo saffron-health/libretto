@@ -73,6 +73,7 @@ main()
     process.exit(0);
   })
   .catch((err) => {
-    console.error("Cloud entrypoint failed:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Cloud entrypoint failed:", message);
     process.exit(1);
   });
