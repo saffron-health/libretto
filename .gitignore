@@ -9,3 +9,4 @@ temp/
 benchmarks/**/runs/
 tmp/
 .turbo/
+.worktrees/

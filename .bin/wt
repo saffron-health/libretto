@@ -3,61 +3,189 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-PKG_DIR="$ROOT_DIR/packages/dev-tools"
+WORKTREES_DIR="$ROOT_DIR/.worktrees"
 
-# Run the wt CLI, streaming output and capturing exec JSON
-tmp_fifo="/tmp/wt-fifo-$$"
-mkfifo "$tmp_fifo"
-if [ -t 0 ]; then
-    node "$PKG_DIR/dist/wt.js" "$@" > "$tmp_fifo" 2>&1 < /dev/tty &
-else
-    node "$PKG_DIR/dist/wt.js" "$@" > "$tmp_fifo" 2>&1 &
-fi
-cli_pid=$!
+usage() {
+    echo "Worktree manager"
+    echo ""
+    echo "Usage: wt <command>"
+    echo ""
+    echo "Commands:"
+    echo "  new <branch-name>   Create a new worktree and cd into it"
+    echo "  list                List all worktrees with last updated date"
+    echo "  prune [--force]     Remove worktrees for branches merged into main"
+    exit 1
+}
 
-while IFS= read -r line; do
-    if printf '%s' "$line" | jq -e '.exec' > /dev/null 2>&1; then
-        printf '%s' "$line" > /tmp/wt-exec-$$
-    else
-        printf '%s\n' "$line"
+cmd_new() {
+    local branch="$1"
+    if [ -z "$branch" ]; then
+        echo "Usage: wt new <branch-name>"
+        exit 1
     fi
-done < "$tmp_fifo"
 
-wait $cli_pid
-cli_exit=$?
-rm -f "$tmp_fifo"
+    local wt_path="$WORKTREES_DIR/$branch"
+    mkdir -p "$WORKTREES_DIR"
 
-if [ $cli_exit -ne 0 ]; then
-    rm -f /tmp/wt-exec-$$
-    exit $cli_exit
-fi
+    if [ -d "$wt_path" ]; then
+        echo "Worktree already exists at $wt_path"
+        cd "$wt_path"
+        exec "$SHELL"
+    fi
 
-# Check if we have an exec command
-if [ -f /tmp/wt-exec-$$ ]; then
-    exec_json=$(cat /tmp/wt-exec-$$)
-    rm -f /tmp/wt-exec-$$
+    git fetch origin main
+    git worktree add -b "$branch" "$wt_path" origin/main
+    echo "Created worktree at $wt_path"
+    cd "$wt_path"
+    exec "$SHELL"
+}
 
-    cwd=$(printf '%s' "$exec_json" | jq -r '.exec.cwd')
-    cmd=$(printf '%s' "$exec_json" | jq -r '.exec.cmd')
+cmd_list() {
+    local worktrees
+    worktrees=$(git worktree list --porcelain)
 
-    cd "$cwd"
+    if [ -z "$worktrees" ]; then
+        echo "No worktrees found."
+        return
+    fi
 
-    # Build args array from JSON (compatible with macOS bash 3.x)
-    cmd_args=()
-    while IFS= read -r arg; do
-        cmd_args+=("$arg")
-    done < <(printf '%s' "$exec_json" | jq -r '.exec.args[]')
+    # Parse porcelain output, filter to .worktrees only
+    local entries=()
+    local current_path=""
+    local current_branch=""
 
-    if [ "$cmd" = "code" ]; then
-        if [ -z "$VISUAL" ]; then
-            echo "Warning: \$VISUAL not set. Add to your shell profile:"
-            echo "  export VISUAL=\"code-insiders\"  # or your preferred editor"
-            echo "Falling back to VS Code..."
-            exec open -a "Visual Studio Code" "$cwd"
-        else
-            exec "$VISUAL" "$cwd"
+    while IFS= read -r line; do
+        if [[ "$line" == "worktree "* ]]; then
+            current_path="${line#worktree }"
+            current_branch=""
+        elif [[ "$line" == "branch refs/heads/"* ]]; then
+            current_branch="${line#branch refs/heads/}"
+        elif [ -z "$line" ] && [ -n "$current_path" ]; then
+            if [[ "$current_path" == *".worktrees"* ]] && [ -n "$current_branch" ]; then
+                entries+=("$current_path|$current_branch")
+            fi
+            current_path=""
+            current_branch=""
         fi
-    else
-        exec "$cmd" "${cmd_args[@]}"
+    done <<< "$worktrees"
+    # Handle last entry (porcelain output may not end with blank line)
+    if [ -n "$current_path" ] && [[ "$current_path" == *".worktrees"* ]] && [ -n "$current_branch" ]; then
+        entries+=("$current_path|$current_branch")
     fi
-fi
+
+    if [ ${#entries[@]} -eq 0 ]; then
+        echo "No worktrees in .worktrees/"
+        return
+    fi
+
+    # Collect rows with dates, sort by date descending
+    local rows=()
+    for entry in "${entries[@]}"; do
+        local wt_path="${entry%%|*}"
+        local branch="${entry##*|}"
+        local epoch
+        epoch=$(git -C "$wt_path" ls-files -z 2>/dev/null | xargs -0 -I{} stat -f "%m" "$wt_path/{}" 2>/dev/null | sort -rn | head -1)
+        epoch="${epoch:-0}"
+        local last_updated
+        last_updated=$(date -r "$epoch" "+%b %d, %Y %H:%M" 2>/dev/null || echo "—")
+        rows+=("$epoch|$last_updated|$branch|$wt_path")
+    done
+
+    # Sort by epoch descending
+    IFS=$'\n' sorted=($(for r in "${rows[@]}"; do echo "$r"; done | sort -t'|' -k1 -rn))
+    unset IFS
+
+    echo ""
+    for row in "${sorted[@]}"; do
+        local rest="${row#*|}"
+        local date="${rest%%|*}"
+        rest="${rest#*|}"
+        local branch="${rest%%|*}"
+        echo "  $branch  ($date)"
+    done
+    echo ""
+}
+
+cmd_prune() {
+    local force=false
+    if [ "$1" = "--force" ] || [ "$1" = "-f" ]; then
+        force=true
+    fi
+
+    git fetch origin main
+
+    # Get branches merged into origin/main
+    local merged
+    merged=$(git branch --merged origin/main | sed 's/^[* ] //' | grep -v '^\(main\|master\)$' || true)
+
+    # Parse worktrees in .worktrees/
+    local worktrees
+    worktrees=$(git worktree list --porcelain)
+
+    local pruned=0
+    local failed=0
+    local current_path=""
+    local current_branch=""
+
+    while IFS= read -r line; do
+        if [[ "$line" == "worktree "* ]]; then
+            current_path="${line#worktree }"
+            current_branch=""
+        elif [[ "$line" == "branch refs/heads/"* ]]; then
+            current_branch="${line#branch refs/heads/}"
+        elif [ -z "$line" ] && [ -n "$current_path" ]; then
+            if [[ "$current_path" == *".worktrees"* ]] && [ -n "$current_branch" ]; then
+                if echo "$merged" | grep -qx "$current_branch"; then
+                    echo "Pruning: $current_branch"
+                    local remove_args=("worktree" "remove")
+                    if $force; then
+                        remove_args+=("--force")
+                    fi
+                    remove_args+=("$current_path")
+                    if git "${remove_args[@]}" 2>/dev/null; then
+                        git branch -d "$current_branch" 2>/dev/null || true
+                        ((pruned++))
+                    else
+                        echo "  Failed to remove worktree: $current_branch"
+                        if ! $force; then
+                            echo "  Try 'wt prune --force' to remove anyway."
+                        fi
+                        ((failed++))
+                    fi
+                fi
+            fi
+            current_path=""
+            current_branch=""
+        fi
+    done <<< "$worktrees"
+
+    if [ $pruned -eq 0 ] && [ $failed -eq 0 ]; then
+        echo "No merged worktrees to prune."
+    else
+        [ $pruned -gt 0 ] && echo "Pruned $pruned worktree(s)."
+        [ $failed -gt 0 ] && echo "Failed to prune $failed worktree(s)."
+    fi
+}
+
+# Main
+case "${1:-}" in
+    new)
+        cmd_new "$2"
+        ;;
+    list|ls)
+        cmd_list
+        ;;
+    prune)
+        cmd_prune "$2"
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    *)
+        if [ -n "${1:-}" ]; then
+            echo "Unknown command: $1"
+            echo ""
+        fi
+        usage
+        ;;
+esac
