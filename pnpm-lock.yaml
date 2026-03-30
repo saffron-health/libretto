@@ -113,6 +113,9 @@ importers:
       ai:
         specifier: ^6.0.116
         version: 6.0.140(zod@4.3.6)
+      esbuild:
+        specifier: ^0.27.0
+        version: 0.27.4
       playwright:
         specifier: ^1.58.2
         version: 1.58.2

@@ -4,6 +4,7 @@ type RecordUnknown = Record<string, unknown>;
 
 export type SimpleCLICommandConfig = {
   description: string;
+  experimental?: boolean;
 };
 
 export type SimpleCLIInputRaw = {
@@ -111,6 +112,7 @@ export type SimpleCLIResolvedCommand = {
 };
 
 type InternalResolvedCommand = SimpleCLIResolvedCommand & {
+  experimental?: boolean;
   input?: SimpleCLIInput<unknown>;
   middlewares: AnySimpleCLIMiddleware[];
   handler: SimpleCLIHandler<unknown, SimpleCLIContext, unknown>;
@@ -858,6 +860,7 @@ export class SimpleCLIApp {
       }
 
       const command = this.findCommandByPath(routeEntry.path);
+      if (command?.experimental) continue;
       entries.push({
         label: token,
         description: command?.description,
@@ -1077,6 +1080,7 @@ function resolveRouteTree(
       routeKey: pathToRouteKey(path),
       path,
       description: command.config.description,
+      experimental: command.config.experimental,
       input: command.input,
       middlewares: mergeInheritedMiddlewares(
         parentMiddlewares,

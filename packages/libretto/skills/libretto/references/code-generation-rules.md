@@ -40,47 +40,42 @@ Key points:
 
 - `workflow(name, handler)` takes a unique workflow name and returns the workflow object that Libretto can run.
 - `npx libretto run ./file.ts myWorkflow` resolves `myWorkflow` from the workflows exported by `./file.ts`, so export or re-export the workflow from that file directly or through a `workflows` object, and make sure the run argument matches the name passed to `workflow("myWorkflow", ...)`.
-- `ctx` provides `session`, `page`, `logger`, and `services` (generic, default `{}`)
+- `ctx` provides `session`, `page`, `logger`, `storage`, and optional `credentials`
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.
 - After validation is complete and the workflow is confirmed working end to end, remove all `pause()` calls and pause-only workflow params unless the user explicitly says to keep them.
 - The browser is launched and closed automatically by the CLI. Do not launch or close it in the handler.
 
-## Passing Application Dependencies via Services
+## Uploading Artifacts with Context Storage
 
-Use the third generic on `workflow<Input, Output, Services>` to inject
-dependencies that exist in your application but not in libretto's runtime
-(DB transactions, API clients, caches, etc.):
+Use `ctx.storage` when a workflow needs to upload artifacts from standalone,
+deployable workflow code. Pass temporary storage access as part of the workflow
+input, then hand that access object to the storage helper:
 
 ```typescript
-import { type Transaction } from "./db";
+import { type GcpTemporaryStorageAccess } from "libretto";
 
-type MyServices = { tx?: Transaction };
+type Input = {
+  storageAccess?: GcpTemporaryStorageAccess;
+};
 
-export const myWorkflow = workflow<Input, Output, MyServices>(
+export const myWorkflow = workflow<Input, Output>(
   "myWorkflow",
   async (ctx, input) => {
-    if (ctx.services.tx) {
-      await ctx.services.tx.insert(/* ... */);
-    } else {
-      ctx.logger.info("No DB transaction — skipping write");
+    if (input.storageAccess) {
+      await ctx.storage.uploadJson({
+        storageAccess: input.storageAccess,
+        fileName: "artifacts/result.json",
+        payload: { ok: true },
+      });
     }
-    // ... browser automation ...
   },
 );
 ```
 
-In production, the caller passes services when invoking `.run()`:
-
-```typescript
-await myWorkflow.run(
-  { session: "debug-flow", page, logger, services: { tx } },
-  input,
-);
-```
-
-When running standalone via `npx libretto run`, services defaults to `{}`,
-so mark fields optional for anything unavailable in that context.
+This keeps the workflow deployable because the workflow only receives
+serializable input. Do not rely on injected live service objects such as DB
+clients or caches inside workflow context.
 
 ## Playwright DOM Interaction Rules
 

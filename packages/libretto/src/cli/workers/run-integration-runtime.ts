@@ -9,6 +9,7 @@ import {
   getWorkflowsFromModuleExports,
   instrumentContext,
   launchBrowser,
+  createWorkflowStorageContext,
   type ExportedLibrettoWorkflow,
   type LibrettoWorkflowContext,
 } from "../../index.js";
@@ -257,7 +258,7 @@ async function runIntegrationInternal(
     session: args.session,
     logger: integrationLogger,
     page: browserSession.page,
-    services: {},
+    storage: createWorkflowStorageContext(integrationLogger),
     credentials: args.credentials,
   };
 
