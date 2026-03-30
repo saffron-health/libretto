@@ -6,7 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@9.15.4",
   "bin": {
-    "wt": "./scripts/wt"
+    "wt": "./dist/wt.js"
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",

@@ -18,6 +18,30 @@ usage() {
     exit 1
 }
 
+mtime_epoch() {
+    local path="$1"
+    case "$(uname -s)" in
+        Darwin)
+            stat -f "%m" "$path"
+            ;;
+        *)
+            stat -c "%Y" "$path"
+            ;;
+    esac
+}
+
+format_epoch() {
+    local epoch="$1"
+    case "$(uname -s)" in
+        Darwin)
+            date -r "$epoch" "+%b %d, %Y %H:%M"
+            ;;
+        *)
+            date -d "@$epoch" "+%b %d, %Y %H:%M"
+            ;;
+    esac
+}
+
 cmd_new() {
     local branch="$1"
     if [ -z "$branch" ]; then
@@ -85,10 +109,12 @@ cmd_list() {
         local wt_path="${entry%%|*}"
         local branch="${entry##*|}"
         local epoch
-        epoch=$(git -C "$wt_path" ls-files -z 2>/dev/null | xargs -0 -I{} stat -f "%m" "$wt_path/{}" 2>/dev/null | sort -rn | head -1)
+        epoch=$(git -C "$wt_path" ls-files -z 2>/dev/null | while IFS= read -r -d '' file; do
+            mtime_epoch "$wt_path/$file"
+        done | sort -rn | head -1)
         epoch="${epoch:-0}"
         local last_updated
-        last_updated=$(date -r "$epoch" "+%b %d, %Y %H:%M" 2>/dev/null || echo "—")
+        last_updated=$(format_epoch "$epoch" 2>/dev/null || echo "—")
         rows+=("$epoch|$last_updated|$branch|$wt_path")
     done
 
