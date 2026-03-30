@@ -1,6 +1,5 @@
 import type { Page } from "playwright";
 import type { MinimalLogger } from "../logger/logger.js";
-import type { WorkflowStorageContext } from "./storage.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
@@ -8,7 +7,6 @@ export type LibrettoWorkflowContext = {
   session: string;
   page: Page;
   logger: MinimalLogger;
-  storage: WorkflowStorageContext;
   credentials?: Record<string, unknown>;
 };
 

@@ -319,14 +319,6 @@ describe("createHostedDeployPackage", () => {
                 warn() {},
                 error() {},
               },
-              storage: {
-                async upload() {
-                  throw new Error("not implemented");
-                },
-                async uploadJson() {
-                  throw new Error("not implemented");
-                },
-              },
             },
             {},
           ),

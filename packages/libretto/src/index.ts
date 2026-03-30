@@ -112,14 +112,6 @@ export {
   type LibrettoWorkflowContext,
   type LibrettoWorkflowHandler,
 } from "./shared/workflow/workflow.js";
-export {
-  createWorkflowStorageContext,
-  type GcpTemporaryStorageAccess,
-  type WorkflowStorageAccess,
-  type WorkflowStorageContext,
-  type WorkflowStorageUploadResult,
-} from "./shared/workflow/storage.js";
-
 const isDirectExecution = (): boolean => {
   const entryArg = process.argv[1];
   if (!entryArg) {
