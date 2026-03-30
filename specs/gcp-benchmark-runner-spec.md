@@ -159,13 +159,13 @@ await uploadRunDirectory(
 );
 ```
 
-- [ ] Create `benchmarks/webVoyager/cloud-entrypoint.ts`
-- [ ] Read `CLOUD_RUN_TASK_INDEX`, `BENCH_RUN_ID`, `BENCH_SELECTION` env vars
-- [ ] Re-derive the full selection deterministically, pick `rows[TASK_INDEX]`
-- [ ] Call `runWebVoyagerCase(row)` (extract it as a standalone export from `runner.ts` if not already)
-- [ ] Upload the case's `runDir` to GCS via `uploadRunDirectory`
-- [ ] Exit 0 on success, exit 1 on failure (Cloud Run handles retries)
-- [ ] Verify entrypoint compiles: `npx tsx --no-warnings -e "import './benchmarks/webVoyager/cloud-entrypoint.js'"`
+- [x] Create `benchmarks/webVoyager/cloud-entrypoint.ts`
+- [x] Read `CLOUD_RUN_TASK_INDEX`, `BENCH_RUN_ID`, `BENCH_SELECTION` env vars
+- [x] Re-derive the full selection deterministically, pick `rows[TASK_INDEX]`
+- [x] Call `runWebVoyagerCase(row)` (extract it as a standalone export from `runner.ts` if not already)
+- [x] Upload the case's `runDir` to GCS via `uploadRunDirectory`
+- [x] Exit 0 on success, exit 1 on failure (Cloud Run handles retries)
+- [x] Verify entrypoint compiles: `npx tsx --no-warnings -e "import './benchmarks/webVoyager/cloud-entrypoint.js'"`
 
 ### Phase 5: Dispatch command — `--gcp` flag on `webVoyager run`
 

@@ -32,7 +32,7 @@ import { evaluateWithScreenshots, type JudgeResult } from "./evaluator.js";
 // Types
 // ---------------------------------------------------------------------------
 
-type WebVoyagerCaseResult = {
+export type WebVoyagerCaseResult = {
   caseId: string;
   runDir: string;
   status: "passed" | "failed";
@@ -280,7 +280,7 @@ async function saveEvaluatorArtifacts(
 // Run a single case
 // ---------------------------------------------------------------------------
 
-async function runWebVoyagerCase(
+export async function runWebVoyagerCase(
   row: WebVoyagerRow,
 ): Promise<WebVoyagerCaseResult> {
   const startedAt = new Date();
