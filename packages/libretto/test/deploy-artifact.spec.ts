@@ -1,4 +1,7 @@
 import {
+  createRequire,
+} from "node:module";
+import {
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -10,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
+import { build } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { createHostedDeployPackage } from "../src/cli/core/deploy-artifact.js";
 
@@ -25,6 +29,8 @@ function extractBundledImplementation(indexSource: string): string {
 
   return gunzipSync(Buffer.from(match[1], "base64")).toString("utf8");
 }
+
+const require = createRequire(import.meta.url);
 
 describe("createHostedDeployPackage", () => {
   it("bundles workspace package source and strips workspace dependencies from the deploy manifest", async () => {
@@ -241,6 +247,90 @@ describe("createHostedDeployPackage", () => {
         expect(existsSync(join(deployPackage.outputDir, "libretto", "dist", "index.js"))).toBe(
           true,
         );
+      } finally {
+        deployPackage.cleanup();
+      }
+    } finally {
+      rmSync(workspaceRoot, { force: true, recursive: true });
+    }
+  });
+
+  it("keeps deployed workflows runnable after rebundling the generated entrypoint to cjs", async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), "libretto-deploy-test-"));
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+    const bundledEntryPoint = join(workspaceRoot, "bundled-entry.cjs");
+
+    try {
+      mkdirSync(join(sourceDir, "src"), { recursive: true });
+
+      writeJson(join(sourceDir, "package.json"), {
+        name: "@repo/worker",
+        private: true,
+        type: "module",
+        dependencies: {
+          libretto: "github:saffron-health/libretto#feat/deploy-cli&path:/packages/libretto",
+        },
+      });
+
+      writeFileSync(
+        entryPoint,
+        [
+          'import { workflow } from "libretto";',
+          "",
+          "export const testWorkflow = workflow(",
+          '  "testWorkflow",',
+          "  async () => ({ ok: true }),",
+          ");",
+          "",
+        ].join("\n"),
+      );
+
+      const deployPackage = await createHostedDeployPackage({
+        deploymentName: "cjs-runtime-worker",
+        entryPoint,
+        sourceDir,
+      });
+
+      try {
+        await build({
+          bundle: true,
+          entryPoints: [join(deployPackage.outputDir, "index.js")],
+          external: ["libretto"],
+          format: "cjs",
+          outfile: bundledEntryPoint,
+          platform: "node",
+          target: "node20",
+        });
+
+        const bundledModule = require(bundledEntryPoint) as {
+          testWorkflow: {
+            run: (ctx: unknown, input: unknown) => Promise<unknown>;
+          };
+        };
+
+        await expect(
+          bundledModule.testWorkflow.run(
+            {
+              session: "test-session",
+              page: {} as never,
+              logger: {
+                info() {},
+                warn() {},
+                error() {},
+              },
+              storage: {
+                async upload() {
+                  throw new Error("not implemented");
+                },
+                async uploadJson() {
+                  throw new Error("not implemented");
+                },
+              },
+            },
+            {},
+          ),
+        ).resolves.toEqual({ ok: true });
       } finally {
         deployPackage.cleanup();
       }

@@ -701,7 +701,8 @@ const BUNDLE_FILENAME = join(
   tmpdir(),
   ${JSON.stringify(outputPrefix)} + BUNDLE_HASH + ".cjs",
 );
-const require = createRequire(import.meta.url);
+const nativeRequire =
+  typeof require === "function" ? require : createRequire(import.meta.url);
 
 function ensureBundleFile() {
   if (!existsSync(BUNDLE_FILENAME)) {
@@ -716,7 +717,7 @@ function ensureBundleFile() {
 
 function createWorkflowProxy(exportName) {
   return workflow(exportName, async (ctx, input) => {
-    const impl = require(ensureBundleFile());
+    const impl = nativeRequire(ensureBundleFile());
     const target = impl[exportName];
     if (!target || typeof target.run !== "function") {
       throw new Error(
