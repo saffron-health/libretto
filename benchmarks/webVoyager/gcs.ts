@@ -60,6 +60,10 @@ const CaseResultSchema = z.object({
 export type ManifestCase = z.infer<typeof ManifestCaseSchema>;
 export type RunManifest = z.infer<typeof RunManifestSchema>;
 export type CaseResult = z.infer<typeof CaseResultSchema>;
+export type DownloadedCaseResult = {
+  runName: string;
+  result: CaseResult;
+};
 
 export type CaseStatusSummary = {
   total: number;
@@ -170,7 +174,6 @@ export async function readManifest(
 export async function listRunIds(bucket: Bucket): Promise<string[]> {
   const [files] = await bucket.getFiles({
     prefix: "runs/",
-    delimiter: "/",
     matchGlob: "runs/*/manifest.json",
   });
 
@@ -192,31 +195,15 @@ export async function countCompletedCases(
   runId: string,
 ): Promise<CaseStatusSummary> {
   const manifest = await readManifest(bucket, runId);
-  const prefix = "runs/" + runId + "/cases/";
-
-  const [files] = await bucket.getFiles({
-    prefix,
-    matchGlob: "runs/" + runId + "/cases/*/result.json",
-  });
+  const results = await downloadResults(bucket, runId);
 
   let passed = 0;
   let failed = 0;
 
-  // Download each result.json to check status
-  await Promise.all(
-    files.map(async (f) => {
-      try {
-        const [contents] = await f.download();
-        const result = CaseResultSchema.parse(
-          JSON.parse(contents.toString("utf8")),
-        );
-        if (result.status === "passed") passed++;
-        else failed++;
-      } catch (err) {
-        console.warn("Warning: failed to read result file %s: %s", f.name, err);
-      }
-    }),
-  );
+  for (const { result } of results) {
+    if (result.status === "passed") passed++;
+    else failed++;
+  }
 
   return {
     total: manifest.totalCases,
@@ -232,29 +219,57 @@ export async function countCompletedCases(
 export async function downloadResults(
   bucket: Bucket,
   runId: string,
-): Promise<CaseResult[]> {
+): Promise<DownloadedCaseResult[]> {
   const prefix = "runs/" + runId + "/cases/";
   const [files] = await bucket.getFiles({
     prefix,
-    matchGlob: "runs/" + runId + "/cases/*/result.json",
+    matchGlob: prefix + "*/result.json",
   });
 
-  const results: CaseResult[] = [];
+  const results: DownloadedCaseResult[] = [];
 
-  await Promise.all(
-    files.map(async (f) => {
-      try {
-        const [contents] = await f.download();
-        results.push(
-          CaseResultSchema.parse(JSON.parse(contents.toString("utf8"))),
-        );
-      } catch (err) {
-        console.warn("Warning: failed to read result file %s: %s", f.name, err);
-      }
-    }),
-  );
+  await runWithConcurrency(files, 16, async (file) => {
+    try {
+      const [contents] = await file.download();
+      results.push({
+        runName: extractRunName(prefix, file.name),
+        result: CaseResultSchema.parse(JSON.parse(contents.toString("utf8"))),
+      });
+    } catch (err) {
+      console.warn("Warning: failed to read result file %s: %s", file.name, err);
+    }
+  });
 
-  // Sort by caseId for deterministic output
-  results.sort((a, b) => a.caseId.localeCompare(b.caseId));
+  results.sort((a, b) => a.runName.localeCompare(b.runName));
   return results;
+}
+
+function extractRunName(prefix: string, fileName: string): string {
+  const suffix = "/result.json";
+  if (!fileName.startsWith(prefix) || !fileName.endsWith(suffix)) {
+    throw new Error(`Unexpected result path: ${fileName}`);
+  }
+
+  return fileName.slice(prefix.length, -suffix.length);
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  let index = 0;
+
+  async function next(): Promise<void> {
+    while (index < items.length) {
+      const item = items[index++];
+      await worker(item);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => next(),
+  );
+  await Promise.all(workers);
 }

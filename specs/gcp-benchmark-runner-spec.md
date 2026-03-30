@@ -227,11 +227,11 @@ export const webVoyagerCommands = SimpleCLI.group({
 });
 ```
 
-- [ ] Add `list` command: calls `listRunIds()`, reads each manifest, prints table (run ID, started, total cases, completed, passed, failed)
-- [ ] Add `status --run <id>` command: reads manifest, calls `countCompletedCases()`, also polls Cloud Run execution status via `ExecutionsClient.getExecution()` for running/pending counts
-- [ ] Add `results --run <id>` command: calls `downloadResults()`, prints per-case table (case ID, status, verdict, duration, error) and aggregate pass/fail counts
-- [ ] If `--run` is omitted on `status`/`results`, default to the most recent run by `startedAt`
-- [ ] Verify `pnpm benchmarks webVoyager list` returns output (after at least one `--gcp` run)
+- [x] Add `list` command: calls `listRunIds()`, reads each manifest, prints table (run ID, started, total cases, completed, passed, failed)
+- [x] Add `status --run <id>` command: reads manifest, calls `countCompletedCases()`, also polls Cloud Run execution status via `ExecutionsClient.getExecution()` for running/pending counts
+- [x] Add `results --run <id>` command: calls `downloadResults()`, prints per-case table (case ID, status, verdict, duration, error) and aggregate pass/fail counts
+- [x] If `--run` is omitted on `status`/`results`, default to the most recent run by `startedAt`
+- [x] Verify `pnpm benchmarks webVoyager list` returns output (after at least one `--gcp` run)
 
 ### Phase 7: Update GitHub Action
 
