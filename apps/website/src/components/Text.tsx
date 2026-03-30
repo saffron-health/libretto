@@ -20,6 +20,8 @@ interface TextProps {
   as?: keyof JSX.IntrinsicElements;
   className?: string;
   children: React.ReactNode;
+  htmlStyle?: React.CSSProperties;
+  [key: `data-${string}`]: string | undefined;
 }
 
 export function Text({
@@ -28,9 +30,15 @@ export function Text({
   as: Tag = "span",
   className = "",
   children,
+  htmlStyle,
+  ...rest
 }: TextProps) {
   const font = style === "serif" ? "font-serif" : "font-sans";
   const classes = `${sizeClasses[size]} ${font} ${className}`.trim();
 
-  return <Tag className={classes}>{children}</Tag>;
+  return (
+    <Tag className={classes} style={htmlStyle} {...rest}>
+      {children}
+    </Tag>
+  );
 }

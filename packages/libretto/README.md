@@ -65,7 +65,7 @@ npx libretto open <url>                    # launch browser and open a URL (head
 npx libretto snapshot --objective "..." --context "..."  # capture PNG + HTML and analyze with an LLM
 npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page (single quoted argument)
 echo "<code>" | npx libretto exec -        # intentionally read Playwright TypeScript from stdin
-npx libretto run <file> <export>           # run an exported workflow from a file
+npx libretto run <file> <workflowName>     # run an exported workflow from a file
 npx libretto resume                        # resume a paused workflow
 npx libretto network                       # view captured network requests
 npx libretto actions                       # view captured user/agent actions

@@ -102,9 +102,13 @@ export {
 
 // Workflow helpers
 export {
+  getWorkflowFromModuleExports,
+  getWorkflowsFromModuleExports,
+  isLibrettoWorkflow,
   LibrettoWorkflow,
   LIBRETTO_WORKFLOW_BRAND,
   workflow,
+  type ExportedLibrettoWorkflow,
   type LibrettoWorkflowContext,
   type LibrettoWorkflowHandler,
 } from "./shared/workflow/workflow.js";

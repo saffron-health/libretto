@@ -65,7 +65,7 @@ describe("multi-session CLI behavior", () => {
     const integrationFilePath = await writeWorkflow(
       "integration-auto-session.mjs",
       `
-export const main = workflow(async () => {
+export const main = workflow("main", async () => {
   console.log("AUTO_SESSION_RUN_OK");
 });
 `,

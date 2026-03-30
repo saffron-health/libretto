@@ -2,9 +2,9 @@ import classnames from "classnames";
 import { useState } from "react";
 import { CheckIcon, CopyIcon } from "../icons";
 
-const COMMAND_1 = "npm i -D libretto";
+const COMMAND_1 = "npm i libretto";
 const COMMAND_2 = "npx libretto init";
-const COPY_COMMAND = "npm i -D libretto && npx libretto init";
+const COPY_COMMAND = "npm i libretto && npx libretto init";
 
 export function InstallSnippet() {
   const [copied, setCopied] = useState(false);

@@ -115,8 +115,8 @@ npx libretto exec --session debug-example --page <page-id> "return await page.ur
 - Re-run the same workflow after each fix to verify the browser behavior end to end.
 
 ```bash
-npx libretto run ./integration.ts main --headless --params '{"status":"open"}'
-npx libretto run ./integration.ts main --auth-profile app.example.com
+npx libretto run ./integration.ts workflowName --headless --params '{"status":"open"}'
+npx libretto run ./integration.ts workflowName --auth-profile app.example.com
 ```
 
 ### `resume`
