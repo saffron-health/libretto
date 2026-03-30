@@ -60,6 +60,7 @@ async function main(): Promise<void> {
   // Upload the case's run directory to GCS
   const bucket = createBenchmarksBucket();
   const gcsPrefix = `runs/${runId}/cases/${runName}`;
+
   await uploadRunDirectory(bucket, result.runDir, gcsPrefix);
 
   console.log(

@@ -23,4 +23,4 @@ COPY . .
 # Build all packages
 RUN pnpm build
 
-ENTRYPOINT ["npx", "tsx", "benchmarks/webVoyager/cloud-entrypoint.ts"]
+ENTRYPOINT ["pnpm", "--filter", "libretto-benchmarks", "exec", "tsx", "webVoyager/cloud-entrypoint.ts"]

@@ -30,6 +30,11 @@ Add a `--gcp` flag to `pnpm benchmarks webVoyager run` that builds a Docker imag
 
 _Added during implementation, not during initial spec creation._
 
+- Add an artifact-aware evaluator mode that runs a separate Pi agent loop against a completed case directory instead of relying only on a screenshot judge. Give it access to `result.json`, `transcript.jsonl`, `.libretto/sessions/*/{actions,logs,network}.jsonl`, Libretto snapshot artifacts, and evaluator screenshots so it can distinguish agent mistakes from evidence-capture failures.
+- Keep the current screenshot judge as a fast baseline or fallback, but add an explicit `INVALID` or `UNVERIFIABLE` path when the evidence bundle is incomplete instead of collapsing those cases into `NO`.
+- Fix `benchmarks/webVoyager/screenshot-collector.ts` so periodic capture is reliable in long-running Cloud Run cases. Replace the private Playwright connection cleanup with a supported disconnect path, add collector logs/artifacts for failed capture attempts, and align page selection with Libretto's normal session connection semantics.
+- Consider promoting Libretto's own snapshot artifacts into the evaluator evidence bundle when the periodic collector produces too few screenshots.
+
 ## Important files/docs/websites for implementation
 
 - `benchmarks/cli.ts` — CLI entrypoint and command routing
@@ -188,16 +193,16 @@ async function dispatchGcpRun(selection: WebVoyagerSelection): Promise<{ runId: 
 }
 ```
 
-- [ ] Add `--gcp` flag to `webVoyagerRunInput` in `commands.ts` as `SimpleCLI.flag()`
-- [ ] Add `@google-cloud/run` to `benchmarks/package.json`
-- [ ] Create `benchmarks/webVoyager/cloud-dispatch.ts` with:
+- [x] Add `--gcp` flag to `webVoyagerRunInput` in `commands.ts` as `SimpleCLI.flag()`
+- [x] Add `@google-cloud/run` to `benchmarks/package.json`
+- [x] Create `benchmarks/webVoyager/cloud-dispatch.ts` with:
   - `generateRunId()` — timestamp + random suffix (e.g. `2026-03-27-a1b2c3`)
   - `buildAndPushImage(tag)` — shells out to `docker build` + `docker push`
   - `updateAndExecuteJob(imageTag, opts)` — uses `JobsClient` to update the job (new image, parallelism) then `runJob` (with taskCount override + env overrides)
   - `dispatchGcpRun(selection, selectionParams)` — orchestrates the above, writes manifest to GCS, returns run ID
-- [ ] Wire `--gcp` flag in `commands.ts` handler: if `--gcp`, call `dispatchGcpRun` instead of `runWebVoyagerBenchmark`
-- [ ] Print: `"Dispatched run {runId} ({N} cases, parallelism {P})\nCheck status: pnpm benchmarks webVoyager status --run {runId}"`
-- [ ] Verify `pnpm benchmarks webVoyager run --gcp --count 1 --random` dispatches successfully (manual end-to-end test)
+- [x] Wire `--gcp` flag in `commands.ts` handler: if `--gcp`, call `dispatchGcpRun` instead of `runWebVoyagerBenchmark`
+- [x] Print: `"Dispatched run {runId} ({N} cases, parallelism {P})\nCheck status: pnpm benchmarks webVoyager status --run {runId}"`
+- [x] Verify `pnpm benchmarks webVoyager run --gcp --count 1 --random` dispatches successfully (manual end-to-end test)
 
 ### Phase 6: Query commands — `list`, `status`, `results`
 

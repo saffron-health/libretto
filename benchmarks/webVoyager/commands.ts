@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SimpleCLI } from "../libretto-internals.js";
+import { dispatchGcpRun } from "./cloud-dispatch.js";
 import { runWebVoyagerBenchmark } from "./runner.js";
 
 const webVoyagerRunInput = SimpleCLI.input({
@@ -23,6 +24,9 @@ const webVoyagerRunInput = SimpleCLI.input({
         help: "Run up to N cases in parallel (default: sequential)",
       },
     ),
+    gcp: SimpleCLI.flag({
+      help: "Dispatch to GCP Cloud Run instead of running locally",
+    }),
   },
 })
   .refine(
@@ -41,14 +45,27 @@ export const webVoyagerCommands = SimpleCLI.group({
       description: "Run WebVoyager benchmark cases",
     })
       .input(webVoyagerRunInput)
-      .handle(async ({ input }) =>
-        runWebVoyagerBenchmark({
+      .handle(async ({ input }) => {
+        if (input.gcp) {
+          const { runId, totalCases, parallelism } = await dispatchGcpRun({
+            offset: input.offset,
+            count: input.count,
+            seed: input.seed,
+            random: input.random,
+          });
+          return {
+            exitCode: 0,
+            stdout: `Dispatched run ${runId} (${totalCases} cases, parallelism ${parallelism})\nCheck status: pnpm benchmarks webVoyager status --run ${runId}`,
+          };
+        }
+
+        return runWebVoyagerBenchmark({
           offset: input.offset,
           count: input.count,
           seed: input.seed,
           random: input.random,
           parallelize: input.parallelize,
-        }),
-      ),
+        });
+      }),
   },
 });

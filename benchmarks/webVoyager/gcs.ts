@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { Bucket, Storage } from "@google-cloud/storage";
 import { z } from "zod";
@@ -118,9 +118,19 @@ async function walkDirectory(dir: string): Promise<string[]> {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...(await walkDirectory(fullPath)));
-    } else {
+    } else if (entry.isSymbolicLink()) {
+      // Resolve symlink and only include if it points to a regular file
+      const resolved = await stat(fullPath);
+      if (resolved.isDirectory()) {
+        results.push(...(await walkDirectory(fullPath)));
+      } else if (resolved.isFile()) {
+        results.push(fullPath);
+      }
+      // Skip broken symlinks, sockets, etc.
+    } else if (entry.isFile()) {
       results.push(fullPath);
     }
+    // Skip sockets, FIFOs, devices, and other non-regular entries
   }
   return results;
 }
