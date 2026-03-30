@@ -8,7 +8,7 @@ type Line =
   | { type: "agent"; text: string };
 
 const USER_MESSAGE =
-  "Open LinkedIn and send connection requests to the top 5 people who viewed my profile";
+  "Use the Libretto skill. Open LinkedIn and send connection requests to the top 5 people who viewed my profile";
 
 function Cursor({ dark }: { dark?: boolean }) {
   return (
@@ -100,7 +100,9 @@ export function TerminalDemo() {
       if (cancelled) return;
 
       // Thinking done
-      setLines((prev) => prev.map((l) => (l.type === "thinking" ? { ...l, done: true } : l)));
+      setLines((prev) =>
+        prev.map((l) => (l.type === "thinking" ? { ...l, done: true } : l)),
+      );
 
       // Tool: bash — open
       await sleep(400);
@@ -116,7 +118,9 @@ export function TerminalDemo() {
       await sleep(1400);
       if (cancelled) return;
       setLines((prev) =>
-        prev.map((l, i) => (i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l)),
+        prev.map((l, i) =>
+          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
+        ),
       );
 
       // Tool: bash — snapshot
@@ -126,14 +130,17 @@ export function TerminalDemo() {
         ...prev,
         {
           type: "tool",
-          label: 'bash: npx libretto snapshot --objective "Find profile viewers"',
+          label:
+            'bash: npx libretto snapshot --objective "Find profile viewers"',
           done: false,
         },
       ]);
       await sleep(1200);
       if (cancelled) return;
       setLines((prev) =>
-        prev.map((l, i) => (i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l)),
+        prev.map((l, i) =>
+          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
+        ),
       );
 
       // Tool: bash — exec click
@@ -150,7 +157,9 @@ export function TerminalDemo() {
       await sleep(900);
       if (cancelled) return;
       setLines((prev) =>
-        prev.map((l, i) => (i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l)),
+        prev.map((l, i) =>
+          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
+        ),
       );
 
       // Tool: bash — exec count
@@ -160,14 +169,17 @@ export function TerminalDemo() {
         ...prev,
         {
           type: "tool",
-          label: "bash: npx libretto exec \"return await page.locator('.profile-card').count()\"",
+          label:
+            "bash: npx libretto exec \"return await page.locator('.profile-card').count()\"",
           done: false,
         },
       ]);
       await sleep(800);
       if (cancelled) return;
       setLines((prev) =>
-        prev.map((l, i) => (i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l)),
+        prev.map((l, i) =>
+          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
+        ),
       );
 
       // Tool: write file
@@ -184,7 +196,9 @@ export function TerminalDemo() {
       await sleep(1000);
       if (cancelled) return;
       setLines((prev) =>
-        prev.map((l, i) => (i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l)),
+        prev.map((l, i) =>
+          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
+        ),
       );
 
       // Agent streams response word by word
@@ -218,13 +232,22 @@ export function TerminalDemo() {
     <div className="mx-auto max-w-[600px] mt-16">
       <div className="rounded-xl border border-ink/[0.08] bg-white shadow-lg overflow-hidden flex flex-col font-mono text-[13px]">
         {/* Title bar */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-ink/[0.06] bg-ink/[0.02]">
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-ink/[0.06] bg-ink/[0.02]">
           <div className="flex gap-1.5">
             <div className="size-2.5 rounded-full bg-ink/10" />
             <div className="size-2.5 rounded-full bg-ink/10" />
             <div className="size-2.5 rounded-full bg-ink/10" />
           </div>
-          <img src="/claude-code-logo.svg" alt="Claude Code" className="h-3.5 w-auto opacity-70" />
+          <div className="flex items-center gap-1.5">
+            <img
+              src="/claude-code-logo.svg"
+              alt="Claude Code"
+              className="h-3.5 w-auto opacity-70"
+            />
+            <span className="font-sans text-[13px] font-[450] text-ink/50">
+              Claude Code
+            </span>
+          </div>
           {/* Reset button */}
           <button
             type="button"
