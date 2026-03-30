@@ -33,7 +33,7 @@ function Navbar() {
 
   return (
     <nav className="px-8 pt-6">
-      <div className="relative mx-auto flex max-w-[1200px] items-center justify-between">
+      <div className="relative mx-auto flex max-w-[800px] items-center justify-between">
         <div className="flex items-center gap-10">
           <a href="/" className="no-underline">
             <Text size="xl" style="serif" className="text-ink font-[200]">

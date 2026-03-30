@@ -8,7 +8,7 @@ type Line =
   | { type: "agent"; text: string };
 
 const USER_MESSAGE =
-  "Open LinkedIn and send connection requests to the top 5 people who viewed my profile";
+  "Use the Libretto skill. Open LinkedIn and send connection requests to the top 5 people who viewed my profile";
 
 function Cursor({ dark }: { dark?: boolean }) {
   return (
