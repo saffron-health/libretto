@@ -5,6 +5,11 @@ import { Text } from "./components/Text";
 import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
 import { GitHubStarIcon } from "./icons";
+import {
+  OrchestrationContainer,
+  AnimationTarget,
+} from "./components/AnimationOrchestration";
+import { AnimatedTitle } from "./components/AnimatedTitle";
 
 function useGitHubStars(repo: string) {
   const [stars, setStars] = useState<number | null>(null);
@@ -32,7 +37,11 @@ function Navbar() {
   const stars = useGitHubStars("saffron-health/libretto");
 
   return (
-    <nav className="px-8 pt-6">
+    <nav
+      data-animate={AnimationTarget.Navbar}
+      style={{ opacity: 0 }}
+      className="px-8 pt-6"
+    >
       <div className="relative mx-auto flex max-w-[800px] items-center justify-between">
         <div className="flex items-center gap-10">
           <a href="/" className="no-underline">
@@ -86,7 +95,11 @@ function Hero() {
       className="relative px-8 pt-24 pb-16 overflow-hidden"
     >
       {/* Interactive ASCII icosahedron background */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.08] -translate-y-24 select-none">
+      <div
+        data-animate={AnimationTarget.Icosahedron}
+        style={{ opacity: 0 }}
+        className="pointer-events-none absolute inset-0 flex items-center justify-center -translate-y-24 select-none"
+      >
         <CanvasAsciiIcosahedron
           className="h-[1600px] w-[1600px] max-h-[180vw] max-w-[180vw] text-ink"
           showAnnotations={false}
@@ -100,7 +113,7 @@ function Hero() {
           style="serif"
           className="mb-8 max-w-[800px] text-center tracking-[-0.03em] text-ink [text-wrap:balance] mx-auto"
         >
-          <span
+          <AnimatedTitle
             className="grain"
             style={{
               fontWeight: 300,
@@ -109,24 +122,34 @@ function Hero() {
             }}
           >
             The AI Toolkit for Building Robust Web Integrations
-          </span>
+          </AnimatedTitle>
         </Text>
         <Text
           as="p"
           size="lg"
+          data-animate={AnimationTarget.Content}
+          htmlStyle={{ opacity: 0 }}
           className="mb-8 max-w-[560px] mx-auto text-center leading-relaxed text-muted"
         >
           An agent skill and token-efficient CLI that inspects live pages,
           reverse-engineers network requests, and ships production-ready
           integration workflows.
         </Text>
-        <InstallSnippet />
-        <div className="flex items-center justify-center gap-6 mb-16">
+        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
+          <InstallSnippet />
+        </div>
+        <div
+          data-animate={AnimationTarget.Content}
+          style={{ opacity: 0 }}
+          className="flex items-center justify-center gap-6 mb-16"
+        >
           <Button className="rounded-full bg-ink border-ink px-7 py-3 text-cream hover:bg-ink/90">
             Go to docs
           </Button>
         </div>
-        <TerminalDemo />
+        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
+          <TerminalDemo />
+        </div>
       </div>
     </section>
   );
@@ -134,9 +157,9 @@ function Hero() {
 
 export function App() {
   return (
-    <div className="min-h-screen bg-cream text-ink">
+    <OrchestrationContainer className="min-h-screen bg-cream text-ink">
       <Navbar />
       <Hero />
-    </div>
+    </OrchestrationContainer>
   );
 }
