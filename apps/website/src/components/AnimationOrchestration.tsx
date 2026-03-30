@@ -5,7 +5,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { useAnimate, stagger } from "motion/react";
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback } from "react";
 
 /**
  * Central orchestrator for the hero entrance animation.
@@ -14,7 +14,7 @@ import { useEffect, useCallback, useState } from "react";
  *  1. Title words appear one-by-one (staggered fade+translate)
  *  2. Description, install snippet, docs button, terminal demo fade in
  *  3. Navbar slides down from top
- *  4. Icosahedron fades in + scales down from 1.3→1
+ *  4. Icosahedron fades in + scales down from 1.15→1
  */
 
 /** Animation target names — use as `data-animate={ANIM.xxx}` */
@@ -27,16 +27,12 @@ export const ANIM = {
 
 const sel = (name: string) => `[data-animate='${name}']`;
 
-type AnimationPhase = "idle" | "title" | "content" | "done";
-
 interface OrchestrationContext {
-  phase: AnimationPhase;
   /** Ref callback — attach to the scoped container that holds all animated elements */
   scopeRef: (node: HTMLElement | null) => void;
 }
 
 const Ctx = createContext<OrchestrationContext>({
-  phase: "idle",
   scopeRef: () => {},
 });
 
@@ -46,8 +42,6 @@ export function useOrchestration() {
 
 export function OrchestrationProvider({ children }: PropsWithChildren) {
   const [scope, animate] = useAnimate<HTMLDivElement>();
-  const [phase, setPhase] = useState<AnimationPhase>("idle");
-
   const scopeRef = useCallback(
     (node: HTMLElement | null) => {
       // Forward to motion's scope ref
@@ -64,7 +58,6 @@ export function OrchestrationProvider({ children }: PropsWithChildren) {
 
     async function run() {
       // ── 1. Title: word-by-word ──
-      setPhase("title");
       await animate(
         sel(ANIM.titleWord),
         { opacity: [0, 1], y: [12, 0], filter: ["blur(4px)", "blur(0px)"] },
@@ -76,7 +69,6 @@ export function OrchestrationProvider({ children }: PropsWithChildren) {
       if (cancelled) return;
 
       // ── 2. Content elements fade in together ──
-      setPhase("content");
       animate(
         sel(ANIM.content),
         { opacity: [0, 1], y: [18, 0] },
@@ -105,8 +97,6 @@ export function OrchestrationProvider({ children }: PropsWithChildren) {
         { duration: 1.2, delay: 0.15 },
       );
       if (cancelled) return;
-
-      setPhase("done");
     }
 
     void run();
@@ -115,7 +105,7 @@ export function OrchestrationProvider({ children }: PropsWithChildren) {
     };
   }, [scope, animate]);
 
-  const value = useMemo(() => ({ phase, scopeRef }), [phase, scopeRef]);
+  const value = useMemo(() => ({ scopeRef }), [scopeRef]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { ANIM } from "./AnimationOrchestration";
 
 /**
@@ -12,11 +12,11 @@ export function AnimatedTitle({
   className,
   style,
 }: {
-  children: ReactNode;
+  children: string;
   className?: string;
   style?: CSSProperties;
 }) {
-  const text = typeof children === "string" ? children : String(children);
+  const text = children;
   const words = text.split(/\s+/);
 
   return (
