@@ -1,0 +1,63 @@
+#!/bin/bash
+set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PKG_DIR="$ROOT_DIR/packages/dev-tools"
+
+# Run the wt CLI, streaming output and capturing exec JSON
+tmp_fifo="/tmp/wt-fifo-$$"
+mkfifo "$tmp_fifo"
+if [ -t 0 ]; then
+    node "$PKG_DIR/dist/wt.js" "$@" > "$tmp_fifo" 2>&1 < /dev/tty &
+else
+    node "$PKG_DIR/dist/wt.js" "$@" > "$tmp_fifo" 2>&1 &
+fi
+cli_pid=$!
+
+while IFS= read -r line; do
+    if printf '%s' "$line" | jq -e '.exec' > /dev/null 2>&1; then
+        printf '%s' "$line" > /tmp/wt-exec-$$
+    else
+        printf '%s\n' "$line"
+    fi
+done < "$tmp_fifo"
+
+wait $cli_pid
+cli_exit=$?
+rm -f "$tmp_fifo"
+
+if [ $cli_exit -ne 0 ]; then
+    rm -f /tmp/wt-exec-$$
+    exit $cli_exit
+fi
+
+# Check if we have an exec command
+if [ -f /tmp/wt-exec-$$ ]; then
+    exec_json=$(cat /tmp/wt-exec-$$)
+    rm -f /tmp/wt-exec-$$
+
+    cwd=$(printf '%s' "$exec_json" | jq -r '.exec.cwd')
+    cmd=$(printf '%s' "$exec_json" | jq -r '.exec.cmd')
+
+    cd "$cwd"
+
+    # Build args array from JSON (compatible with macOS bash 3.x)
+    cmd_args=()
+    while IFS= read -r arg; do
+        cmd_args+=("$arg")
+    done < <(printf '%s' "$exec_json" | jq -r '.exec.args[]')
+
+    if [ "$cmd" = "code" ]; then
+        if [ -z "$VISUAL" ]; then
+            echo "Warning: \$VISUAL not set. Add to your shell profile:"
+            echo "  export VISUAL=\"code-insiders\"  # or your preferred editor"
+            echo "Falling back to VS Code..."
+            exec open -a "Visual Studio Code" "$cwd"
+        else
+            exec "$VISUAL" "$cwd"
+        fi
+    else
+        exec "$cmd" "${cmd_args[@]}"
+    fi
+fi
