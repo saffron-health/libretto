@@ -5,7 +5,6 @@ export const RunIntegrationWorkerRequestSchema = z.object({
   workflowName: z.string().min(1),
   session: z.string().min(1),
   params: z.unknown(),
-  credentials: z.record(z.string(), z.unknown()).optional(),
   headless: z.boolean(),
   visualize: z.boolean().default(true),
   authProfileDomain: z.string().optional(),

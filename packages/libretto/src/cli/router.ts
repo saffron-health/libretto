@@ -1,5 +1,6 @@
 import { aiCommands } from "./commands/ai.js";
 import { browserCommands } from "./commands/browser.js";
+import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
 import { logCommands } from "./commands/logs.js";
 import { setupCommand } from "./commands/setup.js";
@@ -8,6 +9,7 @@ import { SimpleCLI } from "./framework/simple-cli.js";
 
 export const cliRoutes = {
   ...browserCommands,
+  deploy: deployCommand,
   ...executionCommands,
   ...logCommands,
   ai: aiCommands,

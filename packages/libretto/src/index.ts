@@ -112,7 +112,6 @@ export {
   type LibrettoWorkflowContext,
   type LibrettoWorkflowHandler,
 } from "./shared/workflow/workflow.js";
-
 const isDirectExecution = (): boolean => {
   const entryArg = process.argv[1];
   if (!entryArg) {

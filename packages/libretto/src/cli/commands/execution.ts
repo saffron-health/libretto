@@ -609,7 +609,6 @@ async function runIntegrationFromFile(
     workflowName: args.workflowName,
     session: args.session,
     params: args.params,
-    credentials: args.credentials,
     headless: args.headless,
     visualize: args.visualize,
     authProfileDomain: args.authProfileDomain,
@@ -708,7 +707,7 @@ export const execCommand = SimpleCLI.command({
     );
   });
 
-const runUsage = `Usage: libretto run <integrationFile> <workflowName> [--params <json> | --params-file <path>] [--credentials <json>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
+const runUsage = `Usage: libretto run <integrationFile> <workflowName> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -727,9 +726,6 @@ export const runInput = SimpleCLI.input({
     paramsFile: SimpleCLI.option(z.string().optional(), {
       name: "params-file",
       help: "Path to a JSON params file",
-    }),
-    credentials: SimpleCLI.option(z.string().optional(), {
-      help: "Inline JSON credentials passed to ctx.credentials",
     }),
     tsconfig: SimpleCLI.option(z.string().optional(), {
       help: "Path to a tsconfig used for workflow module resolution",
@@ -794,13 +790,6 @@ export const runCommand = SimpleCLI.command({
     assertSessionAvailableForStart(ctx.session, ctx.logger);
 
     const params = resolveRunParams(input.params, input.paramsFile);
-    const rawCredentials = input.credentials
-      ? parseJsonArg("--credentials", input.credentials)
-      : undefined;
-    if (rawCredentials !== undefined && (typeof rawCredentials !== "object" || rawCredentials === null || Array.isArray(rawCredentials))) {
-      throw new Error("--credentials must be a JSON object (e.g., '{\"key\": \"value\"}').");
-    }
-    const credentials = rawCredentials as Record<string, unknown> | undefined;
     const headlessMode = input.headed
       ? false
       : input.headless
@@ -818,7 +807,6 @@ export const runCommand = SimpleCLI.command({
         workflowName: input.workflowName!,
         session: ctx.session,
         params,
-        credentials,
         tsconfigPath: input.tsconfig,
         headless: headlessMode ?? false,
         visualize,
