@@ -134,6 +134,10 @@ jobs:
         if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.libretto_npm_exists != 'true' || steps.state.outputs.create_npm_exists != 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright Chromium
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.libretto_npm_exists != 'true' || steps.state.outputs.create_npm_exists != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Verify release build
         if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.libretto_npm_exists != 'true' || steps.state.outputs.create_npm_exists != 'true'
         run: |
