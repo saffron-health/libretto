@@ -10,7 +10,9 @@
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "sync:mirrors": "node scripts/sync-mirrors.mjs",
+    "check:mirrors": "node scripts/check-mirrors-sync.mjs"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

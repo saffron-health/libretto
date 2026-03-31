@@ -13,6 +13,7 @@ EOF
 bump="${1:-patch}"
 package_json_path="packages/libretto/package.json"
 package_dir="packages/libretto"
+skill_path="packages/libretto/skills/libretto/SKILL.md"
 
 case "$bump" in
   patch|minor|major)
@@ -75,13 +76,19 @@ if git ls-remote --exit-code --heads origin "${branch_name}" >/dev/null 2>&1; th
   exit 1
 fi
 
+git checkout -b "$branch_name"
+
 (
   cd "$package_dir"
   npm version "$next_version" --no-git-tag-version >/dev/null
 )
 
-git checkout -b "$branch_name"
-git add "$package_json_path"
+node packages/dev-tools/scripts/set-libretto-skill-version.mjs "$next_version"
+
+pnpm sync:mirrors
+pnpm check:mirrors
+
+git add "$package_json_path" "$skill_path" README.md packages/libretto/README.md .agents/skills/libretto .claude/skills/libretto
 git commit -m "release: v${next_version}"
 git push -u origin "$branch_name"
 

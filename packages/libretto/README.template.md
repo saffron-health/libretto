@@ -1,5 +1,3 @@
-<!-- Generated from packages/libretto/README.template.md by `pnpm sync:mirrors`. Do not edit directly. -->
-
 # Libretto
 
 [![npm version](https://img.shields.io/npm/v/libretto)](https://www.npmjs.com/package/libretto)
@@ -150,13 +148,13 @@ pnpm test
 
 Source layout:
 
-- `src/cli/` — CLI commands
-- `src/runtime/` — browser runtime (network, recovery, downloads, extraction)
-- `src/shared/` — shared utilities (config, LLM client, logging, state)
-- `test/` — test files (`*.spec.ts`)
-- `README.template.md` — source of truth for the repo and package READMEs
-- `skills/libretto/` — source of truth for the Libretto skill
+- `{{LIBRETTO_PATH_PREFIX}}src/cli/` — CLI commands
+- `{{LIBRETTO_PATH_PREFIX}}src/runtime/` — browser runtime (network, recovery, downloads, extraction)
+- `{{LIBRETTO_PATH_PREFIX}}src/shared/` — shared utilities (config, LLM client, logging, state)
+- `{{LIBRETTO_PATH_PREFIX}}test/` — test files (`*.spec.ts`)
+- `{{LIBRETTO_PATH_PREFIX}}README.template.md` — source of truth for the repo and package READMEs
+- `{{LIBRETTO_PATH_PREFIX}}skills/libretto/` — source of truth for the Libretto skill
 
-Run `pnpm sync:mirrors` after editing `README.template.md` or anything under `skills/libretto/`. `pnpm i` also resyncs the skill mirrors through `postinstall`.
+Run `pnpm sync:mirrors` after editing `{{LIBRETTO_PATH_PREFIX}}README.template.md` or anything under `{{LIBRETTO_PATH_PREFIX}}skills/libretto/`. `pnpm i` also resyncs the skill mirrors through `postinstall`.
 
 To check that generated READMEs, skill mirrors, and skill version metadata are in sync without fixing them, run `pnpm check:mirrors`. To release, run `pnpm prepare-release`.

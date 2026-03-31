@@ -27,8 +27,8 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Check skill mirror parity
-        run: pnpm --filter libretto check:skills
+      - name: Check mirror parity
+        run: pnpm check:mirrors
 
       - name: Configure gcloud secret access for evaluator
         env:

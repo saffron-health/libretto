@@ -31,8 +31,10 @@
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",
-    "sync-skills": "node scripts/sync-skills.mjs",
-    "check:skills": "node scripts/check-skills-sync.mjs",
+    "sync:mirrors": "node ../dev-tools/scripts/sync-mirrors.mjs",
+    "check:mirrors": "node ../dev-tools/scripts/check-mirrors-sync.mjs",
+    "sync-skills": "pnpm run sync:mirrors",
+    "check:skills": "pnpm run check:mirrors",
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
     "test": "pnpm run build && vitest run",
