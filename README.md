@@ -148,10 +148,10 @@ pnpm test
 
 Source layout:
 
-- `src/cli/` — CLI commands
-- `src/runtime/` — browser runtime (network, recovery, downloads, extraction)
-- `src/shared/` — shared utilities (config, LLM client, logging, state)
-- `test/` — test files (`*.spec.ts`)
-- `skills/libretto/` — source of truth for the Libretto skill; mirrors are synced on `pnpm i`
+- `packages/libretto/src/cli/` — CLI commands
+- `packages/libretto/src/runtime/` — browser runtime (network, recovery, downloads, extraction)
+- `packages/libretto/src/shared/` — shared utilities (config, LLM client, logging, state)
+- `packages/libretto/test/` — test files (`*.spec.ts`)
+- `packages/libretto/skills/libretto/` — source of truth for the Libretto skill; mirrors are synced on `pnpm i`
 
 To check that skill mirrors are in sync without fixing them, run `pnpm check:skills`. To release, run `pnpm prepare-release`.
