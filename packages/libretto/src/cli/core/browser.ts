@@ -65,7 +65,7 @@ export function normalizeUrl(url: string): URL {
       parsedUrl.protocol !== "file:"
     ) {
       throw new Error(
-        `Unsupported URL protocol for open: ${parsedUrl.protocol}. Use http://, https://, or file://.`,
+        `Unsupported URL protocol: ${parsedUrl.protocol}. Use http://, https://, or file://.`,
       );
     }
     return parsedUrl;
