@@ -121,7 +121,7 @@ export const deployInput = SimpleCLI.input({
 });
 
 export const deployCommand = SimpleCLI.command({
-  description: "[experimental] Deploy workflows to the hosted platform",
+  description: "Deploy workflows to the hosted platform",
   experimental: true,
 })
   .input(deployInput)

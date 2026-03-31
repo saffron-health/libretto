@@ -9,15 +9,10 @@ import { SimpleCLI } from "./framework/simple-cli.js";
 
 export const cliRoutes = {
   ...browserCommands,
+  deploy: deployCommand,
   ...executionCommands,
   ...logCommands,
   ai: aiCommands,
-  cloud: SimpleCLI.group({
-    description: "Hosted Libretto Cloud commands",
-    routes: {
-      deploy: deployCommand,
-    },
-  }),
   init: initCommand,
   snapshot: snapshotCommand,
 };
