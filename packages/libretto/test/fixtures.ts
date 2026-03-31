@@ -17,17 +17,6 @@ type SpawnResult = {
   stderr: string;
 };
 
-type EvaluationResult = {
-  success: boolean;
-  reason: string;
-  cached: boolean;
-  model: string;
-};
-
-type EvaluateMatcher = {
-  toMatch: (assertion: string) => Promise<EvaluationResult>;
-};
-
 type CliFixtures = {
   workspaceDir: string;
   workspacePath: (...parts: string[]) => string;
@@ -37,7 +26,6 @@ type CliFixtures = {
     env?: Record<string, string>,
     stdinText?: string,
   ) => Promise<SpawnResult>;
-  evaluate: (actual: string) => EvaluateMatcher;
   writeWorkflow: (
     fileName: string,
     source: string,
@@ -59,7 +47,6 @@ const cliEntry = resolve(packageRoot, "dist/cli/index.js");
 const librettoEntry = resolve(packageRoot, "dist/index.js");
 const librettoRuntimePath = new URL("../dist/index.js", import.meta.url).href;
 const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-test-workspaces");
-const EVALUATE_MODEL = "local-evaluate-v1";
 
 let didBuild = false;
 
@@ -187,347 +174,18 @@ function workflowImportHeader(imports?: string[]): string {
   return `import { ${names.join(", ")} } from "${librettoRuntimePath}";\n\n`;
 }
 
-function stableEvaluateHash(input: string): string {
+function stableHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
 function workspaceDirForTask(
   task: Readonly<{ fullName: string; file: { filepath: string } }>,
 ): string {
-  const stableId = stableEvaluateHash(
-    `${task.file.filepath}::${task.fullName}`,
-  ).slice(0, 16);
+  const stableId = stableHash(`${task.file.filepath}::${task.fullName}`).slice(
+    0,
+    16,
+  );
   return join(DETERMINISTIC_WORKSPACE_ROOT, stableId);
-}
-
-type EvaluateCheck = (actual: string, match: RegExpMatchArray) => string | null;
-
-type EvaluateRule = {
-  pattern: RegExp;
-  check: EvaluateCheck;
-};
-
-function normalizeOutput(actual: string): string {
-  return actual.replace(/\r\n/g, "\n");
-}
-
-function requireIncludes(
-  actual: string,
-  expected: string,
-  label = expected,
-): string | null {
-  return actual.includes(expected)
-    ? null
-    : `Missing ${label}.\nActual output:\n${actual}`;
-}
-
-function requireRegex(
-  actual: string,
-  pattern: RegExp,
-  label: string,
-): string | null {
-  return pattern.test(actual)
-    ? null
-    : `Missing ${label}.\nActual output:\n${actual}`;
-}
-
-function runChecks(
-  actual: string,
-  ...checks: Array<string | null>
-): string | null {
-  return checks.find((check): check is string => check !== null) ?? null;
-}
-
-const EVALUATE_RULES: readonly EvaluateRule[] = [
-  {
-    pattern:
-      /^Shows the root CLI help with top-level command usage and includes the snapshot command description\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "Usage: libretto <command>"),
-        requireIncludes(actual, "snapshot"),
-        requireIncludes(actual, "Capture PNG + HTML"),
-      ),
-  },
-  {
-    pattern: /^Shows the root CLI help with the top-level commands list\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "Usage: libretto <command>"),
-        requireIncludes(actual, "Commands:"),
-        requireIncludes(actual, "open"),
-        requireIncludes(actual, "ai"),
-      ),
-  },
-  {
-    pattern:
-      /^Confirms the browser opened successfully for example\.com(?:.*)\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "Browser open"),
-        requireIncludes(actual, "example.com"),
-      ),
-  },
-  {
-    pattern: /^Lists the currently open page for example\.com\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "Open pages:"),
-        requireIncludes(actual, "example.com"),
-      ),
-  },
-  {
-    pattern: /^Reports that the browser for session "([^"]+)" was closed\.$/,
-    check: (actual, match) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "Browser closed"),
-        requireIncludes(actual, match[1]!),
-      ),
-  },
-  {
-    pattern:
-      /^Shows usage for exec command requiring code with optional session and visualize flags\.$/,
-    check: (actual) =>
-      requireIncludes(
-        actual,
-        "Usage: libretto exec <code|-> [--session <name>] [--visualize]",
-      ),
-  },
-  {
-    pattern:
-      /^Explains that the integration file does not exist and mentions the integration\.ts path\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "Integration file does not exist:"),
-        requireIncludes(actual, "integration.ts"),
-      ),
-  },
-  {
-    pattern: /^Reports that --params contained invalid JSON\.$/,
-    check: (actual) => requireIncludes(actual, "Invalid JSON in --params:"),
-  },
-  {
-    pattern:
-      /^Reports that the provided session name is invalid and only allows letters, numbers, dots, underscores, and dashes\.$/,
-    check: (actual) =>
-      requireIncludes(
-        actual,
-        "Invalid session name. Use only letters, numbers, dots, underscores, and dashes.",
-      ),
-  },
-  {
-    pattern: /^Reports that --params-file contained invalid JSON\.$/,
-    check: (actual) =>
-      requireIncludes(actual, "Invalid JSON in --params-file:"),
-  },
-  {
-    pattern: /^Includes TSCONFIG_ALIAS_OK and Integration completed\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "TSCONFIG_ALIAS_OK"),
-        requireIncludes(actual, "Integration completed."),
-      ),
-  },
-  {
-    pattern:
-      /^Reports that importing the integration module failed because of a TypeScript compilation error and includes guidance to pass --tsconfig <path>\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "--tsconfig <path>"),
-        requireRegex(
-          actual,
-          /(failed|error|transform)/i,
-          "a compilation failure",
-        ),
-      ),
-  },
-  {
-    pattern: /^Reports that --session is missing its required value\.$/,
-    check: (actual) => requireIncludes(actual, "Missing value for --session."),
-  },
-  {
-    pattern: /^Explains that no AI config is currently set\.$/,
-    check: (actual) => requireIncludes(actual, "No AI config set."),
-  },
-  {
-    pattern: /^Confirms the AI config was saved\.$/,
-    check: (actual) => requireIncludes(actual, "AI config saved."),
-  },
-  {
-    pattern: /^Shows that the configured AI preset is codex\.$/,
-    check: (actual) => requireIncludes(actual, "AI preset: codex"),
-  },
-  {
-    pattern: /^Confirms the AI config was cleared\.$/,
-    check: (actual) => requireIncludes(actual, "Cleared AI config:"),
-  },
-  {
-    pattern: /^Shows that the configured AI preset is gemini\.$/,
-    check: (actual) => requireIncludes(actual, "AI preset: gemini"),
-  },
-  {
-    pattern:
-      /^Shows that the AI preset is codex and includes the custom command prefix "(.+)"\.$/,
-    check: (actual, match) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "AI preset: codex"),
-        requireIncludes(actual, `Command prefix: ${match[1]!}`),
-      ),
-  },
-  {
-    pattern:
-      /^Includes an interpretation and the answer (snapshot-ok-[^.]+)\.$/,
-    check: (actual, match) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "Interpretation:"),
-        requireIncludes(actual, `Answer: ${match[1]!}`),
-      ),
-  },
-  {
-    pattern: /^Shows at least one network request result for the session\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "example.com/?network=one"),
-        requireIncludes(actual, "request(s) shown."),
-      ),
-  },
-  {
-    pattern: /^Shows at least one action result for the session\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "[AGENT]"),
-        requireRegex(actual, /(reload|goto)/, "reload or goto action"),
-        requireIncludes(actual, "action(s) shown."),
-      ),
-  },
-  {
-    pattern:
-      /^Explains that session "([^"]+)" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session ([^".]+)\.$/,
-    check: (actual, match) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, `No session "${match[1]!}" found.`),
-        requireIncludes(actual, "No active sessions."),
-        requireIncludes(actual, `libretto open <url> --session ${match[2]!}`),
-      ),
-  },
-  {
-    pattern:
-      /^Lists one open page for example\.com and includes its page id\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "Open pages:"),
-        requireIncludes(actual, "example.com"),
-        requireRegex(actual, /id=[^\s]+ url=/, "a page id"),
-      ),
-  },
-  {
-    pattern:
-      /^Lists both the example\.com page and the data:text\/html,multi-page-secondary page, each with page ids\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "example.com"),
-        requireIncludes(actual, "data:text/html,multi-page-secondary"),
-        requireRegex(actual, /id=[^\s]+ url=/, "page ids"),
-      ),
-  },
-  {
-    pattern:
-      /^Explains that multiple pages are open in session "([^"]+)" and tells the user to pass --page <id> to target one page\.$/,
-    check: (actual, match) =>
-      runChecks(
-        actual,
-        requireIncludes(
-          actual,
-          `Multiple pages are open in session "${match[1]!}".`,
-        ),
-        requireIncludes(actual, "Pass --page <id> to target a page"),
-      ),
-  },
-  {
-    pattern:
-      /^Explains that page id "([^"]+)" was not found in session "([^"]+)"\.$/,
-    check: (actual, match) =>
-      requireIncludes(
-        actual,
-        `Page "${match[1]!}" was not found in session "${match[2]!}".`,
-      ),
-  },
-  {
-    pattern:
-      /^Explains that session "([^"]+)" is already open and suggests closing it or using a different session name\.$/,
-    check: (actual, match) =>
-      runChecks(
-        actual,
-        requireIncludes(
-          actual,
-          `Session "${match[1]!}" is already open and connected to`,
-        ),
-        requireIncludes(actual, `libretto close --session ${match[1]!}`),
-      ),
-  },
-  {
-    pattern:
-      /^Includes AUTO_SESSION_RUN_OK and confirms the integration completed successfully\.$/,
-    check: (actual) =>
-      runChecks(
-        actual,
-        requireIncludes(actual, "AUTO_SESSION_RUN_OK"),
-        requireIncludes(actual, "Integration completed."),
-      ),
-  },
-  {
-    pattern:
-      /^Explains that session "([^"]+)" is already open and suggests closing it or choosing another session\.$/,
-    check: (actual, match) =>
-      runChecks(
-        actual,
-        requireIncludes(
-          actual,
-          `Session "${match[1]!}" is already open and connected to`,
-        ),
-        requireIncludes(actual, `libretto close --session ${match[1]!}`),
-      ),
-  },
-];
-
-async function evaluateTextMatch(opts: {
-  actual: string;
-  assertion: string;
-}): Promise<EvaluationResult> {
-  const actual = normalizeOutput(opts.actual);
-  for (const rule of EVALUATE_RULES) {
-    const match = opts.assertion.match(rule.pattern);
-    if (!match) continue;
-    const failureReason = rule.check(actual, match);
-    return {
-      success: failureReason === null,
-      reason: failureReason ?? "Matched local evaluate rule.",
-      cached: false,
-      model: EVALUATE_MODEL,
-    };
-  }
-
-  return {
-    success: false,
-    reason: `No local evaluate rule matched assertion: ${opts.assertion}`,
-    cached: false,
-    model: EVALUATE_MODEL,
-  };
 }
 
 function isPidRunning(pid: number): boolean {
@@ -648,21 +306,6 @@ export const test = base.extend<CliFixtures>({
         );
       },
     );
-  },
-
-  evaluate: async ({}, use) => {
-    await use((actual: string) => ({
-      async toMatch(assertion: string): Promise<EvaluationResult> {
-        const result = await evaluateTextMatch({
-          actual,
-          assertion,
-        });
-        if (!result.success) {
-          throw new Error(result.reason);
-        }
-        return result;
-      },
-    }));
   },
 
   writeWorkflow: async ({ workspaceDir }, use) => {
