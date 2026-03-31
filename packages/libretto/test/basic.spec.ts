@@ -1,8 +1,12 @@
-import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
+
+const librettoPackageJsonPath = fileURLToPath(
+  new URL("../package.json", import.meta.url),
+);
 
 function extractReturnedSessionId(output: string): string | null {
   const patterns = [
@@ -33,79 +37,58 @@ function requireReturnedSessionId(
   return sessionId;
 }
 
+async function installFakeNpm(
+  workspacePath: (...parts: string[]) => string,
+): Promise<{
+  argsPath: string;
+  binDir: string;
+}> {
+  const binDir = workspacePath(".fake-bin");
+  const argsPath = workspacePath(".fake-bin", "npm-args.json");
+  const npmPath = join(binDir, "npm");
+
+  await mkdir(binDir, { recursive: true });
+  await writeFile(
+    npmPath,
+    `#!/usr/bin/env node
+import { writeFileSync } from "node:fs";
+writeFileSync(${JSON.stringify(argsPath)}, JSON.stringify(process.argv.slice(2), null, 2));
+console.log("fake npm ok");
+`,
+    "utf8",
+  );
+  await chmod(npmPath, 0o755);
+
+  return { argsPath, binDir };
+}
+
 describe("basic CLI subprocess behavior", () => {
-  test("init explains snapshot API env setup when no credentials are configured", async ({
-    librettoCli,
-  }) => {
-    const result = await librettoCli("init --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "",
-      ANTHROPIC_API_KEY: "",
-      GEMINI_API_KEY: "",
-      GOOGLE_GENERATIVE_AI_API_KEY: "",
-      GOOGLE_CLOUD_PROJECT: "",
-      GCLOUD_PROJECT: "",
-    });
-
-    expect(result.stdout).toContain("Snapshot analysis:");
-    expect(result.stdout).toContain("No snapshot API credentials detected.");
-    expect(result.stdout).toContain("OPENAI_API_KEY=...");
-    expect(result.stdout).toContain("ANTHROPIC_API_KEY=...");
-    expect(result.stdout).toContain("GEMINI_API_KEY=...");
-  });
-
-  test("init reports when snapshot API credentials are already ready", async ({
-    librettoCli,
-  }) => {
-    const result = await librettoCli("init --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "test-openai-key",
-    });
-
-    expect(result.stdout).toContain("Snapshot analysis:");
-    expect(result.stdout).toContain("Ready: openai/gpt-5.4");
-    expect(result.stdout).toContain("No further action required.");
-  });
-
-  test("init copies skill files without confirmation when agent dirs exist", async ({
+  test("setup shells out to npm init libretto@<installed-version>", async ({
     librettoCli,
     workspacePath,
   }) => {
-    await mkdir(workspacePath(".agents", "skills", "libretto"), {
-      recursive: true,
+    const { argsPath, binDir } = await installFakeNpm(workspacePath);
+    const expectedVersion = JSON.parse(
+      await readFile(librettoPackageJsonPath, "utf8"),
+    ).version as string;
+
+    const result = await librettoCli("setup --skip-browsers", {
+      PATH: `${binDir}:${process.env.PATH ?? ""}`,
     });
-    await mkdir(workspacePath(".claude"), { recursive: true });
-    await writeFile(
-      workspacePath(".agents", "skills", "libretto", "stale.txt"),
-      "stale",
-      "utf8",
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain(
+      `Re-running Libretto setup via: npm init libretto@${expectedVersion} -- --skip-browsers`,
     );
-
-    const result = await librettoCli("init --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "",
-      ANTHROPIC_API_KEY: "",
-      GEMINI_API_KEY: "",
-      GOOGLE_GENERATIVE_AI_API_KEY: "",
-      GOOGLE_CLOUD_PROJECT: "",
-      GCLOUD_PROJECT: "",
-    });
-
-    expect(result.stdout).toContain(".agents/skills/libretto/");
-    expect(result.stdout).toContain(".claude/skills/libretto/");
-    await expect(
-      readFile(workspacePath(".agents", "skills", "libretto", "SKILL.md"), {
-        encoding: "utf8",
-      }),
-    ).resolves.toContain("name: libretto");
-    await expect(
-      readFile(workspacePath(".claude", "skills", "libretto", "SKILL.md"), {
-        encoding: "utf8",
-      }),
-    ).resolves.toContain("name: libretto");
-    expect(
-      existsSync(workspacePath(".agents", "skills", "libretto", "stale.txt")),
-    ).toBe(false);
+    expect(result.stdout).toContain("fake npm ok");
+    await expect(readFile(argsPath, "utf8")).resolves.toBe(
+      JSON.stringify(
+        ["init", `libretto@${expectedVersion}`, "--", "--skip-browsers"],
+        null,
+        2,
+      ),
+    );
   });
 
   test("prints usage for --help", async ({ librettoCli, evaluate }) => {
@@ -176,6 +159,37 @@ describe("basic CLI subprocess behavior", () => {
       "Ensure Node.js is available in PATH for child processes.",
     );
     expect(result.stderr).toContain("Check logs:");
+  });
+
+  test("does not warn before open when an agent root exists without a skills dir", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".agents"), { recursive: true });
+
+    const result = await librettoCli("open https://example.com", {
+      PATH: "/definitely-not-real",
+    });
+
+    expect(result.stderr).not.toContain("Warning: Libretto setup looks stale.");
+    expect(result.stderr).not.toContain("Missing .agents/skills/libretto/.");
+    expect(result.stderr).toContain("Failed to launch browser child process:");
+  });
+
+  test("warns before open when libretto skill is missing from an existing skills dir", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".agents", "skills"), { recursive: true });
+
+    const result = await librettoCli("open https://example.com", {
+      PATH: "/definitely-not-real",
+    });
+
+    expect(result.stderr).toContain("Warning: Libretto setup looks stale.");
+    expect(result.stderr).toContain("Missing .agents/skills/libretto/.");
+    expect(result.stderr).toContain("Run: npx libretto setup");
+    expect(result.stderr).toContain("Failed to launch browser child process:");
   });
 
   test("defaults sessioned browser commands to the default session", async ({

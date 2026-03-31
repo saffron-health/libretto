@@ -33,11 +33,20 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          package_name="$(node -p "require('./packages/libretto/package.json').name")"
-          version="$(node -p "require('./packages/libretto/package.json').version")"
-          echo "package_name=${package_name}" >> "$GITHUB_OUTPUT"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+          libretto_package_name="$(node -p "require('./packages/libretto/package.json').name")"
+          create_package_name="$(node -p "require('./packages/create-libretto/package.json').name")"
+          libretto_version="$(node -p "require('./packages/libretto/package.json').version")"
+          create_version="$(node -p "require('./packages/create-libretto/package.json').version")"
+
+          if [ "$libretto_version" != "$create_version" ]; then
+            echo "libretto version ($libretto_version) does not match create-libretto version ($create_version)" >&2
+            exit 1
+          fi
+
+          echo "libretto_package_name=${libretto_package_name}" >> "$GITHUB_OUTPUT"
+          echo "create_package_name=${create_package_name}" >> "$GITHUB_OUTPUT"
+          echo "version=${libretto_version}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${libretto_version}" >> "$GITHUB_OUTPUT"
 
       - name: Check release state
         id: state
@@ -47,26 +56,32 @@ jobs:
           set -euo pipefail
 
           release_exists=false
-          npm_exists=false
+          libretto_npm_exists=false
+          create_npm_exists=false
 
           if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
             release_exists=true
           fi
 
-          if npm view "${{ steps.version.outputs.package_name }}@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
-            npm_exists=true
+          if npm view "${{ steps.version.outputs.libretto_package_name }}@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
+            libretto_npm_exists=true
+          fi
+
+          if npm view "${{ steps.version.outputs.create_package_name }}@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
+            create_npm_exists=true
           fi
 
           echo "release_exists=${release_exists}" >> "$GITHUB_OUTPUT"
-          echo "npm_exists=${npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "libretto_npm_exists=${libretto_npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "create_npm_exists=${create_npm_exists}" >> "$GITHUB_OUTPUT"
 
       - name: Skip already published version
-        if: steps.state.outputs.release_exists == 'true' && steps.state.outputs.npm_exists == 'true'
+        if: steps.state.outputs.release_exists == 'true' && steps.state.outputs.libretto_npm_exists == 'true' && steps.state.outputs.create_npm_exists == 'true'
         run: |
           echo "Version ${{ steps.version.outputs.version }} is already published to npm and GitHub."
 
       - name: Configure gcloud secret access for evaluator
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.libretto_npm_exists != 'true' || steps.state.outputs.create_npm_exists != 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -107,7 +122,7 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       - name: Restore evaluator cache
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.libretto_npm_exists != 'true' || steps.state.outputs.create_npm_exists != 'true'
         uses: actions/cache@v4
         with:
           path: temp/libretto-cli-evaluate-cache
@@ -116,23 +131,26 @@ jobs:
             libretto-evaluate-cache-${{ runner.os }}-
 
       - name: Install dependencies
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.libretto_npm_exists != 'true' || steps.state.outputs.create_npm_exists != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Verify release build
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.libretto_npm_exists != 'true' || steps.state.outputs.create_npm_exists != 'true'
         run: |
+          pnpm check:mirrors
+          pnpm --filter create-libretto type-check
           pnpm --filter libretto type-check
           pnpm --filter libretto test
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       release_exists: ${{ steps.state.outputs.release_exists }}
-      npm_exists: ${{ steps.state.outputs.npm_exists }}
+      libretto_npm_exists: ${{ steps.state.outputs.libretto_npm_exists }}
+      create_npm_exists: ${{ steps.state.outputs.create_npm_exists }}
 
   release:
     needs: verify
-    if: needs.verify.outputs.release_exists != 'true' || needs.verify.outputs.npm_exists != 'true'
+    if: needs.verify.outputs.release_exists != 'true' || needs.verify.outputs.libretto_npm_exists != 'true' || needs.verify.outputs.create_npm_exists != 'true'
     runs-on: ubuntu-latest
     environment:
       name: release
@@ -160,9 +178,14 @@ jobs:
       - name: Build publish artifacts
         run: pnpm --filter libretto build
 
-      - name: Publish to npm with trusted publishing
-        if: needs.verify.outputs.npm_exists != 'true'
+      - name: Publish libretto to npm with trusted publishing
+        if: needs.verify.outputs.libretto_npm_exists != 'true'
         working-directory: packages/libretto
+        run: npm publish --access public
+
+      - name: Publish create-libretto to npm with trusted publishing
+        if: needs.verify.outputs.create_npm_exists != 'true'
+        working-directory: packages/create-libretto
         run: npm publish --access public
 
       - name: Generate changelog

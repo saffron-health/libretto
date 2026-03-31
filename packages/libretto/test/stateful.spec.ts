@@ -146,7 +146,7 @@ describe("state-driven CLI subprocess behavior", () => {
       "Failed to analyze snapshot because no snapshot analyzer is configured.",
     );
     expect(snapshot.stderr).toContain(
-      "For more info, run `npx libretto init`.",
+      "For more info, run `npx libretto setup`.",
     );
     expect(
       existsSync(workspacePath(".libretto", "sessions", session, "snapshots")),

@@ -2,7 +2,7 @@
 
 ## For people
 
-1. From the repository root, run `pnpm prepare-release patch` (or `minor`/`major`). This pulls `main`, runs tests, bumps `packages/libretto/package.json`, and opens a release PR.
+1. From the repository root, run `pnpm prepare-release patch` (or `minor`/`major`). This pulls `main`, runs tests, bumps `packages/libretto/package.json` and `packages/create-libretto/package.json`, updates the Libretto skill metadata version, and opens a release PR.
 2. Wait for CI and evals to finish on the PR. Review the eval summary comment.
 3. Merge the PR. GitHub Actions will automatically publish to npm and create the GitHub release.
 
@@ -28,7 +28,7 @@ GitHub Actions needs these repository secrets:
 
 The release workflow uses a GitHub Actions environment named `release`. Create that environment in the repository settings (no required reviewers — access is controlled by branch protection on `main` instead).
 
-On npm, configure `libretto` to trust this repository and workflow for publishing. The trusted publisher fields should match:
+On npm, configure both `libretto` and `create-libretto` to trust this repository and workflow for publishing. The trusted publisher fields should match:
 
 - Organization or user: `saffron-health`
 - Repository: `libretto`
@@ -39,6 +39,7 @@ If you prefer the CLI, the setup command is:
 
 ```bash
 npm trust github libretto --repo saffron-health/libretto --file release.yml --env release
+npm trust github create-libretto --repo saffron-health/libretto --file release.yml --env release
 ```
 
 Trusted publishing only works on supported cloud-hosted runners. This workflow uses `ubuntu-latest`, which satisfies that requirement. npm also requires a recent toolchain for trusted publishing, so the publish job runs on Node 24.
@@ -63,11 +64,12 @@ The root `scripts/prepare-release.sh` script does the following:
 
 1. Checks that the working tree is clean.
 2. Updates local `main` from `origin/main`.
-3. Runs `pnpm install --frozen-lockfile`, `pnpm --filter libretto type-check`, and `pnpm --filter libretto test`.
-4. Bumps the version in `packages/libretto/package.json`.
-5. Creates a release branch.
-6. Commits the version bump.
-7. Pushes the branch and opens a PR to `main` with the `release` label.
+3. Runs `pnpm install --frozen-lockfile`, `pnpm check:mirrors`, `pnpm --filter create-libretto type-check`, `pnpm --filter libretto type-check`, and `pnpm --filter libretto test`.
+4. Bumps the version in `packages/libretto/package.json` and `packages/create-libretto/package.json`.
+5. Updates `packages/libretto/skills/libretto/SKILL.md` and resyncs the mirrored skill copies and generated READMEs.
+6. Creates a release branch.
+7. Commits the version bump.
+8. Pushes the branch and opens a PR to `main` with the `release` label.
 
 Release PRs also run the eval workflow. That workflow compares the current eval score against the latest successful `main` baseline and fails if the score drifts by more than 5 percentage points in either direction.
 
@@ -77,11 +79,12 @@ After the release PR merges, `.github/workflows/release.yml` runs on `main`.
 
 The workflow:
 
-1. Reads the version from `packages/libretto/package.json`.
-2. Checks whether that version already exists on npm and in GitHub Releases.
-3. Runs install, type-check, and tests for the `libretto` package in a verification job.
+1. Reads the version from `packages/libretto/package.json` and verifies it matches `packages/create-libretto/package.json`.
+2. Checks whether that version already exists on npm for both `libretto` and `create-libretto`, and whether the GitHub release already exists.
+3. Runs install, mirror parity checks, `create-libretto` type-check, and `libretto` type-check and tests in a verification job.
 4. Publishes `libretto@X.Y.Z` to npm from `packages/libretto` with trusted publishing if it is not already published.
-5. Creates GitHub release `vX.Y.Z` with generated release notes if it does not already exist.
+5. Publishes `create-libretto@X.Y.Z` to npm from `packages/create-libretto` with trusted publishing if it is not already published.
+6. Creates GitHub release `vX.Y.Z` with generated release notes if it does not already exist.
 
 This makes the workflow safe to re-run after partial failures. For example, if npm publish succeeds but GitHub release creation fails, a re-run will skip npm and only create the missing release.
 

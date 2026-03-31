@@ -1,0 +1,32 @@
+{
+  "name": "create-libretto",
+  "version": "0.5.2",
+  "description": "Bootstrap Libretto into an existing project",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saffron-health/libretto"
+  },
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "bin": {
+    "create-libretto": "./dist/bin/create-libretto.js"
+  },
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "type-check": "tsc --noEmit",
+    "prepack": "pnpm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}

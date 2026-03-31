@@ -8,6 +8,7 @@ Options:
   --session <name>        Use a named session (auto-generated for open/run if omitted)
 
 Examples:
+  libretto setup
   libretto open https://linkedin.com
 
   # ... manually log in ...

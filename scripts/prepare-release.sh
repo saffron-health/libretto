@@ -5,14 +5,15 @@ usage() {
   cat <<'EOF'
 Usage: scripts/prepare-release.sh [patch|minor|major]
 
-Creates a release PR branch from main, bumps packages/libretto/package.json,
-pushes the branch, and opens a pull request targeting main.
+Creates a release PR branch from main, bumps the Libretto package versions,
+updates the skill metadata version, pushes the branch, and opens a pull
+request targeting main.
 EOF
 }
 
 bump="${1:-patch}"
-package_json_path="packages/libretto/package.json"
-package_dir="packages/libretto"
+libretto_package_json_path="packages/libretto/package.json"
+create_package_json_path="packages/create-libretto/package.json"
 skill_path="packages/libretto/skills/libretto/SKILL.md"
 
 case "$bump" in
@@ -49,10 +50,12 @@ git checkout main
 git pull --ff-only origin main
 
 pnpm install --frozen-lockfile
+pnpm check:mirrors
+pnpm --filter create-libretto type-check
 pnpm --filter libretto type-check
 pnpm --filter libretto test
 
-current_version="$(node -p "require('./${package_json_path}').version")"
+current_version="$(node -p "require('./${libretto_package_json_path}').version")"
 next_version="$(node -e '
 const [major, minor, patch] = process.argv[1].split(".").map(Number)
 const bump = process.argv[2]
@@ -78,17 +81,26 @@ fi
 
 git checkout -b "$branch_name"
 
-(
-  cd "$package_dir"
-  npm version "$next_version" --no-git-tag-version >/dev/null
-)
+for package_dir in "packages/libretto" "packages/create-libretto"; do
+  (
+    cd "$package_dir"
+    npm version "$next_version" --no-git-tag-version >/dev/null
+  )
+done
 
 node packages/dev-tools/scripts/set-libretto-skill-version.mjs "$next_version"
 
 pnpm sync:mirrors
 pnpm check:mirrors
 
-git add "$package_json_path" "$skill_path" README.md packages/libretto/README.md .agents/skills/libretto .claude/skills/libretto
+git add \
+  "$libretto_package_json_path" \
+  "$create_package_json_path" \
+  "$skill_path" \
+  README.md \
+  packages/libretto/README.md \
+  .agents/skills/libretto \
+  .claude/skills/libretto
 git commit -m "release: v${next_version}"
 git push -u origin "$branch_name"
 
@@ -101,9 +113,12 @@ gh pr create \
 ## Summary
 
 - release libretto v${next_version}
+- release create-libretto v${next_version}
 
 ## Verification
 
+- pnpm check:mirrors
+- pnpm --filter create-libretto type-check
 - pnpm --filter libretto type-check
 - pnpm --filter libretto test
 EOF

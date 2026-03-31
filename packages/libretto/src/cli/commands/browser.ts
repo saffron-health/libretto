@@ -12,6 +12,7 @@ import {
   assertSessionAvailableForStart,
   validateSessionName,
 } from "../core/session.js";
+import { warnIfSetupAuditIssues } from "../core/setup-audit.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   sessionOption,
@@ -72,6 +73,7 @@ export const openCommand = SimpleCLI.command({
   .input(openInput)
   .use(withAutoSession())
   .handle(async ({ input, ctx }) => {
+    warnIfSetupAuditIssues();
     assertSessionAvailableForStart(ctx.session, ctx.logger);
     const headed = input.headed || !input.headless;
     const viewport = parseViewportArg(input.viewport);
@@ -98,6 +100,7 @@ export const connectCommand = SimpleCLI.command({
   .input(connectInput)
   .use(withAutoSession())
   .handle(async ({ input, ctx }) => {
+    warnIfSetupAuditIssues();
     await runConnectWithLogger(input.cdpUrl!, ctx.session, ctx.logger);
   });
 

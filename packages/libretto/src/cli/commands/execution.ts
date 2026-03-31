@@ -19,6 +19,7 @@ import {
   setSessionStatus,
   type SessionState,
 } from "../core/session.js";
+import { warnIfSetupAuditIssues } from "../core/setup-audit.js";
 import {
   readActionLog,
   readNetworkLog,
@@ -788,6 +789,7 @@ export const runCommand = SimpleCLI.command({
   .input(runInput)
   .use(withAutoSession())
   .handle(async ({ input, ctx }) => {
+    warnIfSetupAuditIssues();
     await stopExistingFailedRunSession(ctx.session, ctx.logger);
     assertSessionAvailableForStart(ctx.session, ctx.logger);
 

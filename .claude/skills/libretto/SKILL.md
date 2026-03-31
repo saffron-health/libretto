@@ -21,7 +21,8 @@ metadata:
 
 ## Setup
 
-- Use `npx libretto init` for first-time workspace setup (sets up config file and snapshot command).
+- Use `npm init libretto@latest` from the repo root for first-time workspace setup and upgrades. This installs `libretto`, refreshes the Libretto skill, downloads Chromium, and configures snapshot analysis. `npm create libretto@latest` is equivalent.
+- Use `npx libretto setup` any time you need to rerun setup without upgrading `libretto`, such as after adding `.agents` or `.claude`, or changing browser or snapshot configuration.
 - If credentials are already available, `npx libretto ai configure openai|anthropic|gemini|vertex` is usually enough.
 
 ## Working Rules
