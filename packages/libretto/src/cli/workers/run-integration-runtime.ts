@@ -261,8 +261,6 @@ async function runIntegrationInternal(
     session: args.session,
     logger: integrationLogger,
     page: browserSession.page,
-    services: {},
-    credentials: args.credentials,
   };
 
   try {

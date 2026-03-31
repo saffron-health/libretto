@@ -114,6 +114,8 @@ describe("basic CLI subprocess behavior", () => {
     await evaluate(result.stdout).toMatch(
       "Shows the root CLI help with top-level command usage and includes the snapshot command description.",
     );
+    expect(result.stdout).not.toContain("cloud <subcommand>");
+    expect(result.stdout).toContain("experimental <subcommand>");
     expect(result.stderr).toBe("");
   });
 
@@ -133,6 +135,16 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain(
       "Usage: libretto ai configure [preset] [options]",
     );
+    expect(result.stderr).toBe("");
+  });
+
+  test("prints experimental group help with deploy listed under the new namespace", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("help experimental");
+    expect(result.stdout).toContain("Experimental commands");
+    expect(result.stdout).toContain("Usage: libretto experimental <subcommand>");
+    expect(result.stdout).toContain("deploy");
     expect(result.stderr).toBe("");
   });
 
