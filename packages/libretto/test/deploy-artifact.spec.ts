@@ -209,7 +209,7 @@ describe("createHostedDeployPackage", () => {
     const implementation = extractBundledImplementation(bundle);
 
     expect(deployManifest.dependencies).toEqual({
-      libretto: "0.5.3-experimental.6",
+      libretto: "0.5.3",
       lodash: "^4.17.21",
     });
     expect(bundle).toContain('export const testWorkflow = createWorkflowProxy("testWorkflow");');
