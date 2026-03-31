@@ -3,34 +3,31 @@ import type { MinimalLogger } from "../logger/logger.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
-export type LibrettoWorkflowContext<S = {}> = {
+export type LibrettoWorkflowContext = {
   session: string;
   page: Page;
   logger: MinimalLogger;
-  services: S;
-  credentials?: Record<string, unknown>;
 };
 
-export type LibrettoWorkflowHandler<
-  Input = unknown,
-  Output = unknown,
-  S = {},
-> = (ctx: LibrettoWorkflowContext<S>, input: Input) => Promise<Output>;
+export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
+  ctx: LibrettoWorkflowContext,
+  input: Input,
+) => Promise<Output>;
 
-export class LibrettoWorkflow<Input = unknown, Output = unknown, S = {}> {
+export class LibrettoWorkflow<Input = unknown, Output = unknown> {
   public readonly [LIBRETTO_WORKFLOW_BRAND] = true;
   public readonly name: string;
-  private readonly handler: LibrettoWorkflowHandler<Input, Output, S>;
+  private readonly handler: LibrettoWorkflowHandler<Input, Output>;
 
   constructor(
     name: string,
-    handler: LibrettoWorkflowHandler<Input, Output, S>,
+    handler: LibrettoWorkflowHandler<Input, Output>,
   ) {
     this.name = name;
     this.handler = handler;
   }
 
-  async run(ctx: LibrettoWorkflowContext<S>, input: Input): Promise<Output> {
+  async run(ctx: LibrettoWorkflowContext, input: Input): Promise<Output> {
     return this.handler(ctx, input);
   }
 }
@@ -114,9 +111,9 @@ export function getWorkflowFromModuleExports(
   return null;
 }
 
-export function workflow<Input = unknown, Output = unknown, S = {}>(
+export function workflow<Input = unknown, Output = unknown>(
   name: string,
-  handler: LibrettoWorkflowHandler<Input, Output, S>,
-): LibrettoWorkflow<Input, Output, S> {
+  handler: LibrettoWorkflowHandler<Input, Output>,
+): LibrettoWorkflow<Input, Output> {
   return new LibrettoWorkflow(name, handler);
 }

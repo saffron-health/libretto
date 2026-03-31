@@ -40,47 +40,11 @@ Key points:
 
 - `workflow(name, handler)` takes a unique workflow name and returns the workflow object that Libretto can run.
 - `npx libretto run ./file.ts myWorkflow` resolves `myWorkflow` from the workflows exported by `./file.ts`, so export or re-export the workflow from that file directly or through a `workflows` object, and make sure the run argument matches the name passed to `workflow("myWorkflow", ...)`.
-- `ctx` provides `session`, `page`, `logger`, and `services` (generic, default `{}`)
+- `ctx` provides `session`, `page`, and `logger`
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.
 - After validation is complete and the workflow is confirmed working end to end, remove all `pause()` calls and pause-only workflow params unless the user explicitly says to keep them.
 - The browser is launched and closed automatically by the CLI. Do not launch or close it in the handler.
-
-## Passing Application Dependencies via Services
-
-Use the third generic on `workflow<Input, Output, Services>` to inject
-dependencies that exist in your application but not in libretto's runtime
-(DB transactions, API clients, caches, etc.):
-
-```typescript
-import { type Transaction } from "./db";
-
-type MyServices = { tx?: Transaction };
-
-export const myWorkflow = workflow<Input, Output, MyServices>(
-  "myWorkflow",
-  async (ctx, input) => {
-    if (ctx.services.tx) {
-      await ctx.services.tx.insert(/* ... */);
-    } else {
-      ctx.logger.info("No DB transaction — skipping write");
-    }
-    // ... browser automation ...
-  },
-);
-```
-
-In production, the caller passes services when invoking `.run()`:
-
-```typescript
-await myWorkflow.run(
-  { session: "debug-flow", page, logger, services: { tx } },
-  input,
-);
-```
-
-When running standalone via `npx libretto run`, services defaults to `{}`,
-so mark fields optional for anything unavailable in that context.
 
 ## Playwright DOM Interaction Rules
 

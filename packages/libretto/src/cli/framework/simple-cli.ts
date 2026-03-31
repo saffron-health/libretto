@@ -4,6 +4,7 @@ type RecordUnknown = Record<string, unknown>;
 
 export type SimpleCLICommandConfig = {
   description: string;
+  experimental?: boolean;
 };
 
 export type SimpleCLIInputRaw = {
@@ -111,6 +112,7 @@ export type SimpleCLIResolvedCommand = {
 };
 
 type InternalResolvedCommand = SimpleCLIResolvedCommand & {
+  experimental?: boolean;
   input?: SimpleCLIInput<unknown>;
   middlewares: AnySimpleCLIMiddleware[];
   handler: SimpleCLIHandler<unknown, SimpleCLIContext, unknown>;
@@ -125,6 +127,11 @@ type InternalResolvedGroup = {
 type InternalResolvedRouteEntry = {
   kind: "group" | "command";
   path: readonly string[];
+};
+
+type CollectedRouteTreeResult = {
+  commands: InternalResolvedCommand[];
+  groupDescriptions: Map<string, string | undefined>;
 };
 
 type ResolveRouteTreeResult = {
@@ -147,6 +154,9 @@ type ExtractedGlobalArgs = {
   args: readonly string[];
   named: Readonly<Record<string, unknown>>;
 };
+
+const EXPERIMENTAL_COMMAND_PREFIX = "experimental";
+const EXPERIMENTAL_GROUP_DESCRIPTION = "Experimental commands";
 
 function toCamelCase(input: string): string {
   return input.replace(/-([a-zA-Z0-9])/g, (_match, letter: string) =>
@@ -759,7 +769,7 @@ export class SimpleCLIApp {
 
   private renderRootHelp(): string {
     const lines = [`Usage: ${this.name} <command>`, "", "Commands:"];
-    for (const entry of this.getImmediateRouteEntries([])) {
+    for (const entry of this.getRootHelpEntries()) {
       lines.push(formatListEntry(entry.label, entry.description));
     }
     return lines.join("\n");
@@ -865,6 +875,49 @@ export class SimpleCLIApp {
     }
 
     return entries;
+  }
+
+  private getRootHelpEntries(): Array<{
+    label: string;
+    description?: string;
+  }> {
+    return this.getImmediateRouteEntries([]).filter((entry) => {
+      const token = entry.label.replace(/\s+<subcommand>$/, "");
+      const group = this.findGroupByPath([token]);
+      if (!group) {
+        return true;
+      }
+      if (token === EXPERIMENTAL_COMMAND_PREFIX) {
+        return this.groupHasExperimentalCommand(group.path);
+      }
+      return this.groupHasVisibleNonExperimentalCommand(group.path);
+    });
+  }
+
+  private groupHasVisibleNonExperimentalCommand(path: readonly string[]): boolean {
+    for (const routeEntry of this.routeEntries) {
+      if (routeEntry.kind !== "command") continue;
+      if (!pathStartsWith(routeEntry.path, path)) continue;
+      const command = this.findCommandByPath(routeEntry.path);
+      if (command && !command.experimental) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private groupHasExperimentalCommand(path: readonly string[]): boolean {
+    for (const routeEntry of this.routeEntries) {
+      if (routeEntry.kind !== "command") continue;
+      if (!pathStartsWith(routeEntry.path, path)) continue;
+      const command = this.findCommandByPath(routeEntry.path);
+      if (command?.experimental) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private findBestMatchingCommand(
@@ -1031,37 +1084,46 @@ function validateRequiredNamedArgs(
   }
 }
 
-function resolveRouteTree(
+function resolveRouteTree(routes: SimpleCLIRouteTree<any>): ResolveRouteTreeResult {
+  const collected = collectRouteTree(routes);
+  const { groups, routeEntries } = buildResolvedRouteEntries(
+    collected.commands,
+    collected.groupDescriptions,
+  );
+
+  return {
+    commands: collected.commands,
+    groups,
+    routeEntries,
+  };
+}
+
+function collectRouteTree(
   routes: SimpleCLIRouteTree<any>,
   parentPath: readonly string[] = [],
   parentMiddlewares: readonly AnySimpleCLIMiddleware[] = [],
-): ResolveRouteTreeResult {
-  const resolved: ResolveRouteTreeResult = {
+): CollectedRouteTreeResult {
+  const resolved: CollectedRouteTreeResult = {
     commands: [],
-    groups: [],
-    routeEntries: [],
+    groupDescriptions: new Map<string, string | undefined>(),
   };
 
   for (const [token, routeValue] of Object.entries(routes)) {
     if (isGroup(routeValue)) {
       const groupPath = [...parentPath, token];
-      resolved.groups.push({
-        routeKey: pathToRouteKey(groupPath),
-        path: groupPath,
-        description: routeValue.description,
-      });
-      resolved.routeEntries.push({
-        kind: "group",
-        path: groupPath,
-      });
+      resolved.groupDescriptions.set(
+        pathToRouteKey(groupPath),
+        routeValue.description,
+      );
 
-      const nested = resolveRouteTree(routeValue.routes, groupPath, [
+      const nested = collectRouteTree(routeValue.routes, groupPath, [
         ...parentMiddlewares,
         ...routeValue.middlewares,
       ]);
       resolved.commands.push(...nested.commands);
-      resolved.groups.push(...nested.groups);
-      resolved.routeEntries.push(...nested.routeEntries);
+      for (const [routeKey, description] of nested.groupDescriptions) {
+        resolved.groupDescriptions.set(routeKey, description);
+      }
       continue;
     }
 
@@ -1072,11 +1134,15 @@ function resolveRouteTree(
       );
     }
 
-    const path = [...parentPath, token];
+    const rawPath = [...parentPath, token];
+    const path = command.config.experimental
+      ? [EXPERIMENTAL_COMMAND_PREFIX, ...rawPath]
+      : rawPath;
     resolved.commands.push({
       routeKey: pathToRouteKey(path),
       path,
       description: command.config.description,
+      experimental: command.config.experimental,
       input: command.input,
       middlewares: mergeInheritedMiddlewares(
         parentMiddlewares,
@@ -1088,13 +1154,58 @@ function resolveRouteTree(
         unknown
       >,
     });
-    resolved.routeEntries.push({
-      kind: "command",
-      path,
-    });
   }
 
   return resolved;
+}
+
+function buildResolvedRouteEntries(
+  commands: readonly InternalResolvedCommand[],
+  groupDescriptions: ReadonlyMap<string, string | undefined>,
+): Pick<ResolveRouteTreeResult, "groups" | "routeEntries"> {
+  const groups = new Map<string, InternalResolvedGroup>();
+  const routeEntries: InternalResolvedRouteEntry[] = [];
+
+  for (const command of commands) {
+    for (let depth = 1; depth < command.path.length; depth += 1) {
+      const path = command.path.slice(0, depth);
+      const routeKey = pathToRouteKey(path);
+      if (groups.has(routeKey)) continue;
+
+      groups.set(routeKey, {
+        routeKey,
+        path,
+        description: resolveGroupDescription(path, groupDescriptions),
+      });
+      routeEntries.push({
+        kind: "group",
+        path,
+      });
+    }
+
+    routeEntries.push({
+      kind: "command",
+      path: command.path,
+    });
+  }
+
+  return {
+    groups: [...groups.values()],
+    routeEntries,
+  };
+}
+
+function resolveGroupDescription(
+  path: readonly string[],
+  groupDescriptions: ReadonlyMap<string, string | undefined>,
+): string | undefined {
+  if (path.length === 1 && path[0] === EXPERIMENTAL_COMMAND_PREFIX) {
+    return EXPERIMENTAL_GROUP_DESCRIPTION;
+  }
+
+  const originalPath =
+    path[0] === EXPERIMENTAL_COMMAND_PREFIX ? path.slice(1) : path;
+  return groupDescriptions.get(pathToRouteKey(originalPath));
 }
 
 function mergeInheritedMiddlewares(

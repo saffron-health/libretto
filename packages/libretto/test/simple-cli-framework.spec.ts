@@ -33,6 +33,74 @@ describe("SimpleCLI framework", () => {
     ]);
   });
 
+  test("prefixes experimental commands under the experimental namespace", async () => {
+    const noInput = SimpleCLI.input({ positionals: [], named: {} });
+    const noop = SimpleCLI.command({ description: "noop" })
+      .input(noInput)
+      .handle(async () => {});
+
+    const app = SimpleCLI.define("libretto", {
+      ai: SimpleCLI.group({
+        description: "AI commands",
+        routes: {
+          configure: SimpleCLI.command({
+            description: "Configure AI runtime",
+            experimental: true,
+          })
+            .input(noInput)
+            .handle(async () => {}),
+        },
+      }),
+      open: noop,
+    });
+
+    const commands = app.getCommands();
+    expect(commands.map((command) => command.routeKey)).toEqual([
+      "experimental.ai.configure",
+      "open",
+    ]);
+    expect(commands.map((command) => command.path.join(" "))).toEqual([
+      "experimental ai configure",
+      "open",
+    ]);
+
+    await expect(app.run(["help"])).resolves.toBe(
+      [
+        "Usage: libretto <command>",
+        "",
+        "Commands:",
+        "  experimental <subcommand>  Experimental commands",
+        "  open  noop",
+      ].join("\n"),
+    );
+
+    await expect(app.run(["help", "experimental"])).resolves.toBe(
+      [
+        "Experimental commands",
+        "",
+        "Usage: libretto experimental <subcommand>",
+        "",
+        "Commands:",
+        "  ai <subcommand>  AI commands",
+      ].join("\n"),
+    );
+
+    await expect(app.run(["help", "experimental", "ai"])).resolves.toBe(
+      [
+        "AI commands",
+        "",
+        "Usage: libretto experimental ai <subcommand>",
+        "",
+        "Commands:",
+        "  configure  Configure AI runtime",
+      ].join("\n"),
+    );
+
+    await expect(
+      app.run(["help", "experimental", "ai", "configure"]),
+    ).resolves.toContain("Usage: libretto experimental ai configure");
+  });
+
   test("parses named + positional input from one declaration and supports refine", () => {
     const runInput = SimpleCLI.input({
       positionals: [
