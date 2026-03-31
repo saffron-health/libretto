@@ -7,6 +7,9 @@
     "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai": "^3.0.41",
+    "@types/sharp": "^0.32.0",
+    "playwright": "^1.58.2",
+    "sharp": "^0.34.5",
     "turbo": "^2.8.20"
   },
   "scripts": {
@@ -17,6 +20,7 @@
     "prepare-release": "bash ./scripts/prepare-release.sh",
     "evals": "turbo run evals --filter=libretto-evals --",
     "benchmarks": "turbo run benchmarks --filter=libretto-benchmarks --",
+    "google-login": "gcloud auth login --update-adc && gcloud auth configure-docker us-central1-docker.pkg.dev --quiet",
     "cli": "pnpm --filter libretto cli",
     "website:dev": "pnpm --dir ./apps/website dev"
   }

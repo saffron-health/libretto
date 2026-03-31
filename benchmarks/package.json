@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@google-cloud/run": "^3.2.0",
+    "@google-cloud/storage": "^7.16.0",
     "@mariozechner/pi-coding-agent": "^0.62.0",
     "google-auth-library": "^10.6.1",
     "tsx": "^4.21.0",

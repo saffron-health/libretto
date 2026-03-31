@@ -25,8 +25,14 @@ import {
   getRunName,
   rewriteBenchmarkSkillCommands,
 } from "./prompt.js";
+import { ScreenshotCollector } from "./screenshot-collector.js";
+import { evaluateWithScreenshots, type JudgeResult } from "./evaluator.js";
 
-type WebVoyagerCaseResult = {
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type WebVoyagerCaseResult = {
   caseId: string;
   runDir: string;
   status: "passed" | "failed";
@@ -34,19 +40,18 @@ type WebVoyagerCaseResult = {
   finishedAt: string;
   durationMs: number;
   finalMessage: string | null;
-  evaluationReason: string;
+  judge: JudgeResult;
+  screenshotCount: number;
   error: string | null;
 };
 
-type EvaluationResult = {
-  success: boolean;
-  reason: string;
-};
+// ---------------------------------------------------------------------------
+// Constants & env tunables
+// ---------------------------------------------------------------------------
 
 const BENCHMARK_NAME = "webVoyager";
 const BENCHMARK_MODEL_PROVIDER = "anthropic";
 const BENCHMARK_MODEL_ID = "claude-opus-4-6";
-const EVALUATOR_MODEL = "anthropic/claude-sonnet-4-6";
 const DEFAULT_GCP_PROJECT = "saffron-health";
 const DEFAULT_ANTHROPIC_SECRET_NAME = "anthropic-api-key";
 
@@ -59,10 +64,9 @@ const librettoSkillSourcePath = resolve(
 );
 const distSourcePath = resolve(librettoPackageRoot, "dist");
 
-const EvaluationSchema = z.object({
-  success: z.boolean(),
-  reason: z.string().trim().min(1),
-});
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function extractAssistantText(message: unknown): string {
   if (!message || typeof message !== "object") {
@@ -90,6 +94,10 @@ function extractAssistantText(message: unknown): string {
     .join("\n\n")
     .trim();
 }
+
+// ---------------------------------------------------------------------------
+// GCP / Anthropic key management
+// ---------------------------------------------------------------------------
 
 async function accessSecretVersion(args: {
   projectId: string;
@@ -145,9 +153,13 @@ async function ensureAnthropicApiKey(): Promise<string> {
   return apiKey;
 }
 
+// ---------------------------------------------------------------------------
+// Workspace preparation
+// ---------------------------------------------------------------------------
+
 async function prepareRunWorkspace(
   row: WebVoyagerRow,
-): Promise<{ runDir: string; prompt: string }> {
+): Promise<{ runDir: string; prompt: string; sessionName: string }> {
   const runDir = resolve(
     repoRoot,
     "benchmarks",
@@ -156,7 +168,7 @@ async function prepareRunWorkspace(
     getRunName(row),
   );
   const skillDestination = join(runDir, ".agents", "skills", "libretto");
-  const prompt = buildWebVoyagerPrompt(row, runDir);
+  const { text: prompt, sessionName } = buildWebVoyagerPrompt(row);
 
   await rm(runDir, { recursive: true, force: true });
   await mkdir(runDir, { recursive: true });
@@ -203,44 +215,72 @@ async function prepareRunWorkspace(
   );
   await writeFile(join(runDir, "prompt.md"), `${prompt}\n`, "utf8");
 
-  return { runDir, prompt };
+  return { runDir, prompt, sessionName };
 }
 
-async function evaluateFinalMessage(
-  row: WebVoyagerRow,
-  finalMessage: string | null,
-): Promise<EvaluationResult> {
-  if (!finalMessage?.trim()) {
-    return {
-      success: false,
-      reason: "No final assistant message was recorded.",
-    };
+// ---------------------------------------------------------------------------
+// Save screenshots as artifacts
+// ---------------------------------------------------------------------------
+
+async function saveEvaluatorArtifacts(
+  runDir: string,
+  screenshots: Buffer[],
+  judge: JudgeResult,
+  task: string,
+  agentReasoning: string | null,
+): Promise<{ screenshotPaths: string[]; analysisPath: string }> {
+  const evalDir = join(runDir, "evaluator");
+  const screenshotsDir = join(evalDir, "screenshots");
+  await mkdir(screenshotsDir, { recursive: true });
+
+  // Save screenshots
+  const screenshotPaths: string[] = [];
+  for (let i = 0; i < screenshots.length; i++) {
+    const filename = `screenshot-${String(i + 1).padStart(2, "0")}.png`;
+    const filePath = join(screenshotsDir, filename);
+    await writeFile(filePath, screenshots[i]);
+    screenshotPaths.push(filePath);
   }
 
-  const client = createLLMClient(EVALUATOR_MODEL);
-  return await client.generateObject({
-    schema: EvaluationSchema,
-    temperature: 0,
-    prompt: [
-      "Evaluate whether the final assistant message answers the benchmark task.",
-      "Return only JSON matching the schema.",
-      "Use only the final assistant message as evidence.",
-      "Mark success=false if the message is incomplete, blocked, purely process narration, or does not materially answer the task.",
-      "",
-      `Task: ${row.ques}`,
-      `Website: ${row.web}`,
-      "",
-      "Final assistant message:",
-      finalMessage,
-    ].join("\n"),
-  });
+  // Write analysis markdown
+  const analysisPath = join(evalDir, "analysis.md");
+  const analysisLines = [
+    `# Evaluator Analysis`,
+    "",
+    `## Task`,
+    "",
+    task,
+    "",
+    `## Verdict: ${judge.evaluation}`,
+    "",
+    judge.reasoning,
+    "",
+    `## Evidence`,
+    "",
+    `Screenshots: ${screenshots.length}`,
+    "",
+    ...screenshotPaths.map((p, i) => `- Screenshot ${i + 1}: ${p}`),
+    "",
+  ];
+
+  if (agentReasoning?.trim()) {
+    analysisLines.push(`## Agent Reasoning`, "", agentReasoning.trim(), "");
+  }
+
+  await writeFile(analysisPath, analysisLines.join("\n"), "utf8");
+
+  return { screenshotPaths, analysisPath };
 }
 
-async function runWebVoyagerCase(
+// ---------------------------------------------------------------------------
+// Run a single case
+// ---------------------------------------------------------------------------
+
+export async function runWebVoyagerCase(
   row: WebVoyagerRow,
 ): Promise<WebVoyagerCaseResult> {
   const startedAt = new Date();
-  const { runDir, prompt } = await prepareRunWorkspace(row);
+  const { runDir, prompt, sessionName } = await prepareRunWorkspace(row);
   const anthropicApiKey = await ensureAnthropicApiKey();
   const agentDir = join(runDir, ".pi");
   const authStorage = AuthStorage.create(join(agentDir, "auth.json"));
@@ -296,6 +336,13 @@ async function runWebVoyagerCase(
     settingsManager,
   });
 
+  // Only keep meaningful transcript events (not streaming deltas).
+  const TRANSCRIPT_EVENT_TYPES = new Set([
+    "message_end",
+    "tool_execution_start",
+    "tool_execution_end",
+  ]);
+
   const transcriptPath = join(runDir, "transcript.jsonl");
   const transcriptStream = createWriteStream(transcriptPath, { flags: "w" });
   transcriptStream.write(
@@ -309,8 +356,14 @@ async function runWebVoyagerCase(
   let finalMessage: string | null = null;
   let thrownError: unknown;
 
+  // Start screenshot collection on the libretto browser session
+  const screenshotCollector = new ScreenshotCollector(sessionName, runDir);
+  screenshotCollector.start();
+
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
-    transcriptStream.write(`${JSON.stringify(event)}\n`);
+    if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
+      transcriptStream.write(`${JSON.stringify(event)}\n`);
+    }
 
     switch (event.type) {
       case "message_end": {
@@ -336,7 +389,25 @@ async function runWebVoyagerCase(
     await finished(transcriptStream);
   }
 
-  const evaluation = await evaluateFinalMessage(row, finalMessage);
+  // Collect screenshots and evaluate
+  const screenshots = await screenshotCollector.stop();
+
+  // Evaluate using screenshot-based LLM judge
+  const judge = await evaluateWithScreenshots({
+    task: row.ques,
+    screenshots,
+    agentReasoning: finalMessage,
+  });
+
+  // Persist evaluator artifacts
+  const { screenshotPaths, analysisPath } = await saveEvaluatorArtifacts(
+    runDir,
+    screenshots,
+    judge,
+    row.ques,
+    finalMessage,
+  );
+
   const finishedAt = new Date();
   const durationMs = finishedAt.getTime() - startedAt.getTime();
   const errorMessage =
@@ -345,8 +416,11 @@ async function runWebVoyagerCase(
       : thrownError
         ? String(thrownError)
         : null;
+
+  // INVALID judge verdicts are treated as failures
   const status: "passed" | "failed" =
-    !errorMessage && evaluation.success ? "passed" : "failed";
+    !errorMessage && judge.evaluation === "YES" ? "passed" : "failed";
+
   const result: WebVoyagerCaseResult = {
     caseId: row.id,
     runDir,
@@ -355,7 +429,8 @@ async function runWebVoyagerCase(
     finishedAt: finishedAt.toISOString(),
     durationMs,
     finalMessage,
-    evaluationReason: evaluation.reason,
+    judge,
+    screenshotCount: screenshots.length,
     error: errorMessage,
   };
 
@@ -366,6 +441,8 @@ async function runWebVoyagerCase(
         ...result,
         task: row.ques,
         url: row.web,
+        screenshotPaths,
+        analysisPath,
       },
       null,
       2,
@@ -376,28 +453,72 @@ async function runWebVoyagerCase(
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// Benchmark runner
+// ---------------------------------------------------------------------------
+
 export async function runWebVoyagerBenchmark(args: {
   offset?: number;
   count?: number;
   seed?: number;
   random?: boolean;
+  parallelize?: number;
 }): Promise<{ exitCode: number; stdout: string }> {
   const selection = selectWebVoyagerRows(readWebVoyagerRows(), args);
   const results: WebVoyagerCaseResult[] = [];
+  const concurrency = args.parallelize ?? 1;
 
   console.log(
-    `Running WebVoyager benchmark: ${formatSelectionSummary(selection)}.`,
+    `Running WebVoyager benchmark: ${formatSelectionSummary(selection)}${concurrency > 1 ? ` (parallelism: ${concurrency})` : ""}.`,
   );
 
-  for (const [index, row] of selection.rows.entries()) {
-    console.log(
-      `[${index + 1}/${selection.rows.length}] ${row.id}: ${row.web_name ?? row.web}: ${row.ques}`,
+  if (concurrency <= 1) {
+    // Sequential execution (original behaviour)
+    for (const [index, row] of selection.rows.entries()) {
+      console.log(
+        `[${index + 1}/${selection.rows.length}] ${row.id}: ${row.web_name ?? row.web}: ${row.ques}`,
+      );
+      const result = await runWebVoyagerCase(row);
+      results.push(result);
+
+      const verdict = result.judge.evaluation;
+      console.log(
+        `${result.status === "passed" ? "Passed" : "Failed"} (${verdict}) ${row.id}: ${result.judge.reasoning}`,
+      );
+    }
+  } else {
+    // Parallel execution with bounded concurrency
+    let nextIndex = 0;
+    const total = selection.rows.length;
+    const orderedResults: (WebVoyagerCaseResult | undefined)[] = new Array(
+      total,
     );
-    const result = await runWebVoyagerCase(row);
-    results.push(result);
-    console.log(
-      `${result.status === "passed" ? "Passed" : "Failed"} ${row.id}: ${result.evaluationReason}`,
+
+    async function worker(): Promise<void> {
+      while (nextIndex < total) {
+        const idx = nextIndex++;
+        const row = selection.rows[idx];
+        console.log(
+          `[${idx + 1}/${total}] START ${row.id}: ${row.web_name ?? row.web}: ${row.ques}`,
+        );
+        const result = await runWebVoyagerCase(row);
+        orderedResults[idx] = result;
+
+        const verdict = result.judge.evaluation;
+        console.log(
+          `[${idx + 1}/${total}] ${result.status === "passed" ? "PASSED" : "FAILED"} (${verdict}) ${row.id}: ${result.judge.reasoning}`,
+        );
+      }
+    }
+
+    const workers = Array.from({ length: Math.min(concurrency, total) }, () =>
+      worker(),
     );
+    await Promise.all(workers);
+
+    for (const r of orderedResults) {
+      if (r) results.push(r);
+    }
   }
 
   const failedCount = results.filter(

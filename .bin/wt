@@ -1,0 +1,309 @@
+#!/bin/bash
+set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKTREES_DIR="$ROOT_DIR/.worktrees"
+
+usage() {
+    echo "Worktree manager"
+    echo ""
+    echo "Usage: wt <command>"
+    echo ""
+    echo "Commands:"
+    echo "  new <branch-name>   Create a new worktree and cd into it"
+    echo "  list                List all worktrees with last updated date"
+    echo "  close [--force]     Close the current worktree (must have no uncommitted changes)"
+    echo "  prune [--force]     Remove worktrees for branches merged into main"
+    exit 1
+}
+
+mtime_epoch() {
+    local path="$1"
+    case "$(uname -s)" in
+        Darwin)
+            stat -f "%m" "$path"
+            ;;
+        *)
+            stat -c "%Y" "$path"
+            ;;
+    esac
+}
+
+format_epoch() {
+    local epoch="$1"
+    case "$(uname -s)" in
+        Darwin)
+            date -r "$epoch" "+%b %d, %Y %H:%M"
+            ;;
+        *)
+            date -d "@$epoch" "+%b %d, %Y %H:%M"
+            ;;
+    esac
+}
+
+cmd_new() {
+    local branch="$1"
+    if [ -z "$branch" ]; then
+        echo "Usage: wt new <branch-name>"
+        exit 1
+    fi
+
+    local wt_path="$WORKTREES_DIR/$branch"
+    mkdir -p "$WORKTREES_DIR"
+
+    if [ -d "$wt_path" ]; then
+        echo "Worktree already exists at $wt_path"
+        cd "$wt_path"
+        exec "$SHELL"
+    fi
+
+    git fetch origin main
+    git worktree add -b "$branch" "$wt_path" origin/main
+    echo "Created worktree at $wt_path"
+    cd "$wt_path"
+    exec "$SHELL"
+}
+
+cmd_list() {
+    local worktrees
+    worktrees=$(git worktree list --porcelain)
+
+    if [ -z "$worktrees" ]; then
+        echo "No worktrees found."
+        return
+    fi
+
+    # Parse porcelain output, filter to .worktrees only
+    local entries=()
+    local current_path=""
+    local current_branch=""
+
+    while IFS= read -r line; do
+        if [[ "$line" == "worktree "* ]]; then
+            current_path="${line#worktree }"
+            current_branch=""
+        elif [[ "$line" == "branch refs/heads/"* ]]; then
+            current_branch="${line#branch refs/heads/}"
+        elif [ -z "$line" ] && [ -n "$current_path" ]; then
+            if [[ "$current_path" == *".worktrees"* ]] && [ -n "$current_branch" ]; then
+                entries+=("$current_path|$current_branch")
+            fi
+            current_path=""
+            current_branch=""
+        fi
+    done <<< "$worktrees"
+    # Handle last entry (porcelain output may not end with blank line)
+    if [ -n "$current_path" ] && [[ "$current_path" == *".worktrees"* ]] && [ -n "$current_branch" ]; then
+        entries+=("$current_path|$current_branch")
+    fi
+
+    if [ ${#entries[@]} -eq 0 ]; then
+        echo "No worktrees in .worktrees/"
+        return
+    fi
+
+    # Collect rows with dates, sort by date descending
+    local rows=()
+    for entry in "${entries[@]}"; do
+        local wt_path="${entry%%|*}"
+        local branch="${entry##*|}"
+        local epoch
+        epoch=$(git -C "$wt_path" ls-files -z 2>/dev/null | while IFS= read -r -d '' file; do
+            mtime_epoch "$wt_path/$file"
+        done | sort -rn | head -1)
+        epoch="${epoch:-0}"
+        local last_updated
+        last_updated=$(format_epoch "$epoch" 2>/dev/null || echo "—")
+        rows+=("$epoch|$last_updated|$branch|$wt_path")
+    done
+
+    # Sort by epoch descending
+    IFS=$'\n' sorted=($(for r in "${rows[@]}"; do echo "$r"; done | sort -t'|' -k1 -rn))
+    unset IFS
+
+    echo ""
+    for row in "${sorted[@]}"; do
+        local rest="${row#*|}"
+        local date="${rest%%|*}"
+        rest="${rest#*|}"
+        local branch="${rest%%|*}"
+        echo "  $branch  ($date)"
+    done
+    echo ""
+}
+
+# Check if a branch was squash-merged via GitHub PR.
+# Returns 0 if merged, 1 otherwise.
+is_squash_merged() {
+    local branch="$1"
+    local pr_state
+    pr_state=$(gh pr list --head "$branch" --state merged --json state --jq '.[0].state' 2>/dev/null || true)
+    [ "$pr_state" = "MERGED" ]
+}
+
+cmd_prune() {
+    local force=false
+    if [ "$1" = "--force" ] || [ "$1" = "-f" ]; then
+        force=true
+    fi
+
+    # Check for gh CLI (needed for squash-merge detection)
+    local has_gh=true
+    if ! command -v gh &>/dev/null; then
+        has_gh=false
+        echo "Warning: 'gh' CLI not found. Squash-merged branches won't be detected."
+        echo "  Install it: https://cli.github.com/"
+        echo ""
+    fi
+
+    git fetch origin main
+
+    # Get branches merged into origin/main (detects regular merges)
+    local merged
+    merged=$(git branch --merged origin/main | sed 's/^[* ] //' | grep -v '^\(main\|master\)$' || true)
+
+    # Parse worktrees in .worktrees/
+    local worktrees
+    worktrees=$(git worktree list --porcelain)
+
+    local pruned=0
+    local failed=0
+    local current_path=""
+    local current_branch=""
+
+    _try_prune_entry() {
+        local wt_path="$1"
+        local branch="$2"
+        if [[ "$wt_path" != *".worktrees"* ]] || [ -z "$branch" ]; then
+            return
+        fi
+
+        local is_merged=false
+        # Check regular merge first
+        if echo "$merged" | grep -qx "$branch"; then
+            is_merged=true
+        # Fall back to squash-merge detection via gh
+        elif $has_gh && is_squash_merged "$branch"; then
+            is_merged=true
+        fi
+
+        if $is_merged; then
+            echo "Pruning: $branch"
+            local remove_args=("worktree" "remove")
+            if $force; then
+                remove_args+=("--force")
+            fi
+            remove_args+=("$wt_path")
+            if git "${remove_args[@]}" 2>/dev/null; then
+                git branch -D "$branch" 2>/dev/null || true
+                ((pruned++))
+            else
+                echo "  Failed to remove worktree: $branch"
+                if ! $force; then
+                    echo "  Try 'wt prune --force' to remove anyway."
+                fi
+                ((failed++))
+            fi
+        fi
+    }
+
+    while IFS= read -r line; do
+        if [[ "$line" == "worktree "* ]]; then
+            current_path="${line#worktree }"
+            current_branch=""
+        elif [[ "$line" == "branch refs/heads/"* ]]; then
+            current_branch="${line#branch refs/heads/}"
+        elif [ -z "$line" ] && [ -n "$current_path" ]; then
+            _try_prune_entry "$current_path" "$current_branch"
+            current_path=""
+            current_branch=""
+        fi
+    done <<< "$worktrees"
+    # Handle last entry (porcelain output may not end with blank line)
+    if [ -n "$current_path" ]; then
+        _try_prune_entry "$current_path" "$current_branch"
+    fi
+
+    if [ $pruned -eq 0 ] && [ $failed -eq 0 ]; then
+        echo "No merged worktrees to prune."
+    else
+        [ $pruned -gt 0 ] && echo "Pruned $pruned worktree(s)."
+        [ $failed -gt 0 ] && echo "Failed to prune $failed worktree(s)."
+    fi
+}
+
+cmd_close() {
+    local force=false
+    if [ "$1" = "--force" ] || [ "$1" = "-f" ]; then
+        force=true
+    fi
+
+    # Must be inside a .worktrees/ directory
+    local cwd
+    cwd=$(pwd)
+    if [[ "$cwd" != *".worktrees"* ]]; then
+        echo "Error: Not inside a worktree. Run this from within a .worktrees/ directory."
+        exit 1
+    fi
+
+    # Check for uncommitted changes
+    if ! $force; then
+        if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+            echo "Error: Worktree has uncommitted changes."
+            echo "  Commit or stash them first, or use 'wt close --force' to discard."
+            exit 1
+        fi
+    fi
+
+    # Get the worktree path and branch
+    local wt_path
+    wt_path=$(git rev-parse --show-toplevel)
+    local branch
+    branch=$(git rev-parse --abbrev-ref HEAD)
+
+    # Move back to the main repo root
+    cd "$ROOT_DIR"
+
+    # Remove the worktree
+    local remove_args=("worktree" "remove")
+    if $force; then
+        remove_args+=("--force")
+    fi
+    remove_args+=("$wt_path")
+
+    if git "${remove_args[@]}"; then
+        echo "Closed worktree: $branch"
+        # Start a new shell at the repo root so the caller's shell isn't left in a deleted dir
+        exec "$SHELL"
+    else
+        echo "Failed to remove worktree: $branch"
+        exit 1
+    fi
+}
+
+# Main
+case "${1:-}" in
+    new)
+        cmd_new "$2"
+        ;;
+    list|ls)
+        cmd_list
+        ;;
+    close)
+        cmd_close "$2"
+        ;;
+    prune)
+        cmd_prune "$2"
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    *)
+        if [ -n "${1:-}" ]; then
+            echo "Unknown command: $1"
+            echo ""
+        fi
+        usage
+        ;;
+esac

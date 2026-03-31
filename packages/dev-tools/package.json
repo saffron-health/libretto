@@ -1,0 +1,20 @@
+{
+  "name": "@libretto/dev-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Developer tooling for the libretto monorepo",
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "bin": {
+    "wt": "./dist/wt.js"
+  },
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}
