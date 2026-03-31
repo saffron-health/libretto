@@ -37,7 +37,6 @@ jobs:
           version="$(node -p "require('./packages/libretto/package.json').version")"
           echo "package_name=${package_name}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
 
       - name: Check publish state
         id: state
@@ -117,8 +116,6 @@ jobs:
           pnpm --filter libretto type-check
           pnpm --filter libretto test
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
       npm_exists: ${{ steps.state.outputs.npm_exists }}
 
   release:
