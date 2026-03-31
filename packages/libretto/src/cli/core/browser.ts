@@ -398,12 +398,11 @@ export async function runOpen(
   }
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
-  const escapedProfilePath = (profilePath ?? "")
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'");
   const escapedUrl = url.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const storageStateCode = useProfile
-    ? `storageState: '${escapedProfilePath}',`
+    ? `storageState: '${profilePath!
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")}',`
     : "";
 
   const escapedLogPath = runLogPath.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
