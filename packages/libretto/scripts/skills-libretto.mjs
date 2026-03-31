@@ -41,7 +41,7 @@ export function syncSkillDir(sourceDir, destDir) {
 }
 
 export function syncRepoSkills(repoRoot) {
-  const sourceDir = resolve(repoRoot, "skills/libretto");
+  const sourceDir = resolve(repoRoot, SKILL_DIRS[0]);
   for (const dir of SKILL_DIRS.slice(1)) {
     syncSkillDir(sourceDir, resolve(repoRoot, dir));
   }

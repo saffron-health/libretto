@@ -26,6 +26,8 @@ pnpm test
 Targeted (most common during development):
 
 ```bash
+pnpm sync:mirrors
+pnpm check:mirrors
 pnpm --filter libretto type-check
 pnpm --filter libretto test -- test/basic.spec.ts
 pnpm --filter libretto test -- test/multi-page.spec.ts
@@ -40,5 +42,6 @@ pnpm --filter libretto cli help
 
 ## Skill Documentation Source of Truth
 
+- Edit `packages/libretto/README.template.md` directly for README changes, then run `pnpm sync:mirrors`.
 - Edit `packages/libretto/skills/libretto/SKILL.md` directly.
 - `packages/libretto/skills/libretto` is the source of truth for Libretto skill files.
