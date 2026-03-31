@@ -56,21 +56,53 @@ async function pickFreePort(): Promise<number> {
   });
 }
 
+function tryParseAbsoluteUrl(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyHostWithPort(parsedUrl: URL, rawUrl: string): boolean {
+  const remainder = rawUrl.slice(parsedUrl.protocol.length);
+  if (remainder.length === 0) return false;
+
+  let index = 0;
+  while (index < remainder.length) {
+    const charCode = remainder.charCodeAt(index);
+    if (charCode < 48 || charCode > 57) break;
+    index += 1;
+  }
+
+  if (index === 0) return false;
+  if (index === remainder.length) return true;
+
+  const nextChar = remainder[index];
+  return nextChar === "/" || nextChar === "?" || nextChar === "#";
+}
+
 export function normalizeUrl(url: string): URL {
-  if (url.includes("://")) {
-    const parsedUrl = new URL(url);
-    if (
-      parsedUrl.protocol !== "http:" &&
-      parsedUrl.protocol !== "https:" &&
-      parsedUrl.protocol !== "file:"
-    ) {
-      throw new Error(
-        `Unsupported URL protocol: ${parsedUrl.protocol}. Use http://, https://, or file://.`,
-      );
-    }
+  const parsedUrl = tryParseAbsoluteUrl(url);
+  if (!parsedUrl) {
+    return new URL(`https://${url}`);
+  }
+
+  if (
+    parsedUrl.protocol === "http:" ||
+    parsedUrl.protocol === "https:" ||
+    parsedUrl.protocol === "file:"
+  ) {
     return parsedUrl;
   }
-  return new URL(`https://${url}`);
+
+  if (isLikelyHostWithPort(parsedUrl, url)) {
+    return new URL(`https://${url}`);
+  }
+
+  throw new Error(
+    `Unsupported URL protocol: ${parsedUrl.protocol}. Use http://, https://, or file://.`,
+  );
 }
 
 export function normalizeDomain(url: URL): string {

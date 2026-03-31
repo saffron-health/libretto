@@ -12,6 +12,12 @@ describe("browser URL normalization", () => {
     );
   });
 
+  test("treats bare hosts with embedded redirect URLs as bare hosts", () => {
+    expect(normalizeUrl("example.com?redirect=https://idp.com").href).toBe(
+      "https://example.com/?redirect=https://idp.com",
+    );
+  });
+
   test("preserves explicit https URLs", () => {
     expect(normalizeUrl("https://example.com").href).toBe(
       "https://example.com/",
