@@ -135,6 +135,16 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
+  test("prints cloud group help with deploy listed under the new namespace", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("help cloud");
+    expect(result.stdout).toContain("Hosted Libretto Cloud commands");
+    expect(result.stdout).toContain("Usage: libretto cloud <subcommand>");
+    expect(result.stdout).toContain("deploy");
+    expect(result.stderr).toBe("");
+  });
+
   test("prints run help with explicit visualization disable flag", async ({
     librettoCli,
   }) => {

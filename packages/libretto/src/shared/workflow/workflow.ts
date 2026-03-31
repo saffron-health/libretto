@@ -7,7 +7,6 @@ export type LibrettoWorkflowContext = {
   session: string;
   page: Page;
   logger: MinimalLogger;
-  credentials?: Record<string, unknown>;
 };
 
 export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
