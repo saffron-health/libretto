@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
@@ -164,6 +165,42 @@ describe("basic CLI subprocess behavior", () => {
       "Usage: libretto open <url> [--headless] [--viewport WxH] [--session <name>]",
     );
   });
+
+  test("opens file URLs", async ({ librettoCli, workspacePath }) => {
+    const htmlPath = workspacePath("fixtures", "local-file.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await mkdir(workspacePath(".libretto", "profiles"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      `<!doctype html><html><head><title>Local File Title</title></head><body><h1>Local File Body</h1></body></html>`,
+      "utf8",
+    );
+    await writeFile(
+      workspacePath(".libretto", "profiles", "local-file.json"),
+      "{ definitely-not-valid-json}",
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    const session = "file-url-open";
+
+    const opened = await librettoCli(
+      `open "${fileUrl}" --headless --session ${session}`,
+    );
+    expect(opened.stderr).toBe("");
+    expect(opened.stdout).toContain(`Browser open (headless): ${fileUrl}`);
+    expect(opened.stdout).not.toContain("Loading saved profile");
+
+    const title = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(title.stderr).toBe("");
+    expect(title.stdout).toContain("Local File Title");
+
+    const closed = await librettoCli(`close --session ${session}`);
+    expect(closed.stderr).toBe("");
+    expect(closed.stdout).toContain(`Browser closed (session: ${session}).`);
+  }, 45_000);
 
   test("fails open with actionable error when browser child spawn fails", async ({
     librettoCli,

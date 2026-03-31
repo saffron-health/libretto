@@ -14,7 +14,11 @@ import {
 } from "../../index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { parseSessionStateContent } from "../../shared/state/index.js";
-import { getProfilePath, normalizeDomain } from "../core/browser.js";
+import {
+  getProfilePath,
+  normalizeDomain,
+  normalizeUrl,
+} from "../core/browser.js";
 import {
   getSessionActionsLogPath,
   getSessionDir,
@@ -110,7 +114,7 @@ async function waitForFailureSessionRelease(args: {
 }
 
 function resolveLocalAuthProfilePath(domain: string): string {
-  return getProfilePath(normalizeDomain(domain));
+  return getProfilePath(normalizeDomain(normalizeUrl(domain)));
 }
 
 function getMissingLocalAuthProfileError(args: {
@@ -118,7 +122,7 @@ function getMissingLocalAuthProfileError(args: {
   profilePath: string;
   session: string;
 }): string {
-  const normalizedDomain = normalizeDomain(args.domain);
+  const normalizedDomain = normalizeDomain(normalizeUrl(args.domain));
   return [
     `Local auth profile not found for domain "${normalizedDomain}".`,
     `Expected profile file: ${args.profilePath}`,

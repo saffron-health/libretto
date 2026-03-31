@@ -56,20 +56,25 @@ async function pickFreePort(): Promise<number> {
   });
 }
 
-export function normalizeUrl(url: string): string {
-  if (!/^https?:\/\//i.test(url)) {
-    return `https://${url}`;
+export function normalizeUrl(url: string): URL {
+  if (url.includes("://")) {
+    const parsedUrl = new URL(url);
+    if (
+      parsedUrl.protocol !== "http:" &&
+      parsedUrl.protocol !== "https:" &&
+      parsedUrl.protocol !== "file:"
+    ) {
+      throw new Error(
+        `Unsupported URL protocol for open: ${parsedUrl.protocol}. Use http://, https://, or file://.`,
+      );
+    }
+    return parsedUrl;
   }
-  return url;
+  return new URL(`https://${url}`);
 }
 
-export function normalizeDomain(url: string): string {
-  try {
-    const u = new URL(normalizeUrl(url));
-    return u.hostname.replace(/^www\./, "");
-  } catch {
-    return url.replace(/^www\./, "");
-  }
+export function normalizeDomain(url: URL): string {
+  return url.hostname.replace(/^www\./, "");
 }
 
 export function getProfilePath(domain: string): string {
@@ -359,7 +364,8 @@ export async function runOpen(
   logger: LoggerApi,
   options?: { viewport?: { width: number; height: number } },
 ): Promise<void> {
-  const url = normalizeUrl(rawUrl);
+  const parsedUrl = normalizeUrl(rawUrl);
+  const url = parsedUrl.href;
   const viewport = resolveViewport(options?.viewport, logger);
   const windowPosition = headed ? resolveWindowPosition(logger) : undefined;
   logger.info("open-start", { url, headed, session, viewport, windowPosition });
@@ -371,9 +377,11 @@ export async function runOpen(
   const actionsLogPath = getSessionActionsLogPath(session);
 
   const browserMode = headed ? "headed" : "headless";
-  const domain = normalizeDomain(url);
-  const profilePath = getProfilePath(domain);
-  const useProfile = hasProfile(domain);
+  const supportsSavedProfile =
+    parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+  const domain = supportsSavedProfile ? normalizeDomain(parsedUrl) : undefined;
+  const profilePath = domain ? getProfilePath(domain) : undefined;
+  const useProfile = domain ? hasProfile(domain) : false;
 
   logger.info("open-launching", {
     url,
@@ -390,7 +398,7 @@ export async function runOpen(
   }
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
-  const escapedProfilePath = profilePath
+  const escapedProfilePath = (profilePath ?? "")
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'");
   const escapedUrl = url.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -671,7 +679,7 @@ export async function runSave(
   try {
     await new Promise((r) => setTimeout(r, 500));
 
-    const domain = normalizeDomain(urlOrDomain);
+    const domain = normalizeDomain(normalizeUrl(urlOrDomain));
     const profilePath = getProfilePath(domain);
 
     const cdpSession = await context.newCDPSession(page);
