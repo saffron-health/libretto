@@ -65,6 +65,10 @@ function tryParseAbsoluteUrl(url: string): URL | null {
 }
 
 function isLikelyHostWithPort(parsedUrl: URL, rawUrl: string): boolean {
+  // `new URL("localhost:3000")` parses successfully, but treats `localhost:`
+  // as a custom scheme instead of a bare host with port. Detect that shape so
+  // CLI shorthand like `libretto open localhost:3000` still normalizes to
+  // `https://localhost:3000/`.
   const remainder = rawUrl.slice(parsedUrl.protocol.length);
   if (remainder.length === 0) return false;
 
