@@ -113,23 +113,18 @@ async function waitForFailureSessionRelease(args: {
   }
 }
 
-function resolveLocalAuthProfilePath(domain: string): string {
-  return getProfilePath(normalizeDomain(normalizeUrl(domain)));
-}
-
 function getMissingLocalAuthProfileError(args: {
-  domain: string;
+  normalizedDomain: string;
   profilePath: string;
   session: string;
 }): string {
-  const normalizedDomain = normalizeDomain(normalizeUrl(args.domain));
   return [
-    `Local auth profile not found for domain "${normalizedDomain}".`,
+    `Local auth profile not found for domain "${args.normalizedDomain}".`,
     `Expected profile file: ${args.profilePath}`,
     "To create it:",
-    `  1. libretto open https://${normalizedDomain} --headed --session ${args.session}`,
+    `  1. libretto open https://${args.normalizedDomain} --headed --session ${args.session}`,
     "  2. Log in manually in the browser window.",
-    `  3. libretto save ${normalizedDomain} --session ${args.session}`,
+    `  3. libretto save ${args.normalizedDomain} --session ${args.session}`,
   ].join("\n");
 }
 
@@ -219,13 +214,20 @@ async function runIntegrationInternal(
 
   // Resolve auth profile from CLI flag (--auth-profile <domain>)
   const authProfileDomain = args.authProfileDomain;
-  const storageStatePath = authProfileDomain
-    ? resolveLocalAuthProfilePath(authProfileDomain)
+  const normalizedAuthProfileDomain = authProfileDomain
+    ? normalizeDomain(normalizeUrl(authProfileDomain))
     : undefined;
-  if (authProfileDomain && storageStatePath && !existsSync(storageStatePath)) {
+  const storageStatePath = normalizedAuthProfileDomain
+    ? getProfilePath(normalizedAuthProfileDomain)
+    : undefined;
+  if (
+    normalizedAuthProfileDomain &&
+    storageStatePath &&
+    !existsSync(storageStatePath)
+  ) {
     throw new Error(
       getMissingLocalAuthProfileError({
-        domain: authProfileDomain,
+        normalizedDomain: normalizedAuthProfileDomain,
         profilePath: storageStatePath,
         session: args.session,
       }),

@@ -31,7 +31,11 @@ function extractBundledImplementation(indexSource: string): string {
 }
 
 const require = createRequire(import.meta.url);
-const librettoPackageVersion = require("../package.json").version as string;
+const currentLibrettoVersion = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+) as {
+  version: string;
+};
 
 describe("createHostedDeployPackage", () => {
   const cleanups: Array<() => void> = [];
@@ -210,7 +214,7 @@ describe("createHostedDeployPackage", () => {
     const implementation = extractBundledImplementation(bundle);
 
     expect(deployManifest.dependencies).toEqual({
-      libretto: librettoPackageVersion,
+      libretto: currentLibrettoVersion.version,
       lodash: "^4.17.21",
     });
     expect(bundle).toContain('export const testWorkflow = createWorkflowProxy("testWorkflow");');
