@@ -196,8 +196,7 @@ export class ScreenshotCollector {
     } finally {
       if (browser) {
         try {
-          // Disconnect CDP without closing the browser process
-          (browser as any)._connection?.close();
+          await browser.close();
         } catch {}
       }
     }
