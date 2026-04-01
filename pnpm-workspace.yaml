@@ -4,4 +4,4 @@ packages:
   - "evals"
   - "packages/*"
 
-minimumReleaseAge: 10800
+minimumReleaseAge: 10080
