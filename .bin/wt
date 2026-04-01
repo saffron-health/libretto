@@ -262,8 +262,10 @@ cmd_close() {
     local branch
     branch=$(git rev-parse --abbrev-ref HEAD)
 
-    # Move back to the main repo root
-    cd "$ROOT_DIR"
+    # Move back to the main repo root (not the worktree root, which is about to be deleted)
+    local main_root
+    main_root=$(git -C "$wt_path" worktree list --porcelain | head -1 | sed 's/^worktree //')
+    cd "$main_root"
 
     # Remove the worktree
     local remove_args=("worktree" "remove")
