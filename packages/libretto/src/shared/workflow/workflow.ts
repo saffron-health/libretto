@@ -1,12 +1,10 @@
 import type { Page } from "playwright";
-import type { MinimalLogger } from "../logger/logger.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
 export type LibrettoWorkflowContext = {
   session: string;
   page: Page;
-  logger: MinimalLogger;
 };
 
 export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
