@@ -61,6 +61,15 @@
   --color-faint: oklch(0.6 0.015 107);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+}
+
 @keyframes blink {
   0%,
   100% {

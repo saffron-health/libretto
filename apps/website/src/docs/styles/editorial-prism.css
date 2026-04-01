@@ -1,0 +1,98 @@
+/* Adapted from playwriter.dev Prism theme */
+
+.docs-root code[class*="language-"],
+.docs-root pre[class*="language-"] {
+  color: #1e293b;
+  background: none;
+  text-shadow: none;
+  font-family: var(--font-code);
+  font-size: var(--type-code-size);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.85;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  word-wrap: normal;
+  tab-size: 2;
+  hyphens: none;
+}
+
+.docs-root .token.keyword,
+.docs-root .token.module,
+.docs-root .token.imports,
+.docs-root .token.control-flow {
+  color: #b42318;
+}
+
+.docs-root .token.string,
+.docs-root .token.template-string,
+.docs-root .token.attr-value {
+  color: #0b5ed7;
+}
+
+.docs-root .token.function,
+.docs-root .token.class-name {
+  color: #7c3aed;
+}
+
+.docs-root .token.property,
+.docs-root .token.parameter {
+  color: #b45309;
+}
+
+.docs-root .token.tag .token.tag,
+.docs-root .token.tag .token.class-name {
+  color: #15803d;
+}
+
+.docs-root .token.tag .token.attr-name,
+.docs-root .token.attr-name,
+.docs-root .token.number,
+.docs-root .token.boolean,
+.docs-root .token.constant,
+.docs-root .token.builtin,
+.docs-root .language-bash .token.function {
+  color: #2563eb;
+}
+
+.docs-root .token.operator,
+.docs-root .token.spread {
+  color: #b42318;
+}
+
+.docs-root .token.punctuation,
+.docs-root .token.plain-text,
+.docs-root .token.tag .token.punctuation {
+  color: #1e293b;
+}
+
+.docs-root .token.comment,
+.docs-root .token.prolog,
+.docs-root .token.doctype,
+.docs-root .token.cdata {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.docs-root .token.regex {
+  color: #0b5ed7;
+}
+
+.docs-root code.language-diagram {
+  font-weight: 400;
+}
+
+.docs-root .language-diagram .token.box-drawing,
+.docs-root .language-diagram .token.line-char {
+  color: #8a8a8a;
+}
+
+.docs-root .language-diagram .token.label {
+  color: #0d7a5f;
+}
+
+.docs-root .token {
+  text-shadow: none;
+}

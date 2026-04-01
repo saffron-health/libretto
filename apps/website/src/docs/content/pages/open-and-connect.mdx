@@ -1,0 +1,129 @@
+## open & connect
+
+> Launch a browser session or attach to an existing Chrome DevTools Protocol endpoint.
+
+### open
+
+The `open` command launches a browser and navigates to a URL, creating a new named session. It is the starting point for any interactive workflow: once a session is open, `exec`, `snapshot`, `network`, and `actions` all work against it.
+
+```bash  theme={null}
+npx libretto open https://example.com
+npx libretto open https://example.com --headless --session debug-example
+```
+
+#### When to use `open`
+
+* At the start of script authoring when you need live page state to decide how the workflow should work.
+* When the user needs to log in manually before automation begins (use `--headed`).
+* Any time you need a fresh, isolated browser instance on a specific URL.
+
+#### Flags
+
+<ParamField path="url" type="string" required>
+  The URL to open. Passed as the first positional argument.
+</ParamField>
+
+<ParamField path="--headed" type="boolean">
+  Run the browser in headed (visible) mode. This is the default when neither flag is passed.
+</ParamField>
+
+<ParamField path="--headless" type="boolean">
+  Run the browser in headless mode. Useful for automated runs that don't need a visible window.
+</ParamField>
+
+<ParamField path="--session" type="string">
+  Name for this session. If omitted, Libretto generates a unique name automatically. Use a consistent name to target the session with later commands.
+</ParamField>
+
+<ParamField path="--viewport" type="string">
+  Viewport size in `WIDTHxHEIGHT` format, for example `1920x1080`. Falls back to the value in `.libretto/config.json`, then `1366x768`.
+</ParamField>
+
+<Note>
+  `--headed` and `--headless` are mutually exclusive. Passing both raises an error.
+</Note>
+
+#### Examples
+
+```bash  theme={null}
+# Open in headed mode (default)
+npx libretto open https://app.example.com --headed
+
+# Open in headless mode with an explicit session name
+npx libretto open https://example.com --headless --session debug-example
+
+# Open with a custom viewport
+npx libretto open https://example.com --viewport 1440x900 --session my-session
+
+# Open for a manual login flow, then save the session
+npx libretto open https://app.example.com --headed
+# ... user logs in ...
+npx libretto save app.example.com
+```
+
+***
+
+### connect
+
+The `connect` command attaches to an existing Chrome DevTools Protocol (CDP) endpoint rather than launching a new browser. Use it to drive a browser that is already running — for example, one started with `--remote-debugging-port`, an Electron application, or any other CDP-compatible target.
+
+```bash  theme={null}
+npx libretto connect http://127.0.0.1:9222 --session my-session
+npx libretto connect http://127.0.0.1:9223 --session another-session
+```
+
+#### When to use `connect`
+
+* You have an existing browser process you want to automate without restarting it.
+* You are driving an Electron app exposed over CDP.
+* You want to attach to a remote browser in a CI environment that has already navigated to the right state.
+
+#### Flags
+
+<ParamField path="cdp-url" type="string" required>
+  The CDP endpoint URL to connect to. Passed as the first positional argument. Example: `http://127.0.0.1:9222`.
+</ParamField>
+
+<ParamField path="--session" type="string">
+  Name for this session. Recommended to set explicitly when using `connect` so you can reference it later.
+</ParamField>
+
+#### After connecting
+
+Once connected, all session-scoped commands work normally against the attached browser:
+
+* `exec` — run Playwright TypeScript code
+* `snapshot` — capture a screenshot and analyze the page
+* `pages` — list open pages
+* `network` — view captured network requests
+* `actions` — view recorded actions
+
+<Warning>
+  Libretto does **not** manage the lifecycle of a connected process. Running `npx libretto close --session <name>` clears the Libretto session record but does **not** terminate the remote browser or Electron app.
+</Warning>
+
+#### Examples
+
+```bash  theme={null}
+# Attach to a Chrome instance started with --remote-debugging-port
+npx libretto connect http://127.0.0.1:9222 --session chrome-debug
+
+# Inspect the attached page
+npx libretto snapshot \
+  --session chrome-debug \
+  --objective "What is the current page state?" \
+  --context "Just attached to a running browser."
+
+# Run code against it
+npx libretto exec --session chrome-debug "return await page.url()"
+```
+
+<CardGroup cols={2}>
+  <Card title="exec" icon="code" href="#exec">
+    Execute Playwright TypeScript against the open page.
+  </Card>
+
+  <Card title="snapshot" icon="camera" href="#snapshot">
+    Capture a screenshot and analyze page state.
+  </Card>
+</CardGroup>
