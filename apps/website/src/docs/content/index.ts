@@ -1,4 +1,5 @@
 import introduction from "./pages/introduction.mdx?raw";
+import uiKit from "./pages/ui-kit.mdx?raw";
 import quickstart from "./pages/quickstart.mdx?raw";
 import configuration from "./pages/configuration.mdx?raw";
 import openAndConnect from "./pages/open-and-connect.mdx?raw";
@@ -23,13 +24,34 @@ export type DocsContentPage = {
 export type DocsContentGroup = {
   id: string;
   label: string;
+  path: string;
   pages: DocsContentPage[];
 };
 
+export const defaultDocsGroupId = "get-started";
+
+const isDocsDevBuild =
+  !import.meta.env.PROD ||
+  (typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1"].includes(window.location.hostname));
+
+const devDocsManifest = isDocsDevBuild
+  ? [
+      {
+        id: "ui-kit",
+        label: "UI Kit",
+        path: "/docs/ui-kit",
+        pages: [{ id: "ui-kit-components", label: "Components", content: uiKit }],
+      },
+    ]
+  : [];
+
 export const docsManifest = [
+  ...devDocsManifest,
   {
     id: "get-started",
     label: "Get Started",
+    path: "/docs/get-started",
     pages: [
       { id: "introduction", label: "Introduction", content: introduction },
       { id: "quickstart", label: "Quick start", content: quickstart },
@@ -39,6 +61,7 @@ export const docsManifest = [
   {
     id: "cli-reference",
     label: "CLI Reference",
+    path: "/docs/cli-reference",
     pages: [
       {
         id: "open-and-connect",
@@ -67,6 +90,7 @@ export const docsManifest = [
   {
     id: "library-api",
     label: "Library API",
+    path: "/docs/library-api",
     pages: [
       { id: "workflow", label: "Workflow", content: workflow },
       { id: "extraction", label: "AI Extraction", content: extraction },
@@ -85,6 +109,34 @@ export const docsManifest = [
 export const docsPages = docsManifest.flatMap((group) => {
   return group.pages;
 });
+
+export function normalizeDocsPath(pathname: string): string {
+  if (pathname === "/" || pathname.length === 0) {
+    return pathname;
+  }
+
+  return pathname.replace(/\/+$/, "");
+}
+
+export function getDefaultDocsGroup() {
+  return (
+    docsManifest.find((group) => {
+      return group.id === defaultDocsGroupId;
+    }) ?? docsManifest[0]
+  );
+}
+
+export function getDocsGroupByPath(pathname: string) {
+  const normalizedPath = normalizeDocsPath(pathname);
+
+  if (normalizedPath === "/docs" || normalizedPath === "/docs/index.html") {
+    return getDefaultDocsGroup();
+  }
+
+  return docsManifest.find((group) => {
+    return group.path === normalizedPath;
+  });
+}
 
 export const docsMdxContent = docsPages
   .map((page) => {

@@ -112,45 +112,37 @@ npx libretto ai configure --clear
 
 Provider credentials are read from your shell environment or a `.env` file at the project root. Set the variable for your chosen provider:
 
-<CodeGroup>
-  ```bash OpenAI theme={null}
-  OPENAI_API_KEY=sk-...
-  ```
+```bash theme={null} showLineNumbers={false}
+# OpenAI
+OPENAI_API_KEY=sk-...
 
-  ```bash Anthropic theme={null}
-  ANTHROPIC_API_KEY=sk-ant-...
-  ```
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
 
-  ```bash Gemini theme={null}
-  # Either of these is accepted:
-  GEMINI_API_KEY=...
-  GOOGLE_GENERATIVE_AI_API_KEY=...
-  ```
+# Gemini
+# Either of these is accepted:
+GEMINI_API_KEY=...
+GOOGLE_GENERATIVE_AI_API_KEY=...
 
-  ```bash Vertex theme={null}
-  GOOGLE_CLOUD_PROJECT=my-gcp-project
-  ```
-</CodeGroup>
+# Vertex
+GOOGLE_CLOUD_PROJECT=my-gcp-project
+```
 
 You also need to install the matching Vercel AI SDK peer dependency:
 
-<CodeGroup>
-  ```bash OpenAI theme={null}
-  npm install @ai-sdk/openai
-  ```
+```bash theme={null} showLineNumbers={false}
+# OpenAI
+npm install @ai-sdk/openai
 
-  ```bash Anthropic theme={null}
-  npm install @ai-sdk/anthropic
-  ```
+# Anthropic
+npm install @ai-sdk/anthropic
 
-  ```bash Gemini theme={null}
-  npm install @ai-sdk/google
-  ```
+# Gemini
+npm install @ai-sdk/google
 
-  ```bash Vertex theme={null}
-  npm install @ai-sdk/google-vertex
-  ```
-</CodeGroup>
+# Vertex
+npm install @ai-sdk/google-vertex
+```
 
 All four peer dependencies are optional — install only the one you need.
 

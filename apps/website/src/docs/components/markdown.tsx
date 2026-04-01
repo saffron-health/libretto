@@ -8,6 +8,9 @@
  */
 
 import {
+  Children,
+  Fragment,
+  isValidElement,
   useCallback,
   useEffect,
   useMemo,
@@ -16,6 +19,8 @@ import {
   useSyncExternalStore,
   useTransition,
 } from "react";
+import { useLocation } from "wouter";
+import { AppLink, isAppOwnedPathname } from "../../routing";
 import { createTocDb, searchToc, type SearchState } from "./search";
 import type {
   TocNodeType,
@@ -26,9 +31,12 @@ import type {
 
 export type { TocNodeType, VisualLevel, TocTreeNode, FlatTocItem };
 import Prism from "prismjs";
+import "prismjs/components/prism-javascript";
+import "prismjs/components/prism-typescript";
 import "prismjs/components/prism-jsx";
 import "prismjs/components/prism-tsx";
 import "prismjs/components/prism-bash";
+import "prismjs/components/prism-json";
 
 /* Custom "diagram" language for ASCII/Unicode box-drawing diagrams.
    Tokenizes box-drawing chars as neutral structure, text as highlighted labels. */
@@ -45,8 +53,36 @@ Prism.languages.diagram = {
    ========================================================================= */
 
 const WEIGHT = { regular: 400, prose: 475, heading: 560, bold: 700 } as const;
-const ACTIVE_SECTION_PROBE_OFFSET = 60;
+const ACTIVE_SECTION_VISIBILITY_PX = 60;
+const NAVIGATION_SETTLE_TOLERANCE_PX = 4;
+const NAVIGATION_IDLE_MS = 120;
 type ManualExpansionMode = "open" | "closed";
+
+const CODE_LANGUAGE_ALIASES: Record<string, string> = {
+  bash: "bash",
+  javascript: "javascript",
+  js: "javascript",
+  json: "json",
+  jsonc: "json",
+  shell: "bash",
+  sh: "bash",
+  text: "text",
+  plaintext: "text",
+  ts: "typescript",
+  tsx: "tsx",
+  txt: "text",
+  typescript: "typescript",
+  jsx: "jsx",
+  zsh: "bash",
+};
+
+function normalizeCodeLanguage(lang?: string): string | undefined {
+  if (!lang) {
+    return undefined;
+  }
+
+  return CODE_LANGUAGE_ALIASES[lang.toLowerCase()] ?? lang.toLowerCase();
+}
 
 function getHrefFragment(href: string): string {
   return href.includes("#") ? href.slice(href.indexOf("#")) : href;
@@ -54,6 +90,26 @@ function getHrefFragment(href: string): string {
 
 function getTargetIdFromHref(href: string): string {
   return getHrefFragment(href).replace(/^#/, "");
+}
+
+function normalizeDocsPathname(pathname: string): string {
+  if (pathname === "/") {
+    return pathname;
+  }
+
+  return pathname.replace(/\/+$/, "");
+}
+
+function getHrefPathname(href: string, fallbackPathname: string): string {
+  if (href.startsWith("#")) {
+    return fallbackPathname;
+  }
+
+  try {
+    return normalizeDocsPathname(new URL(href, window.location.origin).pathname);
+  } catch {
+    return fallbackPathname;
+  }
 }
 
 function isPlainAnchorNavigationClick(
@@ -134,6 +190,7 @@ const headingTagByLevel: Record<HeadingLevel, "h1" | "h2" | "h3"> = {
 type PendingNavigation = {
   itemId: string;
   targetId: string;
+  startedAt: number;
 };
 
 function getHeaderHeight(): number {
@@ -160,14 +217,65 @@ function isNavigationInterruptKey(event: KeyboardEvent): boolean {
 
 /* flattenTocTree and helpers moved to toc-tree.ts (server-safe, no 'use client'). */
 
-/** Single useSyncExternalStore that handles both initial hash and scroll-based
- *  active heading tracking. Server snapshot returns fallbackId to avoid
- *  hydration mismatch. Hash is read inside subscribe (not during render) to
- *  keep render pure. All callbacks are stable via useCallback. */
+type TocSectionBounds = {
+  id: string;
+  top: number;
+  bottom: number;
+  visibleHeight: number;
+};
+
+function getTocSectionBounds(headings: HTMLElement[]) {
+  const documentBottom = document.documentElement.scrollHeight;
+
+  return headings.map((heading, index): TocSectionBounds => {
+    const top = window.scrollY + heading.getBoundingClientRect().top;
+    const nextHeading = headings[index + 1];
+    const bottom = nextHeading
+      ? window.scrollY + nextHeading.getBoundingClientRect().top
+      : documentBottom;
+
+    return {
+      id: heading.id,
+      top,
+      bottom,
+      visibleHeight: 0,
+    };
+  });
+}
+
+function getVisibleSectionBounds({
+  sections,
+  viewportTop,
+  viewportBottom,
+}: {
+  sections: TocSectionBounds[];
+  viewportTop: number;
+  viewportBottom: number;
+}) {
+  return sections.map((section) => {
+    const visibleTop = Math.max(section.top, viewportTop);
+    const visibleBottom = Math.min(section.bottom, viewportBottom);
+
+    return {
+      ...section,
+      visibleHeight: Math.max(0, visibleBottom - visibleTop),
+    };
+  });
+}
+
+/** Scroll-derived TOC selection.
+ *
+ * Rules:
+ * - At the top of the docs, the first section is selected.
+ * - During manual scrolling, select the last section in document order with at
+ *   least 60px visible beneath the sticky header.
+ * - If no section reaches the 60px threshold (rare edge cases like tiny final
+ *   sections), fall back to the last partially visible section, then the last
+ *   section above the viewport.
+ *
+ * Server snapshot returns fallbackId to avoid hydration mismatch. */
 function useActiveTocId({ fallbackId }: { fallbackId: string }) {
   const activeRef = useRef(fallbackId);
-  const lastScrollYRef = useRef(0);
-  const scrollDirectionRef = useRef<"up" | "down">("down");
 
   const subscribe = useCallback((onStoreChange: () => void) => {
     const emit = (next: string) => {
@@ -178,19 +286,15 @@ function useActiveTocId({ fallbackId }: { fallbackId: string }) {
       onStoreChange();
     };
 
-    // Read hash on first subscribe to fix flash on initial paint
-    const hash = window.location.hash.replace(/^#/, "");
-    if (hash) {
-      emit(hash);
-    }
-
-    const headings = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-toc-heading="true"][id]'),
-    );
     let rafId = 0;
-    lastScrollYRef.current = window.scrollY;
 
     const computeActive = () => {
+      const headings = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-toc-heading="true"][id]',
+        ),
+      );
+
       if (headings.length === 0) {
         return;
       }
@@ -199,27 +303,20 @@ function useActiveTocId({ fallbackId }: { fallbackId: string }) {
       const viewportTop = window.scrollY + safeHeaderHeight;
       const viewportBottom = window.scrollY + window.innerHeight;
 
-      const sections = headings.map((heading, index) => {
-        const top = window.scrollY + heading.getBoundingClientRect().top;
-        const nextHeading = headings[index + 1];
-        const bottom = nextHeading
-          ? window.scrollY + nextHeading.getBoundingClientRect().top
-          : document.documentElement.scrollHeight;
-        const anchor = top + ACTIVE_SECTION_PROBE_OFFSET;
-
-        return { id: heading.id, top, bottom, anchor };
+      const sections = getVisibleSectionBounds({
+        sections: getTocSectionBounds(headings),
+        viewportTop,
+        viewportBottom,
       });
-
       const firstSection = sections[0];
-      if (firstSection && viewportTop <= firstSection.anchor) {
+
+      if (firstSection && viewportTop <= firstSection.top) {
         emit(firstSection.id);
         return;
       }
 
       const visibleSections = sections.filter((section) => {
-        return (
-          section.anchor >= viewportTop && section.anchor <= viewportBottom
-        );
+        return section.visibleHeight >= ACTIVE_SECTION_VISIBILITY_PX;
       });
 
       if (visibleSections.length > 0) {
@@ -227,30 +324,20 @@ function useActiveTocId({ fallbackId }: { fallbackId: string }) {
         return;
       }
 
-      if (scrollDirectionRef.current === "up") {
-        const nextVisibleFromBottom = sections.find((section) => {
-          return section.anchor > viewportBottom;
-        });
+      const partiallyVisibleSections = sections.filter((section) => {
+        return section.visibleHeight > 0;
+      });
 
-        if (nextVisibleFromBottom) {
-          emit(nextVisibleFromBottom.id);
-          return;
-        }
-
-        emit(sections[sections.length - 1].id);
+      if (partiallyVisibleSections.length > 0) {
+        emit(partiallyVisibleSections[partiallyVisibleSections.length - 1].id);
         return;
       }
 
       const passedSections = sections.filter((section) => {
-        return section.anchor < viewportTop;
+        return section.top <= viewportTop;
       });
 
-      if (passedSections.length > 0) {
-        emit(passedSections[passedSections.length - 1].id);
-        return;
-      }
-
-      emit(sections[0].id);
+      emit(passedSections[passedSections.length - 1]?.id ?? firstSection.id);
     };
 
     const scheduleCompute = () => {
@@ -265,23 +352,10 @@ function useActiveTocId({ fallbackId }: { fallbackId: string }) {
     };
 
     const handleScroll = () => {
-      const nextScrollY = window.scrollY;
-
-      if (nextScrollY > lastScrollYRef.current) {
-        scrollDirectionRef.current = "down";
-      } else if (nextScrollY < lastScrollYRef.current) {
-        scrollDirectionRef.current = "up";
-      }
-
-      lastScrollYRef.current = nextScrollY;
       scheduleCompute();
     };
 
     const handleHistoryNavigation = () => {
-      const nextHash = window.location.hash.replace(/^#/, "");
-      if (nextHash) {
-        emit(nextHash);
-      }
       scheduleCompute();
     };
 
@@ -328,7 +402,7 @@ function TocLink({
   isActive: boolean;
   chevron?: { expanded: boolean; lockedOpen?: boolean };
   onToggle?: () => void;
-  onNavigate?: (item: FlatTocItem, link: HTMLAnchorElement) => void;
+  onNavigate?: (item: FlatTocItem, link: HTMLAnchorElement) => boolean;
   /** Search: dim non-matching items to opacity 0.3 */
   dimmed?: boolean;
   /** Search: item matched the query */
@@ -374,8 +448,10 @@ function TocLink({
         if (!onNavigate || !isPlainAnchorNavigationClick(e)) {
           return;
         }
-        e.preventDefault();
-        onNavigate(item, e.currentTarget);
+        const handled = onNavigate(item, e.currentTarget);
+        if (handled) {
+          e.preventDefault();
+        }
       }}
       onMouseEnter={(e) => {
         if (!effectiveActive && !dimmed) {
@@ -450,8 +526,16 @@ export function TableOfContents({
   items: FlatTocItem[];
   logo?: string;
 }) {
+  const [, navigate] = useLocation();
+  const currentPathname =
+    typeof window === "undefined"
+      ? "/docs"
+      : normalizeDocsPathname(window.location.pathname);
   const firstNavigableItem = items.find((item) => {
-    return item.href.startsWith("#");
+    return (
+      getHrefPathname(item.href, currentPathname) === currentPathname &&
+      item.href.includes("#")
+    );
   });
   const fallbackId = getTargetIdFromHref(firstNavigableItem?.href ?? "");
   const activeHeadingId = useActiveTocId({ fallbackId });
@@ -485,12 +569,25 @@ export function TableOfContents({
     return next;
   }, [items]);
 
+  const activeGroupItem = items.find((item) => {
+    return (
+      item.type === "group" &&
+      getHrefPathname(item.href, currentPathname) === currentPathname
+    );
+  });
   const activeItemId =
     preferredItemIdByHref.get(`#${activeHeadingId}`) ??
+    preferredItemIdByHref.get(`${currentPathname}#${activeHeadingId}`) ??
+    activeGroupItem?.id ??
     firstNavigableItem?.id ??
     items[0]?.id ??
     null;
   const selectedItemId = pendingNavigation?.itemId ?? activeItemId;
+  const activeHeadingIdRef = useRef(activeHeadingId);
+
+  useEffect(() => {
+    activeHeadingIdRef.current = activeHeadingId;
+  }, [activeHeadingId]);
 
   const defaultExpandedIds = useMemo(() => {
     return new Set(
@@ -549,11 +646,6 @@ export function TableOfContents({
       return;
     }
 
-    if (activeHeadingId === pendingNavigation.targetId) {
-      setPendingNavigation(null);
-      return;
-    }
-
     const target = document.getElementById(pendingNavigation.targetId);
     if (!target) {
       setPendingNavigation(null);
@@ -561,6 +653,8 @@ export function TableOfContents({
     }
 
     let rafId = 0;
+    let lastScrollY = window.scrollY;
+    let lastScrollChangeAt = pendingNavigation.startedAt;
 
     const clearPendingNavigation = () => {
       setPendingNavigation((current) => {
@@ -581,10 +675,22 @@ export function TableOfContents({
     };
 
     const checkTargetPosition = () => {
+      const nextScrollY = window.scrollY;
+      if (Math.abs(nextScrollY - lastScrollY) > 0.5) {
+        lastScrollY = nextScrollY;
+        lastScrollChangeAt = performance.now();
+      }
+
       const distanceFromViewportTop =
         target.getBoundingClientRect().top - getHeaderHeight();
+      const targetAligned =
+        Math.abs(distanceFromViewportTop) <= NAVIGATION_SETTLE_TOLERANCE_PX;
+      const targetSelected =
+        activeHeadingIdRef.current === pendingNavigation.targetId;
+      const navigationSettled =
+        performance.now() - lastScrollChangeAt >= NAVIGATION_IDLE_MS;
 
-      if (Math.abs(distanceFromViewportTop) <= 4) {
+      if ((targetAligned || targetSelected) && navigationSettled) {
         clearPendingNavigation();
         return;
       }
@@ -597,7 +703,7 @@ export function TableOfContents({
     window.addEventListener("touchstart", handleUserInterrupt, {
       passive: true,
     });
-    window.addEventListener("mousedown", handleUserInterrupt);
+    window.addEventListener("pointerdown", handleUserInterrupt);
     window.addEventListener("popstate", handleUserInterrupt);
     window.addEventListener("keydown", handleKeyDown);
 
@@ -607,22 +713,38 @@ export function TableOfContents({
       }
       window.removeEventListener("wheel", handleUserInterrupt);
       window.removeEventListener("touchstart", handleUserInterrupt);
-      window.removeEventListener("mousedown", handleUserInterrupt);
+      window.removeEventListener("pointerdown", handleUserInterrupt);
       window.removeEventListener("popstate", handleUserInterrupt);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [activeHeadingId, pendingNavigation]);
+  }, [pendingNavigation]);
 
   const navigateToItem = useCallback(
     (item: FlatTocItem, link?: HTMLAnchorElement | null) => {
+      const itemUrl = new URL(item.href, window.location.origin);
+      const itemPathname = normalizeDocsPathname(itemUrl.pathname);
+
+      if (itemPathname !== currentPathname) {
+        if (!isAppOwnedPathname(itemPathname)) {
+          return false;
+        }
+
+        navigate(`${itemUrl.pathname}${itemUrl.search}${itemUrl.hash}`);
+        return true;
+      }
+
       const targetId = getTargetIdFromHref(item.href);
       const target = targetId ? document.getElementById(targetId) : null;
 
       if (!targetId || !target) {
-        return;
+        return false;
       }
 
-      setPendingNavigation({ itemId: item.id, targetId });
+      setPendingNavigation({
+        itemId: item.id,
+        targetId,
+        startedAt: performance.now(),
+      });
 
       const nextHash = `#${targetId}`;
       const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
@@ -634,8 +756,9 @@ export function TableOfContents({
 
       link?.focus();
       target.scrollIntoView({ block: "start" });
+      return true;
     },
-    [],
+    [currentPathname, navigate],
   );
 
   const toggle = useCallback(
@@ -758,7 +881,16 @@ export function TableOfContents({
         const itemId = focusable[highlightedIndex];
         const item = itemId ? itemById.get(itemId) : undefined;
         if (item) {
-          navigateToItem(item);
+          const handled = navigateToItem(item);
+          if (!handled) {
+            const itemPathname = getHrefPathname(item.href, currentPathname);
+
+            if (isAppOwnedPathname(itemPathname)) {
+              navigate(item.href);
+            } else {
+              window.location.assign(item.href);
+            }
+          }
           handleQueryChange("");
           searchInputRef.current?.blur();
         }
@@ -769,7 +901,9 @@ export function TableOfContents({
       highlightedIndex,
       handleQueryChange,
       itemById,
+      navigate,
       navigateToItem,
+      currentPathname,
     ],
   );
 
@@ -911,7 +1045,7 @@ export function TableOfContents({
 
 export function BackButton() {
   return (
-    <a
+    <AppLink
       href="/"
       className="docs-back-button fixed top-5 right-5 z-[100000] flex h-10 w-10 items-center justify-center rounded-full no-underline"
     >
@@ -924,7 +1058,7 @@ export function BackButton() {
           strokeLinejoin="round"
         />
       </svg>
-    </a>
+    </AppLink>
   );
 }
 
@@ -954,11 +1088,11 @@ export function SectionHeading({
         scrollMarginTop: "var(--header-height)",
       }}
     >
-      <span
-        className={level === 1 ? "docs-section-heading-text-nowrap" : undefined}
-      >
-        {children}
-      </span>
+      {level === 1 ? (
+        <span className="docs-section-heading-text-nowrap">{children}</span>
+      ) : (
+        children
+      )}
       {level === 1 ? <span className="docs-section-heading-rule" /> : null}
     </Tag>
   );
@@ -994,13 +1128,13 @@ export function A({
   const isExternal = /^(https?:)?\/\//.test(href);
 
   return (
-    <a
+    <AppLink
       href={href}
       {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       className="docs-link"
     >
       {children}
-    </a>
+    </AppLink>
   );
 }
 
@@ -1095,10 +1229,99 @@ function Callout({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`docs-callout docs-callout-${tone}`}>
-      <div className="docs-callout-label">{label}</div>
+    <div
+      className={`docs-callout docs-callout-${tone}`}
+      data-callout-tone={tone}
+    >
+      <div className="docs-callout-header">
+        <div className="docs-callout-icon-wrap" aria-hidden="true">
+          <CalloutIcon tone={tone} />
+        </div>
+        <div className="docs-callout-label">{label}</div>
+      </div>
       <div className="docs-callout-body">{children}</div>
     </div>
+  );
+}
+
+function CalloutIcon({ tone }: { tone: "note" | "tip" | "warning" }) {
+  if (tone === "note") {
+    return (
+      <svg className="docs-callout-icon" viewBox="0 0 24 24" fill="none">
+        <path
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+          d="M7.75 19.25H16.25C17.3546 19.25 18.25 18.3546 18.25 17.25V9L14 4.75H7.75C6.64543 4.75 5.75 5.64543 5.75 6.75V17.25C5.75 18.3546 6.64543 19.25 7.75 19.25Z"
+        />
+        <path
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+          d="M18 9.25H13.75V5"
+        />
+        <path
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+          d="M9.75 15.25H14.25"
+        />
+        <path
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+          d="M9.75 12.25H14.25"
+        />
+      </svg>
+    );
+  }
+
+  if (tone === "tip") {
+    return (
+      <svg className="docs-callout-icon" viewBox="0 0 24 24" fill="none">
+        <path
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          d="M12 13V15"
+        />
+        <circle cx="12" cy="9" r="1" fill="currentColor" />
+        <circle
+          cx="12"
+          cy="12"
+          r="7.25"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className="docs-callout-icon" viewBox="0 0 24 24" fill="none">
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        d="M4.9522 16.3536L10.2152 5.85658C10.9531 4.38481 13.0539 4.3852 13.7913 5.85723L19.0495 16.3543C19.7156 17.6841 18.7487 19.25 17.2613 19.25H6.74007C5.25234 19.25 4.2854 17.6835 4.9522 16.3536Z"
+      />
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M12 10V12"
+      />
+      <circle cx="12" cy="16" r="1" fill="currentColor" />
+    </svg>
   );
 }
 
@@ -1126,6 +1349,83 @@ export function Warning({ children }: { children: React.ReactNode }) {
   );
 }
 
+function partitionCalloutChildren(children: React.ReactNode) {
+  const flattenChildren = (nodes: React.ReactNode): React.ReactNode[] => {
+    return Children.toArray(nodes).flatMap((child) => {
+      if (isValidElement(child) && child.type === Fragment) {
+        return flattenChildren(
+          (child.props as { children?: React.ReactNode }).children,
+        );
+      }
+
+      return [child];
+    });
+  };
+
+  const isCalloutElement = (child: React.ReactNode) => {
+    if (!isValidElement(child)) {
+      return false;
+    }
+
+    if (child.type === Note || child.type === Tip || child.type === Warning) {
+      return true;
+    }
+
+    const props = child.props as {
+      [key: string]: unknown;
+      className?: string;
+    };
+    const tone = props["data-callout-tone"];
+    const className = props.className;
+    return (
+      typeof tone === "string" ||
+      (typeof className === "string" && className.includes("docs-callout"))
+    );
+  };
+
+  const childNodes = flattenChildren(children).filter((child) => {
+    return !(typeof child === "string" && child.trim().length === 0);
+  });
+  const asideChildren = childNodes.filter((child) => {
+    return isCalloutElement(child);
+  });
+  const bodyChildren = childNodes.filter((child) => {
+    return !asideChildren.includes(child);
+  });
+
+  return {
+    bodyChildren,
+    asideChildren,
+  };
+}
+
+function CalloutAsideLayout({
+  children,
+  bodyClassName,
+  asideClassName,
+}: {
+  children: React.ReactNode;
+  bodyClassName?: string;
+  asideClassName?: string;
+}) {
+  const { bodyChildren, asideChildren } = partitionCalloutChildren(children);
+
+  return (
+    <div
+      className={`docs-callout-aside-layout ${asideChildren.length > 0 ? "docs-callout-aside-layout-with-aside" : ""}`.trim()}
+    >
+      <div className={bodyClassName ?? "docs-callout-aside-main"}>
+        {bodyChildren}
+      </div>
+      {asideChildren.length > 0 ? (
+        <aside className={asideClassName ?? "docs-callout-aside-rail"}>
+          {asideChildren}
+        </aside>
+      ) : null}
+    </div>
+  );
+}
+
 export function Steps({ children }: { children: React.ReactNode }) {
   return <div className="docs-steps">{children}</div>;
 }
@@ -1142,7 +1442,7 @@ export function Step({
       <div className="docs-step-badge" aria-hidden="true" />
       <div className="docs-step-content">
         <h4 className="docs-step-title">{title}</h4>
-        <div className="docs-step-body">{children}</div>
+        <div className="docs-step-body docs-step-main">{children}</div>
       </div>
     </section>
   );
@@ -1195,17 +1495,61 @@ export function Card({
   children: React.ReactNode;
   icon?: string;
 }) {
-  const isExternal = /^(https?:)?\/\//.test(href);
+  return (
+    <CardLinkSurface title={title} href={href} className="docs-card">
+      <div className="docs-card-body">{children}</div>
+    </CardLinkSurface>
+  );
+}
+
+function CardLinkSurface({
+  title,
+  href,
+  className,
+  titleClassName = "docs-card-title",
+  children,
+}: {
+  title: string;
+  href?: string;
+  className: string;
+  titleClassName?: string;
+  children: React.ReactNode;
+}) {
+  const isExternal = href ? /^(https?:)?\/\//.test(href) : false;
+  const surface = (
+    <>
+      <div className="docs-card-link-icon" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path
+            d="M4.083 9.917 9.917 4.083M5.25 4.083h4.667V8.75"
+            stroke="currentColor"
+            strokeWidth="1.35"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+      <h4 className={titleClassName}>{title}</h4>
+      {children}
+    </>
+  );
+
+  if (!href) {
+    return (
+      <section className={`${className} docs-card-link-surface`.trim()}>
+        {surface}
+      </section>
+    );
+  }
 
   return (
-    <a
+    <AppLink
       href={href}
       {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className="docs-card no-underline"
+      className={`${className} docs-card-link-surface no-underline`.trim()}
     >
-      <div className="docs-card-title">{title}</div>
-      <div className="docs-card-body">{children}</div>
-    </a>
+      {surface}
+    </AppLink>
   );
 }
 
@@ -1221,10 +1565,20 @@ export function Tab({
   children: React.ReactNode;
 }) {
   return (
-    <section className="docs-tab-panel">
-      <h4 className="docs-tab-title">{title}</h4>
-      <div className="docs-tab-body">{children}</div>
-    </section>
+    <CardLinkSurface
+      title={title}
+      className="docs-tab-panel"
+      titleClassName="docs-tab-title"
+    >
+      <div className="docs-tab-body">
+        <CalloutAsideLayout
+          bodyClassName="docs-tab-main"
+          asideClassName="docs-tab-aside"
+        >
+          {children}
+        </CalloutAsideLayout>
+      </div>
+    </CardLinkSurface>
   );
 }
 
@@ -1293,25 +1647,6 @@ export function ResponseField({
   );
 }
 
-export function AccordionGroup({ children }: { children: React.ReactNode }) {
-  return <div className="docs-accordion-group">{children}</div>;
-}
-
-export function Accordion({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="docs-accordion">
-      <h4 className="docs-accordion-title">{title}</h4>
-      <div className="docs-accordion-body">{children}</div>
-    </section>
-  );
-}
-
 export function Expandable({
   title,
   children,
@@ -1322,7 +1657,14 @@ export function Expandable({
   return (
     <section className="docs-expandable">
       <h5 className="docs-expandable-title">{title}</h5>
-      <div className="docs-expandable-body">{children}</div>
+      <div className="docs-expandable-body">
+        <CalloutAsideLayout
+          bodyClassName="docs-expandable-main"
+          asideClassName="docs-expandable-aside"
+        >
+          {children}
+        </CalloutAsideLayout>
+      </div>
     </section>
   );
 }
@@ -1336,7 +1678,7 @@ export function CodeBlock({
   lang = "jsx",
   title,
   lineHeight = "1.85",
-  showLineNumbers = true,
+  showLineNumbers: _showLineNumbers,
 }: {
   children: string;
   lang?: string;
@@ -1344,22 +1686,28 @@ export function CodeBlock({
   lineHeight?: string;
   showLineNumbers?: boolean;
 }) {
-  const lines = children.split("\n");
-
   /* Use Prism.highlight() to get highlighted HTML as a string. Works on both
      server and client (no DOM dependency), avoiding hydration mismatch issues
      that occur with useEffect + highlightElement. */
+  const prismLang = normalizeCodeLanguage(lang);
+
   const highlightedHtml = useMemo(() => {
-    const grammar = lang ? Prism.languages[lang] : undefined;
+    if (!prismLang || prismLang === "text") {
+      return undefined;
+    }
+
+    const grammar = Prism.languages[prismLang];
     if (!grammar) {
       return undefined;
     }
-    return Prism.highlight(children, grammar, lang);
-  }, [children, lang]);
+    return Prism.highlight(children, grammar, prismLang);
+  }, [children, prismLang]);
+
+  const codeClassName = `docs-code-content ${prismLang ? `language-${prismLang}` : ""}`.trim();
 
   return (
-    <figure className="m-0 bleed">
-      <div className="relative">
+    <figure className="m-0">
+      <div className="docs-code-frame relative">
         {title && <div className="docs-code-title">{title}</div>}
         <pre className="docs-code-pre overflow-x-auto">
           <div
@@ -1371,20 +1719,6 @@ export function CodeBlock({
               } as React.CSSProperties
             }
           >
-            {showLineNumbers && (
-              <span
-                className="docs-code-line-numbers select-none shrink-0"
-                aria-hidden="true"
-              >
-                {lines.map((_, i) => {
-                  return (
-                    <span key={i} className="block">
-                      {i + 1}
-                    </span>
-                  );
-                })}
-              </span>
-            )}
             {highlightedHtml ? (
               <code
                 style={
@@ -1393,12 +1727,12 @@ export function CodeBlock({
                       lineHeight,
                   } as React.CSSProperties
                 }
-                className={`docs-code-content ${lang ? `language-${lang}` : ""}`.trim()}
+                className={codeClassName}
                 dangerouslySetInnerHTML={{ __html: highlightedHtml }}
               />
             ) : (
               <code
-                className={`docs-code-content ${lang ? `language-${lang}` : ""}`.trim()}
+                className={codeClassName}
                 style={
                   {
                     ["--docs-code-line-height" as "--docs-code-line-height"]:
@@ -1730,19 +2064,6 @@ export type TabItem = {
   href: string;
 };
 
-/* =========================================================================
-   Aside — MDX component for right-sidebar content.
-   On desktop, extracted from content flow and rendered in grid column 5
-   via SectionRow. On mobile, renders inline as a styled callout.
-   ========================================================================= */
-
-/** Aside is a marker component for MDX. On desktop, its children are extracted
- *  by the section grouping logic and rendered in the right sidebar slot.
- *  On mobile, SectionRow renders it inline. The component itself is a pass-through. */
-export function Aside({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
-
 /** FullWidth is a marker component for MDX. Its children become a section that
  *  spans both the content and aside columns in the grid layout. */
 export function FullWidth({ children }: { children: React.ReactNode }) {
@@ -1767,7 +2088,7 @@ export function SectionRow({
         {content}
       </div>
       {aside && (
-        <div className="docs-section-aside flex flex-col gap-3 my-2 p-3 rounded-(--border-radius-md) border border-(--border-subtle) text-(length:--type-toc-size) leading-[1.5] text-(color:--text-tree-label) lg:col-[2] lg:sticky lg:top-(--sticky-top) lg:self-start lg:max-h-[calc(100vh-var(--header-height))] lg:overflow-y-auto lg:my-[4px]">
+        <div className="docs-section-aside lg:col-[2] lg:sticky lg:top-(--sticky-top) lg:self-start lg:max-h-[calc(100vh-var(--header-height))] lg:overflow-y-auto">
           {aside}
         </div>
       )}
@@ -1794,9 +2115,12 @@ export function SidebarBanner({
   return (
     <div className="docs-sidebar-banner">
       {text}
-      <a href={buttonHref} className="docs-sidebar-banner-button no-underline">
+      <AppLink
+        href={buttonHref}
+        className="docs-sidebar-banner-button no-underline"
+      >
         {buttonLabel}
-      </a>
+      </AppLink>
       {imageUrl && (
         <img
           src={imageUrl}
@@ -1813,14 +2137,14 @@ export function SidebarBanner({
 function TabLink({ tab, isActive }: { tab: TabItem; isActive: boolean }) {
   const isExternal = tab.href.startsWith("http");
   return (
-    <a
+    <AppLink
       href={tab.href}
       {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       className={`docs-tab-link slot-tab no-underline text-(length:--type-toc-size) font-[475] [font-family:var(--font-primary)] ${isActive ? "docs-tab-link-active" : ""}`}
     >
       {tab.label}
       <div data-tab-indicator className="docs-tab-indicator" />
-    </a>
+    </AppLink>
   );
 }
 
@@ -1881,7 +2205,7 @@ export function EditorialPage({
         <div className="slot-navbar">
           {/* Top row: logo + right links */}
           <div className="mx-auto flex items-center justify-between px-(--mobile-padding) py-(--header-padding-y) lg:max-w-(--grid-max-width) lg:px-0">
-            <a href="/" className="slot-logo no-underline flex items-center">
+            <AppLink href="/" className="slot-logo no-underline flex items-center">
               {logo ? (
                 <div
                   role="img"
@@ -1904,7 +2228,7 @@ export function EditorialPage({
                   Libretto
                 </span>
               )}
-            </a>
+            </AppLink>
             <div className="flex items-center gap-4">
               {/* Icon links */}
               {headerLinks && headerLinks.length > 0 && (

@@ -27,7 +27,7 @@ Libretto is designed to be loaded as a **skill** in your coding agent. A skill i
 * Prefer network request approaches over UI automation when the site allows it
 * Validate a finished workflow with a headless `run` before declaring it done
 
-The skill file ships with the package at `skills/libretto/SKILL.md` and is automatically copied into `.agents/skills/libretto` and `.claude/skills/libretto` when you run `npx libretto init`.
+The skill file ships with the package at `skills/libretto/SKILL.md` and is automatically copied into `.agents/skills/libretto` and `.claude/skills/libretto` when you run `npx libretto setup`.
 
 You can invoke Libretto skills with natural language prompts like:
 
@@ -71,7 +71,7 @@ All Libretto state lives in a `.libretto/` directory at your project root:
     └── <domain>.json    # Saved auth state
 ```
 
-Sessions and profiles are automatically git-ignored by a `.libretto/.gitignore` file that `npx libretto init` creates.
+Sessions and profiles are automatically git-ignored by a `.libretto/.gitignore` file that `npx libretto setup` creates.
 
 ### Next steps
 

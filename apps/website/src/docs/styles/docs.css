@@ -58,6 +58,7 @@
   --page-border: color-mix(in oklab, oklch(0.153 0.006 107.1) 10%, transparent);
   --divider: color-mix(in oklab, oklch(0.153 0.006 107.1) 7%, transparent);
   --border-subtle: color-mix(in oklab, oklch(0.153 0.006 107.1) 8%, transparent);
+  --surface-note: color-mix(in oklab, white 65%, var(--bg));
   --code-line-nr: color-mix(in oklab, oklch(0.153 0.006 107.1) 30%, transparent);
   --selection-bg: color-mix(in oklab, oklch(0.153 0.006 107.1) 8%, transparent);
   --btn-bg: color-mix(in oklab, white 82%, var(--bg));
@@ -137,6 +138,10 @@
   opacity: calc(1 / 0.82);
 }
 
+.docs-root strong {
+  font-weight: 560;
+}
+
 .docs-back-button {
   background: var(--btn-bg);
   color: var(--text-secondary);
@@ -177,18 +182,20 @@
   font-weight: 560;
   line-height: 1.4;
   letter-spacing: -0.09px;
-  padding-top: 10px;
+  margin-top: 12px;
+  padding-top: 0;
   padding-bottom: 4px;
 }
 
 .docs-section-heading-3 {
-  font-size: var(--type-heading-3-size);
+  font-size: 14px;
   font-weight: 560;
   line-height: 1.4;
-  letter-spacing: -0.09px;
-  padding-top: 4px;
+  letter-spacing: normal;
+  margin-top: 4px;
+  padding-top: 0;
   padding-bottom: 2px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .docs-section-heading-text-nowrap {
@@ -270,6 +277,13 @@
   padding: 0 0 8px 12px;
 }
 
+.docs-code-frame {
+  border: 1px solid var(--page-border);
+  border-radius: var(--border-radius-md);
+  background: var(--surface-note);
+  overflow: hidden;
+}
+
 .docs-code-pre {
   border-radius: var(--border-radius-md);
   margin: 0;
@@ -277,7 +291,7 @@
 }
 
 .docs-code-body {
-  padding: 12px 8px 8px;
+  padding: 12px 14px 10px;
   font-family: var(--font-code);
   font-size: var(--type-code-size);
   font-weight: 400;
@@ -290,9 +304,11 @@
 .docs-code-line-numbers {
   color: var(--code-line-nr);
   text-align: right;
-  padding-right: 20px;
-  width: 36px;
+  padding-right: 14px;
+  margin-right: 14px;
+  width: 30px;
   user-select: none;
+  border-right: 1px solid var(--page-border);
 }
 
 .docs-code-content {
@@ -534,8 +550,11 @@
 }
 
 .docs-section-aside {
-  margin-top: 4px;
-  margin-bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .docs-sidebar-banner {
@@ -648,12 +667,16 @@
   position: relative;
   display: inline-block;
   font-family: var(--font-code);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 13px;
+  line-height: 16px;
   letter-spacing: 0.01em;
   padding: 2px 4px;
   color: rgba(17, 17, 17, 0.78);
+}
+
+.docs-section-heading .inline-code {
+  vertical-align: baseline;
 }
 
 .inline-code::before {
@@ -661,7 +684,8 @@
   position: absolute;
   inset: -1px 0;
   background: rgba(17, 17, 17, 0.04);
-  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
   z-index: -1;
 }
 
@@ -768,21 +792,45 @@
 }
 
 .docs-callout {
+  --docs-callout-accent: var(--text-secondary);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin: 4px 0;
   padding: 12px 14px;
   border: 1px solid var(--page-border);
   border-radius: var(--border-radius-md);
   background: color-mix(in oklab, white 55%, var(--bg));
+  font-size: var(--type-body-size);
+  line-height: 1.6;
+}
+
+.docs-callout-header {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.docs-callout-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--docs-callout-accent);
+}
+
+.docs-callout-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex-shrink: 0;
 }
 
 .docs-callout-label {
   font-family: var(--font-primary);
-  font-size: var(--type-toc-size);
+  font-size: var(--type-code-size);
   font-weight: 560;
-  color: var(--text-primary);
+  line-height: 1.45;
+  color: var(--docs-callout-accent);
 }
 
 .docs-callout-body {
@@ -792,14 +840,29 @@
 }
 
 .docs-callout-note {
-  background: color-mix(in oklab, white 65%, var(--bg));
+  --docs-callout-accent: color-mix(
+    in oklab,
+    oklch(0.62 0.14 88) 82%,
+    white
+  );
+  background: color-mix(in oklab, oklch(0.9 0.05 95) 46%, white);
 }
 
 .docs-callout-tip {
+  --docs-callout-accent: color-mix(
+    in oklab,
+    oklch(0.55 0.12 170) 76%,
+    white
+  );
   background: color-mix(in oklab, oklch(0.89 0.04 160) 32%, white);
 }
 
 .docs-callout-warning {
+  --docs-callout-accent: color-mix(
+    in oklab,
+    oklch(0.62 0.14 75) 80%,
+    white
+  );
   background: color-mix(in oklab, oklch(0.88 0.05 70) 36%, white);
 }
 
@@ -816,6 +879,17 @@
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 14px;
   align-items: start;
+  position: relative;
+}
+
+.docs-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 13.5px;
+  top: 30px;
+  bottom: -16px;
+  width: 1px;
+  background: var(--page-border);
 }
 
 .docs-step-badge {
@@ -837,10 +911,8 @@
 }
 
 .docs-step-content,
-.docs-step-body,
 .docs-tab-body,
 .docs-field-body,
-.docs-accordion-body,
 .docs-expandable-body,
 .docs-card-body {
   display: flex;
@@ -849,9 +921,7 @@
   min-width: 0;
 }
 
-.docs-step-title,
 .docs-tab-title,
-.docs-accordion-title,
 .docs-expandable-title,
 .docs-card-title {
   margin: 0;
@@ -861,6 +931,57 @@
   line-height: 1.4;
   letter-spacing: -0.09px;
   color: var(--text-primary);
+}
+
+.docs-step-title {
+  margin: 0;
+  font-family: var(--font-primary);
+  font-size: var(--type-body-size);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: normal;
+  color: var(--text-primary);
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.docs-step-body,
+.docs-step-main,
+.docs-tab-main,
+.docs-tab-aside,
+.docs-expandable-main,
+.docs-expandable-aside,
+.docs-callout-aside-layout,
+.docs-callout-aside-main,
+.docs-callout-aside-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.docs-tab-aside .docs-callout,
+.docs-expandable-aside .docs-callout,
+.docs-section-aside .docs-callout,
+.docs-callout-aside-rail .docs-callout {
+  margin: 0;
+}
+
+.docs-card-link-surface {
+  position: relative;
+}
+
+.docs-card-link-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--text-tertiary);
+}
+
+.docs-card-title,
+.docs-tab-title {
+  padding-right: 24px;
 }
 
 .docs-card-grid {
@@ -895,15 +1016,27 @@
 }
 
 .docs-tabs,
-.docs-code-group,
-.docs-accordion-group {
+.docs-code-group {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
+@media (min-width: 1080px) {
+  .docs-callout-aside-layout-with-aside {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(170px, 190px);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .docs-section-aside {
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+}
+
 .docs-tab-panel,
-.docs-accordion,
 .docs-expandable {
   display: flex;
   flex-direction: column;
@@ -923,7 +1056,7 @@
 }
 
 .docs-code-title {
-  margin-bottom: 6px;
+  padding: 10px 14px 0;
   font-family: var(--font-code);
   font-size: var(--type-table-size);
   font-weight: 475;

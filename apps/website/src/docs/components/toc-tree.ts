@@ -36,6 +36,7 @@ export type TocManifestPage = {
 export type TocManifestGroup = {
   id: string;
   label: string;
+  path: string;
   pages: TocManifestPage[];
 };
 
@@ -90,18 +91,19 @@ function getHeadings(mdast: Root, headingIds?: WeakMap<Heading, string>): Headin
 export function generateTocTree(
   mdast: Root,
   headingIds?: WeakMap<Heading, string>,
-  options?: { idPrefix?: string },
+  options?: { idPrefix?: string; hrefPrefix?: string },
 ): TocTreeNode[] {
   const headings = getHeadings(mdast, headingIds);
   const result: TocTreeNode[] = [];
   const stack: { node: TocTreeNode; depth: number }[] = [];
   const idPrefix = options?.idPrefix ?? "heading:";
+  const hrefPrefix = options?.hrefPrefix ?? "";
 
   for (const heading of headings) {
     const node: TocTreeNode = {
       id: `${idPrefix}${heading.id}`,
       label: heading.label,
-      href: heading.href,
+      href: `${hrefPrefix}${heading.href}`,
       type: `h${heading.depth}` as TocNodeType,
       children: [],
     };
@@ -140,32 +142,41 @@ function withoutFirstHeading(mdast: Root): Root {
 
 export function buildDocsTocTree({
   groups,
-  headingIds,
+  headingIdsByGroup,
+  currentGroupId,
 }: {
   groups: TocManifestGroup[];
-  headingIds: WeakMap<Heading, string>;
+  headingIdsByGroup: Map<string, WeakMap<Heading, string>>;
+  currentGroupId: string;
 }): TocTreeNode[] {
   return groups.map((group) => {
+    const groupHeadingIds = headingIdsByGroup.get(group.id);
     const pageNodes = group.pages.map((page) => {
-      const pageHeadings = getHeadings(page.mdast, headingIds);
+      const pageHeadings = getHeadings(page.mdast, groupHeadingIds);
       const firstHeading = pageHeadings[0];
-      const href = firstHeading?.href ?? "#";
+      const href =
+        group.id === currentGroupId
+          ? firstHeading?.href ?? group.path
+          : `${group.path}${firstHeading?.href ?? ""}`;
 
       return {
         id: page.id,
         label: page.label,
         href,
         type: "page" as const,
-        children: generateTocTree(withoutFirstHeading(page.mdast), headingIds, {
-          idPrefix: `${page.id}:`,
-        }),
+        children:
+          group.id === currentGroupId
+            ? generateTocTree(withoutFirstHeading(page.mdast), groupHeadingIds, {
+                idPrefix: `${page.id}:`,
+              })
+            : [],
       };
     });
 
     return {
       id: group.id,
       label: group.label,
-      href: `#${group.id}`,
+      href: group.path,
       type: "group" as const,
       children: pageNodes,
     };

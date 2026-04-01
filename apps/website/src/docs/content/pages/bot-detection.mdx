@@ -8,89 +8,87 @@ Bot detection operates at multiple independent layers. A site doesn't need to im
 
 The five layers range from passive browser fingerprinting (which fires the moment your browser connects) to enterprise bot protection services that aggregate all signals and apply machine learning. Each layer has different mitigations.
 
-<AccordionGroup>
-  <Accordion title="Layer 1: Browser fingerprinting">
-    When a browser connects to a site, the site can inspect dozens of signals to determine if the browser is real or automated:
+#### Layer 1: Browser fingerprinting
 
-    * **`navigator.webdriver`**: Set to `true` in automated browsers. Detection scripts check this immediately. Playwright sets this by default.
-    * **Browser plugin and extension footprint**: Real browsers have plugins like PDF viewers, font lists, and media codecs. Automated browsers often have none. In headless mode, `navigator.plugins.length === 0` is a strong signal.
-    * **WebGL and Canvas fingerprinting**: The site renders invisible graphics and hashes the output. Headless browsers produce distinct rendering artifacts.
-    * **Screen and window dimensions**: Headless browsers often report unusual viewport sizes or have `window.outerWidth === 0`.
-    * **User-Agent consistency**: The User-Agent string must match actual browser behavior. Claiming to be Chrome 120 but having Firefox-like JS engine behavior is a red flag.
-    * **CDP detection**: Some sites detect whether a Chrome DevTools Protocol (CDP) session is attached, which is how Playwright controls the browser.
-    * **Headless-specific object detection**: Automated browsers are missing objects and properties that exist in real headed Chrome. Detection scripts check for a missing `chrome.runtime`, absent `Notification.permission` prompts, `navigator.permissions.query()` behaving differently, and `window.chrome` being undefined or incomplete. `navigator.languages` may also be empty or contain only `"en"` in headless mode.
-    * **Iframe and sandbox detection**: Some sites check if their code is running inside an iframe or sandboxed context by comparing `window.self !== window.top`, inspecting `window.frameElement`, or checking whether `document.hasFocus()` returns `false` (common in headless or background contexts) and whether `document.visibilityState` is `"visible"`.
+When a browser connects to a site, the site can inspect dozens of signals to determine if the browser is real or automated:
 
-    **Affected approaches:** All Playwright-based approaches (Regular Playwright, passive interception, in-browser fetch). Direct HTTP has a different problem — a completely wrong fingerprint.
-  </Accordion>
+* **`navigator.webdriver`**: Set to `true` in automated browsers. Detection scripts check this immediately. Playwright sets this by default.
+* **Browser plugin and extension footprint**: Real browsers have plugins like PDF viewers, font lists, and media codecs. Automated browsers often have none. In headless mode, `navigator.plugins.length === 0` is a strong signal.
+* **WebGL and Canvas fingerprinting**: The site renders invisible graphics and hashes the output. Headless browsers produce distinct rendering artifacts.
+* **Screen and window dimensions**: Headless browsers often report unusual viewport sizes or have `window.outerWidth === 0`.
+* **User-Agent consistency**: The User-Agent string must match actual browser behavior. Claiming to be Chrome 120 but having Firefox-like JS engine behavior is a red flag.
+* **CDP detection**: Some sites detect whether a Chrome DevTools Protocol (CDP) session is attached, which is how Playwright controls the browser.
+* **Headless-specific object detection**: Automated browsers are missing objects and properties that exist in real headed Chrome. Detection scripts check for a missing `chrome.runtime`, absent `Notification.permission` prompts, `navigator.permissions.query()` behaving differently, and `window.chrome` being undefined or incomplete. `navigator.languages` may also be empty or contain only `"en"` in headless mode.
+* **Iframe and sandbox detection**: Some sites check if their code is running inside an iframe or sandboxed context by comparing `window.self !== window.top`, inspecting `window.frameElement`, or checking whether `document.hasFocus()` returns `false` (common in headless or background contexts) and whether `document.visibilityState` is `"visible"`.
 
-  <Accordion title="Layer 2: Behavioral analysis">
-    Beyond the browser itself, detection systems analyze how the user behaves:
+**Affected approaches:** All Playwright-based approaches (Regular Playwright, passive interception, in-browser fetch). Direct HTTP has a different problem — a completely wrong fingerprint.
 
-    * **Mouse movement patterns**: Real users have natural mouse trajectories with acceleration curves. Automated clicks happen without preceding mouse movement.
-    * **Typing cadence**: Real typing has variable delays between keystrokes. `page.fill()` inserts text instantly. `page.type()` with default settings uses uniform delays.
-    * **Scroll behavior**: Real users scroll with momentum and variable speed. Programmatic scrolling is instant or perfectly uniform.
-    * **Navigation timing**: Real users take time to read content before clicking. Bots navigate instantly between actions.
-    * **Interaction sequence**: Clicking a submit button without first clicking or focusing the input fields is suspicious.
+#### Layer 2: Behavioral analysis
 
-    **Mitigation:** Add realistic delays between actions. Use `page.type()` with random inter-key delays instead of `page.fill()` for sensitive fields. Add scroll interactions before clicking. Never navigate faster than a human could read.
-  </Accordion>
+Beyond the browser itself, detection systems analyze how the user behaves:
 
-  <Accordion title="Layer 3: Network-level detection">
-    The network request itself carries signals independent of what the browser reports:
+* **Mouse movement patterns**: Real users have natural mouse trajectories with acceleration curves. Automated clicks happen without preceding mouse movement.
+* **Typing cadence**: Real typing has variable delays between keystrokes. `page.fill()` inserts text instantly. `page.type()` with default settings uses uniform delays.
+* **Scroll behavior**: Real users scroll with momentum and variable speed. Programmatic scrolling is instant or perfectly uniform.
+* **Navigation timing**: Real users take time to read content before clicking. Bots navigate instantly between actions.
+* **Interaction sequence**: Clicking a submit button without first clicking or focusing the input fields is suspicious.
 
-    * **TLS fingerprint (JA3/JA4)**: Every HTTP client has a unique TLS handshake fingerprint based on the cipher suites, extensions, and elliptic curves it offers. Node.js `fetch`/`axios` have a completely different TLS fingerprint than Chrome. This is one of the strongest detection signals and is very hard to fake from outside a browser.
-    * **HTTP/2 fingerprint**: The SETTINGS frame, WINDOW\_UPDATE behavior, and header ordering in HTTP/2 differ between browsers and HTTP libraries.
-    * **Header ordering and values**: Browsers send headers in a specific order — Chrome always sends `sec-ch-ua` headers, for example. Node.js HTTP clients send headers in a different order or omit browser-specific headers entirely.
-    * **Cookie state**: Requests from a real browser session carry the full cookie jar. External HTTP requests must manually replicate cookies and may miss HttpOnly cookies or cookies set by JavaScript.
-    * **Referer and Origin**: Browser requests automatically include the correct `Referer` and `Origin` headers based on navigation state. External requests must fabricate these.
+**Mitigation:** Add realistic delays between actions. Use `page.type()` with random inter-key delays instead of `page.fill()` for sensitive fields. Add scroll interactions before clicking. Never navigate faster than a human could read.
 
-    **Affected approaches:** Direct HTTP is maximally exposed here. Playwright-based requests (including in-browser fetch) use the real browser's TLS stack and header ordering, so they pass network-level checks.
-  </Accordion>
+#### Layer 3: Network-level detection
 
-  <Accordion title="Layer 4: API-level monitoring">
-    Some sophisticated sites monitor the behavior of their own frontend code at runtime:
+The network request itself carries signals independent of what the browser reports:
 
-    * **Fetch/XHR monkey-patching**: The site overrides `window.fetch` and/or `XMLHttpRequest.prototype.open` with wrapper functions that log every request, including its call stack. If a `fetch()` call originates from code that isn't part of the site's own bundle, it can be flagged.
+* **TLS fingerprint (JA3/JA4)**: Every HTTP client has a unique TLS handshake fingerprint based on the cipher suites, extensions, and elliptic curves it offers. Node.js `fetch`/`axios` have a completely different TLS fingerprint than Chrome. This is one of the strongest detection signals and is very hard to fake from outside a browser.
+* **HTTP/2 fingerprint**: The SETTINGS frame, WINDOW\_UPDATE behavior, and header ordering in HTTP/2 differ between browsers and HTTP libraries.
+* **Header ordering and values**: Browsers send headers in a specific order — Chrome always sends `sec-ch-ua` headers, for example. Node.js HTTP clients send headers in a different order or omit browser-specific headers entirely.
+* **Cookie state**: Requests from a real browser session carry the full cookie jar. External HTTP requests must manually replicate cookies and may miss HttpOnly cookies or cookies set by JavaScript.
+* **Referer and Origin**: Browser requests automatically include the correct `Referer` and `Origin` headers based on navigation state. External requests must fabricate these.
 
-    ```javascript  theme={null}
-    // What the site does (runs very early, before your code):
-    const _fetch = window.fetch;
-    window.fetch = function(...args) {
-      const stack = new Error().stack;
-      if (!isExpectedCallSite(stack)) {
-        reportAnomaly({ url: args[0], stack });
-      }
-      return _fetch.apply(this, args);
-    };
-    ```
+**Affected approaches:** Direct HTTP is maximally exposed here. Playwright-based requests (including in-browser fetch) use the real browser's TLS stack and header ordering, so they pass network-level checks.
 
-    * **Proxy-based interception**: Instead of replacing `fetch`, some sites use `Proxy` objects to wrap it. This is harder to detect because `fetch.toString()` still returns `"function fetch() { [native code] }"`.
-    * **Timing correlation**: The site knows which API calls its own code makes and when. If an endpoint is called at a time when the UI flow wouldn't trigger it, that's anomalous.
-    * **Request frequency and patterns**: The site's own code calls APIs in predictable patterns — pagination calls come in sequence, search calls follow debounce timings. Automation that deviates from these patterns can be flagged.
+#### Layer 4: API-level monitoring
 
-    **Affected approaches:** In-browser fetch (`pageRequest()`) is the primary target here. Passive interception (`page.on('response')`) is immune — it makes no additional fetch calls at all.
+Some sophisticated sites monitor the behavior of their own frontend code at runtime:
 
-    <Note>
-      Most sites do not implement Layer 4 monitoring. It is primarily found on sites with enterprise-grade bot protection from services like PerimeterX or Shape Security. Check for fetch patching before committing to an in-browser fetch approach.
-    </Note>
-  </Accordion>
+* **Fetch/XHR monkey-patching**: The site overrides `window.fetch` and/or `XMLHttpRequest.prototype.open` with wrapper functions that log every request, including its call stack. If a `fetch()` call originates from code that isn't part of the site's own bundle, it can be flagged.
 
-  <Accordion title="Layer 5: Enterprise bot protection services">
-    Many sites don't build their own detection — they use third-party services that combine all the layers above into a continuously updated product:
+```javascript  theme={null}
+// What the site does (runs very early, before your code):
+const _fetch = window.fetch;
+window.fetch = function(...args) {
+  const stack = new Error().stack;
+  if (!isExpectedCallSite(stack)) {
+    reportAnomaly({ url: args[0], stack });
+  }
+  return _fetch.apply(this, args);
+};
+```
 
-    | Service                       | Common indicators                                                             |
-    | ----------------------------- | ----------------------------------------------------------------------------- |
-    | **Akamai Bot Manager**        | Scripts from `*.akamaized.net`, `_abck` cookie, `sensor_data` payloads        |
-    | **PerimeterX (HUMAN)**        | Scripts loading from `*.perimeterx.net` or `*.px-cdn.net`, `_px` cookies      |
-    | **DataDome**                  | Scripts from `*.datadome.co`, `datadome` cookie, interstitial challenge pages |
-    | **Cloudflare Bot Management** | `cf_clearance` cookie, challenge pages with "Checking your browser" message   |
-    | **Shape Security (F5)**       | Obfuscated inline scripts that collect telemetry, `_imp_apg_r_` style cookies |
-    | **Kasada**                    | Scripts from `*.kasada.io`, `x-kpsdk-*` headers                               |
+* **Proxy-based interception**: Instead of replacing `fetch`, some sites use `Proxy` objects to wrap it. This is harder to detect because `fetch.toString()` still returns `"function fetch() { [native code] }"`.
+* **Timing correlation**: The site knows which API calls its own code makes and when. If an endpoint is called at a time when the UI flow wouldn't trigger it, that's anomalous.
+* **Request frequency and patterns**: The site's own code calls APIs in predictable patterns — pagination calls come in sequence, search calls follow debounce timings. Automation that deviates from these patterns can be flagged.
 
-    These services push updates frequently. An automation that works today may break next week with no changes on your end.
-  </Accordion>
-</AccordionGroup>
+**Affected approaches:** In-browser fetch (`pageRequest()`) is the primary target here. Passive interception (`page.on('response')`) is immune — it makes no additional fetch calls at all.
+
+<Note>
+  Most sites do not implement Layer 4 monitoring. It is primarily found on sites with enterprise-grade bot protection from services like PerimeterX or Shape Security. Check for fetch patching before committing to an in-browser fetch approach.
+</Note>
+
+#### Layer 5: Enterprise bot protection services
+
+Many sites don't build their own detection — they use third-party services that combine all the layers above into a continuously updated product:
+
+| Service                       | Common indicators                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| **Akamai Bot Manager**        | Scripts from `*.akamaized.net`, `_abck` cookie, `sensor_data` payloads        |
+| **PerimeterX (HUMAN)**        | Scripts loading from `*.perimeterx.net` or `*.px-cdn.net`, `_px` cookies      |
+| **DataDome**                  | Scripts from `*.datadome.co`, `datadome` cookie, interstitial challenge pages |
+| **Cloudflare Bot Management** | `cf_clearance` cookie, challenge pages with "Checking your browser" message   |
+| **Shape Security (F5)**       | Obfuscated inline scripts that collect telemetry, `_imp_apg_r_` style cookies |
+| **Kasada**                    | Scripts from `*.kasada.io`, `x-kpsdk-*` headers                               |
+
+These services push updates frequently. An automation that works today may break next week with no changes on your end.
 
 ***
 

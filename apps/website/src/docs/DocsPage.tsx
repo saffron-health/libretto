@@ -1,13 +1,10 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useEffect, useMemo } from "react";
 import type { Heading, Image, Root, RootContent } from "mdast";
 import { SafeMdxRenderer, type MyRootContent } from "safe-mdx";
 import { mdxParse } from "safe-mdx/parse";
 import { DISCUSSIONS_URL, RELEASES_URL, REPO_URL } from "../site";
 import {
   A,
-  Aside,
-  Accordion,
-  AccordionGroup,
   Bleed,
   Blockquote,
   Caption,
@@ -53,7 +50,11 @@ import {
   slugify,
 } from "./components/toc-tree";
 import "./styles/docs.css";
-import { docsManifest, docsMdxContent } from "./content";
+import {
+  docsManifest,
+  getDefaultDocsGroup,
+  getDocsGroupByPath,
+} from "./content";
 
 const tabItems = [
   { label: "Docs", href: "/docs/" },
@@ -62,11 +63,11 @@ const tabItems = [
   { label: "Changelog", href: RELEASES_URL },
 ] satisfies TabItem[];
 
-function isAsideNode(node: RootContent): boolean {
+function isSidebarCalloutNode(node: RootContent): boolean {
   return (
     node.type === "mdxJsxFlowElement" &&
     "name" in node &&
-    (node as { name?: string }).name === "Aside"
+    ["Note", "Tip", "Warning"].includes((node as { name?: string }).name ?? "")
   );
 }
 
@@ -86,11 +87,64 @@ function isHeroNode(node: RootContent): boolean {
   );
 }
 
+function hoistStepAsideCallouts(node: RootContent): {
+  node: RootContent;
+  asideNodes: RootContent[];
+} {
+  if (node.type !== "mdxJsxFlowElement") {
+    return { node, asideNodes: [] };
+  }
+
+  const element = node as MdxFlowElement;
+  const children = element.children;
+
+  if (element.name === "Step") {
+    const asideNodes = children.filter((child) => isSidebarCalloutNode(child));
+
+    if (asideNodes.length === 0) {
+      return { node, asideNodes: [] };
+    }
+
+    return {
+      node: {
+        ...element,
+        children: children.filter(
+          (child) => !isSidebarCalloutNode(child),
+        ) as typeof children,
+      },
+      asideNodes,
+    };
+  }
+
+  let changed = false;
+  const asideNodes: RootContent[] = [];
+  const nextChildren = children.map((child) => {
+    const result = hoistStepAsideCallouts(child);
+    changed ||= result.node !== child;
+    asideNodes.push(...result.asideNodes);
+    return result.node;
+  }) as typeof children;
+
+  if (!changed && asideNodes.length === 0) {
+    return { node, asideNodes: [] };
+  }
+
+  return {
+    node: {
+      ...element,
+      children: nextChildren,
+    },
+    asideNodes,
+  };
+}
+
 type MdastSection = {
   contentNodes: RootContent[];
   asideNodes: RootContent[];
   fullWidth?: boolean;
 };
+
+type MdxFlowElement = Extract<RootContent, { type: "mdxJsxFlowElement" }>;
 
 function getSectionHref(
   section: MdastSection,
@@ -156,10 +210,12 @@ function groupBySections(root: Root): MdastSection[] {
         fullWidth: true,
       });
       current = { contentNodes: [], asideNodes: [] };
-    } else if (isAsideNode(node)) {
+    } else if (isSidebarCalloutNode(node)) {
       current.asideNodes.push(node);
     } else {
-      current.contentNodes.push(node);
+      const { node: normalizedNode, asideNodes } = hoistStepAsideCallouts(node);
+      current.contentNodes.push(normalizedNode);
+      current.asideNodes.push(...asideNodes);
     }
   }
 
@@ -182,18 +238,56 @@ const parsedDocsGroups = docsManifest.map((group) => {
   };
 });
 
-const pageMdasts = parsedDocsGroups.flatMap((group) => {
-  return group.pages.map((page) => {
-    return page.mdast;
-  });
-});
-
-const mdast: Root = {
-  type: "root",
-  children: pageMdasts.flatMap((pageMdast) => {
-    return pageMdast.children;
+const headingIdsByGroup = new Map(
+  parsedDocsGroups.map((group) => {
+    return [
+      group.id,
+      buildHeadingIdMap(
+        group.pages.map((page) => {
+          return page.mdast;
+        }),
+      ),
+    ] as const;
   }),
-};
+);
+
+function addHeadingTarget(
+  lookup: Map<string, string[]>,
+  id: string,
+  target: string,
+) {
+  const existing = lookup.get(id);
+  if (existing) {
+    existing.push(target);
+    return;
+  }
+
+  lookup.set(id, [target]);
+}
+
+const headingHrefLookup = (() => {
+  const lookup = new Map<string, string[]>();
+
+  for (const group of parsedDocsGroups) {
+    addHeadingTarget(lookup, group.id, group.path);
+    const groupHeadingIds = headingIdsByGroup.get(group.id);
+
+    for (const page of group.pages) {
+      for (const node of page.mdast.children) {
+        if (node.type !== "heading") {
+          continue;
+        }
+
+        const heading = node as Heading;
+        const id =
+          groupHeadingIds?.get(heading) ?? slugify(extractText(heading.children));
+        addHeadingTarget(lookup, id, `${group.path}#${id}`);
+      }
+    }
+  }
+
+  return lookup;
+})();
 
 function PlainImage({
   src,
@@ -223,48 +317,125 @@ function PlainImage({
   return <img src={src} alt={alt} className={className} />;
 }
 
-const mdxComponents = {
-  p: P,
-  a: A,
-  code: Code,
-  ul: List,
-  ol: OL,
-  li: Li,
-  Caption,
-  ComparisonTable,
-  PixelatedImage: PlainImage,
-  Bleed,
-  Aside,
-  FullWidth,
-  Note,
-  Tip,
-  Warning,
-  Steps,
-  Step,
-  CardGroup,
-  Card,
-  Columns,
-  Tabs,
-  Tab,
-  CodeGroup,
-  ParamField,
-  ResponseField,
-  AccordionGroup,
-  Accordion,
-  Expandable,
-  blockquote: Blockquote,
-  table: Table,
-  thead: THead,
-  tbody: TBody,
-  tr: TR,
-  th: TH,
-  td: TD,
-  hr: () => (
-    <div className="docs-divider">
-      <div className="docs-divider-line" />
-    </div>
-  ),
-};
+function createMdxComponents(resolveHref: (href: string) => string) {
+  return {
+    p: P,
+    a: ({ href, children }: { href: string; children: ReactNode }) => {
+      return <A href={resolveHref(href)}>{children}</A>;
+    },
+    code: Code,
+    ul: List,
+    ol: OL,
+    li: Li,
+    Caption,
+    ComparisonTable,
+    PixelatedImage: PlainImage,
+    Bleed,
+    FullWidth,
+    Note,
+    Tip,
+    Warning,
+    Steps,
+    Step,
+    CardGroup,
+    Card: ({
+      title,
+      href,
+      children,
+    }: {
+      title: string;
+      href: string;
+      children: ReactNode;
+    }) => {
+      return (
+        <Card title={title} href={resolveHref(href)}>
+          {children}
+        </Card>
+      );
+    },
+    Columns,
+    Tabs,
+    Tab,
+    CodeGroup,
+    ParamField,
+    ResponseField,
+    Expandable,
+    blockquote: Blockquote,
+    table: Table,
+    thead: THead,
+    tbody: TBody,
+    tr: TR,
+    th: TH,
+    td: TD,
+    hr: () => (
+      <div className="docs-divider">
+        <div className="docs-divider-line" />
+      </div>
+    ),
+  };
+}
+
+function stripMetaValue(raw: string): string {
+  const unwrappedBraces = raw.replace(/^\{(.+)\}$/, "$1");
+
+  if (
+    (unwrappedBraces.startsWith('"') && unwrappedBraces.endsWith('"')) ||
+    (unwrappedBraces.startsWith("'") && unwrappedBraces.endsWith("'"))
+  ) {
+    return unwrappedBraces.slice(1, -1);
+  }
+
+  return unwrappedBraces;
+}
+
+function parseBooleanMetaValue(raw: string): boolean | undefined {
+  const value = stripMetaValue(raw).trim();
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  return undefined;
+}
+
+function parseCodeBlockMeta(meta?: string): {
+  title?: string;
+  showLineNumbers?: boolean;
+} {
+  if (!meta?.trim()) {
+    return {};
+  }
+
+  const tokens = meta.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [];
+  let title: string | undefined;
+  let showLineNumbers: boolean | undefined;
+
+  for (const token of tokens) {
+    const equalsIndex = token.indexOf("=");
+
+    if (equalsIndex === -1) {
+      title ??= stripMetaValue(token);
+      continue;
+    }
+
+    const key = token.slice(0, equalsIndex);
+    const value = token.slice(equalsIndex + 1);
+
+    if (key === "title") {
+      title = stripMetaValue(value);
+    }
+
+    if (key === "showLineNumbers") {
+      showLineNumbers = parseBooleanMetaValue(value);
+    }
+  }
+
+  return { title, showLineNumbers };
+}
 
 function renderNode(
   node: MyRootContent,
@@ -295,17 +466,14 @@ function renderNode(
     const codeNode = node as { lang?: string; value: string; meta?: string };
     const lang = codeNode.lang || "bash";
     const isDiagram = lang === "diagram";
-    const title = codeNode.meta
-      ?.trim()
-      .split(/\s+/)
-      .find((part) => !part.includes("=") && !part.includes("{"));
+    const { title, showLineNumbers } = parseCodeBlockMeta(codeNode.meta);
 
     return (
       <CodeBlock
         lang={lang}
         title={title}
         lineHeight={isDiagram ? "1.3" : "1.85"}
-        showLineNumbers={!isDiagram}
+        showLineNumbers={isDiagram ? false : showLineNumbers}
       >
         {codeNode.value}
       </CodeBlock>
@@ -317,36 +485,114 @@ function renderNode(
 
 function RenderNodes({
   nodes,
+  markdown,
+  components,
   headingIds,
 }: {
   nodes: RootContent[];
+  markdown: string;
+  components: ReturnType<typeof createMdxComponents>;
   headingIds: WeakMap<Heading, string>;
 }) {
   const syntheticRoot: Root = { type: "root", children: nodes };
 
   return (
     <SafeMdxRenderer
-      markdown={docsMdxContent}
+      markdown={markdown}
       mdast={syntheticRoot as MyRootContent}
-      components={mdxComponents}
+      components={components}
       renderNode={(node, transform) => renderNode(node, transform, headingIds)}
     />
   );
 }
 
-export function DocsPage() {
-  const contentChildren = mdast.children.filter((node) => !isHeroNode(node));
+export function DocsPage({ pathname }: { pathname?: string }) {
+  const currentGroup =
+    getDocsGroupByPath(pathname ?? window.location.pathname) ??
+    getDefaultDocsGroup();
+  const parsedCurrentGroup =
+    parsedDocsGroups.find((group) => {
+      return group.id === currentGroup.id;
+    }) ?? parsedDocsGroups[0];
+  const currentGroupHeadingIds = headingIdsByGroup.get(parsedCurrentGroup.id);
+
+  if (!currentGroupHeadingIds) {
+    throw new Error(`Missing heading ids for docs group ${parsedCurrentGroup.id}`);
+  }
+
+  const currentGroupMarkdown = parsedCurrentGroup.pages
+    .map((page) => {
+      return page.content;
+    })
+    .join("\n\n");
+  const currentGroupAnchorIds = new Set<string>([parsedCurrentGroup.id]);
+
+  for (const page of parsedCurrentGroup.pages) {
+    for (const node of page.mdast.children) {
+      if (node.type !== "heading") {
+        continue;
+      }
+
+      const heading = node as Heading;
+      currentGroupAnchorIds.add(
+        currentGroupHeadingIds.get(heading) ??
+          slugify(extractText(heading.children)),
+      );
+    }
+  }
+
+  const resolveDocsHref = useMemo(() => {
+    return (href: string) => {
+      if (/^(https?:)?\/\//.test(href)) {
+        return href;
+      }
+
+      const anchor = href.startsWith("/docs/#")
+        ? href.slice("/docs/#".length)
+        : href.startsWith("#")
+          ? href.slice(1)
+          : null;
+
+      if (anchor) {
+        if (currentGroupAnchorIds.has(anchor)) {
+          return `#${anchor}`;
+        }
+
+        const targets = headingHrefLookup.get(anchor);
+        if (targets && targets.length > 0) {
+          return targets[0];
+        }
+      }
+
+      return href;
+    };
+  }, [currentGroupAnchorIds]);
+
+  const mdxComponents = useMemo(() => {
+    return createMdxComponents(resolveDocsHref);
+  }, [resolveDocsHref]);
+
+  const currentGroupMdast: Root = {
+    type: "root",
+    children: parsedCurrentGroup.pages.flatMap((page) => {
+      return page.mdast.children;
+    }),
+  };
+  const contentChildren = currentGroupMdast.children.filter((node) => !isHeroNode(node));
   const contentMdast: Root = { type: "root", children: contentChildren };
-  const headingIds = buildHeadingIdMap(pageMdasts);
 
   const tocItems = flattenTocTree({
-    roots: buildDocsTocTree({ groups: parsedDocsGroups, headingIds }),
+    roots: buildDocsTocTree({
+      groups: parsedDocsGroups,
+      headingIdsByGroup,
+      currentGroupId: parsedCurrentGroup.id,
+    }),
   });
   const mdastSections = groupBySections(contentMdast);
   const sectionByHref = new Map(
     mdastSections
       .map((section) => {
-        const href = getSectionHref(section, headingIds);
+        const href = getSectionHref(section, currentGroupHeadingIds);
         return href ? ([href, section] as const) : null;
       })
       .filter(
@@ -354,18 +600,17 @@ export function DocsPage() {
       ),
   );
 
-  const sections: EditorialSection[] = parsedDocsGroups.flatMap((group) => {
-    const groupHeadingSection: EditorialSection = {
+  const sections: EditorialSection[] = [
+    {
       content: (
         <div className="docs-group-heading-section">
-          <SectionHeading id={group.id} level={1}>
-            {group.label}
+          <SectionHeading id={parsedCurrentGroup.id} level={1}>
+            {parsedCurrentGroup.label}
           </SectionHeading>
         </div>
       ),
-    };
-
-    const groupSections = group.pages.map((page) => {
+    },
+    ...parsedCurrentGroup.pages.map((page) => {
       const firstPageHeading = page.mdast.children.find(
         (node): node is Heading => {
           return node.type === "heading";
@@ -376,7 +621,7 @@ export function DocsPage() {
         throw new Error(`Missing top-level heading for docs page ${page.id}`);
       }
 
-      const pageHref = `#${headingIds.get(firstPageHeading) ?? slugify(extractText(firstPageHeading.children))}`;
+      const pageHref = `#${currentGroupHeadingIds.get(firstPageHeading) ?? slugify(extractText(firstPageHeading.children))}`;
       const section = sectionByHref.get(pageHref);
 
       if (!section) {
@@ -385,20 +630,43 @@ export function DocsPage() {
 
       const aside =
         section.asideNodes.length > 0 ? (
-          <RenderNodes nodes={section.asideNodes} headingIds={headingIds} />
+          <RenderNodes
+            nodes={section.asideNodes}
+            markdown={currentGroupMarkdown}
+            components={mdxComponents}
+            headingIds={currentGroupHeadingIds}
+          />
         ) : undefined;
 
       return {
         content: (
-          <RenderNodes nodes={section.contentNodes} headingIds={headingIds} />
+          <RenderNodes
+            nodes={section.contentNodes}
+            markdown={currentGroupMarkdown}
+            components={mdxComponents}
+            headingIds={currentGroupHeadingIds}
+          />
         ),
         aside,
         fullWidth: section.fullWidth,
       } satisfies EditorialSection;
-    });
+    }),
+  ];
 
-    return [groupHeadingSection, ...groupSections];
-  });
+  useEffect(() => {
+    if (!window.location.hash) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      return;
+    }
+
+    const targetId = window.location.hash.replace(/^#/, "");
+    const scrollToTarget = () => {
+      const target = document.getElementById(targetId);
+      target?.scrollIntoView({ block: "start" });
+    };
+
+    window.requestAnimationFrame(scrollToTarget);
+  }, [parsedCurrentGroup.id, pathname]);
 
   return (
     <div className="docs-root">

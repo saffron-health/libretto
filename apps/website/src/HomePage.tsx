@@ -11,6 +11,7 @@ import {
 } from "./components/AnimationOrchestration";
 import { AnimatedTitle } from "./components/AnimatedTitle";
 import { DISCUSSIONS_URL, RELEASES_URL, REPO_URL } from "./site";
+import { AppLink } from "./routing";
 
 function useGitHubStars(repo: string) {
   const [stars, setStars] = useState<number | null>(null);
@@ -48,11 +49,11 @@ function Navbar() {
     >
       <div className="relative mx-auto flex max-w-[800px] items-center justify-between">
         <div className="flex items-center gap-10">
-          <a href="/" className="no-underline">
+          <AppLink href="/" className="no-underline">
             <Text size="xl" style="serif" className="text-ink font-[200]">
               Libretto
             </Text>
-          </a>
+          </AppLink>
           <div className="absolute left-1/2 flex -translate-x-1/2 gap-7">
             <a
               href={DISCUSSIONS_URL}
@@ -91,7 +92,6 @@ function Navbar() {
           <Button
             href="/docs/"
             size="sm"
-            className="rounded-full border-ink bg-ink px-5 py-2.5 text-cream no-underline hover:bg-ink/90"
           >
             Go to docs
           </Button>
@@ -159,7 +159,6 @@ function Hero() {
         >
           <Button
             href="/docs/"
-            className="rounded-full border-ink bg-ink px-7 py-3 text-cream no-underline hover:bg-ink/90"
           >
             Go to docs
           </Button>

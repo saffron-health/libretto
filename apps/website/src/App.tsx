@@ -1,25 +1,22 @@
 import { Suspense, lazy } from "react";
+import { useLocation } from "wouter";
 import { HomePage } from "./HomePage";
+import { normalizeDocsPath } from "./docs/content";
 
 const DocsPage = lazy(() =>
   import("./docs/DocsPage").then((module) => ({ default: module.DocsPage })),
 );
 
-function normalizePath(pathname: string): string {
-  if (pathname === "/") {
-    return pathname;
-  }
-
-  return pathname.replace(/\/+$/, "");
-}
-
 export function App() {
-  const pathname = normalizePath(window.location.pathname);
+  const [href] = useLocation();
+  const pathname = normalizeDocsPath(
+    new URL(href, window.location.origin).pathname,
+  );
 
-  if (pathname === "/docs" || pathname === "/docs/index.html") {
+  if (pathname === "/docs" || pathname === "/docs/index.html" || pathname.startsWith("/docs/")) {
     return (
       <Suspense fallback={null}>
-        <DocsPage />
+        <DocsPage pathname={pathname} />
       </Suspense>
     );
   }

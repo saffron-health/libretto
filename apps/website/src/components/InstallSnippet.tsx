@@ -2,15 +2,13 @@ import classnames from "classnames";
 import { useState } from "react";
 import { CheckIcon, CopyIcon } from "../icons";
 
-const COMMAND_1 = "npm i libretto";
-const COMMAND_2 = "npx libretto setup";
-const COPY_COMMAND = "npm i libretto && npx libretto setup";
+const COMMAND = "npm init libretto@latest";
 
 export function InstallSnippet() {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
-    void navigator.clipboard.writeText(COPY_COMMAND);
+    void navigator.clipboard.writeText(COMMAND);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -42,15 +40,9 @@ export function InstallSnippet() {
             </div>
           </div>
         </button>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center">
-            <span className="select-none text-ink/20 w-4">$</span>
-            <span className="pl-2">{COMMAND_1}</span>
-          </div>
-          <div className="flex items-center">
-            <span className="select-none text-ink/20 w-4">$</span>
-            <span className="pl-2">{COMMAND_2}</span>
-          </div>
+        <div className="flex items-center">
+          <span className="select-none text-ink/20 w-4">$</span>
+          <span className="pl-2">{COMMAND}</span>
         </div>
       </div>
     </div>

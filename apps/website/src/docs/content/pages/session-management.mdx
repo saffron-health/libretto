@@ -165,19 +165,19 @@ npx libretto close --all --force
 
 ***
 
-### init
+### setup
 
-The `init` command sets up Libretto in your project for the first time. It installs Chromium, copies the Libretto skill files to your agent directories, and walks you through configuring a snapshot analysis model.
+The `setup` command sets up Libretto in your project for the first time. It installs Chromium, copies the Libretto skill files to your agent directories, and walks you through configuring a snapshot analysis model.
 
 ```bash  theme={null}
-npx libretto init
+npx libretto setup
 ```
 
 <Warning>
-  `init` is interactive — it prompts for API credentials and requires a TTY. Run it yourself in a terminal, not through an agent.
+  `setup` is interactive — it prompts for API credentials and requires a TTY. Run it yourself in a terminal, not through an agent.
 </Warning>
 
-#### What `init` does
+#### What `setup` does
 
 1. Installs the Playwright Chromium browser via `npx playwright install chromium`.
 2. Copies skill files to `.agents/skills/libretto/` and `.claude/skills/libretto/` if those directories exist.
@@ -189,9 +189,9 @@ npx libretto init
   Skip the Playwright Chromium installation step. Useful if Chromium is already installed.
 </ParamField>
 
-#### After `init`
+#### After `setup`
 
-You can change or update the snapshot analysis model at any time without re-running `init`:
+You can change or update the snapshot analysis model at any time without re-running `setup`:
 
 ```bash  theme={null}
 npx libretto ai configure openai

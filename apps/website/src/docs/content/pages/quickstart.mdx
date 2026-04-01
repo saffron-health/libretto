@@ -15,15 +15,15 @@ This guide walks you through installing Libretto, connecting an AI provider, ope
     Libretto requires Node.js 18 or later. It installs Playwright as a direct dependency, so you don't need a separate Playwright install.
   </Step>
 
-  <Step title="Initialize your workspace">
-    Run `init` once per project. This command downloads Chromium if it isn't already installed, creates the `.libretto/` directory structure, writes a `.libretto/.gitignore`, and copies the agent skill files into `.agents/skills/libretto` and `.claude/skills/libretto`.
+  <Step title="Set up your workspace">
+    Run `setup` once per project. This command downloads Chromium if it isn't already installed, creates the `.libretto/` directory structure, writes a `.libretto/.gitignore`, and copies the agent skill files into `.agents/skills/libretto` and `.claude/skills/libretto`.
 
     ```bash  theme={null}
-    npx libretto init
+    npx libretto setup
     ```
 
     <Note>
-      Run `init` yourself in a terminal — not through an agent. It may prompt for input and starts a Chromium download that takes a moment.
+      Run `setup` yourself in a terminal — not through an agent. It may prompt for input and starts a Chromium download that takes a moment.
     </Note>
   </Step>
 
@@ -57,43 +57,35 @@ This guide walks you through installing Libretto, connecting an AI provider, ope
 
     Provider credentials are read from your shell environment or a `.env` file at the project root. Set the appropriate key:
 
-    <CodeGroup>
-      ```bash OpenAI theme={null}
-      export OPENAI_API_KEY=sk-...
-      ```
+    ```bash theme={null} showLineNumbers={false}
+    # OpenAI
+    export OPENAI_API_KEY=sk-...
 
-      ```bash Anthropic theme={null}
-      export ANTHROPIC_API_KEY=sk-ant-...
-      ```
+    # Anthropic
+    export ANTHROPIC_API_KEY=sk-ant-...
 
-      ```bash Gemini theme={null}
-      export GEMINI_API_KEY=...
-      ```
+    # Gemini
+    export GEMINI_API_KEY=...
 
-      ```bash Vertex theme={null}
-      export GOOGLE_CLOUD_PROJECT=my-project
-      ```
-    </CodeGroup>
+    # Vertex
+    export GOOGLE_CLOUD_PROJECT=my-project
+    ```
 
     Libretto uses the Vercel AI SDK under the hood. Install only the peer dependency for your chosen provider:
 
-    <CodeGroup>
-      ```bash OpenAI theme={null}
-      npm install @ai-sdk/openai
-      ```
+    ```bash theme={null} showLineNumbers={false}
+    # OpenAI
+    npm install @ai-sdk/openai
 
-      ```bash Anthropic theme={null}
-      npm install @ai-sdk/anthropic
-      ```
+    # Anthropic
+    npm install @ai-sdk/anthropic
 
-      ```bash Gemini theme={null}
-      npm install @ai-sdk/google
-      ```
+    # Gemini
+    npm install @ai-sdk/google
 
-      ```bash Vertex theme={null}
-      npm install @ai-sdk/google-vertex
-      ```
-    </CodeGroup>
+    # Vertex
+    npm install @ai-sdk/google-vertex
+    ```
   </Step>
 
   <Step title="Open a browser">
@@ -191,7 +183,7 @@ This guide walks you through installing Libretto, connecting an AI provider, ope
 ### What's next
 
 <Tip>
-  If you're using a coding agent like Claude or another AI assistant, load the Libretto skill so your agent knows how to use these commands effectively. After running `npx libretto init`, the skill is available at `.agents/skills/libretto/SKILL.md` and `.claude/skills/libretto/SKILL.md`.
+  If you're using a coding agent like Claude or another AI assistant, load the Libretto skill so your agent knows how to use these commands effectively. After running `npx libretto setup`, the skill is available at `.agents/skills/libretto/SKILL.md` and `.claude/skills/libretto/SKILL.md`.
 </Tip>
 
 Once Libretto is set up, explore the full command set:
