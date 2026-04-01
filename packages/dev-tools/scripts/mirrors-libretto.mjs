@@ -17,6 +17,8 @@ const README_TEMPLATE_PATH = "packages/libretto/README.template.md";
 const README_GENERATED_HEADER =
   "<!-- Generated from packages/libretto/README.template.md by `pnpm sync:mirrors`. Do not edit directly. -->";
 const PACKAGE_JSON_PATH = "packages/libretto/package.json";
+const CREATE_LIBRETTO_PACKAGE_JSON_PATH =
+  "packages/create-libretto/package.json";
 const SKILL_SOURCE_PATH = "packages/libretto/skills/libretto/SKILL.md";
 
 /**
@@ -184,11 +186,14 @@ export function updateLibrettoSkillVersion(skillSource, version) {
     throw new Error(`missing frontmatter in ${SKILL_SOURCE_PATH}`);
   }
 
-  const updatedFrontmatterBody = updateFrontmatterBody(frontmatter.body, (line) => {
-    const match = line.match(/^(\s*)version:\s*"?([^"\n]+)"?\s*$/);
-    if (!match) return null;
-    return `${match[1]}version: "${version}"`;
-  });
+  const updatedFrontmatterBody = updateFrontmatterBody(
+    frontmatter.body,
+    (line) => {
+      const match = line.match(/^(\s*)version:\s*"?([^"\n]+)"?\s*$/);
+      if (!match) return null;
+      return `${match[1]}version: "${version}"`;
+    },
+  );
 
   if (!updatedFrontmatterBody) {
     throw new Error(`could not find metadata.version in ${SKILL_SOURCE_PATH}`);
@@ -200,7 +205,11 @@ export function updateLibrettoSkillVersion(skillSource, version) {
 export function setLibrettoSkillVersion(repoRoot, version) {
   const skillPath = resolve(repoRoot, SKILL_SOURCE_PATH);
   const currentContent = readFileSync(skillPath, "utf8");
-  writeFileSync(skillPath, updateLibrettoSkillVersion(currentContent, version), "utf8");
+  writeFileSync(
+    skillPath,
+    updateLibrettoSkillVersion(currentContent, version),
+    "utf8",
+  );
 }
 
 function syncDirectoryMirror(sourceDir, destDir) {
@@ -249,7 +258,9 @@ function compareDirectoryMirror(mirror, repoRoot, issues) {
       const expectedContent = readFileSync(sourceFilePath);
       const actualContent = readFileSync(targetFilePath);
       if (!expectedContent.equals(actualContent)) {
-        issues.push(`${mirror.name}: ${target} differs from ${mirror.source}: ${file}`);
+        issues.push(
+          `${mirror.name}: ${target} differs from ${mirror.source}: ${file}`,
+        );
       }
     }
   }
@@ -273,7 +284,9 @@ function compareFileMirror(mirror, repoRoot, issues) {
     const expectedContent = target.render(source);
     const actualContent = normalizeText(readFileSync(targetPath, "utf8"));
     if (expectedContent !== actualContent) {
-      issues.push(`${mirror.name}: ${target.path} differs from ${mirror.source}`);
+      issues.push(
+        `${mirror.name}: ${target.path} differs from ${mirror.source}`,
+      );
     }
   }
 }
@@ -282,7 +295,10 @@ function getSkillVersionIssue(repoRoot) {
   const packageJson = JSON.parse(
     readFileSync(resolve(repoRoot, PACKAGE_JSON_PATH), "utf8"),
   );
-  const skillSource = readFileSync(resolve(repoRoot, SKILL_SOURCE_PATH), "utf8");
+  const skillSource = readFileSync(
+    resolve(repoRoot, SKILL_SOURCE_PATH),
+    "utf8",
+  );
   const skillVersion = getLibrettoSkillVersion(skillSource);
 
   if (!skillVersion) {
@@ -294,6 +310,51 @@ function getSkillVersionIssue(repoRoot) {
   }
 
   return null;
+}
+
+function getCreateLibrettoVersionIssue(repoRoot) {
+  const librettoJson = JSON.parse(
+    readFileSync(resolve(repoRoot, PACKAGE_JSON_PATH), "utf8"),
+  );
+  const createLibrettoPath = resolve(
+    repoRoot,
+    CREATE_LIBRETTO_PACKAGE_JSON_PATH,
+  );
+  if (!existsSync(createLibrettoPath)) {
+    return `validation: missing ${CREATE_LIBRETTO_PACKAGE_JSON_PATH}`;
+  }
+  const createLibrettoJson = JSON.parse(
+    readFileSync(createLibrettoPath, "utf8"),
+  );
+
+  if (createLibrettoJson.version !== librettoJson.version) {
+    return `validation: ${CREATE_LIBRETTO_PACKAGE_JSON_PATH} version (${createLibrettoJson.version}) must match ${PACKAGE_JSON_PATH} version (${librettoJson.version})`;
+  }
+
+  return null;
+}
+
+export function syncCreateLibrettoVersion(repoRoot) {
+  const librettoJson = JSON.parse(
+    readFileSync(resolve(repoRoot, PACKAGE_JSON_PATH), "utf8"),
+  );
+  const createLibrettoPath = resolve(
+    repoRoot,
+    CREATE_LIBRETTO_PACKAGE_JSON_PATH,
+  );
+  if (!existsSync(createLibrettoPath)) return;
+  const createLibrettoJson = JSON.parse(
+    readFileSync(createLibrettoPath, "utf8"),
+  );
+
+  if (createLibrettoJson.version !== librettoJson.version) {
+    createLibrettoJson.version = librettoJson.version;
+    writeFileSync(
+      createLibrettoPath,
+      JSON.stringify(createLibrettoJson, null, 2) + "\n",
+      "utf8",
+    );
+  }
 }
 
 export function compareMirrors(repoRoot) {
@@ -310,6 +371,9 @@ export function compareMirrors(repoRoot) {
 
   const skillVersionIssue = getSkillVersionIssue(repoRoot);
   if (skillVersionIssue) issues.push(skillVersionIssue);
+
+  const createLibrettoIssue = getCreateLibrettoVersionIssue(repoRoot);
+  if (createLibrettoIssue) issues.push(createLibrettoIssue);
 
   return {
     ok: issues.length === 0,
@@ -343,6 +407,8 @@ export function syncMirrors(repoRoot) {
       writeFileSync(targetPath, target.render(source), "utf8");
     }
   }
+
+  syncCreateLibrettoVersion(repoRoot);
 
   const result = compareMirrors(repoRoot);
   if (!result.ok) {

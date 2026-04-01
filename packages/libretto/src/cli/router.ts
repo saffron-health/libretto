@@ -2,7 +2,7 @@ import { aiCommands } from "./commands/ai.js";
 import { browserCommands } from "./commands/browser.js";
 import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
-import { initCommand } from "./commands/init.js";
+import { setupCommand } from "./commands/setup.js";
 import { logCommands } from "./commands/logs.js";
 import { snapshotCommand } from "./commands/snapshot.js";
 import { SimpleCLI } from "./framework/simple-cli.js";
@@ -13,7 +13,7 @@ export const cliRoutes = {
   ...executionCommands,
   ...logCommands,
   ai: aiCommands,
-  init: initCommand,
+  setup: setupCommand,
   snapshot: snapshotCommand,
 };
 
