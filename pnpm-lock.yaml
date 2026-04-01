@@ -141,6 +141,8 @@ importers:
         specifier: workspace:*
         version: link:../packages/libretto
 
+  packages/create-libretto: {}
+
   packages/dev-tools:
     devDependencies:
       '@types/node':

@@ -31,23 +31,23 @@ function requireReturnedSessionId(
   return sessionId;
 }
 
+function expectMissingSessionError(output: string, session: string): void {
+  expect(output).toContain(`No session "${session}" found.`);
+  expect(output).toContain("No active sessions.");
+  expect(output).toContain("Start one with:");
+  expect(output).toContain(`libretto open <url> --session ${session}`);
+}
+
 describe("state-driven CLI subprocess behavior", () => {
-  test("shows missing AI config", async ({ librettoCli, evaluate }) => {
+  test("shows missing AI config", async ({ librettoCli }) => {
     const result = await librettoCli("ai configure");
-    await evaluate(result.stdout).toMatch(
-      "Explains that no AI config is currently set.",
-    );
+    expect(result.stdout).toContain("No AI config set.");
     expect(result.stderr).toBe("");
   });
 
-  test("configures, shows, and clears AI config", async ({
-    librettoCli,
-    evaluate,
-  }) => {
+  test("configures, shows, and clears AI config", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure openai");
-    await evaluate(configure.stdout).toMatch(
-      "Confirms the AI config was saved.",
-    );
+    expect(configure.stdout).toContain("AI config saved.");
     expect(configure.stdout).toContain("Model: openai/gpt-5.4");
     expect(configure.stderr).toBe("");
 
@@ -56,51 +56,41 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(show.stderr).toBe("");
 
     const clear = await librettoCli("ai configure --clear");
-    await evaluate(clear.stdout).toMatch("Confirms the AI config was cleared.");
+    expect(clear.stdout).toContain("Cleared AI config:");
     expect(clear.stderr).toBe("");
 
     const showAfterClear = await librettoCli("ai configure");
-    await evaluate(showAfterClear.stdout).toMatch(
-      "Explains that no AI config is currently set.",
-    );
+    expect(showAfterClear.stdout).toContain("No AI config set.");
     expect(showAfterClear.stderr).toBe("");
   });
 
-  test("configures anthropic provider", async ({ librettoCli, evaluate }) => {
+  test("configures anthropic provider", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure anthropic");
-    await evaluate(configure.stdout).toMatch(
-      "Confirms the AI config was saved.",
-    );
+    expect(configure.stdout).toContain("AI config saved.");
 
     const show = await librettoCli("ai configure");
     expect(show.stdout).toContain("Model: anthropic/claude-sonnet-4-6");
   });
 
-  test("configures gemini provider", async ({ librettoCli, evaluate }) => {
+  test("configures gemini provider", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure gemini");
-    await evaluate(configure.stdout).toMatch(
-      "Confirms the AI config was saved.",
-    );
+    expect(configure.stdout).toContain("AI config saved.");
 
     const show = await librettoCli("ai configure");
     expect(show.stdout).toContain("Model: google/gemini-3-flash-preview");
   });
 
-  test("configures vertex provider", async ({ librettoCli, evaluate }) => {
+  test("configures vertex provider", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure vertex");
-    await evaluate(configure.stdout).toMatch(
-      "Confirms the AI config was saved.",
-    );
+    expect(configure.stdout).toContain("AI config saved.");
 
     const show = await librettoCli("ai configure");
     expect(show.stdout).toContain("Model: vertex/gemini-2.5-pro");
   });
 
-  test("configures custom model string", async ({ librettoCli, evaluate }) => {
+  test("configures custom model string", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure openai/gpt-4o");
-    await evaluate(configure.stdout).toMatch(
-      "Confirms the AI config was saved.",
-    );
+    expect(configure.stdout).toContain("AI config saved.");
 
     const show = await librettoCli("ai configure");
     expect(show.stdout).toContain("Model: openai/gpt-4o");
@@ -146,7 +136,7 @@ describe("state-driven CLI subprocess behavior", () => {
       "Failed to analyze snapshot because no snapshot analyzer is configured.",
     );
     expect(snapshot.stderr).toContain(
-      "For more info, run `npx libretto init`.",
+      "For more info, run `npx libretto setup`.",
     );
     expect(
       existsSync(workspacePath(".libretto", "sessions", session, "snapshots")),
@@ -170,12 +160,10 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("open without --session auto-generates a session", async ({
     librettoCli,
-    evaluate,
   }) => {
     const opened = await librettoCli("open https://example.com --headless");
-    await evaluate(opened.stdout).toMatch(
-      "Confirms the browser opened successfully for example.com.",
-    );
+    expect(opened.stdout).toContain("Browser open");
+    expect(opened.stdout).toContain("example.com");
     const sessionId = requireReturnedSessionId(
       "open",
       opened.stdout,
@@ -203,23 +191,12 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("shows recovery guidance when a session-backed command targets a missing session", async ({
     librettoCli,
-    evaluate,
   }) => {
     const session = "missing-session";
     const result = await librettoCli(`pages --session ${session}`);
 
     expect(result.stdout).toBe("");
-    await evaluate(result.stderr).toMatch(
-      'Explains that session "missing-session" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session missing-session.',
-    );
-    expect(result.stderr.trimEnd().split("\n")).toEqual([
-      `No session "${session}" found.`,
-      "",
-      "No active sessions.",
-      "",
-      "Start one with:",
-      `  libretto open <url> --session ${session}`,
-    ]);
+    expectMissingSessionError(result.stderr, session);
   });
 
   test("prints no-op message when closing a session with no browser", async ({
@@ -271,7 +248,6 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("reads and clears network logs for a live session", async ({
     librettoCli,
-    evaluate,
   }) => {
     const session = "network-live-session";
     await librettoCli(
@@ -283,9 +259,8 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const view = await librettoCli(`network --session ${session} --last 5`);
-    await evaluate(view.stdout).toMatch(
-      "Shows at least one network request result for the session.",
-    );
+    expect(view.stdout).toContain("example.com/?network=one");
+    expect(view.stdout).toContain("request(s) shown.");
 
     const clear = await librettoCli(`network --session ${session} --clear`);
     expect(clear.stdout).toContain("Network log cleared.");
@@ -293,7 +268,6 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("reads and clears action logs for a live session", async ({
     librettoCli,
-    evaluate,
   }) => {
     const session = "actions-live-session";
     await librettoCli(
@@ -305,9 +279,9 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const view = await librettoCli(`actions --session ${session} --last 5`);
-    await evaluate(view.stdout).toMatch(
-      "Shows at least one action result for the session.",
-    );
+    expect(view.stdout).toContain("[AGENT]");
+    expect(view.stdout).toMatch(/reload|goto/);
+    expect(view.stdout).toContain("action(s) shown.");
 
     const clear = await librettoCli(`actions --session ${session} --clear`);
     expect(clear.stdout).toContain("Action log cleared.");

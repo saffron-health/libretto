@@ -1,6 +1,4 @@
-import {
-  createRequire,
-} from "node:module";
+import { createRequire } from "node:module";
 import {
   existsSync,
   mkdirSync,
@@ -31,6 +29,11 @@ function extractBundledImplementation(indexSource: string): string {
 }
 
 const require = createRequire(import.meta.url);
+const currentLibrettoVersion = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+) as {
+  version: string;
+};
 
 describe("createHostedDeployPackage", () => {
   const cleanups: Array<() => void> = [];
@@ -83,13 +86,13 @@ describe("createHostedDeployPackage", () => {
 
     writeFileSync(
       join(workspaceRoot, "pnpm-workspace.yaml"),
-      ['packages:', '  - "apps/*"', '  - "packages/*"', ""].join("\n"),
+      ["packages:", '  - "apps/*"', '  - "packages/*"', ""].join("\n"),
     );
     writeJson(join(workspaceRoot, "package.json"), {
       name: "workspace-root",
       private: true,
       devDependencies: {
-        libretto: "0.5.3-experimental.99",
+        libretto: "0.5.4",
       },
     });
 
@@ -145,19 +148,26 @@ describe("createHostedDeployPackage", () => {
     ) as {
       dependencies?: Record<string, string>;
     };
-    const bundle = readFileSync(join(deployPackage.outputDir, "index.js"), "utf8");
+    const bundle = readFileSync(
+      join(deployPackage.outputDir, "index.js"),
+      "utf8",
+    );
     const implementation = extractBundledImplementation(bundle);
 
     expect(deployManifest.dependencies).toEqual({
-      libretto: "0.5.3-experimental.99",
+      libretto: "0.5.4",
     });
     expect(bundle).toContain("createWorkflowProxy");
-    expect(bundle).toContain('export const testWorkflow = createWorkflowProxy("testWorkflow");');
+    expect(bundle).toContain(
+      'export const testWorkflow = createWorkflowProxy("testWorkflow");',
+    );
     expect(implementation).toContain("bundled from workspace source");
     expect(implementation).not.toContain("@repo/config/message");
     expect(bundle).not.toContain("workspace:*");
     expect(
-      readdirSync(deployPackage.outputDir).filter((file) => file.endsWith(".js")),
+      readdirSync(deployPackage.outputDir).filter((file) =>
+        file.endsWith(".js"),
+      ),
     ).toEqual(["index.js"]);
   });
 
@@ -205,14 +215,19 @@ describe("createHostedDeployPackage", () => {
     ) as {
       dependencies?: Record<string, string>;
     };
-    const bundle = readFileSync(join(deployPackage.outputDir, "index.js"), "utf8");
+    const bundle = readFileSync(
+      join(deployPackage.outputDir, "index.js"),
+      "utf8",
+    );
     const implementation = extractBundledImplementation(bundle);
 
     expect(deployManifest.dependencies).toEqual({
-      libretto: "0.5.3",
+      libretto: currentLibrettoVersion.version,
       lodash: "^4.17.21",
     });
-    expect(bundle).toContain('export const testWorkflow = createWorkflowProxy("testWorkflow");');
+    expect(bundle).toContain(
+      'export const testWorkflow = createWorkflowProxy("testWorkflow");',
+    );
     expect(implementation).toContain("lodash");
   });
 
@@ -228,7 +243,8 @@ describe("createHostedDeployPackage", () => {
       private: true,
       type: "module",
       dependencies: {
-        libretto: "github:saffron-health/libretto#feat/deploy-cli&path:/packages/libretto",
+        libretto:
+          "github:saffron-health/libretto#feat/deploy-cli&path:/packages/libretto",
       },
     });
 
@@ -262,12 +278,12 @@ describe("createHostedDeployPackage", () => {
     expect(deployManifest.dependencies).toEqual({
       libretto: "file:./libretto",
     });
-    expect(existsSync(join(deployPackage.outputDir, "libretto", "package.json"))).toBe(
-      true,
-    );
-    expect(existsSync(join(deployPackage.outputDir, "libretto", "dist", "index.js"))).toBe(
-      true,
-    );
+    expect(
+      existsSync(join(deployPackage.outputDir, "libretto", "package.json")),
+    ).toBe(true);
+    expect(
+      existsSync(join(deployPackage.outputDir, "libretto", "dist", "index.js")),
+    ).toBe(true);
   });
 
   it("keeps deployed workflows runnable after rebundling the generated entrypoint to cjs", async () => {
@@ -283,7 +299,8 @@ describe("createHostedDeployPackage", () => {
       private: true,
       type: "module",
       dependencies: {
-        libretto: "github:saffron-health/libretto#feat/deploy-cli&path:/packages/libretto",
+        libretto:
+          "github:saffron-health/libretto#feat/deploy-cli&path:/packages/libretto",
       },
     });
 
@@ -351,7 +368,7 @@ describe("createHostedDeployPackage", () => {
 
     writeFileSync(
       join(workspaceRoot, "pnpm-workspace.yaml"),
-      ['packages:', '  - "apps/*"', '  - "packages/*"', ""].join("\n"),
+      ["packages:", '  - "apps/*"', '  - "packages/*"', ""].join("\n"),
     );
     writeJson(join(sourceDir, "package.json"), {
       name: "@repo/browser-agent",

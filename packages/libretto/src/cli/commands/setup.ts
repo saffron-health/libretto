@@ -12,7 +12,7 @@ import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readAiConfig } from "../core/ai-config.js";
-import { REPO_ROOT } from "../core/context.js";
+import { ensureLibrettoSetup, REPO_ROOT } from "../core/context.js";
 import {
   loadSnapshotEnv,
   resolveSnapshotApiModel,
@@ -86,7 +86,7 @@ function printInvalidAiConfigWarning(): void {
   }
 }
 
-function printSnapshotApiStatus(): void {
+function printSnapshotApiStatus(): boolean {
   const config = safeReadAiConfig();
   const selection = resolveSnapshotApiModel(config);
   const envPath = join(REPO_ROOT, ".env");
@@ -104,7 +104,7 @@ function printSnapshotApiStatus(): void {
       "    Snapshot objectives will use the API analyzer by default.",
     );
     console.log("    No further action required.");
-    return;
+    return true;
   }
 
   console.log("  ✗ No snapshot API credentials detected.");
@@ -119,8 +119,9 @@ function printSnapshotApiStatus(): void {
     "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
   );
   console.log(
-    "    Run `npx libretto init` interactively to set up credentials.",
+    "    Run `npx libretto setup` interactively to set up credentials.",
   );
+  return false;
 }
 
 async function runInteractiveApiSetup(): Promise<void> {
@@ -161,7 +162,7 @@ async function runInteractiveApiSetup(): Promise<void> {
 
     if (answer.toLowerCase() === "s" || !answer) {
       console.log(
-        "\n  Skipped. You can set up API credentials later by rerunning `npx libretto init`.",
+        "\n  Skipped. You can set up API credentials later by rerunning `npx libretto setup`.",
       );
       console.log("  Or add credentials directly to your .env file:");
       console.log("    OPENAI_API_KEY=...");
@@ -295,7 +296,7 @@ function copySkills(): void {
   }
 }
 
-export const initInput = SimpleCLI.input({
+export const setupInput = SimpleCLI.input({
   positionals: [],
   named: {
     skipBrowsers: SimpleCLI.flag({
@@ -305,12 +306,13 @@ export const initInput = SimpleCLI.input({
   },
 });
 
-export const initCommand = SimpleCLI.command({
-  description: "Initialize libretto in the current project",
+export const setupCommand = SimpleCLI.command({
+  description: "Set up libretto in the current project",
 })
-  .input(initInput)
+  .input(setupInput)
   .handle(async ({ input }) => {
-    console.log("Initializing libretto...\n");
+    console.log("Setting up libretto...\n");
+    ensureLibrettoSetup();
 
     if (!input.skipBrowsers) {
       installBrowsers();
@@ -324,8 +326,13 @@ export const initCommand = SimpleCLI.command({
       await runInteractiveApiSetup();
     } else {
       loadSnapshotEnv();
-      printSnapshotApiStatus();
+      const ready = printSnapshotApiStatus();
+      if (!ready) {
+        console.log(
+          "\nIf you're an agent, request the user to run `npx libretto setup`.",
+        );
+      }
     }
 
-    console.log("\n✓ libretto init complete");
+    console.log("\n✓ libretto setup complete");
   });

@@ -2,22 +2,15 @@ import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
 describe("multi-page CLI behavior", () => {
-  test("pages lists open pages with ids and urls", async ({
-    librettoCli,
-    evaluate,
-  }) => {
+  test("pages lists open pages with ids and urls", async ({ librettoCli }) => {
     const session = "multi-page-pages-command";
     const opened = await librettoCli(
       `open https://example.com --headless --session ${session}`,
     );
-    await evaluate(opened.stdout).toMatch(
-      `Confirms the browser opened successfully for example.com in session "${session}".`,
-    );
+    expect(opened.stdout).toContain("Browser open");
+    expect(opened.stdout).toContain("example.com");
 
     const singlePageResult = await librettoCli(`pages --session ${session}`);
-    await evaluate(singlePageResult.stdout).toMatch(
-      "Lists one open page for example.com and includes its page id.",
-    );
     const singlePageLines = singlePageResult.stdout.trimEnd().split("\n");
     expect(singlePageLines[0]).toBe("Open pages:");
     expect(singlePageLines[1]).toMatch(
@@ -30,9 +23,6 @@ describe("multi-page CLI behavior", () => {
     );
 
     const multiplePagesResult = await librettoCli(`pages --session ${session}`);
-    await evaluate(multiplePagesResult.stdout).toMatch(
-      "Lists both the example.com page and the data:text/html,multi-page-secondary page, each with page ids.",
-    );
     const multiplePageLines = multiplePagesResult.stdout.trimEnd().split("\n");
     expect(multiplePageLines[0]).toBe("Open pages:");
     expect(multiplePageLines).toHaveLength(3);
@@ -59,7 +49,6 @@ describe("multi-page CLI behavior", () => {
 
   test("exec requires --page when multiple pages are open", async ({
     librettoCli,
-    evaluate,
   }) => {
     const session = "multi-page-exec-requires-page";
     await librettoCli(
@@ -73,14 +62,14 @@ describe("multi-page CLI behavior", () => {
     const result = await librettoCli(
       `exec "return await page.url()" --session ${session}`,
     );
-    await evaluate(result.stderr).toMatch(
-      `Explains that multiple pages are open in session "${session}" and tells the user to pass --page <id> to target one page.`,
+    expect(result.stderr).toContain(
+      `Multiple pages are open in session "${session}".`,
     );
+    expect(result.stderr).toContain("Pass --page <id> to target a page");
   }, 45_000);
 
   test("commands fail with a clear error for unknown page ids", async ({
     librettoCli,
-    evaluate,
   }) => {
     const session = "multi-page-invalid-page-id";
     const missingPageId = "MISSING_PAGE_ID_FOR_TEST";
@@ -91,22 +80,25 @@ describe("multi-page CLI behavior", () => {
     const execResult = await librettoCli(
       `exec "return page.url()" --session ${session} --page ${missingPageId}`,
     );
-    await evaluate(execResult.stderr).toMatch(
-      `Explains that page id "${missingPageId}" was not found in session "${session}".`,
+    expect(execResult.stderr).toContain(
+      `Page "${missingPageId}" was not found in session "${session}".`,
     );
+    expect(execResult.stderr).toContain(`libretto pages --session ${session}`);
 
     const actionsResult = await librettoCli(
       `actions --session ${session} --page ${missingPageId}`,
     );
-    await evaluate(actionsResult.stderr).toMatch(
-      `Explains that page id "${missingPageId}" was not found in session "${session}".`,
+    expect(actionsResult.stderr).toContain(
+      `Page "${missingPageId}" was not found in session "${session}".`,
     );
+    expect(actionsResult.stderr).toContain(`libretto pages --session ${session}`);
 
     const networkResult = await librettoCli(
       `network --session ${session} --page ${missingPageId}`,
     );
-    await evaluate(networkResult.stderr).toMatch(
-      `Explains that page id "${missingPageId}" was not found in session "${session}".`,
+    expect(networkResult.stderr).toContain(
+      `Page "${missingPageId}" was not found in session "${session}".`,
     );
+    expect(networkResult.stderr).toContain(`libretto pages --session ${session}`);
   }, 45_000);
 });

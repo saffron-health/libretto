@@ -1,0 +1,20 @@
+{
+  "name": "create-libretto",
+  "version": "0.5.4",
+  "description": "Create and set up a Libretto project",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saffron-health/libretto"
+  },
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "create-libretto": "./index.mjs"
+  },
+  "files": [
+    "index.mjs"
+  ]
+}

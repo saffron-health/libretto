@@ -25,9 +25,9 @@ type Output = {
 export const myWorkflow = workflow<Input, Output>(
   "myWorkflow",
   async (ctx: LibrettoWorkflowContext, input): Promise<Output> => {
-    const { session, page, logger } = ctx;
+    const { session, page } = ctx;
 
-    logger.info("workflow-start", { session, query: input.query });
+    console.log("workflow-start", { session, query: input.query });
     await page.goto("https://example.com");
     await pause(session);
 
@@ -40,7 +40,7 @@ Key points:
 
 - `workflow(name, handler)` takes a unique workflow name and returns the workflow object that Libretto can run.
 - `npx libretto run ./file.ts myWorkflow` resolves `myWorkflow` from the workflows exported by `./file.ts`, so export or re-export the workflow from that file directly or through a `workflows` object, and make sure the run argument matches the name passed to `workflow("myWorkflow", ...)`.
-- `ctx` provides `session`, `page`, and `logger`
+- `ctx` provides `session` and `page`. Use `console.log`/`console.warn`/`console.error` for logging — the runtime wraps these with structured metadata automatically.
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.
 - After validation is complete and the workflow is confirmed working end to end, remove all `pause()` calls and pause-only workflow params unless the user explicitly says to keep them.

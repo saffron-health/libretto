@@ -41,7 +41,7 @@ Example:
 ## Common Commands
 
 ```bash
-npx libretto init
+npx libretto setup
 npx libretto ai configure openai
 npx libretto open https://app.example.com --viewport 1440x900
 npx libretto run ./integration.ts main --viewport 1440x900
