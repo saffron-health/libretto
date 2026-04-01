@@ -155,6 +155,6 @@ Source layout:
 - `{{LIBRETTO_PATH_PREFIX}}README.template.md` — source of truth for the repo and package READMEs
 - `{{LIBRETTO_PATH_PREFIX}}skills/libretto/` — source of truth for the Libretto skill
 
-Run `pnpm sync:mirrors` after editing `{{LIBRETTO_PATH_PREFIX}}README.template.md` or anything under `{{LIBRETTO_PATH_PREFIX}}skills/libretto/`. `pnpm i` also resyncs the skill mirrors through `postinstall`.
+Run `pnpm sync:mirrors` after editing `{{LIBRETTO_PATH_PREFIX}}README.template.md` or anything under `{{LIBRETTO_PATH_PREFIX}}skills/libretto/`.
 
 To check that generated READMEs, skill mirrors, and skill version metadata are in sync without fixing them, run `pnpm check:mirrors`. To release, run `pnpm prepare-release`.
