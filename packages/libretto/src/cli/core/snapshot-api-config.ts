@@ -67,7 +67,7 @@ function noSnapshotApiConfiguredMessage(): string {
   return [
     "Failed to analyze snapshot because no snapshot analyzer is configured.",
     `Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_CLOUD_PROJECT to .env or as a shell environment variable, or choose a default model with \`${defaultModelCommandLine()}\`.`,
-    "For more info, run `npx libretto init`.",
+    "For more info, run `npx libretto setup`.",
   ].join(" ");
 }
 
@@ -81,7 +81,7 @@ function missingProviderSnapshotMessage(
   return [
     `Failed to analyze snapshot because ${selection.provider} is configured${configuredSource}, but ${providerMissingCredentialSummary(selection.provider)}.`,
     providerSetupSentence(selection.provider),
-    "For more info, run `npx libretto init`.",
+    "For more info, run `npx libretto setup`.",
   ].join(" ");
 }
 

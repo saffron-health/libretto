@@ -45,9 +45,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  test("configures, shows, and clears AI config", async ({
-    librettoCli,
-  }) => {
+  test("configures, shows, and clears AI config", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure openai");
     expect(configure.stdout).toContain("AI config saved.");
     expect(configure.stdout).toContain("Model: openai/gpt-5.4");
@@ -138,7 +136,7 @@ describe("state-driven CLI subprocess behavior", () => {
       "Failed to analyze snapshot because no snapshot analyzer is configured.",
     );
     expect(snapshot.stderr).toContain(
-      "For more info, run `npx libretto init`.",
+      "For more info, run `npx libretto setup`.",
     );
     expect(
       existsSync(workspacePath(".libretto", "sessions", session, "snapshots")),

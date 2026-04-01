@@ -42,10 +42,10 @@ function expectMissingSessionError(output: string, session: string): void {
 }
 
 describe("basic CLI subprocess behavior", () => {
-  test("init explains snapshot API env setup when no credentials are configured", async ({
+  test("setup explains snapshot API env setup when no credentials are configured", async ({
     librettoCli,
   }) => {
-    const result = await librettoCli("init --skip-browsers", {
+    const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "",
       ANTHROPIC_API_KEY: "",
@@ -62,10 +62,10 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("GEMINI_API_KEY=...");
   });
 
-  test("init reports when snapshot API credentials are already ready", async ({
+  test("setup reports when snapshot API credentials are already ready", async ({
     librettoCli,
   }) => {
-    const result = await librettoCli("init --skip-browsers", {
+    const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "test-openai-key",
     });
@@ -75,7 +75,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("No further action required.");
   });
 
-  test("init copies skill files without confirmation when agent dirs exist", async ({
+  test("setup copies skill files without confirmation when agent dirs exist", async ({
     librettoCli,
     workspacePath,
   }) => {
@@ -89,7 +89,7 @@ describe("basic CLI subprocess behavior", () => {
       "utf8",
     );
 
-    const result = await librettoCli("init --skip-browsers", {
+    const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "",
       ANTHROPIC_API_KEY: "",
@@ -151,7 +151,9 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("help experimental");
     expect(result.stdout).toContain("Experimental commands");
-    expect(result.stdout).toContain("Usage: libretto experimental <subcommand>");
+    expect(result.stdout).toContain(
+      "Usage: libretto experimental <subcommand>",
+    );
     expect(result.stdout).toContain("deploy");
     expect(result.stderr).toBe("");
   });
@@ -279,7 +281,9 @@ describe("basic CLI subprocess behavior", () => {
 
   test("exec with hyphen requires stdin input", async ({ librettoCli }) => {
     const session = "exec-stdin-requires-input";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     const result = await librettoCli(`exec - --session ${session}`);
     expect(result.stderr).toContain("Missing stdin input for `exec -`.");
@@ -289,7 +293,9 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const session = "exec-stdin-with-input";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     const result = await librettoCli(
       `exec - --session ${session}`,
@@ -485,7 +491,7 @@ export const main = workflow("main", async () => {
         "missing-playwright-browsers",
       ),
     });
-    expect(result.stderr).not.toContain("Workflow \"main\" not found");
+    expect(result.stderr).not.toContain('Workflow "main" not found');
   });
 
   test("accepts workflow exported via workflows manifest", async ({
@@ -512,7 +518,7 @@ export const workflows = {
         "missing-playwright-browsers",
       ),
     });
-    expect(result.stderr).not.toContain("Workflow \"main\" not found");
+    expect(result.stderr).not.toContain('Workflow "main" not found');
   });
 
   test("accepts workflow exported directly from workflows binding", async ({
@@ -535,7 +541,7 @@ export const workflows = workflow("main", async () => {
         "missing-playwright-browsers",
       ),
     });
-    expect(result.stderr).not.toContain("Workflow \"main\" not found");
+    expect(result.stderr).not.toContain('Workflow "main" not found');
   });
 
   test("fails run when local auth profile is declared but missing", async ({
