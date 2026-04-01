@@ -86,7 +86,7 @@ function printInvalidAiConfigWarning(): void {
   }
 }
 
-function printSnapshotApiStatus(): void {
+function printSnapshotApiStatus(): boolean {
   const config = safeReadAiConfig();
   const selection = resolveSnapshotApiModel(config);
   const envPath = join(REPO_ROOT, ".env");
@@ -104,7 +104,7 @@ function printSnapshotApiStatus(): void {
       "    Snapshot objectives will use the API analyzer by default.",
     );
     console.log("    No further action required.");
-    return;
+    return true;
   }
 
   console.log("  ✗ No snapshot API credentials detected.");
@@ -121,6 +121,7 @@ function printSnapshotApiStatus(): void {
   console.log(
     "    Run `npx libretto setup` interactively to set up credentials.",
   );
+  return false;
 }
 
 async function runInteractiveApiSetup(): Promise<void> {
@@ -325,10 +326,8 @@ export const setupCommand = SimpleCLI.command({
       await runInteractiveApiSetup();
     } else {
       loadSnapshotEnv();
-      printSnapshotApiStatus();
-      const config = safeReadAiConfig();
-      const selection = resolveSnapshotApiModel(config);
-      if (!selection || !hasProviderCredentials(selection.provider)) {
+      const ready = printSnapshotApiStatus();
+      if (!ready) {
         console.log(
           "\nIf you're an agent, request the user to run `npx libretto setup`.",
         );
