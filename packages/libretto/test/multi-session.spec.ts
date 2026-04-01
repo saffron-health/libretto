@@ -33,12 +33,10 @@ function requireReturnedSessionId(
 describe("multi-session CLI behavior", () => {
   test("open without --session auto-generates distinct sessions", async ({
     librettoCli,
-    evaluate,
   }) => {
     const firstOpen = await librettoCli("open https://example.com --headless");
-    await evaluate(firstOpen.stdout).toMatch(
-      "Confirms the browser opened successfully for example.com.",
-    );
+    expect(firstOpen.stdout).toContain("Browser open");
+    expect(firstOpen.stdout).toContain("example.com");
     const firstSessionId = requireReturnedSessionId(
       "open",
       firstOpen.stdout,
@@ -46,9 +44,8 @@ describe("multi-session CLI behavior", () => {
     );
 
     const secondOpen = await librettoCli("open https://example.com --headless");
-    await evaluate(secondOpen.stdout).toMatch(
-      "Confirms the browser opened successfully for example.com.",
-    );
+    expect(secondOpen.stdout).toContain("Browser open");
+    expect(secondOpen.stdout).toContain("example.com");
     const secondSessionId = requireReturnedSessionId(
       "open",
       secondOpen.stdout,
@@ -59,7 +56,6 @@ describe("multi-session CLI behavior", () => {
 
   test("run twice without --session creates distinct sessions", async ({
     librettoCli,
-    evaluate,
     writeWorkflow,
   }) => {
     const integrationFilePath = await writeWorkflow(
@@ -74,16 +70,14 @@ export const main = workflow("main", async () => {
     const firstRun = await librettoCli(
       `run "${integrationFilePath}" main --headless`,
     );
-    await evaluate(firstRun.stdout).toMatch(
-      "Includes AUTO_SESSION_RUN_OK and confirms the integration completed successfully.",
-    );
+    expect(firstRun.stdout).toContain("AUTO_SESSION_RUN_OK");
+    expect(firstRun.stdout).toContain("Integration completed.");
 
     const secondRun = await librettoCli(
       `run "${integrationFilePath}" main --headless`,
     );
-    await evaluate(secondRun.stdout).toMatch(
-      "Includes AUTO_SESSION_RUN_OK and confirms the integration completed successfully.",
-    );
+    expect(secondRun.stdout).toContain("AUTO_SESSION_RUN_OK");
+    expect(secondRun.stdout).toContain("Integration completed.");
     expect(secondRun.stderr).not.toContain("is already open and connected to");
   }, 90_000);
 
@@ -111,10 +105,7 @@ export const main = workflow("main", async () => {
     expect(closeAll.stdout).toContain("Closed 2 session(s).");
   }, 60_000);
 
-  test("explicit --session is used as-is", async ({
-    librettoCli,
-    evaluate,
-  }) => {
+  test("explicit --session is used as-is", async ({ librettoCli }) => {
     const session = "explicit-session-e2e";
     const opened = await librettoCli(
       `open https://example.com --headless --session ${session}`,
@@ -129,8 +120,9 @@ export const main = workflow("main", async () => {
     const secondOpen = await librettoCli(
       `open https://example.com --headless --session ${session}`,
     );
-    await evaluate(secondOpen.stderr).toMatch(
-      `Explains that session "${session}" is already open and suggests closing it or choosing another session.`,
+    expect(secondOpen.stderr).toContain(
+      `Session "${session}" is already open and connected to`,
     );
+    expect(secondOpen.stderr).toContain(`libretto close --session ${session}`);
   }, 60_000);
 });

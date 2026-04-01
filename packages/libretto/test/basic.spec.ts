@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
@@ -31,6 +32,13 @@ function requireReturnedSessionId(
     );
   }
   return sessionId;
+}
+
+function expectMissingSessionError(output: string, session: string): void {
+  expect(output).toContain(`No session "${session}" found.`);
+  expect(output).toContain("No active sessions.");
+  expect(output).toContain("Start one with:");
+  expect(output).toContain(`libretto open <url> --session ${session}`);
 }
 
 describe("basic CLI subprocess behavior", () => {
@@ -108,21 +116,22 @@ describe("basic CLI subprocess behavior", () => {
     ).toBe(false);
   });
 
-  test("prints usage for --help", async ({ librettoCli, evaluate }) => {
+  test("prints usage for --help", async ({ librettoCli }) => {
     const result = await librettoCli("--help");
-    await evaluate(result.stdout).toMatch(
-      "Shows the root CLI help with top-level command usage and includes the snapshot command description.",
-    );
+    expect(result.stdout).toContain("Usage: libretto <command>");
+    expect(result.stdout).toContain("snapshot");
+    expect(result.stdout).toContain("Capture PNG + HTML");
     expect(result.stdout).not.toContain("cloud <subcommand>");
     expect(result.stdout).toContain("experimental <subcommand>");
     expect(result.stderr).toBe("");
   });
 
-  test("prints usage for help command", async ({ librettoCli, evaluate }) => {
+  test("prints usage for help command", async ({ librettoCli }) => {
     const result = await librettoCli("help");
-    await evaluate(result.stdout).toMatch(
-      "Shows the root CLI help with the top-level commands list.",
-    );
+    expect(result.stdout).toContain("Usage: libretto <command>");
+    expect(result.stdout).toContain("Commands:");
+    expect(result.stdout).toContain("open");
+    expect(result.stdout).toContain("ai");
     expect(result.stderr).toBe("");
   });
 
@@ -177,6 +186,42 @@ describe("basic CLI subprocess behavior", () => {
     );
   });
 
+  test("opens file URLs", async ({ librettoCli, workspacePath }) => {
+    const htmlPath = workspacePath("fixtures", "local-file.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await mkdir(workspacePath(".libretto", "profiles"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      `<!doctype html><html><head><title>Local File Title</title></head><body><h1>Local File Body</h1></body></html>`,
+      "utf8",
+    );
+    await writeFile(
+      workspacePath(".libretto", "profiles", "local-file.json"),
+      "{ definitely-not-valid-json}",
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    const session = "file-url-open";
+
+    const opened = await librettoCli(
+      `open "${fileUrl}" --headless --session ${session}`,
+    );
+    expect(opened.stderr).toBe("");
+    expect(opened.stdout).toContain(`Browser open (headless): ${fileUrl}`);
+    expect(opened.stdout).not.toContain("Loading saved profile");
+
+    const title = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(title.stderr).toBe("");
+    expect(title.stdout).toContain("Local File Title");
+
+    const closed = await librettoCli(`close --session ${session}`);
+    expect(closed.stderr).toBe("");
+    expect(closed.stdout).toContain(`Browser closed (session: ${session}).`);
+  }, 45_000);
+
   test("fails open with actionable error when browser child spawn fails", async ({
     librettoCli,
   }) => {
@@ -192,12 +237,10 @@ describe("basic CLI subprocess behavior", () => {
 
   test("defaults sessioned browser commands to the default session", async ({
     librettoCli,
-    evaluate,
   }) => {
     const opened = await librettoCli("open https://example.com --headless");
-    await evaluate(opened.stdout).toMatch(
-      "Confirms the browser opened successfully for example.com.",
-    );
+    expect(opened.stdout).toContain("Browser open");
+    expect(opened.stdout).toContain("example.com");
     expect(opened.stderr).toBe("");
     const session = requireReturnedSessionId(
       "open",
@@ -206,15 +249,12 @@ describe("basic CLI subprocess behavior", () => {
     );
 
     const pages = await librettoCli(`pages --session ${session}`);
-    await evaluate(pages.stdout).toMatch(
-      "Lists the currently open page for example.com.",
-    );
+    expect(pages.stdout).toContain("Open pages:");
+    expect(pages.stdout).toContain("example.com");
     expect(pages.stderr).toBe("");
 
     const close = await librettoCli(`close --session ${session}`);
-    await evaluate(close.stdout).toMatch(
-      `Reports that the browser for session "${session}" was closed.`,
-    );
+    expect(close.stdout).toContain(`Browser closed (session: ${session}).`);
     expect(close.stderr).toBe("");
   }, 45_000);
 
@@ -227,11 +267,10 @@ describe("basic CLI subprocess behavior", () => {
 
   test("fails exec with missing code usage error when only flags are passed", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli("exec --visualize --session test");
-    await evaluate(result.stderr).toMatch(
-      "Shows usage for exec command requiring code with optional session and visualize flags.",
+    expect(result.stderr).toContain(
+      "Usage: libretto exec <code|-> [--session <name>] [--visualize]",
     );
     expect(result.stderr).not.toContain(
       `Missing required --session for "exec".`,
@@ -263,66 +302,49 @@ describe("basic CLI subprocess behavior", () => {
 
   test("fails run when integration file does not exist", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli("run ./integration.ts main");
-    await evaluate(result.stderr).toMatch(
-      "Explains that the integration file does not exist and mentions the integration.ts path.",
-    );
+    expect(result.stderr).toContain("Integration file does not exist:");
+    expect(result.stderr).toContain("integration.ts");
   });
 
-  test("fails run with invalid JSON in --params", async ({
-    librettoCli,
-    evaluate,
-  }) => {
+  test("fails run with invalid JSON in --params", async ({ librettoCli }) => {
     const result = await librettoCli(
       'run ./integration.ts main --params "{not-json}"',
     );
-    await evaluate(result.stderr).toMatch(
-      "Reports that --params contained invalid JSON.",
-    );
+    expect(result.stderr).toContain("Invalid JSON in --params:");
   });
 
   test("fails fast for invalid session names before command execution", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli(
       "open https://example.com --session ../bad-name",
     );
     expect(result.stdout).toBe("");
-    await evaluate(result.stderr).toMatch(
-      "Reports that the provided session name is invalid and only allows letters, numbers, dots, underscores, and dashes.",
+    expect(result.stderr).toContain(
+      "Invalid session name. Use only letters, numbers, dots, underscores, and dashes.",
     );
   });
 
-  test("fails for invalid inline session names", async ({
-    librettoCli,
-    evaluate,
-  }) => {
+  test("fails for invalid inline session names", async ({ librettoCli }) => {
     const result = await librettoCli(
       "open https://example.com --session=../bad-name",
     );
     expect(result.stdout).toBe("");
-    await evaluate(result.stderr).toMatch(
-      "Reports that the provided session name is invalid and only allows letters, numbers, dots, underscores, and dashes.",
+    expect(result.stderr).toContain(
+      "Invalid session name. Use only letters, numbers, dots, underscores, and dashes.",
     );
   });
 
-  test("accepts hyphen-prefixed session values", async ({
-    librettoCli,
-    evaluate,
-  }) => {
+  test("accepts hyphen-prefixed session values", async ({ librettoCli }) => {
     const result = await librettoCli("pages --session -dash");
-    await evaluate(result.stderr).toMatch(
-      'Explains that session "-dash" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session -dash.',
-    );
+    expectMissingSessionError(result.stderr, "-dash");
     expect(result.stderr).not.toContain("Missing value for --session.");
   });
 
   test("fails run with invalid JSON in --params-file", async ({
     librettoCli,
-    evaluate,
     workspaceDir,
   }) => {
     const paramsPath = join(workspaceDir, "invalid-params.json");
@@ -331,9 +353,7 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli(
       `run ./integration.ts main --params-file "${paramsPath}"`,
     );
-    await evaluate(result.stderr).toMatch(
-      "Reports that --params-file contained invalid JSON.",
-    );
+    expect(result.stderr).toContain("Invalid JSON in --params-file:");
   });
 
   test("fails run when --params and --params-file are both provided", async ({
@@ -384,7 +404,6 @@ export async function main() {
 
   test("run forwards --tsconfig to tsx for workflow imports", async ({
     librettoCli,
-    evaluate,
     workspacePath,
     writeWorkflow,
   }) => {
@@ -424,14 +443,12 @@ export const main = workflow("main", async () => {
     const result = await librettoCli(
       `run "${integrationFilePath}" main --tsconfig "${workspacePath("feature", "tsconfig.json")}" --session tsconfig-test --headless`,
     );
-    await evaluate(result.stdout).toMatch(
-      "Includes TSCONFIG_ALIAS_OK and Integration completed.",
-    );
+    expect(result.stdout).toContain("TSCONFIG_ALIAS_OK");
+    expect(result.stdout).toContain("Integration completed.");
   }, 45_000);
 
   test("run compile failures mention --tsconfig guidance", async ({
     librettoCli,
-    evaluate,
     workspacePath,
   }) => {
     await writeFile(
@@ -442,9 +459,8 @@ export const main = workflow("main", async () => {
     const result = await librettoCli(
       'run "./integration-compile-error.ts" main --session compile-test --headless',
     );
-    await evaluate(result.stderr).toMatch(
-      "Reports that importing the integration module failed because of a TypeScript compilation error and includes guidance to pass --tsconfig <path>.",
-    );
+    expect(result.stderr).toContain("--tsconfig <path>");
+    expect(result.stderr).toMatch(/failed|error|transform/i);
     expect(result.stderr).not.toContain("Browser is still open.");
     expect(result.stderr).not.toContain("use `exec` to inspect it");
   }, 45_000);
@@ -683,24 +699,16 @@ export const main = workflow("main", async (ctx) => {
     );
   });
 
-  test("fails when --session value is missing", async ({
-    librettoCli,
-    evaluate,
-  }) => {
+  test("fails when --session value is missing", async ({ librettoCli }) => {
     const result = await librettoCli(`exec "return 1" --session`);
-    await evaluate(result.stderr).toMatch(
-      "Reports that --session is missing its required value.",
-    );
+    expect(result.stderr).toContain("Missing value for --session.");
   });
 
   test("allows session names that match command tokens", async ({
     librettoCli,
-    evaluate,
   }) => {
     const result = await librettoCli("pages --session open");
     expect(result.stdout).toBe("");
-    await evaluate(result.stderr).toMatch(
-      'Explains that session "open" does not exist, no active sessions are available, and suggests opening a session with libretto open <url> --session open.',
-    );
+    expectMissingSessionError(result.stderr, "open");
   });
 });

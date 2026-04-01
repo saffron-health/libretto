@@ -56,20 +56,61 @@ async function pickFreePort(): Promise<number> {
   });
 }
 
-export function normalizeUrl(url: string): string {
-  if (!/^https?:\/\//i.test(url)) {
-    return `https://${url}`;
+function tryParseAbsoluteUrl(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
   }
-  return url;
 }
 
-export function normalizeDomain(url: string): string {
-  try {
-    const u = new URL(normalizeUrl(url));
-    return u.hostname.replace(/^www\./, "");
-  } catch {
-    return url.replace(/^www\./, "");
+function isLikelyHostWithPort(parsedUrl: URL, rawUrl: string): boolean {
+  // `new URL("localhost:3000")` parses successfully, but treats `localhost:`
+  // as a custom scheme instead of a bare host with port. Detect that shape so
+  // CLI shorthand like `libretto open localhost:3000` still normalizes to
+  // `https://localhost:3000/`.
+  const remainder = rawUrl.slice(parsedUrl.protocol.length);
+  if (remainder.length === 0) return false;
+
+  let index = 0;
+  while (index < remainder.length) {
+    const charCode = remainder.charCodeAt(index);
+    if (charCode < 48 || charCode > 57) break;
+    index += 1;
   }
+
+  if (index === 0) return false;
+  if (index === remainder.length) return true;
+
+  const nextChar = remainder[index];
+  return nextChar === "/" || nextChar === "?" || nextChar === "#";
+}
+
+export function normalizeUrl(url: string): URL {
+  const parsedUrl = tryParseAbsoluteUrl(url);
+  if (!parsedUrl) {
+    return new URL(`https://${url}`);
+  }
+
+  if (
+    parsedUrl.protocol === "http:" ||
+    parsedUrl.protocol === "https:" ||
+    parsedUrl.protocol === "file:"
+  ) {
+    return parsedUrl;
+  }
+
+  if (isLikelyHostWithPort(parsedUrl, url)) {
+    return new URL(`https://${url}`);
+  }
+
+  throw new Error(
+    `Unsupported URL protocol: ${parsedUrl.protocol}. Use http://, https://, or file://.`,
+  );
+}
+
+export function normalizeDomain(url: URL): string {
+  return url.hostname.replace(/^www\./, "");
 }
 
 export function getProfilePath(domain: string): string {
@@ -359,7 +400,8 @@ export async function runOpen(
   logger: LoggerApi,
   options?: { viewport?: { width: number; height: number } },
 ): Promise<void> {
-  const url = normalizeUrl(rawUrl);
+  const parsedUrl = normalizeUrl(rawUrl);
+  const url = parsedUrl.href;
   const viewport = resolveViewport(options?.viewport, logger);
   const windowPosition = headed ? resolveWindowPosition(logger) : undefined;
   logger.info("open-start", { url, headed, session, viewport, windowPosition });
@@ -371,9 +413,11 @@ export async function runOpen(
   const actionsLogPath = getSessionActionsLogPath(session);
 
   const browserMode = headed ? "headed" : "headless";
-  const domain = normalizeDomain(url);
-  const profilePath = getProfilePath(domain);
-  const useProfile = hasProfile(domain);
+  const supportsSavedProfile =
+    parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+  const domain = supportsSavedProfile ? normalizeDomain(parsedUrl) : undefined;
+  const profilePath = domain ? getProfilePath(domain) : undefined;
+  const useProfile = domain ? hasProfile(domain) : false;
 
   logger.info("open-launching", {
     url,
@@ -390,12 +434,11 @@ export async function runOpen(
   }
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
-  const escapedProfilePath = profilePath
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'");
   const escapedUrl = url.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const storageStateCode = useProfile
-    ? `storageState: '${escapedProfilePath}',`
+    ? `storageState: '${profilePath!
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")}',`
     : "";
 
   const escapedLogPath = runLogPath.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -671,7 +714,7 @@ export async function runSave(
   try {
     await new Promise((r) => setTimeout(r, 500));
 
-    const domain = normalizeDomain(urlOrDomain);
+    const domain = normalizeDomain(normalizeUrl(urlOrDomain));
     const profilePath = getProfilePath(domain);
 
     const cdpSession = await context.newCDPSession(page);
