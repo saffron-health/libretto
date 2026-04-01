@@ -255,7 +255,6 @@ async function runIntegrationInternal(
 
   const workflowContext: LibrettoWorkflowContext = {
     session: args.session,
-    logger: integrationLogger,
     page: browserSession.page,
   };
 
