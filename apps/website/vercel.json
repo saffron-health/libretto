@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/docs",
+      "destination": "https://saffron-health-libretto-73.mintlify.dev/docs"
+    },
+    {
+      "source": "/docs/:path*",
+      "destination": "https://saffron-health-libretto-73.mintlify.dev/docs/:path*"
+    }
+  ]
+}

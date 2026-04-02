@@ -1,0 +1,204 @@
+## Quick start
+
+> Install Libretto and run your first browser automation in minutes.
+
+This guide walks you through installing Libretto, connecting an AI provider, opening a browser, and taking your first snapshot.
+
+<Steps>
+  <Step title="Install the package">
+    Install Libretto from npm:
+
+    ```bash  theme={null}
+    npm install libretto
+    ```
+
+    Libretto requires Node.js 18 or later. It installs Playwright as a direct dependency, so you don't need a separate Playwright install.
+  </Step>
+
+  <Step title="Set up your workspace">
+    Run `setup` once per project. This command downloads Chromium if it isn't already installed, creates the `.libretto/` directory structure, writes a `.libretto/.gitignore`, and copies the agent skill files into `.agents/skills/libretto` and `.claude/skills/libretto`.
+
+    ```bash  theme={null}
+    npx libretto setup
+    ```
+
+    <Note>
+      Run `setup` yourself in a terminal — not through an agent. It may prompt for input and starts a Chromium download that takes a moment.
+    </Note>
+  </Step>
+
+  <Step title="Configure an AI provider">
+    Snapshot analysis requires a vision-capable model. Choose your provider:
+
+    ```bash  theme={null}
+    npx libretto ai configure openai
+    # or
+    npx libretto ai configure anthropic
+    # or
+    npx libretto ai configure gemini
+    # or
+    npx libretto ai configure vertex
+    ```
+
+    This writes the selected model to `.libretto/config.json`. The default models are:
+
+    | Provider    | Default model                   |
+    | ----------- | ------------------------------- |
+    | `openai`    | `openai/gpt-5.4`                |
+    | `anthropic` | `anthropic/claude-sonnet-4-6`   |
+    | `gemini`    | `google/gemini-3-flash-preview` |
+    | `vertex`    | `vertex/gemini-2.5-pro`         |
+
+    You can also pass a full model string to use a specific version:
+
+    ```bash  theme={null}
+    npx libretto ai configure openai/gpt-4o
+    ```
+
+    Provider credentials are read from your shell environment or a `.env` file at the project root. Set the appropriate key:
+
+    ```bash theme={null} showLineNumbers={false}
+    # OpenAI
+    export OPENAI_API_KEY=sk-...
+
+    # Anthropic
+    export ANTHROPIC_API_KEY=sk-ant-...
+
+    # Gemini
+    export GEMINI_API_KEY=...
+
+    # Vertex
+    export GOOGLE_CLOUD_PROJECT=my-project
+    ```
+
+    Libretto uses the Vercel AI SDK under the hood. Install only the peer dependency for your chosen provider:
+
+    ```bash theme={null} showLineNumbers={false}
+    # OpenAI
+    npm install @ai-sdk/openai
+
+    # Anthropic
+    npm install @ai-sdk/anthropic
+
+    # Gemini
+    npm install @ai-sdk/google
+
+    # Vertex
+    npm install @ai-sdk/google-vertex
+    ```
+  </Step>
+
+  <Step title="Open a browser">
+    Launch a headed Chromium window and navigate to a URL:
+
+    ```bash  theme={null}
+    npx libretto open https://example.com
+    ```
+
+    To use a named session (recommended when running multiple automations):
+
+    ```bash  theme={null}
+    npx libretto open https://example.com --session my-session
+    ```
+
+    Use `--headless` if you don't need to see the browser:
+
+    ```bash  theme={null}
+    npx libretto open https://example.com --headless --session my-session
+    ```
+  </Step>
+
+  <Step title="Take a snapshot">
+    `snapshot` captures a PNG screenshot and the page HTML, then sends both to your configured vision model. Always provide `--objective` (what you want the model to find or analyze) and `--context` (what you know about the current state):
+
+    ```bash  theme={null}
+    npx libretto snapshot \
+      --objective "Find the main heading and any call-to-action buttons" \
+      --context "I just opened the example.com homepage and want to identify the key interactive elements."
+    ```
+
+    With a named session:
+
+    ```bash  theme={null}
+    npx libretto snapshot \
+      --session my-session \
+      --objective "Explain why the table is empty" \
+      --context "I applied filters on the referrals page and expected rows to appear."
+    ```
+
+    The model returns a structured summary of selectors, element descriptions, and any relevant observations — without putting raw HTML into your agent's context.
+
+    <Tip>
+      A single snapshot objective can include multiple questions. Instead of running several snapshots, combine them: `--objective "Find the submit button and check whether the form has validation errors."`
+    </Tip>
+  </Step>
+
+  <Step title="Execute Playwright code">
+    Use `exec` to run Playwright TypeScript against the open page. The code runs in a context that has `page`, `context`, `browser`, `state`, `fetch`, and `Buffer` available as globals:
+
+    ```bash  theme={null}
+    npx libretto exec "return await page.url()"
+    ```
+
+    ```bash  theme={null}
+    npx libretto exec "return await page.locator('button').count()"
+    ```
+
+    ```bash  theme={null}
+    npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
+    ```
+
+    For longer scripts, pipe from stdin with `-`:
+
+    ```bash  theme={null}
+    echo "return await page.url()" | npx libretto exec - --session my-session
+    ```
+
+    Let failures throw. Don't wrap `exec` code in `try/catch` — surfacing errors is how you debug.
+  </Step>
+
+  <Step title="Run a workflow file">
+    Once you've built a workflow file, run it with `npx libretto run`:
+
+    ```bash  theme={null}
+    npx libretto run ./integration.ts main
+    ```
+
+    Run headless with input parameters:
+
+    ```bash  theme={null}
+    npx libretto run ./integration.ts main --headless --params '{"status":"open"}'
+    ```
+
+    Run with a saved auth profile:
+
+    ```bash  theme={null}
+    npx libretto run ./integration.ts main --auth-profile app.example.com
+    ```
+
+    The second argument (`main`) is the name of the exported `workflow()` instance in the file. See the Library API reference for how to structure workflow files.
+  </Step>
+</Steps>
+
+### What's next
+
+<Tip>
+  If you're using a coding agent like Claude or another AI assistant, load the Libretto skill so your agent knows how to use these commands effectively. After running `npx libretto setup`, the skill is available at `.agents/skills/libretto/SKILL.md` and `.claude/skills/libretto/SKILL.md`.
+</Tip>
+
+Once Libretto is set up, explore the full command set:
+
+```bash  theme={null}
+npx libretto --help
+```
+
+Common commands to try next:
+
+```bash  theme={null}
+npx libretto network                    # view captured HTTP requests
+npx libretto actions                    # view recorded user/agent actions
+npx libretto pages                      # list open pages in the session
+npx libretto save app.example.com       # save authenticated browser state
+npx libretto close                      # close the browser
+npx libretto close --all                # close all sessions
+```

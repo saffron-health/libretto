@@ -14,6 +14,9 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "docs:dev": "cd docs && npx -y mintlify@4.2.473 dev",
+    "docs:validate": "cd docs && npx -y mintlify@4.2.473 validate",
+    "docs:broken-links": "cd docs && npx -y mintlify@4.2.473 broken-links --check-anchors",
     "website:build": "pnpm --dir ./apps/website build",
     "sync:mirrors": "node packages/dev-tools/scripts/sync-mirrors.mjs",
     "check:mirrors": "node packages/dev-tools/scripts/check-mirrors-sync.mjs",

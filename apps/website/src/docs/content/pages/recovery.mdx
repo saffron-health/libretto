@@ -1,0 +1,238 @@
+## Recovery
+
+> Automatically handle errors and popups that interrupt browser automation workflows.
+
+Browser automation workflows are often interrupted by unexpected page state: cookie banners, newsletter modals, session-expired dialogs, or form submission errors. The recovery module provides three tools for handling these situations.
+
+### `attemptWithRecovery()`
+
+Runs a function, and if it throws, optionally runs an LLM-powered popup recovery agent and retries the function once.
+
+```typescript  theme={null}
+async function attemptWithRecovery<T>(
+  page: Page,
+  fn: () => Promise<T>,
+  logger?: MinimalLogger,
+  llmClient?: LLMClient
+): Promise<T>
+```
+
+#### How it works
+
+1. Calls `fn()`.
+2. If `fn()` succeeds, returns the result immediately.
+3. If `fn()` throws and `llmClient` is not provided, re-throws the error.
+4. If `fn()` throws and `llmClient` is provided, runs `executeRecoveryAgent()` with the instruction `"Look at the page to see if there is a popup blocking the screen. If so, close the popup."`
+5. After recovery, calls `fn()` a second time. If it throws again, that error propagates.
+
+<Warning>
+  Recovery is **not** attempted when the error message indicates the browser or page has been closed (`"Target closed"`, `"browser has been closed"`, `"context or browser has been closed"`). These errors are re-thrown immediately.
+</Warning>
+
+#### Parameters
+
+<ParamField path="page" type="Page" required>
+  The Playwright `Page` where the action is being attempted.
+</ParamField>
+
+<ParamField path="fn" type="() => Promise<T>" required>
+  The async function to run. This is the step you want to protect — typically a sequence of Playwright actions.
+</ParamField>
+
+<ParamField path="logger" type="MinimalLogger">
+  Optional logger. Recovery attempts and outcomes are logged at `info` level.
+</ParamField>
+
+<ParamField path="llmClient" type="LLMClient">
+  Optional LLM client. When omitted, errors are re-thrown without any recovery attempt. When provided, the recovery agent runs on failure.
+</ParamField>
+
+#### Example
+
+```typescript  theme={null}
+import { attemptWithRecovery, createLLMClientFromModel } from "libretto";
+import { openai } from "@ai-sdk/openai";
+
+const llmClient = createLLMClientFromModel(openai("gpt-4o"));
+
+// Wrap any step that might be interrupted by a popup
+const result = await attemptWithRecovery(
+  page,
+  async () => {
+    await page.click("#submit");
+    await page.waitForSelector(".success");
+    return await page.textContent(".confirmation-number");
+  },
+  logger,
+  llmClient
+);
+```
+
+***
+
+### `executeRecoveryAgent()`
+
+Runs a vision-based LLM agent to handle page state issues. The agent takes a screenshot, sends it to the LLM with your instruction, executes the suggested browser action, and repeats for up to 3 steps until the action type is `"done"`.
+
+```typescript  theme={null}
+async function executeRecoveryAgent(
+  page: Page,
+  instruction: string,
+  logger?: MinimalLogger,
+  llmClient?: LLMClient
+): Promise<void>
+```
+
+<Note>
+  When `llmClient` is not provided, `executeRecoveryAgent` returns immediately without doing anything.
+</Note>
+
+#### Parameters
+
+<ParamField path="page" type="Page" required>
+  The Playwright `Page` to operate on.
+</ParamField>
+
+<ParamField path="instruction" type="string" required>
+  A natural-language description of what the agent should do. For example: `"Dismiss any cookie consent banner or modal that is blocking the page."`
+</ParamField>
+
+<ParamField path="logger" type="MinimalLogger">
+  Optional logger. Each recovery step's reasoning and action are logged.
+</ParamField>
+
+<ParamField path="llmClient" type="LLMClient">
+  Optional LLM client. The backing model must support vision (multimodal) input.
+</ParamField>
+
+#### Example
+
+```typescript  theme={null}
+import { executeRecoveryAgent, createLLMClientFromModel } from "libretto";
+import { openai } from "@ai-sdk/openai";
+
+const llmClient = createLLMClientFromModel(openai("gpt-4o"));
+
+await executeRecoveryAgent(
+  page,
+  "Dismiss any cookie consent banner or modal that is blocking the page.",
+  logger,
+  llmClient
+);
+```
+
+***
+
+### `detectSubmissionError()`
+
+Uses a CDP screenshot and LLM vision to detect whether a visible error appeared on the page after a form submission or other action. Useful when the site shows errors inline rather than throwing JavaScript exceptions.
+
+```typescript  theme={null}
+async function detectSubmissionError(
+  page: Page,
+  error: unknown,
+  logContext: string,
+  llmClient: LLMClient,
+  knownErrors?: KnownSubmissionError[],
+  logger?: MinimalLogger
+): Promise<DetectedSubmissionError>
+```
+
+If a `knownErrors` entry matches what the LLM sees on screen, `detectSubmissionError` returns a `DetectedSubmissionError`. If no known error matches, it re-throws the original `error`.
+
+<Note>
+  The screenshot is captured via CDP so it works even when the page is unresponsive (e.g. during a loading spinner or frozen UI). If the CDP screenshot itself fails, the original error is re-thrown.
+</Note>
+
+#### Parameters
+
+<ParamField path="page" type="Page" required>
+  The Playwright `Page` to screenshot.
+</ParamField>
+
+<ParamField path="error" type="unknown" required>
+  The original error that triggered the detection call. Re-thrown if no known error matches.
+</ParamField>
+
+<ParamField path="logContext" type="string" required>
+  A string describing the operation being performed. Included in log output and passed to the LLM as context.
+</ParamField>
+
+<ParamField path="llmClient" type="LLMClient" required>
+  An LLM client. The model must support vision input.
+</ParamField>
+
+<ParamField path="knownErrors" type="KnownSubmissionError[]">
+  An optional list of known error definitions to match against. Defaults to `[]`.
+</ParamField>
+
+<ParamField path="logger" type="MinimalLogger">
+  Optional logger.
+</ParamField>
+
+#### `KnownSubmissionError`
+
+<ResponseField name="id" type="string">
+  A stable identifier for this error type. Returned in `DetectedSubmissionError.errorId`.
+</ResponseField>
+
+<ResponseField name="errorPatterns" type="string[]">
+  Descriptions of what the LLM should look for on screen to match this error. For example: `["'Email already in use' message", "duplicate account warning"]`.
+</ResponseField>
+
+<ResponseField name="userMessage" type="string">
+  A human-friendly message returned in `DetectedSubmissionError.message` when this error is matched.
+</ResponseField>
+
+#### `DetectedSubmissionError`
+
+<ResponseField name="matched" type="true">
+  Always `true` — indicates a known error was detected.
+</ResponseField>
+
+<ResponseField name="errorId" type="string">
+  The `id` from the matched `KnownSubmissionError`.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  The `userMessage` from the matched `KnownSubmissionError`.
+</ResponseField>
+
+#### Example
+
+```typescript  theme={null}
+import {
+  detectSubmissionError,
+  createLLMClientFromModel,
+  type KnownSubmissionError,
+} from "libretto";
+import { openai } from "@ai-sdk/openai";
+
+const llmClient = createLLMClientFromModel(openai("gpt-4o"));
+
+const knownErrors: KnownSubmissionError[] = [
+  {
+    id: "duplicate-email",
+    errorPatterns: ["email already in use", "duplicate account"],
+    userMessage: "An account with this email address already exists.",
+  },
+];
+
+try {
+  await page.click("#submit");
+  await page.waitForSelector(".success", { timeout: 5000 });
+} catch (err) {
+  const detected = await detectSubmissionError(
+    page,
+    err,
+    "submit-registration-form",
+    llmClient,
+    knownErrors,
+    logger
+  );
+  // detected.matched === true
+  // detected.errorId === "duplicate-email"
+  // detected.message === "An account with this email address already exists."
+  throw new Error(detected.message);
+}
+```

@@ -1,0 +1,229 @@
+## network & actions
+
+> View captured network requests and recorded user actions from a session.
+
+Libretto automatically captures network requests and browser actions to JSONL log files during every session. The `network` and `actions` commands let you view these logs from the CLI. You can also query them directly with `jq`.
+
+***
+
+### network
+
+The `network` command displays HTTP requests captured during a session. Use it to reverse-engineer a site's internal API, identify endpoints to call directly, or debug unexpected network behavior.
+
+```bash  theme={null}
+npx libretto network --session debug-example
+```
+
+#### Flags
+
+<ParamField path="--session" type="string" required>
+  The session whose network log to read.
+</ParamField>
+
+<ParamField path="--last" type="number">
+  Show only the last N entries.
+</ParamField>
+
+<ParamField path="--filter" type="string">
+  Filter entries by a substring match on the URL.
+</ParamField>
+
+<ParamField path="--method" type="string">
+  Filter entries by HTTP method. Example: `--method POST`.
+</ParamField>
+
+<ParamField path="--page" type="string">
+  Filter entries by page ID. Useful when multiple pages are open in the session.
+</ParamField>
+
+<ParamField path="--clear" type="boolean">
+  Clear the network log for the session.
+</ParamField>
+
+#### Log file location
+
+Network logs are stored at:
+
+```
+.libretto/sessions/<session>/network.jsonl
+```
+
+One JSON object per line. Query directly with `jq` for advanced filtering.
+
+#### Key fields
+
+| Field          | Description                                |
+| -------------- | ------------------------------------------ |
+| `ts`           | ISO timestamp of the request               |
+| `method`       | HTTP method (`GET`, `POST`, `PUT`, etc.)   |
+| `url`          | Full request URL                           |
+| `status`       | HTTP response status code                  |
+| `contentType`  | Response content type                      |
+| `responseBody` | Response body string (may be `null`)       |
+| `pageId`       | Playwright page ID that produced the entry |
+
+#### Examples
+
+```bash  theme={null}
+# View all captured requests
+npx libretto network --session debug-example
+
+# View the last 20 requests
+npx libretto network --session debug-example --last 20
+
+# Filter to POST requests only
+npx libretto network --session debug-example --method POST
+
+# Filter by URL substring
+npx libretto network --session debug-example --filter "/api/referrals"
+
+# Query with jq directly — all POST requests
+jq 'select(.method == "POST")' .libretto/sessions/debug-example/network.jsonl
+
+# Extract URL and status for every request
+jq '{url: .url, status: .status}' .libretto/sessions/debug-example/network.jsonl
+```
+
+***
+
+### actions
+
+The `actions` command displays browser interactions recorded during a session — both actions Libretto performed as an agent and actions a user performed manually in the browser window. Use it to understand what happened during a session and reconstruct workflows from manual user behavior.
+
+```bash  theme={null}
+npx libretto actions --session debug-example
+```
+
+#### Flags
+
+<ParamField path="--session" type="string" required>
+  The session whose action log to read.
+</ParamField>
+
+<ParamField path="--last" type="number">
+  Show only the last N entries.
+</ParamField>
+
+<ParamField path="--filter" type="string">
+  Filter entries by a substring match.
+</ParamField>
+
+<ParamField path="--action" type="string">
+  Filter by action type. Example: `--action click`, `--action fill`.
+</ParamField>
+
+<ParamField path="--source" type="string">
+  Filter by source. `user` for manual browser actions, `agent` for Playwright actions.
+</ParamField>
+
+<ParamField path="--page" type="string">
+  Filter entries by page ID.
+</ParamField>
+
+<ParamField path="--clear" type="boolean">
+  Clear the action log for the session.
+</ParamField>
+
+#### Log file location
+
+Action logs are stored at:
+
+```
+.libretto/sessions/<session>/actions.jsonl
+```
+
+#### Key fields
+
+| Field                  | Description                                                      |
+| ---------------------- | ---------------------------------------------------------------- |
+| `ts`                   | ISO timestamp                                                    |
+| `source`               | `user` (manual DOM event) or `agent` (Playwright call)           |
+| `action`               | Action name: `click`, `dblclick`, `fill`, `goto`, `reload`, etc. |
+| `selector`             | Locator used by the agent                                        |
+| `bestSemanticSelector` | Canonical selector from the user DOM event                       |
+| `targetSelector`       | Raw DOM event target selector (user events only)                 |
+| `ancestorSelectors`    | Meaningful ancestor selectors, closest to farthest               |
+| `nearbyText`           | Visible text near the event target                               |
+| `composedPath`         | Event path from raw target to farthest ancestor                  |
+| `coordinates`          | `{x, y}` for pointer events                                      |
+| `value`                | Typed, selected, or submitted value                              |
+| `url`                  | Navigation target or page URL for navigation actions             |
+| `duration`             | Elapsed time in milliseconds (agent entries)                     |
+| `success`              | `true` if the action completed, `false` on failure               |
+| `error`                | Error message when the action failed                             |
+| `pageId`               | Playwright page ID                                               |
+
+<Note>
+  Agent entries describe what Playwright tried to do (`selector`, `duration`). User entries describe what DOM element was actually interacted with (`bestSemanticSelector`, `targetSelector`, `ancestorSelectors`, `nearbyText`, `composedPath`, `coordinates`).
+</Note>
+
+#### Examples
+
+```bash  theme={null}
+# View all recorded actions
+npx libretto actions --session debug-example
+
+# View the last 20 actions
+npx libretto actions --session debug-example --last 20
+
+# Show only click actions
+npx libretto actions --session debug-example --action click
+
+# Show only user-initiated actions
+npx libretto actions --session debug-example --source user
+
+# Query with jq — last 20 entries
+tail -n 20 .libretto/sessions/debug-example/actions.jsonl | jq .
+
+# Find all failed actions
+jq 'select(.success == false)' .libretto/sessions/debug-example/actions.jsonl
+
+# Extract selector and action for agent entries
+jq 'select(.source == "agent") | {action: .action, selector: .selector}' \
+  .libretto/sessions/debug-example/actions.jsonl
+```
+
+***
+
+### JSONL log files
+
+Both logs use the [JSONL](https://jsonlines.org) format: one JSON object per line, appended in order. This makes them easy to query with standard Unix tools.
+
+```txt
+.libretto/
+  sessions/
+    <session>/
+      state.json
+      logs.jsonl
+      network.jsonl
+      actions.jsonl
+      snapshots/
+```
+
+#### Querying with jq
+
+`jq` works directly on JSONL files because it processes one object per input line by default:
+
+```bash  theme={null}
+# All POST requests in the network log
+jq 'select(.method == "POST")' .libretto/sessions/<session>/network.jsonl
+
+# Last 20 action entries (requires tail)
+tail -n 20 .libretto/sessions/<session>/actions.jsonl | jq .
+
+# Count requests by HTTP method
+jq -r '.method' .libretto/sessions/<session>/network.jsonl | sort | uniq -c
+
+# Find requests to a specific endpoint
+jq 'select(.url | contains("/api/"))' .libretto/sessions/<session>/network.jsonl
+```
+
+<CardGroup cols={2}>
+  <Card title="exec" icon="code" href="#exec">
+    Access `networkLog` and `actionLog` as globals inside exec code.
+  </Card>
+
+  <Card title="snapshot" icon="camera" href="#snapshot">
+    Use snapshot alongside network logs to understand page state.
+  </Card>
+</CardGroup>

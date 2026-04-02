@@ -1,0 +1,197 @@
+## Workflow
+
+> Define and run reusable browser automation workflows.
+
+The `workflow()` factory is the entry point for every Libretto automation. You wrap your Playwright logic in a typed handler, export the result, and the CLI (or your own runner) takes care of launching a browser, wiring up context, and invoking your handler.
+
+### `workflow()`
+
+Creates a `LibrettoWorkflow` from a handler function.
+
+```typescript  theme={null}
+function workflow<Input, Output, S>(
+  handler: LibrettoWorkflowHandler<Input, Output, S>
+): LibrettoWorkflow<Input, Output, S>
+```
+
+The handler receives a `LibrettoWorkflowContext` and typed `input`, and must return a `Promise<Output>`.
+
+```typescript  theme={null}
+type LibrettoWorkflowHandler<Input, Output, S> = (
+  ctx: LibrettoWorkflowContext<S>,
+  input: Input
+) => Promise<Output>
+```
+
+#### `LibrettoWorkflowContext<S>`
+
+<ResponseField name="session" type="string">
+  The session identifier for this workflow run. Use it to correlate logs and state files.
+</ResponseField>
+
+<ResponseField name="page" type="Page">
+  A Playwright `Page` instance ready for navigation and interaction.
+</ResponseField>
+
+<ResponseField name="logger" type="MinimalLogger">
+  A structured logger scoped to this workflow run. See [Logging](#logging) for details.
+</ResponseField>
+
+<ResponseField name="services" type="S">
+  An optional generic services object. Defaults to `{}`. Pass domain services (API clients, repositories, etc.) through here so your handler stays testable.
+</ResponseField>
+
+#### Full example
+
+```typescript  theme={null}
+import { workflow, launchBrowser, pause } from "libretto";
+
+export const main = workflow<{ query: string }, string[]>(async (ctx, input) => {
+  const { page, logger } = ctx;
+
+  await page.goto("https://example.com/search");
+  await page.fill("#query", input.query);
+  await page.click("#submit");
+  await page.waitForSelector(".results");
+
+  const results = await page.$$eval(".result-item", (els) =>
+    els.map((el) => el.textContent ?? "")
+  );
+
+  logger.info("Search complete", { count: results.length });
+  return results;
+});
+```
+
+#### Running with the CLI
+
+Pass the file path and the exported name to `libretto run`:
+
+```bash  theme={null}
+npx libretto run ./my-workflow.ts main
+```
+
+The CLI compiles the file with `tsx`, launches a Chromium browser, and calls your handler with the session context it constructs.
+
+***
+
+### `launchBrowser()`
+
+Launches a Playwright Chromium browser and returns a ready-to-use `BrowserSession`. Use this when you want to run workflows programmatically — outside the CLI — or when you need direct access to the `Browser` or `BrowserContext` objects.
+
+```typescript  theme={null}
+async function launchBrowser(args: LaunchBrowserArgs): Promise<BrowserSession>
+```
+
+#### `LaunchBrowserArgs`
+
+<ParamField path="sessionName" type="string" required>
+  A unique identifier for this browser session. Used to name the session state file written under `.libretto/sessions/`.
+</ParamField>
+
+<ParamField path="headless" type="boolean">
+  Whether to run Chromium in headless mode. Defaults to `false` (visible window).
+</ParamField>
+
+<ParamField path="viewport" type="{ width: number; height: number }">
+  The browser viewport size. Defaults to `{ width: 1366, height: 768 }`.
+</ParamField>
+
+<ParamField path="storageStatePath" type="string">
+  Path to a Playwright storage state JSON file (cookies, localStorage). Useful for resuming authenticated sessions.
+</ParamField>
+
+#### `BrowserSession` return value
+
+<ResponseField name="browser" type="Browser">
+  The underlying Playwright `Browser` instance.
+</ResponseField>
+
+<ResponseField name="context" type="BrowserContext">
+  The Playwright `BrowserContext` created for this session.
+</ResponseField>
+
+<ResponseField name="page" type="Page">
+  The initial `Page` opened in the context. Pass this to your workflow handler.
+</ResponseField>
+
+<ResponseField name="debugPort" type="number">
+  The remote debugging port Chromium is listening on.
+</ResponseField>
+
+<ResponseField name="metadataPath" type="string">
+  Absolute path to the session state JSON file written by `launchBrowser`.
+</ResponseField>
+
+<ResponseField name="close" type="() => Promise<void>">
+  Closes the browser and releases all resources.
+</ResponseField>
+
+#### Programmatic usage
+
+```typescript  theme={null}
+import { launchBrowser } from "libretto";
+import { defaultLogger } from "libretto";
+import { main } from "./my-workflow";
+
+const session = await launchBrowser({
+  sessionName: "my-run",
+  headless: true,
+});
+
+try {
+  const result = await main.run(
+    {
+      session: "my-run",
+      page: session.page,
+      logger: defaultLogger,
+      services: {},
+    },
+    { query: "hello world" }
+  );
+  console.log(result);
+} finally {
+  await session.close();
+}
+```
+
+***
+
+### `pause()`
+
+Pauses a running workflow so you can inspect browser state interactively, then resume from the CLI.
+
+```typescript  theme={null}
+async function pause(session: string): Promise<void>
+```
+
+<ParamField path="session" type="string" required>
+  The session identifier. Must match the session name used when the workflow was started.
+</ParamField>
+
+<Note>
+  `pause()` is a no-op when `NODE_ENV === "production"`. It is safe to leave `pause()` calls in your code without worrying about them blocking production runs.
+</Note>
+
+When called in a non-production environment, `pause()` writes a `.paused` signal file and polls for a `.resume` signal. Use the Libretto CLI to send the resume signal:
+
+```bash  theme={null}
+npx libretto resume --session <session-name>
+```
+
+#### Example
+
+```typescript  theme={null}
+import { workflow, pause } from "libretto";
+
+export const main = workflow<{ id: string }, void>(async (ctx, input) => {
+  const { page, session } = ctx;
+
+  await page.goto(`https://example.com/items/${input.id}`);
+
+  // Pause here to inspect the page before continuing
+  await pause(session);
+
+  await page.click("#confirm");
+});
+```

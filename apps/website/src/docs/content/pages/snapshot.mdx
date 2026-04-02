@@ -1,0 +1,108 @@
+## snapshot
+
+> Capture a screenshot and HTML analysis of the current page using an AI model.
+
+The `snapshot` command is the primary page observation tool. It captures a screenshot and the full HTML of the current page, then sends both to an AI model for analysis against your stated objective.
+
+Use `snapshot` before guessing at selectors, after workflow failures, and whenever the visible page state is unclear.
+
+```bash  theme={null}
+npx libretto snapshot \
+  --objective "Find the sign-in form and submit button" \
+  --context "I just opened the login page and need the email field, password field, and submit button."
+```
+
+### Required flags
+
+<ParamField path="--objective" type="string" required>
+  What you want the AI to find, analyze, or explain. A single objective can include multiple questions or analysis tasks — you don't need to run separate snapshots for each question.
+</ParamField>
+
+<ParamField path="--context" type="string" required>
+  Background information that helps the AI understand the current state of the page. Describe what you just did, what you expected to happen, and what the page should contain.
+</ParamField>
+
+### Optional flags
+
+<ParamField path="--session" type="string" required>
+  The session to snapshot.
+</ParamField>
+
+<ParamField path="--page" type="string">
+  Target a specific page ID within the session. Use `npx libretto pages --session <name>` to list page IDs when a popup or new tab is open. See [pages & close](#save-pages-close) for details.
+</ParamField>
+
+### What snapshot produces
+
+For each run, `snapshot` saves three files under `.libretto/sessions/<session>/snapshots/<snapshot-id>/`:
+
+| File                  | Contents                                         |
+| --------------------- | ------------------------------------------------ |
+| `page.png`            | Full-page screenshot                             |
+| `page.html`           | Raw page HTML                                    |
+| `page.condensed.html` | Token-optimized condensed HTML sent to the model |
+
+The command prints the paths to all three files before the AI analysis output.
+
+### When to use snapshot
+
+* Before writing a selector — use snapshot to confirm the element structure rather than guessing.
+* After a workflow step fails — inspect the exact page state the failure left behind.
+* When the page has rendered content that isn't obvious from the URL alone.
+* When you need answers to multiple questions about a page in a single call.
+
+<Tip>
+  A single `--objective` can ask several things at once. For example: `"Find the submit button selector, confirm whether there are validation errors, and identify the field that currently has focus."` Batching questions into one snapshot is more efficient than calling snapshot repeatedly.
+</Tip>
+
+### Timeout
+
+Snapshot sends a request to an external AI API and waits for the full analysis response. Depending on page complexity and model speed, this can take 30–90 seconds or more.
+
+<Warning>
+  If you are calling `snapshot` from a shell script or wrapping it in another tool, set a timeout of **at least 2 minutes** to avoid premature cancellation.
+</Warning>
+
+### Configuration
+
+Snapshot analysis requires a configured AI model. Run `npx libretto setup` on first setup, or use `npx libretto ai configure <provider>` to set or change the model later. Credentials are read from environment variables or a `.env` file at your project root.
+
+Supported providers: `openai`, `anthropic`, `gemini`, `vertex`.
+
+### Examples
+
+```bash  theme={null}
+# Basic snapshot — find a form
+npx libretto snapshot \
+  --objective "Find the sign-in form and submit button" \
+  --context "I just opened the login page and need the email field, password field, and submit button."
+
+# Snapshot a specific session after a failure
+npx libretto snapshot \
+  --session debug-example \
+  --objective "Explain why the table is empty" \
+  --context "I opened the referrals page, applied filters, and expected rows to appear."
+
+# Snapshot a specific page in a multi-page session
+npx libretto snapshot \
+  --session debug-example \
+  --page <page-id> \
+  --objective "Find the active form" \
+  --context "A modal opened after clicking the Edit button. I need the form fields inside it."
+
+# Snapshot during debugging — ask multiple things at once
+npx libretto snapshot \
+  --session debug-flow \
+  --objective "Find the blocking error or broken selector target. Also describe the current page URL and any visible error messages." \
+  --context "The workflow just failed after trying to continue from the review step, and I need to identify the visible blocker on the current page."
+```
+
+<CardGroup cols={2}>
+  <Card title="exec" icon="code" href="#exec">
+    Run Playwright code to prototype interactions after using snapshot to identify elements.
+  </Card>
+
+  <Card title="run & resume" icon="play" href="#run-resume">
+    Run a full workflow file and use snapshot to debug failures.
+  </Card>
+</CardGroup>

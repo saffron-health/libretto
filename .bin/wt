@@ -12,10 +12,72 @@ usage() {
     echo ""
     echo "Commands:"
     echo "  new <branch-name>   Create a new worktree and cd into it"
+    echo "  from <branch|remote/branch>  Create a worktree from an existing local or remote branch"
     echo "  list                List all worktrees with last updated date"
     echo "  close [--force]     Close the current worktree (must have no uncommitted changes)"
     echo "  prune [--force]     Remove worktrees for branches merged into main"
     exit 1
+}
+
+ensure_worktree_path() {
+    local wt_path="$1"
+    mkdir -p "$WORKTREES_DIR"
+    mkdir -p "$(dirname "$wt_path")"
+
+    if [ -d "$wt_path" ]; then
+        echo "Worktree already exists at $wt_path"
+        cd "$wt_path"
+        exec "$SHELL"
+    fi
+}
+
+branch_exists_local() {
+    local branch="$1"
+    git show-ref --verify --quiet "refs/heads/$branch"
+}
+
+branch_exists_remote() {
+    local remote_ref="$1"
+    git show-ref --verify --quiet "refs/remotes/$remote_ref"
+}
+
+find_remote_branch_matches() {
+    local branch="$1"
+    git for-each-ref --format='%(refname:short)' refs/remotes | while IFS= read -r remote_ref; do
+        [ -z "$remote_ref" ] && continue
+        if [ "${remote_ref#*/}" = "$branch" ]; then
+            echo "$remote_ref"
+        fi
+    done
+}
+
+find_worktree_for_branch() {
+    local branch="$1"
+    local current_path=""
+    local current_branch=""
+
+    while IFS= read -r line; do
+        if [[ "$line" == "worktree "* ]]; then
+            current_path="${line#worktree }"
+            current_branch=""
+        elif [[ "$line" == "branch refs/heads/"* ]]; then
+            current_branch="${line#branch refs/heads/}"
+        elif [ -z "$line" ] && [ -n "$current_path" ]; then
+            if [ "$current_branch" = "$branch" ]; then
+                echo "$current_path"
+                return 0
+            fi
+            current_path=""
+            current_branch=""
+        fi
+    done < <(git worktree list --porcelain)
+
+    if [ -n "$current_path" ] && [ "$current_branch" = "$branch" ]; then
+        echo "$current_path"
+        return 0
+    fi
+
+    return 1
 }
 
 mtime_epoch() {
@@ -50,16 +112,77 @@ cmd_new() {
     fi
 
     local wt_path="$WORKTREES_DIR/$branch"
-    mkdir -p "$WORKTREES_DIR"
-
-    if [ -d "$wt_path" ]; then
-        echo "Worktree already exists at $wt_path"
-        cd "$wt_path"
-        exec "$SHELL"
-    fi
+    ensure_worktree_path "$wt_path"
 
     git fetch origin main
     git worktree add -b "$branch" "$wt_path" origin/main
+    echo "Created worktree at $wt_path"
+    cd "$wt_path"
+    exec "$SHELL"
+}
+
+cmd_from() {
+    local branch_ref="$1"
+    if [ -z "$branch_ref" ]; then
+        echo "Usage: wt from <branch-name|remote/branch-name>"
+        exit 1
+    fi
+
+    local branch="$branch_ref"
+    if ! branch_exists_local "$branch_ref"; then
+        git fetch --all --prune
+
+        if branch_exists_remote "$branch_ref"; then
+            branch="${branch_ref#*/}"
+        else
+            local remote_matches=()
+            while IFS= read -r remote_match; do
+                [ -z "$remote_match" ] && continue
+                remote_matches+=("$remote_match")
+            done < <(find_remote_branch_matches "$branch_ref")
+
+            if [ ${#remote_matches[@]} -eq 0 ]; then
+                echo "Error: Branch '$branch_ref' was not found locally or on any remote."
+                echo "Try: git branch --all --list '*$branch_ref*'"
+                exit 1
+            fi
+
+            if [ ${#remote_matches[@]} -gt 1 ]; then
+                echo "Error: Branch '$branch_ref' matches multiple remote branches:"
+                for remote_match in "${remote_matches[@]}"; do
+                    echo "  $remote_match"
+                done
+                echo "Try: wt from <remote>/<branch>"
+                exit 1
+            fi
+
+            branch="$branch_ref"
+            branch_ref="${remote_matches[0]}"
+        fi
+    fi
+
+    local existing_worktree
+    existing_worktree=$(find_worktree_for_branch "$branch" || true)
+    if [ -n "$existing_worktree" ]; then
+        if [[ "$existing_worktree" == *".worktrees"* ]] && [ -d "$existing_worktree" ]; then
+            echo "Worktree already exists at $existing_worktree"
+            cd "$existing_worktree"
+            exec "$SHELL"
+        fi
+
+        echo "Error: Branch '$branch' is already checked out at $existing_worktree"
+        exit 1
+    fi
+
+    local wt_path="$WORKTREES_DIR/$branch"
+    ensure_worktree_path "$wt_path"
+
+    if branch_exists_local "$branch"; then
+        git worktree add "$wt_path" "$branch"
+    else
+        git worktree add --track -b "$branch" "$wt_path" "$branch_ref"
+    fi
+
     echo "Created worktree at $wt_path"
     cd "$wt_path"
     exec "$SHELL"
@@ -288,6 +411,9 @@ cmd_close() {
 case "${1:-}" in
     new)
         cmd_new "$2"
+        ;;
+    from)
+        cmd_from "$2"
         ;;
     list|ls)
         cmd_list
