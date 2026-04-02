@@ -9,12 +9,14 @@ Browser automation is reliable, but it's not always the fastest approach. When a
 Libretto captures all network traffic during a browser session, so your agent can inspect exactly which API calls the site makes and convert a UI-based workflow to direct requests.
 
 <Warning>
-  Converting to network requests is an optimization, not a starting point. Make
-  sure you have a working browser-based workflow first — you need it to capture
-  the network traffic that reveals the API endpoints. If you don't have a
-  working script yet, start with [one-shot
-  generation](./one-shot-script-generation) or [interactive script
-  building](./interactive-script-building).
+  Not every site is a good candidate for network conversion. Stay with browser automation if:
+
+- The site has enterprise bot protection (Akamai, PerimeterX, Shape Security) **and** monkey-patches `window.fetch` with call-stack inspection
+- The site does API-level monitoring that correlates request timing to UI interactions
+- The data you need is rendered client-side and doesn't come from a clean API response
+
+In these cases, passive interception (`page.on('response', ...)`) is the safest middle ground — it captures API data without making extra requests.
+
 </Warning>
 
 ### What happens next
@@ -90,19 +92,6 @@ Libretto captures all network traffic during a browser session, so your agent ca
 - You need to paginate deeply (fetching page 50 without clicking "next" 49 times)
 - You want data the UI doesn't display (hidden fields, metadata, IDs)
 - Speed and reliability matter more than DOM fidelity
-
-### When to stay with browser automation
-
-<Warning>
-  Not every site is a good candidate for network conversion. Stay with browser automation if:
-
-- The site has enterprise bot protection (Akamai, PerimeterX, Shape Security) **and** monkey-patches `window.fetch` with call-stack inspection
-- The site does API-level monitoring that correlates request timing to UI interactions
-- The data you need is rendered client-side and doesn't come from a clean API response
-
-In these cases, passive interception (`page.on('response', ...)`) is the safest middle ground — it captures API data without making extra requests.
-
-</Warning>
 
 ### Related guides
 
