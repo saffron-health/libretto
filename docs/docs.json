@@ -1,0 +1,108 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Libretto",
+  "description": "Toolkit for building, debugging, and maintaining browser automations.",
+  "colors": {
+    "primary": "#16A34A",
+    "light": "#07C983",
+    "dark": "#15803D"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Overview",
+        "pages": [
+          "index"
+        ]
+      },
+      {
+        "group": "Get started",
+        "pages": [
+          "get-started/introduction",
+          "get-started/quickstart",
+          "get-started/configuration",
+          "get-started/automation-approaches",
+          "get-started/bot-detection"
+        ]
+      },
+      {
+        "group": "CLI reference",
+        "pages": [
+          "cli-reference/open-and-connect",
+          "cli-reference/sessions-and-profiles",
+          "cli-reference/snapshot",
+          "cli-reference/exec",
+          "cli-reference/run-and-resume",
+          "cli-reference/network-and-actions",
+          "cli-reference/session-management"
+        ]
+      },
+      {
+        "group": "Workflow guides",
+        "pages": [
+          "workflow-guides/one-shot-script-generation",
+          "workflow-guides/interactive-script-building",
+          "workflow-guides/debugging-workflows",
+          "workflow-guides/convert-to-network-requests"
+        ]
+      },
+      {
+        "group": "Library API",
+        "pages": [
+          "library-api/workflow",
+          "library-api/extraction",
+          "library-api/network",
+          "library-api/recovery",
+          "library-api/instrumentation",
+          "library-api/logging",
+          "library-api/openapi-spec"
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/saffron-health/libretto"
+        },
+        {
+          "anchor": "npm",
+          "href": "https://www.npmjs.com/package/libretto"
+        }
+      ]
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Discussions",
+        "href": "https://github.com/saffron-health/libretto/discussions"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "GitHub",
+      "href": "https://github.com/saffron-health/libretto"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/saffron-health/libretto",
+      "linkedin": "https://linkedin.com/company/saffron-health"
+    }
+  }
+}
