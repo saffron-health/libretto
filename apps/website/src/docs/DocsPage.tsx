@@ -161,10 +161,7 @@ function buildHeadingIdMap(roots: Root[]): WeakMap<Heading, string> {
       const nextCount = counts.get(base) ?? 0;
       counts.set(base, nextCount + 1);
 
-      headingIds.set(
-        heading,
-        nextCount === 0 ? base : `${base}-${nextCount}`,
-      );
+      headingIds.set(heading, nextCount === 0 ? base : `${base}-${nextCount}`);
     }
   }
 
@@ -265,7 +262,8 @@ const headingHrefLookup = (() => {
 
         const heading = node as Heading;
         const id =
-          groupHeadingIds?.get(heading) ?? slugify(extractText(heading.children));
+          groupHeadingIds?.get(heading) ??
+          slugify(extractText(heading.children));
         addHeadingTarget(lookup, id, `${group.path}#${id}`);
       }
     }
@@ -497,12 +495,14 @@ export function DocsPage({ pathname }: { pathname?: string }) {
     getDefaultDocsGroup();
   const parsedCurrentGroup =
     parsedDocsGroups.find((group) => {
-      return group.id === currentGroup.id;
+      return group.id === currentGroup?.id;
     }) ?? parsedDocsGroups[0];
   const currentGroupHeadingIds = headingIdsByGroup.get(parsedCurrentGroup.id);
 
   if (!currentGroupHeadingIds) {
-    throw new Error(`Missing heading ids for docs group ${parsedCurrentGroup.id}`);
+    throw new Error(
+      `Missing heading ids for docs group ${parsedCurrentGroup.id}`,
+    );
   }
 
   const currentGroupMarkdown = parsedCurrentGroup.pages
