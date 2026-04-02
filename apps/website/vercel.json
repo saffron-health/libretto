@@ -2,44 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/_mintlify/:path*",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/_mintlify/:path*"
-    },
-    {
-      "source": "/api/request",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/_mintlify/api/request"
-    },
-    {
-      "source": "/docs/llms.txt",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/llms.txt"
-    },
-    {
-      "source": "/docs/llms-full.txt",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/llms-full.txt"
-    },
-    {
-      "source": "/docs/sitemap.xml",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/sitemap.xml"
-    },
-    {
-      "source": "/docs/robots.txt",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/robots.txt"
-    },
-    {
-      "source": "/docs/mcp",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/mcp"
-    },
-    {
       "source": "/docs",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/docs"
+      "destination": "https://saffron-health-libretto-73.mintlify.dev/docs"
     },
     {
       "source": "/docs/:path*",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/docs/:path*"
-    },
-    {
-      "source": "/mintlify-assets/:path+",
-      "destination": "https://saffron-health-libretto-73.mintlify.app/mintlify-assets/:path+"
+      "destination": "https://saffron-health-libretto-73.mintlify.dev/docs/:path*"
     }
   ]
 }
