@@ -7,10 +7,7 @@ export default defineConfig({
   plugins: [tailwindcss(), react()],
   build: {
     rollupOptions: {
-      input: {
-        main: fileURLToPath(new URL("./index.html", import.meta.url)),
-        docs: fileURLToPath(new URL("./docs/index.html", import.meta.url)),
-      },
+      input: fileURLToPath(new URL("./index.html", import.meta.url)),
     },
   },
   lint: { options: { typeAware: true, typeCheck: true } },
