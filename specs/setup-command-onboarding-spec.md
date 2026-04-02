@@ -103,16 +103,16 @@ Consolidate into:
 
 This eliminates `snapshot-api-config.ts` and `ai-setup-status.ts` as separate files, and renames `ai-config.ts` → `config.ts`.
 
-- [ ] Rename `ai-config.ts` → `config.ts`. Keep config schema + read/write/clear only, remove `runAiConfigure` and its helpers (`resolveModelFromInput`, `DEFAULT_MODELS`, `PROVIDER_ALIASES`, `CONFIGURE_PROVIDERS`).
-- [ ] Create `ai-model.ts` with env loading (`loadSnapshotEnv`, `parseDotEnvAssignment`, worktree env helpers), model resolution, default model map, `AiSetupStatus`, `resolveAiSetupStatus`, `resolveSnapshotApiModel`, `resolveSnapshotApiModelOrThrow`, and snapshot error messages.
-- [ ] Move `runAiConfigure` and its helpers from `ai-config.ts` into `commands/ai.ts`.
-- [ ] Delete `snapshot-api-config.ts` and `ai-setup-status.ts`.
-- [ ] Update all imports across `commands/setup.ts`, `commands/snapshot.ts`, `commands/ai.ts`, `core/api-snapshot-analyzer.ts`, `core/browser.ts`, `shared/run/browser.ts`, and any other importers.
-- [ ] Update test imports in `test/snapshot-api-config.spec.ts` and `test/ai-setup-status.spec.ts`.
-- [ ] Change the `source` field on `SnapshotApiModelSelection` and `AiSetupStatus` from `env:auto-openai` style to `env:OPENAI_API_KEY` style — report the actual env var name that was detected. For multi-var providers (Google: `GEMINI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`, Vertex: `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT`), report whichever specific var matched. Update all tests that assert on source values.
-- [ ] Run `pnpm --filter libretto type-check`.
-- [ ] Run `pnpm --filter libretto exec vitest run test/ai-setup-status.spec.ts test/snapshot-api-config.spec.ts`.
-- [ ] Success criteria: all existing tests pass with no behavior changes, only import path updates.
+- [x] Rename `ai-config.ts` → `config.ts`. Keep config schema + read/write/clear only, remove `runAiConfigure` and its helpers (`resolveModelFromInput`, `DEFAULT_MODELS`, `PROVIDER_ALIASES`, `CONFIGURE_PROVIDERS`).
+- [x] Create `ai-model.ts` with env loading (`loadSnapshotEnv`, `parseDotEnvAssignment`, worktree env helpers), model resolution, default model map, `AiSetupStatus`, `resolveAiSetupStatus`, `resolveSnapshotApiModel`, `resolveSnapshotApiModelOrThrow`, and snapshot error messages.
+- [x] Move `runAiConfigure` and its helpers from `ai-config.ts` into `commands/ai.ts`.
+- [x] Delete `snapshot-api-config.ts` and `ai-setup-status.ts`.
+- [x] Update all imports across `commands/setup.ts`, `commands/snapshot.ts`, `commands/ai.ts`, `core/api-snapshot-analyzer.ts`, `core/browser.ts`, `shared/run/browser.ts`, and any other importers.
+- [x] Update test imports in `test/snapshot-api-config.spec.ts` and `test/ai-setup-status.spec.ts`.
+- [x] Change the `source` field on `SnapshotApiModelSelection` and `AiSetupStatus` from `env:auto-openai` style to `env:OPENAI_API_KEY` style — report the actual env var name that was detected. For multi-var providers (Google: `GEMINI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`, Vertex: `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT`), report whichever specific var matched. Update all tests that assert on source values.
+- [x] Run `pnpm --filter libretto type-check`.
+- [x] Run `pnpm --filter libretto exec vitest run test/ai-setup-status.spec.ts test/snapshot-api-config.spec.ts`.
+- [x] Success criteria: all existing tests pass with no behavior changes, only import path updates.
 
 ### Phase 2: Make setup persist the default model and print an idempotent healthy summary
 
@@ -189,10 +189,10 @@ async function runStatus() {
 
 Bring the docs and tests back in sync with the new onboarding contract. Keep this phase limited to user-facing text and targeted verification, not additional behavior changes.
 
-- [ ] Update `packages/libretto/README.template.md` so installation/configuration explains that `setup` now pins the default model when credentials are available and that `ai configure` remains the advanced/manual override path.
-- [ ] Update `packages/libretto/skills/libretto/SKILL.md` and `packages/libretto/skills/libretto/references/configuration-file-reference.md` to mention the new `status` command and clarified setup behavior.
-- [ ] Run `pnpm sync:mirrors` after doc changes.
-- [ ] Add/update targeted CLI tests in `packages/libretto/test/basic.spec.ts` and `packages/libretto/test/stateful.spec.ts` for the new help text and status command.
-- [ ] Run `pnpm --filter libretto type-check`.
-- [ ] Run `pnpm --filter libretto exec vitest run test/basic.spec.ts test/stateful.spec.ts test/snapshot-api-config.spec.ts`.
-- [ ] Success criteria: docs consistently describe setup as the first-run onboarding path, `ai configure` as the explicit override path, and `status` as the read-only inspection command.
+- [x] Update `packages/libretto/README.template.md` so installation/configuration explains that `setup` now pins the default model when credentials are available and that `ai configure` remains the advanced/manual override path.
+- [x] Update `packages/libretto/skills/libretto/SKILL.md` and `packages/libretto/skills/libretto/references/configuration-file-reference.md` to mention the new `status` command and clarified setup behavior.
+- [x] Run `pnpm sync:mirrors` after doc changes.
+- [x] Add/update targeted CLI tests in `packages/libretto/test/basic.spec.ts` and `packages/libretto/test/stateful.spec.ts` for the new help text and status command.
+- [x] Run `pnpm --filter libretto type-check`.
+- [x] Run `pnpm --filter libretto exec vitest run test/basic.spec.ts test/stateful.spec.ts test/snapshot-api-config.spec.ts`.
+- [x] Success criteria: docs consistently describe setup as the first-run onboarding path, `ai configure` as the explicit override path, and `status` as the read-only inspection command.

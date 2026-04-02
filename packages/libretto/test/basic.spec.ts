@@ -258,6 +258,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Capture PNG + HTML");
     expect(result.stdout).not.toContain("cloud <subcommand>");
     expect(result.stdout).toContain("experimental <subcommand>");
+    expect(result.stdout).toContain("libretto status");
     expect(result.stderr).toBe("");
   });
 
@@ -267,6 +268,14 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Commands:");
     expect(result.stdout).toContain("open");
     expect(result.stdout).toContain("ai");
+    expect(result.stdout).toContain("status");
+    expect(result.stderr).toBe("");
+  });
+
+  test("prints scoped help for status command", async ({ librettoCli }) => {
+    const result = await librettoCli("help status");
+    expect(result.stdout).toContain("Show workspace status");
+    expect(result.stdout).toContain("AI configuration");
     expect(result.stderr).toBe("");
   });
 

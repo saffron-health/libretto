@@ -314,6 +314,44 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(status.stdout).toContain("No open sessions.");
   });
 
+  test("status shows unconfigured AI when no credentials or config exist", async ({
+    librettoCli,
+  }) => {
+    const status = await librettoCli("status", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "",
+      ANTHROPIC_API_KEY: "",
+      GEMINI_API_KEY: "",
+      GOOGLE_GENERATIVE_AI_API_KEY: "",
+      GOOGLE_CLOUD_PROJECT: "",
+      GCLOUD_PROJECT: "",
+    });
+    expect(status.stdout).toContain("AI configuration:");
+    expect(status.stdout).toContain("No AI model configured");
+    expect(status.stdout).toContain("npx libretto setup");
+  });
+
+  test("status shows configured model after setup pins it", async ({
+    librettoCli,
+  }) => {
+    // Run setup to pin the model
+    await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+
+    // Status should reflect the pinned model
+    const status = await librettoCli("status", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+    expect(status.stdout).toContain("AI configuration:");
+    expect(status.stdout).toContain("openai/gpt-5.4");
+    expect(status.stdout).toContain(
+      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+    );
+  });
+
   test("logs richer user action selectors for nested click targets", async ({
     librettoCli,
   }) => {

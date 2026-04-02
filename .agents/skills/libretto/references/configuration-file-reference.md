@@ -12,8 +12,9 @@ Use this reference when you need to inspect or change the workspace configuratio
 
 Libretto reads workspace config from `.libretto/config.json`.
 
-- The file is usually created or updated by `npx libretto ai configure ...`.
+- The file is created by `npx libretto setup` during first-time onboarding (auto-pins the default model for the detected provider) or by `npx libretto ai configure ...` for explicit overrides.
 - API credentials still come from your shell environment or `.env`. The config file stores the selected model, not the secret itself.
+- Use `npx libretto status` to inspect the current AI configuration and open sessions without changing anything.
 - For first-time setup instructions, follow the main `SKILL.md` flow instead of expanding this reference.
 
 ## Supported Settings
@@ -41,8 +42,9 @@ Example:
 ## Common Commands
 
 ```bash
-npx libretto setup
-npx libretto ai configure openai
+npx libretto setup                                         # first-time onboarding, auto-pins default model
+npx libretto status                                        # inspect AI config and open sessions
+npx libretto ai configure openai                           # explicitly change provider/model
 npx libretto open https://app.example.com --viewport 1440x900
 npx libretto run ./integration.ts main --viewport 1440x900
 ```
@@ -50,4 +52,5 @@ npx libretto run ./integration.ts main --viewport 1440x900
 ## Notes
 
 - If you want a persistent default viewport for the workspace, add `viewport` to `.libretto/config.json` instead of repeating `--viewport` on every command.
-- If `snapshot` analysis is not configured yet, return to the setup steps in the main `SKILL.md` flow.
+- If `snapshot` analysis is not configured yet, run `npx libretto setup` to auto-configure, or see the main `SKILL.md` flow.
+- Run `npx libretto status` at any time to check which model is active and whether credentials are present.
