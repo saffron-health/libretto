@@ -16,12 +16,7 @@ export function normalizeAppPathname(pathname: string): string {
 export function isAppOwnedPathname(pathname: string): boolean {
   const normalizedPathname = normalizeAppPathname(pathname);
 
-  return (
-    normalizedPathname === "/" ||
-    normalizedPathname === "/docs" ||
-    normalizedPathname === "/docs/index.html" ||
-    normalizedPathname.startsWith("/docs/")
-  );
+  return normalizedPathname === "/";
 }
 
 function shouldUseSpaNavigation({
