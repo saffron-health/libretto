@@ -64,7 +64,7 @@ npx libretto snapshot --session debug-example --page <page-id> \
 The `save` command saves the current browser session's cookies and localStorage as a named auth profile. Load the profile later with `--auth-profile` to skip manual login.
 
 ```bash  theme={null}
-npx libretto save app.example.com
+npx libretto save app.example.com --session app-login
 ```
 
 #### When to use `save`
@@ -74,7 +74,7 @@ Only use `save` when the user explicitly asks to save or reuse authenticated bro
 <Steps>
   <Step title="Open the site in headed mode">
     ```bash  theme={null}
-    npx libretto open https://app.example.com --headed
+    npx libretto open https://app.example.com --headed --session app-login
     ```
   </Step>
 
@@ -84,7 +84,7 @@ Only use `save` when the user explicitly asks to save or reuse authenticated bro
 
   <Step title="Save the session">
     ```bash  theme={null}
-    npx libretto save app.example.com
+    npx libretto save app.example.com --session app-login
     ```
 
     The profile is saved to `.libretto/profiles/app.example.com.json`.

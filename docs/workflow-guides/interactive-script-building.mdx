@@ -37,7 +37,7 @@ You perform the workflow once in the browser. Libretto captures the full action 
 
   <Step title="Agent reads what you did">
     ```bash  theme={null}
-    npx libretto actions
+    npx libretto actions --session interactive-flow
     ```
 
     The agent reads the action log to reconstruct your workflow step by step. It can also query the log with `jq` to find specific actions or filter by page:
@@ -53,7 +53,7 @@ You perform the workflow once in the browser. Libretto captures the full action 
 
   <Step title="Agent inspects network traffic">
     ```bash  theme={null}
-    npx libretto network
+    npx libretto network --session interactive-flow
     ```
 
     The agent cross-references your actions with the network requests they triggered. This helps identify the underlying API calls so the workflow can be converted to direct requests if needed.

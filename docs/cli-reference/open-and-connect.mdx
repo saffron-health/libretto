@@ -56,9 +56,9 @@ npx libretto open https://example.com --headless --session debug-example
 npx libretto open https://example.com --viewport 1440x900 --session my-session
 
 # Open for a manual login flow, then save the session
-npx libretto open https://app.example.com --headed
+npx libretto open https://app.example.com --headed --session app-login
 # ... user logs in ...
-npx libretto save app.example.com
+npx libretto save app.example.com --session app-login
 ```
 
 ***

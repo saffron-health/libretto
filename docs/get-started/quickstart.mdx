@@ -196,10 +196,10 @@ npx libretto --help
 Common commands to try next:
 
 ```bash  theme={null}
-npx libretto network                    # view captured HTTP requests
-npx libretto actions                    # view recorded user/agent actions
-npx libretto pages                      # list open pages in the session
-npx libretto save app.example.com       # save authenticated browser state
-npx libretto close                      # close the browser
+npx libretto network --session my-session              # view captured HTTP requests
+npx libretto actions --session my-session              # view recorded user/agent actions
+npx libretto pages --session my-session                # list open pages in the session
+npx libretto save app.example.com --session my-session # save authenticated browser state
+npx libretto close --session my-session                # close the browser
 npx libretto close --all                # close all sessions
 ```

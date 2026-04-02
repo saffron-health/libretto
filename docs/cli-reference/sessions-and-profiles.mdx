@@ -161,10 +161,10 @@ Profiles save browser sessions — cookies and localStorage — so you can reuse
 
 ```bash  theme={null}
 # Open the site in headed mode so you can log in manually
-npx libretto open https://app.example.com --headed
+npx libretto open https://app.example.com --headed --session app-login
 
 # After logging in, save the current session as a profile
-npx libretto save app.example.com
+npx libretto save app.example.com --session app-login
 ```
 
 The profile is stored at `.libretto/profiles/app.example.com.json`. It contains:
@@ -191,7 +191,7 @@ Profiles are:
 * Git-ignored — never committed to version control
 
 <Note>
-  Sessions can expire. If a profile stops working, repeat the manual login flow and run `npx libretto save <domain>` again to refresh it.
+  Sessions can expire. If a profile stops working, repeat the manual login flow and run `npx libretto save <domain> --session <name>` again to refresh it.
 </Note>
 
 ***
