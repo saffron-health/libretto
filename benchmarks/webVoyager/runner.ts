@@ -460,6 +460,7 @@ export async function runWebVoyagerCase(
     JSON.stringify(
       {
         ...result,
+        browserBackend: "kernel",
         task: row.ques,
         url: row.web,
         screenshotPaths,

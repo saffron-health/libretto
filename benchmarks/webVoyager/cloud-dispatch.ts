@@ -162,6 +162,7 @@ export async function dispatchGcpRun(
     executionName: "", // will be updated after execution starts
     totalCases,
     model: MODEL,
+    browserBackend: "kernel",
     startedAt: new Date().toISOString(),
     selection: {
       mode: selection.mode,

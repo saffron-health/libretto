@@ -15,6 +15,7 @@ import { readWebVoyagerRows, selectWebVoyagerRows } from "./dataset.js";
 import { getRunName } from "./prompt.js";
 import { runWebVoyagerCase } from "./runner.js";
 import { createBenchmarksBucket, uploadRunDirectory } from "./gcs.js";
+import { ensureKernelApiKey } from "./kernel-session.js";
 
 async function main(): Promise<void> {
   const taskIndex = Number(process.env.CLOUD_RUN_TASK_INDEX ?? "0");
@@ -27,6 +28,9 @@ async function main(): Promise<void> {
   if (!selectionJson) {
     throw new Error("Missing required env var: BENCH_SELECTION");
   }
+
+  // Fail fast if Kernel credentials are missing — before any agent work
+  await ensureKernelApiKey();
 
   // Re-derive the full selection deterministically, then pick this task's row
   const selectionParams = JSON.parse(selectionJson) as {

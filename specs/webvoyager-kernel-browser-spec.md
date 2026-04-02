@@ -142,7 +142,7 @@ Removed the local browser backend entirely — all WebVoyager benchmark runs now
 
 Make GCP runs work with the Kernel-only backend. The cloud path must propagate `KERNEL_API_KEY` and fail fast when the Cloud Run job is missing credentials.
 
-- [ ] Ensure `KERNEL_API_KEY` is available in the Cloud Run task environment (via `ensureKernelApiKey` which already falls back to GCP Secret Manager)
-- [ ] Update the Cloud Run job setup/docs so dispatched runs have the necessary secret/env configuration
-- [ ] Include `browserBackend: "kernel"` in `result.json` and manifest metadata so result bundles are explicit
-- [ ] Success criteria: `pnpm benchmarks webVoyager run --gcp --count 1` dispatches a run whose case task uses Kernel, and a misconfigured job without `KERNEL_API_KEY` or GCP secret access fails before agent startup with an actionable message
+- [x] Ensure `KERNEL_API_KEY` is available in the Cloud Run task environment (via `ensureKernelApiKey` which already falls back to GCP Secret Manager)
+- [x] Update the Cloud Run job setup/docs so dispatched runs have the necessary secret/env configuration
+- [x] Include `browserBackend: "kernel"` in `result.json` and manifest metadata so result bundles are explicit
+- [x] Success criteria: `pnpm benchmarks webVoyager run --gcp --count 1` dispatches a run whose case task uses Kernel, and a misconfigured job without `KERNEL_API_KEY` or GCP secret access fails before agent startup with an actionable message
