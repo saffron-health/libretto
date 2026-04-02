@@ -525,21 +525,25 @@ export function DocsPage({ pathname }: { pathname?: string }) {
       return page.content;
     })
     .join("\n\n");
-  const currentGroupAnchorIds = new Set<string>([parsedCurrentGroup.id]);
+  const currentGroupAnchorIds = useMemo(() => {
+    const ids = new Set<string>([parsedCurrentGroup.id]);
 
-  for (const page of parsedCurrentGroup.pages) {
-    for (const node of page.mdast.children) {
-      if (node.type !== "heading") {
-        continue;
+    for (const page of parsedCurrentGroup.pages) {
+      for (const node of page.mdast.children) {
+        if (node.type !== "heading") {
+          continue;
+        }
+
+        const heading = node as Heading;
+        ids.add(
+          currentGroupHeadingIds.get(heading) ??
+            slugify(extractText(heading.children)),
+        );
       }
-
-      const heading = node as Heading;
-      currentGroupAnchorIds.add(
-        currentGroupHeadingIds.get(heading) ??
-          slugify(extractText(heading.children)),
-      );
     }
-  }
+
+    return ids;
+  }, [parsedCurrentGroup, currentGroupHeadingIds]);
 
   const resolveDocsHref = useMemo(() => {
     return (href: string) => {
