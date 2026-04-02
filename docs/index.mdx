@@ -40,8 +40,8 @@ npx libretto ai configure openai
 ## Common commands
 
 ```bash
-npx libretto open https://example.com
-npx libretto snapshot --objective "Find the submit button" --context "I just opened the homepage."
-npx libretto exec "return await page.url()"
+npx libretto open https://example.com --session my-session
+npx libretto snapshot --session my-session --objective "Find the submit button" --context "I just opened the homepage."
+npx libretto exec --session my-session "return await page.url()"
 npx libretto run ./integration.ts main
 ```

@@ -19,7 +19,7 @@ Your agent opens a browser window for you to log in, then takes over: exploring 
     The agent starts with:
 
     ```bash  theme={null}
-    npx libretto open https://example.com --headed
+    npx libretto open https://example.com --headed --session one-shot-flow
     ```
 
     Headed mode keeps the browser window visible so you can log in before the agent begins exploring.
@@ -32,6 +32,7 @@ Your agent opens a browser window for you to log in, then takes over: exploring 
   <Step title="Takes a snapshot to understand the page">
     ```bash  theme={null}
     npx libretto snapshot \
+      --session one-shot-flow \
       --objective "Identify feed post elements and their structure" \
       --context "I just loaded the main feed and need the post container selectors."
     ```
@@ -43,7 +44,7 @@ Your agent opens a browser window for you to log in, then takes over: exploring 
     The agent tests selectors and interaction patterns before committing them to code:
 
     ```bash  theme={null}
-    npx libretto exec "return await page.locator('.feed-shared-update-v2').count()"
+    npx libretto exec --session one-shot-flow "return await page.locator('.feed-shared-update-v2').count()"
     ```
 
     Short `exec` calls let the agent validate each step against the live page without writing and re-running a full script each time.

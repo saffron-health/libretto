@@ -113,6 +113,7 @@ This guide walks you through installing Libretto, connecting an AI provider, ope
 
     ```bash  theme={null}
     npx libretto snapshot \
+      --session my-session \
       --objective "Find the main heading and any call-to-action buttons" \
       --context "I just opened the example.com homepage and want to identify the key interactive elements."
     ```
@@ -137,15 +138,15 @@ This guide walks you through installing Libretto, connecting an AI provider, ope
     Use `exec` to run Playwright TypeScript against the open page. The code runs in a context that has `page`, `context`, `browser`, `state`, `fetch`, and `Buffer` available as globals:
 
     ```bash  theme={null}
-    npx libretto exec "return await page.url()"
+    npx libretto exec --session my-session "return await page.url()"
     ```
 
     ```bash  theme={null}
-    npx libretto exec "return await page.locator('button').count()"
+    npx libretto exec --session my-session "return await page.locator('button').count()"
     ```
 
     ```bash  theme={null}
-    npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
+    npx libretto exec --session my-session "await page.locator('button:has-text(\"Continue\")').click()"
     ```
 
     For longer scripts, pipe from stdin with `-`:

@@ -8,11 +8,16 @@ Use `snapshot` before guessing at selectors, after workflow failures, and whenev
 
 ```bash  theme={null}
 npx libretto snapshot \
+  --session debug-example \
   --objective "Find the sign-in form and submit button" \
   --context "I just opened the login page and need the email field, password field, and submit button."
 ```
 
 ### Required flags
+
+<ParamField path="--session" type="string" required>
+  The session to snapshot.
+</ParamField>
 
 <ParamField path="--objective" type="string" required>
   What you want the AI to find, analyze, or explain. A single objective can include multiple questions or analysis tasks — you don't need to run separate snapshots for each question.
@@ -23,10 +28,6 @@ npx libretto snapshot \
 </ParamField>
 
 ### Optional flags
-
-<ParamField path="--session" type="string">
-  The session to snapshot.
-</ParamField>
 
 <ParamField path="--page" type="string">
   Target a specific page ID within the session. Use `npx libretto pages --session <name>` to list page IDs when a popup or new tab is open. See [pages & close](./session-management) for details.
@@ -74,6 +75,7 @@ Supported providers: `openai`, `anthropic`, `gemini`, `vertex`.
 ```bash  theme={null}
 # Basic snapshot — find a form
 npx libretto snapshot \
+  --session debug-example \
   --objective "Find the sign-in form and submit button" \
   --context "I just opened the login page and need the email field, password field, and submit button."
 

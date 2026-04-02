@@ -5,7 +5,7 @@
 The `exec` command runs TypeScript Playwright code against a live browser session. Use it to validate selectors, inspect page data, prototype individual steps, and experiment with interactions before encoding them in a workflow file.
 
 ```bash  theme={null}
-npx libretto exec "return await page.url()"
+npx libretto exec --session debug-example "return await page.url()"
 ```
 
 ### Usage
@@ -15,9 +15,9 @@ npx libretto exec "return await page.url()"
     Pass the code as a quoted string argument:
 
     ```bash  theme={null}
-    npx libretto exec "return await page.url()"
-    npx libretto exec "return await page.locator('button').count()"
-    npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
+    npx libretto exec --session debug-example "return await page.url()"
+    npx libretto exec --session debug-example "return await page.locator('button').count()"
+    npx libretto exec --session debug-example "await page.locator('button:has-text(\"Continue\")').click()"
     ```
   </Tab>
 
@@ -84,10 +84,10 @@ If the code returns a value, `exec` prints it to stdout:
 * If the code returns nothing (`undefined`), `exec` prints `Executed successfully`.
 
 ```bash  theme={null}
-npx libretto exec "return await page.title()"
+npx libretto exec --session debug-example "return await page.title()"
 # My Page Title
 
-npx libretto exec "return await page.locator('li').count()"
+npx libretto exec --session debug-example "return await page.locator('li').count()"
 # 12
 ```
 
@@ -110,16 +110,16 @@ npx libretto exec "return await page.locator('li').count()"
 
 ```bash  theme={null}
 # Return the current URL
-npx libretto exec "return await page.url()"
+npx libretto exec --session debug-example "return await page.url()"
 
 # Count how many buttons are on the page
-npx libretto exec "return await page.locator('button').count()"
+npx libretto exec --session debug-example "return await page.locator('button').count()"
 
 # Click a button
-npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
+npx libretto exec --session debug-example "await page.locator('button:has-text(\"Continue\")').click()"
 
 # Read a value from an input field
-npx libretto exec "return await page.locator('input[name=\"email\"]').inputValue()"
+npx libretto exec --session debug-example "return await page.locator('input[name=\"email\"]').inputValue()"
 
 # Run against a named session
 npx libretto exec --session debug-example "return await page.url()"
