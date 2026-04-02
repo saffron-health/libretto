@@ -120,23 +120,22 @@ The most common failure. A selector that worked last week no longer matches beca
 
 **Popups blocking the workflow**
 
-A modal, cookie banner, or session-expiry dialog appears unexpectedly and blocks interaction with the underlying page. Consider using `attemptWithRecovery()` from the Library API to handle known popup patterns:
+A modal, cookie banner, or session-expiry dialog appears unexpectedly and blocks interaction with the underlying page. Consider wrapping the blocked step with `attemptWithRecovery()` from the Library API so Libretto can run the recovery agent before retrying:
 
 ```typescript  theme={null}
-const result = await attemptWithRecovery(
-  ctx,
+import { attemptWithRecovery, createLLMClientFromModel } from "libretto";
+import { openai } from "@ai-sdk/openai";
+
+const llmClient = createLLMClientFromModel(openai("gpt-4o"));
+
+await attemptWithRecovery(
+  page,
   async () => {
     await page.locator("#continueButton").click();
+    await page.waitForSelector(".success-banner");
   },
-  [
-    {
-      detect: async () =>
-        (await page.locator("#sessionExpiredModal").count()) > 0,
-      recover: async () => {
-        await page.locator("#sessionExpiredModal button").click();
-      },
-    },
-  ],
+  logger,
+  llmClient,
 );
 ```
 
