@@ -13,15 +13,12 @@
     "groups": [
       {
         "group": "Overview",
-        "pages": [
-          "index"
-        ]
+        "pages": ["index"]
       },
       {
         "group": "Get started",
         "pages": [
           "get-started/introduction",
-          "get-started/quickstart",
           "get-started/configuration",
           "get-started/automation-approaches",
           "get-started/bot-detection"
