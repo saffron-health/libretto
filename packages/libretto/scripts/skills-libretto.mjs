@@ -2,10 +2,20 @@
 
 import { cpSync, mkdirSync, rmSync } from "node:fs";
 
-export const SKILL_DIRS = [
-  "packages/libretto/skills/libretto",
-  ".agents/skills/libretto",
-  ".claude/skills/libretto",
+export const SKILL_MIRRORS = [
+  {
+    name: "libretto",
+    source: "packages/libretto/skills/libretto",
+    targets: [".agents/skills/libretto", ".claude/skills/libretto"],
+  },
+  {
+    name: "libretto-readonly",
+    source: "packages/libretto/skills/libretto-readonly",
+    targets: [
+      ".agents/skills/libretto-readonly",
+      ".claude/skills/libretto-readonly",
+    ],
+  },
 ];
 
 export function syncSkillDir(sourceDir, destDir) {

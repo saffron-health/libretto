@@ -16,7 +16,7 @@
     "dist",
     "src",
     "scripts",
-    "skills/libretto"
+    "skills"
   ],
   "types": "./dist/index.d.ts",
   "bin": {

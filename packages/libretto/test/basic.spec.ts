@@ -119,6 +119,7 @@ describe("basic CLI subprocess behavior", () => {
   test("prints usage for --help", async ({ librettoCli }) => {
     const result = await librettoCli("--help");
     expect(result.stdout).toContain("Usage: libretto <command>");
+    expect(result.stdout).toContain("readonly-exec");
     expect(result.stdout).toContain("snapshot");
     expect(result.stdout).toContain("Capture PNG + HTML");
     expect(result.stdout).not.toContain("cloud <subcommand>");
@@ -274,6 +275,15 @@ describe("basic CLI subprocess behavior", () => {
     );
     expect(result.stderr).not.toContain(
       `Missing required --session for "exec".`,
+    );
+  });
+
+  test("fails readonly-exec with missing code usage error", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("readonly-exec --session test");
+    expect(result.stderr).toContain(
+      "Usage: libretto readonly-exec <code|-> [--session <name>] [--page <id>]",
     );
   });
 

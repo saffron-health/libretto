@@ -35,6 +35,7 @@ metadata:
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
+- If the browser must remain read-only, switch to the `libretto-readonly` skill and use `readonly-exec` instead of `exec`.
 
 ## Commands
 
@@ -87,6 +88,7 @@ npx libretto snapshot \
 - Available globals: `page`, `context`, `browser`, `state`, `fetch`, `Buffer`.
 - Let failures throw. Do not hide `exec` failures with `try/catch` or `.catch()`.
 - Do not run multiple `exec` commands in parallel.
+- Do not use `exec` in read-only diagnosis flows. Use `readonly-exec` from the `libretto-readonly` skill for those sessions.
 
 ```bash
 npx libretto exec "return await page.url()"

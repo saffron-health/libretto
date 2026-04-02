@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { SKILL_DIRS, syncSkillDir } from "./skills-libretto.mjs";
+import { SKILL_MIRRORS, syncSkillDir } from "./skills-libretto.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageRoot = join(__dirname, "..");
@@ -36,15 +36,17 @@ const repoRoot =
     ? gitResult.stdout.trim()
     : installCwd;
 
-const sourceDir = join(packageRoot, "skills", "libretto");
-if (!existsSync(sourceDir)) process.exit(0);
-
 const syncMissingDirs = repoRoot === packageRoot;
-for (const dir of SKILL_DIRS.slice(1)) {
-  const rootName = dir.split("/")[0];
-  const rootDir = join(repoRoot, rootName);
-  if (!syncMissingDirs && !existsSync(rootDir)) continue;
-  const dest = join(repoRoot, dir);
-  syncSkillDir(sourceDir, dest);
-  console.log(`libretto: synced skills/libretto -> ${dest}`);
+for (const skillMirror of SKILL_MIRRORS) {
+  const sourceDir = join(packageRoot, skillMirror.source.replace(/^packages\/libretto\//, ""));
+  if (!existsSync(sourceDir)) continue;
+
+  for (const dir of skillMirror.targets) {
+    const rootName = dir.split("/")[0];
+    const rootDir = join(repoRoot, rootName);
+    if (!syncMissingDirs && !existsSync(rootDir)) continue;
+    const dest = join(repoRoot, dir);
+    syncSkillDir(sourceDir, dest);
+    console.log(`libretto: synced ${skillMirror.source} -> ${dest}`);
+  }
 }

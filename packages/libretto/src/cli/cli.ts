@@ -16,6 +16,7 @@ Examples:
 
   libretto exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
   libretto exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
+  libretto readonly-exec "return await page.title()" --session test1
   libretto ai configure openai
   libretto ai configure anthropic
   libretto ai configure gemini
@@ -35,6 +36,9 @@ Examples:
 
 Available in exec:
   page, context, state, browser, networkLog, actionLog
+
+Available in readonly-exec:
+  page, state, snapshot, get
 
 Profiles:
   Profiles are saved to .libretto/profiles/<domain>.json (git-ignored)
