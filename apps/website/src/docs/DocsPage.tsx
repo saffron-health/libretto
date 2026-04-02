@@ -163,7 +163,7 @@ function buildHeadingIdMap(roots: Root[]): WeakMap<Heading, string> {
 
       headingIds.set(
         heading,
-        nextCount === 0 ? base : `${base}-${nextCount + 1}`,
+        nextCount === 0 ? base : `${base}-${nextCount}`,
       );
     }
   }
