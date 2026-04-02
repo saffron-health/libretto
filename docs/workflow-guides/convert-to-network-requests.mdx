@@ -129,7 +129,7 @@ The agent runs the existing script, examines the captured network log, identifie
       }
     }
 
-    export const topPosts = workflow<{}, Output>(async (ctx): Promise<Output> => {
+    export const topPosts = workflow<{}, Output>("topPosts", async (ctx): Promise<Output> => {
       const { page } = ctx;
       await page.goto("https://news.ycombinator.com");
 

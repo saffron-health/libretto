@@ -67,6 +67,7 @@ Your agent opens a browser window for you to log in, then takes over: exploring 
     };
 
     export const linkedInFeedScraper = workflow<{}, Output>(
+      "linkedInFeedScraper",
       async (ctx): Promise<Output> => {
         const { page } = ctx;
 

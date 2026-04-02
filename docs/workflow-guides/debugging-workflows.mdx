@@ -72,7 +72,7 @@ If you need to stop a workflow at a specific point — not at failure, but at a 
 ```typescript  theme={null}
 import { workflow, pause } from "libretto";
 
-export const eligibilityCheck = workflow(async (ctx, input) => {
+export const eligibilityCheck = workflow("eligibilityCheck", async (ctx, input) => {
   const { session, page } = ctx;
 
   await page.goto("https://availity.com");

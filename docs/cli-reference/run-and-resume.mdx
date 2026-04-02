@@ -131,9 +131,9 @@ npx libretto resume --session debug-example
 Insert `await pause(session)` calls in your workflow file to create interactive breakpoints — similar to debugger breakpoints in the browser flow. The workflow stops at each `pause()` call and waits for `resume` before continuing.
 
 ```typescript  theme={null}
-import { workflow, pause, type LibrettoWorkflowContext } from "libretto";
+import { workflow, pause } from "libretto";
 
-export const myWorkflow = workflow(async (ctx, input) => {
+export const myWorkflow = workflow("myWorkflow", async (ctx, input) => {
   const { session, page } = ctx;
 
   await page.goto("https://app.example.com");

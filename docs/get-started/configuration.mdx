@@ -164,7 +164,7 @@ Each Libretto session gets its own directory under `.libretto/sessions/<name>/`.
 
 #### Session files
 
-**`state.json`** — Metadata Libretto uses to reconnect to a running browser: the CDP debug port, the browser process PID, and the session status (`running`, `paused`, `exited`).
+**`state.json`** — Metadata Libretto uses to reconnect to a browser session: the CDP debug port, the browser process PID, and the session status (`active`, `paused`, `completed`, `failed`, `exited`).
 
 **`logs.jsonl`** — Structured JSONL log of CLI events for the session. Useful for tracing what happened during a run.
 

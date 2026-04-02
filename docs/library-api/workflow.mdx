@@ -6,24 +6,25 @@ The `workflow()` factory is the entry point for every Libretto automation. You w
 
 ### `workflow()`
 
-Creates a `LibrettoWorkflow` from a handler function.
+Creates a named `LibrettoWorkflow` from a handler function.
 
 ```typescript  theme={null}
-function workflow<Input, Output, S>(
-  handler: LibrettoWorkflowHandler<Input, Output, S>
-): LibrettoWorkflow<Input, Output, S>
+function workflow<Input = unknown, Output = unknown>(
+  name: string,
+  handler: LibrettoWorkflowHandler<Input, Output>
+): LibrettoWorkflow<Input, Output>
 ```
 
 The handler receives a `LibrettoWorkflowContext` and typed `input`, and must return a `Promise<Output>`.
 
 ```typescript  theme={null}
-type LibrettoWorkflowHandler<Input, Output, S> = (
-  ctx: LibrettoWorkflowContext<S>,
+type LibrettoWorkflowHandler<Input, Output> = (
+  ctx: LibrettoWorkflowContext,
   input: Input
 ) => Promise<Output>
 ```
 
-#### `LibrettoWorkflowContext<S>`
+#### `LibrettoWorkflowContext`
 
 <ResponseField name="session" type="string">
   The session identifier for this workflow run. Use it to correlate logs and state files.
@@ -33,21 +34,13 @@ type LibrettoWorkflowHandler<Input, Output, S> = (
   A Playwright `Page` instance ready for navigation and interaction.
 </ResponseField>
 
-<ResponseField name="logger" type="MinimalLogger">
-  A structured logger scoped to this workflow run. See [Logging](./logging) for details.
-</ResponseField>
-
-<ResponseField name="services" type="S">
-  An optional generic services object. Defaults to `{}`. Pass domain services (API clients, repositories, etc.) through here so your handler stays testable.
-</ResponseField>
-
 #### Full example
 
 ```typescript  theme={null}
 import { workflow, launchBrowser, pause } from "libretto";
 
-export const main = workflow<{ query: string }, string[]>(async (ctx, input) => {
-  const { page, logger } = ctx;
+export const main = workflow<{ query: string }, string[]>("main", async (ctx, input) => {
+  const { page } = ctx;
 
   await page.goto("https://example.com/search");
   await page.fill("#query", input.query);
@@ -58,7 +51,6 @@ export const main = workflow<{ query: string }, string[]>(async (ctx, input) => 
     els.map((el) => el.textContent ?? "")
   );
 
-  logger.info("Search complete", { count: results.length });
   return results;
 });
 ```
@@ -131,7 +123,6 @@ async function launchBrowser(args: LaunchBrowserArgs): Promise<BrowserSession>
 
 ```typescript  theme={null}
 import { launchBrowser } from "libretto";
-import { defaultLogger } from "libretto";
 import { main } from "./my-workflow";
 
 const session = await launchBrowser({
@@ -144,8 +135,6 @@ try {
     {
       session: "my-run",
       page: session.page,
-      logger: defaultLogger,
-      services: {},
     },
     { query: "hello world" }
   );
@@ -184,7 +173,7 @@ npx libretto resume --session <session-name>
 ```typescript  theme={null}
 import { workflow, pause } from "libretto";
 
-export const main = workflow<{ id: string }, void>(async (ctx, input) => {
+export const main = workflow<{ id: string }, void>("main", async (ctx, input) => {
   const { page, session } = ctx;
 
   await page.goto(`https://example.com/items/${input.id}`);

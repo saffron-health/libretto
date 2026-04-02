@@ -75,6 +75,7 @@ You perform the workflow once in the browser. Libretto captures the full action 
     };
 
     export const getInsuranceId = workflow<Input, Output>(
+      "getInsuranceId",
       async (ctx, input): Promise<Output> => {
         const { page } = ctx;
 

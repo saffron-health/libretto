@@ -177,7 +177,7 @@ This guide walks you through installing Libretto, connecting an AI provider, ope
     npx libretto run ./integration.ts main --auth-profile app.example.com
     ```
 
-    The second argument (`main`) is the name of the exported `workflow()` instance in the file. See the Library API reference for how to structure workflow files.
+    The second argument (`main`) is the workflow name passed to `workflow(name, handler)` in the file. In most projects, this matches the exported symbol name. See the Library API reference for how to structure workflow files.
   </Step>
 </Steps>
 
