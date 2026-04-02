@@ -122,76 +122,27 @@ async function openKernelSessionForBenchmark(args: {
   - `closeKernelSessionForBenchmark(...)` — idempotent Kernel session deletion
   - `ensureKernelApiKey()` — resolves from `KERNEL_API_KEY` env var or GCP Secret Manager (`libretto-benchmarks-kernel-api-key`)
 - [x] Prime the Kernel session by connecting over CDP and navigating the existing default page/context to the case start URL
-- [x] Update `buildWebVoyagerPrompt` in `benchmarks/webVoyager/prompt.ts` to accept a `browserBackend` option; in Kernel mode the prompt tells the agent the session is already open, not to run `open`, and to start with `snapshot`
+- [x] Update `buildWebVoyagerPrompt` in `benchmarks/webVoyager/prompt.ts` to always generate a Kernel-mode prompt that tells the agent the session is already open, not to run `open`, and to start with `snapshot` (the `browserBackend` option was removed in Phase 2 when local support was dropped)
 - [x] Success criteria: `pnpm type-check` passes, `pnpm --filter libretto test` passes
 
-### Phase 2: Use the helper in local WebVoyager runs and pre-open the named Libretto session
+### Phase 2: Always use Kernel in WebVoyager runs with runner-owned cleanup
 
-Teach the benchmark runner to choose a browser backend and, in Kernel mode, create the browser before the agent starts. Update the benchmark-local instructions so the agent treats the session as already open and begins with `snapshot`/`exec` instead of `open`.
+Removed the local browser backend entirely — all WebVoyager benchmark runs now use Kernel-backed stealth browsers. The runner opens a Kernel session before the agent starts and cleans it up in a `finally` block.
 
-```ts
-async function prepareBrowserBackend(args: {
-  backend: "local" | "kernel";
-  row: WebVoyagerRow;
-  runDir: string;
-  sessionName: string;
-}) {
-  if (args.backend === "kernel") {
-    return await openKernelSessionForBenchmark({
-      runDir: args.runDir,
-      sessionName: args.sessionName,
-      startUrl: args.row.web,
-    });
-  }
+- [x] Removed `--browser-backend` CLI option and `BrowserBackend` type — Kernel is the only backend
+- [x] `runWebVoyagerCase` always calls `openKernelSessionForBenchmark` after workspace creation and before `createAgentSession`
+- [x] `buildWebVoyagerPrompt` always generates the Kernel prompt (session pre-opened, start with `snapshot`)
+- [x] Benchmark workspace `AGENTS.md` always includes Kernel browser mode instructions
+- [x] Runner always cleans up the Kernel session in a `finally` block via `closeKernelSessionForBenchmark`
+- [x] Kernel metadata artifact (`kernel-session.json`) is written by `openKernelSessionForBenchmark` (landed in Phase 1)
+- [x] Success criteria: `pnpm type-check` passes, `pnpm --filter libretto test` passes
+- [ ] Success criteria: `pnpm benchmarks webVoyager run --count 1` starts with a pre-opened Kernel-backed Libretto session, the agent transcript shows `snapshot`/`exec` use without a preceding `open`, and evaluator screenshots are still captured from the Kernel session
 
-  return null;
-}
-```
+### Phase 3: Thread Kernel mode through Cloud Run dispatch and task startup
 
-- [ ] Add a benchmark backend selector in `benchmarks/webVoyager/commands.ts` and `runner.ts` (for example `--browser-backend local|kernel`, defaulting to `local`)
-- [ ] In `runWebVoyagerCase`, when backend is `kernel`, call the new helper after workspace creation and before `createAgentSession(...)`
-- [ ] Pass `browserBackend` to `buildWebVoyagerPrompt` (prompt changes already landed in Phase 1)
-- [ ] Update benchmark-local `AGENTS.md` to add a Kernel-mode note when backend is `kernel`
-- [ ] Keep the existing local behavior unchanged when backend is `local`
-- [ ] Success criteria: `pnpm benchmarks webVoyager run --count 1 --browser-backend kernel` starts with a pre-opened Kernel-backed Libretto session, the agent transcript shows `snapshot`/`exec` use without a preceding `open`, and evaluator screenshots are still captured from the Kernel session
+Make GCP runs work with the Kernel-only backend. The cloud path must propagate `KERNEL_API_KEY` and fail fast when the Cloud Run job is missing credentials.
 
-### Phase 3: Add runner-owned cleanup and Kernel debugging artifacts
-
-Make benchmark cleanup reliable even if the agent never runs `npx libretto close`. This keeps Kernel costs bounded and makes failures debuggable by preserving the remote session metadata in the run directory.
-
-```ts
-let kernelSession: KernelSessionHandle | null = null;
-
-try {
-  kernelSession = await prepareBrowserBackend(...);
-  await session.prompt(prompt);
-} finally {
-  if (kernelSession) {
-    await closeKernelSessionForBenchmark(kernelSession);
-  }
-}
-```
-
-- [ ] Ensure `runWebVoyagerCase` always deletes the Kernel browser in a `finally` block when Kernel mode was used
-- [ ] Write a small artifact into the run directory with `kernelSessionId`, `browserLiveViewUrl`, backend type, and selected Kernel options so failed runs are inspectable
-- [ ] Include the chosen backend in `result.json` so local and GCP result bundles make the transport choice explicit
-- [ ] Make cleanup idempotent so agent-issued `npx libretto close` only clears local state while runner cleanup still safely deletes the remote Kernel browser
-- [ ] Success criteria: a forced failure mid-run still leaves a debuggable Kernel metadata artifact in the case directory and does not leave the remote browser running after the runner exits
-
-### Phase 4: Thread Kernel mode through Cloud Run dispatch and task startup
-
-Make GCP runs honor the same backend choice as local runs. The cloud path must propagate backend selection and fail fast when the Cloud Run job is missing Kernel credentials.
-
-```ts
-envOverrides: {
-  BENCH_RUN_ID: runId,
-  BENCH_SELECTION: JSON.stringify(selectionParams),
-  BENCH_BROWSER_BACKEND: input.browserBackend,
-}
-```
-
-- [ ] Add backend selection to `benchmarks/webVoyager/cloud-dispatch.ts`, `cloud-entrypoint.ts`, and any manifest/result metadata that should record it
-- [ ] When backend is `kernel`, require `KERNEL_API_KEY` in the task environment and surface a clear startup error if it is missing
-- [ ] Update the Cloud Run job setup/docs so Kernel-backed runs can be dispatched with the necessary secret/env configuration
-- [ ] Preserve current local/GCP behavior for `--browser-backend local`
-- [ ] Success criteria: `pnpm benchmarks webVoyager run --gcp --count 1 --browser-backend kernel` dispatches a run whose case task records `browserBackend: "kernel"`, and a misconfigured job without `KERNEL_API_KEY` fails before agent startup with an actionable message instead of silently falling back to local Playwright
+- [ ] Ensure `KERNEL_API_KEY` is available in the Cloud Run task environment (via `ensureKernelApiKey` which already falls back to GCP Secret Manager)
+- [ ] Update the Cloud Run job setup/docs so dispatched runs have the necessary secret/env configuration
+- [ ] Include `browserBackend: "kernel"` in `result.json` and manifest metadata so result bundles are explicit
+- [ ] Success criteria: `pnpm benchmarks webVoyager run --gcp --count 1` dispatches a run whose case task uses Kernel, and a misconfigured job without `KERNEL_API_KEY` or GCP secret access fails before agent startup with an actionable message

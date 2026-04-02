@@ -29,25 +29,16 @@ export type WebVoyagerPrompt = {
   sessionName: string;
 };
 
-export function buildWebVoyagerPrompt(
-  row: WebVoyagerRow,
-  options?: { browserBackend?: "local" | "kernel" },
-): WebVoyagerPrompt {
+export function buildWebVoyagerPrompt(row: WebVoyagerRow): WebVoyagerPrompt {
   const sessionName = formatSessionName(row.id);
-  const backend = options?.browserBackend ?? "local";
 
-  let text: string;
-  if (backend === "kernel") {
-    text = [
-      row.ques,
-      `Use the libretto skill, with session name "${sessionName}".`,
-      `The browser session is already open and connected to ${row.web}.`,
-      `Do NOT run \`open\` — the session is pre-opened for you.`,
-      `Start by taking a snapshot to see the current page state.`,
-    ].join(" ");
-  } else {
-    text = `${row.ques} Starting website: ${row.web}. Use the libretto skill, with session name "${sessionName}".`;
-  }
+  const text = [
+    row.ques,
+    `Use the libretto skill, with session name "${sessionName}".`,
+    `The browser session is already open and connected to ${row.web}.`,
+    `Do NOT run \`open\` — the session is pre-opened for you.`,
+    `Start by taking a snapshot to see the current page state.`,
+  ].join(" ");
 
   return { text, sessionName };
 }

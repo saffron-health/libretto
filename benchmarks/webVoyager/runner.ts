@@ -27,6 +27,11 @@ import {
 } from "./prompt.js";
 import { ScreenshotCollector } from "./screenshot-collector.js";
 import { evaluateWithScreenshots, type JudgeResult } from "./evaluator.js";
+import {
+  openKernelSessionForBenchmark,
+  closeKernelSessionForBenchmark,
+  type KernelSessionHandle,
+} from "./kernel-session.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -210,6 +215,13 @@ async function prepareRunWorkspace(
       "- Do not inspect sibling benchmark files or parent benchmark directories to discover the answer.",
       "- End with a direct final answer to the task.",
       "",
+      "## Kernel Browser Mode",
+      "",
+      "This benchmark run uses a Kernel-backed stealth browser.",
+      "The browser session is **already open** and connected to the start URL.",
+      "Do NOT run `open` \u2014 the session is pre-opened for you.",
+      "Start by taking a `snapshot` to see the current page state.",
+      "",
     ].join("\n"),
     "utf8",
   );
@@ -282,6 +294,13 @@ export async function runWebVoyagerCase(
   const startedAt = new Date();
   const { runDir, prompt, sessionName } = await prepareRunWorkspace(row);
   const anthropicApiKey = await ensureAnthropicApiKey();
+
+  // Open Kernel-backed stealth browser before the agent starts
+  const kernelSession = await openKernelSessionForBenchmark({
+    runDir,
+    sessionName,
+    startUrl: row.web,
+  });
   const agentDir = join(runDir, ".pi");
   const authStorage = AuthStorage.create(join(agentDir, "auth.json"));
   authStorage.setRuntimeApiKey("anthropic", anthropicApiKey);
@@ -387,6 +406,8 @@ export async function runWebVoyagerCase(
     session.dispose();
     transcriptStream.end();
     await finished(transcriptStream);
+
+    await closeKernelSessionForBenchmark(kernelSession);
   }
 
   // Collect screenshots and evaluate
@@ -469,7 +490,7 @@ export async function runWebVoyagerBenchmark(args: {
   const concurrency = args.parallelize ?? 1;
 
   console.log(
-    `Running WebVoyager benchmark: ${formatSelectionSummary(selection)}${concurrency > 1 ? ` (parallelism: ${concurrency})` : ""}.`,
+    `Running WebVoyager benchmark: ${formatSelectionSummary(selection)}${concurrency > 1 ? ` (parallelism: ${concurrency})` : ""} [kernel backend].`,
   );
 
   if (concurrency <= 1) {
