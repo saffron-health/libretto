@@ -2,18 +2,26 @@ import introduction from "./pages/introduction.mdx?raw";
 import uiKit from "./pages/ui-kit.mdx?raw";
 import quickstart from "./pages/quickstart.mdx?raw";
 import configuration from "./pages/configuration.mdx?raw";
+import automationApproaches from "./pages/automation-approaches.mdx?raw";
+import botDetection from "./pages/bot-detection.mdx?raw";
 import openAndConnect from "./pages/open-and-connect.mdx?raw";
+import sessionsAndProfiles from "./pages/sessions-and-profiles.mdx?raw";
 import snapshot from "./pages/snapshot.mdx?raw";
 import exec from "./pages/exec.mdx?raw";
 import networkAndActions from "./pages/network-and-actions.mdx?raw";
 import sessionManagement from "./pages/session-management.mdx?raw";
 import runAndResume from "./pages/run-and-resume.mdx?raw";
+import oneShotScriptGeneration from "./pages/one-shot-script-generation.mdx?raw";
+import interactiveScriptBuilding from "./pages/interactive-script-building.mdx?raw";
+import debuggingWorkflows from "./pages/debugging-workflows.mdx?raw";
+import convertToNetworkRequests from "./pages/convert-to-network-requests.mdx?raw";
 import workflow from "./pages/workflow.mdx?raw";
 import logging from "./pages/logging.mdx?raw";
 import instrumentation from "./pages/instrumentation.mdx?raw";
 import extraction from "./pages/extraction.mdx?raw";
 import network from "./pages/network.mdx?raw";
 import recovery from "./pages/recovery.mdx?raw";
+import openapiSpec from "./pages/openapi-spec.mdx?raw";
 
 export type DocsContentPage = {
   id: string;
@@ -28,7 +36,7 @@ export type DocsContentGroup = {
   pages: DocsContentPage[];
 };
 
-export const defaultDocsGroupId = "get-started";
+const defaultDocsGroupId = "get-started";
 
 const isDocsDevBuild =
   !import.meta.env.PROD ||
@@ -56,6 +64,12 @@ export const docsManifest = [
       { id: "introduction", label: "Introduction", content: introduction },
       { id: "quickstart", label: "Quick start", content: quickstart },
       { id: "configuration", label: "Configuration", content: configuration },
+      {
+        id: "automation-approaches",
+        label: "Automation approaches",
+        content: automationApproaches,
+      },
+      { id: "bot-detection", label: "Bot detection", content: botDetection },
     ],
   },
   {
@@ -67,6 +81,11 @@ export const docsManifest = [
         id: "open-and-connect",
         label: "open & connect",
         content: openAndConnect,
+      },
+      {
+        id: "sessions-and-profiles",
+        label: "sessions & profiles",
+        content: sessionsAndProfiles,
       },
       { id: "snapshot", label: "snapshot", content: snapshot },
       { id: "exec", label: "exec", content: exec },
@@ -88,6 +107,33 @@ export const docsManifest = [
     ],
   },
   {
+    id: "workflow-guides",
+    label: "Workflow Guides",
+    path: "/docs/workflow-guides",
+    pages: [
+      {
+        id: "one-shot-script-generation",
+        label: "One-shot script generation",
+        content: oneShotScriptGeneration,
+      },
+      {
+        id: "interactive-script-building",
+        label: "Interactive script building",
+        content: interactiveScriptBuilding,
+      },
+      {
+        id: "debugging-workflows",
+        label: "Debugging workflows",
+        content: debuggingWorkflows,
+      },
+      {
+        id: "convert-to-network-requests",
+        label: "Convert to network requests",
+        content: convertToNetworkRequests,
+      },
+    ],
+  },
+  {
     id: "library-api",
     label: "Library API",
     path: "/docs/library-api",
@@ -102,13 +148,10 @@ export const docsManifest = [
         content: instrumentation,
       },
       { id: "logging", label: "Logging", content: logging },
+      { id: "openapi-spec", label: "OpenAPI spec", content: openapiSpec },
     ],
   },
 ] satisfies DocsContentGroup[];
-
-export const docsPages = docsManifest.flatMap((group) => {
-  return group.pages;
-});
 
 export function normalizeDocsPath(pathname: string): string {
   if (pathname === "/" || pathname.length === 0) {
@@ -137,9 +180,3 @@ export function getDocsGroupByPath(pathname: string) {
     return group.path === normalizedPath;
   });
 }
-
-export const docsMdxContent = docsPages
-  .map((page) => {
-    return page.content;
-  })
-  .join("\n\n");

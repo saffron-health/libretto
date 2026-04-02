@@ -554,10 +554,8 @@ function TocLink({
 
 export function TableOfContents({
   items,
-  logo: _logo,
 }: {
   items: FlatTocItem[];
-  logo?: string;
 }) {
   const [, navigate] = useLocation();
   const currentPathname =
@@ -2217,7 +2215,6 @@ export type EditorialSection = {
 
 export function EditorialPage({
   toc,
-  logo,
   tabs,
   activeTab,
   showHeader = true,
@@ -2227,7 +2224,6 @@ export function EditorialPage({
   sections,
 }: {
   toc: FlatTocItem[];
-  logo?: string;
   tabs?: TabItem[];
   activeTab?: string;
   showHeader?: boolean;
@@ -2247,28 +2243,9 @@ export function EditorialPage({
           {/* Top row: logo + right links */}
           <div className="mx-auto flex items-center justify-between px-(--mobile-padding) py-(--header-padding-y) lg:max-w-(--grid-max-width) lg:px-0">
             <AppLink href="/" className="slot-logo no-underline flex items-center">
-              {logo ? (
-                <div
-                  role="img"
-                  aria-label="playwriter"
-                  style={{
-                    height: "var(--logo-height)",
-                    /* aspect ratio from SVG viewBox: 730/201 ≈ 3.63 */
-                    aspectRatio: "730 / 201",
-                    backgroundColor: "var(--logo-color)",
-                    maskImage: `url(${logo})`,
-                    maskSize: "contain",
-                    maskRepeat: "no-repeat",
-                    WebkitMaskImage: `url(${logo})`,
-                    WebkitMaskSize: "contain",
-                    WebkitMaskRepeat: "no-repeat",
-                  }}
-                />
-              ) : (
-                <span className="text-[18px] font-[300] [font-family:var(--font-secondary)] tracking-[-0.02em]">
-                  Libretto
-                </span>
-              )}
+              <span className="text-[18px] font-[300] [font-family:var(--font-secondary)] tracking-[-0.02em]">
+                Libretto
+              </span>
             </AppLink>
             <div className="flex items-center gap-4">
               {/* Icon links */}
@@ -2324,7 +2301,7 @@ export function EditorialPage({
                 : "100vh",
             }}
           >
-            <TableOfContents items={toc} logo={logo} />
+            <TableOfContents items={toc} />
           </div>
         </div>
 
