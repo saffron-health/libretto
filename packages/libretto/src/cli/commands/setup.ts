@@ -234,13 +234,16 @@ function writeEnvVar(envVar: string, value: string, envPath: string): void {
 }
 
 /**
- * Prompt the user to enter a credential for a specific provider and pin its default model.
+ * Prompt the user to enter a credential for a specific provider and pin its model.
+ * When modelOverride is provided (e.g. during repair), preserves the existing model
+ * instead of resetting to the provider default.
  * Returns true if credential was entered successfully.
  */
 async function promptForCredential(
   rl: ReturnType<typeof createInterface>,
   choice: ProviderChoice,
   envPath: string,
+  modelOverride?: string,
 ): Promise<boolean> {
   console.log(`\n  ${choice.label} selected.`);
   console.log(`  ${choice.envHint}\n`);
@@ -255,9 +258,9 @@ async function promptForCredential(
   writeEnvVar(choice.envVar, apiKeyValue, envPath);
   loadSnapshotEnv();
 
-  const defaultModel = DEFAULT_SNAPSHOT_MODELS[choice.provider];
-  writeAiConfig(defaultModel);
-  console.log(`  ✓ Snapshot API ready: ${defaultModel}`);
+  const model = modelOverride ?? DEFAULT_SNAPSHOT_MODELS[choice.provider];
+  writeAiConfig(model);
+  console.log(`  ✓ Snapshot API ready: ${model}`);
   return true;
 }
 
@@ -345,7 +348,7 @@ async function runInteractiveApiSetup(): Promise<void> {
           (c) => c.provider === plan.provider,
         );
         if (matchingChoice) {
-          await promptForCredential(rl, matchingChoice, envPath);
+          await promptForCredential(rl, matchingChoice, envPath, plan.model);
         }
         return;
       }
