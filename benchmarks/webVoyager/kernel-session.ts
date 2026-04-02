@@ -8,14 +8,14 @@
  */
 
 import Kernel from "@onkernel/sdk";
-import { execFile } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { chromium } from "playwright";
 import { GoogleAuth } from "google-auth-library";
-
-const execFileAsync = promisify(execFile);
+import {
+  SESSION_STATE_VERSION,
+  type SessionStateFile,
+} from "../../packages/libretto/src/shared/state/session-state.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,7 +43,7 @@ type KernelSessionMetadata = {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_GCP_PROJECT = "saffron-health";
-const DEFAULT_KERNEL_SECRET_NAME = "libretto-benchmarks-kernel-api-key";
+const DEFAULT_KERNEL_SECRET_NAME = "kernel-api-key-libretto-benchmarks";
 const KERNEL_SESSION_TIMEOUT_SECONDS = 7200; // 2 hours
 const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
 
@@ -172,32 +172,50 @@ async function primeSessionAtUrl(
 }
 
 // ---------------------------------------------------------------------------
-// Libretto CLI connect
+// Libretto session state
 // ---------------------------------------------------------------------------
 
 /**
- * Register the Kernel CDP endpoint as a named Libretto session by calling
- * `pnpm -s cli connect <cdpEndpoint> --session <name>` inside the run
- * workspace. This writes the standard session state file that all other
- * Libretto commands (`snapshot`, `exec`, `pages`) read.
+ * Write a Libretto-compatible `.libretto/sessions/<session>/state.json`
+ * directly into the run workspace. This is the same file that
+ * `libretto connect` would write, but avoids shelling out to the CLI
+ * (the isolated run workspace doesn't have full node_modules).
  */
-async function connectLibrettoSession(
+async function writeLibrettoSessionState(
   runDir: string,
   sessionName: string,
   cdpEndpoint: string,
 ): Promise<void> {
+  const sessionDir = join(runDir, ".libretto", "sessions", sessionName);
+  await mkdir(sessionDir, { recursive: true });
+
+  let port = 443;
   try {
-    await execFileAsync(
-      "pnpm",
-      ["-s", "cli", "connect", cdpEndpoint, "--session", sessionName],
-      { cwd: runDir, timeout: 30_000 },
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Failed to register Kernel session with Libretto CLI: ${msg}`,
-    );
+    const parsed = new URL(cdpEndpoint);
+    if (parsed.port) {
+      port = Number.parseInt(parsed.port, 10);
+    } else if (parsed.protocol === "ws:") {
+      port = 80;
+    }
+  } catch {
+    // keep default
   }
+
+  const state: SessionStateFile = {
+    version: SESSION_STATE_VERSION,
+    port,
+    cdpEndpoint,
+    session: sessionName,
+    startedAt: new Date().toISOString(),
+    status: "active",
+    viewport: DEFAULT_VIEWPORT,
+  };
+
+  await writeFile(
+    join(sessionDir, "state.json"),
+    JSON.stringify(state, null, 2),
+    "utf8",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -236,8 +254,8 @@ export async function openKernelSessionForBenchmark(args: {
     // Navigate to start URL
     await primeSessionAtUrl(handle.cdpEndpoint, args.startUrl);
 
-    // Register with Libretto CLI so snapshot/exec/pages work
-    await connectLibrettoSession(
+    // Write Libretto session state so snapshot/exec/pages work
+    await writeLibrettoSessionState(
       args.runDir,
       args.sessionName,
       handle.cdpEndpoint,
