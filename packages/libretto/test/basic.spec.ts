@@ -162,6 +162,54 @@ describe("basic CLI subprocess behavior", () => {
     );
   });
 
+  test("setup shows provider-specific message when pinned OpenAI + missing key + Anthropic present", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    // Pin OpenAI in config, but only provide Anthropic key
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(
+      workspacePath(".libretto", "config.json"),
+      JSON.stringify({
+        version: 1,
+        ai: { model: "openai/gpt-5.4", updatedAt: "2026-01-01T00:00:00.000Z" },
+      }),
+      "utf8",
+    );
+
+    const result = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "",
+      ANTHROPIC_API_KEY: "test-anthropic-key",
+    });
+
+    // Should name the configured provider and missing env var
+    expect(result.stdout).toContain("openai is configured");
+    expect(result.stdout).toContain("OPENAI_API_KEY is not set");
+    // Should NOT show the generic unconfigured message
+    expect(result.stdout).not.toContain("No snapshot API credentials detected");
+  });
+
+  test("setup shows invalid config warning in non-TTY mode", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(
+      workspacePath(".libretto", "config.json"),
+      "{not-valid-json}",
+      "utf8",
+    );
+
+    const result = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-key",
+    });
+
+    expect(result.stdout).toContain("AI config is invalid");
+    expect(result.stdout).toContain("reconfigure");
+  });
+
   test("setup copies skill files without confirmation when agent dirs exist", async ({
     librettoCli,
     workspacePath,

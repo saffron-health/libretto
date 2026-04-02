@@ -26,7 +26,7 @@ import {
 import type { Provider } from "../../shared/llm/client.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
-type ProviderChoice = {
+export type ProviderChoice = {
   key: string;
   label: string;
   provider: Provider;
@@ -34,7 +34,7 @@ type ProviderChoice = {
   envHint: string;
 };
 
-const PROVIDER_CHOICES: ProviderChoice[] = [
+export const PROVIDER_CHOICES: ProviderChoice[] = [
   {
     key: "1",
     label: "OpenAI",
@@ -107,6 +107,56 @@ function printInvalidAiConfigWarning(status: AiSetupStatus): void {
   }
 }
 
+// ── Repair plan helpers (exported for testing) ──────────────────────────────
+
+export type RepairChoice =
+  | "enter-matching-credential"
+  | "switch-provider"
+  | "skip";
+
+export type RepairPlan =
+  | {
+      kind: "repair-missing-credentials";
+      provider: Provider;
+      model: string;
+      envVar: string;
+      choices: RepairChoice[];
+    }
+  | { kind: "repair-invalid-config"; message: string }
+  | { kind: "no-repair-needed" };
+
+/**
+ * Determine what repair action setup should take for the current AI status.
+ * Pure function — no I/O, no prompts.
+ */
+export function buildRepairPlan(status: AiSetupStatus): RepairPlan {
+  if (status.kind === "configured-missing-credentials") {
+    const choice = PROVIDER_CHOICES.find((c) => c.provider === status.provider);
+    return {
+      kind: "repair-missing-credentials",
+      provider: status.provider,
+      model: status.model,
+      envVar: choice?.envVar ?? `${status.provider.toUpperCase()}_API_KEY`,
+      choices: ["enter-matching-credential", "switch-provider", "skip"],
+    };
+  }
+  if (status.kind === "invalid-config") {
+    return { kind: "repair-invalid-config", message: status.message };
+  }
+  return { kind: "no-repair-needed" };
+}
+
+/**
+ * Format a provider-specific explanation for missing credentials.
+ */
+export function formatMissingCredentialsMessage(
+  plan: RepairPlan & { kind: "repair-missing-credentials" },
+): string {
+  return [
+    `  ✗ ${plan.provider} is configured (model: ${plan.model}), but ${plan.envVar} is not set.`,
+  ].join("\n");
+}
+
 function printSnapshotApiStatus(): boolean {
   loadSnapshotEnv();
   let status = resolveAiSetupStatus();
@@ -117,12 +167,27 @@ function printSnapshotApiStatus(): boolean {
     "  Libretto uses direct API calls for snapshot analysis when supported credentials are available.",
   );
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
-  printInvalidAiConfigWarning(status);
 
   if (status.kind === "ready") {
     const pinned = ensurePinnedDefaultModel(status);
     printHealthySummary(pinned);
     return true;
+  }
+
+  // Provider-specific missing-credentials message
+  const plan = buildRepairPlan(status);
+  if (plan.kind === "repair-missing-credentials") {
+    console.log(formatMissingCredentialsMessage(plan));
+    console.log(
+      `    To fix: add ${plan.envVar} to .env, or run \`npx libretto setup\` interactively to repair.`,
+    );
+    return false;
+  }
+
+  if (plan.kind === "repair-invalid-config") {
+    printInvalidAiConfigWarning(status);
+    console.log("    Run `npx libretto setup` interactively to reconfigure.");
+    return false;
   }
 
   console.log("  ✗ No snapshot API credentials detected.");
@@ -142,6 +207,105 @@ function printSnapshotApiStatus(): boolean {
   return false;
 }
 
+/**
+ * Write an env var to the .env file and update process.env.
+ */
+function writeEnvVar(envVar: string, value: string, envPath: string): void {
+  let envContent = "";
+  if (existsSync(envPath)) {
+    envContent = readFileSync(envPath, "utf-8");
+  }
+
+  const envLine = `${envVar}=${value}`;
+  if (envContent.includes(`${envVar}=`)) {
+    const updated = envContent.replace(
+      new RegExp(`^${envVar}=.*$`, "m"),
+      () => envLine,
+    );
+    writeFileSync(envPath, updated);
+    console.log(`\n  ✓ Updated ${envVar} in ${envPath}`);
+  } else {
+    const separator = envContent && !envContent.endsWith("\n") ? "\n" : "";
+    appendFileSync(envPath, `${separator}${envLine}\n`);
+    console.log(`\n  ✓ Added ${envVar} to ${envPath}`);
+  }
+
+  process.env[envVar] = value;
+}
+
+/**
+ * Prompt the user to enter a credential for a specific provider and pin its default model.
+ * Returns true if credential was entered successfully.
+ */
+async function promptForCredential(
+  rl: ReturnType<typeof createInterface>,
+  choice: ProviderChoice,
+  envPath: string,
+): Promise<boolean> {
+  console.log(`\n  ${choice.label} selected.`);
+  console.log(`  ${choice.envHint}\n`);
+
+  const apiKeyValue = await promptUser(rl, `  Enter your ${choice.envVar}: `);
+
+  if (!apiKeyValue) {
+    console.log("\n  No value entered. Skipping API key setup.");
+    return false;
+  }
+
+  writeEnvVar(choice.envVar, apiKeyValue, envPath);
+  loadSnapshotEnv();
+
+  const defaultModel = DEFAULT_SNAPSHOT_MODELS[choice.provider];
+  writeAiConfig(defaultModel);
+  console.log(`  ✓ Snapshot API ready: ${defaultModel}`);
+  return true;
+}
+
+/**
+ * Run the full provider selection menu and credential entry.
+ * Returns true if a provider was successfully configured.
+ */
+async function promptProviderSelection(
+  rl: ReturnType<typeof createInterface>,
+  envPath: string,
+): Promise<boolean> {
+  console.log(
+    "  Which API provider would you like to use for snapshot analysis?\n",
+  );
+  for (const choice of PROVIDER_CHOICES) {
+    console.log(`    ${choice.key}) ${choice.label}`);
+  }
+  console.log("    s) Skip for now\n");
+
+  const answer = await promptUser(rl, "  Choice: ");
+
+  if (answer.toLowerCase() === "s" || !answer) {
+    printSkipMessage();
+    return false;
+  }
+
+  const selected = PROVIDER_CHOICES.find((choice) => choice.key === answer);
+  if (!selected) {
+    console.log(`\n  Unknown choice "${answer}". Skipping API setup.`);
+    return false;
+  }
+
+  return promptForCredential(rl, selected, envPath);
+}
+
+function printSkipMessage(): void {
+  console.log(
+    "\n  Skipped. You can set up API credentials later by rerunning `npx libretto setup`.",
+  );
+  console.log("  Or add credentials directly to your .env file:");
+  console.log("    OPENAI_API_KEY=...");
+  console.log("    ANTHROPIC_API_KEY=...");
+  console.log("    GEMINI_API_KEY=...");
+  console.log(
+    "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
+  );
+}
+
 async function runInteractiveApiSetup(): Promise<void> {
   loadSnapshotEnv();
   let status = resolveAiSetupStatus();
@@ -150,7 +314,6 @@ async function runInteractiveApiSetup(): Promise<void> {
   console.log("\nSnapshot analysis setup:");
   console.log("  Libretto uses direct API calls for snapshot analysis.");
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
-  printInvalidAiConfigWarning(status);
 
   if (status.kind === "ready") {
     const pinned = ensurePinnedDefaultModel(status);
@@ -158,7 +321,7 @@ async function runInteractiveApiSetup(): Promise<void> {
     return;
   }
 
-  console.log("  ✗ No snapshot API credentials detected.\n");
+  const plan = buildRepairPlan(status);
 
   const rl = createInterface({
     input: process.stdin,
@@ -166,75 +329,50 @@ async function runInteractiveApiSetup(): Promise<void> {
   });
 
   try {
-    console.log(
-      "  Which API provider would you like to use for snapshot analysis?\n",
-    );
-    for (const choice of PROVIDER_CHOICES) {
-      console.log(`    ${choice.key}) ${choice.label}`);
+    // ── Repair: configured provider with missing credentials ──
+    if (plan.kind === "repair-missing-credentials") {
+      console.log(formatMissingCredentialsMessage(plan));
+      console.log("");
+      console.log("  How would you like to fix this?\n");
+      console.log(`    1) Enter ${plan.envVar}`);
+      console.log("    2) Switch to a different provider");
+      console.log("    s) Skip for now\n");
+
+      const answer = await promptUser(rl, "  Choice: ");
+
+      if (answer === "1") {
+        const matchingChoice = PROVIDER_CHOICES.find(
+          (c) => c.provider === plan.provider,
+        );
+        if (matchingChoice) {
+          await promptForCredential(rl, matchingChoice, envPath);
+        }
+        return;
+      }
+
+      if (answer === "2") {
+        await promptProviderSelection(rl, envPath);
+        return;
+      }
+
+      // skip or empty
+      printSkipMessage();
+      return;
     }
-    console.log("    s) Skip for now\n");
 
-    const answer = await promptUser(rl, "  Choice: ");
-
-    if (answer.toLowerCase() === "s" || !answer) {
+    // ── Repair: invalid config → let user pick a provider ──
+    if (plan.kind === "repair-invalid-config") {
+      printInvalidAiConfigWarning(status);
       console.log(
-        "\n  Skipped. You can set up API credentials later by rerunning `npx libretto setup`.",
+        "\n  Would you like to reconfigure with a fresh provider selection?\n",
       );
-      console.log("  Or add credentials directly to your .env file:");
-      console.log("    OPENAI_API_KEY=...");
-      console.log("    ANTHROPIC_API_KEY=...");
-      console.log("    GEMINI_API_KEY=...");
-      console.log(
-        "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
-      );
+      await promptProviderSelection(rl, envPath);
       return;
     }
 
-    const selected = PROVIDER_CHOICES.find((choice) => choice.key === answer);
-    if (!selected) {
-      console.log(`\n  Unknown choice "${answer}". Skipping API setup.`);
-      return;
-    }
-
-    console.log(`\n  ${selected.label} selected.`);
-    console.log(`  ${selected.envHint}\n`);
-
-    const apiKeyValue = await promptUser(
-      rl,
-      `  Enter your ${selected.envVar}: `,
-    );
-
-    if (!apiKeyValue) {
-      console.log("\n  No value entered. Skipping API key setup.");
-      return;
-    }
-
-    let envContent = "";
-    if (existsSync(envPath)) {
-      envContent = readFileSync(envPath, "utf-8");
-    }
-
-    const envLine = `${selected.envVar}=${apiKeyValue}`;
-    if (envContent.includes(`${selected.envVar}=`)) {
-      const updated = envContent.replace(
-        new RegExp(`^${selected.envVar}=.*$`, "m"),
-        () => envLine,
-      );
-      writeFileSync(envPath, updated);
-      console.log(`\n  ✓ Updated ${selected.envVar} in ${envPath}`);
-    } else {
-      const separator = envContent && !envContent.endsWith("\n") ? "\n" : "";
-      appendFileSync(envPath, `${separator}${envLine}\n`);
-      console.log(`\n  ✓ Added ${selected.envVar} to ${envPath}`);
-    }
-
-    loadSnapshotEnv();
-    process.env[selected.envVar] = apiKeyValue;
-
-    // Pin the selected provider's default model to config
-    const defaultModel = DEFAULT_SNAPSHOT_MODELS[selected.provider];
-    writeAiConfig(defaultModel);
-    console.log(`  ✓ Snapshot API ready: ${defaultModel}`);
+    // ── Unconfigured: standard first-run flow ──
+    console.log("  ✗ No snapshot API credentials detected.\n");
+    await promptProviderSelection(rl, envPath);
   } finally {
     rl.close();
   }

@@ -149,12 +149,12 @@ function buildRepairChoices(status: AiSetupStatus): RepairChoice[] {
 }
 ```
 
-- [ ] When setup sees `configured-missing-credentials`, print a provider-specific explanation and prompt the user to either enter the missing matching credential, switch providers, or skip.
-- [ ] Reuse the existing provider list/default model map for the switch-provider path so switching updates `.env` and `.libretto/config.json` together.
-- [ ] If the AI config is invalid, let setup continue into provider selection and overwrite only the `ai` portion with a valid provider default on success.
-- [ ] Extract the repair-plan decisions into testable helpers instead of trying to cover the full TTY loop only through subprocess tests.
-- [ ] Add focused tests for: pinned OpenAI + missing OpenAI key + Anthropic key present, and invalid config + successful provider reselection.
-- [ ] Success criteria: setup no longer reports a generic missing-credentials message for a pinned provider mismatch; it names the configured provider and the concrete recovery options.
+- [x] When setup sees `configured-missing-credentials`, print a provider-specific explanation and prompt the user to either enter the missing matching credential, switch providers, or skip.
+- [x] Reuse the existing provider list/default model map for the switch-provider path so switching updates `.env` and `.libretto/config.json` together.
+- [x] If the AI config is invalid, let setup continue into provider selection and overwrite only the `ai` portion with a valid provider default on success.
+- [x] Extract the repair-plan decisions into testable helpers instead of trying to cover the full TTY loop only through subprocess tests.
+- [x] Add focused tests for: pinned OpenAI + missing OpenAI key + Anthropic key present, and invalid config + successful provider reselection.
+- [x] Success criteria: setup no longer reports a generic missing-credentials message for a pinned provider mismatch; it names the configured provider and the concrete recovery options.
 
 ### Phase 4: Add a `status` command for AI configuration and open sessions
 
