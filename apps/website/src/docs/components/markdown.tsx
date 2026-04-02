@@ -2309,9 +2309,6 @@ export function EditorialPage({
           <>
             {/* Section-based layout: each section is a subgrid row with
                 content in column 3 and optional aside in column 5 (sticky). */}
-            <div className="contents lg:grid lg:grid-cols-subgrid lg:col-[2/-1]">
-              <div className="slot-main flex flex-col gap-5 lg:col-[1] lg:overflow-visible text-(length:--type-body-size)"></div>
-            </div>
             {sections.map((section, i) => {
               if (section.fullWidth) {
                 return (
