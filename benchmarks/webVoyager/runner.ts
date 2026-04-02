@@ -222,6 +222,13 @@ async function prepareRunWorkspace(
       "Do NOT run `open` \u2014 the session is pre-opened for you.",
       "Start by taking a `snapshot` to see the current page state.",
       "",
+      "### CAPTCHA Handling",
+      "",
+      "If you see a CAPTCHA, reCAPTCHA, Cloudflare challenge, or similar test,",
+      "just wait for it to get solved automatically by the browser. Do NOT try to",
+      'solve it yourself. After a Cloudflare "Ready" message appears, continue',
+      "with your intended actions but do NOT click the Cloudflare checkbox.",
+      "",
     ].join("\n"),
     "utf8",
   );
