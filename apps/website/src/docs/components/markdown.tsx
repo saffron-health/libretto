@@ -100,16 +100,23 @@ function normalizeDocsPathname(pathname: string): string {
   return pathname.replace(/\/+$/, "");
 }
 
-function getHrefPathname(href: string, fallbackPathname: string): string {
-  if (href.startsWith("#")) {
-    return fallbackPathname;
+function resolveHrefUrl(href: string): URL | null {
+  if (typeof window === "undefined") {
+    return null;
   }
 
   try {
-    return normalizeDocsPathname(new URL(href, window.location.origin).pathname);
+    return new URL(href, window.location.href);
   } catch {
-    return fallbackPathname;
+    return null;
   }
+}
+
+function getHrefPathname(href: string, fallbackPathname: string): string {
+  const resolvedUrl = resolveHrefUrl(href);
+  return resolvedUrl
+    ? normalizeDocsPathname(resolvedUrl.pathname)
+    : fallbackPathname;
 }
 
 function isPlainAnchorNavigationClick(
@@ -387,6 +394,32 @@ function useActiveTocId({ fallbackId }: { fallbackId: string }) {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
+function useCurrentHash() {
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    const handleHistoryNavigation = () => {
+      onStoreChange();
+    };
+
+    window.addEventListener("hashchange", handleHistoryNavigation);
+    window.addEventListener("popstate", handleHistoryNavigation);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHistoryNavigation);
+      window.removeEventListener("popstate", handleHistoryNavigation);
+    };
+  }, []);
+
+  const getSnapshot = useCallback(() => {
+    return window.location.hash;
+  }, []);
+
+  const getServerSnapshot = useCallback(() => {
+    return "";
+  }, []);
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
 function TocLink({
   item,
   isActive,
@@ -539,6 +572,7 @@ export function TableOfContents({
   });
   const fallbackId = getTargetIdFromHref(firstNavigableItem?.href ?? "");
   const activeHeadingId = useActiveTocId({ fallbackId });
+  const currentHash = useCurrentHash();
   const [pendingNavigation, setPendingNavigation] =
     useState<PendingNavigation | null>(null);
 
@@ -575,9 +609,14 @@ export function TableOfContents({
       getHrefPathname(item.href, currentPathname) === currentPathname
     );
   });
+  const hashedItemId =
+    preferredItemIdByHref.get(currentHash) ??
+    preferredItemIdByHref.get(`${currentPathname}${currentHash}`) ??
+    null;
   const activeItemId =
     preferredItemIdByHref.get(`#${activeHeadingId}`) ??
     preferredItemIdByHref.get(`${currentPathname}#${activeHeadingId}`) ??
+    hashedItemId ??
     activeGroupItem?.id ??
     firstNavigableItem?.id ??
     items[0]?.id ??
@@ -721,11 +760,13 @@ export function TableOfContents({
 
   const navigateToItem = useCallback(
     (item: FlatTocItem, link?: HTMLAnchorElement | null) => {
-      const itemUrl = new URL(item.href, window.location.origin);
-      const itemPathname = normalizeDocsPathname(itemUrl.pathname);
+      const itemUrl = resolveHrefUrl(item.href);
+      const itemPathname = itemUrl
+        ? normalizeDocsPathname(itemUrl.pathname)
+        : currentPathname;
 
       if (itemPathname !== currentPathname) {
-        if (!isAppOwnedPathname(itemPathname)) {
+        if (!itemUrl || !isAppOwnedPathname(itemPathname)) {
           return false;
         }
 
