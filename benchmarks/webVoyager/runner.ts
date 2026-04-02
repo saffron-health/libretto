@@ -1,5 +1,6 @@
+import { execFileSync } from "node:child_process";
 import { createWriteStream, readFileSync } from "node:fs";
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { finished } from "node:stream/promises";
 import { GoogleAuth } from "google-auth-library";
@@ -20,11 +21,7 @@ import {
   selectWebVoyagerRows,
   type WebVoyagerRow,
 } from "./dataset.js";
-import {
-  buildWebVoyagerPrompt,
-  getRunName,
-  rewriteBenchmarkSkillCommands,
-} from "./prompt.js";
+import { buildWebVoyagerPrompt, getRunName } from "./prompt.js";
 import { ScreenshotCollector } from "./screenshot-collector.js";
 import { evaluateWithScreenshots, type JudgeResult } from "./evaluator.js";
 
@@ -45,6 +42,36 @@ export type WebVoyagerCaseResult = {
   error: string | null;
 };
 
+type TranscriptUsageEntry = {
+  timestamp: string | null;
+  model: string | null;
+  provider: string | null;
+  responseId: string | null;
+  stopReason: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalTokens: number;
+  requestContextTokens: number;
+  costUsd: number | null;
+};
+
+type TranscriptUsageSummary = {
+  assistantTurnCount: number;
+  turnsWithUsage: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCacheReadTokens: number;
+  totalCacheWriteTokens: number;
+  totalTokens: number;
+  maxInputTokens: number;
+  maxRequestContextTokens: number;
+  maxOutputTokens: number;
+  totalCostUsd: number | null;
+  turns: TranscriptUsageEntry[];
+};
+
 // ---------------------------------------------------------------------------
 // Constants & env tunables
 // ---------------------------------------------------------------------------
@@ -54,15 +81,12 @@ const BENCHMARK_MODEL_PROVIDER = "anthropic";
 const BENCHMARK_MODEL_ID = "claude-opus-4-6";
 const DEFAULT_GCP_PROJECT = "saffron-health";
 const DEFAULT_ANTHROPIC_SECRET_NAME = "anthropic-api-key";
+const BENCHMARK_SNAPSHOT_MODEL = "vertex/gemini-2.5-flash";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 const librettoPackageRoot = resolve(repoRoot, "packages", "libretto");
-const librettoSkillSourcePath = resolve(
-  librettoPackageRoot,
-  "skills",
-  "libretto",
-);
-const distSourcePath = resolve(librettoPackageRoot, "dist");
+const librettoPackageManifest = readLibrettoPackageManifest();
+const rootPackageManager = readRootPackageManager();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -93,6 +117,374 @@ function extractAssistantText(message: unknown): string {
     .filter(Boolean)
     .join("\n\n")
     .trim();
+}
+
+function readLibrettoPackageManifest(): {
+  peerDependencies?: Record<string, string>;
+} {
+  try {
+    const packageJsonPath = resolve(librettoPackageRoot, "package.json");
+    return JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+      peerDependencies?: Record<string, string>;
+    };
+  } catch {
+    return {};
+  }
+}
+
+function readRootPackageManager(): string {
+  try {
+    const packageJsonPath = resolve(repoRoot, "package.json");
+    const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+      packageManager?: unknown;
+    };
+    return typeof parsed.packageManager === "string"
+      ? parsed.packageManager
+      : "pnpm@9.15.4";
+  } catch {
+    return "pnpm@9.15.4";
+  }
+}
+
+function resolveSnapshotModelForBenchmarkWorkspace(): string {
+  return BENCHMARK_SNAPSHOT_MODEL;
+}
+
+function resolveBenchmarkWorkspaceProjectId(): string | null {
+  return (
+    process.env.GOOGLE_CLOUD_PROJECT?.trim() ||
+    process.env.GCLOUD_PROJECT?.trim() ||
+    process.env.LIBRETTO_BENCHMARK_GCP_PROJECT?.trim() ||
+    null
+  );
+}
+
+async function writeBenchmarkWorkspaceEnvFile(runDir: string): Promise<void> {
+  const projectId = resolveBenchmarkWorkspaceProjectId();
+  if (!projectId) {
+    return;
+  }
+
+  await writeFile(
+    join(runDir, ".env"),
+    [
+      "# Benchmark workspace runtime configuration",
+      `GOOGLE_CLOUD_PROJECT=${projectId}`,
+      `GCLOUD_PROJECT=${projectId}`,
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}
+
+function resolveProviderPackageForModel(model: string): string | null {
+  const provider = model.split("/", 1)[0]?.toLowerCase();
+  if (!provider) {
+    return null;
+  }
+
+  switch (provider) {
+    case "anthropic":
+      return "@ai-sdk/anthropic";
+    case "google":
+    case "gemini":
+      return "@ai-sdk/google";
+    case "vertex":
+      return "@ai-sdk/google-vertex";
+    case "openai":
+    case "codex":
+      return "@ai-sdk/openai";
+    default:
+      return null;
+  }
+}
+
+function resolveProviderInstallSpec(model: string): string | null {
+  const packageName = resolveProviderPackageForModel(model);
+  if (!packageName) {
+    return null;
+  }
+
+  const version = librettoPackageManifest.peerDependencies?.[packageName];
+  return version ? `${packageName}@${version}` : packageName;
+}
+
+function runWorkspaceCommand(
+  runDir: string,
+  command: string,
+  args: string[],
+): void {
+  try {
+    execFileSync(command, args, {
+      cwd: runDir,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+    });
+  } catch (error) {
+    const details =
+      typeof error === "object" && error !== null
+        ? (error as { stdout?: string | Buffer; stderr?: string | Buffer })
+        : {};
+    const stdout =
+      typeof details.stdout === "string"
+        ? details.stdout.trim()
+        : Buffer.isBuffer(details.stdout)
+          ? details.stdout.toString("utf8").trim()
+          : "";
+    const stderr =
+      typeof details.stderr === "string"
+        ? details.stderr.trim()
+        : Buffer.isBuffer(details.stderr)
+          ? details.stderr.toString("utf8").trim()
+          : "";
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      [
+        `Failed to run ${command} ${args.join(" ")} in ${runDir}.`,
+        message,
+        stdout ? `stdout:\n${stdout}` : null,
+        stderr ? `stderr:\n${stderr}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
+  }
+}
+
+function toTokenCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function toOptionalNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatTranscriptTimestamp(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value).toISOString();
+  }
+
+  return null;
+}
+
+function collectTranscriptUsageEntry(event: AgentSessionEvent): TranscriptUsageEntry | null {
+  if (event.type !== "message_end") {
+    return null;
+  }
+
+  const typedEvent = event as AgentSessionEvent & {
+    message?: {
+      role?: string;
+      timestamp?: string | number;
+      usage?: {
+        input?: number;
+        output?: number;
+        cacheRead?: number;
+        cacheWrite?: number;
+        totalTokens?: number;
+        cost?: { total?: number };
+      };
+      model?: string;
+      provider?: string;
+      responseId?: string;
+      stopReason?: string;
+      timestamp?: string | number;
+    };
+    usage?: {
+      input?: number;
+      output?: number;
+      cacheRead?: number;
+      cacheWrite?: number;
+      totalTokens?: number;
+      cost?: { total?: number };
+    };
+    model?: string;
+    provider?: string;
+    responseId?: string;
+    stopReason?: string;
+    timestamp?: string | number;
+  };
+
+  if (typedEvent.message?.role !== "assistant") {
+    return null;
+  }
+
+  const usage = typedEvent.usage ?? typedEvent.message?.usage;
+  const inputTokens = toTokenCount(usage?.input);
+  const outputTokens = toTokenCount(usage?.output);
+  const cacheReadTokens = toTokenCount(usage?.cacheRead);
+  const cacheWriteTokens = toTokenCount(usage?.cacheWrite);
+  const totalTokens = toTokenCount(usage?.totalTokens);
+
+  return {
+    timestamp: formatTranscriptTimestamp(
+      typedEvent.timestamp ?? typedEvent.message?.timestamp,
+    ),
+    model:
+      typeof (typedEvent.model ?? typedEvent.message?.model) === "string"
+        ? (typedEvent.model ?? typedEvent.message?.model)
+        : null,
+    provider:
+      typeof (typedEvent.provider ?? typedEvent.message?.provider) === "string"
+        ? (typedEvent.provider ?? typedEvent.message?.provider)
+        : null,
+    responseId:
+      typeof (typedEvent.responseId ?? typedEvent.message?.responseId) ===
+      "string"
+        ? (typedEvent.responseId ?? typedEvent.message?.responseId)
+        : null,
+    stopReason:
+      typeof (typedEvent.stopReason ?? typedEvent.message?.stopReason) ===
+      "string"
+        ? (typedEvent.stopReason ?? typedEvent.message?.stopReason)
+        : null,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    totalTokens,
+    requestContextTokens: inputTokens + cacheReadTokens,
+    costUsd: toOptionalNumber(usage?.cost?.total),
+  };
+}
+
+function summarizeTranscriptUsage(
+  turns: TranscriptUsageEntry[],
+): TranscriptUsageSummary {
+  const totals = turns.reduce(
+    (acc, turn) => {
+      acc.totalInputTokens += turn.inputTokens;
+      acc.totalOutputTokens += turn.outputTokens;
+      acc.totalCacheReadTokens += turn.cacheReadTokens;
+      acc.totalCacheWriteTokens += turn.cacheWriteTokens;
+      acc.totalTokens += turn.totalTokens;
+      acc.maxInputTokens = Math.max(acc.maxInputTokens, turn.inputTokens);
+      acc.maxRequestContextTokens = Math.max(
+        acc.maxRequestContextTokens,
+        turn.requestContextTokens,
+      );
+      acc.maxOutputTokens = Math.max(acc.maxOutputTokens, turn.outputTokens);
+
+      if (turn.costUsd != null) {
+        acc.totalCostUsd = (acc.totalCostUsd ?? 0) + turn.costUsd;
+      }
+
+      return acc;
+    },
+    {
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalCacheReadTokens: 0,
+      totalCacheWriteTokens: 0,
+      totalTokens: 0,
+      maxInputTokens: 0,
+      maxRequestContextTokens: 0,
+      maxOutputTokens: 0,
+      totalCostUsd: null as number | null,
+    },
+  );
+
+  return {
+    assistantTurnCount: turns.length,
+    turnsWithUsage: turns.filter(
+      (turn) =>
+        turn.inputTokens > 0 ||
+        turn.outputTokens > 0 ||
+        turn.cacheReadTokens > 0 ||
+        turn.cacheWriteTokens > 0 ||
+        turn.totalTokens > 0,
+    ).length,
+    totalInputTokens: totals.totalInputTokens,
+    totalOutputTokens: totals.totalOutputTokens,
+    totalCacheReadTokens: totals.totalCacheReadTokens,
+    totalCacheWriteTokens: totals.totalCacheWriteTokens,
+    totalTokens: totals.totalTokens,
+    maxInputTokens: totals.maxInputTokens,
+    maxRequestContextTokens: totals.maxRequestContextTokens,
+    maxOutputTokens: totals.maxOutputTokens,
+    totalCostUsd: totals.totalCostUsd,
+    turns,
+  };
+}
+
+function formatUsd(value: number | null): string {
+  return value == null ? "-" : `$${value.toFixed(4)}`;
+}
+
+async function writeTranscriptAnalysis(
+  runDir: string,
+  summary: TranscriptUsageSummary,
+): Promise<string> {
+  const analysisPath = join(runDir, "transcript-analysis.md");
+  const lines = [
+    "# Transcript Analysis",
+    "",
+    "## Context / token usage summary",
+    "",
+    `- Assistant turns: ${summary.assistantTurnCount}`,
+    `- Turns with usage metadata: ${summary.turnsWithUsage}`,
+    `- Total input tokens: ${summary.totalInputTokens}`,
+    `- Total output tokens: ${summary.totalOutputTokens}`,
+    `- Total cache read tokens: ${summary.totalCacheReadTokens}`,
+    `- Total cache write tokens: ${summary.totalCacheWriteTokens}`,
+    `- Total billed tokens: ${summary.totalTokens}`,
+    `- Max input tokens in a single turn: ${summary.maxInputTokens}`,
+    `- Max request context tokens (input + cache read): ${summary.maxRequestContextTokens}`,
+    `- Max output tokens in a single turn: ${summary.maxOutputTokens}`,
+    `- Total model cost: ${formatUsd(summary.totalCostUsd)}`,
+    "",
+    "## Per-turn context usage",
+    "",
+  ];
+
+  if (summary.turns.length === 0) {
+    lines.push("No assistant turns were recorded in the transcript.");
+  } else {
+    lines.push(
+      "| # | Timestamp | Provider / Model | Stop reason | Input | Cache read | Cache write | Output | Total | Context | Cost |",
+      "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|",
+    );
+
+    summary.turns.forEach((turn, index) => {
+      lines.push(
+        `| ${index + 1} | ${turn.timestamp ?? "-"} | ${turn.provider ?? "-"} / ${turn.model ?? "-"} | ${turn.stopReason ?? "-"} | ${turn.inputTokens} | ${turn.cacheReadTokens} | ${turn.cacheWriteTokens} | ${turn.outputTokens} | ${turn.totalTokens} | ${turn.requestContextTokens} | ${formatUsd(turn.costUsd)} |`,
+      );
+    });
+  }
+
+  await writeFile(analysisPath, `${lines.join("\n")}\n`, "utf8");
+  return analysisPath;
+}
+
+function readTranscriptUsageSummary(
+  transcriptPath: string,
+): TranscriptUsageSummary {
+  const raw = readFileSync(transcriptPath, "utf8");
+  const turns: TranscriptUsageEntry[] = [];
+
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed) as AgentSessionEvent;
+      const usageEntry = collectTranscriptUsageEntry(parsed);
+      if (usageEntry) {
+        turns.push(usageEntry);
+      }
+    } catch {
+      // Ignore malformed lines in analysis output; the raw transcript remains the source of truth.
+    }
+  }
+
+  return summarizeTranscriptUsage(turns);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,27 +521,40 @@ async function accessSecretVersion(args: {
   return decoded;
 }
 
-async function ensureAnthropicApiKey(): Promise<string> {
-  const existing = process.env.ANTHROPIC_API_KEY?.trim();
-  if (existing) {
-    return existing;
+async function ensureBenchmarkProjectEnv(): Promise<string> {
+  const existingProjectId =
+    process.env.GOOGLE_CLOUD_PROJECT?.trim() ||
+    process.env.GCLOUD_PROJECT?.trim() ||
+    process.env.LIBRETTO_BENCHMARK_GCP_PROJECT?.trim();
+  if (existingProjectId) {
+    process.env.GOOGLE_CLOUD_PROJECT ??= existingProjectId;
+    process.env.GCLOUD_PROJECT ??= existingProjectId;
+    return existingProjectId;
   }
 
   const auth = new GoogleAuth({
     scopes: ["https://www.googleapis.com/auth/cloud-platform"],
   });
-  const projectId =
-    process.env.LIBRETTO_BENCHMARK_GCP_PROJECT?.trim() ||
-    (await auth.getProjectId()) ||
-    DEFAULT_GCP_PROJECT;
+  const projectId = (await auth.getProjectId()) || DEFAULT_GCP_PROJECT;
+
+  process.env.GOOGLE_CLOUD_PROJECT ??= projectId;
+  process.env.GCLOUD_PROJECT ??= projectId;
+  return projectId;
+}
+
+async function ensureAnthropicApiKey(): Promise<string> {
+  const projectId = await ensureBenchmarkProjectEnv();
+  const existing = process.env.ANTHROPIC_API_KEY?.trim();
+  if (existing) {
+    return existing;
+  }
+
   const secretName =
     process.env.LIBRETTO_BENCHMARK_ANTHROPIC_SECRET_NAME?.trim() ||
     DEFAULT_ANTHROPIC_SECRET_NAME;
   const apiKey = await accessSecretVersion({ projectId, secretName });
 
   process.env.ANTHROPIC_API_KEY = apiKey;
-  process.env.GOOGLE_CLOUD_PROJECT ??= projectId;
-  process.env.GCLOUD_PROJECT ??= projectId;
   return apiKey;
 }
 
@@ -167,20 +572,13 @@ async function prepareRunWorkspace(
     "runs",
     getRunName(row),
   );
-  const skillDestination = join(runDir, ".agents", "skills", "libretto");
   const { text: prompt, sessionName } = buildWebVoyagerPrompt(row);
+  const snapshotModel = resolveSnapshotModelForBenchmarkWorkspace();
+  const snapshotProviderInstallSpec = resolveProviderInstallSpec(snapshotModel);
 
   await rm(runDir, { recursive: true, force: true });
   await mkdir(runDir, { recursive: true });
-  await cp(distSourcePath, join(runDir, "dist"), { recursive: true });
-  await cp(librettoSkillSourcePath, skillDestination, { recursive: true });
-  await writeFile(
-    join(skillDestination, "SKILL.md"),
-    rewriteBenchmarkSkillCommands(
-      readFileSync(join(skillDestination, "SKILL.md"), "utf8"),
-    ),
-    "utf8",
-  );
+  await mkdir(join(runDir, ".agents"), { recursive: true });
 
   await writeFile(
     join(runDir, "package.json"),
@@ -189,24 +587,21 @@ async function prepareRunWorkspace(
         name: `libretto-benchmark-${getRunName(row)}`,
         private: true,
         type: "module",
-        scripts: {
-          cli: "LIBRETTO_REPO_ROOT=. node ./dist/cli/index.js",
-        },
+        packageManager: rootPackageManager,
       },
       null,
       2,
     ),
     "utf8",
   );
-
-  await mkdir(join(runDir, "node_modules"), { recursive: true });
   await writeFile(
     join(runDir, "AGENTS.md"),
     [
       "# Benchmark Workspace Rules",
       "",
       "- Use the libretto skill in this workspace.",
-      "- Use the local CLI via `pnpm -s cli ...`.",
+      "- Use the local CLI via `npx libretto ...`.",
+      `- Libretto snapshot analysis is preconfigured to \`${snapshotModel}\`; do not run \`libretto ai configure\` to change it.`,
       "- Do not inspect sibling benchmark files or parent benchmark directories to discover the answer.",
       "- End with a direct final answer to the task.",
       "",
@@ -214,6 +609,26 @@ async function prepareRunWorkspace(
     "utf8",
   );
   await writeFile(join(runDir, "prompt.md"), `${prompt}\n`, "utf8");
+  await writeBenchmarkWorkspaceEnvFile(runDir);
+
+  runWorkspaceCommand(runDir, "git", ["init", "-q"]);
+  runWorkspaceCommand(runDir, "pnpm", [
+    "add",
+    "--lockfile=false",
+    `file:${librettoPackageRoot}`,
+    ...(snapshotProviderInstallSpec ? [snapshotProviderInstallSpec] : []),
+  ]);
+  runWorkspaceCommand(runDir, "npx", [
+    "libretto",
+    "setup",
+    "--skip-browsers",
+  ]);
+  runWorkspaceCommand(runDir, "npx", [
+    "libretto",
+    "ai",
+    "configure",
+    snapshotModel,
+  ]);
 
   return { runDir, prompt, sessionName };
 }
@@ -280,8 +695,8 @@ export async function runWebVoyagerCase(
   row: WebVoyagerRow,
 ): Promise<WebVoyagerCaseResult> {
   const startedAt = new Date();
-  const { runDir, prompt, sessionName } = await prepareRunWorkspace(row);
   const anthropicApiKey = await ensureAnthropicApiKey();
+  const { runDir, prompt, sessionName } = await prepareRunWorkspace(row);
   const agentDir = join(runDir, ".pi");
   const authStorage = AuthStorage.create(join(agentDir, "auth.json"));
   authStorage.setRuntimeApiKey("anthropic", anthropicApiKey);
@@ -407,6 +822,10 @@ export async function runWebVoyagerCase(
     row.ques,
     finalMessage,
   );
+  const transcriptAnalysisPath = await writeTranscriptAnalysis(
+    runDir,
+    readTranscriptUsageSummary(transcriptPath),
+  );
 
   const finishedAt = new Date();
   const durationMs = finishedAt.getTime() - startedAt.getTime();
@@ -443,6 +862,7 @@ export async function runWebVoyagerCase(
         url: row.web,
         screenshotPaths,
         analysisPath,
+        transcriptAnalysisPath,
       },
       null,
       2,

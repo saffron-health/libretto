@@ -20,10 +20,6 @@ export function getRunName(row: WebVoyagerRow): string {
   return slugify(`${siteSlug}-${row.id}`);
 }
 
-export function rewriteBenchmarkSkillCommands(markdown: string): string {
-  return markdown.replaceAll("npx libretto", "pnpm -s cli");
-}
-
 export type WebVoyagerPrompt = {
   text: string;
   sessionName: string;
