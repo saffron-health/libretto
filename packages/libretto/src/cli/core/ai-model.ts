@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { type AiConfig, readAiConfig } from "./ai-config.js";
+import { type AiConfig, readAiConfig } from "./config.js";
 import { LIBRETTO_CONFIG_PATH, REPO_ROOT } from "./context.js";
 import {
   hasProviderCredentials,
@@ -8,22 +8,49 @@ import {
   type Provider,
 } from "../../shared/llm/client.js";
 
-const DEFAULT_SNAPSHOT_MODELS = {
+// ── Default models ──────────────────────────────────────────────────────────
+
+export const DEFAULT_SNAPSHOT_MODELS = {
   openai: "openai/gpt-5.4",
   anthropic: "anthropic/claude-sonnet-4-6",
   google: "google/gemini-3-flash-preview",
   vertex: "vertex/gemini-2.5-pro",
 } as const satisfies Record<Provider, string>;
 
+// ── Source detection ────────────────────────────────────────────────────────
+
+/**
+ * Detect which specific env var provides credentials for a provider.
+ * Returns the env var name (e.g. "OPENAI_API_KEY", "GEMINI_API_KEY"),
+ * or null if no credential is found.
+ */
+function detectProviderEnvVar(
+  provider: Provider,
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  switch (provider) {
+    case "openai":
+      return env.OPENAI_API_KEY?.trim() ? "OPENAI_API_KEY" : null;
+    case "anthropic":
+      return env.ANTHROPIC_API_KEY?.trim() ? "ANTHROPIC_API_KEY" : null;
+    case "google":
+      if (env.GEMINI_API_KEY?.trim()) return "GEMINI_API_KEY";
+      if (env.GOOGLE_GENERATIVE_AI_API_KEY?.trim())
+        return "GOOGLE_GENERATIVE_AI_API_KEY";
+      return null;
+    case "vertex":
+      if (env.GOOGLE_CLOUD_PROJECT?.trim()) return "GOOGLE_CLOUD_PROJECT";
+      if (env.GCLOUD_PROJECT?.trim()) return "GCLOUD_PROJECT";
+      return null;
+  }
+}
+
+// ── Snapshot model resolution ───────────────────────────────────────────────
+
 export type SnapshotApiModelSelection = {
   model: string;
   provider: Provider;
-  source:
-    | "config"
-    | "env:auto-openai"
-    | "env:auto-anthropic"
-    | "env:auto-google"
-    | "env:auto-vertex";
+  source: "config" | `env:${string}`;
 };
 
 export class SnapshotApiUnavailableError extends Error {
@@ -84,6 +111,8 @@ function missingProviderSnapshotMessage(
     "For more info, run `npx libretto setup`.",
   ].join(" ");
 }
+
+// ── Dotenv loading ──────────────────────────────────────────────────────────
 
 function readWorktreeEnvPath(): string | null {
   const gitPath = join(REPO_ROOT, ".git");
@@ -165,6 +194,8 @@ export function parseDotEnvAssignment(
   return { key, value };
 }
 
+// ── Model resolution ────────────────────────────────────────────────────────
+
 function inferAutoSnapshotModel(): SnapshotApiModelSelection | null {
   const providersInPriorityOrder: Provider[] = [
     "openai",
@@ -174,11 +205,12 @@ function inferAutoSnapshotModel(): SnapshotApiModelSelection | null {
   ];
 
   for (const provider of providersInPriorityOrder) {
-    if (!hasProviderCredentials(provider)) continue;
+    const envVar = detectProviderEnvVar(provider);
+    if (!envVar) continue;
     return {
       model: DEFAULT_SNAPSHOT_MODELS[provider],
       provider,
-      source: `env:auto-${provider}` as SnapshotApiModelSelection["source"],
+      source: `env:${envVar}`,
     };
   }
 
@@ -228,4 +260,104 @@ export function resolveSnapshotApiModelOrThrow(
 
 export function isSnapshotApiUnavailableError(error: unknown): boolean {
   return error instanceof SnapshotApiUnavailableError;
+}
+
+// ── AI setup status ─────────────────────────────────────────────────────────
+
+/**
+ * Workspace AI setup health states.
+ *
+ * - `ready`: a usable model was resolved and the matching provider has credentials.
+ * - `configured-missing-credentials`: config pins a provider whose credentials are absent.
+ * - `invalid-config`: `.libretto/config.json` exists but fails schema validation.
+ * - `unconfigured`: no config and no env credentials detected.
+ */
+export type AiSetupStatus =
+  | {
+      kind: "ready";
+      model: string;
+      provider: Provider;
+      source: "config" | `env:${string}`;
+    }
+  | {
+      kind: "configured-missing-credentials";
+      model: string;
+      provider: Provider;
+    }
+  | { kind: "invalid-config"; message: string }
+  | { kind: "unconfigured" };
+
+/**
+ * Read AI config without throwing on invalid files.
+ * Returns the config or an error message.
+ */
+function readAiConfigSafely(
+  configPath: string,
+): { ok: true; config: AiConfig | null } | { ok: false; message: string } {
+  try {
+    return { ok: true, config: readAiConfig(configPath) };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
+ * Resolve the workspace's current AI setup health.
+ *
+ * Uses the existing config reader and snapshot model resolver, but wraps
+ * them to distinguish broken states (invalid config, missing credentials)
+ * that the throwing APIs collapse into errors.
+ *
+ * 1. If config read throws → `invalid-config`.
+ * 2. If config has an `ai` block → check credentials for that provider.
+ * 3. If no config or no `ai` block → auto-detect from env via existing resolver.
+ */
+export function resolveAiSetupStatus(
+  configPath: string = LIBRETTO_CONFIG_PATH,
+): AiSetupStatus {
+  loadSnapshotEnv();
+
+  const configResult = readAiConfigSafely(configPath);
+
+  if (!configResult.ok) {
+    return { kind: "invalid-config", message: configResult.message };
+  }
+
+  // Config exists with an ai block — use it directly to check credentials
+  if (configResult.config) {
+    const selection = resolveSnapshotApiModel(configResult.config);
+    if (!selection) {
+      // Should not happen when config has a model, but handle gracefully
+      return { kind: "unconfigured" };
+    }
+    if (hasProviderCredentials(selection.provider)) {
+      return {
+        kind: "ready",
+        model: selection.model,
+        provider: selection.provider,
+        source: selection.source,
+      };
+    }
+    return {
+      kind: "configured-missing-credentials",
+      model: selection.model,
+      provider: selection.provider,
+    };
+  }
+
+  // No ai config — fall back to env auto-detect via existing resolver
+  const envSelection = resolveSnapshotApiModel(null);
+  if (envSelection && hasProviderCredentials(envSelection.provider)) {
+    return {
+      kind: "ready",
+      model: envSelection.model,
+      provider: envSelection.provider,
+      source: envSelection.source,
+    };
+  }
+
+  return { kind: "unconfigured" };
 }

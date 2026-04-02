@@ -11,12 +11,12 @@ import {
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readAiConfig } from "../core/ai-config.js";
+import { readAiConfig } from "../core/config.js";
 import { ensureLibrettoSetup, REPO_ROOT } from "../core/context.js";
 import {
   loadSnapshotEnv,
   resolveSnapshotApiModel,
-} from "../core/snapshot-api-config.js";
+} from "../core/ai-model.js";
 import { hasProviderCredentials } from "../../shared/llm/client.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 

@@ -35,7 +35,7 @@ Add a small `npx libretto status` command that reports AI configuration health a
 ## Important files/docs/websites for implementation
 
 - `packages/libretto/src/cli/commands/setup.ts` — current setup flow for browser install, skill sync, interactive credential prompts, and status-only output.
-- `packages/libretto/src/cli/core/ai-config.ts` — shared config schema and the existing `ai configure` read/write/show/clear behavior that setup should reuse.
+- `packages/libretto/src/cli/core/ai-config.ts` (renamed to `config.ts` in Phase 1.5) — shared config schema and the existing `ai configure` read/write/show/clear behavior that setup should reuse.
 - `packages/libretto/src/cli/core/snapshot-api-config.ts` — env loading, config-first model resolution, provider priority, and user-facing snapshot setup error messages.
 - `packages/libretto/src/shared/llm/client.ts` — provider parsing and credential detection rules that determine whether setup/status should consider a provider ready.
 - `packages/libretto/src/cli/core/context.ts` — `.libretto/config.json`, `.libretto/sessions`, and other workspace path constants used by setup and status.
@@ -95,19 +95,17 @@ The current layout has overlapping concerns:
 
 Consolidate into:
 
-| New file         | Responsibility                                                                                                                                                   |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ai-config.ts`   | Config schema, read/write/clear. Pure file I/O. Remove `runAiConfigure`.                                                                                         |
-| `ai-env.ts`      | `.env` loading, dotenv parser, worktree env resolution. No model logic.                                                                                          |
-| `ai-model.ts`    | Model resolution (config-first then env), single default model map, `AiSetupStatus` health resolver, snapshot error messages + `resolveSnapshotApiModelOrThrow`. |
-| `commands/ai.ts` | Move `runAiConfigure` here alongside the command definition.                                                                                                     |
+| New file           | Responsibility                                                                                                                                                                                                        |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/config.ts`   | Config schema, read/write/clear. Pure file I/O. Rename from `ai-config.ts` (it already owns viewport/windowPosition, so `config.ts` is more accurate). Remove `runAiConfigure`.                                       |
+| `core/ai-model.ts` | Env loading, dotenv parser, worktree env resolution, model resolution (config-first then env), single default model map, `AiSetupStatus` health resolver, snapshot error messages + `resolveSnapshotApiModelOrThrow`. |
+| `commands/ai.ts`   | Move `runAiConfigure` here alongside the command definition.                                                                                                                                                          |
 
-This eliminates `snapshot-api-config.ts` and `ai-setup-status.ts` as separate files.
+This eliminates `snapshot-api-config.ts` and `ai-setup-status.ts` as separate files, and renames `ai-config.ts` → `config.ts`.
 
-- [ ] Create `ai-env.ts` with `loadSnapshotEnv`, `parseDotEnvAssignment`, and worktree env helpers extracted from `snapshot-api-config.ts`.
-- [ ] Create `ai-model.ts` with model resolution, default model map, `AiSetupStatus`, `resolveAiSetupStatus`, `resolveSnapshotApiModel`, `resolveSnapshotApiModelOrThrow`, and snapshot error messages.
-- [ ] Move `runAiConfigure` from `ai-config.ts` into `commands/ai.ts`.
-- [ ] Keep `ai-config.ts` as config schema + read/write/clear only.
+- [ ] Rename `ai-config.ts` → `config.ts`. Keep config schema + read/write/clear only, remove `runAiConfigure` and its helpers (`resolveModelFromInput`, `DEFAULT_MODELS`, `PROVIDER_ALIASES`, `CONFIGURE_PROVIDERS`).
+- [ ] Create `ai-model.ts` with env loading (`loadSnapshotEnv`, `parseDotEnvAssignment`, worktree env helpers), model resolution, default model map, `AiSetupStatus`, `resolveAiSetupStatus`, `resolveSnapshotApiModel`, `resolveSnapshotApiModelOrThrow`, and snapshot error messages.
+- [ ] Move `runAiConfigure` and its helpers from `ai-config.ts` into `commands/ai.ts`.
 - [ ] Delete `snapshot-api-config.ts` and `ai-setup-status.ts`.
 - [ ] Update all imports across `commands/setup.ts`, `commands/snapshot.ts`, `commands/ai.ts`, `core/api-snapshot-analyzer.ts`, `core/browser.ts`, `shared/run/browser.ts`, and any other importers.
 - [ ] Update test imports in `test/snapshot-api-config.spec.ts` and `test/ai-setup-status.spec.ts`.

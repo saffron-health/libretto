@@ -25,7 +25,7 @@ import {
   getSessionNetworkLogPath,
   PROFILES_DIR,
 } from "./context.js";
-import { readLibrettoConfig } from "./ai-config.js";
+import { readLibrettoConfig } from "./config.js";
 import {
   assertSessionAvailableForStart,
   clearSessionState,

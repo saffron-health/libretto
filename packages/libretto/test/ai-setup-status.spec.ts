@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveAiSetupStatus } from "../src/cli/core/ai-setup-status.js";
+import { resolveAiSetupStatus } from "../src/cli/core/ai-model.js";
 
 function clearProviderEnv(): void {
   vi.stubEnv("OPENAI_API_KEY", "");
@@ -48,7 +48,7 @@ describe("resolveAiSetupStatus", () => {
         kind: "ready",
         model: "openai/gpt-5.4",
         provider: "openai",
-        source: "env:auto-openai",
+        source: "env:OPENAI_API_KEY",
       });
     });
 
@@ -58,7 +58,7 @@ describe("resolveAiSetupStatus", () => {
         kind: "ready",
         model: "anthropic/claude-sonnet-4-6",
         provider: "anthropic",
-        source: "env:auto-anthropic",
+        source: "env:ANTHROPIC_API_KEY",
       });
     });
 
@@ -68,7 +68,7 @@ describe("resolveAiSetupStatus", () => {
         kind: "ready",
         model: "google/gemini-3-flash-preview",
         provider: "google",
-        source: "env:auto-google",
+        source: "env:GEMINI_API_KEY",
       });
     });
 
@@ -79,7 +79,7 @@ describe("resolveAiSetupStatus", () => {
         kind: "ready",
         model: "openai/gpt-5.4",
         provider: "openai",
-        source: "env:auto-openai",
+        source: "env:OPENAI_API_KEY",
       });
     });
   });
