@@ -328,7 +328,15 @@ export function resolveAiSetupStatus(
 
   // Config exists with an ai block — use it directly to check credentials
   if (configResult.config) {
-    const selection = resolveSnapshotApiModel(configResult.config);
+    let selection: SnapshotApiModelSelection | null;
+    try {
+      selection = resolveSnapshotApiModel(configResult.config);
+    } catch (err) {
+      return {
+        kind: "invalid-config",
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
     if (!selection) {
       // Should not happen when config has a model, but handle gracefully
       return { kind: "unconfigured" };

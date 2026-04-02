@@ -179,6 +179,16 @@ describe("resolveAiSetupStatus", () => {
       vi.stubEnv("OPENAI_API_KEY", "test-key");
       expect(resolveAiSetupStatus(configPath).kind).toBe("invalid-config");
     });
+
+    it("reports invalid-config for malformed model string without slash", () => {
+      writeConfig({
+        version: 1,
+        ai: { model: "openai", updatedAt: "2026-01-01T00:00:00.000Z" },
+      });
+      vi.stubEnv("OPENAI_API_KEY", "test-key");
+      const status = resolveAiSetupStatus(configPath);
+      expect(status.kind).toBe("invalid-config");
+    });
   });
 
   describe("fully unconfigured", () => {
