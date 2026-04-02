@@ -24,6 +24,7 @@ const RunManifestSchema = z.object({
   executionName: z.string(),
   totalCases: z.number(),
   model: z.string(),
+  browserBackend: z.string().optional(),
   startedAt: z.string(),
   selection: z.object({
     mode: z.enum(["slice", "random"]),
@@ -49,6 +50,7 @@ const CaseResultSchema = z.object({
   judge: JudgeResultSchema,
   screenshotCount: z.number(),
   error: z.nullable(z.string()),
+  browserBackend: z.string().optional(),
   task: z.string().optional(),
   url: z.string().optional(),
 });
@@ -236,7 +238,11 @@ export async function downloadResults(
         result: CaseResultSchema.parse(JSON.parse(contents.toString("utf8"))),
       });
     } catch (err) {
-      console.warn("Warning: failed to read result file %s: %s", file.name, err);
+      console.warn(
+        "Warning: failed to read result file %s: %s",
+        file.name,
+        err,
+      );
     }
   });
 

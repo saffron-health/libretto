@@ -74,7 +74,10 @@ function formatTimestamp(value: string): string {
     return value;
   }
 
-  return date.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "Z");
+  return date
+    .toISOString()
+    .replace("T", " ")
+    .replace(/\.\d{3}Z$/, "Z");
 }
 
 function formatDuration(durationMs: number | null | undefined): string {
@@ -105,9 +108,7 @@ function formatError(error: string | null | undefined): string {
   }
 
   const singleLine = error.replace(/\s+/g, " ").trim();
-  return singleLine.length <= 60
-    ? singleLine
-    : `${singleLine.slice(0, 57)}...`;
+  return singleLine.length <= 60 ? singleLine : `${singleLine.slice(0, 57)}...`;
 }
 
 function toCount(value: unknown): number {
@@ -361,12 +362,8 @@ async function handleStatus(args: {
       : "Cloud Run progress unavailable (execution metadata missing).",
     executionProgress ? "Cloud Run:" : null,
     executionProgress ? `  status: ${executionProgress.status}` : null,
-    executionProgress
-      ? `  running: ${executionProgress.runningCount}`
-      : null,
-    executionProgress
-      ? `  pending: ${executionProgress.pendingCount}`
-      : null,
+    executionProgress ? `  running: ${executionProgress.runningCount}` : null,
+    executionProgress ? `  pending: ${executionProgress.pendingCount}` : null,
     executionProgress
       ? `  succeeded: ${executionProgress.succeededCount}`
       : null,
@@ -421,10 +418,7 @@ async function handleResults(args: {
       `Failed: ${failedCount}`,
       `Pending: ${pendingCount}`,
       "",
-      renderTable(
-        ["CASE ID", "STATUS", "VERDICT", "DURATION", "ERROR"],
-        rows,
-      ),
+      renderTable(["CASE ID", "STATUS", "VERDICT", "DURATION", "ERROR"], rows),
     ].join("\n"),
   };
 }

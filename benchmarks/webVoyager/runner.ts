@@ -24,6 +24,11 @@ import {
 import { buildWebVoyagerPrompt, getRunName } from "./prompt.js";
 import { ScreenshotCollector } from "./screenshot-collector.js";
 import { evaluateWithScreenshots, type JudgeResult } from "./evaluator.js";
+import {
+  openKernelSessionForBenchmark,
+  closeKernelSessionForBenchmark,
+  type KernelSessionHandle,
+} from "./kernel-session.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -272,7 +277,9 @@ function formatTranscriptTimestamp(value: unknown): string | null {
   return null;
 }
 
-function collectTranscriptUsageEntry(event: AgentSessionEvent): TranscriptUsageEntry | null {
+function collectTranscriptUsageEntry(
+  event: AgentSessionEvent,
+): TranscriptUsageEntry | null {
   if (event.type !== "message_end") {
     return null;
   }
@@ -293,7 +300,6 @@ function collectTranscriptUsageEntry(event: AgentSessionEvent): TranscriptUsageE
       provider?: string;
       responseId?: string;
       stopReason?: string;
-      timestamp?: string | number;
     };
     usage?: {
       input?: number;
@@ -327,21 +333,21 @@ function collectTranscriptUsageEntry(event: AgentSessionEvent): TranscriptUsageE
     ),
     model:
       typeof (typedEvent.model ?? typedEvent.message?.model) === "string"
-        ? (typedEvent.model ?? typedEvent.message?.model)
+        ? ((typedEvent.model ?? typedEvent.message?.model) as string)
         : null,
     provider:
       typeof (typedEvent.provider ?? typedEvent.message?.provider) === "string"
-        ? (typedEvent.provider ?? typedEvent.message?.provider)
+        ? ((typedEvent.provider ?? typedEvent.message?.provider) as string)
         : null,
     responseId:
       typeof (typedEvent.responseId ?? typedEvent.message?.responseId) ===
       "string"
-        ? (typedEvent.responseId ?? typedEvent.message?.responseId)
+        ? ((typedEvent.responseId ?? typedEvent.message?.responseId) as string)
         : null,
     stopReason:
       typeof (typedEvent.stopReason ?? typedEvent.message?.stopReason) ===
       "string"
-        ? (typedEvent.stopReason ?? typedEvent.message?.stopReason)
+        ? ((typedEvent.stopReason ?? typedEvent.message?.stopReason) as string)
         : null,
     inputTokens,
     outputTokens,
@@ -605,6 +611,20 @@ async function prepareRunWorkspace(
       "- Do not inspect sibling benchmark files or parent benchmark directories to discover the answer.",
       "- End with a direct final answer to the task.",
       "",
+      "## Kernel Browser Mode",
+      "",
+      "This benchmark run uses a Kernel-backed stealth browser.",
+      "The browser session is **already open** and connected to the start URL.",
+      "Do NOT run `open` \u2014 the session is pre-opened for you.",
+      "Start by taking a `snapshot` to see the current page state.",
+      "",
+      "### CAPTCHA Handling",
+      "",
+      "If you see a CAPTCHA, reCAPTCHA, Cloudflare challenge, or similar test,",
+      "just wait for it to get solved automatically by the browser. Do NOT try to",
+      'solve it yourself. After a Cloudflare "Ready" message appears, continue',
+      "with your intended actions but do NOT click the Cloudflare checkbox.",
+      "",
     ].join("\n"),
     "utf8",
   );
@@ -618,11 +638,7 @@ async function prepareRunWorkspace(
     `file:${librettoPackageRoot}`,
     ...(snapshotProviderInstallSpec ? [snapshotProviderInstallSpec] : []),
   ]);
-  runWorkspaceCommand(runDir, "npx", [
-    "libretto",
-    "setup",
-    "--skip-browsers",
-  ]);
+  runWorkspaceCommand(runDir, "npx", ["libretto", "setup", "--skip-browsers"]);
   runWorkspaceCommand(runDir, "npx", [
     "libretto",
     "ai",
@@ -697,180 +713,195 @@ export async function runWebVoyagerCase(
   const startedAt = new Date();
   const anthropicApiKey = await ensureAnthropicApiKey();
   const { runDir, prompt, sessionName } = await prepareRunWorkspace(row);
-  const agentDir = join(runDir, ".pi");
-  const authStorage = AuthStorage.create(join(agentDir, "auth.json"));
-  authStorage.setRuntimeApiKey("anthropic", anthropicApiKey);
 
-  const modelRegistry = new ModelRegistry(authStorage);
-  const settingsManager = SettingsManager.inMemory({
-    compaction: { enabled: false },
-  });
-  const localSkillsRoot = join(runDir, ".agents", "skills");
-  const resourceLoader = new DefaultResourceLoader({
-    cwd: runDir,
-    agentDir,
-    settingsManager,
-    skillsOverride: (current) => ({
-      skills: current.skills.filter((skill) =>
-        skill.filePath.startsWith(localSkillsRoot),
-      ),
-      diagnostics: current.diagnostics,
-    }),
-  });
-  await resourceLoader.reload();
-
-  if (
-    !resourceLoader
-      .getSkills()
-      .skills.some((skill) => skill.name === "libretto")
-  ) {
-    throw new Error(
-      "Failed to load the local libretto skill into the benchmark workspace.",
-    );
-  }
-
-  const model = modelRegistry.find(
-    BENCHMARK_MODEL_PROVIDER,
-    BENCHMARK_MODEL_ID,
-  );
-  if (!model) {
-    throw new Error(
-      `Unknown Pi model: ${BENCHMARK_MODEL_PROVIDER}/${BENCHMARK_MODEL_ID}`,
-    );
-  }
-
-  const { session } = await createAgentSession({
-    cwd: runDir,
-    agentDir,
-    model,
-    thinkingLevel: "medium",
-    authStorage,
-    modelRegistry,
-    resourceLoader,
-    sessionManager: SessionManager.inMemory(),
-    settingsManager,
-  });
-
-  // Only keep meaningful transcript events (not streaming deltas).
-  const TRANSCRIPT_EVENT_TYPES = new Set([
-    "message_end",
-    "tool_execution_start",
-    "tool_execution_end",
-  ]);
-
-  const transcriptPath = join(runDir, "transcript.jsonl");
-  const transcriptStream = createWriteStream(transcriptPath, { flags: "w" });
-  transcriptStream.write(
-    `${JSON.stringify({
-      ts: startedAt.toISOString(),
-      type: "user_prompt",
-      text: prompt,
-    })}\n`,
-  );
-
-  let finalMessage: string | null = null;
-  let thrownError: unknown;
-
-  // Start screenshot collection on the libretto browser session
-  const screenshotCollector = new ScreenshotCollector(sessionName, runDir);
-  screenshotCollector.start();
-
-  const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
-    if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
-      transcriptStream.write(`${JSON.stringify(event)}\n`);
-    }
-
-    switch (event.type) {
-      case "message_end": {
-        const messageText = extractAssistantText(event.message);
-        if (!messageText) {
-          break;
-        }
-
-        finalMessage = messageText;
-        break;
-      }
-    }
+  // Open Kernel-backed stealth browser before the agent starts
+  const kernelSession = await openKernelSessionForBenchmark({
+    runDir,
+    sessionName,
+    startUrl: row.web,
   });
 
   try {
-    await session.prompt(prompt);
-  } catch (error) {
-    thrownError = error;
+    const agentDir = join(runDir, ".pi");
+    const authStorage = AuthStorage.create(join(agentDir, "auth.json"));
+    authStorage.setRuntimeApiKey("anthropic", anthropicApiKey);
+
+    const modelRegistry = new ModelRegistry(authStorage);
+    const settingsManager = SettingsManager.inMemory({
+      compaction: { enabled: false },
+    });
+    const localSkillsRoot = join(runDir, ".agents", "skills");
+    const resourceLoader = new DefaultResourceLoader({
+      cwd: runDir,
+      agentDir,
+      settingsManager,
+      skillsOverride: (current) => ({
+        skills: current.skills.filter((skill) =>
+          skill.filePath.startsWith(localSkillsRoot),
+        ),
+        diagnostics: current.diagnostics,
+      }),
+    });
+    await resourceLoader.reload();
+
+    if (
+      !resourceLoader
+        .getSkills()
+        .skills.some((skill) => skill.name === "libretto")
+    ) {
+      throw new Error(
+        "Failed to load the local libretto skill into the benchmark workspace.",
+      );
+    }
+
+    const model = modelRegistry.find(
+      BENCHMARK_MODEL_PROVIDER,
+      BENCHMARK_MODEL_ID,
+    );
+    if (!model) {
+      throw new Error(
+        `Unknown Pi model: ${BENCHMARK_MODEL_PROVIDER}/${BENCHMARK_MODEL_ID}`,
+      );
+    }
+
+    const { session } = await createAgentSession({
+      cwd: runDir,
+      agentDir,
+      model,
+      thinkingLevel: "medium",
+      authStorage,
+      modelRegistry,
+      resourceLoader,
+      sessionManager: SessionManager.inMemory(),
+      settingsManager,
+    });
+
+    // Only keep meaningful transcript events (not streaming deltas).
+    const TRANSCRIPT_EVENT_TYPES = new Set([
+      "message_end",
+      "tool_execution_start",
+      "tool_execution_end",
+    ]);
+
+    const transcriptPath = join(runDir, "transcript.jsonl");
+    const transcriptStream = createWriteStream(transcriptPath, { flags: "w" });
+    transcriptStream.write(
+      `${JSON.stringify({
+        ts: startedAt.toISOString(),
+        type: "user_prompt",
+        text: prompt,
+      })}\n`,
+    );
+
+    let finalMessage: string | null = null;
+    let thrownError: unknown;
+
+    // Start screenshot collection on the libretto browser session
+    const screenshotCollector = new ScreenshotCollector(sessionName, runDir);
+    screenshotCollector.start();
+
+    const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
+      if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
+        transcriptStream.write(`${JSON.stringify(event)}\n`);
+      }
+
+      switch (event.type) {
+        case "message_end": {
+          const messageText = extractAssistantText(event.message);
+          if (!messageText) {
+            break;
+          }
+
+          finalMessage = messageText;
+          break;
+        }
+      }
+    });
+
+    try {
+      await session.prompt(prompt);
+    } catch (error) {
+      thrownError = error;
+    } finally {
+      unsubscribe();
+      session.dispose();
+      transcriptStream.end();
+      await finished(transcriptStream);
+    }
+
+    // Stop screenshot collector BEFORE destroying the Kernel session
+    // so the final capture can still reach the remote browser
+    const screenshots = await screenshotCollector.stop();
+
+    // Evaluate using screenshot-based LLM judge
+    const judge = await evaluateWithScreenshots({
+      task: row.ques,
+      screenshots,
+      agentReasoning: finalMessage,
+    });
+
+    // Persist evaluator artifacts
+    const { screenshotPaths, analysisPath } = await saveEvaluatorArtifacts(
+      runDir,
+      screenshots,
+      judge,
+      row.ques,
+      finalMessage,
+    );
+    const transcriptAnalysisPath = await writeTranscriptAnalysis(
+      runDir,
+      readTranscriptUsageSummary(transcriptPath),
+    );
+
+    const finishedAt = new Date();
+    const durationMs = finishedAt.getTime() - startedAt.getTime();
+    const errorMessage =
+      thrownError instanceof Error
+        ? thrownError.message
+        : thrownError
+          ? String(thrownError)
+          : null;
+
+    // INVALID judge verdicts are treated as failures
+    const status: "passed" | "failed" =
+      !errorMessage && judge.evaluation === "YES" ? "passed" : "failed";
+
+    const result: WebVoyagerCaseResult = {
+      caseId: row.id,
+      runDir,
+      status,
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      durationMs,
+      finalMessage,
+      judge,
+      screenshotCount: screenshots.length,
+      error: errorMessage,
+    };
+
+    await writeFile(
+      join(runDir, "result.json"),
+      JSON.stringify(
+        {
+          ...result,
+          browserBackend: "kernel",
+          task: row.ques,
+          url: row.web,
+          screenshotPaths,
+          analysisPath,
+          transcriptAnalysisPath,
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    return result;
   } finally {
-    unsubscribe();
-    session.dispose();
-    transcriptStream.end();
-    await finished(transcriptStream);
+    // Always clean up the Kernel session, even if setup or agent throws
+    await closeKernelSessionForBenchmark(kernelSession);
   }
-
-  // Collect screenshots and evaluate
-  const screenshots = await screenshotCollector.stop();
-
-  // Evaluate using screenshot-based LLM judge
-  const judge = await evaluateWithScreenshots({
-    task: row.ques,
-    screenshots,
-    agentReasoning: finalMessage,
-  });
-
-  // Persist evaluator artifacts
-  const { screenshotPaths, analysisPath } = await saveEvaluatorArtifacts(
-    runDir,
-    screenshots,
-    judge,
-    row.ques,
-    finalMessage,
-  );
-  const transcriptAnalysisPath = await writeTranscriptAnalysis(
-    runDir,
-    readTranscriptUsageSummary(transcriptPath),
-  );
-
-  const finishedAt = new Date();
-  const durationMs = finishedAt.getTime() - startedAt.getTime();
-  const errorMessage =
-    thrownError instanceof Error
-      ? thrownError.message
-      : thrownError
-        ? String(thrownError)
-        : null;
-
-  // INVALID judge verdicts are treated as failures
-  const status: "passed" | "failed" =
-    !errorMessage && judge.evaluation === "YES" ? "passed" : "failed";
-
-  const result: WebVoyagerCaseResult = {
-    caseId: row.id,
-    runDir,
-    status,
-    startedAt: startedAt.toISOString(),
-    finishedAt: finishedAt.toISOString(),
-    durationMs,
-    finalMessage,
-    judge,
-    screenshotCount: screenshots.length,
-    error: errorMessage,
-  };
-
-  await writeFile(
-    join(runDir, "result.json"),
-    JSON.stringify(
-      {
-        ...result,
-        task: row.ques,
-        url: row.web,
-        screenshotPaths,
-        analysisPath,
-        transcriptAnalysisPath,
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  );
-
-  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -889,7 +920,7 @@ export async function runWebVoyagerBenchmark(args: {
   const concurrency = args.parallelize ?? 1;
 
   console.log(
-    `Running WebVoyager benchmark: ${formatSelectionSummary(selection)}${concurrency > 1 ? ` (parallelism: ${concurrency})` : ""}.`,
+    `Running WebVoyager benchmark: ${formatSelectionSummary(selection)}${concurrency > 1 ? ` (parallelism: ${concurrency})` : ""} [kernel backend].`,
   );
 
   if (concurrency <= 1) {
