@@ -6,7 +6,7 @@ That setup makes docs authoring fragile and blocks a simpler content model where
 
 ## Solution overview
 
-Move docs content to a repo-root `docs/` directory where each top-level folder becomes one docs route, such as `docs/getting-started/` becoming `/docs/getting-started`. Within each folder, `.mdx` files remain stitched into a single long-form page for that route, preserving the current hash-fragment navigation model.
+Move docs content to a repo-root `docs/` directory where each top-level folder becomes one docs route, such as `docs/get-started/` becoming `/docs/get-started`. Within each folder, `.mdx` files remain stitched into a single long-form page for that route, preserving the current hash-fragment navigation model.
 
 Replace the hard-coded manifest with a Vite-generated virtual module that scans the docs filesystem, reads lightweight frontmatter, parses MDX to `mdast` at build time, and exports a typed docs tree to the app. Keep `safe-mdx` for rendering, but stop doing per-page `mdxParse(...)` work in the browser. Do not adopt `comptime.ts` in v1; Vite's plugin and virtual-module model is a better fit for filesystem scanning, watch mode, and generated content metadata in this app.
 
@@ -24,8 +24,8 @@ Replace the hard-coded manifest with a Vite-generated virtual module that scans 
 
 ## Non-goals
 
-- No migrations or backfills.
-- No switch to page-per-file routes like `/docs/getting-started/quickstart` in v1.
+- No data migrations or backfills.
+- No switch to page-per-file routes like `/docs/get-started/quickstart` in v1.
 - No redesign of docs styling, editorial layout, or MDX components.
 - No replacement of `safe-mdx` with a different MDX runtime.
 - No adoption of `comptime.ts` in v1.
