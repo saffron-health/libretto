@@ -178,12 +178,12 @@ async function runStatus() {
 }
 ```
 
-- [ ] Add `status` to the CLI router and root help text.
-- [ ] Print AI status using the shared resolver from Phase 1, including configured model, config path when present, and the change command.
-- [ ] List open sessions by reading session state files and filtering to live processes, then print session name, status, and local endpoint details.
-- [ ] Print `No open sessions.` when no live sessions exist.
-- [ ] Add a stateful subprocess test that opens a headless session, runs `status`, and verifies the configured AI model and session name both appear.
-- [ ] Success criteria: `status` gives a useful read-only summary on a healthy workspace without triggering browser install, skill sync, or setup prompts.
+- [x] Add `status` to the CLI router and root help text.
+- [x] Print AI status using the shared resolver from Phase 1, including configured model, config path when present, and the change command.
+- [x] List open sessions by reading session state files and filtering to live processes, then print session name, status, and local endpoint details.
+- [x] Print `No open sessions.` when no live sessions exist.
+- [x] Add a stateful subprocess test that opens a headless session, runs `status`, and verifies the configured AI model and session name both appear.
+- [x] Success criteria: `status` gives a useful read-only summary on a healthy workspace without triggering browser install, skill sync, or setup prompts.
 
 ### Phase 5: Update docs and targeted CLI coverage
 

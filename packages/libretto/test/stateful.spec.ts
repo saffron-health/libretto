@@ -287,6 +287,36 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(clear.stdout).toContain("Action log cleared.");
   }, 60_000);
 
+  test("status shows AI config and open sessions", async ({ librettoCli }) => {
+    // Configure AI model
+    const configure = await librettoCli("ai configure openai");
+    expect(configure.stdout).toContain("AI config saved.");
+
+    // Open a headless session
+    const session = "status-test-session";
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
+
+    // Run status and verify both AI model and session appear
+    const status = await librettoCli("status");
+    expect(status.exitCode).toBe(0);
+    expect(status.stderr).toBe("");
+    expect(status.stdout).toContain("AI configuration:");
+    expect(status.stdout).toContain("openai/gpt-5.4");
+    expect(status.stdout).toContain("Open sessions:");
+    expect(status.stdout).toContain(session);
+    expect(status.stdout).toContain("http://127.0.0.1:");
+  }, 45_000);
+
+  test("status shows no open sessions when none exist", async ({
+    librettoCli,
+  }) => {
+    const status = await librettoCli("status");
+    expect(status.exitCode).toBe(0);
+    expect(status.stdout).toContain("No open sessions.");
+  });
+
   test("logs richer user action selectors for nested click targets", async ({
     librettoCli,
   }) => {
