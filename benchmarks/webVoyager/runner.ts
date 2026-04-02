@@ -413,12 +413,13 @@ export async function runWebVoyagerCase(
     session.dispose();
     transcriptStream.end();
     await finished(transcriptStream);
-
-    await closeKernelSessionForBenchmark(kernelSession);
   }
 
-  // Collect screenshots and evaluate
+  // Stop screenshot collector BEFORE destroying the Kernel session
+  // so the final capture can still reach the remote browser
   const screenshots = await screenshotCollector.stop();
+
+  await closeKernelSessionForBenchmark(kernelSession);
 
   // Evaluate using screenshot-based LLM judge
   const judge = await evaluateWithScreenshots({
