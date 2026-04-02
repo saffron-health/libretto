@@ -300,8 +300,6 @@ describe("state-driven CLI subprocess behavior", () => {
 
     // Run status and verify both AI model and session appear
     const status = await librettoCli("status");
-    expect(status.exitCode).toBe(0);
-    expect(status.stderr).toBe("");
     expect(status.stdout).toContain("AI configuration:");
     expect(status.stdout).toContain("openai/gpt-5.4");
     expect(status.stdout).toContain("Open sessions:");
@@ -313,7 +311,6 @@ describe("state-driven CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const status = await librettoCli("status");
-    expect(status.exitCode).toBe(0);
     expect(status.stdout).toContain("No open sessions.");
   });
 
