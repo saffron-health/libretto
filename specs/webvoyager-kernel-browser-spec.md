@@ -87,17 +87,17 @@ _Added during implementation, not during initial spec creation._
 
 ## Implementation
 
-### Phase 1: Add a benchmark-owned Kernel session bootstrap helper
+### Phase 1: Add WebSocket CDP support to `libretto connect` and a benchmark-owned Kernel session bootstrap helper
 
-Create a small helper in `benchmarks/webVoyager` that can create and destroy a Kernel browser session and write Libretto-compatible session files in a run workspace. This gives the benchmark a concrete way to put a named Libretto session onto Kernel without touching Libretto CLI internals.
+Teach `libretto connect` to accept `ws://`/`wss://` CDP WebSocket URLs (Kernel returns these), then create a benchmark helper that provisions a Kernel browser and registers it via `libretto connect`.
+
+#### `libretto connect` WebSocket support
+
+`runConnect` in `packages/libretto/src/cli/core/browser.ts` previously only accepted HTTP(S) URLs and validated reachability by fetching `/json/version`. For WebSocket URLs the HTTP health check is skipped — the Playwright `connectOverCDP` call serves as validation instead. Port inference maps `wss:` → 443 and `ws:` → 80 when no explicit port is present.
+
+#### Kernel session bootstrap
 
 ```ts
-type KernelSessionHandle = {
-  kernelSessionId: string;
-  cdpEndpoint: string;
-  liveViewUrl: string | null;
-};
-
 async function openKernelSessionForBenchmark(args: {
   runDir: string;
   sessionName: string;
@@ -109,24 +109,21 @@ async function openKernelSessionForBenchmark(args: {
     timeout_seconds: 7200,
   });
   await primeSessionAtUrl(kernelBrowser.cdp_ws_url, args.startUrl);
-  await writeLibrettoSessionState(args.runDir, args.sessionName, kernelBrowser);
-  return {
-    kernelSessionId: kernelBrowser.session_id,
-    cdpEndpoint: kernelBrowser.cdp_ws_url,
-    liveViewUrl: kernelBrowser.browser_live_view_url ?? null,
-  };
+  // Uses `pnpm -s cli connect <wss://...> --session <name>` in the run workspace
+  await connectLibrettoSession(args.runDir, args.sessionName, kernelBrowser.cdp_ws_url);
+  return { ... };
 }
 ```
 
-- [ ] Add `@onkernel/sdk` to `benchmarks/package.json`
-- [ ] Create `benchmarks/webVoyager/kernel-session.ts` with:
-  - `openKernelSessionForBenchmark(...)`
-  - `closeKernelSessionForBenchmark(...)`
-  - a small helper that writes `.libretto/sessions/<session>/state.json` with `cdpEndpoint`, `session`, `startedAt`, `status`, `viewport`, and a parsed numeric `port`
-  - a separate benchmark-owned metadata file (for example `kernel-session.json`) that stores `kernelSessionId` and live-view URL for cleanup/debugging
-- [ ] Validate `KERNEL_API_KEY` early and return an actionable error when Kernel mode is selected without credentials
-- [ ] Prime the Kernel session by connecting over CDP and navigating the existing default page/context to the case start URL
-- [ ] Success criteria: `pnpm type-check` passes, and with `KERNEL_API_KEY` set a direct smoke call to the helper against `https://example.com` produces a Libretto session state file whose `cdpEndpoint` can be reused by `chromium.connectOverCDP(...)`
+- [x] Add `@onkernel/sdk` (`^0.44.0`) to `benchmarks/package.json`
+- [x] Update `runConnect` in `packages/libretto/src/cli/core/browser.ts` to accept `ws://`/`wss://` CDP URLs by skipping the HTTP `/json/version` health check for WebSocket protocols and mapping `wss:` → port 443 / `ws:` → port 80
+- [x] Create `benchmarks/webVoyager/kernel-session.ts` with:
+  - `openKernelSessionForBenchmark(...)` — creates Kernel browser, primes at start URL, registers via `libretto connect`, writes `kernel-session.json` metadata
+  - `closeKernelSessionForBenchmark(...)` — idempotent Kernel session deletion
+  - `ensureKernelApiKey()` — resolves from `KERNEL_API_KEY` env var or GCP Secret Manager (`libretto-benchmarks-kernel-api-key`)
+- [x] Prime the Kernel session by connecting over CDP and navigating the existing default page/context to the case start URL
+- [x] Update `buildWebVoyagerPrompt` in `benchmarks/webVoyager/prompt.ts` to accept a `browserBackend` option; in Kernel mode the prompt tells the agent the session is already open, not to run `open`, and to start with `snapshot`
+- [x] Success criteria: `pnpm type-check` passes, `pnpm --filter libretto test` passes
 
 ### Phase 2: Use the helper in local WebVoyager runs and pre-open the named Libretto session
 
@@ -153,7 +150,8 @@ async function prepareBrowserBackend(args: {
 
 - [ ] Add a benchmark backend selector in `benchmarks/webVoyager/commands.ts` and `runner.ts` (for example `--browser-backend local|kernel`, defaulting to `local`)
 - [ ] In `runWebVoyagerCase`, when backend is `kernel`, call the new helper after workspace creation and before `createAgentSession(...)`
-- [ ] Update benchmark-local `AGENTS.md` and/or prompt text so Kernel mode explicitly says the named Libretto session is already open and the agent should use `npx libretto snapshot`, `exec`, and `pages` instead of `npx libretto open`
+- [ ] Pass `browserBackend` to `buildWebVoyagerPrompt` (prompt changes already landed in Phase 1)
+- [ ] Update benchmark-local `AGENTS.md` to add a Kernel-mode note when backend is `kernel`
 - [ ] Keep the existing local behavior unchanged when backend is `local`
 - [ ] Success criteria: `pnpm benchmarks webVoyager run --count 1 --browser-backend kernel` starts with a pre-opened Kernel-backed Libretto session, the agent transcript shows `snapshot`/`exec` use without a preceding `open`, and evaluator screenshots are still captured from the Kernel session
 

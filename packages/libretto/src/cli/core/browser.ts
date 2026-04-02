@@ -1005,18 +1005,22 @@ export async function runConnect(
       [
         `Invalid CDP URL: ${cdpUrl}`,
         ``,
-        `Expected an HTTP URL pointing to a Chrome DevTools Protocol endpoint, for example:`,
+        `Expected an HTTP or WebSocket URL pointing to a Chrome DevTools Protocol endpoint, for example:`,
         `  libretto connect http://127.0.0.1:9222`,
         `  libretto connect http://remote-host:9222`,
         `  libretto connect http://remote-host:9222/devtools/browser/<id>`,
+        `  libretto connect ws://remote-host:9222/devtools/browser/<id>`,
+        `  libretto connect wss://remote-host/cdp-endpoint`,
       ].join("\n"),
     );
   }
 
   const endpoint = parsedUrl.href;
+  const isWebSocket =
+    parsedUrl.protocol === "ws:" || parsedUrl.protocol === "wss:";
   const port = parsedUrl.port
     ? Number(parsedUrl.port)
-    : parsedUrl.protocol === "https:"
+    : parsedUrl.protocol === "https:" || parsedUrl.protocol === "wss:"
       ? 443
       : 80;
 
@@ -1024,17 +1028,20 @@ export async function runConnect(
     `Connecting to CDP endpoint at ${endpoint} (session: ${session})...`,
   );
 
-  // Verify the CDP endpoint is reachable
-  const versionUrl = `${parsedUrl.protocol}//${parsedUrl.host}/json/version`;
-  try {
-    const resp = await fetch(versionUrl);
-    const versionInfo = await resp.json();
-    logger.info("connect-version-ok", { versionUrl, versionInfo });
-  } catch (err) {
-    logger.error("connect-version-failed", { versionUrl, error: err });
-    throw new Error(
-      `Cannot reach CDP endpoint at ${versionUrl}. Make sure the target is running and accessible at ${parsedUrl.host}.`,
-    );
+  // Verify the CDP endpoint is reachable (HTTP only — WebSocket
+  // endpoints are validated by the Playwright connect call below).
+  if (!isWebSocket) {
+    const versionUrl = `${parsedUrl.protocol}//${parsedUrl.host}/json/version`;
+    try {
+      const resp = await fetch(versionUrl);
+      const versionInfo = await resp.json();
+      logger.info("connect-version-ok", { versionUrl, versionInfo });
+    } catch (err) {
+      logger.error("connect-version-failed", { versionUrl, error: err });
+      throw new Error(
+        `Cannot reach CDP endpoint at ${versionUrl}. Make sure the target is running and accessible at ${parsedUrl.host}.`,
+      );
+    }
   }
 
   // Connect via CDP using the full endpoint URL
