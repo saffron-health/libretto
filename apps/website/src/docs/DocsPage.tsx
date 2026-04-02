@@ -146,21 +146,6 @@ type MdastSection = {
 
 type MdxFlowElement = Extract<RootContent, { type: "mdxJsxFlowElement" }>;
 
-function getSectionHref(
-  section: MdastSection,
-  headingIds: WeakMap<Heading, string>,
-): string | null {
-  const heading = section.contentNodes.find((node): node is Heading => {
-    return node.type === "heading" && (node as Heading).depth === 2;
-  });
-
-  if (!heading) {
-    return null;
-  }
-
-  return `#${headingIds.get(heading) ?? slugify(extractText(heading.children))}`;
-}
-
 function buildHeadingIdMap(roots: Root[]): WeakMap<Heading, string> {
   const counts = new Map<string, number>();
   const headingIds = new WeakMap<Heading, string>();
@@ -576,15 +561,6 @@ export function DocsPage({ pathname }: { pathname?: string }) {
     return createMdxComponents(resolveDocsHref);
   }, [resolveDocsHref]);
 
-  const currentGroupMdast: Root = {
-    type: "root",
-    children: parsedCurrentGroup.pages.flatMap((page) => {
-      return page.mdast.children;
-    }),
-  };
-  const contentChildren = currentGroupMdast.children.filter((node) => !isHeroNode(node));
-  const contentMdast: Root = { type: "root", children: contentChildren };
-
   const tocItems = flattenTocTree({
     roots: buildDocsTocTree({
       groups: parsedDocsGroups,
@@ -592,17 +568,6 @@ export function DocsPage({ pathname }: { pathname?: string }) {
       currentGroupId: parsedCurrentGroup.id,
     }),
   });
-  const mdastSections = groupBySections(contentMdast);
-  const sectionByHref = new Map(
-    mdastSections
-      .map((section) => {
-        const href = getSectionHref(section, currentGroupHeadingIds);
-        return href ? ([href, section] as const) : null;
-      })
-      .filter(
-        (entry): entry is readonly [string, MdastSection] => entry !== null,
-      ),
-  );
 
   const sections: EditorialSection[] = [
     {
@@ -614,46 +579,41 @@ export function DocsPage({ pathname }: { pathname?: string }) {
         </div>
       ),
     },
-    ...parsedCurrentGroup.pages.map((page) => {
-      const firstPageHeading = page.mdast.children.find(
-        (node): node is Heading => {
-          return node.type === "heading";
-        },
-      );
+    ...parsedCurrentGroup.pages.flatMap((page) => {
+      const contentMdast: Root = {
+        type: "root",
+        children: page.mdast.children.filter((node) => !isHeroNode(node)),
+      };
+      const pageSections = groupBySections(contentMdast);
 
-      if (!firstPageHeading) {
-        throw new Error(`Missing top-level heading for docs page ${page.id}`);
+      if (pageSections.length === 0) {
+        throw new Error(`Missing docs sections for page ${page.id}`);
       }
 
-      const pageHref = `#${currentGroupHeadingIds.get(firstPageHeading) ?? slugify(extractText(firstPageHeading.children))}`;
-      const section = sectionByHref.get(pageHref);
+      return pageSections.map((section) => {
+        const aside =
+          section.asideNodes.length > 0 ? (
+            <RenderNodes
+              nodes={section.asideNodes}
+              markdown={currentGroupMarkdown}
+              components={mdxComponents}
+              headingIds={currentGroupHeadingIds}
+            />
+          ) : undefined;
 
-      if (!section) {
-        throw new Error(`Missing docs page section for ${pageHref}`);
-      }
-
-      const aside =
-        section.asideNodes.length > 0 ? (
-          <RenderNodes
-            nodes={section.asideNodes}
-            markdown={currentGroupMarkdown}
-            components={mdxComponents}
-            headingIds={currentGroupHeadingIds}
-          />
-        ) : undefined;
-
-      return {
-        content: (
-          <RenderNodes
-            nodes={section.contentNodes}
-            markdown={currentGroupMarkdown}
-            components={mdxComponents}
-            headingIds={currentGroupHeadingIds}
-          />
-        ),
-        aside,
-        fullWidth: section.fullWidth,
-      } satisfies EditorialSection;
+        return {
+          content: (
+            <RenderNodes
+              nodes={section.contentNodes}
+              markdown={currentGroupMarkdown}
+              components={mdxComponents}
+              headingIds={currentGroupHeadingIds}
+            />
+          ),
+          aside,
+          fullWidth: section.fullWidth,
+        } satisfies EditorialSection;
+      });
     }),
   ];
 
