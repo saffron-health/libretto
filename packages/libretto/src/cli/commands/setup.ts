@@ -11,18 +11,25 @@ import {
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readAiConfig } from "../core/config.js";
-import { ensureLibrettoSetup, REPO_ROOT } from "../core/context.js";
+import { writeAiConfig } from "../core/config.js";
 import {
+  ensureLibrettoSetup,
+  LIBRETTO_CONFIG_PATH,
+  REPO_ROOT,
+} from "../core/context.js";
+import {
+  type AiSetupStatus,
+  DEFAULT_SNAPSHOT_MODELS,
   loadSnapshotEnv,
-  resolveSnapshotApiModel,
+  resolveAiSetupStatus,
 } from "../core/ai-model.js";
-import { hasProviderCredentials } from "../../shared/llm/client.js";
+import type { Provider } from "../../shared/llm/client.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
 type ProviderChoice = {
   key: string;
   label: string;
+  provider: Provider;
   envVar: string;
   envHint: string;
 };
@@ -31,27 +38,31 @@ const PROVIDER_CHOICES: ProviderChoice[] = [
   {
     key: "1",
     label: "OpenAI",
+    provider: "openai",
     envVar: "OPENAI_API_KEY",
     envHint: "Get your key at https://platform.openai.com/api-keys",
   },
   {
     key: "2",
     label: "Anthropic",
+    provider: "anthropic",
     envVar: "ANTHROPIC_API_KEY",
     envHint: "Get your key at https://console.anthropic.com/settings/keys",
   },
   {
     key: "3",
     label: "Google Gemini",
+    provider: "google",
     envVar: "GEMINI_API_KEY",
     envHint: "Get your key at https://aistudio.google.com/apikey",
   },
   {
     key: "4",
     label: "Google Vertex AI",
+    provider: "vertex",
     envVar: "GOOGLE_CLOUD_PROJECT",
     envHint:
-      "Requires gcloud auth application-default login and a GCP project ID",
+      "Requires `gcloud auth application-default login` and a GCP project ID",
   },
 ];
 
@@ -66,29 +77,39 @@ function promptUser(
   });
 }
 
-function safeReadAiConfig(): ReturnType<typeof readAiConfig> {
-  try {
-    return readAiConfig();
-  } catch {
-    return null;
+/**
+ * If the workspace has usable credentials but no pinned model in config,
+ * write the resolved default model to `.libretto/config.json`.
+ */
+function ensurePinnedDefaultModel(
+  status: AiSetupStatus & { kind: "ready" },
+): AiSetupStatus & { kind: "ready" } {
+  if (status.source !== "config") {
+    writeAiConfig(status.model);
+    return { ...status, source: "config" as const };
   }
+  return status;
 }
 
-function printInvalidAiConfigWarning(): void {
-  try {
-    readAiConfig();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.log("  ! Existing AI config is invalid:");
-    for (const line of message.split("\n")) {
-      console.log(`    ${line}`);
-    }
+function printHealthySummary(status: AiSetupStatus & { kind: "ready" }): void {
+  console.log(`  ✓ Model: ${status.model}`);
+  console.log(`  Config: ${LIBRETTO_CONFIG_PATH}`);
+  console.log(
+    "  To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+  );
+}
+
+function printInvalidAiConfigWarning(status: AiSetupStatus): void {
+  if (status.kind !== "invalid-config") return;
+  console.log("  ! Existing AI config is invalid:");
+  for (const line of status.message.split("\n")) {
+    console.log(`    ${line}`);
   }
 }
 
 function printSnapshotApiStatus(): boolean {
-  const config = safeReadAiConfig();
-  const selection = resolveSnapshotApiModel(config);
+  loadSnapshotEnv();
+  let status = resolveAiSetupStatus();
   const envPath = join(REPO_ROOT, ".env");
 
   console.log("\nSnapshot analysis:");
@@ -96,14 +117,11 @@ function printSnapshotApiStatus(): boolean {
     "  Libretto uses direct API calls for snapshot analysis when supported credentials are available.",
   );
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
-  printInvalidAiConfigWarning();
+  printInvalidAiConfigWarning(status);
 
-  if (selection && hasProviderCredentials(selection.provider)) {
-    console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
-    console.log(
-      "    Snapshot objectives will use the API analyzer by default.",
-    );
-    console.log("    No further action required.");
+  if (status.kind === "ready") {
+    const pinned = ensurePinnedDefaultModel(status);
+    printHealthySummary(pinned);
     return true;
   }
 
@@ -125,20 +143,18 @@ function printSnapshotApiStatus(): boolean {
 }
 
 async function runInteractiveApiSetup(): Promise<void> {
-  const config = safeReadAiConfig();
-  const selection = resolveSnapshotApiModel(config);
+  loadSnapshotEnv();
+  let status = resolveAiSetupStatus();
   const envPath = join(REPO_ROOT, ".env");
 
   console.log("\nSnapshot analysis setup:");
   console.log("  Libretto uses direct API calls for snapshot analysis.");
   console.log(`  Credentials are loaded from process env and ${envPath}.`);
-  printInvalidAiConfigWarning();
+  printInvalidAiConfigWarning(status);
 
-  if (selection && hasProviderCredentials(selection.provider)) {
-    console.log(`  ✓ Ready: ${selection.model} (${selection.source})`);
-    console.log(
-      "    Snapshot objectives will use the API analyzer by default.",
-    );
+  if (status.kind === "ready") {
+    const pinned = ensurePinnedDefaultModel(status);
+    printHealthySummary(pinned);
     return;
   }
 
@@ -214,10 +230,11 @@ async function runInteractiveApiSetup(): Promise<void> {
 
     loadSnapshotEnv();
     process.env[selected.envVar] = apiKeyValue;
-    const newSelection = resolveSnapshotApiModel(safeReadAiConfig());
-    if (newSelection && hasProviderCredentials(newSelection.provider)) {
-      console.log(`  ✓ Snapshot API ready: ${newSelection.model}`);
-    }
+
+    // Pin the selected provider's default model to config
+    const defaultModel = DEFAULT_SNAPSHOT_MODELS[selected.provider];
+    writeAiConfig(defaultModel);
+    console.log(`  ✓ Snapshot API ready: ${defaultModel}`);
   } finally {
     rl.close();
   }

@@ -128,13 +128,13 @@ function ensurePinnedDefaultModel(status: AiSetupStatus) {
 }
 ```
 
-- [ ] Update setup so that when usable credentials already exist and no AI model is pinned yet, it writes `.libretto/config.json` with the resolved default model.
-- [ ] Update the interactive provider-selection path so that a newly entered credential writes both the env var and the provider's default model to config.
-- [ ] When setup is already healthy with config + matching credentials, print the configured model, config path, and `npx libretto ai configure ...` change guidance instead of prompting again.
-- [ ] Do not print a healthy summary when the AI config is invalid.
-- [ ] Add a subprocess test for `setup --skip-browsers` with `OPENAI_API_KEY` already present that verifies `.libretto/config.json` is created and the output shows the configured model.
-- [ ] Add a rerun test that verifies healthy setup output includes the model and how to change it with `npx libretto ai configure ...`.
-- [ ] Success criteria: a workspace with only `OPENAI_API_KEY` set becomes config-backed after one `setup --skip-browsers` run, and a second run does not re-enter the AI onboarding path.
+- [x] Update setup so that when usable credentials already exist and no AI model is pinned yet, it writes `.libretto/config.json` with the resolved default model.
+- [x] Update the interactive provider-selection path so that a newly entered credential writes both the env var and the provider's default model to config.
+- [x] When setup is already healthy with config + matching credentials, print the configured model, config path, and `npx libretto ai configure ...` change guidance instead of prompting again.
+- [x] Do not print a healthy summary when the AI config is invalid.
+- [x] Add a subprocess test for `setup --skip-browsers` with `OPENAI_API_KEY` already present that verifies `.libretto/config.json` is created and the output shows the configured model.
+- [x] Add a rerun test that verifies healthy setup output includes the model and how to change it with `npx libretto ai configure ...`.
+- [x] Success criteria: a workspace with only `OPENAI_API_KEY` set becomes config-backed after one `setup --skip-browsers` run, and a second run does not re-enter the AI onboarding path.
 
 ### Phase 3: Add interactive repair flows for broken configured-provider states
 

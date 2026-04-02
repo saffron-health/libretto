@@ -107,8 +107,59 @@ describe("basic CLI subprocess behavior", () => {
     });
 
     expect(result.stdout).toContain("Snapshot analysis:");
-    expect(result.stdout).toContain("Ready: openai/gpt-5.4");
-    expect(result.stdout).toContain("No further action required.");
+    expect(result.stdout).toContain("Model: openai/gpt-5.4");
+    expect(result.stdout).toContain("Config:");
+    expect(result.stdout).toContain("config.json");
+    expect(result.stdout).toContain(
+      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+    );
+  });
+
+  test("setup auto-pins default model when OPENAI_API_KEY is present", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const result = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Model: openai/gpt-5.4");
+
+    // Verify config.json was created with the pinned model
+    const configPath = workspacePath(".libretto", "config.json");
+    const config = JSON.parse(await readFile(configPath, { encoding: "utf8" }));
+    expect(config.ai.model).toBe("openai/gpt-5.4");
+  });
+
+  test("setup rerun shows healthy summary without re-prompting", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    // First run: pins the model
+    const first = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+    expect(first.exitCode).toBe(0);
+    expect(first.stdout).toContain("Model: openai/gpt-5.4");
+
+    // Second run: should show healthy summary, not re-prompt
+    const second = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+    expect(second.exitCode).toBe(0);
+    expect(second.stdout).toContain("Model: openai/gpt-5.4");
+    expect(second.stdout).toContain("Config:");
+    expect(second.stdout).toContain(
+      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+    );
+    // Should NOT contain the unconfigured prompts
+    expect(second.stdout).not.toContain(
+      "No snapshot API credentials detected.",
+    );
   });
 
   test("setup copies skill files without confirmation when agent dirs exist", async ({
