@@ -61,22 +61,60 @@ Introduce one shared resolver that explains the workspace's AI setup state in te
 ```ts
 type AiSetupStatus =
   | { kind: "ready"; model: string; source: "config" | `env:auto-${string}` }
-  | { kind: "configured-missing-credentials"; model: string; provider: Provider }
+  | {
+      kind: "configured-missing-credentials";
+      model: string;
+      provider: Provider;
+    }
   | { kind: "invalid-config"; message: string }
   | { kind: "unconfigured" };
 
 function resolveAiSetupStatus(): AiSetupStatus {
   const config = readAiConfigSafely();
-  if (config.kind === "invalid") return { kind: "invalid-config", message: config.message };
+  if (config.kind === "invalid")
+    return { kind: "invalid-config", message: config.message };
   return resolveConfiguredOrEnvStatus(config.value);
 }
 ```
 
-- [ ] Add a small shared helper module for AI setup/status resolution instead of duplicating branching in `setup.ts` and the new `status` command.
-- [ ] Represent the configured-provider-missing-credentials case explicitly so setup can offer repair guidance instead of falling back to the generic "No snapshot API credentials detected" message.
-- [ ] Treat invalid `.libretto/config.json` as its own state and never collapse it into a ready env-only path.
-- [ ] Add focused tests for: env-only ready, config ready, configured provider missing credentials, invalid config, and fully unconfigured.
-- [ ] Success criteria: `packages/libretto/test/snapshot-api-config.spec.ts` (or a new focused resolver test) fails if a pinned OpenAI model with only an Anthropic key is reported as ready.
+- [x] Add a small shared helper module for AI setup/status resolution instead of duplicating branching in `setup.ts` and the new `status` command.
+- [x] Represent the configured-provider-missing-credentials case explicitly so setup can offer repair guidance instead of falling back to the generic "No snapshot API credentials detected" message.
+- [x] Treat invalid `.libretto/config.json` as its own state and never collapse it into a ready env-only path.
+- [x] Add focused tests for: env-only ready, config ready, configured provider missing credentials, invalid config, and fully unconfigured.
+- [x] Success criteria: `packages/libretto/test/ai-setup-status.spec.ts` fails if a pinned OpenAI model with only an Anthropic key is reported as ready.
+
+### Phase 1.5: Consolidate AI config/env/model core modules
+
+Clean up the `core/` directory so each file has a single clear responsibility before the behavior changes in later phases touch these same files. This is a pure rename/move refactor with no behavior changes.
+
+The current layout has overlapping concerns:
+
+- `ai-config.ts` mixes the config file schema with the `ai configure` CLI handler and a default model map.
+- `snapshot-api-config.ts` mixes `.env` loading, dotenv parsing, worktree env resolution, model resolution, and snapshot-specific error messages, plus its own duplicate default model map.
+- `ai-setup-status.ts` is a thin wrapper that exists only because the above two don't expose the right granularity.
+
+Consolidate into:
+
+| New file         | Responsibility                                                                                                                                                   |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ai-config.ts`   | Config schema, read/write/clear. Pure file I/O. Remove `runAiConfigure`.                                                                                         |
+| `ai-env.ts`      | `.env` loading, dotenv parser, worktree env resolution. No model logic.                                                                                          |
+| `ai-model.ts`    | Model resolution (config-first then env), single default model map, `AiSetupStatus` health resolver, snapshot error messages + `resolveSnapshotApiModelOrThrow`. |
+| `commands/ai.ts` | Move `runAiConfigure` here alongside the command definition.                                                                                                     |
+
+This eliminates `snapshot-api-config.ts` and `ai-setup-status.ts` as separate files.
+
+- [ ] Create `ai-env.ts` with `loadSnapshotEnv`, `parseDotEnvAssignment`, and worktree env helpers extracted from `snapshot-api-config.ts`.
+- [ ] Create `ai-model.ts` with model resolution, default model map, `AiSetupStatus`, `resolveAiSetupStatus`, `resolveSnapshotApiModel`, `resolveSnapshotApiModelOrThrow`, and snapshot error messages.
+- [ ] Move `runAiConfigure` from `ai-config.ts` into `commands/ai.ts`.
+- [ ] Keep `ai-config.ts` as config schema + read/write/clear only.
+- [ ] Delete `snapshot-api-config.ts` and `ai-setup-status.ts`.
+- [ ] Update all imports across `commands/setup.ts`, `commands/snapshot.ts`, `commands/ai.ts`, `core/api-snapshot-analyzer.ts`, `core/browser.ts`, `shared/run/browser.ts`, and any other importers.
+- [ ] Update test imports in `test/snapshot-api-config.spec.ts` and `test/ai-setup-status.spec.ts`.
+- [ ] Change the `source` field on `SnapshotApiModelSelection` and `AiSetupStatus` from `env:auto-openai` style to `env:OPENAI_API_KEY` style — report the actual env var name that was detected. For multi-var providers (Google: `GEMINI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`, Vertex: `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT`), report whichever specific var matched. Update all tests that assert on source values.
+- [ ] Run `pnpm --filter libretto type-check`.
+- [ ] Run `pnpm --filter libretto exec vitest run test/ai-setup-status.spec.ts test/snapshot-api-config.spec.ts`.
+- [ ] Success criteria: all existing tests pass with no behavior changes, only import path updates.
 
 ### Phase 2: Make setup persist the default model and print an idempotent healthy summary
 
@@ -127,7 +165,12 @@ Expose a read-only summary command so users can inspect workspace readiness with
 ```ts
 type StatusSummary = {
   ai: AiSetupStatus;
-  sessions: Array<{ name: string; status?: SessionStatus; pid?: number; port: number }>;
+  sessions: Array<{
+    name: string;
+    status?: SessionStatus;
+    pid?: number;
+    port: number;
+  }>;
 };
 
 async function runStatus() {
