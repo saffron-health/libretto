@@ -158,8 +158,7 @@ export function formatMissingCredentialsMessage(
 }
 
 function printSnapshotApiStatus(): boolean {
-  loadSnapshotEnv();
-  let status = resolveAiSetupStatus();
+  const status = resolveAiSetupStatus();
   const envPath = join(REPO_ROOT, ".env");
 
   console.log("\nSnapshot analysis:");
@@ -310,8 +309,7 @@ function printSkipMessage(): void {
 }
 
 async function runInteractiveApiSetup(): Promise<void> {
-  loadSnapshotEnv();
-  let status = resolveAiSetupStatus();
+  const status = resolveAiSetupStatus();
   const envPath = join(REPO_ROOT, ".env");
 
   console.log("\nSnapshot analysis setup:");
@@ -483,7 +481,6 @@ export const setupCommand = SimpleCLI.command({
     if (process.stdin.isTTY) {
       await runInteractiveApiSetup();
     } else {
-      loadSnapshotEnv();
       const ready = printSnapshotApiStatus();
       if (!ready) {
         console.log(

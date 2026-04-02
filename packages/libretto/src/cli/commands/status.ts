@@ -1,9 +1,5 @@
 import { LIBRETTO_CONFIG_PATH } from "../core/context.js";
-import {
-  type AiSetupStatus,
-  loadSnapshotEnv,
-  resolveAiSetupStatus,
-} from "../core/ai-model.js";
+import { type AiSetupStatus, resolveAiSetupStatus } from "../core/ai-model.js";
 import { listRunningSessions, type SessionState } from "../core/session.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
@@ -73,7 +69,6 @@ export const statusCommand = SimpleCLI.command({
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
   .handle(async () => {
-    loadSnapshotEnv();
     const aiStatus = resolveAiSetupStatus();
     printAiStatus(aiStatus);
 

@@ -138,7 +138,14 @@ export function writeAiConfig(
   model: string,
   configPath: string = LIBRETTO_CONFIG_PATH,
 ): AiConfig {
-  const librettoConfig = readLibrettoConfig(configPath);
+  let librettoConfig: LibrettoConfig;
+  try {
+    librettoConfig = readLibrettoConfig(configPath);
+  } catch {
+    // Existing config is malformed — start fresh so repair flows can
+    // overwrite a broken file instead of throwing.
+    librettoConfig = { version: CURRENT_CONFIG_VERSION };
+  }
   const ai = AiConfigSchema.parse({
     model,
     updatedAt: new Date().toISOString(),

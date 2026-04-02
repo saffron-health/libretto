@@ -7,19 +7,13 @@ import {
   type AiConfig,
 } from "../core/config.js";
 import { LIBRETTO_CONFIG_PATH } from "../core/context.js";
+import { DEFAULT_SNAPSHOT_MODELS } from "../core/ai-model.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
-/** Default models for each provider shorthand accepted by `ai configure`. */
-const DEFAULT_MODELS: Record<string, string> = {
-  openai: "openai/gpt-5.4",
-  anthropic: "anthropic/claude-sonnet-4-6",
-  gemini: "google/gemini-3-flash-preview",
-  vertex: "vertex/gemini-2.5-pro",
-};
-
 const PROVIDER_ALIASES: Record<string, string> = {
-  claude: DEFAULT_MODELS.anthropic,
-  google: DEFAULT_MODELS.gemini,
+  claude: DEFAULT_SNAPSHOT_MODELS.anthropic,
+  gemini: DEFAULT_SNAPSHOT_MODELS.google,
+  google: DEFAULT_SNAPSHOT_MODELS.google,
 };
 
 const CONFIGURE_PROVIDERS = [
@@ -53,7 +47,11 @@ function resolveModelFromInput(input: string): string | null {
 
   // Provider shorthand
   const normalized = trimmed.toLowerCase();
-  return DEFAULT_MODELS[normalized] ?? PROVIDER_ALIASES[normalized] ?? null;
+  return (
+    (DEFAULT_SNAPSHOT_MODELS as Record<string, string>)[normalized] ??
+    PROVIDER_ALIASES[normalized] ??
+    null
+  );
 }
 
 export function runAiConfigure(
