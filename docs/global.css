@@ -60,7 +60,25 @@
 
 /* Border separating content from TOC/assistant panel */
 #table-of-contents-layout {
-  border-left: 1px solid rgba(30, 29, 26, 0.08);
+  border-left: 1px solid rgba(30, 29, 26, 0.15);
+}
+
+/* Blockquote border — warm brown, thinner */
+.mdx-content blockquote {
+  border-left-color: var(--faint);
+  border-left-width: 2px;
+}
+
+/* Stepper number circles — tan background */
+[data-component-part="step-number"] > div {
+  background-color: #e8e2d6;
+  color: var(--muted);
+}
+
+/* Card body text — slightly smaller */
+[data-component-part="card-content"] {
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 /* Cards — softer, warmer borders */

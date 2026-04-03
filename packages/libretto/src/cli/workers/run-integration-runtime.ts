@@ -295,7 +295,6 @@ async function runIntegrationInternal(
       JSON.stringify({ completedAt: new Date().toISOString() }, null, 2),
       "utf8",
     );
-    console.log("Integration completed.");
     return { status: "completed" };
   } finally {
     restoreStdout();
