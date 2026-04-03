@@ -4,9 +4,11 @@ import {
   runCloseAll as runCloseAllWithLogger,
   runConnect as runConnectWithLogger,
   runOpen,
+  runOpenWithProvider,
   runPages,
   runSave,
 } from "../core/browser.js";
+import { resolveProviderName, getProvider } from "../core/providers/index.js";
 import { createLoggerForSession, withSessionLogger } from "../core/context.js";
 import {
   assertSessionAvailableForStart,
@@ -56,6 +58,10 @@ export const openInput = SimpleCLI.input({
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
+    provider: SimpleCLI.option(z.string().optional(), {
+      help: "Browser provider (local, kernel, browserbase)",
+      aliases: ["-p"],
+    }),
   },
 })
   .refine(
@@ -75,9 +81,21 @@ export const openCommand = SimpleCLI.command({
   .handle(async ({ input, ctx }) => {
     warnIfInstalledSkillOutOfDate();
     assertSessionAvailableForStart(ctx.session, ctx.logger);
-    const headed = input.headed || !input.headless;
-    const viewport = parseViewportArg(input.viewport);
-    await runOpen(input.url!, headed, ctx.session, ctx.logger, { viewport });
+    const providerName = resolveProviderName(input.provider);
+    if (providerName === "local") {
+      const headed = input.headed || !input.headless;
+      const viewport = parseViewportArg(input.viewport);
+      await runOpen(input.url!, headed, ctx.session, ctx.logger, { viewport });
+    } else {
+      const provider = getProvider(providerName);
+      await runOpenWithProvider(
+        input.url!,
+        providerName,
+        provider,
+        ctx.session,
+        ctx.logger,
+      );
+    }
   });
 
 export const connectInput = SimpleCLI.input({

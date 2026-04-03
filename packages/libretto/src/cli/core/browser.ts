@@ -36,6 +36,7 @@ import {
   readSessionState,
   writeSessionState,
 } from "./session.js";
+import type { ProviderApi } from "./providers/types.js";
 import { installSessionTelemetry } from "./session-telemetry.js";
 
 const CLOSE_WAIT_MS = 1_500;
@@ -702,6 +703,92 @@ await new Promise(() => {});
   throw new Error(
     `Failed to connect to browser after ${Math.ceil(cdpStartupTimeoutMs / 1000)}s. Check startup logs: ${runLogPath}`,
   );
+}
+
+export async function runOpenWithProvider(
+  rawUrl: string,
+  providerName: string,
+  provider: ProviderApi,
+  session: string,
+  logger: LoggerApi,
+): Promise<void> {
+  const parsedUrl = normalizeUrl(rawUrl);
+  const url = parsedUrl.href;
+  logger.info("open-provider-start", { url, provider: providerName, session });
+
+  console.log(
+    `Creating ${providerName} browser session (session: ${session})...`,
+  );
+
+  const providerSession = await provider.createSession();
+  logger.info("open-provider-session-created", {
+    provider: providerName,
+    sessionId: providerSession.sessionId,
+    cdpEndpoint: providerSession.cdpEndpoint,
+  });
+
+  console.log(`Connecting to ${providerName} browser...`);
+
+  const browser = await tryConnectToCDP(
+    providerSession.cdpEndpoint,
+    logger,
+    30_000,
+  );
+  if (!browser) {
+    throw new Error(
+      `Could not connect to ${providerName} browser at ${providerSession.cdpEndpoint}. The remote session was created but CDP connection failed.`,
+    );
+  }
+
+  const contexts = browser.contexts();
+  let page: Page;
+  if (contexts.length > 0 && contexts[0].pages().length > 0) {
+    page = contexts[0].pages()[0];
+  } else {
+    const context =
+      contexts.length > 0 ? contexts[0] : await browser.newContext();
+    page = await context.newPage();
+  }
+
+  await page.goto(url);
+  logger.info("open-provider-navigated", { url, session });
+
+  disconnectBrowser(browser, logger, session);
+
+  // Parse the CDP endpoint to extract a port for session state.
+  // For WebSocket URLs, use port 0 as a sentinel since there's no local port.
+  let port = 0;
+  try {
+    const cdpUrl = new URL(providerSession.cdpEndpoint);
+    if (cdpUrl.port) {
+      port = Number(cdpUrl.port);
+    }
+  } catch {
+    // Keep port 0 if URL parsing fails
+  }
+
+  writeSessionState(
+    {
+      port,
+      cdpEndpoint: providerSession.cdpEndpoint,
+      session,
+      startedAt: new Date().toISOString(),
+      status: "active",
+      provider: {
+        name: providerName,
+        sessionId: providerSession.sessionId,
+      },
+    },
+    logger,
+  );
+
+  logger.info("open-provider-success", {
+    url,
+    provider: providerName,
+    session,
+    sessionId: providerSession.sessionId,
+  });
+  console.log(`Browser open (${providerName}): ${url}`);
 }
 
 export async function runSave(

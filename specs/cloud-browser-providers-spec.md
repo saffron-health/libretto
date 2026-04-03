@@ -154,11 +154,11 @@ if (providerName === "local") {
 }
 ```
 
-- [ ] Add `--provider` option to `openInput` in `packages/libretto/src/cli/commands/browser.ts`.
-- [ ] Add `runOpenWithProvider()` to `packages/libretto/src/cli/core/browser.ts` that: (1) calls `provider.createSession()`, (2) connects via `chromium.connectOverCDP(cdpEndpoint)`, (3) navigates to the URL, (4) writes session state including the `provider` field.
-- [ ] Update the `open` command handler to branch on provider.
-- [ ] Manual test: `KERNEL_API_KEY=... libretto open https://example.com --provider kernel` opens a remote browser and `libretto pages` lists the page.
-- [ ] Verify `pnpm --filter libretto type-check` passes.
+- [x] Add `--provider` option (with `-p` shorthand) to `openInput` in `packages/libretto/src/cli/commands/browser.ts`.
+- [x] Add `runOpenWithProvider()` to `packages/libretto/src/cli/core/browser.ts` that: (1) calls `provider.createSession()`, (2) connects via `chromium.connectOverCDP(cdpEndpoint)`, (3) navigates to the URL, (4) writes session state including the `provider` field.
+- [x] Update the `open` command handler to branch on provider.
+- [x] Manual test: `KERNEL_API_KEY=... libretto open https://example.com --provider kernel` opens a remote browser and `libretto pages` lists the page.
+- [x] Verify `pnpm --filter libretto type-check` passes.
 
 ### Phase 5: Wire provider cleanup into the `close` command
 
