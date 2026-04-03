@@ -337,7 +337,7 @@ export const test = base.extend<CliFixtures>({
       const normalized: SessionState = {
         session,
         port: state?.port ?? 9222,
-        pid: state?.pid ?? 12345,
+        pid: state && "pid" in state ? state.pid : 12345,
         startedAt: state?.startedAt ?? "2026-01-01T00:00:00.000Z",
         mode: state?.mode ?? "write-access",
         status: state?.status,
