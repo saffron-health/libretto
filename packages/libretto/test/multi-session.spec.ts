@@ -61,20 +61,18 @@ describe("multi-session CLI behavior", () => {
     const integrationFilePath = await writeWorkflow(
       "integration-auto-session.mjs",
       `
-export const main = workflow("main", async () => {
+export default workflow("main", async () => {
   console.log("AUTO_SESSION_RUN_OK");
 });
 `,
     );
 
-    const firstRun = await librettoCli(
-      `run "${integrationFilePath}" main --headless`,
-    );
+    const firstRun = await librettoCli(`run "${integrationFilePath}" --headless`);
     expect(firstRun.stdout).toContain("AUTO_SESSION_RUN_OK");
     expect(firstRun.stdout).toContain("Integration completed.");
 
     const secondRun = await librettoCli(
-      `run "${integrationFilePath}" main --headless`,
+      `run "${integrationFilePath}" --headless`,
     );
     expect(secondRun.stdout).toContain("AUTO_SESSION_RUN_OK");
     expect(secondRun.stdout).toContain("Integration completed.");
