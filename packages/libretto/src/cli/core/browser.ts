@@ -790,6 +790,34 @@ export async function runOpenWithProvider(
     await page.goto(url);
     logger.info("open-provider-navigated", { url, session });
 
+    // Parse the CDP endpoint to extract a port for session state.
+    // For WebSocket URLs, use port 0 as a sentinel since there's no local port.
+    let port = 0;
+    try {
+      const cdpUrl = new URL(providerSession.cdpEndpoint);
+      if (cdpUrl.port) {
+        port = Number(cdpUrl.port);
+      }
+    } catch {
+      // Keep port 0 if URL parsing fails
+    }
+
+    writeSessionState(
+      {
+        port,
+        cdpEndpoint: providerSession.cdpEndpoint,
+        session,
+        startedAt: new Date().toISOString(),
+        status: "active",
+        mode: accessMode,
+        provider: {
+          name: providerName,
+          sessionId: providerSession.sessionId,
+        },
+      },
+      logger,
+    );
+
     disconnectBrowser(browser, logger, session);
   } catch (err) {
     if (browser) {
@@ -812,34 +840,6 @@ export async function runOpenWithProvider(
     }
     throw err;
   }
-
-  // Parse the CDP endpoint to extract a port for session state.
-  // For WebSocket URLs, use port 0 as a sentinel since there's no local port.
-  let port = 0;
-  try {
-    const cdpUrl = new URL(providerSession.cdpEndpoint);
-    if (cdpUrl.port) {
-      port = Number(cdpUrl.port);
-    }
-  } catch {
-    // Keep port 0 if URL parsing fails
-  }
-
-  writeSessionState(
-    {
-      port,
-      cdpEndpoint: providerSession.cdpEndpoint,
-      session,
-      startedAt: new Date().toISOString(),
-      status: "active",
-      mode: accessMode,
-      provider: {
-        name: providerName,
-        sessionId: providerSession.sessionId,
-      },
-    },
-    logger,
-  );
 
   logger.info("open-provider-success", {
     url,
