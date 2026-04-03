@@ -1203,7 +1203,8 @@ export async function runCloseAll(
       `Cleared ${clearedUnreadableStates} unreadable session state file(s).`,
     );
   }
-  console.log(`Closed ${closable.length} session(s).`);
+  const closedCount = closable.length - failedProviderSessions.size;
+  console.log(`Closed ${closedCount} session(s).`);
   if (forceKilled > 0) {
     console.log(`Force-killed ${forceKilled} session(s).`);
   }
