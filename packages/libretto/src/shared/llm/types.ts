@@ -4,10 +4,15 @@ export type MessageContentPart =
   | { type: "text"; text: string }
   | { type: "image"; image: string | Uint8Array; mediaType?: string };
 
-export type Message = {
-  role: "user" | "assistant";
-  content: string | MessageContentPart[];
-};
+export type Message =
+  | {
+      role: "system";
+      content: string;
+    }
+  | {
+      role: "user" | "assistant";
+      content: string | MessageContentPart[];
+    };
 
 /**
  * Pluggable LLM client interface.

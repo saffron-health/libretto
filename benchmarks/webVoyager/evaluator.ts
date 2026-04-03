@@ -24,25 +24,20 @@ export type JudgeResult = {
 // ---------------------------------------------------------------------------
 
 const JUDGE_MODEL =
-  process.env.BENCH_JUDGE_MODEL ?? "anthropic/claude-sonnet-4-6";
+  process.env.BENCH_JUDGE_MODEL ?? "vertex/gemini-2.5-flash";
 
 // ---------------------------------------------------------------------------
 // System prompt (mirrors Stagehand V3Evaluator multi-screenshot approach)
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are an expert evaluator for browser automation agents.
-
-You will be shown a sequence of screenshots captured during the agent's task execution, plus the agent's own reasoning about what it accomplished.
-
-Your job:
-1. Analyze ALL screenshots to understand the complete journey the agent took.
-2. Look for visual evidence of task completion across the full screenshot sequence.
-3. Consider the agent's reasoning, but verify it against the visual evidence.
-4. A task is successful ONLY if there is clear visual evidence that the core objective was achieved, not just that the agent navigated to some pages.
-
-Return a JSON object with:
-- "evaluation": "YES" if the task was completed successfully, "NO" otherwise.
-- "reasoning": A brief explanation of your verdict referencing the visual evidence.`;
+function buildSystemPrompt(hasAgentReasoning: boolean): string {
+  return `You are an expert evaluator that confidently returns YES or NO given a question and multiple screenshots showing the progression of a task.
+${hasAgentReasoning ? "You also have access to the agent's detailed reasoning and thought process throughout the task." : ""}
+Analyze ALL screenshots to understand the complete journey. Look for evidence of task completion across all screenshots, not just the last one.
+Success criteria may appear at different points in the sequence (confirmation messages, intermediate states, etc).
+${hasAgentReasoning ? "The agent's reasoning provides crucial context about what actions were attempted, what was observed, and the decision-making process. Use this alongside the visual evidence to make a comprehensive evaluation." : ""}
+Today's date is ${new Date().toLocaleDateString()}`;
+}
 
 // ---------------------------------------------------------------------------
 // evaluate()
@@ -55,50 +50,44 @@ export async function evaluateWithScreenshots(opts: {
 }): Promise<JudgeResult> {
   const { task, screenshots, agentReasoning } = opts;
 
-  if (screenshots.length === 0 && !agentReasoning?.trim()) {
+  if (screenshots.length === 0) {
     return {
-      evaluation: "NO",
+      evaluation: "INVALID",
       reasoning:
-        "No screenshots captured and no agent reasoning available — cannot verify task completion.",
+        "No screenshots captured; matching Stagehand's multi-screenshot evaluator, this benchmark run cannot be judged.",
     };
   }
 
   // Build the multimodal user message
   const contentParts: MessageContentPart[] = [];
 
+  // Build question text with reasoning context and screenshot framing
+  const hasReasoning = !!agentReasoning?.trim();
+  let questionText: string;
+  if (hasReasoning) {
+    questionText = `Question: Did the agent successfully complete this task: "${task}"?\n\nAgent's reasoning and actions throughout the task:\n${agentReasoning!.trim()}\n\nI'm providing ${screenshots.length} screenshots showing the progression of the task. Please analyze both the agent's reasoning and all screenshots to determine if the task was completed successfully.`;
+  } else {
+    questionText = `Did the agent successfully complete this task: "${task}"?\n\nI'm providing ${screenshots.length} screenshots showing the progression of the task. Please analyze all of them to determine if the task was completed successfully.`;
+  }
+
   contentParts.push({
     type: "text",
-    text: `Did the agent successfully complete this task: "${task}"?`,
+    text: questionText,
   });
 
   // Add screenshots as image parts
-  for (let i = 0; i < screenshots.length; i++) {
-    contentParts.push({
-      type: "text",
-      text: `Screenshot ${i + 1} of ${screenshots.length}:`,
-    });
+  for (const screenshot of screenshots) {
     contentParts.push({
       type: "image",
-      image: screenshots[i],
+      image: screenshot,
       mediaType: "image/png",
     });
   }
 
-  // Add agent reasoning if available
-  if (agentReasoning?.trim()) {
-    contentParts.push({
-      type: "text",
-      text: `\nAgent's reasoning about what it accomplished:\n${agentReasoning.trim()}`,
-    });
-  }
+  const systemPrompt = buildSystemPrompt(hasReasoning);
 
   const messages: Message[] = [
-    { role: "user", content: SYSTEM_PROMPT },
-    {
-      role: "assistant",
-      content:
-        "I understand. Please provide the task, screenshots, and agent reasoning for me to evaluate.",
-    },
+    { role: "system", content: systemPrompt },
     { role: "user", content: contentParts },
   ];
 

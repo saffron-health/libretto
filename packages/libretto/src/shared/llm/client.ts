@@ -160,8 +160,29 @@ function convertAssistantContentParts(parts: MessageContentPart[]) {
     .map((part) => ({ type: "text" as const, text: part.text }));
 }
 
+function convertSystemContent(content: string | MessageContentPart[]): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  return content
+    .filter(
+      (part): part is MessageContentPart & { type: "text" } =>
+        part.type === "text",
+    )
+    .map((part) => part.text)
+    .join("\n\n");
+}
+
 function convertMessages(messages: Message[]): ModelMessage[] {
   return messages.map((msg): ModelMessage => {
+    if (msg.role === "system") {
+      return {
+        role: "system",
+        content: convertSystemContent(msg.content),
+      };
+    }
+
     if (msg.role === "user") {
       if (typeof msg.content === "string") {
         return { role: "user", content: msg.content };

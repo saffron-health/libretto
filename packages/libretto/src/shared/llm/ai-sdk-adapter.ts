@@ -40,6 +40,10 @@ export function createLLMClientFromModel(model: LanguageModel): LLMClient {
     }): Promise<ZodOutput<T>> {
       // Convert libretto Message format to AI SDK message format
       const messages = opts.messages.map((msg) => {
+        if (msg.role === "system") {
+          return { role: "system" as const, content: msg.content };
+        }
+
         if (typeof msg.content === "string") {
           return { role: msg.role, content: msg.content };
         }

@@ -13,8 +13,6 @@ import {
   SettingsManager,
   type AgentSessionEvent,
 } from "@mariozechner/pi-coding-agent";
-import { z } from "zod";
-import { createLLMClient } from "../libretto-internals.js";
 import {
   formatSelectionSummary,
   readWebVoyagerRows,
@@ -27,7 +25,6 @@ import { evaluateWithScreenshots, type JudgeResult } from "./evaluator.js";
 import {
   openKernelSessionForBenchmark,
   closeKernelSessionForBenchmark,
-  type KernelSessionHandle,
 } from "./kernel-session.js";
 
 // ---------------------------------------------------------------------------
@@ -794,11 +791,12 @@ export async function runWebVoyagerCase(
     );
 
     let finalMessage: string | null = null;
+    const collectedReasoning: string[] = [];
     let thrownError: unknown;
+    const pendingToolCalls = new Map<string, { toolName: string; args: unknown }>();
 
-    // Start screenshot collection on the libretto browser session
+    // Capture screenshots after relevant libretto exec/snapshot tool calls.
     const screenshotCollector = new ScreenshotCollector(sessionName, runDir);
-    screenshotCollector.start();
 
     const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
       if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
@@ -806,6 +804,43 @@ export async function runWebVoyagerCase(
       }
 
       switch (event.type) {
+        case "tool_execution_start": {
+          const typedEvent = event as AgentSessionEvent & {
+            toolCallId?: string;
+            toolName?: string;
+            args?: unknown;
+          };
+          if (
+            typeof typedEvent.toolCallId === "string" &&
+            typeof typedEvent.toolName === "string"
+          ) {
+            pendingToolCalls.set(typedEvent.toolCallId, {
+              toolName: typedEvent.toolName,
+              args: typedEvent.args,
+            });
+          }
+          break;
+        }
+        case "tool_execution_end": {
+          const typedEvent = event as AgentSessionEvent & {
+            toolCallId?: string;
+            toolName?: string;
+          };
+          const pendingToolCall =
+            typeof typedEvent.toolCallId === "string"
+              ? pendingToolCalls.get(typedEvent.toolCallId) ?? null
+              : null;
+          if (pendingToolCall) {
+            screenshotCollector.captureForToolCall(
+              pendingToolCall.toolName,
+              pendingToolCall.args,
+            );
+          }
+          if (typeof typedEvent.toolCallId === "string") {
+            pendingToolCalls.delete(typedEvent.toolCallId);
+          }
+          break;
+        }
         case "message_end": {
           const messageText = extractAssistantText(event.message);
           if (!messageText) {
@@ -813,6 +848,7 @@ export async function runWebVoyagerCase(
           }
 
           finalMessage = messageText;
+          collectedReasoning.push(messageText);
           break;
         }
       }
@@ -834,10 +870,13 @@ export async function runWebVoyagerCase(
     const screenshots = await screenshotCollector.stop();
 
     // Evaluate using screenshot-based LLM judge
+    // Pass all accumulated reasoning (mirrors Stagehand's approach of
+    // concatenating every reasoning segment across the full session).
+    const fullReasoning = collectedReasoning.join("\n\n").trim() || null;
     const judge = await evaluateWithScreenshots({
       task: row.ques,
       screenshots,
-      agentReasoning: finalMessage,
+      agentReasoning: fullReasoning,
     });
 
     // Persist evaluator artifacts
@@ -846,7 +885,7 @@ export async function runWebVoyagerCase(
       screenshots,
       judge,
       row.ques,
-      finalMessage,
+      fullReasoning,
     );
     const transcriptAnalysisPath = await writeTranscriptAnalysis(
       runDir,

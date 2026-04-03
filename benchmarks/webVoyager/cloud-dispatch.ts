@@ -32,6 +32,7 @@ const MAX_PARALLELISM = 20;
 const MODEL = "claude-opus-4-6";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
+const VERBOSE_DOCKER_LOGS = process.env.BENCH_VERBOSE_DOCKER === "1";
 
 // ---------------------------------------------------------------------------
 // Run ID generation
@@ -50,8 +51,7 @@ export function generateRunId(): string {
 
 export function buildAndPushImage(tag: string): void {
   console.log(`Building Docker image: ${tag}`);
-  execFileSync(
-    "docker",
+  runDockerCommand(
     [
       "build",
       "--platform",
@@ -60,16 +60,73 @@ export function buildAndPushImage(tag: string): void {
       "benchmarks/Dockerfile",
       "-t",
       tag,
+      ...(VERBOSE_DOCKER_LOGS ? [] : ["--quiet"]),
       ".",
     ],
-    { cwd: repoRoot, stdio: "inherit" },
+    `Failed to build Docker image ${tag}.`,
   );
+  console.log(`Built Docker image: ${tag}`);
 
   console.log(`Pushing Docker image: ${tag}`);
-  execFileSync("docker", ["push", tag], {
-    cwd: repoRoot,
-    stdio: "inherit",
-  });
+  runDockerCommand(
+    ["push", ...(VERBOSE_DOCKER_LOGS ? [] : ["--quiet"]), tag],
+    `Failed to push Docker image ${tag}.`,
+  );
+  console.log(`Pushed Docker image: ${tag}`);
+}
+
+function runDockerCommand(args: string[], failurePrefix: string): string {
+  try {
+    return execFileSync("docker", args, {
+      cwd: repoRoot,
+      stdio: VERBOSE_DOCKER_LOGS ? "inherit" : ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+    });
+  } catch (error) {
+    const details =
+      typeof error === "object" && error !== null
+        ? (error as { stdout?: string | Buffer; stderr?: string | Buffer })
+        : {};
+    const stdout =
+      typeof details.stdout === "string"
+        ? details.stdout.trim()
+        : Buffer.isBuffer(details.stdout)
+          ? details.stdout.toString("utf8").trim()
+          : "";
+    const stderr =
+      typeof details.stderr === "string"
+        ? details.stderr.trim()
+        : Buffer.isBuffer(details.stderr)
+          ? details.stderr.toString("utf8").trim()
+          : "";
+    const message = error instanceof Error ? error.message : String(error);
+
+    throw new Error(
+      [
+        failurePrefix,
+        message,
+        stdout ? `stdout:\n${truncateForCli(stdout)}` : null,
+        stderr ? `stderr:\n${truncateForCli(stderr)}` : null,
+        VERBOSE_DOCKER_LOGS
+          ? null
+          : "Re-run with BENCH_VERBOSE_DOCKER=1 for full Docker logs.",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
+  }
+}
+
+function truncateForCli(output: string, maxLines = 80): string {
+  const lines = output.split("\n");
+  if (lines.length <= maxLines) {
+    return output;
+  }
+
+  return [
+    `... trimmed to last ${maxLines} lines ...`,
+    ...lines.slice(-maxLines),
+  ].join("\n");
 }
 
 // ---------------------------------------------------------------------------
