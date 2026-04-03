@@ -1,8 +1,8 @@
 ---
-title: Automation approaches
+title: Automation & bot detection
 ---
 
-> Choose the right integration strategy: Playwright UI, passive interception, in-browser fetch, or direct HTTP.
+> Choose the right integration strategy and understand bot detection trade-offs.
 
 ### Overview
 
@@ -151,19 +151,16 @@ Libretto supports four distinct approaches to capturing data and automating web 
   </Tab>
 
   <Tab title="Direct HTTP">
-    Make HTTP requests directly from Node.js using `fetch`, `axios`, `got`, or similar libraries. No browser involved.
+    Make HTTP requests directly from Node.js using the built-in `fetch` API. No browser involved.
 
     ```typescript  theme={null}
-    import axios from 'axios';
-
-    const response = await axios.get('https://example.com/api/search/results', {
-      params: { q: 'term', page: 1 },
+    const response = await fetch('https://example.com/api/search/results?q=term&page=1', {
       headers: {
         'User-Agent': 'Mozilla/5.0 ...',
         'Cookie': 'session=abc123; ...',
       },
     });
-    const data = response.data;
+    const data = await response.json();
     ```
 
     **Pros:**
@@ -250,14 +247,37 @@ Libretto supports four distinct approaches to capturing data and automating web 
 
 ***
 
-### Related pages
+### Bot detection
 
-<CardGroup cols={2}>
-  <Card title="Bot detection" icon="shield" href="./bot-detection">
-    Understand how sites detect automation and which signals each approach exposes.
-  </Card>
+<Warning>
+  Bot detection avoidance is best-effort. Libretto cannot guarantee your
+  automation will go undetected. Using Libretto with authenticated accounts may
+  violate the terms of service of those services. Understand the risks before
+  automating against any site you don't control.
+</Warning>
 
-  <Card title="Sessions and profiles" icon="user" href="../cli-reference/sessions-and-profiles">
-    Manage named browser sessions and persist authenticated state across runs.
-  </Card>
-</CardGroup>
+#### What Libretto does automatically
+
+Libretto applies two baseline stealth measures when launching a browser:
+
+- **Suppresses the automation flag** — Disables Chrome's `AutomationControlled` blink feature so `navigator.webdriver` is not set to `true`.
+- **Sets a real User-Agent** — Overrides the default Playwright user-agent with a standard Chrome user-agent string.
+
+These measures help with sites that only perform basic automation checks. They are not sufficient for sites with enterprise bot protection (Cloudflare, Akamai, PerimeterX, DataDome, etc.).
+
+#### Signs your automation is being detected
+
+Watch for these during development:
+
+- **Challenge pages** — "Checking your browser..." interstitials, CAPTCHAs, or blank pages before content loads
+- **HTTP 403 / Access Denied** — Requests that work in a normal browser but fail in automation
+- **Degraded results** — Fewer items returned, missing data, or slower responses compared to manual browsing
+- **Account flags** — Login failures, security alerts, or account lockouts when using authenticated sessions
+
+#### Tips for reducing detection risk
+
+- **Use headed mode** — Headless browsers have detectable differences in rendering and API behavior. Libretto launches in headed mode by default.
+- **Add realistic delays** — Use `page.type()` with variable delays instead of `page.fill()`. Pause between actions like a human would.
+- **Reuse authenticated profiles** — Use `libretto save` to persist session state. Logging in every run is more suspicious than reusing a saved session.
+- **Avoid cloud IPs** — Requests from AWS/GCP/Azure IP ranges face higher scrutiny. Run from a residential IP when possible.
+- **Check for fetch patching** — Before using `pageRequest()`, open the browser console and run `window.fetch.toString()`. If it returns actual JavaScript (not `"[native code]"`), the site monitors fetch calls. Prefer passive interception instead.

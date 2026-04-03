@@ -4,7 +4,7 @@ title: One-shot workflow generation
 
 > Give your agent a goal and a URL, and get back a complete browser automation script.
 
-One-shot generation is the fastest path from idea to working automation. You describe what you want in a single prompt, and your coding agent — armed with the Libretto skill — opens a browser, explores the site, and writes a complete workflow file. No recording, no hand-holding.
+One-shot generation is the fastest way to go from an idea to a working automation. You describe what you want in a single prompt, and your coding agent opens a browser, explores the site, and writes a complete workflow file.
 
 ### Steps
 
@@ -12,9 +12,11 @@ One-shot generation is the fastest path from idea to working automation. You des
   <Step title="Prompt your agent">
     Describe the **site**, the **data or action** you want, and the **shape of the output**. The more specific you are, the better your results.
 
-    > Use the Libretto skill. Go on Hacker News and scrape the first 10 posts for title, URL, score, author, and number of comments.
+    ```text Example prompt
+    Use the Libretto skill. Go on Craigslist and scrape the first 10 "free stuff" listings for title, location, and link.
+    ```
 
-    Include "Use the Libretto skill" in your prompt so your coding agent uses Libretto's CLI tools instead of writing a Playwright script from scratch.
+    Include "Use the Libretto skill" so your agent uses Libretto's CLI tools instead of writing a Playwright script from scratch.
 
   </Step>
 
@@ -23,21 +25,21 @@ One-shot generation is the fastest path from idea to working automation. You des
 
     ```bash  theme={null}
     # What the agent runs behind the scenes
-    npx libretto open https://news.ycombinator.com --headed --session one-shot-flow
+    npx libretto open https://sfbay.craigslist.org --headed --session one-shot-flow
     ```
 
     <Note>
-      If the site needs login, make sure your prompt doesn't say `--headless` — the agent needs to open a visible browser so you can authenticate. You can mention "I need to log in first" in your prompt to be explicit.
+      If the site needs login, make sure your prompt doesn't say `--headless`. You can mention "I need to log in first" in your prompt to be explicit.
     </Note>
 
   </Step>
 
   <Step title="The agent explores the page">
-    The agent takes snapshots of the page and tests selectors against the live DOM. You'll see it running commands like `npx libretto snapshot` and `npx libretto exec` in your terminal. The browser window stays visible so you can watch what's happening.
+    The agent takes snapshots and tests selectors against the live DOM. You'll see it running commands like `npx libretto snapshot` and `npx libretto exec` in your terminal.
 
-    You don't need to do anything during this phase, but if the agent seems stuck or heading in the wrong direction, you can interrupt and redirect:
+    You don't need to do anything during this phase, but you can redirect the agent if it seems stuck:
 
-    > That's the wrong section — the posts are in the main feed, not the sidebar.
+    > The listings are in the main content area, not the sidebar.
 
   </Step>
 
@@ -48,55 +50,53 @@ One-shot generation is the fastest path from idea to working automation. You des
     import { workflow } from "libretto";
 
     type Output = {
-      posts: Array<{
+      listings: Array<{
         title: string;
-        url: string;
-        score: number;
-        author: string;
-        commentCount: number;
+        location: string;
+        link: string;
       }>;
     };
 
-    export const hnTopPosts = workflow<{}, Output>(
-      "hnTopPosts",
+    export const freeStuff = workflow<{}, Output>(
+      "freeStuff",
       async (ctx): Promise<Output> => {
         const { page } = ctx;
 
-        await page.goto("https://news.ycombinator.com");
-        await page.waitForSelector(".athing");
+        await page.goto("https://sfbay.craigslist.org/search/zip");
+        await page.waitForSelector(".result-row");
 
-        const rows = await page.locator(".athing").all();
-        const posts = [];
+        const rows = await page.locator(".result-row").all();
+        const listings = [];
 
         for (const row of rows.slice(0, 10)) {
-          const title = await row.locator(".titleline > a").textContent();
-          const url = await row.locator(".titleline > a").getAttribute("href");
-          // ... extract score, author, comment count from subtext row
+          const title = await row.locator(".result-title").textContent();
+          const link = await row.locator("a").getAttribute("href");
+          // ... extract location
         }
 
-        return { posts };
+        return { listings };
       },
     );
     ```
 
     Things to check:
     - **Output type** matches what you asked for
-    - **Selectors** look reasonable (class names, data attributes, or ARIA roles — not brittle positional selectors)
+    - **Selectors** look reasonable (class names, data attributes, or ARIA roles, not brittle positional selectors)
     - **Pagination** logic is present if you asked for more items than fit on one page
 
   </Step>
 
   <Step title="Check the validation run">
-    The agent runs the workflow headless and shows you the output. Check that the returned data looks right — correct field names, real values, expected number of items.
+    The agent runs the workflow headless and shows you the output. Check that the returned data looks right.
 
     ```bash  theme={null}
     # What the agent runs
-    npx libretto run ./hn-top-posts.ts hnTopPosts --headless
+    npx libretto run ./free-stuff.ts freeStuff --headless
     ```
 
-    If the output is wrong or incomplete, tell the agent what's off:
+    If the output is wrong, tell the agent what's off:
 
-    > The reactions count is always 0 — it looks like it's reading the wrong element.
+    > The location is always empty. It looks like it's reading the wrong element.
 
     The agent will re-inspect the page and fix the issue.
 
@@ -106,7 +106,7 @@ One-shot generation is the fastest path from idea to working automation. You des
 ### When to use this approach
 
 - You're automating a site for the first time and don't know its structure
-- The task is self-contained and clearly scoped ("get the first 10 posts")
+- The task is self-contained and clearly scoped ("get the first 10 listings")
 - You want a working script with minimal back-and-forth
 - You don't need to demonstrate the workflow manually first
 
@@ -120,14 +120,14 @@ One-shot generation is the fastest path from idea to working automation. You des
 
 <Note>
   Make sure your coding agent has the Libretto skill installed before starting.
-  Run `npx libretto setup` in your project root to set up the workspace and
-  configure snapshot analysis if you haven't already.
+  Run `npm init libretto@latest` in your project root to set up the workspace
+  if you haven't already.
 </Note>
 
 ### Related guides
 
 <CardGroup cols={2}>
-  <Card title="Interactive script building" href="./interactive-script-building">
+  <Card title="Interactive workflow building" href="./interactive-script-building">
     Show the agent your workflow manually and let it turn your actions into code.
   </Card>
 

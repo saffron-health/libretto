@@ -50,9 +50,8 @@
         "pages": [
           "get-started/introduction",
           "get-started/configuration",
-          "get-started/architecture",
-          "get-started/automation-approaches",
-          "get-started/bot-detection"
+          "get-started/core-concepts",
+          "get-started/automation-approaches"
         ]
       },
       {
@@ -82,10 +81,8 @@
           "library-api/workflow",
           "library-api/extraction",
           "library-api/network",
-          "library-api/recovery",
-          "library-api/instrumentation",
-          "library-api/logging",
-          "library-api/openapi-spec"
+          "library-api/downloads",
+          "library-api/recovery"
         ]
       }
     ],
@@ -113,13 +110,7 @@
   "contextual": {
     "options": [
       "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
+      "view"
     ]
   },
   "footer": {}

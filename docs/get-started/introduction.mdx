@@ -7,7 +7,7 @@ sidebarTitle: Introduction
 
 Libretto gives your coding agent a live browser and a token-efficient CLI to inspect pages, capture traffic, record actions, and debug workflows — all without flooding your agent's context window with raw HTML.
 
-Built by the team at [Saffron Health](https://saffron.health), Libretto was created to help maintain browser integrations to common healthcare software. It's open-source so other teams can do the same.
+We created Libretto to help us build and maintain browser integrations for healthcare EHRs and payor portals. It's open-source so other teams can do the same. Built by the team at [Saffron Health](https://saffron.health).
 
 ## Get started
 
@@ -17,26 +17,24 @@ Run this in your project directory:
 npm init libretto@latest
 ```
 
-This installs Libretto, downloads Chromium, sets up the `.libretto/` directory, copies agent skill files, and walks you through configuring a snapshot analysis model.
+This installs Libretto, sets up the `.libretto/` directory, copies agent skill files, and walks you through configuring an AI provider for snapshot analysis. If Chromium isn't already installed, it downloads it automatically.
 
 <Note>
-  Run this yourself in a terminal — not through an agent. It may prompt for
-  input and starts a Chromium download that takes a moment.
+  Run this yourself in a terminal, not through an agent. It may prompt for
+  input.
 </Note>
 
-Once setup is complete, load up your favorite coding agent and try one of these prompts:
+Once setup is complete, load up your favorite coding agent and try a prompt:
 
-> Use the Libretto skill. Go to LinkedIn and scrape the first 10 posts — content, author, reaction count, and first 25 comments.
-
-> I'll show you a workflow in eClinicalWorks to get a patient's primary insurance ID. Use the Libretto skill to turn it into a Playwright script.
-
-> We have a browser script at `./integration.ts` that's throwing a broken selector error. Fix it. Use the Libretto skill.
+```text Example prompt
+Use the Libretto skill. Go to Craigslist and scrape the first 10 listings in the "free stuff" section for title, location, and link.
+```
 
 ## Core capabilities
 
 - **Inspect live pages** — Snapshot any page and get a token-efficient summary of selectors, interactive elements, and visible state.
 - **Capture network traffic** — Record every HTTP request/response to a structured JSONL log for reverse-engineering site APIs.
-- **Record user actions** — Capture DOM events with semantic selectors so your agent can reconstruct workflows as Playwright scripts.
+- **Record user actions** — Capture clicks, form fills, and navigation in the browser so your agent can turn them into Playwright scripts.
 - **Debug broken workflows** — Keep the browser open on failure so your agent can inspect, patch, and re-run without restarting.
 
 ## Common commands
@@ -51,23 +49,11 @@ npx libretto run ./integration.ts main
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="CLI reference" icon="terminal" href="../cli-reference/open-and-connect">
-    Full reference for every Libretto command and flag.
+  <Card title="Configuration" icon="settings" href="./configuration">
+    Configure your AI provider, viewport, and session defaults.
   </Card>
 
-<Card
-  title="Workflow guides"
-  icon="sparkles"
-  href="../workflow-guides/one-shot-script-generation"
->
-  See how Libretto fits into real agent-driven automation workflows.
-</Card>
-
-<Card title="Library API" icon="code" href="../library-api/workflow">
-  Write workflow files with the typed `workflow()` API.
-</Card>
-
-  <Card title="Configuration" icon="settings" href="./configuration">
-    Configure Libretto's AI provider, viewport, and session defaults.
+  <Card title="Workflow guides" icon="sparkles" href="../workflow-guides/one-shot-script-generation">
+    Build your first automation with step-by-step guides.
   </Card>
 </CardGroup>

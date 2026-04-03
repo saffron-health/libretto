@@ -4,7 +4,9 @@ title: Interactive workflow building
 
 > Record your actions in the browser and let your agent turn them into automation code.
 
-Some workflows are too complex to describe in words alone — especially in healthcare software and legacy web apps where the interaction sequence matters and the UI has unusual patterns. Interactive script building lets you perform the workflow yourself while Libretto records every click, fill, and navigation. Your agent then reads the action log and translates what you did into a reusable automation script.
+Some workflows are too complex to describe in words alone, especially in healthcare software and legacy web apps where the interaction sequence matters and the UI has unusual patterns. Interactive script building lets you perform the workflow yourself while Libretto records every click, fill, and navigation. Your agent then reads the action log and translates what you did into a reusable automation script.
+
+This approach combines your knowledge of the application (you drive the browser and show the agent the workflow) with the agent's ability to figure out the right selectors and write reliable Playwright code.
 
 ### Steps
 
@@ -12,16 +14,18 @@ Some workflows are too complex to describe in words alone — especially in heal
   <Step title="Prompt your agent">
     Describe the **site**, the **workflow** you're going to demonstrate, and the **input/output shape** you want. Mention that you'll show the steps manually.
 
-    > Use the Libretto skill. I'm going to show you a workflow in eClinicalWorks to look up a patient's primary insurance ID. Turn it into a script that takes patient name and DOB as input and returns the insurance ID. URL is https://your-ehr.example.com
+    ```text Example prompt
+    Use the Libretto skill. I'm going to show you a workflow in eClinicalWorks to look up a patient's primary insurance ID. Turn it into a script that takes patient name and DOB as input and returns the insurance ID. URL is https://your-ehr.example.com
+    ```
 
     Include "Use the Libretto skill" so your coding agent uses Libretto's CLI tools instead of writing a Playwright script from scratch.
 
   </Step>
 
   <Step title="Perform the workflow in the browser">
-    The agent opens a headed browser window on your screen. If the site requires login, do that first. Then walk through the workflow exactly as you normally would — search for a patient, open their record, navigate to the insurance tab, whatever the task requires.
+    The agent opens a headed browser window on your screen. If the site requires login, do that first. Then walk through the workflow exactly as you normally would: search for a patient, open their record, navigate to the insurance tab, whatever the task requires.
 
-    Libretto records every click, form fill, and navigation in the background. You don't need to do anything special — just use the app normally.
+    Libretto records every click, form fill, and navigation in the background. You don't need to do anything special, just use the app normally.
 
     When you're done, tell the agent what you did and where the result ended up:
 
@@ -32,21 +36,21 @@ Some workflows are too complex to describe in words alone — especially in heal
     > I clicked the second search result because the first row is always a header. Also, the insurance tab sometimes takes a few seconds to load.
 
     <Note>
-      Take your time. The recording captures everything, so there's no penalty for pausing to think or scrolling around to orient yourself. If you make a mistake, just undo it naturally — the agent can filter out dead ends.
+      Take your time. The recording captures everything, so there's no penalty for pausing to think or scrolling around. If you make a mistake, just undo it naturally. The agent can filter out dead ends.
     </Note>
 
   </Step>
 
   <Step title="Wait for the agent to recreate your workflow">
-    The agent reads the action log that Libretto recorded — every click, fill, and navigation along with the selectors and page context for each one. You'll see it run commands like:
+    The agent reads the action log that Libretto recorded: every click, fill, and navigation along with the selectors and page context for each one. You'll see it run commands like:
 
     ```bash  theme={null}
     npx libretto actions --session interactive-flow
     ```
 
-    It uses this log as a blueprint to write a TypeScript workflow file that replicates your steps programmatically. The agent may also snapshot the page or test selectors against the live DOM to make sure everything works. You don't need to do anything during this phase.
+    It uses this log as a blueprint to write a TypeScript workflow file that replicates your steps programmatically. The agent may also snapshot the page or test selectors against the live DOM to make sure everything works.
 
-    If the agent asks clarifying questions about what you did, answer them — but usually the action log plus your summary is enough.
+    If the agent asks clarifying questions about what you did, answer them. Usually the action log plus your summary is enough.
 
   </Step>
 
@@ -54,13 +58,13 @@ Some workflows are too complex to describe in words alone — especially in heal
     The agent writes a TypeScript file that exports a `workflow()`. Things to check:
 
     - **Output type** matches what you asked for
-    - **Selectors** look reasonable (class names, data attributes, or ARIA roles — not brittle positional selectors)
-    - **Parameterization** — values you typed during the demo should be replaced with input parameters, not hardcoded
-    - **Wait logic** — if you mentioned something takes time to load, make sure there's a `waitForSelector` or similar
+    - **Selectors** look reasonable (class names, data attributes, or ARIA roles, not brittle positional selectors)
+    - **Parameterization**: values you typed during the demo should be replaced with input parameters, not hardcoded
+    - **Wait logic**: if you mentioned something takes time to load, make sure there's a `waitForSelector` or similar
 
     If something's off, tell the agent:
 
-    > The patient name is hardcoded — it should come from the input parameter. Also, the insurance tab selector looks fragile, can you use the tab's text instead?
+    > The patient name is hardcoded. It should come from the input parameter. Also, the insurance tab selector looks fragile, can you use the tab's text instead?
 
   </Step>
 
@@ -73,9 +77,9 @@ Some workflows are too complex to describe in words alone — especially in heal
       --params '{"patientName": "Jane Smith", "dob": "1985-04-12"}'
     ```
 
-    If the output is wrong or incomplete, tell the agent what's off:
+    If the output is wrong, tell the agent what's off:
 
-    > It returned an empty string for the insurance ID — I think the tab content hadn't loaded yet when it tried to read the value.
+    > It returned an empty string for the insurance ID. I think the tab content hadn't loaded yet when it tried to read the value.
 
     The agent will re-inspect the page and fix the issue.
 
@@ -86,7 +90,6 @@ Some workflows are too complex to describe in words alone — especially in heal
 
 - The workflow involves many steps and is hard to describe concisely
 - You're working with EHR, healthcare, or legacy enterprise software with unusual UI patterns
-- You want to delegate the "figure out the selectors" work entirely to the agent
 - The workflow involves conditional paths that are easier to show than explain
 
 ### Tips

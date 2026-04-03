@@ -4,7 +4,7 @@ title: Convert to network requests
 
 > Convert browser automations to direct API calls for speed and reliability.
 
-Browser automation is reliable, but it's not always the fastest approach. When a site's internal API is accessible from within the browser context, calling those endpoints directly is faster and less fragile than driving the UI — no selectors to maintain, no page rendering to wait for, and no DOM changes to break your script.
+Browser automation is reliable, but it's not always the fastest approach. When a site's internal API is accessible from within the browser context, calling those endpoints directly is faster and less fragile than driving the UI. No selectors to maintain, no page rendering to wait for, and no DOM changes to break your script.
 
 Libretto captures all network traffic during a browser session, so your agent can inspect exactly which API calls the site makes and convert a UI-based workflow to direct requests.
 
@@ -15,7 +15,7 @@ Libretto captures all network traffic during a browser session, so your agent ca
 - The site does API-level monitoring that correlates request timing to UI interactions
 - The data you need is rendered client-side and doesn't come from a clean API response
 
-In these cases, passive interception (`page.on('response', ...)`) is the safest middle ground — it captures API data without making extra requests.
+In these cases, stick with your existing Playwright automation or use passive interception (`page.on('response', ...)`) to capture API data without making extra requests.
 
 </Warning>
 
@@ -25,9 +25,11 @@ In these cases, passive interception (`page.on('response', ...)`) is the safest 
   <Step title="Prompt your agent">
     Point the agent at the **existing workflow file** and ask it to convert to network requests.
 
-    > Use the Libretto skill. We have a browser script at ./integration.ts that automates going to Hacker News and getting the first 10 posts. Convert it to direct network requests instead.
+    ```text Example prompt
+    Use the Libretto skill. We have a browser script at ./integration.ts that automates going to Hacker News and getting the first 10 posts. Convert it to direct network requests instead.
+    ```
 
-    Include "Use the Libretto skill" so your agent uses Libretto's network capture and security review tools instead of guessing at API endpoints.
+    Include "Use the Libretto skill" so your agent uses Libretto's network capture tools instead of guessing at API endpoints.
 
   </Step>
 
@@ -47,8 +49,8 @@ In these cases, passive interception (`page.on('response', ...)`) is the safest 
   <Step title="Review the agent's approach">
     The agent reports what API endpoints it found and whether the site has bot protection. It recommends one of two approaches:
 
-    - **In-browser fetch** — call endpoints directly from within the browser's JavaScript context. The requests share the browser's cookies and TLS fingerprint, so they look identical to the site's own requests. Faster, but only safe when the site doesn't monitor for anomalous call patterns.
-    - **Passive interception** — set up a `page.on('response', ...)` listener and let the site's own code make the requests. Zero detection risk because no extra requests are made, but you're limited to whatever requests the site naturally triggers — you still drive the UI to produce them. Safer, but less flexible. Use this when the site has bot protection.
+    - **In-browser fetch**: call endpoints directly from within the browser's JavaScript context. The requests share the browser's cookies and TLS fingerprint, so they look identical to the site's own requests. Faster, but only safe when the site doesn't monitor for anomalous call patterns.
+    - **Passive interception**: set up a `page.on('response', ...)` listener and let the site's own code make the requests. Zero detection risk because no extra requests are made, but you're limited to whatever requests the site naturally triggers. Safer, but less flexible. Use this when the site has bot protection.
 
     If the agent's recommendation looks reasonable, let it proceed. If you'd rather use one approach over the other, say so:
 
