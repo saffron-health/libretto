@@ -118,9 +118,17 @@ describe("basic CLI subprocess behavior", () => {
     await mkdir(workspacePath(".agents", "skills", "libretto"), {
       recursive: true,
     });
+    await mkdir(workspacePath(".agents", "skills", "libretto-readonly"), {
+      recursive: true,
+    });
     await mkdir(workspacePath(".claude"), { recursive: true });
     await writeFile(
       workspacePath(".agents", "skills", "libretto", "stale.txt"),
+      "stale",
+      "utf8",
+    );
+    await writeFile(
+      workspacePath(".agents", "skills", "libretto-readonly", "stale.txt"),
       "stale",
       "utf8",
     );
@@ -136,7 +144,9 @@ describe("basic CLI subprocess behavior", () => {
     });
 
     expect(result.stdout).toContain(".agents/skills/libretto/");
+    expect(result.stdout).toContain(".agents/skills/libretto-readonly/");
     expect(result.stdout).toContain(".claude/skills/libretto/");
+    expect(result.stdout).toContain(".claude/skills/libretto-readonly/");
     await expect(
       readFile(workspacePath(".agents", "skills", "libretto", "SKILL.md"), {
         encoding: "utf8",
@@ -147,8 +157,29 @@ describe("basic CLI subprocess behavior", () => {
         encoding: "utf8",
       }),
     ).resolves.toContain("name: libretto");
+    await expect(
+      readFile(
+        workspacePath(".agents", "skills", "libretto-readonly", "SKILL.md"),
+        {
+          encoding: "utf8",
+        },
+      ),
+    ).resolves.toContain("name: libretto-readonly");
+    await expect(
+      readFile(
+        workspacePath(".claude", "skills", "libretto-readonly", "SKILL.md"),
+        {
+          encoding: "utf8",
+        },
+      ),
+    ).resolves.toContain("name: libretto-readonly");
     expect(
       existsSync(workspacePath(".agents", "skills", "libretto", "stale.txt")),
+    ).toBe(false);
+    expect(
+      existsSync(
+        workspacePath(".agents", "skills", "libretto-readonly", "stale.txt"),
+      ),
     ).toBe(false);
   });
 
