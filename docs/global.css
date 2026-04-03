@@ -67,6 +67,11 @@
   font-size: 0.8125rem;
 }
 
+/* Border separating content from TOC/assistant panel */
+#table-of-contents-layout {
+  border-left: 1px solid rgba(30, 29, 26, 0.08);
+}
+
 /* Cards — softer, warmer borders */
 .card {
   border-color: rgba(30, 29, 26, 0.1);
