@@ -14,6 +14,11 @@ export const SessionViewportSchema = z.object({
   height: z.number().int().min(1),
 });
 
+export const ProviderStateSchema = z.object({
+  name: z.string(),
+  sessionId: z.string(),
+});
+
 export const SessionStateFileSchema = z.object({
   version: z.literal(SESSION_STATE_VERSION),
   port: z.number().int().min(0).max(65535),
@@ -23,6 +28,7 @@ export const SessionStateFileSchema = z.object({
   startedAt: z.string().datetime({ offset: true }),
   status: SessionStatusSchema.optional(),
   viewport: SessionViewportSchema.optional(),
+  provider: ProviderStateSchema.optional(),
 });
 
 export type SessionStatus = z.infer<typeof SessionStatusSchema>;
