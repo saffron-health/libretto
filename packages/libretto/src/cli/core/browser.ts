@@ -279,6 +279,13 @@ export async function connect(
             sessionId: state.provider.sessionId,
             error: cleanupErr,
           });
+          // Preserve state with cleanup-failed status so user can retry close
+          writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+          throw new Error(
+            `Could not connect to ${state.provider.name} session "${state.provider.sessionId}" for session "${session}", ` +
+              `and remote cleanup also failed. State preserved with status "cleanup-failed". ` +
+              `Retry with: libretto close --session ${session}`,
+          );
         }
       }
       clearSessionState(session, logger);
@@ -961,7 +968,13 @@ export async function runClose(
         sessionId: state.provider.sessionId,
         error: err,
       });
-      // Still clear state even if remote cleanup fails
+      // Preserve state with cleanup-failed status so the user can retry.
+      // The provider.sessionId is retained for manual or future cleanup.
+      writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+      throw new Error(
+        `Failed to close remote ${state.provider.name} session "${state.provider.sessionId}" for session "${session}". ` +
+          `State preserved with status "cleanup-failed". Retry with: libretto close --session ${session}`,
+      );
     }
   } else {
     logger.info("close-killing", { session, pid: state.pid, port: state.port });
@@ -1043,9 +1056,11 @@ function resolveClosableSessions(logger: LoggerApi): {
 function clearStoppedSessionStates(
   sessions: ReadonlyArray<ClosableSession>,
   logger: LoggerApi,
+  skip?: ReadonlySet<string>,
 ): number {
   let cleared = 0;
   for (const session of sessions) {
+    if (skip?.has(session.session)) continue;
     if (session.pid == null || !isPidRunning(session.pid)) {
       clearSessionState(session.session, logger);
       cleared += 1;
@@ -1072,6 +1087,7 @@ export async function runCloseAll(
   }
 
   // Close provider sessions via their APIs
+  const failedProviderSessions = new Set<string>();
   for (const target of closable) {
     if (target.provider) {
       logger.info("close-all-provider", {
@@ -1089,6 +1105,12 @@ export async function runCloseAll(
           sessionId: target.provider.sessionId,
           error: err,
         });
+        failedProviderSessions.add(target.session);
+        // Mark as cleanup-failed, preserving provider.sessionId for retry
+        const state = readSessionState(target.session, logger);
+        if (state) {
+          writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+        }
       }
     }
   }
@@ -1117,7 +1139,11 @@ export async function runCloseAll(
     (target) => target.pid != null && isPidRunning(target.pid),
   );
   if (survivors.length > 0 && !force) {
-    const closed = clearStoppedSessionStates(closable, logger);
+    const closed = clearStoppedSessionStates(
+      closable,
+      logger,
+      failedProviderSessions,
+    );
 
     throw new Error(
       [
@@ -1150,7 +1176,11 @@ export async function runCloseAll(
       (target) => target.pid != null && isPidRunning(target.pid),
     );
     if (survivors.length > 0) {
-      const closed = clearStoppedSessionStates(closable, logger);
+      const closed = clearStoppedSessionStates(
+        closable,
+        logger,
+        failedProviderSessions,
+      );
       throw new Error(
         [
           `Failed to force-close ${survivors.length} session(s): ${formatSessionList(survivors)}.`,
@@ -1160,7 +1190,13 @@ export async function runCloseAll(
     }
   }
 
-  clearStoppedSessionStates(closable, logger);
+  clearStoppedSessionStates(closable, logger, failedProviderSessions);
+
+  if (failedProviderSessions.size > 0) {
+    console.log(
+      `Warning: ${failedProviderSessions.size} provider session(s) failed remote cleanup and were preserved with status "cleanup-failed".`,
+    );
+  }
 
   if (clearedUnreadableStates > 0) {
     console.log(

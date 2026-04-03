@@ -3,18 +3,15 @@ import { createBrowserbaseProvider } from "./browserbase.js";
 import { createKernelProvider } from "./kernel.js";
 import type { ProviderApi } from "./types.js";
 
-export type ProviderName = "local" | "kernel" | "browserbase";
+const PROVIDER_NAMES = ["local", "kernel", "browserbase"] as const;
+export type ProviderName = (typeof PROVIDER_NAMES)[number];
 
-const VALID_PROVIDER_NAMES = new Set<string>([
-  "local",
-  "kernel",
-  "browserbase",
-]);
+const VALID_PROVIDER_NAMES = new Set<string>(PROVIDER_NAMES);
 
 function assertValidProviderName(value: string, source: string): ProviderName {
   if (!VALID_PROVIDER_NAMES.has(value)) {
     throw new Error(
-      `Invalid provider "${value}" from ${source}. Valid providers: ${[...VALID_PROVIDER_NAMES].join(", ")}`,
+      `Invalid provider "${value}" from ${source}. Valid providers: ${PROVIDER_NAMES.join(", ")}`,
     );
   }
   return value as ProviderName;
@@ -46,8 +43,6 @@ export function resolveProviderName(cliFlag?: string): ProviderName {
  * Get a ProviderApi instance for a cloud provider.
  * Only call this for non-"local" providers.
  */
-export function getProvider(name: Exclude<ProviderName, "local">): ProviderApi;
-export function getProvider(name: string): ProviderApi;
 export function getProvider(name: string): ProviderApi {
   switch (name) {
     case "kernel":

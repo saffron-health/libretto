@@ -8,6 +8,7 @@ export const SessionStatusSchema = z.enum([
   "completed",
   "failed",
   "exited",
+  "cleanup-failed",
 ]);
 export const SessionAccessModeSchema = z.enum(["read-only", "write-access"]);
 export const SessionViewportSchema = z.object({
