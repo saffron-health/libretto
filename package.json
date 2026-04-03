@@ -27,6 +27,7 @@
     "benchmarks": "pnpm --dir ./benchmarks --silent benchmarks",
     "google-login": "gcloud auth login --update-adc && gcloud auth configure-docker us-central1-docker.pkg.dev --quiet",
     "cli": "pnpm --filter libretto cli",
+    "create-tmp-workspace": "pnpm --filter @libretto/dev-tools create-tmp-workspace",
     "website:dev": "pnpm --dir ./apps/website dev"
   }
 }

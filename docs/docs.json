@@ -9,6 +9,11 @@
     "dark": "#1e1d1a"
   },
   "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/favicon.svg",
+    "dark": "/favicon.svg",
+    "href": "https://libretto.sh"
+  },
   "fonts": {
     "heading": {
       "family": "PP Editorial New",

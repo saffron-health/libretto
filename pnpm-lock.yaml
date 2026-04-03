@@ -127,6 +127,9 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      '@libretto/dev-tools':
+        specifier: workspace:*
+        version: link:../packages/dev-tools
       libretto:
         specifier: workspace:*
         version: link:../packages/libretto
@@ -143,6 +146,9 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      '@libretto/dev-tools':
+        specifier: workspace:*
+        version: link:../packages/dev-tools
       libretto:
         specifier: workspace:*
         version: link:../packages/libretto

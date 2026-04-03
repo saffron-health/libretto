@@ -99,7 +99,7 @@ describe("snapshot API model resolution", () => {
     vi.stubEnv("GOOGLE_CLOUD_PROJECT", "test-project");
 
     expect(resolveSnapshotApiModel(null)).toMatchObject({
-      model: "vertex/gemini-2.5-pro",
+      model: "vertex/gemini-2.5-flash",
       provider: "vertex",
       source: "env:GOOGLE_CLOUD_PROJECT",
     });

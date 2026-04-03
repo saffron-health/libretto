@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createWriteStream, readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { createTmpWorkspace } from "@libretto/dev-tools/tmp-workspace";
 import { finished } from "node:stream/promises";
 import { GoogleAuth } from "google-auth-library";
 import {
@@ -568,35 +569,27 @@ async function ensureAnthropicApiKey(): Promise<string> {
 async function prepareRunWorkspace(
   row: WebVoyagerRow,
 ): Promise<{ runDir: string; prompt: string; sessionName: string }> {
-  const runDir = resolve(
-    repoRoot,
-    "benchmarks",
-    BENCHMARK_NAME,
-    "runs",
-    getRunName(row),
-  );
+  const runName = getRunName(row);
+  const parentDir = resolve(repoRoot, "benchmarks", BENCHMARK_NAME, "runs");
+  const runDir = resolve(parentDir, runName);
   const { text: prompt, sessionName } = buildWebVoyagerPrompt(row);
   const snapshotModel = resolveSnapshotModelForBenchmarkWorkspace();
-  const snapshotProviderInstallSpec = resolveProviderInstallSpec(snapshotModel);
 
+  // Clean any previous run
   await rm(runDir, { recursive: true, force: true });
-  await mkdir(runDir, { recursive: true });
-  await mkdir(join(runDir, ".agents"), { recursive: true });
 
-  await writeFile(
-    join(runDir, "package.json"),
-    JSON.stringify(
-      {
-        name: `libretto-benchmark-${getRunName(row)}`,
-        private: true,
-        type: "module",
-        packageManager: rootPackageManager,
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  );
+  // Core workspace setup via shared utility
+  await createTmpWorkspace({
+    name: runName,
+    parentDir,
+    snapshotModel,
+    skipBrowsers: true,
+    skipBuild: true,
+    quiet: true,
+  });
+
+  // Benchmark-specific files layered on top
+  await mkdir(join(runDir, ".agents"), { recursive: true });
   await writeFile(
     join(runDir, "AGENTS.md"),
     [
@@ -627,21 +620,6 @@ async function prepareRunWorkspace(
   );
   await writeFile(join(runDir, "prompt.md"), `${prompt}\n`, "utf8");
   await writeBenchmarkWorkspaceEnvFile(runDir);
-
-  runWorkspaceCommand(runDir, "git", ["init", "-q"]);
-  runWorkspaceCommand(runDir, "pnpm", [
-    "add",
-    "--lockfile=false",
-    `file:${librettoPackageRoot}`,
-    ...(snapshotProviderInstallSpec ? [snapshotProviderInstallSpec] : []),
-  ]);
-  runWorkspaceCommand(runDir, "npx", ["libretto", "setup", "--skip-browsers"]);
-  runWorkspaceCommand(runDir, "npx", [
-    "libretto",
-    "ai",
-    "configure",
-    snapshotModel,
-  ]);
 
   return { runDir, prompt, sessionName };
 }
