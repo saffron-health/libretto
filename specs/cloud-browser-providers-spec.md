@@ -65,7 +65,6 @@ Establish the provider interface contract and the three-tier resolution: CLI fla
 ```ts
 // In packages/libretto/src/cli/core/providers/types.ts
 export type ProviderSession = {
-  name: string;        // "kernel" | "browserbase"
   sessionId: string;   // remote session id for cleanup
   cdpEndpoint: string; // CDP WebSocket URL
 };
@@ -82,12 +81,12 @@ export function resolveProviderName(cliFlag?: string): ProviderName { ... }
 export function getProvider(name: Exclude<ProviderName, "local">): ProviderApi { ... }
 ```
 
-- [ ] Create `packages/libretto/src/cli/core/providers/types.ts` with `ProviderSession` and `ProviderApi` types.
-- [ ] Create `packages/libretto/src/cli/core/providers/index.ts` with `resolveProviderName()` implementing the precedence chain and `getProvider()` that dispatches to provider modules.
-- [ ] Add optional `provider` field (string) to `LibrettoConfigSchema` in `packages/libretto/src/cli/core/config.ts`.
-- [ ] Add a unit test in `packages/libretto/test/browser.spec.ts` that verifies resolution precedence: flag wins over env var, env var wins over config, defaults to `"local"`.
-- [ ] Verify `pnpm --filter libretto type-check` passes.
-- [ ] Verify `pnpm --filter libretto test -- test/browser.spec.ts` passes.
+- [x] Create `packages/libretto/src/cli/core/providers/types.ts` with `ProviderSession` (without `name` — caller knows the provider) and `ProviderApi` types.
+- [x] Create `packages/libretto/src/cli/core/providers/index.ts` with `resolveProviderName()` implementing the precedence chain and `getProvider()` that dispatches to provider modules.
+- [x] Add optional `provider` field (string) to `LibrettoConfigSchema` in `packages/libretto/src/cli/core/config.ts`.
+- [x] Add a unit test in `packages/libretto/test/browser.spec.ts` that verifies resolution precedence: flag wins over env var, env var wins over config, defaults to `"local"`.
+- [x] Verify `pnpm --filter libretto type-check` passes.
+- [x] Verify `pnpm --filter libretto test -- test/browser.spec.ts` passes.
 
 ### Phase 3: Implement Kernel and Browserbase provider modules
 
