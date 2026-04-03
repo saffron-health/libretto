@@ -5,35 +5,16 @@ import {
   getPauseSignalPaths,
   removeSignalIfExists,
 } from "../../cli/core/pause-signals.js";
-import {
-  listSessionsWithStateFile,
-  readSessionState,
-} from "../../cli/core/session.js";
-
-function isPidRunning(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function getRunningSessions(): string[] {
-  return listSessionsWithStateFile().filter((candidate) => {
-    const state = readSessionState(candidate);
-    return state !== null && state.pid != null && isPidRunning(state.pid);
-  });
-}
+import { listRunningSessions } from "../../cli/core/session.js";
 
 function throwMissingSessionError(): never {
-  const runningSessions = getRunningSessions();
+  const runningSessions = listRunningSessions();
   const lines = ["pause(session) requires a non-empty session ID."];
 
   if (runningSessions.length > 0) {
     lines.push("", "Running sessions:");
-    for (const runningSession of runningSessions) {
-      lines.push(`  ${runningSession}`);
+    for (const s of runningSessions) {
+      lines.push(`  ${s.session}`);
     }
   }
 

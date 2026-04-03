@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AiConfig } from "../src/cli/core/ai-config.js";
+import type { AiConfig } from "../src/cli/core/config.js";
 import { buildInlinePromptSelection } from "../src/cli/core/snapshot-analyzer.js";
 import {
   parseDotEnvAssignment,
   resolveSnapshotApiModelOrThrow,
   resolveSnapshotApiModel,
-} from "../src/cli/core/snapshot-api-config.js";
+} from "../src/cli/core/ai-model.js";
 import { LIBRETTO_CONFIG_PATH } from "../src/cli/core/context.js";
 
 function makeConfig(model: string): AiConfig {
@@ -37,7 +37,7 @@ describe("snapshot API model resolution", () => {
     expect(resolveSnapshotApiModel(null)).toMatchObject({
       model: "openai/gpt-5.4",
       provider: "openai",
-      source: "env:auto-openai",
+      source: "env:OPENAI_API_KEY",
     });
   });
 
@@ -77,7 +77,7 @@ describe("snapshot API model resolution", () => {
     expect(resolveSnapshotApiModel(null)).toMatchObject({
       model: "google/gemini-3-flash-preview",
       provider: "google",
-      source: "env:auto-google",
+      source: "env:GEMINI_API_KEY",
     });
   });
 
@@ -89,7 +89,7 @@ describe("snapshot API model resolution", () => {
     expect(resolveSnapshotApiModel(null)).toMatchObject({
       model: "google/gemini-3-flash-preview",
       provider: "google",
-      source: "env:auto-google",
+      source: "env:GOOGLE_GENERATIVE_AI_API_KEY",
     });
   });
 
@@ -101,7 +101,7 @@ describe("snapshot API model resolution", () => {
     expect(resolveSnapshotApiModel(null)).toMatchObject({
       model: "vertex/gemini-2.5-pro",
       provider: "vertex",
-      source: "env:auto-vertex",
+      source: "env:GOOGLE_CLOUD_PROJECT",
     });
   });
 
@@ -114,7 +114,7 @@ describe("snapshot API model resolution", () => {
     expect(resolveSnapshotApiModel(null)).toMatchObject({
       model: "openai/gpt-5.4",
       provider: "openai",
-      source: "env:auto-openai",
+      source: "env:OPENAI_API_KEY",
     });
   });
 

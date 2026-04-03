@@ -16,6 +16,7 @@ Examples:
 
   libretto exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
   libretto exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
+  libretto status
   libretto ai configure openai
   libretto ai configure anthropic
   libretto ai configure gemini

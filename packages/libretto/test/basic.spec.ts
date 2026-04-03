@@ -107,8 +107,98 @@ describe("basic CLI subprocess behavior", () => {
     });
 
     expect(result.stdout).toContain("Snapshot analysis:");
-    expect(result.stdout).toContain("Ready: openai/gpt-5.4");
-    expect(result.stdout).toContain("No further action required.");
+    expect(result.stdout).toContain("Model: openai/gpt-5.4");
+    expect(result.stdout).toContain("Config:");
+    expect(result.stdout).toContain("config.json");
+    expect(result.stdout).toContain(
+      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+    );
+  });
+
+  test("setup auto-pins default model when OPENAI_API_KEY is present", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+
+    expect(result.stdout).toContain("Model: openai/gpt-5.4");
+    expect(result.stdout).toContain("Config:");
+  });
+
+  test("setup rerun shows healthy summary without re-prompting", async ({
+    librettoCli,
+  }) => {
+    // First run: pins the model
+    const first = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+    expect(first.stdout).toContain("Model: openai/gpt-5.4");
+
+    // Second run: should show healthy summary, not re-prompt
+    const second = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+    expect(second.stdout).toContain("Model: openai/gpt-5.4");
+    expect(second.stdout).toContain("Config:");
+    expect(second.stdout).toContain(
+      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+    );
+    // Should NOT contain the unconfigured prompts
+    expect(second.stdout).not.toContain(
+      "No snapshot API credentials detected.",
+    );
+  });
+
+  test("setup shows provider-specific message when pinned OpenAI + missing key + Anthropic present", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    // Pin OpenAI in config, but only provide Anthropic key
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(
+      workspacePath(".libretto", "config.json"),
+      JSON.stringify({
+        version: 1,
+        ai: { model: "openai/gpt-5.4", updatedAt: "2026-01-01T00:00:00.000Z" },
+      }),
+      "utf8",
+    );
+
+    const result = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "",
+      ANTHROPIC_API_KEY: "test-anthropic-key",
+    });
+
+    // Should name the configured provider and missing env var
+    expect(result.stdout).toContain("openai is configured");
+    expect(result.stdout).toContain("OPENAI_API_KEY is not set");
+    // Should NOT show the generic unconfigured message
+    expect(result.stdout).not.toContain("No snapshot API credentials detected");
+  });
+
+  test("setup shows invalid config warning in non-TTY mode", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(
+      workspacePath(".libretto", "config.json"),
+      "{not-valid-json}",
+      "utf8",
+    );
+
+    const result = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-key",
+    });
+
+    expect(result.stdout).toContain("AI config is invalid");
+    expect(result.stdout).toContain("reconfigure");
   });
 
   test("setup copies skill files without confirmation when agent dirs exist", async ({
@@ -159,6 +249,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Capture PNG + HTML");
     expect(result.stdout).not.toContain("cloud <subcommand>");
     expect(result.stdout).toContain("experimental <subcommand>");
+    expect(result.stdout).toContain("libretto status");
     expect(result.stderr).toBe("");
   });
 
@@ -168,6 +259,14 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Commands:");
     expect(result.stdout).toContain("open");
     expect(result.stdout).toContain("ai");
+    expect(result.stdout).toContain("status");
+    expect(result.stderr).toBe("");
+  });
+
+  test("prints scoped help for status command", async ({ librettoCli }) => {
+    const result = await librettoCli("help status");
+    expect(result.stdout).toContain("Show workspace status");
+    expect(result.stdout).toContain("AI configuration");
     expect(result.stderr).toBe("");
   });
 

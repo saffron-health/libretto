@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readLibrettoConfig } from "../src/cli/core/ai-config.js";
+import { readLibrettoConfig } from "../src/cli/core/config.js";
 
 describe("ai config validation output", () => {
   it("prints a valid config example instead of raw JSON schema", () => {

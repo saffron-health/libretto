@@ -111,6 +111,22 @@ function listActiveSessions(): string[] {
   return listSessionsWithStateFile();
 }
 
+/**
+ * List sessions whose state file exists and whose pid is still running.
+ * Returns session states (not just names) so callers can access port, status, etc.
+ */
+export function listRunningSessions(): SessionState[] {
+  const sessions = listSessionsWithStateFile();
+  const running: SessionState[] = [];
+  for (const name of sessions) {
+    const state = readSessionState(name);
+    if (!state) continue;
+    if (state.pid == null || !isPidRunning(state.pid)) continue;
+    running.push(state);
+  }
+  return running;
+}
+
 function throwSessionNotFoundError(session: string): never {
   const active = listActiveSessions();
   const lines = [`No session "${session}" found.`];
@@ -180,7 +196,7 @@ export function clearSessionState(session: string, logger?: LoggerApi): void {
   logger?.info("session-state-cleared", { session, stateFile });
 }
 
-function isPidRunning(pid: number): boolean {
+export function isPidRunning(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;

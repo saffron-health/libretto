@@ -17,8 +17,8 @@ import {
   type InterpretResult,
   type InterpretArgs,
 } from "./snapshot-analyzer.js";
-import { readAiConfig, type AiConfig } from "./ai-config.js";
-import { resolveSnapshotApiModelOrThrow } from "./snapshot-api-config.js";
+import { readAiConfig, type AiConfig } from "./config.js";
+import { resolveSnapshotApiModelOrThrow } from "./ai-model.js";
 
 export async function runApiInterpret(
   args: InterpretArgs,
