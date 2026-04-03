@@ -473,7 +473,7 @@ describe("basic CLI subprocess behavior", () => {
     const cliVersion = await readCliVersion();
     await seedInstalledSkillVersion(workspacePath, ".claude", "0.0.0");
 
-    const result = await librettoCli("run ./integration.ts main");
+    const result = await librettoCli("run ./integration.ts");
 
     expect(result.stderr).toContain(
       expectedSkillVersionWarning("0.0.0", cliVersion),
