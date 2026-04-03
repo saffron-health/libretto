@@ -15,6 +15,7 @@
     "benchmarks": "tsx cli.ts"
   },
   "devDependencies": {
+    "@libretto/dev-tools": "workspace:*",
     "libretto": "workspace:*"
   }
 }

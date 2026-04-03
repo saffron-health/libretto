@@ -14,7 +14,7 @@ export const DEFAULT_SNAPSHOT_MODELS = {
   openai: "openai/gpt-5.4",
   anthropic: "anthropic/claude-sonnet-4-6",
   google: "google/gemini-3-flash-preview",
-  vertex: "vertex/gemini-2.5-pro",
+  vertex: "vertex/gemini-2.5-flash",
 } as const satisfies Record<Provider, string>;
 
 // ── Source detection ────────────────────────────────────────────────────────

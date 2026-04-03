@@ -1,23 +1,11 @@
-import {
-  cp,
-  mkdir,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import {
-  dirname,
-  isAbsolute,
-  join,
-  relative,
-  resolve,
-} from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { test as base } from "vitest";
 import { ClaudeEvalHarness, ensureClaudeAuthConfigured } from "./harness.js";
+import { createTmpWorkspace } from "@libretto/dev-tools/tmp-workspace";
 
 type EvalFixtures = {
   harness: ClaudeEvalHarness;
@@ -63,36 +51,27 @@ function stableHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
-function workspaceDirForTask(task: Readonly<{ fullName: string; file: { filepath: string } }>): string {
-  const stableId = stableHash(`${task.file.filepath}::${task.fullName}`).slice(0, 16);
+function workspaceDirForTask(
+  task: Readonly<{ fullName: string; file: { filepath: string } }>,
+): string {
+  const stableId = stableHash(`${task.file.filepath}::${task.fullName}`).slice(
+    0,
+    16,
+  );
   return join(DETERMINISTIC_WORKSPACE_ROOT, stableId);
 }
 
-function assertWithinRoot(root: string, candidate: string, label: string): void {
+function assertWithinRoot(
+  root: string,
+  candidate: string,
+  label: string,
+): void {
   const rel = relative(root, candidate);
   if (rel.startsWith("..") || isAbsolute(rel)) {
-    throw new Error(`${label} must stay within ${root}. Received: ${candidate}`);
+    throw new Error(
+      `${label} must stay within ${root}. Received: ${candidate}`,
+    );
   }
-}
-
-async function setupWorkspacePackage(workspaceDir: string): Promise<void> {
-  const workspacePackagePath = join(workspaceDir, "package.json");
-  const workspacePackageJson = {
-    name: "libretto-eval-workspace",
-    private: true,
-    type: "module",
-  };
-  await writeFile(
-    workspacePackagePath,
-    `${JSON.stringify(workspacePackageJson, null, 2)}\n`,
-    "utf8",
-  );
-
-  const nodeModulesPath = join(workspaceDir, "node_modules");
-  const librettoLinkPath = join(nodeModulesPath, "libretto");
-  await mkdir(nodeModulesPath, { recursive: true });
-  await rm(librettoLinkPath, { recursive: true, force: true });
-  await symlink(librettoPackageRoot, librettoLinkPath, "dir");
 }
 
 export const test = base.extend<EvalFixtures>({
@@ -102,8 +81,12 @@ export const test = base.extend<EvalFixtures>({
   evalWorkspaceDir: async ({ task }, use) => {
     const workspaceDir = workspaceDirForTask(task);
     await rm(workspaceDir, { recursive: true, force: true });
-    await mkdir(workspaceDir, { recursive: true });
-    await setupWorkspacePackage(workspaceDir);
+    await createTmpWorkspace({
+      name: stableHash(`${task.file.filepath}::${task.fullName}`).slice(0, 16),
+      parentDir: DETERMINISTIC_WORKSPACE_ROOT,
+      skipBrowsers: true,
+      quiet: true,
+    });
     try {
       await use(workspaceDir);
     } finally {
@@ -116,21 +99,27 @@ export const test = base.extend<EvalFixtures>({
   },
 
   copyEvalReference: async ({ evalWorkspaceDir }, use) => {
-    await use(async (sourceRelativePath: string, destinationRelativePath?: string) => {
-      const sourcePath = resolve(referencesRoot, sourceRelativePath);
-      assertWithinRoot(referencesRoot, sourcePath, "Reference source path");
+    await use(
+      async (sourceRelativePath: string, destinationRelativePath?: string) => {
+        const sourcePath = resolve(referencesRoot, sourceRelativePath);
+        assertWithinRoot(referencesRoot, sourcePath, "Reference source path");
 
-      const targetRelative = destinationRelativePath ?? sourceRelativePath;
-      const targetPath = resolve(evalWorkspaceDir, targetRelative);
-      assertWithinRoot(evalWorkspaceDir, targetPath, "Workspace destination path");
+        const targetRelative = destinationRelativePath ?? sourceRelativePath;
+        const targetPath = resolve(evalWorkspaceDir, targetRelative);
+        assertWithinRoot(
+          evalWorkspaceDir,
+          targetPath,
+          "Workspace destination path",
+        );
 
-      await mkdir(dirname(targetPath), { recursive: true });
-      await cp(sourcePath, targetPath, {
-        recursive: true,
-        force: true,
-      });
-      return targetPath;
-    });
+        await mkdir(dirname(targetPath), { recursive: true });
+        await cp(sourcePath, targetPath, {
+          recursive: true,
+          force: true,
+        });
+        return targetPath;
+      },
+    );
   },
   harness: async ({ evalWorkspaceDir }, use) => {
     ensureClaudeAuthConfigured();
