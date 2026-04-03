@@ -89,10 +89,7 @@ function Navbar() {
               <span className="text-sm font-medium">{formatStars(stars)}</span>
             )}
           </a>
-          <Button
-            href="/docs/"
-            size="sm"
-          >
+          <Button href="/docs/get-started/introduction" size="sm">
             Go to docs
           </Button>
         </div>
@@ -157,11 +154,7 @@ function Hero() {
           style={{ opacity: 0 }}
           className="mb-16 flex items-center justify-center gap-6"
         >
-          <Button
-            href="/docs/"
-          >
-            Go to docs
-          </Button>
+          <Button href="/docs/get-started/introduction">Go to docs</Button>
         </div>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
           <TerminalDemo />
