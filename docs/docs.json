@@ -12,16 +12,22 @@
   "navigation": {
     "groups": [
       {
-        "group": "Overview",
-        "pages": ["index"]
-      },
-      {
         "group": "Get started",
         "pages": [
           "get-started/introduction",
           "get-started/configuration",
+          "get-started/architecture",
           "get-started/automation-approaches",
           "get-started/bot-detection"
+        ]
+      },
+      {
+        "group": "Workflow guides",
+        "pages": [
+          "workflow-guides/one-shot-script-generation",
+          "workflow-guides/interactive-script-building",
+          "workflow-guides/debugging-workflows",
+          "workflow-guides/convert-to-network-requests"
         ]
       },
       {
@@ -34,15 +40,6 @@
           "cli-reference/run-and-resume",
           "cli-reference/network-and-actions",
           "cli-reference/session-management"
-        ]
-      },
-      {
-        "group": "Workflow guides",
-        "pages": [
-          "workflow-guides/one-shot-script-generation",
-          "workflow-guides/interactive-script-building",
-          "workflow-guides/debugging-workflows",
-          "workflow-guides/convert-to-network-requests"
         ]
       },
       {

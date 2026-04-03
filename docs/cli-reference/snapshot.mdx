@@ -1,12 +1,14 @@
-## snapshot
+---
+title: snapshot
+---
 
 > Capture a screenshot and HTML analysis of the current page using an AI model.
 
-The `snapshot` command is the primary page observation tool. It captures a screenshot and the full HTML of the current page, then sends both to an AI model for analysis against your stated objective.
+The `snapshot` command is the primary page observation tool. It captures a screenshot and the full HTML of the current page, then sends the screenshot and a condensed (token-optimized) version of the HTML to an AI model for analysis against your stated objective.
 
 Use `snapshot` before guessing at selectors, after workflow failures, and whenever the visible page state is unclear.
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto snapshot \
   --session debug-example \
   --objective "Find the sign-in form and submit button" \
@@ -20,11 +22,15 @@ npx libretto snapshot \
 </ParamField>
 
 <ParamField path="--objective" type="string" required>
-  What you want the AI to find, analyze, or explain. A single objective can include multiple questions or analysis tasks — you don't need to run separate snapshots for each question.
+  What you want the AI to find, analyze, or explain. A single objective can
+  include multiple questions or analysis tasks — you don't need to run separate
+  snapshots for each question.
 </ParamField>
 
 <ParamField path="--context" type="string" required>
-  Background information that helps the AI understand the current state of the page. Describe what you just did, what you expected to happen, and what the page should contain.
+  Background information that helps the AI understand the current state of the
+  page. Describe what you just did, what you expected to happen, and what the
+  page should contain.
 </ParamField>
 
 ### Optional flags
@@ -47,13 +53,16 @@ The command prints the paths to all three files before the AI analysis output.
 
 ### When to use snapshot
 
-* Before writing a selector — use snapshot to confirm the element structure rather than guessing.
-* After a workflow step fails — inspect the exact page state the failure left behind.
-* When the page has rendered content that isn't obvious from the URL alone.
-* When you need answers to multiple questions about a page in a single call.
+- Before writing a selector — use snapshot to confirm the element structure rather than guessing.
+- After a workflow step fails — inspect the exact page state the failure left behind.
+- When the page has rendered content that isn't obvious from the URL alone.
+- When you need answers to multiple questions about a page in a single call.
 
 <Tip>
-  A single `--objective` can ask several things at once. For example: `"Find the submit button selector, confirm whether there are validation errors, and identify the field that currently has focus."` Batching questions into one snapshot is more efficient than calling snapshot repeatedly.
+  A single `--objective` can ask several things at once. For example: `"Find the
+  submit button selector, confirm whether there are validation errors, and
+  identify the field that currently has focus."` Batching questions into one
+  snapshot is more efficient than calling snapshot repeatedly.
 </Tip>
 
 ### Timeout
@@ -61,7 +70,8 @@ The command prints the paths to all three files before the AI analysis output.
 Snapshot sends a request to an external AI API and waits for the full analysis response. Depending on page complexity and model speed, this can take 30–90 seconds or more.
 
 <Warning>
-  If you are calling `snapshot` from a shell script or wrapping it in another tool, set a timeout of **at least 2 minutes** to avoid premature cancellation.
+  If you are calling `snapshot` from a shell script or wrapping it in another
+  tool, set a timeout of **at least 2 minutes** to avoid premature cancellation.
 </Warning>
 
 ### Configuration
@@ -72,7 +82,7 @@ Supported providers: `openai`, `anthropic`, `gemini`, `vertex`.
 
 ### Examples
 
-```bash  theme={null}
+```bash theme={null}
 # Basic snapshot — find a form
 npx libretto snapshot \
   --session debug-example \

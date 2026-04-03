@@ -1,4 +1,6 @@
-## Workflow
+---
+title: Workflow
+---
 
 > Define and run reusable browser automation workflows.
 
@@ -8,26 +10,27 @@ The `workflow()` factory is the entry point for every Libretto automation. You w
 
 Creates a named `LibrettoWorkflow` from a handler function.
 
-```typescript  theme={null}
+```typescript theme={null}
 function workflow<Input = unknown, Output = unknown>(
   name: string,
-  handler: LibrettoWorkflowHandler<Input, Output>
-): LibrettoWorkflow<Input, Output>
+  handler: LibrettoWorkflowHandler<Input, Output>,
+): LibrettoWorkflow<Input, Output>;
 ```
 
 The handler receives a `LibrettoWorkflowContext` and typed `input`, and must return a `Promise<Output>`.
 
-```typescript  theme={null}
+```typescript theme={null}
 type LibrettoWorkflowHandler<Input, Output> = (
   ctx: LibrettoWorkflowContext,
-  input: Input
-) => Promise<Output>
+  input: Input,
+) => Promise<Output>;
 ```
 
 #### `LibrettoWorkflowContext`
 
 <ResponseField name="session" type="string">
-  The session identifier for this workflow run. Use it to correlate logs and state files.
+  The session identifier for this workflow run. Use it to correlate logs and
+  state files.
 </ResponseField>
 
 <ResponseField name="page" type="Page">
@@ -36,53 +39,65 @@ type LibrettoWorkflowHandler<Input, Output> = (
 
 #### Full example
 
-```typescript  theme={null}
+```typescript theme={null}
 import { workflow, launchBrowser, pause } from "libretto";
 
-export const main = workflow<{ query: string }, string[]>("main", async (ctx, input) => {
-  const { page } = ctx;
+export const main = workflow<{ query: string }, string[]>(
+  "main",
+  async (ctx, input) => {
+    const { page } = ctx;
 
-  await page.goto("https://example.com/search");
-  await page.fill("#query", input.query);
-  await page.click("#submit");
-  await page.waitForSelector(".results");
+    await page.goto("https://example.com/search");
+    await page.fill("#query", input.query);
+    await page.click("#submit");
+    await page.waitForSelector(".results");
 
-  const results = await page.$$eval(".result-item", (els) =>
-    els.map((el) => el.textContent ?? "")
-  );
+    const results = await page.$$eval(".result-item", (els) =>
+      els.map((el) => el.textContent ?? ""),
+    );
 
-  return results;
-});
+    return results;
+  },
+);
 ```
 
 #### Running with the CLI
 
-Pass the file path and the exported name to `libretto run`:
+Pass the file path and the workflow's **runtime name** to `libretto run`. The runtime name is the `name` string you pass as the first argument to `workflow(name, handler)` — not the JavaScript export identifier:
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto run ./my-workflow.ts main
 ```
 
 The CLI compiles the file with `tsx`, launches a Chromium browser, and calls your handler with the session context it constructs.
 
-***
+<Note>
+  The CLI resolves workflows by their runtime `name` string, not by the JavaScript variable or export name. If you write `export const myExport = workflow("main", handler)`, the CLI argument must be `main`, not `myExport`.
+
+**Module discovery:** The CLI scans all exports from your file. It supports direct named exports (e.g. `export const foo = workflow(...)`), a special `workflows` export that is either a single workflow or an object map of workflows (e.g. `export const workflows = { foo, bar }`), and resolves the target workflow by matching the runtime `name` string across all discovered workflows.
+
+</Note>
+
+---
 
 ### `launchBrowser()`
 
 Launches a Playwright Chromium browser and returns a ready-to-use `BrowserSession`. Use this when you want to run workflows programmatically — outside the CLI — or when you need direct access to the `Browser` or `BrowserContext` objects.
 
-```typescript  theme={null}
-async function launchBrowser(args: LaunchBrowserArgs): Promise<BrowserSession>
+```typescript theme={null}
+async function launchBrowser(args: LaunchBrowserArgs): Promise<BrowserSession>;
 ```
 
 #### `LaunchBrowserArgs`
 
 <ParamField path="sessionName" type="string" required>
-  A unique identifier for this browser session. Used to name the session state file written under `.libretto/sessions/`.
+  A unique identifier for this browser session. Used to name the session state
+  file written under `.libretto/sessions/`.
 </ParamField>
 
 <ParamField path="headless" type="boolean">
-  Whether to run Chromium in headless mode. Defaults to `false` (visible window).
+  Whether to run Chromium in headless mode. Defaults to `false` (visible
+  window).
 </ParamField>
 
 <ParamField path="viewport" type="{ width: number; height: number }">
@@ -90,7 +105,8 @@ async function launchBrowser(args: LaunchBrowserArgs): Promise<BrowserSession>
 </ParamField>
 
 <ParamField path="storageStatePath" type="string">
-  Path to a Playwright storage state JSON file (cookies, localStorage). Useful for resuming authenticated sessions.
+  Path to a Playwright storage state JSON file (cookies, localStorage). Useful
+  for resuming authenticated sessions.
 </ParamField>
 
 #### `BrowserSession` return value
@@ -121,7 +137,7 @@ async function launchBrowser(args: LaunchBrowserArgs): Promise<BrowserSession>
 
 #### Programmatic usage
 
-```typescript  theme={null}
+```typescript theme={null}
 import { launchBrowser } from "libretto";
 import { main } from "./my-workflow";
 
@@ -136,7 +152,7 @@ try {
       session: "my-run",
       page: session.page,
     },
-    { query: "hello world" }
+    { query: "hello world" },
   );
   console.log(result);
 } finally {
@@ -144,43 +160,49 @@ try {
 }
 ```
 
-***
+---
 
 ### `pause()`
 
 Pauses a running workflow so you can inspect browser state interactively, then resume from the CLI.
 
-```typescript  theme={null}
-async function pause(session: string): Promise<void>
+```typescript theme={null}
+async function pause(session: string): Promise<void>;
 ```
 
 <ParamField path="session" type="string" required>
-  The session identifier. Must match the session name used when the workflow was started.
+  The session identifier. Must match the session name used when the workflow was
+  started.
 </ParamField>
 
 <Note>
-  `pause()` is a no-op when `NODE_ENV === "production"`. It is safe to leave `pause()` calls in your code without worrying about them blocking production runs.
+  `pause()` is a no-op when `NODE_ENV === "production"`. It is safe to leave
+  `pause()` calls in your code without worrying about them blocking production
+  runs.
 </Note>
 
 When called in a non-production environment, `pause()` writes a `.paused` signal file and polls for a `.resume` signal. Use the Libretto CLI to send the resume signal:
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto resume --session <session-name>
 ```
 
 #### Example
 
-```typescript  theme={null}
+```typescript theme={null}
 import { workflow, pause } from "libretto";
 
-export const main = workflow<{ id: string }, void>("main", async (ctx, input) => {
-  const { page, session } = ctx;
+export const main = workflow<{ id: string }, void>(
+  "main",
+  async (ctx, input) => {
+    const { page, session } = ctx;
 
-  await page.goto(`https://example.com/items/${input.id}`);
+    await page.goto(`https://example.com/items/${input.id}`);
 
-  // Pause here to inspect the page before continuing
-  await pause(session);
+    // Pause here to inspect the page before continuing
+    await pause(session);
 
-  await page.click("#confirm");
-});
+    await page.click("#confirm");
+  },
+);
 ```

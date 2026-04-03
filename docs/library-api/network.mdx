@@ -1,4 +1,6 @@
-## Network
+---
+title: Network
+---
 
 > Execute typed HTTP requests inside the browser context and handle downloads.
 
@@ -8,18 +10,19 @@ Libretto provides two ways to make HTTP requests from within a workflow: `pageRe
 
 Executes a `fetch()` call inside the browser context via `page.evaluate()`. Because the request runs inside the real browser process, it uses the browser's TLS fingerprint, cookies, and session — the same as what the site's own JavaScript would send. This avoids bot-detection issues that arise when making the same request from Node.js directly.
 
-```typescript  theme={null}
+```typescript theme={null}
 async function pageRequest<T extends z.ZodType | undefined = undefined>(
   page: Page,
   config: RequestConfig,
-  options?: PageRequestOptions<T>
-): Promise<PageRequestResult<T>>
+  options?: PageRequestOptions<T>,
+): Promise<T extends z.ZodType ? z.infer<T> : any>;
 ```
 
-The return type is `z.infer<T>` when a `schema` is provided, or `any` otherwise.
+Returns `z.infer<T>` when a `schema` is provided in `options`, or `any` otherwise.
 
 <Note>
-  Non-2xx responses cause `pageRequest` to throw an error. The error message includes the HTTP method, URL, and status code.
+  Non-2xx responses cause `pageRequest` to throw an error. The error message
+  includes the HTTP method, URL, and status code.
 </Note>
 
 #### `RequestConfig`
@@ -28,30 +31,42 @@ The return type is `z.infer<T>` when a `schema` is provided, or `any` otherwise.
   The URL to fetch. Relative URLs are resolved in the browser context.
 </ParamField>
 
-<ParamField path="method" type="&#x22;GET&#x22; | &#x22;POST&#x22; | &#x22;PUT&#x22; | &#x22;DELETE&#x22; | &#x22;PATCH&#x22;">
+<ParamField
+  path="method"
+  type="&#x22;GET&#x22; | &#x22;POST&#x22; | &#x22;PUT&#x22; | &#x22;DELETE&#x22; | &#x22;PATCH&#x22;"
+>
   HTTP method. Defaults to `"GET"`.
 </ParamField>
 
 <ParamField path="headers" type="Record<string, string>">
-  Additional request headers to merge with any that `bodyType` adds automatically.
+  Additional request headers to merge with any that `bodyType` adds
+  automatically.
 </ParamField>
 
 <ParamField path="body" type="Record<string, any> | string">
-  Request body. When `bodyType` is `"json"` (the default), objects are serialized with `JSON.stringify`. When `bodyType` is `"form"`, objects are encoded as `application/x-www-form-urlencoded`.
+  Request body. When `bodyType` is `"json"` (the default), objects are
+  serialized with `JSON.stringify`. When `bodyType` is `"form"`, objects are
+  encoded as `application/x-www-form-urlencoded`.
 </ParamField>
 
 <ParamField path="bodyType" type="&#x22;json&#x22; | &#x22;form&#x22;">
-  How to serialize the `body`. Defaults to `"json"`. Setting this to `"form"` also sets `Content-Type: application/x-www-form-urlencoded` automatically.
+  How to serialize the `body`. Defaults to `"json"`. Setting this to `"form"`
+  also sets `Content-Type: application/x-www-form-urlencoded` automatically.
 </ParamField>
 
-<ParamField path="responseType" type="&#x22;json&#x22; | &#x22;text&#x22; | &#x22;xml&#x22;">
-  How to parse the response. Defaults to `"json"`. Both `"text"` and `"xml"` return the raw response text.
+<ParamField
+  path="responseType"
+  type="&#x22;json&#x22; | &#x22;text&#x22; | &#x22;xml&#x22;"
+>
+  How to parse the response. Defaults to `"json"`. Both `"text"` and `"xml"`
+  return the raw response text.
 </ParamField>
 
 #### `PageRequestOptions<T>`
 
 <ParamField path="logger" type="MinimalLogger">
-  Optional logger. When provided, request details (method, URL, status, duration) are logged at `info` level, and failures at `warn`.
+  Optional logger. When provided, request details (method, URL, status,
+  duration) are logged at `info` level, and failures at `warn`.
 </ParamField>
 
 <ParamField path="schema" type="T extends z.ZodType">
@@ -60,7 +75,7 @@ The return type is `z.infer<T>` when a `schema` is provided, or `any` otherwise.
 
 #### Example
 
-```typescript  theme={null}
+```typescript theme={null}
 import { pageRequest } from "libretto";
 import { z } from "zod";
 
@@ -76,23 +91,23 @@ const data = await pageRequest(
     method: "POST",
     body: { query: "example", page: 1 },
   },
-  { schema: ResultSchema }
+  { schema: ResultSchema },
 );
 // data is typed as { items: Array<{ id: string; name: string }>; total: number }
 ```
 
-***
+---
 
 ### `downloadViaClick()`
 
 Triggers a file download by clicking a DOM element and intercepts the resulting download using Playwright's download event. The download promise is registered **before** the click so the event is never missed.
 
-```typescript  theme={null}
+```typescript theme={null}
 async function downloadViaClick(
   page: Page,
   selector: string,
-  options?: DownloadViaClickOptions
-): Promise<DownloadResult>
+  options?: DownloadViaClickOptions,
+): Promise<DownloadResult>;
 ```
 
 #### Parameters
@@ -114,6 +129,7 @@ async function downloadViaClick(
     <ParamField path="timeout" type="number">
       Milliseconds to wait for the download event. Defaults to `30000`.
     </ParamField>
+
   </Expandable>
 </ParamField>
 
@@ -124,12 +140,13 @@ async function downloadViaClick(
 </ResponseField>
 
 <ResponseField name="filename" type="string">
-  The filename suggested by the server via the `Content-Disposition` header or the URL.
+  The filename suggested by the server via the `Content-Disposition` header or
+  the URL.
 </ResponseField>
 
 #### Example
 
-```typescript  theme={null}
+```typescript theme={null}
 import { downloadViaClick } from "libretto";
 
 const { buffer, filename } = await downloadViaClick(page, "#export-btn", {
@@ -140,18 +157,18 @@ const { buffer, filename } = await downloadViaClick(page, "#export-btn", {
 console.log(`Downloaded ${filename} (${buffer.length} bytes)`);
 ```
 
-***
+---
 
 ### `downloadAndSave()`
 
 Convenience wrapper around `downloadViaClick()` that also writes the downloaded file to disk.
 
-```typescript  theme={null}
+```typescript theme={null}
 async function downloadAndSave(
   page: Page,
   selector: string,
-  options?: SaveDownloadOptions
-): Promise<DownloadResult & { savedTo: string }>
+  options?: SaveDownloadOptions,
+): Promise<DownloadResult & { savedTo: string }>;
 ```
 
 #### Parameters
@@ -177,6 +194,7 @@ async function downloadAndSave(
     <ParamField path="timeout" type="number">
       Milliseconds to wait for the download event. Defaults to `30000`.
     </ParamField>
+
   </Expandable>
 </ParamField>
 
@@ -190,14 +208,13 @@ Returns `DownloadResult & { savedTo: string }` — the same `buffer` and `filena
 
 #### Example
 
-```typescript  theme={null}
+```typescript theme={null}
 import { downloadAndSave } from "libretto";
 
-const { filename, savedTo } = await downloadAndSave(
-  page,
-  "#export-btn",
-  { savePath: "/tmp/report.csv", logger }
-);
+const { filename, savedTo } = await downloadAndSave(page, "#export-btn", {
+  savePath: "/tmp/report.csv",
+  logger,
+});
 
 console.log(`Saved ${filename} to ${savedTo}`);
 ```

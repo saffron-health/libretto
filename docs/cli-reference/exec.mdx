@@ -1,10 +1,12 @@
-## exec
+---
+title: exec
+---
 
 > Execute Playwright TypeScript code against the open browser page.
 
 The `exec` command runs TypeScript Playwright code against a live browser session. Use it to validate selectors, inspect page data, prototype individual steps, and experiment with interactions before encoding them in a workflow file.
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto exec --session debug-example "return await page.url()"
 ```
 
@@ -19,6 +21,7 @@ npx libretto exec --session debug-example "return await page.url()"
     npx libretto exec --session debug-example "return await page.locator('button').count()"
     npx libretto exec --session debug-example "await page.locator('button:has-text(\"Continue\")').click()"
     ```
+
   </Tab>
 
   <Tab title="stdin (multi-line)">
@@ -39,6 +42,7 @@ npx libretto exec --session debug-example "return await page.url()"
     return data;
     EOF
     ```
+
   </Tab>
 </Tabs>
 
@@ -46,21 +50,28 @@ npx libretto exec --session debug-example "return await page.url()"
 
 Inside the code you pass to `exec`, these variables are available without any imports:
 
-| Global       | Type                      | Description                                 |
-| ------------ | ------------------------- | ------------------------------------------- |
-| `page`       | `Page`                    | The active Playwright page                  |
-| `context`    | `BrowserContext`          | The browser context for the session         |
-| `browser`    | `Browser`                 | The browser instance                        |
-| `state`      | `Record<string, unknown>` | A mutable object scoped to this `exec` call |
-| `fetch`      | `typeof fetch`            | The global fetch function                   |
-| `Buffer`     | `typeof Buffer`           | Node.js `Buffer`                            |
-| `networkLog` | `function`                | Read captured network log entries           |
-| `actionLog`  | `function`                | Read captured action log entries            |
+| Global          | Type                      | Description                                 |
+| --------------- | ------------------------- | ------------------------------------------- |
+| `page`          | `Page`                    | The active Playwright page                  |
+| `context`       | `BrowserContext`          | The browser context for the session         |
+| `browser`       | `Browser`                 | The browser instance                        |
+| `state`         | `Record<string, unknown>` | A mutable object scoped to this `exec` call |
+| `fetch`         | `typeof fetch`            | The global fetch function                   |
+| `Buffer`        | `typeof Buffer`           | Node.js `Buffer`                            |
+| `networkLog`    | `function`                | Read captured network log entries           |
+| `actionLog`     | `function`                | Read captured action log entries            |
+| `console`       | `Console`                 | Standard console (`log`, `warn`, `error`)   |
+| `setTimeout`    | `function`                | Schedule a callback after a delay           |
+| `setInterval`   | `function`                | Schedule a repeating callback               |
+| `clearTimeout`  | `function`                | Cancel a scheduled `setTimeout`             |
+| `clearInterval` | `function`                | Cancel a scheduled `setInterval`            |
+| `URL`           | `typeof URL`              | The WHATWG `URL` constructor                |
 
 ### Flags
 
 <ParamField path="code" type="string" required>
-  The Playwright TypeScript code to execute, passed as the first positional argument. Pass `-` to read from stdin.
+  The Playwright TypeScript code to execute, passed as the first positional
+  argument. Pass `-` to read from stdin.
 </ParamField>
 
 <ParamField path="--session" type="string" required>
@@ -72,18 +83,19 @@ Inside the code you pass to `exec`, these variables are available without any im
 </ParamField>
 
 <ParamField path="--visualize" type="boolean">
-  Enable ghost cursor and highlight visualization. Shows a visible cursor trace and element highlights as Playwright interacts with the page.
+  Enable ghost cursor and highlight visualization. Shows a visible cursor trace
+  and element highlights as Playwright interacts with the page.
 </ParamField>
 
 ### Return values
 
 If the code returns a value, `exec` prints it to stdout:
 
-* Strings are printed as-is.
-* All other values are printed as pretty-printed JSON.
-* If the code returns nothing (`undefined`), `exec` prints `Executed successfully`.
+- Strings are printed as-is.
+- All other values are printed as pretty-printed JSON.
+- If the code returns nothing (`undefined`), `exec` prints `Executed successfully`.
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto exec --session debug-example "return await page.title()"
 # My Page Title
 
@@ -94,21 +106,24 @@ npx libretto exec --session debug-example "return await page.locator('li').count
 ### Rules
 
 <Warning>
-  **Let failures throw.** Do not hide `exec` failures with `try/catch` or `.catch()`. Swallowed errors make debugging harder — surface them so you can see exactly what failed.
+  **Let failures throw.** Do not hide `exec` failures with `try/catch` or
+  `.catch()`. Swallowed errors make debugging harder — surface them so you can
+  see exactly what failed.
 </Warning>
 
 <Warning>
-  **Do not run multiple `exec` commands in parallel.** Each `exec` call drives the same browser page. Running them concurrently causes race conditions.
+  **Do not run multiple `exec` commands in parallel.** Each `exec` call drives
+  the same browser page. Running them concurrently causes race conditions.
 </Warning>
 
-* Use `exec` for focused inspection and short-lived interaction experiments.
-* Use `exec -` (stdin) for complex multi-line scripts.
-* Validate a selector with `exec` before encoding it in a workflow file.
-* Use `exec` to prototype a single step, then move the working code into your `.ts` workflow file.
+- Use `exec` for focused inspection and short-lived interaction experiments.
+- Use `exec -` (stdin) for complex multi-line scripts.
+- Validate a selector with `exec` before encoding it in a workflow file.
+- Use `exec` to prototype a single step, then move the working code into your `.ts` workflow file.
 
 ### Examples
 
-```bash  theme={null}
+```bash theme={null}
 # Return the current URL
 npx libretto exec --session debug-example "return await page.url()"
 

@@ -12,7 +12,7 @@ When a Libretto workflow fails, the browser stays open at the exact point of fai
   <Step title="Prompt your agent with the failure">
     Describe the **script**, what it's **supposed to do**, and what's **going wrong**. Point the agent at the file and include any error output you have.
 
-    > Use the Libretto skill. The workflow at ./integration.ts is supposed to go to Availity and perform an eligibility check for a patient. But I'm getting a broken selector error when I run it. Fix it.
+    > Use the Libretto skill. The workflow at ./integration.ts is supposed to go to Availity and perform an eligibility check for a patient. But I'm getting a broken selector error when I run it. Fix it. \<_paste error here_\>
 
     Include "Use the Libretto skill" so your agent uses Libretto's debugging tools (snapshots, live exec) instead of guessing at fixes from the code alone.
 
@@ -110,14 +110,8 @@ The workflow halts at the `pause()` with the browser open. Inspect the page, the
 ### Tips
 
 <Tip>
-  Use `--headed` when you need to watch what's happening and `--headless` for
-  the fix/verify loop. Switch to headless once you've confirmed the visual
-  behavior is correct — it's faster.
-</Tip>
-
-<Tip>
-  Give your debug session a descriptive name with `--session`. Names like
-  `debug-eligibility-submit` are much easier to work with than the default.
+  Paste your error message into the prompt. Agents often do a better job
+  debugging when they're given the stack trace.
 </Tip>
 
 ### Related guides
