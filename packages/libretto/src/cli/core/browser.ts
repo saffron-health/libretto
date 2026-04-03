@@ -745,6 +745,7 @@ export async function runOpenWithProvider(
   provider: ProviderApi,
   session: string,
   logger: LoggerApi,
+  accessMode: SessionAccessMode = "write-access",
 ): Promise<void> {
   const parsedUrl = normalizeUrl(rawUrl);
   const url = parsedUrl.href;
@@ -831,7 +832,7 @@ export async function runOpenWithProvider(
       session,
       startedAt: new Date().toISOString(),
       status: "active",
-      mode: "write-access",
+      mode: accessMode,
       provider: {
         name: providerName,
         sessionId: providerSession.sessionId,

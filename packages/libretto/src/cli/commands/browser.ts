@@ -110,6 +110,7 @@ export const openCommand = SimpleCLI.command({
         provider,
         ctx.session,
         ctx.logger,
+        resolveRequestedSessionMode(input.readOnly),
       );
     }
   });
