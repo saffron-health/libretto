@@ -11,7 +11,9 @@
   "favicon": "/favicon.svg",
   "fonts": {
     "heading": {
-      "family": "Newsreader",
+      "family": "PP Editorial New",
+      "source": "/fonts/PPEditorialNew-Regular.woff2",
+      "format": "woff2",
       "weight": 400
     },
     "body": {

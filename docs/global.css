@@ -1,14 +1,5 @@
 /* Match the main Libretto website's warm, editorial aesthetic */
 
-/* PP Editorial New */
-@font-face {
-  font-family: "PP Editorial New";
-  src: url("/fonts/PPEditorialNew-Regular.otf") format("opentype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* Warm cream tones for backgrounds */
 :root {
   --cream: #f5f2ec;
