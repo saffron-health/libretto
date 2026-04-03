@@ -1,5 +1,5 @@
 {
-  "name": "libretto-benchmarks",
+  "name": "@libretto/benchmarks",
   "private": true,
   "type": "module",
   "dependencies": {
