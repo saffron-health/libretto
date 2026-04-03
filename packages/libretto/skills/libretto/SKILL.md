@@ -37,6 +37,8 @@ metadata:
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
+- If the browser must remain read-only, switch to the `libretto-readonly` skill and use `readonly-exec` instead of `exec`.
+- Use `session-mode` to inspect or change a session between `write-access` and `read-only`.
 
 ## Commands
 
@@ -45,21 +47,37 @@ metadata:
 - Open a page before using `exec` or `snapshot`.
 - Use `open` at the start of script authoring when you need live page state to decide how the workflow should work.
 - Use headed mode when the user needs to log in or watch the workflow.
+- Pass `--read-only` when you want the session locked for inspection from the moment it is created.
 
 ```bash
 npx libretto open https://example.com --headed
+npx libretto open https://example.com --headless --read-only --session readonly-example
 npx libretto open https://example.com --headless --session debug-example
 ```
 
 ### `connect`
 
 - Use `connect` to attach to any existing Chrome DevTools Protocol (CDP) endpoint — a browser started with `--remote-debugging-port`, an Electron app, or any other CDP-compatible target.
-- After connecting, `exec`, `snapshot`, `pages`, and all other session commands work normally.
+- After connecting, `exec`, `snapshot`, `pages`, and the rest of the session commands follow that session's stored mode.
 - Libretto does not manage the connected process's lifecycle. `close` clears the session but does not terminate the remote process.
+- Session mode is enforced only through Libretto. A separate tool that connects directly to the raw CDP endpoint bypasses it.
+- Pass `--read-only` if the connected session must stay inspection-only from the start.
 
 ```bash
 npx libretto connect http://127.0.0.1:9222 --session my-session
+npx libretto connect http://127.0.0.1:9222 --read-only --session readonly-session
 npx libretto connect http://127.0.0.1:9223 --session another-session
+```
+
+### `session-mode`
+
+- Use `session-mode` to inspect or update whether an existing session is `write-access` or `read-only`.
+- `open`, `run`, and `connect` default new sessions to `write-access`.
+
+```bash
+npx libretto session-mode --session my-session
+npx libretto session-mode read-only --session my-session
+npx libretto session-mode write-access --session my-session
 ```
 
 ### `snapshot`
@@ -89,6 +107,7 @@ npx libretto snapshot \
 - Available globals: `page`, `context`, `browser`, `state`, `fetch`, `Buffer`.
 - Let failures throw. Do not hide `exec` failures with `try/catch` or `.catch()`.
 - Do not run multiple `exec` commands in parallel.
+- Do not use `exec` in read-only diagnosis flows. Use `readonly-exec` from the `libretto-readonly` skill for those sessions.
 
 ```bash
 npx libretto exec "return await page.url()"
@@ -111,6 +130,7 @@ npx libretto exec --session debug-example --page <page-id> "return await page.ur
 
 - Use `run` to verify a workflow file after creating it or editing it, preferring `run --headless` for the normal fix/verify loop.
 - Plain `run` defaults to headed mode.
+- Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.
 - If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
 - Insert `await pause(session)` statements in the workflow file when you need to stop at specific states for interactive debugging, like breakpoints in the browser flow.
 - If the workflow pauses, resume it with `npx libretto resume --session <name>`.
@@ -118,6 +138,7 @@ npx libretto exec --session debug-example --page <page-id> "return await page.ur
 
 ```bash
 npx libretto run ./integration.ts workflowName --headless --params '{"status":"open"}'
+npx libretto run ./integration.ts workflowName --headless --read-only
 npx libretto run ./integration.ts workflowName --auth-profile app.example.com
 ```
 

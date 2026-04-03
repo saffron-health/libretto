@@ -17,10 +17,7 @@ export class LibrettoWorkflow<Input = unknown, Output = unknown> {
   public readonly name: string;
   private readonly handler: LibrettoWorkflowHandler<Input, Output>;
 
-  constructor(
-    name: string,
-    handler: LibrettoWorkflowHandler<Input, Output>,
-  ) {
+  constructor(name: string, handler: LibrettoWorkflowHandler<Input, Output>) {
     this.name = name;
     this.handler = handler;
   }

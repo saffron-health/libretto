@@ -6,9 +6,9 @@ In read-only sessions, `exec` is fully blocked. Agents still need a safe way to 
 
 Add a new `readonly-exec` CLI command that reuses the `exec` runtime pipeline but enforces a strict read-only sandbox:
 
-- allow read-only observation helpers (`page.content`, `page.title`, locator text reads, `networkLog`)
+- allow read-only observation through the proxied `page`, `snapshot`, locator text reads, and `get`
 - block mutating Playwright actions (click/fill/type/press/check/selectOption/hover/drag/navigation methods)
-- block outbound network mutation requests (`fetch`, `XMLHttpRequest`, `navigator.sendBeacon`, form submit)
+- block outbound network mutation requests (raw `fetch`, non-GET requests, `XMLHttpRequest`, `navigator.sendBeacon`, form submit)
 - keep command output and ergonomics aligned with `exec`
 
 ## Goals
@@ -31,39 +31,40 @@ Add a new `readonly-exec` CLI command that reuses the `exec` runtime pipeline bu
 
 ## Important files/docs/websites for implementation
 
-- `packages/libretto/src/index.ts` — add `readonly-exec` command parsing and runtime.
-- `packages/libretto/src/cli-basic.test.ts` — usage and argument behavior for the new command.
-- `packages/libretto/src/cli-stateful.test.ts` — read-only session behavior tests.
-- `packages/libretto/src/test-fixtures.ts` — seeded session and permission fixtures.
-- `packages/libretto/skills/original-skill/SKILL.md` — switch read-only workflows from `exec` to `readonly-exec`.
-- `packages/libretto/skills/libretto-network-skill/SKILL.md` — same as above for `.bin/libretto` workflow.
+- `packages/libretto/packages/libretto/src/cli/commands/execution.ts` — add `readonly-exec` command parsing and shared execution wiring.
+- `packages/libretto/packages/libretto/src/cli/core/readonly-exec.ts` — read-only Playwright proxies and helper surface.
+- `packages/libretto/packages/libretto/test/basic.spec.ts` — usage and argument behavior for the new command.
+- `packages/libretto/packages/libretto/test/stateful.spec.ts` — browser-backed allowed/denied behavior tests.
+- `packages/libretto/packages/libretto/test/fixtures.ts` — subprocess test helpers.
+- `packages/libretto/packages/libretto/skills/libretto/SKILL.md` — interactive skill guidance now points read-only flows at `libretto-readonly`.
+- `packages/libretto/packages/libretto/skills/libretto-readonly/SKILL.md` — source-of-truth read-only diagnosis skill.
 
 ## Implementation
 
 ### Phase 1: Add command surface and wiring
 
-- [ ] Add `readonly-exec <code>` command and usage text.
-- [ ] Reuse existing `compileExecFunction` pipeline for execution.
-- [ ] Keep `exec` behavior unchanged for interactive sessions.
-- [ ] Success criteria: command is discoverable in `--help` and returns usage errors analogous to `exec`.
+- [x] Add `readonly-exec <code>` command and usage text.
+- [x] Reuse existing `compileExecFunction` pipeline for execution.
+- [x] Keep `exec` behavior unchanged for interactive sessions.
+- [x] Success criteria: command is discoverable in `--help` and returns usage errors analogous to `exec`.
 
 ### Phase 2: Build read-only runtime guardrails
 
-- [ ] Introduce `createReadOnlyExecHelpers` derived from current `exec` helpers.
-- [ ] Remove/replace mutating globals (`fetch` wrapper that denies non-GET/HEAD, deny XHR/sendBeacon/form submit APIs).
-- [ ] Wrap `page`/`context` with deny-list guards for mutating Playwright methods.
-- [ ] Return deterministic errors like `ReadonlyExecDenied: page.click is blocked in readonly-exec`.
-- [ ] Success criteria: known mutating calls fail immediately before side effects.
+- [x] Introduce `createReadonlyExecHelpers` derived from current `exec` helpers.
+- [x] Replace raw network access with a GET-only helper and a denied raw `fetch`.
+- [x] Wrap `page` and chained locators with allowlisted read-only proxies.
+- [x] Return deterministic errors like `ReadonlyExecDenied: page.click is blocked in readonly-exec`.
+- [x] Success criteria: known mutating calls fail immediately before side effects.
 
 ### Phase 3: Add tests for allowed vs denied operations
 
-- [ ] Add tests that `readonly-exec` works in read-only sessions where `exec` is blocked.
-- [ ] Add tests that read operations succeed (e.g., `return await page.title()`, `return await networkLog()`).
-- [ ] Add tests that mutating APIs are denied (`page.click`, `page.goto`, `fetch('POST ...')`).
-- [ ] Success criteria: test suite verifies both safety boundaries and retained read-only utility.
+- [x] Add tests that `readonly-exec` supports read-only page inspection, chained locator reads, and snapshot payloads.
+- [x] Add tests that read operations succeed (e.g., `return await page.title()`, locator reads, GET requests).
+- [x] Add tests that mutating APIs are denied (`page.fill`, `page.goto`, `get(..., { method: 'POST' })`).
+- [x] Success criteria: targeted CLI tests verify both safety boundaries and retained read-only utility.
 
 ### Phase 4: Skill/doc rollout
 
-- [ ] Update skill instructions so agents use `readonly-exec` by default in read-only mode.
-- [ ] Keep `exec` only after explicit interactive authorization.
-- [ ] Success criteria: skill docs show a clear decision path: read-only inspect first, interactive only with explicit user approval.
+- [x] Update skill instructions so agents use `readonly-exec` by default in read-only diagnosis mode.
+- [x] Keep `exec` documented as the interactive tool and point read-only flows at `libretto-readonly`.
+- [x] Success criteria: skill docs show a clear decision path between interactive repair and read-only inspection.

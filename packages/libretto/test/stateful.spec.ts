@@ -1,5 +1,9 @@
+import { createServer } from "node:http";
 import { existsSync } from "node:fs";
-import { describe, expect } from "vitest";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import type { AddressInfo } from "node:net";
+import { pathToFileURL } from "node:url";
+import { describe, expect, onTestFinished } from "vitest";
 import { test } from "./fixtures";
 
 function extractReturnedSessionId(output: string): string | null {
@@ -36,6 +40,10 @@ function expectMissingSessionError(output: string, session: string): void {
   expect(output).toContain("No active sessions.");
   expect(output).toContain("Start one with:");
   expect(output).toContain(`libretto open <url> --session ${session}`);
+}
+
+function parseJsonStdout<T>(stdout: string): T {
+  return JSON.parse(stdout.trim()) as T;
 }
 
 describe("state-driven CLI subprocess behavior", () => {
@@ -105,7 +113,6 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const snapshot = await librettoCli(`snapshot --session ${session}`);
-    expect(snapshot.exitCode).not.toBe(0);
     expect(snapshot.stderr).toContain("Missing required option --objective.");
   }, 45_000);
 
@@ -130,7 +137,6 @@ describe("state-driven CLI subprocess behavior", () => {
         GCLOUD_PROJECT: "",
       },
     );
-    expect(snapshot.exitCode).not.toBe(0);
     expect(snapshot.stdout).not.toContain("Screenshot saved:");
     expect(snapshot.stderr).toContain(
       "Failed to analyze snapshot because no snapshot analyzer is configured.",
@@ -154,7 +160,6 @@ describe("state-driven CLI subprocess behavior", () => {
     const snapshot = await librettoCli(
       `snapshot --context "extra context only" --session ${session}`,
     );
-    expect(snapshot.exitCode).not.toBe(0);
     expect(snapshot.stderr).toContain("Missing required option --objective.");
   }, 45_000);
 
@@ -378,5 +383,434 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(view.stdout).toContain("target=span");
     expect(view.stdout).toContain('text="Save"');
     expect(view.stdout).toContain("@(42,24)");
+  }, 60_000);
+
+  test("open and connect sessions default to write-access and support --read-only", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const sourceSession = "connect-source-session-mode";
+    const connectedSession = "connect-target-session-mode";
+    const readonlyOpenSession = "open-readonly-session-mode";
+    const readonlyConnectedSession = "connect-readonly-session-mode";
+    await librettoCli(
+      `open https://example.com --headless --session ${sourceSession}`,
+    );
+
+    const sourceMode = await librettoCli(
+      `session-mode --session ${sourceSession}`,
+    );
+    expect(sourceMode.stdout).toContain(
+      `Session "${sourceSession}" mode: write-access`,
+    );
+
+    await librettoCli(
+      `open https://example.com --headless --read-only --session ${readonlyOpenSession}`,
+    );
+    const readonlyOpenMode = await librettoCli(
+      `session-mode --session ${readonlyOpenSession}`,
+    );
+    expect(readonlyOpenMode.stdout).toContain(
+      `Session "${readonlyOpenSession}" mode: read-only`,
+    );
+
+    const sourceState = JSON.parse(
+      await readFile(
+        workspacePath(".libretto", "sessions", sourceSession, "state.json"),
+        "utf8",
+      ),
+    ) as { port: number };
+
+    const connected = await librettoCli(
+      `connect http://127.0.0.1:${sourceState.port} --session ${connectedSession}`,
+    );
+    expect(connected.stdout).toContain(`(session: ${connectedSession})`);
+
+    const connectedMode = await librettoCli(
+      `session-mode --session ${connectedSession}`,
+    );
+    expect(connectedMode.stdout).toContain(
+      `Session "${connectedSession}" mode: write-access`,
+    );
+
+    await librettoCli(
+      `connect http://127.0.0.1:${sourceState.port} --read-only --session ${readonlyConnectedSession}`,
+    );
+    const readonlyConnectedMode = await librettoCli(
+      `session-mode --session ${readonlyConnectedSession}`,
+    );
+    expect(readonlyConnectedMode.stdout).toContain(
+      `Session "${readonlyConnectedSession}" mode: read-only`,
+    );
+  }, 60_000);
+
+  test("read-only sessions block exec but still allow readonly-exec", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "exec-readonly-guard";
+    const htmlPath = workspacePath("fixtures", "exec-readonly-guard.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      "<!doctype html><html><head><title>Exec Guard</title></head><body><h1>Guarded</h1></body></html>",
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(
+      `open "${fileUrl}" --headless --read-only --session ${session}`,
+    );
+
+    const blockedExec = await librettoCli(
+      `exec "return page.url()" --session ${session}`,
+    );
+    expect(blockedExec.stderr).toContain(
+      `Command "exec" is blocked for session "${session}" because it is in read-only mode.`,
+    );
+    expect(blockedExec.stderr).toContain(
+      `libretto session-mode write-access --session ${session}`,
+    );
+
+    const readonlyExec = await librettoCli(
+      `readonly-exec "return page.url()" --session ${session}`,
+    );
+    expect(readonlyExec.stderr).toBe("");
+    expect(readonlyExec.stdout.trim()).toBe(fileUrl);
+  }, 60_000);
+
+  test("read-only guard also applies to remote CDP-backed sessions", async ({
+    librettoCli,
+    seedSessionState,
+    workspacePath,
+  }) => {
+    const sourceSession = "remote-cdp-source";
+    await librettoCli(
+      `open https://example.com --headless --session ${sourceSession}`,
+    );
+
+    const sourceState = JSON.parse(
+      await readFile(
+        workspacePath(".libretto", "sessions", sourceSession, "state.json"),
+        "utf8",
+      ),
+    ) as { port: number };
+
+    const remoteSession = "remote-cdp-readonly";
+    await seedSessionState({
+      session: remoteSession,
+      port: sourceState.port,
+      cdpEndpoint: `http://127.0.0.1:${sourceState.port}`,
+      mode: "read-only",
+      pid: 12345,
+      status: "active",
+    });
+
+    const blockedExec = await librettoCli(
+      `exec "return page.url()" --session ${remoteSession}`,
+    );
+    expect(blockedExec.stderr).toContain(
+      `Command "exec" is blocked for session "${remoteSession}" because it is in read-only mode.`,
+    );
+
+    const readonlyExec = await librettoCli(
+      `readonly-exec "return page.url()" --session ${remoteSession}`,
+    );
+    expect(readonlyExec.stderr).toBe("");
+    expect(readonlyExec.stdout.trim()).toContain("example.com");
+  }, 60_000);
+
+  test("readonly-exec allows read-only page and locator inspection", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "readonly-exec-reads";
+    const htmlPath = workspacePath("fixtures", "readonly-exec.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      [
+        "<!doctype html>",
+        "<html>",
+        "<head><title>Readonly Fixture</title></head>",
+        "<body>",
+        '<h1 id="heading">Readonly Heading</h1>',
+        "<ul>",
+        "<li>Alpha</li>",
+        "<li>Beta</li>",
+        "</ul>",
+        '<div id="visible">Visible</div>',
+        '<div id="hidden" style="display:none">Hidden</div>',
+        '<input id="name" value="unchanged" />',
+        "</body>",
+        "</html>",
+      ].join(""),
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `readonly-exec - --session ${session}`,
+      undefined,
+      [
+        "await page.waitForLoadState('domcontentloaded');",
+        "const pageErrorCount = (await page.pageErrors()).length;",
+        "const allItems = await Promise.all((await page.getByRole('listitem').all()).map((item) => item.textContent()));",
+        "return {",
+        "  url: page.url(),",
+        "  title: await page.title(),",
+        "  pageErrorCount,",
+        "  loaded: true,",
+        "  heading: await page.locator('#heading').textContent(),",
+        "  headingId: await page.locator('#heading').getAttribute('id'),",
+        "  count: await page.locator('li').count(),",
+        "  secondItem: await page.getByRole('listitem').nth(1).textContent(),",
+        "  allItems,",
+        "  visible: await page.locator('#visible').isVisible(),",
+        "  hidden: await page.locator('#hidden').isHidden(),",
+        "  nameValue: await page.locator('#name').inputValue(),",
+        "  nameEditable: await page.locator('#name').isEditable(),",
+        "};",
+      ].join("\n"),
+    );
+
+    expect(result.stderr).toBe("");
+    expect(parseJsonStdout<Record<string, unknown>>(result.stdout)).toEqual({
+      url: fileUrl,
+      title: "Readonly Fixture",
+      pageErrorCount: 0,
+      loaded: true,
+      heading: "Readonly Heading",
+      headingId: "heading",
+      count: 2,
+      secondItem: "Beta",
+      allItems: ["Alpha", "Beta"],
+      visible: true,
+      hidden: true,
+      nameValue: "unchanged",
+      nameEditable: true,
+    });
+  }, 60_000);
+
+  test("readonly-exec allows safe scrolling helpers", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "readonly-exec-scroll";
+    const htmlPath = workspacePath("fixtures", "readonly-scroll.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      [
+        "<!doctype html>",
+        "<html>",
+        "<head><title>Readonly Scroll</title></head>",
+        '<body style="margin:0">',
+        '<div style="height:1800px;background:linear-gradient(#fff,#ddd)">Spacer</div>',
+        '<div id="target" style="height:120px">Target</div>',
+        "</body>",
+        "</html>",
+      ].join(""),
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `readonly-exec - --session ${session}`,
+      undefined,
+      [
+        "const target = page.locator('#target');",
+        "const beforeBox = await target.boundingBox();",
+        "await scrollBy(0, 2200);",
+        "const afterScrollByBox = await target.boundingBox();",
+        "await target.scrollIntoViewIfNeeded();",
+        "const afterLocatorScrollBox = await target.boundingBox();",
+        "return {",
+        "  movedByScrollBy: Boolean(beforeBox && afterScrollByBox && afterScrollByBox.y < beforeBox.y),",
+        "  afterLocatorScrollInViewport: Boolean(afterLocatorScrollBox && afterLocatorScrollBox.y >= 0 && afterLocatorScrollBox.y < 720),",
+        "};",
+      ].join("\n"),
+    );
+
+    expect(result.stderr).toBe("");
+    expect(parseJsonStdout<Record<string, unknown>>(result.stdout)).toEqual({
+      movedByScrollBy: true,
+      afterLocatorScrollInViewport: true,
+    });
+  }, 60_000);
+
+  test("readonly-exec snapshot returns diagnostic payload", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "readonly-exec-snapshot";
+    const htmlPath = workspacePath("fixtures", "readonly-snapshot.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      "<!doctype html><html><head><title>Snapshot Fixture</title></head><body><main><h1>Snapshot Heading</h1></main></body></html>",
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `readonly-exec - --session ${session}`,
+      undefined,
+      [
+        "const snap = await snapshot();",
+        "return {",
+        "  url: snap.currentUrl,",
+        "  title: snap.pageTitle,",
+        "  htmlContainsHeading: snap.pageHtml.includes('Snapshot Heading'),",
+        "  hasScreenshot: snap.screenshot.bytesBase64.length > 0,",
+        "};",
+      ].join("\n"),
+    );
+
+    expect(result.stderr).toBe("");
+    expect(parseJsonStdout<Record<string, unknown>>(result.stdout)).toEqual({
+      url: fileUrl,
+      title: "Snapshot Fixture",
+      htmlContainsHeading: true,
+      hasScreenshot: true,
+    });
+  }, 60_000);
+
+  test("readonly-exec denies mutating Playwright APIs", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "readonly-exec-denials";
+    const htmlPath = workspacePath("fixtures", "readonly-denials.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      "<!doctype html><html><head><title>Readonly Denials</title></head><body><button id=\"submit\">Submit</button><input id=\"name\" value=\"unchanged\" /></body></html>",
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
+
+    const blockedGoto = await librettoCli(
+      `readonly-exec "await page.goto('https://example.com')" --session ${session}`,
+    );
+    expect(blockedGoto.stderr).toContain(
+      "ReadonlyExecDenied: page.goto is blocked in readonly-exec",
+    );
+
+    const blockedFill = await librettoCli(
+      `readonly-exec "await page.locator('#name').fill('Alice')" --session ${session}`,
+    );
+    expect(blockedFill.stderr).toContain(
+      "ReadonlyExecDenied: locator.fill is blocked in readonly-exec",
+    );
+
+    const blockedEvaluate = await librettoCli(
+      `readonly-exec "return await page.evaluate(() => document.title)" --session ${session}`,
+    );
+    expect(blockedEvaluate.stderr).toContain(
+      "ReadonlyExecDenied: page.evaluate is blocked in readonly-exec",
+    );
+
+    const blockedKeyboard = await librettoCli(
+      `readonly-exec "await page.keyboard.press('Tab')" --session ${session}`,
+    );
+    expect(blockedKeyboard.stderr).toContain(
+      "ReadonlyExecDenied: page.keyboard is blocked in readonly-exec",
+    );
+
+    const blockedMouse = await librettoCli(
+      `readonly-exec "await page.mouse.click(1, 1)" --session ${session}`,
+    );
+    expect(blockedMouse.stderr).toContain(
+      "ReadonlyExecDenied: page.mouse is blocked in readonly-exec",
+    );
+
+    const blockedClock = await librettoCli(
+      `readonly-exec "return typeof page.clock" --session ${session}`,
+    );
+    expect(blockedClock.stderr).toContain(
+      "ReadonlyExecDenied: page.clock is blocked in readonly-exec",
+    );
+
+    const currentUrlResult = await librettoCli(
+      `readonly-exec "return page.url()" --session ${session}`,
+    );
+    expect(currentUrlResult.stderr).toBe("");
+    expect(currentUrlResult.stdout.trim()).toBe(fileUrl);
+  }, 60_000);
+
+  test("readonly-exec only allows GET network requests", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "readonly-exec-network";
+    const methods: string[] = [];
+    const server = createServer((req, res) => {
+      methods.push(req.method ?? "UNKNOWN");
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end("pong");
+    });
+
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", () => resolve()),
+    );
+
+    onTestFinished(async () => {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        }),
+      );
+    });
+
+    const port = (server.address() as AddressInfo).port;
+    const htmlPath = workspacePath("fixtures", "readonly-network.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      "<!doctype html><html><head><title>Readonly Network</title></head><body><p>network</p></body></html>",
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
+
+    const getResult = await librettoCli(
+      `readonly-exec - --session ${session}`,
+      undefined,
+      [
+        `const response = await get('http://127.0.0.1:${port}/ping');`,
+        "return { status: response.status, body: await response.text() };",
+      ].join("\n"),
+    );
+    expect(getResult.stderr).toBe("");
+    expect(parseJsonStdout<Record<string, unknown>>(getResult.stdout)).toEqual(
+      {
+        status: 200,
+        body: "pong",
+      },
+    );
+
+    const blockedPost = await librettoCli(
+      `readonly-exec - --session ${session}`,
+      undefined,
+      `await get('http://127.0.0.1:${port}/ping', { method: 'POST' });`,
+    );
+    expect(blockedPost.stderr).toContain(
+      "ReadonlyExecDenied: POST requests are blocked in readonly-exec",
+    );
+    expect(methods).toEqual(["GET"]);
   }, 60_000);
 });

@@ -16,6 +16,9 @@ Examples:
 
   libretto exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
   libretto exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
+  libretto readonly-exec "return await page.title()" --session test1
+  libretto connect http://127.0.0.1:9222 --read-only --session test1
+  libretto run ./integration.ts workflowName --read-only --session test1
   libretto status
   libretto ai configure openai
   libretto ai configure anthropic
@@ -37,6 +40,9 @@ Examples:
 Available in exec:
   page, context, state, browser, networkLog, actionLog
 
+Available in readonly-exec:
+  page, state, snapshot, scrollBy, get
+
 Profiles:
   Profiles are saved to .libretto/profiles/<domain>.json (git-ignored)
   They persist cookies, localStorage, and session data across browser launches.
@@ -47,6 +53,9 @@ Sessions:
   Session state is stored in .libretto/sessions/<session>/state.json
   CLI logs are stored in .libretto/sessions/<session>/logs.jsonl
   Each session runs an isolated browser instance on a dynamic port.
+  Session mode is stored per session as read-only or write-access.
+  Use --read-only on open, connect, or run to create a read-only session.
+  Session mode is enforced by Libretto commands, not by raw CDP clients outside Libretto.
 `;
 }
 

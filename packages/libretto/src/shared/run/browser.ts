@@ -9,6 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { ensureLibrettoSessionStatePath } from "../paths/paths.js";
 import {
   SESSION_STATE_VERSION,
+  type SessionAccessMode,
   SessionStateFileSchema,
 } from "../state/session-state.js";
 import { readLibrettoConfig } from "../../cli/core/config.js";
@@ -34,6 +35,7 @@ export type LaunchBrowserArgs = {
   headless?: boolean;
   viewport?: { width: number; height: number };
   storageStatePath?: string;
+  accessMode?: SessionAccessMode;
 };
 
 export type BrowserSession = {
@@ -97,6 +99,7 @@ export async function launchBrowser({
   headless = false,
   viewport = { width: 1366, height: 768 },
   storageStatePath,
+  accessMode = "write-access",
 }: LaunchBrowserArgs): Promise<BrowserSession> {
   const debugPort = await pickFreePort();
   const windowPosition = headless ? undefined : resolveWindowPosition();
@@ -141,6 +144,7 @@ export async function launchBrowser({
         pid: process.pid,
         startedAt: new Date().toISOString(),
         status: "active",
+        mode: accessMode,
       },
       null,
       2,
