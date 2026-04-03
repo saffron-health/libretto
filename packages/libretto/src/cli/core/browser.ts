@@ -729,31 +729,54 @@ export async function runOpenWithProvider(
 
   console.log(`Connecting to ${providerName} browser...`);
 
-  const browser = await tryConnectToCDP(
-    providerSession.cdpEndpoint,
-    logger,
-    30_000,
-  );
-  if (!browser) {
-    throw new Error(
-      `Could not connect to ${providerName} browser at ${providerSession.cdpEndpoint}. The remote session was created but CDP connection failed.`,
+  let browser: Browser | null = null;
+  try {
+    browser = await tryConnectToCDP(
+      providerSession.cdpEndpoint,
+      logger,
+      30_000,
     );
+    if (!browser) {
+      throw new Error(
+        `Could not connect to ${providerName} browser at ${providerSession.cdpEndpoint}. The remote session was created but CDP connection failed.`,
+      );
+    }
+
+    const contexts = browser.contexts();
+    let page: Page;
+    if (contexts.length > 0 && contexts[0].pages().length > 0) {
+      page = contexts[0].pages()[0];
+    } else {
+      const context =
+        contexts.length > 0 ? contexts[0] : await browser.newContext();
+      page = await context.newPage();
+    }
+
+    await page.goto(url);
+    logger.info("open-provider-navigated", { url, session });
+
+    disconnectBrowser(browser, logger, session);
+  } catch (err) {
+    if (browser) {
+      disconnectBrowser(browser, logger, session);
+    }
+    // Clean up the remote session so it doesn't leak
+    logger.warn("open-provider-cleanup-after-error", {
+      provider: providerName,
+      sessionId: providerSession.sessionId,
+      error: err,
+    });
+    try {
+      await provider.closeSession(providerSession.sessionId);
+    } catch (cleanupErr) {
+      logger.warn("open-provider-cleanup-failed", {
+        provider: providerName,
+        sessionId: providerSession.sessionId,
+        error: cleanupErr,
+      });
+    }
+    throw err;
   }
-
-  const contexts = browser.contexts();
-  let page: Page;
-  if (contexts.length > 0 && contexts[0].pages().length > 0) {
-    page = contexts[0].pages()[0];
-  } else {
-    const context =
-      contexts.length > 0 ? contexts[0] : await browser.newContext();
-    page = await context.newPage();
-  }
-
-  await page.goto(url);
-  logger.info("open-provider-navigated", { url, session });
-
-  disconnectBrowser(browser, logger, session);
 
   // Parse the CDP endpoint to extract a port for session state.
   // For WebSocket URLs, use port 0 as a sentinel since there's no local port.
