@@ -6,7 +6,7 @@ Follow the user's existing codebase conventions, abstractions, and patterns when
 
 ## Workflow File Structure
 
-Generated files must export a `workflow()` instance so they can be run via `npx libretto run <file> <workflowName>`. Import `workflow` and its types from `"libretto"`:
+Generated files must default-export a `workflow()` instance so they can be run via `npx libretto run <file>`. Import `workflow` and its types from `"libretto"`:
 
 ```typescript
 import { workflow, pause, type LibrettoWorkflowContext } from "libretto";
@@ -22,7 +22,7 @@ type Output = {
   results: Array<{ name: string; value: string }>;
 };
 
-export const myWorkflow = workflow<Input, Output>(
+export default workflow<Input, Output>(
   "myWorkflow",
   async (ctx: LibrettoWorkflowContext, input): Promise<Output> => {
     const { session, page } = ctx;
@@ -39,7 +39,7 @@ export const myWorkflow = workflow<Input, Output>(
 Key points:
 
 - `workflow(name, handler)` takes a unique workflow name and returns the workflow object that Libretto can run.
-- `npx libretto run ./file.ts myWorkflow` resolves `myWorkflow` from the workflows exported by `./file.ts`, so export or re-export the workflow from that file directly or through a `workflows` object, and make sure the run argument matches the name passed to `workflow("myWorkflow", ...)`.
+- `npx libretto run ./file.ts` executes the file's default-exported workflow, so always use `export default workflow(...)`.
 - `ctx` provides `session` and `page`. Use `console.log`/`console.warn`/`console.error` for logging — the runtime wraps these with structured metadata automatically.
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.

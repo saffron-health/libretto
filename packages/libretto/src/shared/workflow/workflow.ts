@@ -67,31 +67,45 @@ function addWorkflowOrThrow(
   workflowsByName.set(value.name, value);
 }
 
+function collectWorkflowsOrThrow(
+  values: Iterable<unknown>,
+): ExportedLibrettoWorkflow[] {
+  const workflowsByName = new Map<string, ExportedLibrettoWorkflow>();
+
+  for (const value of values) {
+    addWorkflowOrThrow(workflowsByName, value);
+  }
+
+  return [...workflowsByName.values()];
+}
+
 export function getWorkflowsFromModuleExports(
   moduleExports: WorkflowModuleExports,
 ): ExportedLibrettoWorkflow[] {
-  const workflowsByName = new Map<string, ExportedLibrettoWorkflow>();
+  const discoveredValues: unknown[] = [];
 
   for (const [exportName, value] of Object.entries(moduleExports)) {
     if (exportName === "workflows" && value && typeof value === "object") {
       // Support both `export const workflows = workflow(...)` and
       // `export const workflows = { myWorkflow }`.
       if (isLibrettoWorkflow(value)) {
-        addWorkflowOrThrow(workflowsByName, value);
+        discoveredValues.push(value);
       } else {
-        for (const nestedValue of Object.values(
-          value as Record<string, unknown>,
-        )) {
-          addWorkflowOrThrow(workflowsByName, nestedValue);
-        }
+        discoveredValues.push(...Object.values(value as Record<string, unknown>));
       }
       continue;
     }
 
-    addWorkflowOrThrow(workflowsByName, value);
+    discoveredValues.push(value);
   }
 
-  return [...workflowsByName.values()];
+  return collectWorkflowsOrThrow(discoveredValues);
+}
+
+export function getDefaultWorkflowFromModuleExports(
+  moduleExports: WorkflowModuleExports,
+): ExportedLibrettoWorkflow | null {
+  return isLibrettoWorkflow(moduleExports.default) ? moduleExports.default : null;
 }
 
 export function getWorkflowFromModuleExports(
