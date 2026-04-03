@@ -4,6 +4,8 @@
 
 This repository is a pnpm monorepo. The main package lives in `packages/libretto`.
 
+We use Mintlify for our docs. Source at `docs/`. Configuration in `docs/docs.json`. Use the Mintlify skill when updating docs. Preview with `cd docs && mint dev`.
+
 ## Package Structure
 
 - `packages/libretto` — the Libretto package (runtime, CLI, tests)

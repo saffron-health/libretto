@@ -4,13 +4,21 @@
   "private": true,
   "description": "Developer tooling for the libretto monorepo",
   "type": "module",
-  "packageManager": "pnpm@9.15.4",
+  "packageManager": "pnpm@10.33.0",
   "bin": {
-    "wt": "./dist/wt.js"
+    "wt": "./dist/wt.js",
+    "create-tmp-workspace": "./dist/create-tmp-workspace.js"
+  },
+  "exports": {
+    "./tmp-workspace": {
+      "types": "./dist/tmp-workspace.d.ts",
+      "import": "./dist/tmp-workspace.js"
+    }
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
+    "create-tmp-workspace": "node dist/create-tmp-workspace.js",
     "sync:mirrors": "node scripts/sync-mirrors.mjs",
     "check:mirrors": "node scripts/check-mirrors-sync.mjs"
   },

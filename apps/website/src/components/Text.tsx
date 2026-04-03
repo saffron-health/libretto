@@ -18,6 +18,7 @@ interface TextProps {
   size?: Size;
   style?: "serif" | "sans";
   as?: keyof JSX.IntrinsicElements;
+  id?: string;
   className?: string;
   children: React.ReactNode;
   htmlStyle?: React.CSSProperties;

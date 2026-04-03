@@ -1,0 +1,121 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "Libretto",
+  "description": "Toolkit for building, debugging, and maintaining browser automations.",
+  "colors": {
+    "primary": "#5a5546",
+    "light": "#908879",
+    "dark": "#1e1d1a"
+  },
+  "favicon": "/favicon.svg",
+  "fonts": {
+    "heading": {
+      "family": "PP Editorial New",
+      "source": "/fonts/PPEditorialNew-Regular.woff2",
+      "format": "woff2",
+      "weight": 400
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400
+    }
+  },
+  "appearance": {
+    "default": "light"
+  },
+  "background": {
+    "color": {
+      "light": "#f5f2ec",
+      "dark": "#1e1d1a"
+    }
+  },
+  "styling": {
+    "codeblocks": {
+      "theme": {
+        "light": "github-light",
+        "dark": "github-dark"
+      }
+    }
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get started",
+        "pages": [
+          "get-started/introduction",
+          "get-started/configuration",
+          "get-started/architecture",
+          "get-started/automation-approaches",
+          "get-started/bot-detection"
+        ]
+      },
+      {
+        "group": "Workflow guides",
+        "pages": [
+          "workflow-guides/one-shot-script-generation",
+          "workflow-guides/interactive-script-building",
+          "workflow-guides/debugging-workflows",
+          "workflow-guides/convert-to-network-requests"
+        ]
+      },
+      {
+        "group": "CLI reference",
+        "pages": [
+          "cli-reference/open-and-connect",
+          "cli-reference/sessions-and-profiles",
+          "cli-reference/snapshot",
+          "cli-reference/exec",
+          "cli-reference/run-and-resume",
+          "cli-reference/network-and-actions",
+          "cli-reference/session-management"
+        ]
+      },
+      {
+        "group": "Library API",
+        "pages": [
+          "library-api/workflow",
+          "library-api/extraction",
+          "library-api/network",
+          "library-api/recovery",
+          "library-api/instrumentation",
+          "library-api/logging",
+          "library-api/openapi-spec"
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/saffron-health/libretto",
+          "icon": "github"
+        },
+        {
+          "anchor": "npm",
+          "href": "https://www.npmjs.com/package/libretto",
+          "icon": "npm"
+        },
+        {
+          "anchor": "Changelog",
+          "href": "https://github.com/saffron-health/libretto/releases",
+          "icon": "clock-rotate-left"
+        }
+      ]
+    }
+  },
+  "navbar": {},
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {}
+}

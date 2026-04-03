@@ -45,30 +45,6 @@ export const LibrettoConfigSchema = z
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
 
-/** Default models for each provider shorthand accepted by `ai configure`. */
-const DEFAULT_MODELS: Record<string, string> = {
-  openai: "openai/gpt-5.4",
-  anthropic: "anthropic/claude-sonnet-4-6",
-  gemini: "google/gemini-3-flash-preview",
-  vertex: "vertex/gemini-2.5-pro",
-};
-
-const PROVIDER_ALIASES: Record<string, string> = {
-  claude: DEFAULT_MODELS.anthropic,
-  google: DEFAULT_MODELS.gemini,
-};
-
-const CONFIGURE_PROVIDERS = [
-  "openai",
-  "anthropic",
-  "gemini",
-  "vertex",
-] as const;
-
-function formatConfigureProviders(separator = " | "): string {
-  return CONFIGURE_PROVIDERS.join(separator);
-}
-
 function formatConfigIssues(error: z.ZodError): string {
   return error.issues
     .map((issue) => `  - ${issue.path.join(".") || "root"}: ${issue.message}`)
@@ -108,7 +84,7 @@ function invalidConfigError(configPath: string, detail?: string): Error {
       '  - "ai", "viewport", and "windowPosition" are optional.',
       '  - "ai.model" must be a provider/model string like "openai/gpt-5.4" or "anthropic/claude-sonnet-4-6".',
       "Fix the file to match this shape, or delete it and rerun:",
-      `  npx libretto ai configure ${formatConfigureProviders()}`,
+      `  npx libretto ai configure openai | anthropic | gemini | vertex`,
     ]
       .filter(Boolean)
       .join("\n"),
@@ -162,7 +138,14 @@ export function writeAiConfig(
   model: string,
   configPath: string = LIBRETTO_CONFIG_PATH,
 ): AiConfig {
-  const librettoConfig = readLibrettoConfig(configPath);
+  let librettoConfig: LibrettoConfig;
+  try {
+    librettoConfig = readLibrettoConfig(configPath);
+  } catch {
+    // Existing config is malformed — start fresh so repair flows can
+    // overwrite a broken file instead of throwing.
+    librettoConfig = { version: CURRENT_CONFIG_VERSION };
+  }
   const ai = AiConfigSchema.parse({
     model,
     updatedAt: new Date().toISOString(),
@@ -191,85 +174,4 @@ export function clearAiConfig(
     configPath,
   );
   return true;
-}
-
-function printAiConfig(config: AiConfig, configPath: string): void {
-  console.log(`Model: ${config.model}`);
-  console.log(`Config file: ${configPath}`);
-  console.log(`Updated at: ${config.updatedAt}`);
-}
-
-/**
- * Resolve the model string from a `ai configure` argument.
- * Accepts a provider shorthand ("openai", "anthropic", "gemini", "vertex")
- * or a full provider/model-id string ("openai/gpt-4o", "anthropic/claude-sonnet-4-6").
- */
-function resolveModelFromInput(input: string): string | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-
-  // Full model string (contains a slash)
-  if (trimmed.includes("/")) return trimmed;
-
-  // Provider shorthand
-  const normalized = trimmed.toLowerCase();
-  return DEFAULT_MODELS[normalized] ?? PROVIDER_ALIASES[normalized] ?? null;
-}
-
-export function runAiConfigure(
-  input: {
-    preset?: string;
-    clear?: boolean;
-  },
-  options: {
-    configureCommandName?: string;
-    configPath?: string;
-  } = {},
-): void {
-  const configureCommandName =
-    options.configureCommandName ?? "npx libretto ai configure";
-  const configPath = options.configPath ?? LIBRETTO_CONFIG_PATH;
-
-  const presetArg = input.preset?.trim();
-
-  if (!presetArg && !input.clear) {
-    const config = readAiConfig(configPath);
-    if (!config) {
-      console.log(
-        `No AI config set. Choose a default model: ${configureCommandName} ${formatConfigureProviders()}`,
-      );
-      console.log(
-        "Provider credentials still come from your shell or .env file.",
-      );
-      return;
-    }
-    printAiConfig(config, configPath);
-    return;
-  }
-
-  if (input.clear) {
-    const removed = clearAiConfig(configPath);
-    if (removed) {
-      console.log(`Cleared AI config: ${configPath}`);
-    } else {
-      console.log("No AI config was set.");
-    }
-    return;
-  }
-
-  const model = resolveModelFromInput(presetArg!);
-  if (!model) {
-    console.log(
-      `Usage: ${configureCommandName} <${CONFIGURE_PROVIDERS.join("|")}|provider/model-id>\n` +
-        `       ${configureCommandName}\n` +
-        `       ${configureCommandName} --clear`,
-    );
-    throw new Error(
-      `Invalid provider or model. Use one of: ${formatConfigureProviders()}, or a full model string like "openai/gpt-4o".`,
-    );
-  }
-
-  const config = writeAiConfig(model, configPath);
-  console.log("AI config saved.");
-  printAiConfig(config, configPath);
 }

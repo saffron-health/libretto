@@ -1,0 +1,85 @@
+/* Match the main Libretto website's warm, editorial aesthetic */
+
+/* Warm cream tones for backgrounds */
+:root {
+  --cream: #f5f2ec;
+  --ink: #1e1d1a;
+  --muted: #5a5546;
+  --faint: #908879;
+}
+
+/* Navbar logo — serif to match main site */
+.nav-logo {
+  font-family: "PP Editorial New", "Georgia", serif;
+  font-weight: 400;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+/* Navbar styling */
+#navbar {
+  background: var(--cream);
+  border-bottom: 1px solid rgba(30, 29, 26, 0.08);
+}
+
+/* Sidebar warm background */
+#sidebar {
+  background: var(--cream);
+}
+
+/* Page title — serif heading feel */
+#page-title {
+  font-family: "PP Editorial New", "Newsreader", "Georgia", serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* Headings in content area */
+.mdx-content h1,
+.mdx-content h2,
+.mdx-content h3,
+.mdx-content h4 {
+  font-family: "PP Editorial New", "Newsreader", "Georgia", serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Sidebar group titles — plain sans, lighter */
+#sidebar h5 {
+  font-family:
+    "Inter",
+    -apple-system,
+    system-ui,
+    sans-serif;
+  font-weight: 500;
+  color: var(--faint);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+/* Border separating content from TOC/assistant panel */
+#table-of-contents-layout {
+  border-left: 1px solid rgba(30, 29, 26, 0.08);
+}
+
+/* Cards — softer, warmer borders */
+.card {
+  border-color: rgba(30, 29, 26, 0.1);
+}
+
+.card:hover {
+  border-color: rgba(30, 29, 26, 0.2);
+}
+
+/* Dark mode overrides */
+/* Dark mode overrides — Mintlify uses a .dark class on <html> */
+.dark #navbar {
+  background: var(--ink);
+  border-bottom-color: rgba(245, 242, 236, 0.08);
+}
+
+.dark #sidebar {
+  background: var(--ink);
+}
+

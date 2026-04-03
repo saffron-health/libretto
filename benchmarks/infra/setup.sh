@@ -5,6 +5,7 @@
 # Prerequisites:
 #   - gcloud CLI authenticated with access to the saffron-health project
 #   - Secret "anthropic-api-key" already exists in Secret Manager
+#   - Secret "kernel-api-key-libretto-benchmarks" already exists in Secret Manager
 #
 # Usage:
 #   bash benchmarks/infra/setup.sh
@@ -48,7 +49,7 @@ if gcloud run jobs describe "${JOB_NAME}" --region="${REGION}" --quiet 2>/dev/nu
     --max-retries=1 \
     --cpu=4 \
     --memory=8Gi \
-    --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest \
+    --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest,KERNEL_API_KEY=kernel-api-key-libretto-benchmarks:latest \
     --quiet
 else
   gcloud run jobs create "${JOB_NAME}" \
@@ -58,7 +59,7 @@ else
     --max-retries=1 \
     --cpu=4 \
     --memory=8Gi \
-    --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest \
+    --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest,KERNEL_API_KEY=kernel-api-key-libretto-benchmarks:latest \
     --quiet
 fi
 

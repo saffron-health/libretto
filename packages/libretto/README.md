@@ -22,12 +22,19 @@ https://github.com/user-attachments/assets/9b9a0ab3-5133-4b20-b3be-459943349d18
 ```bash
 npm install libretto
 
-# Install skill, download Chromium if not already installed, configure snapshot analysis
+# First-time onboarding: install skill, download Chromium, and pin the default snapshot model
 npx libretto setup
 
-# Configure or change the snapshot analysis model (see Configuration section below). `npx libretto setup` sets this up the first time.
+# Check workspace readiness at any time
+npx libretto status
+
+# Manually change the snapshot analysis model (advanced override)
 npx libretto ai configure <openai | anthropic | gemini | vertex>
 ```
+
+`setup` detects available provider credentials (e.g. `OPENAI_API_KEY`) and automatically pins the default model to `.libretto/config.json`. Re-running `setup` on a healthy workspace shows the current configuration instead of re-prompting. If credentials are missing for a previously configured provider, `setup` offers an interactive repair flow.
+
+Use `ai configure` when you want to explicitly switch providers or set a custom model string.
 
 ## Use cases
 
@@ -62,7 +69,8 @@ Agents can use Libretto to reproduce the failure, pause the workflow at any poin
 You can also use Libretto directly from the command line. All commands accept `--session <name>` to target a specific session.
 
 ```bash
-npx libretto setup                         # interactive; run yourself, not through an agent
+npx libretto setup                         # interactive first-run onboarding; run yourself, not through an agent
+npx libretto status                        # check AI config health and open sessions
 npx libretto open <url>                    # launch browser and open a URL (headed by default)
 npx libretto snapshot --objective "..." --context "..."  # capture PNG + HTML and analyze with an LLM
 npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page (single quoted argument)
@@ -74,7 +82,8 @@ npx libretto actions                       # view captured user/agent actions
 npx libretto pages                         # list open pages in the session
 npx libretto save <domain>                 # save browser session (cookies, localStorage) for reuse
 npx libretto close                         # close the browser
-npx libretto ai configure <provider>       # configure snapshot analysis model
+npx libretto ai configure <provider>       # manually change snapshot analysis model
+npx libretto status                        # show AI config and open sessions
 ```
 
 ## Configuration
@@ -98,10 +107,16 @@ All Libretto state lives in a `.libretto/` directory at your project root. Confi
 
 The `ai` field configures which model Libretto uses for snapshot analysis — extracting selectors, identifying interactive elements, or diagnosing why a step failed. This keeps heavy visual context out of your coding agent's context window. Snapshot analysis is required.
 
-The easiest way to set the model is through the CLI:
+`npx libretto setup` automatically pins the default model for the first provider whose credentials it finds. To explicitly change the provider or model afterward:
 
 ```bash
 npx libretto ai configure <openai | anthropic | gemini | vertex>
+```
+
+To inspect the current configuration without changing anything:
+
+```bash
+npx libretto status
 ```
 
 Provider credentials are read from environment variables or a `.env` file at your project root: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`, or `GOOGLE_CLOUD_PROJECT` for Vertex.

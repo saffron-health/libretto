@@ -1,0 +1,73 @@
+---
+title: Introduction
+sidebarTitle: Introduction
+---
+
+> Libretto is the AI toolkit for building and maintaining browser automations.
+
+Libretto gives your coding agent a live browser and a token-efficient CLI to inspect pages, capture traffic, record actions, and debug workflows — all without flooding your agent's context window with raw HTML.
+
+Built by the team at [Saffron Health](https://saffron.health), Libretto was created to help maintain browser integrations to common healthcare software. It's open-source so other teams can do the same.
+
+## Get started
+
+Run this in your project directory:
+
+```bash theme={null}
+npm init libretto@latest
+```
+
+This installs Libretto, downloads Chromium, sets up the `.libretto/` directory, copies agent skill files, and walks you through configuring a snapshot analysis model.
+
+<Note>
+  Run this yourself in a terminal — not through an agent. It may prompt for
+  input and starts a Chromium download that takes a moment.
+</Note>
+
+Once setup is complete, load up your favorite coding agent and try one of these prompts:
+
+> Use the Libretto skill. Go to LinkedIn and scrape the first 10 posts — content, author, reaction count, and first 25 comments.
+
+> I'll show you a workflow in eClinicalWorks to get a patient's primary insurance ID. Use the Libretto skill to turn it into a Playwright script.
+
+> We have a browser script at `./integration.ts` that's throwing a broken selector error. Fix it. Use the Libretto skill.
+
+## Core capabilities
+
+- **Inspect live pages** — Snapshot any page and get a token-efficient summary of selectors, interactive elements, and visible state.
+- **Capture network traffic** — Record every HTTP request/response to a structured JSONL log for reverse-engineering site APIs.
+- **Record user actions** — Capture DOM events with semantic selectors so your agent can reconstruct workflows as Playwright scripts.
+- **Debug broken workflows** — Keep the browser open on failure so your agent can inspect, patch, and re-run without restarting.
+
+## Common commands
+
+```bash
+npx libretto open https://example.com --session my-session
+npx libretto snapshot --session my-session --objective "Find the submit button" --context "I just opened the homepage."
+npx libretto exec --session my-session "return await page.url()"
+npx libretto run ./integration.ts main
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="CLI reference" icon="terminal" href="../cli-reference/open-and-connect">
+    Full reference for every Libretto command and flag.
+  </Card>
+
+<Card
+  title="Workflow guides"
+  icon="sparkles"
+  href="../workflow-guides/one-shot-script-generation"
+>
+  See how Libretto fits into real agent-driven automation workflows.
+</Card>
+
+<Card title="Library API" icon="code" href="../library-api/workflow">
+  Write workflow files with the typed `workflow()` API.
+</Card>
+
+  <Card title="Configuration" icon="settings" href="./configuration">
+    Configure Libretto's AI provider, viewport, and session defaults.
+  </Card>
+</CardGroup>

@@ -5,6 +5,8 @@ import { pathToFileURL } from "node:url";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
+const packageJsonUrl = new URL("../package.json", import.meta.url);
+
 function extractReturnedSessionId(output: string): string | null {
   const patterns = [
     /\(session:\s*([a-zA-Z0-9._-]+)\)/i,
@@ -41,6 +43,40 @@ function expectMissingSessionError(output: string, session: string): void {
   expect(output).toContain(`libretto open <url> --session ${session}`);
 }
 
+async function readCliVersion(): Promise<string> {
+  const manifest = JSON.parse(await readFile(packageJsonUrl, "utf8")) as {
+    version: string;
+  };
+  return manifest.version;
+}
+
+async function seedInstalledSkillVersion(
+  workspacePath: (...parts: string[]) => string,
+  rootDir: ".agents" | ".claude",
+  version: string,
+): Promise<void> {
+  await mkdir(workspacePath(rootDir, "skills", "libretto"), {
+    recursive: true,
+  });
+  await writeFile(
+    workspacePath(rootDir, "skills", "libretto", "SKILL.md"),
+    `---
+name: libretto
+metadata:
+  version: "${version}"
+---
+`,
+    "utf8",
+  );
+}
+
+function expectedSkillVersionWarning(
+  skillVersion: string,
+  cliVersion: string,
+): string {
+  return `Warning: Your agent skill (${skillVersion}) is out of date with your Libretto CLI (${cliVersion}). Please run \`npx libretto setup\` to update your skills to the correct version.`;
+}
+
 describe("basic CLI subprocess behavior", () => {
   test("setup explains snapshot API env setup when no credentials are configured", async ({
     librettoCli,
@@ -71,8 +107,98 @@ describe("basic CLI subprocess behavior", () => {
     });
 
     expect(result.stdout).toContain("Snapshot analysis:");
-    expect(result.stdout).toContain("Ready: openai/gpt-5.4");
-    expect(result.stdout).toContain("No further action required.");
+    expect(result.stdout).toContain("Model: openai/gpt-5.4");
+    expect(result.stdout).toContain("Config:");
+    expect(result.stdout).toContain("config.json");
+    expect(result.stdout).toContain(
+      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+    );
+  });
+
+  test("setup auto-pins default model when OPENAI_API_KEY is present", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+
+    expect(result.stdout).toContain("Model: openai/gpt-5.4");
+    expect(result.stdout).toContain("Config:");
+  });
+
+  test("setup rerun shows healthy summary without re-prompting", async ({
+    librettoCli,
+  }) => {
+    // First run: pins the model
+    const first = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+    expect(first.stdout).toContain("Model: openai/gpt-5.4");
+
+    // Second run: should show healthy summary, not re-prompt
+    const second = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-openai-key",
+    });
+    expect(second.stdout).toContain("Model: openai/gpt-5.4");
+    expect(second.stdout).toContain("Config:");
+    expect(second.stdout).toContain(
+      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+    );
+    // Should NOT contain the unconfigured prompts
+    expect(second.stdout).not.toContain(
+      "No snapshot API credentials detected.",
+    );
+  });
+
+  test("setup shows provider-specific message when pinned OpenAI + missing key + Anthropic present", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    // Pin OpenAI in config, but only provide Anthropic key
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(
+      workspacePath(".libretto", "config.json"),
+      JSON.stringify({
+        version: 1,
+        ai: { model: "openai/gpt-5.4", updatedAt: "2026-01-01T00:00:00.000Z" },
+      }),
+      "utf8",
+    );
+
+    const result = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "",
+      ANTHROPIC_API_KEY: "test-anthropic-key",
+    });
+
+    // Should name the configured provider and missing env var
+    expect(result.stdout).toContain("openai is configured");
+    expect(result.stdout).toContain("OPENAI_API_KEY is not set");
+    // Should NOT show the generic unconfigured message
+    expect(result.stdout).not.toContain("No snapshot API credentials detected");
+  });
+
+  test("setup shows invalid config warning in non-TTY mode", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(
+      workspacePath(".libretto", "config.json"),
+      "{not-valid-json}",
+      "utf8",
+    );
+
+    const result = await librettoCli("setup --skip-browsers", {
+      LIBRETTO_DISABLE_DOTENV: "1",
+      OPENAI_API_KEY: "test-key",
+    });
+
+    expect(result.stdout).toContain("AI config is invalid");
+    expect(result.stdout).toContain("reconfigure");
   });
 
   test("setup copies skill files without confirmation when agent dirs exist", async ({
@@ -123,6 +249,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Capture PNG + HTML");
     expect(result.stdout).not.toContain("cloud <subcommand>");
     expect(result.stdout).toContain("experimental <subcommand>");
+    expect(result.stdout).toContain("libretto status");
     expect(result.stderr).toBe("");
   });
 
@@ -132,6 +259,14 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Commands:");
     expect(result.stdout).toContain("open");
     expect(result.stdout).toContain("ai");
+    expect(result.stdout).toContain("status");
+    expect(result.stderr).toBe("");
+  });
+
+  test("prints scoped help for status command", async ({ librettoCli }) => {
+    const result = await librettoCli("help status");
+    expect(result.stdout).toContain("Show workspace status");
+    expect(result.stdout).toContain("AI configuration");
     expect(result.stderr).toBe("");
   });
 
@@ -237,6 +372,23 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toContain("Check logs:");
   });
 
+  test("warns on open when the installed skill version is out of date", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    await seedInstalledSkillVersion(workspacePath, ".agents", "0.0.0");
+
+    const result = await librettoCli("open https://example.com", {
+      PATH: "/definitely-not-real",
+    });
+
+    expect(result.stderr).toContain(
+      expectedSkillVersionWarning("0.0.0", cliVersion),
+    );
+    expect(result.stderr).toContain("Failed to launch browser child process:");
+  });
+
   test("defaults sessioned browser commands to the default session", async ({
     librettoCli,
   }) => {
@@ -312,6 +464,49 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("run ./integration.ts");
     expect(result.stderr).toContain("Integration file does not exist:");
     expect(result.stderr).toContain("integration.ts");
+  });
+
+  test("warns on run when the installed skill version is out of date", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    await seedInstalledSkillVersion(workspacePath, ".claude", "0.0.0");
+
+    const result = await librettoCli("run ./integration.ts main");
+
+    expect(result.stderr).toContain(
+      expectedSkillVersionWarning("0.0.0", cliVersion),
+    );
+    expect(result.stderr).toContain("Integration file does not exist:");
+  });
+
+  test("warns on connect when the installed skill version is out of date", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    await seedInstalledSkillVersion(workspacePath, ".agents", "0.0.0");
+
+    const result = await librettoCli("connect not-a-url --session mismatch");
+
+    expect(result.stderr).toContain(
+      expectedSkillVersionWarning("0.0.0", cliVersion),
+    );
+    expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
+  });
+
+  test("does not warn when the installed skill version matches the CLI", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    await seedInstalledSkillVersion(workspacePath, ".agents", cliVersion);
+
+    const result = await librettoCli("connect not-a-url --session matching");
+
+    expect(result.stderr).not.toContain("Warning: Your agent skill (");
+    expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 
   test("fails run with invalid JSON in --params", async ({ librettoCli }) => {

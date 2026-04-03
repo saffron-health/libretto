@@ -13,15 +13,21 @@
     "knip": "knip --cache --files --exports"
   },
   "dependencies": {
+    "@orama/orama": "^3.1.18",
     "@tailwindcss/vite": "^4.2.2",
     "classnames": "^2.5.1",
     "motion": "^12.38.0",
+    "prismjs": "^1.30.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "tailwindcss": "^4.2.2"
+    "safe-mdx": "^1.3.9",
+    "tailwindcss": "^4.2.2",
+    "wouter": "^3.9.0"
   },
   "devDependencies": {
     "@ai-sdk/google-vertex": "^4.0.95",
+    "@types/mdast": "^4.0.4",
+    "@types/prismjs": "^1.26.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

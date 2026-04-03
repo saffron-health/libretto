@@ -1,0 +1,38 @@
+---
+title: Architecture
+sidebarTitle: Architecture
+---
+
+### CLI vs Library API
+
+Libretto ships two interfaces:
+
+- **CLI** (`npx libretto <command>`) — the primary interface for both agents and humans. Commands open browsers, take snapshots, execute Playwright code, run workflow files, and manage sessions. Every command accepts `--session <name>` to target a specific browser session.
+
+- **Library API** (`import { workflow } from "libretto"`) — used inside workflow files you want to run with `npx libretto run`. The `workflow()` function wraps your automation handler and gives it typed access to `page` and `session`.
+
+### Sessions
+
+A **session** is a named browser context. When you run `npx libretto open https://example.com --session my-session`, Libretto launches a Chromium instance and registers it under that name. Subsequent commands (`snapshot`, `exec`, `network`, `actions`) all target that session by name.
+
+If you don't pass `--session`, Libretto generates a unique session name automatically. Sessions are independent — you can have multiple sessions open at the same time, each pointing to a different browser or URL.
+
+### The `.libretto/` directory
+
+All Libretto state lives in a `.libretto/` directory at your project root:
+
+```
+.libretto/
+├── config.json           # Model and viewport config
+├── sessions/
+│   └── <name>/
+│       ├── state.json    # Port, PID, status
+│       ├── logs.jsonl    # Session logs
+│       ├── network.jsonl
+│       ├── actions.jsonl
+│       └── snapshots/    # PNG + HTML
+└── profiles/
+    └── <domain>.json     # Auth state
+```
+
+Sessions and profiles are automatically git-ignored by a `.libretto/.gitignore` file created during setup.

@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/playwright:v1.58.2-noble
 
 # Enable corepack for pnpm
-RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 WORKDIR /app
 

@@ -1,7 +1,7 @@
 {
   "name": "libretto-monorepo",
   "private": true,
-  "packageManager": "pnpm@9.15.4",
+  "packageManager": "pnpm@10.33.0",
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/google": "^3.0.51",
@@ -14,6 +14,9 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "docs:dev": "cd docs && npx -y mintlify@4.2.473 dev",
+    "docs:validate": "cd docs && npx -y mintlify@4.2.473 validate",
+    "docs:broken-links": "cd docs && npx -y mintlify@4.2.473 broken-links --check-anchors",
     "website:build": "pnpm --dir ./apps/website build",
     "sync:mirrors": "node packages/dev-tools/scripts/sync-mirrors.mjs",
     "check:mirrors": "node packages/dev-tools/scripts/check-mirrors-sync.mjs",
@@ -24,6 +27,7 @@
     "benchmarks": "turbo run benchmarks --filter=libretto-benchmarks --",
     "google-login": "gcloud auth login --update-adc && gcloud auth configure-docker us-central1-docker.pkg.dev --quiet",
     "cli": "pnpm --filter libretto cli",
+    "create-tmp-workspace": "pnpm --filter @libretto/dev-tools create-tmp-workspace",
     "website:dev": "pnpm --dir ./apps/website dev"
   }
 }

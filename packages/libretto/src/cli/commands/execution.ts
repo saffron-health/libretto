@@ -19,6 +19,7 @@ import {
   setSessionStatus,
   type SessionState,
 } from "../core/session.js";
+import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import {
   readActionLog,
   readNetworkLog,
@@ -782,6 +783,7 @@ export const runCommand = SimpleCLI.command({
   .input(runInput)
   .use(withAutoSession())
   .handle(async ({ input, ctx }) => {
+    warnIfInstalledSkillOutOfDate();
     await stopExistingFailedRunSession(ctx.session, ctx.logger);
     assertSessionAvailableForStart(ctx.session, ctx.logger);
 

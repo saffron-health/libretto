@@ -61,6 +61,135 @@
   --color-faint: oklch(0.6 0.015 107);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+}
+
+.libretto-button {
+  position: relative;
+  min-width: fit-content;
+  border: 0;
+  cursor: pointer;
+  color: var(--color-cream);
+  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  text-decoration: none;
+  text-rendering: geometricPrecision;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%),
+    linear-gradient(180deg, oklch(0.248 0.007 107.1) 0%, oklch(0.176 0.006 107.1) 100%),
+    radial-gradient(
+      130% 160% at 50% 0%,
+      oklch(0.288 0.008 107.1) 0%,
+      oklch(0.22 0.007 107.1) 46%,
+      oklch(0.156 0.006 107.1) 100%
+    );
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 0 1px oklch(0.418 0.009 107.1 / 0.72),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.24),
+    0 1px 1px rgba(17, 17, 17, 0.16),
+    0 12px 28px rgba(17, 17, 17, 0.09);
+  transition:
+    background 120ms ease-in-out,
+    box-shadow 120ms ease-in-out,
+    color 120ms ease-in-out,
+    transform 80ms ease-in-out;
+}
+
+.libretto-button:hover {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 100%),
+    linear-gradient(180deg, oklch(0.268 0.007 107.1) 0%, oklch(0.192 0.006 107.1) 100%),
+    radial-gradient(
+      130% 160% at 50% 0%,
+      oklch(0.308 0.008 107.1) 0%,
+      oklch(0.236 0.007 107.1) 46%,
+      oklch(0.17 0.006 107.1) 100%
+    );
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px oklch(0.49 0.01 107.1 / 0.84),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.24),
+    0 1px 1px rgba(17, 17, 17, 0.16),
+    0 14px 30px rgba(17, 17, 17, 0.12);
+}
+
+.libretto-button[aria-pressed="true"] {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%),
+    linear-gradient(180deg, oklch(0.276 0.008 107.1) 0%, oklch(0.2 0.006 107.1) 100%),
+    radial-gradient(
+      130% 160% at 50% 0%,
+      oklch(0.318 0.009 107.1) 0%,
+      oklch(0.246 0.007 107.1) 46%,
+      oklch(0.176 0.006 107.1) 100%
+    );
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 0 1px oklch(0.53 0.011 107.1 / 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 0 0 1px oklch(0.68 0.009 107.1 / 0.12),
+    0 14px 30px rgba(17, 17, 17, 0.12);
+}
+
+.libretto-button:focus-visible {
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 0 1px oklch(0.53 0.011 107.1 / 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 0 0 3px oklch(0.735 0.01 107.1 / 0.28),
+    0 14px 30px rgba(17, 17, 17, 0.12);
+}
+
+.libretto-button:active {
+  transform: translateY(1px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%),
+    linear-gradient(180deg, oklch(0.228 0.007 107.1) 0%, oklch(0.166 0.006 107.1) 100%),
+    radial-gradient(
+      130% 160% at 50% 0%,
+      oklch(0.268 0.008 107.1) 0%,
+      oklch(0.208 0.007 107.1) 46%,
+      oklch(0.152 0.006 107.1) 100%
+    );
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.13),
+    inset 0 0 0 1px oklch(0.43 0.009 107.1 / 0.78),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.28),
+    0 8px 18px rgba(17, 17, 17, 0.09);
+}
+
+.libretto-button:disabled,
+.libretto-button[aria-disabled="true"] {
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px oklch(0.37 0.008 107.1 / 0.42),
+    0 6px 14px rgba(17, 17, 17, 0.06);
+}
+
+.libretto-button--default {
+  min-height: 2.25rem;
+  padding-inline: 1.375rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.libretto-button--sm {
+  min-height: 1.9375rem;
+  padding-inline: 0.9375rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
 @keyframes blink {
   0%,
   100% {
