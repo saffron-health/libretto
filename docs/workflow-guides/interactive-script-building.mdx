@@ -1,139 +1,101 @@
-## Interactive script building
+---
+title: Interactive workflow building
+---
 
 > Record your actions in the browser and let your agent turn them into automation code.
 
-Some workflows are too complex to describe in words alone — especially in healthcare software and legacy web apps where the interaction sequence matters and the UI has unusual patterns. Interactive script building lets you perform the workflow yourself, with Libretto recording every click, fill, and navigation. Your agent then reads the action log and translates what you did into a reusable automation script.
+Some workflows are too complex to describe in words alone — especially in healthcare software and legacy web apps where the interaction sequence matters and the UI has unusual patterns. Interactive script building lets you perform the workflow yourself while Libretto records every click, fill, and navigation. Your agent then reads the action log and translates what you did into a reusable automation script.
 
-### Example prompt
-
-> I'm gonna show you a workflow in the eclinicalworks EHR to get a patient's primary insurance ID. Use libretto skill to turn it into a playwright script that takes patient name and dob as input to get back the insurance ID. URL is ...
-
-You perform the workflow once in the browser. Libretto captures the full action log. The agent reads it and writes a script that can run the same steps programmatically.
-
-### Step-by-step process
+### Steps
 
 <Steps>
-  <Step title="Agent opens a headed browser">
-    ```bash  theme={null}
-    npx libretto open https://your-ehr.example.com --headed
-    ```
+  <Step title="Prompt your agent">
+    Describe the **site**, the **workflow** you're going to demonstrate, and the **input/output shape** you want. Mention that you'll show the steps manually.
 
-    The browser opens on your screen. You're in control from here.
+    > Use the Libretto skill. I'm going to show you a workflow in eClinicalWorks to look up a patient's primary insurance ID. Turn it into a script that takes patient name and DOB as input and returns the insurance ID. URL is https://your-ehr.example.com
+
+    Include "Use the Libretto skill" so your coding agent uses Libretto's CLI tools instead of writing a Playwright script from scratch.
+
   </Step>
 
-  <Step title="You perform the workflow manually">
-    Navigate through the application exactly as you would normally. Log in, search for a patient, open their record, find the insurance tab — whatever the workflow requires. Libretto records everything happening in the browser as you go.
+  <Step title="Perform the workflow in the browser">
+    The agent opens a headed browser window on your screen. If the site requires login, do that first. Then walk through the workflow exactly as you normally would — search for a patient, open their record, navigate to the insurance tab, whatever the task requires.
+
+    Libretto records every click, form fill, and navigation in the background. You don't need to do anything special — just use the app normally.
+
+    When you're done, tell the agent what you did and where the result ended up:
+
+    > I'm done. I searched by patient name, opened their chart, and clicked the Insurance tab. The primary insurance ID is visible in the Patient Info section on screen.
+
+    Call out anything non-obvious about what you did:
+
+    > I clicked the second search result because the first row is always a header. Also, the insurance tab sometimes takes a few seconds to load.
+
+    <Note>
+      Take your time. The recording captures everything, so there's no penalty for pausing to think or scrolling around to orient yourself. If you make a mistake, just undo it naturally — the agent can filter out dead ends.
+    </Note>
+
   </Step>
 
-  <Step title="Libretto records your actions">
-    Every click, form fill, and navigation is written to the action log at:
+  <Step title="Wait for the agent to recreate your workflow">
+    The agent reads the action log that Libretto recorded — every click, fill, and navigation along with the selectors and page context for each one. You'll see it run commands like:
 
-    ```
-    .libretto/sessions/<session>/actions.jsonl
-    ```
-
-    Each entry captures the action type, the element you interacted with, the value you typed (if any), and the URL of the page at that moment.
-  </Step>
-
-  <Step title="Agent reads what you did">
     ```bash  theme={null}
     npx libretto actions --session interactive-flow
     ```
 
-    The agent reads the action log to reconstruct your workflow step by step. It can also query the log with `jq` to find specific actions or filter by page:
+    It uses this log as a blueprint to write a TypeScript workflow file that replicates your steps programmatically. The agent may also snapshot the page or test selectors against the live DOM to make sure everything works. You don't need to do anything during this phase.
 
-    ```bash  theme={null}
-    # See all fill actions (form inputs you typed into)
-    jq 'select(.action == "fill")' .libretto/sessions/<session>/actions.jsonl
+    If the agent asks clarifying questions about what you did, answer them — but usually the action log plus your summary is enough.
 
-    # See the last 20 actions
-    tail -n 20 .libretto/sessions/<session>/actions.jsonl | jq .
-    ```
   </Step>
 
-  <Step title="Agent inspects network traffic">
-    ```bash  theme={null}
-    npx libretto network --session interactive-flow
-    ```
+  <Step title="Review the generated workflow file">
+    The agent writes a TypeScript file that exports a `workflow()`. Things to check:
 
-    The agent cross-references your actions with the network requests they triggered. This helps identify the underlying API calls so the workflow can be converted to direct requests if needed.
+    - **Output type** matches what you asked for
+    - **Selectors** look reasonable (class names, data attributes, or ARIA roles — not brittle positional selectors)
+    - **Parameterization** — values you typed during the demo should be replaced with input parameters, not hardcoded
+    - **Wait logic** — if you mentioned something takes time to load, make sure there's a `waitForSelector` or similar
+
+    If something's off, tell the agent:
+
+    > The patient name is hardcoded — it should come from the input parameter. Also, the insurance tab selector looks fragile, can you use the tab's text instead?
+
   </Step>
 
-  <Step title="Agent writes the workflow file">
-    Using the action log as a blueprint, the agent writes a TypeScript workflow that replicates your steps:
+  <Step title="Check the validation run">
+    The agent runs the workflow headless with test parameters and shows you the output. Check that the returned data looks right.
 
-    ```typescript  theme={null}
-    import { workflow } from "libretto";
-
-    type Input = {
-      patientName: string;
-      dob: string; // YYYY-MM-DD
-    };
-
-    type Output = {
-      primaryInsuranceId: string;
-    };
-
-    export const getInsuranceId = workflow<Input, Output>(
-      "getInsuranceId",
-      async (ctx, input): Promise<Output> => {
-        const { page } = ctx;
-
-        await page.goto("https://your-ehr.example.com");
-
-        // Search for the patient by name and DOB
-        await page.locator("#patientSearch").fill(input.patientName);
-        await page.locator("#dobField").fill(input.dob);
-        await page.locator("button[type='submit']").click();
-
-        // Open the patient record
-        await page.locator(".patient-result").first().click();
-
-        // Navigate to insurance tab
-        await page.locator("#insuranceTab").click();
-
-        // Extract the primary insurance ID
-        const insuranceId = await page
-          .locator("[data-field='primaryInsuranceId']").textContent();
-
-        return { primaryInsuranceId: insuranceId?.trim() ?? "" };
-      },
-    );
-    ```
-  </Step>
-
-  <Step title="Agent validates with a headless run">
     ```bash  theme={null}
+    # What the agent runs
     npx libretto run ./get-insurance-id.ts getInsuranceId --headless \
       --params '{"patientName": "Jane Smith", "dob": "1985-04-12"}'
     ```
 
-    The agent confirms the actual returned output matches what you'd expect.
+    If the output is wrong or incomplete, tell the agent what's off:
+
+    > It returned an empty string for the insurance ID — I think the tab content hadn't loaded yet when it tried to read the value.
+
+    The agent will re-inspect the page and fix the issue.
+
   </Step>
 </Steps>
 
-### What the action log captures
-
-Each entry in `actions.jsonl` is a JSON object on its own line. User-initiated events include:
-
-* `action` — what happened: `click`, `dblclick`, `fill`, `goto`, etc.
-* `bestSemanticSelector` — the most stable selector for the element you interacted with
-* `value` — the text you typed or option you selected
-* `url` — the page URL at the time of the action
-* `nearbyText` — visible text near the element, for human context
-
-Agent-initiated events include the Playwright locator used and whether the action succeeded.
-
-<Note>
-  The `bestSemanticSelector` field in user action entries is the most reliable selector to use in generated code. It's the canonical identifier Libretto chose for the element based on the DOM structure — prefer it over `targetSelector` or raw CSS paths when writing workflow code.
-</Note>
-
 ### When to use this approach
 
-* The workflow involves many steps and is hard to describe concisely
-* You're working with EHR, healthcare, or legacy enterprise software with unusual UI patterns
-* You want to delegate the "figure out the selectors" work entirely to the agent
-* The workflow involves conditional paths that are easier to show than explain
+- The workflow involves many steps and is hard to describe concisely
+- You're working with EHR, healthcare, or legacy enterprise software with unusual UI patterns
+- You want to delegate the "figure out the selectors" work entirely to the agent
+- The workflow involves conditional paths that are easier to show than explain
+
+### Tips
+
+<Tip>
+  After you log in, tell the agent to save the session with `npx libretto save`.
+  Future runs can restore your login state so you don't have to authenticate
+  every time.
+</Tip>
 
 ### Related guides
 

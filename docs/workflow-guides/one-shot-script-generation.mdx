@@ -1,123 +1,127 @@
-## One-shot script generation
+---
+title: One-shot workflow generation
+---
 
-> Ask your agent to explore a site and generate a complete browser automation script.
+> Give your agent a goal and a URL, and get back a complete browser automation script.
 
-One-shot generation means you give your agent a goal and a URL, and it does the rest. The agent opens a live browser, explores the site, figures out the page structure, and writes a complete workflow file — without you needing to record actions or hand-hold the process.
+One-shot generation is the fastest path from idea to working automation. You describe what you want in a single prompt, and your coding agent — armed with the Libretto skill — opens a browser, explores the site, and writes a complete workflow file. No recording, no hand-holding.
 
-This is the fastest path from idea to working automation when you're starting from scratch on a site you haven't automated before.
-
-### Example prompt
-
-> Use the Libretto skill. Go on LinkedIn and scrape the first 10 posts for content, who posted it, the number of reactions, the first 25 comments, and the first 25 reposts.
-
-Your agent opens a browser window for you to log in, then takes over: exploring the feed, identifying selectors, prototyping interactions, and assembling the final workflow file.
-
-### How the agent works
+### Steps
 
 <Steps>
-  <Step title="Opens a headed browser">
-    The agent starts with:
+  <Step title="Prompt your agent">
+    Describe the **site**, the **data or action** you want, and the **shape of the output**. The more specific you are, the better your results.
+
+    > Use the Libretto skill. Go on Hacker News and scrape the first 10 posts for title, URL, score, author, and number of comments.
+
+    Include "Use the Libretto skill" in your prompt so your coding agent uses Libretto's CLI tools instead of writing a Playwright script from scratch.
+
+  </Step>
+
+  <Step title="Log in when the browser opens (if needed)">
+    The agent opens a browser window on your screen. If the site requires authentication, the agent will ask you to log in manually. Do that, then tell the agent you're done.
 
     ```bash  theme={null}
-    npx libretto open https://example.com --headed --session one-shot-flow
+    # What the agent runs behind the scenes
+    npx libretto open https://news.ycombinator.com --headed --session one-shot-flow
     ```
 
-    Headed mode keeps the browser window visible so you can log in before the agent begins exploring.
+    <Note>
+      If the site needs login, make sure your prompt doesn't say `--headless` — the agent needs to open a visible browser so you can authenticate. You can mention "I need to log in first" in your prompt to be explicit.
+    </Note>
+
   </Step>
 
-  <Step title="Reviews the site's security posture">
-    Before choosing how to capture data, the agent reads the site-security reference and checks for bot detection, monkey-patched fetch, and challenge pages. This determines whether to use direct `fetch()` calls, passive network interception, or DOM extraction.
+  <Step title="The agent explores the page">
+    The agent takes snapshots of the page and tests selectors against the live DOM. You'll see it running commands like `npx libretto snapshot` and `npx libretto exec` in your terminal. The browser window stays visible so you can watch what's happening.
+
+    You don't need to do anything during this phase, but if the agent seems stuck or heading in the wrong direction, you can interrupt and redirect:
+
+    > That's the wrong section — the posts are in the main feed, not the sidebar.
+
   </Step>
 
-  <Step title="Takes a snapshot to understand the page">
-    ```bash  theme={null}
-    npx libretto snapshot \
-      --session one-shot-flow \
-      --objective "Identify feed post elements and their structure" \
-      --context "I just loaded the main feed and need the post container selectors."
-    ```
-
-    Snapshot captures a screenshot and the page HTML, then uses an LLM to analyze it — keeping the heavy visual context out of your coding agent's context window.
-  </Step>
-
-  <Step title="Uses exec to prototype interactions">
-    The agent tests selectors and interaction patterns before committing them to code:
-
-    ```bash  theme={null}
-    npx libretto exec --session one-shot-flow "return await page.locator('.feed-shared-update-v2').count()"
-    ```
-
-    Short `exec` calls let the agent validate each step against the live page without writing and re-running a full script each time.
-  </Step>
-
-  <Step title="Writes the workflow file">
-    Once the agent has a working path, it generates a TypeScript file that exports a `workflow()` instance:
+  <Step title="Review the generated workflow file">
+    The agent writes a TypeScript file that exports a `workflow()`. Here's roughly what to expect:
 
     ```typescript  theme={null}
     import { workflow } from "libretto";
 
     type Output = {
       posts: Array<{
+        title: string;
+        url: string;
+        score: number;
         author: string;
-        content: string;
-        reactions: number;
-        comments: string[];
-        reposts: string[];
+        commentCount: number;
       }>;
     };
 
-    export const linkedInFeedScraper = workflow<{}, Output>(
-      "linkedInFeedScraper",
+    export const hnTopPosts = workflow<{}, Output>(
+      "hnTopPosts",
       async (ctx): Promise<Output> => {
         const { page } = ctx;
 
-        await page.goto("https://www.linkedin.com/feed/");
-        await page.waitForSelector(".feed-shared-update-v2");
+        await page.goto("https://news.ycombinator.com");
+        await page.waitForSelector(".athing");
 
-        // Collect first 10 posts
-        const postElements = await page.locator(".feed-shared-update-v2").all();
+        const rows = await page.locator(".athing").all();
         const posts = [];
 
-        for (const post of postElements.slice(0, 10)) {
-          const author = await post.locator(".update-components-actor__name").textContent();
-          const content = await post.locator(".feed-shared-text").textContent();
-          // ... extract reactions, comments, reposts
+        for (const row of rows.slice(0, 10)) {
+          const title = await row.locator(".titleline > a").textContent();
+          const url = await row.locator(".titleline > a").getAttribute("href");
+          // ... extract score, author, comment count from subtext row
         }
 
         return { posts };
       },
     );
     ```
+
+    Things to check:
+    - **Output type** matches what you asked for
+    - **Selectors** look reasonable (class names, data attributes, or ARIA roles — not brittle positional selectors)
+    - **Pagination** logic is present if you asked for more items than fit on one page
+
   </Step>
 
-  <Step title="Validates with a headless run">
+  <Step title="Check the validation run">
+    The agent runs the workflow headless and shows you the output. Check that the returned data looks right — correct field names, real values, expected number of items.
+
     ```bash  theme={null}
-    npx libretto run ./linkedin-feed.ts linkedInFeedScraper --headless
+    # What the agent runs
+    npx libretto run ./hn-top-posts.ts hnTopPosts --headless
     ```
 
-    The agent confirms actual returned output, not just process exit status. If the run fails, the browser stays open for inspection.
+    If the output is wrong or incomplete, tell the agent what's off:
+
+    > The reactions count is always 0 — it looks like it's reading the wrong element.
+
+    The agent will re-inspect the page and fix the issue.
+
   </Step>
 </Steps>
 
 ### When to use this approach
 
-* You're automating a site for the first time and don't know its structure
-* The task is self-contained and clearly scoped ("get the first 10 posts")
-* You want a working script with minimal back-and-forth
-* You don't need to demonstrate the workflow manually first
+- You're automating a site for the first time and don't know its structure
+- The task is self-contained and clearly scoped ("get the first 10 posts")
+- You want a working script with minimal back-and-forth
+- You don't need to demonstrate the workflow manually first
 
 ### Tips
 
 <Tip>
-  Always use `--headed` when the site requires login. The browser window opens on your screen so you can authenticate, and then the agent takes over. Without `--headed`, the agent has no way to get past a login wall.
-</Tip>
-
-<Tip>
-  Give your agent a specific, measurable objective. "Scrape the first 10 posts" is actionable. "Get some LinkedIn data" is not — the agent will have to guess at scope and structure.
+  After you log in, tell the agent to save the session with `npx libretto save`.
+  Future runs can restore your login state so you don't have to authenticate
+  every time.
 </Tip>
 
 <Note>
-  Make sure your coding agent has the Libretto skill installed before starting. Run `npx libretto setup` in your project root to set up the workspace and configure snapshot analysis if you haven't already.
+  Make sure your coding agent has the Libretto skill installed before starting.
+  Run `npx libretto setup` in your project root to set up the workspace and
+  configure snapshot analysis if you haven't already.
 </Note>
 
 ### Related guides

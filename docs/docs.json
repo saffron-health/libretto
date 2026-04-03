@@ -1,27 +1,67 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "maple",
   "name": "Libretto",
   "description": "Toolkit for building, debugging, and maintaining browser automations.",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#5a5546",
+    "light": "#908879",
+    "dark": "#1e1d1a"
   },
   "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/favicon.svg",
+    "dark": "/favicon.svg",
+    "href": "https://libretto.sh"
+  },
+  "fonts": {
+    "heading": {
+      "family": "PP Editorial New",
+      "source": "/fonts/PPEditorialNew-Regular.woff2",
+      "format": "woff2",
+      "weight": 400
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400
+    }
+  },
+  "appearance": {
+    "default": "light"
+  },
+  "background": {
+    "color": {
+      "light": "#f5f2ec",
+      "dark": "#1e1d1a"
+    }
+  },
+  "styling": {
+    "codeblocks": {
+      "theme": {
+        "light": "github-light",
+        "dark": "github-dark"
+      }
+    }
+  },
   "navigation": {
     "groups": [
-      {
-        "group": "Overview",
-        "pages": ["index"]
-      },
       {
         "group": "Get started",
         "pages": [
           "get-started/introduction",
           "get-started/configuration",
+          "get-started/architecture",
           "get-started/automation-approaches",
           "get-started/bot-detection"
+        ]
+      },
+      {
+        "group": "Workflow guides",
+        "pages": [
+          "workflow-guides/one-shot-script-generation",
+          "workflow-guides/interactive-script-building",
+          "workflow-guides/debugging-workflows",
+          "workflow-guides/convert-to-network-requests"
         ]
       },
       {
@@ -34,15 +74,6 @@
           "cli-reference/run-and-resume",
           "cli-reference/network-and-actions",
           "cli-reference/session-management"
-        ]
-      },
-      {
-        "group": "Workflow guides",
-        "pages": [
-          "workflow-guides/one-shot-script-generation",
-          "workflow-guides/interactive-script-building",
-          "workflow-guides/debugging-workflows",
-          "workflow-guides/convert-to-network-requests"
         ]
       },
       {
@@ -62,28 +93,23 @@
       "anchors": [
         {
           "anchor": "GitHub",
-          "href": "https://github.com/saffron-health/libretto"
+          "href": "https://github.com/saffron-health/libretto",
+          "icon": "github"
         },
         {
           "anchor": "npm",
-          "href": "https://www.npmjs.com/package/libretto"
+          "href": "https://www.npmjs.com/package/libretto",
+          "icon": "npm"
+        },
+        {
+          "anchor": "Changelog",
+          "href": "https://github.com/saffron-health/libretto/releases",
+          "icon": "clock-rotate-left"
         }
       ]
     }
   },
-  "navbar": {
-    "links": [
-      {
-        "label": "Discussions",
-        "href": "https://github.com/saffron-health/libretto/discussions"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "GitHub",
-      "href": "https://github.com/saffron-health/libretto"
-    }
-  },
+  "navbar": {},
   "contextual": {
     "options": [
       "copy",
@@ -96,10 +122,5 @@
       "vscode"
     ]
   },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/saffron-health/libretto",
-      "linkedin": "https://linkedin.com/company/saffron-health"
-    }
-  }
+  "footer": {}
 }

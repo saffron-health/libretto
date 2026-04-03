@@ -1,4 +1,6 @@
-## Convert to network requests
+---
+title: Convert to network requests
+---
 
 > Convert browser automations to direct API calls for speed and reliability.
 
@@ -6,190 +8,90 @@ Browser automation is reliable, but it's not always the fastest approach. When a
 
 Libretto captures all network traffic during a browser session, so your agent can inspect exactly which API calls the site makes and convert a UI-based workflow to direct requests.
 
-### Example prompt
+<Warning>
+  Not every site is a good candidate for network conversion. Stay with browser automation if:
 
-> We have a browser script at ./integration.ts that automates going to Hacker News and getting the first 10 posts. Convert it to direct network scripts instead. Use the Libretto skill.
+- The site has enterprise bot protection (Akamai, PerimeterX, Shape Security) **and** monkey-patches `window.fetch` with call-stack inspection
+- The site does API-level monitoring that correlates request timing to UI interactions
+- The data you need is rendered client-side and doesn't come from a clean API response
 
-The agent runs the existing script, examines the captured network log, identifies the API endpoints that return the data, and rewrites the integration to call them directly from within the browser context.
+In these cases, passive interception (`page.on('response', ...)`) is the safest middle ground — it captures API data without making extra requests.
 
-### The process
+</Warning>
+
+### Steps
 
 <Steps>
-  <Step title="Run the existing script and capture traffic">
-    ```bash  theme={null}
-    npx libretto run ./integration.ts main --headed
-    ```
+  <Step title="Prompt your agent">
+    Point the agent at the **existing workflow file** and ask it to convert to network requests.
 
-    Running the script with Libretto automatically captures all network requests and responses to `.libretto/sessions/<session>/network.jsonl`.
+    > Use the Libretto skill. We have a browser script at ./integration.ts that automates going to Hacker News and getting the first 10 posts. Convert it to direct network requests instead.
+
+    Include "Use the Libretto skill" so your agent uses Libretto's network capture and security review tools instead of guessing at API endpoints.
+
   </Step>
 
-  <Step title="Examine the network log">
+  <Step title="Watch the agent analyze the traffic">
+    The agent runs the existing script to capture all network requests and responses, then examines the log to find API endpoints that return the data you need.
+
     ```bash  theme={null}
+    # What the agent runs
+    npx libretto run ./integration.ts main --headed
     npx libretto network --session conversion-flow
     ```
 
-    The agent reviews the captured requests to find API calls that return the data you need:
+    If the site requires login, the agent opens a headed browser and you'll log in as usual. Otherwise you don't need to do anything during this phase.
+
+  </Step>
+
+  <Step title="Review the agent's approach">
+    The agent reports what API endpoints it found and whether the site has bot protection. It recommends one of two approaches:
+
+    - **In-browser fetch** — call endpoints directly from within the browser's JavaScript context. The requests share the browser's cookies and TLS fingerprint, so they look identical to the site's own requests. Faster, but only safe when the site doesn't monitor for anomalous call patterns.
+    - **Passive interception** — set up a `page.on('response', ...)` listener and let the site's own code make the requests. Zero detection risk because no extra requests are made, but you're limited to whatever requests the site naturally triggers — you still drive the UI to produce them. Safer, but less flexible. Use this when the site has bot protection.
+
+    If the agent's recommendation looks reasonable, let it proceed. If you'd rather use one approach over the other, say so:
+
+    > Use passive interception — I don't want to risk triggering their bot detection.
+
+  </Step>
+
+  <Step title="Review the rewritten workflow">
+    The agent rewrites the workflow to use network requests instead of DOM extraction. Things to check:
+
+    - **Endpoints** — are the URLs and HTTP methods correct?
+    - **Auth/cookies** — does the new version handle authentication the same way as the original?
+    - **Output shape** — the return type should be identical to the browser-based version
+    - **Error handling** — API calls should check response status codes and handle failures gracefully
+    - **Pagination** — if the original script paginated through UI, the new version should paginate through the API
+
+    If something's off:
+
+    > The original script also grabbed the comment count, but the new version doesn't fetch that field from the API.
+
+  </Step>
+
+  <Step title="Check the validation run">
+    The agent runs the rewritten workflow headless and shows you the output. Compare it to what the browser-based version returned — the data should match.
 
     ```bash  theme={null}
-    # Filter for JSON API responses
-    jq 'select(.contentType | test("application/json"))' \
-      .libretto/sessions/<session>/network.jsonl
-
-    # Find POST requests
-    jq 'select(.method == "POST")' \
-      .libretto/sessions/<session>/network.jsonl
-    ```
-  </Step>
-
-  <Step title="Run a site security review">
-    Before committing to a network-first approach, the agent checks whether direct API calls are safe on this site:
-
-    * Is there enterprise bot protection (Akamai, PerimeterX, Cloudflare)?
-    * Is `window.fetch` monkey-patched to inspect call stacks?
-    * Does the site do API-level monitoring?
-
-    This determines which network strategy to use.
-  </Step>
-
-  <Step title="Choose the right network approach">
-    <Tabs>
-      <Tab title="In-browser fetch">
-        Call endpoints from within the browser's JavaScript context. The requests share the browser's cookies, TLS fingerprint, and origin — they look identical to requests the site's own code would make.
-
-        ```typescript  theme={null}
-        // In your workflow file
-        const data = await page.evaluate(async () => {
-          const res = await fetch("/api/items?page=1");
-          return res.json();
-        });
-        ```
-
-        Use this when the site has no bot protection and `fetch` is not monkey-patched.
-      </Tab>
-
-      <Tab title="Passive interception">
-        Set up a `page.on('response', ...)` listener before navigating. The requests happen naturally as the site loads; you capture the responses without making any extra calls.
-
-        ```typescript  theme={null}
-        const capturedData: unknown[] = [];
-
-        page.on("response", async (response) => {
-          if (response.url().includes("/api/items")) {
-            capturedData.push(await response.json());
-          }
-        });
-
-        await page.goto("https://example.com");
-        await page.waitForSelector(".item-list");
-        ```
-
-        Use this when the site has bot protection or monkey-patches `fetch` — no extra requests means no anomalous call stack patterns to flag.
-      </Tab>
-    </Tabs>
-  </Step>
-
-  <Step title="Rewrite the workflow">
-    The agent replaces the DOM-extraction logic with typed API client methods:
-
-    ```typescript  theme={null}
-    import { workflow } from "libretto";
-
-    type Post = {
-      id: number;
-      title: string;
-      url: string;
-      score: number;
-      by: string;
-    };
-
-    type Output = { posts: Post[] };
-
-    class HackerNewsClient {
-      constructor(private page: import("playwright").Page) {}
-
-      private async apiFetch(path: string): Promise<string> {
-        return await this.page.evaluate(
-          async ({ path }) => {
-            const res = await fetch(`https://hacker-news.firebaseio.com${path}`);
-            if (!res.ok) throw new Error(`${res.status} for ${path}`);
-            return res.text();
-          },
-          { path },
-        );
-      }
-
-      async getTopStoryIds(): Promise<number[]> {
-        const raw = await this.apiFetch("/v0/topstories.json");
-        return JSON.parse(raw);
-      }
-
-      async getItem(id: number): Promise<Post> {
-        const raw = await this.apiFetch(`/v0/item/${id}.json`);
-        return JSON.parse(raw);
-      }
-    }
-
-    export const topPosts = workflow<{}, Output>("topPosts", async (ctx): Promise<Output> => {
-      const { page } = ctx;
-      await page.goto("https://news.ycombinator.com");
-
-      const client = new HackerNewsClient(page);
-      const ids = (await client.getTopStoryIds()).slice(0, 10);
-      const posts = await Promise.all(ids.map((id) => client.getItem(id)));
-
-      return { posts };
-    });
-    ```
-  </Step>
-
-  <Step title="Validate headless">
-    ```bash  theme={null}
+    # What the agent runs
     npx libretto run ./integration.ts topPosts --headless
     ```
 
-    Confirm the output matches what the browser-based version returned.
+    If the output is wrong or incomplete, tell the agent what's off:
+
+    > The scores are all null — it looks like the API response has a different field name for that.
+
   </Step>
 </Steps>
 
-### When to use direct network calls
+### When to convert to network requests
 
-The network approach is the default preference for new integrations. Use it when:
-
-* The site exposes a usable JSON API
-* You need to paginate deeply (fetching page 50 without clicking "next" 49 times)
-* You want data the UI doesn't display (hidden fields, metadata, IDs)
-* Speed and reliability matter more than DOM fidelity
-
-### When not to use the network approach
-
-<Warning>
-  Check the site's security posture before committing to a network-first strategy. Do not use direct `fetch()` calls if:
-
-  * The site has enterprise bot protection (Akamai, PerimeterX, Shape Security) **and** you've confirmed fetch is monkey-patched
-  * `window.fetch` is wrapped with call-stack inspection — your calls will be flagged because they don't originate from the site's own bundled code
-  * The site does API-level monitoring that correlates request timing to UI interactions
-
-  In these cases, use passive interception (`page.on('response', ...)`) instead. It captures the same data at zero additional detection risk because the requests come from the site's own code.
-</Warning>
-
-### Security analysis
-
-The Libretto skill includes a site-security review reference that guides your agent through checking for bot protection services, fetch interception, and challenge flows. The agent uses this to produce a **Site Assessment Summary** before choosing an integration strategy:
-
-```text  theme={null}
-## Site Assessment: https://example.com
-
-### Bot Detection Profile
-- Enterprise bot protection: None detected
-- Fetch/XHR interception: Native (not patched)
-- Challenge pages: None
-- Overall security posture: Low
-
-### Safe Approaches
-- page.evaluate(fetch(...)): Safe
-- page.on('response', ...): Viable
-- DOM extraction: Always available as fallback
-```
+- The site exposes a usable JSON API behind the UI
+- You need to paginate deeply (fetching page 50 without clicking "next" 49 times)
+- You want data the UI doesn't display (hidden fields, metadata, IDs)
+- Speed and reliability matter more than DOM fidelity
 
 ### Related guides
 

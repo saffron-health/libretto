@@ -1,156 +1,117 @@
-## Debugging workflows
+---
+title: Debugging workflows
+---
 
 > Reproduce failures, inspect live page state, and fix broken browser automations.
 
-When a Libretto workflow fails, the browser stays open at the exact point of failure. This is the key difference between debugging with Libretto and debugging with a generic test runner — you don't lose the state. Your agent can inspect the live page, test new selectors, and fix the issue before re-running to verify.
+When a Libretto workflow fails, the browser stays open at the exact point of failure. This is the key difference between debugging with Libretto and debugging with a generic test runner — you don't lose the state. Your agent can inspect the live page, test new selectors, and fix the issue without starting over.
 
-### Example prompt
-
-> We have a browser script at ./integration.ts that is supposed to go to Availity and perform an eligibility check for a patient. But I'm getting a broken selector error when I run it. Fix it. Use the Libretto skill.
-
-The agent reproduces the failure, snapshots the broken state, finds the correct selector in the current DOM, patches the code, and re-runs to confirm.
-
-### The debugging workflow
+### Steps
 
 <Steps>
-  <Step title="Run the failing script">
+  <Step title="Prompt your agent with the failure">
+    Describe the **script**, what it's **supposed to do**, and what's **going wrong**. Point the agent at the file and include any error output you have.
+
+    > Use the Libretto skill. The workflow at ./integration.ts is supposed to go to Availity and perform an eligibility check for a patient. But I'm getting a broken selector error when I run it. Fix it. \<_paste error here_\>
+
+    Include "Use the Libretto skill" so your agent uses Libretto's debugging tools (snapshots, live exec) instead of guessing at fixes from the code alone.
+
+    <Note>
+      This guide assumes the script is a Libretto workflow file (using `workflow()` from `libretto`). If the failing script is a plain Playwright test, ask your agent to convert it to a Libretto workflow first — Libretto's debugging tools depend on the session and browser management that `workflow()` provides.
+    </Note>
+
+  </Step>
+
+  <Step title="Watch the failure reproduce">
+    The agent runs the script in headed mode so you can see the browser. It stops at the failure point with the browser still open — you can see exactly what state the page is in when things go wrong.
+
     ```bash  theme={null}
+    # What the agent runs
     npx libretto run ./integration.ts main --session debug-flow --headed
     ```
 
-    Use `--headed` so you can watch the browser and see where it stops. Name the session something descriptive — you'll use it for all subsequent commands.
+    You don't need to do anything here, but if you happen to notice something useful — a popup that wasn't there before, a redesigned page — you can mention it to save the agent time.
+
   </Step>
 
-  <Step title="Browser stays open at the failure point">
-    When a workflow fails, Libretto keeps the browser open and returns control to the CLI. The agent sees the error message and knows to inspect the current page state before touching any code.
+  <Step title="Wait for the agent to diagnose and fix">
+    The agent snapshots the broken page state, identifies what's wrong, and tests new selectors against the live DOM. You'll see it running commands like `npx libretto snapshot` and `npx libretto exec` in your terminal while the browser stays open.
+
+    You don't need to intervene, but if you have context that would help, share it:
+
+    > They redesigned the eligibility form last week — the submit button used to be in a sidebar but now it's inline.
+
   </Step>
 
-  <Step title="Snapshot the broken state">
+  <Step title="Review the fix">
+    The agent patches the workflow file. Check the diff:
+
+    - Is the new selector reasonable? (`data-testid`, ARIA role, or visible text are more stable than class names)
+    - Did it address the **root cause** or just the immediate symptom?
+    - If the site changed its markup, are there other selectors in the file that might have the same problem?
+
+    If something looks off:
+
+    > That selector uses a class name that looks auto-generated. Can you use the button's text label instead?
+
+  </Step>
+
+  <Step title="Check the verification run">
+    The agent re-runs the workflow headless to confirm the fix works.
+
     ```bash  theme={null}
-    npx libretto snapshot \
-      --session debug-flow \
-      --objective "Find the blocking error or broken selector target" \
-      --context "The workflow failed while trying to submit the eligibility form. I need to identify the element that can't be found."
-    ```
-
-    Snapshot captures the current screenshot and HTML, then uses LLM analysis to identify what's on the page, what's missing, and what the correct selectors should be. This keeps the heavy visual context out of your coding agent's context window.
-  </Step>
-
-  <Step title="Test selectors with exec">
-    Once the snapshot identifies candidate selectors, the agent validates them against the live page:
-
-    ```bash  theme={null}
-    npx libretto exec --session debug-flow \
-      "return await page.locator('[data-testid=\"member-id-input\"]').count()"
-    ```
-
-    If the count is `0`, the selector doesn't match. Try alternatives until you find one that returns `1`:
-
-    ```bash  theme={null}
-    npx libretto exec --session debug-flow \
-      "return await page.locator('input[name=\"memberId\"]').count()"
-    ```
-  </Step>
-
-  <Step title="Fix the code">
-    With the correct selector confirmed, the agent updates the workflow file. Read the code generation rules before editing production code — Playwright locator APIs, no `querySelectorAll` in `page.evaluate()`, type-safe output.
-  </Step>
-
-  <Step title="Re-run to verify">
-    ```bash  theme={null}
+    # What the agent runs
     npx libretto run ./integration.ts main --headless
     ```
 
-    Switch to `--headless` for the verify loop — it's faster. If the run succeeds, confirm the actual returned output is correct. If it fails again, the browser stays open and you repeat from step 3.
+    If it passes, you're done. If it fails again, tell the agent what's still wrong — the browser stays open and the agent repeats the diagnose/fix cycle.
+
   </Step>
 </Steps>
 
 ### Using `pause()` as a breakpoint
 
-If you need to stop a workflow at a specific point — not at failure, but at a known state you want to inspect — add a `pause()` call:
+If you need the workflow to stop at a specific point — not at failure, but at a known state you want to inspect — ask the agent to add a `pause()` call:
 
-```typescript  theme={null}
+> Add a pause right before the form submission so I can inspect the page state.
+
+The agent adds it to your workflow:
+
+```typescript theme={null}
 import { workflow, pause } from "libretto";
 
-export const eligibilityCheck = workflow("eligibilityCheck", async (ctx, input) => {
-  const { session, page } = ctx;
+export const eligibilityCheck = workflow(
+  "eligibilityCheck",
+  async (ctx, input) => {
+    const { session, page } = ctx;
 
-  await page.goto("https://availity.com");
-  await page.locator("#memberSearch").fill(input.memberId);
+    await page.goto("https://availity.com");
+    await page.locator("#memberSearch").fill(input.memberId);
 
-  // Pause here to inspect the page before submitting
-  await pause(session);
+    // Pause here to inspect the page before submitting
+    await pause(session);
 
-  await page.locator("button[type='submit']").click();
-  // ...
-});
-```
-
-Run the workflow and it will halt at the `pause()` call with the browser open. Inspect, test selectors, then resume:
-
-```bash  theme={null}
-npx libretto resume --session debug-flow
-```
-
-`pause()` is a no-op when `NODE_ENV === "production"`, so you can leave it in during development and it won't affect production runs. Remove it once you're done debugging.
-
-### Reading logs for error context
-
-The session log at `.libretto/sessions/<session>/logs.jsonl` contains structured entries for every step the workflow took. Use `jq` to find the error:
-
-```bash  theme={null}
-# Find error entries
-jq 'select(.level == "error")' .libretto/sessions/debug-flow/logs.jsonl
-
-# See the last 20 log entries
-tail -n 20 .libretto/sessions/debug-flow/logs.jsonl | jq .
-```
-
-Libretto's instrumentation enriches timeout errors with element context — what was being waited for, its selector, and the page state at the time — so you're not left reading a raw timeout message.
-
-### Common errors
-
-**Broken selectors**
-
-The most common failure. A selector that worked last week no longer matches because the site updated its markup. Fix:
-
-1. Use `snapshot` to see the current DOM and identify the updated element
-2. Use `exec` to test new selectors against the live page
-3. Prefer stable selectors: `data-testid` attributes, ARIA roles, and visible label text over class names and positional selectors
-
-**Popups blocking the workflow**
-
-A modal, cookie banner, or session-expiry dialog appears unexpectedly and blocks interaction with the underlying page. Consider wrapping the blocked step with `attemptWithRecovery()` from the Library API so Libretto can run the recovery agent before retrying:
-
-```typescript  theme={null}
-import { attemptWithRecovery, createLLMClientFromModel } from "libretto";
-import { openai } from "@ai-sdk/openai";
-
-const llmClient = createLLMClientFromModel(openai("gpt-4o"));
-
-await attemptWithRecovery(
-  page,
-  async () => {
-    await page.locator("#continueButton").click();
-    await page.waitForSelector(".success-banner");
+    await page.locator("button[type='submit']").click();
+    // ...
   },
-  logger,
-  llmClient,
 );
 ```
 
-**Timeout errors**
+The workflow halts at the `pause()` with the browser open. Inspect the page, then tell the agent to resume. `pause()` is a no-op when `NODE_ENV === "production"`, so it's safe to leave in during development.
 
-A `waitForSelector` or locator action times out because the expected element never appeared. Check the snapshot to see what the page actually shows — it may be a loading spinner, an error state, or a redirect you didn't expect. The structured log entry will include which selector was being waited for.
+### Common errors
+
+**Broken selectors** — The most common failure. A selector that worked last week no longer matches because the site updated its markup. Tell the agent what changed if you know, or just let it snapshot and figure it out.
+
+**Popups blocking the workflow** — A modal, cookie banner, or session-expiry dialog appears unexpectedly. Tell the agent about the popup and ask it to add recovery logic using `attemptWithRecovery()` so future runs handle it automatically.
+
+**Timeout errors** — A `waitForSelector` or locator action times out because the expected element never appeared. The page might show a loading spinner, an error state, or a redirect. The agent can snapshot to see what actually rendered.
 
 ### Tips
 
 <Tip>
-  Use `--headless` for the fix/verify loop and `--headed` when you need to watch what's happening. Headed mode is slower but lets you see exactly what the browser is doing at each step. Switch back to headless once you've confirmed the visual behavior is correct.
-</Tip>
-
-<Tip>
-  Give your debug session a descriptive name with `--session`. If you run multiple debug sessions, names like `debug-eligibility-submit` are much easier to work with than the default session name.
+  Paste your error message into the prompt. Agents often do a better job
+  debugging when they're given the stack trace.
 </Tip>
 
 ### Related guides

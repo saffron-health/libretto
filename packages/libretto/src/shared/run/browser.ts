@@ -12,7 +12,7 @@ import {
   type SessionAccessMode,
   SessionStateFileSchema,
 } from "../state/session-state.js";
-import { readLibrettoConfig } from "../../cli/core/ai-config.js";
+import { readLibrettoConfig } from "../../cli/core/config.js";
 
 async function pickFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {

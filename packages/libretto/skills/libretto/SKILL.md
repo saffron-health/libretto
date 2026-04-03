@@ -21,8 +21,10 @@ metadata:
 
 ## Setup
 
-- Use `npx libretto setup` for first-time workspace setup (sets up config file and snapshot command).
-- If credentials are already available, `npx libretto ai configure openai|anthropic|gemini|vertex` is usually enough.
+- Use `npx libretto setup` for first-time workspace onboarding. It installs Chromium, syncs skills, and pins the default snapshot model to `.libretto/config.json` when provider credentials are available.
+- Re-running `setup` on a healthy workspace shows the current configuration. If credentials are missing for a configured provider, it offers an interactive repair flow.
+- Use `npx libretto status` to inspect AI configuration health and open sessions without triggering setup.
+- Use `npx libretto ai configure openai|anthropic|gemini|vertex` to explicitly change the snapshot model or provider (advanced override).
 
 ## Working Rules
 

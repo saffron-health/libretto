@@ -1,4 +1,6 @@
-## run & resume
+---
+title: run & resume
+---
 
 > Execute a workflow file and resume paused workflows.
 
@@ -6,19 +8,19 @@
 
 The `run` command executes a named export from a TypeScript workflow file against a live browser. Use it to verify a workflow after creating or editing it.
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto run ./integration.ts main
 npx libretto run ./integration.ts main --headless
 ```
 
 #### Syntax
 
-```bash  theme={null}
-npx libretto run <file> <export> [flags]
+```bash theme={null}
+npx libretto run <file> <workflowName> [flags]
 ```
 
-* `<file>` — path to the TypeScript workflow file
-* `<export>` — the named export from that file (e.g., `main`, `myWorkflow`)
+- `<file>` — path to the TypeScript workflow file
+- `<workflowName>` — the runtime name of the workflow, i.e. the `name` string passed as the first argument to `workflow(name, handler)` (e.g., `"main"`, `"myWorkflow"`)
 
 #### Flags
 
@@ -27,11 +29,14 @@ npx libretto run <file> <export> [flags]
 </ParamField>
 
 <ParamField path="--headed" type="boolean">
-  Run the browser in headed (visible) mode. This is the default when neither flag is passed.
+  Run the browser in headed (visible) mode. This is the default when neither
+  flag is passed.
 </ParamField>
 
 <ParamField path="--session" type="string">
-  Name for this run session. Auto-generated if omitted. Use an explicit name to target the session with `exec`, `snapshot`, or `resume` after a failure or pause.
+  Name for this run session. Auto-generated if omitted. Use an explicit name to
+  target the session with `exec`, `snapshot`, or `resume` after a failure or
+  pause.
 </ParamField>
 
 <ParamField path="--params" type="string">
@@ -39,7 +44,8 @@ npx libretto run <file> <export> [flags]
 </ParamField>
 
 <ParamField path="--params-file" type="string">
-  Path to a JSON file to use as workflow input. Cannot be used together with `--params`.
+  Path to a JSON file to use as workflow input. Cannot be used together with
+  `--params`.
 </ParamField>
 
 <ParamField path="--auth-profile" type="string">
@@ -47,11 +53,13 @@ npx libretto run <file> <export> [flags]
 </ParamField>
 
 <ParamField path="--viewport" type="string">
-  Viewport size in `WIDTHxHEIGHT` format, for example `1920x1080`. Falls back to `.libretto/config.json`, then `1366x768`.
+  Viewport size in `WIDTHxHEIGHT` format, for example `1920x1080`. Falls back to
+  `.libretto/config.json`, then `1366x768`.
 </ParamField>
 
 <ParamField path="--tsconfig" type="string">
-  Path to a `tsconfig.json` file for module resolution during workflow compilation.
+  Path to a `tsconfig.json` file for module resolution during workflow
+  compilation.
 </ParamField>
 
 <ParamField path="--no-visualize" type="boolean">
@@ -62,7 +70,7 @@ npx libretto run <file> <export> [flags]
 
 When a workflow fails, Libretto keeps the browser open at the point of failure. You can then use `snapshot` and `exec` to inspect the live page state before editing the workflow code.
 
-```bash  theme={null}
+```bash theme={null}
 # Workflow fails — browser stays open
 npx libretto run ./integration.ts main --session debug-flow --headed
 
@@ -83,7 +91,7 @@ npx libretto run ./integration.ts main --headless
 
 Prefer `run --headless` for the normal fix-and-verify loop. When the headless run passes, do a final headed run if you or the user wants to watch the finished workflow:
 
-```bash  theme={null}
+```bash theme={null}
 # Fix/verify loop — fast, no visible browser
 npx libretto run ./integration.ts main --headless
 
@@ -93,7 +101,7 @@ npx libretto run ./integration.ts main --headed
 
 #### Examples
 
-```bash  theme={null}
+```bash theme={null}
 # Basic run
 npx libretto run ./integration.ts main
 
@@ -110,13 +118,13 @@ npx libretto run ./integration.ts main --auth-profile app.example.com
 npx libretto run ./integration.ts main --session debug-flow --headed
 ```
 
-***
+---
 
 ### resume
 
 The `resume` command unpauses a workflow that has stopped at an `await pause(session)` call. Use it repeatedly until the workflow completes or pauses again at the next breakpoint.
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto resume --session debug-example
 ```
 
@@ -130,7 +138,7 @@ npx libretto resume --session debug-example
 
 Insert `await pause(session)` calls in your workflow file to create interactive breakpoints — similar to debugger breakpoints in the browser flow. The workflow stops at each `pause()` call and waits for `resume` before continuing.
 
-```typescript  theme={null}
+```typescript theme={null}
 import { workflow, pause } from "libretto";
 
 export const myWorkflow = workflow("myWorkflow", async (ctx, input) => {
@@ -141,7 +149,7 @@ export const myWorkflow = workflow("myWorkflow", async (ctx, input) => {
   // Pause here for inspection
   await pause(session);
 
-  await page.locator('#submit').click();
+  await page.locator("#submit").click();
 
   // Pause again before the final step
   await pause(session);
@@ -151,7 +159,9 @@ export const myWorkflow = workflow("myWorkflow", async (ctx, input) => {
 ```
 
 <Note>
-  `pause()` is a **no-op when `NODE_ENV === "production"`**. You can leave `pause()` calls in your workflow code during development and they will be silently skipped in production.
+  `pause()` is a **no-op when `NODE_ENV === "production"`**. You can leave
+  `pause()` calls in your workflow code during development and they will be
+  silently skipped in production.
 </Note>
 
 #### Complete debugging flow
@@ -163,6 +173,7 @@ export const myWorkflow = workflow("myWorkflow", async (ctx, input) => {
     ```
 
     If the workflow hits a `pause()`, it prints `Workflow paused.` and returns. The browser stays open.
+
   </Step>
 
   <Step title="Inspect the paused page state">
@@ -174,6 +185,7 @@ export const myWorkflow = workflow("myWorkflow", async (ctx, input) => {
 
     npx libretto exec --session debug-flow "return await page.url()"
     ```
+
   </Step>
 
   <Step title="Resume the workflow">
@@ -182,6 +194,7 @@ export const myWorkflow = workflow("myWorkflow", async (ctx, input) => {
     ```
 
     Keep running `resume` until the workflow prints `Integration completed.` or fails with an error.
+
   </Step>
 
   <Step title="Fix the code and re-run">
@@ -190,6 +203,7 @@ export const myWorkflow = workflow("myWorkflow", async (ctx, input) => {
     ```bash  theme={null}
     npx libretto run ./integration.ts main --headless
     ```
+
   </Step>
 </Steps>
 

@@ -1,12 +1,10 @@
-## Configuration
+---
+title: Configuration
+---
 
 > Configure Libretto's AI model, viewport, and session settings.
 
 All Libretto state lives in a `.libretto/` directory at your project root. This page covers the config file, environment variables, sessions, and auth profiles.
-
-<Note>
-  Add `.libretto/` to your `.gitignore`. Libretto creates a `.libretto/.gitignore` that automatically ignores `sessions/` and `profiles/`, but the `config.json` file itself is not ignored. If you prefer to exclude the entire directory, add `.libretto/` to your root `.gitignore`.
-</Note>
 
 ### Config file
 
@@ -14,13 +12,13 @@ All Libretto state lives in a `.libretto/` directory at your project root. This 
 
 The config file controls snapshot analysis and the default viewport. The easiest way to create or update it is through the CLI:
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto ai configure <openai|anthropic|gemini|vertex>
 ```
 
 You can also edit the file directly. The full schema is:
 
-```json  theme={null}
+```json theme={null}
 {
   "version": 1,
   "ai": {
@@ -38,15 +36,20 @@ You can also edit the file directly. The full schema is:
 </ParamField>
 
 <ParamField path="ai" type="object">
-  Configures the model used for `snapshot` analysis. Snapshot analysis is required — without it, `npx libretto snapshot` will fail.
+  Configures the model used for `snapshot` analysis. Snapshot analysis is
+  required — without it, `npx libretto snapshot` will fail.
 </ParamField>
 
 <ParamField path="ai.model" type="string">
-  A `provider/model-id` string, for example `openai/gpt-5.4`, `anthropic/claude-sonnet-4-6`, `google/gemini-3-flash-preview`, or `vertex/gemini-2.5-pro`. This is the model Libretto sends screenshot and HTML data to when you run `snapshot`.
+  A `provider/model-id` string, for example `openai/gpt-5.4`,
+  `anthropic/claude-sonnet-4-6`, `google/gemini-3-flash-preview`, or
+  `vertex/gemini-2.5-pro`. This is the model Libretto sends screenshot and HTML
+  data to when you run `snapshot`.
 </ParamField>
 
 <ParamField path="ai.updatedAt" type="string">
-  ISO 8601 timestamp of the last time the AI config was written. Set automatically by `npx libretto ai configure`.
+  ISO 8601 timestamp of the last time the AI config was written. Set
+  automatically by `npx libretto ai configure`.
 </ParamField>
 
 <ParamField path="viewport" type="object">
@@ -62,7 +65,8 @@ You can also edit the file directly. The full schema is:
 </ParamField>
 
 <ParamField path="windowPosition" type="object">
-  Optional. Sets the initial position of the headed browser window on screen. Has no effect in headless mode.
+  Optional. Sets the initial position of the headed browser window on screen.
+  Has no effect in headless mode.
 </ParamField>
 
 <ParamField path="windowPosition.x" type="number">
@@ -77,7 +81,7 @@ You can also edit the file directly. The full schema is:
 
 To set your model, run:
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto ai configure <provider>
 ```
 
@@ -92,19 +96,19 @@ Accepted provider shorthands and their default models:
 
 You can also pass a full `provider/model-id` string to pin a specific version:
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto ai configure openai/gpt-4o
 ```
 
 To view the current configuration:
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto ai configure
 ```
 
 To clear it:
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto ai configure --clear
 ```
 
@@ -170,14 +174,14 @@ Each Libretto session gets its own directory under `.libretto/sessions/<name>/`.
 
 **`network.jsonl`** — One entry per HTTP request/response captured while the session was open. Each entry includes `ts`, `method`, `url`, `status`, `contentType`, and `responseBody`. Query with `jq`:
 
-```bash  theme={null}
+```bash theme={null}
 # Show all POST requests
 jq 'select(.method == "POST")' .libretto/sessions/my-session/network.jsonl
 ```
 
 **`actions.jsonl`** — One entry per user or agent action. User entries include `bestSemanticSelector`, `nearbyText`, and coordinates. Agent entries include the Playwright locator and duration. Query with `jq`:
 
-```bash  theme={null}
+```bash theme={null}
 # Last 20 actions
 tail -n 20 .libretto/sessions/my-session/actions.jsonl | jq .
 ```
@@ -196,7 +200,7 @@ Profiles save browser session state — cookies, localStorage, and other persist
 
 1. Open the site in headed mode so you can log in manually:
 
-   ```bash  theme={null}
+   ```bash theme={null}
    npx libretto open https://app.example.com --headed --session app-login
    ```
 
@@ -204,7 +208,7 @@ Profiles save browser session state — cookies, localStorage, and other persist
 
 3. Save the current session state as a profile:
 
-   ```bash  theme={null}
+   ```bash theme={null}
    npx libretto save app.example.com --session app-login
    ```
 
@@ -212,12 +216,13 @@ Profiles save browser session state — cookies, localStorage, and other persist
 
 Pass `--auth-profile <domain>` to `run`:
 
-```bash  theme={null}
+```bash theme={null}
 npx libretto run ./integration.ts main --auth-profile app.example.com
 ```
 
 <Warning>
-  Sessions can expire. If a profile stops working, repeat the login and save flow to refresh it.
+  Sessions can expire. If a profile stops working, repeat the login and save
+  flow to refresh it.
 </Warning>
 
 Profiles are machine-local and git-ignored. They are not safe to commit or share — they contain authentication tokens for live accounts.

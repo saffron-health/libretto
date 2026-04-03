@@ -12,8 +12,8 @@ import {
 import { SimpleCLI } from "../framework/simple-cli.js";
 import { pageOption, sessionOption, withRequiredSession } from "./shared.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
-import { readAiConfig } from "../core/ai-config.js";
-import { resolveSnapshotApiModelOrThrow } from "../core/snapshot-api-config.js";
+import { readAiConfig } from "../core/config.js";
+import { resolveSnapshotApiModelOrThrow } from "../core/ai-model.js";
 
 const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
 

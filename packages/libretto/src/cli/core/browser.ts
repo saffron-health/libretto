@@ -26,10 +26,11 @@ import {
   getSessionNetworkLogPath,
   PROFILES_DIR,
 } from "./context.js";
-import { readLibrettoConfig } from "./ai-config.js";
+import { readLibrettoConfig } from "./config.js";
 import {
   assertSessionAvailableForStart,
   clearSessionState,
+  isPidRunning,
   listSessionsWithStateFile,
   readSessionStateOrThrow,
   logFileForSession,
@@ -830,15 +831,6 @@ type ClosableSession = {
 
 function waitForCloseSignalWindow(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-function isPidRunning(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function sendSignalToProcessGroupOrPid(

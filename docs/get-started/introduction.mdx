@@ -1,4 +1,7 @@
-## Introduction
+---
+title: Introduction
+sidebarTitle: Introduction
+---
 
 > Libretto is the AI toolkit for building and maintaining browser automations.
 
@@ -31,62 +34,19 @@ Once setup is complete, load up your favorite coding agent and try one of these 
 
 ## Core capabilities
 
-Libretto is organized around four capabilities that cover the full lifecycle of a browser automation:
+- **Inspect live pages** — Snapshot any page and get a token-efficient summary of selectors, interactive elements, and visible state.
+- **Capture network traffic** — Record every HTTP request/response to a structured JSONL log for reverse-engineering site APIs.
+- **Record user actions** — Capture DOM events with semantic selectors so your agent can reconstruct workflows as Playwright scripts.
+- **Debug broken workflows** — Keep the browser open on failure so your agent can inspect, patch, and re-run without restarting.
 
-**Inspect live pages** — Take a snapshot of any open page and let a vision model extract selectors, identify interactive elements, and summarize the visible state. Snapshot analysis runs in a separate process so the results are token-efficient summaries, not raw DOM dumps.
+## Common commands
 
-**Capture network traffic** — Record every HTTP request and response made by the browser. Libretto writes these to a structured JSONL log you can query with `jq` or pass directly to your agent to reverse-engineer the site's API.
-
-**Record user actions** — As you interact with a page manually, Libretto captures each DOM event with a semantic selector, nearby text, and coordinates. Your agent can read these recorded actions and reconstruct the workflow as a typed Playwright script.
-
-**Debug broken workflows** — When a workflow fails, Libretto keeps the browser open. Your agent can inspect the live page state with `snapshot` and `exec`, identify the broken selector or unexpected page change, patch the code, and re-run — all without restarting from scratch.
-
-## The skill concept
-
-Libretto is designed to be loaded as a **skill** in your coding agent. A skill is a set of instructions that tells your agent when and how to use a tool. When you give your agent the Libretto skill, it knows to:
-
-- Open a browser before guessing at page structure
-- Use `snapshot` as the primary observation tool instead of reading raw HTML
-- Prefer network request approaches over UI automation when the site allows it
-- Validate a finished workflow with a headless `run` before declaring it done
-
-The skill file ships with the package at `skills/libretto/SKILL.md` and is automatically copied into `.agents/skills/libretto` and `.claude/skills/libretto` when you run `npm init libretto@latest`.
-
-## Architecture overview
-
-### CLI vs Library API
-
-Libretto ships two interfaces:
-
-- **CLI** (`npx libretto <command>`) — the primary interface for both agents and humans. Commands open browsers, take snapshots, execute Playwright code, run workflow files, and manage sessions. Every command accepts `--session <name>` to target a specific browser session.
-
-- **Library API** (`import { workflow } from "libretto"`) — used inside workflow files you want to run with `npx libretto run`. The `workflow()` function wraps your automation handler and gives it typed access to `page` and `session`.
-
-### Sessions
-
-A **session** is a named browser context. When you run `npx libretto open https://example.com --session my-session`, Libretto launches a Chromium instance and registers it under that name. Subsequent commands (`snapshot`, `exec`, `network`, `actions`) all target that session by name.
-
-If you don't pass `--session`, Libretto generates a unique session name automatically. Sessions are independent — you can have multiple sessions open at the same time, each pointing to a different browser or URL.
-
-### The `.libretto/` directory
-
-All Libretto state lives in a `.libretto/` directory at your project root:
-
+```bash
+npx libretto open https://example.com --session my-session
+npx libretto snapshot --session my-session --objective "Find the submit button" --context "I just opened the homepage."
+npx libretto exec --session my-session "return await page.url()"
+npx libretto run ./integration.ts main
 ```
-.libretto/
-├── config.json          # AI model and viewport settings
-├── sessions/
-│   └── <name>/
-│       ├── state.json   # Debug port, PID, status
-│       ├── logs.jsonl   # Structured session logs
-│       ├── network.jsonl
-│       ├── actions.jsonl
-│       └── snapshots/   # PNG + HTML captures
-└── profiles/
-    └── <domain>.json    # Saved auth state
-```
-
-Sessions and profiles are automatically git-ignored by a `.libretto/.gitignore` file created during setup.
 
 ## Next steps
 
