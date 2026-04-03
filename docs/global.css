@@ -73,13 +73,13 @@
 }
 
 /* Dark mode overrides */
-@media (prefers-color-scheme: dark) {
-  #navbar {
-    background: var(--ink);
-    border-bottom-color: rgba(245, 242, 236, 0.08);
-  }
-
-  #sidebar {
-    background: var(--ink);
-  }
+/* Dark mode overrides — Mintlify uses a .dark class on <html> */
+.dark #navbar {
+  background: var(--ink);
+  border-bottom-color: rgba(245, 242, 236, 0.08);
 }
+
+.dark #sidebar {
+  background: var(--ink);
+}
+
