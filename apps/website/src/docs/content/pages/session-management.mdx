@@ -1,0 +1,214 @@
+## save, pages & close
+
+> Manage browser sessions, pages, and saved authentication profiles.
+
+### The `--session` flag
+
+Almost every Libretto command accepts `--session <name>` to target a specific browser session. When you omit `--session` on commands that support auto-generation (`open`, `run`), Libretto creates a unique name automatically.
+
+Session state is stored under `.libretto/sessions/<session>/`:
+
+```txt
+.libretto/
+  sessions/
+    <session>/
+      state.json
+      logs.jsonl
+      network.jsonl
+      actions.jsonl
+      snapshots/
+  profiles/
+```
+
+Session directories are git-ignored. Each session runs an isolated browser instance on a dynamic port.
+
+***
+
+### pages
+
+The `pages` command lists all open pages (tabs) in a session and prints their IDs and URLs.
+
+```bash  theme={null}
+npx libretto pages --session debug-example
+```
+
+#### When to use `pages`
+
+* A popup or new tab opened during navigation or interaction.
+* `exec` or `snapshot` fails because more than one page is open in the session.
+* You are not sure which page holds the relevant state.
+
+After running `pages`, pass the target page ID to other commands with `--page <page-id>`:
+
+```bash  theme={null}
+# List pages
+npx libretto pages --session debug-example
+
+# Target a specific page
+npx libretto exec --session debug-example --page <page-id> "return await page.url()"
+npx libretto snapshot --session debug-example --page <page-id> \
+  --objective "Find the active form" \
+  --context "A modal opened in a new tab."
+```
+
+#### Flags
+
+<ParamField path="--session" type="string" required>
+  The session to list pages for.
+</ParamField>
+
+***
+
+### save
+
+The `save` command saves the current browser session's cookies and localStorage as a named auth profile. Load the profile later with `--auth-profile` to skip manual login.
+
+```bash  theme={null}
+npx libretto save app.example.com
+```
+
+#### When to use `save`
+
+Only use `save` when the user explicitly asks to save or reuse authenticated browser state. A typical flow:
+
+<Steps>
+  <Step title="Open the site in headed mode">
+    ```bash  theme={null}
+    npx libretto open https://app.example.com --headed
+    ```
+  </Step>
+
+  <Step title="Log in manually">
+    The browser window is visible. Log in as usual.
+  </Step>
+
+  <Step title="Save the session">
+    ```bash  theme={null}
+    npx libretto save app.example.com
+    ```
+
+    The profile is saved to `.libretto/profiles/app.example.com.json`.
+  </Step>
+
+  <Step title="Use the profile in future runs">
+    ```bash  theme={null}
+    npx libretto run ./integration.ts main --auth-profile app.example.com
+    ```
+  </Step>
+</Steps>
+
+#### Profile storage
+
+Profiles are stored in `.libretto/profiles/<domain>.json`. They are:
+
+* Machine-local — not shared across environments or team members.
+* Git-ignored by default.
+* Subject to session expiry — if authentication stops working, repeat the login-and-save flow.
+
+#### Flags
+
+<ParamField path="domain" type="string" required>
+  The domain (or URL) used to name the saved profile. Passed as the first positional argument. Example: `app.example.com`.
+</ParamField>
+
+<ParamField path="--session" type="string" required>
+  The session to save. Use the same name you passed to `npx libretto open --session`.
+</ParamField>
+
+***
+
+### close
+
+The `close` command closes a browser session and cleans up its state.
+
+```bash  theme={null}
+npx libretto close --session debug-example
+npx libretto close --all
+```
+
+#### When to use `close`
+
+* When you are done with a session.
+* When an exploration session is no longer helping progress and you want to free up the browser.
+* For full workspace cleanup at the end of a task.
+
+<Note>
+  When using `connect` to attach to an external CDP endpoint, `close` clears the Libretto session record but **does not terminate the remote browser process**.
+</Note>
+
+#### Flags
+
+<ParamField path="--session" type="string">
+  The session to close. Required unless `--all` is passed.
+</ParamField>
+
+<ParamField path="--all" type="boolean">
+  Close all tracked sessions in this workspace.
+</ParamField>
+
+<ParamField path="--force" type="boolean">
+  Force-kill sessions that do not respond to SIGTERM. Requires `--all`.
+</ParamField>
+
+#### Examples
+
+```bash  theme={null}
+# Close a named session
+npx libretto close --session debug-example
+
+# Close all sessions in the workspace
+npx libretto close --all
+
+# Close all sessions, force-killing any that are unresponsive
+npx libretto close --all --force
+```
+
+***
+
+### setup
+
+The `setup` command sets up Libretto in your project for the first time. It installs Chromium, copies the Libretto skill files to your agent directories, and walks you through configuring a snapshot analysis model.
+
+```bash  theme={null}
+npx libretto setup
+```
+
+<Warning>
+  `setup` is interactive — it prompts for API credentials and requires a TTY. Run it yourself in a terminal, not through an agent.
+</Warning>
+
+#### What `setup` does
+
+1. Installs the Playwright Chromium browser via `npx playwright install chromium`.
+2. Copies skill files to `.agents/skills/libretto/` and `.claude/skills/libretto/` if those directories exist.
+3. Prompts you to select an AI provider (OpenAI, Anthropic, Google Gemini, or Google Vertex AI) and enter your API key, which is written to `.env`.
+
+#### Flags
+
+<ParamField path="--skip-browsers" type="boolean">
+  Skip the Playwright Chromium installation step. Useful if Chromium is already installed.
+</ParamField>
+
+#### After `setup`
+
+You can change or update the snapshot analysis model at any time without re-running `setup`:
+
+```bash  theme={null}
+npx libretto ai configure openai
+npx libretto ai configure anthropic
+npx libretto ai configure gemini
+npx libretto ai configure vertex
+
+# Or specify a model directly
+npx libretto ai configure openai/gpt-4o
+```
+
+<CardGroup cols={2}>
+  <Card title="open & connect" icon="browser" href="#open-connect">
+    Start a session after init completes.
+  </Card>
+
+  <Card title="network & actions" icon="chart-network" href="#network-actions">
+    Explore session logs captured during a run.
+  </Card>
+</CardGroup>

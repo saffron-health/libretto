@@ -3,3 +3,5 @@ packages:
   - "benchmarks"
   - "evals"
   - "packages/*"
+
+minimumReleaseAge: 10080

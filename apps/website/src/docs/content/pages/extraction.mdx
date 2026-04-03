@@ -1,0 +1,134 @@
+## AI Extraction
+
+> Extract structured data from pages using AI-powered analysis.
+
+`extractFromPage()` combines a screenshot with DOM content and sends both to an LLM to extract structured data matching a Zod schema. Because the visual analysis happens in a separate LLM call, it keeps your coding agent's context window free of raw HTML.
+
+### `extractFromPage()`
+
+```typescript  theme={null}
+async function extractFromPage<T extends z.ZodType>(
+  options: ExtractOptions<T>
+): Promise<z.infer<T>>
+```
+
+#### How it works
+
+* **With `selector`**: waits for the element to be visible, takes a screenshot of just that element, and reads its `innerHTML` (truncated at 30 000 characters).
+* **Without `selector`**: takes a full-page screenshot via CDP and reads the full page HTML (truncated at 50 000 characters).
+
+Both the screenshot and the DOM snippet are sent to the LLM together with your instruction. The response is parsed and validated against your Zod schema before being returned.
+
+#### `ExtractOptions<T>`
+
+<ParamField path="page" type="Page" required>
+  The Playwright `Page` to extract from.
+</ParamField>
+
+<ParamField path="instruction" type="string" required>
+  A natural-language description of what to extract. For example: `"Extract the first 5 search results"`.
+</ParamField>
+
+<ParamField path="schema" type="T extends z.ZodType" required>
+  A Zod schema that describes the shape of the data you want back. The return type of `extractFromPage` is `z.infer<T>`.
+</ParamField>
+
+<ParamField path="llmClient" type="LLMClient" required>
+  An LLM client instance. Create one with [`createLLMClientFromModel()`](#createllmclientfrommodel). The backing model must support vision (multimodal) input because `extractFromPage` always sends a screenshot.
+</ParamField>
+
+<ParamField path="logger" type="MinimalLogger">
+  Optional logger. Defaults to a simple `console`-based logger when omitted.
+</ParamField>
+
+<ParamField path="selector" type="string">
+  Optional CSS selector. When provided, the screenshot and DOM capture are scoped to the matching element instead of the full page. Useful for large pages where you only care about one section.
+</ParamField>
+
+#### Example
+
+```typescript  theme={null}
+import { extractFromPage, createLLMClientFromModel } from "libretto";
+import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
+
+const llmClient = createLLMClientFromModel(openai("gpt-4o"));
+
+const SearchResult = z.object({
+  title: z.string(),
+  url: z.string(),
+  snippet: z.string(),
+});
+
+const results = await extractFromPage({
+  page,
+  instruction: "Extract the first 5 search results",
+  schema: z.array(SearchResult),
+  llmClient,
+  // Optional: scope to a specific element
+  selector: ".search-results",
+});
+// results is typed as Array<{ title: string; url: string; snippet: string }>
+```
+
+<Tip>
+  Use `selector` to narrow extraction to a single widget or table when the full page HTML is large. Scoped extraction is faster and uses fewer tokens.
+</Tip>
+
+***
+
+### `createLLMClientFromModel()`
+
+Creates a Libretto `LLMClient` from a Vercel AI SDK `LanguageModel`. This is the standard way to supply an LLM client to `extractFromPage`, `attemptWithRecovery`, and `detectSubmissionError`.
+
+```typescript  theme={null}
+function createLLMClientFromModel(model: LanguageModel): LLMClient
+```
+
+<ParamField path="model" type="LanguageModel" required>
+  A Vercel AI SDK language model instance. Pass the result of calling a provider factory such as `openai("gpt-4o")`, `anthropic("claude-3-5-sonnet-20241022")`, or `google("gemini-1.5-pro")`.
+</ParamField>
+
+#### Supported providers
+
+Any provider that implements the Vercel AI SDK `LanguageModel` interface works. The most common ones:
+
+| Package                 | Example                                   |
+| ----------------------- | ----------------------------------------- |
+| `@ai-sdk/openai`        | `openai("gpt-4o")`                        |
+| `@ai-sdk/anthropic`     | `anthropic("claude-3-5-sonnet-20241022")` |
+| `@ai-sdk/google`        | `google("gemini-1.5-pro")`                |
+| `@ai-sdk/google-vertex` | `vertex("gemini-1.5-pro")`                |
+
+#### Example
+
+```typescript  theme={null}
+import { createLLMClientFromModel } from "libretto";
+import { openai } from "@ai-sdk/openai";
+
+const llmClient = createLLMClientFromModel(openai("gpt-4o"));
+```
+
+#### `LLMClient` interface
+
+You can also implement `LLMClient` directly if you want to use a provider that is not in the Vercel AI SDK:
+
+```typescript  theme={null}
+interface LLMClient {
+  generateObject<T extends z.ZodType>(opts: {
+    prompt: string;
+    schema: T;
+    temperature?: number;
+  }): Promise<z.output<T>>;
+
+  generateObjectFromMessages<T extends z.ZodType>(opts: {
+    messages: Message[];
+    schema: T;
+    temperature?: number;
+  }): Promise<z.output<T>>;
+}
+```
+
+<Note>
+  Implementations should throw on failure rather than returning sentinel values like `null` or `undefined`. Libretto relies on thrown exceptions to trigger retry and recovery logic.
+</Note>

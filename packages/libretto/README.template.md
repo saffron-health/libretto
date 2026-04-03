@@ -21,9 +21,9 @@ https://github.com/user-attachments/assets/9b9a0ab3-5133-4b20-b3be-459943349d18
 npm install libretto
 
 # Install skill, download Chromium if not already installed, configure snapshot analysis
-npx libretto init
+npx libretto setup
 
-# Configure or change the snapshot analysis model (see Configuration section below). `npx libretto init` sets this up the first time.
+# Configure or change the snapshot analysis model (see Configuration section below). `npx libretto setup` sets this up the first time.
 npx libretto ai configure <openai | anthropic | gemini | vertex>
 ```
 
@@ -60,7 +60,7 @@ Agents can use Libretto to reproduce the failure, pause the workflow at any poin
 You can also use Libretto directly from the command line. All commands accept `--session <name>` to target a specific session.
 
 ```bash
-npx libretto init                          # interactive; run yourself, not through an agent
+npx libretto setup                         # interactive; run yourself, not through an agent
 npx libretto open <url>                    # launch browser and open a URL (headed by default)
 npx libretto snapshot --objective "..." --context "..."  # capture PNG + HTML and analyze with an LLM
 npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page (single quoted argument)
@@ -155,6 +155,6 @@ Source layout:
 - `{{LIBRETTO_PATH_PREFIX}}README.template.md` — source of truth for the repo and package READMEs
 - `{{LIBRETTO_PATH_PREFIX}}skills/libretto/` — source of truth for the Libretto skill
 
-Run `pnpm sync:mirrors` after editing `{{LIBRETTO_PATH_PREFIX}}README.template.md` or anything under `{{LIBRETTO_PATH_PREFIX}}skills/libretto/`. `pnpm i` also resyncs the skill mirrors through `postinstall`.
+Run `pnpm sync:mirrors` after editing `{{LIBRETTO_PATH_PREFIX}}README.template.md` or anything under `{{LIBRETTO_PATH_PREFIX}}skills/libretto/`.
 
 To check that generated READMEs, skill mirrors, and skill version metadata are in sync without fixing them, run `pnpm check:mirrors`. To release, run `pnpm prepare-release`.

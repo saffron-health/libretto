@@ -5,6 +5,8 @@ import { pathToFileURL } from "node:url";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
+const packageJsonUrl = new URL("../package.json", import.meta.url);
+
 function extractReturnedSessionId(output: string): string | null {
   const patterns = [
     /\(session:\s*([a-zA-Z0-9._-]+)\)/i,
@@ -41,11 +43,45 @@ function expectMissingSessionError(output: string, session: string): void {
   expect(output).toContain(`libretto open <url> --session ${session}`);
 }
 
+async function readCliVersion(): Promise<string> {
+  const manifest = JSON.parse(await readFile(packageJsonUrl, "utf8")) as {
+    version: string;
+  };
+  return manifest.version;
+}
+
+async function seedInstalledSkillVersion(
+  workspacePath: (...parts: string[]) => string,
+  rootDir: ".agents" | ".claude",
+  version: string,
+): Promise<void> {
+  await mkdir(workspacePath(rootDir, "skills", "libretto"), {
+    recursive: true,
+  });
+  await writeFile(
+    workspacePath(rootDir, "skills", "libretto", "SKILL.md"),
+    `---
+name: libretto
+metadata:
+  version: "${version}"
+---
+`,
+    "utf8",
+  );
+}
+
+function expectedSkillVersionWarning(
+  skillVersion: string,
+  cliVersion: string,
+): string {
+  return `Warning: Your agent skill (${skillVersion}) is out of date with your Libretto CLI (${cliVersion}). Please run \`npx libretto setup\` to update your skills to the correct version.`;
+}
+
 describe("basic CLI subprocess behavior", () => {
-  test("init explains snapshot API env setup when no credentials are configured", async ({
+  test("setup explains snapshot API env setup when no credentials are configured", async ({
     librettoCli,
   }) => {
-    const result = await librettoCli("init --skip-browsers", {
+    const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "",
       ANTHROPIC_API_KEY: "",
@@ -62,10 +98,10 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("GEMINI_API_KEY=...");
   });
 
-  test("init reports when snapshot API credentials are already ready", async ({
+  test("setup reports when snapshot API credentials are already ready", async ({
     librettoCli,
   }) => {
-    const result = await librettoCli("init --skip-browsers", {
+    const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "test-openai-key",
     });
@@ -75,7 +111,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("No further action required.");
   });
 
-  test("init copies skill files without confirmation when agent dirs exist", async ({
+  test("setup copies skill files without confirmation when agent dirs exist", async ({
     librettoCli,
     workspacePath,
   }) => {
@@ -89,7 +125,7 @@ describe("basic CLI subprocess behavior", () => {
       "utf8",
     );
 
-    const result = await librettoCli("init --skip-browsers", {
+    const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "",
       ANTHROPIC_API_KEY: "",
@@ -152,7 +188,9 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("help experimental");
     expect(result.stdout).toContain("Experimental commands");
-    expect(result.stdout).toContain("Usage: libretto experimental <subcommand>");
+    expect(result.stdout).toContain(
+      "Usage: libretto experimental <subcommand>",
+    );
     expect(result.stdout).toContain("deploy");
     expect(result.stderr).toBe("");
   });
@@ -236,6 +274,23 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toContain("Check logs:");
   });
 
+  test("warns on open when the installed skill version is out of date", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    await seedInstalledSkillVersion(workspacePath, ".agents", "0.0.0");
+
+    const result = await librettoCli("open https://example.com", {
+      PATH: "/definitely-not-real",
+    });
+
+    expect(result.stderr).toContain(
+      expectedSkillVersionWarning("0.0.0", cliVersion),
+    );
+    expect(result.stderr).toContain("Failed to launch browser child process:");
+  });
+
   test("defaults sessioned browser commands to the default session", async ({
     librettoCli,
   }) => {
@@ -289,7 +344,9 @@ describe("basic CLI subprocess behavior", () => {
 
   test("exec with hyphen requires stdin input", async ({ librettoCli }) => {
     const session = "exec-stdin-requires-input";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     const result = await librettoCli(`exec - --session ${session}`);
     expect(result.stderr).toContain("Missing stdin input for `exec -`.");
@@ -299,7 +356,9 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const session = "exec-stdin-with-input";
-    await librettoCli(`open https://example.com --headless --session ${session}`);
+    await librettoCli(
+      `open https://example.com --headless --session ${session}`,
+    );
 
     const result = await librettoCli(
       `exec - --session ${session}`,
@@ -316,6 +375,49 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("run ./integration.ts main");
     expect(result.stderr).toContain("Integration file does not exist:");
     expect(result.stderr).toContain("integration.ts");
+  });
+
+  test("warns on run when the installed skill version is out of date", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    await seedInstalledSkillVersion(workspacePath, ".claude", "0.0.0");
+
+    const result = await librettoCli("run ./integration.ts main");
+
+    expect(result.stderr).toContain(
+      expectedSkillVersionWarning("0.0.0", cliVersion),
+    );
+    expect(result.stderr).toContain("Integration file does not exist:");
+  });
+
+  test("warns on connect when the installed skill version is out of date", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    await seedInstalledSkillVersion(workspacePath, ".agents", "0.0.0");
+
+    const result = await librettoCli("connect not-a-url --session mismatch");
+
+    expect(result.stderr).toContain(
+      expectedSkillVersionWarning("0.0.0", cliVersion),
+    );
+    expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
+  });
+
+  test("does not warn when the installed skill version matches the CLI", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    await seedInstalledSkillVersion(workspacePath, ".agents", cliVersion);
+
+    const result = await librettoCli("connect not-a-url --session matching");
+
+    expect(result.stderr).not.toContain("Warning: Your agent skill (");
+    expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 
   test("fails run with invalid JSON in --params", async ({ librettoCli }) => {
@@ -495,7 +597,7 @@ export const main = workflow("main", async () => {
         "missing-playwright-browsers",
       ),
     });
-    expect(result.stderr).not.toContain("Workflow \"main\" not found");
+    expect(result.stderr).not.toContain('Workflow "main" not found');
   });
 
   test("accepts workflow exported via workflows manifest", async ({
@@ -522,7 +624,7 @@ export const workflows = {
         "missing-playwright-browsers",
       ),
     });
-    expect(result.stderr).not.toContain("Workflow \"main\" not found");
+    expect(result.stderr).not.toContain('Workflow "main" not found');
   });
 
   test("accepts workflow exported directly from workflows binding", async ({
@@ -545,7 +647,7 @@ export const workflows = workflow("main", async () => {
         "missing-playwright-browsers",
       ),
     });
-    expect(result.stderr).not.toContain("Workflow \"main\" not found");
+    expect(result.stderr).not.toContain('Workflow "main" not found');
   });
 
   test("fails run when local auth profile is declared but missing", async ({
