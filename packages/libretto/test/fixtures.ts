@@ -34,7 +34,10 @@ type CliFixtures = {
   ) => Promise<string>;
   writeWorkflowScript: (fileName: string, source: string) => Promise<string>;
   seedSessionState: (state?: Partial<SessionState>) => Promise<SessionState>;
-  seedSessionMode: (session: string, mode: SessionAccessMode) => Promise<string>;
+  seedSessionMode: (
+    session: string,
+    mode: SessionAccessMode,
+  ) => Promise<string>;
   seedProfile: (domain: string, sourcePath: string) => Promise<string>;
 };
 
@@ -340,6 +343,7 @@ export const test = base.extend<CliFixtures>({
         status: state?.status,
         cdpEndpoint: state?.cdpEndpoint,
         viewport: state?.viewport,
+        provider: state?.provider,
       };
       const dir = workspacePath(".libretto", "sessions", session);
       await mkdir(dir, { recursive: true });
@@ -361,7 +365,12 @@ export const test = base.extend<CliFixtures>({
   seedSessionMode: async ({ workspacePath }, use) => {
     await use(async (session: string, mode: SessionAccessMode) => {
       const dir = workspacePath(".libretto", "sessions", session);
-      const path = workspacePath(".libretto", "sessions", session, "state.json");
+      const path = workspacePath(
+        ".libretto",
+        "sessions",
+        session,
+        "state.json",
+      );
       await mkdir(dir, { recursive: true });
 
       let payload: SessionState = {

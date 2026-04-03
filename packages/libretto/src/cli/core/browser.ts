@@ -38,7 +38,7 @@ import {
   writeSessionState,
 } from "./session.js";
 import type { ProviderApi } from "./providers/types.js";
-import { getProvider } from "./providers/index.js";
+import { getCloudProviderApi } from "./providers/index.js";
 import { installSessionTelemetry } from "./session-telemetry.js";
 
 const CLOSE_WAIT_MS = 1_500;
@@ -270,7 +270,7 @@ export async function connect(
           sessionId: state.provider.sessionId,
         });
         try {
-          const provider = getProvider(state.provider.name);
+          const provider = getCloudProviderApi(state.provider.name);
           await provider.closeSession(state.provider.sessionId);
         } catch (cleanupErr) {
           logger.warn("connect-provider-cleanup-failed", {
@@ -959,7 +959,7 @@ export async function runClose(
       sessionId: state.provider.sessionId,
     });
     try {
-      const provider = getProvider(state.provider.name);
+      const provider = getCloudProviderApi(state.provider.name);
       await provider.closeSession(state.provider.sessionId);
     } catch (err) {
       logger.warn("close-provider-error", {
@@ -1096,7 +1096,7 @@ export async function runCloseAll(
         sessionId: target.provider.sessionId,
       });
       try {
-        const provider = getProvider(target.provider.name);
+        const provider = getCloudProviderApi(target.provider.name);
         await provider.closeSession(target.provider.sessionId);
       } catch (err) {
         logger.warn("close-all-provider-error", {

@@ -9,7 +9,10 @@ import {
   runPages,
   runSave,
 } from "../core/browser.js";
-import { resolveProviderName, getProvider } from "../core/providers/index.js";
+import {
+  resolveProviderName,
+  getCloudProviderApi,
+} from "../core/providers/index.js";
 import { createLoggerForSession, withSessionLogger } from "../core/context.js";
 import {
   type SessionAccessMode,
@@ -103,7 +106,7 @@ export const openCommand = SimpleCLI.command({
         accessMode: resolveRequestedSessionMode(input.readOnly),
       });
     } else {
-      const provider = getProvider(providerName);
+      const provider = getCloudProviderApi(providerName);
       await runOpenWithProvider(
         input.url!,
         providerName,
