@@ -54,9 +54,9 @@ export const SessionStateFileSchema = z.object({
 });
 ```
 
-- [ ] Add `ProviderStateSchema` to `packages/libretto/src/shared/state/session-state.ts` with `name` (string) and `sessionId` (string) fields.
-- [ ] Add optional `provider` field to `SessionStateFileSchema`.
-- [ ] Verify `pnpm --filter libretto type-check` passes.
+- [x] Add `ProviderStateSchema` to `packages/libretto/src/shared/state/session-state.ts` with `name` (string) and `sessionId` (string) fields.
+- [x] Add optional `provider` field to `SessionStateFileSchema`.
+- [x] Verify `pnpm --filter libretto type-check` passes.
 
 ### Phase 2: Define ProviderApi type, provider modules, and resolution logic
 
@@ -133,11 +133,11 @@ export function createKernelProvider(): ProviderApi {
 }
 ```
 
-- [ ] Create `packages/libretto/src/cli/core/providers/kernel.ts` exporting `createKernelProvider()` that returns a `ProviderApi`. Kernel API: `POST /browsers` returns `{ session_id, cdp_ws_url }`, `DELETE /browsers/{session_id}`.
-- [ ] Create `packages/libretto/src/cli/core/providers/browserbase.ts` exporting `createBrowserbaseProvider()` that returns a `ProviderApi`. Browserbase API: `POST /v1/sessions` with `{ projectId }` returns `{ id, connectUrl }`, close via `POST /v1/sessions/{id}` with `{ status: "REQUEST_RELEASE" }`.
-- [ ] Wire both into `getProvider()` in `providers/index.ts`.
-- [ ] Validate that missing API key env vars produce clear error messages (e.g. `KERNEL_API_KEY is required for Kernel provider.`).
-- [ ] Verify `pnpm --filter libretto type-check` passes.
+- [x] Create `packages/libretto/src/cli/core/providers/kernel.ts` exporting `createKernelProvider()` that returns a `ProviderApi`. Kernel API: `POST /browsers` returns `{ session_id, cdp_ws_url }`, `DELETE /browsers/{session_id}`.
+- [x] Create `packages/libretto/src/cli/core/providers/browserbase.ts` exporting `createBrowserbaseProvider()` that returns a `ProviderApi`. Browserbase API: `POST /v1/sessions` with `{ projectId }` returns `{ id, connectUrl }`, close via `POST /v1/sessions/{id}` with `{ status: "REQUEST_RELEASE" }`.
+- [x] Wire both into `getProvider()` in `providers/index.ts`.
+- [x] Validate that missing API key env vars produce clear error messages (e.g. `KERNEL_API_KEY is required for Kernel provider.`).
+- [x] Verify `pnpm --filter libretto type-check` passes.
 
 ### Phase 4: Wire `--provider` into the `open` command
 
