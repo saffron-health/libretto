@@ -835,7 +835,7 @@ function resolveRunParams(
 }
 
 export const runCommand = SimpleCLI.command({
-  description: "Run an exported Libretto workflow from a file",
+  description: "Run the default-exported Libretto workflow from a file",
 })
   .input(runInput)
   .use(withAutoSession())

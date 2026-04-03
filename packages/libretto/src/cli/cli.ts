@@ -18,7 +18,7 @@ Examples:
   libretto exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
   libretto readonly-exec "return await page.title()" --session test1
   libretto connect http://127.0.0.1:9222 --read-only --session test1
-  libretto run ./integration.ts workflowName --read-only --session test1
+  libretto run ./integration.ts --read-only --session test1
   libretto status
   libretto ai configure openai
   libretto ai configure anthropic

@@ -137,9 +137,9 @@ npx libretto exec --session debug-example --page <page-id> "return await page.ur
 - Re-run the same workflow after each fix to verify the browser behavior end to end.
 
 ```bash
-npx libretto run ./integration.ts workflowName --headless --params '{"status":"open"}'
-npx libretto run ./integration.ts workflowName --headless --read-only
-npx libretto run ./integration.ts workflowName --auth-profile app.example.com
+npx libretto run ./integration.ts --headless --params '{"status":"open"}'
+npx libretto run ./integration.ts --headless --read-only
+npx libretto run ./integration.ts --auth-profile app.example.com
 ```
 
 ### `resume`
@@ -226,7 +226,7 @@ Assistant: I found the working path. I'll now update the workflow file outside L
 <example>
 [Context: The user has an existing Libretto workflow that is failing]
 Assistant: I'll reproduce the failure first so we can inspect the exact browser state it leaves behind.
-Assistant: [Runs `npx libretto run ./integration.ts main --session debug-flow --headed`]
+Assistant: [Runs `npx libretto run ./integration.ts --session debug-flow --headed`]
 Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
 Assistant: [Runs `npx libretto snapshot --session debug-flow --objective "Find the blocking error or broken selector target" --context "The workflow just failed after trying to continue from the review step, and I need to identify the visible blocker on the current page."`]
 Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
