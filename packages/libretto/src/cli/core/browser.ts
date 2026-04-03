@@ -37,6 +37,7 @@ import {
   writeSessionState,
 } from "./session.js";
 import type { ProviderApi } from "./providers/types.js";
+import { getProvider } from "./providers/index.js";
 import { installSessionTelemetry } from "./session-telemetry.js";
 
 const CLOSE_WAIT_MS = 1_500;
@@ -259,6 +260,26 @@ export async function connect(
       pid: state.pid,
     });
     if (state.pid == null || !isPidRunning(state.pid)) {
+      // If this is a provider session, attempt to close the remote session
+      // so it doesn't leak when we clear local state.
+      if (state.provider) {
+        logger.warn("connect-provider-cleanup", {
+          session,
+          provider: state.provider.name,
+          sessionId: state.provider.sessionId,
+        });
+        try {
+          const provider = getProvider(state.provider.name);
+          await provider.closeSession(state.provider.sessionId);
+        } catch (cleanupErr) {
+          logger.warn("connect-provider-cleanup-failed", {
+            session,
+            provider: state.provider.name,
+            sessionId: state.provider.sessionId,
+            error: cleanupErr,
+          });
+        }
+      }
       clearSessionState(session, logger);
       throw new Error(
         `No browser running for session "${session}". Run 'libretto open <url> --session ${session}' first.`,
@@ -908,11 +929,31 @@ export async function runClose(
     return;
   }
 
-  logger.info("close-killing", { session, pid: state.pid, port: state.port });
-
-  if (state.pid != null) {
-    sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
-    await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+  if (state.provider) {
+    // Cloud provider session — close via provider API, no local pid to kill
+    logger.info("close-provider", {
+      session,
+      provider: state.provider.name,
+      sessionId: state.provider.sessionId,
+    });
+    try {
+      const provider = getProvider(state.provider.name);
+      await provider.closeSession(state.provider.sessionId);
+    } catch (err) {
+      logger.warn("close-provider-error", {
+        session,
+        provider: state.provider.name,
+        sessionId: state.provider.sessionId,
+        error: err,
+      });
+      // Still clear state even if remote cleanup fails
+    }
+  } else {
+    logger.info("close-killing", { session, pid: state.pid, port: state.port });
+    if (state.pid != null) {
+      sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
+      await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+    }
   }
 
   clearSessionState(session, logger);
@@ -924,6 +965,7 @@ type ClosableSession = {
   session: string;
   pid?: number;
   port: number;
+  provider?: { name: string; sessionId: string };
 };
 
 function waitForCloseSignalWindow(ms: number): Promise<void> {
@@ -976,6 +1018,7 @@ function resolveClosableSessions(logger: LoggerApi): {
       session,
       pid: state.pid,
       port: state.port,
+      provider: state.provider,
     });
   }
 
@@ -1013,7 +1056,31 @@ export async function runCloseAll(
     return;
   }
 
+  // Close provider sessions via their APIs
   for (const target of closable) {
+    if (target.provider) {
+      logger.info("close-all-provider", {
+        session: target.session,
+        provider: target.provider.name,
+        sessionId: target.provider.sessionId,
+      });
+      try {
+        const provider = getProvider(target.provider.name);
+        await provider.closeSession(target.provider.sessionId);
+      } catch (err) {
+        logger.warn("close-all-provider-error", {
+          session: target.session,
+          provider: target.provider.name,
+          sessionId: target.provider.sessionId,
+          error: err,
+        });
+      }
+    }
+  }
+
+  // Send SIGTERM to local sessions
+  for (const target of closable) {
+    if (target.provider) continue; // already handled above
     logger.info("close-all-sigterm", {
       session: target.session,
       pid: target.pid,

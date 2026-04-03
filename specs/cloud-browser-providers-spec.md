@@ -172,8 +172,9 @@ if (state.provider) {
 }
 ```
 
-- [ ] Update `runClose()` in `packages/libretto/src/cli/core/browser.ts` to call `getProvider(state.provider.name).closeSession(state.provider.sessionId)` when `state.provider` is present, before killing the local process.
-- [ ] Update `runCloseAll()` to also call provider cleanup for each session with provider metadata.
-- [ ] For provider sessions, skip the local pid-based kill logic (there is no local browser process to kill).
-- [ ] Manual test: `libretto close --session <name>` on a Kernel session calls `DELETE /browsers/{id}` and clears state.
-- [ ] Verify `pnpm --filter libretto type-check` passes.
+- [x] Update `runClose()` in `packages/libretto/src/cli/core/browser.ts` to call `getProvider(state.provider.name).closeSession(state.provider.sessionId)` when `state.provider` is present, before killing the local process.
+- [x] Update `runCloseAll()` to also call provider cleanup for each session with provider metadata.
+- [x] For provider sessions, skip the local pid-based kill logic (there is no local browser process to kill).
+- [x] Fix `connect()` to attempt `provider.closeSession()` before clearing state when CDP connection fails for provider sessions (prevents remote session leaks).
+- [x] Manual test: `libretto close --session <name>` on a Kernel session calls `DELETE /browsers/{id}` and clears state.
+- [x] Verify `pnpm --filter libretto type-check` passes.
