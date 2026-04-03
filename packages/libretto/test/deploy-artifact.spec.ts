@@ -157,10 +157,7 @@ describe("createHostedDeployPackage", () => {
     expect(deployManifest.dependencies).toEqual({
       libretto: "0.5.4",
     });
-    expect(bundle).toContain("createWorkflowProxy");
-    expect(bundle).toContain(
-      'export const testWorkflow = createWorkflowProxy("testWorkflow");',
-    );
+    expect(bundle).toContain('createWorkflowProxy("testWorkflow")');
     expect(implementation).toContain("bundled from workspace source");
     expect(implementation).not.toContain("@repo/config/message");
     expect(bundle).not.toContain("workspace:*");
@@ -169,6 +166,57 @@ describe("createHostedDeployPackage", () => {
         file.endsWith(".js"),
       ),
     ).toEqual(["index.js"]);
+  });
+
+  it("discovers workflows from files that are only imported by the deploy entry point", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "browser-agent");
+    const entryPoint = join(sourceDir, "src", "index.ts");
+
+    mkdirSync(join(sourceDir, "src", "workflows"), { recursive: true });
+
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/browser-agent",
+      private: true,
+      type: "module",
+      dependencies: {
+        libretto: currentLibrettoVersion.version,
+      },
+    });
+
+    writeFileSync(
+      join(sourceDir, "src", "workflows", "test.ts"),
+      [
+        'import { workflow } from "libretto";',
+        "",
+        "export default workflow(",
+        '  "test",',
+        '  async () => "IMPORTED_ONLY_WORKFLOW",',
+        ");",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      entryPoint,
+      ['import "./workflows/test";', ""].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "import-only-entrypoint",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+
+    const bundle = readFileSync(
+      join(deployPackage.outputDir, "index.js"),
+      "utf8",
+    );
+    const implementation = extractBundledImplementation(bundle);
+
+    expect(bundle).toContain('createWorkflowProxy("test")');
+    expect(implementation).toContain("IMPORTED_ONLY_WORKFLOW");
   });
 
   it("adds user-specified externals to the generated runtime manifest", async () => {
@@ -225,9 +273,7 @@ describe("createHostedDeployPackage", () => {
       libretto: currentLibrettoVersion.version,
       lodash: "^4.17.21",
     });
-    expect(bundle).toContain(
-      'export const testWorkflow = createWorkflowProxy("testWorkflow");',
-    );
+    expect(bundle).toContain('createWorkflowProxy("testWorkflow")');
     expect(implementation).toContain("lodash");
   });
 
@@ -335,14 +381,22 @@ describe("createHostedDeployPackage", () => {
       target: "node20",
     });
 
-    const bundledModule = require(bundledEntryPoint) as {
-      testWorkflow: {
-        run: (ctx: unknown, input: unknown) => Promise<unknown>;
-      };
-    };
+    const bundledModule = require(bundledEntryPoint) as Record<
+      string,
+      {
+        name?: string;
+        run?: (ctx: unknown, input: unknown) => Promise<unknown>;
+      }
+    >;
+    const deployedWorkflow = Object.values(bundledModule).find(
+      (candidate) =>
+        candidate?.name === "testWorkflow" && typeof candidate.run === "function",
+    );
+
+    expect(deployedWorkflow).toBeDefined();
 
     await expect(
-      bundledModule.testWorkflow.run(
+      deployedWorkflow!.run!(
         {
           session: "test-session",
           page: {} as never,

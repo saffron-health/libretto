@@ -24,7 +24,9 @@ import {
   readNetworkLog,
   wrapPageForActionLogging,
 } from "../core/telemetry.js";
-import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
+import {
+  type RunIntegrationWorkerRequest,
+} from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   pageOption,
@@ -605,7 +607,6 @@ async function runIntegrationFromFile(
   );
   const payload = JSON.stringify({
     integrationPath: args.integrationPath,
-    workflowName: args.workflowName,
     session: args.session,
     params: args.params,
     headless: args.headless,
@@ -706,15 +707,12 @@ export const execCommand = SimpleCLI.command({
     );
   });
 
-const runUsage = `Usage: libretto run <integrationFile> <workflowName> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
+const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
     SimpleCLI.positional("integrationFile", z.string().optional(), {
       help: "Path to the integration file",
-    }),
-    SimpleCLI.positional("workflowName", z.string().optional(), {
-      help: "Workflow name to run (from workflow(name, handler))",
     }),
   ],
   named: {
@@ -745,7 +743,7 @@ export const runInput = SimpleCLI.input({
   },
 })
   .refine(
-    (input) => Boolean(input.integrationFile && input.workflowName),
+    (input) => Boolean(input.integrationFile),
     runUsage,
   )
   .refine(
@@ -802,7 +800,6 @@ export const runCommand = SimpleCLI.command({
     await runIntegrationFromFile(
       {
         integrationPath: input.integrationFile!,
-        workflowName: input.workflowName!,
         session: ctx.session,
         params,
         tsconfigPath: input.tsconfig,
