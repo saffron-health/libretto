@@ -587,6 +587,7 @@ async function prepareRunWorkspace(
     parentDir,
     snapshotModel,
     skipBrowsers: true,
+    skipBuild: true,
     quiet: true,
   });
 

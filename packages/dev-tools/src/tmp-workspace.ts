@@ -21,6 +21,10 @@ export type CreateTmpWorkspaceOptions = {
   extraPackages?: string[];
   /** Suppress stdout from sub-commands (default: false). */
   quiet?: boolean;
+  /** Skip building libretto before installing (default: false).
+   *  Use when the caller knows libretto is already built, e.g. in
+   *  parallel eval/benchmark runs where a prior step handles the build. */
+  skipBuild?: boolean;
 };
 
 function findRepoRoot(): string {
@@ -98,8 +102,10 @@ export async function createTmpWorkspace(
   log(`Creating workspace: ${workspaceDir}`);
 
   // Build libretto so the workspace gets the latest CLI
-  log("  Building libretto...");
-  run(librettoPackageRoot, "pnpm", ["build"], quiet);
+  if (!options.skipBuild) {
+    log("  Building libretto...");
+    run(librettoPackageRoot, "pnpm", ["build"], quiet);
+  }
 
   // git init
   log("  Initializing git repo...");

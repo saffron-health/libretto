@@ -85,6 +85,7 @@ export const test = base.extend<EvalFixtures>({
       name: stableHash(`${task.file.filepath}::${task.fullName}`).slice(0, 16),
       parentDir: DETERMINISTIC_WORKSPACE_ROOT,
       skipBrowsers: true,
+      skipBuild: true,
       quiet: true,
     });
     try {
