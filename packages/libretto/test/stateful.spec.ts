@@ -85,7 +85,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(configure.stdout).toContain("AI config saved.");
 
     const show = await librettoCli("ai configure");
-    expect(show.stdout).toContain("Model: vertex/gemini-2.5-pro");
+    expect(show.stdout).toContain("Model: vertex/gemini-2.5-flash");
   });
 
   test("configures custom model string", async ({ librettoCli }) => {
