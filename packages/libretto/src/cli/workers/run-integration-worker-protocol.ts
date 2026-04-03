@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SessionAccessModeSchema } from "../../shared/state/index.js";
 
 export const RunIntegrationWorkerRequestSchema = z.object({
   integrationPath: z.string().min(1),
@@ -9,6 +10,7 @@ export const RunIntegrationWorkerRequestSchema = z.object({
   visualize: z.boolean().default(true),
   authProfileDomain: z.string().optional(),
   viewport: z.object({ width: z.number(), height: z.number() }).optional(),
+  accessMode: SessionAccessModeSchema.default("write-access"),
 });
 
 export type RunIntegrationWorkerRequest = z.infer<

@@ -81,6 +81,63 @@ export const main = workflow("main", async () => {
     expect(secondRun.stderr).not.toContain("is already open and connected to");
   }, 90_000);
 
+  test("run creates a fresh write-access session even if another session is read-only", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const unrelatedSession = "unrelated-readonly-session";
+    await librettoCli(
+      `open https://example.com --headless --read-only --session ${unrelatedSession}`,
+    );
+
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-write-access.mjs",
+      `
+export const main = workflow("main", async () => {
+  console.log("RUN_MODE_OK");
+});
+`,
+    );
+
+    const runSession = "run-write-access-session";
+    const runResult = await librettoCli(
+      `run "${integrationFilePath}" main --session ${runSession} --headless`,
+    );
+    expect(runResult.stdout).toContain("RUN_MODE_OK");
+    expect(runResult.stdout).toContain("Integration completed.");
+
+    const runMode = await librettoCli(
+      `session-mode --session ${runSession}`,
+    );
+    expect(runMode.stdout).toContain(
+      `Session "${runSession}" mode: write-access`,
+    );
+  }, 90_000);
+
+  test("run supports --read-only for the created session", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-readonly.mjs",
+      `
+export const main = workflow("main", async () => {
+  console.log("RUN_READONLY_OK");
+});
+`,
+    );
+
+    const session = "run-readonly-session";
+    const runResult = await librettoCli(
+      `run "${integrationFilePath}" main --session ${session} --headless --read-only`,
+    );
+    expect(runResult.stdout).toContain("RUN_READONLY_OK");
+    expect(runResult.stdout).toContain("Integration completed.");
+
+    const mode = await librettoCli(`session-mode --session ${session}`);
+    expect(mode.stdout).toContain(`Session "${session}" mode: read-only`);
+  }, 90_000);
+
   test("exec without --session shows missing session error", async ({
     librettoCli,
   }) => {

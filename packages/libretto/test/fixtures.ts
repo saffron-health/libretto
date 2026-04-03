@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { test as base } from "vitest";
 import {
   SESSION_STATE_VERSION,
+  type SessionAccessMode,
   type SessionState,
 } from "../src/shared/state/index.js";
 
@@ -33,10 +34,7 @@ type CliFixtures = {
   ) => Promise<string>;
   writeWorkflowScript: (fileName: string, source: string) => Promise<string>;
   seedSessionState: (state?: Partial<SessionState>) => Promise<SessionState>;
-  seedSessionPermission: (
-    session: string,
-    mode: "read-only" | "full-access",
-  ) => Promise<string>;
+  seedSessionMode: (session: string, mode: SessionAccessMode) => Promise<string>;
   seedProfile: (domain: string, sourcePath: string) => Promise<string>;
 };
 
@@ -338,7 +336,10 @@ export const test = base.extend<CliFixtures>({
         port: state?.port ?? 9222,
         pid: state?.pid ?? 12345,
         startedAt: state?.startedAt ?? "2026-01-01T00:00:00.000Z",
+        mode: state?.mode ?? "write-access",
         status: state?.status,
+        cdpEndpoint: state?.cdpEndpoint,
+        viewport: state?.viewport,
       };
       const dir = workspacePath(".libretto", "sessions", session);
       await mkdir(dir, { recursive: true });
@@ -357,25 +358,38 @@ export const test = base.extend<CliFixtures>({
     });
   },
 
-  seedSessionPermission: async ({ workspacePath }, use) => {
-    await use(async (session: string, mode: "read-only" | "full-access") => {
-      const dir = workspacePath(".libretto");
-      const path = workspacePath(".libretto", "config.json");
+  seedSessionMode: async ({ workspacePath }, use) => {
+    await use(async (session: string, mode: SessionAccessMode) => {
+      const dir = workspacePath(".libretto", "sessions", session);
+      const path = workspacePath(".libretto", "sessions", session, "state.json");
       await mkdir(dir, { recursive: true });
-      let payload: Record<string, unknown> = { version: 1 };
-      if (existsSync(path)) {
-        payload = JSON.parse(await readFile(path, "utf8")) as Record<
-          string,
-          unknown
-        >;
-      }
-      payload.version = 1;
-      payload.permissions = {
-        sessions: {
-          [session]: mode,
-        },
+
+      let payload: SessionState = {
+        session,
+        port: 9222,
+        pid: 12345,
+        startedAt: "2026-01-01T00:00:00.000Z",
+        status: "active",
+        mode: "write-access",
       };
-      await writeFile(path, JSON.stringify(payload, null, 2), "utf8");
+
+      if (existsSync(path)) {
+        payload = JSON.parse(await readFile(path, "utf8")) as SessionState;
+      }
+
+      payload.mode = mode;
+      await writeFile(
+        path,
+        JSON.stringify(
+          {
+            version: SESSION_STATE_VERSION,
+            ...payload,
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
       return path;
     });
   },

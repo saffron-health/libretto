@@ -236,9 +236,19 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain(
       "Usage: libretto run [integrationFile] [workflowName] [options]",
     );
+    expect(result.stdout).toContain("--read-only");
     expect(result.stdout).toContain("--no-visualize");
     expect(result.stdout).toContain(
       "Disable ghost cursor + highlight visualization in headed mode",
+    );
+    expect(result.stderr).toBe("");
+  });
+
+  test("prints session-mode help", async ({ librettoCli }) => {
+    const result = await librettoCli("help session-mode");
+    expect(result.stdout).toContain("View or set the session access mode");
+    expect(result.stdout).toContain(
+      "Usage: libretto session-mode [mode] [options]",
     );
     expect(result.stderr).toBe("");
   });
@@ -252,7 +262,36 @@ describe("basic CLI subprocess behavior", () => {
   test("fails open with missing url usage error", async ({ librettoCli }) => {
     const result = await librettoCli("open");
     expect(result.stderr).toContain(
-      "Usage: libretto open <url> [--headless] [--viewport WxH] [--session <name>]",
+      "Usage: libretto open <url> [--headless] [--read-only] [--viewport WxH] [--session <name>]",
+    );
+  });
+
+  test("session-mode prints and updates the current session mode", async ({
+    librettoCli,
+    seedSessionState,
+  }) => {
+    const session = "session-mode-cli";
+    await seedSessionState({ session, mode: "write-access" });
+
+    const currentMode = await librettoCli(
+      `session-mode --session ${session}`,
+    );
+    expect(currentMode.stdout).toContain(
+      `Session "${session}" mode: write-access`,
+    );
+
+    const setMode = await librettoCli(
+      `session-mode read-only --session ${session}`,
+    );
+    expect(setMode.stdout).toContain(
+      `Session "${session}" mode set to read-only.`,
+    );
+
+    const updatedMode = await librettoCli(
+      `session-mode --session ${session}`,
+    );
+    expect(updatedMode.stdout).toContain(
+      `Session "${session}" mode: read-only`,
     );
   });
 
@@ -751,6 +790,41 @@ export const main = workflow("main", async (ctx) => {
     expect(result.stdout).toContain("Workflow paused.");
     expect(result.stdout).not.toContain("WORKFLOW_AFTER_PAUSE");
     expect(result.stdout).not.toContain("Integration completed.");
+  }, 45_000);
+
+  test("resume remains allowed after a paused session is relocked to read-only", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "pause-readonly-resume";
+    const integrationFilePath = await writeWorkflow(
+      "integration-pause-readonly-resume.mjs",
+      `
+let resumedOnce = false;
+
+export const main = workflow("main", async (ctx) => {
+  console.log("WORKFLOW_BEFORE_PAUSE");
+  if (!resumedOnce) {
+    resumedOnce = true;
+    await pause(ctx.session);
+  }
+  console.log("WORKFLOW_AFTER_RESUME");
+});
+`,
+      ["workflow", "pause"],
+    );
+
+    const paused = await librettoCli(
+      `run "${integrationFilePath}" main --session ${session} --headless --read-only`,
+    );
+    expect(paused.stdout).toContain("WORKFLOW_BEFORE_PAUSE");
+    expect(paused.stdout).toContain("Workflow paused.");
+
+    const resumed = await librettoCli(`resume --session ${session}`);
+    expect(resumed.stdout).toContain(`Resume signal sent for session "${session}".`);
+    expect(resumed.stdout).toContain("WORKFLOW_AFTER_RESUME");
+    expect(resumed.stdout).toContain("Integration completed.");
+    expect(resumed.stderr).toBe("");
   }, 45_000);
 
   test("pause reports running sessions when session id is missing", async ({

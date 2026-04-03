@@ -20,6 +20,8 @@
     "website:build": "pnpm --dir ./apps/website build",
     "sync:mirrors": "node packages/dev-tools/scripts/sync-mirrors.mjs",
     "check:mirrors": "node packages/dev-tools/scripts/check-mirrors-sync.mjs",
+    "sync-skills": "pnpm run sync:mirrors",
+    "check:skills": "pnpm run check:mirrors",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "prepare-release": "bash ./scripts/prepare-release.sh",

@@ -17,6 +17,8 @@ Examples:
   libretto exec "await page.locator('button:has-text(\\"Sign in\\")').click()"
   libretto exec "await page.fill('input[name=\\"email\\"]', 'test@example.com')"
   libretto readonly-exec "return await page.title()" --session test1
+  libretto connect http://127.0.0.1:9222 --read-only --session test1
+  libretto run ./integration.ts workflowName --read-only --session test1
   libretto ai configure openai
   libretto ai configure anthropic
   libretto ai configure gemini
@@ -46,10 +48,13 @@ Profiles:
   Local profiles are machine-local and are not shared with other users/environments.
   Sessions can expire; if run fails auth, log in again and re-save the profile.
 
-Sessions:
+  Sessions:
   Session state is stored in .libretto/sessions/<session>/state.json
   CLI logs are stored in .libretto/sessions/<session>/logs.jsonl
   Each session runs an isolated browser instance on a dynamic port.
+  Session mode is stored per session as read-only or write-access.
+  Use --read-only on open, connect, or run to create a read-only session.
+  Session mode is enforced by Libretto commands, not by raw CDP clients outside Libretto.
 `;
 }
 

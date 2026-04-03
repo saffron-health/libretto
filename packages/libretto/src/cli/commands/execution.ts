@@ -14,6 +14,7 @@ import { parseViewportArg } from "./browser.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
   assertSessionAvailableForStart,
+  assertSessionAllowsCommand,
   clearSessionState,
   readSessionState,
   setSessionStatus,
@@ -628,6 +629,7 @@ async function runIntegrationFromFile(
     visualize: args.visualize,
     authProfileDomain: args.authProfileDomain,
     viewport: args.viewport,
+    accessMode: args.accessMode,
   } satisfies RunIntegrationWorkerRequest);
   const worker = spawn(
     process.execPath,
@@ -706,6 +708,7 @@ export const execCommand = SimpleCLI.command({
   .input(execInput)
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
+    assertSessionAllowsCommand(ctx.sessionState, "exec", ["write-access"]);
     const code = input.code!;
     const codeFromArgsOrStdin = code === "-" ? readStdinSync() : code;
     if (codeFromArgsOrStdin === null) {
@@ -759,7 +762,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     });
   });
 
-const runUsage = `Usage: libretto run <integrationFile> <workflowName> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
+const runUsage = `Usage: libretto run <integrationFile> <workflowName> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only] [--no-visualize] [--viewport WxH]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -784,6 +787,10 @@ export const runInput = SimpleCLI.input({
     }),
     headed: SimpleCLI.flag({ help: "Run in headed mode" }),
     headless: SimpleCLI.flag({ help: "Run in headless mode" }),
+    readOnly: SimpleCLI.flag({
+      name: "read-only",
+      help: "Create the session in read-only mode",
+    }),
     noVisualize: SimpleCLI.flag({
       name: "no-visualize",
       help: "Disable ghost cursor + highlight visualization in headed mode",
@@ -864,6 +871,7 @@ export const runCommand = SimpleCLI.command({
         visualize,
         authProfileDomain: input.authProfile,
         viewport,
+        accessMode: input.readOnly ? "read-only" : "write-access",
       },
       ctx.logger,
     );

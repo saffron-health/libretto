@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { pathToFileURL } from "node:url";
 import { describe, expect, onTestFinished } from "vitest";
@@ -318,6 +318,141 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(view.stdout).toContain("target=span");
     expect(view.stdout).toContain('text="Save"');
     expect(view.stdout).toContain("@(42,24)");
+  }, 60_000);
+
+  test("open and connect sessions default to write-access and support --read-only", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const sourceSession = "connect-source-session-mode";
+    const connectedSession = "connect-target-session-mode";
+    const readonlyOpenSession = "open-readonly-session-mode";
+    const readonlyConnectedSession = "connect-readonly-session-mode";
+    await librettoCli(
+      `open https://example.com --headless --session ${sourceSession}`,
+    );
+
+    const sourceMode = await librettoCli(
+      `session-mode --session ${sourceSession}`,
+    );
+    expect(sourceMode.stdout).toContain(
+      `Session "${sourceSession}" mode: write-access`,
+    );
+
+    await librettoCli(
+      `open https://example.com --headless --read-only --session ${readonlyOpenSession}`,
+    );
+    const readonlyOpenMode = await librettoCli(
+      `session-mode --session ${readonlyOpenSession}`,
+    );
+    expect(readonlyOpenMode.stdout).toContain(
+      `Session "${readonlyOpenSession}" mode: read-only`,
+    );
+
+    const sourceState = JSON.parse(
+      await readFile(
+        workspacePath(".libretto", "sessions", sourceSession, "state.json"),
+        "utf8",
+      ),
+    ) as { port: number };
+
+    const connected = await librettoCli(
+      `connect http://127.0.0.1:${sourceState.port} --session ${connectedSession}`,
+    );
+    expect(connected.stdout).toContain(`(session: ${connectedSession})`);
+
+    const connectedMode = await librettoCli(
+      `session-mode --session ${connectedSession}`,
+    );
+    expect(connectedMode.stdout).toContain(
+      `Session "${connectedSession}" mode: write-access`,
+    );
+
+    await librettoCli(
+      `connect http://127.0.0.1:${sourceState.port} --read-only --session ${readonlyConnectedSession}`,
+    );
+    const readonlyConnectedMode = await librettoCli(
+      `session-mode --session ${readonlyConnectedSession}`,
+    );
+    expect(readonlyConnectedMode.stdout).toContain(
+      `Session "${readonlyConnectedSession}" mode: read-only`,
+    );
+  }, 60_000);
+
+  test("read-only sessions block exec but still allow readonly-exec", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "exec-readonly-guard";
+    const htmlPath = workspacePath("fixtures", "exec-readonly-guard.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      "<!doctype html><html><head><title>Exec Guard</title></head><body><h1>Guarded</h1></body></html>",
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(
+      `open "${fileUrl}" --headless --read-only --session ${session}`,
+    );
+
+    const blockedExec = await librettoCli(
+      `exec "return page.url()" --session ${session}`,
+    );
+    expect(blockedExec.stderr).toContain(
+      `Command "exec" is blocked for session "${session}" because it is in read-only mode.`,
+    );
+    expect(blockedExec.stderr).toContain(
+      `libretto session-mode write-access --session ${session}`,
+    );
+
+    const readonlyExec = await librettoCli(
+      `readonly-exec "return page.url()" --session ${session}`,
+    );
+    expect(readonlyExec.stderr).toBe("");
+    expect(readonlyExec.stdout.trim()).toBe(fileUrl);
+  }, 60_000);
+
+  test("read-only guard also applies to remote CDP-backed sessions", async ({
+    librettoCli,
+    seedSessionState,
+    workspacePath,
+  }) => {
+    const sourceSession = "remote-cdp-source";
+    await librettoCli(
+      `open https://example.com --headless --session ${sourceSession}`,
+    );
+
+    const sourceState = JSON.parse(
+      await readFile(
+        workspacePath(".libretto", "sessions", sourceSession, "state.json"),
+        "utf8",
+      ),
+    ) as { port: number };
+
+    const remoteSession = "remote-cdp-readonly";
+    await seedSessionState({
+      session: remoteSession,
+      port: sourceState.port,
+      cdpEndpoint: `http://127.0.0.1:${sourceState.port}`,
+      mode: "read-only",
+      pid: 12345,
+      status: "active",
+    });
+
+    const blockedExec = await librettoCli(
+      `exec "return page.url()" --session ${remoteSession}`,
+    );
+    expect(blockedExec.stderr).toContain(
+      `Command "exec" is blocked for session "${remoteSession}" because it is in read-only mode.`,
+    );
+
+    const readonlyExec = await librettoCli(
+      `readonly-exec "return page.url()" --session ${remoteSession}`,
+    );
+    expect(readonlyExec.stderr).toBe("");
+    expect(readonlyExec.stdout.trim()).toContain("example.com");
   }, 60_000);
 
   test("readonly-exec allows read-only page and locator inspection", async ({

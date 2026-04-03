@@ -238,6 +238,7 @@ async function runIntegrationInternal(
     headless: args.headless,
     storageStatePath,
     viewport: args.viewport,
+    accessMode: args.accessMode,
   });
   if (!args.headless && args.visualize !== false) {
     await installHeadedWorkflowVisualization({

@@ -10,6 +10,7 @@ metadata:
 ## How Libretto Read-Only Works
 
 - Use this skill when the browser session must stay strictly read-only.
+- Libretto stores read-only vs write-access on the session itself.
 - The primary inspection tools are `snapshot` and `readonly-exec`.
 - `readonly-exec` reuses Libretto's normal execution pipeline, but it only exposes read-only helpers and denies mutating Playwright methods.
 
@@ -28,9 +29,11 @@ metadata:
 ### `connect`
 
 - Use `connect` to attach to an existing CDP endpoint for a preserved browser session.
+- Use `--read-only` when creating the Libretto session handle for a preserved browser session.
+- Libretto read-only mode is enforced through Libretto commands; direct CDP clients that skip Libretto are outside this boundary.
 
 ```bash
-npx libretto connect http://127.0.0.1:9222 --session failed-job-debug
+npx libretto connect http://127.0.0.1:9222 --read-only --session failed-job-debug
 ```
 
 ### `pages`
