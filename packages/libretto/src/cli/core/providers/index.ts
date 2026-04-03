@@ -34,13 +34,9 @@ export function resolveProviderName(cliFlag?: string): ProviderName {
     return assertValidProviderName(envVar, "LIBRETTO_PROVIDER env var");
   }
 
-  try {
-    const config = readLibrettoConfig();
-    if (config.provider) {
-      return assertValidProviderName(config.provider, "config file");
-    }
-  } catch {
-    // Config read failure — fall through to default
+  const config = readLibrettoConfig();
+  if (config.provider) {
+    return assertValidProviderName(config.provider, "config file");
   }
 
   return "local";
