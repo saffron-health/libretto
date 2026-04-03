@@ -23,16 +23,16 @@ All Libretto state lives in a `.libretto/` directory at your project root:
 
 ```
 .libretto/
-├── config.json          # AI model and viewport settings
+├── config.json           # Model and viewport config
 ├── sessions/
 │   └── <name>/
-│       ├── state.json   # Debug port, PID, status
-│       ├── logs.jsonl   # Structured session logs
+│       ├── state.json    # Port, PID, status
+│       ├── logs.jsonl    # Session logs
 │       ├── network.jsonl
 │       ├── actions.jsonl
-│       └── snapshots/   # PNG + HTML captures
+│       └── snapshots/    # PNG + HTML
 └── profiles/
-    └── <domain>.json    # Saved auth state
+    └── <domain>.json     # Auth state
 ```
 
 Sessions and profiles are automatically git-ignored by a `.libretto/.gitignore` file created during setup.
