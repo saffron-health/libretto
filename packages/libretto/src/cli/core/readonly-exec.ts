@@ -1,7 +1,17 @@
 import type { Locator, Page } from "playwright";
 import { condenseDom } from "../../shared/condense-dom/condense-dom.js";
 
-const PAGE_READ_METHODS = new Set(["url", "title", "content"]);
+const PAGE_READ_METHODS = new Set([
+  "url",
+  "title",
+  "content",
+  "pageErrors",
+  "viewportSize",
+  "waitForLoadState",
+  "waitForRequest",
+  "waitForResponse",
+  "waitForURL",
+]);
 const PAGE_LOCATOR_FACTORY_METHODS = new Set([
   "locator",
   "getByRole",
@@ -26,9 +36,18 @@ const LOCATOR_READ_METHODS = new Set([
   "innerText",
   "allTextContents",
   "allInnerTexts",
+  "ariaSnapshot",
+  "boundingBox",
   "count",
+  "getAttribute",
+  "inputValue",
+  "isChecked",
+  "isDisabled",
+  "isEditable",
+  "isEnabled",
   "isVisible",
   "isHidden",
+  "waitFor",
 ]);
 
 const LOCATOR_FACTORY_METHODS = new Set([
@@ -47,6 +66,10 @@ const LOCATOR_FACTORY_METHODS = new Set([
   "last",
   "nth",
 ]);
+
+const LOCATOR_COLLECTION_FACTORY_METHODS = new Set(["all"]);
+
+const LOCATOR_SCROLL_METHODS = new Set(["scrollIntoViewIfNeeded"]);
 
 type ReadonlyExecOptions = {
   onActivity?: () => void;
@@ -113,6 +136,23 @@ export function wrapLocatorForReadonlyExec(
           const nextLocator = value.apply(target, args) as Locator;
           markActivity(options.onActivity);
           return wrapLocatorForReadonlyExec(nextLocator, options);
+        };
+      }
+
+      if (LOCATOR_COLLECTION_FACTORY_METHODS.has(prop)) {
+        return async (...args: unknown[]) => {
+          const locators = (await value.apply(target, args)) as Locator[];
+          markActivity(options.onActivity);
+          return locators.map((locator) =>
+            wrapLocatorForReadonlyExec(locator, options),
+          );
+        };
+      }
+
+      if (LOCATOR_SCROLL_METHODS.has(prop)) {
+        return async (...args: unknown[]) => {
+          await value.apply(target, args);
+          markActivity(options.onActivity);
         };
       }
 
@@ -235,6 +275,15 @@ export function createReadonlyExecHelpers(
     page: readonlyPage,
     state: execState,
     snapshot: async () => await captureReadonlySnapshot(page, options),
+    scrollBy: async (deltaX: number, deltaY: number) => {
+      await page.evaluate(
+        ([x, y]) => {
+          window.scrollBy(x, y);
+        },
+        [deltaX, deltaY] as const,
+      );
+      markActivity(options.onActivity);
+    },
     get: async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = resolveRequestMethod(input, init);
       if (method !== "GET" && method !== "HEAD") {

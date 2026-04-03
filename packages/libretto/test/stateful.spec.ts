@@ -355,14 +355,23 @@ describe("state-driven CLI subprocess behavior", () => {
       `readonly-exec - --session ${session}`,
       undefined,
       [
+        "await page.waitForLoadState('domcontentloaded');",
+        "const pageErrorCount = (await page.pageErrors()).length;",
+        "const allItems = await Promise.all((await page.getByRole('listitem').all()).map((item) => item.textContent()));",
         "return {",
         "  url: page.url(),",
         "  title: await page.title(),",
+        "  pageErrorCount,",
+        "  loaded: true,",
         "  heading: await page.locator('#heading').textContent(),",
+        "  headingId: await page.locator('#heading').getAttribute('id'),",
         "  count: await page.locator('li').count(),",
         "  secondItem: await page.getByRole('listitem').nth(1).textContent(),",
+        "  allItems,",
         "  visible: await page.locator('#visible').isVisible(),",
         "  hidden: await page.locator('#hidden').isHidden(),",
+        "  nameValue: await page.locator('#name').inputValue(),",
+        "  nameEditable: await page.locator('#name').isEditable(),",
         "};",
       ].join("\n"),
     );
@@ -371,11 +380,66 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(parseJsonStdout<Record<string, unknown>>(result.stdout)).toEqual({
       url: fileUrl,
       title: "Readonly Fixture",
+      pageErrorCount: 0,
+      loaded: true,
       heading: "Readonly Heading",
+      headingId: "heading",
       count: 2,
       secondItem: "Beta",
+      allItems: ["Alpha", "Beta"],
       visible: true,
       hidden: true,
+      nameValue: "unchanged",
+      nameEditable: true,
+    });
+  }, 60_000);
+
+  test("readonly-exec allows safe scrolling helpers", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "readonly-exec-scroll";
+    const htmlPath = workspacePath("fixtures", "readonly-scroll.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      [
+        "<!doctype html>",
+        "<html>",
+        "<head><title>Readonly Scroll</title></head>",
+        '<body style="margin:0">',
+        '<div style="height:1800px;background:linear-gradient(#fff,#ddd)">Spacer</div>',
+        '<div id="target" style="height:120px">Target</div>',
+        "</body>",
+        "</html>",
+      ].join(""),
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `readonly-exec - --session ${session}`,
+      undefined,
+      [
+        "const target = page.locator('#target');",
+        "const beforeBox = await target.boundingBox();",
+        "await scrollBy(0, 2200);",
+        "const afterScrollByBox = await target.boundingBox();",
+        "await target.scrollIntoViewIfNeeded();",
+        "const afterLocatorScrollBox = await target.boundingBox();",
+        "return {",
+        "  movedByScrollBy: Boolean(beforeBox && afterScrollByBox && afterScrollByBox.y < beforeBox.y),",
+        "  afterLocatorScrollInViewport: Boolean(afterLocatorScrollBox && afterLocatorScrollBox.y >= 0 && afterLocatorScrollBox.y < 720),",
+        "};",
+      ].join("\n"),
+    );
+
+    expect(result.stderr).toBe("");
+    expect(parseJsonStdout<Record<string, unknown>>(result.stdout)).toEqual({
+      movedByScrollBy: true,
+      afterLocatorScrollInViewport: true,
     });
   }, 60_000);
 

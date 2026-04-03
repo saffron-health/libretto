@@ -38,7 +38,7 @@ Available in exec:
   page, context, state, browser, networkLog, actionLog
 
 Available in readonly-exec:
-  page, state, snapshot, get
+  page, state, snapshot, scrollBy, get
 
 Profiles:
   Profiles are saved to .libretto/profiles/<domain>.json (git-ignored)
