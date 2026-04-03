@@ -12,8 +12,7 @@
     "access": "public"
   },
   "bin": {
-    "create-libretto": "./index.mjs",
-    "@libretto/create": "./index.mjs"
+    "create-libretto": "./index.mjs"
   },
   "files": [
     "index.mjs"
