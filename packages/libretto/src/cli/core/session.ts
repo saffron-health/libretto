@@ -121,6 +121,10 @@ export function listRunningSessions(): SessionState[] {
   for (const name of sessions) {
     const state = readSessionState(name);
     if (!state) continue;
+    if (state.provider) {
+      running.push(state);
+      continue;
+    }
     if (state.pid == null || !isPidRunning(state.pid)) continue;
     running.push(state);
   }
