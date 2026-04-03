@@ -1,5 +1,5 @@
 {
-  "name": "create-libretto",
+  "name": "@libretto/create",
   "version": "0.5.4",
   "description": "Create and set up a Libretto project",
   "license": "MIT",
@@ -12,7 +12,8 @@
     "access": "public"
   },
   "bin": {
-    "create-libretto": "./index.mjs"
+    "create-libretto": "./index.mjs",
+    "@libretto/create": "./index.mjs"
   },
   "files": [
     "index.mjs"
