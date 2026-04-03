@@ -57,7 +57,9 @@ function printOpenSessions(sessions: SessionState[]): void {
 
   for (const session of sessions) {
     const statusLabel = session.status ? ` [${session.status}]` : "";
-    const endpoint = `http://127.0.0.1:${session.port}`;
+    const endpoint = session.provider
+      ? `${session.provider.name} (${session.cdpEndpoint})`
+      : `http://127.0.0.1:${session.port}`;
     console.log(`  ${session.session}${statusLabel} — ${endpoint}`);
   }
 }

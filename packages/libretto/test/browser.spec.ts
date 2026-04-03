@@ -38,7 +38,7 @@ describe("browser URL normalization", () => {
 });
 
 describe("resolveProviderName precedence", () => {
-  const originalEnv = process.env;
+  const originalEnv = { ...process.env };
 
   afterEach(() => {
     process.env = { ...originalEnv };
