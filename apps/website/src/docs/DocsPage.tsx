@@ -497,6 +497,16 @@ export function DocsPage({ pathname }: { pathname?: string }) {
     parsedDocsGroups.find((group) => {
       return group.id === currentGroup?.id;
     }) ?? parsedDocsGroups[0];
+
+  if (!parsedCurrentGroup) {
+    return (
+      <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
+        <p>Docs have moved.</p>
+        <a href="https://libretto.mintlify.app">View the Libretto docs →</a>
+      </div>
+    );
+  }
+
   const currentGroupHeadingIds = headingIdsByGroup.get(parsedCurrentGroup.id);
 
   if (!currentGroupHeadingIds) {
