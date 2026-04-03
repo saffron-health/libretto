@@ -14,6 +14,7 @@ import { parseViewportArg } from "./browser.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
   assertSessionAvailableForStart,
+  assertSessionAllowsCommand,
   clearSessionState,
   readSessionState,
   setSessionStatus,
@@ -25,6 +26,7 @@ import {
   readNetworkLog,
   wrapPageForActionLogging,
 } from "../core/telemetry.js";
+import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
 import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
@@ -38,6 +40,7 @@ type ExecFunction = (...args: unknown[]) => Promise<unknown>;
 type RunIntegrationCommandRequest = RunIntegrationWorkerRequest & {
   tsconfigPath?: string;
 };
+type ExecMode = "exec" | "readonly-exec";
 
 type StripTypeScriptTypesFn = (
   code: string,
@@ -203,14 +206,20 @@ async function runExec(
   code: string,
   session: string,
   logger: LoggerApi,
-  visualize = false,
-  pageId?: string,
+  options: {
+    visualize?: boolean;
+    pageId?: string;
+    mode?: ExecMode;
+  } = {},
 ): Promise<void> {
+  const visualize = options.visualize ?? false;
+  const pageId = options.pageId;
+  const mode = options.mode ?? "exec";
   const { cleaned: cleanedCode, strippedCount } = stripEmptyCatchHandlers(code);
   if (strippedCount > 0) {
     console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
   }
-  logger.info("exec-start", {
+  logger.info(`${mode}-start`, {
     session,
     codeLength: cleanedCode.length,
     codePreview: cleanedCode.slice(0, 200),
@@ -236,20 +245,20 @@ async function runExec(
   const stallInterval = setInterval(() => {
     const silenceMs = Date.now() - lastActivityTs;
     if (silenceMs >= STALL_THRESHOLD_MS) {
-      logger.warn("exec-stall-warning", {
+      logger.warn(`${mode}-stall-warning`, {
         session,
         silenceMs,
         codePreview: cleanedCode.slice(0, 200),
       });
       console.warn(
-        `[stall-warning] No Playwright activity for ${Math.round(silenceMs / 1000)}s — exec may be hung (code: ${cleanedCode.slice(0, 100)}...)`,
+        `[stall-warning] No Playwright activity for ${Math.round(silenceMs / 1000)}s — ${mode} may be hung (code: ${cleanedCode.slice(0, 100)}...)`,
       );
     }
   }, STALL_THRESHOLD_MS);
 
   const execStartTs = Date.now();
   const sigintHandler = () => {
-    logger.info("exec-interrupted", {
+    logger.info(`${mode}-interrupted`, {
       session,
       duration: Date.now() - execStartTs,
       codePreview: cleanedCode.slice(0, 200),
@@ -257,60 +266,67 @@ async function runExec(
   };
   process.on("SIGINT", sigintHandler);
 
-  wrapPageForActionLogging(page, session, resolvedPageId, onActivity);
+  if (mode === "exec") {
+    wrapPageForActionLogging(page, session, resolvedPageId, onActivity);
+  }
 
-  if (visualize) {
+  if (visualize && mode === "exec") {
     await installInstrumentation(page, { visualize: true, logger });
   }
 
   try {
-    const execState: Record<string, unknown> = {};
+    const helpers =
+      mode === "readonly-exec"
+        ? createReadonlyExecHelpers(page, { onActivity })
+        : (() => {
+            const execState: Record<string, unknown> = {};
 
-    const networkLog = (
-      opts: {
-        last?: number;
-        filter?: string;
-        method?: string;
-        pageId?: string;
-      } = {},
-    ) => {
-      return readNetworkLog(session, opts);
-    };
+            const networkLog = (
+              opts: {
+                last?: number;
+                filter?: string;
+                method?: string;
+                pageId?: string;
+              } = {},
+            ) => {
+              return readNetworkLog(session, opts);
+            };
 
-    const actionLog = (
-      opts: {
-        last?: number;
-        filter?: string;
-        action?: string;
-        source?: string;
-        pageId?: string;
-      } = {},
-    ) => {
-      return readActionLog(session, opts);
-    };
+            const actionLog = (
+              opts: {
+                last?: number;
+                filter?: string;
+                action?: string;
+                source?: string;
+                pageId?: string;
+              } = {},
+            ) => {
+              return readActionLog(session, opts);
+            };
 
-    const helpers = {
-      page,
-      context,
-      state: execState,
-      browser,
-      networkLog,
-      actionLog,
-      console,
-      setTimeout,
-      setInterval,
-      clearTimeout,
-      clearInterval,
-      fetch,
-      URL,
-      Buffer,
-    };
+            return {
+              page,
+              context,
+              state: execState,
+              browser,
+              networkLog,
+              actionLog,
+              console,
+              setTimeout,
+              setInterval,
+              clearTimeout,
+              clearInterval,
+              fetch,
+              URL,
+              Buffer,
+            };
+          })();
 
     const helperNames = Object.keys(helpers);
     const fn = compileExecFunction(cleanedCode, helperNames);
 
     const result = await fn(...Object.values(helpers));
-    logger.info("exec-success", { session, hasResult: result !== undefined });
+    logger.info(`${mode}-success`, { session, hasResult: result !== undefined });
     if (result !== undefined) {
       console.log(
         typeof result === "string" ? result : JSON.stringify(result, null, 2),
@@ -319,7 +335,7 @@ async function runExec(
       console.log("Executed successfully");
     }
   } catch (err) {
-    logger.error("exec-error", {
+    logger.error(`${mode}-error`, {
       error: err,
       session,
       codePreview: cleanedCode.slice(0, 200),
@@ -606,13 +622,13 @@ async function runIntegrationFromFile(
   );
   const payload = JSON.stringify({
     integrationPath: args.integrationPath,
-    workflowName: args.workflowName,
     session: args.session,
     params: args.params,
     headless: args.headless,
     visualize: args.visualize,
     authProfileDomain: args.authProfileDomain,
     viewport: args.viewport,
+    accessMode: args.accessMode,
   } satisfies RunIntegrationWorkerRequest);
   const worker = spawn(
     process.execPath,
@@ -691,6 +707,7 @@ export const execCommand = SimpleCLI.command({
   .input(execInput)
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
+    assertSessionAllowsCommand(ctx.sessionState, "exec", ["write-access"]);
     const code = input.code!;
     const codeFromArgsOrStdin = code === "-" ? readStdinSync() : code;
     if (codeFromArgsOrStdin === null) {
@@ -702,20 +719,54 @@ export const execCommand = SimpleCLI.command({
       codeFromArgsOrStdin,
       ctx.session,
       ctx.logger,
-      input.visualize,
-      input.page,
+      {
+        visualize: input.visualize,
+        pageId: input.page,
+        mode: "exec",
+      },
     );
   });
 
-const runUsage = `Usage: libretto run <integrationFile> <workflowName> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--no-visualize] [--viewport WxH]`;
+export const readonlyExecInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("code", z.string().optional(), {
+      help: "Read-only Playwright TypeScript code to execute",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+    page: pageOption(),
+  },
+}).refine(
+  (input) => input.code !== undefined,
+  `Usage: libretto readonly-exec <code|-> [--session <name>] [--page <id>]\n       echo '<code>' | libretto readonly-exec - [--session <name>] [--page <id>]`,
+);
+
+export const readonlyExecCommand = SimpleCLI.command({
+  description: "Execute read-only Playwright inspection code",
+})
+  .input(readonlyExecInput)
+  .use(withRequiredSession())
+  .handle(async ({ input, ctx }) => {
+    const code = input.code!;
+    const codeFromArgsOrStdin = code === "-" ? readStdinSync() : code;
+    if (codeFromArgsOrStdin === null) {
+      throw new Error(
+        "Missing stdin input for `readonly-exec -`. Pipe inspection code into stdin.",
+      );
+    }
+    await runExec(codeFromArgsOrStdin, ctx.session, ctx.logger, {
+      pageId: input.page,
+      mode: "readonly-exec",
+    });
+  });
+
+const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only] [--no-visualize] [--viewport WxH]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
     SimpleCLI.positional("integrationFile", z.string().optional(), {
       help: "Path to the integration file",
-    }),
-    SimpleCLI.positional("workflowName", z.string().optional(), {
-      help: "Workflow name to run (from workflow(name, handler))",
     }),
   ],
   named: {
@@ -732,6 +783,10 @@ export const runInput = SimpleCLI.input({
     }),
     headed: SimpleCLI.flag({ help: "Run in headed mode" }),
     headless: SimpleCLI.flag({ help: "Run in headless mode" }),
+    readOnly: SimpleCLI.flag({
+      name: "read-only",
+      help: "Create the session in read-only mode",
+    }),
     noVisualize: SimpleCLI.flag({
       name: "no-visualize",
       help: "Disable ghost cursor + highlight visualization in headed mode",
@@ -746,7 +801,7 @@ export const runInput = SimpleCLI.input({
   },
 })
   .refine(
-    (input) => Boolean(input.integrationFile && input.workflowName),
+    (input) => Boolean(input.integrationFile),
     runUsage,
   )
   .refine(
@@ -780,7 +835,7 @@ function resolveRunParams(
 }
 
 export const runCommand = SimpleCLI.command({
-  description: "Run an exported Libretto workflow from a file",
+  description: "Run the default-exported Libretto workflow from a file",
 })
   .input(runInput)
   .use(withAutoSession())
@@ -804,7 +859,6 @@ export const runCommand = SimpleCLI.command({
     await runIntegrationFromFile(
       {
         integrationPath: input.integrationFile!,
-        workflowName: input.workflowName!,
         session: ctx.session,
         params,
         tsconfigPath: input.tsconfig,
@@ -812,6 +866,7 @@ export const runCommand = SimpleCLI.command({
         visualize,
         authProfileDomain: input.authProfile,
         viewport,
+        accessMode: input.readOnly ? "read-only" : "write-access",
       },
       ctx.logger,
     );
@@ -835,6 +890,7 @@ export const resumeCommand = SimpleCLI.command({
 
 export const executionCommands = {
   exec: execCommand,
+  "readonly-exec": readonlyExecCommand,
   run: runCommand,
   resume: resumeCommand,
 };

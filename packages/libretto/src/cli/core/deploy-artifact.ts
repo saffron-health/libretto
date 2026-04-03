@@ -10,11 +10,17 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire, Module } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
+import {
+  getWorkflowFromModuleExports,
+  getWorkflowsFromModuleExports,
+  LIBRETTO_WORKFLOW_BRAND,
+} from "../../shared/workflow/workflow.js";
 
 type PackageManifest = {
   name?: string;
@@ -81,6 +87,7 @@ const CURRENT_LIBRETTO_VERSION = readCurrentLibrettoVersion();
 const CURRENT_LIBRETTO_PACKAGE_DIR = fileURLToPath(
   new URL("../../..", import.meta.url),
 );
+const require = createRequire(import.meta.url);
 
 function readCurrentLibrettoVersion(): string {
   const packageJsonPath = fileURLToPath(
@@ -654,46 +661,141 @@ function formatBuildError(error: unknown): string {
     .join("\n");
 }
 
-function extractExportNamesFromEsmBundle(bundleSource: string): string[] {
-  const exportNames = new Set<string>();
+function getGeneratedWorkflowExportName(index: number): string {
+  return `workflow_${index}`;
+}
 
-  for (const entry of bundleSource.matchAll(
-    /export\s+(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)/g,
-  )) {
-    exportNames.add(entry[1]!);
+function getPackageNameFromImportPath(importPath: string): string {
+  if (importPath.startsWith("@")) {
+    return importPath.split("/").slice(0, 2).join("/");
+  }
+  return importPath.split("/")[0] ?? importPath;
+}
+
+function createExternalDiscoveryStub(): object {
+  const stub = (() => createExternalDiscoveryStub()) as unknown as ((
+    ...args: unknown[]
+  ) => object) &
+    Record<PropertyKey, unknown>;
+
+  return new Proxy(stub, {
+    apply: () => createExternalDiscoveryStub(),
+    construct: () => createExternalDiscoveryStub(),
+    get: (_target, property) => {
+      if (property === "__esModule") {
+        return true;
+      }
+      if (property === "default") {
+        return createExternalDiscoveryStub();
+      }
+      if (property === Symbol.toPrimitive) {
+        return () => "";
+      }
+      return createExternalDiscoveryStub();
+    },
+  });
+}
+
+function createDiscoveryLibrettoModule(workflowNames: Set<string>): object {
+  const moduleShape: Record<PropertyKey, unknown> = {
+    LIBRETTO_WORKFLOW_BRAND,
+    workflow: (name: string) => {
+      workflowNames.add(name);
+      return {
+        [LIBRETTO_WORKFLOW_BRAND]: true,
+        name,
+        async run() {
+          return undefined;
+        },
+      };
+    },
+  };
+
+  return new Proxy(moduleShape, {
+    get(target, property) {
+      if (property in target) {
+        return target[property];
+      }
+      if (property === "__esModule") {
+        return true;
+      }
+      return createExternalDiscoveryStub();
+    },
+  });
+}
+
+function discoverBundledWorkflowNames(args: {
+  absEntryPoint: string;
+  absSourceDir: string;
+  bundleBuffer: Buffer;
+  externalPackages: ReadonlySet<string>;
+}): string[] {
+  const discoveryPath = join(
+    args.absSourceDir,
+    `.libretto-deploy-discovery-${process.pid}-${Date.now()}.cjs`,
+  );
+  const originalRequire = Module.prototype.require;
+  const workflowNames = new Set<string>();
+  const discoveryLibrettoModule = createDiscoveryLibrettoModule(workflowNames);
+  let loadedModuleExports: Record<string, unknown> | null = null;
+
+  try {
+    writeFileSync(discoveryPath, args.bundleBuffer);
+    Module.prototype.require = function patchedRequire(id: string) {
+      const packageName = getPackageNameFromImportPath(id);
+      if (packageName === "libretto") {
+        return discoveryLibrettoModule;
+      }
+      if (packageName !== "libretto" && args.externalPackages.has(packageName)) {
+        return createExternalDiscoveryStub();
+      }
+      return originalRequire.call(this, id);
+    };
+    loadedModuleExports = require(discoveryPath) as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(
+      `Failed to evaluate deploy entry point ${args.absEntryPoint} while discovering workflows.\n${formatBuildError(error)}`,
+    );
+  } finally {
+    Module.prototype.require = originalRequire;
+    delete (require.cache as Record<string, unknown> | undefined)?.[
+      discoveryPath
+    ];
+    rmSync(discoveryPath, { force: true });
   }
 
-  for (const entry of bundleSource.matchAll(/export\s+\{([^}]+)\};/g)) {
-    const specifiers = entry[1]?.split(",") ?? [];
-    for (const specifier of specifiers) {
-      const trimmed = specifier.trim();
-      if (!trimmed) {
-        continue;
-      }
-      const aliasMatch = trimmed.match(
-        /^([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*|default)$/,
-      );
-      if (aliasMatch?.[2]) {
-        exportNames.add(aliasMatch[2]);
-        continue;
-      }
-      if (/^[A-Za-z_$][\w$]*$/.test(trimmed)) {
-        exportNames.add(trimmed);
-      }
-    }
+  const discoveredWorkflowNames = [...workflowNames].sort((left, right) =>
+    left.localeCompare(right),
+  );
+
+  if (discoveredWorkflowNames.length === 0) {
+    throw new Error(
+      `No workflows were found in ${args.absEntryPoint}. Import the workflow files you want to deploy from the entry point, or export a workflow directly from it.`,
+    );
   }
 
-  if (/\bexport\s+default\b/m.test(bundleSource)) {
-    exportNames.add("default");
+  const exportedWorkflowNames = new Set(
+    getWorkflowsFromModuleExports(loadedModuleExports ?? {}).map(
+      (workflow) => workflow.name,
+    ),
+  );
+  const nonExportedWorkflowNames = discoveredWorkflowNames.filter(
+    (name) => !exportedWorkflowNames.has(name),
+  );
+
+  if (nonExportedWorkflowNames.length > 0) {
+    throw new Error(
+      `Workflows discovered in ${args.absEntryPoint} must be exported from the deploy entry point. Re-export them from the entry point or export them through a \`workflows\` object. Non-exported workflows: ${nonExportedWorkflowNames.join(", ")}`,
+    );
   }
 
-  return [...exportNames];
+  return discoveredWorkflowNames;
 }
 
 function createBootstrapSource(args: {
   bundleBuffer: Buffer;
   deploymentName: string;
-  exportNames: readonly string[];
+  workflowNames: readonly string[];
 }): string {
   const bundleHash = createHash("sha256")
     .update(args.bundleBuffer)
@@ -703,17 +805,12 @@ function createBootstrapSource(args: {
     "base64",
   );
   const outputPrefix = `${normalizePackageName(args.deploymentName)}-`;
-  const hasDefaultExport = args.exportNames.includes("default");
-  const exportLines = args.exportNames
-    .filter((name) => name !== "default")
+  const exportLines = args.workflowNames
     .map(
-      (name) =>
-        `export const ${name} = createWorkflowProxy(${JSON.stringify(name)});`,
+      (name, index) =>
+        `export const ${getGeneratedWorkflowExportName(index)} = createWorkflowProxy(${JSON.stringify(name)});`,
     )
     .join("\n");
-  const defaultExportLine = hasDefaultExport
-    ? 'export default createWorkflowProxy("default");'
-    : "";
 
   // The deploy entrypoint is tiny on purpose. Hosted build imports this module
   // to discover workflow exports. The implementation bundle stays embedded in
@@ -724,7 +821,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { workflow } from "libretto";
+import { getWorkflowFromModuleExports, workflow } from "libretto";
 
 const BUNDLE_HASH = ${JSON.stringify(bundleHash)};
 const BUNDLE_GZIP_BASE64 = ${JSON.stringify(bundleBase64)};
@@ -747,13 +844,13 @@ function ensureBundleFile() {
   return BUNDLE_FILENAME;
 }
 
-function createWorkflowProxy(exportName) {
-  return workflow(exportName, async (ctx, input) => {
+function createWorkflowProxy(workflowName) {
+  return workflow(workflowName, async (ctx, input) => {
     const impl = nativeRequire(ensureBundleFile());
-    const target = impl[exportName];
+    const target = getWorkflowFromModuleExports(impl, workflowName);
     if (!target || typeof target.run !== "function") {
       throw new Error(
-        \`Expected workflow export "\${exportName}" to be available in the bundled deployment implementation.\`,
+        \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
       );
     }
     return await target.run(ctx, input);
@@ -761,7 +858,6 @@ function createWorkflowProxy(exportName) {
 }
 
 ${exportLines}
-${defaultExportLine}
 `;
 }
 
@@ -802,45 +898,19 @@ async function writeBundledDeployEntrypoint(args: {
       );
     }
 
-    // A separate ESM bundle is used only to read the entry module's exported
-    // workflow names. Scanning the CommonJS bundle would also see exports from
-    // bundled dependencies, which is not the deploy surface.
-    const exportBuild = await build({
-      absWorkingDir: args.absSourceDir,
-      bundle: true,
-      entryPoints: [args.absEntryPoint],
-      external: [...args.externalPackages],
-      format: "esm",
-      outfile: "entry-exports.js",
-      platform: "node",
-      plugins: [
-        workspaceSourcePlugin(args.workspacePackages, args.externalPackages),
-      ],
-      splitting: false,
-      target: "node20",
-      write: false,
+    const workflowNames = discoverBundledWorkflowNames({
+      absEntryPoint: args.absEntryPoint,
+      absSourceDir: args.absSourceDir,
+      bundleBuffer: Buffer.from(bundledImplementation.contents),
+      externalPackages: args.externalPackages,
     });
-
-    const bundledExports = exportBuild.outputFiles?.find((file) =>
-      file.path.endsWith("entry-exports.js"),
-    );
-    if (!bundledExports) {
-      throw new Error("Bundler did not produce an export analysis file.");
-    }
-
-    const exportNames = extractExportNamesFromEsmBundle(bundledExports.text);
-    if (exportNames.length === 0) {
-      throw new Error(
-        `No named exports were found in ${args.absEntryPoint}. Hosted deploy expects the entry point to export one or more workflows.`,
-      );
-    }
 
     writeFileSync(
       join(args.outputDir, "index.js"),
       createBootstrapSource({
         bundleBuffer: Buffer.from(bundledImplementation.contents),
         deploymentName: args.deploymentName,
-        exportNames,
+        workflowNames,
       }),
     );
   } catch (error) {

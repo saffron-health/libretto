@@ -61,24 +61,79 @@ describe("multi-session CLI behavior", () => {
     const integrationFilePath = await writeWorkflow(
       "integration-auto-session.mjs",
       `
-export const main = workflow("main", async () => {
+export default workflow("main", async () => {
   console.log("AUTO_SESSION_RUN_OK");
 });
 `,
     );
 
-    const firstRun = await librettoCli(
-      `run "${integrationFilePath}" main --headless`,
-    );
+    const firstRun = await librettoCli(`run "${integrationFilePath}" --headless`);
     expect(firstRun.stdout).toContain("AUTO_SESSION_RUN_OK");
     expect(firstRun.stdout).toContain("Integration completed.");
 
     const secondRun = await librettoCli(
-      `run "${integrationFilePath}" main --headless`,
+      `run "${integrationFilePath}" --headless`,
     );
     expect(secondRun.stdout).toContain("AUTO_SESSION_RUN_OK");
     expect(secondRun.stdout).toContain("Integration completed.");
     expect(secondRun.stderr).not.toContain("is already open and connected to");
+  }, 90_000);
+
+  test("run creates a fresh write-access session even if another session is read-only", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const unrelatedSession = "unrelated-readonly-session";
+    await librettoCli(
+      `open https://example.com --headless --read-only --session ${unrelatedSession}`,
+    );
+
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-write-access.mjs",
+      `
+export default workflow("main", async () => {
+  console.log("RUN_MODE_OK");
+});
+`,
+    );
+
+    const runSession = "run-write-access-session";
+    const runResult = await librettoCli(
+      `run "${integrationFilePath}" --session ${runSession} --headless`,
+    );
+    expect(runResult.stdout).toContain("RUN_MODE_OK");
+    expect(runResult.stdout).toContain("Integration completed.");
+
+    const runMode = await librettoCli(
+      `session-mode --session ${runSession}`,
+    );
+    expect(runMode.stdout).toContain(
+      `Session "${runSession}" mode: write-access`,
+    );
+  }, 90_000);
+
+  test("run supports --read-only for the created session", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-readonly.mjs",
+      `
+export default workflow("main", async () => {
+  console.log("RUN_READONLY_OK");
+});
+`,
+    );
+
+    const session = "run-readonly-session";
+    const runResult = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --read-only`,
+    );
+    expect(runResult.stdout).toContain("RUN_READONLY_OK");
+    expect(runResult.stdout).toContain("Integration completed.");
+
+    const mode = await librettoCli(`session-mode --session ${session}`);
+    expect(mode.stdout).toContain(`Session "${session}" mode: read-only`);
   }, 90_000);
 
   test("exec without --session shows missing session error", async ({

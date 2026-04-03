@@ -19,7 +19,7 @@ Use this reference only when the user explicitly asks to save or reuse local aut
 ```bash
 npx libretto open https://app.example.com --headed
 npx libretto save app.example.com
-npx libretto run ./integration.ts main --auth-profile app.example.com
+npx libretto run ./integration.ts --auth-profile app.example.com
 ```
 
 ## Notes

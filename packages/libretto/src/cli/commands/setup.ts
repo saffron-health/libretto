@@ -394,13 +394,13 @@ function installBrowsers(): void {
   }
 }
 
-function getPackageSkillsDir(): string {
+function getPackageSkillsRoot(): string {
   const thisFile = fileURLToPath(import.meta.url);
   // Walk up from dist/cli/commands/ to package root
   let dir = dirname(thisFile);
   while (dir !== dirname(dir)) {
     if (existsSync(join(dir, "skills", "libretto"))) {
-      return join(dir, "skills", "libretto");
+      return join(dir, "skills");
     }
     dir = dirname(dir);
   }
@@ -427,28 +427,34 @@ function copySkills(): void {
     return;
   }
 
-  const destinations = agentDirs.map((d) => join(d, "skills", "libretto"));
-
-  let sourceDir: string;
+  let skillsRoot: string;
   try {
-    sourceDir = getPackageSkillsDir();
+    skillsRoot = getPackageSkillsRoot();
   } catch (e) {
     console.error(`  ✗ ${e instanceof Error ? e.message : String(e)}`);
     return;
   }
 
-  for (let i = 0; i < agentDirs.length; i++) {
-    const skillDest = destinations[i];
-    const name = basename(agentDirs[i]);
-    // Remove existing dir first so stale files from prior versions don't persist
-    if (existsSync(skillDest)) {
-      rmSync(skillDest, { recursive: true });
+  const skillNames = readdirSync(skillsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+
+  for (const agentDir of agentDirs) {
+    const agentName = basename(agentDir);
+
+    for (const skillName of skillNames) {
+      const sourceDir = join(skillsRoot, skillName);
+      const skillDest = join(agentDir, "skills", skillName);
+      if (existsSync(skillDest)) {
+        rmSync(skillDest, { recursive: true });
+      }
+      cpSync(sourceDir, skillDest, { recursive: true });
+      const fileCount = readdirSync(skillDest).length;
+      console.log(
+        `  ✓ Copied ${fileCount} skill files to ${agentName}/skills/${skillName}/`,
+      );
     }
-    cpSync(sourceDir, skillDest, { recursive: true });
-    const fileCount = readdirSync(skillDest).length;
-    console.log(
-      `  ✓ Copied ${fileCount} skill files to ${name}/skills/libretto/`,
-    );
   }
 }
 

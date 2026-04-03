@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { SKILL_DIRS } from "../../libretto/scripts/skills-libretto.mjs";
+import { SKILL_MIRRORS } from "../../libretto/scripts/skills-libretto.mjs";
 
 const README_TEMPLATE_PATH = "packages/libretto/README.template.md";
 const README_GENERATED_HEADER =
@@ -19,7 +19,6 @@ const README_GENERATED_HEADER =
 const PACKAGE_JSON_PATH = "packages/libretto/package.json";
 const CREATE_LIBRETTO_PACKAGE_JSON_PATH =
   "packages/create-libretto/package.json";
-const SKILL_SOURCE_PATH = "packages/libretto/skills/libretto/SKILL.md";
 
 /**
  * @typedef {{
@@ -48,12 +47,12 @@ const SKILL_SOURCE_PATH = "packages/libretto/skills/libretto/SKILL.md";
 
 /** @type {(DirectoryMirror | FileMirror)[]} */
 export const MIRRORS = [
-  {
-    name: "skills",
+  ...SKILL_MIRRORS.map((skillMirror) => ({
+    name: `skill:${skillMirror.name}`,
     kind: "directory",
-    source: SKILL_DIRS[0],
-    targets: SKILL_DIRS.slice(1),
-  },
+    source: skillMirror.source,
+    targets: skillMirror.targets,
+  })),
   {
     name: "readmes",
     kind: "file",
@@ -183,7 +182,7 @@ export function getLibrettoSkillVersion(skillSource) {
 export function updateLibrettoSkillVersion(skillSource, version) {
   const frontmatter = getFrontmatterBlock(skillSource);
   if (!frontmatter) {
-    throw new Error(`missing frontmatter in ${SKILL_SOURCE_PATH}`);
+    throw new Error(`missing frontmatter in Libretto skill source`);
   }
 
   const updatedFrontmatterBody = updateFrontmatterBody(
@@ -196,20 +195,24 @@ export function updateLibrettoSkillVersion(skillSource, version) {
   );
 
   if (!updatedFrontmatterBody) {
-    throw new Error(`could not find metadata.version in ${SKILL_SOURCE_PATH}`);
+    throw new Error(
+      `could not find metadata.version in Libretto skill source`,
+    );
   }
 
   return `${skillSource.slice(0, frontmatter.start)}---\n${updatedFrontmatterBody}\n---${skillSource.slice(frontmatter.start + frontmatter.fullMatch.length)}`;
 }
 
 export function setLibrettoSkillVersion(repoRoot, version) {
-  const skillPath = resolve(repoRoot, SKILL_SOURCE_PATH);
-  const currentContent = readFileSync(skillPath, "utf8");
-  writeFileSync(
-    skillPath,
-    updateLibrettoSkillVersion(currentContent, version),
-    "utf8",
-  );
+  for (const skillMirror of SKILL_MIRRORS) {
+    const skillPath = resolve(repoRoot, `${skillMirror.source}/SKILL.md`);
+    const currentContent = readFileSync(skillPath, "utf8");
+    writeFileSync(
+      skillPath,
+      updateLibrettoSkillVersion(currentContent, version),
+      "utf8",
+    );
+  }
 }
 
 function syncDirectoryMirror(sourceDir, destDir) {
@@ -295,18 +298,18 @@ function getSkillVersionIssue(repoRoot) {
   const packageJson = JSON.parse(
     readFileSync(resolve(repoRoot, PACKAGE_JSON_PATH), "utf8"),
   );
-  const skillSource = readFileSync(
-    resolve(repoRoot, SKILL_SOURCE_PATH),
-    "utf8",
-  );
-  const skillVersion = getLibrettoSkillVersion(skillSource);
+  for (const skillMirror of SKILL_MIRRORS) {
+    const skillPath = `${skillMirror.source}/SKILL.md`;
+    const skillSource = readFileSync(resolve(repoRoot, skillPath), "utf8");
+    const skillVersion = getLibrettoSkillVersion(skillSource);
 
-  if (!skillVersion) {
-    return `validation: could not find metadata.version in ${SKILL_SOURCE_PATH}`;
-  }
+    if (!skillVersion) {
+      return `validation: could not find metadata.version in ${skillPath}`;
+    }
 
-  if (skillVersion !== packageJson.version) {
-    return `validation: ${SKILL_SOURCE_PATH} metadata.version (${skillVersion}) must match ${PACKAGE_JSON_PATH} version (${packageJson.version})`;
+    if (skillVersion !== packageJson.version) {
+      return `validation: ${skillPath} metadata.version (${skillVersion}) must match ${PACKAGE_JSON_PATH} version (${packageJson.version})`;
+    }
   }
 
   return null;
