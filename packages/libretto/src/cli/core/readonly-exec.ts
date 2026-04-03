@@ -13,6 +13,14 @@ const PAGE_LOCATOR_FACTORY_METHODS = new Set([
   "getByTestId",
 ]);
 
+const PAGE_DENIED_PROPERTIES = new Set([
+  "keyboard",
+  "mouse",
+  "touchscreen",
+  "request",
+  "coverage",
+]);
+
 const LOCATOR_READ_METHODS = new Set([
   "textContent",
   "innerText",
@@ -127,6 +135,10 @@ export function wrapPageForReadonlyExec(
     get(target, prop, receiver) {
       if (typeof prop !== "string") {
         return Reflect.get(target, prop, receiver);
+      }
+
+      if (PAGE_DENIED_PROPERTIES.has(prop)) {
+        return denyOperation("page", prop);
       }
 
       const value = Reflect.get(target, prop, target);

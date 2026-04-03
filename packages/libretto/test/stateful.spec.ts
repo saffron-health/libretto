@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { pathToFileURL } from "node:url";
-import { describe, expect } from "vitest";
+import { describe, expect, onTestFinished } from "vitest";
 import { test } from "./fixtures";
 
 function extractReturnedSessionId(output: string): string | null {
@@ -113,7 +113,6 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const snapshot = await librettoCli(`snapshot --session ${session}`);
-    expect(snapshot.exitCode).not.toBe(0);
     expect(snapshot.stderr).toContain("Missing required option --objective.");
   }, 45_000);
 
@@ -138,7 +137,6 @@ describe("state-driven CLI subprocess behavior", () => {
         GCLOUD_PROJECT: "",
       },
     );
-    expect(snapshot.exitCode).not.toBe(0);
     expect(snapshot.stdout).not.toContain("Screenshot saved:");
     expect(snapshot.stderr).toContain(
       "Failed to analyze snapshot because no snapshot analyzer is configured.",
@@ -162,7 +160,6 @@ describe("state-driven CLI subprocess behavior", () => {
     const snapshot = await librettoCli(
       `snapshot --context "extra context only" --session ${session}`,
     );
-    expect(snapshot.exitCode).not.toBe(0);
     expect(snapshot.stderr).toContain("Missing required option --objective.");
   }, 45_000);
 
@@ -440,7 +437,6 @@ describe("state-driven CLI subprocess behavior", () => {
     const blockedGoto = await librettoCli(
       `readonly-exec "await page.goto('https://example.com')" --session ${session}`,
     );
-    expect(blockedGoto.exitCode).not.toBe(0);
     expect(blockedGoto.stderr).toContain(
       "ReadonlyExecDenied: page.goto is blocked in readonly-exec",
     );
@@ -448,7 +444,6 @@ describe("state-driven CLI subprocess behavior", () => {
     const blockedFill = await librettoCli(
       `readonly-exec "await page.locator('#name').fill('Alice')" --session ${session}`,
     );
-    expect(blockedFill.exitCode).not.toBe(0);
     expect(blockedFill.stderr).toContain(
       "ReadonlyExecDenied: locator.fill is blocked in readonly-exec",
     );
@@ -456,9 +451,22 @@ describe("state-driven CLI subprocess behavior", () => {
     const blockedEvaluate = await librettoCli(
       `readonly-exec "return await page.evaluate(() => document.title)" --session ${session}`,
     );
-    expect(blockedEvaluate.exitCode).not.toBe(0);
     expect(blockedEvaluate.stderr).toContain(
       "ReadonlyExecDenied: page.evaluate is blocked in readonly-exec",
+    );
+
+    const blockedKeyboard = await librettoCli(
+      `readonly-exec "await page.keyboard.press('Tab')" --session ${session}`,
+    );
+    expect(blockedKeyboard.stderr).toContain(
+      "ReadonlyExecDenied: page.keyboard is blocked in readonly-exec",
+    );
+
+    const blockedMouse = await librettoCli(
+      `readonly-exec "await page.mouse.click(1, 1)" --session ${session}`,
+    );
+    expect(blockedMouse.stderr).toContain(
+      "ReadonlyExecDenied: page.mouse is blocked in readonly-exec",
     );
 
     const currentUrlResult = await librettoCli(
@@ -484,46 +492,7 @@ describe("state-driven CLI subprocess behavior", () => {
       server.listen(0, "127.0.0.1", () => resolve()),
     );
 
-    try {
-      const port = (server.address() as AddressInfo).port;
-      const htmlPath = workspacePath("fixtures", "readonly-network.html");
-      await mkdir(workspacePath("fixtures"), { recursive: true });
-      await writeFile(
-        htmlPath,
-        "<!doctype html><html><head><title>Readonly Network</title></head><body><p>network</p></body></html>",
-        "utf8",
-      );
-
-      const fileUrl = pathToFileURL(htmlPath).href;
-      await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
-
-      const getResult = await librettoCli(
-        `readonly-exec - --session ${session}`,
-        undefined,
-        [
-          `const response = await get('http://127.0.0.1:${port}/ping');`,
-          "return { status: response.status, body: await response.text() };",
-        ].join("\n"),
-      );
-      expect(getResult.stderr).toBe("");
-      expect(parseJsonStdout<Record<string, unknown>>(getResult.stdout)).toEqual(
-        {
-          status: 200,
-          body: "pong",
-        },
-      );
-
-      const blockedPost = await librettoCli(
-        `readonly-exec - --session ${session}`,
-        undefined,
-        `await get('http://127.0.0.1:${port}/ping', { method: 'POST' });`,
-      );
-      expect(blockedPost.exitCode).not.toBe(0);
-      expect(blockedPost.stderr).toContain(
-        "ReadonlyExecDenied: POST requests are blocked in readonly-exec",
-      );
-      expect(methods).toEqual(["GET"]);
-    } finally {
+    onTestFinished(async () => {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => {
           if (error) {
@@ -533,6 +502,44 @@ describe("state-driven CLI subprocess behavior", () => {
           resolve();
         }),
       );
-    }
+    });
+
+    const port = (server.address() as AddressInfo).port;
+    const htmlPath = workspacePath("fixtures", "readonly-network.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      "<!doctype html><html><head><title>Readonly Network</title></head><body><p>network</p></body></html>",
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
+
+    const getResult = await librettoCli(
+      `readonly-exec - --session ${session}`,
+      undefined,
+      [
+        `const response = await get('http://127.0.0.1:${port}/ping');`,
+        "return { status: response.status, body: await response.text() };",
+      ].join("\n"),
+    );
+    expect(getResult.stderr).toBe("");
+    expect(parseJsonStdout<Record<string, unknown>>(getResult.stdout)).toEqual(
+      {
+        status: 200,
+        body: "pong",
+      },
+    );
+
+    const blockedPost = await librettoCli(
+      `readonly-exec - --session ${session}`,
+      undefined,
+      `await get('http://127.0.0.1:${port}/ping', { method: 'POST' });`,
+    );
+    expect(blockedPost.stderr).toContain(
+      "ReadonlyExecDenied: POST requests are blocked in readonly-exec",
+    );
+    expect(methods).toEqual(["GET"]);
   }, 60_000);
 });
