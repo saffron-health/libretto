@@ -51,11 +51,11 @@ The config file is at `.libretto/config.json`. You can edit it directly or use t
 ```
 
 <ParamField path="version" type="number" required>
-  Config schema version. Always `1`.
+  Config schema version.
 </ParamField>
 
 <ParamField path="ai.model" type="string">
-  Optional. A `provider/model-id` string (e.g. `openai/gpt-5.4`). Only needed if you want to use `npx libretto snapshot`. Without this, snapshot will fail but all other commands work fine.
+  Optional. A `provider/model-id` string (e.g. `openai/gpt-5.4`). Needed for `npx libretto snapshot`.
 </ParamField>
 
 <ParamField path="viewport" type="object">
