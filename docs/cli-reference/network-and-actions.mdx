@@ -79,7 +79,7 @@ npx libretto network --session debug-example --method POST
 # Filter by URL substring
 npx libretto network --session debug-example --filter "/api/referrals"
 
-# Query with jq directly — all POST requests
+# Query with jq directly, all POST requests
 jq 'select(.method == "POST")' .libretto/sessions/debug-example/network.jsonl
 
 # Extract URL and status for every request
@@ -90,7 +90,7 @@ jq '{url: .url, status: .status}' .libretto/sessions/debug-example/network.jsonl
 
 ### actions
 
-The `actions` command displays browser interactions recorded during a session — both actions Libretto performed as an agent and actions a user performed manually in the browser window. Use it to understand what happened during a session and reconstruct workflows from manual user behavior.
+The `actions` command displays browser interactions recorded during a session, both actions Libretto performed as an agent and actions a user performed manually in the browser window. Use it to understand what happened during a session and reconstruct workflows from manual user behavior.
 
 ```bash  theme={null}
 npx libretto actions --session debug-example
@@ -174,7 +174,7 @@ npx libretto actions --session debug-example --action click
 # Show only user-initiated actions
 npx libretto actions --session debug-example --source user
 
-# Query with jq — last 20 entries
+# Query with jq, last 20 entries
 tail -n 20 .libretto/sessions/debug-example/actions.jsonl | jq .
 
 # Find all failed actions

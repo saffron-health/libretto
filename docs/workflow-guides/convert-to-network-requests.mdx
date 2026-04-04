@@ -54,18 +54,18 @@ In these cases, stick with your existing Playwright automation or use passive in
 
     If the agent's recommendation looks reasonable, let it proceed. If you'd rather use one approach over the other, say so:
 
-    > Use passive interception — I don't want to risk triggering their bot detection.
+    > Use passive interception, I don't want to risk triggering their bot detection.
 
   </Step>
 
   <Step title="Review the rewritten workflow">
     The agent rewrites the workflow to use network requests instead of DOM extraction. Things to check:
 
-    - **Endpoints** — are the URLs and HTTP methods correct?
-    - **Auth/cookies** — does the new version handle authentication the same way as the original?
-    - **Output shape** — the return type should be identical to the browser-based version
-    - **Error handling** — API calls should check response status codes and handle failures gracefully
-    - **Pagination** — if the original script paginated through UI, the new version should paginate through the API
+    - **Endpoints:** are the URLs and HTTP methods correct?
+    - **Auth/cookies:** does the new version handle authentication the same way as the original?
+    - **Output shape:** the return type should be identical to the browser-based version
+    - **Error handling:** API calls should check response status codes and handle failures gracefully
+    - **Pagination:** if the original script paginated through UI, the new version should paginate through the API
 
     If something's off:
 
@@ -74,7 +74,7 @@ In these cases, stick with your existing Playwright automation or use passive in
   </Step>
 
   <Step title="Check the validation run">
-    The agent runs the rewritten workflow headless and shows you the output. Compare it to what the browser-based version returned — the data should match.
+    The agent runs the rewritten workflow headless and shows you the output. Compare it to what the browser-based version returned. The data should match.
 
     ```bash  theme={null}
     # What the agent runs
@@ -83,7 +83,7 @@ In these cases, stick with your existing Playwright automation or use passive in
 
     If the output is wrong or incomplete, tell the agent what's off:
 
-    > The scores are all null — it looks like the API response has a different field name for that.
+    > The scores are all null. It looks like the API response has a different field name for that.
 
   </Step>
 </Steps>
@@ -99,7 +99,7 @@ In these cases, stick with your existing Playwright automation or use passive in
 
 <CardGroup cols={2}>
   <Card title="One-shot script generation" href="./one-shot-script-generation">
-    Start from scratch — give your agent a goal and let it build the workflow.
+    Start from scratch. Give your agent a goal and let it build the workflow.
   </Card>
 
   <Card title="Debugging workflows" href="./debugging-workflows">

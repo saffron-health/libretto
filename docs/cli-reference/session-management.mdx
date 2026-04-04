@@ -104,9 +104,9 @@ Only use `save` when the user explicitly asks to save or reuse authenticated bro
 
 Profiles are stored in `.libretto/profiles/<domain>.json`. They are:
 
-- Machine-local — not shared across environments or team members.
+- Machine-local, not shared across environments or team members.
 - Git-ignored by default.
-- Subject to session expiry — if authentication stops working, repeat the login-and-save flow.
+- Subject to session expiry. If authentication stops working, repeat the login-and-save flow.
 
 #### Flags
 
@@ -255,7 +255,7 @@ npx libretto setup
 
 1. Installs the Playwright Chromium browser via `npx playwright install chromium`.
 2. Copies skill files to `.agents/skills/libretto/` and `.claude/skills/libretto/` if those directories exist.
-3. Prompts you to select an AI provider (OpenAI, Anthropic, Google Gemini, or Google Vertex AI) and configure credentials, which are written to `.env`. For most providers this is an API key. For Google Vertex AI, it writes your `GOOGLE_CLOUD_PROJECT` value and relies on Application Default Credentials — run `gcloud auth application-default login` separately to authenticate.
+3. Prompts you to select an AI provider (OpenAI, Anthropic, Google Gemini, or Google Vertex AI) and configure credentials, which are written to `.env`. For most providers this is an API key. For Google Vertex AI, it writes your `GOOGLE_CLOUD_PROJECT` value and relies on Application Default Credentials. Run `gcloud auth application-default login` separately to authenticate.
 
 #### Flags
 

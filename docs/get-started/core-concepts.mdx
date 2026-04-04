@@ -8,8 +8,8 @@ title: Core concepts
 
 Libretto ships two interfaces:
 
-- **CLI** (`npx libretto <command>`) — the primary interface for both agents and humans. Commands open browsers, take snapshots, execute Playwright code, run workflow files, and manage sessions. Every command accepts `--session <name>` to target a specific browser session.
-- **Library API** (`import { workflow } from "libretto"`) — used inside workflow files you run with `npx libretto run`. The `workflow()` function wraps your automation handler and gives it typed access to `page` and `session`.
+- **CLI** (`npx libretto <command>`): the primary interface for both agents and humans. Commands open browsers, take snapshots, execute Playwright code, run workflow files, and manage sessions. Every command accepts `--session <name>` to target a specific browser session.
+- **Library API** (`import { workflow } from "libretto"`): used inside workflow files you run with `npx libretto run`. The `workflow()` function wraps your automation handler and gives it typed access to `page` and `session`.
 
 ### Sessions
 
@@ -17,7 +17,7 @@ A **session** is a named browser context. When you run `npx libretto open https:
 
 Sessions are created automatically when you run `open`, `connect`, or `run`, and cleaned up with `npx libretto close`.
 
-If you don't pass `--session`, Libretto generates a unique session name automatically. Sessions are independent — you can have multiple sessions open at the same time, each pointing to a different browser or URL.
+If you don't pass `--session`, Libretto generates a unique session name automatically. Sessions are independent: you can have multiple sessions open at the same time, each pointing to a different browser or URL.
 
 #### Session directory layout
 
@@ -33,25 +33,25 @@ Each session gets its own directory under `.libretto/sessions/<name>/`:
     └── <snapshot-id>/
 ```
 
-**`state.json`** — Metadata Libretto uses to reconnect to a browser session: the CDP debug port, the browser process PID, and the session status (`active`, `paused`, `completed`, `failed`, `exited`).
+**`state.json`:** Metadata Libretto uses to reconnect to a browser session: the CDP debug port, the browser process PID, and the session status (`active`, `paused`, `completed`, `failed`, `exited`).
 
-**`logs.jsonl`** — Structured JSONL log of CLI events for the session. Useful for tracing what happened during a run.
+**`logs.jsonl`:** Structured JSONL log of CLI events for the session. Useful for tracing what happened during a run.
 
-**`network.jsonl`** — One entry per HTTP request/response captured while the session was open. Each entry includes `ts`, `method`, `url`, `status`, `contentType`, and `responseBody`. Query with `jq`:
+**`network.jsonl`:** One entry per HTTP request/response captured while the session was open. Each entry includes `ts`, `method`, `url`, `status`, `contentType`, and `responseBody`. Query with `jq`:
 
 ```bash theme={null}
 # Show all POST requests
 jq 'select(.method == "POST")' .libretto/sessions/my-session/network.jsonl
 ```
 
-**`actions.jsonl`** — One entry per user or agent action. User entries include `bestSemanticSelector`, `nearbyText`, and coordinates. Agent entries include the Playwright locator and duration. Query with `jq`:
+**`actions.jsonl`:** One entry per user or agent action. User entries include `bestSemanticSelector`, `nearbyText`, and coordinates. Agent entries include the Playwright locator and duration. Query with `jq`:
 
 ```bash theme={null}
 # Last 20 actions
 tail -n 20 .libretto/sessions/my-session/actions.jsonl | jq .
 ```
 
-**`snapshots/`** — One subdirectory per `snapshot` run, containing the captured PNG and HTML file.
+**`snapshots/`:** One subdirectory per `snapshot` run, containing the captured PNG and HTML file.
 
 Sessions are git-ignored by `.libretto/.gitignore`.
 
@@ -90,7 +90,7 @@ npx libretto run ./integration.ts main --auth-profile app.example.com
   flow to refresh it.
 </Warning>
 
-Profiles are machine-local and git-ignored. They are not safe to commit or share — they contain authentication tokens for live accounts.
+Profiles are machine-local and git-ignored. They are not safe to commit or share because they contain authentication tokens for live accounts.
 
 ### The `.libretto/` directory
 

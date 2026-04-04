@@ -38,7 +38,7 @@ async function attemptWithRecovery<T>(
 </ParamField>
 
 <ParamField path="fn" type="() => Promise<T>" required>
-  The async function to run. This is the step you want to protect — typically a sequence of Playwright actions.
+  The async function to run. This is the step you want to protect, typically a sequence of Playwright actions.
 </ParamField>
 
 <ParamField path="logger" type="MinimalLogger">
@@ -189,7 +189,7 @@ If a `knownErrors` entry matches what the LLM sees on screen, `detectSubmissionE
 #### `DetectedSubmissionError`
 
 <ResponseField name="matched" type="true">
-  Always `true` — indicates a known error was detected.
+  Always `true`. Indicates a known error was detected.
 </ResponseField>
 
 <ResponseField name="errorId" type="string">

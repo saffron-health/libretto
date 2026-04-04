@@ -6,7 +6,7 @@ title: Automation & bot detection
 
 ### Overview
 
-Libretto supports four distinct approaches to capturing data and automating web interactions. Each makes different trade-offs between detection risk, setup complexity, data quality, and control. Understanding the trade-offs helps you pick the right tool for your target site.
+Libretto supports four distinct approaches to capturing data and automating web interactions. Each makes different trade-offs between detection risk, setup complexity, data quality, and control. Knowing the trade-offs helps you pick the right approach for your target site.
 
 | Approach                                     | Bot detection risk | Best for                                            |
 | -------------------------------------------- | ------------------ | --------------------------------------------------- |
@@ -25,7 +25,7 @@ Libretto supports four distinct approaches to capturing data and automating web 
 
 <Tabs>
   <Tab title="Regular Playwright">
-    Standard Playwright usage — navigate pages, click elements, fill forms, and read DOM content using selectors and `page.evaluate()`.
+    Standard Playwright usage: navigate pages, click elements, fill forms, and read DOM content using selectors and `page.evaluate()`.
 
     ```typescript  theme={null}
     // Navigate and interact
@@ -45,7 +45,7 @@ Libretto supports four distinct approaches to capturing data and automating web 
 
     **Pros:**
 
-    * Simplest approach — uses Playwright as intended
+    * Simplest approach, uses Playwright as intended
     * No need to understand the site's API structure
     * Works with any site regardless of how data is rendered (server-side, client-side, or hybrid)
     * Data extraction is visual/DOM-based, which maps naturally to what a user sees
@@ -54,9 +54,9 @@ Libretto supports four distinct approaches to capturing data and automating web 
 
     **Cons:**
 
-    * Slower than API-based approaches — requires full page rendering
-    * Fragile against DOM changes — selectors break when the site updates its markup
-    * Harder to get structured data — you're scraping rendered HTML rather than clean API responses
+    * Slower than API-based approaches because it requires full page rendering
+    * Fragile against DOM changes, since selectors break when the site updates its markup
+    * Harder to get structured data because you're scraping rendered HTML rather than clean API responses
     * Cannot access data that isn't rendered in the DOM (e.g., API responses with fields the UI doesn't display)
 
     **Bot detection risk: MODERATE**
@@ -69,7 +69,7 @@ Libretto supports four distinct approaches to capturing data and automating web 
   </Tab>
 
   <Tab title="Passive Interception">
-    Listen to network responses the browser naturally makes as you navigate. You don't make any extra requests — you just capture the data flowing through.
+    Listen to network responses the browser naturally makes as you navigate. You don't make any extra requests, you just capture the data flowing through.
 
     ```typescript  theme={null}
     const capturedData: any[] = [];
@@ -90,18 +90,18 @@ Libretto supports four distinct approaches to capturing data and automating web 
 
     **Pros:**
 
-    * Zero additional bot detection risk from network requests — you're not making any extra calls. The requests that happen are the ones the site's own code triggers.
+    * Zero additional bot detection risk from network requests because you're not making any extra calls. The requests that happen are the ones the site's own code triggers.
     * Gets clean, structured API data (JSON) rather than scraped DOM content
     * API responses often contain more data than the UI displays (hidden fields, IDs, metadata)
-    * Not fragile against DOM changes — the API contract tends to be more stable than CSS selectors
-    * Works with Playwright's existing page context — no additional setup
+    * Not fragile against DOM changes, since the API contract tends to be more stable than CSS selectors
+    * Works with Playwright's existing page context with no additional setup
 
     **Cons:**
 
-    * You only get data that the page naturally loads — you must trigger the right UI flow to cause the requests you need
+    * You only get data that the page naturally loads, so you must trigger the right UI flow to cause the requests you need
     * Still requires Playwright browser automation to drive the page, so you have the browser fingerprinting risk for the navigation itself
-    * Timing can be tricky — you must set up the listener before the navigation that triggers the request
-    * Responses may be paginated or partial — the site's UI might lazy-load data, requiring you to trigger scrolling or "load more" interactions
+    * Timing can be tricky. You must set up the listener before the navigation that triggers the request.
+    * Responses may be paginated or partial. The site's UI might lazy-load data, requiring you to trigger scrolling or "load more" interactions.
     * If the site uses GraphQL or batched API calls, parsing the right data out of responses requires understanding the API structure
     * Some responses may be encrypted or obfuscated by bot protection services
 
@@ -127,23 +127,23 @@ Libretto supports four distinct approaches to capturing data and automating web 
 
     **Pros:**
 
-    * Requests come from the real browser — same TLS fingerprint, same cookies, same origin, same HTTP/2 settings. From the server's perspective, it looks identical to a request the site's own JS would make.
-    * Full control over which endpoints you call and with what parameters — no need to trigger UI flows
+    * Requests come from the real browser with the same TLS fingerprint, cookies, origin, and HTTP/2 settings. From the server's perspective, it looks identical to a request the site's own JS would make.
+    * Full control over which endpoints you call and with what parameters, no need to trigger UI flows
     * Can call endpoints the UI doesn't naturally hit (e.g., fetch page 50 of results without clicking "next" 49 times)
     * Gets clean, structured API data (JSON)
-    * Faster than driving the UI — skip page rendering and go straight to the data
+    * Faster than driving the UI: skip page rendering and go straight to the data
 
     **Cons:**
 
-    * Requires understanding the site's API — you need to know the endpoint URLs, required headers, authentication tokens, and request body format. This requires reverse-engineering the site's network traffic first.
-    * Vulnerable to fetch/XHR monkey-patching — if the site wraps `window.fetch`, your calls may be intercepted and flagged because the call stack won't match the site's expected code paths
+    * Requires understanding the site's API: you need to know the endpoint URLs, required headers, authentication tokens, and request body format. You'll need to reverse-engineer the site's network traffic first.
+    * Vulnerable to fetch/XHR monkey-patching. If the site wraps `window.fetch`, your calls may be intercepted and flagged because the call stack won't match the site's expected code paths.
     * Still requires a Playwright browser to be running (for the execution context)
     * API endpoints can change without notice
     * Must handle authentication tokens and CSRF tokens that the site's own code normally manages
 
     **Bot detection risk: LOW to MODERATE**
 
-    The network-level risk is very low — the requests are genuine browser requests. The risk comes from browser fingerprinting (same as regular Playwright), fetch/XHR monkey-patching detecting unexpected call stacks, and timing/pattern analysis if your requests don't match normal UI flow patterns.
+    The network-level risk is very low because the requests are genuine browser requests. The risk comes from browser fingerprinting (same as regular Playwright), fetch/XHR monkey-patching detecting unexpected call stacks, and timing/pattern analysis if your requests don't match normal UI flow patterns.
 
     <Note>
       Most sites do not implement fetch call stack monitoring. This approach is effectively undetectable on the vast majority of sites. Only sites with enterprise-grade bot protection from services like PerimeterX or Shape Security are likely to catch this.
@@ -165,21 +165,21 @@ Libretto supports four distinct approaches to capturing data and automating web 
 
     **Pros:**
 
-    * Fastest approach — no browser overhead, no page rendering, minimal memory usage
-    * Simple code — just HTTP requests, no browser lifecycle management
-    * Easy to parallelize — make many concurrent requests without launching multiple browser instances
-    * Lowest resource consumption — suitable for high-volume data collection
+    * Fastest approach, with no browser overhead, no page rendering, and minimal memory usage
+    * Simple code: just HTTP requests, no browser lifecycle management
+    * Easy to parallelize. Make many concurrent requests without launching multiple browser instances.
+    * Lowest resource consumption, suitable for high-volume data collection
 
     **Cons:**
 
-    * No cookies unless manually managed — you must extract cookies from a browser session and replicate them, including HttpOnly cookies you can't access from JS
-    * No browser-specific headers — `sec-ch-ua`, `sec-fetch-*`, and other headers that browsers add automatically must be manually fabricated
-    * No JavaScript execution — if the site requires JS to set cookies, generate tokens, or solve challenges, you can't do it
+    * No cookies unless manually managed. You must extract cookies from a browser session and replicate them, including HttpOnly cookies you can't access from JS.
+    * No browser-specific headers. `sec-ch-ua`, `sec-fetch-*`, and other headers that browsers add automatically must be manually fabricated.
+    * No JavaScript execution. If the site requires JS to set cookies, generate tokens, or solve challenges, you can't do it.
     * CSRF and auth tokens must be manually extracted and refreshed
-    * Breaks easily — API changes, new security headers, or updated bot protection will break requests with no fallback
+    * Breaks easily. API changes, new security headers, or updated bot protection will break requests with no fallback.
 
     <Warning>
-      **Bot detection risk: VERY HIGH.** This approach is detectable at nearly every layer. TLS fingerprinting alone will catch Node.js HTTP clients on any site with even basic bot protection — the TLS fingerprint is fundamentally different from any real browser, and this is one of the strongest detection signals. This approach only works reliably against sites with zero bot detection, or against documented public APIs that expect programmatic access.
+      **Bot detection risk: VERY HIGH.** This approach is detectable at nearly every layer. TLS fingerprinting alone will catch Node.js HTTP clients on any site with even basic bot protection. The TLS fingerprint is fundamentally different from any real browser, and this is one of the strongest detection signals. This approach only works reliably against sites with zero bot detection, or against documented public APIs that expect programmatic access.
     </Warning>
   </Tab>
 </Tabs>
@@ -260,8 +260,8 @@ Libretto supports four distinct approaches to capturing data and automating web 
 
 Libretto applies two baseline stealth measures when launching a browser:
 
-- **Suppresses the automation flag** — Disables Chrome's `AutomationControlled` blink feature so `navigator.webdriver` is not set to `true`.
-- **Sets a real User-Agent** — Overrides the default Playwright user-agent with a standard Chrome user-agent string.
+- **Suppresses the automation flag:** Disables Chrome's `AutomationControlled` blink feature so `navigator.webdriver` is not set to `true`.
+- **Sets a real User-Agent:** Overrides the default Playwright user-agent with a standard Chrome user-agent string.
 
 These measures help with sites that only perform basic automation checks. They are not sufficient for sites with enterprise bot protection (Cloudflare, Akamai, PerimeterX, DataDome, etc.).
 
@@ -269,15 +269,15 @@ These measures help with sites that only perform basic automation checks. They a
 
 Watch for these during development:
 
-- **Challenge pages** — "Checking your browser..." interstitials, CAPTCHAs, or blank pages before content loads
-- **HTTP 403 / Access Denied** — Requests that work in a normal browser but fail in automation
-- **Degraded results** — Fewer items returned, missing data, or slower responses compared to manual browsing
-- **Account flags** — Login failures, security alerts, or account lockouts when using authenticated sessions
+- **Challenge pages:** "Checking your browser..." interstitials, CAPTCHAs, or blank pages before content loads
+- **HTTP 403 / Access Denied:** Requests that work in a normal browser but fail in automation
+- **Degraded results:** Fewer items returned, missing data, or slower responses compared to manual browsing
+- **Account flags:** Login failures, security alerts, or account lockouts when using authenticated sessions
 
 #### Tips for reducing detection risk
 
-- **Use headed mode** — Headless browsers have detectable differences in rendering and API behavior. Libretto launches in headed mode by default.
-- **Add realistic delays** — Use `page.type()` with variable delays instead of `page.fill()`. Pause between actions like a human would.
-- **Reuse authenticated profiles** — Use `libretto save` to persist session state. Logging in every run is more suspicious than reusing a saved session.
-- **Avoid cloud IPs** — Requests from AWS/GCP/Azure IP ranges face higher scrutiny. Run from a residential IP when possible.
-- **Check for fetch patching** — Before using `pageRequest()`, open the browser console and run `window.fetch.toString()`. If it returns actual JavaScript (not `"[native code]"`), the site monitors fetch calls. Prefer passive interception instead.
+- **Use headed mode.** Headless browsers have detectable differences in rendering and API behavior. Libretto launches in headed mode by default.
+- **Add realistic delays.** Use `page.type()` with variable delays instead of `page.fill()`. Pause between actions like a human would.
+- **Reuse authenticated profiles.** Use `libretto save` to persist session state. Logging in every run is more suspicious than reusing a saved session.
+- **Avoid cloud IPs.** Requests from AWS/GCP/Azure IP ranges face higher scrutiny. Run from a residential IP when possible.
+- **Check for fetch patching.** Before using `pageRequest()`, open the browser console and run `window.fetch.toString()`. If it returns actual JavaScript (not `"[native code]"`), the site monitors fetch calls. Prefer passive interception instead.

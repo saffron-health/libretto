@@ -123,11 +123,11 @@ The workflow halts at the `pause()` with the browser open. Inspect the page, the
 
 ### Common errors
 
-**Broken selectors** — The most common failure. A selector that worked last week no longer matches because the site updated its markup. Tell the agent what changed if you know, or just let it snapshot and figure it out.
+**Broken selectors:** the most common failure. A selector that worked last week no longer matches because the site updated its markup. Tell the agent what changed if you know, or just let it snapshot and figure it out.
 
-**Popups blocking the workflow** — A modal, cookie banner, or session-expiry dialog appears unexpectedly. Tell the agent about the popup and ask it to add recovery logic using `attemptWithRecovery()` so future runs handle it automatically.
+**Popups blocking the workflow:** a modal, cookie banner, or session-expiry dialog appears unexpectedly. Tell the agent about the popup and ask it to add recovery logic using `attemptWithRecovery()` so future runs handle it automatically.
 
-**Timeout errors** — A `waitForSelector` or locator action times out because the expected element never appeared. The page might show a loading spinner, an error state, or a redirect. The agent can snapshot to see what actually rendered.
+**Timeout errors:** a `waitForSelector` or locator action times out because the expected element never appeared. The page might show a loading spinner, an error state, or a redirect. The agent can snapshot to see what actually rendered.
 
 ### Tips
 

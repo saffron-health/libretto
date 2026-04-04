@@ -6,7 +6,7 @@ title: sessions & profiles
 
 ### Sessions
 
-Every Libretto session gets its own isolated directory under `.libretto/sessions/<name>/`. Sessions are git-ignored by default — they contain runtime state and machine-local data that should not be committed.
+Every Libretto session gets its own isolated directory under `.libretto/sessions/<name>/`. Sessions are git-ignored by default. They contain runtime state and machine-local data that should not be committed.
 
 You can run multiple sessions simultaneously. Each session targets a specific browser instance and has its own log files, network capture, and snapshot history.
 
@@ -86,7 +86,7 @@ Each session directory contains several log files you can query directly with `j
 
 #### logs.jsonl
 
-Structured CLI and system logs. Contains debug output from Libretto itself — command execution, errors, and internal events.
+Structured CLI and system logs. Contains debug output from Libretto itself, including command execution, errors, and internal events.
 
 ```bash theme={null}
 # View the last 20 log entries
@@ -95,7 +95,7 @@ tail -n 20 .libretto/sessions/my-session/logs.jsonl | jq .
 
 #### actions.jsonl
 
-Recorded user and agent actions. Each line is a JSON object representing one interaction — a click, fill, navigation, or other Playwright action. Libretto records both actions you perform manually in the browser (`source: "user"`) and actions the agent performs programmatically (`source: "agent"`).
+Recorded user and agent actions. Each line is a JSON object representing one interaction: a click, fill, navigation, or other Playwright action. Libretto records both actions you perform manually in the browser (`source: "user"`) and actions the agent performs programmatically (`source: "agent"`).
 
 Key fields:
 
@@ -156,15 +156,15 @@ jq 'select(.contentType | contains("application/json")) | .responseBody' \
 
 The `snapshots/` directory contains files captured by `npx libretto snapshot`. Each snapshot gets its own subdirectory named by snapshot ID and produces three files:
 
-- `page.png` — a full-page screenshot
-- `page.html` — the raw full DOM at capture time
-- `page.condensed.html` — a token-optimized condensed version of the HTML sent to the AI analysis model
+- `page.png`: a full-page screenshot
+- `page.html`: the raw full DOM at capture time
+- `page.condensed.html`: a token-optimized condensed version of the HTML sent to the AI analysis model
 
 ---
 
 ### Profiles
 
-Profiles save browser sessions — cookies and localStorage — so you can reuse authenticated state across multiple runs without logging in every time.
+Profiles save browser sessions (cookies and localStorage) so you can reuse authenticated state across runs without logging in every time.
 
 #### Creating a profile
 
@@ -196,8 +196,8 @@ Libretto loads the profile before executing the workflow, so the browser starts 
 Profiles are:
 
 - Stored at `.libretto/profiles/<domain>.json`
-- Machine-local — not shared between machines
-- Git-ignored — never committed to version control
+- Machine-local, not shared between machines
+- Git-ignored, never committed to version control
 
 <Note>
   Sessions can expire. If a profile stops working, repeat the manual login flow and run `npx libretto save <domain> --session <name>` again to refresh it.
