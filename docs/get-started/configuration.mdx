@@ -54,12 +54,12 @@ The config file is at `.libretto/config.json`. You can edit it directly or use t
   Config schema version. Always `1`.
 </ParamField>
 
-<ParamField path="ai.model" type="string">
-  A `provider/model-id` string. This is the model Libretto sends screenshot and HTML data to when you run `snapshot`.
+<ParamField path="ai.model" type="string" required>
+  A `provider/model-id` string (e.g. `openai/gpt-5.4`). Required for `npx libretto snapshot` to work. Without this, snapshot analysis will fail.
 </ParamField>
 
 <ParamField path="viewport" type="object">
-  Default browser window size (width and height in pixels) used by `open` and `run` when you don't pass `--viewport`. Built-in default is `1366x768`.
+  Optional. Default browser window size (width and height in pixels) used by `open` and `run` when you don't pass `--viewport`. Defaults to `1366x768` if not set.
 </ParamField>
 
 <ParamField path="windowPosition" type="object">
