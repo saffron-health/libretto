@@ -51,6 +51,7 @@
           "get-started/introduction",
           "get-started/configuration",
           "get-started/core-concepts",
+          "get-started/how-workflow-generation-works",
           "get-started/automation-approaches"
         ]
       },
