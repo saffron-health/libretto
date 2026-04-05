@@ -15,6 +15,21 @@ Libretto supports four distinct approaches to capturing data and automating web 
 | In-browser fetch (`pageRequest()`)           | Low-Moderate    | Deep pagination, bulk queries without UI clicking   |
 | Direct HTTP from Node.js                     | Very high          | Public/documented APIs with no bot detection        |
 
+### Assessing bot detection
+
+<Warning>
+  Bot detection avoidance is best-effort. Libretto cannot guarantee your
+  automation will go undetected. Using Libretto with authenticated accounts may
+  violate the terms of service of those services. Understand the risks before
+  automating against any site you don't control.
+</Warning>
+
+Libretto captures all network traffic and page state during a session, which lets you (or your agent) check what bot detection measures a site uses before committing to an automation approach:
+
+- **Network log inspection.** Use `npx libretto network` to review all requests and responses. Look for calls to bot detection services (Cloudflare, Akamai, PerimeterX, DataDome) or challenge endpoints.
+- **Fetch patching check.** Run `npx libretto exec` to evaluate `window.fetch.toString()` in the browser console. If it returns actual JavaScript (not `"[native code]"`), the site monkey-patches fetch and you should prefer passive interception over in-browser fetch.
+- **Snapshot analysis.** Use `npx libretto snapshot` to check for challenge pages, CAPTCHAs, or interstitials that indicate detection.
+
 ***
 
 ### Approach details
@@ -218,37 +233,3 @@ Libretto supports four distinct approaches to capturing data and automating web 
 * You're hitting a public/documented API (not scraping a website)
 * You need to make thousands of concurrent requests
 
-***
-
-### Bot detection
-
-<Warning>
-  Bot detection avoidance is best-effort. Libretto cannot guarantee your
-  automation will go undetected. Using Libretto with authenticated accounts may
-  violate the terms of service of those services. Understand the risks before
-  automating against any site you don't control.
-</Warning>
-
-#### How Libretto helps you assess bot detection
-
-Libretto captures all network traffic and page state during a session, which lets you (or your agent) check what bot detection measures a site uses before committing to an automation approach:
-
-- **Network log inspection.** Use `npx libretto network` to review all requests and responses. Look for calls to bot detection services (Cloudflare, Akamai, PerimeterX, DataDome) or challenge endpoints.
-- **Fetch patching check.** Run `npx libretto exec` to evaluate `window.fetch.toString()` in the browser console. If it returns actual JavaScript (not `"[native code]"`), the site monkey-patches fetch and you should prefer passive interception over in-browser fetch.
-- **Snapshot analysis.** Use `npx libretto snapshot` to check for challenge pages, CAPTCHAs, or interstitials that indicate detection.
-
-#### Signs your automation is being detected
-
-Watch for these during development:
-
-- **Challenge pages:** "Checking your browser..." interstitials, CAPTCHAs, or blank pages before content loads
-- **HTTP 403 / Access Denied:** Requests that work in a normal browser but fail in automation
-- **Degraded results:** Fewer items returned, missing data, or slower responses compared to manual browsing
-- **Account flags:** Login failures, security alerts, or account lockouts when using authenticated sessions
-
-#### Tips for reducing detection risk
-
-- **Use headed mode.** Headless browsers have detectable differences in rendering and API behavior. Libretto launches in headed mode by default.
-- **Add realistic delays.** Use `page.type()` with variable delays instead of `page.fill()`. Pause between actions like a human would.
-- **Reuse authenticated profiles.** Use `libretto save` to persist session state. Logging in every run is more suspicious than reusing a saved session.
-- **Avoid cloud IPs.** Requests from AWS/GCP/Azure IP ranges face higher scrutiny. Run from a residential IP when possible.
