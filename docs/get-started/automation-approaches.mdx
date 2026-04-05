@@ -16,7 +16,7 @@ Libretto supports four distinct approaches to capturing data and automating web 
 | Direct HTTP from Node.js                     | Very high          | Public/documented APIs with no bot detection        |
 
 <Tip>
-  **Recommended hybrid:** Combine Regular Playwright for navigation with passive `page.on('response')` interception for data capture. This gives you browser-based reliability with structured API data quality at minimal detection risk.
+  **Recommended approach:** Use in-browser fetch (`pageRequest()`) for most sites. For high-security sites with aggressive bot detection, combine Regular Playwright navigation with passive `page.on('response')` interception instead.
 </Tip>
 
 ***
@@ -237,12 +237,12 @@ Libretto supports four distinct approaches to capturing data and automating web 
 
 ***
 
-### Recommended hybrid
+### Recommended approach
 
 <Tip>
-  For most browser automation workflows, combine Approach 1 and Approach 2: use Regular Playwright to navigate and interact with the site (handling popups, login flows, and anything requiring UI interaction with Libretto's recovery features), and passively intercept API responses with `page.on('response')` to capture structured data.
+  Use in-browser fetch (`pageRequest()`) for most sites. It gives you full control over which endpoints you call, structured JSON responses, and the real browser's network fingerprint.
 
-  This gives you the reliability of browser-based navigation with the data quality of API responses, at minimal detection risk.
+  For high-security sites with aggressive bot detection (Cloudflare, Akamai, PerimeterX), use Regular Playwright for navigation and passive `page.on('response')` interception for data capture. This avoids making any extra requests that could trigger detection.
 </Tip>
 
 ***
