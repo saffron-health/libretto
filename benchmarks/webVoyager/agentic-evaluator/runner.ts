@@ -173,6 +173,7 @@ function buildReportEvaluationTool(args: {
               text: "Evaluation accepted. Do not call report_evaluation again.",
             },
           ],
+          details: undefined,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -183,22 +184,6 @@ function buildReportEvaluationTool(args: {
         }
         throw error;
       }
-    },
-    prepareArguments(argsValue) {
-      return argsValue as {
-        evaluatorId: string;
-        evaluation: "YES" | "NO";
-        reasoning: string;
-        metadata: {
-          model: string;
-          temperature?: number;
-          promptVersion: string;
-          durationMs: number;
-          maxTurns: number;
-          totalTokens?: number;
-          costUsd?: number;
-        };
-      };
     },
   };
 }
@@ -514,7 +499,7 @@ export async function evaluateCaseWithAgent(
   }
 
   const evaluation = parseAgenticEvaluation({
-    ...submittedEvaluation,
+    ...submittedEvaluation!,
     metadata: {
       model: modelName,
       promptVersion: AGENTIC_EVALUATOR_PROMPT_VERSION,
