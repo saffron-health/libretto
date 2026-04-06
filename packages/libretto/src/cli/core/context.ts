@@ -1,6 +1,4 @@
 import { Logger, createFileLogSink } from "../../shared/logger/index.js";
-import type { LanguageModel } from "ai";
-import type { LoggerApi } from "../../shared/logger/index.js";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveLibrettoRepoRoot } from "../../shared/paths/repo-root.js";
@@ -72,13 +70,6 @@ export function createLoggerForSession(session: string): Logger {
   );
 }
 
-export async function closeLogger(
-  logger: Logger | null | undefined,
-): Promise<void> {
-  if (!logger) return;
-  await logger.close();
-}
-
 export async function withSessionLogger<T>(
   session: string,
   run: (logger: Logger) => Promise<T>,
@@ -87,48 +78,6 @@ export async function withSessionLogger<T>(
   try {
     return await run(logger);
   } finally {
-    await closeLogger(logger);
+    await logger.close();
   }
 }
-
-let modelFactory:
-  | ((logger: LoggerApi, model: string) => Promise<LanguageModel>)
-  | null = null;
-
-export function setModelFactory(
-  factory: (logger: LoggerApi, model: string) => Promise<LanguageModel>,
-): void {
-  modelFactory = factory;
-}
-
-/** @deprecated Use {@link setModelFactory} instead. */
-export const setLLMClientFactory = setModelFactory;
-
-export function getModelFactory():
-  | ((logger: LoggerApi, model: string) => Promise<LanguageModel>)
-  | null {
-  return modelFactory;
-}
-
-export function maybeConfigureModelFactoryFromEnv(): void {
-  if (modelFactory) return;
-
-  const hasAnyCreds =
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.GCLOUD_PROJECT ||
-    process.env.ANTHROPIC_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-
-  if (!hasAnyCreds) return;
-
-  setModelFactory(async (_logger, model) => {
-    const { resolveModel } = await import("./resolve-model.js");
-    return resolveModel(model);
-  });
-}
-
-/** @deprecated Use {@link maybeConfigureModelFactoryFromEnv} instead. */
-export const maybeConfigureLLMClientFactoryFromEnv =
-  maybeConfigureModelFactoryFromEnv;
