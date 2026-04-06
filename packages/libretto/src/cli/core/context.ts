@@ -1,5 +1,5 @@
 import { Logger, createFileLogSink } from "../../shared/logger/index.js";
-import type { LLMClient } from "../../shared/llm/index.js";
+import type { LanguageModel } from "ai";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -91,24 +91,27 @@ export async function withSessionLogger<T>(
   }
 }
 
-let llmClientFactory:
-  | ((logger: LoggerApi, model: string) => Promise<LLMClient>)
+let modelFactory:
+  | ((logger: LoggerApi, model: string) => Promise<LanguageModel>)
   | null = null;
 
-export function setLLMClientFactory(
-  factory: (logger: LoggerApi, model: string) => Promise<LLMClient>,
+export function setModelFactory(
+  factory: (logger: LoggerApi, model: string) => Promise<LanguageModel>,
 ): void {
-  llmClientFactory = factory;
+  modelFactory = factory;
 }
 
-export function getLLMClientFactory():
-  | ((logger: LoggerApi, model: string) => Promise<LLMClient>)
+/** @deprecated Use {@link setModelFactory} instead. */
+export const setLLMClientFactory = setModelFactory;
+
+export function getModelFactory():
+  | ((logger: LoggerApi, model: string) => Promise<LanguageModel>)
   | null {
-  return llmClientFactory;
+  return modelFactory;
 }
 
-export function maybeConfigureLLMClientFactoryFromEnv(): void {
-  if (llmClientFactory) return;
+export function maybeConfigureModelFactoryFromEnv(): void {
+  if (modelFactory) return;
 
   const hasAnyCreds =
     process.env.GOOGLE_CLOUD_PROJECT ||
@@ -120,8 +123,11 @@ export function maybeConfigureLLMClientFactoryFromEnv(): void {
 
   if (!hasAnyCreds) return;
 
-  setLLMClientFactory(async (_logger, model) => {
+  setModelFactory(async (_logger, model) => {
     const { createLLMClient } = await import("../../shared/llm/index.js");
     return createLLMClient(model);
   });
 }
+
+/** @deprecated Use {@link maybeConfigureModelFactoryFromEnv} instead. */
+export const maybeConfigureLLMClientFactoryFromEnv = maybeConfigureModelFactoryFromEnv;

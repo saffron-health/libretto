@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { runLibrettoCLI } from "./cli.js";
 import {
-  maybeConfigureLLMClientFactoryFromEnv,
+  maybeConfigureModelFactoryFromEnv,
+  setModelFactory,
   setLLMClientFactory,
 } from "./core/context.js";
 
-export { setLLMClientFactory };
+export { setModelFactory, setLLMClientFactory };
 export { runClose } from "./commands/browser.js";
 export { runLibrettoCLI };
 
-maybeConfigureLLMClientFactoryFromEnv();
+maybeConfigureModelFactoryFromEnv();
 void runLibrettoCLI();

@@ -3,7 +3,7 @@ import {
   type MinimalLogger,
   defaultLogger,
 } from "../../shared/logger/logger.js";
-import type { LLMClient } from "../../shared/llm/types.js";
+import { generateObject, type LanguageModel } from "ai";
 
 type BrowserAction =
   | { type: "click"; x: number; y: number; button?: string }
@@ -183,9 +183,9 @@ export async function executeRecoveryAgent(
   page: Page,
   instruction: string,
   logger?: MinimalLogger,
-  llmClient?: LLMClient,
+  model?: LanguageModel,
 ): Promise<void> {
-  if (!llmClient) {
+  if (!model) {
     return;
   }
   const log = logger ?? defaultLogger;
@@ -213,7 +213,8 @@ export async function executeRecoveryAgent(
 
   const maxSteps = 3;
   for (let step = 1; step <= maxSteps; step++) {
-    const result = await llmClient.generateObjectFromMessages({
+    const { object: result } = await generateObject({
+      model,
       schema: recoveryActionSchema,
       messages: [
         {

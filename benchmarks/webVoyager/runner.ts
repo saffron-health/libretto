@@ -15,7 +15,7 @@ import {
   type AgentSessionEvent,
 } from "@mariozechner/pi-coding-agent";
 import { z } from "zod";
-import { createLLMClient } from "../libretto-internals.js";
+
 import {
   formatSelectionSummary,
   readWebVoyagerRows,
