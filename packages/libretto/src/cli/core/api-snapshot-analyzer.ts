@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { generateObject } from "ai";
-import { createLLMClient } from "../../shared/llm/index.js";
+import { resolveModel } from "./resolve-model.js";
 import {
   InterpretResultSchema,
   buildInlinePromptSelection,
@@ -65,7 +65,7 @@ export async function runApiInterpret(
   const imageMimeType = getMimeType(args.pngPath);
   const imageBytes = Buffer.from(imageBase64, "base64");
 
-  const model = await createLLMClient(selection.model);
+  const model = await resolveModel(selection.model);
 
   const { object: result } = await generateObject({
     model,

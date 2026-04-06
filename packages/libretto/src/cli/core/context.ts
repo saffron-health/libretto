@@ -124,10 +124,11 @@ export function maybeConfigureModelFactoryFromEnv(): void {
   if (!hasAnyCreds) return;
 
   setModelFactory(async (_logger, model) => {
-    const { createLLMClient } = await import("../../shared/llm/index.js");
-    return createLLMClient(model);
+    const { resolveModel } = await import("./resolve-model.js");
+    return resolveModel(model);
   });
 }
 
 /** @deprecated Use {@link maybeConfigureModelFactoryFromEnv} instead. */
-export const maybeConfigureLLMClientFactoryFromEnv = maybeConfigureModelFactoryFromEnv;
+export const maybeConfigureLLMClientFactoryFromEnv =
+  maybeConfigureModelFactoryFromEnv;

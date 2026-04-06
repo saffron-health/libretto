@@ -1,6 +1,6 @@
 import { generateObject, type ModelMessage, type UserContent } from "ai";
 import { z } from "zod";
-import { createLLMClient } from "../libretto-internals.js";
+import { resolveModel } from "../libretto-internals.js";
 
 // ---------------------------------------------------------------------------
 // Schema & types
@@ -99,7 +99,7 @@ export async function evaluateWithScreenshots(opts: {
     { role: "user", content: contentParts },
   ];
 
-  const model = await createLLMClient(JUDGE_MODEL);
+  const model = await resolveModel(JUDGE_MODEL);
 
   try {
     const { object: result } = await generateObject({

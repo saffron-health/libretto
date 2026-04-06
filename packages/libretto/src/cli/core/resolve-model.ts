@@ -136,7 +136,7 @@ async function getProviderModel(
   }
 }
 
-export async function createLLMClient(model: string): Promise<LanguageModel> {
+export async function resolveModel(model: string): Promise<LanguageModel> {
   const { provider, modelId } = parseModel(model);
   return getProviderModel(provider, modelId);
 }
