@@ -4,42 +4,73 @@ title: Debugging workflows
 
 > Reproduce failures, inspect live page state, and fix broken browser automations.
 
-When a Libretto workflow fails, the browser stays open at the exact point of failure. This is the key difference between debugging with Libretto and debugging with a generic test runner — you don't lose the state. Your agent can inspect the live page, test new selectors, and fix the issue without starting over.
+There are two common debugging scenarios: connecting to a remote browser session that's already open (e.g. a production run that failed), and reproducing a failure locally from error logs.
 
-### Steps
+### Remote debugging (connect to an open session)
+
+When a workflow fails in production or a remote environment, the browser often stays open at the point of failure. You can connect to it directly with Libretto and debug the live page state.
+
+<Steps>
+  <Step title="Connect to the remote browser">
+    Get the CDP (Chrome DevTools Protocol) endpoint URL from your deployment logs. Then connect:
+
+    ```bash  theme={null}
+    npx libretto connect <cdp-endpoint-url> --session remote-debug
+    ```
+
+  </Step>
+
+  <Step title="Prompt your agent to investigate">
+    Tell the agent what went wrong and point it at the open session.
+
+    ```text Example prompt
+    Use the Libretto skill. I have a remote browser session open at --session remote-debug. The eligibility check workflow failed with a broken selector error. Inspect the current page state and figure out what changed.
+    ```
+
+    The agent can snapshot the page, test selectors, and execute code against the live browser without restarting the workflow.
+
+  </Step>
+
+  <Step title="Review the fix">
+    The agent patches the workflow file based on what it found in the live page. Check the diff and verify the fix addresses the root cause.
+
+  </Step>
+</Steps>
+
+### Local debugging (reproduce from error logs)
+
+When you have error output from a failed run (stack traces, log files, GCP logs, etc.), you can have your agent reproduce and fix the issue locally.
 
 <Steps>
   <Step title="Prompt your agent with the failure">
-    Describe the **script**, what it's **supposed to do**, and what's **going wrong**. Point the agent at the file and include any error output you have.
+    Describe the **script**, what it's **supposed to do**, and what's **going wrong**. Include the error output.
 
-    > Use the Libretto skill. The workflow at ./integration.ts is supposed to go to Availity and perform an eligibility check for a patient. But I'm getting a broken selector error when I run it. Fix it. \<_paste error here_\>
+    ```text Example prompt
+    Use the Libretto skill. The workflow at ./integration.ts is supposed to go to Availity and perform an eligibility check for a patient. But I'm getting a broken selector error. Fix it.
+    ```
 
-    Include "Use the Libretto skill" so your agent uses Libretto's debugging tools (snapshots, live exec) instead of guessing at fixes from the code alone.
-
-    <Note>
-      This guide assumes the script is a Libretto workflow file (using `workflow()` from `libretto`). If the failing script is a plain Playwright test, ask your agent to convert it to a Libretto workflow first — Libretto's debugging tools depend on the session and browser management that `workflow()` provides.
-    </Note>
+    Paste the error or stack trace directly into your prompt.
 
   </Step>
 
   <Step title="Watch the failure reproduce">
-    The agent runs the script in headed mode so you can see the browser. It stops at the failure point with the browser still open — you can see exactly what state the page is in when things go wrong.
+    The agent runs the script in headed mode so you can see the browser. It stops at the failure point with the browser still open.
 
     ```bash  theme={null}
     # What the agent runs
     npx libretto run ./integration.ts main --session debug-flow --headed
     ```
 
-    You don't need to do anything here, but if you happen to notice something useful — a popup that wasn't there before, a redesigned page — you can mention it to save the agent time.
+    If you notice something useful (a popup that wasn't there before, a redesigned page), mention it to save the agent time.
 
   </Step>
 
   <Step title="Wait for the agent to diagnose and fix">
-    The agent snapshots the broken page state, identifies what's wrong, and tests new selectors against the live DOM. You'll see it running commands like `npx libretto snapshot` and `npx libretto exec` in your terminal while the browser stays open.
+    The agent snapshots the broken page state, identifies what's wrong, and tests new selectors against the live DOM. You'll see it running `npx libretto snapshot` and `npx libretto exec` commands while the browser stays open.
 
-    You don't need to intervene, but if you have context that would help, share it:
+    If you have context that would help, share it:
 
-    > They redesigned the eligibility form last week — the submit button used to be in a sidebar but now it's inline.
+    > They redesigned the eligibility form last week. The submit button used to be in a sidebar but now it's inline.
 
   </Step>
 
@@ -50,32 +81,23 @@ When a Libretto workflow fails, the browser stays open at the exact point of fai
     - Did it address the **root cause** or just the immediate symptom?
     - If the site changed its markup, are there other selectors in the file that might have the same problem?
 
-    If something looks off:
-
-    > That selector uses a class name that looks auto-generated. Can you use the button's text label instead?
-
   </Step>
 
   <Step title="Check the verification run">
     The agent re-runs the workflow headless to confirm the fix works.
 
     ```bash  theme={null}
-    # What the agent runs
     npx libretto run ./integration.ts main --headless
     ```
 
-    If it passes, you're done. If it fails again, tell the agent what's still wrong — the browser stays open and the agent repeats the diagnose/fix cycle.
+    If it fails again, the browser stays open and the agent repeats the diagnose/fix cycle.
 
   </Step>
 </Steps>
 
 ### Using `pause()` as a breakpoint
 
-If you need the workflow to stop at a specific point — not at failure, but at a known state you want to inspect — ask the agent to add a `pause()` call:
-
-> Add a pause right before the form submission so I can inspect the page state.
-
-The agent adds it to your workflow:
+If you need the workflow to stop at a specific point (not at failure, but at a known state you want to inspect), ask the agent to add a `pause()` call:
 
 ```typescript theme={null}
 import { workflow, pause } from "libretto";
@@ -101,27 +123,27 @@ The workflow halts at the `pause()` with the browser open. Inspect the page, the
 
 ### Common errors
 
-**Broken selectors** — The most common failure. A selector that worked last week no longer matches because the site updated its markup. Tell the agent what changed if you know, or just let it snapshot and figure it out.
+**Broken selectors:** the most common failure. A selector that worked last week no longer matches because the site updated its markup. Tell the agent what changed if you know, or just let it snapshot and figure it out.
 
-**Popups blocking the workflow** — A modal, cookie banner, or session-expiry dialog appears unexpectedly. Tell the agent about the popup and ask it to add recovery logic using `attemptWithRecovery()` so future runs handle it automatically.
+**Popups blocking the workflow:** a modal, cookie banner, or session-expiry dialog appears unexpectedly. Tell the agent about the popup and ask it to add recovery logic using `attemptWithRecovery()` so future runs handle it automatically.
 
-**Timeout errors** — A `waitForSelector` or locator action times out because the expected element never appeared. The page might show a loading spinner, an error state, or a redirect. The agent can snapshot to see what actually rendered.
+**Timeout errors:** a `waitForSelector` or locator action times out because the expected element never appeared. The page might show a loading spinner, an error state, or a redirect. The agent can snapshot to see what actually rendered.
 
 ### Tips
 
 <Tip>
-  Paste your error message into the prompt. Agents often do a better job
-  debugging when they're given the stack trace.
+  Paste your error message into the prompt. Agents do a better job debugging
+  when they have the stack trace.
 </Tip>
 
 ### Related guides
 
 <CardGroup cols={2}>
-  <Card title="One-shot script generation" href="./one-shot-script-generation">
+  <Card title="One-shot workflow generation" href="./one-shot-workflow-generation">
     Build a new automation from scratch without any prior knowledge of the site.
   </Card>
 
-  <Card title="Interactive script building" href="./interactive-script-building">
+  <Card title="Interactive workflow building" href="./interactive-workflow-building">
     Show the workflow manually and let your agent turn it into reusable code.
   </Card>
 </CardGroup>

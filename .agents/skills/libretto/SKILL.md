@@ -119,7 +119,7 @@ echo "return await page.url()" | npx libretto exec - --session debug-example
 ### `pages`
 
 - Use `pages` when a popup, new tab, or second page appears.
-- If `exec`, `snapshot`, `network`, or `actions` complains about multiple pages, list page ids first and then pass `--page`.
+- If `exec` or `snapshot` complains about multiple pages, list page ids first and then pass `--page`.
 
 ```bash
 npx libretto pages --session debug-example
@@ -214,7 +214,7 @@ Assistant: I'll inspect the real site first if needed, but before I finish I'll 
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
 Assistant: [Reads `references/site-security-review.md` before choosing between passive network inspection, direct browser fetch calls, and Playwright-first automation]
 Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page and need the first meaningful step."`]
-Assistant: [Uses `network`, `snapshot`, and `exec` as needed to understand the site and decide the implementation path]
+Assistant: [Uses `snapshot` and `exec` as needed to understand the site and decide the implementation path]
 Assistant: [Reads `references/code-generation-rules.md` before writing production workflow code]
 Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
 </example>

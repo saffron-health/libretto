@@ -1,0 +1,138 @@
+---
+title: sessions
+---
+
+> Manage named browser sessions and control session access modes.
+
+### The `--session` flag
+
+Almost every Libretto command accepts `--session <name>` to target a specific browser session. When you omit `--session` on commands that support auto-generation (`open`, `run`), Libretto creates a unique name automatically.
+
+Session state is stored under `.libretto/sessions/<session>/`:
+
+```txt
+.libretto/
+  sessions/
+    <session>/
+      state.json
+      logs.jsonl
+      network.jsonl
+      actions.jsonl
+      snapshots/
+```
+
+Session directories are git-ignored. Each session runs an isolated browser instance on a dynamic port.
+
+---
+
+### close
+
+The `close` command closes a browser session and cleans up its state.
+
+```bash theme={null}
+npx libretto close --session debug-example
+npx libretto close --all
+```
+
+#### When to use `close`
+
+- When you are done with a session.
+- When an exploration session is no longer helping progress and you want to free up the browser.
+- For full workspace cleanup at the end of a task.
+
+<Note>
+  When using `connect` to attach to an external CDP endpoint, `close` clears the
+  Libretto session record but **does not terminate the remote browser process**.
+</Note>
+
+#### Flags
+
+<ParamField path="--session" type="string">
+  The session to close. Required unless `--all` is passed.
+</ParamField>
+
+<ParamField path="--all" type="boolean">
+  Close all tracked sessions in this workspace.
+</ParamField>
+
+<ParamField path="--force" type="boolean">
+  Force-kill sessions that do not respond to SIGTERM. Requires `--all`.
+</ParamField>
+
+#### Examples
+
+```bash theme={null}
+# Close a named session
+npx libretto close --session debug-example
+
+# Close all sessions in the workspace
+npx libretto close --all
+
+# Close all sessions, force-killing any that are unresponsive
+npx libretto close --all --force
+```
+
+---
+
+### Read-only sessions
+
+Read-only mode prevents any mutating browser actions (clicks, typing, navigation, form fills) while still allowing inspection. This is useful for diagnosing live production sessions without risking accidental state changes.
+
+#### Starting a read-only session
+
+Pass `--read-only` to `open`, `connect`, or `run`:
+
+```bash theme={null}
+npx libretto open https://example.com --read-only --session diag
+npx libretto connect ws://localhost:9222 --read-only --session remote-diag
+npx libretto run ./workflow.ts main --read-only --session test-run
+```
+
+#### Changing session mode
+
+View or change the mode of an existing session with `session-mode`:
+
+```bash theme={null}
+# View current mode
+npx libretto session-mode --session my-session
+
+# Switch to read-only
+npx libretto session-mode read-only --session my-session
+
+# Switch back to write-access
+npx libretto session-mode write-access --session my-session
+```
+
+#### What's allowed in read-only mode
+
+| Command         | Allowed |
+| --------------- | ------- |
+| `snapshot`      | Yes     |
+| `readonly-exec` | Yes     |
+| `pages`         | Yes     |
+| `close`         | Yes     |
+| `session-mode`  | Yes     |
+| `exec`          | No      |
+
+#### `readonly-exec`
+
+A restricted version of `exec` that only allows read operations on the page. Available methods include:
+
+- **Page reads**: `url()`, `title()`, `content()`, `viewportSize`, `waitForLoadState`, `waitForURL`
+- **Locator factories**: `locator()`, `getByRole()`, `getByText()`, `getByLabel()`, `getByPlaceholder()`, `getByAltText()`, `getByTitle()`, `getByTestId()`
+- **Locator reads**: `textContent()`, `innerText()`, `boundingBox()`, `count()`, `getAttribute()`, `inputValue()`, `isVisible()`, `isHidden()`, `isEnabled()`, `isChecked()`
+- **Network**: `get(url)` (GET/HEAD only, no request bodies)
+- **Helpers**: `snapshot()`, `scrollBy()`, `console`, `state`
+
+Any mutating operation (click, fill, goto, reload, etc.) throws a `ReadonlyExecDenied` error.
+
+```bash theme={null}
+# Read page title
+npx libretto readonly-exec --session diag "return await page.title()"
+
+# Check if an element is visible
+npx libretto readonly-exec --session diag "return await page.locator('#submit').isVisible()"
+
+# Get text content of a section
+npx libretto readonly-exec --session diag "return await page.locator('.results').textContent()"
+```

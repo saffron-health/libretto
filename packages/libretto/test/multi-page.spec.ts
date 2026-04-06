@@ -85,20 +85,5 @@ describe("multi-page CLI behavior", () => {
     );
     expect(execResult.stderr).toContain(`libretto pages --session ${session}`);
 
-    const actionsResult = await librettoCli(
-      `actions --session ${session} --page ${missingPageId}`,
-    );
-    expect(actionsResult.stderr).toContain(
-      `Page "${missingPageId}" was not found in session "${session}".`,
-    );
-    expect(actionsResult.stderr).toContain(`libretto pages --session ${session}`);
-
-    const networkResult = await librettoCli(
-      `network --session ${session} --page ${missingPageId}`,
-    );
-    expect(networkResult.stderr).toContain(
-      `Page "${missingPageId}" was not found in session "${session}".`,
-    );
-    expect(networkResult.stderr).toContain(`libretto pages --session ${session}`);
   }, 45_000);
 });

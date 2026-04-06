@@ -1,0 +1,95 @@
+---
+title: Network requests
+---
+
+> Execute typed HTTP requests inside the browser context.
+
+### `pageRequest()`
+
+Executes a `fetch()` call inside the browser context via `page.evaluate()`. Because the request runs inside the real browser process, it uses the browser's TLS fingerprint, cookies, and session. This avoids bot-detection issues that arise when making the same request from Node.js directly.
+
+```typescript theme={null}
+async function pageRequest<T extends z.ZodType | undefined = undefined>(
+  page: Page,
+  config: RequestConfig,
+  options?: PageRequestOptions<T>,
+): Promise<T extends z.ZodType ? z.infer<T> : any>;
+```
+
+Returns `z.infer<T>` when a `schema` is provided in `options`, or `any` otherwise.
+
+<Note>
+  Non-2xx responses cause `pageRequest` to throw an error. The error message
+  includes the HTTP method, URL, and status code.
+</Note>
+
+#### `RequestConfig`
+
+<ParamField path="url" type="string" required>
+  The URL to fetch. Relative URLs are resolved in the browser context.
+</ParamField>
+
+<ParamField
+  path="method"
+  type="&#x22;GET&#x22; | &#x22;POST&#x22; | &#x22;PUT&#x22; | &#x22;DELETE&#x22; | &#x22;PATCH&#x22;"
+>
+  HTTP method. Defaults to `"GET"`.
+</ParamField>
+
+<ParamField path="headers" type="Record<string, string>">
+  Additional request headers to merge with any that `bodyType` adds
+  automatically.
+</ParamField>
+
+<ParamField path="body" type="Record<string, any> | string">
+  Request body. When `bodyType` is `"json"` (the default), objects are
+  serialized with `JSON.stringify`. When `bodyType` is `"form"`, objects are
+  encoded as `application/x-www-form-urlencoded`.
+</ParamField>
+
+<ParamField path="bodyType" type="&#x22;json&#x22; | &#x22;form&#x22;">
+  How to serialize the `body`. Defaults to `"json"`. Setting this to `"form"`
+  also sets `Content-Type: application/x-www-form-urlencoded` automatically.
+</ParamField>
+
+<ParamField
+  path="responseType"
+  type="&#x22;json&#x22; | &#x22;text&#x22; | &#x22;xml&#x22;"
+>
+  How to parse the response. Defaults to `"json"`. Both `"text"` and `"xml"`
+  return the raw response text.
+</ParamField>
+
+#### `PageRequestOptions<T>`
+
+<ParamField path="logger" type="MinimalLogger">
+  Optional logger. When provided, request details (method, URL, status,
+  duration) are logged at `info` level, and failures at `warn`.
+</ParamField>
+
+<ParamField path="schema" type="T extends z.ZodType">
+  Optional Zod schema. When provided, the parsed response body is validated with `schema.parse()` before being returned. The return type of `pageRequest` becomes `z.infer<T>`.
+</ParamField>
+
+#### Example
+
+```typescript theme={null}
+import { pageRequest } from "libretto";
+import { z } from "zod";
+
+const ResultSchema = z.object({
+  items: z.array(z.object({ id: z.string(), name: z.string() })),
+  total: z.number(),
+});
+
+const data = await pageRequest(
+  page,
+  {
+    url: "/api/search",
+    method: "POST",
+    body: { query: "example", page: 1 },
+  },
+  { schema: ResultSchema },
+);
+// data is typed as { items: Array<{ id: string; name: string }>; total: number }
+```

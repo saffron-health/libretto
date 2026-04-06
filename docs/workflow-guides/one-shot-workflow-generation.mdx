@@ -1,0 +1,137 @@
+---
+title: One-shot workflow generation
+---
+
+> Give your agent a goal and a URL, and get back a complete browser automation script.
+
+One-shot generation is the fastest way to go from an idea to a working automation. You describe what you want in a single prompt, and your coding agent opens a browser, explores the site, and writes a complete workflow file.
+
+### Steps
+
+<Steps>
+  <Step title="Prompt your agent">
+    Describe the **site**, the **data or action** you want, and the **shape of the output**. The more specific you are, the better your results.
+
+    ```text Example prompt
+    Use the Libretto skill. Go on Craigslist and scrape the first 10 "free stuff" listings for title, location, and link.
+    ```
+
+    Include "Use the Libretto skill" so your agent uses Libretto's CLI tools instead of writing a Playwright script from scratch.
+
+  </Step>
+
+  <Step title="Log in when the browser opens (if needed)">
+    The agent opens a browser window on your screen. If the site requires authentication, the agent will ask you to log in manually. Do that, then tell the agent you're done.
+
+    ```bash  theme={null}
+    # What the agent runs behind the scenes
+    npx libretto open https://sfbay.craigslist.org --headed --session one-shot-flow
+    ```
+
+    <Note>
+      If the site needs login, make sure your prompt doesn't say `--headless`. You can mention "I need to log in first" in your prompt to be explicit.
+    </Note>
+
+  </Step>
+
+  <Step title="The agent explores the page">
+    The agent takes snapshots and tests selectors against the live DOM. You'll see it running commands like `npx libretto snapshot` and `npx libretto exec` in your terminal.
+
+    You don't need to do anything during this phase, but you can redirect the agent if it seems stuck:
+
+    > The listings are in the main content area, not the sidebar.
+
+  </Step>
+
+  <Step title="Review the generated workflow file">
+    The agent writes a TypeScript file that exports a `workflow()`. Here's roughly what to expect:
+
+    ```typescript  theme={null}
+    import { workflow } from "libretto";
+
+    type Output = {
+      listings: Array<{
+        title: string;
+        location: string;
+        link: string;
+      }>;
+    };
+
+    export const freeStuff = workflow<{}, Output>(
+      "freeStuff",
+      async (ctx): Promise<Output> => {
+        const { page } = ctx;
+
+        await page.goto("https://sfbay.craigslist.org/search/zip");
+        await page.waitForSelector(".result-row");
+
+        const rows = await page.locator(".result-row").all();
+        const listings = [];
+
+        for (const row of rows.slice(0, 10)) {
+          const title = await row.locator(".result-title").textContent();
+          const link = await row.locator("a").getAttribute("href");
+          // ... extract location
+        }
+
+        return { listings };
+      },
+    );
+    ```
+
+    Things to check:
+    - **Output type** matches what you asked for
+    - **Selectors** look reasonable (class names, data attributes, or ARIA roles, not brittle positional selectors)
+    - **Pagination** logic is present if you asked for more items than fit on one page
+
+  </Step>
+
+  <Step title="Check the validation run">
+    The agent runs the workflow headless and shows you the output. Check that the returned data looks right.
+
+    ```bash  theme={null}
+    # What the agent runs
+    npx libretto run ./free-stuff.ts freeStuff --headless
+    ```
+
+    If the output is wrong, tell the agent what's off:
+
+    > The location is always empty. It looks like it's reading the wrong element.
+
+    The agent will re-inspect the page and fix the issue.
+
+  </Step>
+</Steps>
+
+### When to use this approach
+
+- You're automating a site for the first time and don't know its structure
+- The task is self-contained and clearly scoped ("get the first 10 listings")
+- You want a working script with minimal back-and-forth
+- You don't need to demonstrate the workflow manually first
+
+### Tips
+
+<Tip>
+  After you log in, tell the agent to save the session with `npx libretto save`.
+  Future runs can restore your login state so you don't have to authenticate
+  every time.
+</Tip>
+
+<Note>
+  Make sure your coding agent has the Libretto skill installed before starting.
+  Run `npm init libretto@latest` in your project root to set up the workspace
+  if you haven't already.
+</Note>
+
+### Related guides
+
+<CardGroup cols={2}>
+  <Card title="Interactive workflow building" href="./interactive-workflow-building">
+    Show the agent your workflow manually and let it turn your actions into code.
+  </Card>
+
+  <Card title="Convert to network requests" href="./convert-to-network-requests">
+    Speed up an existing browser script by switching to direct API calls.
+  </Card>
+</CardGroup>

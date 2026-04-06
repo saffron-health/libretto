@@ -1,0 +1,102 @@
+---
+title: Core concepts
+---
+
+> How Libretto organizes browsers, sessions, and state.
+
+### CLI vs Library API
+
+Libretto ships two interfaces:
+
+- **CLI** (`npx libretto <command>`): the primary interface for both agents and humans. Commands open browsers, take snapshots, execute Playwright code, run workflow files, and manage sessions. Every command accepts `--session <name>` to target a specific browser session.
+- **Library API** (`import { workflow } from "libretto"`): used inside workflow files you run with `npx libretto run`. The `workflow()` function wraps your automation handler and gives it typed access to `page` and `session`.
+
+### The `.libretto/` directory
+
+All Libretto state lives in a `.libretto/` directory at your project root:
+
+```
+.libretto/
+├── config.json              # AI model and viewport settings
+├── sessions/
+│   └── <name>/
+│       ├── state.json       # Debug port, browser PID, session status
+│       ├── logs.jsonl       # Structured CLI and runtime logs
+│       ├── network.jsonl    # Captured HTTP requests and responses
+│       ├── actions.jsonl    # Recorded user and agent actions
+│       └── snapshots/       # PNG screenshots and HTML captures
+│           └── <snapshot-id>/
+└── profiles/
+    └── <domain>.json        # Saved auth state (cookies, localStorage)
+```
+
+**`config.json`:** Your AI provider and viewport settings. Created by `npm init libretto@latest` and updated with `npx libretto ai configure`. See [Configuration](./configuration) for details.
+
+Sessions and profiles are automatically git-ignored by a `.libretto/.gitignore` file created during setup. The config file and skill files are meant to be committed.
+
+### Sessions
+
+A **session** is a named browser context. When you run `npx libretto open https://example.com --session my-session`, Libretto launches a Chromium instance and registers it under that name. Subsequent commands (`snapshot`, `exec`, `pages`) all target that session by name.
+
+Sessions are created automatically when you run `open`, `connect`, or `run`, and cleaned up with `npx libretto close`.
+
+If you don't pass `--session`, Libretto generates a unique session name automatically. Sessions are independent: you can have multiple sessions open at the same time, each pointing to a different browser or URL.
+
+#### Session files
+
+**`state.json`:** Metadata Libretto uses to reconnect to a browser session: the CDP debug port, the browser process PID, and the session status (`active`, `paused`, `completed`, `failed`, `exited`).
+
+**`logs.jsonl`:** Structured JSONL log of CLI events for the session. Useful for tracing what happened during a run.
+
+**`network.jsonl`:** One entry per HTTP request/response captured while the session was open. Each entry includes `ts`, `method`, `url`, `status`, `contentType`, and `responseBody`. Query with `jq`:
+
+```bash theme={null}
+# Show all POST requests
+jq 'select(.method == "POST")' .libretto/sessions/my-session/network.jsonl
+```
+
+**`actions.jsonl`:** One entry per user or agent action. User entries include `bestSemanticSelector`, `nearbyText`, and coordinates. Agent entries include the Playwright locator and duration. Query with `jq`:
+
+```bash theme={null}
+# Last 20 actions
+tail -n 20 .libretto/sessions/my-session/actions.jsonl | jq .
+```
+
+**`snapshots/`:** One subdirectory per `snapshot` run, containing the captured PNG and HTML file.
+
+### Profiles
+
+Profiles save browser session state (cookies, localStorage, and other persistent storage) so you can reuse authenticated state across runs without logging in again each time.
+
+**Location:** `.libretto/profiles/<domain>.json`
+
+#### Saving a profile
+
+1. Open the site in headed mode so you can log in manually:
+
+   ```bash theme={null}
+   npx libretto open https://app.example.com --headed --session app-login
+   ```
+
+2. Log in to the site in the browser window.
+
+3. Save the current session state as a profile:
+
+   ```bash theme={null}
+   npx libretto save app.example.com --session app-login
+   ```
+
+#### Using a profile
+
+Pass `--auth-profile <domain>` to `run`:
+
+```bash theme={null}
+npx libretto run ./integration.ts main --auth-profile app.example.com
+```
+
+<Warning>
+  Sessions can expire. If a profile stops working, repeat the login and save
+  flow to refresh it.
+</Warning>
+
+Profiles are machine-local and git-ignored. They are not safe to commit or share because they contain authentication tokens for live accounts.

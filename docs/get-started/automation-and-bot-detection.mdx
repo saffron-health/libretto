@@ -1,0 +1,235 @@
+---
+title: Automation & bot detection
+---
+
+> Choose the right integration strategy and understand bot detection trade-offs.
+
+### Overview
+
+Libretto supports four distinct approaches to capturing data and automating web interactions. Each makes different trade-offs between detection risk, setup complexity, data quality, and control. Knowing the trade-offs helps you pick the right approach for your target site.
+
+| Approach                                     | Bot detection risk | Best for                                            |
+| -------------------------------------------- | ------------------ | --------------------------------------------------- |
+| Regular Playwright                           | Low-Moderate       | Simple DOM extraction, server-rendered sites        |
+| Passive interception (`page.on('response')`) | Low                | SPAs that load data via API calls during navigation |
+| In-browser fetch (`pageRequest()`)           | Low-Moderate    | Deep pagination, bulk queries without UI clicking   |
+| Direct HTTP from Node.js                     | Very high          | Public/documented APIs with no bot detection        |
+
+### Assessing bot detection
+
+<Warning>
+  Bot detection avoidance is best-effort. Libretto cannot guarantee your
+  automation will go undetected. Using Libretto with authenticated accounts may
+  violate the terms of service of those services. Understand the risks before
+  automating against any site you don't control.
+</Warning>
+
+Libretto captures all network traffic and page state during a session, which lets you (or your agent) check what bot detection measures a site uses before committing to an automation approach:
+
+- **Network log inspection.** Query `.libretto/sessions/<session>/network.jsonl` with `jq` to review all requests and responses. Look for calls to bot detection services (Cloudflare, Akamai, PerimeterX, DataDome) or challenge endpoints.
+- **Fetch patching check.** Run `npx libretto exec` to evaluate `window.fetch.toString()` in the browser console. If it returns actual JavaScript (not `"[native code]"`), the site monkey-patches fetch and you should prefer passive interception over in-browser fetch.
+- **Snapshot analysis.** Use `npx libretto snapshot` to check for challenge pages, CAPTCHAs, or interstitials that indicate detection.
+
+***
+
+### Approach details
+
+<Tabs>
+  <Tab title="Regular Playwright">
+    Standard Playwright usage: navigate pages, click elements, fill forms, and read DOM content using selectors and `page.evaluate()`.
+
+    ```typescript  theme={null}
+    // Navigate and interact
+    await page.goto('https://example.com/search');
+    await page.fill('#query', 'search term');
+    await page.click('#submit');
+    await page.waitForSelector('.results');
+
+    // Extract data from the DOM
+    const results = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('.result-item')).map(el => ({
+        title: el.querySelector('h2')?.textContent,
+        price: el.querySelector('.price')?.textContent,
+      }));
+    });
+    ```
+
+    **Pros:**
+
+    * Simplest approach, uses Playwright as intended
+    * No need to understand the site's API structure
+    * Works with any site regardless of how data is rendered (server-side, client-side, or hybrid)
+    * Data extraction is visual/DOM-based, which maps naturally to what a user sees
+    * Easy to debug with `headless: false` and Playwright's trace viewer
+    * Integrates directly with Libretto's step-based workflow, recovery, and extraction features
+
+    **Cons:**
+
+    * Slower than API-based approaches because it requires full page rendering
+    * Fragile against DOM changes, since selectors break when the site updates its markup
+    * Harder to get structured data because you're scraping rendered HTML rather than clean API responses
+    * Cannot access data that isn't rendered in the DOM (e.g., API responses with fields the UI doesn't display)
+
+    **Bot detection risk: LOW-MODERATE**
+
+    Plain Playwright is detectable by browser fingerprinting (Layer 1). Sites with any enterprise bot protection will likely flag it. Sites without active detection won't notice.
+
+    <Note>
+      Use `playwright-extra` with the stealth plugin to patch common fingerprint leaks, or run Playwright with a persistent browser context that looks more like a real browser profile.
+    </Note>
+  </Tab>
+
+  <Tab title="Passive Interception">
+    Listen to network responses the browser naturally makes as you navigate. You don't make any extra requests, you just capture the data flowing through.
+
+    ```typescript  theme={null}
+    const capturedData: any[] = [];
+
+    page.on('response', async (response) => {
+      const url = response.url();
+      if (url.includes('/api/search/results')) {
+        const json = await response.json();
+        capturedData.push(json);
+      }
+    });
+
+    // Trigger the data load by interacting with the UI normally
+    await page.goto('https://example.com/search?q=term');
+    await page.waitForSelector('.results');
+    // capturedData now has the raw API response
+    ```
+
+    **Pros:**
+
+    * Zero additional bot detection risk from network requests because you're not making any extra calls. The requests that happen are the ones the site's own code triggers.
+    * Gets clean, structured API data (JSON) rather than scraped DOM content
+    * API responses often contain more data than the UI displays (hidden fields, IDs, metadata)
+    * Not fragile against DOM changes, since the API contract tends to be more stable than CSS selectors
+    * Works with Playwright's existing page context with no additional setup
+
+    **Cons:**
+
+    * You only get data that the page naturally loads, so you must trigger the right UI flow to cause the requests you need
+    * Still requires Playwright browser automation to drive the page, so you have the browser fingerprinting risk for the navigation itself
+    * Timing can be tricky. You must set up the listener before the navigation that triggers the request.
+    * Responses may be paginated or partial. The site's UI might lazy-load data, requiring you to trigger scrolling or "load more" interactions.
+    * If the site uses GraphQL or batched API calls, parsing the right data out of responses requires understanding the API structure
+    * Some responses may be encrypted or obfuscated by bot protection services
+
+    **Bot detection risk: LOW**
+
+    The network requests themselves carry zero additional risk since they originate from the site's own JavaScript. The only risk is from the browser automation layer needed to drive the UI. No extra fetch calls means no anomalous network patterns for API-level monitoring to flag.
+  </Tab>
+
+  <Tab title="In-Browser Fetch">
+    Execute fetch calls from within the browser page's JavaScript context. The requests originate from the browser process itself with all the right credentials and fingerprints. Libretto's `pageRequest()` function provides a typed wrapper for this pattern.
+
+    ```typescript  theme={null}
+    const data = await page.evaluate(async () => {
+      const res = await fetch('/api/search/results?q=term&page=2', {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+      return res.json();
+    });
+    ```
+
+    **Pros:**
+
+    * Requests come from the real browser with the same TLS fingerprint, cookies, origin, and HTTP/2 settings. From the server's perspective, it looks identical to a request the site's own JS would make.
+    * Full control over which endpoints you call and with what parameters, no need to trigger UI flows
+    * Can call endpoints the UI doesn't naturally hit (e.g., fetch page 50 of results without clicking "next" 49 times)
+    * Gets clean, structured API data (JSON)
+    * Faster than driving the UI: skip page rendering and go straight to the data
+
+    **Cons:**
+
+    * Requires understanding the site's API: you need to know the endpoint URLs, required headers, authentication tokens, and request body format. You'll need to reverse-engineer the site's network traffic first.
+    * Vulnerable to fetch/XHR monkey-patching. If the site wraps `window.fetch`, your calls may be intercepted and flagged because the call stack won't match the site's expected code paths.
+    * Still requires a Playwright browser to be running (for the execution context)
+    * API endpoints can change without notice
+    * Must handle authentication tokens and CSRF tokens that the site's own code normally manages
+
+    **Bot detection risk: LOW to MODERATE**
+
+    The network-level risk is very low because the requests are genuine browser requests. The risk comes from browser fingerprinting (same as regular Playwright), fetch/XHR monkey-patching detecting unexpected call stacks, and timing/pattern analysis if your requests don't match normal UI flow patterns.
+
+    <Note>
+      Most sites do not implement fetch call stack monitoring. This approach is effectively undetectable on the vast majority of sites. Only sites with enterprise-grade bot protection from services like PerimeterX or Shape Security are likely to catch this.
+    </Note>
+  </Tab>
+
+  <Tab title="Direct HTTP">
+    Make HTTP requests directly from Node.js using the built-in `fetch` API. No browser involved.
+
+    ```typescript  theme={null}
+    const response = await fetch('https://example.com/api/search/results?q=term&page=1', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 ...',
+        'Cookie': 'session=abc123; ...',
+      },
+    });
+    const data = await response.json();
+    ```
+
+    **Pros:**
+
+    * Fastest approach, with no browser overhead, no page rendering, and minimal memory usage
+    * Simple code: just HTTP requests, no browser lifecycle management
+    * Easy to parallelize. Make many concurrent requests without launching multiple browser instances.
+    * Lowest resource consumption, suitable for high-volume data collection
+
+    **Cons:**
+
+    * No cookies unless manually managed. You must extract cookies from a browser session and replicate them, including HttpOnly cookies you can't access from JS.
+    * No browser-specific headers. `sec-ch-ua`, `sec-fetch-*`, and other headers that browsers add automatically must be manually fabricated.
+    * No JavaScript execution. If the site requires JS to set cookies, generate tokens, or solve challenges, you can't do it.
+    * CSRF and auth tokens must be manually extracted and refreshed
+    * Breaks easily. API changes, new security headers, or updated bot protection will break requests with no fallback.
+
+    <Warning>
+      **Bot detection risk: VERY HIGH.** This approach is detectable at nearly every layer. TLS fingerprinting alone will catch Node.js HTTP clients on any site with even basic bot protection. The TLS fingerprint is fundamentally different from any real browser, and this is one of the strongest detection signals. This approach only works reliably against sites with zero bot detection, or against documented public APIs that expect programmatic access.
+    </Warning>
+  </Tab>
+</Tabs>
+
+***
+
+### Decision guide
+
+<Tip>
+  **Recommended approach:** Use in-browser fetch (`pageRequest()`) for most sites. It gives you full control over which endpoints you call, structured JSON responses, and the real browser's network fingerprint.
+
+  For high-security sites with aggressive bot detection (Cloudflare, Akamai, PerimeterX), use Regular Playwright for navigation and passive `page.on('response')` interception for data capture. This avoids making any extra requests that could trigger detection.
+</Tip>
+
+**Use Regular Playwright when:**
+
+* The data you need is visible in the DOM and straightforward to extract with selectors
+* The site doesn't have aggressive bot protection, or you're using stealth plugins
+* You want the simplest implementation that integrates with Libretto's recovery and extraction features
+* The data is rendered server-side and doesn't come from a separate API call
+
+**Use passive interception (`page.on('response')`) when:**
+
+* The site loads data via API calls during normal navigation (most modern SPAs)
+* You want structured JSON data without reverse-engineering the full API
+* Minimizing detection risk is important
+* You're already navigating through the UI and want to passively capture data along the way
+
+**Use in-browser fetch (`pageRequest()`) when:**
+
+* You need data from API endpoints that the UI doesn't naturally trigger (e.g., deep pagination, bulk exports)
+* You've verified the site doesn't monkey-patch `fetch` (or you can work around it)
+* You want maximum control over which data you fetch and when
+* You've already reverse-engineered the relevant API endpoints
+
+**Use Direct Node.js HTTP when:**
+
+* The target site has zero bot detection
+* Speed and resource efficiency are the primary concerns
+* You're hitting a public/documented API (not scraping a website)
+* You need to make thousands of concurrent requests
+

@@ -1,14 +1,14 @@
 ---
-title: Recovery
+title: Error recovery
 ---
 
-> Automatically handle errors and popups that interrupt browser automation workflows.
+> Automatically handle errors that interrupt browser automation workflows.
 
-Browser automation workflows are often interrupted by unexpected page state: cookie banners, newsletter modals, session-expired dialogs, or form submission errors. The recovery module provides three tools for handling these situations.
+Browser automation workflows are often interrupted by unexpected page state: cookie banners, modals, session-expired dialogs, form submission errors, or any other condition that blocks progress. The recovery module provides three tools for handling these situations. Each accepts a natural-language instruction, so recovery logic isn't limited to a specific type of error.
 
 ### `attemptWithRecovery()`
 
-Runs a function, and if it throws, optionally runs an LLM-powered popup recovery agent and retries the function once.
+Runs a function, and if it throws, optionally runs an LLM-powered recovery agent to resolve the issue, then retries the function once.
 
 ```typescript  theme={null}
 async function attemptWithRecovery<T>(
@@ -24,7 +24,7 @@ async function attemptWithRecovery<T>(
 1. Calls `fn()`.
 2. If `fn()` succeeds, returns the result immediately.
 3. If `fn()` throws and `llmClient` is not provided, re-throws the error.
-4. If `fn()` throws and `llmClient` is provided, runs `executeRecoveryAgent()` with the instruction `"Look at the page to see if there is a popup blocking the screen. If so, close the popup."`
+4. If `fn()` throws and `llmClient` is provided, runs `executeRecoveryAgent()` to inspect the page and attempt to resolve whatever is blocking progress
 5. After recovery, calls `fn()` a second time. If it throws again, that error propagates.
 
 <Warning>
@@ -38,7 +38,7 @@ async function attemptWithRecovery<T>(
 </ParamField>
 
 <ParamField path="fn" type="() => Promise<T>" required>
-  The async function to run. This is the step you want to protect — typically a sequence of Playwright actions.
+  The async function to run. This is the step you want to protect, typically a sequence of Playwright actions.
 </ParamField>
 
 <ParamField path="logger" type="MinimalLogger">
@@ -74,7 +74,7 @@ const result = await attemptWithRecovery(
 
 ### `executeRecoveryAgent()`
 
-Runs a vision-based LLM agent to handle page state issues. The agent takes a screenshot, sends it to the LLM with your instruction, executes the suggested browser action, and repeats for up to 3 steps until the action type is `"done"`.
+Runs a vision-based LLM agent to handle any page state issue. The agent takes a screenshot, sends it to the LLM with your instruction, executes the suggested browser action, and repeats for up to 3 steps until the action type is `"done"`. The instruction can describe any recovery scenario, not just popups.
 
 ```typescript  theme={null}
 async function executeRecoveryAgent(
@@ -189,7 +189,7 @@ If a `knownErrors` entry matches what the LLM sees on screen, `detectSubmissionE
 #### `DetectedSubmissionError`
 
 <ResponseField name="matched" type="true">
-  Always `true` — indicates a known error was detected.
+  Always `true`. Indicates a known error was detected.
 </ResponseField>
 
 <ResponseField name="errorId" type="string">

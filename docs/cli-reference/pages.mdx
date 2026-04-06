@@ -1,0 +1,38 @@
+---
+title: pages
+---
+
+> List open browser tabs in a session and target specific pages.
+
+### pages
+
+The `pages` command lists all open pages (tabs) in a session and prints their IDs and URLs.
+
+```bash theme={null}
+npx libretto pages --session debug-example
+```
+
+#### When to use `pages`
+
+- A popup or new tab opened during navigation or interaction.
+- `exec` or `snapshot` fails because more than one page is open in the session.
+- You are not sure which page holds the relevant state.
+
+After running `pages`, pass the target page ID to other commands with `--page <page-id>`:
+
+```bash theme={null}
+# List pages
+npx libretto pages --session debug-example
+
+# Target a specific page
+npx libretto exec --session debug-example --page <page-id> "return await page.url()"
+npx libretto snapshot --session debug-example --page <page-id> \
+  --objective "Find the active form" \
+  --context "A modal opened in a new tab."
+```
+
+#### Flags
+
+<ParamField path="--session" type="string" required>
+  The session to list pages for.
+</ParamField>

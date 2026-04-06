@@ -50,16 +50,16 @@
         "pages": [
           "get-started/introduction",
           "get-started/configuration",
-          "get-started/architecture",
-          "get-started/automation-approaches",
-          "get-started/bot-detection"
+          "get-started/core-concepts",
+          "get-started/how-workflow-generation-works",
+          "get-started/automation-and-bot-detection"
         ]
       },
       {
         "group": "Workflow guides",
         "pages": [
-          "workflow-guides/one-shot-script-generation",
-          "workflow-guides/interactive-script-building",
+          "workflow-guides/one-shot-workflow-generation",
+          "workflow-guides/interactive-workflow-building",
           "workflow-guides/debugging-workflows",
           "workflow-guides/convert-to-network-requests"
         ]
@@ -68,24 +68,23 @@
         "group": "CLI reference",
         "pages": [
           "cli-reference/open-and-connect",
-          "cli-reference/sessions-and-profiles",
+          "cli-reference/sessions",
+          "cli-reference/profiles",
           "cli-reference/snapshot",
           "cli-reference/exec",
           "cli-reference/run-and-resume",
-          "cli-reference/network-and-actions",
-          "cli-reference/session-management"
+          "cli-reference/session-logs",
+          "cli-reference/pages"
         ]
       },
       {
         "group": "Library API",
         "pages": [
           "library-api/workflow",
-          "library-api/extraction",
-          "library-api/network",
-          "library-api/recovery",
-          "library-api/instrumentation",
-          "library-api/logging",
-          "library-api/openapi-spec"
+          "library-api/ai-extraction",
+          "library-api/network-requests",
+          "library-api/downloads",
+          "library-api/error-recovery"
         ]
       }
     ],
@@ -113,13 +112,7 @@
   "contextual": {
     "options": [
       "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
+      "view"
     ]
   },
   "footer": {}

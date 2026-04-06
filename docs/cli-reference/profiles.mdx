@@ -1,0 +1,72 @@
+---
+title: profiles
+---
+
+> Save and reuse authenticated browser state across runs.
+
+### save
+
+The `save` command saves the current browser session's cookies and localStorage as a named auth profile. Load the profile later with `--auth-profile` to skip manual login.
+
+```bash theme={null}
+npx libretto save app.example.com --session app-login
+```
+
+#### When to use `save`
+
+Only use `save` when you want to save or reuse authenticated browser state. A typical flow:
+
+<Steps>
+  <Step title="Open the site in headed mode">
+    ```bash  theme={null}
+    npx libretto open https://app.example.com --headed --session app-login
+    ```
+  </Step>
+
+<Step title="Log in manually">
+  The browser window is visible. Log in as usual.
+</Step>
+
+  <Step title="Save the session">
+    ```bash  theme={null}
+    npx libretto save app.example.com --session app-login
+    ```
+
+    The profile is saved to `.libretto/profiles/app.example.com.json`.
+
+  </Step>
+
+  <Step title="Use the profile in future runs">
+    ```bash  theme={null}
+    npx libretto run ./integration.ts main --auth-profile app.example.com
+    ```
+  </Step>
+</Steps>
+
+#### Flags
+
+<ParamField path="domain" type="string" required>
+  The domain (or URL) used to name the saved profile. Passed as the first
+  positional argument. Example: `app.example.com`.
+</ParamField>
+
+<ParamField path="--session" type="string" required>
+  The session to save. Use the same name you passed to `npx libretto open
+  --session`.
+</ParamField>
+
+---
+
+### Profile storage
+
+Profiles are stored in `.libretto/profiles/<domain>.json`. They are:
+
+- Machine-local, not shared across environments or team members.
+- Git-ignored by default.
+- Subject to session expiry. If authentication stops working, repeat the login-and-save flow.
+
+<Note>
+  Profiles contain session cookies that are effectively credentials. The
+  `.libretto/` directory is already git-ignored, but double-check your
+  `.gitignore` if you're storing Libretto state in a non-standard location.
+</Note>
