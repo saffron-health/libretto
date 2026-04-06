@@ -7,6 +7,7 @@
     "@onkernel/sdk": "^0.44.0",
     "@google-cloud/storage": "^7.16.0",
     "@mariozechner/pi-coding-agent": "^0.62.0",
+    "@sinclair/typebox": "^0.34.41",
     "google-auth-library": "^10.6.1",
     "tsx": "^4.21.0",
     "zod": "^4.3.6"

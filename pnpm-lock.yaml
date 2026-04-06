@@ -114,6 +114,9 @@ importers:
       '@mariozechner/pi-coding-agent':
         specifier: ^0.62.0
         version: 0.62.0(ws@8.20.0)(zod@4.3.6)
+      '@sinclair/typebox':
+        specifier: ^0.34.41
+        version: 0.34.48
       '@onkernel/sdk':
         specifier: ^0.44.0
         version: 0.44.0

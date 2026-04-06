@@ -2,12 +2,12 @@ import { z } from "zod";
 
 export const AGENTIC_EVALUATOR_ID = "webvoyager-pi-agent-v1" as const;
 export const AGENTIC_EVALUATOR_PROMPT_VERSION =
-  "webvoyager-pi-agent-v1.phase-1" as const;
-export const DEFAULT_AGENTIC_EVALUATOR_MAX_TURNS = 12 as const;
+  "webvoyager-pi-agent-v1.phase-2b" as const;
+export const DEFAULT_AGENTIC_EVALUATOR_MAX_TURNS = 100 as const;
 
 export const AgenticEvaluationMetadataSchema = z.object({
   model: z.string().min(1),
-  temperature: z.literal(0),
+  temperature: z.number().min(0).max(1).optional(),
   promptVersion: z.string().min(1),
   durationMs: z.number().nonnegative(),
   maxTurns: z.number().int().positive(),
