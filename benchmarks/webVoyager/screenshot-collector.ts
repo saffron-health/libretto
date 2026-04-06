@@ -67,8 +67,8 @@ async function computeSSIM(a: Buffer, b: Buffer): Promise<number> {
     return 0;
   }
 
-  const c1 = 0.01 * 0.01;
-  const c2 = 0.03 * 0.03;
+  const c1 = (0.01 * 255) ** 2;
+  const c2 = (0.03 * 255) ** 2;
 
   let sumA = 0;
   let sumB = 0;
@@ -262,7 +262,10 @@ export class ScreenshotCollector {
       const page = candidatePages.at(-1) ?? pages.at(-1) ?? null;
       if (!page) return null;
 
-      return (await page.screenshot({ type: "png", fullPage: false })) as Buffer;
+      return (await page.screenshot({
+        type: "png",
+        fullPage: false,
+      })) as Buffer;
     } catch {
       return null;
     } finally {
@@ -296,9 +299,7 @@ function getCaptureKind(
   }
 
   const match = command.match(/\blibretto\s+(exec|snapshot)\b/);
-  return match?.[1] === "exec" || match?.[1] === "snapshot"
-    ? match[1]
-    : null;
+  return match?.[1] === "exec" || match?.[1] === "snapshot" ? match[1] : null;
 }
 
 function delay(ms: number): Promise<void> {

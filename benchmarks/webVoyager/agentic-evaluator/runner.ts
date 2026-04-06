@@ -227,7 +227,7 @@ function renderEvaluationAnalysis(args: {
     `- Verdict: ${evaluation.evaluation}`,
     `- Evaluator ID: ${evaluation.evaluatorId}`,
     `- Model: ${evaluation.metadata.model}`,
-    `- Temperature: ${evaluation.metadata.temperature}`,
+    `- Temperature: ${evaluation.metadata.temperature ?? "-"}`,
     `- Prompt version: ${evaluation.metadata.promptVersion}`,
     `- Duration (ms): ${evaluation.metadata.durationMs}`,
     `- Max turns: ${evaluation.metadata.maxTurns}`,
