@@ -209,6 +209,7 @@ async function writeLibrettoSessionState(
     startedAt: new Date().toISOString(),
     status: "active",
     viewport: DEFAULT_VIEWPORT,
+    mode: "write-access" as const,
   };
 
   await writeFile(

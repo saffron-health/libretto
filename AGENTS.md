@@ -25,6 +25,8 @@ pnpm type-check
 pnpm test
 ```
 
+- Prefer `pnpm -s <script>` (or `pnpm --silent ...`) for routine scripted commands when you want less pnpm noise in logs.
+
 Targeted (most common during development):
 
 ```bash

@@ -4,13 +4,13 @@ import {
   type MinimalLogger,
   defaultLogger,
 } from "../../shared/logger/logger.js";
-import type { LLMClient } from "../../shared/llm/types.js";
+import { generateObject, type LanguageModel } from "ai";
 
 export type ExtractOptions<T extends z.ZodType> = {
   page: Page;
   instruction: string;
   schema: T;
-  llmClient: LLMClient;
+  model: LanguageModel;
   logger?: MinimalLogger;
   /** Optional CSS selector to scope extraction to a specific element. */
   selector?: string;
@@ -31,7 +31,7 @@ export async function extractFromPage<T extends z.ZodType>(
     schema,
     selector,
     logger = defaultLogger,
-    llmClient,
+    model,
   } = options;
 
   let screenshot: string;
@@ -79,7 +79,8 @@ ${domContent ? `Here is the HTML content for additional context:\n<html>\n${domC
 
 Extract the requested information from the screenshot and return it in the specified format. Be precise and only extract what is visible.`;
 
-  const result = await llmClient.generateObjectFromMessages({
+  const { object: result } = await generateObject({
+    model,
     schema,
     messages: [
       {
@@ -98,5 +99,5 @@ Extract the requested information from the screenshot and return it in the speci
     instruction: instruction.slice(0, 100),
   });
 
-  return result;
+  return result as z.infer<T>;
 }

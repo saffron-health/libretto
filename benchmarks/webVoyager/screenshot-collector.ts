@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium, type Browser } from "playwright";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -8,13 +8,9 @@ import { join } from "node:path";
 // ---------------------------------------------------------------------------
 
 const MAX_SCREENSHOTS = Number(process.env.BENCH_MAX_SCREENSHOTS) || 7;
-const SCREENSHOT_INTERVAL_MS =
-  Number(process.env.BENCH_SCREENSHOT_INTERVAL_MS) || 3000;
 const SCREENSHOT_SCALE = Number(process.env.BENCH_SCREENSHOT_SCALE) || 0.7;
-
-// MSE threshold – pairs below this are considered duplicates.
 const MSE_THRESHOLD = 30;
-// Thumbnail dimensions used for dedup comparison (fast path).
+const SSIM_THRESHOLD = 0.75;
 const THUMB_WIDTH = 400;
 const THUMB_HEIGHT = 300;
 
@@ -55,6 +51,53 @@ function computeMSE(a: Buffer, b: Buffer): number {
   return sum / a.length;
 }
 
+async function computeSSIM(a: Buffer, b: Buffer): Promise<number> {
+  const grayA = await sharp(a)
+    .resize(THUMB_WIDTH, THUMB_HEIGHT)
+    .grayscale()
+    .raw()
+    .toBuffer();
+  const grayB = await sharp(b)
+    .resize(THUMB_WIDTH, THUMB_HEIGHT)
+    .grayscale()
+    .raw()
+    .toBuffer();
+
+  if (grayA.length !== grayB.length) {
+    return 0;
+  }
+
+  const c1 = (0.01 * 255) ** 2;
+  const c2 = (0.03 * 255) ** 2;
+
+  let sumA = 0;
+  let sumB = 0;
+  let sumASquared = 0;
+  let sumBSquared = 0;
+  let sumAB = 0;
+  const count = grayA.length;
+
+  for (let i = 0; i < count; i++) {
+    sumA += grayA[i];
+    sumB += grayB[i];
+    sumASquared += grayA[i] * grayA[i];
+    sumBSquared += grayB[i] * grayB[i];
+    sumAB += grayA[i] * grayB[i];
+  }
+
+  const meanA = sumA / count;
+  const meanB = sumB / count;
+  const varianceA = sumASquared / count - meanA * meanA;
+  const varianceB = sumBSquared / count - meanB * meanB;
+  const covariance = sumAB / count - meanA * meanB;
+
+  const numerator = (2 * meanA * meanB + c1) * (2 * covariance + c2);
+  const denominator =
+    (meanA * meanA + meanB * meanB + c1) * (varianceA + varianceB + c2);
+
+  return denominator === 0 ? 0 : numerator / denominator;
+}
+
 // ---------------------------------------------------------------------------
 // Session state reader (minimal, avoid importing the full CLI)
 // ---------------------------------------------------------------------------
@@ -87,89 +130,114 @@ function readCdpEndpoint(runDir: string, session: string): string | null {
 // ---------------------------------------------------------------------------
 
 export type CollectedScreenshot = {
-  /** Full-resolution PNG buffer (before resize). */
   original: Buffer;
-  /** Timestamp of capture. */
   capturedAt: Date;
 };
 
 export class ScreenshotCollector {
   private screenshots: CollectedScreenshot[] = [];
   private lastThumb: Buffer | null = null;
-  private timer: ReturnType<typeof setInterval> | null = null;
-  private capturing = false;
+  private lastScreenshot: Buffer | null = null;
   private stopped = false;
+  private captureQueue: Promise<void> = Promise.resolve();
   private readonly sessionName: string;
   private readonly runDir: string;
   private readonly maxScreenshots: number;
-  private readonly intervalMs: number;
 
   constructor(
     sessionName: string,
     runDir: string,
-    opts?: { maxScreenshots?: number; intervalMs?: number },
+    opts?: { maxScreenshots?: number },
   ) {
     this.sessionName = sessionName;
     this.runDir = runDir;
     this.maxScreenshots = opts?.maxScreenshots ?? MAX_SCREENSHOTS;
-    this.intervalMs = opts?.intervalMs ?? SCREENSHOT_INTERVAL_MS;
   }
 
-  /** Begin periodic screenshot capture. */
-  start(): void {
-    if (this.stopped) return;
-    // Take initial screenshot then start interval
-    void this.capture();
-    this.timer = setInterval(() => void this.capture(), this.intervalMs);
+  captureForToolCall(toolName: string, args: unknown): void {
+    const captureKind = getCaptureKind(toolName, args);
+    if (this.stopped || !captureKind) {
+      return;
+    }
+
+    this.enqueueCapture(false);
+    if (captureKind === "exec") {
+      this.captureQueue = this.captureQueue
+        .catch(() => {})
+        .then(() => delay(750))
+        .then(() => this.captureNow(false));
+    }
   }
 
-  /** Stop capturing and return the deduplicated, resized screenshot buffers. */
   async stop(): Promise<Buffer[]> {
     this.stopped = true;
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
-    // One final capture attempt
-    await this.capture();
 
-    // Resize all kept screenshots
+    await this.captureQueue.catch(() => {});
+    const finalScreenshot = await this.takeScreenshot();
+    if (
+      finalScreenshot &&
+      (this.screenshots.length === 0 ||
+        !(await this.isDuplicateScreenshot(finalScreenshot)))
+    ) {
+      await this.storeScreenshot(finalScreenshot);
+    }
+
     const resized = await Promise.all(
-      this.screenshots.map((s) => imageResize(s.original, SCREENSHOT_SCALE)),
+      this.screenshots.map((screenshot) =>
+        imageResize(screenshot.original, SCREENSHOT_SCALE),
+      ),
     );
 
-    // Clear internal state
     this.screenshots = [];
     this.lastThumb = null;
+    this.lastScreenshot = null;
 
     return resized;
   }
 
-  private async capture(): Promise<void> {
-    if (this.capturing) return;
-    this.capturing = true;
-    try {
-      const buf = await this.takeScreenshot();
-      if (!buf) return;
+  private enqueueCapture(forceKeep: boolean): void {
+    this.captureQueue = this.captureQueue
+      .catch(() => {})
+      .then(() => this.captureNow(forceKeep));
+  }
 
-      // Dedup via MSE on thumbnails
-      const thumb = await toThumbnailRaw(buf);
-      if (this.lastThumb) {
-        const mse = computeMSE(this.lastThumb, thumb);
-        if (mse < MSE_THRESHOLD) return; // too similar, skip
+  private async captureNow(forceKeep: boolean): Promise<void> {
+    const screenshot = await this.takeScreenshot();
+    if (!screenshot) {
+      return;
+    }
+
+    if (!forceKeep && (await this.isDuplicateScreenshot(screenshot))) {
+      return;
+    }
+
+    await this.storeScreenshot(screenshot);
+  }
+
+  private async isDuplicateScreenshot(screenshot: Buffer): Promise<boolean> {
+    const thumb = await toThumbnailRaw(screenshot);
+    if (this.lastThumb && this.lastScreenshot) {
+      const mse = computeMSE(this.lastThumb, thumb);
+      if (mse < MSE_THRESHOLD) {
+        return true;
       }
 
-      this.lastThumb = thumb;
-      this.screenshots.push({ original: buf, capturedAt: new Date() });
-
-      // Cap – drop oldest when over limit
-      while (this.screenshots.length > this.maxScreenshots) {
-        this.screenshots.shift();
+      const ssim = await computeSSIM(this.lastScreenshot, screenshot);
+      if (ssim >= SSIM_THRESHOLD) {
+        return true;
       }
-    } catch {
-      // Browser not ready yet or disconnected – silently ignore
-    } finally {
-      this.capturing = false;
+    }
+
+    return false;
+  }
+
+  private async storeScreenshot(screenshot: Buffer): Promise<void> {
+    this.lastThumb = await toThumbnailRaw(screenshot);
+    this.lastScreenshot = screenshot;
+
+    this.screenshots.push({ original: screenshot, capturedAt: new Date() });
+    while (this.screenshots.length > this.maxScreenshots) {
+      this.screenshots.shift();
     }
   }
 
@@ -183,14 +251,21 @@ export class ScreenshotCollector {
       const contexts = browser.contexts();
       if (contexts.length === 0) return null;
 
-      const pages = contexts.flatMap((c) => c.pages());
-      const page = pages.find((p) => {
-        const url = p.url();
+      const pages = contexts.flatMap((context) => context.pages());
+      if (pages.length === 0) return null;
+
+      const candidatePages = pages.filter((page) => {
+        const url = page.url();
         return url && !url.startsWith("chrome://") && !url.startsWith("about:");
       });
+
+      const page = candidatePages.at(-1) ?? pages.at(-1) ?? null;
       if (!page) return null;
 
-      return (await page.screenshot({ type: "png" })) as Buffer;
+      return (await page.screenshot({
+        type: "png",
+        fullPage: false,
+      })) as Buffer;
     } catch {
       return null;
     } finally {
@@ -201,4 +276,32 @@ export class ScreenshotCollector {
       }
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Tool-call detection
+// ---------------------------------------------------------------------------
+
+function getCaptureKind(
+  toolName: string,
+  args: unknown,
+): "exec" | "snapshot" | null {
+  if (toolName !== "bash" || !args || typeof args !== "object") {
+    return null;
+  }
+
+  const command =
+    typeof (args as { command?: unknown }).command === "string"
+      ? (args as { command: string }).command
+      : null;
+  if (!command) {
+    return null;
+  }
+
+  const match = command.match(/\blibretto\s+(exec|snapshot)\b/);
+  return match?.[1] === "exec" || match?.[1] === "snapshot" ? match[1] : null;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

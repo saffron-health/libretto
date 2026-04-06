@@ -3,7 +3,7 @@ import {
   type MinimalLogger,
   defaultLogger,
 } from "../../shared/logger/logger.js";
-import type { LLMClient } from "../../shared/llm/types.js";
+import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 
 /**
@@ -47,7 +47,7 @@ export async function detectSubmissionError(
   page: Page,
   error: unknown,
   logContext: string,
-  llmClient: LLMClient,
+  model: LanguageModel,
   knownErrors: KnownSubmissionError[] = [],
   logger?: MinimalLogger,
 ): Promise<DetectedSubmissionError> {
@@ -109,7 +109,8 @@ IMPORTANT:
 
 ${domSnapshot ? `<dom_snapshot>\n${domSnapshot}\n</dom_snapshot>` : ""}`;
 
-  const result = await llmClient.generateObjectFromMessages({
+  const { object: result } = await generateObject({
+    model,
     schema: detectSubmissionErrorSchema,
     messages: [
       {

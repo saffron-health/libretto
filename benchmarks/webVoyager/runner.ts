@@ -14,8 +14,6 @@ import {
   SettingsManager,
   type AgentSessionEvent,
 } from "@mariozechner/pi-coding-agent";
-import { z } from "zod";
-import { createLLMClient } from "../libretto-internals.js";
 import {
   formatSelectionSummary,
   readWebVoyagerRows,
@@ -24,11 +22,13 @@ import {
 } from "./dataset.js";
 import { buildWebVoyagerPrompt, getRunName } from "./prompt.js";
 import { ScreenshotCollector } from "./screenshot-collector.js";
-import { evaluateWithScreenshots, type JudgeResult } from "./evaluator.js";
+import {
+  evaluateCaseWithAgent,
+  type AgenticJudgeResult,
+} from "./agentic-evaluator/runner.js";
 import {
   openKernelSessionForBenchmark,
   closeKernelSessionForBenchmark,
-  type KernelSessionHandle,
 } from "./kernel-session.js";
 
 // ---------------------------------------------------------------------------
@@ -43,7 +43,7 @@ export type WebVoyagerCaseResult = {
   finishedAt: string;
   durationMs: number;
   finalMessage: string | null;
-  judge: JudgeResult;
+  judge: AgenticJudgeResult;
   screenshotCount: number;
   error: string | null;
 };
@@ -628,60 +628,6 @@ async function prepareRunWorkspace(
 }
 
 // ---------------------------------------------------------------------------
-// Save screenshots as artifacts
-// ---------------------------------------------------------------------------
-
-async function saveEvaluatorArtifacts(
-  runDir: string,
-  screenshots: Buffer[],
-  judge: JudgeResult,
-  task: string,
-  agentReasoning: string | null,
-): Promise<{ screenshotPaths: string[]; analysisPath: string }> {
-  const evalDir = join(runDir, "evaluator");
-  const screenshotsDir = join(evalDir, "screenshots");
-  await mkdir(screenshotsDir, { recursive: true });
-
-  // Save screenshots
-  const screenshotPaths: string[] = [];
-  for (let i = 0; i < screenshots.length; i++) {
-    const filename = `screenshot-${String(i + 1).padStart(2, "0")}.png`;
-    const filePath = join(screenshotsDir, filename);
-    await writeFile(filePath, screenshots[i]);
-    screenshotPaths.push(filePath);
-  }
-
-  // Write analysis markdown
-  const analysisPath = join(evalDir, "analysis.md");
-  const analysisLines = [
-    `# Evaluator Analysis`,
-    "",
-    `## Task`,
-    "",
-    task,
-    "",
-    `## Verdict: ${judge.evaluation}`,
-    "",
-    judge.reasoning,
-    "",
-    `## Evidence`,
-    "",
-    `Screenshots: ${screenshots.length}`,
-    "",
-    ...screenshotPaths.map((p, i) => `- Screenshot ${i + 1}: ${p}`),
-    "",
-  ];
-
-  if (agentReasoning?.trim()) {
-    analysisLines.push(`## Agent Reasoning`, "", agentReasoning.trim(), "");
-  }
-
-  await writeFile(analysisPath, analysisLines.join("\n"), "utf8");
-
-  return { screenshotPaths, analysisPath };
-}
-
-// ---------------------------------------------------------------------------
 // Run a single case
 // ---------------------------------------------------------------------------
 
@@ -773,10 +719,13 @@ export async function runWebVoyagerCase(
 
     let finalMessage: string | null = null;
     let thrownError: unknown;
+    const pendingToolCalls = new Map<
+      string,
+      { toolName: string; args: unknown }
+    >();
 
-    // Start screenshot collection on the libretto browser session
+    // Capture screenshots after relevant libretto exec/snapshot tool calls.
     const screenshotCollector = new ScreenshotCollector(sessionName, runDir);
-    screenshotCollector.start();
 
     const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
       if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
@@ -784,6 +733,43 @@ export async function runWebVoyagerCase(
       }
 
       switch (event.type) {
+        case "tool_execution_start": {
+          const typedEvent = event as AgentSessionEvent & {
+            toolCallId?: string;
+            toolName?: string;
+            args?: unknown;
+          };
+          if (
+            typeof typedEvent.toolCallId === "string" &&
+            typeof typedEvent.toolName === "string"
+          ) {
+            pendingToolCalls.set(typedEvent.toolCallId, {
+              toolName: typedEvent.toolName,
+              args: typedEvent.args,
+            });
+          }
+          break;
+        }
+        case "tool_execution_end": {
+          const typedEvent = event as AgentSessionEvent & {
+            toolCallId?: string;
+            toolName?: string;
+          };
+          const pendingToolCall =
+            typeof typedEvent.toolCallId === "string"
+              ? (pendingToolCalls.get(typedEvent.toolCallId) ?? null)
+              : null;
+          if (pendingToolCall) {
+            screenshotCollector.captureForToolCall(
+              pendingToolCall.toolName,
+              pendingToolCall.args,
+            );
+          }
+          if (typeof typedEvent.toolCallId === "string") {
+            pendingToolCalls.delete(typedEvent.toolCallId);
+          }
+          break;
+        }
         case "message_end": {
           const messageText = extractAssistantText(event.message);
           if (!messageText) {
@@ -811,21 +797,14 @@ export async function runWebVoyagerCase(
     // so the final capture can still reach the remote browser
     const screenshots = await screenshotCollector.stop();
 
-    // Evaluate using screenshot-based LLM judge
-    const judge = await evaluateWithScreenshots({
-      task: row.ques,
-      screenshots,
-      agentReasoning: finalMessage,
-    });
-
-    // Persist evaluator artifacts
-    const { screenshotPaths, analysisPath } = await saveEvaluatorArtifacts(
+    const evaluatorRun = await evaluateCaseWithAgent({
       runDir,
-      screenshots,
-      judge,
-      row.ques,
-      finalMessage,
-    );
+      promptPath: join(runDir, "prompt.md"),
+      transcriptPath,
+      apiKey: anthropicApiKey,
+      modelProvider: BENCHMARK_MODEL_PROVIDER,
+      modelId: BENCHMARK_MODEL_ID,
+    });
     const transcriptAnalysisPath = await writeTranscriptAnalysis(
       runDir,
       readTranscriptUsageSummary(transcriptPath),
@@ -840,9 +819,10 @@ export async function runWebVoyagerCase(
           ? String(thrownError)
           : null;
 
-    // INVALID judge verdicts are treated as failures
     const status: "passed" | "failed" =
-      !errorMessage && judge.evaluation === "YES" ? "passed" : "failed";
+      !errorMessage && evaluatorRun.judge.evaluation === "YES"
+        ? "passed"
+        : "failed";
 
     const result: WebVoyagerCaseResult = {
       caseId: row.id,
@@ -852,7 +832,7 @@ export async function runWebVoyagerCase(
       finishedAt: finishedAt.toISOString(),
       durationMs,
       finalMessage,
-      judge,
+      judge: evaluatorRun.judge,
       screenshotCount: screenshots.length,
       error: errorMessage,
     };
@@ -865,8 +845,9 @@ export async function runWebVoyagerCase(
           browserBackend: "kernel",
           task: row.ques,
           url: row.web,
-          screenshotPaths,
-          analysisPath,
+          analysisPath: evaluatorRun.analysisPath,
+          evaluatorTranscriptPath: evaluatorRun.transcriptPath,
+          evaluatorResultPath: evaluatorRun.resultPath,
           transcriptAnalysisPath,
         },
         null,
