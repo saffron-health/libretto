@@ -1,6 +1,4 @@
-import { generateObject, type LanguageModel, type ModelMessage } from "ai";
-import type { ZodType, output as ZodOutput } from "zod";
-import type { LLMClient, Message, MessageContentPart } from "./types.js";
+import type { LanguageModel } from "ai";
 
 export type Provider = "google" | "vertex" | "anthropic" | "openai";
 
@@ -138,87 +136,7 @@ async function getProviderModel(
   }
 }
 
-function convertUserContentParts(parts: MessageContentPart[]) {
-  return parts.map((part) => {
-    if (part.type === "text") {
-      return { type: "text" as const, text: part.text };
-    }
-    return {
-      type: "image" as const,
-      image: part.image,
-      ...(part.mediaType ? { mediaType: part.mediaType } : {}),
-    };
-  });
-}
-
-function convertAssistantContentParts(parts: MessageContentPart[]) {
-  return parts
-    .filter(
-      (part): part is MessageContentPart & { type: "text" } =>
-        part.type === "text",
-    )
-    .map((part) => ({ type: "text" as const, text: part.text }));
-}
-
-function convertMessages(messages: Message[]): ModelMessage[] {
-  return messages.map((msg): ModelMessage => {
-    if (msg.role === "user") {
-      if (typeof msg.content === "string") {
-        return { role: "user", content: msg.content };
-      }
-      return {
-        role: "user",
-        content: convertUserContentParts(msg.content),
-      };
-    }
-    if (typeof msg.content === "string") {
-      return { role: "assistant", content: msg.content };
-    }
-    return {
-      role: "assistant",
-      content: convertAssistantContentParts(msg.content),
-    };
-  });
-}
-
-export function createLLMClient(model: string): LLMClient {
+export async function resolveModel(model: string): Promise<LanguageModel> {
   const { provider, modelId } = parseModel(model);
-  let modelPromise: Promise<LanguageModel> | null = null;
-
-  const getModel = () => {
-    modelPromise ??= getProviderModel(provider, modelId);
-    return modelPromise;
-  };
-
-  return {
-    async generateObject<T extends ZodType>(opts: {
-      prompt: string;
-      schema: T;
-      temperature?: number;
-    }): Promise<ZodOutput<T>> {
-      const aiModel = await getModel();
-      const result = await generateObject({
-        model: aiModel,
-        prompt: opts.prompt,
-        schema: opts.schema,
-        temperature: opts.temperature ?? 0,
-      });
-      return result.object as ZodOutput<T>;
-    },
-
-    async generateObjectFromMessages<T extends ZodType>(opts: {
-      messages: Message[];
-      schema: T;
-      temperature?: number;
-    }): Promise<ZodOutput<T>> {
-      const aiModel = await getModel();
-      const result = await generateObject({
-        model: aiModel,
-        messages: convertMessages(opts.messages),
-        schema: opts.schema,
-        temperature: opts.temperature ?? 0,
-      });
-      return result.object as ZodOutput<T>;
-    },
-  };
+  return getProviderModel(provider, modelId);
 }

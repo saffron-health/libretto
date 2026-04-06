@@ -1,9 +1,6 @@
+import { generateObject, type ModelMessage, type UserContent } from "ai";
 import { z } from "zod";
-import {
-  createLLMClient,
-  type Message,
-  type MessageContentPart,
-} from "../libretto-internals.js";
+import { resolveModel } from "../libretto-internals.js";
 
 // ---------------------------------------------------------------------------
 // Schema & types
@@ -64,7 +61,7 @@ export async function evaluateWithScreenshots(opts: {
   }
 
   // Build the multimodal user message
-  const contentParts: MessageContentPart[] = [];
+  const contentParts: UserContent = [];
 
   contentParts.push({
     type: "text",
@@ -92,7 +89,7 @@ export async function evaluateWithScreenshots(opts: {
     });
   }
 
-  const messages: Message[] = [
+  const messages: ModelMessage[] = [
     { role: "user", content: SYSTEM_PROMPT },
     {
       role: "assistant",
@@ -102,10 +99,11 @@ export async function evaluateWithScreenshots(opts: {
     { role: "user", content: contentParts },
   ];
 
-  const client = createLLMClient(JUDGE_MODEL);
+  const model = await resolveModel(JUDGE_MODEL);
 
   try {
-    const result = await client.generateObjectFromMessages({
+    const { object: result } = await generateObject({
+      model,
       messages,
       schema: EvaluationSchema,
       temperature: 0,

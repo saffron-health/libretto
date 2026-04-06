@@ -6,7 +6,7 @@ import {
   hasProviderCredentials,
   parseModel,
   type Provider,
-} from "../../shared/llm/client.js";
+} from "./resolve-model.js";
 
 // ── Default models ──────────────────────────────────────────────────────────
 
