@@ -3,7 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "ai": "^6.0.116",
     "@google-cloud/run": "^3.2.0",
     "@onkernel/sdk": "^0.44.0",
     "@google-cloud/storage": "^7.16.0",
