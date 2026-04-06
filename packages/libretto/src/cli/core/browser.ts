@@ -797,21 +797,10 @@ export async function runOpenWithProvider(
     await page.goto(url);
     logger.info("open-provider-navigated", { url, session });
 
-    // Parse the CDP endpoint to extract a port for session state.
-    // For WebSocket URLs, use port 0 as a sentinel since there's no local port.
-    let port = 0;
-    try {
-      const cdpUrl = new URL(providerSession.cdpEndpoint);
-      if (cdpUrl.port) {
-        port = Number(cdpUrl.port);
-      }
-    } catch {
-      // Keep port 0 if URL parsing fails
-    }
-
+    // Cloud sessions have no local port. Reconnection uses cdpEndpoint directly.
     writeSessionState(
       {
-        port,
+        port: 0,
         cdpEndpoint: providerSession.cdpEndpoint,
         session,
         startedAt: new Date().toISOString(),
