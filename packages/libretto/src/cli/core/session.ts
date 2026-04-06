@@ -14,9 +14,11 @@ import {
   LIBRETTO_SESSIONS_DIR,
 } from "./context.js";
 import {
+  SessionAccessModeSchema,
   SESSION_STATE_VERSION,
   parseSessionStateContent,
   serializeSessionState,
+  type SessionAccessMode,
   type SessionStatus,
   type SessionState,
 } from "../../shared/state/index.js";
@@ -35,7 +37,13 @@ export function generateSessionName(): string {
   return `ses-${id}`;
 }
 export { SESSION_STATE_VERSION };
-export type { SessionStatus, SessionState };
+export type { SessionAccessMode, SessionStatus, SessionState };
+
+export function resolveSessionAccessMode(
+  state: Pick<SessionState, "mode"> | null | undefined,
+): SessionAccessMode {
+  return SessionAccessModeSchema.parse(state?.mode);
+}
 
 export function logFileForSession(session: string): string {
   validateSessionName(session);
@@ -181,9 +189,45 @@ export function writeSessionState(
   logger?.info("session-state-write", {
     session: state.session,
     stateFile,
+    mode: state.mode,
     port: state.port,
     pid: state.pid,
   });
+}
+
+export function setSessionMode(
+  session: string,
+  mode: SessionAccessMode,
+  logger?: LoggerApi,
+): SessionState {
+  const state = readSessionStateOrThrow(session);
+  const normalizedMode = SessionAccessModeSchema.parse(mode);
+  if (state.mode === normalizedMode) {
+    return state;
+  }
+
+  const nextState = {
+    ...state,
+    mode: normalizedMode,
+  };
+  writeSessionState(nextState, logger);
+  return nextState;
+}
+
+export function assertSessionAllowsCommand(
+  state: SessionState,
+  commandName: string,
+  allowedModes: readonly SessionAccessMode[],
+): void {
+  const mode = resolveSessionAccessMode(state);
+  if (allowedModes.includes(mode)) {
+    return;
+  }
+
+  const supportedModes = [...allowedModes].join(", ");
+  throw new Error(
+    `Command "${commandName}" is blocked for session "${state.session}" because it is in ${mode} mode. Allowed modes for this command: ${supportedModes}. Run \`libretto session-mode write-access --session ${state.session}\` to unlock the session.`,
+  );
 }
 
 export function clearSessionState(session: string, logger?: LoggerApi): void {

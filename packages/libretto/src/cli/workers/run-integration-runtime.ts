@@ -5,7 +5,7 @@ import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  getWorkflowFromModuleExports,
+  getDefaultWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,
   instrumentContext,
   launchBrowser,
@@ -138,9 +138,8 @@ function getAbsoluteIntegrationPath(integrationPath: string): string {
   return absolutePath;
 }
 
-async function loadWorkflowByName(
+async function loadDefaultWorkflow(
   absolutePath: string,
-  workflowName: string,
 ): Promise<LoadedLibrettoWorkflow> {
   let loadedModule: Record<string, unknown>;
   try {
@@ -156,22 +155,23 @@ async function loadWorkflowByName(
     );
   }
 
-  const workflow = getWorkflowFromModuleExports(loadedModule, workflowName);
-  if (workflow) {
-    return workflow as LoadedLibrettoWorkflow;
+  const defaultWorkflow = getDefaultWorkflowFromModuleExports(loadedModule);
+  if (defaultWorkflow) {
+    return defaultWorkflow as LoadedLibrettoWorkflow;
   }
 
-  const availableWorkflows = getWorkflowsFromModuleExports(loadedModule).map(
+  const availableWorkflowNames = getWorkflowsFromModuleExports(loadedModule).map(
     (candidate) => candidate.name,
   );
 
-  const detail =
-    availableWorkflows.length > 0
-      ? ` Available workflows: ${availableWorkflows.join(", ")}`
-      : ' No workflows found in this file. Export a workflow() instance from "libretto" directly or via `export const workflows = { ... }`.';
+  if (availableWorkflowNames.length === 0) {
+    throw new Error(
+      `No default-exported workflow found in ${absolutePath}. Export the workflow with \`export default workflow("name", handler)\`.`,
+    );
+  }
 
   throw new Error(
-    `Workflow "${workflowName}" not found in ${absolutePath}.${detail}`,
+    `No default-exported workflow found in ${absolutePath}. libretto run only uses the file's default export. Available named workflows: ${availableWorkflowNames.join(", ")}`,
   );
 }
 
@@ -194,7 +194,7 @@ async function runIntegrationInternal(
 ): Promise<RunIntegrationOutcome> {
   const { logger } = options;
   const absolutePath = getAbsoluteIntegrationPath(args.integrationPath);
-  const workflow = await loadWorkflowByName(absolutePath, args.workflowName);
+  const workflow = await loadDefaultWorkflow(absolutePath);
   const signalPaths = getPauseSignalPaths(args.session);
   await removeSignalIfExists(signalPaths.pausedSignalPath);
   await removeSignalIfExists(signalPaths.resumeSignalPath);
@@ -203,12 +203,12 @@ async function runIntegrationInternal(
   const restoreStdout = mirrorStdoutToFile(signalPaths.outputSignalPath);
 
   console.log(
-    `Running workflow "${args.workflowName}" from ${absolutePath} (${args.headless ? "headless" : "headed"})...`,
+    `Running workflow "${workflow.name}" from ${absolutePath} (${args.headless ? "headless" : "headed"})...`,
   );
 
   const integrationLogger = logger.withScope("integration-run", {
     integrationPath: absolutePath,
-    workflowName: args.workflowName,
+    workflowName: workflow.name,
     session: args.session,
   });
 
@@ -238,6 +238,7 @@ async function runIntegrationInternal(
     headless: args.headless,
     storageStatePath,
     viewport: args.viewport,
+    accessMode: args.accessMode,
   });
   if (!args.headless && args.visualize !== false) {
     await installHeadedWorkflowVisualization({

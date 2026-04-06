@@ -102,6 +102,7 @@ export {
 
 // Workflow helpers
 export {
+  getDefaultWorkflowFromModuleExports,
   getWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,
   isLibrettoWorkflow,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SessionAccessModeSchema } from "../../shared/state/index.js";
 import {
   runClose as runCloseWithLogger,
   runCloseAll as runCloseAllWithLogger,
@@ -9,7 +10,9 @@ import {
 } from "../core/browser.js";
 import { createLoggerForSession, withSessionLogger } from "../core/context.js";
 import {
+  type SessionAccessMode,
   assertSessionAvailableForStart,
+  setSessionMode,
   validateSessionName,
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
@@ -43,6 +46,10 @@ export function parseViewportArg(
   return { width, height };
 }
 
+function resolveRequestedSessionMode(readOnly: boolean | undefined): SessionAccessMode {
+  return readOnly ? "read-only" : "write-access";
+}
+
 export const openInput = SimpleCLI.input({
   positionals: [
     SimpleCLI.positional("url", z.string().optional(), {
@@ -53,6 +60,10 @@ export const openInput = SimpleCLI.input({
     session: sessionOption(),
     headed: SimpleCLI.flag({ help: "Run browser in headed mode" }),
     headless: SimpleCLI.flag({ help: "Run browser in headless mode" }),
+    readOnly: SimpleCLI.flag({
+      name: "read-only",
+      help: "Create the session in read-only mode",
+    }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
@@ -60,7 +71,7 @@ export const openInput = SimpleCLI.input({
 })
   .refine(
     (input) => Boolean(input.url),
-    `Usage: libretto open <url> [--headless] [--viewport WxH] [--session <name>]`,
+    `Usage: libretto open <url> [--headless] [--read-only] [--viewport WxH] [--session <name>]`,
   )
   .refine(
     (input) => !(input.headed && input.headless),
@@ -77,7 +88,10 @@ export const openCommand = SimpleCLI.command({
     assertSessionAvailableForStart(ctx.session, ctx.logger);
     const headed = input.headed || !input.headless;
     const viewport = parseViewportArg(input.viewport);
-    await runOpen(input.url!, headed, ctx.session, ctx.logger, { viewport });
+    await runOpen(input.url!, headed, ctx.session, ctx.logger, {
+      viewport,
+      accessMode: resolveRequestedSessionMode(input.readOnly),
+    });
   });
 
 export const connectInput = SimpleCLI.input({
@@ -88,10 +102,14 @@ export const connectInput = SimpleCLI.input({
   ],
   named: {
     session: sessionOption(),
+    readOnly: SimpleCLI.flag({
+      name: "read-only",
+      help: "Create the session in read-only mode",
+    }),
   },
 }).refine(
   (input) => Boolean(input.cdpUrl),
-  `Usage: libretto connect <cdp-url> --session <name>`,
+  `Usage: libretto connect <cdp-url> [--read-only] --session <name>`,
 );
 
 export const connectCommand = SimpleCLI.command({
@@ -101,7 +119,12 @@ export const connectCommand = SimpleCLI.command({
   .use(withAutoSession())
   .handle(async ({ input, ctx }) => {
     warnIfInstalledSkillOutOfDate();
-    await runConnectWithLogger(input.cdpUrl!, ctx.session, ctx.logger);
+    await runConnectWithLogger(
+      input.cdpUrl!,
+      ctx.session,
+      ctx.logger,
+      resolveRequestedSessionMode(input.readOnly),
+    );
   });
 
 export const saveInput = SimpleCLI.input({
@@ -143,6 +166,32 @@ export const pagesCommand = SimpleCLI.command({
     await runPages(ctx.session, ctx.logger);
   });
 
+export const sessionModeInput = SimpleCLI.input({
+  positionals: [
+    SimpleCLI.positional("mode", SessionAccessModeSchema.optional(), {
+      help: "Session mode to set",
+    }),
+  ],
+  named: {
+    session: sessionOption(),
+  },
+});
+
+export const sessionModeCommand = SimpleCLI.command({
+  description: "View or set the session access mode",
+})
+  .input(sessionModeInput)
+  .use(withRequiredSession())
+  .handle(async ({ input, ctx }) => {
+    if (!input.mode) {
+      console.log(`Session "${ctx.session}" mode: ${ctx.sessionState.mode}`);
+      return;
+    }
+
+    const nextState = setSessionMode(ctx.session, input.mode, ctx.logger);
+    console.log(`Session "${ctx.session}" mode set to ${nextState.mode}.`);
+  });
+
 export const closeInput = SimpleCLI.input({
   positionals: [],
   named: {
@@ -182,6 +231,7 @@ export const browserCommands = {
   connect: connectCommand,
   save: saveCommand,
   pages: pagesCommand,
+  "session-mode": sessionModeCommand,
   close: closeCommand,
 };
 

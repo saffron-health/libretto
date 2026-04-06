@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    name: "libretto-evals",
+    name: "@libretto/evals",
     environment: "node",
     include: ["**/*.eval.ts"],
     testTimeout: 0,

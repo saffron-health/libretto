@@ -6,10 +6,12 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { build } from "esbuild";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -29,6 +31,7 @@ function extractBundledImplementation(indexSource: string): string {
 }
 
 const require = createRequire(import.meta.url);
+const currentLibrettoPackageDir = fileURLToPath(new URL("..", import.meta.url));
 const currentLibrettoVersion = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ) as {
@@ -73,6 +76,51 @@ describe("createHostedDeployPackage", () => {
     return readdirSync(tmpdir())
       .filter((entry) => entry.startsWith("libretto-deploy-"))
       .sort();
+  }
+
+  async function rebundleDeployEntrypointToCjs(args: {
+    deployPackage: Awaited<ReturnType<typeof createHostedDeployPackage>>;
+    outfile: string;
+  }): Promise<
+    Record<
+      string,
+      {
+        name?: string;
+        run?: (ctx: unknown, input: unknown) => Promise<unknown>;
+      }
+    >
+  > {
+    const nodeModulesDir = join(dirname(args.outfile), "node_modules");
+    mkdirSync(nodeModulesDir, { recursive: true });
+    const linkedPackageDirs = [
+      join(nodeModulesDir, "libretto"),
+      join(tmpdir(), "node_modules", "libretto"),
+    ];
+    for (const linkedPackageDir of linkedPackageDirs) {
+      if (existsSync(linkedPackageDir)) {
+        continue;
+      }
+      mkdirSync(dirname(linkedPackageDir), { recursive: true });
+      symlinkSync(currentLibrettoPackageDir, linkedPackageDir, "dir");
+    }
+
+    await build({
+      bundle: true,
+      entryPoints: [join(args.deployPackage.outputDir, "index.js")],
+      external: ["libretto"],
+      format: "cjs",
+      outfile: args.outfile,
+      platform: "node",
+      target: "node20",
+    });
+
+    return require(args.outfile) as Record<
+      string,
+      {
+        name?: string;
+        run?: (ctx: unknown, input: unknown) => Promise<unknown>;
+      }
+    >;
   }
 
   it("bundles workspace package source and strips workspace dependencies from the deploy manifest", async () => {
@@ -157,10 +205,7 @@ describe("createHostedDeployPackage", () => {
     expect(deployManifest.dependencies).toEqual({
       libretto: "0.5.4",
     });
-    expect(bundle).toContain("createWorkflowProxy");
-    expect(bundle).toContain(
-      'export const testWorkflow = createWorkflowProxy("testWorkflow");',
-    );
+    expect(bundle).toContain('createWorkflowProxy("testWorkflow")');
     expect(implementation).toContain("bundled from workspace source");
     expect(implementation).not.toContain("@repo/config/message");
     expect(bundle).not.toContain("workspace:*");
@@ -169,6 +214,50 @@ describe("createHostedDeployPackage", () => {
         file.endsWith(".js"),
       ),
     ).toEqual(["index.js"]);
+  });
+
+  it("rejects workflows that are only imported for side effects by the deploy entry point", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "browser-agent");
+    const entryPoint = join(sourceDir, "src", "index.ts");
+
+    mkdirSync(join(sourceDir, "src", "workflows"), { recursive: true });
+
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/browser-agent",
+      private: true,
+      type: "module",
+      dependencies: {
+        libretto: currentLibrettoVersion.version,
+      },
+    });
+
+    writeFileSync(
+      join(sourceDir, "src", "workflows", "test.ts"),
+      [
+        'import { workflow } from "libretto";',
+        "",
+        "export default workflow(",
+        '  "test",',
+        '  async () => "IMPORTED_ONLY_WORKFLOW",',
+        ");",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      entryPoint,
+      ['import "./workflows/test";', ""].join("\n"),
+    );
+
+    await expect(
+      createHostedDeployPackage({
+        deploymentName: "import-only-entrypoint",
+        entryPoint,
+        sourceDir,
+      }),
+    ).rejects.toThrow(
+      'Non-exported workflows: test',
+    );
   });
 
   it("adds user-specified externals to the generated runtime manifest", async () => {
@@ -225,9 +314,7 @@ describe("createHostedDeployPackage", () => {
       libretto: currentLibrettoVersion.version,
       lodash: "^4.17.21",
     });
-    expect(bundle).toContain(
-      'export const testWorkflow = createWorkflowProxy("testWorkflow");',
-    );
+    expect(bundle).toContain('createWorkflowProxy("testWorkflow")');
     expect(implementation).toContain("lodash");
   });
 
@@ -286,13 +373,13 @@ describe("createHostedDeployPackage", () => {
     ).toBe(true);
   });
 
-  it("keeps deployed workflows runnable after rebundling the generated entrypoint to cjs", async () => {
+  it("keeps re-exported default workflows runnable after rebundling the generated entrypoint to cjs", async () => {
     const workspaceRoot = createWorkspaceRoot();
     const sourceDir = join(workspaceRoot, "apps", "worker");
-    const entryPoint = join(sourceDir, "src", "workflow.ts");
+    const entryPoint = join(sourceDir, "src", "index.ts");
     const bundledEntryPoint = join(workspaceRoot, "bundled-entry.cjs");
 
-    mkdirSync(join(sourceDir, "src"), { recursive: true });
+    mkdirSync(join(sourceDir, "src", "workflows"), { recursive: true });
 
     writeJson(join(sourceDir, "package.json"), {
       name: "@repo/worker",
@@ -305,16 +392,22 @@ describe("createHostedDeployPackage", () => {
     });
 
     writeFileSync(
-      entryPoint,
+      join(sourceDir, "src", "workflows", "workflow.ts"),
       [
         'import { workflow } from "libretto";',
         "",
-        "export const testWorkflow = workflow(",
+        "export default workflow(",
         '  "testWorkflow",',
         "  async () => ({ ok: true }),",
         ");",
         "",
       ].join("\n"),
+    );
+    writeFileSync(
+      entryPoint,
+      ['export { default as myExport } from "./workflows/workflow";', ""].join(
+        "\n",
+      ),
     );
 
     const deployPackage = trackDeployPackage(
@@ -325,24 +418,19 @@ describe("createHostedDeployPackage", () => {
       }),
     );
 
-    await build({
-      bundle: true,
-      entryPoints: [join(deployPackage.outputDir, "index.js")],
-      external: ["libretto"],
-      format: "cjs",
+    const bundledModule = await rebundleDeployEntrypointToCjs({
+      deployPackage,
       outfile: bundledEntryPoint,
-      platform: "node",
-      target: "node20",
     });
+    const deployedWorkflow = Object.values(bundledModule).find(
+      (candidate) =>
+        candidate?.name === "testWorkflow" && typeof candidate.run === "function",
+    );
 
-    const bundledModule = require(bundledEntryPoint) as {
-      testWorkflow: {
-        run: (ctx: unknown, input: unknown) => Promise<unknown>;
-      };
-    };
+    expect(deployedWorkflow).toBeDefined();
 
     await expect(
-      bundledModule.testWorkflow.run(
+      deployedWorkflow!.run!(
         {
           session: "test-session",
           page: {} as never,

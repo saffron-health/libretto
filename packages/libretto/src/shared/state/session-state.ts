@@ -9,6 +9,7 @@ export const SessionStatusSchema = z.enum([
   "failed",
   "exited",
 ]);
+export const SessionAccessModeSchema = z.enum(["read-only", "write-access"]);
 export const SessionViewportSchema = z.object({
   width: z.number().int().min(1),
   height: z.number().int().min(1),
@@ -22,10 +23,12 @@ export const SessionStateFileSchema = z.object({
   session: z.string().min(1),
   startedAt: z.string().datetime({ offset: true }),
   status: SessionStatusSchema.optional(),
+  mode: SessionAccessModeSchema.default("write-access"),
   viewport: SessionViewportSchema.optional(),
 });
 
 export type SessionStatus = z.infer<typeof SessionStatusSchema>;
+export type SessionAccessMode = z.infer<typeof SessionAccessModeSchema>;
 export type SessionStateFile = z.infer<typeof SessionStateFileSchema>;
 export type SessionState = Omit<SessionStateFile, "version">;
 

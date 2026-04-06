@@ -12,6 +12,7 @@ import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import type { LoggerApi } from "../../shared/logger/index.js";
+import type { SessionAccessMode } from "../../shared/state/index.js";
 import {
   filterSemanticClasses,
   INTERACTIVE_ROLE_NAMES,
@@ -399,13 +400,24 @@ export async function runOpen(
   headed: boolean,
   session: string,
   logger: LoggerApi,
-  options?: { viewport?: { width: number; height: number } },
+  options?: {
+    viewport?: { width: number; height: number };
+    accessMode?: SessionAccessMode;
+  },
 ): Promise<void> {
   const parsedUrl = normalizeUrl(rawUrl);
   const url = parsedUrl.href;
   const viewport = resolveViewport(options?.viewport, logger);
+  const accessMode = options?.accessMode ?? "write-access";
   const windowPosition = headed ? resolveWindowPosition(logger) : undefined;
-  logger.info("open-start", { url, headed, session, viewport, windowPosition });
+  logger.info("open-start", {
+    url,
+    headed,
+    session,
+    viewport,
+    windowPosition,
+    accessMode,
+  });
   assertSessionAvailableForStart(session, logger);
 
   const port = await pickFreePort();
@@ -675,6 +687,7 @@ await new Promise(() => {});
           session,
           startedAt: new Date().toISOString(),
           status: "active",
+          mode: accessMode,
           viewport,
         },
         logger,
@@ -985,8 +998,9 @@ export async function runConnect(
   cdpUrl: string,
   session: string,
   logger: LoggerApi,
+  accessMode: SessionAccessMode = "write-access",
 ): Promise<void> {
-  logger.info("connect-start", { cdpUrl, session });
+  logger.info("connect-start", { cdpUrl, session, accessMode });
   assertSessionAvailableForStart(session, logger);
 
   let parsedUrl: URL;
@@ -1034,6 +1048,11 @@ export async function runConnect(
         `Cannot reach CDP endpoint at ${versionUrl}. Make sure the target is running and accessible at ${parsedUrl.host}.`,
       );
     }
+  } else {
+    logger.info("connect-skip-version-check", {
+      reason: "WebSocket-only endpoint, skipping HTTP version check",
+      endpoint,
+    });
   }
 
   // Connect via CDP using the full endpoint URL
@@ -1060,6 +1079,7 @@ export async function runConnect(
       session,
       startedAt: new Date().toISOString(),
       status: "active",
+      mode: accessMode,
     },
     logger,
   );
