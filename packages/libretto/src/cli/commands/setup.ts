@@ -23,7 +23,7 @@ import {
   loadSnapshotEnv,
   resolveAiSetupStatus,
 } from "../core/ai-model.js";
-import type { Provider } from "../../shared/llm/client.js";
+import type { Provider } from "../core/resolve-model.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
 export type ProviderChoice = {

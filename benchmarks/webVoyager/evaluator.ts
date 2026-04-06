@@ -1,9 +1,6 @@
+import { generateObject, type ModelMessage, type UserContent } from "ai";
 import { z } from "zod";
-import {
-  createLLMClient,
-  type Message,
-  type MessageContentPart,
-} from "../libretto-internals.js";
+import { resolveModel } from "../libretto-internals.js";
 
 // ---------------------------------------------------------------------------
 // Schema & types
@@ -23,8 +20,7 @@ export type JudgeResult = {
 // Default judge model
 // ---------------------------------------------------------------------------
 
-const JUDGE_MODEL =
-  process.env.BENCH_JUDGE_MODEL ?? "vertex/gemini-2.5-flash";
+const JUDGE_MODEL = process.env.BENCH_JUDGE_MODEL ?? "vertex/gemini-2.5-flash";
 
 // ---------------------------------------------------------------------------
 // System prompt (mirrors Stagehand V3Evaluator multi-screenshot approach)
@@ -59,7 +55,7 @@ export async function evaluateWithScreenshots(opts: {
   }
 
   // Build the multimodal user message
-  const contentParts: MessageContentPart[] = [];
+  const contentParts: UserContent = [];
 
   // Build question text with reasoning context and screenshot framing
   const hasReasoning = !!agentReasoning?.trim();
@@ -86,15 +82,16 @@ export async function evaluateWithScreenshots(opts: {
 
   const systemPrompt = buildSystemPrompt(hasReasoning);
 
-  const messages: Message[] = [
+  const messages: ModelMessage[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: contentParts },
   ];
 
-  const client = createLLMClient(JUDGE_MODEL);
+  const model = await resolveModel(JUDGE_MODEL);
 
   try {
-    const result = await client.generateObjectFromMessages({
+    const { object: result } = await generateObject({
+      model,
       messages,
       schema: EvaluationSchema,
       temperature: 0,
