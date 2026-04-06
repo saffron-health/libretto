@@ -39,7 +39,7 @@ In these cases, stick with your existing Playwright automation or use passive in
     ```bash  theme={null}
     # What the agent runs
     npx libretto run ./integration.ts main --headed
-    npx libretto network --session conversion-flow
+    jq . .libretto/sessions/conversion-flow/network.jsonl
     ```
 
     If the site requires login, the agent opens a headed browser and you'll log in as usual. Otherwise you don't need to do anything during this phase.

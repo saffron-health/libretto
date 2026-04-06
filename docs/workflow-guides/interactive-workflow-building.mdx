@@ -45,7 +45,7 @@ This approach combines your knowledge of the application (you drive the browser 
     The agent reads the action log that Libretto recorded: every click, fill, and navigation along with the selectors and page context for each one. You'll see it run commands like:
 
     ```bash  theme={null}
-    npx libretto actions --session interactive-flow
+    tail -n 20 .libretto/sessions/interactive-flow/actions.jsonl | jq .
     ```
 
     It uses this log as a blueprint to write a TypeScript workflow file that replicates your steps programmatically. The agent may also snapshot the page or test selectors against the live DOM to make sure everything works.
