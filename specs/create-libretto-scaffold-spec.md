@@ -187,32 +187,9 @@ function scaffoldProject(targetDir, projectName, pkgManager) {
 - [x] Verify `.gitignore` exists (not `_gitignore`)
 - [x] Verify `package.json.template` is NOT present in the output directory
 
-### Phase 3: Add create-libretto tests
+### Phase 3: Add create-libretto tests — SKIPPED
 
-Add tests that verify the scaffolding produces correct output without running install/setup (mock those). This catches regressions in template copying, placeholder replacement, and package manager detection.
-
-```ts
-// test/scaffold.spec.ts
-import { scaffoldProject, detectPackageManager } from "../index.mjs";
-
-test("detects pnpm from user agent", () => {
-  process.env.npm_config_user_agent = "pnpm/10.0.0 node/v22.0.0";
-  expect(detectPackageManager()).toBe("pnpm");
-});
-
-test("scaffolds project with correct file structure", () => {
-  // scaffold to tmpdir with install/setup mocked
-  // assert files exist, package.json has correct name, .gitignore present
-});
-```
-
-- [ ] Create `packages/create-libretto/test/scaffold.spec.ts`
-- [ ] Test package manager detection for npm, pnpm, yarn, bun user agents, and missing/empty user agent
-- [ ] Test that scaffolding creates expected files: `package.json`, `tsconfig.json`, `.gitignore`, `src/index.ts`, `src/workflows/star-repo.ts`, `src/shared/utils.ts`, `README.md`
-- [ ] Test that `package.json.template` is consumed (not present in output) and `package.json` has the patched name
-- [ ] Test that README has the project name and correct run command for the detected package manager
-- [ ] Test that scaffolding into a non-empty directory errors
-- [ ] Verify tests pass: `pnpm --filter create-libretto test` (add vitest as a devDependency to create-libretto if needed)
+Intentionally skipped. The scaffolder logic is straightforward (`readFileSync` → `replaceAll` → `writeFileSync`) and the real failure modes (templates missing from published package, install/setup failures in real environments, OS path edge cases) aren't testable with unit tests using `skipInstall: true`. Not worth the maintenance cost.
 
 ### Phase 4: Add "Manual setup" docs page for existing repos
 
