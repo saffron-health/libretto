@@ -1,4 +1,10 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Pane } from "tweakpane";
 import { ArrowUpIcon } from "../icons/ArrowUpIcon";
@@ -601,11 +607,11 @@ export function useKonamiPane() {
     return () => clearTimeout(id);
   }, [state]);
 
-  const closePane = () => {
+  const closePane = useCallback(() => {
     setState("idle");
     konamiIndexRef.current = 0;
     setKonamiProgress([]);
-  };
+  }, []);
 
   return {
     konamiProgress,
