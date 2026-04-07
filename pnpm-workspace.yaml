@@ -5,5 +5,7 @@ packages:
   - "packages/*"
 
 minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - libretto
 
 enablePrePostScripts: false
