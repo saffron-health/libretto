@@ -890,36 +890,22 @@ export const runCommand = SimpleCLI.command({
       };
     }
 
-    try {
-      await runIntegrationFromFile(
-        {
-          integrationPath: input.integrationFile!,
-          session: ctx.session,
-          params,
-          tsconfigPath: input.tsconfig,
-          headless: cdpEndpoint ? true : (headlessMode ?? false),
-          visualize,
-          authProfileDomain: input.authProfile,
-          viewport,
-          accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
-          cdpEndpoint,
-          provider: providerInfo,
-        },
-        ctx.logger,
-      );
-    } catch (err) {
-      if (provider && providerInfo) {
-        try {
-          await provider.closeSession(providerInfo.sessionId);
-        } catch (cleanupErr) {
-          console.error(
-            `Failed to clean up ${providerInfo.name} session ${providerInfo.sessionId}:`,
-            cleanupErr instanceof Error ? cleanupErr.message : cleanupErr,
-          );
-        }
-      }
-      throw err;
-    }
+    await runIntegrationFromFile(
+      {
+        integrationPath: input.integrationFile!,
+        session: ctx.session,
+        params,
+        tsconfigPath: input.tsconfig,
+        headless: cdpEndpoint ? true : (headlessMode ?? false),
+        visualize,
+        authProfileDomain: input.authProfile,
+        viewport,
+        accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
+        cdpEndpoint,
+        provider: providerInfo,
+      },
+      ctx.logger,
+    );
   });
 
 export const resumeInput = SimpleCLI.input({
