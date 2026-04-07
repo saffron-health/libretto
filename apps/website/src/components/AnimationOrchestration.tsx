@@ -70,7 +70,7 @@ export function OrchestrationContainer({
       await animate(
         selector(AnimationTarget.Icosahedron),
         {
-          opacity: [0, 0.1],
+          opacity: [0, 1],
           scale: [1.15, 1],
           filter: ["blur(4px)", "blur(0px)"],
         },

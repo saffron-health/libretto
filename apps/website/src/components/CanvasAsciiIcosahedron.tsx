@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Pane } from "tweakpane";
 
 type Vec3 = [number, number, number];
 type Face = [number, number, number];
@@ -47,11 +48,6 @@ type Ripple = {
   speed: number;
   energy: number;
 };
-type FlowSample = {
-  x: number;
-  y: number;
-  glow: number;
-};
 
 type CanvasAsciiIcosahedronProps = {
   className?: string;
@@ -88,8 +84,6 @@ const POINTER_RELEASE_LERP = 0.07;
 
 const MAX_PARTICLES = 48;
 const MAX_RIPPLES = 14;
-const POINTER_RADIUS_RATIO = 0.17;
-const MAX_FLOW_OFFSET = 3.7;
 
 const VERTICES = createVertices();
 const FACES = orientFaces(createFaces(), VERTICES);
@@ -102,26 +96,15 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function withAlpha(color: string, alpha: number) {
-  const normalizedAlpha = clamp(alpha, 0, 1);
-  const rgbMatch = color.match(/rgba?\(([^)]+)\)/);
-
-  if (!rgbMatch) {
-    return color;
-  }
-
-  const [red = "255", green = "255", blue = "255"] = rgbMatch[1]
-    .split(",")
-    .map((value) => value.trim());
-
-  return `rgba(${red}, ${green}, ${blue}, ${normalizedAlpha})`;
-}
-
-function measureSquareScale(context: CanvasRenderingContext2D, fontSize: number) {
+function measureSquareScale(
+  context: CanvasRenderingContext2D,
+  fontSize: number,
+) {
   const sample = "M".repeat(64);
   const previousFont = context.font;
   context.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
-  const characterWidth = context.measureText(sample).width / sample.length || fontSize;
+  const characterWidth =
+    context.measureText(sample).width / sample.length || fontSize;
   context.font = previousFont;
   return fontSize / characterWidth;
 }
@@ -131,7 +114,11 @@ function dot(a: Vec3, b: Vec3) {
 }
 
 function cross(a: Vec3, b: Vec3): Vec3 {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
 }
 
 function subtract(a: Vec3, b: Vec3): Vec3 {
@@ -185,7 +172,14 @@ function applyFixedTilt(vertex: Vec3): Vec3 {
   return rotateZ(rotateX(vertex, TILT_X), TILT_Z);
 }
 
-function edgeFunction(ax: number, ay: number, bx: number, by: number, px: number, py: number) {
+function edgeFunction(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  px: number,
+  py: number,
+) {
   return (px - ax) * (by - ay) - (py - ay) * (bx - ax);
 }
 
@@ -207,12 +201,20 @@ function createVertices(): Vec3[] {
 
   for (let index = 0; index < 5; index += 1) {
     const angle = (index * FULL_TURN) / 5;
-    vertices.push([ringRadius * Math.sin(angle), ringY, ringRadius * Math.cos(angle)]);
+    vertices.push([
+      ringRadius * Math.sin(angle),
+      ringY,
+      ringRadius * Math.cos(angle),
+    ]);
   }
 
   for (let index = 0; index < 5; index += 1) {
     const angle = (index * FULL_TURN) / 5 + Math.PI / 5;
-    vertices.push([ringRadius * Math.sin(angle), -ringY, ringRadius * Math.cos(angle)]);
+    vertices.push([
+      ringRadius * Math.sin(angle),
+      -ringY,
+      ringRadius * Math.cos(angle),
+    ]);
   }
 
   vertices.push([0, -1, 0]);
@@ -333,22 +335,24 @@ function projectVertex(position: Vec3): ProjectedVertex {
   };
 }
 
-function sampleBuffer(buffer: Int16Array, x: number, y: number) {
-  const sampleX = clamp(Math.round(x), 0, COLS - 1);
-  const sampleY = clamp(Math.round(y), 0, ROWS - 1);
-  return buffer[sampleY * COLS + sampleX];
-}
-
 function getShadeCharacter(shadeIndex: number, owner: number) {
   if (owner < 0) {
     return SHADING_CHARS[shadeIndex];
   }
 
-  const textureGroup = FACE_TEXTURE_GROUPS[owner] % SHADE_CHARACTER_GROUPS.length;
-  return SHADE_CHARACTER_GROUPS[textureGroup][shadeIndex] ?? SHADING_CHARS[shadeIndex];
+  const textureGroup =
+    FACE_TEXTURE_GROUPS[owner] % SHADE_CHARACTER_GROUPS.length;
+  return (
+    SHADE_CHARACTER_GROUPS[textureGroup][shadeIndex] ??
+    SHADING_CHARS[shadeIndex]
+  );
 }
 
-function applyFaceBorders(source: Int16Array, ownerBuffer: Int16Array, target: Int16Array) {
+function applyFaceBorders(
+  source: Int16Array,
+  ownerBuffer: Int16Array,
+  target: Int16Array,
+) {
   target.set(source);
 
   for (let row = 1; row < ROWS - 1; row += 1) {
@@ -375,7 +379,11 @@ function applyFaceBorders(source: Int16Array, ownerBuffer: Int16Array, target: I
       }
 
       if (hasDifferentNeighbor) {
-        target[index] = clamp(shadeIndex + FACE_BORDER_BOOST, 0, LAST_SHADE_INDEX);
+        target[index] = clamp(
+          shadeIndex + FACE_BORDER_BOOST,
+          0,
+          LAST_SHADE_INDEX,
+        );
       }
     }
   }
@@ -422,7 +430,8 @@ function drawTriangle(
       const alpha = w0 / area;
       const beta = w1 / area;
       const gamma = w2 / area;
-      const invDepth = alpha * a.invDepth + beta * b.invDepth + gamma * c.invDepth;
+      const invDepth =
+        alpha * a.invDepth + beta * b.invDepth + gamma * c.invDepth;
       const index = y * COLS + x;
 
       if (invDepth > zBuffer[index]) {
@@ -443,7 +452,10 @@ function drawEdge(
 ) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const steps = Math.max(2, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) * 2));
+  const steps = Math.max(
+    2,
+    Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) * 2),
+  );
 
   for (let step = 0; step <= steps; step += 1) {
     const t = step / steps;
@@ -595,7 +607,36 @@ export function CanvasAsciiIcosahedron({
     let lastPointerTime = 0;
     let hasPointerHistory = false;
     let lastWakeTime = 0;
-    let glyphColor = "rgb(255, 255, 255)";
+    let glyphColor = "rgb(0, 0, 0)";
+    let glyphR = 0;
+    let glyphG = 0;
+    let glyphB = 0;
+
+    const params = {
+      innerRadius: 2,
+      outerRadius: 4,
+      scrambleSpeed: 80,
+    };
+
+    const pane = new Pane({ title: "Icosahedron" });
+    pane.addBinding(params, "innerRadius", {
+      label: "Inner Radius (cells)",
+      min: 1,
+      max: 20,
+      step: 0.5,
+    });
+    pane.addBinding(params, "outerRadius", {
+      label: "Outer Radius (cells)",
+      min: 1,
+      max: 40,
+      step: 0.5,
+    });
+    pane.addBinding(params, "scrambleSpeed", {
+      label: "Scramble Speed (ms)",
+      min: 16,
+      max: 500,
+      step: 1,
+    });
 
     const resize = () => {
       const bounds = container.getBoundingClientRect();
@@ -608,7 +649,15 @@ export function CanvasAsciiIcosahedron({
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      glyphColor = getComputedStyle(container).color || "rgb(255, 255, 255)";
+      glyphColor = getComputedStyle(container).color || "rgb(0, 0, 0)";
+      // Resolve to RGB for alpha blending
+      context.fillStyle = glyphColor;
+      context.fillRect(0, 0, 1, 1);
+      const pixel = context.getImageData(0, 0, 1, 1).data;
+      glyphR = pixel[0];
+      glyphG = pixel[1];
+      glyphB = pixel[2];
+      context.clearRect(0, 0, 1, 1);
     };
 
     const deactivatePointer = () => {
@@ -623,7 +672,12 @@ export function CanvasAsciiIcosahedron({
       const localX = event.clientX - rect.left;
       const localY = event.clientY - rect.top;
 
-      if (localX < 0 || localX > rect.width || localY < 0 || localY > rect.height) {
+      if (
+        localX < 0 ||
+        localX > rect.width ||
+        localY < 0 ||
+        localY > rect.height
+      ) {
         deactivatePointer();
         return;
       }
@@ -657,7 +711,15 @@ export function CanvasAsciiIcosahedron({
 
       const speed = Math.hypot(vx, vy);
       if (now - lastWakeTime > 22) {
-        appendWake(particles, ripples, pointerTarget.x, pointerTarget.y, vx, vy, speed);
+        appendWake(
+          particles,
+          ripples,
+          pointerTarget.x,
+          pointerTarget.y,
+          vx,
+          vy,
+          speed,
+        );
         lastWakeTime = now;
       }
 
@@ -684,10 +746,14 @@ export function CanvasAsciiIcosahedron({
       const step = delta / 16.6667;
 
       angle = (angle + delta * SPIN_SPEED) % FULL_TURN;
-      pointerState.x += (pointerTarget.x - pointerState.x) * POINTER_POSITION_LERP;
-      pointerState.y += (pointerTarget.y - pointerState.y) * POINTER_POSITION_LERP;
-      pointerState.vx += (pointerTarget.vx - pointerState.vx) * POINTER_VELOCITY_LERP;
-      pointerState.vy += (pointerTarget.vy - pointerState.vy) * POINTER_VELOCITY_LERP;
+      pointerState.x +=
+        (pointerTarget.x - pointerState.x) * POINTER_POSITION_LERP;
+      pointerState.y +=
+        (pointerTarget.y - pointerState.y) * POINTER_POSITION_LERP;
+      pointerState.vx +=
+        (pointerTarget.vx - pointerState.vx) * POINTER_VELOCITY_LERP;
+      pointerState.vy +=
+        (pointerTarget.vy - pointerState.vy) * POINTER_VELOCITY_LERP;
       pointerState.strength +=
         ((pointerTarget.active ? 1 : 0) - pointerState.strength) *
         (pointerTarget.active ? POINTER_ACTIVATE_LERP : POINTER_RELEASE_LERP);
@@ -764,7 +830,11 @@ export function CanvasAsciiIcosahedron({
           ],
           1 / 3,
         );
-        const toCamera = normalize([-center[0], -center[1], CAMERA_DISTANCE - center[2]]);
+        const toCamera = normalize([
+          -center[0],
+          -center[1],
+          CAMERA_DISTANCE - center[2],
+        ]);
 
         if (dot(normal, toCamera) <= 0) {
           continue;
@@ -775,7 +845,16 @@ export function CanvasAsciiIcosahedron({
         const brightness = clamp(0.08 + diffuse * 0.92, 0, 1);
         const shadeIndex = brightnessToShadeIndex(brightness);
         faceShades[faceIndex] = shadeIndex;
-        drawTriangle(shadeBuffer, ownerBuffer, zBuffer, a, b, c, shadeIndex, faceIndex);
+        drawTriangle(
+          shadeBuffer,
+          ownerBuffer,
+          zBuffer,
+          a,
+          b,
+          c,
+          shadeIndex,
+          faceIndex,
+        );
       }
 
       for (const edge of EDGES) {
@@ -792,11 +871,19 @@ export function CanvasAsciiIcosahedron({
         let shadeIndex: number;
 
         if (visibleAdjacentFaces.length === 1) {
-          shadeIndex = clamp(faceShades[visibleAdjacentFaces[0]] + 3, 5, LAST_SHADE_INDEX);
+          shadeIndex = clamp(
+            faceShades[visibleAdjacentFaces[0]] + 3,
+            5,
+            LAST_SHADE_INDEX,
+          );
         } else {
           const first = faceShades[visibleAdjacentFaces[0]];
           const second = faceShades[visibleAdjacentFaces[1]];
-          shadeIndex = clamp(Math.min(first, second) - 2, 1, LAST_SHADE_INDEX - 2);
+          shadeIndex = clamp(
+            Math.min(first, second) - 2,
+            1,
+            LAST_SHADE_INDEX - 2,
+          );
         }
 
         drawEdge(shadeBuffer, zBuffer, a, b, shadeIndex);
@@ -806,89 +893,11 @@ export function CanvasAsciiIcosahedron({
 
       const cellWidth = width / COLS;
       const cellHeight = height / ROWS;
-      const fontSize = Math.max(8, Math.min(cellHeight * 1.02, cellWidth * 1.72));
+      const fontSize = Math.max(
+        8,
+        Math.min(cellHeight * 1.02, cellWidth * 1.72),
+      );
       const glyphScaleX = measureSquareScale(context, fontSize);
-      const pointerRadius = Math.min(width, height) * POINTER_RADIUS_RATIO;
-
-      const sampleFlow = (x: number, y: number): FlowSample => {
-        let flowX = 0;
-        let flowY = 0;
-        let glow = 0;
-
-        const pointerX = pointerState.x * width;
-        const pointerY = pointerState.y * height;
-        const dxPointer = x - pointerX;
-        const dyPointer = y - pointerY;
-        const pointerDistance = Math.hypot(dxPointer, dyPointer) || 1;
-        const pointerDistanceSquared = dxPointer * dxPointer + dyPointer * dyPointer;
-        const pointerInfluence = Math.exp(
-          -(pointerDistanceSquared / (pointerRadius * pointerRadius)),
-        );
-        const pointerVelocityX = pointerState.vx * width * 2.45;
-        const pointerVelocityY = pointerState.vy * height * 2.45;
-        const radialPush = pointerInfluence * pointerState.strength * 33;
-
-        flowX += (dxPointer / pointerDistance) * radialPush;
-        flowY += (dyPointer / pointerDistance) * radialPush;
-        flowX += pointerVelocityX * pointerInfluence * pointerState.strength * 0.36;
-        flowY += pointerVelocityY * pointerInfluence * pointerState.strength * 0.36;
-        flowX += (-dyPointer / pointerDistance) * pointerInfluence * pointerVelocityX * 0.07;
-        flowY += (dxPointer / pointerDistance) * pointerInfluence * pointerVelocityY * 0.07;
-        glow += pointerInfluence * pointerState.strength * 0.55;
-
-        for (const particle of particles) {
-          const particleX = particle.x * width;
-          const particleY = particle.y * height;
-          const radius = particle.radius * Math.min(width, height);
-          const dx = x - particleX;
-          const dy = y - particleY;
-          const distanceSquared = dx * dx + dy * dy;
-
-          if (distanceSquared > radius * radius * 2.4) {
-            continue;
-          }
-
-          const distance = Math.hypot(dx, dy) || 1;
-          const influence = Math.exp(-(distanceSquared / (radius * radius)));
-          const life = 1 - particle.age / particle.life;
-          const pressure = particle.energy * influence * life;
-
-          flowX += particle.vx * width * pressure * 2.05;
-          flowY += particle.vy * height * pressure * 2.05;
-          flowX += (dx / distance) * pressure * 9.5;
-          flowY += (dy / distance) * pressure * 9.5;
-          flowX += (-dy / distance) * pressure * particle.swirl * 11.5;
-          flowY += (dx / distance) * pressure * particle.swirl * 11.5;
-          glow += pressure * 0.8;
-        }
-
-        for (const ripple of ripples) {
-          const rippleX = ripple.x * width;
-          const rippleY = ripple.y * height;
-          const dx = x - rippleX;
-          const dy = y - rippleY;
-          const distance = Math.hypot(dx, dy) || 1;
-          const radius = ripple.radius * Math.min(width, height);
-          const waveOffset = Math.abs(distance - radius);
-
-          if (waveOffset > 21) {
-            continue;
-          }
-
-          const life = 1 - ripple.age / ripple.life;
-          const wave = Math.exp(-(waveOffset * waveOffset) / 104) * life * ripple.energy;
-          flowX += (dx / distance) * wave * 4.2;
-          flowY += (dy / distance) * wave * 4.2;
-          glow += wave * 0.55;
-        }
-
-        return {
-          x: clamp(flowX / Math.max(cellWidth, 1e-3), -MAX_FLOW_OFFSET, MAX_FLOW_OFFSET),
-          y: clamp(flowY / Math.max(cellHeight, 1e-3), -MAX_FLOW_OFFSET, MAX_FLOW_OFFSET),
-          glow: clamp(glow, 0, 1.8),
-        };
-      };
-
       const minX = clamp(Math.floor(projectedMinX) - 18, 0, COLS - 1);
       const maxX = clamp(Math.ceil(projectedMaxX) + 18, 0, COLS - 1);
       const minY = clamp(Math.floor(projectedMinY) - 18, 0, ROWS - 1);
@@ -899,78 +908,103 @@ export function CanvasAsciiIcosahedron({
       context.textBaseline = "middle";
       context.lineJoin = "round";
 
-      const resolveGlyphCell = (col: number, row: number, index: number) => {
-        const originalShade = borderedShadeBuffer[index];
-        if (originalShade < 0) {
-          return null;
-        }
+      const pointerPixelX = pointerState.x * width;
+      const pointerPixelY = pointerState.y * height;
+      const innerRadius = Math.max(cellWidth, cellHeight) * params.innerRadius;
+      const outerRadius = Math.max(cellWidth, cellHeight) * params.outerRadius;
+      // Time seed that ticks at scrambleSpeed interval
+      const timeSeed = Math.floor(time / params.scrambleSpeed);
 
-        const baseX = (col + 0.5) * cellWidth;
-        const baseY = (row + 0.5) * cellHeight;
-        const flow = sampleFlow(baseX, baseY);
-        const sourceCol = col - flow.x * 1.08;
-        const sourceRow = row - flow.y * 1.08;
-        let sampledShade = sampleBuffer(borderedShadeBuffer, sourceCol, sourceRow);
-        let sampledOwner = sampleBuffer(ownerBuffer, sourceCol, sourceRow);
-
-        if (sampledShade < 0) {
-          const distortion = Math.hypot(flow.x, flow.y);
-          if (distortion < 0.7) {
-            sampledShade = originalShade;
-            sampledOwner = ownerBuffer[index];
-          } else {
-            return null;
-          }
-        }
-
-        return {
-          baseX,
-          baseY,
-          flow,
-          sampledShade,
-          sampledOwner,
-        };
+      // Simple hash for per-cell pseudo-random scramble
+      const scrambleHash = (col: number, row: number, seed: number) => {
+        let h = (col * 374761 + row * 668265 + seed * 982451) | 0;
+        h = ((h >> 16) ^ h) * 0x45d9f3b;
+        h = ((h >> 16) ^ h) * 0x45d9f3b;
+        return ((h >> 16) ^ h) >>> 0;
       };
 
-      const drawGlyphPass = (
-        compositeOperation: GlobalCompositeOperation | null,
-        xOffset: number,
-        yOffset: number,
-        alphaFor: (shadeFactor: number, glow: number) => number,
+      // Returns: 0 = normal, 1 = inner teal, 2 = outer teal
+      // Uses different hash bits so both layers are independent
+      const scrambleLevel = (col: number, row: number, dist: number) => {
+        if (pointerState.strength < 0.1 || dist > outerRadius) return 0;
+        const hash = scrambleHash(col, row, timeSeed);
+        if (dist <= innerRadius && hash % 100 < 40) return 1;
+        if ((hash >>> 8) % 100 < 15) return 2;
+        return 0;
+      };
+
+      const getScrambledChar = (
+        shadeIndex: number,
+        col: number,
+        row: number,
       ) => {
-        context.save();
-        context.scale(glyphScaleX, 1);
-
-        if (compositeOperation) {
-          context.globalCompositeOperation = compositeOperation;
-        }
-
-        for (let row = minY; row <= maxY; row += 1) {
-          const rowOffset = row * COLS;
-
-          for (let col = minX; col <= maxX; col += 1) {
-            const glyph = resolveGlyphCell(col, row, rowOffset + col);
-            if (!glyph) {
-              continue;
-            }
-
-            const drawX = glyph.baseX + glyph.flow.x * cellWidth * xOffset;
-            const drawY = glyph.baseY + glyph.flow.y * cellHeight * yOffset;
-            const shadeFactor = glyph.sampledShade / LAST_SHADE_INDEX;
-            const char = getShadeCharacter(glyph.sampledShade, glyph.sampledOwner);
-
-            context.fillStyle = withAlpha(glyphColor, alphaFor(shadeFactor, glyph.flow.glow));
-            context.fillText(char, drawX / glyphScaleX, drawY);
-          }
-        }
-
-        context.restore();
+        const hash = scrambleHash(col, row, timeSeed);
+        const groupIndex = hash % SHADE_CHARACTER_GROUPS.length;
+        return (
+          SHADE_CHARACTER_GROUPS[groupIndex][shadeIndex] ??
+          SHADING_CHARS[shadeIndex]
+        );
       };
 
-      drawGlyphPass("lighter", 0.34, 0.26, (shadeFactor, glow) => 0.05 + shadeFactor * 0.08 + glow * 0.03);
-      drawGlyphPass(null, 0.22, 0.18, (shadeFactor, glow) =>
-        clamp(0.26 + shadeFactor * 0.7 + glow * 0.04, 0, 1),
-      );
+      const BASE_OPACITY = 0.1;
+      const TEAL_INNER = `rgba(0, 140, 120, 1)`;
+      const TEAL_OUTER = `rgba(40, 190, 160, 1)`;
+      const BASE_COLOR = `rgba(${glyphR}, ${glyphG}, ${glyphB}, ${BASE_OPACITY})`;
+
+      // Glow pass (additive)
+      context.save();
+      context.scale(glyphScaleX, 1);
+      context.globalCompositeOperation = "lighter";
+      context.fillStyle = BASE_COLOR;
+
+      for (let row = minY; row <= maxY; row += 1) {
+        const rowOffset = row * COLS;
+        for (let col = minX; col <= maxX; col += 1) {
+          const index = rowOffset + col;
+          const shadeIndex = borderedShadeBuffer[index];
+          if (shadeIndex < 0) continue;
+          const owner = ownerBuffer[index];
+          const baseX = (col + 0.5) * cellWidth;
+          const baseY = (row + 0.5) * cellHeight;
+          const char = getShadeCharacter(shadeIndex, owner);
+          context.fillText(char, baseX / glyphScaleX, baseY);
+        }
+      }
+
+      context.restore();
+
+      // Main pass
+      context.save();
+      context.scale(glyphScaleX, 1);
+
+      for (let row = minY; row <= maxY; row += 1) {
+        const rowOffset = row * COLS;
+        for (let col = minX; col <= maxX; col += 1) {
+          const index = rowOffset + col;
+          const shadeIndex = borderedShadeBuffer[index];
+          if (shadeIndex < 0) continue;
+          const owner = ownerBuffer[index];
+          const baseX = (col + 0.5) * cellWidth;
+          const baseY = (row + 0.5) * cellHeight;
+
+          const dx = baseX - pointerPixelX;
+          const dy = baseY - pointerPixelY;
+          const dist = Math.hypot(dx, dy);
+
+          const level = scrambleLevel(col, row, dist);
+          if (level > 0) {
+            context.fillStyle = level === 1 ? TEAL_INNER : TEAL_OUTER;
+            const char = getScrambledChar(shadeIndex, col, row);
+            context.fillText(char, baseX / glyphScaleX, baseY);
+          } else {
+            context.fillStyle = BASE_COLOR;
+            const char = getShadeCharacter(shadeIndex, owner);
+            context.fillText(char, baseX / glyphScaleX, baseY);
+          }
+        }
+      }
+
+      context.restore();
 
       frameId = window.requestAnimationFrame(renderFrame);
     };
@@ -980,7 +1014,9 @@ export function CanvasAsciiIcosahedron({
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(container);
 
-    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("pointermove", handlePointerMove, {
+      passive: true,
+    });
     window.addEventListener("pointercancel", deactivatePointer);
     window.addEventListener("blur", deactivatePointer);
     window.addEventListener("mouseout", handleWindowMouseOut);
@@ -990,6 +1026,7 @@ export function CanvasAsciiIcosahedron({
 
     return () => {
       cancelAnimationFrame(frameId);
+      pane.dispose();
       resizeObserver.disconnect();
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointercancel", deactivatePointer);
@@ -1009,8 +1046,8 @@ export function CanvasAsciiIcosahedron({
             <span>/icosahedron</span>
           </div>
           <div className="pointer-events-none absolute bottom-6 left-6 max-w-sm text-xs leading-5 text-current/36">
-            ASCII stays intact, but the glyph field now warps and trails in a liquid-style wake
-            around the cursor.
+            ASCII stays intact, but the glyph field now warps and trails in a
+            liquid-style wake around the cursor.
           </div>
         </>
       ) : null}
