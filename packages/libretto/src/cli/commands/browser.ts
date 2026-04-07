@@ -242,7 +242,11 @@ export const sessionModeCommand = SimpleCLI.command({
   });
 
 export const closeInput = SimpleCLI.input({
-  positionals: [],
+  positionals: [
+    SimpleCLI.positional("session", z.string().optional(), {
+      help: "Session name to close",
+    }),
+  ],
   named: {
     session: sessionOption(),
     all: SimpleCLI.flag({
@@ -254,7 +258,7 @@ export const closeInput = SimpleCLI.input({
   },
 }).refine(
   (input) => input.all || input.session,
-  `Usage: libretto close --session <name>\nUsage: libretto close --all [--force]`,
+  `Usage: libretto close <session>\nUsage: libretto close --all [--force]`,
 );
 
 export const closeCommand = SimpleCLI.command({
