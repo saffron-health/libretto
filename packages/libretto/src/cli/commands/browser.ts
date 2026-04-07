@@ -13,6 +13,7 @@ import {
   resolveProviderName,
   getCloudProviderApi,
 } from "../core/providers/index.js";
+import { readLibrettoConfig } from "../core/config.js";
 import { createLoggerForSession, withSessionLogger } from "../core/context.js";
 import {
   type SessionAccessMode,
@@ -53,8 +54,12 @@ export function parseViewportArg(
 
 function resolveRequestedSessionMode(
   readOnly: boolean | undefined,
+  writeAccess: boolean | undefined,
 ): SessionAccessMode {
-  return readOnly ? "read-only" : "write-access";
+  if (readOnly) return "read-only";
+  if (writeAccess) return "write-access";
+  const config = readLibrettoConfig();
+  return config.sessionMode ?? "write-access";
 }
 
 export const openInput = SimpleCLI.input({
@@ -71,6 +76,10 @@ export const openInput = SimpleCLI.input({
       name: "read-only",
       help: "Create the session in read-only mode",
     }),
+    writeAccess: SimpleCLI.flag({
+      name: "write-access",
+      help: "Create the session in write-access mode (overrides config default)",
+    }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
@@ -82,11 +91,15 @@ export const openInput = SimpleCLI.input({
 })
   .refine(
     (input) => Boolean(input.url),
-    `Usage: libretto open <url> [--headless] [--read-only] [--viewport WxH] [--session <name>]`,
+    `Usage: libretto open <url> [--headless] [--read-only|--write-access] [--viewport WxH] [--session <name>]`,
   )
   .refine(
     (input) => !(input.headed && input.headless),
     "Cannot pass both --headed and --headless.",
+  )
+  .refine(
+    (input) => !(input.readOnly && input.writeAccess),
+    "Cannot pass both --read-only and --write-access.",
   );
 
 export const openCommand = SimpleCLI.command({
@@ -103,7 +116,10 @@ export const openCommand = SimpleCLI.command({
       const viewport = parseViewportArg(input.viewport);
       await runOpen(input.url!, headed, ctx.session, ctx.logger, {
         viewport,
-        accessMode: resolveRequestedSessionMode(input.readOnly),
+        accessMode: resolveRequestedSessionMode(
+          input.readOnly,
+          input.writeAccess,
+        ),
       });
     } else {
       const provider = getCloudProviderApi(providerName);
@@ -113,7 +129,7 @@ export const openCommand = SimpleCLI.command({
         provider,
         ctx.session,
         ctx.logger,
-        resolveRequestedSessionMode(input.readOnly),
+        resolveRequestedSessionMode(input.readOnly, input.writeAccess),
       );
     }
   });
@@ -130,11 +146,20 @@ export const connectInput = SimpleCLI.input({
       name: "read-only",
       help: "Create the session in read-only mode",
     }),
+    writeAccess: SimpleCLI.flag({
+      name: "write-access",
+      help: "Create the session in write-access mode (overrides config default)",
+    }),
   },
-}).refine(
-  (input) => Boolean(input.cdpUrl),
-  `Usage: libretto connect <cdp-url> [--read-only] --session <name>`,
-);
+})
+  .refine(
+    (input) => Boolean(input.cdpUrl),
+    `Usage: libretto connect <cdp-url> [--read-only|--write-access] --session <name>`,
+  )
+  .refine(
+    (input) => !(input.readOnly && input.writeAccess),
+    "Cannot pass both --read-only and --write-access.",
+  );
 
 export const connectCommand = SimpleCLI.command({
   description: "Connect to an existing Chrome DevTools Protocol (CDP) endpoint",
@@ -147,7 +172,7 @@ export const connectCommand = SimpleCLI.command({
       input.cdpUrl!,
       ctx.session,
       ctx.logger,
-      resolveRequestedSessionMode(input.readOnly),
+      resolveRequestedSessionMode(input.readOnly, input.writeAccess),
     );
   });
 

@@ -46,7 +46,8 @@ The config file is at `.libretto/config.json`. You can edit it directly or use t
     "model": "openai/gpt-5.4",
     "updatedAt": "2026-01-01T00:00:00.000Z"
   },
-  "viewport": { "width": 1280, "height": 800 }
+  "viewport": { "width": 1280, "height": 800 },
+  "sessionMode": "write-access"
 }
 ```
 
@@ -59,9 +60,13 @@ The config file is at `.libretto/config.json`. You can edit it directly or use t
 </ParamField>
 
 <ParamField path="viewport" type="object">
-  Optional. Default browser window size (width and height in pixels) used by `open` and `run` when you don't pass `--viewport`. Defaults to `1366x768` if not set.
+  Optional, manually set. Default browser window size (width and height in pixels) used by `open` and `run` when you don't pass `--viewport`. Defaults to `1366x768` if not set.
+</ParamField>
+
+<ParamField path="sessionMode" type="string">
+  Optional, manually set. Default access mode for new sessions created by `open`, `connect`, and `run`. Must be `"read-only"` or `"write-access"`. Defaults to `"write-access"` when omitted. Pass `--read-only` or `--write-access` to `open`, `connect`, or `run` to override when creating a session.
 </ParamField>
 
 <ParamField path="windowPosition" type="object">
-  Optional. Sets the initial position of the headed browser window on screen. Has no effect in headless mode.
+  Optional, manually set. Sets the initial position of the headed browser window on screen. Has no effect in headless mode.
 </ParamField>

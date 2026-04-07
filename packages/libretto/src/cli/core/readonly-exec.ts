@@ -1,5 +1,4 @@
 import type { Locator, Page } from "playwright";
-import { condenseDom } from "../../shared/condense-dom/condense-dom.js";
 
 const PAGE_READ_METHODS = new Set([
   "url",
@@ -69,16 +68,6 @@ const LOCATOR_ALLOWED_PROPERTIES = new Set<string>([]);
 
 type ReadonlyExecOptions = {
   onActivity?: () => void;
-};
-
-type ReadonlySnapshotPayload = {
-  screenshot: {
-    mimeType: "image/png";
-    bytesBase64: string;
-  };
-  currentUrl: string;
-  pageTitle: string;
-  pageHtml: string;
 };
 
 const readonlyPageCache = new WeakMap<Page, Page>();
@@ -240,28 +229,6 @@ function assertReadonlyRequestBodyAllowed(
   }
 }
 
-async function captureReadonlySnapshot(
-  page: Page,
-  options: ReadonlyExecOptions = {},
-): Promise<ReadonlySnapshotPayload> {
-  const [screenshotBytes, title, html] = await Promise.all([
-    page.screenshot({ type: "png" }),
-    page.title(),
-    page.content(),
-  ]);
-  markActivity(options.onActivity);
-
-  return {
-    screenshot: {
-      mimeType: "image/png",
-      bytesBase64: screenshotBytes.toString("base64"),
-    },
-    currentUrl: page.url(),
-    pageTitle: title,
-    pageHtml: condenseDom(html).html,
-  };
-}
-
 export function createReadonlyExecHelpers(
   page: Page,
   options: ReadonlyExecOptions = {},
@@ -272,7 +239,10 @@ export function createReadonlyExecHelpers(
   return {
     page: readonlyPage,
     state: execState,
-    snapshot: async () => await captureReadonlySnapshot(page, options),
+    // Playwright has no native viewport scroll method — only locator.scrollIntoViewIfNeeded().
+    // Arbitrary scrolling requires page.evaluate(), which is blocked by the readonly proxy
+    // since it can run arbitrary code. This helper calls evaluate on the raw (unwrapped) page,
+    // scoped to just window.scrollBy.
     scrollBy: async (deltaX: number, deltaY: number) => {
       await page.evaluate(
         ([x, y]) => {
@@ -296,6 +266,8 @@ export function createReadonlyExecHelpers(
         method,
       });
     },
+    // Shadows the global Node.js fetch to prevent unrestricted HTTP access.
+    // Without this, agent code would fall through to the global fetch (POST, PUT, DELETE, etc.).
     fetch: () => {
       throw new ReadonlyExecDeniedError(
         "fetch is blocked in readonly-exec; use get() instead",

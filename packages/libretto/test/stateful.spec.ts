@@ -576,45 +576,6 @@ describe("state-driven CLI subprocess behavior", () => {
     });
   }, 60_000);
 
-  test("readonly-exec snapshot returns diagnostic payload", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    const session = "readonly-exec-snapshot";
-    const htmlPath = workspacePath("fixtures", "readonly-snapshot.html");
-    await mkdir(workspacePath("fixtures"), { recursive: true });
-    await writeFile(
-      htmlPath,
-      "<!doctype html><html><head><title>Snapshot Fixture</title></head><body><main><h1>Snapshot Heading</h1></main></body></html>",
-      "utf8",
-    );
-
-    const fileUrl = pathToFileURL(htmlPath).href;
-    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
-
-    const result = await librettoCli(
-      `readonly-exec - --session ${session}`,
-      undefined,
-      [
-        "const snap = await snapshot();",
-        "return {",
-        "  url: snap.currentUrl,",
-        "  title: snap.pageTitle,",
-        "  htmlContainsHeading: snap.pageHtml.includes('Snapshot Heading'),",
-        "  hasScreenshot: snap.screenshot.bytesBase64.length > 0,",
-        "};",
-      ].join("\n"),
-    );
-
-    expect(result.stderr).toBe("");
-    expect(parseJsonStdout<Record<string, unknown>>(result.stdout)).toEqual({
-      url: fileUrl,
-      title: "Snapshot Fixture",
-      htmlContainsHeading: true,
-      hasScreenshot: true,
-    });
-  }, 60_000);
-
   test("readonly-exec denies mutating Playwright APIs", async ({
     librettoCli,
     workspacePath,

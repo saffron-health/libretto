@@ -362,7 +362,7 @@ describe("basic CLI subprocess behavior", () => {
   test("fails open with missing url usage error", async ({ librettoCli }) => {
     const result = await librettoCli("open");
     expect(result.stderr).toContain(
-      "Usage: libretto open <url> [--headless] [--read-only] [--viewport WxH] [--session <name>]",
+      "Usage: libretto open <url> [--headless] [--read-only|--write-access] [--viewport WxH] [--session <name>]",
     );
   });
 

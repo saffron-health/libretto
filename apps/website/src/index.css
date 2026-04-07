@@ -51,8 +51,8 @@
 
 @theme {
   --font-sans:
-    "Inter", -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-    sans-serif;
+    "Inter", -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", sans-serif;
   --font-serif: "PP Editorial New", "Newsreader", serif;
 
   --color-cream: oklch(0.966 0.005 106.5);
@@ -82,8 +82,16 @@ body {
   text-decoration: none;
   text-rendering: geometricPrecision;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%),
-    linear-gradient(180deg, oklch(0.248 0.007 107.1) 0%, oklch(0.176 0.006 107.1) 100%),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.14) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    ),
+    linear-gradient(
+      180deg,
+      oklch(0.248 0.007 107.1) 0%,
+      oklch(0.176 0.006 107.1) 100%
+    ),
     radial-gradient(
       130% 160% at 50% 0%,
       oklch(0.288 0.008 107.1) 0%,
@@ -105,8 +113,16 @@ body {
 
 .libretto-button:hover {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 100%),
-    linear-gradient(180deg, oklch(0.268 0.007 107.1) 0%, oklch(0.192 0.006 107.1) 100%),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    ),
+    linear-gradient(
+      180deg,
+      oklch(0.268 0.007 107.1) 0%,
+      oklch(0.192 0.006 107.1) 100%
+    ),
     radial-gradient(
       130% 160% at 50% 0%,
       oklch(0.308 0.008 107.1) 0%,
@@ -123,8 +139,16 @@ body {
 
 .libretto-button[aria-pressed="true"] {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%),
-    linear-gradient(180deg, oklch(0.276 0.008 107.1) 0%, oklch(0.2 0.006 107.1) 100%),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.05) 100%
+    ),
+    linear-gradient(
+      180deg,
+      oklch(0.276 0.008 107.1) 0%,
+      oklch(0.2 0.006 107.1) 100%
+    ),
     radial-gradient(
       130% 160% at 50% 0%,
       oklch(0.318 0.009 107.1) 0%,
@@ -151,8 +175,16 @@ body {
 .libretto-button:active {
   transform: translateY(1px);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%),
-    linear-gradient(180deg, oklch(0.228 0.007 107.1) 0%, oklch(0.166 0.006 107.1) 100%),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    ),
+    linear-gradient(
+      180deg,
+      oklch(0.228 0.007 107.1) 0%,
+      oklch(0.166 0.006 107.1) 100%
+    ),
     radial-gradient(
       130% 160% at 50% 0%,
       oklch(0.268 0.008 107.1) 0%,

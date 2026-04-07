@@ -41,7 +41,6 @@
 .mdx-content h4 {
   font-family: "PP Editorial New", "Newsreader", "Georgia", serif;
   font-weight: 400;
-  letter-spacing: -0.01em;
 }
 
 /* Sidebar group titles — plain sans, lighter */
@@ -90,6 +89,20 @@
   border-color: rgba(30, 29, 26, 0.2);
 }
 
+/* Inline code — match fenced code block background & border */
+.mdx-content :not(pre) > code {
+  background-color: #f0ede7;
+  border: 1px solid rgba(30, 29, 26, 0.1);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.875em;
+}
+
+.dark .mdx-content :not(pre) > code {
+  background-color: rgba(245, 242, 236, 0.08);
+  border-color: rgba(245, 242, 236, 0.1);
+}
+
 /* Dark mode overrides */
 /* Dark mode overrides — Mintlify uses a .dark class on <html> */
 .dark #navbar {
@@ -100,4 +113,3 @@
 .dark #sidebar {
   background: var(--ink);
 }
-

@@ -22,6 +22,7 @@ Libretto reads workspace config from `.libretto/config.json`.
 - `ai.model` selects the configured analysis model for `snapshot`.
 - `viewport` is an optional top-level setting used by `open` and `run` when you do not pass `--viewport`.
 - Viewport precedence is: CLI `--viewport`, then `.libretto/config.json`, then the default `1366x768`.
+- `sessionMode` sets the default session access mode for new sessions created by `open`, `connect`, and `run`. Must be `"read-only"` or `"write-access"`. When omitted, defaults to `"write-access"`. Pass `--read-only` or `--write-access` to `open`, `connect`, or `run` to override when creating a session.
 
 Example:
 
@@ -35,7 +36,8 @@ Example:
   "viewport": {
     "width": 1280,
     "height": 800
-  }
+  },
+  "sessionMode": "write-access"
 }
 ```
 

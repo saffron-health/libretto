@@ -27,7 +27,7 @@
     }
   },
   "appearance": {
-    "default": "light"
+    "default": "system"
   },
   "background": {
     "color": {
@@ -110,10 +110,7 @@
   },
   "navbar": {},
   "contextual": {
-    "options": [
-      "copy",
-      "view"
-    ]
+    "options": ["copy", "view", "chatgpt", "claude"]
   },
   "footer": {}
 }

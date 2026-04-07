@@ -88,6 +88,17 @@ npx libretto connect ws://localhost:9222 --read-only --session remote-diag
 npx libretto run ./workflow.ts main --read-only --session test-run
 ```
 
+You can also manually set `sessionMode` in `.libretto/config.json` to change the default for all new sessions:
+
+```json theme={null}
+{
+  "version": 1,
+  "sessionMode": "read-only"
+}
+```
+
+Pass `--write-access` to `open`, `connect`, or `run` to override a `read-only` config default when creating a session.
+
 #### Changing session mode
 
 View or change the mode of an existing session with `session-mode`:
@@ -122,7 +133,8 @@ A restricted version of `exec` that only allows read operations on the page. Ava
 - **Locator factories**: `locator()`, `getByRole()`, `getByText()`, `getByLabel()`, `getByPlaceholder()`, `getByAltText()`, `getByTitle()`, `getByTestId()`
 - **Locator reads**: `textContent()`, `innerText()`, `boundingBox()`, `count()`, `getAttribute()`, `inputValue()`, `isVisible()`, `isHidden()`, `isEnabled()`, `isChecked()`
 - **Network**: `get(url)` (GET/HEAD only, no request bodies)
-- **Helpers**: `snapshot()`, `scrollBy()`, `console`, `state`
+- **Viewport**: `scrollBy(deltaX, deltaY)` for scrolling by pixel offset
+- **Other**: `state`, `console`, `URL`, `Buffer`
 
 Any mutating operation (click, fill, goto, reload, etc.) throws a `ReadonlyExecDenied` error.
 

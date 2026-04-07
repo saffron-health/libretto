@@ -8,7 +8,7 @@ type Line =
   | { type: "agent"; text: string };
 
 const USER_MESSAGE =
-  "Use the Libretto skill. Open LinkedIn and send connection requests to the top 5 people who viewed my profile";
+  'Use the Libretto skill. Go on Craigslist and scrape the first 10 "free stuff" listings for title, location, and link.';
 
 function Cursor({ dark }: { dark?: boolean }) {
   return (
@@ -111,7 +111,7 @@ export function TerminalDemo() {
         ...prev,
         {
           type: "tool",
-          label: "bash: npx libretto open https://linkedin.com --headed",
+          label: "bash: npx libretto open https://craigslist.org --headed",
           done: false,
         },
       ]);
@@ -131,7 +131,7 @@ export function TerminalDemo() {
         {
           type: "tool",
           label:
-            'bash: npx libretto snapshot --objective "Find profile viewers"',
+            'bash: npx libretto snapshot --objective "Find free stuff listings"',
           done: false,
         },
       ]);
@@ -143,7 +143,7 @@ export function TerminalDemo() {
         ),
       );
 
-      // Tool: bash — exec click
+      // Tool: bash — exec click free stuff link
       await sleep(300);
       if (cancelled) return;
       setLines((prev) => [
@@ -162,7 +162,7 @@ export function TerminalDemo() {
         ),
       );
 
-      // Tool: bash — exec count
+      // Tool: bash — exec scrape listings
       await sleep(300);
       if (cancelled) return;
       setLines((prev) => [
@@ -170,7 +170,7 @@ export function TerminalDemo() {
         {
           type: "tool",
           label:
-            "bash: npx libretto exec \"return await page.locator('.profile-card').count()\"",
+            "bash: npx libretto exec \"return await page.locator('.cl-static-search-result').first().textContent()\"",
           done: false,
         },
       ]);
@@ -189,7 +189,7 @@ export function TerminalDemo() {
         ...prev,
         {
           type: "tool",
-          label: "write: linkedin_connections.ts",
+          label: "write: craigslist_free_stuff.ts",
           done: false,
         },
       ]);
@@ -205,7 +205,7 @@ export function TerminalDemo() {
       await sleep(400);
       if (cancelled) return;
       const agentText =
-        "Created linkedin_connections.ts — a workflow that opens LinkedIn, finds your profile viewers, and sends connection requests to the top 5.\n\nRun it anytime:\n  npx libretto run ./linkedin_connections.ts main --headless";
+        "Created craigslist_free_stuff.ts — a workflow that opens Craigslist, navigates to free stuff, and scrapes the first 10 listings for title, location, and link.\n\nRun it anytime:\n  npx libretto run ./craigslist_free_stuff.ts main --headless";
       setIsStreamingAgent(true);
       const words = agentText.split(/(?<=\s)/);
       let so_far = "";
