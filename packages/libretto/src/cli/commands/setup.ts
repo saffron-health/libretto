@@ -77,6 +77,18 @@ function promptUser(
   });
 }
 
+/** Map provider to a human-readable label for status messages. */
+function providerLabel(provider: Provider): string {
+  const choice = PROVIDER_CHOICES.find((c) => c.provider === provider);
+  return choice?.label ?? provider;
+}
+
+/** Extract the env var name from source like "env:GOOGLE_CLOUD_PROJECT". */
+function sourceEnvVar(source: string): string | null {
+  if (source.startsWith("env:")) return source.slice(4);
+  return null;
+}
+
 /**
  * If the workspace has usable credentials but no pinned model in config,
  * write the resolved default model to `.libretto/config.json`.
@@ -92,18 +104,24 @@ function ensurePinnedDefaultModel(
 }
 
 function printHealthySummary(status: AiSetupStatus & { kind: "ready" }): void {
-  console.log(`  ✓ Model: ${status.model}`);
-  console.log(`  Config: ${LIBRETTO_CONFIG_PATH}`);
+  const envVar = sourceEnvVar(status.source);
+  if (envVar) {
+    console.log(
+      `✓ Detected ${envVar}. Using ${providerLabel(status.provider)}.`,
+    );
+  } else {
+    console.log(`✓ Using ${providerLabel(status.provider)} (${status.model}).`);
+  }
   console.log(
-    "  To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+    "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
   );
 }
 
 function printInvalidAiConfigWarning(status: AiSetupStatus): void {
   if (status.kind !== "invalid-config") return;
-  console.log("  ! Existing AI config is invalid:");
+  console.log("! Existing AI config is invalid:");
   for (const line of status.message.split("\n")) {
-    console.log(`    ${line}`);
+    console.log(`  ${line}`);
   }
 }
 
@@ -152,23 +170,19 @@ export function buildRepairPlan(status: AiSetupStatus): RepairPlan {
 export function formatMissingCredentialsMessage(
   plan: RepairPlan & { kind: "repair-missing-credentials" },
 ): string {
-  return [
-    `  ✗ ${plan.provider} is configured (model: ${plan.model}), but ${plan.envVar} is not set.`,
-  ].join("\n");
+  return `✗ ${plan.provider} is configured (model: ${plan.model}), but ${plan.envVar} is not set.`;
 }
 
 function printSnapshotApiStatus(): boolean {
   const status = resolveAiSetupStatus();
-  const envPath = join(REPO_ROOT, ".env");
 
-  console.log("\nSnapshot analysis:");
   console.log(
-    "  Libretto uses direct API calls for snapshot analysis when supported credentials are available.",
+    "\nLibretto uses a sub-agent to analyze DOM snapshots. The model is determined by environment variables.",
   );
-  console.log(`  Credentials are loaded from process env and ${envPath}.`);
 
   if (status.kind === "ready") {
     const pinned = ensurePinnedDefaultModel(status);
+    console.log();
     printHealthySummary(pinned);
     return true;
   }
@@ -176,32 +190,34 @@ function printSnapshotApiStatus(): boolean {
   // Provider-specific missing-credentials message
   const plan = buildRepairPlan(status);
   if (plan.kind === "repair-missing-credentials") {
+    console.log();
     console.log(formatMissingCredentialsMessage(plan));
     console.log(
-      `    To fix: add ${plan.envVar} to .env, or run \`npx libretto setup\` interactively to repair.`,
+      `  To fix: add ${plan.envVar} to .env, or run \`npx libretto setup\` interactively to repair.`,
     );
     return false;
   }
 
   if (plan.kind === "repair-invalid-config") {
     printInvalidAiConfigWarning(status);
-    console.log("    Run `npx libretto setup` interactively to reconfigure.");
+    console.log("  Run `npx libretto setup` interactively to reconfigure.");
     return false;
   }
 
-  console.log("  ✗ No snapshot API credentials detected.");
-  console.log("    Add one provider to .env:");
-  console.log("      OPENAI_API_KEY=...");
-  console.log("      ANTHROPIC_API_KEY=...");
-  console.log("      GEMINI_API_KEY=...  # or GOOGLE_GENERATIVE_AI_API_KEY");
+  console.log();
+  console.log("✗ No snapshot API credentials detected.");
+  console.log("  Add one provider to .env:");
+  console.log("    OPENAI_API_KEY=...");
+  console.log("    ANTHROPIC_API_KEY=...");
+  console.log("    GEMINI_API_KEY=...  # or GOOGLE_GENERATIVE_AI_API_KEY");
   console.log(
-    "      GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
+    "    GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
   );
   console.log(
-    "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
+    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
   );
   console.log(
-    "    Run `npx libretto setup` interactively to set up credentials.",
+    "  Run `npx libretto setup` interactively to set up credentials.",
   );
   return false;
 }
@@ -222,11 +238,11 @@ function writeEnvVar(envVar: string, value: string, envPath: string): void {
       () => envLine,
     );
     writeFileSync(envPath, updated);
-    console.log(`\n  ✓ Updated ${envVar} in ${envPath}`);
+    console.log(`\n✓ Updated ${envVar} in ${envPath}`);
   } else {
     const separator = envContent && !envContent.endsWith("\n") ? "\n" : "";
     appendFileSync(envPath, `${separator}${envLine}\n`);
-    console.log(`\n  ✓ Added ${envVar} to ${envPath}`);
+    console.log(`\n✓ Added ${envVar} to ${envPath}`);
   }
 
   process.env[envVar] = value;
@@ -244,13 +260,13 @@ async function promptForCredential(
   envPath: string,
   modelOverride?: string,
 ): Promise<boolean> {
-  console.log(`\n  ${choice.label} selected.`);
-  console.log(`  ${choice.envHint}\n`);
+  console.log(`\n${choice.label} selected.`);
+  console.log(`${choice.envHint}\n`);
 
-  const apiKeyValue = await promptUser(rl, `  Enter your ${choice.envVar}: `);
+  const apiKeyValue = await promptUser(rl, `Enter your ${choice.envVar}: `);
 
   if (!apiKeyValue) {
-    console.log("\n  No value entered. Skipping API key setup.");
+    console.log("\nNo value entered. Skipping API key setup.");
     return false;
   }
 
@@ -259,7 +275,10 @@ async function promptForCredential(
 
   const model = modelOverride ?? DEFAULT_SNAPSHOT_MODELS[choice.provider];
   writeAiConfig(model);
-  console.log(`  ✓ Snapshot API ready: ${model}`);
+  console.log(`✓ Snapshot API ready: ${model}`);
+  console.log(
+    "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+  );
   return true;
 }
 
@@ -272,14 +291,14 @@ async function promptProviderSelection(
   envPath: string,
 ): Promise<boolean> {
   console.log(
-    "  Which API provider would you like to use for snapshot analysis?\n",
+    "Which model provider would you like to use for snapshot analysis?\n",
   );
   for (const choice of PROVIDER_CHOICES) {
-    console.log(`    ${choice.key}) ${choice.label}`);
+    console.log(`  ${choice.key}) ${choice.label}`);
   }
-  console.log("    s) Skip for now\n");
+  console.log("  s) Skip for now\n");
 
-  const answer = await promptUser(rl, "  Choice: ");
+  const answer = await promptUser(rl, "Choice: ");
 
   if (answer.toLowerCase() === "s" || !answer) {
     printSkipMessage();
@@ -288,7 +307,7 @@ async function promptProviderSelection(
 
   const selected = PROVIDER_CHOICES.find((choice) => choice.key === answer);
   if (!selected) {
-    console.log(`\n  Unknown choice "${answer}". Skipping API setup.`);
+    console.log(`\nUnknown choice "${answer}". Skipping API setup.`);
     return false;
   }
 
@@ -297,14 +316,14 @@ async function promptProviderSelection(
 
 function printSkipMessage(): void {
   console.log(
-    "\n  Skipped. You can set up API credentials later by rerunning `npx libretto setup`.",
+    "\nSkipped. You can set up API credentials later by rerunning `npx libretto setup`.",
   );
-  console.log("  Or add credentials directly to your .env file:");
-  console.log("    OPENAI_API_KEY=...");
-  console.log("    ANTHROPIC_API_KEY=...");
-  console.log("    GEMINI_API_KEY=...");
+  console.log("Or add credentials directly to your .env file:");
+  console.log("  OPENAI_API_KEY=...");
+  console.log("  ANTHROPIC_API_KEY=...");
+  console.log("  GEMINI_API_KEY=...");
   console.log(
-    "    Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
+    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
   );
 }
 
@@ -312,12 +331,13 @@ async function runInteractiveApiSetup(): Promise<void> {
   const status = resolveAiSetupStatus();
   const envPath = join(REPO_ROOT, ".env");
 
-  console.log("\nSnapshot analysis setup:");
-  console.log("  Libretto uses direct API calls for snapshot analysis.");
-  console.log(`  Credentials are loaded from process env and ${envPath}.`);
+  console.log(
+    "\nLibretto uses a sub-agent to analyze DOM snapshots. The model is determined by environment variables.",
+  );
 
   if (status.kind === "ready") {
     const pinned = ensurePinnedDefaultModel(status);
+    console.log();
     printHealthySummary(pinned);
     return;
   }
@@ -334,12 +354,12 @@ async function runInteractiveApiSetup(): Promise<void> {
     if (plan.kind === "repair-missing-credentials") {
       console.log(formatMissingCredentialsMessage(plan));
       console.log("");
-      console.log("  How would you like to fix this?\n");
-      console.log(`    1) Enter ${plan.envVar}`);
-      console.log("    2) Switch to a different provider");
-      console.log("    s) Skip for now\n");
+      console.log("How would you like to fix this?\n");
+      console.log(`  1) Enter ${plan.envVar}`);
+      console.log("  2) Switch to a different provider");
+      console.log("  s) Skip for now\n");
 
-      const answer = await promptUser(rl, "  Choice: ");
+      const answer = await promptUser(rl, "Choice: ");
 
       if (answer === "1") {
         const matchingChoice = PROVIDER_CHOICES.find(
@@ -365,14 +385,14 @@ async function runInteractiveApiSetup(): Promise<void> {
     if (plan.kind === "repair-invalid-config") {
       printInvalidAiConfigWarning(status);
       console.log(
-        "\n  Would you like to reconfigure with a fresh provider selection?\n",
+        "\nWould you like to reconfigure with a fresh provider selection?\n",
       );
       await promptProviderSelection(rl, envPath);
       return;
     }
 
     // ── Unconfigured: standard first-run flow ──
-    console.log("  ✗ No snapshot API credentials detected.\n");
+    console.log("✗ No snapshot API credentials detected.\n");
     await promptProviderSelection(rl, envPath);
   } finally {
     rl.close();
@@ -380,16 +400,16 @@ async function runInteractiveApiSetup(): Promise<void> {
 }
 
 function installBrowsers(): void {
-  console.log("\nInstalling Playwright Chromium...");
+  console.log("Installing Playwright Chromium...");
   const result = spawnSync("npx", ["playwright", "install", "chromium"], {
     stdio: "inherit",
     shell: true,
   });
   if (result.status === 0) {
-    console.log("  ✓ Playwright Chromium installed");
+    console.log("✓ Playwright Chromium installed");
   } else {
     console.error(
-      "  ✗ Failed to install Playwright Chromium. Run manually: npx playwright install chromium",
+      "✗ Failed to install Playwright Chromium. Run manually: npx playwright install chromium",
     );
   }
 }
@@ -421,9 +441,6 @@ function copySkills(): void {
   const agentDirs = detectAgentDirs(REPO_ROOT);
 
   if (agentDirs.length === 0) {
-    console.log(
-      "\nSkills: No .agents/ or .claude/ directory found in repo root — skipping.",
-    );
     return;
   }
 
@@ -431,7 +448,7 @@ function copySkills(): void {
   try {
     skillsRoot = getPackageSkillsRoot();
   } catch (e) {
-    console.error(`  ✗ ${e instanceof Error ? e.message : String(e)}`);
+    console.error(`✗ ${e instanceof Error ? e.message : String(e)}`);
     return;
   }
 
@@ -452,7 +469,7 @@ function copySkills(): void {
       cpSync(sourceDir, skillDest, { recursive: true });
       const fileCount = readdirSync(skillDest).length;
       console.log(
-        `  ✓ Copied ${fileCount} skill files to ${agentName}/skills/${skillName}/`,
+        `✓ Copied ${fileCount} skill files to ${agentName}/skills/${skillName}/`,
       );
     }
   }
@@ -473,13 +490,12 @@ export const setupCommand = SimpleCLI.command({
 })
   .input(setupInput)
   .handle(async ({ input }) => {
-    console.log("Setting up libretto...\n");
     ensureLibrettoSetup();
 
     if (!input.skipBrowsers) {
       installBrowsers();
     } else {
-      console.log("\nSkipping browser installation (--skip-browsers)");
+      console.log("Skipping browser installation (--skip-browsers)");
     }
 
     copySkills();
@@ -495,5 +511,6 @@ export const setupCommand = SimpleCLI.command({
       }
     }
 
+    console.log(`\nConfig set up at ${LIBRETTO_CONFIG_PATH}`);
     console.log("\n✓ libretto setup complete");
   });
