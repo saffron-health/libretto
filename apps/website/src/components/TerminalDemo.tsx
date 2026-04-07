@@ -204,7 +204,7 @@ export function TerminalDemo() {
   const [extraLines, setExtraLines] = useState<Line[]>([]);
   const [extraStreaming, setExtraStreaming] = useState("");
   const [isExtraStreaming, setIsExtraStreaming] = useState(false);
-  const extraCancelRef = useRef(false);
+  const extraGenRef = useRef(0);
   const extraStreamingRef = useRef("");
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -240,7 +240,7 @@ export function TerminalDemo() {
       setActiveIndex(index);
       setSkipTyping(true);
       setAnimationKey((k) => k + 1);
-      extraCancelRef.current = true;
+      extraGenRef.current++;
       setExtraLines([]);
       setExtraStreaming("");
       setIsExtraStreaming(false);
@@ -251,7 +251,7 @@ export function TerminalDemo() {
 
   const interruptExtraStreaming = useCallback(() => {
     if (!isExtraStreaming) return;
-    extraCancelRef.current = true;
+    extraGenRef.current++;
     const partial = extraStreamingRef.current;
     setIsExtraStreaming(false);
     setExtraStreaming("");
@@ -285,25 +285,26 @@ export function TerminalDemo() {
       setExtraLines((prev) => [...prev, { type: "user", text }]);
 
       // Stream CTA response
-      extraCancelRef.current = false;
+      const gen = ++extraGenRef.current;
       extraStreamingRef.current = "";
 
       async function stream() {
         const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+        const isStale = () => extraGenRef.current !== gen;
         await sleep(400);
-        if (extraCancelRef.current) return;
+        if (isStale()) return;
         setIsExtraStreaming(true);
         const words = CTA_RESPONSE.split(/(?<=\s)/);
         let soFar = "";
         for (const word of words) {
-          if (extraCancelRef.current) return;
+          if (isStale()) return;
           soFar += word;
           extraStreamingRef.current = soFar;
           setExtraStreaming(soFar);
           await sleep(35 + Math.random() * 30);
         }
         await sleep(200);
-        if (extraCancelRef.current) return;
+        if (isStale()) return;
         setIsExtraStreaming(false);
         setExtraStreaming("");
         extraStreamingRef.current = "";
@@ -340,7 +341,14 @@ export function TerminalDemo() {
           {/* Reset button */}
           <button
             type="button"
-            onClick={() => setAnimationKey((k) => k + 1)}
+            onClick={() => {
+              extraGenRef.current++;
+              setExtraLines([]);
+              setExtraStreaming("");
+              setIsExtraStreaming(false);
+              setUserInput("");
+              setAnimationKey((k) => k + 1);
+            }}
             className={`p-1 rounded-md text-ink/30 hover:text-ink/60 hover:bg-ink/[0.05] transition-all duration-300 cursor-pointer ${animationDone ? "opacity-100" : "opacity-0 pointer-events-none"}`}
             aria-label="Replay animation"
           >
