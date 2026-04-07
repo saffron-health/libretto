@@ -5,7 +5,7 @@
 **Never manually edit `packages/libretto/package.json` version.** Use the release script:
 
 ```bash
-bash scripts/prepare-release.sh [patch|minor|major]
+pnpm prepare-release [patch|minor|major]
 ```
 
 This bumps the version, updates all SKILL.md files, syncs mirrors, validates parity, commits, pushes a `release-v*` branch, and opens a PR. The release CI workflow triggers automatically when the PR merges to `main`.

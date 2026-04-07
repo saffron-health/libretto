@@ -15,7 +15,7 @@
 To bump the version and create a release PR, run from the repo root:
 
 ```bash
-bash scripts/prepare-release.sh [patch|minor|major]
+pnpm prepare-release [patch|minor|major]
 ```
 
-Never manually edit `packages/libretto/package.json` version — the script handles the version bump, SKILL.md version updates, mirror syncing, and PR creation.
+Never manually edit `packages/libretto/package.json` version — this command handles the version bump, SKILL.md version updates, mirror syncing, and PR creation.
