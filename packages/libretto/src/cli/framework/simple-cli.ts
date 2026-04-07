@@ -1265,14 +1265,17 @@ function buildInputNormalizer<
         key,
       ].filter((candidate) => candidate.length > 0);
 
-      let value: unknown = undefined;
+      let found = false;
       for (const candidate of normalizedCandidates) {
         if (Object.prototype.hasOwnProperty.call(named, candidate)) {
-          value = named[candidate];
+          output[key] = named[candidate];
+          found = true;
           break;
         }
       }
-      output[key] = value;
+      if (!found && !Object.prototype.hasOwnProperty.call(output, key)) {
+        output[key] = undefined;
+      }
     }
 
     return output as InputObjectFor<TPositionals, TNamed>;
