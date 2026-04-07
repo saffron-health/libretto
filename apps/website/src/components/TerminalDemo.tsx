@@ -1,14 +1,12 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { RefreshIcon } from "../icons";
+import { workflowExamples, type WorkflowExample } from "./workflowExamples";
 
 type Line =
   | { type: "user"; text: string }
   | { type: "thinking"; done: boolean }
   | { type: "tool"; label: string; done: boolean }
   | { type: "agent"; text: string };
-
-const USER_MESSAGE =
-  'Use the Libretto skill. Go on Craigslist and scrape the first 10 "free stuff" listings for title, location, and link.';
 
 function Cursor({ dark }: { dark?: boolean }) {
   return (
@@ -45,21 +43,13 @@ function ToolLine({ label, done }: { label: string; done: boolean }) {
   );
 }
 
-export function TerminalDemo() {
+function useTerminalAnimation(example: WorkflowExample, animationKey: number) {
   const [lines, setLines] = useState<Line[]>([]);
   const [promptText, setPromptText] = useState("");
   const [promptSubmitted, setPromptSubmitted] = useState(false);
   const [streamingAgent, setStreamingAgent] = useState("");
   const [isStreamingAgent, setIsStreamingAgent] = useState(false);
   const [animationDone, setAnimationDone] = useState(false);
-  const [animationKey, setAnimationKey] = useState(0);
-  const bodyRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (bodyRef.current) {
-      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-    }
-  }, [lines, promptText, streamingAgent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,13 +64,13 @@ export function TerminalDemo() {
     async function run() {
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-      await sleep(1000);
+      await sleep(600);
 
       // User types char by char
-      for (let c = 0; c <= USER_MESSAGE.length; c++) {
+      for (let c = 0; c <= example.userMessage.length; c++) {
         if (cancelled) return;
-        setPromptText(USER_MESSAGE.slice(0, c));
-        await sleep(30);
+        setPromptText(example.userMessage.slice(0, c));
+        await sleep(25);
       }
 
       await sleep(500);
@@ -89,14 +79,14 @@ export function TerminalDemo() {
       // Submit
       setPromptSubmitted(true);
       setPromptText("");
-      setLines([{ type: "user", text: USER_MESSAGE }]);
+      setLines([{ type: "user", text: example.userMessage }]);
 
       await sleep(300);
       if (cancelled) return;
 
       // Thinking (spinning)
       setLines((prev) => [...prev, { type: "thinking", done: false }]);
-      await sleep(1800);
+      await sleep(example.thinkDurationMs);
       if (cancelled) return;
 
       // Thinking done
@@ -104,121 +94,44 @@ export function TerminalDemo() {
         prev.map((l) => (l.type === "thinking" ? { ...l, done: true } : l)),
       );
 
-      // Tool: bash — open
-      await sleep(400);
-      if (cancelled) return;
-      setLines((prev) => [
-        ...prev,
-        {
-          type: "tool",
-          label: "bash: npx libretto open https://craigslist.org --headed",
-          done: false,
-        },
-      ]);
-      await sleep(1400);
-      if (cancelled) return;
-      setLines((prev) =>
-        prev.map((l, i) =>
-          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
-        ),
-      );
-
-      // Tool: bash — snapshot
-      await sleep(300);
-      if (cancelled) return;
-      setLines((prev) => [
-        ...prev,
-        {
-          type: "tool",
-          label:
-            'bash: npx libretto snapshot --objective "Find free stuff listings"',
-          done: false,
-        },
-      ]);
-      await sleep(1200);
-      if (cancelled) return;
-      setLines((prev) =>
-        prev.map((l, i) =>
-          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
-        ),
-      );
-
-      // Tool: bash — exec click free stuff link
-      await sleep(300);
-      if (cancelled) return;
-      setLines((prev) => [
-        ...prev,
-        {
-          type: "tool",
-          label: 'bash: npx libretto exec "await page.locator(…).click()"',
-          done: false,
-        },
-      ]);
-      await sleep(900);
-      if (cancelled) return;
-      setLines((prev) =>
-        prev.map((l, i) =>
-          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
-        ),
-      );
-
-      // Tool: bash — exec scrape listings
-      await sleep(300);
-      if (cancelled) return;
-      setLines((prev) => [
-        ...prev,
-        {
-          type: "tool",
-          label:
-            "bash: npx libretto exec \"return await page.locator('.cl-static-search-result').first().textContent()\"",
-          done: false,
-        },
-      ]);
-      await sleep(800);
-      if (cancelled) return;
-      setLines((prev) =>
-        prev.map((l, i) =>
-          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
-        ),
-      );
-
-      // Tool: write file
-      await sleep(300);
-      if (cancelled) return;
-      setLines((prev) => [
-        ...prev,
-        {
-          type: "tool",
-          label: "write: craigslist_free_stuff.ts",
-          done: false,
-        },
-      ]);
-      await sleep(1000);
-      if (cancelled) return;
-      setLines((prev) =>
-        prev.map((l, i) =>
-          i === prev.length - 1 && l.type === "tool" ? { ...l, done: true } : l,
-        ),
-      );
+      // Tool steps
+      for (const tool of example.tools) {
+        await sleep(300);
+        if (cancelled) return;
+        setLines((prev) => [
+          ...prev,
+          { type: "tool", label: tool.label, done: false },
+        ]);
+        await sleep(tool.durationMs);
+        if (cancelled) return;
+        setLines((prev) =>
+          prev.map((l, i) =>
+            i === prev.length - 1 && l.type === "tool"
+              ? { ...l, done: true }
+              : l,
+          ),
+        );
+      }
 
       // Agent streams response word by word
       await sleep(400);
       if (cancelled) return;
-      const agentText =
-        "Created craigslist_free_stuff.ts — a workflow that opens Craigslist, navigates to free stuff, and scrapes the first 10 listings for title, location, and link.\n\nRun it anytime:\n  npx libretto run ./craigslist_free_stuff.ts main --headless";
       setIsStreamingAgent(true);
-      const words = agentText.split(/(?<=\s)/);
-      let so_far = "";
+      const words = example.agentResponse.split(/(?<=\s)/);
+      let soFar = "";
       for (const word of words) {
         if (cancelled) return;
-        so_far += word;
-        setStreamingAgent(so_far);
+        soFar += word;
+        setStreamingAgent(soFar);
         await sleep(35 + Math.random() * 30);
       }
       await sleep(200);
       setIsStreamingAgent(false);
       setStreamingAgent("");
-      setLines((prev) => [...prev, { type: "agent", text: agentText }]);
+      setLines((prev) => [
+        ...prev,
+        { type: "agent", text: example.agentResponse },
+      ]);
       setAnimationDone(true);
     }
 
@@ -226,10 +139,69 @@ export function TerminalDemo() {
     return () => {
       cancelled = true;
     };
-  }, [animationKey]);
+  }, [example, animationKey]);
+
+  return {
+    lines,
+    promptText,
+    promptSubmitted,
+    streamingAgent,
+    isStreamingAgent,
+    animationDone,
+  };
+}
+
+export function TerminalDemo() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [animationKey, setAnimationKey] = useState(0);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  const example = workflowExamples[activeIndex];
+
+  const {
+    lines,
+    promptText,
+    promptSubmitted,
+    streamingAgent,
+    isStreamingAgent,
+    animationDone,
+  } = useTerminalAnimation(example, animationKey);
+
+  useEffect(() => {
+    if (bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+  }, [lines, promptText, streamingAgent]);
+
+  const handleTabClick = useCallback(
+    (index: number) => {
+      if (index === activeIndex) return;
+      setActiveIndex(index);
+      setAnimationKey((k) => k + 1);
+    },
+    [activeIndex],
+  );
 
   return (
     <div className="mx-auto max-w-[600px] mt-16">
+      {/* Tabs */}
+      <div className="flex gap-1 mb-2 px-1 overflow-x-auto">
+        {workflowExamples.map((ex, i) => (
+          <button
+            key={ex.id}
+            type="button"
+            onClick={() => handleTabClick(i)}
+            className={`px-3 py-1.5 rounded-t-lg text-[12px] font-medium transition-colors whitespace-nowrap cursor-pointer ${
+              i === activeIndex
+                ? "bg-white text-ink border border-b-0 border-ink/[0.08]"
+                : "text-ink/40 hover:text-ink/60 hover:bg-ink/[0.03]"
+            }`}
+          >
+            {ex.tab}
+          </button>
+        ))}
+      </div>
+
       <div className="rounded-xl border border-ink/[0.08] bg-white shadow-lg overflow-hidden flex flex-col font-mono text-[13px]">
         {/* Title bar */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-ink/[0.06] bg-ink/[0.02]">
