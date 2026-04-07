@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -171,6 +171,32 @@ function createSpinner(message) {
   };
 }
 
+/**
+ * Run install command asynchronously so the spinner can animate.
+ * Returns { stdout, stderr, status }.
+ */
+function runInstallAsync(cmd, cwd) {
+  return new Promise((resolve) => {
+    const [bin, ...args] = cmd.split(" ");
+    const child = spawn(bin, args, {
+      cwd,
+      stdio: ["inherit", "pipe", "pipe"],
+      shell: true,
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (data) => {
+      stdout += data;
+    });
+    child.stderr.on("data", (data) => {
+      stderr += data;
+    });
+    child.on("close", (status, signal) => {
+      resolve({ stdout, stderr, status, signal });
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Scaffold
 // ---------------------------------------------------------------------------
@@ -193,7 +219,7 @@ function readDepsFromPackageJson(targetDir) {
  *
  * Exported so tests can call it directly with `skipInstall: true`.
  */
-export function scaffoldProject(
+export async function scaffoldProject(
   targetDir,
   projectName,
   pkgManager,
@@ -260,39 +286,26 @@ export function scaffoldProject(
     console.log();
 
     const spinner = createSpinner("Installing packages...");
-    try {
-      const output = execSync(installCommand(pkgManager), {
-        cwd: targetDir,
-        encoding: "utf-8",
-        stdio: ["inherit", "pipe", "pipe"],
-      });
-      spinner.stop();
-      // Print just the summary lines (e.g. "added 123 packages...")
-      const lines = output.split("\n");
-      for (const line of lines) {
+    const result = await runInstallAsync(installCommand(pkgManager), targetDir);
+    spinner.stop();
+
+    // Print stderr (warnings)
+    if (result.stderr) {
+      for (const line of result.stderr.split("\n")) {
+        if (line.trim()) console.error(line);
+      }
+    }
+
+    if (result.status !== 0) {
+      console.error(`\nFailed to install dependencies.`);
+      process.exit(1);
+    }
+
+    // Print stdout summary lines (e.g. "added 123 packages...")
+    if (result.stdout) {
+      for (const line of result.stdout.split("\n")) {
         const trimmed = line.trim();
-        if (!trimmed) continue;
-        console.log(trimmed);
-      }
-    } catch (err) {
-      spinner.stop();
-      // Print stderr warnings/summary even on "success with warnings"
-      if (err.stderr) {
-        const lines = err.stderr.split("\n");
-        for (const line of lines) {
-          if (line.trim()) console.error(line);
-        }
-      }
-      if (err.status !== 0 && err.status !== null) {
-        console.error(`\nFailed to install dependencies.`);
-        process.exit(1);
-      }
-      // status 0 or null with stderr = warnings, continue
-      if (err.stdout) {
-        const lines = err.stdout.split("\n");
-        for (const line of lines) {
-          if (line.trim()) console.log(line);
-        }
+        if (trimmed) console.log(trimmed);
       }
     }
 
@@ -329,7 +342,11 @@ async function main() {
   let rawName = process.argv[2];
 
   if (!rawName) {
-    rawName = await promptProjectName(DEFAULT_NAME);
+    if (process.stdin.isTTY) {
+      rawName = await promptProjectName(DEFAULT_NAME);
+    } else {
+      rawName = DEFAULT_NAME;
+    }
   }
 
   const targetDir = resolve(rawName);
@@ -352,7 +369,7 @@ async function main() {
   );
   console.log(`Using ${BOLD}${pkgManager}${RESET} and TypeScript.\n`);
 
-  scaffoldProject(targetDir, projectName, pkgManager);
+  await scaffoldProject(targetDir, projectName, pkgManager);
 
   console.log(
     `\n${GREEN}Success!${RESET} Created ${BOLD}${projectName}${RESET} at ${targetDir}\n`,
