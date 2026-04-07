@@ -3,7 +3,7 @@ import {
   type MinimalLogger,
   defaultLogger,
 } from "../../shared/logger/logger.js";
-import type { LLMClient } from "../../shared/llm/types.js";
+import type { LanguageModel } from "ai";
 import { executeRecoveryAgent } from "./agent.js";
 
 /**
@@ -14,7 +14,7 @@ export async function attemptWithRecovery<T>(
   page: Page,
   fn: () => Promise<T>,
   logger?: MinimalLogger,
-  llmClient?: LLMClient,
+  model?: LanguageModel,
 ): Promise<T> {
   const log = logger ?? defaultLogger;
   try {
@@ -33,7 +33,7 @@ export async function attemptWithRecovery<T>(
       throw error;
     }
 
-    if (!llmClient) {
+    if (!model) {
       throw error;
     }
 
@@ -45,7 +45,7 @@ export async function attemptWithRecovery<T>(
       page,
       "Look at the page to see if there is a popup blocking the screen. If so, close the popup.",
       log,
-      llmClient,
+      model,
     );
 
     return await fn();

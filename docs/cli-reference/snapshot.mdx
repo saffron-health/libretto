@@ -23,7 +23,7 @@ npx libretto snapshot \
 
 <ParamField path="--objective" type="string" required>
   What you want the AI to find, analyze, or explain. A single objective can
-  include multiple questions or analysis tasks — you don't need to run separate
+  include multiple questions or analysis tasks. You don't need to run separate
   snapshots for each question.
 </ParamField>
 
@@ -36,7 +36,7 @@ npx libretto snapshot \
 ### Optional flags
 
 <ParamField path="--page" type="string">
-  Target a specific page ID within the session. Use `npx libretto pages --session <name>` to list page IDs when a popup or new tab is open. See [pages & close](./session-management) for details.
+  Target a specific page ID within the session. Use `npx libretto pages --session <name>` to list page IDs when a popup or new tab is open. See [pages](./pages) for details.
 </ParamField>
 
 ### What snapshot produces
@@ -53,8 +53,8 @@ The command prints the paths to all three files before the AI analysis output.
 
 ### When to use snapshot
 
-- Before writing a selector — use snapshot to confirm the element structure rather than guessing.
-- After a workflow step fails — inspect the exact page state the failure left behind.
+- Before writing a selector. Use snapshot to confirm the element structure rather than guessing.
+- After a workflow step fails. Inspect the exact page state the failure left behind.
 - When the page has rendered content that isn't obvious from the URL alone.
 - When you need answers to multiple questions about a page in a single call.
 
@@ -83,7 +83,7 @@ Supported providers: `openai`, `anthropic`, `gemini`, `vertex`.
 ### Examples
 
 ```bash theme={null}
-# Basic snapshot — find a form
+# Basic snapshot, find a form
 npx libretto snapshot \
   --session debug-example \
   --objective "Find the sign-in form and submit button" \
@@ -102,7 +102,7 @@ npx libretto snapshot \
   --objective "Find the active form" \
   --context "A modal opened after clicking the Edit button. I need the form fields inside it."
 
-# Snapshot during debugging — ask multiple things at once
+# Snapshot during debugging, ask multiple things at once
 npx libretto snapshot \
   --session debug-flow \
   --objective "Find the blocking error or broken selector target. Also describe the current page URL and any visible error messages." \

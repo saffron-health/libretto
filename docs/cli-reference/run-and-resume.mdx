@@ -19,8 +19,8 @@ npx libretto run ./integration.ts main --headless
 npx libretto run <file> <workflowName> [flags]
 ```
 
-- `<file>` — path to the TypeScript workflow file
-- `<workflowName>` — the runtime name of the workflow, i.e. the `name` string passed as the first argument to `workflow(name, handler)` (e.g., `"main"`, `"myWorkflow"`)
+- `<file>`: path to the TypeScript workflow file
+- `<workflowName>`: the runtime name of the workflow, the `name` string passed as the first argument to `workflow(name, handler)` (e.g., `"main"`, `"myWorkflow"`)
 
 #### Flags
 
@@ -66,12 +66,20 @@ npx libretto run <file> <workflowName> [flags]
   Disable ghost cursor and element highlight visualization in headed mode.
 </ParamField>
 
+<Info>
+  **Cloud browser providers:** The `run` command does not yet support the
+  `--provider` flag. Workflows always run against a local browser. Cloud
+  provider support for `run` is planned — see [open &
+  connect](/cli-reference/open-and-connect#cloud-browser-providers) for the
+  current provider support on `open`.
+</Info>
+
 #### Behavior on failure
 
 When a workflow fails, Libretto keeps the browser open at the point of failure. You can then use `snapshot` and `exec` to inspect the live page state before editing the workflow code.
 
 ```bash theme={null}
-# Workflow fails — browser stays open
+# Workflow fails, browser stays open
 npx libretto run ./integration.ts main --session debug-flow --headed
 
 # Inspect the failure state
@@ -92,10 +100,10 @@ npx libretto run ./integration.ts main --headless
 Prefer `run --headless` for the normal fix-and-verify loop. When the headless run passes, do a final headed run if you or the user wants to watch the finished workflow:
 
 ```bash theme={null}
-# Fix/verify loop — fast, no visible browser
+# Fix/verify loop, fast, no visible browser
 npx libretto run ./integration.ts main --headless
 
-# Final confirmation run — shows the browser
+# Final confirmation run, shows the browser
 npx libretto run ./integration.ts main --headed
 ```
 
@@ -136,7 +144,7 @@ npx libretto resume --session debug-example
 
 #### The `pause()` API
 
-Insert `await pause(session)` calls in your workflow file to create interactive breakpoints — similar to debugger breakpoints in the browser flow. The workflow stops at each `pause()` call and waits for `resume` before continuing.
+Insert `await pause(session)` calls in your workflow file to create interactive breakpoints, similar to debugger breakpoints in the browser flow. The workflow stops at each `pause()` call and waits for `resume` before continuing.
 
 ```typescript theme={null}
 import { workflow, pause } from "libretto";

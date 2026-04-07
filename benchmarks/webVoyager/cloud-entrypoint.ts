@@ -76,7 +76,12 @@ main()
   .then(() => {
     process.exit(0);
   })
-  .catch(() => {
+  .catch((error) => {
+    if (error instanceof Error) {
+      console.error(error.stack ?? error.message);
+    } else {
+      console.error(error);
+    }
     console.error("Cloud entrypoint failed.");
     process.exit(1);
   });

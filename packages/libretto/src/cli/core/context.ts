@@ -1,6 +1,4 @@
 import { Logger, createFileLogSink } from "../../shared/logger/index.js";
-import type { LLMClient } from "../../shared/llm/index.js";
-import type { LoggerApi } from "../../shared/logger/index.js";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveLibrettoRepoRoot } from "../../shared/paths/repo-root.js";
@@ -72,13 +70,6 @@ export function createLoggerForSession(session: string): Logger {
   );
 }
 
-export async function closeLogger(
-  logger: Logger | null | undefined,
-): Promise<void> {
-  if (!logger) return;
-  await logger.close();
-}
-
 export async function withSessionLogger<T>(
   session: string,
   run: (logger: Logger) => Promise<T>,
@@ -87,41 +78,6 @@ export async function withSessionLogger<T>(
   try {
     return await run(logger);
   } finally {
-    await closeLogger(logger);
+    await logger.close();
   }
-}
-
-let llmClientFactory:
-  | ((logger: LoggerApi, model: string) => Promise<LLMClient>)
-  | null = null;
-
-export function setLLMClientFactory(
-  factory: (logger: LoggerApi, model: string) => Promise<LLMClient>,
-): void {
-  llmClientFactory = factory;
-}
-
-export function getLLMClientFactory():
-  | ((logger: LoggerApi, model: string) => Promise<LLMClient>)
-  | null {
-  return llmClientFactory;
-}
-
-export function maybeConfigureLLMClientFactoryFromEnv(): void {
-  if (llmClientFactory) return;
-
-  const hasAnyCreds =
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.GCLOUD_PROJECT ||
-    process.env.ANTHROPIC_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-
-  if (!hasAnyCreds) return;
-
-  setLLMClientFactory(async (_logger, model) => {
-    const { createLLMClient } = await import("../../shared/llm/index.js");
-    return createLLMClient(model);
-  });
 }

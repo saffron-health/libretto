@@ -4,7 +4,7 @@ description: "Read-only Libretto workflow for diagnosing live browser state with
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.5.4"
+  version: "0.5.6"
 ---
 
 ## How Libretto Read-Only Works
@@ -13,6 +13,7 @@ metadata:
 - Libretto stores read-only vs write-access on the session itself.
 - The primary inspection tools are `snapshot` and `readonly-exec`.
 - `readonly-exec` reuses Libretto's normal execution pipeline, but it only exposes read-only helpers and denies mutating Playwright methods.
+- Only a user can change the session mode for an existing session. Never change a session's mode on your own — the user must change it themselves manually.
 
 ## Working Rules
 
@@ -60,14 +61,29 @@ npx libretto snapshot \
 ### `readonly-exec`
 
 - Use `readonly-exec` for narrow inspection code only.
-- Available helpers: `page`, `state`, `snapshot`, `get`.
-- Allowed browser reads are limited to page URL/title/HTML, locator text reads, locator count, visibility checks, snapshots, and GET requests.
 - Denied operations fail with `ReadonlyExecDenied: ...`.
+
+#### Helpers
+
+- `page` — a read-only Playwright `Page` proxy. Standard Playwright read methods work normally (`url()`, `title()`, `content()`, `getByRole()`, `locator()`, `textContent()`, `isVisible()`, `count()`, `scrollIntoViewIfNeeded()`, etc.). Anything that mutates the page (`click`, `fill`, `goto`, `evaluate`, `keyboard`, `mouse`) is blocked.
+- `state` — the current Libretto session state object.
+- `get(url, options?)` — HTTP client restricted to **GET and HEAD** requests. Replaces `fetch`, which is blocked in readonly mode. Any request with a body or a non-GET/HEAD method throws `ReadonlyExecDenied`.
+- `scrollBy(deltaX, deltaY)` — scroll the viewport by pixel offset. Use this to inspect content below the fold without targeting a specific element.
+
+Standard JS globals `console`, `URL`, `Buffer`, `setTimeout`, and `setInterval` are also available.
+
+#### Examples
 
 ```bash
 npx libretto readonly-exec "return page.url()" --session failed-job-debug
 npx libretto readonly-exec "return await page.getByRole('heading').first().textContent()" --session failed-job-debug
-echo "return await snapshot()" | npx libretto readonly-exec - --session failed-job-debug
+
+# HTTP GET inspection
+echo "const r = await get('https://api.example.com/status'); return await r.json()" \
+  | npx libretto readonly-exec - --session failed-job-debug
+
+# Scroll down to inspect below-the-fold content
+npx libretto readonly-exec "await scrollBy(0, 500)" --session failed-job-debug
 ```
 
 ### `close`

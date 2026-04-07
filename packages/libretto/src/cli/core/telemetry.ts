@@ -2,7 +2,6 @@ import {
   appendFileSync,
   existsSync,
   readFileSync,
-  writeFileSync,
 } from "node:fs";
 import type { Page } from "playwright";
 import {
@@ -63,31 +62,6 @@ export function readNetworkLog(
   }
 
   return entries;
-}
-
-export function formatNetworkEntry(e: NetworkLogEntry): string {
-  const time = e.ts.replace(/.*T/, "").replace(/\.\d+Z$/, "");
-  const duration = e.durationMs != null ? `${e.durationMs}ms` : "?ms";
-  const size = e.size != null ? `${e.size}B` : "";
-  const parts = [
-    `[${time}]`,
-    `${e.status}`,
-    `${e.method.padEnd(6)}`,
-    e.url,
-    duration,
-    size,
-  ].filter(Boolean);
-  let line = parts.join(" ");
-  if (e.postData) {
-    line += `\n         body: ${e.postData.substring(0, 120)}${e.postData.length > 120 ? "..." : ""}`;
-  }
-  return line;
-}
-
-export function clearNetworkLog(session: string): void {
-  assertSessionStateExistsOrThrow(session);
-  const logPath = getSessionNetworkLogPath(session);
-  writeFileSync(logPath, "");
 }
 
 export type ActionLogEntry = {
@@ -180,32 +154,6 @@ export function readActionLog(
   }
 
   return entries;
-}
-
-export function formatActionEntry(e: ActionLogEntry): string {
-  const time = e.ts.replace(/.*T/, "").replace(/\.\d+Z$/, "");
-  const src = e.source.toUpperCase().padEnd(5);
-  const displaySelector = e.bestSemanticSelector || e.selector;
-  const parts = [`[${time}]`, `[${src}]`, e.action];
-  if (displaySelector) parts.push(displaySelector);
-  if (e.targetSelector && e.targetSelector !== displaySelector) {
-    parts.push(`target=${e.targetSelector}`);
-  }
-  if (e.nearbyText) parts.push(`text="${e.nearbyText}"`);
-  if (e.coordinates) {
-    parts.push(`@(${e.coordinates.x},${e.coordinates.y})`);
-  }
-  if (e.value) parts.push(`"${e.value}"`);
-  if (e.url) parts.push(e.url);
-  if (e.duration != null) parts.push(`${e.duration}ms`);
-  if (!e.success) parts.push(`ERROR: ${e.error || "unknown"}`);
-  return parts.join(" ");
-}
-
-export function clearActionLog(session: string): void {
-  assertSessionStateExistsOrThrow(session);
-  const logPath = getSessionActionsLogPath(session);
-  writeFileSync(logPath, "");
 }
 
 const LOCATOR_ACTION_METHODS = [

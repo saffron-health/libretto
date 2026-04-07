@@ -4,7 +4,7 @@ description: "Browser automation CLI for building, maintaining, and running brow
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.5.4"
+  version: "0.5.6"
 ---
 
 ## How Libretto Works
@@ -38,7 +38,6 @@ metadata:
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
 - If the browser must remain read-only, switch to the `libretto-readonly` skill and use `readonly-exec` instead of `exec`.
-- Use `session-mode` to inspect or change a session between `write-access` and `read-only`.
 
 ## Commands
 
@@ -60,7 +59,6 @@ npx libretto open https://example.com --headless --session debug-example
 - Use `connect` to attach to any existing Chrome DevTools Protocol (CDP) endpoint — a browser started with `--remote-debugging-port`, an Electron app, or any other CDP-compatible target.
 - After connecting, `exec`, `snapshot`, `pages`, and the rest of the session commands follow that session's stored mode.
 - Libretto does not manage the connected process's lifecycle. `close` clears the session but does not terminate the remote process.
-- Session mode is enforced only through Libretto. A separate tool that connects directly to the raw CDP endpoint bypasses it.
 - Pass `--read-only` if the connected session must stay inspection-only from the start.
 
 ```bash
@@ -71,13 +69,13 @@ npx libretto connect http://127.0.0.1:9223 --session another-session
 
 ### `session-mode`
 
-- Use `session-mode` to inspect or update whether an existing session is `write-access` or `read-only`.
-- `open`, `run`, and `connect` default new sessions to `write-access`.
+- Use `session-mode` to inspect whether an existing session is `write-access` or `read-only`.
+- Only a user can change the session mode for an existing session. Never change a session's mode on your own — the user must change it themselves manually.
+- `open`, `run`, and `connect` default new sessions to `write-access` unless the config sets `sessionMode` to `read-only`.
+- Pass `--read-only` or `--write-access` to override the config default for a single command.
 
 ```bash
 npx libretto session-mode --session my-session
-npx libretto session-mode read-only --session my-session
-npx libretto session-mode write-access --session my-session
 ```
 
 ### `snapshot`
@@ -119,7 +117,7 @@ echo "return await page.url()" | npx libretto exec - --session debug-example
 ### `pages`
 
 - Use `pages` when a popup, new tab, or second page appears.
-- If `exec`, `snapshot`, `network`, or `actions` complains about multiple pages, list page ids first and then pass `--page`.
+- If `exec` or `snapshot` complains about multiple pages, list page ids first and then pass `--page`.
 
 ```bash
 npx libretto pages --session debug-example
@@ -214,7 +212,7 @@ Assistant: I'll inspect the real site first if needed, but before I finish I'll 
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
 Assistant: [Reads `references/site-security-review.md` before choosing between passive network inspection, direct browser fetch calls, and Playwright-first automation]
 Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page and need the first meaningful step."`]
-Assistant: [Uses `network`, `snapshot`, and `exec` as needed to understand the site and decide the implementation path]
+Assistant: [Uses `snapshot` and `exec` as needed to understand the site and decide the implementation path]
 Assistant: [Reads `references/code-generation-rules.md` before writing production workflow code]
 Assistant: I found the working path. I'll now update the workflow file outside Libretto and verify it with `npx libretto run ...`.
 </example>

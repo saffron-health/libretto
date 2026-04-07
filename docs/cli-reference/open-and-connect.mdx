@@ -6,7 +6,7 @@ title: open & connect
 
 ### open
 
-The `open` command launches a browser and navigates to a URL, creating a new named session. It is the starting point for any interactive workflow: once a session is open, `exec`, `snapshot`, `network`, and `actions` all work against it.
+The `open` command launches a browser and navigates to a URL, creating a new named session. It is the starting point for any interactive workflow: once a session is open, `exec`, `snapshot`, and `pages` all work against it.
 
 ```bash theme={null}
 npx libretto open https://example.com
@@ -46,9 +46,16 @@ npx libretto open https://example.com --headless --session debug-example
   the value in `.libretto/config.json`, then `1366x768`.
 </ParamField>
 
+<ParamField path="--provider, -p" type="string">
+  Browser provider to use. One of `local`, `kernel`, or `browserbase`. Defaults to `local`.
+
+**Resolution order:** `--provider` flag → `LIBRETTO_PROVIDER` env var → `provider` field in `.libretto/config.json` → `"local"`.
+
+</ParamField>
+
 <Note>
   If a saved auth profile exists for the URL's domain, `open` automatically
-  loads it — injecting the saved cookies and localStorage into the new session
+  loads it, injecting the saved cookies and localStorage into the new session
   before navigating. You can override this by passing `--auth-profile`
   explicitly, or skip profile loading by not having a saved profile for that
   domain.
@@ -74,13 +81,60 @@ npx libretto save app.example.com --session app-login
 
 ---
 
+### Cloud browser providers
+
+By default, `open` launches a local Chromium instance. You can instead run the browser in the cloud using the `--provider` flag (or `LIBRETTO_PROVIDER` env var, or `provider` in `.libretto/config.json`).
+
+#### Available providers
+
+| Provider                 | Value         | Required environment variables                  |
+| ------------------------ | ------------- | ----------------------------------------------- |
+| Local Chromium (default) | `local`       | None                                            |
+| Kernel                   | `kernel`      | `KERNEL_API_KEY`                                |
+| Browserbase              | `browserbase` | `BROWSERBASE_API_KEY`, `BROWSERBASE_PROJECT_ID` |
+
+#### Configuration
+
+You can set the provider in three ways (highest precedence first):
+
+1. **CLI flag:** `--provider kernel` (or `-p kernel`)
+2. **Environment variable:** `LIBRETTO_PROVIDER=kernel`
+3. **Config file:** add `"provider": "kernel"` to `.libretto/config.json`
+
+If none is set, the default is `local`.
+
+#### Examples
+
+```bash theme={null}
+# Open with Kernel cloud browser
+export KERNEL_API_KEY="your-key"
+npx libretto open https://example.com --provider kernel
+
+# Open with Browserbase
+export BROWSERBASE_API_KEY="your-key"
+export BROWSERBASE_PROJECT_ID="your-project-id"
+npx libretto open https://example.com -p browserbase
+
+# Set provider via config so you don't need the flag every time
+# .libretto/config.json: { "version": 1, "provider": "kernel" }
+npx libretto open https://example.com
+```
+
+<Note>
+  Cloud providers ignore `--headed` / `--headless` and `--viewport` flags since
+  the browser runs remotely. The session is always headless from the local
+  machine's perspective.
+</Note>
+
+---
+
 ### connect
 
-The `connect` command attaches to an existing Chrome DevTools Protocol (CDP) endpoint rather than launching a new browser. Use it to drive a browser that is already running — for example, one started with `--remote-debugging-port`, an Electron application, or any other CDP-compatible target.
+The `connect` command attaches to an existing Chrome DevTools Protocol (CDP) endpoint rather than launching a new browser. Use it to drive a browser that is already running, for example one started with `--remote-debugging-port`, an Electron application, or any other CDP-compatible target.
 
 ```bash theme={null}
 npx libretto connect http://127.0.0.1:9222 --session my-session
-npx libretto connect http://127.0.0.1:9223 --session another-session
+npx libretto connect ws://127.0.0.1:9223 --session another-session
 ```
 
 #### When to use `connect`
@@ -92,8 +146,9 @@ npx libretto connect http://127.0.0.1:9223 --session another-session
 #### Flags
 
 <ParamField path="cdp-url" type="string" required>
-  The CDP endpoint URL to connect to. Passed as the first positional argument.
-  Example: `http://127.0.0.1:9222`.
+  The CDP endpoint URL to connect to. This can be either an HTTP or WebSocket
+  URL and is passed as the first positional argument. Example:
+  `http://127.0.0.1:9222`.
 </ParamField>
 
 <ParamField path="--session" type="string">
@@ -105,11 +160,9 @@ npx libretto connect http://127.0.0.1:9223 --session another-session
 
 Once connected, all session-scoped commands work normally against the attached browser:
 
-- `exec` — run Playwright TypeScript code
-- `snapshot` — capture a screenshot and analyze the page
-- `pages` — list open pages
-- `network` — view captured network requests
-- `actions` — view recorded actions
+- `exec`: run Playwright TypeScript code
+- `snapshot`: capture a screenshot and analyze the page
+- `pages`: list open pages
 
 <Warning>
   Libretto does **not** manage the lifecycle of a connected process. Running `npx libretto close --session <name>` clears the Libretto session record but does **not** terminate the remote browser or Electron app.

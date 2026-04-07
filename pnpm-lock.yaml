@@ -62,6 +62,9 @@ importers:
       tailwindcss:
         specifier: ^4.2.2
         version: 4.2.2
+      tweakpane:
+        specifier: ^4.0.5
+        version: 4.0.5
       wouter:
         specifier: ^3.9.0
         version: 3.9.0(react@19.2.4)
@@ -69,6 +72,9 @@ importers:
       '@ai-sdk/google-vertex':
         specifier: ^4.0.95
         version: 4.0.95(zod@4.3.6)
+      '@tweakpane/core':
+        specifier: ^2.0.5
+        version: 2.0.5
       '@types/mdast':
         specifier: ^4.0.4
         version: 4.0.4
@@ -117,6 +123,9 @@ importers:
       '@onkernel/sdk':
         specifier: ^0.44.0
         version: 0.44.0
+      '@sinclair/typebox':
+        specifier: ^0.34.41
+        version: 0.34.48
       google-auth-library:
         specifier: ^10.6.1
         version: 10.6.2
@@ -2083,6 +2092,9 @@ packages:
     resolution: {integrity: sha512-voicVULvUV5yaGXo0Iue13BcHGYW3u0VgqSbfQwBaHbpj1zLjYV4KIe+7fYIo6DO8FVUJzxFps3ODCQG/Wy2Qw==}
     cpu: [arm64]
     os: [win32]
+
+  '@tweakpane/core@2.0.5':
+    resolution: {integrity: sha512-punBgD5rKCF5vcNo6BsSOXiDR/NSs9VM7SG65QSLJIxfRaGgj54ree9zQW6bO3pNFf3AogiGgaNODUVQRk9YqQ==}
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -4077,6 +4089,9 @@ packages:
     resolution: {integrity: sha512-Rb4qk5YT8RUwwdXtkLpkVhNEe/lor6+WV7S5tTlLpxSz6MjV5Qi8jGNn4gS6NAvrYGA/rNrE6YUQM85sCZUDbQ==}
     hasBin: true
 
+  tweakpane@4.0.5:
+    resolution: {integrity: sha512-rxEXdSI+ArlG1RyO6FghC4ZUX8JkEfz8F3v1JuteXSV0pEtHJzyo07fcDG+NsJfN5L39kSbCYbB9cBGHyuI/tQ==}
+
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
@@ -6054,6 +6069,8 @@ snapshots:
 
   '@turbo/windows-arm64@2.8.20':
     optional: true
+
+  '@tweakpane/core@2.0.5': {}
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
@@ -8389,6 +8406,8 @@ snapshots:
       '@turbo/linux-arm64': 2.8.20
       '@turbo/windows-64': 2.8.20
       '@turbo/windows-arm64': 2.8.20
+
+  tweakpane@4.0.5: {}
 
   typescript@5.9.3: {}
 

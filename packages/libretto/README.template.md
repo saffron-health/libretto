@@ -75,8 +75,6 @@ npx libretto exec "<code>"                 # execute Playwright TypeScript again
 echo "<code>" | npx libretto exec -        # intentionally read Playwright TypeScript from stdin
 npx libretto run <file>                    # run the file's default-exported workflow
 npx libretto resume                        # resume a paused workflow
-npx libretto network                       # view captured network requests
-npx libretto actions                       # view captured user/agent actions
 npx libretto pages                         # list open pages in the session
 npx libretto save <domain>                 # save browser session (cookies, localStorage) for reuse
 npx libretto close                         # close the browser

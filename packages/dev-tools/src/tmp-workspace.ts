@@ -28,10 +28,20 @@ export type CreateTmpWorkspaceOptions = {
 };
 
 function findRepoRoot(): string {
-  const result = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-    encoding: "utf-8",
-  });
-  return result.trim();
+  const override = process.env.LIBRETTO_REPO_ROOT?.trim();
+  if (override) {
+    return resolve(override);
+  }
+
+  try {
+    const result = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return result.trim();
+  } catch {
+    return resolve(import.meta.dirname, "..", "..", "..");
+  }
 }
 
 function run(

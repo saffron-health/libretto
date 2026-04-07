@@ -63,7 +63,7 @@ export const main = workflow<{ query: string }, string[]>(
 
 #### Running with the CLI
 
-Pass the file path and the workflow's **runtime name** to `libretto run`. The runtime name is the `name` string you pass as the first argument to `workflow(name, handler)` — not the JavaScript export identifier:
+Pass the file path and the workflow's **runtime name** to `libretto run`. The runtime name is the `name` string you pass as the first argument to `workflow(name, handler)`, not the JavaScript export identifier:
 
 ```bash theme={null}
 npx libretto run ./my-workflow.ts main
@@ -82,7 +82,7 @@ The CLI compiles the file with `tsx`, launches a Chromium browser, and calls you
 
 ### `launchBrowser()`
 
-Launches a Playwright Chromium browser and returns a ready-to-use `BrowserSession`. Use this when you want to run workflows programmatically — outside the CLI — or when you need direct access to the `Browser` or `BrowserContext` objects.
+Launches a Playwright Chromium browser and returns a ready-to-use `BrowserSession`. Use this when you want to run workflows programmatically outside the CLI, or when you need direct access to the `Browser` or `BrowserContext` objects.
 
 ```typescript theme={null}
 async function launchBrowser(args: LaunchBrowserArgs): Promise<BrowserSession>;

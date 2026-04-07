@@ -251,46 +251,6 @@ describe("state-driven CLI subprocess behavior", () => {
     );
   }, 45_000);
 
-  test("reads and clears network logs for a live session", async ({
-    librettoCli,
-  }) => {
-    const session = "network-live-session";
-    await librettoCli(
-      `open https://example.com --headless --session ${session}`,
-    );
-
-    await librettoCli(
-      `exec "await page.goto('https://example.com/?network=one'); return await page.url();" --session ${session}`,
-    );
-
-    const view = await librettoCli(`network --session ${session} --last 5`);
-    expect(view.stdout).toContain("example.com/?network=one");
-    expect(view.stdout).toContain("request(s) shown.");
-
-    const clear = await librettoCli(`network --session ${session} --clear`);
-    expect(clear.stdout).toContain("Network log cleared.");
-  }, 60_000);
-
-  test("reads and clears action logs for a live session", async ({
-    librettoCli,
-  }) => {
-    const session = "actions-live-session";
-    await librettoCli(
-      `open https://example.com --headless --session ${session}`,
-    );
-
-    await librettoCli(
-      `exec "await page.reload(); return await page.url();" --session ${session}`,
-    );
-
-    const view = await librettoCli(`actions --session ${session} --last 5`);
-    expect(view.stdout).toContain("[AGENT]");
-    expect(view.stdout).toMatch(/reload|goto/);
-    expect(view.stdout).toContain("action(s) shown.");
-
-    const clear = await librettoCli(`actions --session ${session} --clear`);
-    expect(clear.stdout).toContain("Action log cleared.");
-  }, 60_000);
 
   test("status shows AI config and open sessions", async ({ librettoCli }) => {
     // Configure AI model
@@ -357,33 +317,6 @@ describe("state-driven CLI subprocess behavior", () => {
     );
   });
 
-  test("logs richer user action selectors for nested click targets", async ({
-    librettoCli,
-  }) => {
-    const session = "actions-rich-user-log";
-    const html = encodeURIComponent(
-      `<button id="saveBtn" aria-label="Save record"><span>Save</span></button>`,
-    );
-    await librettoCli(
-      `open https://example.com --headless --session ${session}`,
-    );
-
-    await librettoCli(
-      `exec "await page.goto('data:text/html,${html}'); return await page.url();" --session ${session}`,
-    );
-    await librettoCli(
-      `exec "await page.evaluate(() => { const target = document.querySelector('#saveBtn span'); if (!(target instanceof HTMLElement)) throw new Error('Missing nested span target'); target.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 42, clientY: 24 })); });" --session ${session}`,
-    );
-
-    const view = await librettoCli(
-      `actions --session ${session} --action dblclick --source user --last 5`,
-    );
-    expect(view.stdout).toContain("dblclick");
-    expect(view.stdout).toContain("button#saveBtn");
-    expect(view.stdout).toContain("target=span");
-    expect(view.stdout).toContain('text="Save"');
-    expect(view.stdout).toContain("@(42,24)");
-  }, 60_000);
 
   test("open and connect sessions default to write-access and support --read-only", async ({
     librettoCli,
@@ -640,45 +573,6 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(parseJsonStdout<Record<string, unknown>>(result.stdout)).toEqual({
       movedByScrollBy: true,
       afterLocatorScrollInViewport: true,
-    });
-  }, 60_000);
-
-  test("readonly-exec snapshot returns diagnostic payload", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    const session = "readonly-exec-snapshot";
-    const htmlPath = workspacePath("fixtures", "readonly-snapshot.html");
-    await mkdir(workspacePath("fixtures"), { recursive: true });
-    await writeFile(
-      htmlPath,
-      "<!doctype html><html><head><title>Snapshot Fixture</title></head><body><main><h1>Snapshot Heading</h1></main></body></html>",
-      "utf8",
-    );
-
-    const fileUrl = pathToFileURL(htmlPath).href;
-    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
-
-    const result = await librettoCli(
-      `readonly-exec - --session ${session}`,
-      undefined,
-      [
-        "const snap = await snapshot();",
-        "return {",
-        "  url: snap.currentUrl,",
-        "  title: snap.pageTitle,",
-        "  htmlContainsHeading: snap.pageHtml.includes('Snapshot Heading'),",
-        "  hasScreenshot: snap.screenshot.bytesBase64.length > 0,",
-        "};",
-      ].join("\n"),
-    );
-
-    expect(result.stderr).toBe("");
-    expect(parseJsonStdout<Record<string, unknown>>(result.stdout)).toEqual({
-      url: fileUrl,
-      title: "Snapshot Fixture",
-      htmlContainsHeading: true,
-      hasScreenshot: true,
     });
   }, 60_000);
 

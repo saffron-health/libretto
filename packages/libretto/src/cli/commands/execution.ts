@@ -26,6 +26,7 @@ import {
   readNetworkLog,
   wrapPageForActionLogging,
 } from "../core/telemetry.js";
+import { readLibrettoConfig } from "../core/config.js";
 import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
 import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
@@ -761,7 +762,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     });
   });
 
-const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only] [--no-visualize] [--viewport WxH]`;
+const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--viewport WxH]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -787,6 +788,10 @@ export const runInput = SimpleCLI.input({
       name: "read-only",
       help: "Create the session in read-only mode",
     }),
+    writeAccess: SimpleCLI.flag({
+      name: "write-access",
+      help: "Create the session in write-access mode (overrides config default)",
+    }),
     noVisualize: SimpleCLI.flag({
       name: "no-visualize",
       help: "Disable ghost cursor + highlight visualization in headed mode",
@@ -811,6 +816,10 @@ export const runInput = SimpleCLI.input({
   .refine(
     (input) => !(input.headed && input.headless),
     "Cannot pass both --headed and --headless.",
+  )
+  .refine(
+    (input) => !(input.readOnly && input.writeAccess),
+    "Cannot pass both --read-only and --write-access.",
   );
 
 function resolveRunParams(
@@ -866,7 +875,7 @@ export const runCommand = SimpleCLI.command({
         visualize,
         authProfileDomain: input.authProfile,
         viewport,
-        accessMode: input.readOnly ? "read-only" : "write-access",
+        accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
       },
       ctx.logger,
     );

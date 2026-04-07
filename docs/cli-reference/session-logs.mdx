@@ -1,0 +1,107 @@
+---
+title: session logs
+---
+
+> Understand the JSONL log files Libretto captures during every session.
+
+Libretto automatically records network requests and browser actions to JSONL log files during every session. Your agent reads these files directly to reverse-engineer APIs, reconstruct workflows from user behavior, and debug failures.
+
+### Log file locations
+
+```txt
+.libretto/sessions/<session>/
+  logs.jsonl       # CLI and system events
+  network.jsonl    # HTTP requests and responses
+  actions.jsonl    # User and agent browser actions
+```
+
+---
+
+### network.jsonl
+
+One JSON object per line, one entry per HTTP request/response captured while the session was open.
+
+#### Key fields
+
+| Field          | Description                                |
+| -------------- | ------------------------------------------ |
+| `ts`           | ISO timestamp of the request               |
+| `method`       | HTTP method (`GET`, `POST`, `PUT`, etc.)   |
+| `url`          | Full request URL                           |
+| `status`       | HTTP response status code                  |
+| `contentType`  | Response content type                      |
+| `responseBody` | Response body string (may be `null`)       |
+| `postData`     | Request body for POST/PUT requests         |
+| `pageId`       | Playwright page ID that produced the entry |
+
+#### Querying examples
+
+```bash theme={null}
+# All POST requests
+jq 'select(.method == "POST")' .libretto/sessions/<session>/network.jsonl
+
+# Find requests to a specific endpoint
+jq 'select(.url | contains("/api/"))' .libretto/sessions/<session>/network.jsonl
+
+# View JSON API responses
+jq 'select(.contentType | contains("application/json")) | .responseBody' \
+  .libretto/sessions/<session>/network.jsonl
+
+# Count requests by HTTP method
+jq -r '.method' .libretto/sessions/<session>/network.jsonl | sort | uniq -c
+```
+
+---
+
+### actions.jsonl
+
+One JSON object per line, one entry per browser interaction. Libretto records both actions you perform manually in the browser (`source: "user"`) and actions the agent performs programmatically (`source: "agent"`).
+
+#### Key fields
+
+| Field                  | Description                                                      |
+| ---------------------- | ---------------------------------------------------------------- |
+| `ts`                   | ISO timestamp                                                    |
+| `source`               | `user` (manual DOM event) or `agent` (Playwright call)           |
+| `action`               | Action name: `click`, `dblclick`, `fill`, `goto`, `reload`, etc. |
+| `selector`             | Locator used by the agent                                        |
+| `bestSemanticSelector` | Canonical selector from the user DOM event                       |
+| `nearbyText`           | Visible text near the event target                               |
+| `coordinates`          | `{x, y}` for pointer events                                     |
+| `value`                | Typed, selected, or submitted value                              |
+| `url`                  | Navigation target for goto-style actions                         |
+| `duration`             | Elapsed time in milliseconds (agent entries)                     |
+| `success`              | `true` if the action completed, `false` on failure               |
+| `error`                | Error message when the action failed                             |
+
+<Note>
+  Agent entries describe what Playwright tried to do (`selector`, `duration`). User entries describe what DOM element was actually interacted with (`bestSemanticSelector`, `nearbyText`, `coordinates`).
+</Note>
+
+#### Querying examples
+
+```bash theme={null}
+# Last 20 actions
+tail -n 20 .libretto/sessions/<session>/actions.jsonl | jq .
+
+# Show only user-initiated actions
+jq 'select(.source == "user")' .libretto/sessions/<session>/actions.jsonl
+
+# Find all failed actions
+jq 'select(.success == false)' .libretto/sessions/<session>/actions.jsonl
+
+# Extract selector and action for agent entries
+jq 'select(.source == "agent") | {action: .action, selector: .selector}' \
+  .libretto/sessions/<session>/actions.jsonl
+```
+
+---
+
+### logs.jsonl
+
+Structured CLI and system log. Contains debug output from Libretto itself, including command execution, errors, and internal events.
+
+```bash theme={null}
+# View the last 20 log entries
+tail -n 20 .libretto/sessions/<session>/logs.jsonl | jq .
+```

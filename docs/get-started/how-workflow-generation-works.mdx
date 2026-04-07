@@ -1,0 +1,69 @@
+---
+title: How workflow generation works
+---
+
+> Understand the flow your agent follows to build a browser automation.
+
+Whether you're generating a workflow from scratch or recording one interactively, the process follows the same four phases. Knowing this flow helps you guide your agent and debug issues when they come up.
+
+### 1. Open a browser session
+
+The agent launches a browser and registers it as a named session:
+
+```bash theme={null}
+npx libretto open https://example.com --headed --session my-session
+```
+
+The browser window appears on your screen. If the site requires login, you authenticate manually. The session tracks all state (network traffic, actions, snapshots) in `.libretto/sessions/my-session/`.
+
+### 2. Snapshot and analyze the page
+
+The agent takes a screenshot and condensed HTML snapshot, then sends them to an AI model for analysis:
+
+```bash theme={null}
+npx libretto snapshot --session my-session \
+  --objective "Find the search input" \
+  --context "I just opened the homepage"
+```
+
+The snapshot returns a structured summary of selectors, interactive elements, and visible state. This keeps the agent's context window small while still giving it a detailed understanding of the page.
+
+### 3. Prototype interactions
+
+The agent tests selectors and prototypes actions against the live browser using `exec`:
+
+```bash theme={null}
+npx libretto exec --session my-session "await page.fill('#search', 'test query')"
+```
+
+This lets the agent validate that selectors work before writing them into the final script. The agent iterates between `snapshot` and `exec` until it has working selectors for each step of the workflow.
+
+### 4. Write and validate the workflow
+
+The agent writes a TypeScript file that exports a `workflow()`:
+
+```typescript theme={null}
+import { workflow } from "libretto";
+
+export const myWorkflow = workflow("myWorkflow", async (ctx) => {
+  const { page } = ctx;
+  await page.goto("https://example.com");
+  // ... automation steps
+});
+```
+
+Then it runs the workflow headless to verify everything works end-to-end:
+
+```bash theme={null}
+npx libretto run ./my-workflow.ts myWorkflow --headless
+```
+
+If the run fails, the browser stays open at the point of failure so the agent can inspect, fix, and retry without starting over.
+
+### How the workflow guides fit in
+
+Each [workflow guide](/workflow-guides/one-shot-workflow-generation) walks through this same four-phase flow with different starting points:
+
+- **One-shot generation:** The agent drives the entire process. You provide a prompt, the agent handles all four phases.
+- **Interactive building:** You drive phases 1 and 2 by performing the workflow in the browser while Libretto records your actions. The agent handles phases 3 and 4.
+- **Debugging:** You start at a failed workflow (phase 4) and the agent uses phases 2 and 3 to diagnose and fix it.

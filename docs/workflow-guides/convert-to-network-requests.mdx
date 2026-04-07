@@ -4,7 +4,7 @@ title: Convert to network requests
 
 > Convert browser automations to direct API calls for speed and reliability.
 
-Browser automation is reliable, but it's not always the fastest approach. When a site's internal API is accessible from within the browser context, calling those endpoints directly is faster and less fragile than driving the UI — no selectors to maintain, no page rendering to wait for, and no DOM changes to break your script.
+Browser automation is reliable, but it's not always the fastest approach. When a site's internal API is accessible from within the browser context, calling those endpoints directly is faster and less fragile than driving the UI. No selectors to maintain, no page rendering to wait for, and no DOM changes to break your script.
 
 Libretto captures all network traffic during a browser session, so your agent can inspect exactly which API calls the site makes and convert a UI-based workflow to direct requests.
 
@@ -15,7 +15,7 @@ Libretto captures all network traffic during a browser session, so your agent ca
 - The site does API-level monitoring that correlates request timing to UI interactions
 - The data you need is rendered client-side and doesn't come from a clean API response
 
-In these cases, passive interception (`page.on('response', ...)`) is the safest middle ground — it captures API data without making extra requests.
+In these cases, stick with your existing Playwright automation or use passive interception (`page.on('response', ...)`) to capture API data without making extra requests.
 
 </Warning>
 
@@ -25,9 +25,11 @@ In these cases, passive interception (`page.on('response', ...)`) is the safest 
   <Step title="Prompt your agent">
     Point the agent at the **existing workflow file** and ask it to convert to network requests.
 
-    > Use the Libretto skill. We have a browser script at ./integration.ts that automates going to Hacker News and getting the first 10 posts. Convert it to direct network requests instead.
+    ```text Example prompt
+    Use the Libretto skill. We have a browser script at ./integration.ts that automates going to Hacker News and getting the first 10 posts. Convert it to direct network requests instead.
+    ```
 
-    Include "Use the Libretto skill" so your agent uses Libretto's network capture and security review tools instead of guessing at API endpoints.
+    Include "Use the Libretto skill" so your agent uses Libretto's network capture tools instead of guessing at API endpoints.
 
   </Step>
 
@@ -37,7 +39,7 @@ In these cases, passive interception (`page.on('response', ...)`) is the safest 
     ```bash  theme={null}
     # What the agent runs
     npx libretto run ./integration.ts main --headed
-    npx libretto network --session conversion-flow
+    jq . .libretto/sessions/conversion-flow/network.jsonl
     ```
 
     If the site requires login, the agent opens a headed browser and you'll log in as usual. Otherwise you don't need to do anything during this phase.
@@ -47,23 +49,23 @@ In these cases, passive interception (`page.on('response', ...)`) is the safest 
   <Step title="Review the agent's approach">
     The agent reports what API endpoints it found and whether the site has bot protection. It recommends one of two approaches:
 
-    - **In-browser fetch** — call endpoints directly from within the browser's JavaScript context. The requests share the browser's cookies and TLS fingerprint, so they look identical to the site's own requests. Faster, but only safe when the site doesn't monitor for anomalous call patterns.
-    - **Passive interception** — set up a `page.on('response', ...)` listener and let the site's own code make the requests. Zero detection risk because no extra requests are made, but you're limited to whatever requests the site naturally triggers — you still drive the UI to produce them. Safer, but less flexible. Use this when the site has bot protection.
+    - **In-browser fetch**: call endpoints directly from within the browser's JavaScript context. The requests share the browser's cookies and TLS fingerprint, so they look identical to the site's own requests. Faster, but only safe when the site doesn't monitor for anomalous call patterns.
+    - **Passive interception**: set up a `page.on('response', ...)` listener and let the site's own code make the requests. Zero detection risk because no extra requests are made, but you're limited to whatever requests the site naturally triggers. Safer, but less flexible. Use this when the site has bot protection.
 
     If the agent's recommendation looks reasonable, let it proceed. If you'd rather use one approach over the other, say so:
 
-    > Use passive interception — I don't want to risk triggering their bot detection.
+    > Use passive interception, I don't want to risk triggering their bot detection.
 
   </Step>
 
   <Step title="Review the rewritten workflow">
     The agent rewrites the workflow to use network requests instead of DOM extraction. Things to check:
 
-    - **Endpoints** — are the URLs and HTTP methods correct?
-    - **Auth/cookies** — does the new version handle authentication the same way as the original?
-    - **Output shape** — the return type should be identical to the browser-based version
-    - **Error handling** — API calls should check response status codes and handle failures gracefully
-    - **Pagination** — if the original script paginated through UI, the new version should paginate through the API
+    - **Endpoints:** are the URLs and HTTP methods correct?
+    - **Auth/cookies:** does the new version handle authentication the same way as the original?
+    - **Output shape:** the return type should be identical to the browser-based version
+    - **Error handling:** API calls should check response status codes and handle failures gracefully
+    - **Pagination:** if the original script paginated through UI, the new version should paginate through the API
 
     If something's off:
 
@@ -72,7 +74,7 @@ In these cases, passive interception (`page.on('response', ...)`) is the safest 
   </Step>
 
   <Step title="Check the validation run">
-    The agent runs the rewritten workflow headless and shows you the output. Compare it to what the browser-based version returned — the data should match.
+    The agent runs the rewritten workflow headless and shows you the output. Compare it to what the browser-based version returned. The data should match.
 
     ```bash  theme={null}
     # What the agent runs
@@ -81,7 +83,7 @@ In these cases, passive interception (`page.on('response', ...)`) is the safest 
 
     If the output is wrong or incomplete, tell the agent what's off:
 
-    > The scores are all null — it looks like the API response has a different field name for that.
+    > The scores are all null. It looks like the API response has a different field name for that.
 
   </Step>
 </Steps>
@@ -96,11 +98,11 @@ In these cases, passive interception (`page.on('response', ...)`) is the safest 
 ### Related guides
 
 <CardGroup cols={2}>
-  <Card title="One-shot script generation" href="./one-shot-script-generation">
-    Start from scratch — give your agent a goal and let it build the workflow.
+  <Card title="One-shot workflow generation" icon="bolt" href="./one-shot-workflow-generation">
+    Start from scratch. Give your agent a goal and let it build the workflow.
   </Card>
 
-  <Card title="Debugging workflows" href="./debugging-workflows">
+  <Card title="Debugging workflows" icon="bug" href="./debugging-workflows">
     Reproduce failures and fix broken automations interactively.
   </Card>
 </CardGroup>

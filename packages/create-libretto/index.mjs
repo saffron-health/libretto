@@ -8,6 +8,7 @@ import {
   readFileSync,
   readdirSync,
   renameSync,
+  realpathSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -188,7 +189,7 @@ Next steps:
 // Only run main when this file is executed directly (not imported)
 if (
   process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url)
 ) {
   main();
 }

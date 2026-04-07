@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
+import { SessionAccessModeSchema } from "../../shared/state/index.js";
 import { LIBRETTO_CONFIG_PATH } from "./context.js";
 
 export const CURRENT_CONFIG_VERSION = 1;
@@ -41,6 +42,7 @@ export const LibrettoConfigSchema = z
     ai: AiConfigSchema.optional(),
     viewport: ViewportConfigSchema.optional(),
     windowPosition: WindowPositionConfigSchema.optional(),
+    sessionMode: SessionAccessModeSchema.optional(),
   })
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;
@@ -67,6 +69,7 @@ function formatExpectedConfigExample(): string {
         x: 1600,
         y: 120,
       },
+      sessionMode: "write-access",
     },
     null,
     2,
@@ -81,7 +84,7 @@ function invalidConfigError(configPath: string, detail?: string): Error {
       "Expected config example:",
       formatExpectedConfigExample(),
       "Notes:",
-      '  - "ai", "viewport", and "windowPosition" are optional.',
+      '  - "ai", "viewport", "windowPosition", and "sessionMode" are optional.',
       '  - "ai.model" must be a provider/model string like "openai/gpt-5.4" or "anthropic/claude-sonnet-4-6".',
       "Fix the file to match this shape, or delete it and rerun:",
       `  npx libretto ai configure openai | anthropic | gemini | vertex`,
