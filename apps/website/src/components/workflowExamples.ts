@@ -136,7 +136,7 @@ export const workflowExamples: WorkflowExample[] = [
   },
   {
     id: "uhc",
-    tab: "UnitedHealthcare",
+    tab: "United Healthcare",
     userMessage:
       "Use the Libretto skill. Log into the UnitedHealthcare provider portal and review a submitted claim by claim number — pull back the status, paid amount, patient responsibility, and any denial codes.",
     thinkDurationMs: 2000,
