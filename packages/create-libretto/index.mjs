@@ -12,7 +12,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -156,6 +156,8 @@ function main() {
   const rawName = process.argv[2] ?? "libretto-automations";
   const targetDir = resolve(rawName);
   const projectName = basename(targetDir);
+  const relPath = relative(process.cwd(), targetDir) || ".";
+  const cdTarget = relPath.startsWith("..") ? targetDir : relPath;
   const pkgManager = detectPackageManager();
 
   // Bail if directory exists and is non-empty
@@ -163,13 +165,13 @@ function main() {
     const entries = readdirSync(targetDir);
     if (entries.length > 0) {
       console.error(
-        `Error: Target directory "${projectName}" already exists and is not empty.`,
+        `Error: Target directory "${cdTarget}" already exists and is not empty.`,
       );
       process.exit(1);
     }
   }
 
-  console.log(`\nScaffolding Libretto project in ./${projectName}...\n`);
+  console.log(`\nScaffolding Libretto project in ${cdTarget}...\n`);
 
   scaffoldProject(targetDir, projectName, pkgManager);
 
@@ -180,7 +182,7 @@ Done! Your Libretto project is ready.
 
 Next steps:
 
-  cd ${projectName}
+  cd ${cdTarget}
   ${run} libretto open https://example.com --headed   # explore a page interactively
   ${run} libretto run src/workflows/star-repo.ts       # run the example workflow
 `);
