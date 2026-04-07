@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { CanvasAsciiIcosahedron } from "./components/CanvasAsciiIcosahedron";
+import {
+  CanvasAsciihedron,
+  useKonamiPane,
+  KonamiOverlay,
+} from "./components/CanvasAsciihedron";
 import { Button } from "./components/Button";
 import { Text } from "./components/Text";
 import { TerminalDemo } from "./components/TerminalDemo";
@@ -98,7 +102,13 @@ function Navbar() {
   );
 }
 
-function Hero() {
+function Hero({
+  paneUnlocked,
+  onClosePane,
+}: {
+  paneUnlocked: boolean;
+  onClosePane: () => void;
+}) {
   const sectionRef = useRef<HTMLElement>(null);
 
   return (
@@ -111,10 +121,12 @@ function Hero() {
         style={{ opacity: 0 }}
         className="pointer-events-none absolute inset-0 flex -translate-y-24 items-center justify-center select-none"
       >
-        <CanvasAsciiIcosahedron
+        <CanvasAsciihedron
           className="h-[1600px] w-[1600px] max-h-[180vw] max-w-[180vw] text-ink"
           showAnnotations={false}
           objectScale={1.2}
+          paneUnlocked={paneUnlocked}
+          onClosePane={onClosePane}
         />
       </div>
       <div className="relative mx-auto max-w-[1200px]">
@@ -165,10 +177,16 @@ function Hero() {
 }
 
 export function HomePage() {
+  const { konamiProgress, konamiCompleted, paneUnlocked, closePane } =
+    useKonamiPane();
+
   return (
     <OrchestrationContainer className="min-h-screen bg-cream text-ink">
+      {!paneUnlocked && (
+        <KonamiOverlay progress={konamiProgress} completed={konamiCompleted} />
+      )}
       <Navbar />
-      <Hero />
+      <Hero paneUnlocked={paneUnlocked} onClosePane={closePane} />
     </OrchestrationContainer>
   );
 }

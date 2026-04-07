@@ -1,5 +1,10 @@
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Pane } from "tweakpane";
+import { ArrowUpIcon } from "../icons/ArrowUpIcon";
+import { ArrowDownIcon } from "../icons/ArrowDownIcon";
+import { ArrowLeftIcon } from "../icons/ArrowLeftIcon";
+import { ArrowRightIcon } from "../icons/ArrowRightIcon";
 
 type Vec3 = [number, number, number];
 type Face = [number, number, number];
@@ -39,17 +44,8 @@ type WakeParticle = {
   energy: number;
   swirl: number;
 };
-type Ripple = {
-  x: number;
-  y: number;
-  age: number;
-  life: number;
-  radius: number;
-  speed: number;
-  energy: number;
-};
 
-type CanvasAsciiIcosahedronProps = {
+type CanvasAsciihedronProps = {
   className?: string;
   showAnnotations?: boolean;
   objectScale?: number;
@@ -83,7 +79,6 @@ const POINTER_ACTIVATE_LERP = 0.14;
 const POINTER_RELEASE_LERP = 0.07;
 
 const MAX_PARTICLES = 48;
-const MAX_RIPPLES = 14;
 
 const VERTICES = createVertices();
 const FACES = orientFaces(createFaces(), VERTICES);
@@ -323,13 +318,17 @@ function assignFaceTextureGroups(faceCount: number, edges: Edge[]) {
   return groups;
 }
 
-function projectVertex(position: Vec3): ProjectedVertex {
-  const depth = CAMERA_DISTANCE - position[2];
+function projectVertex(
+  position: Vec3,
+  cameraDistance: number,
+  zoom: number,
+): ProjectedVertex {
+  const depth = cameraDistance - position[2];
   const invDepth = 1 / depth;
 
   return {
-    x: COLS / 2 + position[0] * ZOOM * invDepth,
-    y: ROWS / 2 - position[1] * ZOOM * invDepth,
+    x: COLS / 2 + position[0] * zoom * invDepth,
+    y: ROWS / 2 - position[1] * zoom * invDepth,
     invDepth,
     position,
   };
@@ -352,6 +351,7 @@ function applyFaceBorders(
   source: Int16Array,
   ownerBuffer: Int16Array,
   target: Int16Array,
+  borderBoost: number,
 ) {
   target.set(source);
 
@@ -379,11 +379,7 @@ function applyFaceBorders(
       }
 
       if (hasDifferentNeighbor) {
-        target[index] = clamp(
-          shadeIndex + FACE_BORDER_BOOST,
-          0,
-          LAST_SHADE_INDEX,
-        );
+        target[index] = clamp(shadeIndex + borderBoost, 0, LAST_SHADE_INDEX);
       }
     }
   }
@@ -490,6 +486,8 @@ function createWakeParticle(
   vx: number,
   vy: number,
   speed: number,
+  life: number,
+  lifeRandom: number,
 ): WakeParticle {
   return {
     x,
@@ -497,71 +495,172 @@ function createWakeParticle(
     vx: vx * (0.93 + Math.random() * 0.3) + (Math.random() - 0.5) * 0.0045,
     vy: vy * (0.93 + Math.random() * 0.3) + (Math.random() - 0.5) * 0.0045,
     age: 0,
-    life: 640 + Math.random() * 480,
+    life: life + Math.random() * lifeRandom,
     radius: 0.046 + speed * 1.95 + Math.random() * 0.035,
     energy: clamp(0.88 + speed * 20, 0.88, 2),
     swirl: (Math.random() - 0.5) * (0.55 + speed * 18),
   };
 }
 
-function createRipple(x: number, y: number, speed: number): Ripple {
-  return {
-    x,
-    y,
-    age: 0,
-    life: 640 + speed * 1900,
-    radius: 0.015,
-    speed: 0.00135 + speed * 0.06,
-    energy: clamp(0.5 + speed * 14, 0.5, 1.2),
-  };
-}
-
 function appendWake(
   particles: WakeParticle[],
-  ripples: Ripple[],
   x: number,
   y: number,
   vx: number,
   vy: number,
   speed: number,
+  life: number,
+  lifeRandom: number,
+  maxParticles: number,
 ) {
   if (speed <= 0.002) {
     return;
   }
 
-  const steps = clamp(Math.round(2 + speed * 95), 2, 3);
+  particles.push(createWakeParticle(x, y, vx, vy, speed, life, lifeRandom));
 
-  for (let step = 0; step < steps; step += 1) {
-    const progress = steps === 1 ? 0 : step / (steps - 1);
-    particles.push(
-      createWakeParticle(
-        x - vx * progress * 1.3 + (Math.random() - 0.5) * 0.008,
-        y - vy * progress * 1.3 + (Math.random() - 0.5) * 0.008,
-        vx,
-        vy,
-        speed,
-      ),
-    );
-  }
-
-  if (speed > 0.012) {
-    ripples.push(createRipple(x, y, speed));
-  }
-
-  while (particles.length > MAX_PARTICLES) {
+  while (particles.length > maxParticles) {
     particles.shift();
-  }
-
-  while (ripples.length > MAX_RIPPLES) {
-    ripples.shift();
   }
 }
 
-export function CanvasAsciiIcosahedron({
+const KONAMI_SEQUENCE = [
+  "ArrowUp",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowLeft",
+  "ArrowRight",
+  "b",
+  "a",
+] as const;
+
+const KEY_LABELS: Record<string, ReactNode> = {
+  ArrowUp: <ArrowUpIcon className="size-3" />,
+  ArrowDown: <ArrowDownIcon className="size-3" />,
+  ArrowLeft: <ArrowLeftIcon className="size-3" />,
+  ArrowRight: <ArrowRightIcon className="size-3" />,
+  b: "B",
+  a: "A",
+};
+
+type KonamiState = "idle" | "typing" | "completed" | "unlocked";
+
+export function useKonamiPane() {
+  const [konamiProgress, setKonamiProgress] = useState<ReactNode[]>([]);
+  const [state, setState] = useState<KonamiState>("idle");
+  const konamiIndexRef = useRef(0);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(0 as never);
+
+  useEffect(() => {
+    if (state === "completed" || state === "unlocked") return;
+
+    const resetProgress = () => {
+      konamiIndexRef.current = 0;
+      setKonamiProgress([]);
+      setState("idle");
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      clearTimeout(timeoutRef.current);
+
+      const expected = KONAMI_SEQUENCE[konamiIndexRef.current];
+      if (e.key === expected) {
+        const nextIndex = konamiIndexRef.current + 1;
+        konamiIndexRef.current = nextIndex;
+        setKonamiProgress(
+          KONAMI_SEQUENCE.slice(0, nextIndex).map((k) => KEY_LABELS[k] ?? k),
+        );
+        if (nextIndex === KONAMI_SEQUENCE.length) {
+          setState("completed");
+        } else {
+          setState("typing");
+          timeoutRef.current = setTimeout(resetProgress, 3000);
+        }
+      } else {
+        resetProgress();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      clearTimeout(timeoutRef.current);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [state]);
+
+  // Completed → unlock after 500ms
+  useEffect(() => {
+    if (state !== "completed") return;
+    const id = setTimeout(() => {
+      setKonamiProgress([]);
+      setState("unlocked");
+    }, 500);
+    return () => clearTimeout(id);
+  }, [state]);
+
+  const closePane = () => {
+    setState("idle");
+    konamiIndexRef.current = 0;
+    setKonamiProgress([]);
+  };
+
+  return {
+    konamiProgress,
+    konamiCompleted: state === "completed",
+    paneUnlocked: state === "unlocked",
+    closePane,
+  };
+}
+
+export function KonamiOverlay({
+  progress,
+  completed,
+}: {
+  progress: ReactNode[];
+  completed: boolean;
+}) {
+  return (
+    <div className="pointer-events-none fixed bottom-4 left-4 z-50 flex gap-1.5 font-mono text-xs">
+      <AnimatePresence>
+        {progress.map((label, i) => (
+          <motion.span
+            key={i}
+            initial={{ opacity: 0, scale: 0.5, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: -4 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            style={
+              completed
+                ? {
+                    color: "rgb(22, 163, 74)",
+                    borderColor: "rgba(22, 163, 74, 0.5)",
+                    transition: "color 0.2s, border-color 0.2s",
+                  }
+                : undefined
+            }
+            className="inline-flex h-5 items-center justify-center rounded border border-stone-300/60 px-1.5 py-0.5 text-stone-400/80"
+          >
+            {label}
+          </motion.span>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export function CanvasAsciihedron({
   className = "",
   showAnnotations = true,
   objectScale = 1,
-}: CanvasAsciiIcosahedronProps) {
+  paneUnlocked = false,
+  onClosePane,
+}: CanvasAsciihedronProps & {
+  paneUnlocked?: boolean;
+  onClosePane?: () => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -594,7 +693,6 @@ export function CanvasAsciiIcosahedron({
     const pointerTarget = createPointerTarget();
     const pointerState = createPointerState();
     const particles: WakeParticle[] = [];
-    const ripples: Ripple[] = [];
 
     let width = 1;
     let height = 1;
@@ -613,28 +711,149 @@ export function CanvasAsciiIcosahedron({
     let glyphB = 0;
 
     const params = {
-      innerRadius: 2,
-      outerRadius: 4,
+      // Rendering
+      spinSpeed: SPIN_SPEED,
+      cameraDistance: CAMERA_DISTANCE,
+      zoom: ZOOM,
+      baseOpacity: 0.08,
+      faceBorderBoost: FACE_BORDER_BOOST,
+      // Scramble
+      innerRadius: 1,
+      outerRadius: 2,
       scrambleSpeed: 80,
+      innerDensity: 40,
+      outerDensity: 15,
+      // Wake
+      wakeRadius: 2,
+      wakeDensity: 250,
+      wakeLife: 640,
+      wakeLifeRandom: 480,
+      wakeSpawnInterval: 22,
+      maxParticles: MAX_PARTICLES,
     };
 
-    const pane = new Pane({ title: "Icosahedron" });
-    pane.addBinding(params, "innerRadius", {
+    let paneContainer: HTMLDivElement | null = null;
+    if (paneUnlocked) {
+      paneContainer = document.createElement("div");
+      paneContainer.style.cssText =
+        "position:fixed;bottom:16px;left:16px;z-index:50;opacity:0;transform:translateY(8px);transition:opacity 0.3s ease,transform 0.3s ease;";
+      document.body.appendChild(paneContainer);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (paneContainer) {
+            paneContainer.style.opacity = "1";
+            paneContainer.style.transform = "translateY(0)";
+          }
+        });
+      });
+    }
+    const pane = paneContainer
+      ? new Pane({ title: "Asciihedron", container: paneContainer })
+      : null;
+
+    if (pane && onClosePane) {
+      pane.addButton({ title: "Close" }).on("click", onClosePane);
+    }
+
+    const renderFolder = pane?.addFolder({ title: "Rendering" });
+    renderFolder?.addBinding(params, "spinSpeed", {
+      label: "Spin Speed",
+      min: 0,
+      max: 0.005,
+      step: 0.00001,
+    });
+    renderFolder?.addBinding(params, "cameraDistance", {
+      label: "Camera Distance",
+      min: 2,
+      max: 10,
+      step: 0.1,
+    });
+    renderFolder?.addBinding(params, "zoom", {
+      label: "Zoom",
+      min: 50,
+      max: 400,
+      step: 1,
+    });
+    renderFolder?.addBinding(params, "baseOpacity", {
+      label: "Base Opacity",
+      min: 0,
+      max: 1,
+      step: 0.01,
+    });
+    renderFolder?.addBinding(params, "faceBorderBoost", {
+      label: "Border Boost",
+      min: 0,
+      max: 5,
+      step: 1,
+    });
+
+    const scrambleFolder = pane?.addFolder({ title: "Scramble" });
+    scrambleFolder?.addBinding(params, "innerRadius", {
       label: "Inner Radius (cells)",
-      min: 1,
+      min: 0,
       max: 20,
       step: 0.5,
     });
-    pane.addBinding(params, "outerRadius", {
+    scrambleFolder?.addBinding(params, "outerRadius", {
       label: "Outer Radius (cells)",
-      min: 1,
+      min: 0,
       max: 40,
       step: 0.5,
     });
-    pane.addBinding(params, "scrambleSpeed", {
+    scrambleFolder?.addBinding(params, "scrambleSpeed", {
       label: "Scramble Speed (ms)",
       min: 16,
       max: 500,
+      step: 1,
+    });
+    scrambleFolder?.addBinding(params, "innerDensity", {
+      label: "Inner Density (%)",
+      min: 0,
+      max: 100,
+      step: 1,
+    });
+    scrambleFolder?.addBinding(params, "outerDensity", {
+      label: "Outer Density (%)",
+      min: 0,
+      max: 100,
+      step: 1,
+    });
+
+    const wakeFolder = pane?.addFolder({ title: "Wake" });
+    wakeFolder?.addBinding(params, "wakeRadius", {
+      label: "Wake Radius (cells)",
+      min: 0.5,
+      max: 10,
+      step: 0.5,
+    });
+    wakeFolder?.addBinding(params, "wakeDensity", {
+      label: "Wake Density",
+      min: 0,
+      max: 1000,
+      step: 10,
+    });
+    wakeFolder?.addBinding(params, "wakeLife", {
+      label: "Wake Life (ms)",
+      min: 100,
+      max: 2000,
+      step: 10,
+    });
+    wakeFolder?.addBinding(params, "wakeLifeRandom", {
+      label: "Life Randomness (ms)",
+      min: 0,
+      max: 1000,
+      step: 10,
+    });
+    wakeFolder?.addBinding(params, "wakeSpawnInterval", {
+      label: "Spawn Interval (ms)",
+      min: 5,
+      max: 100,
+      step: 1,
+    });
+    wakeFolder?.addBinding(params, "maxParticles", {
+      label: "Max Particles",
+      min: 4,
+      max: 128,
       step: 1,
     });
 
@@ -710,15 +929,17 @@ export function CanvasAsciiIcosahedron({
       pointerTarget.active = true;
 
       const speed = Math.hypot(vx, vy);
-      if (now - lastWakeTime > 22) {
+      if (now - lastWakeTime > params.wakeSpawnInterval) {
         appendWake(
           particles,
-          ripples,
           pointerTarget.x,
           pointerTarget.y,
           vx,
           vy,
           speed,
+          params.wakeLife,
+          params.wakeLifeRandom,
+          params.maxParticles,
         );
         lastWakeTime = now;
       }
@@ -743,9 +964,7 @@ export function CanvasAsciiIcosahedron({
     const renderFrame = (time: number) => {
       const delta = previousTime === 0 ? 16 : Math.min(34, time - previousTime);
       previousTime = time;
-      const step = delta / 16.6667;
-
-      angle = (angle + delta * SPIN_SPEED) % FULL_TURN;
+      angle = (angle + delta * params.spinSpeed) % FULL_TURN;
       pointerState.x +=
         (pointerTarget.x - pointerState.x) * POINTER_POSITION_LERP;
       pointerState.y +=
@@ -763,29 +982,9 @@ export function CanvasAsciiIcosahedron({
       for (let index = particles.length - 1; index >= 0; index -= 1) {
         const particle = particles[index];
         particle.age += delta;
-        particle.x += particle.vx * step;
-        particle.y += particle.vy * step;
-        particle.vx *= Math.pow(0.964, step);
-        particle.vy *= Math.pow(0.964, step);
 
-        if (
-          particle.age >= particle.life ||
-          particle.x < -0.2 ||
-          particle.x > 1.2 ||
-          particle.y < -0.2 ||
-          particle.y > 1.2
-        ) {
+        if (particle.age >= particle.life) {
           particles.splice(index, 1);
-        }
-      }
-
-      for (let index = ripples.length - 1; index >= 0; index -= 1) {
-        const ripple = ripples[index];
-        ripple.age += delta;
-        ripple.radius += ripple.speed * step;
-
-        if (ripple.age >= ripple.life) {
-          ripples.splice(index, 1);
         }
       }
 
@@ -803,7 +1002,11 @@ export function CanvasAsciiIcosahedron({
 
       for (let index = 0; index < TILTED_VERTICES.length; index += 1) {
         const spun = rotateAroundAxis(TILTED_VERTICES[index], SPIN_AXIS, angle);
-        const projected = projectVertex(spun);
+        const projected = projectVertex(
+          spun,
+          params.cameraDistance,
+          params.zoom,
+        );
         projected.x = COLS / 2 + (projected.x - COLS / 2) * objectScale;
         projected.y = ROWS / 2 + (projected.y - ROWS / 2) * objectScale;
         projectedVertices[index] = projected;
@@ -833,7 +1036,7 @@ export function CanvasAsciiIcosahedron({
         const toCamera = normalize([
           -center[0],
           -center[1],
-          CAMERA_DISTANCE - center[2],
+          params.cameraDistance - center[2],
         ]);
 
         if (dot(normal, toCamera) <= 0) {
@@ -889,14 +1092,16 @@ export function CanvasAsciiIcosahedron({
         drawEdge(shadeBuffer, zBuffer, a, b, shadeIndex);
       }
 
-      applyFaceBorders(shadeBuffer, ownerBuffer, borderedShadeBuffer);
+      applyFaceBorders(
+        shadeBuffer,
+        ownerBuffer,
+        borderedShadeBuffer,
+        params.faceBorderBoost,
+      );
 
       const cellWidth = width / COLS;
       const cellHeight = height / ROWS;
-      const fontSize = Math.max(
-        8,
-        Math.min(cellHeight * 1.02, cellWidth * 1.72),
-      );
+      const fontSize = Math.max(8, Math.min(cellHeight, cellWidth));
       const glyphScaleX = measureSquareScale(context, fontSize);
       const minX = clamp(Math.floor(projectedMinX) - 18, 0, COLS - 1);
       const maxX = clamp(Math.ceil(projectedMaxX) + 18, 0, COLS - 1);
@@ -924,29 +1129,53 @@ export function CanvasAsciiIcosahedron({
       };
 
       // Returns: 0 = normal, 1 = inner teal, 2 = outer teal
-      // Uses different hash bits so both layers are independent
-      const scrambleLevel = (col: number, row: number, dist: number) => {
-        if (pointerState.strength < 0.1 || dist > outerRadius) return 0;
+      // Check cursor proximity AND wake particles for trail effect
+      const scrambleLevel = (
+        col: number,
+        row: number,
+        dist: number,
+        baseX: number,
+        baseY: number,
+      ) => {
         const hash = scrambleHash(col, row, timeSeed);
-        if (dist <= innerRadius && hash % 100 < 40) return 1;
-        if ((hash >>> 8) % 100 < 15) return 2;
+
+        // Direct cursor proximity (existing behavior)
+        if (pointerState.strength >= 0.1 && dist <= outerRadius) {
+          if (dist <= innerRadius && hash % 100 < params.innerDensity) return 1;
+          if ((hash >>> 8) % 100 < params.outerDensity) return 2;
+        }
+
+        // Wake trail: check proximity to wake particles
+        const wakeR = Math.max(cellWidth, cellHeight) * params.wakeRadius;
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          const fade = 1 - p.age / p.life; // 1 → 0 as particle dies
+          const pxX = p.x * width;
+          const pxY = p.y * height;
+          const pdx = baseX - pxX;
+          const pdy = baseY - pxY;
+          const pdist = Math.hypot(pdx, pdy);
+          const effectRadius = wakeR * fade;
+          if (pdist > effectRadius) continue;
+          const t = pdist / Math.max(effectRadius, 1);
+          const prob = fade * (1 - t * t); // quadratic falloff
+          if ((hash >>> 4) % 1000 < prob * params.wakeDensity) return 2;
+        }
+
         return 0;
       };
 
+      const SCRAMBLE_CHARS = "1!|/:;.,'-`~*+=";
       const getScrambledChar = (
-        shadeIndex: number,
+        _shadeIndex: number,
         col: number,
         row: number,
       ) => {
         const hash = scrambleHash(col, row, timeSeed);
-        const groupIndex = hash % SHADE_CHARACTER_GROUPS.length;
-        return (
-          SHADE_CHARACTER_GROUPS[groupIndex][shadeIndex] ??
-          SHADING_CHARS[shadeIndex]
-        );
+        return SCRAMBLE_CHARS[hash % SCRAMBLE_CHARS.length];
       };
 
-      const BASE_OPACITY = 0.1;
+      const BASE_OPACITY = params.baseOpacity;
       const TEAL_INNER = `rgba(0, 140, 120, 1)`;
       const TEAL_OUTER = `rgba(40, 190, 160, 1)`;
       const BASE_COLOR = `rgba(${glyphR}, ${glyphG}, ${glyphB}, ${BASE_OPACITY})`;
@@ -991,7 +1220,7 @@ export function CanvasAsciiIcosahedron({
           const dy = baseY - pointerPixelY;
           const dist = Math.hypot(dx, dy);
 
-          const level = scrambleLevel(col, row, dist);
+          const level = scrambleLevel(col, row, dist, baseX, baseY);
           if (level > 0) {
             context.fillStyle = level === 1 ? TEAL_INNER : TEAL_OUTER;
             const char = getScrambledChar(shadeIndex, col, row);
@@ -1026,7 +1255,8 @@ export function CanvasAsciiIcosahedron({
 
     return () => {
       cancelAnimationFrame(frameId);
-      pane.dispose();
+      pane?.dispose();
+      paneContainer?.remove();
       resizeObserver.disconnect();
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointercancel", deactivatePointer);
@@ -1034,7 +1264,7 @@ export function CanvasAsciiIcosahedron({
       window.removeEventListener("mouseout", handleWindowMouseOut);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [objectScale]);
+  }, [objectScale, paneUnlocked, onClosePane]);
 
   return (
     <div ref={containerRef} className={`relative overflow-hidden ${className}`}>
@@ -1042,8 +1272,8 @@ export function CanvasAsciiIcosahedron({
       {showAnnotations ? (
         <>
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-6 text-[10px] uppercase tracking-[0.34em] text-current/28">
-            <span>Canvas ASCII Icosahedron</span>
-            <span>/icosahedron</span>
+            <span>Asciihedron</span>
+            <span>/asciihedron</span>
           </div>
           <div className="pointer-events-none absolute bottom-6 left-6 max-w-sm text-xs leading-5 text-current/36">
             ASCII stays intact, but the glyph field now warps and trails in a
