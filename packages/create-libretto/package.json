@@ -15,6 +15,7 @@
     "create-libretto": "./index.mjs"
   },
   "files": [
-    "index.mjs"
+    "index.mjs",
+    "template/**"
   ]
 }

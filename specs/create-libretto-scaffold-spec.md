@@ -170,8 +170,8 @@ function scaffoldProject(targetDir, projectName, pkgManager) {
 }
 ```
 
-- [ ] Rewrite `packages/create-libretto/index.mjs` to:
-  - Parse `process.argv[2]` as project name (default: `my-automations`)
+- [x] Rewrite `packages/create-libretto/index.mjs` to:
+  - Parse `process.argv[2]` as project name (default: `libretto-automations`)
   - Error if target directory already exists and is non-empty
   - Detect package manager from `npm_config_user_agent`
   - Copy all files from `template/` to target directory recursively
@@ -181,11 +181,11 @@ function scaffoldProject(targetDir, projectName, pkgManager) {
   - Run install command (`npm install` / `pnpm install` / `yarn` / `bun install`)
   - Run setup command (`npx libretto setup` / `pnpm exec libretto setup` / etc.)
   - Print success message with next steps (cd, dev command, run command)
-- [ ] Update `packages/create-libretto/package.json` `files` field to include `template/**`
-- [ ] Verify `npm create libretto test-project` in a temp directory creates the correct file structure
-- [ ] Verify the generated `package.json` has the correct project name and libretto version
-- [ ] Verify `.gitignore` exists (not `_gitignore`)
-- [ ] Verify `package.json.template` is NOT present in the output directory
+- [x] Update `packages/create-libretto/package.json` `files` field to include `template/**`
+- [x] Verify `npm create libretto test-project` in a temp directory creates the correct file structure
+- [x] Verify the generated `package.json` has the correct project name and libretto version
+- [x] Verify `.gitignore` exists (not `_gitignore`)
+- [x] Verify `package.json.template` is NOT present in the output directory
 
 ### Phase 3: Add create-libretto tests
 
