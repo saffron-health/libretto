@@ -239,6 +239,7 @@ async function runIntegrationInternal(
     storageStatePath,
     viewport: args.viewport,
     accessMode: args.accessMode,
+    cdpEndpoint: args.cdpEndpoint,
   });
   if (!args.headless && args.visualize !== false) {
     await installHeadedWorkflowVisualization({

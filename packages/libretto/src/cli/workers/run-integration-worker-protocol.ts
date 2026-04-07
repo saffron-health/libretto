@@ -10,6 +10,7 @@ export const RunIntegrationWorkerRequestSchema = z.object({
   authProfileDomain: z.string().optional(),
   viewport: z.object({ width: z.number(), height: z.number() }).optional(),
   accessMode: SessionAccessModeSchema.default("write-access"),
+  cdpEndpoint: z.string().optional(),
 });
 
 export type RunIntegrationWorkerRequest = z.infer<

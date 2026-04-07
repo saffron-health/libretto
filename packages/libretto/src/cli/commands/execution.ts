@@ -27,6 +27,7 @@ import {
   wrapPageForActionLogging,
 } from "../core/telemetry.js";
 import { readLibrettoConfig } from "../core/config.js";
+import { resolveProviderName, getCloudProviderApi } from "../core/providers/index.js";
 import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
 import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
@@ -630,6 +631,7 @@ async function runIntegrationFromFile(
     authProfileDomain: args.authProfileDomain,
     viewport: args.viewport,
     accessMode: args.accessMode,
+    cdpEndpoint: args.cdpEndpoint,
   } satisfies RunIntegrationWorkerRequest);
   const worker = spawn(
     process.execPath,
@@ -803,6 +805,10 @@ export const runInput = SimpleCLI.input({
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
+    provider: SimpleCLI.option(z.string().optional(), {
+      help: "Browser provider (local, kernel, browserbase)",
+      aliases: ["-p"],
+    }),
   },
 })
   .refine(
@@ -865,17 +871,30 @@ export const runCommand = SimpleCLI.command({
       ctx.logger,
     );
 
+    const providerName = resolveProviderName(input.provider);
+    let cdpEndpoint: string | undefined;
+    if (providerName !== "local") {
+      const provider = getCloudProviderApi(providerName);
+      console.log(
+        `Creating ${providerName} browser session (session: ${ctx.session})...`,
+      );
+      const providerSession = await provider.createSession();
+      console.log(`Connecting to ${providerName} browser...`);
+      cdpEndpoint = providerSession.cdpEndpoint;
+    }
+
     await runIntegrationFromFile(
       {
         integrationPath: input.integrationFile!,
         session: ctx.session,
         params,
         tsconfigPath: input.tsconfig,
-        headless: headlessMode ?? false,
+        headless: cdpEndpoint ? true : (headlessMode ?? false),
         visualize,
         authProfileDomain: input.authProfile,
         viewport,
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
+        cdpEndpoint,
       },
       ctx.logger,
     );

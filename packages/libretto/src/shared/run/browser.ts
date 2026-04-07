@@ -36,6 +36,7 @@ export type LaunchBrowserArgs = {
   viewport?: { width: number; height: number };
   storageStatePath?: string;
   accessMode?: SessionAccessMode;
+  cdpEndpoint?: string;
 };
 
 export type BrowserSession = {
@@ -100,7 +101,48 @@ export async function launchBrowser({
   viewport = { width: 1366, height: 768 },
   storageStatePath,
   accessMode = "write-access",
+  cdpEndpoint,
 }: LaunchBrowserArgs): Promise<BrowserSession> {
+  // Cloud/remote mode: connect to an existing CDP endpoint instead of launching locally
+  if (cdpEndpoint) {
+    const browser = await chromium.connectOverCDP(cdpEndpoint);
+    const context =
+      browser.contexts()[0] ?? (await browser.newContext({ viewport }));
+    const page = context.pages()[0] ?? (await context.newPage());
+    page.setDefaultTimeout(30_000);
+    page.setDefaultNavigationTimeout(45_000);
+
+    const metadataPath = ensureLibrettoSessionStatePath(sessionName);
+    writeFileSync(
+      metadataPath,
+      JSON.stringify(
+        {
+          version: SESSION_STATE_VERSION,
+          session: sessionName,
+          port: 0,
+          cdpEndpoint,
+          pid: process.pid,
+          startedAt: new Date().toISOString(),
+          status: "active",
+          mode: accessMode,
+        },
+        null,
+        2,
+      ),
+    );
+
+    return {
+      browser,
+      context,
+      page,
+      debugPort: 0,
+      metadataPath,
+      close: async () => {
+        await browser.close();
+      },
+    };
+  }
+
   const debugPort = await pickFreePort();
   const windowPosition = headless ? undefined : resolveWindowPosition();
   const browser = await chromium.launch({
