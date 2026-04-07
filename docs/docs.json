@@ -49,6 +49,8 @@
         "group": "Get started",
         "pages": [
           "get-started/introduction",
+          "get-started/new-package-setup",
+          "get-started/existing-package-setup",
           "get-started/configuration",
           "get-started/architecture",
           "get-started/automation-approaches",

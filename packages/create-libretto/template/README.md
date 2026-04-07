@@ -16,12 +16,6 @@ Run a workflow:
 {{runCommand}} libretto run src/workflows/star-repo.ts
 ```
 
-## Deploy
-
-```bash
-{{runCommand}} libretto experimental deploy .
-```
-
 ## Learn more
 
 - [Libretto docs](https://libretto.sh)

@@ -72,6 +72,38 @@
   border-color: rgba(30, 29, 26, 0.2);
 }
 
+/* Card icons — compact size */
+.card svg {
+  height: 1rem;
+  width: 1rem;
+}
+
+/* Step titles — medium weight */
+[data-component-part="step-title"] {
+  font-weight: 500 !important;
+}
+
+/* Card headings — body font, medium weight */
+.card [data-component-part="card-title"] {
+  font-family: "Inter", -apple-system, system-ui, sans-serif !important;
+  font-weight: 500 !important;
+  letter-spacing: 0;
+}
+
+/* Previous/next pagination — remove backgrounds and hover ring */
+#pagination {
+  background: transparent;
+}
+
+#pagination a > div {
+  background: transparent;
+}
+
+#pagination a:hover > div {
+  --tw-ring-shadow: 0 0 #0000;
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000);
+}
+
 /* Dark mode overrides */
 /* Dark mode overrides — Mintlify uses a .dark class on <html> */
 .dark #navbar {
@@ -81,5 +113,9 @@
 
 .dark #sidebar {
   background: var(--ink);
+}
+
+.dark #sidebar [data-active="true"] a {
+  color: #fff;
 }
 

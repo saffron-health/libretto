@@ -1,0 +1,76 @@
+---
+title: Existing package setup
+sidebarTitle: Existing package setup
+---
+
+If you already have a Node.js project and want to add Libretto to it, follow these steps.
+
+<Note>
+  Starting from scratch? See [New package setup](./new-package-setup) to
+  scaffold a project automatically.
+</Note>
+
+<Steps>
+  <Step title="Install Libretto">
+    ```bash
+    npm install libretto
+    ```
+  </Step>
+
+  <Step title="Run setup">
+    ```bash
+    npx libretto setup
+    ```
+
+    This downloads Chromium, creates the `.libretto/` directory, copies agent skill files, and walks you through configuring a snapshot analysis model.
+
+    <Note>
+      Run this yourself in a terminal — not through an agent. It may prompt for
+      input and starts a Chromium download that takes a moment.
+    </Note>
+
+  </Step>
+
+  <Step title="Create a workflow">
+    Create a workflow file — for example, `src/workflows/scrape-page.ts`:
+
+    ```ts src/workflows/scrape-page.ts
+    import { workflow } from "libretto";
+
+    export const scrapePage = workflow("scrape-page", async ({ page }) => {
+      await page.goto("https://example.com");
+      const title = await page.title();
+      console.log(`Page title: ${title}`);
+    });
+    ```
+
+    The `workflow()` function wraps your automation with browser lifecycle management, error handling, and session recording.
+
+  </Step>
+
+  <Step title="Run it">
+    ```bash
+    npx libretto run src/workflows/scrape-page.ts
+    ```
+
+    Add `--headed` to watch the browser as it runs:
+
+    ```bash
+    npx libretto run src/workflows/scrape-page.ts --headed
+    ```
+
+  </Step>
+</Steps>
+
+<CardGroup cols={2}>
+  <Card
+    title="CLI reference"
+    icon="terminal"
+    href="../cli-reference/open-and-connect"
+  >
+    Full reference for every Libretto command and flag.
+  </Card>
+  <Card title="Workflow API" icon="code" href="../library-api/workflow">
+    Write workflow files with the typed `workflow()` API.
+  </Card>
+</CardGroup>

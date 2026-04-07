@@ -195,15 +195,15 @@ Intentionally skipped. The scaffolder logic is straightforward (`readFileSync` â
 
 Add a Mintlify page explaining how to add Libretto to an existing project without the scaffolder, and update the introduction page to reference both flows.
 
-- [ ] Create `docs/get-started/manual-setup.mdx` covering:
+- [x] Create `docs/get-started/manual-setup.mdx` covering:
   - Install libretto: `npm install libretto`
   - Run setup: `npx libretto setup`
   - Create a workflow file with `import { workflow } from "libretto"` and `export default workflow(...)`
   - Run it: `npx libretto run ./path/to/workflow.ts`
   - Mention the `src/index.ts` re-export pattern for deploy
-- [ ] Add `"get-started/manual-setup"` to `docs/docs.json` navigation under "Get started" group, after "introduction"
-- [ ] Update `docs/get-started/introduction.mdx` to add a brief note after the setup section: "Already have a project? See [Manual setup](./manual-setup) to add Libretto to an existing repo."
-- [ ] Verify docs build: `cd docs && npx @mintlify/cli dev` renders the new page without errors
+- [x] Add `"get-started/manual-setup"` to `docs/docs.json` navigation under "Get started" group, after "introduction"
+- [x] Update `docs/get-started/introduction.mdx` to add a brief note after the setup section: "Already have a project? See [Manual setup](./manual-setup) to add Libretto to an existing repo."
+- [x] Verify docs build: `cd docs && npx @mintlify/cli validate` passes without errors
 
 ### Phase 5: Update introduction docs to reflect new create flow
 

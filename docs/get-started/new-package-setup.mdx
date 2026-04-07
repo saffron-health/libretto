@@ -1,0 +1,44 @@
+---
+title: New package setup
+sidebarTitle: New package setup
+---
+
+Create a new project with an example workflow, TypeScript config, and everything wired up:
+
+```bash theme={null}
+npm create libretto@latest my-project
+```
+
+This scaffolds a project directory, installs dependencies, downloads Chromium, sets up the `.libretto/` directory, copies agent skill files, and walks you through configuring a snapshot analysis model.
+
+<Note>
+  Run this yourself in a terminal — not through an agent. It may prompt for
+  input and starts a Chromium download that takes a moment.
+</Note>
+
+Other package managers:
+
+```bash
+pnpm create libretto my-project
+```
+
+```bash
+yarn create libretto my-project
+```
+
+```bash
+bunx create-libretto my-project
+```
+
+<CardGroup cols={2}>
+  <Card
+    title="CLI reference"
+    icon="terminal"
+    href="../cli-reference/open-and-connect"
+  >
+    Full reference for every Libretto command and flag.
+  </Card>
+  <Card title="Workflow API" icon="code" href="../library-api/workflow">
+    Write workflow files with the typed `workflow()` API.
+  </Card>
+</CardGroup>
