@@ -1,6 +1,6 @@
 {
   "name": "libretto",
-  "version": "0.5.6",
+  "version": "0.6.0",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
   "repository": {
