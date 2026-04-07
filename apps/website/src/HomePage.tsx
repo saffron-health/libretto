@@ -188,6 +188,7 @@ function Footer() {
             href="https://www.linkedin.com/company/saffron-health"
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="Saffron Health on LinkedIn"
             className="text-muted/50 transition-colors hover:text-muted"
           >
             <LinkedInIcon width={14} height={14} />
@@ -196,6 +197,7 @@ function Footer() {
             href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="Libretto on GitHub"
             className="text-muted/50 transition-colors hover:text-muted"
           >
             <GitHubIcon width={14} height={14} />
