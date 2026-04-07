@@ -117,6 +117,10 @@ jobs:
         if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright browsers
+        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        run: npx playwright install chromium
+
       - name: Verify release build
         if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
         run: |
