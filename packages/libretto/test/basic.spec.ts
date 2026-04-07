@@ -91,7 +91,7 @@ describe("basic CLI subprocess behavior", () => {
       GCLOUD_PROJECT: "",
     });
 
-    expect(result.stdout).toContain("Snapshot analysis:");
+    expect(result.stdout).toContain("sub-agent to analyze DOM snapshots");
     expect(result.stdout).toContain("No snapshot API credentials detected.");
     expect(result.stdout).toContain("OPENAI_API_KEY=...");
     expect(result.stdout).toContain("ANTHROPIC_API_KEY=...");
@@ -106,9 +106,8 @@ describe("basic CLI subprocess behavior", () => {
       OPENAI_API_KEY: "test-openai-key",
     });
 
-    expect(result.stdout).toContain("Snapshot analysis:");
-    expect(result.stdout).toContain("Model: openai/gpt-5.4");
-    expect(result.stdout).toContain("Config:");
+    expect(result.stdout).toContain("Using OpenAI");
+    expect(result.stdout).toContain("Detected OPENAI_API_KEY");
     expect(result.stdout).toContain("config.json");
     expect(result.stdout).toContain(
       "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
@@ -123,8 +122,8 @@ describe("basic CLI subprocess behavior", () => {
       OPENAI_API_KEY: "test-openai-key",
     });
 
-    expect(result.stdout).toContain("Model: openai/gpt-5.4");
-    expect(result.stdout).toContain("Config:");
+    expect(result.stdout).toContain("Using OpenAI");
+    expect(result.stdout).toContain("config.json");
   });
 
   test("setup rerun shows healthy summary without re-prompting", async ({
@@ -135,15 +134,15 @@ describe("basic CLI subprocess behavior", () => {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "test-openai-key",
     });
-    expect(first.stdout).toContain("Model: openai/gpt-5.4");
+    expect(first.stdout).toContain("Using OpenAI");
 
     // Second run: should show healthy summary, not re-prompt
     const second = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "test-openai-key",
     });
-    expect(second.stdout).toContain("Model: openai/gpt-5.4");
-    expect(second.stdout).toContain("Config:");
+    expect(second.stdout).toContain("Using OpenAI");
+    expect(second.stdout).toContain("config.json");
     expect(second.stdout).toContain(
       "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
     );

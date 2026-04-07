@@ -181,9 +181,9 @@ function printSnapshotApiStatus(): boolean {
   );
 
   if (status.kind === "ready") {
-    const pinned = ensurePinnedDefaultModel(status);
     console.log();
-    printHealthySummary(pinned);
+    printHealthySummary(status);
+    ensurePinnedDefaultModel(status);
     return true;
   }
 
@@ -336,9 +336,9 @@ async function runInteractiveApiSetup(): Promise<void> {
   );
 
   if (status.kind === "ready") {
-    const pinned = ensurePinnedDefaultModel(status);
     console.log();
-    printHealthySummary(pinned);
+    printHealthySummary(status);
+    ensurePinnedDefaultModel(status);
     return;
   }
 
