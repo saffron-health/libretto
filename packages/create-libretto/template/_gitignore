@@ -1,0 +1,4 @@
+node_modules
+.libretto/sessions/
+.libretto/profiles/
+dist/

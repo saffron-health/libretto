@@ -1,0 +1,16 @@
+{
+  "name": "{{projectName}}",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "libretto open --headed",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "libretto": "{{librettoVersion}}"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

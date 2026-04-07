@@ -44,8 +44,8 @@ Rewrite `create-libretto` to scaffold a complete project directory with template
 
 Create the static template files that will be copied into new projects. After this phase, the template directory exists in the package but isn't wired up yet.
 
-- [ ] Create `packages/create-libretto/template/_gitignore` with entries for `node_modules`, `.libretto/sessions/`, `.libretto/profiles/`, `dist/`
-- [ ] Create `packages/create-libretto/template/tsconfig.json`:
+- [x] Create `packages/create-libretto/template/_gitignore` with entries for `node_modules`, `.libretto/sessions/`, `.libretto/profiles/`, `dist/`
+- [x] Create `packages/create-libretto/template/tsconfig.json`:
 
 ```json
 {
@@ -62,7 +62,7 @@ Create the static template files that will be copied into new projects. After th
 }
 ```
 
-- [ ] Create `packages/create-libretto/template/src/shared/utils.ts` with a trivial helper:
+- [x] Create `packages/create-libretto/template/src/shared/utils.ts` with a trivial helper:
 
 ```ts
 export function log(message: string): void {
@@ -70,7 +70,7 @@ export function log(message: string): void {
 }
 ```
 
-- [ ] Create `packages/create-libretto/template/src/workflows/star-repo.ts`:
+- [x] Create `packages/create-libretto/template/src/workflows/star-repo.ts`:
 
 ```ts
 import { workflow } from "libretto";
@@ -84,13 +84,13 @@ export const starRepo = workflow("star-repo", async ({ page }) => {
 });
 ```
 
-- [ ] Create `packages/create-libretto/template/src/index.ts`:
+- [x] Create `packages/create-libretto/template/src/index.ts`:
 
 ```ts
 export { starRepo } from "./workflows/star-repo.js";
 ```
 
-- [ ] Create `packages/create-libretto/template/README.md`:
+- [x] Create `packages/create-libretto/template/README.md`:
 
 ````md
 # {{projectName}}
@@ -124,7 +124,7 @@ Run a workflow:
 - [Workflow API](https://libretto.sh/library-api/workflow)
 ````
 
-- [ ] Create `packages/create-libretto/template/package.json.template`:
+- [x] Create `packages/create-libretto/template/package.json.template`:
 
 ```json
 {
@@ -145,7 +145,7 @@ Run a workflow:
 }
 ```
 
-- [ ] Verify all template files exist under `packages/create-libretto/template/` with correct structure
+- [x] Verify all template files exist under `packages/create-libretto/template/` with correct structure
 
 ### Phase 2: Rewrite create-libretto with template copying and package manager detection
 
