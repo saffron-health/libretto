@@ -260,34 +260,17 @@ export async function connect(
       endpoint,
       pid: state.pid,
     });
+    // Provider sessions have no local PID to check liveness.
+    // Don't destroy the remote session on a transient failure —
+    // let the user retry or explicitly close.
+    if (state.provider) {
+      throw new Error(
+        `Could not connect to ${state.provider.name} session for "${session}" at ${endpoint}. ` +
+          `The remote session may still be active. Try again, or close with: libretto close --session ${session}`,
+      );
+    }
+
     if (state.pid == null || !isPidRunning(state.pid)) {
-      // If this is a provider session, attempt to close the remote session
-      // so it doesn't leak when we clear local state.
-      if (state.provider) {
-        logger.warn("connect-provider-cleanup", {
-          session,
-          provider: state.provider.name,
-          sessionId: state.provider.sessionId,
-        });
-        try {
-          const provider = getCloudProviderApi(state.provider.name);
-          await provider.closeSession(state.provider.sessionId);
-        } catch (cleanupErr) {
-          logger.warn("connect-provider-cleanup-failed", {
-            session,
-            provider: state.provider.name,
-            sessionId: state.provider.sessionId,
-            error: cleanupErr,
-          });
-          // Preserve state with cleanup-failed status so user can retry close
-          writeSessionState({ ...state, status: "cleanup-failed" }, logger);
-          throw new Error(
-            `Could not connect to ${state.provider.name} session "${state.provider.sessionId}" for session "${session}", ` +
-              `and remote cleanup also failed. State preserved with status "cleanup-failed". ` +
-              `Retry with: libretto close --session ${session}`,
-          );
-        }
-      }
       clearSessionState(session, logger);
       throw new Error(
         `No browser running for session "${session}". Run 'libretto open <url> --session ${session}' first.`,
