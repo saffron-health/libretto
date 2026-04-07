@@ -8,7 +8,7 @@ import { Button } from "./components/Button";
 import { Text } from "./components/Text";
 import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
-import { GitHubStarIcon } from "./icons";
+import { GitHubIcon, GitHubStarIcon, LinkedInIcon } from "./icons";
 import {
   OrchestrationContainer,
   AnimationTarget,
@@ -176,6 +176,36 @@ function Hero({
   );
 }
 
+function Footer() {
+  return (
+    <footer className="px-8 pb-8 pt-16">
+      <div className="mx-auto flex max-w-[800px] items-center justify-between">
+        <Text size="xs" className="text-muted/50">
+          © {new Date().getFullYear()} Saffron Health
+        </Text>
+        <div className="flex items-center gap-3">
+          <a
+            href="https://www.linkedin.com/company/saffron-health"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted/50 transition-colors hover:text-muted"
+          >
+            <LinkedInIcon width={14} height={14} />
+          </a>
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted/50 transition-colors hover:text-muted"
+          >
+            <GitHubIcon width={14} height={14} />
+          </a>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 export function HomePage() {
   const { konamiProgress, konamiCompleted, paneUnlocked, closePane } =
     useKonamiPane();
@@ -187,6 +217,7 @@ export function HomePage() {
       )}
       <Navbar />
       <Hero paneUnlocked={paneUnlocked} onClosePane={closePane} />
+      <Footer />
     </OrchestrationContainer>
   );
 }

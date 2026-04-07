@@ -149,3 +149,14 @@
 .dark #sidebar [data-active="true"] a {
   color: #fff;
 }
+
+/* Footer copyright */
+footer::after {
+  content: "© 2026 Saffron Health";
+  display: block;
+  text-align: center;
+  padding: 2rem 0 1rem;
+  font-size: 0.75rem;
+  color: var(--faint);
+  opacity: 0.5;
+}

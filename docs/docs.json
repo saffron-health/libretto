@@ -114,5 +114,10 @@
   "contextual": {
     "options": ["copy", "view", "chatgpt", "claude"]
   },
-  "footer": {}
+  "footer": {
+    "socials": {
+      "github": "https://github.com/saffron-health/libretto",
+      "linkedin": "https://www.linkedin.com/company/saffron-health"
+    }
+  }
 }
