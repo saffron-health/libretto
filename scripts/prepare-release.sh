@@ -88,7 +88,17 @@ node packages/dev-tools/scripts/set-libretto-skill-version.mjs "$next_version"
 pnpm sync:mirrors
 pnpm check:mirrors
 
-git add "$package_json_path" "$skill_path" README.md packages/libretto/README.md .agents/skills/libretto .claude/skills/libretto
+git add \
+  "$package_json_path" \
+  packages/libretto/skills/libretto/SKILL.md \
+  packages/libretto/skills/libretto-readonly/SKILL.md \
+  .agents/skills/libretto \
+  .agents/skills/libretto-readonly \
+  .claude/skills/libretto \
+  .claude/skills/libretto-readonly \
+  packages/create-libretto/package.json \
+  README.md \
+  packages/libretto/README.md
 git commit -m "release: v${next_version}"
 git push -u origin "$branch_name"
 
