@@ -160,10 +160,20 @@ jobs:
       - name: Build publish artifacts
         run: pnpm --filter libretto build
 
-      - name: Publish to npm with trusted publishing
+      - name: Publish libretto to npm
         if: needs.verify.outputs.npm_exists != 'true'
         working-directory: packages/libretto
         run: npm publish --access public
+
+      - name: Publish create-libretto to npm
+        if: needs.verify.outputs.npm_exists != 'true'
+        working-directory: packages/create-libretto
+        run: |
+          if ! npm view "create-libretto@${{ needs.verify.outputs.version }}" version >/dev/null 2>&1; then
+            npm publish --access public
+          else
+            echo "create-libretto@${{ needs.verify.outputs.version }} already published, skipping."
+          fi
 
       - name: Generate changelog
         if: needs.verify.outputs.release_exists != 'true'
