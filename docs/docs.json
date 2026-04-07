@@ -49,8 +49,8 @@
         "group": "Get started",
         "pages": [
           "get-started/introduction",
-          "get-started/new-package-setup",
-          "get-started/existing-package-setup",
+          "get-started/create-new-libretto-package",
+          "get-started/add-libretto-to-existing-package",
           "get-started/configuration",
           "get-started/core-concepts",
           "get-started/how-workflow-generation-works",
