@@ -2,7 +2,7 @@ import classnames from "classnames";
 import { useState } from "react";
 import { CheckIcon, CopyIcon } from "../icons";
 
-const COMMAND = "npm init libretto@latest";
+const COMMAND = "npm create libretto@latest";
 
 export function InstallSnippet() {
   const [copied, setCopied] = useState(false);
