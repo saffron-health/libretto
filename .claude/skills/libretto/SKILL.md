@@ -76,8 +76,6 @@ npx libretto connect http://127.0.0.1:9223 --session another-session
 
 ```bash
 npx libretto session-mode --session my-session
-npx libretto session-mode read-only --session my-session
-npx libretto session-mode write-access --session my-session
 ```
 
 ### `snapshot`
