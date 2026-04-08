@@ -61,21 +61,26 @@ async function pollDeployment(
 ): Promise<DeploymentResponse["json"]> {
   const start = Date.now();
   let status: DeploymentStatus = "building";
+  let workflows: string[] | null | undefined = null;
   let deployment: DeploymentResponse["json"] | undefined;
 
-  while (status === "building" && Date.now() - start < maxWaitMs) {
+  while (
+    (status === "building" || (status === "ready" && !workflows?.length)) &&
+    Date.now() - start < maxWaitMs
+  ) {
     await new Promise((r) => setTimeout(r, pollIntervalMs));
 
-    const res = await postJson(apiUrl, apiKey, "/v1/deployments/get", {
+    const res = await postJson(apiUrl, apiKey, "/v1/deployments/sync", {
       id: deploymentId,
     });
     const body = (await res.json()) as DeploymentResponse;
     if (res.status !== 200) {
       throw new Error(
-        `Failed to get deployment status (${res.status}): ${JSON.stringify(body)}`,
+        `Failed to sync deployment status (${res.status}): ${JSON.stringify(body)}`,
       );
     }
     status = body.json.status;
+    workflows = body.json.workflows;
     deployment = body.json;
     process.stdout.write(".");
   }
