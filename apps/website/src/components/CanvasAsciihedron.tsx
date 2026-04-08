@@ -1105,8 +1105,14 @@ export function CanvasAsciihedron({
         params.faceBorderBoost,
       );
 
-      const cellWidth = width / COLS;
-      const cellHeight = height / ROWS;
+      const rawCellWidth = width / COLS;
+      const rawCellHeight = height / ROWS;
+      const cellSize = Math.min(rawCellWidth, rawCellHeight);
+      const cellWidth = cellSize;
+      const cellHeight = cellSize;
+      // Offset to center the square grid within the non-square canvas
+      const gridOffsetX = (width - cellSize * COLS) / 2;
+      const gridOffsetY = (height - cellSize * ROWS) / 2;
       const fontSize = Math.max(8, Math.min(cellHeight, cellWidth));
       const glyphScaleX = measureSquareScale(context, fontSize);
       const minX = clamp(Math.floor(projectedMinX) - 18, 0, COLS - 1);
@@ -1199,8 +1205,8 @@ export function CanvasAsciihedron({
           const shadeIndex = borderedShadeBuffer[index];
           if (shadeIndex < 0) continue;
           const owner = ownerBuffer[index];
-          const baseX = (col + 0.5) * cellWidth;
-          const baseY = (row + 0.5) * cellHeight;
+          const baseX = gridOffsetX + (col + 0.5) * cellWidth;
+          const baseY = gridOffsetY + (row + 0.5) * cellHeight;
           const char = getShadeCharacter(shadeIndex, owner);
           context.fillText(char, baseX / glyphScaleX, baseY);
         }
@@ -1219,8 +1225,8 @@ export function CanvasAsciihedron({
           const shadeIndex = borderedShadeBuffer[index];
           if (shadeIndex < 0) continue;
           const owner = ownerBuffer[index];
-          const baseX = (col + 0.5) * cellWidth;
-          const baseY = (row + 0.5) * cellHeight;
+          const baseX = gridOffsetX + (col + 0.5) * cellWidth;
+          const baseY = gridOffsetY + (row + 0.5) * cellHeight;
 
           const dx = baseX - pointerPixelX;
           const dy = baseY - pointerPixelY;

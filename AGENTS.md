@@ -43,7 +43,7 @@ pnpm --filter libretto test -- test/stateful.spec.ts
 Local CLI invocation:
 
 ```bash
-pnpm --filter libretto cli help
+pnpm -s cli help
 ```
 
 ## Code Quality

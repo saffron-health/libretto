@@ -3,6 +3,7 @@
   "version": "0.6.2",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
+  "homepage": "https://libretto.sh",
   "repository": {
     "type": "git",
     "url": "https://github.com/saffron-health/libretto"

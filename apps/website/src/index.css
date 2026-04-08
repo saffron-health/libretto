@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* PP Editorial New font family */
 @font-face {
   font-family: "PP Editorial New";

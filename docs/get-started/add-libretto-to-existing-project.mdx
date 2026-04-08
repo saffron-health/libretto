@@ -1,13 +1,13 @@
 ---
-title: Add libretto to existing package
-sidebarTitle: Add libretto to existing package
+title: Add Libretto to an existing project
+sidebarTitle: Add to an existing project
 ---
 
 If you already have a Node.js project and want to add Libretto to it, follow these steps.
 
 <Note>
-  Starting from scratch? See [Create a new libretto package](./create-new-libretto-package) to
-  scaffold a package automatically.
+  Starting from scratch? See [Create a new Libretto project](./create-new-libretto-project) to
+  scaffold a project automatically.
 </Note>
 
 <Steps>
@@ -37,7 +37,7 @@ If you already have a Node.js project and want to add Libretto to it, follow the
     ```ts src/workflows/scrape-page.ts
     import { workflow } from "libretto";
 
-    export const scrapePage = workflow("scrape-page", async ({ page }) => {
+    export default workflow("scrape-page", async ({ page }) => {
       await page.goto("https://example.com");
       const title = await page.title();
       console.log(`Page title: ${title}`);

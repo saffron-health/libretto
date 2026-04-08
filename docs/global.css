@@ -62,6 +62,11 @@
   border-left: 1px solid rgba(30, 29, 26, 0.15);
 }
 
+/* Restore bold for <strong> inside body content */
+.mdx-content strong {
+  font-weight: 560;
+}
+
 /* Blockquote border — warm brown, thinner */
 .mdx-content blockquote {
   border-left-color: var(--faint);
@@ -133,6 +138,19 @@
 .dark .mdx-content :not(pre) > code {
   background-color: rgba(245, 242, 236, 0.08);
   border-color: rgba(245, 242, 236, 0.1);
+}
+
+/* Code blocks with language="text" should wrap */
+div.code-block:has(code[language="text"]) .whitespace-pre,
+div.code-block:has(code[language="text"]) pre,
+div.code-block:has(code[language="text"]) code {
+  white-space: pre-wrap !important;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+div.code-block:has(code[language="text"]) [data-component-part="code-block-root"] {
+  overflow-x: hidden;
 }
 
 /* Dark mode overrides */

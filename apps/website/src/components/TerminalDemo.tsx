@@ -357,13 +357,13 @@ export function TerminalDemo() {
         </div>
 
         {/* macOS-style tab bar */}
-        <div className="flex border-y border-ink/[0.08] bg-ink/[0.04]">
+        <div className="flex border-y border-ink/[0.08] bg-ink/[0.04] overflow-x-auto scrollbar-none">
           {workflowExamples.map((ex, i) => (
             <button
               key={ex.id}
               type="button"
               onClick={() => handleTabClick(i)}
-              className={`flex-1 px-3 py-1.5 text-[11.5px] font-sans font-medium transition-colors duration-100 ease-out whitespace-nowrap border-r border-ink/[0.08] last:border-r-0 ${
+              className={`shrink-0 px-3 py-1.5 text-[11.5px] font-sans font-medium transition-colors duration-100 ease-out whitespace-nowrap border-r border-ink/[0.08] last:border-r-0 ${
                 i === activeIndex
                   ? "bg-white text-ink/70"
                   : "text-ink/35 hover:text-ink/50 hover:bg-ink/[0.02]"
