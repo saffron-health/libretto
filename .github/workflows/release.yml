@@ -124,6 +124,7 @@ jobs:
       - name: Verify release build
         if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
         run: |
+          pnpm check:mirrors
           pnpm --filter libretto type-check
           pnpm --filter libretto test
     outputs:
