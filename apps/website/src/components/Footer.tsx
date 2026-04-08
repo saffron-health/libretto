@@ -1,6 +1,6 @@
 import { Text } from "./Text";
-import { GitHubIcon, LinkedInIcon } from "../icons";
-import { REPO_URL } from "../site";
+import { DiscordIcon, GitHubIcon, LinkedInIcon } from "../icons";
+import { DISCORD_URL, REPO_URL } from "../site";
 
 export function Footer() {
   return (
@@ -19,6 +19,15 @@ export function Footer() {
             className="text-muted/50 transition-colors hover:text-muted"
           >
             <LinkedInIcon width={14} height={14} />
+          </a>
+          <a
+            href={DISCORD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Libretto on Discord"
+            className="text-muted/50 transition-colors hover:text-muted"
+          >
+            <DiscordIcon width={14} height={14} />
           </a>
           <a
             href={REPO_URL}
