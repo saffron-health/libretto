@@ -280,8 +280,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Capture PNG + HTML");
     expect(result.stdout).not.toContain("cloud <subcommand>");
     expect(result.stdout).toContain("experimental <subcommand>");
-    expect(result.stdout).toContain("\nSessions:\n  Session state is stored");
-    expect(result.stdout).toContain("libretto status");
+    expect(result.stdout).toContain("Docs (agent-friendly): https://libretto.sh/docs");
     expect(result.stderr).toBe("");
   });
 
