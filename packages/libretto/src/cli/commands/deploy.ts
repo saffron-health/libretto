@@ -60,14 +60,17 @@ async function pollDeployment(
   maxWaitMs: number,
 ): Promise<DeploymentResponse["json"]> {
   const start = Date.now();
+  const workflowWaitMs = 60_000;
   let status: DeploymentStatus = "building";
   let workflows: string[] | null | undefined = null;
+  let readyAt: number | null = null;
   let deployment: DeploymentResponse["json"] | undefined;
 
-  while (
-    (status === "building" || (status === "ready" && !workflows?.length)) &&
-    Date.now() - start < maxWaitMs
-  ) {
+  while (Date.now() - start < maxWaitMs) {
+    if (status !== "building" && status !== "ready") break;
+    if (status === "ready" && workflows?.length) break;
+    if (status === "ready" && readyAt && Date.now() - readyAt > workflowWaitMs) break;
+
     await new Promise((r) => setTimeout(r, pollIntervalMs));
 
     const res = await postJson(apiUrl, apiKey, "/v1/deployments/sync", {
@@ -82,12 +85,19 @@ async function pollDeployment(
     status = body.json.status;
     workflows = body.json.workflows;
     deployment = body.json;
+    if (status === "ready" && readyAt === null) readyAt = Date.now();
     process.stdout.write(".");
   }
   console.log();
 
   if (!deployment) {
     throw new Error("Deployment timed out before receiving a status update.");
+  }
+
+  if (status === "ready" && !workflows?.length) {
+    throw new Error(
+      "Build completed but workflow discovery failed due to a server-side error. Please redeploy.",
+    );
   }
 
   return deployment;
