@@ -55,12 +55,12 @@ function useTerminalAnimation(
   const [streamingAgent, setStreamingAgent] = useState("");
   const [isStreamingAgent, setIsStreamingAgent] = useState(false);
   const [animationDone, setAnimationDone] = useState(false);
-  const cancelledRef = useRef(false);
+  const generationRef = useRef(0);
   const streamingRef = useRef("");
 
   const interrupt = useCallback(() => {
     if (animationDone) return;
-    cancelledRef.current = true;
+    generationRef.current++;
 
     // Commit any partial streaming text
     const partial = streamingRef.current;
@@ -89,7 +89,7 @@ function useTerminalAnimation(
   }, [animationDone]);
 
   useEffect(() => {
-    cancelledRef.current = false;
+    const gen = ++generationRef.current;
     streamingRef.current = "";
 
     setLines([]);
@@ -101,7 +101,7 @@ function useTerminalAnimation(
 
     async function run() {
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-      const isCancelled = () => cancelledRef.current;
+      const isCancelled = () => generationRef.current !== gen;
 
       if (skipTyping) {
         setPromptSubmitted(true);
@@ -179,7 +179,7 @@ function useTerminalAnimation(
 
     void run();
     return () => {
-      cancelledRef.current = true;
+      generationRef.current++;
     };
   }, [example, animationKey, skipTyping]);
 
