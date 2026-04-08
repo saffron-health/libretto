@@ -5,6 +5,7 @@ import { GitHubStarIcon } from "../icons";
 import { AnimationTarget } from "./AnimationOrchestration";
 import { DISCUSSIONS_URL, RELEASES_URL, REPO_URL } from "../site";
 import { AppLink } from "../routing";
+import { MobileMenu } from "./MobileMenu";
 
 function useGitHubStars(repo: string) {
   const [stars, setStars] = useState<number | null>(null);
@@ -47,7 +48,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
               Libretto
             </Text>
           </AppLink>
-          <div className="absolute left-1/2 flex -translate-x-1/2 gap-7">
+          <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
             <a
               href={DISCUSSIONS_URL}
               target="_blank"
@@ -75,7 +76,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-ink/70 transition-colors hover:text-ink"
+            className="hidden items-center gap-1.5 text-ink/70 transition-colors hover:text-ink md:flex"
           >
             <GitHubStarIcon width={15} height={15} />
             {stars !== null && (
@@ -85,6 +86,11 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
           <Button href="/docs/get-started/introduction" size="sm">
             Go to docs
           </Button>
+          <div className="md:hidden">
+            <MobileMenu
+              stars={stars !== null ? formatStars(stars) : null}
+            />
+          </div>
         </div>
       </div>
     </nav>
