@@ -33,10 +33,10 @@ function Hero({
       <div
         data-animate={AnimationTarget.Icosahedron}
         style={{ opacity: 0 }}
-        className="pointer-events-none absolute inset-0 flex -translate-y-24 items-center justify-center select-none"
+        className="pointer-events-none absolute inset-0 flex -translate-y-24 max-md:-translate-y-48 items-center justify-center select-none"
       >
         <CanvasAsciihedron
-          className="h-[1600px] w-[1600px] max-h-[180vw] max-w-[180vw] text-ink"
+          className="h-[1600px] w-[1600px] min-h-[1200px] min-w-[1200px] shrink-0 max-h-[180vw] max-w-[180vw] text-ink"
           showAnnotations={false}
           objectScale={1.2}
           paneUnlocked={paneUnlocked}
@@ -68,9 +68,15 @@ function Hero({
           htmlStyle={{ opacity: 0 }}
           className="mx-auto mb-8 max-w-[560px] text-center leading-relaxed text-muted"
         >
-          An agent skill and token-efficient CLI that inspects live pages,
-          reverse-engineers network requests, and ships production-ready
-          integration workflows.
+          <span className="hidden md:inline">
+            An agent skill and token-efficient CLI that inspects live pages,
+            reverse-engineers network requests, and ships production-ready
+            integration workflows.
+          </span>
+          <span className="md:hidden">
+            An agent skill and CLI that inspects live pages and ships
+            production-ready integration workflows.
+          </span>
         </Text>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
           <InstallSnippet />

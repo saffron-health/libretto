@@ -4,7 +4,7 @@
 import { workflow } from "libretto";
 import { log } from "../shared/utils.js";
 
-export const starRepo = workflow("star-repo", async ({ page }) => {
+export default workflow("star-repo", async ({ page }) => {
   log("Navigating to Libretto repo...");
   await page.goto("https://github.com/saffron-health/libretto");
   await page.locator('button:has-text("Star")').click();

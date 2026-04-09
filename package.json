@@ -15,7 +15,7 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "docs:dev": "cd docs && mintlify dev",
+    "docs:dev": "cd docs && mintlify dev --no-open",
     "docs:validate": "cd docs && mintlify validate",
     "docs:broken-links": "cd docs && mintlify broken-links --check-anchors",
     "website:build": "pnpm --dir ./apps/website build",
@@ -29,7 +29,7 @@
     "evals": "turbo run evals --filter=@libretto/evals --",
     "benchmarks": "turbo run benchmarks --filter=@libretto/benchmarks --",
     "google-login": "gcloud auth login --update-adc && gcloud auth configure-docker us-central1-docker.pkg.dev --quiet",
-    "cli": "pnpm --filter libretto cli",
+    "cli": "pnpm -s --filter libretto cli",
     "create-tmp-workspace": "pnpm --filter @libretto/dev-tools create-tmp-workspace",
     "website:dev": "pnpm --dir ./apps/website dev"
   }
