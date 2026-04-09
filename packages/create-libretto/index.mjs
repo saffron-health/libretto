@@ -124,6 +124,20 @@ function installCommand(pkgManager) {
   }
 }
 
+/** Return the command for adding a specific package (e.g. `npm install <pkg>`). */
+function addCommand(pkgManager) {
+  switch (pkgManager) {
+    case "yarn":
+      return "yarn add";
+    case "bun":
+      return "bun add";
+    case "pnpm":
+      return "pnpm add";
+    default:
+      return "npm install";
+  }
+}
+
 /** Return the run command for scripts (used in next-steps messaging). */
 function runCommand(pkgManager) {
   switch (pkgManager) {
@@ -379,17 +393,18 @@ export async function scaffoldProject(
     if (provider) {
       const sdkPackage = PROVIDER_SDK_PACKAGES[provider];
       const spec = resolveSdkVersionSpec(targetDir, sdkPackage);
+      const add = addCommand(pkgManager);
       console.log(`\nInstalling ${spec}...`);
       const sdkSpinner = createSpinner(`Installing ${sdkPackage}...`);
       const sdkResult = await runInstallAsync(
-        `${installCommand(pkgManager)} ${spec}`,
+        `${add} ${spec}`,
         targetDir,
       );
       sdkSpinner.stop();
 
       if (sdkResult.status !== 0) {
         console.error(
-          `\nFailed to install ${sdkPackage}. Install it manually: ${installCommand(pkgManager)} ${spec}`,
+          `\nFailed to install ${sdkPackage}. Install it manually: ${add} ${spec}`,
         );
       } else {
         console.log(`${GREEN}✓${RESET} Installed ${sdkPackage}`);
