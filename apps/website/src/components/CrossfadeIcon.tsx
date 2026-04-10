@@ -24,7 +24,7 @@ export function CrossfadeIcon({
 }: CrossfadeIconProps) {
   return (
     <span
-      className={`relative inline-flex items-center justify-center ${className}`}
+      className={`inline-flex items-center justify-center ${className}`}
     >
       <AnimatePresence initial={false} mode="wait">
         <motion.span
