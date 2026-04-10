@@ -1,5 +1,6 @@
-export { AthenahealthLogo, EClinicalWorksLogo, UHCLogo, AvailityLogo, AzaleaHealthLogo } from "./EhrLogos";
+export { AWSLogo } from "./AWSLogo";
 export { BrowserbaseLogo } from "./BrowserbaseLogo";
+export { GCPLogo } from "./GCPLogo";
 export { CheckIcon } from "./CheckIcon";
 export { CopyIcon } from "./CopyIcon";
 export { DiscordIcon } from "./DiscordIcon";

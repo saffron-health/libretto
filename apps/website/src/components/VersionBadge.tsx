@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Text } from "./Text";
 
 function useNpmVersion(pkg: string) {
   const [version, setVersion] = useState<string | null>(null);
@@ -22,17 +21,15 @@ export function VersionBadge() {
   const version = useNpmVersion("libretto");
 
   return (
-    <div className="mb-5 flex items-center justify-center">
-      <div className="inline-flex items-center gap-2 rounded-full border border-ink/12 bg-ink/[0.06] px-3.5 py-1.5 backdrop-blur-sm">
-        <Text size="xs" className="font-medium tracking-wide text-ink/60">
-          beta
-        </Text>
+    <div className="mb-8 flex items-center justify-center">
+      <div className="inline-flex items-center gap-2 rounded-full border border-ink/12 bg-ink/[0.06] px-3 py-1 font-mono text-[11px] backdrop-blur-sm">
+        <span className="font-medium uppercase tracking-widest text-ink/60">
+          Beta
+        </span>
         {version !== null && (
           <>
             <span className="inline-block size-1 rounded-full bg-ink/20" />
-            <Text size="xs" className="font-medium tabular-nums text-ink/60">
-              v{version}
-            </Text>
+            <span className="tabular-nums text-ink/50">v{version}</span>
           </>
         )}
       </div>

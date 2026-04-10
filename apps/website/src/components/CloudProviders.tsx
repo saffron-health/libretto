@@ -1,6 +1,6 @@
 import { SectionHeading } from "./SectionHeading";
 import { Text } from "./Text";
-import { KernelLogo, BrowserbaseLogo } from "../icons";
+import { AWSLogo, KernelLogo, BrowserbaseLogo, GCPLogo } from "../icons";
 
 export function CloudProviders() {
   return (
@@ -21,9 +21,8 @@ export function CloudProviders() {
         <div className="mx-auto flex max-w-[700px] flex-wrap items-center justify-center gap-12 md:gap-16">
           <KernelLogo className="h-7 w-auto text-ink/25" />
           <BrowserbaseLogo className="h-8 w-auto text-ink/25" />
-          <Text size="sm" className="font-medium text-ink/20 italic">
-            + more coming soon
-          </Text>
+          <AWSLogo className="h-8 w-auto text-ink/25" />
+          <GCPLogo className="h-8 w-auto text-ink/25" />
         </div>
       </div>
     </section>

@@ -51,7 +51,7 @@ function Hero({
         />
       </div>
       <div className="relative mx-auto max-w-[1200px]">
-        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
+        <div data-animate={AnimationTarget.Navbar} style={{ opacity: 0 }}>
           <VersionBadge />
         </div>
         <Text

@@ -9,6 +9,17 @@ type Line =
   | { type: "agent"; text: string }
   | { type: "interrupted" };
 
+const BRAILLE_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+function BrailleSpinner() {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setFrame((f) => (f + 1) % BRAILLE_FRAMES.length), 80);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="text-ink/20 inline-block w-[1ch] text-center">{BRAILLE_FRAMES[frame]}</span>;
+}
+
 function Cursor({ dark }: { dark?: boolean }) {
   return (
     <span
@@ -23,7 +34,7 @@ function ThinkingLine({ done }: { done: boolean }) {
       {done ? (
         <span className="text-teal-600/60">✓</span>
       ) : (
-        <span className="animate-spin-slow text-ink/20">◐</span>
+        <BrailleSpinner />
       )}
       <span>Thinking</span>
       {done && <span className="text-ink/15">▶</span>}
@@ -32,14 +43,22 @@ function ThinkingLine({ done }: { done: boolean }) {
 }
 
 function ToolLine({ label, done }: { label: string; done: boolean }) {
+  const isBash = label.startsWith("bash:");
+  const displayLabel = isBash ? label.slice("bash: ".length) : label;
   return (
-    <div className="flex items-center gap-2 text-ink/25">
-      {done ? (
+    <div className="flex items-start gap-2 text-ink/25">
+      {isBash ? (
+        done ? (
+          <span className="text-ink/30 select-none inline-block w-[1ch] text-center">$</span>
+        ) : (
+          <BrailleSpinner />
+        )
+      ) : done ? (
         <span className="text-teal-600/60">✓</span>
       ) : (
-        <span className="animate-spin-slow text-ink/20">◐</span>
+        <BrailleSpinner />
       )}
-      <span>{label}</span>
+      <span>{displayLabel}</span>
     </div>
   );
 }
@@ -207,7 +226,7 @@ export function TerminalDemo() {
   const extraGenRef = useRef(0);
   const extraStreamingRef = useRef("");
   const bodyRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const example = workflowExamples[activeIndex];
 
@@ -320,23 +339,25 @@ export function TerminalDemo() {
 
   return (
     <div className="mx-auto max-w-[600px] mt-16">
-      <div className="rounded-xl border border-ink/[0.08] bg-white shadow-lg overflow-hidden flex flex-col font-mono text-[13px]">
+      <div className="rounded-xl border border-ink/[0.08] bg-white shadow-lg overflow-hidden flex flex-col font-mono text-[13px] h-[580px]">
         {/* Title bar */}
-        <div className="flex items-center justify-between px-3 py-1.5 bg-ink/[0.02]">
+        <div className="relative flex items-center px-3 py-1.5 bg-ink/[0.02]">
           <div className="flex gap-1.5">
             <div className="size-2.5 rounded-full bg-ink/10" />
             <div className="size-2.5 rounded-full bg-ink/10" />
             <div className="size-2.5 rounded-full bg-ink/10" />
           </div>
-          <div className="flex items-center gap-1.5">
-            <img
-              src="/claude-code-logo.svg"
-              alt="Claude Code"
-              className="h-3.5 w-auto opacity-70"
-            />
-            <span className="font-sans text-[13px] font-[450] text-ink/50">
-              Claude Code
-            </span>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="flex items-center gap-1.5">
+              <img
+                src="/claude-code-logo.svg"
+                alt="Claude Code"
+                className="h-3.5 w-auto opacity-70"
+              />
+              <span className="font-sans text-[13px] font-[450] text-ink/50">
+                Claude Code
+              </span>
+            </div>
           </div>
           {/* Reset button */}
           <button
@@ -349,7 +370,7 @@ export function TerminalDemo() {
               setUserInput("");
               setAnimationKey((k) => k + 1);
             }}
-            className={`p-1 rounded-md text-ink/30 hover:text-ink/60 hover:bg-ink/[0.05] transition-all duration-300 cursor-pointer ${animationDone ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+            className={`ml-auto p-1 rounded-md text-ink/30 hover:text-ink/60 hover:bg-ink/[0.05] transition-all duration-300 cursor-pointer ${animationDone ? "opacity-100" : "opacity-0 pointer-events-none"}`}
             aria-label="Replay animation"
           >
             <RefreshIcon className="size-3.5" />
@@ -363,7 +384,7 @@ export function TerminalDemo() {
               key={ex.id}
               type="button"
               onClick={() => handleTabClick(i)}
-              className={`shrink-0 px-3 py-1.5 text-[11.5px] font-sans font-medium transition-colors duration-100 ease-out whitespace-nowrap border-r border-ink/[0.08] last:border-r-0 ${
+              className={`flex-1 min-w-fit px-3 py-1.5 text-[11.5px] font-sans font-medium transition-colors duration-100 ease-out whitespace-nowrap border-r border-ink/[0.08] last:border-r-0 ${
                 i === activeIndex
                   ? "bg-white text-ink/70"
                   : "text-ink/35 hover:text-ink/50 hover:bg-ink/[0.02]"
@@ -377,14 +398,14 @@ export function TerminalDemo() {
         {/* Body */}
         <div
           ref={bodyRef}
-          className="px-5 pt-5 pb-3 h-[500px] overflow-y-auto flex flex-col gap-2 leading-[1.65]"
+          className="px-5 pt-5 pb-3 flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 leading-[1.65]"
         >
           <div className="flex-1" />
 
           {lines.map((line, i) => {
             if (line.type === "user") {
               return (
-                <div key={i} className="flex gap-3 items-start mb-2">
+                <div key={i} className="flex gap-3 items-start">
                   <div className="w-[3px] shrink-0 self-stretch bg-teal-500" />
                   <span className="text-teal-700">{line.text}</span>
                 </div>
@@ -398,7 +419,7 @@ export function TerminalDemo() {
             }
             if (line.type === "agent") {
               return (
-                <div key={i} className="text-ink/70 whitespace-pre-wrap mt-1">
+                <div key={i} className="text-ink/70 whitespace-pre-wrap">
                   {line.text}
                 </div>
               );
@@ -415,7 +436,7 @@ export function TerminalDemo() {
 
           {/* Streaming agent text */}
           {isStreamingAgent && (
-            <div className="text-ink/70 whitespace-pre-wrap mt-1">
+            <div className="text-ink/70 whitespace-pre-wrap">
               {streamingAgent}
               <Cursor />
             </div>
@@ -425,7 +446,7 @@ export function TerminalDemo() {
           {extraLines.map((line, i) => {
             if (line.type === "user") {
               return (
-                <div key={`extra-${i}`} className="flex gap-3 items-start mb-2">
+                <div key={`extra-${i}`} className="flex gap-3 items-start">
                   <div className="w-[3px] shrink-0 self-stretch bg-teal-500" />
                   <span className="text-teal-700">{line.text}</span>
                 </div>
@@ -435,7 +456,7 @@ export function TerminalDemo() {
               return (
                 <div
                   key={`extra-${i}`}
-                  className="text-ink/70 whitespace-pre-wrap mt-1"
+                  className="text-ink/70 whitespace-pre-wrap"
                 >
                   {line.text}
                 </div>
@@ -456,7 +477,7 @@ export function TerminalDemo() {
 
           {/* Extra streaming */}
           {isExtraStreaming && (
-            <div className="text-ink/70 whitespace-pre-wrap mt-1">
+            <div className="text-ink/70 whitespace-pre-wrap">
               {extraStreaming}
               <Cursor />
             </div>
@@ -464,21 +485,36 @@ export function TerminalDemo() {
         </div>
 
         {/* Prompt box */}
-        <div className="border-t border-ink/[0.1] text-[12.5px]">
+        <div className="border-t border-ink/[0.1] text-[12.5px] max-h-[30%] flex flex-col">
           {!promptSubmitted ? (
             <div className="min-h-[24px] px-5 py-3 text-ink/70 leading-[1.65]">
               {promptText}
               <Cursor />
             </div>
           ) : (
-            <form onSubmit={handleUserSubmit}>
-              <input
+            <form
+              onSubmit={handleUserSubmit}
+              className="flex flex-col min-h-0"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleUserSubmit(e);
+                }
+              }}
+            >
+              <textarea
                 ref={inputRef}
-                type="text"
                 value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
+                onChange={(e) => {
+                  setUserInput(e.target.value);
+                  // Auto-resize
+                  const el = e.target;
+                  el.style.height = "auto";
+                  el.style.height = `${el.scrollHeight}px`;
+                }}
                 placeholder="Ask a question…"
-                className="w-full px-5 py-3 min-h-[24px] bg-transparent text-ink/70 placeholder:text-ink/20 outline-none leading-[1.65]"
+                rows={1}
+                className="w-full px-5 py-3 bg-transparent text-ink/70 placeholder:text-ink/20 outline-none leading-[1.65] resize-none overflow-y-auto"
               />
             </form>
           )}
