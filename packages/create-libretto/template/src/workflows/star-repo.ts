@@ -7,6 +7,14 @@ import { log } from "../shared/utils.js";
 export default workflow("star-repo", async ({ page }) => {
   log("Navigating to Libretto repo...");
   await page.goto("https://github.com/saffron-health/libretto");
-  await page.locator('button:has-text("Star")').click();
-  log("Starred the repo!");
+
+  const description = await page
+    .locator('meta[name="description"]')
+    .getAttribute("content");
+  log(`Repo description: ${description}`);
+
+  const stars = await page.locator("#repo-stars-counter-star").textContent();
+  log(`Stars: ${stars?.trim()}`);
+
+  log("Done! Edit this workflow or create your own in src/workflows/.");
 });

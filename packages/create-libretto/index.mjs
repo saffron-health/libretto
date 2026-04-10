@@ -30,6 +30,59 @@ const GREEN = "\x1b[32m";
 const CYAN = "\x1b[36m";
 
 // ---------------------------------------------------------------------------
+// Provider → AI SDK package mapping
+// ---------------------------------------------------------------------------
+
+const PROVIDER_SDK_PACKAGES = {
+  openai: "@ai-sdk/openai",
+  anthropic: "@ai-sdk/anthropic",
+  google: "@ai-sdk/google",
+  vertex: "@ai-sdk/google-vertex",
+};
+
+/**
+ * Read `.libretto/config.json` and extract the provider prefix from `ai.model`.
+ * Returns null if config is missing or model is not recognized.
+ */
+function detectProviderFromConfig(targetDir) {
+  const configPath = join(targetDir, ".libretto", "config.json");
+  if (!existsSync(configPath)) return null;
+
+  try {
+    const config = JSON.parse(readFileSync(configPath, "utf-8"));
+    const model = config?.ai?.model;
+    if (typeof model !== "string") return null;
+
+    const provider = model.split("/")[0];
+    if (provider in PROVIDER_SDK_PACKAGES) return provider;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the peer-dependency version range for the SDK package from the
+ * installed libretto package.json. Falls back to "latest" if not found.
+ */
+function resolveSdkVersionSpec(targetDir, sdkPackage) {
+  try {
+    const librettoPkgPath = join(
+      targetDir,
+      "node_modules",
+      "libretto",
+      "package.json",
+    );
+    const librettoPkg = JSON.parse(readFileSync(librettoPkgPath, "utf-8"));
+    const range = librettoPkg.peerDependencies?.[sdkPackage];
+    if (range) return `${sdkPackage}@${range}`;
+  } catch {
+    // fall through
+  }
+  return sdkPackage;
+}
+
+// ---------------------------------------------------------------------------
 // Package manager detection
 // ---------------------------------------------------------------------------
 
@@ -68,6 +121,20 @@ function installCommand(pkgManager) {
       return "bun install";
     default:
       return `${pkgManager} install`;
+  }
+}
+
+/** Return the command for adding a specific package (e.g. `npm install <pkg>`). */
+function addCommand(pkgManager) {
+  switch (pkgManager) {
+    case "yarn":
+      return "yarn add";
+    case "bun":
+      return "bun add";
+    case "pnpm":
+      return "pnpm add";
+    default:
+      return "npm install";
   }
 }
 
@@ -319,6 +386,29 @@ export async function scaffoldProject(
     } catch {
       console.error(`\nFailed to run libretto setup.`);
       process.exit(1);
+    }
+
+    // 6. Install the AI SDK package for the selected provider
+    const provider = detectProviderFromConfig(targetDir);
+    if (provider) {
+      const sdkPackage = PROVIDER_SDK_PACKAGES[provider];
+      const spec = resolveSdkVersionSpec(targetDir, sdkPackage);
+      const add = addCommand(pkgManager);
+      console.log(`\nInstalling ${spec}...`);
+      const sdkSpinner = createSpinner(`Installing ${sdkPackage}...`);
+      const sdkResult = await runInstallAsync(
+        `${add} ${spec}`,
+        targetDir,
+      );
+      sdkSpinner.stop();
+
+      if (sdkResult.status !== 0) {
+        console.error(
+          `\nFailed to install ${sdkPackage}. Install it manually: ${add} ${spec}`,
+        );
+      } else {
+        console.log(`${GREEN}✓${RESET} Installed ${sdkPackage}`);
+      }
     }
   }
 }
