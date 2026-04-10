@@ -291,6 +291,9 @@ export function TerminalDemo() {
       const text = userInput.trim();
       if (!text) return;
       setUserInput("");
+      if (inputRef.current) {
+        inputRef.current.style.height = "auto";
+      }
 
       // Interrupt main animation if still running
       if (!animationDone) {

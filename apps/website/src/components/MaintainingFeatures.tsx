@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { SectionHeading } from "./SectionHeading";
 import { Text } from "./Text";
 
@@ -155,14 +155,11 @@ export function MaintainingFeatures() {
 
         <div className="grid gap-10 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
           {features.map((f, i) => (
-            <>
+            <Fragment key={f.title}>
               {i > 0 && (
-                <div
-                  key={`divider-${f.title}`}
-                  className="hidden md:block w-px self-stretch bg-ink/10"
-                />
+                <div className="hidden md:block w-px self-stretch bg-ink/10" />
               )}
-              <div key={f.title} className="px-2">
+              <div className="px-2">
                 <div className="mb-4">{f.icon}</div>
                 <Text as="h3" size="md" className="mb-2 font-medium text-ink">
                   {f.title}
@@ -171,7 +168,7 @@ export function MaintainingFeatures() {
                   {f.description}
                 </Text>
               </div>
-            </>
+            </Fragment>
           ))}
         </div>
       </div>
