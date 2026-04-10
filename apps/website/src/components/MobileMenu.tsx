@@ -6,9 +6,10 @@ import {
   Popover,
   Button as AriaButton,
 } from "react-aria-components";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { GitHubStarIcon } from "../icons";
 import { DISCUSSIONS_URL, RELEASES_URL, REPO_URL } from "../site";
+import { CrossfadeIcon } from "./CrossfadeIcon";
 
 type AnimationState = "unmounted" | "hidden" | "visible";
 
@@ -71,8 +72,6 @@ function CloseIcon() {
   );
 }
 
-const crossfade = { duration: 0.15, ease: "easeOut" as const };
-
 const itemClass =
   "flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-ink outline-none rounded-lg cursor-pointer data-[focused]:bg-ink/[0.06] data-[pressed]:bg-ink/[0.08]";
 
@@ -87,31 +86,12 @@ export function MobileMenu({ stars }: { stars: string | null }) {
         aria-label="Menu"
         className="relative flex size-9 items-center justify-center rounded-lg text-ink outline-none hover:bg-ink/[0.06] focus-visible:ring-2 focus-visible:ring-ink/20"
       >
-        <AnimatePresence initial={false}>
-          {animation === "visible" ? (
-            <motion.span
-              key="close"
-              className="absolute inset-0 flex items-center justify-center"
-              initial={{ opacity: 0, scale: 0.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.6 }}
-              transition={crossfade}
-            >
-              <CloseIcon />
-            </motion.span>
-          ) : (
-            <motion.span
-              key="hamburger"
-              className="absolute inset-0 flex items-center justify-center"
-              initial={{ opacity: 0, scale: 0.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.6 }}
-              transition={crossfade}
-            >
-              <HamburgerIcon />
-            </motion.span>
-          )}
-        </AnimatePresence>
+        <CrossfadeIcon
+          activeKey={animation === "visible" ? "close" : "hamburger"}
+          className="absolute inset-0"
+        >
+          {animation === "visible" ? <CloseIcon /> : <HamburgerIcon />}
+        </CrossfadeIcon>
       </AriaButton>
       <Popover
         placement="bottom end"

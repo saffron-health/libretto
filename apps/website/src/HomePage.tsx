@@ -15,6 +15,13 @@ import {
 import { AnimatedTitle } from "./components/AnimatedTitle";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
+import { VersionBadge } from "./components/VersionBadge";
+import { FeatureRows } from "./components/FeatureRows";
+import { BattleTestedBanner } from "./components/BattleTestedBanner";
+import { MaintainingFeatures } from "./components/MaintainingFeatures";
+import { CloudProviders } from "./components/CloudProviders";
+import { FAQ } from "./components/FAQ";
+import { CTA } from "./components/CTA";
 
 function Hero({
   paneUnlocked,
@@ -44,6 +51,9 @@ function Hero({
         />
       </div>
       <div className="relative mx-auto max-w-[1200px]">
+        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
+          <VersionBadge />
+        </div>
         <Text
           as="h1"
           size="5xl"
@@ -107,6 +117,12 @@ export function HomePage() {
       )}
       <Navbar animate />
       <Hero paneUnlocked={paneUnlocked} onClosePane={closePane} />
+      <FeatureRows />
+      <BattleTestedBanner />
+      <MaintainingFeatures />
+      <CloudProviders />
+      <FAQ />
+      <CTA />
       <Footer />
     </OrchestrationContainer>
   );

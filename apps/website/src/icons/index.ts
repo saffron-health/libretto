@@ -1,7 +1,9 @@
+export { BrowserbaseLogo } from "./BrowserbaseLogo";
 export { CheckIcon } from "./CheckIcon";
 export { CopyIcon } from "./CopyIcon";
 export { DiscordIcon } from "./DiscordIcon";
 export { GitHubIcon } from "./GitHubIcon";
 export { GitHubStarIcon } from "./GitHubStarIcon";
+export { KernelLogo } from "./KernelLogo";
 export { LinkedInIcon } from "./LinkedInIcon";
 export { RefreshIcon } from "./RefreshIcon";
