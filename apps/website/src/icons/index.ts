@@ -1,3 +1,4 @@
+export { AthenahealthLogo, EClinicalWorksLogo, UHCLogo, AvailityLogo, AzaleaHealthLogo } from "./EhrLogos";
 export { BrowserbaseLogo } from "./BrowserbaseLogo";
 export { CheckIcon } from "./CheckIcon";
 export { CopyIcon } from "./CopyIcon";

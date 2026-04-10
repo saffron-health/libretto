@@ -23,17 +23,14 @@ export function VersionBadge() {
 
   return (
     <div className="mb-5 flex items-center justify-center">
-      <div className="inline-flex items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.04] px-3.5 py-1.5">
-        <Text
-          size="xs"
-          className="font-medium tracking-wide text-ink/70 uppercase"
-        >
-          Beta
+      <div className="inline-flex items-center gap-2 rounded-full border border-ink/12 bg-ink/[0.06] px-3.5 py-1.5 backdrop-blur-sm">
+        <Text size="xs" className="font-medium tracking-wide text-ink/60">
+          beta
         </Text>
         {version !== null && (
           <>
-            <span className="inline-block size-1 rounded-full bg-ink/25" />
-            <Text size="xs" className="font-medium tabular-nums text-ink/50">
+            <span className="inline-block size-1 rounded-full bg-ink/20" />
+            <Text size="xs" className="font-medium tabular-nums text-ink/60">
               v{version}
             </Text>
           </>
