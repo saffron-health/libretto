@@ -1,14 +1,54 @@
 ---
-title: Add Libretto to an existing project
-sidebarTitle: Add to an existing project
+title: Installation
+sidebarTitle: Installation
 ---
 
-If you already have a Node.js project and want to add Libretto to it, follow these steps.
+Already have a Node.js package and just want to install Libretto without scaffolding? [Skip to install into an existing package](#install-into-an-existing-package).
 
-<Note>
-  Starting from scratch? See [Create a new Libretto project](./create-new-libretto-project) to
-  scaffold a project automatically.
-</Note>
+## Create a new package
+
+Use this if you want Libretto to scaffold a new package with directory structure, example workflows, and dependencies. This works whether you're starting fresh or adding Libretto as a new package to a monorepo.
+
+<Steps>
+  <Step title="Scaffold the package">
+    ```bash theme={null}
+    npm create libretto@latest
+    ```
+
+    You'll be prompted for a package name (defaults to `my-automations`). You can also pass it directly:
+
+    ```bash theme={null}
+    npm create libretto@latest my-project
+    ```
+
+    This scaffolds a package directory, installs dependencies, downloads Chromium, sets up the `.libretto/` directory, copies agent skill files, and walks you through configuring a snapshot analysis model.
+
+    <Note>
+      Run this yourself in a terminal — not through an agent. It may prompt for
+      input and starts a Chromium download that takes a moment.
+    </Note>
+
+  </Step>
+
+  <Step title="Run a workflow">
+    The scaffolded package includes an example workflow. Run it with:
+
+    ```bash
+    npx libretto run src/workflows/star-repo.ts
+    ```
+
+    Add `--headed` to watch the browser as it runs:
+
+    ```bash
+    npx libretto run src/workflows/star-repo.ts --headed
+    ```
+
+  </Step>
+</Steps>
+
+## Install into an existing package
+
+If you already have a Node.js package that you plan to use for Libretto automations, you can skip the scaffolding and just install Libretto directly.
 
 <Steps>
   <Step title="Install Libretto">

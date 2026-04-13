@@ -5,23 +5,23 @@ sidebarTitle: Introduction
 
 > Libretto is a CLI and skill for your coding agent to build and maintain browser automations.
 
-For our prior startup [Saffron Health](https://saffron.health), we spent a lot of time integrating with healthcare EHRs and payor portals that don't have APIs. Building and maintaining those browser automations was painfully slow and ate up engineering time we didn't have. So, we built Libretto to make it easy to create new integrations and quickly fix errors when they pop up.
+We spent a year building and maintaining browser automations for EHR and payer portal integrations at [Saffron Health](https://saffron.health). None of those systems had the APIs we needed, and building and maintaining the automations was painfully slow. So, we built Libretto to make it easy to create new integrations and quickly fix errors when they pop up.
 
 ## Core capabilities
 
 - **Inspect live pages:** Snapshot any page and get a token-efficient summary of selectors, interactive elements, and visible state.
 - **Capture network traffic:** Record every HTTP request/response to a structured JSONL log for reverse-engineering site APIs.
 - **Record user actions:** Capture clicks, form fills, and navigation in the browser so your agent can turn them into Playwright scripts.
-- **Debug broken workflows:** Keep the browser open on failure so your agent can inspect, patch, and re-run without restarting.
+- **Debug broken workflows:** Give your coding agent tools and debugging features to step through and investigate failing workflows.
 
 ## Get started
 
 <CardGroup cols={2}>
-  <Card title="Create a new project" icon="plus" href="./create-new-libretto-project">
-    Scaffold a new Libretto project from scratch.
+  <Card title="Create a new package" icon="plus" href="./installation#create-a-new-package">
+    Scaffold a new Libretto package with directory structure and example workflows.
   </Card>
 
-  <Card title="Add to an existing project" icon="folder-open" href="./add-libretto-to-existing-project">
-    Add Libretto to a project you already have.
+  <Card title="Install into an existing package" icon="folder-open" href="./installation#install-into-an-existing-package">
+    Add Libretto to a package you already have.
   </Card>
 </CardGroup>

@@ -15,7 +15,7 @@ Libretto ships two interfaces:
 
 All Libretto state lives in a `.libretto/` directory at your project root:
 
-```
+```bash theme={null}
 .libretto/
 ├── config.json              # AI model and viewport settings
 ├── sessions/
@@ -30,7 +30,7 @@ All Libretto state lives in a `.libretto/` directory at your project root:
     └── <domain>.json        # Saved auth state (cookies, localStorage)
 ```
 
-**`config.json`:** Your AI provider and viewport settings. Created by `npm init libretto@latest` and updated with `npx libretto ai configure`. See [Configuration](./configuration) for details.
+**`config.json`:** Your AI provider and viewport settings. Created by `npm create libretto@latest` or `npx libretto setup`, and updated with `npx libretto ai configure`. See [Configuration](./configuration) for details.
 
 Sessions and profiles are automatically git-ignored by a `.libretto/.gitignore` file created during setup. The config file and skill files are meant to be committed.
 
