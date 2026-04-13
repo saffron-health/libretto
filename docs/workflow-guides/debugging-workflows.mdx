@@ -119,7 +119,7 @@ export const eligibilityCheck = workflow(
 );
 ```
 
-The workflow halts at the `pause()` with the browser open. Inspect the page, then tell the agent to resume. `pause()` is a no-op when `NODE_ENV === "production"`, so it's safe to leave in during development.
+The workflow halts at the `pause()` with the browser open. The agent can also drive this autonomously by adding `pause()` calls where it wants to inspect, running the workflow, and calling `npx libretto resume --session <name>` to continue when it's ready. `pause()` is a no-op when `NODE_ENV === "production"`, so it's safe to leave in during development.
 
 ### Common errors
 
