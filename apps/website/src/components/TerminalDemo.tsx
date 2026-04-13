@@ -246,12 +246,7 @@ export function TerminalDemo() {
     }
   }, [lines, promptText, streamingAgent, extraLines, extraStreaming]);
 
-  // Focus input when animation finishes
-  useEffect(() => {
-    if (animationDone && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [animationDone]);
+
 
   const handleTabClick = useCallback(
     (index: number) => {
