@@ -26,9 +26,12 @@ function parseEnvFile(content: string): Record<string, string> {
   for (const raw of content.split("\n")) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
-    const eqIndex = line.indexOf("=");
+    const withoutExport = line.startsWith("export ")
+      ? line.slice("export ".length).trimStart()
+      : line;
+    const eqIndex = withoutExport.indexOf("=");
     if (eqIndex === -1) continue;
-    const key = line.slice(0, eqIndex).trim();
+    const key = withoutExport.slice(0, eqIndex).trim();
     let value = line.slice(eqIndex + 1).trim();
     // Strip matching quotes
     if (
