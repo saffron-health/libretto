@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { RELEASES_URL } from "../site";
 
 interface ReleaseInfo {
   tagName: string;
@@ -36,7 +35,7 @@ export function VersionBadge() {
   return (
     <div className="mb-8 flex items-center justify-center">
       <a
-        href={release.url || RELEASES_URL}
+        href={release.url}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center gap-2 rounded-full border border-ink/12 bg-ink/[0.06] px-3 py-1 font-mono text-[11px] text-ink/50 backdrop-blur-sm transition-colors hover:text-ink"
