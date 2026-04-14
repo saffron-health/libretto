@@ -115,7 +115,7 @@ To inspect the current configuration without changing anything:
 npx libretto status
 ```
 
-Provider credentials are read from environment variables or a `.env` file at your project root: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`, or `GOOGLE_CLOUD_PROJECT` for Vertex.
+Provider credentials are read from environment variables or a `.env` file at your **repository root** (next to your `.git` directory): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`, or `GOOGLE_CLOUD_PROJECT` for Vertex. Set `LIBRETTO_DISABLE_DOTENV=1` to skip `.env` loading.
 
 The `viewport` field sets the default browser viewport size. Both fields are optional.
 

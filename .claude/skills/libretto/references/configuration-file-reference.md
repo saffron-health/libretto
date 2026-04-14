@@ -13,7 +13,7 @@ Use this reference when you need to inspect or change the workspace configuratio
 Libretto reads workspace config from `.libretto/config.json`.
 
 - The file is created by `npx libretto setup` during first-time onboarding (auto-pins the default model for the detected provider) or by `npx libretto ai configure ...` for explicit overrides.
-- API credentials still come from your shell environment or `.env`. The config file stores the selected model, not the secret itself.
+- API credentials come from your shell environment or a `.env` file **at the repository root** (next to your `.git` directory). The config file stores the selected model, not the secret itself. Set `LIBRETTO_DISABLE_DOTENV=1` to skip `.env` loading (useful in CI).
 - Use `npx libretto status` to inspect the current AI configuration and open sessions without changing anything.
 - For first-time setup instructions, follow the main `SKILL.md` flow instead of expanding this reference.
 

@@ -1,70 +1,91 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { resolveLibrettoRepoRoot } from "../paths/repo-root.js";
 
-/**
- * Walk up from `startDir` until a `.env` file is found.
- * Returns the full path to the `.env`, or `null` if the filesystem root is reached.
- */
-function findNearestEnv(startDir: string): string | null {
-  let dir = startDir;
-  while (true) {
-    const envPath = join(dir, ".env");
-    if (existsSync(envPath)) return envPath;
-    const parent = dirname(dir);
-    if (parent === dir) return null; // filesystem root
-    dir = parent;
+const REPO_ROOT = resolveLibrettoRepoRoot();
+
+export function parseDotEnvAssignment(
+  line: string,
+): { key: string; value: string } | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) return null;
+
+  const withoutExport = trimmed.startsWith("export ")
+    ? trimmed.slice("export ".length).trimStart()
+    : trimmed;
+  const eqIdx = withoutExport.indexOf("=");
+  if (eqIdx < 1) return null;
+
+  const key = withoutExport.slice(0, eqIdx).trim();
+  if (!key) return null;
+
+  const rawValue = withoutExport.slice(eqIdx + 1).trimStart();
+  if (!rawValue) {
+    return { key, value: "" };
   }
-}
 
-/**
- * Parse a `.env` file into key-value pairs.
- * Handles KEY=VALUE, KEY="VALUE", KEY='VALUE', comments (#), and blank lines.
- * Does not support multiline values or variable interpolation.
- */
-function parseEnvFile(content: string): Record<string, string> {
-  const vars: Record<string, string> = {};
-  for (const raw of content.split("\n")) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const withoutExport = line.startsWith("export ")
-      ? line.slice("export ".length).trimStart()
-      : line;
-    const eqIndex = withoutExport.indexOf("=");
-    if (eqIndex === -1) continue;
-    const key = withoutExport.slice(0, eqIndex).trim();
-    let value = withoutExport.slice(eqIndex + 1).trim();
-    // Handle quoted values (with or without trailing inline comments)
-    const quote = value[0];
-    if (quote === '"' || quote === "'") {
-      const closeIndex = value.indexOf(quote, 1);
-      if (closeIndex !== -1) {
-        value = value.slice(1, closeIndex);
-      }
-    } else {
-      // Strip inline comments from unquoted values
-      const commentIndex = value.search(/\s#/);
-      if (commentIndex >= 0) {
-        value = value.slice(0, commentIndex).trimEnd();
-      }
+  if (rawValue.startsWith('"')) {
+    const closeIdx = rawValue.indexOf('"', 1);
+    if (closeIdx > 0) {
+      return { key, value: rawValue.slice(1, closeIdx) };
     }
-    vars[key] = value;
+    return { key, value: rawValue.slice(1) };
   }
-  return vars;
+
+  if (rawValue.startsWith("'")) {
+    const closeIdx = rawValue.indexOf("'", 1);
+    if (closeIdx > 0) {
+      return { key, value: rawValue.slice(1, closeIdx) };
+    }
+    return { key, value: rawValue.slice(1) };
+  }
+
+  const inlineCommentIndex = rawValue.search(/\s#/);
+  const value =
+    inlineCommentIndex >= 0
+      ? rawValue.slice(0, inlineCommentIndex).trimEnd()
+      : rawValue.trim();
+  return { key, value };
+}
+
+function readWorktreeEnvPath(): string | null {
+  const gitPath = join(REPO_ROOT, ".git");
+  if (!existsSync(gitPath)) return null;
+
+  try {
+    const gitPointer = readFileSync(gitPath, "utf-8").trim();
+    const match = gitPointer.match(/^gitdir:\s*(.+)$/i);
+    if (!match?.[1]) return null;
+    const worktreeGitDir = resolve(REPO_ROOT, match[1].trim());
+    const commonGitDir = resolve(worktreeGitDir, "..", "..");
+    return join(dirname(commonGitDir), ".env");
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Load the nearest `.env` file above `scriptPath`.
- * Existing `process.env` values are never overridden.
+ * Load the `.env` file at the repository root into `process.env`.
+ * Existing values are never overridden.
+ * Respects `LIBRETTO_DISABLE_DOTENV=1` to skip loading entirely.
  * Returns the path of the loaded `.env`, or `null` if none was found.
  */
-export function loadProjectEnv(scriptPath: string): string | null {
-  const envPath = findNearestEnv(dirname(scriptPath));
+export function loadEnv(): string | null {
+  if (process.env.LIBRETTO_DISABLE_DOTENV?.trim() === "1") return null;
+
+  const envPathCandidates = [
+    join(REPO_ROOT, ".env"),
+    readWorktreeEnvPath(),
+  ].filter((value): value is string => Boolean(value));
+
+  const envPath = envPathCandidates.find((candidate) => existsSync(candidate));
   if (!envPath) return null;
 
-  const vars = parseEnvFile(readFileSync(envPath, "utf8"));
-  for (const [key, value] of Object.entries(vars)) {
-    if (process.env[key] === undefined) {
-      process.env[key] = value;
+  for (const line of readFileSync(envPath, "utf-8").split("\n")) {
+    const parsed = parseDotEnvAssignment(line);
+    if (!parsed) continue;
+    if (!(parsed.key in process.env)) {
+      process.env[parsed.key] = parsed.value;
     }
   }
   return envPath;

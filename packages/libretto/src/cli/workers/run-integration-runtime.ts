@@ -4,7 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { loadProjectEnv } from "../../shared/env/load-env.js";
+import { loadEnv } from "../../shared/env/load-env.js";
 import {
   getDefaultWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,
@@ -196,7 +196,7 @@ async function runIntegrationInternal(
   const { logger } = options;
   const absolutePath = getAbsoluteIntegrationPath(args.integrationPath);
 
-  const envPath = loadProjectEnv(absolutePath);
+  const envPath = loadEnv();
   if (envPath) {
     logger.info("loaded-env", { path: envPath });
   }
