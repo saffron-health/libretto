@@ -252,10 +252,15 @@ body {
   text-decoration-color: oklch(0.55 0.15 175);
 }
 
+.libretto-button--secondary:focus-visible {
+  box-shadow: 0 0 0 2px oklch(0.55 0.15 175 / 0.4);
+}
+
 .libretto-button--secondary:active {
   background: transparent;
   color: var(--color-ink);
   box-shadow: none;
+  transform: none;
   text-decoration-color: oklch(0.55 0.15 175);
 }
 
