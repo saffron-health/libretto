@@ -117,7 +117,7 @@ const features: MaintainFeature[] = [
     icon: <LayersIcon className="text-ink/40" />,
   },
   {
-    title: "Read-only mode for sensitive workflows",
+    title: "Read-only mode",
     description:
       "Enable read-only mode to restrict the agent to only observing the page. It won't fill out incorrect information or submit something unexpected.",
     icon: <LogInIcon className="text-ink/40" />,

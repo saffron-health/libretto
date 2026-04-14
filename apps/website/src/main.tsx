@@ -4,11 +4,12 @@ import "./index.css";
 import { App } from "./App";
 import { IcosahedronDebug } from "./IcosahedronDebug";
 
-if (import.meta.env.DEV) {
-  void import("cssstudio").then(({ startStudio }) => {
-    startStudio();
-  });
-}
+// Temporarily disabled.
+// if (import.meta.env.DEV) {
+//   void import("cssstudio").then(({ startStudio }) => {
+//     startStudio();
+//   });
+// }
 
 const path = window.location.pathname;
 const DevAgentation = import.meta.env.DEV

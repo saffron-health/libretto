@@ -3,6 +3,12 @@
 [![npm version](https://img.shields.io/npm/v/libretto)](https://www.npmjs.com/package/libretto)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Discussions](https://img.shields.io/github/discussions/saffron-health/libretto)](https://github.com/saffron-health/libretto/discussions)
+[![Discord](https://img.shields.io/badge/Discord-Join%20chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/NYrG56hVDt)
+
+- Website: [libretto.sh](https://libretto.sh)
+- Repository: [github.com/saffron-health/libretto](https://github.com/saffron-health/libretto)
+- Docs: [libretto.sh/docs](https://libretto.sh/docs)
+- Discord: [discord.gg/NYrG56hVDt](https://discord.gg/NYrG56hVDt)
 
 Libretto is a toolkit for building robust web integrations. It gives your coding agent a live browser and a token-efficient CLI to:
 
@@ -135,7 +141,7 @@ Profiles save browser sessions (cookies, localStorage) so you can reuse authenti
 
 ## Community
 
-Have a question, idea, or want to share what you've built? Join the conversation on [GitHub Discussions](https://github.com/saffron-health/libretto/discussions).
+Have a question, idea, or want to share what you've built? Join the conversation on [Discord](https://discord.gg/NYrG56hVDt) for quick help or [GitHub Discussions](https://github.com/saffron-health/libretto/discussions) for longer-form threads.
 
 - **[Q&A](https://github.com/saffron-health/libretto/discussions/categories/q-a)** — Ask questions and get help
 - **[Ideas](https://github.com/saffron-health/libretto/discussions/categories/ideas)** — Suggest new features or improvements
