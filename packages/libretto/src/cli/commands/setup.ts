@@ -431,7 +431,7 @@ function copySkills(): void {
 
   if (agentDirs.length === 0) {
     console.log(
-      "\n⚠ No .agents/ or .claude/ directory found. Libretto skills were not installed.",
+      "\n⚠️ No .agents/ or .claude/ directory found. Libretto skills were not installed.",
     );
     console.log(
       "  Create one of these directories in your repo root and rerun `npx libretto setup` to install skills:",
