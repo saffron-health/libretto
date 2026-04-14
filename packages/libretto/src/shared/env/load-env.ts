@@ -33,12 +33,13 @@ function parseEnvFile(content: string): Record<string, string> {
     if (eqIndex === -1) continue;
     const key = withoutExport.slice(0, eqIndex).trim();
     let value = withoutExport.slice(eqIndex + 1).trim();
-    // Strip matching quotes
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
+    // Handle quoted values (with or without trailing inline comments)
+    const quote = value[0];
+    if (quote === '"' || quote === "'") {
+      const closeIndex = value.indexOf(quote, 1);
+      if (closeIndex !== -1) {
+        value = value.slice(1, closeIndex);
+      }
     } else {
       // Strip inline comments from unquoted values
       const commentIndex = value.search(/\s#/);
