@@ -8,4 +8,5 @@ export { GitHubIcon } from "./GitHubIcon";
 export { GitHubStarIcon } from "./GitHubStarIcon";
 export { KernelLogo } from "./KernelLogo";
 export { LinkedInIcon } from "./LinkedInIcon";
+export { NpmIcon } from "./NpmIcon";
 export { RefreshIcon } from "./RefreshIcon";

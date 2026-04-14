@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Text } from "./Text";
 import { Button } from "./Button";
-import { GitHubStarIcon } from "../icons";
+import { GitHubStarIcon, NpmIcon } from "../icons";
 import { AnimationTarget } from "./AnimationOrchestration";
-import { DISCUSSIONS_URL, RELEASES_URL, REPO_URL } from "../site";
+import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
 import { AppLink } from "../routing";
 import { MobileMenu } from "./MobileMenu";
 
@@ -73,6 +73,15 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
         </div>
         <div className="flex items-center gap-4">
           <a
+            href={NPM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Libretto on npm"
+            className="hidden text-ink/70 transition-colors hover:text-ink md:flex"
+          >
+            <NpmIcon width={36} height={14} />
+          </a>
+          <a
             href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
@@ -87,9 +96,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             Go to docs
           </Button>
           <div className="md:hidden">
-            <MobileMenu
-              stars={stars !== null ? formatStars(stars) : null}
-            />
+            <MobileMenu stars={stars !== null ? formatStars(stars) : null} />
           </div>
         </div>
       </div>

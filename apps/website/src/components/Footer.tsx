@@ -1,6 +1,6 @@
 import { Text } from "./Text";
-import { DiscordIcon, GitHubIcon, LinkedInIcon } from "../icons";
-import { DISCORD_URL, REPO_URL } from "../site";
+import { DiscordIcon, GitHubIcon, NpmIcon } from "../icons";
+import { DISCORD_URL, NPM_URL, REPO_URL } from "../site";
 
 export function Footer() {
   return (
@@ -12,13 +12,13 @@ export function Footer() {
         </Text>
         <div className="flex items-center gap-3">
           <a
-            href="https://www.linkedin.com/company/saffron-health"
+            href={NPM_URL}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Saffron Health on LinkedIn"
+            aria-label="Libretto on npm"
             className="text-muted/50 transition-colors hover:text-muted"
           >
-            <LinkedInIcon width={14} height={14} />
+            <NpmIcon width={28} height={12} />
           </a>
           <a
             href={DISCORD_URL}

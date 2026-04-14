@@ -638,16 +638,11 @@ export function KonamiOverlay({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: -4 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            style={
+            className={`inline-flex h-5 items-center justify-center rounded border px-1.5 py-0.5 transition-colors duration-200 ${
               completed
-                ? {
-                    color: "rgb(22, 163, 74)",
-                    borderColor: "rgba(22, 163, 74, 0.5)",
-                    transition: "color 0.2s, border-color 0.2s",
-                  }
-                : undefined
-            }
-            className="inline-flex h-5 items-center justify-center rounded border border-stone-300/60 px-1.5 py-0.5 text-stone-400/80"
+                ? "border-green-900/20 bg-green-500/15 text-green-950/80"
+                : "border-ink/[0.08] bg-ink/[0.025] text-ink/55"
+            }`}
           >
             {label}
           </motion.span>

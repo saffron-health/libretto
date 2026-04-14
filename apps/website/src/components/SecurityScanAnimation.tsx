@@ -113,7 +113,10 @@ function StepRow({
 
 function MockWebsitePanel() {
   return (
-    <div className="relative min-w-[76%] self-start flex-1 overflow-visible rounded-lg border border-ink/10 bg-white/60 sm:min-w-0">
+    <div
+      className="relative min-w-[76%] flex-1 overflow-visible rounded-lg border border-ink/10 bg-white/60 sm:min-w-0"
+      style={{ alignSelf: "safe center" }}
+    >
       {/* Placeholder layout lines */}
       <div className="flex flex-col gap-2 p-4 pt-5">
         {/* Nav bar suggestion */}
@@ -267,7 +270,7 @@ export function SecurityScanAnimation() {
   }, []);
 
   return (
-    <div className="flex h-full w-full flex-row items-start gap-3 overflow-hidden p-4 sm:items-center">
+    <div className="flex h-full w-full flex-row items-start gap-3 overflow-visible p-4 sm:items-center">
       {/* Left: checklist */}
       <motion.div
         layout

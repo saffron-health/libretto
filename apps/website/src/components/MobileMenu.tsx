@@ -7,8 +7,8 @@ import {
   Button as AriaButton,
 } from "react-aria-components";
 import { motion } from "motion/react";
-import { GitHubStarIcon } from "../icons";
-import { DISCUSSIONS_URL, RELEASES_URL, REPO_URL } from "../site";
+import { GitHubStarIcon, NpmIcon } from "../icons";
+import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
 import { CrossfadeIcon } from "./CrossfadeIcon";
 
 type AnimationState = "unmounted" | "hidden" | "visible";
@@ -130,6 +130,15 @@ export function MobileMenu({ stars }: { stars: string | null }) {
               className={itemClass}
             >
               Changelog
+            </MenuItem>
+            <MenuItem
+              href={NPM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={itemClass}
+            >
+              <NpmIcon width={28} height={12} />
+              npm
             </MenuItem>
             <MenuItem
               href={REPO_URL}
