@@ -1,8 +1,13 @@
 import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
+import { startStudio } from "cssstudio";
 import "./index.css";
 import { App } from "./App";
 import { IcosahedronDebug } from "./IcosahedronDebug";
+
+if (import.meta.env.DEV) {
+  startStudio();
+}
 
 const path = window.location.pathname;
 const DevAgentation = import.meta.env.DEV

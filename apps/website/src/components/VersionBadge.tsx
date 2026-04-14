@@ -20,18 +20,14 @@ function useNpmVersion(pkg: string) {
 export function VersionBadge() {
   const version = useNpmVersion("libretto");
 
+  if (version === null) {
+    return null;
+  }
+
   return (
     <div className="mb-8 flex items-center justify-center">
       <div className="inline-flex items-center gap-2 rounded-full border border-ink/12 bg-ink/[0.06] px-3 py-1 font-mono text-[11px] backdrop-blur-sm">
-        <span className="font-medium uppercase tracking-widest text-ink/60">
-          Beta
-        </span>
-        {version !== null && (
-          <>
-            <span className="inline-block size-1 rounded-full bg-ink/20" />
-            <span className="tabular-nums text-ink/50">v{version}</span>
-          </>
-        )}
+        <span className="tabular-nums text-ink/50">v{version}</span>
       </div>
     </div>
   );

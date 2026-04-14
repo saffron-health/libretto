@@ -1,10 +1,14 @@
-import { SectionHeading } from "./SectionHeading";
-import { Text } from "./Text";
+import type { ReactNode } from "react";
+import { SectionHeading } from "./SectionHeading.js";
+import { Text } from "./Text.js";
+import { RecordReplayAnimation } from "./RecordReplayAnimation.js";
+import { SecurityScanAnimation } from "./SecurityScanAnimation.js";
+import { CodebaseAnimation } from "./CodebaseAnimation.js";
 
 interface Feature {
   title: string;
   description: string;
-  gifPlaceholder: string;
+  animation: ReactNode;
 }
 
 const features: Feature[] = [
@@ -12,19 +16,19 @@ const features: Feature[] = [
     title: "Record user actions",
     description:
       "Libretto turns your browser actions and plain-language instructions into deterministic automation scripts.",
-    gifPlaceholder: "Recording user actions",
+    animation: <RecordReplayAnimation />,
   },
   {
     title: "Smart integration selection",
     description:
       "Libretto analyzes each site's security and structure to determine the right integration approach, combining browser automation with direct API requests.",
-    gifPlaceholder: "Scanning integration approaches",
+    animation: <SecurityScanAnimation />,
   },
   {
     title: "Native to your codebase",
     description:
       "Libretto generates deterministic TypeScript that follows your existing abstractions and lives alongside your application code.",
-    gifPlaceholder: "File tree with workflows",
+    animation: <CodebaseAnimation />,
   },
 ];
 
@@ -44,9 +48,7 @@ export function FeatureRows() {
             size="md"
             className="mx-auto max-w-[520px] leading-relaxed text-muted"
           >
-            Go from idea to production workflow in minutes, not days. Libretto
-            gives your agent everything it needs to inspect, record, and ship
-            browser integrations.
+            Go from idea to production workflow in minutes, not days.
           </Text>
         </div>
 
@@ -67,10 +69,8 @@ export function FeatureRows() {
                   </Text>
                 </div>
 
-                <div className="flex aspect-[4/3] w-full flex-1 items-center justify-center rounded-xl border border-ink/8 bg-ink/[0.03]">
-                  <Text size="sm" className="text-faint select-none">
-                    {feature.gifPlaceholder}
-                  </Text>
+                <div className="flex aspect-[4/3] w-full flex-1 items-center justify-center overflow-hidden rounded-xl border border-ink/8 bg-ink/[0.03]">
+                  {feature.animation}
                 </div>
               </div>
             );

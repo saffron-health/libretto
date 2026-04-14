@@ -19,7 +19,7 @@ export default defineConfig([
     dts: true,
     bundle: false,
     minify: false,
-    clean: true,
+    clean: ["!cli/**"],
     outDir: "dist",
   },
   {
@@ -28,7 +28,7 @@ export default defineConfig([
     dts: false,
     bundle: false,
     minify: false,
-    clean: false,
+    clean: true,
     outDir: "dist/cli",
     onSuccess: async () => {
       ensureCliShebang();
