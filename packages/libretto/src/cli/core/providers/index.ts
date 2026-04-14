@@ -2,9 +2,10 @@ import { readLibrettoConfig } from "../config.js";
 import { createBrowserbaseProvider } from "./browserbase.js";
 import { createKernelProvider } from "./kernel.js";
 import { createLibrettoCloudProvider } from "./libretto-cloud.js";
+import { createSteelProvider } from "./steel.js";
 import type { ProviderApi } from "./types.js";
 
-const VALID_PROVIDERS = new Set(["local", "kernel", "browserbase", "libretto-cloud"] as const);
+const VALID_PROVIDERS = new Set(["local", "kernel", "browserbase", "libretto-cloud", "steel"] as const);
 export type ProviderName =
   typeof VALID_PROVIDERS extends Set<infer T> ? T : never;
 
@@ -49,6 +50,8 @@ export function getCloudProviderApi(name: string): ProviderApi {
       return createKernelProvider();
     case "browserbase":
       return createBrowserbaseProvider();
+    case "steel":
+      return createSteelProvider();
     case "libretto-cloud":
       console.warn(
         "Note: The libretto-cloud provider is in alpha.",
@@ -56,7 +59,7 @@ export function getCloudProviderApi(name: string): ProviderApi {
       return createLibrettoCloudProvider();
     default:
       throw new Error(
-        `Unknown provider "${name}". Valid cloud providers: kernel, browserbase`,
+        `Unknown provider "${name}". Valid cloud providers: kernel, browserbase, steel`,
       );
   }
 }
