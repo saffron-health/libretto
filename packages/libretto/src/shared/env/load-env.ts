@@ -45,6 +45,7 @@ function parseEnvFile(content: string): Record<string, string> {
       if (commentIndex >= 0) {
         value = value.slice(0, commentIndex).trimEnd();
       }
+    }
     vars[key] = value;
   }
   return vars;
