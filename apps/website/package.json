@@ -36,6 +36,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "agentation": "^3.0.2",
     "cssstudio": "^0.2.0",
+    "html2canvas-pro": "^2.0.2",
     "knip": "^6.0.6",
     "libretto": "workspace:*",
     "typescript": "~5.9.3",

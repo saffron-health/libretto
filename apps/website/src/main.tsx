@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import { App } from "./App";
 import { IcosahedronDebug } from "./IcosahedronDebug";
+import { OgImage } from "./OgImage";
 
 // Temporarily disabled.
 // if (import.meta.env.DEV) {
@@ -18,7 +19,9 @@ const DevAgentation = import.meta.env.DEV
 
 createRoot(document.getElementById("app")!).render(
   <StrictMode>
-    {path === "/icosahedron" ? (
+    {path === "/og-image" ? (
+      <OgImage />
+    ) : path === "/icosahedron" ? (
       <IcosahedronDebug />
     ) : (
       <>
