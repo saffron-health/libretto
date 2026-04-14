@@ -230,6 +230,40 @@ body {
   font-weight: 500;
 }
 
+.libretto-button--secondary {
+  background: transparent;
+  color: var(--color-muted);
+  font-weight: 500;
+  padding: 0;
+  min-height: unset;
+  border-radius: 0;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--color-muted);
+  text-decoration-thickness: 1.5px;
+  transition: color 85ms ease-out, text-decoration-color 85ms ease-out;
+}
+
+.libretto-button--secondary:hover {
+  background: transparent;
+  color: var(--color-ink);
+  box-shadow: none;
+  text-decoration-color: oklch(0.55 0.15 175);
+}
+
+.libretto-button--secondary:focus-visible {
+  box-shadow: 0 0 0 2px oklch(0.55 0.15 175 / 0.4);
+}
+
+.libretto-button--secondary:active {
+  background: transparent;
+  color: var(--color-ink);
+  box-shadow: none;
+  transform: none;
+  text-decoration-color: oklch(0.55 0.15 175);
+}
+
 @keyframes blink {
   0%,
   100% {

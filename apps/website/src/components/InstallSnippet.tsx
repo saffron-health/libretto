@@ -21,7 +21,7 @@ export function InstallSnippet() {
           onClick={handleCopy}
           className="copy-icon-btn absolute top-2.5 right-2.5 size-7 flex items-center justify-center rounded-lg"
         >
-          <div className="relative">
+          <div className="relative size-[18px] shrink-0">
             <div
               className={classnames(
                 "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out will-change-[opacity,filter,scale]",
@@ -32,11 +32,11 @@ export function InstallSnippet() {
             </div>
             <div
               className={classnames(
-                "flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out will-change-[opacity,filter,scale]",
+                "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out will-change-[opacity,filter,scale]",
                 copied ? "scale-[0.25] opacity-0" : "scale-100 opacity-100",
               )}
             >
-              <CopyIcon width={18} height={18} />
+              <CopyIcon width={18} height={18} className="translate-y-px" />
             </div>
           </div>
         </button>

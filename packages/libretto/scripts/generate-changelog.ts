@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { Agent, type AgentTool, type AgentEvent } from "@mariozechner/pi-agent-core";
 import { getModel } from "@mariozechner/pi-ai";
-import { Type } from "@sinclair/typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 const tag = process.argv[2];
 if (!tag) {
@@ -17,6 +17,11 @@ if (!process.env.ANTHROPIC_API_KEY) {
 
 const ALLOWED_GH_SUBCOMMANDS = new Set(["pr", "release", "repo", "issue"]);
 const ALLOWED_ACTIONS = new Set(["list", "view", "diff", "status", "checks"]);
+const GhToolParamsSchema = Type.Object({
+  args: Type.String({ description: "Arguments to pass to gh (without the leading 'gh')" }),
+});
+
+type GhToolParams = Static<typeof GhToolParamsSchema>;
 
 const ghTool: AgentTool = {
   name: "gh",
@@ -27,11 +32,9 @@ const ghTool: AgentTool = {
     "'pr view 128 --json title,body,files', 'pr diff 128'.",
     "Only read operations are allowed (list, view, diff, etc.). Mutating commands will be rejected.",
   ].join(" "),
-  parameters: Type.Object({
-    args: Type.String({ description: "Arguments to pass to gh (without the leading 'gh')" }),
-  }),
-  execute: async (_toolCallId, rawParams) => {
-    const params = rawParams as { args: string };
+  parameters: GhToolParamsSchema,
+  execute: async (_toolCallId: string, rawParams: unknown) => {
+    const params = rawParams as GhToolParams;
     const args = params.args.trim();
     const parts = args.split(/\s+/);
     const subcommand = parts[0];

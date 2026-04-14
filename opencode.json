@@ -4,5 +4,17 @@
     "explore": {
       "disable": true
     }
+  },
+  "mcp": {
+    "css-studio": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "cssstudio"
+      ],
+      "enabled": true,
+      "environment": {}
+    }
   }
 }

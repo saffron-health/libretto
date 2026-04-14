@@ -5,7 +5,7 @@ import { Text } from "./Text";
 /** Matches TEAL_OUTER in CanvasAsciihedron */
 const teal = "rgba(40, 190, 160, 1)";
 
-/** Git-merge / branching tree — represents deterministic code paths */
+/** Dice icon — represents deterministic outcomes */
 function MergeIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -15,34 +15,25 @@ function MergeIcon({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
     >
-      {/* Main trunk + primary branch */}
-      <path
+      <rect
+        x="5.25"
+        y="5.25"
+        width="13.5"
+        height="13.5"
+        rx="3"
         stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
         strokeWidth="1.5"
-        d="m4.75 19.25 7.25-5V5"
       />
-      {/* Secondary branch + arrowhead — teal accent */}
-      <path
-        stroke={teal}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-        d="m14 15.63 5.25 3.62"
-      />
-      <path
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-        d="m8.75 8.25L12 4.75l3.25 3.5"
-      />
+      <circle cx="9.25" cy="9.25" r="1.1" fill="currentColor" />
+      <circle cx="14.75" cy="9.25" r="1.1" fill={teal} />
+      <circle cx="12" cy="12" r="1.1" fill="currentColor" />
+      <circle cx="9.25" cy="14.75" r="1.1" fill={teal} />
+      <circle cx="14.75" cy="14.75" r="1.1" fill="currentColor" />
     </svg>
   );
 }
 
-/** Stacked layers with drill-down arrow — represents stepping through code */
+/** Clock with loop arrow — represents repeatable debugging */
 function LayersIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -52,27 +43,39 @@ function LayersIcon({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
     >
-      {/* Layer shapes */}
-      <path
-        d="M8.09615 9.5L4.75 11L9 12.9052M8.09615 9.5L4.75 8L12 4.75L19.25 8L15.9038 9.5M8.09615 9.5L12 11.25L15.9038 9.5M15.9038 9.5L19.25 11L15 12.9052"
+      <circle
+        cx="12"
+        cy="12"
+        r="4.75"
         stroke="currentColor"
         strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
       />
-      {/* Down arrow — teal accent */}
       <path
-        d="M12 13.75V19.25M12 19.25L9.75 16.75M12 19.25L14.25 16.75"
-        stroke={teal}
-        strokeWidth="1.5"
+        d="M12 9.5V12L13.75 13.75"
+        stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+      <path
+        stroke={teal}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        d="M7.25 7.75H4.75V5.25"
+      />
+      <path
+        d="M4.95 8.05A8 8 0 1 1 5.1 16.6"
+        stroke={teal}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
       />
     </svg>
   );
 }
 
-/** Arrow entering a contained box — represents viewing into a restricted space */
+/** Eye icon — represents safe observation without interaction */
 function LogInIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -82,29 +85,14 @@ function LogInIcon({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
     >
-      {/* Box outline */}
       <path
+        d="M3.25 12C4.9 8.95 8.12 7 12 7C15.88 7 19.1 8.95 20.75 12C19.1 15.05 15.88 17 12 17C8.12 17 4.9 15.05 3.25 12Z"
         stroke="currentColor"
+        strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="1.5"
-        d="M9.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H9.75"
       />
-      {/* Arrow + chevron — teal accent */}
-      <path
-        stroke={teal}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-        d="M9.75 8.75L13.25 12L9.75 15.25"
-      />
-      <path
-        stroke={teal}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-        d="M13 12H4.75"
-      />
+      <circle cx="12" cy="12" r="2.25" stroke={teal} strokeWidth="1.5" />
     </svg>
   );
 }
@@ -149,9 +137,8 @@ export function MaintainingFeatures() {
             size="md"
             className="mx-auto max-w-[520px] leading-relaxed text-muted"
           >
-            Browser automations inevitably hit unexpected edge cases, from UI
-            changes to unanticipated site behavior. Libretto makes them easy to
-            diagnose and fast to fix.
+            Browser automations inevitably hit unexpected edge cases, and
+            Libretto makes them easy to diagnose and fast to fix.
           </Text>
         </div>
 
@@ -159,7 +146,7 @@ export function MaintainingFeatures() {
           {features.map((f, i) => (
             <Fragment key={f.title}>
               {i > 0 && (
-                <div className="hidden md:block w-px self-stretch bg-ink/10" />
+                <div className="hidden w-px self-center bg-ink/10 md:block md:h-[60%]" />
               )}
               <div className="px-2">
                 <div className="mb-4">{f.icon}</div>

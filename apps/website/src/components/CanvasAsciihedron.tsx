@@ -76,7 +76,7 @@ const ZOOM = 190;
 const TILT_X = 0;
 const TILT_Z = Math.PI / 9;
 const SPIN_SPEED = 0.00036;
-const LIGHT_DIRECTION = normalize([0.85, 0.95, 0.65]);
+const LIGHT_DIRECTION = normalize([0, 0.85, 0.65]);
 const FACE_BORDER_BOOST = 1;
 
 const POINTER_POSITION_LERP = 0.14;
@@ -721,11 +721,13 @@ export function CanvasAsciihedron({
       spinSpeed: SPIN_SPEED,
       cameraDistance: CAMERA_DISTANCE,
       zoom: ZOOM,
-      baseOpacity: 0.08,
+      baseOpacity: 0.12,
       faceBorderBoost: FACE_BORDER_BOOST,
+      depthMin: 0.15,
+      depthMax: 0.9,
       // Scramble
       innerRadius: 1,
-      outerRadius: 2,
+      outerRadius: 3,
       scrambleSpeed: 80,
       innerDensity: 40,
       outerDensity: 15,
@@ -791,6 +793,18 @@ export function CanvasAsciihedron({
       min: 0,
       max: 5,
       step: 1,
+    });
+    renderFolder?.addBinding(params, "depthMin", {
+      label: "Depth Min α",
+      min: 0,
+      max: 1,
+      step: 0.01,
+    });
+    renderFolder?.addBinding(params, "depthMax", {
+      label: "Depth Max α",
+      min: 0,
+      max: 1,
+      step: 0.01,
     });
 
     const scrambleFolder = pane?.addFolder({ title: "Scramble" });
@@ -1105,6 +1119,18 @@ export function CanvasAsciihedron({
         params.faceBorderBoost,
       );
 
+      // Compute visible depth range for depth-based opacity
+      let depthMin = Infinity;
+      let depthMax = -Infinity;
+      for (let i = 0; i < CELL_COUNT; i += 1) {
+        if (shadeBuffer[i] >= 0) {
+          const d = zBuffer[i];
+          if (d < depthMin) depthMin = d;
+          if (d > depthMax) depthMax = d;
+        }
+      }
+      const depthRange = depthMax - depthMin || 1;
+
       const rawCellWidth = width / COLS;
       const rawCellHeight = height / ROWS;
       const cellSize = Math.min(rawCellWidth, rawCellHeight);
@@ -1190,13 +1216,12 @@ export function CanvasAsciihedron({
       const BASE_OPACITY = params.baseOpacity;
       const TEAL_INNER = `rgba(0, 140, 120, 1)`;
       const TEAL_OUTER = `rgba(40, 190, 160, 1)`;
-      const BASE_COLOR = `rgba(${glyphR}, ${glyphG}, ${glyphB}, ${BASE_OPACITY})`;
 
-      // Glow pass (additive)
+
+      // Glow pass (additive) — depth-modulated
       context.save();
       context.scale(glyphScaleX, 1);
       context.globalCompositeOperation = "lighter";
-      context.fillStyle = BASE_COLOR;
 
       for (let row = minY; row <= maxY; row += 1) {
         const rowOffset = row * COLS;
@@ -1207,6 +1232,10 @@ export function CanvasAsciihedron({
           const owner = ownerBuffer[index];
           const baseX = gridOffsetX + (col + 0.5) * cellWidth;
           const baseY = gridOffsetY + (row + 0.5) * cellHeight;
+          // Closer (higher invDepth) → stronger, further → weaker
+          const depthT = (zBuffer[index] - depthMin) / depthRange;
+          const depthAlpha = BASE_OPACITY * (params.depthMin + (params.depthMax - params.depthMin) * depthT);
+          context.fillStyle = `rgba(${glyphR}, ${glyphG}, ${glyphB}, ${depthAlpha})`;
           const char = getShadeCharacter(shadeIndex, owner);
           context.fillText(char, baseX / glyphScaleX, baseY);
         }
@@ -1238,7 +1267,10 @@ export function CanvasAsciihedron({
             const char = getScrambledChar(shadeIndex, col, row);
             context.fillText(char, baseX / glyphScaleX, baseY);
           } else {
-            context.fillStyle = BASE_COLOR;
+            // Closer (higher invDepth) → darker/more opaque
+            const depthT = (zBuffer[index] - depthMin) / depthRange;
+            const depthAlpha = BASE_OPACITY * (params.depthMin + (params.depthMax - params.depthMin) * depthT);
+            context.fillStyle = `rgba(${glyphR}, ${glyphG}, ${glyphB}, ${depthAlpha})`;
             const char = getShadeCharacter(shadeIndex, owner);
             context.fillText(char, baseX / glyphScaleX, baseY);
           }
