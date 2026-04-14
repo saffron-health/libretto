@@ -39,8 +39,13 @@ function parseEnvFile(content: string): Record<string, string> {
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1);
+    } else {
+      // Strip inline comments from unquoted values
+      const commentIndex = value.search(/\s#/);
+      if (commentIndex >= 0) {
+        value = value.slice(0, commentIndex).trimEnd();
+      }
     }
-    vars[key] = value;
   }
   return vars;
 }
