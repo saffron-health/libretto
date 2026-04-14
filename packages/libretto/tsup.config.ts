@@ -19,7 +19,7 @@ export default defineConfig([
     dts: true,
     bundle: false,
     minify: false,
-    clean: ["!cli/**"],
+    clean: ["**", "!cli/**"],
     outDir: "dist",
   },
   {
