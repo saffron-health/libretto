@@ -55,6 +55,9 @@ type CanvasAsciihedronProps = {
   className?: string;
   showAnnotations?: boolean;
   objectScale?: number;
+  spinSpeed?: number;
+  initialAngle?: number;
+  baseOpacity?: number;
 };
 
 const COLS = 160;
@@ -656,6 +659,9 @@ export function CanvasAsciihedron({
   className = "",
   showAnnotations = true,
   objectScale = 1,
+  spinSpeed: spinSpeedProp,
+  initialAngle: initialAngleProp,
+  baseOpacity: baseOpacityProp,
   paneUnlocked = false,
   onClosePane,
 }: CanvasAsciihedronProps & {
@@ -700,7 +706,7 @@ export function CanvasAsciihedron({
     let devicePixelRatio = 1;
     let frameId = 0;
     let previousTime = 0;
-    let angle = Math.PI / 10;
+    let angle = initialAngleProp ?? Math.PI / 10;
     let lastPointerX = 0;
     let lastPointerY = 0;
     let lastPointerTime = 0;
@@ -713,10 +719,10 @@ export function CanvasAsciihedron({
 
     const params = {
       // Rendering
-      spinSpeed: SPIN_SPEED,
+      spinSpeed: spinSpeedProp ?? SPIN_SPEED,
       cameraDistance: CAMERA_DISTANCE,
       zoom: ZOOM,
-      baseOpacity: 0.12,
+      baseOpacity: baseOpacityProp ?? 0.12,
       faceBorderBoost: FACE_BORDER_BOOST,
       depthMin: 0.15,
       depthMax: 0.9,
@@ -1303,7 +1309,7 @@ export function CanvasAsciihedron({
       window.removeEventListener("mouseout", handleWindowMouseOut);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [objectScale, paneUnlocked, onClosePane]);
+  }, [objectScale, spinSpeedProp, initialAngleProp, baseOpacityProp, paneUnlocked, onClosePane]);
 
   return (
     <div ref={containerRef} className={`relative overflow-hidden ${className}`}>

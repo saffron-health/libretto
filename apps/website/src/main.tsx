@@ -12,13 +12,22 @@ import { IcosahedronDebug } from "./IcosahedronDebug";
 // }
 
 const path = window.location.pathname;
+
+// Dev-only lazy imports — fully tree-shaken from production builds
 const DevAgentation = import.meta.env.DEV
   ? lazy(() => import("agentation").then((module) => ({ default: module.Agentation })))
+  : null;
+const DevOgImage = import.meta.env.DEV
+  ? lazy(() => import("./OgImage").then((m) => ({ default: m.OgImage })))
   : null;
 
 createRoot(document.getElementById("app")!).render(
   <StrictMode>
-    {path === "/icosahedron" ? (
+    {path === "/og-image" && DevOgImage ? (
+      <Suspense fallback={null}>
+        <DevOgImage />
+      </Suspense>
+    ) : path === "/icosahedron" ? (
       <IcosahedronDebug />
     ) : (
       <>
