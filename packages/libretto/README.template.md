@@ -102,6 +102,10 @@ Join our Discord to connect with other developers, get help, and share what you'
 
 For longer-form threads, head to [GitHub Discussions](https://github.com/saffron-health/libretto/discussions). Found a bug? [Open an issue](https://github.com/saffron-health/libretto/issues/new).
 
+## License
+
+[MIT License](LICENSE) — use it freely in commercial and open-source projects.
+
 ## Development
 
 For local development in this repository:
