@@ -75,20 +75,13 @@ Agents can use Libretto to reproduce the failure, pause the workflow at any poin
 You can also use Libretto directly from the command line. All commands accept `--session <name>` to target a specific session.
 
 ```bash
-npx libretto setup                         # interactive first-run onboarding; run yourself, not through an agent
-npx libretto status                        # check AI config health and open sessions
-npx libretto open <url>                    # launch browser and open a URL (headed by default)
-npx libretto snapshot --objective "..." --context "..."  # capture PNG + HTML and analyze with an LLM
-npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page (single quoted argument)
-echo "<code>" | npx libretto exec -        # intentionally read Playwright TypeScript from stdin
-npx libretto run <file>                    # run the file's default-exported workflow
-npx libretto resume                        # resume a paused workflow
-npx libretto pages                         # list open pages in the session
-npx libretto save <domain>                 # save browser session (cookies, localStorage) for reuse
+npx libretto open <url>                    # launch browser and open a URL
+npx libretto snapshot --objective "..."    # capture PNG + HTML and analyze with an LLM
+npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page
 npx libretto close                         # close the browser
-npx libretto ai configure <provider>       # manually change snapshot analysis model
-npx libretto status                        # show AI config and open sessions
 ```
+
+Run `npx libretto help` for the full list of commands.
 
 ## Configuration
 
