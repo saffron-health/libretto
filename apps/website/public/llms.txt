@@ -1,0 +1,57 @@
+# Libretto
+
+> The AI Toolkit for Building Robust Web Integrations
+
+An agent skill and token-efficient CLI that inspects live pages, reverse-engineers network requests, and ships production-ready integration workflows.
+
+## Links
+
+- [Documentation](https://libretto.sh/docs/get-started/introduction)
+- [GitHub](https://github.com/saffron-health/libretto)
+- [npm](https://www.npmjs.com/package/libretto)
+- [Discord](https://discord.gg/NYrG56hVDt)
+
+## Installation
+
+```
+npx libretto
+```
+
+## Features
+
+### Build new automations easily
+
+Go from idea to production workflow in minutes, not days.
+
+- **Record user actions**: Libretto turns your browser actions and plain-language instructions into deterministic automation scripts.
+- **Smart integration selection**: Libretto analyzes each site's security and structure to determine the right integration approach, combining browser automation with direct API requests.
+- **Native to your codebase**: Libretto generates deterministic TypeScript that follows your existing abstractions and lives alongside your application code.
+
+### Effortless debugging
+
+Browser automations inevitably hit unexpected edge cases, and Libretto makes them easy to diagnose and fast to fix.
+
+- **Deterministic failures**: Runtime agents introduce nondeterminism that makes failures hard to reproduce. Libretto generates deterministic code, so failures are repeatable and easy to fix.
+- **Agent-friendly debugging**: When something breaks, the agent reruns the workflow and inserts pause statements to step through and debug the failure, just like a developer would.
+- **Read-only mode**: Enable read-only mode to restrict the agent to only observing the page. It won't fill out incorrect information or submit something unexpected.
+
+### Cloud providers
+
+The CLI has built-in support for Browserbase and Kernel to spin up browser sessions directly. Libretto can also connect to any browser that exposes a CDP endpoint. Deploy wherever you want — AWS, GCP, or any cloud provider.
+
+## FAQ
+
+### What is Libretto?
+Libretto is an open-source toolkit for building browser automations. It gives your coding agent a live browser and a CLI to inspect pages, capture network traffic, record user actions, and turn them into deterministic automation scripts.
+
+### How is it different from existing tools like Stagehand or Browser-Use?
+Libretto is a CLI and skill that gives your coding agent tools to build new automations and debug scripts that fail. Tools like Stagehand and Browser-Use use AI at runtime to handle edge cases without human involvement. They also rely entirely on UI interactions, which makes them slow, expensive, and nondeterministic. Libretto generates deterministic scripts that can use both UI automation and direct network requests. When a script breaks, you use Libretto to diagnose and fix it. You can still add AI runtime logic since it's all just TypeScript, but it's not the default.
+
+### What cloud providers do you support?
+The CLI has built-in support for Browserbase and Kernel to spin up browser sessions directly. Libretto can also connect to any browser that exposes a CDP endpoint, so you can run scripts against any arbitrary browser. Since the code lives in your repo, you can deploy it wherever you want, like AWS or GCP.
+
+### Is it open source?
+Yes, fully open source under the MIT license.
+
+### Where can I get help?
+Jump into the Discord for quick help, open an issue on GitHub, or read through the docs.
