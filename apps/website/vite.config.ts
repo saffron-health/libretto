@@ -6,20 +6,16 @@ import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const llmsContent = readFileSync(resolve(__dirname, "public/llms.txt"), "utf-8");
 
-function markdownAccept(): Plugin {
+function llmsMarkdownContentType(): Plugin {
   return {
-    name: "markdown-accept",
+    name: "llms-markdown-content-type",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const accept = req.headers.accept ?? "";
-        if (accept.includes("text/markdown")) {
-          const content = readFileSync(
-            resolve(__dirname, "public/llms.txt"),
-            "utf-8",
-          );
+        if (req.url === "/llms.txt") {
           res.setHeader("Content-Type", "text/markdown; charset=utf-8");
-          res.end(content);
+          res.end(llmsContent);
           return;
         }
         next();
@@ -29,7 +25,7 @@ function markdownAccept(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [markdownAccept(), tailwindcss(), react()],
+  plugins: [llmsMarkdownContentType(), tailwindcss(), react()],
   build: {
     rollupOptions: {
       input: fileURLToPath(new URL("./index.html", import.meta.url)),
