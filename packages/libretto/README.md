@@ -7,11 +7,6 @@
 [![GitHub Discussions](https://img.shields.io/github/discussions/saffron-health/libretto)](https://github.com/saffron-health/libretto/discussions)
 [![Discord](https://img.shields.io/badge/Discord-Join%20chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/NYrG56hVDt)
 
-- Website: [libretto.sh](https://libretto.sh)
-- Repository: [github.com/saffron-health/libretto](https://github.com/saffron-health/libretto)
-- Docs: [libretto.sh/docs](https://libretto.sh/docs)
-- Discord: [discord.gg/NYrG56hVDt](https://discord.gg/NYrG56hVDt)
-
 Libretto is a toolkit for building robust web integrations. It gives your coding agent a live browser and a token-efficient CLI to:
 
 - Inspect live pages with minimal context overhead
@@ -22,6 +17,13 @@ Libretto is a toolkit for building robust web integrations. It gives your coding
 We at [Saffron Health](https://saffron.health) built Libretto to help us maintain our browser integrations to common healthcare software. We're open-sourcing it so other teams have an easier time doing the same thing.
 
 https://github.com/user-attachments/assets/9b9a0ab3-5133-4b20-b3be-459943349d18
+
+### Quick Links
+
+- Website: [libretto.sh](https://libretto.sh)
+- Docs: [libretto.sh/docs](https://libretto.sh/docs)
+- Repository: [github.com/saffron-health/libretto](https://github.com/saffron-health/libretto)
+- Discord: [discord.gg/NYrG56hVDt](https://discord.gg/NYrG56hVDt)
 
 ## Installation
 
@@ -92,69 +94,15 @@ npx libretto status                        # show AI config and open sessions
 
 ## Configuration
 
-All Libretto state lives in a `.libretto/` directory at your project root. Configuration is stored in `.libretto/config.json`.
+All Libretto state lives in a `.libretto/` directory at your project root. See the [configuration docs](https://libretto.sh/docs/configuration) for details on config files, sessions, and profiles.
 
-### Config file
+## Join the Community
 
-`.libretto/config.json` controls snapshot analysis and viewport settings:
+Join our Discord to connect with other developers, get help, and share what you've built:
 
-```json
-{
-  "version": 1,
-  "ai": {
-    "model": "openai/gpt-5.4",
-    "updatedAt": "2026-01-01T00:00:00.000Z"
-  },
-  "viewport": { "width": 1280, "height": 800 }
-}
-```
+[![Discord](https://img.shields.io/badge/Discord-Join%20chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/NYrG56hVDt)
 
-The `ai` field configures which model Libretto uses for snapshot analysis — extracting selectors, identifying interactive elements, or diagnosing why a step failed. This keeps heavy visual context out of your coding agent's context window. Snapshot analysis is required.
-
-`npx libretto setup` automatically pins the default model for the first provider whose credentials it finds. To explicitly change the provider or model afterward:
-
-```bash
-npx libretto ai configure <openai | anthropic | gemini | vertex>
-```
-
-To inspect the current configuration without changing anything:
-
-```bash
-npx libretto status
-```
-
-Provider credentials are read from environment variables or a `.env` file at your **repository root** (next to your `.git` directory): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`, or `GOOGLE_CLOUD_PROJECT` for Vertex. Set `LIBRETTO_DISABLE_DOTENV=1` to skip `.env` loading.
-
-The `viewport` field sets the default browser viewport size. Both fields are optional.
-
-### Sessions
-
-Each Libretto session gets its own directory under `.libretto/sessions/<name>/` containing runtime state. Sessions are git-ignored.
-
-- `state.json` — session metadata (debug port, PID, status)
-- `logs.jsonl` — structured session logs
-- `network.jsonl` — captured network requests
-- `actions.jsonl` — recorded user actions
-- `snapshots/` — screenshot PNGs and HTML snapshots
-
-### Profiles
-
-Profiles save browser sessions (cookies, localStorage) so you can reuse authenticated state across runs. They are stored in `.libretto/profiles/<domain>.json`, created via `npx libretto save <domain>`. Profiles are machine-local and git-ignored.
-
-## Community
-
-Have a question, idea, or want to share what you've built? Join the conversation on [Discord](https://discord.gg/NYrG56hVDt) for quick help or [GitHub Discussions](https://github.com/saffron-health/libretto/discussions) for longer-form threads.
-
-- **[Q&A](https://github.com/saffron-health/libretto/discussions/categories/q-a)** — Ask questions and get help
-- **[Ideas](https://github.com/saffron-health/libretto/discussions/categories/ideas)** — Suggest new features or improvements
-- **[Show and tell](https://github.com/saffron-health/libretto/discussions/categories/show-and-tell)** — Share your workflows and automations
-- **[General](https://github.com/saffron-health/libretto/discussions/categories/general)** — Chat about anything Libretto-related
-
-Found a bug? Please [open an issue](https://github.com/saffron-health/libretto/issues/new).
-
-## Authors
-
-Maintained by the team at [Saffron Health](https://saffron.health).
+For longer-form threads, head to [GitHub Discussions](https://github.com/saffron-health/libretto/discussions). Found a bug? [Open an issue](https://github.com/saffron-health/libretto/issues/new).
 
 ## Development
 
@@ -179,3 +127,10 @@ Source layout:
 Run `pnpm sync:mirrors` after editing `README.template.md` or anything under `skills/libretto/`.
 
 To check that generated READMEs, skill mirrors, and skill version metadata are in sync without fixing them, run `pnpm check:mirrors`. To release, run `pnpm prepare-release`.
+
+---
+
+> [!NOTE]
+> This is an early-stage project under active development. APIs may change before version 1.0. We recommend pinning to specific versions in production.
+
+Built by the team at [Saffron Health](https://saffron.health).
