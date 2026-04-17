@@ -19,7 +19,7 @@ export function CTA() {
           <Button href="/docs/get-started/introduction">Go to docs</Button>
           <div className="flex items-center gap-2">
             <span className="text-sm text-faint">or</span>
-            <Button href="https://cal.com/team/saffron-health/libretto-demo" variant="secondary">talk to a dev</Button>
+            <Button href="https://cal.com/team/saffron-health/libretto-demo" variant="secondary">book a demo</Button>
           </div>
         </div>
       </div>
