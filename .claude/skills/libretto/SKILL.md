@@ -34,7 +34,7 @@ metadata:
 - Defer repo/code review until you begin generating code, unless the user explicitly asks for it earlier.
 - Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code.
 - Validation requires a successful clean `run --headless` with confirmation of the actual returned output, not just process success. If the user wants to watch the finished workflow, do a final headed `run` after headless validation succeeds.
-- After validation, always present the user with a ready-to-run command they can copy-paste to test the workflow themselves (e.g. `npx libretto run ./workflow.ts --headed --params '{"key":"value"}'`). Include `--headed` so they can watch the browser, and include any `--params` or `--auth-profile` flags the workflow needs.
+- After validation, always show the user: (1) the output/results from the headless validation run, and (2) a headed version of the same command so they can re-run it themselves and watch the browser (e.g. replace `--headless` with `--headed`). Include any `--params` or `--auth-profile` flags the workflow needs.
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
@@ -218,7 +218,9 @@ Assistant: [Reads `references/code-generation-rules.md` before writing productio
 Assistant: I found the working path. I'll now create the workflow file and verify it.
 Assistant: [Creates or edits `target-workflow.ts` following `references/code-generation-rules.md`]
 Assistant: [Runs `npx libretto run ./target-workflow.ts --headless --params '{"status":"open"}'` to validate]
-Assistant: Headless validation passed. Here is the command to test-run the workflow yourself in a visible browser:
+Assistant: Validation passed. Here are the results:
+[Shows the output/results from the headless run]
+To watch it yourself in a browser:
 ```
 npx libretto run ./target-workflow.ts --headed --params '{"status":"open"}'
 ```
@@ -239,7 +241,9 @@ Assistant: [Reads `references/code-generation-rules.md` before patching the work
 Assistant: I found the issue. I'll patch the workflow code and verify.
 Assistant: [Edits `integration.ts` following `references/code-generation-rules.md`]
 Assistant: [Runs `npx libretto run ./integration.ts --headless` to validate the fix]
-Assistant: Fix verified. Here is the command to test-run the workflow yourself:
+Assistant: Fix verified. Here are the results:
+[Shows the output/results from the headless run]
+To watch it yourself in a browser:
 ```
 npx libretto run ./integration.ts --headed
 ```
