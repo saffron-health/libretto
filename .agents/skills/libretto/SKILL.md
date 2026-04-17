@@ -220,10 +220,7 @@ Assistant: [Creates or edits `target-workflow.ts` following `references/code-gen
 Assistant: [Runs `npx libretto run ./target-workflow.ts --headless --params '{"status":"open"}'` to validate]
 Assistant: Validation passed. Here are the results:
 [Shows the output/results from the headless run]
-To watch it yourself in a browser:
-```
-npx libretto run ./target-workflow.ts --headed --params '{"status":"open"}'
-```
+To watch it yourself in a browser, run: npx libretto run ./target-workflow.ts --headed --params '{"status":"open"}'
 </example>
 ```
 
@@ -243,10 +240,7 @@ Assistant: [Edits `integration.ts` following `references/code-generation-rules.m
 Assistant: [Runs `npx libretto run ./integration.ts --headless` to validate the fix]
 Assistant: Fix verified. Here are the results:
 [Shows the output/results from the headless run]
-To watch it yourself in a browser:
-```
-npx libretto run ./integration.ts --headed
-```
+To watch it yourself in a browser, run: npx libretto run ./integration.ts --headed
 </example>
 ```
 
