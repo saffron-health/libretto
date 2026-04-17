@@ -1,4 +1,4 @@
-import type { BrowserContext } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { cwd } from "node:process";
@@ -176,6 +176,131 @@ async function loadDefaultWorkflow(
   );
 }
 
+// ---------------------------------------------------------------------------
+// tsx/esbuild __name shim for page.evaluate and similar Playwright APIs
+// ---------------------------------------------------------------------------
+// When tsx compiles TypeScript with keepNames: true, it wraps functions with
+// __name(...) calls. Playwright serializes callback arguments to these APIs
+// via Function#toString() and evaluates them in the browser context, which
+// does not have __name defined. We intercept these methods and prepend a
+// no-op __name polyfill so the serialized source executes correctly.
+// ---------------------------------------------------------------------------
+
+const __NAME_SHIM = [
+  "const __name = (target, value) =>",
+  "  Object.defineProperty(target, 'name', { value, configurable: true });",
+].join(" ");
+
+/**
+ * Methods on Page/Frame that serialize a JS callback into the browser context.
+ */
+const EVALUATE_METHOD_NAMES = [
+  "evaluate",
+  "evaluateHandle",
+  "waitForFunction",
+  "$eval",
+  "$$eval",
+] as const;
+
+/**
+ * Wrap a function so that when Playwright serializes it, the source includes
+ * a __name shim. We create a wrapper whose toString() output prepends the shim
+ * before the original function body.
+ */
+function shimCallback<T>(fn: T): T {
+  if (typeof fn !== "function") return fn;
+
+  const original = fn as Function;
+  const originalSource = original.toString();
+
+  // Only shim if the source actually references __name
+  if (!originalSource.includes("__name")) return fn;
+
+  // Build a wrapper that Playwright will serialize via toString().
+  // The wrapper source includes the __name shim followed by the original
+  // function invocation.
+  const shimmedSource = `${__NAME_SHIM}\nreturn (${originalSource}).apply(this, arguments);`;
+
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  const shimmed = new Function(shimmedSource) as T & Function;
+
+  // Preserve arity information for Playwright's serializer
+  Object.defineProperty(shimmed, "length", {
+    value: original.length,
+    configurable: true,
+  });
+
+  return shimmed as T;
+}
+
+/**
+ * Return a proxied Page where evaluate-family methods automatically shim
+ * their first (callback) argument with a __name polyfill.
+ */
+function shimPageEvaluateMethods(page: Page): Page {
+  return new Proxy(page, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+
+      if (
+        typeof prop === "string" &&
+        (EVALUATE_METHOD_NAMES as readonly string[]).includes(prop) &&
+        typeof value === "function"
+      ) {
+        return function (this: unknown, ...args: unknown[]) {
+          if (args.length > 0) {
+            args[0] = shimCallback(args[0]);
+          }
+          return (value as Function).apply(target, args);
+        };
+      }
+
+      // Also proxy mainFrame() and locator() so their evaluate methods are shimmed
+      if (prop === "mainFrame" && typeof value === "function") {
+        return function (this: unknown, ...args: unknown[]) {
+          const frame = (value as Function).apply(target, args);
+          return shimEvaluateMethods(frame);
+        };
+      }
+
+      if (prop === "locator" && typeof value === "function") {
+        return function (this: unknown, ...args: unknown[]) {
+          const locator = (value as Function).apply(target, args);
+          return shimEvaluateMethods(locator);
+        };
+      }
+
+      return value;
+    },
+  });
+}
+
+/**
+ * Generic evaluate-method shim for Frame, Locator, ElementHandle, etc.
+ */
+function shimEvaluateMethods<T extends object>(obj: T): T {
+  return new Proxy(obj, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+
+      if (
+        typeof prop === "string" &&
+        (EVALUATE_METHOD_NAMES as readonly string[]).includes(prop) &&
+        typeof value === "function"
+      ) {
+        return function (this: unknown, ...args: unknown[]) {
+          if (args.length > 0) {
+            args[0] = shimCallback(args[0]);
+          }
+          return (value as Function).apply(target, args);
+        };
+      }
+
+      return value;
+    },
+  });
+}
+
 export async function installHeadedWorkflowVisualization(args: {
   context: BrowserContext;
   logger: LoggerApi;
@@ -271,7 +396,7 @@ async function runIntegrationInternal(
 
   const workflowContext: LibrettoWorkflowContext = {
     session: args.session,
-    page: browserSession.page,
+    page: shimPageEvaluateMethods(browserSession.page),
   };
 
   try {

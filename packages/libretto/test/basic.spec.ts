@@ -1018,6 +1018,36 @@ export default workflow("main", async () => {
     expect(result.stdout).not.toContain("Workflow paused.");
   }, 45_000);
 
+  test("run succeeds with page.evaluate callbacks containing nested helpers (tsx __name shim)", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const integrationFilePath = await writeWorkflow(
+      "integration-evaluate-nested.ts",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("https://example.com");
+  const value = await page.evaluate(async () => {
+    const normalize = (input: string | null | undefined) => input?.trim() ?? null;
+    const parseNumberLike = (input: unknown) =>
+      Number(String(input).replace(/[^\\d.]/g, ""));
+    return { text: normalize(" x "), num: parseNumberLike("12") };
+  });
+  console.log("EVAL_RESULT", JSON.stringify(value));
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session evaluate-nested-test --headless`,
+    );
+    expect(result.stderr).not.toContain("__name is not defined");
+    expect(result.stdout).toContain("EVAL_RESULT");
+    expect(result.stdout).toContain('"text":"x"');
+    expect(result.stdout).toContain('"num":12');
+    expect(result.stdout).toContain("Integration completed.");
+  }, 45_000);
+
   test("run prints failure guidance and keeps browser open for exec inspection", async ({
     librettoCli,
     writeWorkflow,
