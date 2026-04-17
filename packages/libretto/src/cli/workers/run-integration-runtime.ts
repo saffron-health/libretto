@@ -235,8 +235,16 @@ function shimCallback<T>(fn: T): T {
 }
 
 /**
+ * $eval and $$eval take (selector, pageFunction, arg?) — callback is at index 1.
+ * All other evaluate methods take (pageFunction, arg?) — callback is at index 0.
+ */
+function callbackIndex(methodName: string): number {
+  return methodName === "$eval" || methodName === "$$eval" ? 1 : 0;
+}
+
+/**
  * Return a proxied Page where evaluate-family methods automatically shim
- * their first (callback) argument with a __name polyfill.
+ * their callback argument with a __name polyfill.
  */
 function shimPageEvaluateMethods(page: Page): Page {
   return new Proxy(page, {
@@ -248,9 +256,10 @@ function shimPageEvaluateMethods(page: Page): Page {
         (EVALUATE_METHOD_NAMES as readonly string[]).includes(prop) &&
         typeof value === "function"
       ) {
+        const cbIdx = callbackIndex(prop);
         return function (this: unknown, ...args: unknown[]) {
-          if (args.length > 0) {
-            args[0] = shimCallback(args[0]);
+          if (args.length > cbIdx) {
+            args[cbIdx] = shimCallback(args[cbIdx]);
           }
           return (value as Function).apply(target, args);
         };
@@ -289,9 +298,10 @@ function shimEvaluateMethods<T extends object>(obj: T): T {
         (EVALUATE_METHOD_NAMES as readonly string[]).includes(prop) &&
         typeof value === "function"
       ) {
+        const cbIdx = callbackIndex(prop);
         return function (this: unknown, ...args: unknown[]) {
-          if (args.length > 0) {
-            args[0] = shimCallback(args[0]);
+          if (args.length > cbIdx) {
+            args[cbIdx] = shimCallback(args[cbIdx]);
           }
           return (value as Function).apply(target, args);
         };
