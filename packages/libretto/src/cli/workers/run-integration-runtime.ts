@@ -196,6 +196,7 @@ const __NAME_SHIM = [
  */
 const EVALUATE_METHOD_NAMES = [
   "evaluate",
+  "evaluateAll",
   "evaluateHandle",
   "waitForFunction",
   "$eval",
