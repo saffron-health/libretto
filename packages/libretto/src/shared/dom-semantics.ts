@@ -58,7 +58,6 @@ export function isObfuscatedClass(cls: string): boolean {
   if (cls.length > 80) return true;
   if (/^_?[0-9a-f]{6,}$/i.test(cls)) return true;
   if (/^[a-z]+_[0-9a-f]{4,}$/i.test(cls)) return true;
-  if (/^[a-z]{1,2}[0-9]{2,}$/i.test(cls)) return true;
 
   const digits = (cls.match(/[0-9]/g) || []).length;
   const letters = (cls.match(/[a-zA-Z]/g) || []).length;

@@ -5,7 +5,7 @@ import {
   type CDPSession,
   type Page,
 } from "playwright";
-import { openSync, existsSync, writeFileSync } from "node:fs";
+import { openSync, closeSync, existsSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -460,6 +460,7 @@ export async function runOpen(
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
   const escapedUrl = url.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const escapedSession = session.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const storageStateCode = useProfile
     ? `storageState: '${profilePath!
         .replace(/\\/g, "\\\\")
@@ -618,7 +619,7 @@ process.on('exit', (code) => {
 	childLog('info', 'child-exit', { code, pid: process.pid, port: ${port} });
 });
 
-childLog('info', 'child-launched', { port: ${port}, pid: process.pid, session: '${session}' });
+childLog('info', 'child-launched', { port: ${port}, pid: process.pid, session: '${escapedSession}' });
 
 await new Promise(() => {});
 `;
@@ -631,6 +632,9 @@ await new Promise(() => {});
     cwd: resolve(dirname(fileURLToPath(import.meta.url)), "../../.."),
   });
   child.unref();
+
+  // Close the file descriptor in the parent process; the child inherits it.
+  closeSync(childStderrFd);
 
   logger.info("open-child-spawned", { pid: child.pid, port, session });
 
