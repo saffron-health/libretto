@@ -17,7 +17,7 @@ function printAiStatus(status: AiSetupStatus): void {
         console.log(`  Source: ${status.source}`);
       }
       console.log(
-        "  To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+        "  To change: npx libretto ai configure openai | anthropic | gemini | vertex | openrouter",
       );
       break;
 

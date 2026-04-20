@@ -17,6 +17,7 @@ export const DEFAULT_SNAPSHOT_MODELS = {
   anthropic: "anthropic/claude-sonnet-4-6",
   google: "google/gemini-3-flash-preview",
   vertex: "vertex/gemini-2.5-flash",
+  openrouter: "openrouter/free",
 } as const satisfies Record<Provider, string>;
 
 // ── Source detection ────────────────────────────────────────────────────────
@@ -44,6 +45,8 @@ function detectProviderEnvVar(
       if (env.GOOGLE_CLOUD_PROJECT?.trim()) return "GOOGLE_CLOUD_PROJECT";
       if (env.GCLOUD_PROJECT?.trim()) return "GCLOUD_PROJECT";
       return null;
+    case "openrouter":
+      return env.OPENROUTER_API_KEY?.trim() ? "OPENROUTER_API_KEY" : null;
   }
 }
 
@@ -72,11 +75,13 @@ function providerSetupSentence(provider: Provider): string {
       return "Add GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY to .env or as a shell environment variable.";
     case "vertex":
       return "Add GOOGLE_CLOUD_PROJECT or GCLOUD_PROJECT to .env or as a shell environment variable, and make sure application default credentials are configured.";
+    case "openrouter":
+      return "Add OPENROUTER_API_KEY to .env or as a shell environment variable.";
   }
 }
 
 function defaultModelCommandLine(): string {
-  return "npx libretto ai configure openai | anthropic | gemini | vertex";
+  return "npx libretto ai configure openai | anthropic | gemini | vertex | openrouter";
 }
 
 function providerMissingCredentialSummary(provider: Provider): string {
@@ -89,13 +94,15 @@ function providerMissingCredentialSummary(provider: Provider): string {
       return "GEMINI_API_KEY and GOOGLE_GENERATIVE_AI_API_KEY are missing";
     case "vertex":
       return "GOOGLE_CLOUD_PROJECT and GCLOUD_PROJECT are missing";
+    case "openrouter":
+      return "OPENROUTER_API_KEY is missing";
   }
 }
 
 function noSnapshotApiConfiguredMessage(): string {
   return [
     "Failed to analyze snapshot because no snapshot analyzer is configured.",
-    `Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_CLOUD_PROJECT to .env or as a shell environment variable, or choose a default model with \`${defaultModelCommandLine()}\`.`,
+    `Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_CLOUD_PROJECT, or OPENROUTER_API_KEY to .env or as a shell environment variable, or choose a default model with \`${defaultModelCommandLine()}\`.`,
     "For more info, run `npx libretto setup`.",
   ].join(" ");
 }
@@ -122,6 +129,7 @@ function inferAutoSnapshotModel(): SnapshotApiModelSelection | null {
     "anthropic",
     "google",
     "vertex",
+    "openrouter",
   ];
 
   for (const provider of providersInPriorityOrder) {

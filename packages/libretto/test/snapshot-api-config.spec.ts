@@ -18,6 +18,7 @@ function clearProviderEnv(): void {
   vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "");
   vi.stubEnv("GOOGLE_CLOUD_PROJECT", "");
   vi.stubEnv("GCLOUD_PROJECT", "");
+  vi.stubEnv("OPENROUTER_API_KEY", "");
 }
 
 describe("snapshot API model resolution", () => {
@@ -111,8 +112,43 @@ describe("snapshot API model resolution", () => {
     clearProviderEnv();
 
     expect(() => resolveSnapshotApiModelOrThrow(null)).toThrowError(
-      "Failed to analyze snapshot because no snapshot analyzer is configured. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_CLOUD_PROJECT to .env or as a shell environment variable, or choose a default model with `npx libretto ai configure openai | anthropic | gemini | vertex`. For more info, run `npx libretto setup`.",
+      "Failed to analyze snapshot because no snapshot analyzer is configured. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_CLOUD_PROJECT, or OPENROUTER_API_KEY to .env or as a shell environment variable, or choose a default model with `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter`. For more info, run `npx libretto setup`.",
     );
+  });
+
+  it("auto-detects OpenRouter when OPENROUTER_API_KEY is present", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+    vi.stubEnv("OPENROUTER_API_KEY", "sk-or-test-key");
+
+    expect(resolveSnapshotApiModel(null)).toMatchObject({
+      model: "openrouter/free",
+      provider: "openrouter",
+      source: "env:OPENROUTER_API_KEY",
+    });
+  });
+
+  it("uses config model for openrouter", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+    vi.stubEnv("OPENROUTER_API_KEY", "sk-or-test-key");
+
+    expect(resolveSnapshotApiModel("openrouter/google/gemma-4-31b-it:free")).toMatchObject({
+      model: "openrouter/google/gemma-4-31b-it:free",
+      provider: "openrouter",
+      source: "config",
+    });
+  });
+
+  it("prefers OpenAI over OpenRouter when both keys are present", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+    vi.stubEnv("OPENAI_API_KEY", "sk-openai-key");
+    vi.stubEnv("OPENROUTER_API_KEY", "sk-or-test-key");
+
+    expect(resolveSnapshotApiModel(null)).toMatchObject({
+      provider: "openai",
+    });
   });
 
   it("explains how to fix a configured provider with missing credentials", () => {

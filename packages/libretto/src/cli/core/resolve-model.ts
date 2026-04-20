@@ -1,6 +1,6 @@
 import type { LanguageModel } from "ai";
 
-export type Provider = "google" | "vertex" | "anthropic" | "openai";
+export type Provider = "google" | "vertex" | "anthropic" | "openai" | "openrouter";
 
 const GEMINI_API_KEY_ENV_VARS = [
   "GEMINI_API_KEY",
@@ -19,6 +19,7 @@ const SUPPORTED_PROVIDER_ALIASES = {
   anthropic: "anthropic",
   codex: "openai",
   openai: "openai",
+  openrouter: "openrouter",
 } as const satisfies Record<string, Provider>;
 
 function readFirstEnvValue(
@@ -51,7 +52,7 @@ export function parseModel(model: string): {
 
   if (!provider) {
     throw new Error(
-      `Unsupported provider "${providerInput}". Supported providers: openai/codex, anthropic, google (Gemini API), and vertex.`,
+      `Unsupported provider "${providerInput}". Supported providers: openai/codex, anthropic, google (Gemini API), vertex, and openrouter.`,
     );
   }
 
@@ -71,6 +72,8 @@ export function hasProviderCredentials(
       return Boolean(env.ANTHROPIC_API_KEY?.trim());
     case "openai":
       return Boolean(env.OPENAI_API_KEY?.trim());
+    case "openrouter":
+      return Boolean(env.OPENROUTER_API_KEY?.trim());
   }
 }
 
@@ -85,6 +88,9 @@ export function missingProviderCredentialsMessage(provider: Provider): string {
     }
     case "openai": {
       return "OpenAI API key is missing. Set OPENAI_API_KEY.";
+    }
+    case "openrouter": {
+      return "OpenRouter API key is missing. Set OPENROUTER_API_KEY.";
     }
   }
 }
@@ -132,6 +138,18 @@ async function getProviderModel(
       const { createOpenAI } = await import("@ai-sdk/openai");
       const openai = createOpenAI({ apiKey });
       return openai(modelId);
+    }
+    case "openrouter": {
+      const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error(missingProviderCredentialsMessage(provider));
+      }
+      const { createOpenAI } = await import("@ai-sdk/openai");
+      const openrouter = createOpenAI({
+        apiKey,
+        baseURL: "https://openrouter.ai/api/v1",
+      });
+      return openrouter(modelId);
     }
   }
 }

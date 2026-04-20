@@ -67,7 +67,7 @@ function invalidConfigError(configPath: string, detail?: string): Error {
       '  - "snapshotModel", "viewport", "windowPosition", and "sessionMode" are optional.',
       '  - "snapshotModel" must be a provider/model string like "openai/gpt-5.4" or "anthropic/claude-sonnet-4-6".',
       "Fix the file to match this shape, or delete it and rerun:",
-      `  npx libretto ai configure openai | anthropic | gemini | vertex`,
+      `  npx libretto ai configure openai | anthropic | gemini | vertex | openrouter`,
     ]
       .filter(Boolean)
       .join("\n"),

@@ -27,6 +27,7 @@ const PROVIDER_SDK_PACKAGES: Record<Provider, string> = {
   anthropic: "@ai-sdk/anthropic",
   google: "@ai-sdk/google",
   vertex: "@ai-sdk/google-vertex",
+  openrouter: "@ai-sdk/openai",
 };
 
 function detectPackageManager(): string {
@@ -120,6 +121,13 @@ export const PROVIDER_CHOICES: ProviderChoice[] = [
     envHint:
       "Requires `gcloud auth application-default login` and a GCP project ID",
   },
+  {
+    key: "5",
+    label: "OpenRouter",
+    provider: "openrouter",
+    envVar: "OPENROUTER_API_KEY",
+    envHint: "Get your key at https://openrouter.ai/settings/keys",
+  },
 ];
 
 function promptUser(
@@ -169,7 +177,7 @@ function printHealthySummary(status: AiSetupStatus & { kind: "ready" }): void {
     console.log(`✓ Using ${providerLabel(status.provider)} (${status.model}).`);
   }
   console.log(
-    "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+    "To change: npx libretto ai configure openai | anthropic | gemini | vertex | openrouter",
   );
 }
 
@@ -267,7 +275,7 @@ function printSnapshotApiStatus(): boolean {
     "    GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
   );
   console.log(
-    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
+    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter` to set a specific model.",
   );
   console.log(
     "  Run `npx libretto setup` interactively to set up credentials.",
@@ -323,7 +331,7 @@ function printSkipMessage(): void {
   console.log("  ANTHROPIC_API_KEY=...");
   console.log("  GEMINI_API_KEY=...");
   console.log(
-    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex` to set a specific model.",
+    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter` to set a specific model.",
   );
 }
 
