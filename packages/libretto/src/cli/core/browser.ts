@@ -6,26 +6,13 @@ import {
   type Page,
 } from "playwright";
 import { openSync, existsSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
-import {
-  filterSemanticClasses,
-  INTERACTIVE_ROLE_NAMES,
-  INTERACTIVE_TAG_NAMES,
-  isObfuscatedClass,
-  TEST_ATTRIBUTE_NAMES,
-  TRUSTED_ATTRIBUTE_NAMES,
-} from "../../shared/dom-semantics.js";
-import {
-  getSessionActionsLogPath,
-  getSessionNetworkLogPath,
-  PROFILES_DIR,
-} from "./context.js";
+import { PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import {
   assertSessionAvailableForStart,
@@ -39,7 +26,6 @@ import {
 } from "./session.js";
 import type { ProviderApi } from "./providers/types.js";
 import { getCloudProviderApi } from "./providers/index.js";
-import { installSessionTelemetry } from "./session-telemetry.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const FORCE_CLOSE_WAIT_MS = 300;
@@ -434,8 +420,6 @@ export async function runOpen(
 
   const port = await pickFreePort();
   const runLogPath = logFileForSession(session);
-  const networkLogPath = getSessionNetworkLogPath(session);
-  const actionsLogPath = getSessionActionsLogPath(session);
 
   const browserMode = headed ? "headed" : "headless";
   const supportsSavedProfile =
@@ -459,177 +443,29 @@ export async function runOpen(
   }
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
-  const escapedUrl = url.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  const storageStateCode = useProfile
-    ? `storageState: '${profilePath!
-        .replace(/\\/g, "\\\\")
-        .replace(/'/g, "\\'")}',`
-    : "";
-
-  const escapedLogPath = runLogPath.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  const escapedNetworkLogPath = networkLogPath
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'");
-  const escapedActionsLogPath = actionsLogPath
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'");
-  const windowPositionArg = windowPosition
-    ? `, '--window-position=${windowPosition.x},${windowPosition.y}'`
-    : "";
-  const windowBoundsSetupCode = windowPosition
-    ? `
-const requestedWindowBounds = { left: ${windowPosition.x}, top: ${windowPosition.y}, windowState: 'normal' };
-const pageCdp = await context.newCDPSession(page);
-let browserCdp;
-try {
-	const targetInfo = await pageCdp.send('Target.getTargetInfo');
-	const targetId = targetInfo?.targetInfo?.targetId;
-	browserCdp = await browser.newBrowserCDPSession();
-	const windowResult = await browserCdp.send(
-		'Browser.getWindowForTarget',
-		targetId ? { targetId } : {},
-	);
-	await browserCdp.send('Browser.setWindowBounds', {
-		windowId: windowResult.windowId,
-		bounds: requestedWindowBounds,
-	});
-	await new Promise((resolve) => setTimeout(resolve, 250));
-	const actualWindow = await browserCdp.send('Browser.getWindowBounds', {
-		windowId: windowResult.windowId,
-	});
-	childLog('info', 'window-bounds-set', {
-		windowId: windowResult.windowId,
-		requestedBounds: requestedWindowBounds,
-		actualBounds: actualWindow.bounds,
-	});
-} catch (error) {
-	childLog('warn', 'window-bounds-set-failed', {
-		requestedBounds: requestedWindowBounds,
-		message: error instanceof Error ? error.message : String(error),
-		stack: error instanceof Error ? error.stack : undefined,
-	});
-} finally {
-	await pageCdp.detach().catch(() => {});
-	if (browserCdp) {
-		await browserCdp.detach().catch(() => {});
-	}
-}
-`
-    : "";
-
-  const launcherCode = `
-import { chromium } from 'playwright';
-import { appendFileSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
-
-const LOG_FILE = '${escapedLogPath}';
-const NETWORK_LOG = '${escapedNetworkLogPath}';
-const ACTIONS_LOG = '${escapedActionsLogPath}';
-mkdirSync(dirname(NETWORK_LOG), { recursive: true });
-
-// tsx/esbuild may emit __name() wrappers in Function#toString output.
-	const __name = (target, value) =>
-		Object.defineProperty(target, 'name', { value, configurable: true });
-
-	const TEST_ATTRIBUTE_NAMES = ${JSON.stringify([...TEST_ATTRIBUTE_NAMES])};
-	const TRUSTED_ATTRIBUTE_NAMES = ${JSON.stringify([...TRUSTED_ATTRIBUTE_NAMES])};
-	const INTERACTIVE_TAG_NAMES = ${JSON.stringify([...INTERACTIVE_TAG_NAMES])};
-	const INTERACTIVE_ROLE_NAMES = ${JSON.stringify([...INTERACTIVE_ROLE_NAMES])};
-	const filterSemanticClasses = ${filterSemanticClasses.toString()};
-	const isObfuscatedClass = ${isObfuscatedClass.toString()};
-
-	${installSessionTelemetry.toString()}
-
-	function logAction(entry) {
-		appendFileSync(ACTIONS_LOG, JSON.stringify(entry) + '\\n');
-	}
-
-function logNetwork(entry) {
-	appendFileSync(NETWORK_LOG, JSON.stringify(entry) + '\\n');
-}
-
-function childLog(level, event, data = {}) {
-	try {
-		const entry = JSON.stringify({
-			timestamp: new Date().toISOString(),
-			id: Math.random().toString(36).slice(2, 10),
-			level,
-			scope: 'libretto.child',
-			event,
-			data,
-		});
-		appendFileSync(LOG_FILE, entry + '\\n');
-	} catch {}
-}
-
-const browser = await chromium.launch({
-	headless: ${!headed},
-	args: ['--disable-blink-features=AutomationControlled', '--remote-debugging-port=${port}', '--remote-debugging-address=127.0.0.1', '--no-focus-on-check'${windowPositionArg}],
-});
-
-browser.on('disconnected', () => {
-	childLog('warn', 'browser-disconnected', { port: ${port} });
-});
-
-const context = await browser.newContext({
-	${storageStateCode}
-	viewport: { width: ${viewport.width}, height: ${viewport.height} },
-	userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-});
-
-const page = await context.newPage();
-${windowBoundsSetupCode}
-page.setDefaultTimeout(30000);
-page.setDefaultNavigationTimeout(45000);
-
-await installSessionTelemetry({
-	context,
-	initialPage: page,
-	includeUserDomActions: true,
-	logAction,
-	logNetwork,
-});
-
-
-await page.goto('${escapedUrl}');
-
-process.on('SIGTERM', async () => {
-	childLog('info', 'child-sigterm');
-	await browser.close();
-	process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-	childLog('info', 'child-sigint');
-	await browser.close();
-	process.exit(0);
-});
-
-process.on('uncaughtException', (err) => {
-	childLog('error', 'uncaught-exception', { message: err.message, stack: err.stack });
-	process.exit(1);
-});
-
-process.on('unhandledRejection', (reason) => {
-	childLog('warn', 'unhandled-rejection', { reason: String(reason) });
-});
-
-process.on('exit', (code) => {
-	childLog('info', 'child-exit', { code, pid: process.pid, port: ${port} });
-});
-
-childLog('info', 'child-launched', { port: ${port}, pid: process.pid, session: '${session}' });
-
-await new Promise(() => {});
-`;
+  const daemonEntryPath = fileURLToPath(
+    new URL("./browser-daemon.ts", import.meta.url),
+  );
+  const daemonConfig = {
+    port,
+    url,
+    session,
+    headed,
+    viewport,
+    storageStatePath: useProfile ? profilePath : undefined,
+    windowPosition,
+  };
 
   const childStderrFd = openSync(runLogPath, "a");
 
-  const child = spawn("node", ["--input-type=module", "-e", launcherCode], {
-    detached: true,
-    stdio: ["ignore", "ignore", childStderrFd],
-    cwd: resolve(dirname(fileURLToPath(import.meta.url)), "../../.."),
-  });
+  const child = spawn(
+    process.execPath,
+    ["--import", "tsx", daemonEntryPath, JSON.stringify(daemonConfig)],
+    {
+      detached: true,
+      stdio: ["ignore", "ignore", childStderrFd],
+    },
+  );
   child.unref();
 
   logger.info("open-child-spawned", { pid: child.pid, port, session });
