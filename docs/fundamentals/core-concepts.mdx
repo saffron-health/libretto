@@ -30,7 +30,7 @@ All Libretto state lives in a `.libretto/` directory at your project root:
     └── <domain>.json        # Saved auth state (cookies, localStorage)
 ```
 
-**`config.json`:** Your AI provider and viewport settings. Created by `npm create libretto@latest` or `npx libretto setup`, and updated with `npx libretto ai configure`. See [Configuration](./configuration) for details.
+**`config.json`:** Your AI provider and viewport settings. Created by `npm create libretto@latest` or `npx libretto setup`, and updated with `npx libretto ai configure`. See [Configuration](/get-started/configuration) for details.
 
 Sessions and profiles are automatically git-ignored by a `.libretto/.gitignore` file created during setup. The config file and skill files are meant to be committed.
 
@@ -64,39 +64,4 @@ tail -n 20 .libretto/sessions/my-session/actions.jsonl | jq .
 
 **`snapshots/`:** One subdirectory per `snapshot` run, containing the captured PNG and HTML file.
 
-### Profiles
-
-Profiles save browser session state (cookies, localStorage, and other persistent storage) so you can reuse authenticated state across runs without logging in again each time.
-
-**Location:** `.libretto/profiles/<domain>.json`
-
-#### Saving a profile
-
-1. Open the site in headed mode so you can log in manually:
-
-   ```bash theme={null}
-   npx libretto open https://linkedin.com --headed --session app-login
-   ```
-
-2. Log in to the site in the browser window.
-
-3. Save the current session state as a profile:
-
-   ```bash theme={null}
-   npx libretto save linkedin.com --session app-login
-   ```
-
-#### Using a profile
-
-Pass `--auth-profile <domain>` to `run`:
-
-```bash theme={null}
-npx libretto run ./integration.ts --auth-profile linkedin.com
-```
-
-<Warning>
-  Sessions can expire. If a profile stops working, repeat the login and save
-  flow to refresh it.
-</Warning>
-
-Profiles are machine-local and git-ignored. They are not safe to commit or share because they contain authentication tokens for live accounts.
+For authenticated sites, see [Website authentication](/fundamentals/website-authentication) to learn how to pass credentials, TOTP secrets, and save reusable login profiles.

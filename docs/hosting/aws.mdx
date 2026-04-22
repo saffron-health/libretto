@@ -1,0 +1,189 @@
+---
+title: Deploy on AWS
+sidebarTitle: AWS
+---
+
+> Run Libretto workflows as ECS Fargate tasks, triggered from your API or EventBridge.
+
+ECS on Fargate is the closest AWS analog to Cloud Run Jobs: you register a task definition, then invoke it on demand and Fargate starts a fresh container, runs the task, and exits. Libretto workflows map cleanly to this model.
+
+### Prerequisites
+
+- An AWS account with a VPC (default VPC is fine to start).
+- ECR, ECS, CodeBuild, and Secrets Manager available in your target region.
+- A task execution role and a task role scoped to the secrets your workflows need.
+- AWS CLI installed and authenticated locally.
+
+### 1. Write the dispatcher and Dockerfile
+
+Use the same env-var dispatcher pattern as the GCP guide; the image is portable across clouds:
+
+```typescript theme={null}
+// src/main.ts
+import { pullReferrals } from "./workflows/pull-referrals";
+import { submitPriorAuth } from "./workflows/submit-prior-auth";
+
+const workflows = {
+  "pull-referrals": pullReferrals,
+  "submit-prior-auth": submitPriorAuth,
+} as const;
+
+type WorkflowName = keyof typeof workflows;
+
+async function main() {
+  const name = process.env.LIBRETTO_WORKFLOW as WorkflowName | undefined;
+  const inputJson = process.env.LIBRETTO_INPUT ?? "{}";
+
+  if (!name || !(name in workflows)) {
+    throw new Error(
+      `Set LIBRETTO_WORKFLOW to one of: ${Object.keys(workflows).join(", ")}`,
+    );
+  }
+  await workflows[name](JSON.parse(inputJson));
+}
+
+void main();
+```
+
+```dockerfile theme={null}
+# Dockerfile
+FROM mcr.microsoft.com/playwright:v1.58.2-noble
+
+RUN apt-get update && apt-get install -y git \
+  && corepack enable \
+  && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+RUN mkdir -p /root/.cache && cp -a /ms-playwright /root/.cache/
+
+COPY . .
+RUN pnpm install --frozen-lockfile
+
+ENV NODE_ENV=production
+ENTRYPOINT ["pnpm", "start"]
+```
+
+### 2. Push the image to ECR
+
+```bash theme={null}
+aws ecr create-repository --repository-name browser-agent --region us-east-1
+
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin \
+  123456789012.dkr.ecr.us-east-1.amazonaws.com
+
+docker build -f apps/browser-agent/Dockerfile \
+  -t 123456789012.dkr.ecr.us-east-1.amazonaws.com/browser-agent:latest .
+
+docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/browser-agent:latest
+```
+
+For CI, wire the same steps up in CodeBuild with a `buildspec.yml` that tags both `:latest` and `:$CODEBUILD_RESOLVED_SOURCE_VERSION`.
+
+### 3. Register the task definition
+
+```json theme={null}
+{
+  "family": "browser-agent-task",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/browserAgentTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "browser-agent",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/browser-agent:latest",
+      "essential": true,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/browser-agent",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "task"
+        }
+      }
+    }
+  ]
+}
+```
+
+Register it:
+
+```bash theme={null}
+aws ecs register-task-definition \
+  --cli-input-json file://browser-agent-task.json \
+  --region us-east-1
+```
+
+### 4. Inject credentials at runtime
+
+Pull secrets from Secrets Manager inside your dispatcher, not the container environment, so they never appear in the task definition:
+
+```typescript theme={null}
+import {
+  SecretsManagerClient,
+  GetSecretValueCommand,
+} from "@aws-sdk/client-secrets-manager";
+
+const client = new SecretsManagerClient({ region: process.env.AWS_REGION });
+
+export async function getSecret(name: string): Promise<string> {
+  const { SecretString } = await client.send(
+    new GetSecretValueCommand({ SecretId: name }),
+  );
+  if (!SecretString) throw new Error(`Secret ${name} is empty`);
+  return SecretString;
+}
+```
+
+Attach an IAM policy to `browserAgentTaskRole` that allows `secretsmanager:GetSecretValue` on the specific ARNs the workflows use.
+
+### 5. Trigger the task
+
+From your API, using the AWS SDK:
+
+```typescript theme={null}
+import { ECSClient, RunTaskCommand } from "@aws-sdk/client-ecs";
+
+const ecs = new ECSClient({ region: "us-east-1" });
+
+await ecs.send(
+  new RunTaskCommand({
+    cluster: "browser-agent-cluster",
+    launchType: "FARGATE",
+    taskDefinition: "browser-agent-task",
+    networkConfiguration: {
+      awsvpcConfiguration: {
+        subnets: ["subnet-abc123"],
+        assignPublicIp: "ENABLED",
+      },
+    },
+    overrides: {
+      containerOverrides: [
+        {
+          name: "browser-agent",
+          environment: [
+            { name: "LIBRETTO_WORKFLOW", value: "pull-referrals" },
+            { name: "LIBRETTO_INPUT", value: JSON.stringify(input) },
+          ],
+        },
+      ],
+    },
+  }),
+);
+```
+
+For scheduled runs, point an EventBridge rule at the task definition on a cron schedule.
+
+### 6. Observability
+
+- **Logs:** Container stdout/stderr streams to CloudWatch Logs under the group declared in the task definition (`/ecs/browser-agent`).
+- **Task history:** `aws ecs list-tasks --cluster browser-agent-cluster --desired-status STOPPED`.
+- **Session artifacts:** upload `.libretto/sessions/<name>/` to S3 at the end of each run for post-hoc debugging.
+
+<Tip>
+  A failed task that uploads its session directory to S3 gives you everything you need to reproduce the failure locally: the network log, actions log, and snapshots. See [debugging workflows](/workflow-guides/debugging-workflows) for the diagnosis flow.
+</Tip>
