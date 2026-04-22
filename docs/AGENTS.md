@@ -2,9 +2,9 @@
 
 Config in `docs.json`. Preview with `pnpm docs:dev` (runs on `localhost:3000`).
 
-## Sidebar group names match URL folders
+## Sidebar group name must match the URL
 
-Each page's folder under `docs/` must equal its `docs.json` group name, lowercased and hyphenated (e.g. group `"CLI reference"` → `cli-reference/*`). When adding a page, put it in the matching folder and register it in `docs.json`.
+A page's URL prefix must match its `docs.json` group name, lowercased and hyphenated. For example, group `"CLI reference"` maps to URL `/cli-reference/*`, with files at `docs/cli-reference/*.mdx`. When adding a page, put it in the matching folder and register it in `docs.json`.
 
 ## Testing
 
