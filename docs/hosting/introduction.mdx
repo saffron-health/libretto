@@ -1,0 +1,56 @@
+---
+title: Self-hosting overview
+sidebarTitle: Overview
+---
+
+> Run Libretto workflows on your own infrastructure instead of a managed browser platform.
+
+Libretto workflows are just TypeScript files. They don't need a managed service to execute. If you'd rather run them on infrastructure you control (for data residency, cost, or compliance reasons), you can package a workflow as a container and run it as a scheduled or API-triggered job on your own cloud.
+
+This section walks through a production-style self-hosting setup: a workflow package built into a Docker image and executed as a **Cloud Run Job** on GCP, or an **ECS task** on AWS. The same pattern works for any scheduler that can start a container with a one-shot task.
+
+### What you need
+
+<CardGroup cols={2}>
+  <Card title="A container runtime">
+    Cloud Run Jobs (GCP), ECS Fargate (AWS), Kubernetes Jobs, or any other "run a container once and exit" platform.
+  </Card>
+
+  <Card title="A secret store">
+    GCP Secret Manager, AWS Secrets Manager, or Vault, used to inject credentials, AI provider keys, and TOTP secrets at runtime.
+  </Card>
+
+  <Card title="An entry point">
+    A workflow file (or a small dispatcher that selects a workflow by name) that the container runs on start.
+  </Card>
+
+  <Card title="Artifact storage (optional)">
+    GCS or S3 for downloaded files, screenshots, and logs you want to persist beyond the job's lifetime.
+  </Card>
+</CardGroup>
+
+### How a run works
+
+When your API or scheduler triggers a job:
+
+1. A container starts from a Playwright base image.
+2. It pulls credentials from Secret Manager at runtime (never from environment variables baked in at build time).
+3. A small dispatcher reads `LIBRETTO_WORKFLOW` and `LIBRETTO_INPUT` from env and invokes the matching workflow, which drives the target website via Playwright.
+4. Any downloaded artifacts are uploaded to object storage (GCS or S3).
+5. The container exits with a success or failure code your scheduler can act on.
+
+### Pick your platform
+
+<CardGroup cols={2}>
+  <Card title="Deploy on GCP" icon="google" href="/hosting/gcp">
+    Cloud Run Jobs, Artifact Registry, Cloud Build, Secret Manager.
+  </Card>
+
+  <Card title="Deploy on AWS" icon="aws" href="/hosting/aws">
+    ECS Fargate tasks, ECR, CodeBuild, Secrets Manager.
+  </Card>
+</CardGroup>
+
+<Note>
+  Libretto itself runs Chromium through Playwright, so hosts need the Playwright browser binaries available. The Dockerfile examples on both platform pages start from `mcr.microsoft.com/playwright` to avoid installing them manually.
+</Note>
