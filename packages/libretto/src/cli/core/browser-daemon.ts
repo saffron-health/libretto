@@ -54,19 +54,15 @@ function childLog(
   event: string,
   data: Record<string, unknown> = {},
 ): void {
-  try {
-    const entry = JSON.stringify({
-      timestamp: new Date().toISOString(),
-      id: Math.random().toString(36).slice(2, 10),
-      level,
-      scope: "libretto.child",
-      event,
-      data,
-    });
-    appendFileSync(logFile, entry + "\n");
-  } catch {
-    // Best-effort logging; swallow errors to avoid crashing the daemon.
-  }
+  const entry = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    id: Math.random().toString(36).slice(2, 10),
+    level,
+    scope: "libretto.child",
+    event,
+    data,
+  });
+  appendFileSync(logFile, entry + "\n");
 }
 
 function logAction(entry: TelemetryEntry): void {
