@@ -59,8 +59,6 @@ jobs:
             core.setOutput('number', prNumber);
             core.setOutput('title', prTitle);
             core.setOutput('body', prBody);
-            core.setOutput('ref', headRef);
-            core.setOutput('sha', headSha);
 
       - uses: actions/checkout@v4
         with:
