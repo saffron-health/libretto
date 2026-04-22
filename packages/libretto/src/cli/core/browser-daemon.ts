@@ -13,7 +13,7 @@
  */
 
 import { chromium } from "playwright";
-import { appendFile, mkdir, unlink } from "node:fs/promises";
+import { mkdir, unlink } from "node:fs/promises";
 import { appendFileSync } from "node:fs";
 import { installSessionTelemetry } from "./session-telemetry.js";
 import {
@@ -49,28 +49,32 @@ const actionsLogFile = getSessionActionsLogPath(config.session);
 
 type TelemetryEntry = Record<string, unknown>;
 
-async function childLog(
+function childLog(
   level: string,
   event: string,
   data: Record<string, unknown> = {},
-): Promise<void> {
-  const entry = JSON.stringify({
-    timestamp: new Date().toISOString(),
-    id: Math.random().toString(36).slice(2, 10),
-    level,
-    scope: "libretto.child",
-    event,
-    data,
-  });
-  await appendFile(logFile, entry + "\n");
+): void {
+  try {
+    const entry = JSON.stringify({
+      timestamp: new Date().toISOString(),
+      id: Math.random().toString(36).slice(2, 10),
+      level,
+      scope: "libretto.child",
+      event,
+      data,
+    });
+    appendFileSync(logFile, entry + "\n");
+  } catch {
+    // Best-effort logging; swallow errors to avoid crashing the daemon.
+  }
 }
 
-async function logAction(entry: TelemetryEntry): Promise<void> {
-  await appendFile(actionsLogFile, JSON.stringify(entry) + "\n");
+function logAction(entry: TelemetryEntry): void {
+  appendFileSync(actionsLogFile, JSON.stringify(entry) + "\n");
 }
 
-async function logNetwork(entry: TelemetryEntry): Promise<void> {
-  await appendFile(networkLogFile, JSON.stringify(entry) + "\n");
+function logNetwork(entry: TelemetryEntry): void {
+  appendFileSync(networkLogFile, JSON.stringify(entry) + "\n");
 }
 
 // ── Launch browser ─────────────────────────────────────────────────────
@@ -114,7 +118,7 @@ async function shutdown(
   if (shuttingDown) return;
   shuttingDown = true;
   try {
-    await childLog("info", reason, { port: config.port });
+    childLog("info", reason, { port: config.port });
     await cleanupSessionState();
     if (closeBrowser) await browser.close();
   } finally {
@@ -171,26 +175,23 @@ process.on("uncaughtException", (err) => {
   childLog("error", "uncaught-exception", {
     message: err.message,
     stack: err.stack,
-  }).finally(() => process.exit(1));
+  });
+  process.exit(1);
 });
 
-process.on("unhandledRejection", async (reason) => {
-  await childLog("warn", "unhandled-rejection", { reason: String(reason) });
+process.on("unhandledRejection", (reason) => {
+  childLog("warn", "unhandled-rejection", { reason: String(reason) });
 });
 
 process.on("exit", (code) => {
-  const entry = JSON.stringify({
-    timestamp: new Date().toISOString(),
-    id: Math.random().toString(36).slice(2, 10),
-    level: "info",
-    scope: "libretto.child",
-    event: "child-exit",
-    data: { code, pid: process.pid, port: config.port },
+  childLog("info", "child-exit", {
+    code,
+    pid: process.pid,
+    port: config.port,
   });
-  appendFileSync(logFile, entry + "\n");
 });
 
-await childLog("info", "child-launched", {
+childLog("info", "child-launched", {
   port: config.port,
   pid: process.pid,
   session: config.session,
