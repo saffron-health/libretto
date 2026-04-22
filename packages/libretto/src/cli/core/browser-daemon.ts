@@ -12,7 +12,7 @@
  * - Stay alive until the browser disconnects or a signal is received
  */
 
-import { chromium, type Page } from "playwright";
+import { chromium } from "playwright";
 import { appendFile, mkdir, unlink } from "node:fs/promises";
 import { appendFileSync } from "node:fs";
 import { installSessionTelemetry } from "./session-telemetry.js";
@@ -152,32 +152,6 @@ await installSessionTelemetry({
   logAction,
   logNetwork,
 });
-
-// ── Track pages — close browser when all pages are closed ──────────────
-
-function trackPage(p: Page): void {
-  p.on("close", async () => {
-    const remaining = context
-      .pages()
-      .filter(
-        (pg) =>
-          !pg.isClosed() &&
-          !pg.url().startsWith("devtools://") &&
-          !pg.url().startsWith("chrome-error://"),
-      );
-    await childLog("info", "page-closed", {
-      closedUrl: p.url(),
-      remainingPages: remaining.length,
-    });
-    if (remaining.length === 0 && !shuttingDown) {
-      await childLog("info", "all-pages-closed-shutting-down");
-      await browser.close();
-    }
-  });
-}
-
-trackPage(page);
-context.on("page", (newPage) => trackPage(newPage));
 
 // ── Navigate ───────────────────────────────────────────────────────────
 
