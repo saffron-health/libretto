@@ -444,7 +444,7 @@ export async function runOpen(
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
   const daemonEntryPath = fileURLToPath(
-    new URL("./browser-daemon.ts", import.meta.url),
+    new URL("./browser-daemon.js", import.meta.url),
   );
   const daemonConfig = {
     port,

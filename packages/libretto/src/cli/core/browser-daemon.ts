@@ -12,14 +12,16 @@
  * - Stay alive until the browser disconnects or a signal is received
  */
 
-import { chromium } from "playwright";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { chromium, type Page } from "playwright";
+import { appendFile, mkdir, unlink } from "node:fs/promises";
+import { appendFileSync } from "node:fs";
 import { installSessionTelemetry } from "./session-telemetry.js";
 import {
   getSessionDir,
   getSessionLogsPath,
   getSessionNetworkLogPath,
   getSessionActionsLogPath,
+  getSessionStatePath,
 } from "./context.js";
 
 // ── Config schema ──────────────────────────────────────────────────────
@@ -39,7 +41,7 @@ const config: DaemonConfig = JSON.parse(process.argv[2]);
 // ── Derived paths ──────────────────────────────────────────────────────
 
 const sessionDir = getSessionDir(config.session);
-mkdirSync(sessionDir, { recursive: true });
+await mkdir(sessionDir, { recursive: true });
 
 const logFile = getSessionLogsPath(config.session);
 const networkLogFile = getSessionNetworkLogPath(config.session);
@@ -47,32 +49,28 @@ const actionsLogFile = getSessionActionsLogPath(config.session);
 
 type TelemetryEntry = Record<string, unknown>;
 
-function childLog(
+async function childLog(
   level: string,
   event: string,
   data: Record<string, unknown> = {},
-): void {
-  try {
-    const entry = JSON.stringify({
-      timestamp: new Date().toISOString(),
-      id: Math.random().toString(36).slice(2, 10),
-      level,
-      scope: "libretto.child",
-      event,
-      data,
-    });
-    appendFileSync(logFile, entry + "\n");
-  } catch {
-    // Best-effort logging; swallow errors to avoid crashing the daemon.
-  }
+): Promise<void> {
+  const entry = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    id: Math.random().toString(36).slice(2, 10),
+    level,
+    scope: "libretto.child",
+    event,
+    data,
+  });
+  await appendFile(logFile, entry + "\n");
 }
 
-function logAction(entry: TelemetryEntry): void {
-  appendFileSync(actionsLogFile, JSON.stringify(entry) + "\n");
+async function logAction(entry: TelemetryEntry): Promise<void> {
+  await appendFile(actionsLogFile, JSON.stringify(entry) + "\n");
 }
 
-function logNetwork(entry: TelemetryEntry): void {
-  appendFileSync(networkLogFile, JSON.stringify(entry) + "\n");
+async function logNetwork(entry: TelemetryEntry): Promise<void> {
+  await appendFile(networkLogFile, JSON.stringify(entry) + "\n");
 }
 
 // ── Launch browser ─────────────────────────────────────────────────────
@@ -94,8 +92,38 @@ const browser = await chromium.launch({
   args: launchArgs,
 });
 
+async function cleanupSessionState(): Promise<void> {
+  const sessionStatePath = getSessionStatePath(config.session);
+  try {
+    await unlink(sessionStatePath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+}
+
+let shuttingDown = false;
+let wakeDaemon: () => void;
+const sleepPromise = new Promise<void>((resolve) => {
+  wakeDaemon = resolve;
+});
+
+async function shutdown(
+  reason: string,
+  closeBrowser: boolean,
+): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    await childLog("info", reason, { port: config.port });
+    await cleanupSessionState();
+    if (closeBrowser) await browser.close();
+  } finally {
+    wakeDaemon();
+  }
+}
+
 browser.on("disconnected", () => {
-  childLog("warn", "browser-disconnected", { port: config.port });
+  void shutdown("browser-disconnected-exiting", false);
 });
 
 // ── Create context & page ──────────────────────────────────────────────
@@ -125,49 +153,75 @@ await installSessionTelemetry({
   logNetwork,
 });
 
+// ── Track pages — close browser when all pages are closed ──────────────
+
+function trackPage(p: Page): void {
+  p.on("close", async () => {
+    const remaining = context
+      .pages()
+      .filter(
+        (pg) =>
+          !pg.isClosed() &&
+          !pg.url().startsWith("devtools://") &&
+          !pg.url().startsWith("chrome-error://"),
+      );
+    await childLog("info", "page-closed", {
+      closedUrl: p.url(),
+      remainingPages: remaining.length,
+    });
+    if (remaining.length === 0 && !shuttingDown) {
+      await childLog("info", "all-pages-closed-shutting-down");
+      await browser.close();
+    }
+  });
+}
+
+trackPage(page);
+context.on("page", (newPage) => trackPage(newPage));
+
 // ── Navigate ───────────────────────────────────────────────────────────
 
 await page.goto(config.url);
 
 // ── Process lifecycle ──────────────────────────────────────────────────
 
-process.on("SIGTERM", async () => {
-  childLog("info", "child-sigterm");
-  await browser.close();
-  process.exit(0);
+process.on("SIGTERM", () => {
+  void shutdown("child-sigterm", true);
 });
 
-process.on("SIGINT", async () => {
-  childLog("info", "child-sigint");
-  await browser.close();
-  process.exit(0);
+process.on("SIGINT", () => {
+  void shutdown("child-sigint", true);
 });
 
 process.on("uncaughtException", (err) => {
   childLog("error", "uncaught-exception", {
     message: err.message,
     stack: err.stack,
-  });
-  process.exit(1);
+  }).finally(() => process.exit(1));
 });
 
-process.on("unhandledRejection", (reason) => {
-  childLog("warn", "unhandled-rejection", { reason: String(reason) });
+process.on("unhandledRejection", async (reason) => {
+  await childLog("warn", "unhandled-rejection", { reason: String(reason) });
 });
 
 process.on("exit", (code) => {
-  childLog("info", "child-exit", {
-    code,
-    pid: process.pid,
-    port: config.port,
+  const entry = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    id: Math.random().toString(36).slice(2, 10),
+    level: "info",
+    scope: "libretto.child",
+    event: "child-exit",
+    data: { code, pid: process.pid, port: config.port },
   });
+  appendFileSync(logFile, entry + "\n");
 });
 
-childLog("info", "child-launched", {
+await childLog("info", "child-launched", {
   port: config.port,
   pid: process.pid,
   session: config.session,
 });
 
 // Keep the daemon alive until the browser disconnects or a signal arrives.
-await new Promise(() => {});
+await sleepPromise;
+process.exit(0);

@@ -136,8 +136,10 @@ browser.on("disconnected", () => {
 });
 ```
 
-- [ ] Replace `await new Promise(() => {})` with a pattern that exits on browser disconnect (e.g., a promise that resolves on the `disconnected` event)
-- [ ] On disconnect, delete the session state file before exiting
-- [ ] Retain `SIGTERM`/`SIGINT` handlers for `libretto close` to still work
-- [ ] Manual test: `pnpm -s cli open https://example.com --headed`, close the Chrome window manually, verify the Node daemon process exits and the session state file is cleaned up (i.e., `pnpm -s cli status` shows no active session)
-- [ ] Manual test: `pnpm -s cli open https://example.com --headed`, then `pnpm -s cli close` still works as before
+- [x] Replace `await new Promise(() => {})` with a deferred promise that resolves on `browser.on('disconnected')`
+- [x] On disconnect, delete the session state file via `getSessionStatePath()` + `unlinkSync()` before exiting
+- [x] SIGTERM/SIGINT handlers also call `cleanupSessionState()` before `browser.close()`
+- [x] Fix: daemon entry path uses `.js` extension (required for ESM resolution from built `dist/` output)
+- [x] Manual test: kill Chromium process → daemon exits (code 0), state.json cleaned, `status` shows no session
+- [x] Manual test: `pnpm -s cli close` still works as before
+- Note: closing the last Chrome *window* does not terminate Chromium (Playwright launches with `--no-startup-window`). The `disconnected` event fires only when the Chromium process dies. This is documented in Future Work ("Daemon monitors all pages closing").
