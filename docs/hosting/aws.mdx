@@ -166,7 +166,7 @@ await ecs.send(
         {
           name: "browser-agent",
           environment: [
-            { name: "LIBRETTO_WORKFLOW", value: "./src/workflows/pull-referrals.ts" },
+            { name: "LIBRETTO_WORKFLOW", value: "pull-referrals" },
             { name: "LIBRETTO_INPUT", value: JSON.stringify(input) },
           ],
         },
