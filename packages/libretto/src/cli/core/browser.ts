@@ -7,7 +7,8 @@ import {
 } from "playwright";
 import { openSync, existsSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import type { LoggerApi } from "../../shared/logger/index.js";
@@ -446,6 +447,8 @@ export async function runOpen(
   const daemonEntryPath = fileURLToPath(
     new URL("./browser-daemon.js", import.meta.url),
   );
+  const require = createRequire(import.meta.url);
+  const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
   const daemonConfig = {
     port,
     url,
@@ -460,7 +463,7 @@ export async function runOpen(
 
   const child = spawn(
     process.execPath,
-    ["--import", "tsx", daemonEntryPath, JSON.stringify(daemonConfig)],
+    ["--import", tsxImportPath, daemonEntryPath, JSON.stringify(daemonConfig)],
     {
       detached: true,
       stdio: ["ignore", "ignore", childStderrFd],
