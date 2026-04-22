@@ -1,22 +1,61 @@
 name: OpenCode Review
+
 on:
+  # Auto-review for maintainer PRs (non-fork)
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
+  # /review command for any PR (runs in base repo context with full permissions)
+  issue_comment:
+    types: [created]
 
 concurrency:
-  group: codex-review-${{ github.event.pull_request.number }}
+  group: codex-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Run if:
+    #   - pull_request from the same repo (not a fork), OR
+    #   - issue_comment with /review from an OWNER or MEMBER on a PR
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       startsWith(github.event.comment.body, '/review') &&
+       contains(fromJson('["OWNER","MEMBER"]'), github.event.comment.author_association))
     permissions:
       contents: read
       pull-requests: write
       issues: write
       id-token: write
     steps:
+      - name: Resolve PR metadata
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let prNumber, prTitle, prBody;
+            if (context.eventName === 'issue_comment') {
+              prNumber = context.payload.issue.number;
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+              });
+              prTitle = pr.title;
+              prBody = pr.body || '';
+            } else {
+              prNumber = context.payload.pull_request.number;
+              prTitle = context.payload.pull_request.title;
+              prBody = context.payload.pull_request.body || '';
+            }
+            core.setOutput('number', prNumber);
+            core.setOutput('title', prTitle);
+            core.setOutput('body', prBody);
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -46,9 +85,9 @@ jobs:
           use_github_token: "true"
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
-            PR TITLE: ${{ github.event.pull_request.title }}
-            PR DESCRIPTION: ${{ github.event.pull_request.body }}
+            PR NUMBER: ${{ steps.pr.outputs.number }}
+            PR TITLE: ${{ steps.pr.outputs.title }}
+            PR DESCRIPTION: ${{ steps.pr.outputs.body }}
 
             You are an expert code reviewer specializing in evaluating implementations for simplicity and correctness. Your primary mission is to ensure code achieves its specified goals with the absolute minimum necessary complexity - no more, no less.
 
@@ -215,13 +254,14 @@ jobs:
         uses: actions/github-script@v7
         env:
           RUN_ID: ${{ github.run_id }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
         with:
           github-token: ${{ github.token }}
           script: |
             const marker = "<!-- opencode-review -->";
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const issueNumber = context.payload.pull_request.number;
+            const issueNumber = parseInt(process.env.PR_NUMBER, 10);
             const runPath = `/${owner}/${repo}/actions/runs/${process.env.RUN_ID}`;
 
             const comments = await github.paginate(github.rest.issues.listComments, {
