@@ -92,17 +92,8 @@ describe("createHostedDeployPackage", () => {
   > {
     const nodeModulesDir = join(dirname(args.outfile), "node_modules");
     mkdirSync(nodeModulesDir, { recursive: true });
-    const linkedPackageDirs = [
-      join(nodeModulesDir, "libretto"),
-      join(tmpdir(), "node_modules", "libretto"),
-    ];
-    for (const linkedPackageDir of linkedPackageDirs) {
-      if (existsSync(linkedPackageDir)) {
-        continue;
-      }
-      mkdirSync(dirname(linkedPackageDir), { recursive: true });
-      symlinkSync(currentLibrettoPackageDir, linkedPackageDir, "dir");
-    }
+    const linkedPackageDir = join(nodeModulesDir, "libretto");
+    symlinkSync(currentLibrettoPackageDir, linkedPackageDir, "dir");
 
     await build({
       bundle: true,

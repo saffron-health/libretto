@@ -1,0 +1,237 @@
+---
+title: Deploy on GCP
+sidebarTitle: GCP
+---
+
+> Run Libretto workflows as Cloud Run Jobs, triggered from your API or a scheduler.
+
+Cloud Run Jobs are GCP's managed container runtime for one-shot tasks. Each invocation spins up a fresh container, runs your workflow to completion, and exits. That's a good fit for browser automations that take minutes rather than seconds.
+
+### Prerequisites
+
+- A GCP project with billing enabled.
+- Artifact Registry, Cloud Run, Cloud Build, and Secret Manager APIs enabled.
+- A service account with access to the secrets your workflows need.
+- `gcloud` installed and authenticated locally.
+
+### 1. Write a dispatcher entry point
+
+A single image should be able to run any workflow in your package. The simplest way is a small `src/main.ts` that reads two env vars (which workflow to run, and its JSON input) then calls into the workflow directly:
+
+```typescript theme={null}
+// src/main.ts
+import { pullReferrals } from "./workflows/pull-referrals";
+import { submitPriorAuth } from "./workflows/submit-prior-auth";
+
+const workflows = {
+  "pull-referrals": pullReferrals,
+  "submit-prior-auth": submitPriorAuth,
+} as const;
+
+type WorkflowName = keyof typeof workflows;
+
+async function main() {
+  const name = process.env.LIBRETTO_WORKFLOW as WorkflowName | undefined;
+  const inputJson = process.env.LIBRETTO_INPUT ?? "{}";
+
+  if (!name || !(name in workflows)) {
+    throw new Error(
+      `Set LIBRETTO_WORKFLOW to one of: ${Object.keys(workflows).join(", ")}`,
+    );
+  }
+
+  const input = JSON.parse(inputJson);
+  await workflows[name](input);
+}
+
+void main();
+```
+
+Wire it up in `package.json`:
+
+```json theme={null}
+{
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "cloud:build": "gcloud builds submit --config cloudbuild.yaml .",
+    "cloud:deploy": "gcloud run jobs replace browser-agent-job.yaml --region=us-central1"
+  }
+}
+```
+
+### 2. Write the Dockerfile
+
+Start from the official Playwright image so Chromium and all its dependencies are already present. The rest installs `pnpm`, copies your source, and hands off to the dispatcher on start:
+
+```dockerfile theme={null}
+# Dockerfile
+FROM mcr.microsoft.com/playwright:v1.58.2-noble
+
+RUN apt-get update && apt-get install -y git \
+  && corepack enable \
+  && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# Playwright browsers need to be in the root user's cache
+RUN mkdir -p /root/.cache && cp -a /ms-playwright /root/.cache/
+
+COPY . .
+RUN pnpm install --frozen-lockfile
+
+ENV NODE_ENV=production
+
+# The dispatcher reads LIBRETTO_WORKFLOW / LIBRETTO_INPUT from env
+ENTRYPOINT ["pnpm", "start"]
+```
+
+Add a `.dockerignore` at the repo root so local state doesn't leak into the image:
+
+```gitignore theme={null}
+node_modules
+*/*/node_modules
+.git
+.gitignore
+dist
+build
+coverage
+.env
+.env.*
+*.log
+tmp/
+.DS_Store
+.libretto/sessions
+.libretto/profiles
+```
+
+### 3. Define the Cloud Run Job
+
+Describe the job declaratively so you can version it alongside your code. The shape below matches what `gcloud run jobs replace` emits after you create a job through the console or CLI:
+
+```yaml theme={null}
+# browser-agent-job.yaml
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: browser-agent-job
+spec:
+  template:
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          containers:
+            - image: us-central1-docker.pkg.dev/PROJECT_ID/browser-agent/browser-agent:latest
+              resources:
+                limits:
+                  cpu: 1000m
+                  memory: 2Gi
+          maxRetries: 0
+          serviceAccountName: browser-agent-sa@PROJECT_ID.iam.gserviceaccount.com
+          timeoutSeconds: "3600"
+```
+
+The `serviceAccountName` is what grants the job permission to read secrets, write to GCS, and so on. Scope it tightly.
+
+### 4. Build and deploy via Cloud Build
+
+```yaml theme={null}
+# cloudbuild.yaml
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      [
+        "build",
+        "-f", "Dockerfile",
+        "-t", "us-central1-docker.pkg.dev/$PROJECT_ID/browser-agent/browser-agent:$BUILD_ID",
+        "-t", "us-central1-docker.pkg.dev/$PROJECT_ID/browser-agent/browser-agent:latest",
+        ".",
+      ]
+  - name: gcr.io/cloud-builders/docker
+    args: ["push", "us-central1-docker.pkg.dev/$PROJECT_ID/browser-agent/browser-agent:$BUILD_ID"]
+  - name: gcr.io/cloud-builders/docker
+    args: ["push", "us-central1-docker.pkg.dev/$PROJECT_ID/browser-agent/browser-agent:latest"]
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args: ["run", "jobs", "replace", "browser-agent-job.yaml", "--region=us-central1"]
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_32
+timeout: "1200s"
+```
+
+Trigger a build and deploy:
+
+```bash theme={null}
+pnpm cloud:build    # builds + pushes image, replaces job spec
+```
+
+### 5. Inject credentials at runtime
+
+Never bake credentials into the image. Read them from Secret Manager inside your workflow dispatcher:
+
+```typescript theme={null}
+import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
+
+const sm = new SecretManagerServiceClient();
+
+export async function getSecret(name: string): Promise<string> {
+  const [version] = await sm.accessSecretVersion({
+    name: `projects/${process.env.GCP_PROJECT}/secrets/${name}/versions/latest`,
+  });
+  const payload = version.payload?.data?.toString();
+  if (!payload) throw new Error(`Secret ${name} is empty`);
+  return payload;
+}
+```
+
+Grant the job's service account `roles/secretmanager.secretAccessor` on each secret it needs:
+
+```bash theme={null}
+gcloud secrets add-iam-policy-binding MY_SECRET \
+  --member="serviceAccount:browser-agent-sa@PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+```
+
+### 6. Trigger the job
+
+From your API (service-to-service), pass the workflow name and input as env var overrides so the dispatcher picks them up:
+
+```typescript theme={null}
+import { JobsClient } from "@google-cloud/run";
+
+const client = new JobsClient();
+
+await client.runJob({
+  name: "projects/PROJECT_ID/locations/us-central1/jobs/browser-agent-job",
+  overrides: {
+    containerOverrides: [
+      {
+        env: [
+          { name: "LIBRETTO_WORKFLOW", value: "pull-referrals" },
+          { name: "LIBRETTO_INPUT", value: JSON.stringify(input) },
+        ],
+      },
+    ],
+  },
+});
+```
+
+From the CLI for ad-hoc runs:
+
+```bash theme={null}
+gcloud run jobs execute browser-agent-job \
+  --region=us-central1 \
+  --update-env-vars LIBRETTO_WORKFLOW=pull-referrals,LIBRETTO_INPUT='{"limit":50}'
+```
+
+### 7. Observability
+
+- **Logs:** `gcloud logs read browser-agent-job --region=us-central1`
+- **Execution history:** `gcloud run jobs executions list --job=browser-agent-job --region=us-central1`
+- **Session logs:** upload `.libretto/sessions/<name>/logs.jsonl` to GCS at the end of each run if you want to keep them beyond the job's lifetime.
+
+<Tip>
+  Libretto writes detailed network, action, and snapshot logs under `.libretto/sessions/<name>/`. Pushing that directory to GCS on failure gives you a reproducible record for debugging. See [debugging workflows](/workflow-guides/debugging-workflows) for what to look at.
+</Tip>
