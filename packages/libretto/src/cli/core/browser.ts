@@ -5,7 +5,7 @@ import {
   type CDPSession,
   type Page,
 } from "playwright";
-import { openSync, existsSync, writeFileSync } from "node:fs";
+import { openSync, closeSync, existsSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -470,6 +470,7 @@ export async function runOpen(
     },
   );
   child.unref();
+  closeSync(childStderrFd);
 
   logger.info("open-child-spawned", { pid: child.pid, port, session });
 
