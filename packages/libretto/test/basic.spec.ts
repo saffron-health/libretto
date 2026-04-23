@@ -433,12 +433,9 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const result = await librettoCli("open https://example.com", {
-      PATH: "/definitely-not-real",
+      PLAYWRIGHT_BROWSERS_PATH: "/definitely-not-real",
     });
-    expect(result.stderr).toContain("Failed to launch browser child process:");
-    expect(result.stderr).toContain(
-      "Ensure Node.js is available in PATH for child processes.",
-    );
+    expect(result.stderr).toContain("Browser child process exited before startup");
     expect(result.stderr).toContain("Check logs:");
   });
 
@@ -450,13 +447,13 @@ describe("basic CLI subprocess behavior", () => {
     await seedInstalledSkillVersion(workspacePath, ".agents", "0.0.0");
 
     const result = await librettoCli("open https://example.com", {
-      PATH: "/definitely-not-real",
+      PLAYWRIGHT_BROWSERS_PATH: "/definitely-not-real",
     });
 
     expect(result.stderr).toContain(
       expectedSkillVersionWarning("0.0.0", cliVersion),
     );
-    expect(result.stderr).toContain("Failed to launch browser child process:");
+    expect(result.stderr).toContain("Browser child process exited before startup");
   });
 
   test("defaults sessioned browser commands to the default session", async ({
