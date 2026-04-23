@@ -68,26 +68,27 @@ The only pre-processing needed:
 Write the tests first so every subsequent phase has a clear pass/fail signal. These tests launch a real headless browser via `librettoCli`, run multiple exec calls, and assert that state persists. All tests should fail initially (exec currently creates fresh state each call).
 
 ```ts
-// test/persistent-exec.spec.ts
-test("variable defined in one exec is available in the next", async ({ librettoCli }) => {
+// test/persistent-exec.spec.ts — uses writeHtml(title, body?) fixture from fixtures.ts
+test("variable defined in one exec is available in the next", async ({ librettoCli, writeHtml }) => {
   const session = "persist-var";
-  await librettoCli(`open https://example.com --headless --session ${session}`);
+  const url = await writeHtml("Test");
+  await librettoCli(`open "${url}" --headless --session ${session}`);
   await librettoCli(`exec "const x = 42" --session ${session}`);
   const result = await librettoCli(`exec "x" --session ${session}`);
   expect(result.stdout.trim()).toBe("42");
 });
 ```
 
-- [ ] Create `packages/libretto/test/persistent-exec.spec.ts`
-- [ ] Test: `const x = 42` in one exec, then `x` in the next → stdout is `42`
-- [ ] Test: `function double(n) { return n * 2 }` in one exec, then `double(21)` → stdout is `42`
-- [ ] Test: `class Adder { add(a, b) { return a + b } }` in one exec, then `new Adder().add(1, 2)` → stdout is `3`
-- [ ] Test: `const { a, b } = { a: 1, b: 2 }` in one exec, then `a + b` → stdout is `3`
-- [ ] Test: `return await page.title()` still works (backward compat with `return` keyword)
-- [ ] Test: `async function getTitle() { return await page.title() }` then `await getTitle()` → returns the page title (async function + top-level await persist)
-- [ ] Test: readonly-exec also persists state across calls (separate context from exec)
-- [ ] Test: exec error in one call doesn't break subsequent calls (`undeclaredVar` throws, then `1 + 1` → `2`)
-- [ ] Verify tests fail with current implementation: `pnpm --filter libretto test -- test/persistent-exec.spec.ts` (expected: failures on persistence assertions)
+- [x] Create `packages/libretto/test/persistent-exec.spec.ts`
+- [x] Test: `const x = 42` in one exec, then `x` in the next → stdout is `42`
+- [x] Test: `function double(n) { return n * 2 }` in one exec, then `double(21)` → stdout is `42`
+- [x] Test: `class Adder { add(a, b) { return a + b } }` in one exec, then `new Adder().add(1, 2)` → stdout is `3`
+- [x] Test: `const { a, b } = { a: 1, b: 2 }` in one exec, then `a + b` → stdout is `3`
+- [x] Test: `return await page.title()` still works (backward compat with `return` keyword)
+- [x] Test: `async function getTitle() { return await page.title() }` then `await getTitle()` → returns the page title (async function + top-level await persist)
+- [x] Test: readonly-exec also persists state across calls (separate context from exec)
+- [x] Test: exec error in one call doesn't break subsequent calls (`undeclaredVar` throws, then `1 + 1` → `2`)
+- [x] Verify tests fail with current implementation: `pnpm --filter libretto test -- test/persistent-exec.spec.ts` (expected: 7 failures on persistence/expression-value assertions, 1 pass on `return` backward compat)
 
 ### Phase 2: Add exec socket path to session state
 
