@@ -1,0 +1,100 @@
+---
+title: Website authentication
+---
+
+> Pass credentials into a workflow, and reuse authenticated browser state across runs when the login can't be scripted.
+
+Most real automation targets sit behind a login. There are two patterns for getting past it, and they cover different kinds of login:
+
+1. **Pass credentials into the workflow as input** (username, password, TOTP secret). The workflow's Playwright code fills them into the login form and submits, just like any other form interaction. This works for any login you can script end-to-end, including ones with TOTP.
+2. **Save an authenticated profile** from a one-time manual login and reuse it with `--auth-profile`. Use this when the login can't be scripted (CAPTCHAs, SMS codes, device-approval prompts, magic links), so future runs start already signed in.
+
+### Passing credentials into a workflow
+
+Workflows receive a typed `input` object. Credentials are just fields on that input, and your Playwright code fills them into the page the same way it fills any other form. If the site also requires a TOTP (Google Authenticator style) code, store the **shared secret** alongside the other credentials and derive a fresh code each run with a library like [`otplib`](https://www.npmjs.com/package/otplib):
+
+```typescript theme={null}
+import { authenticator } from "otplib";
+import { workflow } from "libretto";
+
+type Input = {
+  username: string;
+  password: string;
+  totpSecret: string;
+};
+
+export const main = workflow<Input, { success: boolean }>(
+  "portal-login",
+  async (ctx, input) => {
+    const { page } = ctx;
+
+    await page.goto("https://portal.example.com/login");
+    await page.fill('[name="username"]', input.username);
+    await page.fill('[name="password"]', input.password);
+    await page.click('button[type="submit"]');
+
+    // The site prompts for a TOTP code
+    await page.waitForSelector('[name="otp"]');
+    await page.fill('[name="otp"]', authenticator.generate(input.totpSecret));
+    await page.click('button[type="submit"]');
+
+    await page.waitForURL(/\/dashboard/);
+    return { success: true };
+  },
+);
+```
+
+Invoke the workflow with credentials sourced from your environment:
+
+```bash theme={null}
+npx libretto run ./portal-login.ts \
+  --input '{"username":"'"$PORTAL_USERNAME"'","password":"'"$PORTAL_PASSWORD"'","totpSecret":"'"$PORTAL_TOTP_SECRET"'"}'
+```
+
+<Warning>
+  Credentials passed on the command line land in your shell history and the session log. For production, inject them from a secret manager (GCP Secret Manager, AWS Secrets Manager, Vault) and read them inside the dispatcher that invokes the workflow.
+</Warning>
+
+### Saving profiles locally
+
+When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magic links), the workaround is to log in **once** in a visible browser and snapshot the authenticated state. Libretto calls that snapshot a **profile**: cookies, `localStorage`, and other persistent storage saved to `.libretto/profiles/<domain>.json`. Future runs start already signed in by loading the profile.
+
+<Steps>
+  <Step title="Open the site in headed mode">
+    ```bash  theme={null}
+    npx libretto open https://portal.example.com --headed --session portal-login
+    ```
+
+    A visible Chromium window launches, pinned to the session `portal-login`.
+  </Step>
+
+  <Step title="Complete the login in the browser">
+    Enter credentials, solve CAPTCHAs, approve device prompts, or whatever else the site requires.
+  </Step>
+
+  <Step title="Save the session as a profile">
+    ```bash  theme={null}
+    npx libretto save portal.example.com --session portal-login
+    ```
+
+    Libretto writes the authenticated state to `.libretto/profiles/portal.example.com.json`.
+  </Step>
+
+  <Step title="Reuse the profile in future runs">
+    ```bash  theme={null}
+    npx libretto run ./report.ts --auth-profile portal.example.com
+    ```
+
+    The run starts already signed in. No login step required.
+  </Step>
+</Steps>
+
+<Warning>
+  Sessions can expire. If a profile stops working, repeat the login-and-save flow to refresh it. For servers, rotate profiles on a schedule shorter than the site's session TTL.
+</Warning>
+
+Profiles are:
+
+- **Machine-local.** They live in `.libretto/profiles/` and are not shared across environments or team members.
+- **Git-ignored by default.** The `.libretto/.gitignore` created during setup excludes them.
+- **Effectively credentials.** Treat them like a password. Never commit, never share, and rotate them if leaked.

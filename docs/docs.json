@@ -50,10 +50,16 @@
         "pages": [
           "get-started/introduction",
           "get-started/installation",
-          "get-started/configuration",
-          "get-started/core-concepts",
-          "get-started/how-workflow-generation-works",
-          "get-started/automation-and-bot-detection"
+          "get-started/configuration"
+        ]
+      },
+      {
+        "group": "Fundamentals",
+        "pages": [
+          "fundamentals/core-concepts",
+          "fundamentals/how-workflow-generation-works",
+          "fundamentals/automation-and-bot-detection",
+          "fundamentals/website-authentication"
         ]
       },
       {
@@ -85,6 +91,14 @@
           "library-api/ai-extraction",
           "library-api/network-requests",
           "library-api/file-downloads"
+        ]
+      },
+      {
+        "group": "Hosting",
+        "pages": [
+          "hosting/introduction",
+          "hosting/gcp",
+          "hosting/aws"
         ]
       }
     ],
