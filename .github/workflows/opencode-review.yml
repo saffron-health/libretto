@@ -37,7 +37,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            let prNumber, prTitle, prBody, headRef, headSha;
+            let prNumber, prTitle, prBody;
             if (context.eventName === 'issue_comment') {
               prNumber = context.payload.issue.number;
               const { data: pr } = await github.rest.pulls.get({
@@ -47,18 +47,15 @@ jobs:
               });
               prTitle = pr.title;
               prBody = pr.body || '';
-              headRef = pr.head.ref;
-              headSha = pr.head.sha;
             } else {
               prNumber = context.payload.pull_request.number;
               prTitle = context.payload.pull_request.title;
               prBody = context.payload.pull_request.body || '';
-              headRef = context.payload.pull_request.head.ref;
-              headSha = context.payload.pull_request.head.sha;
             }
             core.setOutput('number', prNumber);
             core.setOutput('title', prTitle);
             core.setOutput('body', prBody);
+
 
       - uses: actions/checkout@v4
         with:
