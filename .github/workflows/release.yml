@@ -167,6 +167,7 @@ jobs:
         run: npm publish --access public
 
       - name: Publish create-libretto to npm
+        continue-on-error: true
         working-directory: packages/create-libretto
         run: |
           if ! npm view "create-libretto@${{ needs.verify.outputs.version }}" version >/dev/null 2>&1; then
