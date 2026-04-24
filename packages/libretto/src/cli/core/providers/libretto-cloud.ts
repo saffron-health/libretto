@@ -13,6 +13,8 @@ export function createLibrettoCloudProvider(): ProviderApi {
     );
   const endpoint = apiUrl.replace(/\/$/, "");
 
+  // The Libretto Cloud API is an oRPC RPCHandler, not plain REST, so inputs
+  // must be wrapped as { json: ... } and outputs arrive the same way.
   return {
     async createSession() {
       const timeoutSeconds = Number(
@@ -24,7 +26,9 @@ export function createLibrettoCloudProvider(): ProviderApi {
           "x-api-key": apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ timeout_seconds: timeoutSeconds }),
+        body: JSON.stringify({
+          json: { timeout_seconds: timeoutSeconds },
+        }),
       });
       if (!resp.ok) {
         const body = await resp.text();
@@ -32,9 +36,8 @@ export function createLibrettoCloudProvider(): ProviderApi {
           `Libretto Cloud API error (${resp.status}): ${body}`,
         );
       }
-      const json = (await resp.json()) as {
-        session_id: string;
-        cdp_url: string;
+      const { json } = (await resp.json()) as {
+        json: { session_id: string; cdp_url: string };
       };
       return {
         sessionId: json.session_id,
@@ -48,7 +51,7 @@ export function createLibrettoCloudProvider(): ProviderApi {
           "x-api-key": apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify({ json: { session_id: sessionId } }),
       });
       if (!resp.ok) {
         const body = await resp.text();
