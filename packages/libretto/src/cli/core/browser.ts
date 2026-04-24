@@ -590,7 +590,12 @@ export async function runOpenWithProvider(
     provider: providerName,
     sessionId: providerSession.sessionId,
     cdpEndpoint: providerSession.cdpEndpoint,
+    liveViewUrl: providerSession.liveViewUrl,
   });
+
+  if (providerSession.liveViewUrl) {
+    console.log(`View live session: ${providerSession.liveViewUrl}`);
+  }
 
   console.log(`Connecting to ${providerName} browser...`);
 
@@ -763,6 +768,7 @@ export async function runClose(
     return;
   }
 
+  let replayUrl: string | undefined;
   if (state.provider) {
     // Cloud provider session — close via provider API, no local pid to kill
     logger.info("close-provider", {
@@ -772,7 +778,8 @@ export async function runClose(
     });
     try {
       const provider = getCloudProviderApi(state.provider.name);
-      await provider.closeSession(state.provider.sessionId);
+      const result = await provider.closeSession(state.provider.sessionId);
+      replayUrl = result.replayUrl;
     } catch (err) {
       logger.warn("close-provider-error", {
         session,
@@ -797,8 +804,11 @@ export async function runClose(
   }
 
   clearSessionState(session, logger);
-  logger.info("close-success", { session });
+  logger.info("close-success", { session, replayUrl });
   console.log(`Browser closed (session: ${session}).`);
+  if (replayUrl) {
+    console.log(`View recording: ${replayUrl}`);
+  }
 }
 
 type ClosableSession = {
@@ -900,6 +910,7 @@ export async function runCloseAll(
 
   // Close provider sessions via their APIs
   const failedProviderSessions = new Set<string>();
+  const replayUrls: Array<{ session: string; replayUrl: string }> = [];
   for (const target of closable) {
     if (target.provider) {
       logger.info("close-all-provider", {
@@ -909,7 +920,13 @@ export async function runCloseAll(
       });
       try {
         const provider = getCloudProviderApi(target.provider.name);
-        await provider.closeSession(target.provider.sessionId);
+        const result = await provider.closeSession(target.provider.sessionId);
+        if (result.replayUrl) {
+          replayUrls.push({
+            session: target.session,
+            replayUrl: result.replayUrl,
+          });
+        }
       } catch (err) {
         logger.warn("close-all-provider-error", {
           session: target.session,
@@ -1019,6 +1036,9 @@ export async function runCloseAll(
   console.log(`Closed ${closedCount} session(s).`);
   if (forceKilled > 0) {
     console.log(`Force-killed ${forceKilled} session(s).`);
+  }
+  for (const { session, replayUrl } of replayUrls) {
+    console.log(`View recording (${session}): ${replayUrl}`);
   }
 }
 

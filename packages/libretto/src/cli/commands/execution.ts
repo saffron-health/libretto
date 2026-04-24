@@ -882,6 +882,15 @@ export const runCommand = SimpleCLI.command({
         `Creating ${providerName} browser session (session: ${ctx.session})...`,
       );
       const providerSession = await provider.createSession();
+      ctx.logger.info("run-provider-session-created", {
+        provider: providerName,
+        sessionId: providerSession.sessionId,
+        cdpEndpoint: providerSession.cdpEndpoint,
+        liveViewUrl: providerSession.liveViewUrl,
+      });
+      if (providerSession.liveViewUrl) {
+        console.log(`View live session: ${providerSession.liveViewUrl}`);
+      }
       console.log(`Connecting to ${providerName} browser...`);
       cdpEndpoint = providerSession.cdpEndpoint;
       providerInfo = {
@@ -910,7 +919,10 @@ export const runCommand = SimpleCLI.command({
     } finally {
       if (provider && providerInfo) {
         try {
-          await provider.closeSession(providerInfo.sessionId);
+          const result = await provider.closeSession(providerInfo.sessionId);
+          if (result.replayUrl) {
+            console.log(`View recording: ${result.replayUrl}`);
+          }
         } catch (cleanupErr) {
           console.error(
             `Failed to clean up ${providerInfo.name} session ${providerInfo.sessionId}:`,

@@ -37,11 +37,17 @@ export function createLibrettoCloudProvider(): ProviderApi {
         );
       }
       const { json } = (await resp.json()) as {
-        json: { session_id: string; cdp_url: string };
+        json: {
+          session_id: string;
+          cdp_url: string;
+          live_view_url: string | null;
+          recording_url: string | null;
+        };
       };
       return {
         sessionId: json.session_id,
         cdpEndpoint: json.cdp_url,
+        liveViewUrl: json.live_view_url ?? undefined,
       };
     },
     async closeSession(sessionId) {
@@ -59,6 +65,10 @@ export function createLibrettoCloudProvider(): ProviderApi {
           `Libretto Cloud API error closing session ${sessionId} (${resp.status}): ${body}`,
         );
       }
+      const { json } = (await resp.json()) as {
+        json: { replay_url: string | null };
+      };
+      return { replayUrl: json.replay_url ?? undefined };
     },
   };
 }
