@@ -910,6 +910,7 @@ export async function runCloseAll(
 
   // Close provider sessions via their APIs
   const failedProviderSessions = new Set<string>();
+  const replayUrls: Array<{ session: string; replayUrl: string }> = [];
   for (const target of closable) {
     if (target.provider) {
       logger.info("close-all-provider", {
@@ -919,7 +920,13 @@ export async function runCloseAll(
       });
       try {
         const provider = getCloudProviderApi(target.provider.name);
-        await provider.closeSession(target.provider.sessionId);
+        const result = await provider.closeSession(target.provider.sessionId);
+        if (result.replayUrl) {
+          replayUrls.push({
+            session: target.session,
+            replayUrl: result.replayUrl,
+          });
+        }
       } catch (err) {
         logger.warn("close-all-provider-error", {
           session: target.session,
@@ -1029,6 +1036,9 @@ export async function runCloseAll(
   console.log(`Closed ${closedCount} session(s).`);
   if (forceKilled > 0) {
     console.log(`Force-killed ${forceKilled} session(s).`);
+  }
+  for (const { session, replayUrl } of replayUrls) {
+    console.log(`View recording (${session}): ${replayUrl}`);
   }
 }
 
