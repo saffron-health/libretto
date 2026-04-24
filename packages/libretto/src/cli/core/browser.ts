@@ -590,7 +590,12 @@ export async function runOpenWithProvider(
     provider: providerName,
     sessionId: providerSession.sessionId,
     cdpEndpoint: providerSession.cdpEndpoint,
+    liveViewUrl: providerSession.liveViewUrl,
   });
+
+  if (providerSession.liveViewUrl) {
+    console.log(`View live session: ${providerSession.liveViewUrl}`);
+  }
 
   console.log(`Connecting to ${providerName} browser...`);
 
@@ -763,6 +768,7 @@ export async function runClose(
     return;
   }
 
+  let replayUrl: string | undefined;
   if (state.provider) {
     // Cloud provider session — close via provider API, no local pid to kill
     logger.info("close-provider", {
@@ -772,7 +778,8 @@ export async function runClose(
     });
     try {
       const provider = getCloudProviderApi(state.provider.name);
-      await provider.closeSession(state.provider.sessionId);
+      const result = await provider.closeSession(state.provider.sessionId);
+      replayUrl = result.replayUrl;
     } catch (err) {
       logger.warn("close-provider-error", {
         session,
@@ -797,8 +804,11 @@ export async function runClose(
   }
 
   clearSessionState(session, logger);
-  logger.info("close-success", { session });
+  logger.info("close-success", { session, replayUrl });
   console.log(`Browser closed (session: ${session}).`);
+  if (replayUrl) {
+    console.log(`View recording: ${replayUrl}`);
+  }
 }
 
 type ClosableSession = {

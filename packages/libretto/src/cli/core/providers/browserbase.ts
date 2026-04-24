@@ -52,6 +52,7 @@ export function createBrowserbaseProvider(): ProviderApi {
           `Browserbase API error closing session ${sessionId} (${resp.status}): ${body}`,
         );
       }
+      return {};
     },
   };
 }

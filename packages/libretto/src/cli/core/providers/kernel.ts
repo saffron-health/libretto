@@ -44,6 +44,7 @@ export function createKernelProvider(): ProviderApi {
           `Kernel API error closing session ${sessionId} (${resp.status}): ${body}`,
         );
       }
+      return {};
     },
   };
 }
