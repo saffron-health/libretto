@@ -149,16 +149,16 @@ async function evalInRepl(
 }
 ```
 
-- [ ] Move `stripEmptyCatchHandlers` from `execution.ts` into a new `packages/libretto/src/cli/core/exec-sandbox.ts` module (shared between daemon and CLI fallback)
-- [ ] Add `createExecRepl()` and `evalInRepl()` helpers in the daemon
-- [ ] Create two REPL instances at daemon startup: one for `exec` mode (full helpers including `page`, `context`, `browser`, `networkLog`, `actionLog`, `console`, `fetch`, etc.), one for `readonly-exec` (read-only helpers from `createReadonlyExecHelpers`)
-- [ ] Add an HTTP server to `browser-daemon.ts` that listens on `config.execSocketPath`
-- [ ] Implement `POST /exec` handler: accepts `{ code, mode, pageId?, visualize? }`, strips TS types via `node:module.stripTypeScriptTypes`, applies `stripEmptyCatchHandlers`, strips leading `return` for backward compat, feeds to the appropriate REPL via `evalInRepl()`
-- [ ] Return `{ ok: true, result }` on success, `{ ok: false, error: { message, stack } }` on failure
-- [ ] Handle page targeting: if `pageId` is provided, update the REPL context's `page` reference to the target page
-- [ ] Add stall-detection interval (60s) and structured `childLog` calls for exec-start/success/error
-- [ ] Clean up the Unix socket file in `shutdown()` (unlink alongside session state)
-- [ ] Verify `pnpm --filter libretto type-check` passes
+- [x] Move `stripEmptyCatchHandlers` from `execution.ts` into a new `packages/libretto/src/cli/core/exec-sandbox.ts` module (shared between daemon and CLI fallback)
+- [x] Add `createExecRepl()` and `evalInRepl()` helpers in the daemon
+- [x] Create two REPL instances at daemon startup: one for `exec` mode (full helpers including `page`, `context`, `browser`, `networkLog`, `actionLog`, `console`, `fetch`, etc.), one for `readonly-exec` (read-only helpers from `createReadonlyExecHelpers`)
+- [x] Add an HTTP server to `browser-daemon.ts` that listens on `config.execSocketPath`
+- [x] Implement `POST /exec` handler: accepts `{ code, mode, pageId?, visualize? }`, strips TS types via `node:module.stripTypeScriptTypes`, applies `stripEmptyCatchHandlers`, strips leading `return` for backward compat, feeds to the appropriate REPL via `evalInRepl()`
+- [x] Return `{ ok: true, result }` on success, `{ ok: false, error: { message, stack } }` on failure
+- [x] Handle page targeting: if `pageId` is provided, update the REPL context's `page` reference to the target page
+- [x] Add stall-detection interval (60s) and structured `childLog` calls for exec-start/success/error
+- [x] Clean up the Unix socket file in `shutdown()` (unlink alongside session state)
+- [x] Verify `pnpm --filter libretto type-check` passes
 
 ### Phase 4: Make the CLI exec command a thin client
 

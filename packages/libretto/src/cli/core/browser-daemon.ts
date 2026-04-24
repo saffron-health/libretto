@@ -13,9 +13,20 @@
  */
 
 import { chromium } from "playwright";
+import type { Page } from "playwright";
 import { mkdir, unlink } from "node:fs/promises";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync, unlinkSync } from "node:fs";
+import repl from "node:repl";
+import { createServer, type Server } from "node:http";
+import { PassThrough } from "node:stream";
 import { installSessionTelemetry } from "./session-telemetry.js";
+import { stripEmptyCatchHandlers, stripTypeScript } from "./exec-sandbox.js";
+import { createReadonlyExecHelpers } from "./readonly-exec.js";
+import {
+  readNetworkLog,
+  readActionLog,
+  wrapPageForActionLogging,
+} from "./telemetry.js";
 import {
   getSessionDir,
   getSessionLogsPath,
@@ -116,6 +127,21 @@ async function shutdown(
   shuttingDown = true;
   try {
     childLog("info", reason, { port: config.port });
+    // Close exec server and clean up socket
+    if (execServer) {
+      execServer.close();
+    }
+    if (config.execSocketPath) {
+      try {
+        await unlink(config.execSocketPath);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+          childLog("warn", "exec-socket-cleanup-error", {
+            error: String(err),
+          });
+        }
+      }
+    }
     await cleanupSessionState();
     if (closeBrowser) await browser.close();
   } finally {
@@ -157,6 +183,219 @@ await installSessionTelemetry({
 // ── Navigate ───────────────────────────────────────────────────────────
 
 await page.goto(config.url);
+
+// ── Exec server (persistent REPL) ─────────────────────────────────────
+
+/**
+ * Create a REPL instance with an isolated context.
+ *
+ * `useGlobal: false` gives each REPL its own V8 context so exec and
+ * readonly-exec don't share state. Node globals like `console`,
+ * `setTimeout`, `fetch` aren't available in an isolated context by
+ * default, so we copy them from `globalThis`.
+ */
+function createExecRepl(globals: Record<string, unknown>): repl.REPLServer {
+  const r = repl.start({
+    input: new PassThrough(),
+    output: new PassThrough(),
+    prompt: "",
+    terminal: false,
+    useGlobal: false,
+  });
+  Object.assign(r.context, globalThis, globals);
+  return r;
+}
+
+/**
+ * Evaluate code in a REPL and return the result as a promise.
+ */
+async function evalInRepl(
+  r: repl.REPLServer,
+  code: string,
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    r.eval(code + "\n", r.context, "libretto-exec", (err, result) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  });
+}
+
+// Lazy REPL creation — only instantiate when first used.
+let _execRepl: repl.REPLServer | undefined;
+let _readonlyExecRepl: repl.REPLServer | undefined;
+
+function getExecRepl(): repl.REPLServer {
+  if (!_execRepl) {
+    _execRepl = createExecRepl({
+      page,
+      context,
+      browser,
+      state: {} as Record<string, unknown>,
+      networkLog: (
+        opts: {
+          last?: number;
+          filter?: string;
+          method?: string;
+          pageId?: string;
+        } = {},
+      ) => readNetworkLog(config.session, opts),
+      actionLog: (
+        opts: {
+          last?: number;
+          filter?: string;
+          action?: string;
+          source?: string;
+          pageId?: string;
+        } = {},
+      ) => readActionLog(config.session, opts),
+    });
+  }
+  return _execRepl;
+}
+
+function getReadonlyExecRepl(): repl.REPLServer {
+  if (!_readonlyExecRepl) {
+    _readonlyExecRepl = createExecRepl(
+      createReadonlyExecHelpers(page) as unknown as Record<string, unknown>,
+    );
+  }
+  return _readonlyExecRepl;
+}
+
+function stripLeadingReturn(code: string): string {
+  return code.replace(/^\s*return\s+/, "");
+}
+
+function prepareCode(rawCode: string): string {
+  let code = stripTypeScript(rawCode);
+  code = stripEmptyCatchHandlers(code).cleaned;
+  code = stripLeadingReturn(code);
+  return code;
+}
+
+function findPageById(pageId: string): Page | undefined {
+  return context.pages().find((p) => {
+    const url = p.url();
+    return url === pageId || url.includes(pageId);
+  });
+}
+
+let execServer: Server | undefined;
+
+if (config.execSocketPath) {
+  // Remove stale socket file if present
+  if (existsSync(config.execSocketPath)) {
+    unlinkSync(config.execSocketPath);
+  }
+
+  execServer = createServer(async (req, res) => {
+    if (req.method !== "POST" || req.url !== "/exec") {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: { message: "Not found" } }));
+      return;
+    }
+
+    // Read request body
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(chunk as Buffer);
+    }
+    const bodyStr = Buffer.concat(chunks).toString("utf-8");
+
+    let body: {
+      code: string;
+      mode: "exec" | "readonly-exec";
+      pageId?: string;
+      visualize?: boolean;
+    };
+    try {
+      body = JSON.parse(bodyStr) as typeof body;
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({ ok: false, error: { message: "Invalid JSON body" } }),
+      );
+      return;
+    }
+
+    const { code: rawCode, mode, pageId } = body;
+
+    childLog("info", "exec-start", {
+      mode,
+      codeLength: rawCode.length,
+      codePreview: rawCode.slice(0, 200),
+      pageId,
+    });
+
+    // Page targeting: update the REPL context's page reference
+    const replInstance =
+      mode === "readonly-exec" ? getReadonlyExecRepl() : getExecRepl();
+    if (pageId) {
+      const targetPage = findPageById(pageId);
+      if (targetPage) {
+        if (mode === "readonly-exec") {
+          const readonlyHelpers = createReadonlyExecHelpers(targetPage);
+          Object.assign(replInstance.context, {
+            page: readonlyHelpers.page,
+          });
+        } else {
+          replInstance.context.page = targetPage;
+          wrapPageForActionLogging(targetPage, config.session, pageId);
+        }
+      }
+    }
+
+    const preparedCode = prepareCode(rawCode);
+
+    // Stall detection
+    const STALL_THRESHOLD_MS = 60_000;
+    const stallTimer = setTimeout(() => {
+      childLog("warn", "exec-stall-warning", {
+        mode,
+        silenceMs: STALL_THRESHOLD_MS,
+        codePreview: rawCode.slice(0, 200),
+      });
+    }, STALL_THRESHOLD_MS);
+
+    try {
+      const result = await evalInRepl(replInstance, preparedCode);
+
+      clearTimeout(stallTimer);
+      childLog("info", "exec-success", {
+        mode,
+        hasResult: result !== undefined,
+      });
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, result }));
+    } catch (err) {
+      clearTimeout(stallTimer);
+      const error = err instanceof Error ? err : new Error(String(err));
+
+      childLog("error", "exec-error", {
+        mode,
+        message: error.message,
+        stack: error.stack,
+        codePreview: rawCode.slice(0, 200),
+      });
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          ok: false,
+          error: { message: error.message, stack: error.stack },
+        }),
+      );
+    }
+  });
+
+  execServer.listen(config.execSocketPath, () => {
+    childLog("info", "exec-server-listening", {
+      socketPath: config.execSocketPath,
+    });
+  });
+}
 
 // ── Process lifecycle ──────────────────────────────────────────────────
 
