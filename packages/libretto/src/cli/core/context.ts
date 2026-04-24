@@ -38,6 +38,10 @@ export function getSessionActionsLogPath(session: string): string {
   return join(getSessionDir(session), "actions.jsonl");
 }
 
+export function getSessionExecSocketPath(session: string): string {
+  return join(getSessionDir(session), "exec.sock");
+}
+
 export function getSessionSnapshotsDir(session: string): string {
   return join(getSessionDir(session), "snapshots");
 }

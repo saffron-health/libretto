@@ -32,6 +32,7 @@ export const SessionStateFileSchema = z.object({
   mode: SessionAccessModeSchema.default("write-access"),
   viewport: SessionViewportSchema.optional(),
   provider: ProviderStateSchema.optional(),
+  execSocketPath: z.string().optional(),
 });
 
 export type SessionStatus = z.infer<typeof SessionStatusSchema>;

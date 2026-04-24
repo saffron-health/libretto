@@ -34,6 +34,7 @@ type DaemonConfig = {
   viewport: { width: number; height: number };
   storageStatePath?: string;
   windowPosition?: { x: number; y: number };
+  execSocketPath?: string;
 };
 
 const config: DaemonConfig = JSON.parse(process.argv[2]);

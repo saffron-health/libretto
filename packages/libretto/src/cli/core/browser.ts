@@ -13,7 +13,7 @@ import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
-import { PROFILES_DIR } from "./context.js";
+import { PROFILES_DIR, getSessionExecSocketPath } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import {
   assertSessionAvailableForStart,
@@ -449,6 +449,7 @@ export async function runOpen(
   );
   const require = createRequire(import.meta.url);
   const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
+  const execSocketPath = getSessionExecSocketPath(session);
   const daemonConfig = {
     port,
     url,
@@ -457,6 +458,7 @@ export async function runOpen(
     viewport,
     storageStatePath: useProfile ? profilePath : undefined,
     windowPosition,
+    execSocketPath,
   };
 
   const childStderrFd = openSync(runLogPath, "a");
@@ -541,6 +543,7 @@ export async function runOpen(
           status: "active",
           mode: accessMode,
           viewport,
+          execSocketPath,
         },
         logger,
       );

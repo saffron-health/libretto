@@ -101,11 +101,11 @@ export function getSessionExecSocketPath(session: string): string {
 }
 ```
 
-- [ ] Add `getSessionExecSocketPath(session)` to `packages/libretto/src/cli/core/context.ts`
-- [ ] Add optional `execSocketPath: z.string().optional()` to `SessionStateFileSchema` in `packages/libretto/src/shared/state/session-state.ts`
-- [ ] In `runOpen()` in `browser.ts`, include `execSocketPath: getSessionExecSocketPath(session)` in the `writeSessionState()` call
-- [ ] Pass `execSocketPath` through to the daemon via `daemonConfig`
-- [ ] Verify `pnpm --filter libretto type-check` passes
+- [x] Add `getSessionExecSocketPath(session)` to `packages/libretto/src/cli/core/context.ts`
+- [x] Add optional `execSocketPath: z.string().optional()` to `SessionStateFileSchema` in `packages/libretto/src/shared/state/session-state.ts`
+- [x] In `runOpen()` in `browser.ts`, include `execSocketPath: getSessionExecSocketPath(session)` in the `writeSessionState()` call
+- [x] Pass `execSocketPath` through to the daemon via `daemonConfig`
+- [x] Verify `pnpm --filter libretto type-check` passes
 
 ### Phase 3: Add the exec server and persistent REPL to the daemon
 
