@@ -13,15 +13,20 @@
  */
 
 import { chromium } from "playwright";
-import type { Page } from "playwright";
+import type { CDPSession, Page } from "playwright";
 import { mkdir, unlink } from "node:fs/promises";
-import { appendFileSync, existsSync, unlinkSync } from "node:fs";
-import repl from "node:repl";
-import { createServer, type Server } from "node:http";
-import { PassThrough } from "node:stream";
+import { appendFileSync } from "node:fs";
+import vm from "node:vm";
+import { Session as InspectorSession } from "node:inspector/promises";
+import type { Server } from "node:http";
+import { installInstrumentation } from "../../shared/instrumentation/index.js";
 import { installSessionTelemetry } from "./session-telemetry.js";
-import { stripEmptyCatchHandlers, stripTypeScript } from "./exec-sandbox.js";
+import {
+  stripEmptyCatchHandlers,
+  stripTypeScript,
+} from "./exec-sandbox.js";
 import { createReadonlyExecHelpers } from "./readonly-exec.js";
+import { serveDaemon, type ExecRequest, type ExecResult } from "./daemon-rpc.js";
 import {
   readNetworkLog,
   readActionLog,
@@ -184,142 +189,235 @@ await installSessionTelemetry({
 
 await page.goto(config.url);
 
-// ── Exec server (persistent REPL) ─────────────────────────────────────
+// ── Exec sandbox (Inspector-based persistent context) ──────────────────
+//
+// Uses the Chrome DevTools Protocol `Runtime.evaluate` with `replMode: true`
+// against a dedicated `vm.Context`. This gives us REPL semantics —
+// `const`/`let`/`class` persistence, top-level `await`, `const`
+// re-declaration, and proper error reporting — all via a public Node API,
+// without the `repl` module's internal domain hacks.
+
+type EvalResult =
+  | { ok: true; value: unknown }
+  | { ok: false; error: string };
 
 /**
- * Create a REPL instance with an isolated context.
+ * A persistent execution sandbox backed by `node:inspector/promises`.
  *
- * `useGlobal: false` gives each REPL its own V8 context so exec and
- * readonly-exec don't share state. Node globals like `console`,
- * `setTimeout`, `fetch` aren't available in an isolated context by
- * default, so we copy them from `globalThis`.
+ * Each sandbox owns a `vm.Context` and an Inspector session. Code is
+ * evaluated via `Runtime.evaluate({ replMode: true })`, which gives V8
+ * REPL semantics: declarations persist, `const` can be re-declared, and
+ * top-level `await` works natively.
  */
-function createExecRepl(globals: Record<string, unknown>): repl.REPLServer {
-  const r = repl.start({
-    input: new PassThrough(),
-    output: new PassThrough(),
-    prompt: "",
-    terminal: false,
-    useGlobal: false,
-  });
-  Object.assign(r.context, globalThis, globals);
-  return r;
-}
-
 /**
- * Evaluate code in a REPL and return the result as a promise.
+ * Typed wrapper for `Inspector.Session.post` calls.
+ *
+ * The `node:inspector/promises` type declarations are incomplete in
+ * `@types/node` — the Session class is missing `post()` overloads, and
+ * `Runtime.EvaluateParameterType` doesn't include `replMode`. We cast
+ * through this helper to keep the rest of the code clean.
  */
-async function evalInRepl(
-  r: repl.REPLServer,
-  code: string,
-): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    r.eval(code + "\n", r.context, "libretto-exec", (err, result) => {
-      if (err) reject(err);
-      else resolve(result);
-    });
-  });
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type InspectorPost = (method: string, params?: Record<string, unknown>) => Promise<any>;
 
-// Lazy REPL creation — only instantiate when first used.
-let _execRepl: repl.REPLServer | undefined;
-let _readonlyExecRepl: repl.REPLServer | undefined;
+type RuntimeEvaluateResult = {
+  result: { type: string; value?: unknown; description?: string };
+  exceptionDetails?: { text: string; exception?: { description?: string } };
+};
 
-function getExecRepl(): repl.REPLServer {
-  if (!_execRepl) {
-    _execRepl = createExecRepl({
-      page,
-      context,
-      browser,
-      state: {} as Record<string, unknown>,
-      networkLog: (
-        opts: {
-          last?: number;
-          filter?: string;
-          method?: string;
-          pageId?: string;
-        } = {},
-      ) => readNetworkLog(config.session, opts),
-      actionLog: (
-        opts: {
-          last?: number;
-          filter?: string;
-          action?: string;
-          source?: string;
-          pageId?: string;
-        } = {},
-      ) => readActionLog(config.session, opts),
-    });
+class InspectorSandbox {
+  #session: InspectorSession;
+  #post: InspectorPost;
+  #contextId!: number;
+  #context: vm.Context;
+  #name: string;
+  /** Serializes evaluations so two concurrent calls can't interleave. */
+  #queue = Promise.resolve<EvalResult>({ ok: true, value: undefined });
+
+  constructor(globals: Record<string, unknown>, name: string) {
+    this.#name = name;
+    this.#context = vm.createContext(globals, { name });
+    this.#session = new InspectorSession();
+    // Cast once — see `InspectorPost` comment above.
+    this.#post = this.#session.post.bind(this.#session) as InspectorPost;
   }
-  return _execRepl;
-}
 
-function getReadonlyExecRepl(): repl.REPLServer {
-  if (!_readonlyExecRepl) {
-    _readonlyExecRepl = createExecRepl(
-      createReadonlyExecHelpers(page) as unknown as Record<string, unknown>,
+  async init(): Promise<void> {
+    this.#session.connect();
+
+    // Listen for context creation events before enabling Runtime so that
+    // `Runtime.enable` replays the already-created context.
+    const contextReady = new Promise<number>((resolve) => {
+      this.#session.on(
+        "Runtime.executionContextCreated",
+        ({ params }: { params: { context: { name: string; id: number } } }) => {
+          if (params.context.name === this.#name) {
+            resolve(params.context.id);
+          }
+        },
+      );
+    });
+
+    await this.#post("Runtime.enable");
+    this.#contextId = await contextReady;
+  }
+
+  /** Read a global binding from the sandbox context. */
+  getGlobal(key: string): unknown {
+    return (this.#context as Record<string, unknown>)[key];
+  }
+
+  /** Update or add a global binding in the sandbox context. */
+  setGlobal(key: string, value: unknown): void {
+    (this.#context as Record<string, unknown>)[key] = value;
+  }
+
+  /** Evaluate `code` with REPL semantics. Serialized to one-at-a-time. */
+  eval(code: string): Promise<EvalResult> {
+    const run = async (): Promise<EvalResult> => {
+      const result: RuntimeEvaluateResult = await this.#post(
+        "Runtime.evaluate",
+        {
+          contextId: this.#contextId,
+          expression: code,
+          replMode: true,
+          awaitPromise: true,
+          returnByValue: true,
+        },
+      );
+
+      if (result.exceptionDetails) {
+        const desc =
+          result.result.description ??
+          result.exceptionDetails.exception?.description ??
+          result.exceptionDetails.text;
+        return { ok: false, error: desc ?? "Unknown error" };
+      }
+
+      return { ok: true, value: result.result.value };
+    };
+
+    // Chain onto the queue so evaluations never overlap.
+    const next = this.#queue.then(run, run);
+    this.#queue = next.then(
+      () => ({ ok: true as const, value: undefined }),
+      () => ({ ok: true as const, value: undefined }),
     );
+    return next;
   }
-  return _readonlyExecRepl;
+
+  disconnect(): void {
+    this.#session.disconnect();
+  }
 }
 
-function stripLeadingReturn(code: string): string {
-  return code.replace(/^\s*return\s+/, "");
+// Lazy sandbox creation — cache the promise so concurrent requests
+// don't race on init.
+let _execSandboxPromise: Promise<InspectorSandbox> | undefined;
+let _readonlyExecSandboxPromise: Promise<InspectorSandbox> | undefined;
+
+function getExecSandbox(): Promise<InspectorSandbox> {
+  if (!_execSandboxPromise) {
+    _execSandboxPromise = (async () => {
+      const sb = new InspectorSandbox(
+        {
+          page,
+          context,
+          browser,
+          state: {} as Record<string, unknown>,
+          console,
+          setTimeout,
+          setInterval,
+          clearTimeout,
+          clearInterval,
+          fetch,
+          URL,
+          Buffer,
+          networkLog: (
+            opts: {
+              last?: number;
+              filter?: string;
+              method?: string;
+              pageId?: string;
+            } = {},
+          ) => readNetworkLog(config.session, opts),
+          actionLog: (
+            opts: {
+              last?: number;
+              filter?: string;
+              action?: string;
+              source?: string;
+              pageId?: string;
+            } = {},
+          ) => readActionLog(config.session, opts),
+        },
+        "libretto-exec",
+      );
+      await sb.init();
+      return sb;
+    })();
+  }
+  return _execSandboxPromise;
 }
 
-function prepareCode(rawCode: string): string {
-  let code = stripTypeScript(rawCode);
-  code = stripEmptyCatchHandlers(code).cleaned;
-  code = stripLeadingReturn(code);
-  return code;
+function getReadonlyExecSandbox(): Promise<InspectorSandbox> {
+  if (!_readonlyExecSandboxPromise) {
+    _readonlyExecSandboxPromise = (async () => {
+      const sb = new InspectorSandbox(
+        createReadonlyExecHelpers(page) as unknown as Record<string, unknown>,
+        "libretto-readonly-exec",
+      );
+      await sb.init();
+      return sb;
+    })();
+  }
+  return _readonlyExecSandboxPromise;
 }
 
-function findPageById(pageId: string): Page | undefined {
-  return context.pages().find((p) => {
-    const url = p.url();
-    return url === pageId || url.includes(pageId);
-  });
+// ── Page resolution ────────────────────────────────────────────────────
+
+/** Resolve a Playwright page's CDP target ID (same logic as browser.ts). */
+async function resolvePageId(p: Page): Promise<string> {
+  const cdp: CDPSession = await p.context().newCDPSession(p);
+  try {
+    const info = await cdp.send("Target.getTargetInfo");
+    const targetId = (info as { targetInfo?: { targetId?: unknown } })
+      ?.targetInfo?.targetId;
+    if (typeof targetId !== "string" || targetId.length === 0) {
+      throw new Error(
+        `Could not resolve target id for page at URL "${p.url()}".`,
+      );
+    }
+    return targetId;
+  } finally {
+    await cdp.detach();
+  }
+}
+
+/** Find a page by its CDP target ID. */
+async function findPageById(pageId: string): Promise<Page | undefined> {
+  for (const p of context.pages()) {
+    const id = await resolvePageId(p);
+    if (id === pageId) return p;
+  }
+  return undefined;
+}
+
+// Track pages that have already been wrapped for action logging so we
+// don't double-wrap on repeated targeted execs.
+const wrappedPages = new WeakSet<Page>();
+
+function ensureActionLogging(p: Page, pageId?: string): void {
+  if (wrappedPages.has(p)) return;
+  wrapPageForActionLogging(p, config.session, pageId);
+  wrappedPages.add(p);
 }
 
 let execServer: Server | undefined;
 
 if (config.execSocketPath) {
-  // Remove stale socket file if present
-  if (existsSync(config.execSocketPath)) {
-    unlinkSync(config.execSocketPath);
-  }
-
-  execServer = createServer(async (req, res) => {
-    if (req.method !== "POST" || req.url !== "/exec") {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: false, error: { message: "Not found" } }));
-      return;
-    }
-
-    // Read request body
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(chunk as Buffer);
-    }
-    const bodyStr = Buffer.concat(chunks).toString("utf-8");
-
-    let body: {
-      code: string;
-      mode: "exec" | "readonly-exec";
-      pageId?: string;
-      visualize?: boolean;
-    };
-    try {
-      body = JSON.parse(bodyStr) as typeof body;
-    } catch {
-      res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({ ok: false, error: { message: "Invalid JSON body" } }),
-      );
-      return;
-    }
-
-    const { code: rawCode, mode, pageId } = body;
+  async function handleExec(req: ExecRequest): Promise<ExecResult> {
+    const { code: rawCode, mode, pageId, visualize } = req;
 
     childLog("info", "exec-start", {
       mode,
@@ -328,69 +426,83 @@ if (config.execSocketPath) {
       pageId,
     });
 
-    // Page targeting: update the REPL context's page reference
-    const replInstance =
-      mode === "readonly-exec" ? getReadonlyExecRepl() : getExecRepl();
+    const sandbox =
+      mode === "readonly-exec"
+        ? await getReadonlyExecSandbox()
+        : await getExecSandbox();
+
+    // Resolve the effective page for this request. If pageId is given,
+    // temporarily rebind and restore after eval so we don't mutate the
+    // default for future untargeted execs.
+    let restorePage: (() => void) | undefined;
     if (pageId) {
-      const targetPage = findPageById(pageId);
-      if (targetPage) {
-        if (mode === "readonly-exec") {
-          const readonlyHelpers = createReadonlyExecHelpers(targetPage);
-          Object.assign(replInstance.context, {
-            page: readonlyHelpers.page,
-          });
-        } else {
-          replInstance.context.page = targetPage;
-          wrapPageForActionLogging(targetPage, config.session, pageId);
-        }
+      const targetPage = await findPageById(pageId);
+      if (!targetPage) {
+        throw new Error(
+          `Page "${pageId}" was not found in session "${config.session}". Run "libretto pages --session ${config.session}" to list ids.`,
+        );
+      }
+      if (mode === "readonly-exec") {
+        const readonlyHelpers = createReadonlyExecHelpers(targetPage);
+        const prev = sandbox.getGlobal("page");
+        sandbox.setGlobal("page", readonlyHelpers.page);
+        restorePage = () => sandbox.setGlobal("page", prev);
+      } else {
+        ensureActionLogging(targetPage, pageId);
+        const prev = sandbox.getGlobal("page");
+        sandbox.setGlobal("page", targetPage);
+        restorePage = () => sandbox.setGlobal("page", prev);
       }
     }
 
-    const preparedCode = prepareCode(rawCode);
+    // Ensure action logging for the default page on first exec.
+    if (mode === "exec") {
+      ensureActionLogging(page);
+    }
 
-    // Stall detection
-    const STALL_THRESHOLD_MS = 60_000;
-    const stallTimer = setTimeout(() => {
-      childLog("warn", "exec-stall-warning", {
-        mode,
-        silenceMs: STALL_THRESHOLD_MS,
-        codePreview: rawCode.slice(0, 200),
-      });
-    }, STALL_THRESHOLD_MS);
+    // Install visualization if requested.
+    if (visualize && mode === "exec") {
+      const effectivePage = (sandbox.getGlobal("page") ?? page) as Page;
+      await installInstrumentation(effectivePage, { visualize: true });
+    }
+
+    const { cleaned, strippedCount } = stripEmptyCatchHandlers(rawCode);
+    const preparedCode = stripTypeScript(cleaned);
 
     try {
-      const result = await evalInRepl(replInstance, preparedCode);
+      const result = await sandbox.eval(preparedCode);
 
-      clearTimeout(stallTimer);
+      if (!result.ok) {
+        childLog("error", "exec-error", {
+          mode,
+          message: result.error,
+          codePreview: rawCode.slice(0, 200),
+        });
+        throw new Error(result.error);
+      }
+
+      const output =
+        result.value === undefined || result.value === null
+          ? null
+          : typeof result.value === "string"
+            ? result.value
+            : JSON.stringify(result.value, null, 2);
+
       childLog("info", "exec-success", {
         mode,
-        hasResult: result !== undefined,
+        hasResult: output !== null,
       });
-
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, result }));
-    } catch (err) {
-      clearTimeout(stallTimer);
-      const error = err instanceof Error ? err : new Error(String(err));
-
-      childLog("error", "exec-error", {
-        mode,
-        message: error.message,
-        stack: error.stack,
-        codePreview: rawCode.slice(0, 200),
-      });
-
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          ok: false,
-          error: { message: error.message, stack: error.stack },
-        }),
-      );
+      return { output, strippedCatchCount: strippedCount };
+    } finally {
+      restorePage?.();
     }
+  }
+
+  execServer = serveDaemon(config.execSocketPath, {
+    exec: handleExec,
   });
 
-  execServer.listen(config.execSocketPath, () => {
+  execServer.on("listening", () => {
     childLog("info", "exec-server-listening", {
       socketPath: config.execSocketPath,
     });

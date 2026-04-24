@@ -34,6 +34,7 @@ import {
   stripTypeScript,
   hasStripTypeScriptTypes,
 } from "../core/exec-sandbox.js";
+import { connectDaemon } from "../core/daemon-rpc.js";
 import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
@@ -80,6 +81,54 @@ function compileExecFunction(
 
 
 
+async function runExecViaDaemon(
+  socketPath: string,
+  code: string,
+  mode: ExecMode,
+  session: string,
+  logger: LoggerApi,
+  options: { pageId?: string; visualize?: boolean },
+): Promise<void> {
+  logger.info(`${mode}-start`, {
+    session,
+    codeLength: code.length,
+    codePreview: code.slice(0, 200),
+    visualize: options.visualize ?? false,
+    pageId: options.pageId,
+  });
+
+  const STALL_THRESHOLD_MS = 60_000;
+  const stallTimer = setTimeout(() => {
+    logger.warn(`${mode}-stall-warning`, {
+      session,
+      silenceMs: STALL_THRESHOLD_MS,
+      codePreview: code.slice(0, 200),
+    });
+    console.warn(
+      `[stall-warning] No exec response for ${Math.round(STALL_THRESHOLD_MS / 1000)}s — ${mode} may be hung (code: ${code.slice(0, 100)}...)`,
+    );
+  }, STALL_THRESHOLD_MS);
+
+  try {
+    const daemon = connectDaemon(socketPath);
+    const { output, strippedCatchCount } = await daemon.exec({
+      code,
+      mode,
+      pageId: options.pageId,
+      visualize: options.visualize,
+    });
+
+    if (strippedCatchCount > 0) {
+      console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
+    }
+
+    logger.info(`${mode}-success`, { session, hasResult: output !== null });
+    console.log(output ?? "Executed successfully");
+  } finally {
+    clearTimeout(stallTimer);
+  }
+}
+
 async function runExec(
   code: string,
   session: string,
@@ -90,9 +139,21 @@ async function runExec(
     mode?: ExecMode;
   } = {},
 ): Promise<void> {
+  const mode = options.mode ?? "exec";
+
+  // Check if we can delegate to the daemon's exec server
+  const state = readSessionState(session, logger);
+  if (state?.execSocketPath && existsSync(state.execSocketPath)) {
+    await runExecViaDaemon(state.execSocketPath, code, mode, session, logger, {
+      pageId: options.pageId,
+      visualize: options.visualize,
+    });
+    return;
+  }
+
+  // Fallback: direct-CDP execution (cloud sessions, etc.)
   const visualize = options.visualize ?? false;
   const pageId = options.pageId;
-  const mode = options.mode ?? "exec";
   const { cleaned: cleanedCode, strippedCount } = stripEmptyCatchHandlers(code);
   if (strippedCount > 0) {
     console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");

@@ -26,7 +26,7 @@ Node's `repl.start()` creates a REPL instance with a persistent context. It hand
 The only pre-processing needed:
 
 1. Strip TypeScript types via `node:module.stripTypeScriptTypes` (same as current behavior)
-2. Strip leading `return` keyword for backward compatibility (current exec compiles to a function where `return` is valid; REPL-style evaluation uses the last expression's value instead)
+2. Strip empty `.catch(() => {})` handlers so errors bubble up
 
 ## Goals
 
@@ -84,11 +84,10 @@ test("variable defined in one exec is available in the next", async ({ librettoC
 - [x] Test: `function double(n) { return n * 2 }` in one exec, then `double(21)` → stdout is `42`
 - [x] Test: `class Adder { add(a, b) { return a + b } }` in one exec, then `new Adder().add(1, 2)` → stdout is `3`
 - [x] Test: `const { a, b } = { a: 1, b: 2 }` in one exec, then `a + b` → stdout is `3`
-- [x] Test: `return await page.title()` still works (backward compat with `return` keyword)
 - [x] Test: `async function getTitle() { return await page.title() }` then `await getTitle()` → returns the page title (async function + top-level await persist)
 - [x] Test: readonly-exec also persists state across calls (separate context from exec)
 - [x] Test: exec error in one call doesn't break subsequent calls (`undeclaredVar` throws, then `1 + 1` → `2`)
-- [x] Verify tests fail with current implementation: `pnpm --filter libretto test -- test/persistent-exec.spec.ts` (expected: 7 failures on persistence/expression-value assertions, 1 pass on `return` backward compat)
+- [x] Verify tests fail with current implementation: `pnpm --filter libretto test -- test/persistent-exec.spec.ts` (expected: all failures on persistence/expression-value assertions)
 
 ### Phase 2: Add exec socket path to session state
 
@@ -109,7 +108,7 @@ export function getSessionExecSocketPath(session: string): string {
 
 ### Phase 3: Add the exec server and persistent REPL to the daemon
 
-The daemon starts an HTTP server on a Unix socket. It creates two `repl.start()` instances (exec and readonly-exec), each with appropriate helpers injected into their context. Each request strips TypeScript types, strips `return`, feeds code to the REPL, and returns the result.
+The daemon starts an HTTP server on a Unix socket. It creates two `repl.start()` instances (exec and readonly-exec), each with appropriate helpers injected into their context. Each request strips TypeScript types, strips empty catch handlers, feeds code to the REPL, and returns the result.
 
 ```ts
 // In browser-daemon.ts
@@ -153,7 +152,7 @@ async function evalInRepl(
 - [x] Add `createExecRepl()` and `evalInRepl()` helpers in the daemon
 - [x] Create two REPL instances at daemon startup: one for `exec` mode (full helpers including `page`, `context`, `browser`, `networkLog`, `actionLog`, `console`, `fetch`, etc.), one for `readonly-exec` (read-only helpers from `createReadonlyExecHelpers`)
 - [x] Add an HTTP server to `browser-daemon.ts` that listens on `config.execSocketPath`
-- [x] Implement `POST /exec` handler: accepts `{ code, mode, pageId?, visualize? }`, strips TS types via `node:module.stripTypeScriptTypes`, applies `stripEmptyCatchHandlers`, strips leading `return` for backward compat, feeds to the appropriate REPL via `evalInRepl()`
+- [x] Implement `POST /exec` handler: accepts `{ code, mode, pageId?, visualize? }`, strips empty catch handlers, strips TS types via `node:module.stripTypeScriptTypes`, feeds to the appropriate REPL via `evalInRepl()`
 - [x] Return `{ ok: true, result }` on success, `{ ok: false, error: { message, stack } }` on failure
 - [x] Handle page targeting: if `pageId` is provided, update the REPL context's `page` reference to the target page
 - [x] Add stall-detection interval (60s) and structured `childLog` calls for exec-start/success/error
@@ -188,11 +187,11 @@ async function runExecViaDaemon(
 }
 ```
 
-- [ ] Add `runExecViaDaemon()` using Node's `http.request` with `socketPath` option
-- [ ] Modify `runExec()`: check `state.execSocketPath` — if socket exists, delegate to `runExecViaDaemon()`; otherwise fall back to existing direct-CDP logic
-- [ ] Update the direct-CDP fallback to import `stripEmptyCatchHandlers` from `exec-sandbox.ts`
-- [ ] Preserve stall-warning timer on client side (timeout on HTTP request)
-- [ ] Preserve "Stripped `.catch(() => {})`" message on client side
-- [ ] Verify `pnpm --filter libretto type-check` passes
-- [ ] Verify Phase 1 tests pass: `pnpm --filter libretto test -- test/persistent-exec.spec.ts`
-- [ ] Verify existing tests still pass: `pnpm --filter libretto test -- test/stateful.spec.ts`
+- [x] Add `runExecViaDaemon()` using Node's `http.request` with `socketPath` option
+- [x] Modify `runExec()`: check `state.execSocketPath` — if socket exists, delegate to `runExecViaDaemon()`; otherwise fall back to existing direct-CDP logic
+- [x] Update the direct-CDP fallback to import `stripEmptyCatchHandlers` from `exec-sandbox.ts`
+- [x] Preserve stall-warning timer on client side (timeout on HTTP request)
+- [x] Preserve "Stripped `.catch(() => {})`" message on client side
+- [x] Verify `pnpm --filter libretto type-check` passes
+- [x] Verify Phase 1 tests pass: `pnpm --filter libretto test -- test/persistent-exec.spec.ts`
+- [x] Verify existing tests still pass: `pnpm --filter libretto test -- test/stateful.spec.ts`

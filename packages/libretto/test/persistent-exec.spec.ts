@@ -62,20 +62,6 @@ describe("persistent exec sandbox", () => {
     expect(result.stdout.trim()).toBe("3");
   }, 60_000);
 
-  test("return keyword still works for backward compatibility", async ({
-    librettoCli,
-    writeHtml,
-  }) => {
-    const session = "persist-return";
-    const url = await writeHtml("Return Test");
-    await librettoCli(`open "${url}" --headless --session ${session}`);
-
-    const result = await librettoCli(
-      `exec "return await page.title()" --session ${session}`,
-    );
-    expect(result.stdout.trim()).toBe("Return Test");
-  }, 60_000);
-
   test("async function and top-level await persist across execs", async ({
     librettoCli,
     writeHtml,
