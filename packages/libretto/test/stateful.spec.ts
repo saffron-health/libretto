@@ -130,6 +130,10 @@ describe("state-driven CLI subprocess behavior", () => {
       {
         LIBRETTO_DISABLE_DOTENV: "1",
         OPENAI_API_KEY: "",
+        CODEX_OAUTH_TOKEN: "",
+        CODEX_ACCOUNT_ID: "",
+        CHATGPT_ACCOUNT_ID: "",
+        CODEX_HOME: workspacePath(".codex-missing"),
         ANTHROPIC_API_KEY: "",
         GEMINI_API_KEY: "",
         GOOGLE_GENERATIVE_AI_API_KEY: "",
@@ -285,6 +289,10 @@ describe("state-driven CLI subprocess behavior", () => {
     const status = await librettoCli("status", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "",
+      CODEX_OAUTH_TOKEN: "",
+      CODEX_ACCOUNT_ID: "",
+      CHATGPT_ACCOUNT_ID: "",
+      CODEX_HOME: "/tmp/libretto-test-missing-codex-home",
       ANTHROPIC_API_KEY: "",
       GEMINI_API_KEY: "",
       GOOGLE_GENERATIVE_AI_API_KEY: "",

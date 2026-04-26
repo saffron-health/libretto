@@ -97,7 +97,8 @@ export const PROVIDER_CHOICES: ProviderChoice[] = [
     label: "OpenAI",
     provider: "openai",
     envVar: "OPENAI_API_KEY",
-    envHint: "Get your key at https://platform.openai.com/api-keys",
+    envHint:
+      "Get an API key at https://platform.openai.com/api-keys, or use Codex OAuth via `codex login`",
   },
   {
     key: "2",
@@ -173,6 +174,10 @@ function printHealthySummary(status: AiSetupStatus & { kind: "ready" }): void {
     console.log(
       `✓ Detected ${envVar}. Using ${providerLabel(status.provider)}.`,
     );
+  } else if (status.source === "codex-auth-json-api-key") {
+    console.log("✓ Detected Codex auth.json API key. Using OpenAI.");
+  } else if (status.source === "codex-auth-json-oauth") {
+    console.log("✓ Detected Codex OAuth credentials. Using OpenAI.");
   } else {
     console.log(`✓ Using ${providerLabel(status.provider)} (${status.model}).`);
   }
@@ -231,6 +236,9 @@ export function buildRepairPlan(status: AiSetupStatus): RepairPlan {
 export function formatMissingCredentialsMessage(
   plan: RepairPlan & { kind: "repair-missing-credentials" },
 ): string {
+  if (plan.provider === "openai") {
+    return `✗ ${plan.provider} is configured (model: ${plan.model}), but OpenAI API key and Codex OAuth credentials are missing.`;
+  }
   return `✗ ${plan.provider} is configured (model: ${plan.model}), but ${plan.envVar} is not set.`;
 }
 
@@ -253,9 +261,15 @@ function printSnapshotApiStatus(): boolean {
   if (plan.kind === "repair-missing-credentials") {
     console.log();
     console.log(formatMissingCredentialsMessage(plan));
-    console.log(
-      `  To fix: add ${plan.envVar} to .env, or run \`npx libretto setup\` interactively to repair.`,
-    );
+    if (plan.provider === "openai") {
+      console.log(
+        "  To fix: add OPENAI_API_KEY to .env, add CODEX_OAUTH_TOKEN with CODEX_ACCOUNT_ID, use `codex login`, or run `npx libretto setup` interactively to repair.",
+      );
+    } else {
+      console.log(
+        `  To fix: add ${plan.envVar} to .env, or run \`npx libretto setup\` interactively to repair.`,
+      );
+    }
     return false;
   }
 
@@ -269,6 +283,7 @@ function printSnapshotApiStatus(): boolean {
   console.log("✗ No snapshot API credentials detected.");
   console.log("  Add one provider to .env:");
   console.log("    OPENAI_API_KEY=...");
+  console.log("    CODEX_OAUTH_TOKEN=...  # plus CODEX_ACCOUNT_ID");
   console.log("    ANTHROPIC_API_KEY=...");
   console.log("    GEMINI_API_KEY=...  # or GOOGLE_GENERATIVE_AI_API_KEY");
   console.log(
@@ -328,6 +343,7 @@ function printSkipMessage(): void {
   );
   console.log("Or add credentials directly to your .env file:");
   console.log("  OPENAI_API_KEY=...");
+  console.log("  CODEX_OAUTH_TOKEN=...  # plus CODEX_ACCOUNT_ID");
   console.log("  ANTHROPIC_API_KEY=...");
   console.log("  GEMINI_API_KEY=...");
   console.log(
@@ -360,7 +376,13 @@ async function runInteractiveApiSetup(): Promise<void> {
     // ── Repair: configured provider with missing credentials ──
     if (plan.kind === "repair-missing-credentials") {
       console.log(formatMissingCredentialsMessage(plan));
-      console.log(`\nAdd ${plan.envVar} to your .env file to fix this.`);
+      if (plan.provider === "openai") {
+        console.log(
+          "\nAdd OPENAI_API_KEY to your .env file, add CODEX_OAUTH_TOKEN with CODEX_ACCOUNT_ID, or use `codex login` to fix this.",
+        );
+      } else {
+        console.log(`\nAdd ${plan.envVar} to your .env file to fix this.`);
+      }
       console.log("");
       console.log("Or switch to a different provider:\n");
       console.log("  1) Switch to a different provider");

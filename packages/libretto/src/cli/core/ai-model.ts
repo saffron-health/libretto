@@ -5,6 +5,7 @@ import {
   parseModel,
   type Provider,
 } from "./resolve-model.js";
+import { resolveOpenAiCredentials } from "./openai-credentials.js";
 
 // Re-export so existing consumers (e.g. tests) don't break.
 export { parseDotEnvAssignment } from "../../shared/env/load-env.js";
@@ -26,13 +27,13 @@ export const DEFAULT_SNAPSHOT_MODELS = {
  * Returns the env var name (e.g. "OPENAI_API_KEY", "GEMINI_API_KEY"),
  * or null if no credential is found.
  */
-function detectProviderEnvVar(
+function detectProviderCredentialSource(
   provider: Provider,
   env: NodeJS.ProcessEnv = process.env,
 ): string | null {
   switch (provider) {
     case "openai":
-      return env.OPENAI_API_KEY?.trim() ? "OPENAI_API_KEY" : null;
+      return resolveOpenAiCredentials(env)?.source ?? null;
     case "anthropic":
       return env.ANTHROPIC_API_KEY?.trim() ? "ANTHROPIC_API_KEY" : null;
     case "google":
@@ -54,7 +55,11 @@ function detectProviderEnvVar(
 export type SnapshotApiModelSelection = {
   model: string;
   provider: Provider;
-  source: "config" | `env:${string}`;
+  source:
+    | "config"
+    | `env:${string}`
+    | "codex-auth-json-api-key"
+    | "codex-auth-json-oauth";
 };
 
 export class SnapshotApiUnavailableError extends Error {
@@ -67,7 +72,7 @@ export class SnapshotApiUnavailableError extends Error {
 function providerSetupSentence(provider: Provider): string {
   switch (provider) {
     case "openai":
-      return "Add OPENAI_API_KEY to .env or as a shell environment variable.";
+      return "Add OPENAI_API_KEY to .env or as a shell environment variable, set CODEX_OAUTH_TOKEN with CODEX_ACCOUNT_ID, or use a Codex login.";
     case "anthropic":
       return "Add ANTHROPIC_API_KEY to .env or as a shell environment variable.";
     case "google":
@@ -86,7 +91,7 @@ function defaultModelCommandLine(): string {
 function providerMissingCredentialSummary(provider: Provider): string {
   switch (provider) {
     case "openai":
-      return "OPENAI_API_KEY is missing";
+      return "OpenAI API key and Codex OAuth credentials are missing";
     case "anthropic":
       return "ANTHROPIC_API_KEY is missing";
     case "google":
@@ -101,7 +106,7 @@ function providerMissingCredentialSummary(provider: Provider): string {
 function noSnapshotApiConfiguredMessage(): string {
   return [
     "Failed to analyze snapshot because no snapshot analyzer is configured.",
-    `Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_CLOUD_PROJECT, or OPENROUTER_API_KEY to .env or as a shell environment variable, or choose a default model with \`${defaultModelCommandLine()}\`.`,
+    `Add OPENAI_API_KEY, CODEX_OAUTH_TOKEN with CODEX_ACCOUNT_ID, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_CLOUD_PROJECT, or OPENROUTER_API_KEY to .env or as a shell environment variable, use a Codex login, or choose a default model with \`${defaultModelCommandLine()}\`.`,
     "For more info, run `npx libretto setup`.",
   ].join(" ");
 }
@@ -132,12 +137,16 @@ function inferAutoSnapshotModel(): SnapshotApiModelSelection | null {
   ];
 
   for (const provider of providersInPriorityOrder) {
-    const envVar = detectProviderEnvVar(provider);
-    if (!envVar) continue;
+    const credentialSource = detectProviderCredentialSource(provider);
+    if (!credentialSource) continue;
     return {
       model: DEFAULT_SNAPSHOT_MODELS[provider],
       provider,
-      source: `env:${envVar}`,
+      source:
+        credentialSource === "codex-auth-json-api-key" ||
+        credentialSource === "codex-auth-json-oauth"
+          ? credentialSource
+          : `env:${credentialSource}`,
     };
   }
 
@@ -206,7 +215,11 @@ export type AiSetupStatus =
       kind: "ready";
       model: string;
       provider: Provider;
-      source: "config" | `env:${string}`;
+      source:
+        | "config"
+        | `env:${string}`
+        | "codex-auth-json-api-key"
+        | "codex-auth-json-oauth";
     }
   | {
       kind: "configured-missing-credentials";
