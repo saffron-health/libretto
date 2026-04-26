@@ -11,6 +11,10 @@ import type { AiSetupStatus } from "../src/cli/core/ai-model.js";
 
 function clearProviderEnv(): void {
   vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("CODEX_OAUTH_TOKEN", "");
+  vi.stubEnv("CODEX_ACCOUNT_ID", "");
+  vi.stubEnv("CHATGPT_ACCOUNT_ID", "");
+  vi.stubEnv("CODEX_HOME", join(tmpdir(), "libretto-test-missing-codex-home"));
   vi.stubEnv("ANTHROPIC_API_KEY", "");
   vi.stubEnv("GEMINI_API_KEY", "");
   vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "");
@@ -151,7 +155,8 @@ describe("formatMissingCredentialsMessage", () => {
     }
     const msg = formatMissingCredentialsMessage(plan);
     expect(msg).toContain("openai");
-    expect(msg).toContain("OPENAI_API_KEY");
+    expect(msg).toContain("OpenAI API key");
+    expect(msg).toContain("Codex OAuth");
     expect(msg).toContain("openai/gpt-5.4");
     expect(msg).not.toContain("No snapshot API credentials detected");
   });

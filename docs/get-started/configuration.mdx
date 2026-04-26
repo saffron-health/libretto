@@ -38,12 +38,12 @@ Both `npm create libretto@latest` and `npx libretto setup` handle initial config
 
 #### AI Provider Reference
 
-| Provider    | Default model                   | Environment variable   | SDK package              |
-| ----------- | ------------------------------- | ---------------------- | ------------------------ |
-| `openai`    | `openai/gpt-5.4`               | `OPENAI_API_KEY`       | `@ai-sdk/openai`        |
-| `anthropic` | `anthropic/claude-sonnet-4-6`   | `ANTHROPIC_API_KEY`    | `@ai-sdk/anthropic`     |
-| `gemini`    | `google/gemini-3-flash-preview` | `GEMINI_API_KEY`       | `@ai-sdk/google`        |
-| `vertex`    | `vertex/gemini-2.5-flash`       | `GOOGLE_CLOUD_PROJECT` | `@ai-sdk/google-vertex`  |
+| Provider    | Default model                   | Credentials                                      | SDK package             |
+| ----------- | ------------------------------- | ------------------------------------------------ | ----------------------- |
+| `openai`    | `openai/gpt-5.4`                | `OPENAI_API_KEY`, Codex OAuth from `codex login`, or `CODEX_OAUTH_TOKEN` with `CODEX_ACCOUNT_ID` | `@ai-sdk/openai` |
+| `anthropic` | `anthropic/claude-sonnet-4-6`   | `ANTHROPIC_API_KEY`                              | `@ai-sdk/anthropic`    |
+| `gemini`    | `google/gemini-3-flash-preview` | `GEMINI_API_KEY`                                 | `@ai-sdk/google`       |
+| `vertex`    | `vertex/gemini-2.5-flash`       | `GOOGLE_CLOUD_PROJECT`                           | `@ai-sdk/google-vertex` |
 
 To view the current configuration, run `npx libretto ai configure` with no arguments. To clear it, pass `--clear`.
 

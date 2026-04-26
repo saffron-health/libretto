@@ -1,4 +1,9 @@
 import type { LanguageModel } from "ai";
+import {
+  type OpenAiCredentials,
+  hasOpenAiCredentials,
+  resolveOpenAiCredentials,
+} from "./openai-credentials.js";
 
 export type Provider = "google" | "vertex" | "anthropic" | "openai" | "openrouter";
 
@@ -21,6 +26,14 @@ const SUPPORTED_PROVIDER_ALIASES = {
   openai: "openai",
   openrouter: "openrouter",
 } as const satisfies Record<string, Provider>;
+
+const CODEX_OPENAI_BASE_URL = "https://chatgpt.com/backend-api/codex";
+
+type OpenAiProviderSettings = {
+  apiKey: string;
+  baseURL?: string;
+  headers?: Record<string, string>;
+};
 
 function readFirstEnvValue(
   env: NodeJS.ProcessEnv,
@@ -71,7 +84,7 @@ export function hasProviderCredentials(
     case "anthropic":
       return Boolean(env.ANTHROPIC_API_KEY?.trim());
     case "openai":
-      return Boolean(env.OPENAI_API_KEY?.trim());
+      return hasOpenAiCredentials(env);
     case "openrouter":
       return Boolean(env.OPENROUTER_API_KEY?.trim());
   }
@@ -87,12 +100,30 @@ export function missingProviderCredentialsMessage(provider: Provider): string {
       return "Anthropic API key is missing. Set ANTHROPIC_API_KEY.";
     }
     case "openai": {
-      return "OpenAI API key is missing. Set OPENAI_API_KEY.";
+      return "OpenAI credentials are missing. Set OPENAI_API_KEY, set CODEX_OAUTH_TOKEN with CODEX_ACCOUNT_ID, or use a Codex login.";
     }
     case "openrouter": {
       return "OpenRouter API key is missing. Set OPENROUTER_API_KEY.";
     }
   }
+}
+
+export function buildOpenAiProviderSettings(
+  credentials: OpenAiCredentials,
+): OpenAiProviderSettings {
+  if (credentials.kind === "api-key") {
+    return { apiKey: credentials.token };
+  }
+
+  return {
+    apiKey: credentials.token,
+    baseURL: CODEX_OPENAI_BASE_URL,
+    headers: {
+      "chatgpt-account-id": credentials.accountId,
+      "OpenAI-Beta": "responses=experimental",
+      originator: "libretto",
+    },
+  };
 }
 
 async function getProviderModel(
@@ -131,12 +162,12 @@ async function getProviderModel(
       return anthropic(modelId);
     }
     case "openai": {
-      const apiKey = process.env.OPENAI_API_KEY?.trim();
-      if (!apiKey) {
+      const credentials = resolveOpenAiCredentials();
+      if (!credentials) {
         throw new Error(missingProviderCredentialsMessage(provider));
       }
       const { createOpenAI } = await import("@ai-sdk/openai");
-      const openai = createOpenAI({ apiKey });
+      const openai = createOpenAI(buildOpenAiProviderSettings(credentials));
       return openai(modelId);
     }
     case "openrouter": {

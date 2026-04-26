@@ -6,6 +6,10 @@ import { resolveAiSetupStatus } from "../src/cli/core/ai-model.js";
 
 function clearProviderEnv(): void {
   vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("CODEX_OAUTH_TOKEN", "");
+  vi.stubEnv("CODEX_ACCOUNT_ID", "");
+  vi.stubEnv("CHATGPT_ACCOUNT_ID", "");
+  vi.stubEnv("CODEX_HOME", join(tmpdir(), "libretto-test-missing-codex-home"));
   vi.stubEnv("ANTHROPIC_API_KEY", "");
   vi.stubEnv("GEMINI_API_KEY", "");
   vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "");
@@ -49,6 +53,58 @@ describe("resolveAiSetupStatus", () => {
         model: "openai/gpt-5.4",
         provider: "openai",
         source: "env:OPENAI_API_KEY",
+      });
+    });
+
+    it("resolves ready from Codex auth.json API key when no config exists", () => {
+      const codexHome = join(testDir, "codex-home");
+      mkdirSync(codexHome, { recursive: true });
+      writeFileSync(
+        join(codexHome, "auth.json"),
+        JSON.stringify({ OPENAI_API_KEY: "sk-codex-api-key" }),
+        "utf-8",
+      );
+      vi.stubEnv("CODEX_HOME", codexHome);
+
+      expect(resolveAiSetupStatus(configPath)).toEqual({
+        kind: "ready",
+        model: "openai/gpt-5.4",
+        provider: "openai",
+        source: "codex-auth-json-api-key",
+      });
+    });
+
+    it("resolves ready from Codex OAuth env when no config exists", () => {
+      vi.stubEnv("CODEX_OAUTH_TOKEN", "test-token");
+      vi.stubEnv("CODEX_ACCOUNT_ID", "test-account");
+      expect(resolveAiSetupStatus(configPath)).toEqual({
+        kind: "ready",
+        model: "openai/gpt-5.4",
+        provider: "openai",
+        source: "env:CODEX_OAUTH_TOKEN",
+      });
+    });
+
+    it("resolves ready from Codex auth.json OAuth when no config exists", () => {
+      const codexHome = join(testDir, "codex-home");
+      mkdirSync(codexHome, { recursive: true });
+      writeFileSync(
+        join(codexHome, "auth.json"),
+        JSON.stringify({
+          tokens: {
+            access_token: "test-token",
+            account_id: "test-account",
+          },
+        }),
+        "utf-8",
+      );
+      vi.stubEnv("CODEX_HOME", codexHome);
+
+      expect(resolveAiSetupStatus(configPath)).toEqual({
+        kind: "ready",
+        model: "openai/gpt-5.4",
+        provider: "openai",
+        source: "codex-auth-json-oauth",
       });
     });
 
