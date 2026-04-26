@@ -396,7 +396,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const blockedExec = await librettoCli(
-      `exec "return page.url()" --session ${session}`,
+      `exec "page.url()" --session ${session}`,
     );
     expect(blockedExec.stderr).toContain(
       `Command "exec" is blocked for session "${session}" because it is in read-only mode.`,
@@ -406,7 +406,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const readonlyExec = await librettoCli(
-      `readonly-exec "return page.url()" --session ${session}`,
+      `readonly-exec "page.url()" --session ${session}`,
     );
     expect(readonlyExec.stderr).toBe("");
     expect(readonlyExec.stdout.trim()).toBe(fileUrl);
@@ -440,7 +440,7 @@ describe("state-driven CLI subprocess behavior", () => {
     });
 
     const blockedExec = await librettoCli(
-      `exec "return page.url()" --session ${remoteSession}`,
+      `exec "page.url()" --session ${remoteSession}`,
     );
     expect(blockedExec.stderr).toContain(
       `Command "exec" is blocked for session "${remoteSession}" because it is in read-only mode.`,
@@ -491,7 +491,7 @@ describe("state-driven CLI subprocess behavior", () => {
         "await page.waitForLoadState('domcontentloaded');",
         "const pageErrorCount = (await page.pageErrors()).length;",
         "const allItems = await Promise.all((await page.getByRole('listitem').all()).map((item) => item.textContent()));",
-        "return {",
+        "({",
         "  url: page.url(),",
         "  title: await page.title(),",
         "  pageErrorCount,",
@@ -505,7 +505,7 @@ describe("state-driven CLI subprocess behavior", () => {
         "  hidden: await page.locator('#hidden').isHidden(),",
         "  nameValue: await page.locator('#name').inputValue(),",
         "  nameEditable: await page.locator('#name').isEditable(),",
-        "};",
+        "})",
       ].join("\n"),
     );
 
@@ -562,10 +562,10 @@ describe("state-driven CLI subprocess behavior", () => {
         "const afterScrollByBox = await target.boundingBox();",
         "await target.scrollIntoViewIfNeeded();",
         "const afterLocatorScrollBox = await target.boundingBox();",
-        "return {",
+        "({",
         "  movedByScrollBy: Boolean(beforeBox && afterScrollByBox && afterScrollByBox.y < beforeBox.y),",
         "  afterLocatorScrollInViewport: Boolean(afterLocatorScrollBox && afterLocatorScrollBox.y >= 0 && afterLocatorScrollBox.y < 720),",
-        "};",
+        "})",
       ].join("\n"),
     );
 
@@ -607,7 +607,7 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const blockedEvaluate = await librettoCli(
-      `readonly-exec "return await page.evaluate(() => document.title)" --session ${session}`,
+      `readonly-exec "await page.evaluate(() => document.title)" --session ${session}`,
     );
     expect(blockedEvaluate.stderr).toContain(
       "ReadonlyExecDenied: page.evaluate is blocked in readonly-exec",
@@ -628,14 +628,14 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const blockedClock = await librettoCli(
-      `readonly-exec "return typeof page.clock" --session ${session}`,
+      `readonly-exec "typeof page.clock" --session ${session}`,
     );
     expect(blockedClock.stderr).toContain(
       "ReadonlyExecDenied: page.clock is blocked in readonly-exec",
     );
 
     const currentUrlResult = await librettoCli(
-      `readonly-exec "return page.url()" --session ${session}`,
+      `readonly-exec "page.url()" --session ${session}`,
     );
     expect(currentUrlResult.stderr).toBe("");
     expect(currentUrlResult.stdout.trim()).toBe(fileUrl);
@@ -686,7 +686,7 @@ describe("state-driven CLI subprocess behavior", () => {
       undefined,
       [
         `const response = await get('http://127.0.0.1:${port}/ping');`,
-        "return { status: response.status, body: await response.text() };",
+        "({ status: response.status, body: await response.text() })",
       ].join("\n"),
     );
     expect(getResult.stderr).toBe("");

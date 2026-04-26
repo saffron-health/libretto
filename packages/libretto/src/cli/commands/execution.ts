@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
-import * as moduleBuiltin from "node:module";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { installInstrumentation } from "../../shared/instrumentation/index.js";
@@ -29,6 +29,12 @@ import {
 import { readLibrettoConfig } from "../core/config.js";
 import { resolveProviderName, getCloudProviderApi } from "../core/providers/index.js";
 import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
+import {
+  stripEmptyCatchHandlers,
+  stripTypeScript,
+  hasStripTypeScriptTypes,
+} from "../core/exec-sandbox.js";
+import { connectDaemon } from "../core/daemon-rpc.js";
 import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
@@ -44,67 +50,17 @@ type RunIntegrationCommandRequest = RunIntegrationWorkerRequest & {
 };
 type ExecMode = "exec" | "readonly-exec";
 
-type StripTypeScriptTypesFn = (
-  code: string,
-  options?: { mode?: "strip" | "transform" },
-) => string;
-
-const stripTypeScriptTypes = (
-  moduleBuiltin as { stripTypeScriptTypes?: StripTypeScriptTypesFn }
-).stripTypeScriptTypes;
-const require = moduleBuiltin.createRequire(import.meta.url);
+const require = createRequire(import.meta.url);
 const tsxCliPath = require.resolve("tsx/cli");
-
-function withSuppressedStripTypeScriptWarning<T>(action: () => T): T {
-  type EmitWarningFn = (...args: unknown[]) => void;
-  const mutableProcess = process as unknown as { emitWarning: EmitWarningFn };
-  const originalEmitWarning = mutableProcess.emitWarning;
-
-  mutableProcess.emitWarning = (...args: unknown[]) => {
-    const warning = args[0];
-    const typeOrOptions = args[1];
-    const warningMessage =
-      typeof warning === "string"
-        ? warning
-        : warning instanceof Error
-          ? warning.message
-          : "";
-    const warningType =
-      typeof typeOrOptions === "string"
-        ? typeOrOptions
-        : typeof typeOrOptions === "object" &&
-            typeOrOptions !== null &&
-            "type" in typeOrOptions &&
-            typeof (typeOrOptions as { type?: unknown }).type === "string"
-          ? ((typeOrOptions as { type?: string }).type ?? "")
-          : "";
-
-    if (
-      warningType === "ExperimentalWarning" &&
-      warningMessage.includes("stripTypeScriptTypes")
-    ) {
-      return;
-    }
-    originalEmitWarning(...args);
-  };
-
-  try {
-    return action();
-  } finally {
-    mutableProcess.emitWarning = originalEmitWarning;
-  }
-}
 
 function compileTypeScriptExecFunction(
   code: string,
   helperNames: string[],
 ): ExecFunction | null {
-  if (!stripTypeScriptTypes) return null;
+  if (!hasStripTypeScriptTypes) return null;
 
   const wrappedSource = `(async function __librettoExec(${helperNames.join(", ")}) {\n${code}\n})`;
-  const jsSource = withSuppressedStripTypeScriptWarning(() =>
-    stripTypeScriptTypes(wrappedSource, { mode: "strip" }),
-  );
+  const jsSource = stripTypeScript(wrappedSource);
   const createFunction = new Function(
     `return ${jsSource}`,
   ) as () => ExecFunction;
@@ -123,85 +79,54 @@ function compileExecFunction(
   return new AsyncFunction(...helperNames, code);
 }
 
-/**
- * Strip `.catch(() => {})` / `?.catch(() => {})` from executable code,
- * skipping occurrences inside string literals (single, double, backtick)
- * and single-line / multi-line comments so we never corrupt non-code text.
- */
-function stripEmptyCatchHandlers(code: string): {
-  cleaned: string;
-  strippedCount: number;
-} {
-  const catchRe = /\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g;
-  let strippedCount = 0;
-  let result = "";
-  let i = 0;
 
-  while (i < code.length) {
-    // Single-line comment
-    if (code[i] === "/" && code[i + 1] === "/") {
-      const end = code.indexOf("\n", i);
-      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 1);
-      result += slice;
-      i += slice.length;
-      continue;
+
+async function runExecViaDaemon(
+  socketPath: string,
+  code: string,
+  mode: ExecMode,
+  session: string,
+  logger: LoggerApi,
+  options: { pageId?: string; visualize?: boolean },
+): Promise<void> {
+  logger.info(`${mode}-start`, {
+    session,
+    codeLength: code.length,
+    codePreview: code.slice(0, 200),
+    visualize: options.visualize ?? false,
+    pageId: options.pageId,
+  });
+
+  const STALL_THRESHOLD_MS = 60_000;
+  const stallTimer = setTimeout(() => {
+    logger.warn(`${mode}-stall-warning`, {
+      session,
+      silenceMs: STALL_THRESHOLD_MS,
+      codePreview: code.slice(0, 200),
+    });
+    console.warn(
+      `[stall-warning] No exec response for ${Math.round(STALL_THRESHOLD_MS / 1000)}s — ${mode} may be hung (code: ${code.slice(0, 100)}...)`,
+    );
+  }, STALL_THRESHOLD_MS);
+
+  try {
+    const daemon = connectDaemon(socketPath);
+    const { output, strippedCatchCount } = await daemon.exec({
+      code,
+      mode,
+      pageId: options.pageId,
+      visualize: options.visualize,
+    });
+
+    if (strippedCatchCount > 0) {
+      console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
     }
-    // Multi-line comment
-    if (code[i] === "/" && code[i + 1] === "*") {
-      const end = code.indexOf("*/", i + 2);
-      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 2);
-      result += slice;
-      i += slice.length;
-      continue;
-    }
-    // String literals
-    if (code[i] === '"' || code[i] === "'" || code[i] === "`") {
-      const quote = code[i];
-      let j = i + 1;
-      while (j < code.length) {
-        if (code[j] === "\\" && quote !== "`") {
-          j += 2;
-          continue;
-        }
-        if (code[j] === "\\" && quote === "`") {
-          j += 2;
-          continue;
-        }
-        if (code[j] === quote) {
-          j++;
-          break;
-        }
-        // Template literal interpolation — skip nested braces
-        if (quote === "`" && code[j] === "$" && code[j + 1] === "{") {
-          let depth = 1;
-          j += 2;
-          while (j < code.length && depth > 0) {
-            if (code[j] === "{") depth++;
-            else if (code[j] === "}") depth--;
-            j++;
-          }
-          continue;
-        }
-        j++;
-      }
-      result += code.slice(i, j);
-      i = j;
-      continue;
-    }
-    // Try to match the catch pattern at the current position
-    catchRe.lastIndex = i;
-    const match = catchRe.exec(code);
-    if (match && match.index === i) {
-      strippedCount++;
-      i += match[0].length;
-      continue;
-    }
-    // Regular character
-    result += code[i];
-    i++;
+
+    logger.info(`${mode}-success`, { session, hasResult: output !== null });
+    console.log(output ?? "Executed successfully");
+  } finally {
+    clearTimeout(stallTimer);
   }
-
-  return { cleaned: result, strippedCount };
 }
 
 async function runExec(
@@ -214,9 +139,21 @@ async function runExec(
     mode?: ExecMode;
   } = {},
 ): Promise<void> {
+  const mode = options.mode ?? "exec";
+
+  // Check if we can delegate to the daemon's exec server
+  const state = readSessionState(session, logger);
+  if (state?.execSocketPath && existsSync(state.execSocketPath)) {
+    await runExecViaDaemon(state.execSocketPath, code, mode, session, logger, {
+      pageId: options.pageId,
+      visualize: options.visualize,
+    });
+    return;
+  }
+
+  // Fallback: direct-CDP execution (cloud sessions, etc.)
   const visualize = options.visualize ?? false;
   const pageId = options.pageId;
-  const mode = options.mode ?? "exec";
   const { cleaned: cleanedCode, strippedCount } = stripEmptyCatchHandlers(code);
   if (strippedCount > 0) {
     console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");

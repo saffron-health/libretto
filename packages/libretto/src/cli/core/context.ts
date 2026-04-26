@@ -1,6 +1,8 @@
 import { Logger, createFileLogSink } from "../../shared/logger/index.js";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { resolveLibrettoRepoRoot } from "../../shared/paths/repo-root.js";
 import { validateSessionName } from "./session.js";
 
@@ -36,6 +38,24 @@ export function getSessionNetworkLogPath(session: string): string {
 
 export function getSessionActionsLogPath(session: string): string {
   return join(getSessionDir(session), "actions.jsonl");
+}
+
+/**
+ * Unix domain sockets are limited to ~104 bytes on macOS.  We keep the
+ * socket inside `.libretto/sessions/<name>/exec.sock` when the path fits,
+ * falling back to a hashed path in `$TMPDIR` only when it would exceed
+ * the limit.
+ */
+const UNIX_SOCKET_PATH_MAX = 104;
+
+export function getSessionExecSocketPath(session: string): string {
+  const preferred = join(getSessionDir(session), "exec.sock");
+  if (Buffer.byteLength(preferred) < UNIX_SOCKET_PATH_MAX) {
+    return preferred;
+  }
+  const absDir = resolve(getSessionDir(session));
+  const hash = createHash("sha256").update(absDir).digest("hex").slice(0, 12);
+  return join(tmpdir(), `lb-exec-${hash}.sock`);
 }
 
 export function getSessionSnapshotsDir(session: string): string {

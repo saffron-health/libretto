@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFile, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { test as base } from "vitest";
 import {
   SESSION_STATE_VERSION,
@@ -27,6 +27,7 @@ type CliFixtures = {
     env?: Record<string, string>,
     stdinText?: string,
   ) => Promise<SpawnResult>;
+  writeHtml: (title: string, body?: string) => Promise<string>;
   writeWorkflow: (
     fileName: string,
     source: string,
@@ -288,6 +289,19 @@ export const test = base.extend<CliFixtures>({
 
   librettoRuntimePath: async ({}, use) => {
     await use(librettoRuntimePath);
+  },
+
+  writeHtml: async ({ workspaceDir }, use) => {
+    let counter = 0;
+    await use(async (title: string, body?: string) => {
+      const htmlPath = join(workspaceDir, `page-${counter++}.html`);
+      await writeFile(
+        htmlPath,
+        `<!doctype html><html><head><title>${title}</title></head><body>${body ?? ""}</body></html>`,
+        "utf8",
+      );
+      return pathToFileURL(htmlPath).href;
+    });
   },
 
   librettoCli: async ({ workspaceDir }, use) => {
