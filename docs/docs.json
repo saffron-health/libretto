@@ -137,5 +137,10 @@
       "discord": "https://discord.gg/NYrG56hVDt",
       "linkedin": "https://www.linkedin.com/company/saffron-health"
     }
+  },
+  "integrations": {
+    "fathom": {
+      "siteId": "OSJVKIKF"
+    }
   }
 }
