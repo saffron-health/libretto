@@ -265,6 +265,45 @@ function runInstallAsync(cmd, cwd) {
 }
 
 // ---------------------------------------------------------------------------
+// Git
+// ---------------------------------------------------------------------------
+
+function isGitAvailable() {
+  try {
+    execSync("git --version", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isInsideGitWorkTree(targetDir) {
+  try {
+    const output = execSync("git rev-parse --is-inside-work-tree", {
+      cwd: targetDir,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return output.trim() === "true";
+  } catch {
+    return false;
+  }
+}
+
+function initializeGitRepository(targetDir) {
+  if (!isGitAvailable()) return false;
+  if (existsSync(join(targetDir, ".git"))) return false;
+  if (isInsideGitWorkTree(targetDir)) return false;
+
+  try {
+    execSync("git init", { cwd: targetDir, stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Scaffold
 // ---------------------------------------------------------------------------
 
@@ -411,6 +450,11 @@ export async function scaffoldProject(
       }
     }
   }
+
+  // 6. Initialize a git repository for standalone projects.
+  if (initializeGitRepository(targetDir)) {
+    console.log(`${GREEN}✓${RESET} Initialized git repository`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -461,9 +505,16 @@ async function main() {
 
   await scaffoldProject(targetDir, projectName, pkgManager);
 
+  const run = runCommand(pkgManager);
+  const relDir = relative(process.cwd(), targetDir) || projectName;
+
   console.log(
     `\n${GREEN}Success!${RESET} Created ${BOLD}${projectName}${RESET} at ${targetDir}\n`,
   );
+  console.log(`Next steps:`);
+  console.log(`  cd ${relDir}`);
+  console.log(`  ${run} libretto run src/workflows/star-repo.ts`);
+  console.log();
 }
 
 // Only run main when this file is executed directly (not imported)
