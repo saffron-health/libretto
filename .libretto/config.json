@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshotModel": "openai/gpt-5.4",
+  "snapshotModel": "vertex/gemini-2.5-flash",
   "ai": {
     "model": "openai/gpt-5.4",
     "updatedAt": "2026-04-14T00:16:50.626Z"
