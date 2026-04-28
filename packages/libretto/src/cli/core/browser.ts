@@ -342,7 +342,18 @@ export async function runPages(
   logger: LoggerApi,
 ): Promise<void> {
   logger.info("pages-start", { session });
-  const pageSummaries = await listOpenPages(session, logger);
+
+  const state = readSessionStateOrThrow(session);
+  let pageSummaries: OpenPageSummary[];
+
+  if (state.daemonSocketPath) {
+    // Daemon-backed session — daemon tracks its own page IDs.
+    const client = new DaemonClient(state.daemonSocketPath);
+    pageSummaries = await client.pages();
+  } else {
+    // Connect-based session — use CDP target IDs.
+    pageSummaries = await listOpenPages(session, logger);
+  }
 
   if (pageSummaries.length === 0) {
     console.log("No pages found.");

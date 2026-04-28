@@ -13,7 +13,12 @@
  * - Stay alive until the browser disconnects or a signal is received
  */
 
-import { chromium, type Browser } from "playwright";
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "playwright";
 import { mkdir } from "node:fs/promises";
 import { appendFileSync } from "node:fs";
 import { installSessionTelemetry } from "./session-telemetry.js";
@@ -28,6 +33,13 @@ import {
   getDaemonSocketPath,
   type DaemonRequest,
 } from "./daemon-ipc.js";
+import { installInstrumentation } from "../../shared/instrumentation/index.js";
+import {
+  compileExecFunction,
+  stripEmptyCatchHandlers,
+} from "./exec-compiler.js";
+import { createReadonlyExecHelpers } from "./readonly-exec.js";
+import { readNetworkLog, readActionLog, wrapPageForActionLogging } from "./telemetry.js";
 
 // ── Config schema ──────────────────────────────────────────────────────
 
@@ -46,16 +58,28 @@ type TelemetryEntry = Record<string, unknown>;
 // ── BrowserDaemon ──────────────────────────────────────────────────────
 
 const PROTOCOL_VERSION = 1;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 class BrowserDaemon {
   private readonly logFile: string;
+  private readonly execState: Record<string, unknown> = {};
+  private readonly pageById = new Map<string, Page>();
 
   private constructor(
     private readonly config: DaemonConfig,
     private readonly browser: Browser,
+    private readonly context: BrowserContext,
+    private readonly page: Page,
     private readonly ipcServer: DaemonServer,
   ) {
     this.logFile = getSessionLogsPath(config.session);
+  }
+
+  private trackPage(page: Page): string {
+    const id = `page-${Math.random().toString(36).slice(2, 5)}`;
+    this.pageById.set(id, page);
+    page.on("close", () => this.pageById.delete(id));
+    return id;
   }
 
   static async create(config: DaemonConfig): Promise<BrowserDaemon> {
@@ -110,6 +134,12 @@ class BrowserDaemon {
       },
     });
 
+    // Action logging — wrap the initial page and any future pages.
+    wrapPageForActionLogging(page, config.session);
+    context.on("page", (newPage) => {
+      wrapPageForActionLogging(newPage, config.session);
+    });
+
     // IPC server — handler is wired after construction to avoid a
     // circular type inference issue (daemon references itself).
     const socketPath = getDaemonSocketPath(config.session);
@@ -117,7 +147,13 @@ class BrowserDaemon {
     const ipcServer = new DaemonServer(socketPath, (request) =>
       handler(request),
     );
-    const daemon = new BrowserDaemon(config, browser, ipcServer);
+    const daemon = new BrowserDaemon(config, browser, context, page, ipcServer);
+
+    // Track the initial page and auto-track any pages opened later.
+    daemon.trackPage(page);
+    context.on("page", (newPage) => {
+      daemon.trackPage(newPage);
+    });
     handler = (request) => daemon.handleRequest(request);
     await ipcServer.listen();
     daemon.log("info", "ipc-server-listening", { socketPath });
@@ -161,15 +197,123 @@ class BrowserDaemon {
     if (closeBrowser) await this.browser.close();
   }
 
+  // ── Page resolution ────────────────────────────────────────────────
+
+  private resolveTargetPage(pageId?: string): Page {
+    if (!pageId) {
+      if (this.pageById.size > 1) {
+        throw new Error(
+          `Multiple pages are open in session "${this.config.session}". Pass --page <id> to target a page (run "libretto pages --session ${this.config.session}" to list ids).`,
+        );
+      }
+      return this.page;
+    }
+    const page = this.pageById.get(pageId);
+    if (!page) {
+      throw new Error(
+        `Page "${pageId}" was not found in session "${this.config.session}". Run "libretto pages --session ${this.config.session}" to list ids.`,
+      );
+    }
+    return page;
+  }
+
   // ── IPC handler ────────────────────────────────────────────────────
 
   private async handleRequest(request: DaemonRequest): Promise<unknown> {
-    switch (request.command) {
-      case "ping":
-        return { protocolVersion: PROTOCOL_VERSION };
-      default:
-        throw new Error(`Unknown command: ${request.command}`);
+    if (request.command === "ping") {
+      return { protocolVersion: PROTOCOL_VERSION };
     }
+
+    // All non-ping commands get a timeout guard.
+    return Promise.race([
+      this.dispatchCommand(request),
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(
+          () => reject(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`)),
+          REQUEST_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  }
+
+  private async dispatchCommand(request: DaemonRequest): Promise<unknown> {
+    switch (request.command) {
+      case "pages":
+        return this.handlePages();
+      case "exec":
+        return this.handleExec(request.code, request.pageId, request.visualize);
+      case "readonly-exec":
+        return this.handleReadonlyExec(request.code, request.pageId);
+      default:
+        throw new Error(`Unknown command: ${(request as { command: string }).command}`);
+    }
+  }
+
+  private handlePages(): unknown {
+    const results: Array<{ id: string; url: string; active: boolean }> = [];
+    for (const [id, page] of this.pageById) {
+      const url = page.url();
+      if (url.startsWith("devtools://") || url.startsWith("chrome-error://")) continue;
+      results.push({ id, url, active: page === this.page });
+    }
+    return results;
+  }
+
+  private async handleExec(
+    code: string,
+    pageId?: string,
+    visualize?: boolean,
+  ): Promise<unknown> {
+    const targetPage = this.resolveTargetPage(pageId);
+    const { cleaned } = stripEmptyCatchHandlers(code);
+
+    if (visualize) {
+      await installInstrumentation(targetPage, { visualize: true });
+    }
+
+    const session = this.config.session;
+    const networkLog = (
+      opts: {
+        last?: number;
+        filter?: string;
+        method?: string;
+        pageId?: string;
+      } = {},
+    ) => readNetworkLog(session, opts);
+
+    const actionLog = (
+      opts: {
+        last?: number;
+        filter?: string;
+        action?: string;
+        source?: string;
+        pageId?: string;
+      } = {},
+    ) => readActionLog(session, opts);
+
+    const helpers = {
+      page: targetPage,
+      context: this.context,
+      browser: this.browser,
+      state: this.execState,
+      networkLog,
+      actionLog,
+    };
+
+    const helperNames = Object.keys(helpers);
+    const fn = compileExecFunction(cleaned, helperNames);
+    const result = await fn(...Object.values(helpers));
+    return { result };
+  }
+
+  private async handleReadonlyExec(code: string, pageId?: string): Promise<unknown> {
+    const targetPage = this.resolveTargetPage(pageId);
+    const { cleaned } = stripEmptyCatchHandlers(code);
+    const helpers = createReadonlyExecHelpers(targetPage);
+    const helperNames = Object.keys(helpers);
+    const fn = compileExecFunction(cleaned, helperNames);
+    const result = await fn(...Object.values(helpers));
+    return { result };
   }
 }
 

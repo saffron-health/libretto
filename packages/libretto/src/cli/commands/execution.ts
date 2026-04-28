@@ -17,6 +17,7 @@ import {
   assertSessionAllowsCommand,
   clearSessionState,
   readSessionState,
+  readSessionStateOrThrow,
   setSessionStatus,
   type SessionState,
 } from "../core/session.js";
@@ -29,6 +30,11 @@ import {
 import { readLibrettoConfig } from "../core/config.js";
 import { resolveProviderName, getCloudProviderApi } from "../core/providers/index.js";
 import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
+import {
+  compileExecFunction,
+  stripEmptyCatchHandlers,
+} from "../core/exec-compiler.js";
+import { DaemonClient } from "../core/daemon-ipc.js";
 import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
@@ -38,173 +44,68 @@ import {
   withRequiredSession,
 } from "./shared.js";
 
-type ExecFunction = (...args: unknown[]) => Promise<unknown>;
 type RunIntegrationCommandRequest = RunIntegrationWorkerRequest & {
   tsconfigPath?: string;
 };
 type ExecMode = "exec" | "readonly-exec";
 
-type StripTypeScriptTypesFn = (
-  code: string,
-  options?: { mode?: "strip" | "transform" },
-) => string;
-
-const stripTypeScriptTypes = (
-  moduleBuiltin as { stripTypeScriptTypes?: StripTypeScriptTypesFn }
-).stripTypeScriptTypes;
 const require = moduleBuiltin.createRequire(import.meta.url);
 const tsxCliPath = require.resolve("tsx/cli");
 
-function withSuppressedStripTypeScriptWarning<T>(action: () => T): T {
-  type EmitWarningFn = (...args: unknown[]) => void;
-  const mutableProcess = process as unknown as { emitWarning: EmitWarningFn };
-  const originalEmitWarning = mutableProcess.emitWarning;
+async function runExecViaDaemon(
+  code: string,
+  session: string,
+  daemonSocketPath: string,
+  logger: LoggerApi,
+  options: {
+    visualize?: boolean;
+    pageId?: string;
+    mode?: ExecMode;
+  },
+): Promise<void> {
+  const mode = options.mode ?? "exec";
+  const { cleaned: cleanedCode, strippedCount } = stripEmptyCatchHandlers(code);
+  if (strippedCount > 0) {
+    console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
+  }
+  logger.info(`${mode}-start`, {
+    session,
+    codeLength: cleanedCode.length,
+    codePreview: cleanedCode.slice(0, 200),
+    visualize: options.visualize,
+    pageId: options.pageId,
+    via: "daemon",
+  });
 
-  mutableProcess.emitWarning = (...args: unknown[]) => {
-    const warning = args[0];
-    const typeOrOptions = args[1];
-    const warningMessage =
-      typeof warning === "string"
-        ? warning
-        : warning instanceof Error
-          ? warning.message
-          : "";
-    const warningType =
-      typeof typeOrOptions === "string"
-        ? typeOrOptions
-        : typeof typeOrOptions === "object" &&
-            typeOrOptions !== null &&
-            "type" in typeOrOptions &&
-            typeof (typeOrOptions as { type?: unknown }).type === "string"
-          ? ((typeOrOptions as { type?: string }).type ?? "")
-          : "";
+  const client = new DaemonClient(daemonSocketPath);
 
-    if (
-      warningType === "ExperimentalWarning" &&
-      warningMessage.includes("stripTypeScriptTypes")
-    ) {
-      return;
-    }
-    originalEmitWarning(...args);
-  };
+  const { result } =
+    mode === "exec"
+      ? await client.exec({
+          code: cleanedCode,
+          pageId: options.pageId,
+          visualize: options.visualize,
+        })
+      : await client.readonlyExec({
+          code: cleanedCode,
+          pageId: options.pageId,
+        });
 
-  try {
-    return action();
-  } finally {
-    mutableProcess.emitWarning = originalEmitWarning;
+  logger.info(`${mode}-success`, {
+    session,
+    hasResult: result !== undefined,
+    via: "daemon",
+  });
+  if (result !== undefined) {
+    console.log(
+      typeof result === "string" ? result : JSON.stringify(result, null, 2),
+    );
+  } else {
+    console.log("Executed successfully");
   }
 }
 
-function compileTypeScriptExecFunction(
-  code: string,
-  helperNames: string[],
-): ExecFunction | null {
-  if (!stripTypeScriptTypes) return null;
-
-  const wrappedSource = `(async function __librettoExec(${helperNames.join(", ")}) {\n${code}\n})`;
-  const jsSource = withSuppressedStripTypeScriptWarning(() =>
-    stripTypeScriptTypes(wrappedSource, { mode: "strip" }),
-  );
-  const createFunction = new Function(
-    `return ${jsSource}`,
-  ) as () => ExecFunction;
-  return createFunction();
-}
-
-function compileExecFunction(
-  code: string,
-  helperNames: string[],
-): ExecFunction {
-  const typeStripped = compileTypeScriptExecFunction(code, helperNames);
-  if (typeStripped) return typeStripped;
-
-  const AsyncFunction = Object.getPrototypeOf(async function () {})
-    .constructor as new (...args: string[]) => ExecFunction;
-  return new AsyncFunction(...helperNames, code);
-}
-
-/**
- * Strip `.catch(() => {})` / `?.catch(() => {})` from executable code,
- * skipping occurrences inside string literals (single, double, backtick)
- * and single-line / multi-line comments so we never corrupt non-code text.
- */
-function stripEmptyCatchHandlers(code: string): {
-  cleaned: string;
-  strippedCount: number;
-} {
-  const catchRe = /\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g;
-  let strippedCount = 0;
-  let result = "";
-  let i = 0;
-
-  while (i < code.length) {
-    // Single-line comment
-    if (code[i] === "/" && code[i + 1] === "/") {
-      const end = code.indexOf("\n", i);
-      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 1);
-      result += slice;
-      i += slice.length;
-      continue;
-    }
-    // Multi-line comment
-    if (code[i] === "/" && code[i + 1] === "*") {
-      const end = code.indexOf("*/", i + 2);
-      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 2);
-      result += slice;
-      i += slice.length;
-      continue;
-    }
-    // String literals
-    if (code[i] === '"' || code[i] === "'" || code[i] === "`") {
-      const quote = code[i];
-      let j = i + 1;
-      while (j < code.length) {
-        if (code[j] === "\\" && quote !== "`") {
-          j += 2;
-          continue;
-        }
-        if (code[j] === "\\" && quote === "`") {
-          j += 2;
-          continue;
-        }
-        if (code[j] === quote) {
-          j++;
-          break;
-        }
-        // Template literal interpolation — skip nested braces
-        if (quote === "`" && code[j] === "$" && code[j + 1] === "{") {
-          let depth = 1;
-          j += 2;
-          while (j < code.length && depth > 0) {
-            if (code[j] === "{") depth++;
-            else if (code[j] === "}") depth--;
-            j++;
-          }
-          continue;
-        }
-        j++;
-      }
-      result += code.slice(i, j);
-      i = j;
-      continue;
-    }
-    // Try to match the catch pattern at the current position
-    catchRe.lastIndex = i;
-    const match = catchRe.exec(code);
-    if (match && match.index === i) {
-      strippedCount++;
-      i += match[0].length;
-      continue;
-    }
-    // Regular character
-    result += code[i];
-    i++;
-  }
-
-  return { cleaned: result, strippedCount };
-}
-
-async function runExec(
+async function runExecViaConnect(
   code: string,
   session: string,
   logger: LoggerApi,
@@ -212,7 +113,7 @@ async function runExec(
     visualize?: boolean;
     pageId?: string;
     mode?: ExecMode;
-  } = {},
+  },
 ): Promise<void> {
   const visualize = options.visualize ?? false;
   const pageId = options.pageId;
@@ -227,6 +128,7 @@ async function runExec(
     codePreview: cleanedCode.slice(0, 200),
     visualize,
     pageId,
+    via: "connect",
   });
   const {
     browser,
@@ -313,14 +215,6 @@ async function runExec(
               browser,
               networkLog,
               actionLog,
-              console,
-              setTimeout,
-              setInterval,
-              clearTimeout,
-              clearInterval,
-              fetch,
-              URL,
-              Buffer,
             };
           })();
 
@@ -348,6 +242,23 @@ async function runExec(
     process.removeListener("SIGINT", sigintHandler);
     disconnectBrowser(browser, logger, session);
   }
+}
+
+async function runExec(
+  code: string,
+  session: string,
+  logger: LoggerApi,
+  options: {
+    visualize?: boolean;
+    pageId?: string;
+    mode?: ExecMode;
+  } = {},
+): Promise<void> {
+  const state = readSessionStateOrThrow(session);
+  if (state.daemonSocketPath) {
+    return runExecViaDaemon(code, session, state.daemonSocketPath, logger, options);
+  }
+  return runExecViaConnect(code, session, logger, options);
 }
 
 function parseJsonArg(label: string, raw: string): unknown {

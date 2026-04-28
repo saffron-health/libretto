@@ -130,13 +130,31 @@ export class DaemonServer {
 }
 
 // ---------------------------------------------------------------------------
+// Response data types — maps command name to the shape returned on success
+// ---------------------------------------------------------------------------
+
+export type DaemonResultMap = {
+  ping: { protocolVersion: number };
+  pages: Array<{ id: string; url: string; active: boolean }>;
+  exec: { result: unknown };
+  "readonly-exec": { result: unknown };
+  snapshot: {
+    pngPath: string;
+    htmlPath: string;
+    snapshotRunId: string;
+    pageUrl: string;
+    title: string;
+  };
+};
+
+// ---------------------------------------------------------------------------
 // DaemonClient — connects to UDS, sends NDJSON request, reads response
 // ---------------------------------------------------------------------------
 
 export class DaemonClient {
   constructor(private readonly socketPath: string) {}
 
-  async send(request: DaemonRequest): Promise<DaemonResponse> {
+  private async send(request: DaemonRequest): Promise<DaemonResponse> {
     return new Promise<DaemonResponse>((resolve, reject) => {
       const socket = netConnect(this.socketPath);
       let buffer = "";
@@ -168,12 +186,53 @@ export class DaemonClient {
     });
   }
 
+  private generateId(): string {
+    return Math.random().toString(36).slice(2, 10);
+  }
+
+  private async sendOrThrow<C extends DaemonRequest["command"]>(
+    request: DaemonRequest & { command: C },
+  ): Promise<DaemonResultMap[C]> {
+    const response = await this.send(request);
+    if (response.type === "error") {
+      throw new Error(response.message);
+    }
+    return response.data as DaemonResultMap[C];
+  }
+
   async ping(): Promise<boolean> {
     try {
-      const response = await this.send({ id: "ping", command: "ping" });
-      return response.type === "result";
+      await this.sendOrThrow({ id: this.generateId(), command: "ping" });
+      return true;
     } catch {
       return false;
     }
+  }
+
+  async pages(): Promise<DaemonResultMap["pages"]> {
+    return this.sendOrThrow({ id: this.generateId(), command: "pages" });
+  }
+
+  async exec(args: {
+    code: string;
+    pageId?: string;
+    visualize?: boolean;
+  }): Promise<DaemonResultMap["exec"]> {
+    return this.sendOrThrow({
+      id: this.generateId(),
+      command: "exec",
+      ...args,
+    });
+  }
+
+  async readonlyExec(args: {
+    code: string;
+    pageId?: string;
+  }): Promise<DaemonResultMap["readonly-exec"]> {
+    return this.sendOrThrow({
+      id: this.generateId(),
+      command: "readonly-exec",
+      ...args,
+    });
   }
 }

@@ -110,40 +110,69 @@ Refactored from procedural top-level script into a class with a static factory m
 
 **Test results:** 3 of 4 daemon IPC tests pass (they work via the existing CDP connect/disconnect path). The `exec persists state across calls` test fails — expected, since state persistence requires routing `exec` through the daemon (Phase 3).
 
-### Phase 3: Route pages, exec, and readonly-exec through daemon
+### Phase 3: Route pages, exec, and readonly-exec through daemon ✅
 
 Add `pages`, `exec`, and `readonly-exec` handlers to the daemon, and wire the CLI commands to use `DaemonClient` when `daemonSocketPath` is present. This is the core phase that enables aria-ref selectors to work across snapshot→exec calls.
 
-Only `page`, `context`, `browser`, and `state` (plus `networkLog` and `actionLog`) need to be injected as helpers. Standard Node.js globals (`console`, `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `fetch`, `URL`, `Buffer`) are naturally available in the `AsyncFunction` scope and do not need explicit injection.
+**Files created/modified:**
+
+- `packages/libretto/src/cli/core/exec-compiler.ts` (new — shared `compileExecFunction`, `compileTypeScriptExecFunction`, `withSuppressedStripTypeScriptWarning`, `stripEmptyCatchHandlers`, extracted from `execution.ts`)
+- `packages/libretto/src/cli/core/daemon-ipc.ts` (added `DaemonResultMap` response type map; `DaemonClient.send` made private; added typed convenience methods `pages()`, `exec()`, `readonlyExec()` via generic `sendOrThrow`)
+- `packages/libretto/src/cli/core/browser-daemon.ts` (promoted `context`/`page` to instance fields; added `pages`, `exec`, `readonly-exec` handlers with 60s timeout; `execState` persists across calls; daemon-owned page IDs; action logging installed once in `create()` + `context.on("page")` for dynamic pages)
+- `packages/libretto/src/cli/commands/execution.ts` (imports compiler from `exec-compiler.ts`; split `runExec` into `runExecViaDaemon`/`runExecViaConnect` with daemon routing when `daemonSocketPath` present; removed redundant Node.js globals from connect-based helpers)
+- `packages/libretto/src/cli/core/browser.ts` (`runPages` routes through `DaemonClient` when `daemonSocketPath` present)
+
+**Daemon-owned page IDs:**
+
+The daemon assigns its own page IDs (`page-<3 random alphanumeric chars>`) via a `Map<string, Page>`. Pages are registered when created (initial page in `create()`, dynamic pages via `context.on("page")`), and unregistered on close. `resolveTargetPage(pageId?)` is synchronous — just a map lookup, no CDP sessions. The `pages` command must route through the daemon for `open`-based sessions so users see the same IDs that `exec --page <id>` expects. `connect`-based sessions continue using CDP target IDs via `listOpenPages()`.
+
+**Typed `DaemonClient` interface:**
+
+`DaemonClient.send` is private. All commands go through typed convenience methods that auto-generate request IDs, send via `sendOrThrow`, and return typed results. Error responses throw automatically — no manual `response.type === "error"` checks at call sites.
 
 ```ts
-// Daemon exec handler (inside the RequestHandler):
-case "exec":
-case "readonly-exec": {
-  const { cleaned } = stripEmptyCatchHandlers(request.code);
-  if (request.command === "exec" && request.visualize)
-    await installInstrumentation(targetPage, { visualize: true });
-  const helpers = request.command === "readonly-exec"
-    ? createReadonlyExecHelpers(targetPage)
-    : { page: targetPage, context, browser, state: execState, networkLog, actionLog };
-  const fn = compileExecFunction(cleaned, Object.keys(helpers));
-  const result = await fn(...Object.values(helpers));
-  return { result };
+export type DaemonResultMap = {
+  ping: { protocolVersion: number };
+  pages: Array<{ id: string; url: string; active: boolean }>;
+  exec: { result: unknown };
+  "readonly-exec": { result: unknown };
+  snapshot: { pngPath: string; htmlPath: string; snapshotRunId: string; pageUrl: string; title: string };
+};
+
+export class DaemonClient {
+  private async send(request: DaemonRequest): Promise<DaemonResponse> { ... }
+  private async sendOrThrow<C extends DaemonRequest["command"]>(
+    request: DaemonRequest & { command: C },
+  ): Promise<DaemonResultMap[C]> { ... }
+
+  async ping(): Promise<boolean> { ... }
+  async pages(): Promise<DaemonResultMap["pages"]> { ... }
+  async exec(args: { code: string; pageId?: string; visualize?: boolean }): Promise<DaemonResultMap["exec"]> { ... }
+  async readonlyExec(args: { code: string; pageId?: string }): Promise<DaemonResultMap["readonly-exec"]> { ... }
 }
 ```
 
-- [ ] Move `compileExecFunction`, `stripEmptyCatchHandlers`, and related helpers (`compileTypeScriptExecFunction`, `withSuppressedStripTypeScriptWarning`) to a shared module (e.g. `packages/libretto/src/cli/core/exec-compiler.ts`) importable by both the daemon and the `connect`-based session path.
-- [ ] Implement `pages` handler in the daemon's `RequestHandler`. Enumerate operational pages with IDs — reuse `resolveOperationalPages`/`resolvePageReferences` logic extracted from `browser.ts`.
-- [ ] Update `runPages()` in `browser.ts`: when `state.daemonSocketPath` is present, use `DaemonClient` to send a `pages` request. For `connect`-based sessions (no `daemonSocketPath`), use the existing direct CDP path.
-- [ ] Implement `exec` handler in the daemon's `RequestHandler`. Inject only the non-global helpers: `page`, `context`, `browser`, `state`, `networkLog`, `actionLog`. Standard Node.js globals (`console`, `setTimeout`, `fetch`, `URL`, `Buffer`, etc.) are available naturally via `AsyncFunction` scope — do not inject them.
-- [ ] The daemon's `execState` persists across calls — state set in one exec is available in the next.
-- [ ] Implement `readonly-exec` handler using `createReadonlyExecHelpers()`.
-- [ ] Add per-request timeout (60s default) so a bad exec doesn't wedge the daemon. On timeout, respond with an error.
-- [ ] `wrapPageForActionLogging()` must be idempotent — guard against double-wrapping since the Page persists across requests.
-- [ ] Update `exec` and `readonly-exec` commands in `execution.ts`: when `state.daemonSocketPath` is present, use `DaemonClient` to send the request. For `connect`-based sessions (no `daemonSocketPath`), use the existing direct CDP path.
-- [ ] Also update the `connect`-based path's helper injection to match: only inject `page`, `context`, `browser`, `state`, `networkLog`, `actionLog`. Remove the redundant Node.js globals from the helpers object.
-- [ ] Run `pnpm --filter libretto type-check` — passes.
-- [ ] Tests now passing: all 4 daemon IPC tests (`pages`, `exec` value return, `exec` state persistence, `readonly-exec`).
+**Exec helper injection:**
+
+Only `page`, `context`, `browser`, `state`, `networkLog`, `actionLog` are injected. Standard Node.js globals (`console`, `setTimeout`, `fetch`, `URL`, `Buffer`, etc.) are naturally available in the `AsyncFunction` scope — not injected.
+
+**Action logging:**
+
+Installed once in `create()` on the initial page, plus `context.on("page", ...)` for dynamically opened pages. No per-request wrapping or idempotency flag needed.
+
+**Checklist:**
+
+- [x] Move `compileExecFunction`, `stripEmptyCatchHandlers`, and related helpers to `exec-compiler.ts`.
+- [x] Implement `pages` handler — iterates daemon's `pageById` map, filters devtools/error pages.
+- [x] Route `runPages()` through daemon when `daemonSocketPath` present.
+- [x] Implement `exec` handler with persistent `execState`, `requireSinglePage` validation, instrumentation.
+- [x] Implement `readonly-exec` handler using `createReadonlyExecHelpers()`.
+- [x] Add per-request timeout (60s default) so a bad exec doesn't wedge the daemon.
+- [x] Update `exec` and `readonly-exec` in `execution.ts`: daemon path when `daemonSocketPath` present, connect path otherwise.
+- [x] Remove redundant Node.js globals from connect-based helper injection.
+- [x] Add typed `DaemonClient` methods (`pages`, `exec`, `readonlyExec`) with `DaemonResultMap` and `sendOrThrow`.
+- [x] `pnpm --filter libretto type-check` — passes.
+- [x] All 4 daemon IPC tests pass. Full suite: 199 passed, 0 failed.
 
 ### Phase 4: Route snapshot through daemon
 
@@ -164,18 +193,33 @@ case "snapshot": {
 
 // CLI snapshot command — daemon path:
 const client = new DaemonClient(state.daemonSocketPath);
-const resp = await client.send({ id, command: "snapshot", pageId });
-// resp.data has { pngPath, htmlPath, ... }
+const { pngPath, htmlPath, ... } = await client.snapshot({ pageId });
 // CLI reads htmlPath, runs condenseDom, writes condensedHtmlPath, then calls runApiInterpret
 ```
 
-- [ ] Implement `snapshot` handler in the daemon's `RequestHandler` that performs viewport normalization, screenshot, and `page.content()` capture. Write artifacts to the session snapshot directory. Return `{ pngPath, htmlPath, snapshotRunId, pageUrl, title }`.
+- [ ] Add `snapshot` typed method to `DaemonClient`.
+- [ ] Implement `snapshot` handler in `BrowserDaemon.dispatchCommand` that performs viewport normalization, screenshot, and `page.content()` capture. Write artifacts to the session snapshot directory. Return `{ pngPath, htmlPath, snapshotRunId, pageUrl, title }`.
 - [ ] Port the viewport normalization and zero-width screenshot retry logic from `captureScreenshot()` into the daemon handler.
 - [ ] Update the `snapshot` command in `snapshot.ts`: when `state.daemonSocketPath` is present, use `DaemonClient`. CLI reads `htmlPath`, runs `condenseDom`, writes `condensedHtmlPath`, then calls `runApiInterpret` as before. For `connect`-based sessions (no `daemonSocketPath`), use the existing `captureScreenshot()` path.
 - [ ] Run `pnpm --filter libretto type-check` — passes.
 - [ ] Add test to `test/daemon-ipc.spec.ts`: open headless → snapshot (without AI — use cleared API credentials) → verify stderr contains `Failed to analyze snapshot` (confirming the daemon captured the screenshot and the CLI reached the AI step). Alternatively, verify the snapshot PNG and HTML files exist on disk.
 
-### Phase 5: SKILL.md update and full verification
+### Phase 5: Remove connect fallback for daemon-backed sessions
+
+After all commands are routed through the daemon (Phases 3–4), remove the CDP connect/disconnect fallback from `open`-based sessions. The daemon is the exclusive implementation — if the daemon is unreachable, the command fails instead of silently falling back to a fresh CDP connection (which would lose aria-refs and state).
+
+Currently, each command checks `state.daemonSocketPath` and branches: daemon path vs connect path. The connect path (`connect()` + `disconnectBrowser()` in `browser.ts`) is still reachable for `open`-based sessions in theory, since `daemonSocketPath` is the only gate. This phase removes the connect path for daemon-backed sessions entirely, so `connect()`/`disconnectBrowser()` are only used by `connect`-based sessions.
+
+Concrete steps:
+
+- [ ] Remove `runExecViaConnect` from `execution.ts`. Replace `runExec` branching with: `if (!state.daemonSocketPath) throw new Error("...")` for `open` sessions, or route `connect`-based sessions through a separate `connect`-only path.
+- [ ] Remove the `listOpenPages` fallback from `runPages`. Daemon-backed sessions use `client.pages()`; connect-based sessions use `listOpenPages`.
+- [ ] Remove the `captureScreenshot` fallback from `snapshot.ts`. Same pattern.
+- [ ] Audit all remaining `connect()` / `disconnectBrowser()` imports in command files. They should only be reachable for `connect`-based sessions (`save` command, etc.).
+- [ ] Run `pnpm --filter libretto test` — all tests pass. Daemon IPC tests verify the daemon path; connect-based tests (if any) verify the connect path. No test relies on an `open` session falling back to CDP connect.
+- [ ] Run `pnpm --filter libretto type-check` — passes.
+
+### Phase 6: SKILL.md update and full verification
 
 Update skill documentation to reflect that `[ref=eN]` selectors now work when using daemon-backed sessions, and clarify limitations for non-daemon sessions. Run the full test suite.
 
