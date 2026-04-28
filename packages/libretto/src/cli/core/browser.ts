@@ -402,6 +402,7 @@ export async function runOpen(
   options?: {
     viewport?: { width: number; height: number };
     accessMode?: SessionAccessMode;
+    authProfileDomain?: string;
   },
 ): Promise<void> {
   const parsedUrl = normalizeUrl(rawUrl);
@@ -423,9 +424,26 @@ export async function runOpen(
   const runLogPath = logFileForSession(session);
 
   const browserMode = headed ? "headed" : "headless";
+
+  // When --auth-profile is provided, use that domain for profile lookup
+  // instead of deriving it from the URL.
+  const authDomain = options?.authProfileDomain
+    ? normalizeDomain(normalizeUrl(options.authProfileDomain))
+    : undefined;
+  if (authDomain) {
+    const authProfilePath = getProfilePath(authDomain);
+    if (!existsSync(authProfilePath)) {
+      throw new Error(
+        `No saved auth profile for "${authDomain}". ` +
+          `Save one first: libretto open https://${authDomain} --headed --session <name>, ` +
+          `log in, then run: libretto save ${authDomain} --session <name>`,
+      );
+    }
+  }
+
   const supportsSavedProfile =
     parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
-  const domain = supportsSavedProfile ? normalizeDomain(parsedUrl) : undefined;
+  const domain = authDomain ?? (supportsSavedProfile ? normalizeDomain(parsedUrl) : undefined);
   const profilePath = domain ? getProfilePath(domain) : undefined;
   const useProfile = domain ? hasProfile(domain) : false;
 
