@@ -435,8 +435,8 @@ export async function runOpen(
     if (!existsSync(authProfilePath)) {
       throw new Error(
         `No saved auth profile for "${authDomain}". ` +
-          `Save one first: libretto open https://${authDomain} --session <name>, ` +
-          `log in, then run: libretto auth save ${authDomain}`,
+          `Save one first: libretto open https://${authDomain} --headed --session <name>, ` +
+          `log in, then run: libretto save ${authDomain} --session <name>`,
       );
     }
   }
