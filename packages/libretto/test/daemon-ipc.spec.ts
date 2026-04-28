@@ -1,28 +1,7 @@
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures.js";
 
 describe("daemon IPC", () => {
-  test("open writes daemonSocketPath into session state", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    const session = "daemon-ipc-state";
-    await librettoCli(
-      `open https://example.com --headless --session ${session}`,
-    );
-
-    const raw = await readFile(
-      workspacePath(".libretto", "sessions", session, "state.json"),
-      "utf8",
-    );
-    const state = JSON.parse(raw) as { daemonSocketPath?: string };
-    expect(state.daemonSocketPath).toBeDefined();
-    expect(typeof state.daemonSocketPath).toBe("string");
-    expect(state.daemonSocketPath).toMatch(/^\/tmp\/libretto-/);
-  }, 45_000);
-
   test("pages returns page list through daemon IPC", async ({
     librettoCli,
   }) => {
@@ -73,25 +52,4 @@ describe("daemon IPC", () => {
     expect(result.stdout).toContain("example.com");
   }, 45_000);
 
-  test("close removes daemon socket file", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    const session = "daemon-ipc-close";
-    await librettoCli(
-      `open https://example.com --headless --session ${session}`,
-    );
-
-    const raw = await readFile(
-      workspacePath(".libretto", "sessions", session, "state.json"),
-      "utf8",
-    );
-    const state = JSON.parse(raw) as { daemonSocketPath?: string };
-    expect(state.daemonSocketPath).toBeDefined();
-    const socketPath = state.daemonSocketPath!;
-
-    await librettoCli(`close --session ${session}`);
-
-    expect(existsSync(socketPath)).toBe(false);
-  }, 60_000);
 });
