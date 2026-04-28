@@ -82,7 +82,7 @@ export const openInput = SimpleCLI.input({
     }),
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
-      help: "Domain for local auth profile (e.g. apps.example.com)",
+      help: "Override the domain used for auth profile lookup (e.g. use login.example.com's profile when opening app.example.com)",
     }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
@@ -107,7 +107,8 @@ export const openInput = SimpleCLI.input({
   );
 
 export const openCommand = SimpleCLI.command({
-  description: "Launch browser and open URL (headed by default)",
+  description:
+    "Launch browser and open URL (headed by default). Automatically loads a saved auth profile for the URL's domain if one exists.",
 })
   .input(openInput)
   .use(withAutoSession())
