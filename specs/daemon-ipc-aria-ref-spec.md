@@ -65,12 +65,19 @@ Protocol types (`DaemonRequest`, `DaemonResponse`), `getDaemonSocketPath()`, `da
 - `packages/libretto/src/shared/state/session-state.ts` (added `daemonSocketPath` field)
 - `packages/libretto/test/daemon-ipc.spec.ts` (new — 4 failing tests)
 
-### Phase 2: DaemonServer, DaemonClient, ping, and open/close wiring
+### Phase 2: DaemonServer, DaemonClient, ping, open/close wiring, and daemon refactor ✅
 
-Rename `daemon-protocol.ts` to `daemon-ipc.ts` and add `DaemonServer` and `DaemonClient` classes alongside the existing types. Start the IPC server in the daemon with a `ping` handler, wire `runOpen()` to write `daemonSocketPath` and verify IPC, and clean up the socket on close. Command handlers (`pages`, `exec`, `snapshot`, etc.) are added in later phases.
+Renamed `daemon-protocol.ts` to `daemon-ipc.ts` and added `DaemonServer` and `DaemonClient` classes alongside the existing types. Started the IPC server in the daemon with a `ping` handler, wired `runOpen()` to write `daemonSocketPath` and verify IPC, and cleaned up the socket on close. Refactored `browser-daemon.ts` from procedural top-level code into a `BrowserDaemon` class.
+
+**Files modified:**
+
+- `packages/libretto/src/cli/core/daemon-protocol.ts` → `daemon-ipc.ts` (renamed, added `DaemonServer` and `DaemonClient` classes)
+- `packages/libretto/src/cli/core/browser-daemon.ts` (refactored to `BrowserDaemon` class, IPC server with `ping` handler)
+- `packages/libretto/src/cli/core/browser.ts` (`runOpen` writes `daemonSocketPath` + IPC ping verification, `runClose` unlinks socket)
+
+**`daemon-ipc.ts` — IPC infrastructure:**
 
 ```ts
-// packages/libretto/src/cli/core/daemon-ipc.ts
 export type RequestHandler = (request: DaemonRequest) => Promise<unknown>;
 
 export class DaemonServer {
@@ -86,14 +93,22 @@ export class DaemonClient {
 }
 ```
 
-- [ ] Rename `packages/libretto/src/cli/core/daemon-protocol.ts` to `daemon-ipc.ts`. Update all imports (`test/daemon-ipc.spec.ts` does not import it directly, so only internal references need updating).
-- [ ] Add `DaemonServer` class. Constructor takes `socketPath` and `handler: RequestHandler`. `listen()` unlinks any stale socket, creates a `net.createServer` that accepts one NDJSON request per connection, calls the handler, writes one NDJSON response, and closes the connection. `close()` closes the server and unlinks the socket.
-- [ ] Add `DaemonClient` class. Constructor takes `socketPath`. `send(request)` opens a connection, writes NDJSON, reads one NDJSON response line, closes, and returns the parsed `DaemonResponse`. `ping()` sends a ping request and returns `true` on success, `false` on connection error.
-- [ ] In `packages/libretto/src/cli/core/browser-daemon.ts`, instantiate `DaemonServer` after page creation with a `RequestHandler` that dispatches on `request.command`. Implement `ping` (returns `{ protocolVersion: 1 }`). Call `server.close()` in the existing `shutdown()` function.
-- [ ] Update `runOpen()` in `browser.ts`: compute `daemonSocketPath` via `getDaemonSocketPath`, include it when writing session state, and use `new DaemonClient(socketPath).ping()` to verify IPC is reachable before returning.
-- [ ] Update `runClose()` in `browser.ts`: unlink the daemon socket file from `state.daemonSocketPath` during close.
-- [ ] Run `pnpm --filter libretto type-check` — passes.
-- [ ] All 4 daemon IPC tests still fail (expected — command handlers not yet implemented).
+**`browser-daemon.ts` — `BrowserDaemon` class:**
+
+Refactored from procedural top-level script into a class with a static factory method:
+
+- `static async create(config)`: all async setup (browser launch, context/page creation, telemetry, IPC server, navigation) happens here. Private constructor receives fully-initialized values.
+- `shutdown(reason, closeBrowser)`: idempotent — `DaemonServer.close()` nulls server, `unlink` tolerates ENOENT, no `shuttingDown` flag needed.
+- `handleRequest(request)`: dispatches on `request.command`. Currently only `ping` (returns `{ protocolVersion: 1 }`).
+- No explicit keepalive mechanism — the process stays alive via active handles (`net.Server` + browser connection). `shutdown()` closes both, letting the process exit naturally.
+- Daemon does NOT manage session state cleanup — that's the CLI client's responsibility (`runClose()` in `browser.ts` calls `clearSessionState()`).
+
+**`browser.ts` — open/close wiring:**
+
+- `runOpen()`: computes `daemonSocketPath` via `getDaemonSocketPath`, includes it in `writeSessionState()`. After writing state, polls `DaemonClient.ping()` (up to 20 attempts × 250ms) to verify IPC is reachable. Removed the previous hardcoded 2s sleep — the IPC ping loop provides the necessary wait.
+- `runClose()`: unlinks `state.daemonSocketPath` if present before clearing session state.
+
+**Test results:** 3 of 4 daemon IPC tests pass (they work via the existing CDP connect/disconnect path). The `exec persists state across calls` test fails — expected, since state persistence requires routing `exec` through the daemon (Phase 3).
 
 ### Phase 3: Route pages, exec, and readonly-exec through daemon
 

@@ -5,7 +5,7 @@ import {
   type CDPSession,
   type Page,
 } from "playwright";
-import { openSync, closeSync, existsSync, writeFileSync } from "node:fs";
+import { openSync, closeSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -27,6 +27,7 @@ import {
 } from "./session.js";
 import type { ProviderApi } from "./providers/types.js";
 import { getCloudProviderApi } from "./providers/index.js";
+import { getDaemonSocketPath, DaemonClient } from "./daemon-ipc.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const FORCE_CLOSE_WAIT_MS = 300;
@@ -532,6 +533,7 @@ export async function runOpen(
       logger.info("open-waiting-for-cdp", { attempt: i, port, session });
     }
     if (ready) {
+      const daemonSocketPath = getDaemonSocketPath(session);
       writeSessionState(
         {
           port,
@@ -541,9 +543,31 @@ export async function runOpen(
           status: "active",
           mode: accessMode,
           viewport,
+          daemonSocketPath,
         },
         logger,
       );
+
+      // Wait for the daemon's IPC server to become reachable.
+      const client = new DaemonClient(daemonSocketPath);
+      const ipcMaxAttempts = 20;
+      const ipcPollIntervalMs = 250;
+      let ipcReady = false;
+      for (let j = 0; j < ipcMaxAttempts; j++) {
+        ipcReady = await client.ping();
+        if (ipcReady) break;
+        await new Promise((r) => setTimeout(r, ipcPollIntervalMs));
+      }
+      if (!ipcReady) {
+        logger.warn("open-ipc-ping-failed", {
+          session,
+          daemonSocketPath,
+          attempts: ipcMaxAttempts,
+        });
+      } else {
+        logger.info("open-ipc-ping-ok", { session, daemonSocketPath });
+      }
+
       logger.info("open-success", {
         url,
         mode: browserMode,
@@ -553,7 +577,6 @@ export async function runOpen(
       });
       console.log(`Browser open (${browserMode}): ${url}`);
 
-      await new Promise((r) => setTimeout(r, 2000));
       return;
     }
   }
@@ -800,6 +823,21 @@ export async function runClose(
     if (state.pid != null) {
       sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
       await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+    }
+  }
+
+  // Clean up daemon socket file if present.
+  if (state.daemonSocketPath) {
+    try {
+      unlinkSync(state.daemonSocketPath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        logger.warn("close-socket-unlink-failed", {
+          session,
+          socketPath: state.daemonSocketPath,
+          error: err,
+        });
+      }
     }
   }
 
