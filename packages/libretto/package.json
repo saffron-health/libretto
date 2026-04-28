@@ -15,6 +15,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "src",
     "scripts",
     "skills"
