@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { buildInlinePromptSelection } from "../src/cli/core/snapshot-analyzer.js";
 import {
   parseDotEnvAssignment,
@@ -6,6 +9,8 @@ import {
   resolveSnapshotApiModel,
 } from "../src/cli/core/ai-model.js";
 import { LIBRETTO_CONFIG_PATH } from "../src/cli/core/context.js";
+import { resolveOpenAiCredentials } from "../src/cli/core/openai-credentials.js";
+import { buildOpenAiProviderSettings } from "../src/cli/core/resolve-model.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -13,6 +18,10 @@ afterEach(() => {
 
 function clearProviderEnv(): void {
   vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("CODEX_OAUTH_TOKEN", "");
+  vi.stubEnv("CODEX_ACCOUNT_ID", "");
+  vi.stubEnv("CHATGPT_ACCOUNT_ID", "");
+  vi.stubEnv("CODEX_HOME", join(tmpdir(), "libretto-test-missing-codex-home"));
   vi.stubEnv("ANTHROPIC_API_KEY", "");
   vi.stubEnv("GEMINI_API_KEY", "");
   vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "");
@@ -31,6 +40,127 @@ describe("snapshot API model resolution", () => {
       model: "openai/gpt-5.4",
       provider: "openai",
       source: "env:OPENAI_API_KEY",
+    });
+  });
+
+  it("uses Codex auth.json API key as OpenAI credentials", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+    const codexHome = join(
+      tmpdir(),
+      `libretto-test-codex-home-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    mkdirSync(codexHome, { recursive: true });
+    writeFileSync(
+      join(codexHome, "auth.json"),
+      JSON.stringify({ OPENAI_API_KEY: "sk-codex-api-key" }),
+      "utf-8",
+    );
+    vi.stubEnv("CODEX_HOME", codexHome);
+
+    expect(resolveSnapshotApiModel(null)).toMatchObject({
+      model: "openai/gpt-5.4",
+      provider: "openai",
+      source: "codex-auth-json-api-key",
+    });
+  });
+
+  it("uses CODEX_OAUTH_TOKEN as OpenAI credentials", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+    vi.stubEnv("CODEX_OAUTH_TOKEN", "test-codex-access-token");
+    vi.stubEnv("CODEX_ACCOUNT_ID", "test-account-id");
+
+    expect(resolveSnapshotApiModel(null)).toMatchObject({
+      model: "openai/gpt-5.4",
+      provider: "openai",
+      source: "env:CODEX_OAUTH_TOKEN",
+    });
+
+    expect(resolveOpenAiCredentials()).toEqual({
+      kind: "codex-oauth",
+      token: "test-codex-access-token",
+      accountId: "test-account-id",
+      source: "CODEX_OAUTH_TOKEN",
+    });
+  });
+
+  it("uses Codex auth.json OAuth tokens as OpenAI credentials", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+    const codexHome = join(
+      tmpdir(),
+      `libretto-test-codex-home-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    mkdirSync(codexHome, { recursive: true });
+    writeFileSync(
+      join(codexHome, "auth.json"),
+      JSON.stringify({
+        tokens: {
+          access_token: "test-codex-access-token",
+          account_id: "test-account-id",
+        },
+      }),
+      "utf-8",
+    );
+    vi.stubEnv("CODEX_HOME", codexHome);
+
+    expect(resolveSnapshotApiModel(null)).toMatchObject({
+      model: "openai/gpt-5.4",
+      provider: "openai",
+      source: "codex-auth-json-oauth",
+    });
+
+    expect(resolveOpenAiCredentials()).toEqual({
+      kind: "codex-oauth",
+      token: "test-codex-access-token",
+      accountId: "test-account-id",
+      source: "codex-auth-json-oauth",
+    });
+  });
+
+  it("ignores CODEX_OAUTH_TOKEN without an account id", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+    vi.stubEnv("CODEX_OAUTH_TOKEN", "test-codex-access-token");
+
+    expect(resolveSnapshotApiModel(null)).toBeNull();
+  });
+
+  it("ignores Codex auth.json OAuth tokens without an account id", () => {
+    vi.stubEnv("LIBRETTO_DISABLE_DOTENV", "1");
+    clearProviderEnv();
+    const codexHome = join(
+      tmpdir(),
+      `libretto-test-codex-home-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    mkdirSync(codexHome, { recursive: true });
+    writeFileSync(
+      join(codexHome, "auth.json"),
+      JSON.stringify({ tokens: { access_token: "test-codex-access-token" } }),
+      "utf-8",
+    );
+    vi.stubEnv("CODEX_HOME", codexHome);
+
+    expect(resolveSnapshotApiModel(null)).toBeNull();
+  });
+
+  it("builds Codex OAuth OpenAI provider settings for the Codex backend", () => {
+    expect(
+      buildOpenAiProviderSettings({
+        kind: "codex-oauth",
+        token: "test-codex-access-token",
+        accountId: "test-account-id",
+        source: "codex-auth-json-oauth",
+      }),
+    ).toEqual({
+      apiKey: "test-codex-access-token",
+      baseURL: "https://chatgpt.com/backend-api/codex",
+      headers: {
+        "chatgpt-account-id": "test-account-id",
+        "OpenAI-Beta": "responses=experimental",
+        originator: "libretto",
+      },
     });
   });
 
@@ -112,7 +242,7 @@ describe("snapshot API model resolution", () => {
     clearProviderEnv();
 
     expect(() => resolveSnapshotApiModelOrThrow(null)).toThrowError(
-      "Failed to analyze snapshot because no snapshot analyzer is configured. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_CLOUD_PROJECT, or OPENROUTER_API_KEY to .env or as a shell environment variable, or choose a default model with `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter`. For more info, run `npx libretto setup`.",
+      "Failed to analyze snapshot because no snapshot analyzer is configured. Add OPENAI_API_KEY, CODEX_OAUTH_TOKEN with CODEX_ACCOUNT_ID, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_CLOUD_PROJECT, or OPENROUTER_API_KEY to .env or as a shell environment variable, use a Codex login, or choose a default model with `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter`. For more info, run `npx libretto setup`.",
     );
   });
 
@@ -158,7 +288,7 @@ describe("snapshot API model resolution", () => {
     expect(() =>
       resolveSnapshotApiModelOrThrow("openai/gpt-5.4"),
     ).toThrowError(
-      `Failed to analyze snapshot because openai is configured in ${LIBRETTO_CONFIG_PATH}, but OPENAI_API_KEY is missing. Add OPENAI_API_KEY to .env or as a shell environment variable. For more info, run \`npx libretto setup\`.`,
+      `Failed to analyze snapshot because openai is configured in ${LIBRETTO_CONFIG_PATH}, but OpenAI API key and Codex OAuth credentials are missing. Add OPENAI_API_KEY to .env or as a shell environment variable, set CODEX_OAUTH_TOKEN with CODEX_ACCOUNT_ID, or use a Codex login. For more info, run \`npx libretto setup\`.`,
     );
   });
 });

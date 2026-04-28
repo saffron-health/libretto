@@ -84,6 +84,10 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "",
+      CODEX_OAUTH_TOKEN: "",
+      CODEX_ACCOUNT_ID: "",
+      CHATGPT_ACCOUNT_ID: "",
+      CODEX_HOME: "/tmp/libretto-test-missing-codex-home",
       ANTHROPIC_API_KEY: "",
       GEMINI_API_KEY: "",
       GOOGLE_GENERATIVE_AI_API_KEY: "",
@@ -94,6 +98,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("sub-agent to analyze DOM snapshots");
     expect(result.stdout).toContain("No snapshot API credentials detected.");
     expect(result.stdout).toContain("OPENAI_API_KEY=...");
+    expect(result.stdout).toContain("CODEX_OAUTH_TOKEN=...");
     expect(result.stdout).toContain("ANTHROPIC_API_KEY=...");
     expect(result.stdout).toContain("GEMINI_API_KEY=...");
   });
@@ -170,12 +175,18 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "",
+      CODEX_OAUTH_TOKEN: "",
+      CODEX_ACCOUNT_ID: "",
+      CHATGPT_ACCOUNT_ID: "",
+      CODEX_HOME: workspacePath(".codex-missing"),
       ANTHROPIC_API_KEY: "test-anthropic-key",
     });
 
     // Should name the configured provider and missing env var
     expect(result.stdout).toContain("openai is configured");
-    expect(result.stdout).toContain("OPENAI_API_KEY is not set");
+    expect(result.stdout).toContain(
+      "OpenAI API key and Codex OAuth credentials are missing",
+    );
     // Should NOT show the generic unconfigured message
     expect(result.stdout).not.toContain("No snapshot API credentials detected");
   });
@@ -225,6 +236,10 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "",
+      CODEX_OAUTH_TOKEN: "",
+      CODEX_ACCOUNT_ID: "",
+      CHATGPT_ACCOUNT_ID: "",
+      CODEX_HOME: workspacePath(".codex-missing"),
       ANTHROPIC_API_KEY: "",
       GEMINI_API_KEY: "",
       GOOGLE_GENERATIVE_AI_API_KEY: "",

@@ -38,7 +38,7 @@ npx libretto status
 npx libretto ai configure <openai | anthropic | gemini | vertex>
 ```
 
-`setup` detects available provider credentials (e.g. `OPENAI_API_KEY`) and automatically pins the default model to `.libretto/config.json`. Re-running `setup` on a healthy workspace shows the current configuration instead of re-prompting. If credentials are missing for a previously configured provider, `setup` offers an interactive repair flow.
+`setup` detects available provider credentials (e.g. `OPENAI_API_KEY`, Codex OAuth from `codex login`, or `CODEX_OAUTH_TOKEN` with `CODEX_ACCOUNT_ID`) and automatically pins the default model to `.libretto/config.json`. Re-running `setup` on a healthy workspace shows the current configuration instead of re-prompting. If credentials are missing for a previously configured provider, `setup` offers an interactive repair flow.
 
 Use `ai configure` when you want to explicitly switch providers or set a custom model string.
 

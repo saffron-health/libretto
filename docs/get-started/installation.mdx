@@ -30,12 +30,15 @@ Use this if you want Libretto to scaffold a new package with directory structure
 
   </Step>
 
-  <Step title="Set your API key">
-    Libretto uses an AI model to analyze page snapshots during workflow generation. Add the API key for your chosen provider to a `.env` file in your project root:
+  <Step title="Set your AI credentials">
+    Libretto uses an AI model to analyze page snapshots during workflow generation. Add credentials for your chosen provider to a `.env` file in your project root, or use Codex OAuth from `codex login` for OpenAI models:
 
     ```bash theme={null}
     # .env
     OPENAI_API_KEY=sk-...
+    # or
+    CODEX_OAUTH_TOKEN=...
+    CODEX_ACCOUNT_ID=...
     ```
 
     See the [AI Provider Reference](/get-started/configuration#ai-provider-reference) for the full list of supported providers and their environment variables.
@@ -76,12 +79,15 @@ If you already have a Node.js package that you plan to use for Libretto automati
 
   </Step>
 
-  <Step title="Set your API key">
-    Libretto uses an AI model to analyze page snapshots during workflow generation. Add the API key for your chosen provider to a `.env` file in your project root:
+  <Step title="Set your AI credentials">
+    Libretto uses an AI model to analyze page snapshots during workflow generation. Add credentials for your chosen provider to a `.env` file in your project root, or use Codex OAuth from `codex login` for OpenAI models:
 
     ```bash theme={null}
     # .env
     OPENAI_API_KEY=sk-...
+    # or
+    CODEX_OAUTH_TOKEN=...
+    CODEX_ACCOUNT_ID=...
     ```
 
     See the [AI Provider Reference](/get-started/configuration#ai-provider-reference) for the full list of supported providers and their environment variables.
