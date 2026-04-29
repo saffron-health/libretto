@@ -270,7 +270,7 @@ jobs:
           }
           EOF
           OPENCODE_CONFIG="$PWD/opencode-review-config.json" "$HOME/.opencode/bin/opencode" run \
-            --model openai/gpt-5.3-codex \
+            --model openai/gpt-5.5 \
             --agent plan \
             "$PROMPT" | tee opencode-review.md
 
