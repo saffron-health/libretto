@@ -203,27 +203,6 @@ async function resolvePageReferences(pages: Page[]): Promise<PageReference[]> {
   return refs;
 }
 
-export async function listOpenPages(
-  session: string,
-  logger: LoggerApi,
-): Promise<OpenPageSummary[]> {
-  const { browser, page: activePage } = await connect(session, logger);
-  try {
-    const pages = browser
-      .contexts()
-      .flatMap((ctx) => ctx.pages())
-      .filter(isOperationalPage);
-    const pageRefs = await resolvePageReferences(pages);
-    return pageRefs.map(({ id, page }) => ({
-      id,
-      url: page.url(),
-      active: page === activePage,
-    }));
-  } finally {
-    disconnectBrowser(browser, logger, session);
-  }
-}
-
 export async function connect(
   session: string,
   logger: LoggerApi,

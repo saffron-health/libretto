@@ -414,7 +414,6 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("read-only guard also applies to remote CDP-backed sessions", async ({
     librettoCli,
-    seedSessionState,
     workspacePath,
   }) => {
     const sourceSession = "remote-cdp-source";
@@ -430,14 +429,9 @@ describe("state-driven CLI subprocess behavior", () => {
     ) as { port: number };
 
     const remoteSession = "remote-cdp-readonly";
-    await seedSessionState({
-      session: remoteSession,
-      port: sourceState.port,
-      cdpEndpoint: `http://127.0.0.1:${sourceState.port}`,
-      mode: "read-only",
-      pid: 12345,
-      status: "active",
-    });
+    await librettoCli(
+      `connect http://127.0.0.1:${sourceState.port} --session ${remoteSession} --read-only`,
+    );
 
     const blockedExec = await librettoCli(
       `exec "return page.url()" --session ${remoteSession}`,
