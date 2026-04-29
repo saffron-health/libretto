@@ -68,6 +68,7 @@ const LOCATOR_ALLOWED_PROPERTIES = new Set<string>([]);
 
 type ReadonlyExecOptions = {
   onActivity?: () => void;
+  console?: Console;
 };
 
 const readonlyPageCache = new WeakMap<Page, Page>();
@@ -273,7 +274,7 @@ export function createReadonlyExecHelpers(
         "fetch is blocked in readonly-exec; use get() instead",
       );
     },
-    console,
+    console: options.console ?? console,
     setTimeout,
     setInterval,
     clearTimeout,

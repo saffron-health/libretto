@@ -65,7 +65,7 @@ async function execViaDaemon(
 
   const client = new DaemonClient(daemonSocketPath);
 
-  const { result } =
+  const { result, output } =
     mode === "exec"
       ? await client.exec({
           code: cleanedCode,
@@ -82,6 +82,12 @@ async function execViaDaemon(
     hasResult: result !== undefined,
     via: "daemon",
   });
+  if (output?.stdout) {
+    process.stdout.write(output.stdout);
+  }
+  if (output?.stderr) {
+    process.stderr.write(output.stderr);
+  }
   if (result !== undefined) {
     console.log(
       typeof result === "string" ? result : JSON.stringify(result, null, 2),

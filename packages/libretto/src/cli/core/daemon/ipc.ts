@@ -136,8 +136,11 @@ export class DaemonServer {
 export type DaemonResultMap = {
   ping: { protocolVersion: number };
   pages: Array<{ id: string; url: string; active: boolean }>;
-  exec: { result: unknown };
-  "readonly-exec": { result: unknown };
+  exec: { result: unknown; output?: { stdout: string; stderr: string } };
+  "readonly-exec": {
+    result: unknown;
+    output?: { stdout: string; stderr: string };
+  };
   snapshot: {
     pngPath: string;
     htmlPath: string;

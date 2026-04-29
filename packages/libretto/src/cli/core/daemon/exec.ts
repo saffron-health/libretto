@@ -1,4 +1,5 @@
 import type { Browser, BrowserContext, Page } from "playwright";
+import { format, formatWithOptions, type InspectOptions } from "node:util";
 import { installInstrumentation } from "../../../shared/instrumentation/index.js";
 import {
   compileExecFunction,
@@ -6,6 +7,40 @@ import {
 } from "../exec-compiler.js";
 import { createReadonlyExecHelpers } from "../readonly-exec.js";
 import { readNetworkLog, readActionLog } from "../telemetry.js";
+
+type ExecOutput = {
+  stdout: string;
+  stderr: string;
+};
+
+type ExecResponse = {
+  result: unknown;
+  output: ExecOutput;
+};
+
+function createBufferedConsole(): { console: Console; output: ExecOutput } {
+  const output: ExecOutput = { stdout: "", stderr: "" };
+  const writeStdout = (...args: unknown[]) => {
+    output.stdout += `${format(...args)}\n`;
+  };
+  const writeStderr = (...args: unknown[]) => {
+    output.stderr += `${format(...args)}\n`;
+  };
+
+  const bufferedConsole = {
+    ...globalThis.console,
+    log: writeStdout,
+    info: writeStdout,
+    debug: writeStdout,
+    dir: (value?: unknown, options?: InspectOptions) => {
+      output.stdout += `${formatWithOptions(options ?? {}, value)}\n`;
+    },
+    warn: writeStderr,
+    error: writeStderr,
+  } satisfies Console;
+
+  return { console: bufferedConsole, output };
+}
 
 export async function handleExec(
   targetPage: Page,
@@ -15,8 +50,9 @@ export async function handleExec(
   execState: Record<string, unknown>,
   session: string,
   visualize?: boolean,
-): Promise<{ result: unknown }> {
+): Promise<ExecResponse> {
   const { cleaned } = stripEmptyCatchHandlers(code);
+  const buffered = createBufferedConsole();
 
   if (visualize) {
     await installInstrumentation(targetPage, { visualize: true });
@@ -46,6 +82,7 @@ export async function handleExec(
     context,
     browser,
     state: execState,
+    console: buffered.console,
     networkLog,
     actionLog,
   };
@@ -53,17 +90,20 @@ export async function handleExec(
   const helperNames = Object.keys(helpers);
   const fn = compileExecFunction(cleaned, helperNames);
   const result = await fn(...Object.values(helpers));
-  return { result };
+  return { result, output: buffered.output };
 }
 
 export async function handleReadonlyExec(
   targetPage: Page,
   code: string,
-): Promise<{ result: unknown }> {
+): Promise<ExecResponse> {
   const { cleaned } = stripEmptyCatchHandlers(code);
-  const helpers = createReadonlyExecHelpers(targetPage);
+  const buffered = createBufferedConsole();
+  const helpers = createReadonlyExecHelpers(targetPage, {
+    console: buffered.console,
+  });
   const helperNames = Object.keys(helpers);
   const fn = compileExecFunction(cleaned, helperNames);
   const result = await fn(...Object.values(helpers));
-  return { result };
+  return { result, output: buffered.output };
 }

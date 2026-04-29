@@ -52,6 +52,20 @@ describe("daemon IPC", () => {
     expect(result.stdout).toContain("Exec Test");
   }, 45_000);
 
+  test("exec prints console output through daemon IPC", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-console";
+    const url = await writeFixturePage(workspacePath, "exec-console");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec "console.log('hello from exec')" --session ${session}`,
+    );
+    expect(result.stdout).toContain("hello from exec");
+  }, 45_000);
+
   test("exec persists state across calls", async ({
     librettoCli,
     workspacePath,
@@ -84,6 +98,20 @@ describe("daemon IPC", () => {
       `readonly-exec "return page.url()" --session ${session}`,
     );
     expect(result.stdout).toContain("readonly.html");
+  }, 45_000);
+
+  test("readonly-exec prints console output through daemon IPC", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-readonly-console";
+    const url = await writeFixturePage(workspacePath, "readonly-console");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `readonly-exec "console.log('hello from readonly')" --session ${session}`,
+    );
+    expect(result.stdout).toContain("hello from readonly");
   }, 45_000);
 
   test("snapshot through daemon IPC fails at analysis, not at daemon layer", async ({
