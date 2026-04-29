@@ -21,6 +21,7 @@ import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   ApiCallError,
   betterAuthCall,
+  HOSTED_API_URL,
   NOT_AUTHENTICATED_MESSAGE,
   orpcCall,
   pickCredential,
@@ -199,27 +200,9 @@ export const signupCommand = SimpleCLI.command({
   description: "Create a new hosted-platform account and organization",
   experimental: true,
 })
-  .input(
-    SimpleCLI.input({
-      positionals: [],
-      named: {
-        apiUrl: SimpleCLI.option(z.string().optional(), {
-          name: "api-url",
-          help: "Override LIBRETTO_API_URL for first-time signup.",
-        }),
-      },
-    }),
-  )
-  .handle(async ({ input }) => {
-    const apiUrl = (input.apiUrl ?? process.env.LIBRETTO_API_URL ?? "")
-      .trim()
-      .replace(/\/$/, "");
-    if (!apiUrl) {
-      throw new Error(
-        "Pass --api-url <url> or set LIBRETTO_API_URL to point at your hosted libretto deployment.",
-      );
-    }
-
+  .input(SimpleCLI.input({ positionals: [], named: {} }))
+  .handle(async () => {
+    const apiUrl = HOSTED_API_URL;
     console.log("Sign up for libretto cloud");
     console.log();
     console.log("Heads up: a libretto user can only belong to one organization.");
@@ -266,15 +249,15 @@ export const signupCommand = SimpleCLI.command({
           apiUrl,
           path: "/v1/auth/signupAndCreateOrg",
           input: {
-          name,
-          email,
-          password,
-          organizationName: orgName,
-          organizationSlug: orgSlug,
-          debugNotificationEmail,
-        },
-        unauthenticated: true,
-      });
+            name,
+            email,
+            password,
+            organizationName: orgName,
+            organizationSlug: orgSlug,
+            debugNotificationEmail,
+          },
+          unauthenticated: true,
+        });
         break;
       } catch (e) {
         if (
@@ -312,9 +295,7 @@ export const signupCommand = SimpleCLI.command({
     console.log();
     console.log("To generate an API key, run:");
     console.log("  libretto experimental auth api-key issue --label <label>");
-    console.log(
-      "Then add LIBRETTO_API_KEY=<key> and LIBRETTO_API_URL=<url> to your project's .env file.",
-    );
+    console.log("Then add LIBRETTO_API_KEY=<key> to your project's .env file.");
   });
 
 // ---------------------------------------------------------------------------
@@ -325,27 +306,9 @@ export const loginCommand = SimpleCLI.command({
   description: "Sign in to an existing hosted-platform account",
   experimental: true,
 })
-  .input(
-    SimpleCLI.input({
-      positionals: [],
-      named: {
-        apiUrl: SimpleCLI.option(z.string().optional(), {
-          name: "api-url",
-          help: "Override LIBRETTO_API_URL.",
-        }),
-      },
-    }),
-  )
-  .handle(async ({ input }) => {
-    const stored = await readAuthState();
-    const apiUrl = (
-      input.apiUrl ?? process.env.LIBRETTO_API_URL ?? stored?.apiUrl ?? ""
-    )
-      .trim()
-      .replace(/\/$/, "");
-    if (!apiUrl) {
-      throw new Error("Pass --api-url <url> or set LIBRETTO_API_URL.");
-    }
+  .input(SimpleCLI.input({ positionals: [], named: {} }))
+  .handle(async () => {
+    const apiUrl = HOSTED_API_URL;
 
     const email = await prompt("Email:");
     const password = await promptPassword("Password:");
@@ -546,26 +509,13 @@ export const acceptInviteCommand = SimpleCLI.command({
           help: "Invitation id from the invite email.",
         }),
       ],
-      named: {
-        apiUrl: SimpleCLI.option(z.string().optional(), {
-          name: "api-url",
-          help: "Override LIBRETTO_API_URL (only needed before first signup).",
-        }),
-      },
+      named: {},
     }),
   )
   .handle(async ({ input }) => {
     const stored = await readAuthState();
-    const apiUrl = (
-      input.apiUrl ?? process.env.LIBRETTO_API_URL ?? stored?.apiUrl ?? ""
-    )
-      .trim()
-      .replace(/\/$/, "");
-    if (!apiUrl) {
-      throw new Error("Pass --api-url <url> or set LIBRETTO_API_URL.");
-    }
-
-    const credential = pickCredential(stored?.apiUrl === apiUrl ? stored : null);
+    const apiUrl = HOSTED_API_URL;
+    const credential = pickCredential(stored);
     const expectedTenantSlug = input.tenantSlug;
 
     if (credential.source !== "none") {
@@ -662,9 +612,7 @@ export const acceptInviteCommand = SimpleCLI.command({
     console.log("Email verified. You're logged in and a member of the organization.");
     console.log("To generate an API key, run:");
     console.log("  libretto experimental auth api-key issue --label <label>");
-    console.log(
-      "Then add LIBRETTO_API_KEY=<key> and LIBRETTO_API_URL=<url> to your project's .env file.",
-    );
+    console.log("Then add LIBRETTO_API_KEY=<key> to your project's .env file.");
   });
 
 // ---------------------------------------------------------------------------
@@ -702,7 +650,6 @@ export const apiKeyIssueCommand = SimpleCLI.command({
     console.log();
     console.log("Add the following to your project's .env file:");
     console.log(`  LIBRETTO_API_KEY=${key.key}`);
-    console.log(`  LIBRETTO_API_URL=${apiUrl}`);
     console.log();
     console.log(
       "The key is not stored on disk by the CLI — losing it means revoking + re-issuing.",
@@ -790,7 +737,6 @@ export const whoamiCommand = SimpleCLI.command({
     const credential = pickCredential(stored);
 
     const envKey = process.env.LIBRETTO_API_KEY?.trim();
-    const envUrl = process.env.LIBRETTO_API_URL?.trim();
 
     if (credential.source === "none") {
       console.log(
@@ -800,7 +746,7 @@ export const whoamiCommand = SimpleCLI.command({
     }
 
     console.log(`Auth source:      ${credential.source}`);
-    console.log(`API URL:          ${stored?.apiUrl ?? envUrl ?? "(none)"}`);
+    console.log(`API URL:          ${HOSTED_API_URL}`);
     console.log(
       `LIBRETTO_API_KEY: ${envKey ? `set in env (${envKey.slice(0, 6)}…)` : "not set in env"}`,
     );

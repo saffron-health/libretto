@@ -7,11 +7,7 @@ hidden: true
 
 ### Before you start
 
-Ask the Libretto team for your hosted API URL, then set it before the first command:
-
-```bash theme={null}
-export LIBRETTO_API_URL=<value-from-the-libretto-team>
-```
+Hosted Libretto CLI commands use `https://api.libretto.sh` automatically.
 
 The examples below use `npx libretto`. If `libretto` is already on your `PATH`, drop `npx`.
 
@@ -20,7 +16,7 @@ The examples below use `npx libretto`. If `libretto` is already on your `PATH`, 
 Use `auth signup` when you are creating a brand new hosted organization:
 
 ```bash theme={null}
-npx libretto experimental auth signup --api-url "$LIBRETTO_API_URL"
+npx libretto experimental auth signup
 ```
 
 The CLI prompts for your name, email, password, organization name, organization slug, and the alert email that Hosted Libretto should use for hosted workflow failure notifications. After the account is created, it waits for email verification and stores the hosted session locally in `~/.libretto/auth.json`.
@@ -72,7 +68,7 @@ The command prints the invitation id and the organization slug that the recipien
 Use `accept-invite` when you are joining an existing organization:
 
 ```bash theme={null}
-npx libretto experimental auth accept-invite <tenant-slug> <invitation-id> --api-url "$LIBRETTO_API_URL"
+npx libretto experimental auth accept-invite <tenant-slug> <invitation-id>
 ```
 
 If you are not logged in yet, the CLI creates the account first, waits for email verification, and then saves the hosted session locally.
@@ -92,7 +88,6 @@ The command prints the raw key once. The CLI does not store that key on disk for
 Add it to your project:
 
 ```bash theme={null}
-LIBRETTO_API_URL=https://api.libretto.dev
 LIBRETTO_API_KEY=<issued-key>
 ```
 
@@ -110,7 +105,6 @@ npx libretto experimental auth api-key revoke <key-id>
 
 ### Troubleshooting
 
-- If the CLI says no hosted URL is configured, set `LIBRETTO_API_URL` or pass `--api-url` on the first auth command.
 - If signup fails because the email already exists, log in to that account or delete the existing hosted account before retrying.
 - If an invite fails for a logged-in user, make sure that user is not already a member of another Libretto organization.
 

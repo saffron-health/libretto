@@ -7,10 +7,9 @@ hidden: true
 
 ### Before you deploy
 
-Ask the Libretto team for your hosted `LIBRETTO_API_URL`, then issue an API key for the deployment environment:
+Hosted Libretto CLI commands and API requests use `https://api.libretto.sh`. Issue an API key for the deployment environment:
 
 ```bash theme={null}
-export LIBRETTO_API_URL=<value-from-the-libretto-team>
 export LIBRETTO_API_KEY=<issued-api-key>
 ```
 
@@ -98,7 +97,7 @@ export default workflow<Input, { status: string }>(
 then hit the endpoint with `workflow: "check-eligibility"`:
 
 ```bash theme={null}
-curl -X POST "$LIBRETTO_API_URL/v1/jobs/create" \
+curl -X POST "https://api.libretto.sh/v1/jobs/create" \
   -H "x-api-key: $LIBRETTO_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -115,7 +114,7 @@ curl -X POST "$LIBRETTO_API_URL/v1/jobs/create" \
 That request returns a `job_id` immediately. Use that id to fetch status or the final result:
 
 ```bash theme={null}
-curl -X POST "$LIBRETTO_API_URL/v1/jobs/get" \
+curl -X POST "https://api.libretto.sh/v1/jobs/get" \
   -H "x-api-key: $LIBRETTO_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
