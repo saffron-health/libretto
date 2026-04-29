@@ -142,21 +142,6 @@ class BrowserDaemon {
       });
     }
 
-    // Action logging — wrap known pages and any future pages.
-    for (const p of initialPages) {
-      wrapPageForActionLogging(p, session);
-    }
-    context.on("page", (newPage) => {
-      wrapPageForActionLogging(newPage, session);
-    });
-
-    // Navigate after telemetry is installed (so we capture the initial
-    // page load) but before starting the IPC server (so callers polling
-    // for IPC readiness see a page that has already loaded).
-    if (navigateUrl) {
-      await page.goto(navigateUrl);
-    }
-
     // IPC server — handler is wired after construction to avoid a
     // circular type inference issue (daemon references itself).
     const socketPath = getDaemonSocketPath(session);
@@ -174,13 +159,23 @@ class BrowserDaemon {
       logger,
     );
 
-    // Track known pages and auto-track any pages opened later.
+    // Action logging and page tracking must be registered before optional
+    // navigation so popups opened during the initial load are visible to IPC.
     for (const p of initialPages) {
+      wrapPageForActionLogging(p, session);
       daemon.trackPage(p);
     }
     context.on("page", (newPage) => {
+      wrapPageForActionLogging(newPage, session);
       daemon.trackPage(newPage);
     });
+
+    // Navigate after telemetry is installed (so we capture the initial
+    // page load) but before starting the IPC server (so callers polling
+    // for IPC readiness see a page that has already loaded).
+    if (navigateUrl) {
+      await page.goto(navigateUrl);
+    }
 
     handler = (request) => daemon.handleRequest(request);
     await ipcServer.listen();
