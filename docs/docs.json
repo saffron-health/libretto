@@ -100,6 +100,30 @@
           "hosting/gcp",
           "hosting/aws"
         ]
+      },
+      {
+        "group": "Libretto Cloud",
+        "hidden": true,
+        "pages": [
+          "libretto-cloud/overview",
+          "libretto-cloud/authentication",
+          "libretto-cloud/deployments",
+          "libretto-cloud/billing"
+        ]
+      },
+      {
+        "group": "Libretto Cloud API",
+        "hidden": true,
+        "pages": [
+          "libretto-cloud-api/overview",
+          "libretto-cloud-api/authentication",
+          "libretto-cloud-api/sessions",
+          "libretto-cloud-api/deployments-and-workflows",
+          "libretto-cloud-api/jobs-and-logs",
+          "libretto-cloud-api/credentials",
+          "libretto-cloud-api/webhooks",
+          "libretto-cloud-api/schedules"
+        ]
       }
     ],
     "global": {

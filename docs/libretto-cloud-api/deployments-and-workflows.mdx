@@ -1,0 +1,199 @@
+---
+title: Libretto Cloud API deployments and workflows
+hidden: true
+---
+
+> Use the deployments API when you already have a workflow bundle, and use the workflows API to inspect deployed or AI-generated workflows.
+
+All routes on this page require `x-api-key`.
+
+### Deployments
+
+#### POST `/v1/deployments/create`
+
+Upload a base64-encoded gzip tarball and create a hosted deployment.
+
+Request fields:
+
+- `description`: optional deployment description
+- `source`: base64-encoded gzip tarball
+- `entry_point`: optional entry file, default `index.ts`
+- `auto_repair`: optional boolean, default `false`
+
+Response fields:
+
+- `deployment_id`
+- `status`: always `building`
+- `created_at`
+
+#### POST `/v1/deployments/list`
+
+List deployments for the current tenant.
+
+Send an empty request body:
+
+```json
+{ "json": {} }
+```
+
+Response fields for each deployment:
+
+- `id`
+- `description`
+- `status`
+- `source_path`
+- `bundle_path`
+- `build_error`
+- `entry_point`
+- `built_at`
+- `created_at`
+- `workflows`
+
+#### POST `/v1/deployments/sync`
+
+Poll a deployment until the build finishes and workflow discovery lands.
+
+Request fields:
+
+- `id`: deployment id
+
+Response fields:
+
+- `id`
+- `description`
+- `status`
+- `source_path`
+- `bundle_path`
+- `build_error`
+- `entry_point`
+- `built_at`
+- `created_at`
+- `workflows`
+
+### Workflows
+
+#### POST `/v1/workflows/list`
+
+List deployed workflows and in-progress workflow builds.
+
+Response fields:
+
+- `deployed_workflows`
+- `in_progress_builds`
+
+Each `deployed_workflows` entry includes:
+
+- `name`
+- `deployment_id`
+- `deployment_status`
+- `created_at`
+- `updated_at`
+
+Each `in_progress_builds` entry includes:
+
+- `build_id`
+- `status`
+- `workflow_name`
+- `summary`
+- `error`
+- `created_at`
+- `updated_at`
+
+#### POST `/v1/workflows/get`
+
+Return the deployment backing a single workflow name.
+
+Request fields:
+
+- `workflow`: workflow name
+
+Response fields:
+
+- `workflow`
+- `deployment_id`
+- `deployment_status`
+- `deployment_created_at`
+- `deployment_built_at`
+- `created_at`
+- `updated_at`
+
+#### POST `/v1/workflows/delete`
+
+Delete a workflow by name.
+
+Request fields:
+
+- `workflow`: workflow name
+
+Response fields:
+
+- `success`
+- `message`
+
+### AI workflow build routes
+
+#### POST `/v1/workflows/build`
+
+Create an AI-driven workflow build from a natural-language description.
+
+Request fields:
+
+- `descriptions`: one or more natural-language descriptions
+- `initial_url`: URL where the build should start
+- `params`: optional workflow params schema example
+- `network_log`: optional captured network log
+- `action_log`: optional captured action log
+- `entry_point`: optional entry file, default `index.ts`
+
+Response fields:
+
+- `build_id`
+- `status`: `pending` or `agent_running`
+
+#### POST `/v1/workflows/buildStatus`
+
+Poll an AI workflow build.
+
+Request fields:
+
+- `build_id`
+
+Response fields:
+
+- `build_id`
+- `status`
+- `deployment_id`
+- `workflow_name`
+- `summary`
+- `error`
+- `details`
+- `attempted_steps`
+- `created_at`
+- `updated_at`
+
+### Example deploy poll
+
+```bash
+curl -X POST "https://api.libretto.sh/v1/deployments/sync" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "id": "<deployment-id>"
+    }
+  }'
+```
+
+<CardGroup cols={3}>
+  <Card title="Jobs and Logs" icon="terminal" href="/libretto-cloud-api/jobs-and-logs">
+    Invoke workflows and inspect job state.
+  </Card>
+
+  <Card title="Sessions" icon="browser" href="/libretto-cloud-api/sessions">
+    Create browser sessions directly.
+  </Card>
+
+  <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
+    See the shared request format.
+  </Card>
+</CardGroup>

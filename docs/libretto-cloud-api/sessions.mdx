@@ -1,0 +1,78 @@
+---
+title: Libretto Cloud API sessions
+hidden: true
+---
+
+> Use the sessions API to create and close hosted browser sessions directly.
+
+All routes on this page require `x-api-key`.
+
+### POST `/v1/sessions/create`
+
+Start a hosted browser session.
+
+Request fields:
+
+- `timeout_seconds`: optional session timeout, default `7200`, max `18000`
+
+Response fields:
+
+- `success`
+- `session_id`
+- `cdp_url`
+- `live_view_url`
+- `recording_url`
+
+Example:
+
+```bash
+curl -X POST "https://api.libretto.sh/v1/sessions/create" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "timeout_seconds": 1800
+    }
+  }'
+```
+
+### POST `/v1/sessions/close`
+
+Close a hosted browser session by provider session id.
+
+Request fields:
+
+- `session_id`: session id returned from `sessions/create`
+
+Response fields:
+
+- `success`
+- `message`
+- `replay_url`
+
+Example:
+
+```bash
+curl -X POST "https://api.libretto.sh/v1/sessions/close" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "session_id": "<session-id>"
+    }
+  }'
+```
+
+<CardGroup cols={3}>
+  <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
+    See the shared request format.
+  </Card>
+
+  <Card title="Jobs and Logs" icon="terminal" href="/libretto-cloud-api/jobs-and-logs">
+    Run workflows and inspect results.
+  </Card>
+
+  <Card title="Deployments and Workflows" icon="rocket" href="/libretto-cloud-api/deployments-and-workflows">
+    Deploy workflows before invoking them.
+  </Card>
+</CardGroup>

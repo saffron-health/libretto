@@ -1,3 +1,4 @@
+import { HOSTED_API_URL } from "../auth-fetch.js";
 import type { ProviderApi } from "./types.js";
 
 export function createLibrettoCloudProvider(): ProviderApi {
@@ -6,12 +7,7 @@ export function createLibrettoCloudProvider(): ProviderApi {
     throw new Error(
       "LIBRETTO_API_KEY is required for the Libretto Cloud provider.",
     );
-  const apiUrl = process.env.LIBRETTO_API_URL;
-  if (!apiUrl)
-    throw new Error(
-      "LIBRETTO_API_URL is required for the Libretto Cloud provider.",
-    );
-  const endpoint = apiUrl.replace(/\/$/, "");
+  const endpoint = HOSTED_API_URL;
 
   // The Libretto Cloud API is an oRPC RPCHandler, not plain REST, so inputs
   // must be wrapped as { json: ... } and outputs arrive the same way.

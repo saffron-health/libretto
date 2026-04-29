@@ -1,0 +1,102 @@
+---
+title: Libretto Cloud API authentication
+hidden: true
+---
+
+> Use the public auth endpoints to create a new account or accept an invite when you do not already have a Libretto account.
+
+These endpoints use the same ORPC request envelope as the rest of the Libretto Cloud API, but they do not require `x-api-key`.
+
+### POST `/v1/auth/signupAndCreateOrg`
+
+Create a new user account, create a new organization, send the verification email, and return the session cookie material that the CLI stores locally.
+
+Request fields:
+
+- `name`: user display name
+- `email`: user email address
+- `password`: password, 8 to 128 characters
+- `organizationName`: organization display name
+- `organizationSlug`: lowercase slug for the organization
+- `debugNotificationEmail`: email that receives hosted workflow failure notifications
+
+Response fields:
+
+- `userId`
+- `email`
+- `organizationId`
+- `organizationSlug`
+- `sessionToken`
+- `setCookie`
+- `emailVerified`
+
+Example:
+
+```bash
+curl -X POST "https://api.libretto.sh/v1/auth/signupAndCreateOrg" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "name": "Casey Lee",
+      "email": "casey@example.com",
+      "password": "super-secret-password",
+      "organizationName": "Acme Health",
+      "organizationSlug": "acme-health",
+      "debugNotificationEmail": "alerts@example.com"
+    }
+  }'
+```
+
+### POST `/v1/auth/acceptInviteAndSignup`
+
+Create a user account for an invited email address and accept the invitation in one call.
+
+Request fields:
+
+- `invitationId`: invitation id from the invite email
+- `tenantSlug`: organization slug from the invite email
+- `name`: user display name
+- `password`: password, 8 to 128 characters
+
+Response fields:
+
+- `userId`
+- `email`
+- `organizationId`
+- `organizationSlug`
+- `sessionToken`
+- `setCookie`
+- `emailVerified`
+
+Example:
+
+```bash
+curl -X POST "https://api.libretto.sh/v1/auth/acceptInviteAndSignup" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "invitationId": "<invitation-id>",
+      "tenantSlug": "acme-health",
+      "name": "Casey Lee",
+      "password": "super-secret-password"
+    }
+  }'
+```
+
+### Interactive auth flows
+
+Interactive login, logout, invites, API-key issuance, and member management are handled through the Libretto Cloud CLI auth flow rather than separate public `/v1/*` endpoints here. Use [Libretto Cloud authentication](/libretto-cloud/authentication) for that workflow.
+
+<CardGroup cols={3}>
+  <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
+    Start with the base URL, envelope, and auth model.
+  </Card>
+
+  <Card title="Sessions" icon="browser" href="/libretto-cloud-api/sessions">
+    Create and close hosted browser sessions.
+  </Card>
+
+  <Card title="Deployments and Workflows" icon="rocket" href="/libretto-cloud-api/deployments-and-workflows">
+    Upload bundles and inspect workflow state.
+  </Card>
+</CardGroup>

@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { HOSTED_API_URL } from "../core/auth-fetch.js";
 import { buildHostedDeployTarball } from "../core/deploy-artifact.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
@@ -19,21 +20,15 @@ function generateDeploymentName(): string {
 }
 
 function getConfig() {
-  const apiUrl = process.env.LIBRETTO_API_URL;
   const apiKey = process.env.LIBRETTO_API_KEY;
 
-  if (!apiUrl) {
-    throw new Error(
-      "LIBRETTO_API_URL environment variable is required.",
-    );
-  }
   if (!apiKey) {
     throw new Error(
       "LIBRETTO_API_KEY environment variable is required.",
     );
   }
 
-  return { apiUrl: apiUrl.replace(/\/$/, ""), apiKey };
+  return { apiUrl: HOSTED_API_URL, apiKey };
 }
 
 async function postJson(

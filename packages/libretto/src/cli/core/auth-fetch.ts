@@ -11,6 +11,8 @@
 
 import { readAuthState, writeAuthState, type AuthState } from "./auth-storage.js";
 
+export const HOSTED_API_URL = "https://api.libretto.sh";
+
 /**
  * Shared "you have no usable credential" message. Pointed at the two
  * recovery paths so users don't have to remember which mechanism does what.
@@ -38,13 +40,8 @@ export function pickCredential(state: AuthState | null): CredentialChoice {
   return { source: "none" };
 }
 
-export function resolveApiUrl(state: AuthState | null): string {
-  const env = process.env.LIBRETTO_API_URL?.trim();
-  if (env) return env.replace(/\/$/, "");
-  if (state?.apiUrl) return state.apiUrl.replace(/\/$/, "");
-  throw new Error(
-    "No hosted-platform URL configured. Set LIBRETTO_API_URL, or run `libretto experimental auth signup` to create an account.",
-  );
+export function resolveApiUrl(_state: AuthState | null): string {
+  return HOSTED_API_URL;
 }
 
 type FetchOptions = {

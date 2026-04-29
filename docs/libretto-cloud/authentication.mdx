@@ -1,0 +1,118 @@
+---
+title: Libretto Cloud authentication
+hidden: true
+---
+
+> Create or join a Libretto Cloud organization, store a local session, and issue API keys for cloud runs.
+
+### Before you start
+
+The examples below use `npx libretto`. If `libretto` is already on your `PATH`, drop `npx`.
+
+### Create a new user account and organization
+
+Use `auth signup` when you are creating a brand new Libretto Cloud organization:
+
+```bash theme={null}
+npx libretto experimental auth signup
+```
+
+The CLI prompts for your name, email, password, organization name, organization slug, and the alert email that Libretto Cloud should use for workflow failure notifications. After the account is created, it waits for email verification and stores the session locally in `~/.libretto/auth.json`.
+
+<Note>
+  A Libretto user can only belong to one organization at a time. If your team already has an organization, use an invite instead of creating a second account.
+</Note>
+
+If the organization slug is already taken, the CLI re-prompts for just the slug and keeps the rest of your signup input.
+
+### Log in to an existing account
+
+Use `auth login` when the account already exists:
+
+```bash theme={null}
+npx libretto experimental auth login
+```
+
+This stores a new Libretto Cloud session in `~/.libretto/auth.json`. If the account is not verified yet, the CLI re-sends the verification email.
+
+To clear local credentials:
+
+```bash theme={null}
+npx libretto experimental auth logout
+```
+
+### Check the active identity
+
+Use `whoami` to confirm which Libretto Cloud account the CLI is using:
+
+```bash theme={null}
+npx libretto experimental auth whoami
+```
+
+If `LIBRETTO_API_KEY` is set, the CLI prefers that key over the stored session cookie.
+
+### Invite a teammate
+
+Use `invite` from an account that can manage members in the active organization:
+
+```bash theme={null}
+npx libretto experimental auth invite teammate@example.com --role member
+```
+
+The command prints the invitation id and the organization slug that the recipient needs for `accept-invite`.
+
+### Accept an invite
+
+Use `accept-invite` when you are joining an existing organization:
+
+```bash theme={null}
+npx libretto experimental auth accept-invite <tenant-slug> <invitation-id>
+```
+
+If you are not logged in yet, the CLI creates the account first, waits for email verification, and then saves the hosted session locally.
+
+If you are already logged in, `accept-invite` only works when that account is not already a member of another organization.
+
+### Issue an API key
+
+Use API keys for project `.env` files, CI, or other non-interactive Libretto Cloud runs:
+
+```bash theme={null}
+npx libretto experimental auth api-key issue --label laptop-dev
+```
+
+The command prints the raw key once. The CLI does not store that key on disk for you.
+
+Add it to your project:
+
+```bash theme={null}
+LIBRETTO_API_KEY=<issued-key>
+```
+
+To inspect existing keys:
+
+```bash theme={null}
+npx libretto experimental auth api-key list
+```
+
+To revoke a key:
+
+```bash theme={null}
+npx libretto experimental auth api-key revoke <key-id>
+```
+
+### Troubleshooting
+
+- If signup fails because the email already exists, log in to that account or delete the existing Libretto Cloud account before retrying.
+- If an invite fails for a logged-in user, make sure that user is not already a member of another Libretto organization.
+
+<CardGroup cols={2}>
+  <Card title="Deployments" icon="rocket" href="/libretto-cloud/deployments">
+    Deploy workflows to Libretto Cloud and investigate cloud runs.
+  </Card>
+
+  <Card title="Libretto Cloud billing" icon="credit-card" href="/libretto-cloud/billing">
+    Open the plans page and manage your subscription.
+  </Card>
+
+</CardGroup>

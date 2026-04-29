@@ -1,0 +1,181 @@
+---
+title: Libretto Cloud API jobs and logs
+hidden: true
+---
+
+> Use the jobs API to run workflows and inspect results, and use the logs API to fetch executor logs for recent jobs.
+
+All routes on this page require `x-api-key`.
+
+### Jobs
+
+#### POST `/v1/jobs/create`
+
+Start a workflow job.
+
+Request fields:
+
+- `workflow`: deployed workflow name
+- `params`: workflow input object
+- `nonce`: optional idempotency-style nonce
+- `timeout_seconds`: optional timeout, default `1800`, max `3600`
+- `callback_url`: optional callback URL
+- `callback_secret`: optional callback secret
+- `skip_callbacks`: optional boolean
+
+If you set `callback_url`, you must also set `callback_secret`.
+
+Response fields:
+
+- `success`
+- `job_id`
+- `status`: always `running`
+- `message`
+
+#### POST `/v1/jobs/list`
+
+List jobs for the current tenant.
+
+Request fields:
+
+- `status`: optional status filter
+- `limit`: optional page size, default `20`, max `100`
+- `cursor`: optional pagination cursor from `next_cursor`
+
+Response fields:
+
+- `jobs`
+- `next_cursor`
+
+Each job summary includes:
+
+- `job_id`
+- `deployment_id`
+- `workflow_id`
+- `workflow`
+- `status`
+- `created_at`
+- `completed_at`
+
+#### POST `/v1/jobs/get`
+
+Return a single job and its result data.
+
+Request fields:
+
+- `id`: job id
+
+Response fields:
+
+- `job_id`
+- `deployment_id`
+- `deployment_version`
+- `workflow_id`
+- `workflow`
+- `params`
+- `status`
+- `created_at`
+- `started_at`
+- `completed_at`
+- `result`
+- `error`
+- `mapped_stack`
+- `recording_url`
+
+#### POST `/v1/jobs/debugReport`
+
+Return the hosted debug or autofix report for a failed job.
+
+Request fields:
+
+- `id`: job id
+
+Response fields:
+
+- `job_id`
+- `debug_agent_status`
+- `debug_agent_mode`
+- `error`
+- `tldr`
+- `handoff_prompt`
+- `screenshot_url`
+- `dom_snapshot_url`
+- `recording_url`
+- `autofix_summary`
+- `autofix_deployment_id`
+- `email_sent_at`
+- `job_error`
+- `job_mapped_stack`
+- `job_params`
+- `job_workflow`
+
+#### POST `/v1/jobs/cancel`
+
+Cancel a queued or running job.
+
+Request fields:
+
+- `id`: job id
+
+Response fields:
+
+- `success`
+- `message`
+
+### Logs
+
+#### POST `/v1/logs/list`
+
+Fetch recent executor logs for one job or for recent jobs in the tenant.
+
+Request fields:
+
+- `jobId`: optional job id
+- `workflow`: optional workflow-name filter
+- `level`: optional `info`, `warn`, or `error`
+- `pageToken`: optional next-page token
+- `limit`: optional page size, default `100`, max `1000`
+
+Response fields:
+
+- `logs`
+- `nextPageToken`
+
+Each log entry includes:
+
+- `jobId`
+- `workflow`
+- `level`
+- `message`
+- `timestamp`
+
+### Example job run
+
+```bash
+curl -X POST "https://api.libretto.sh/v1/jobs/create" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "workflow": "check-eligibility",
+      "params": {
+        "memberId": "12345"
+      },
+      "timeout_seconds": 300
+    }
+  }'
+```
+
+<CardGroup cols={3}>
+  <Card title="Credentials" icon="lock" href="/libretto-cloud-api/credentials">
+    Store credentials used by Libretto Cloud workflows.
+  </Card>
+
+  <Card title="Deployments and Workflows" icon="rocket" href="/libretto-cloud-api/deployments-and-workflows">
+    Deploy workflows and inspect build state.
+  </Card>
+
+  <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
+    See the shared request format.
+  </Card>
+</CardGroup>
