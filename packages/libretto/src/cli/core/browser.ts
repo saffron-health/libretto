@@ -448,7 +448,11 @@ export async function runOpen(
     session,
     logger,
     logPath: runLogPath,
-    ipcTimeoutMs: 15_000,
+    // The daemon launches Chromium, installs telemetry, navigates to
+    // the URL, and only then starts IPC. Navigation alone can take up
+    // to 45s (page.setDefaultNavigationTimeout), so the IPC timeout
+    // must cover launch + navigation.
+    ipcTimeoutMs: 60_000,
   });
 
   writeSessionState(
@@ -516,7 +520,8 @@ export async function runOpenWithProvider(
     session,
     logger,
     logPath: runLogPath,
-    ipcTimeoutMs: 30_000,
+    // Remote CDP connection + navigation; must cover both.
+    ipcTimeoutMs: 60_000,
     onFailure: () => provider.closeSession(providerSession.sessionId),
   });
 
