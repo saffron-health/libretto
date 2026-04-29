@@ -5,7 +5,7 @@ description: Update AGENTS.md files based on session learnings about a topic. Us
 
 Update AGENTS.md files based on what was learned in this session about: $TOPIC
 
-Read `docs/updating-agents-docs.md` for full guidelines before proceeding.
+Read `./references/updating-agents-docs.md` for full guidelines before proceeding.
 
 ## Process
 

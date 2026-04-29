@@ -12,7 +12,7 @@ Guidelines for updating AGENTS.md files based on learnings from the current sess
 
 Place docs in the deepest/lowest common ancestor:
 
-- Root `AGENTS.md`: repo-wide conventions (build commands, package structure)
+- Root `AGENTS.md`: repo-wide conventions (build commands, monorepo structure)
 - Package `AGENTS.md` (e.g., `apps/api/AGENTS.md`): package-specific patterns
 - Subdirectory `AGENTS.md` (e.g., `apps/api/src/sync/AGENTS.md`): feature-specific details
 - `docs/*.md`: detailed explanations, tutorials, or complex topics
@@ -40,13 +40,13 @@ When referencing docs/ files, provide a clear trigger so agents know WHEN to rea
 Bad (too vague):
 
 ```markdown
-See docs/interactive-debugging-workflow.md for more information.
+See docs/logging.md for more information.
 ```
 
 Good (clear trigger):
 
 ```markdown
-When fixing browser automation issues (selectors not working, elements not found), read docs/interactive-debugging-workflow.md
+When investigating production errors or debugging request flows, read docs/logging.md
 ```
 
 Pattern: When [specific situation], read [doc]
@@ -70,9 +70,9 @@ Keep it simple: just tell agents when the doc is relevant.
 Good (clear trigger + value):
 
 ```markdown
-When fixing browser automation issues (clicks not working, elements not found, selectors failing), use the interactive debugging workflow instead of the edit-restart cycle. This reduces iteration time from 5-10 minutes to 30 seconds.
+When investigating production errors or tracing request flows, query structured logs in GCP instead of adding ad-hoc console.log statements. This gives you historical context without redeploying.
 
-See docs/interactive-debugging-workflow.md for detailed instructions and examples.
+See docs/logging.md for query patterns and examples.
 ```
 
 Pattern:
