@@ -1,0 +1,167 @@
+---
+title: Hosted deployments
+hidden: true
+---
+
+> Deploy workflow bundles to the hosted platform, then use the platform's failure emails and debug tools when runs break.
+
+### Before you deploy
+
+Ask the Libretto team for your hosted `LIBRETTO_API_URL`, then issue an API key for the deployment environment:
+
+```bash theme={null}
+export LIBRETTO_API_URL=<value-from-the-libretto-team>
+export LIBRETTO_API_KEY=<issued-api-key>
+```
+
+### Expected deploy directory
+
+`libretto experimental deploy` uploads one package directory at a time. That directory must contain:
+
+- A `package.json`
+- An entry file for workflow discovery
+- The workflow files you want to deploy
+
+By default, Libretto looks for `index.ts` inside the directory you pass to `deploy`.
+
+Recommended layout:
+
+```text
+my-automations/
+├── package.json
+├── index.ts
+└── src/
+    └── workflows/
+        ├── check-eligibility.ts
+        └── submit-prior-auth.ts
+```
+
+Each workflow file should default-export a `workflow(...)`. Then `index.ts` should export the workflows you want Hosted Libretto to discover:
+
+```ts theme={null}
+export { default as checkEligibility } from "./src/workflows/check-eligibility";
+export { default as submitPriorAuth } from "./src/workflows/submit-prior-auth";
+```
+
+The hosted API uses the workflow name from the `workflow("...")` call inside the file, not the filename or the export alias from `index.ts`.
+
+If your workflows live in a package inside a monorepo, run `deploy` against that package directory instead of the monorepo root.
+
+### Deploy workflows
+
+Use `deploy` to upload a hosted workflow bundle:
+
+```bash theme={null}
+npx libretto experimental deploy .
+```
+
+That command expects:
+
+- `.` to contain `package.json`
+- `./index.ts` to be the deploy entry point
+- `index.ts` to export the workflows that should be deployed
+
+You can also set a description and point `--entry-point` at a different file relative to the deploy directory:
+
+```bash theme={null}
+npx libretto experimental deploy . \
+  --description "payer portal workflows" \
+  --entry-point src/workflows/check-eligibility.ts
+```
+
+The CLI bundles the deploy artifact, uploads it to the hosted platform, then waits for the build to finish. When the build is ready, it prints the deployment id and the discovered workflow names.
+
+### Run a deployed workflow
+
+After the deployment finishes, call the hosted jobs endpoint with the workflow name from your code. For example, if your workflow file looks like this:
+
+```ts theme={null}
+// src/workflows/check-eligibility.ts
+import { workflow } from "libretto";
+
+type Input = {
+  memberId: string;
+};
+
+export default workflow<Input, { status: string }>(
+  "check-eligibility",
+  async ({ page }, input) => {
+    await page.goto("https://example.com/eligibility");
+
+    return {
+      status: "eligible",
+    };
+  },
+);
+```
+
+then hit the endpoint with `workflow: "check-eligibility"`:
+
+```bash theme={null}
+curl -X POST "$LIBRETTO_API_URL/v1/jobs/create" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "workflow": "check-eligibility",
+      "params": {
+        "memberId": "12345"
+      },
+      "timeout_seconds": 300
+    }
+  }'
+```
+
+That request returns a `job_id` immediately. Use that id to fetch status or the final result:
+
+```bash theme={null}
+curl -X POST "$LIBRETTO_API_URL/v1/jobs/get" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "id": "<job-id>"
+    }
+  }'
+```
+
+The `workflow` value must match the workflow name declared in code and discovered during deploy, not the deployment id, filename, or export alias.
+
+### Investigate hosted failures
+
+When a hosted workflow job fails, the platform emails the configured debug recipient with:
+
+- A short diagnosis.
+- A handoff prompt for a local coding agent.
+- Links to the relevant debug context, such as screenshots or recordings when available.
+
+That email is designed to move the fix back into a local coding workflow quickly. After you receive it, use the local repo and Libretto tooling to inspect the failure and patch the workflow.
+
+For the local debugging flow, see [Debugging workflows](/workflow-guides/debugging-workflows).
+
+### Hosting options
+
+Hosted Libretto is the managed path. If you would rather run Libretto on infrastructure you control, use the self-hosting docs instead:
+
+- [Self-hosting overview](/hosting/introduction)
+- [Deploy on GCP](/hosting/gcp)
+- [Deploy on AWS](/hosting/aws)
+
+<Note>
+  This page covers the managed hosted-platform flow. The self-hosting pages are the right reference when you want to own the runtime, scheduler, and secrets infrastructure yourself.
+</Note>
+
+<CardGroup cols={3}>
+  <Card title="Hosted overview" icon="book-open" href="/hosted-libretto/overview">
+    Start with the high-level hosted workflow.
+  </Card>
+
+  <Card title="Authentication" icon="key" href="/hosted-libretto/authentication">
+    Create accounts, join organizations, and issue API keys.
+  </Card>
+
+  <Card title="Hosted billing" icon="credit-card" href="/hosted-libretto/billing">
+    Manage plans and open the billing portal.
+  </Card>
+
+</CardGroup>

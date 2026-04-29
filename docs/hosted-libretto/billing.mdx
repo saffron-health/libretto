@@ -1,0 +1,88 @@
+---
+title: Hosted billing
+hidden: true
+---
+
+> View your current hosted plan, open the Libretto plans page, and manage payment details through Stripe.
+
+Only organization owners can view billing status or open billing-management links.
+
+<Warning>
+  These commands are for Hosted Libretto accounts with billing enabled. If your CLI does not expose `experimental billing`, ask the Libretto team.
+</Warning>
+
+### Open the plans page
+
+Use `billing portal` to print a short-lived link to Libretto's hosted plans page:
+
+```bash theme={null}
+npx libretto experimental billing portal
+```
+
+The page shows:
+
+- Your current plan.
+- The currently available upgrade or downgrade options.
+- A link for payment methods and invoices.
+- A contact path for BAA and Enterprise requests.
+
+### Check the current plan and usage
+
+Use `billing status` to inspect the current plan, subscription status, usage, and period end:
+
+```bash theme={null}
+npx libretto experimental billing status
+```
+
+Example output:
+
+```text
+Plan:    Pro (active)
+Usage:   37.40 / 100 browser hours this period
+Period:  ends 2026-05-21
+```
+
+If cancellation is already scheduled, the command prints that too.
+
+### Hosted usage limits
+
+These limits apply to Hosted Libretto. Local browser sessions on your own machine do not count toward hosted billing.
+
+#### What counts toward usage
+
+Hosted browser hours accrue when Hosted Libretto provisions a browser session for:
+
+- A hosted browser session opened through the managed platform.
+- A hosted workflow job that needs a browser session.
+
+#### How usage is measured
+
+Hosted usage is measured per browser session, from the time a session starts until Libretto records it as closed.
+
+Each session is billed by the minute and rounds up to the next whole minute, which is the same general metering model used by other hosted browser providers.
+
+If your organization exceeds its plan limit, Hosted Libretto will not spin up new browser sessions until you move to a plan with more capacity.
+
+### Change plans, payment methods, invoices, and cancellation
+
+Run `billing portal`, open the printed plans page, and use it to change plans or open Stripe's customer portal for payment details, invoices, and cancellation. After any plan change, run `billing status` again in your terminal to confirm the updated plan.
+
+### BAA and Enterprise
+
+For BAA and Enterprise, please reach out to us at `team@saffron.health`.
+
+### Troubleshooting
+
+- If the plans link says it is expired or invalid, run `npx libretto experimental billing portal` again to get a fresh link.
+- If billing commands fail with an auth error, log in again or set `LIBRETTO_API_KEY` and `LIBRETTO_API_URL`.
+- If you can authenticate but still cannot access billing, confirm that your user is an organization owner.
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/hosted-libretto/authentication">
+    Manage hosted login state, invites, and API keys.
+  </Card>
+
+  <Card title="Deployments" icon="rocket" href="/hosted-libretto/deployments">
+    Deploy workflows and invoke them on the hosted platform.
+  </Card>
+</CardGroup>
