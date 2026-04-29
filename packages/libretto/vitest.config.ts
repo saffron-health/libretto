@@ -10,6 +10,6 @@ export default defineConfig({
     isolate: true,
     fileParallelism: true,
     maxWorkers: 4,
-    reporters: ["minimal"],
+    reporters: ["agent"],
   },
 });
