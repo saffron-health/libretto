@@ -79,6 +79,8 @@ class BrowserDaemon {
     this.logger = logger.withScope("child");
   }
 
+  private shuttingDown = false;
+
   private trackPage(page: Page): string {
     const id = `page-${Math.random().toString(36).slice(2, 5)}`;
     this.pageById.set(id, page);
@@ -285,6 +287,8 @@ class BrowserDaemon {
   // ── Lifecycle ──────────────────────────────────────────────────────
 
   async shutdown(reason: string, closeBrowser: boolean): Promise<void> {
+    if (this.shuttingDown) return;
+    this.shuttingDown = true;
     this.logger.info(reason, { session: this.session });
     await this.ipcServer.close();
     if (!closeBrowser) return;
@@ -336,11 +340,14 @@ class BrowserDaemon {
       return { protocolVersion: PROTOCOL_VERSION };
     }
 
-    // All non-ping commands get a timeout guard.
+    // All non-ping commands get a timeout guard. The timer is cleared
+    // when the command settles to avoid orphaned timers that would
+    // keep the event loop alive after shutdown.
+    let timerId: ReturnType<typeof setTimeout>;
     return Promise.race([
-      this.dispatchCommand(request),
+      this.dispatchCommand(request).finally(() => clearTimeout(timerId)),
       new Promise<never>((_resolve, reject) => {
-        setTimeout(
+        timerId = setTimeout(
           () =>
             reject(
               new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`),

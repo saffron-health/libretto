@@ -682,21 +682,7 @@ export async function runClose(
     }
   }
 
-  // Clean up daemon socket file if present.
-  if (state.daemonSocketPath) {
-    try {
-      unlinkSync(state.daemonSocketPath);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-        logger.warn("close-socket-unlink-failed", {
-          session,
-          socketPath: state.daemonSocketPath,
-          error: err,
-        });
-      }
-    }
-  }
-
+  unlinkDaemonSocket(state.daemonSocketPath, logger, session);
   clearSessionState(session, logger);
   logger.info("close-success", { session, replayUrl });
   console.log(`Browser closed (session: ${session}).`);
@@ -710,6 +696,7 @@ type ClosableSession = {
   pid?: number;
   port: number;
   provider?: { name: string; sessionId: string };
+  daemonSocketPath?: string;
 };
 
 function waitForCloseSignalWindow(ms: number): Promise<void> {
@@ -763,10 +750,30 @@ function resolveClosableSessions(logger: LoggerApi): {
       pid: state.pid,
       port: state.port,
       provider: state.provider,
+      daemonSocketPath: state.daemonSocketPath,
     });
   }
 
   return { closable, clearedUnreadableStates };
+}
+
+function unlinkDaemonSocket(
+  socketPath: string | undefined,
+  logger: LoggerApi,
+  session: string,
+): void {
+  if (!socketPath) return;
+  try {
+    unlinkSync(socketPath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      logger.warn("close-socket-unlink-failed", {
+        session,
+        socketPath,
+        error: err,
+      });
+    }
+  }
 }
 
 function clearStoppedSessionStates(
@@ -778,6 +785,7 @@ function clearStoppedSessionStates(
   for (const session of sessions) {
     if (skip?.has(session.session)) continue;
     if (session.pid == null || !isPidRunning(session.pid)) {
+      unlinkDaemonSocket(session.daemonSocketPath, logger, session.session);
       clearSessionState(session.session, logger);
       cleared += 1;
     }
