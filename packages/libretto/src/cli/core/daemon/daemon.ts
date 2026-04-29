@@ -69,6 +69,8 @@ type DaemonConnectConfig = {
   mode: "connect";
   session: string;
   cdpEndpoint: string;
+  /** If set, the daemon navigates to this URL after connecting. */
+  url?: string;
 };
 
 /**
@@ -289,8 +291,13 @@ class BrowserDaemon {
         operationalPages.length > 0 ? operationalPages : [page],
     });
 
+    if (config.url) {
+      await page.goto(config.url);
+    }
+
     daemon.logger.info("child-connected", {
       cdpEndpoint: config.cdpEndpoint,
+      url: config.url,
       pid: process.pid,
       session: config.session,
     });

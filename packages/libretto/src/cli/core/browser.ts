@@ -612,71 +612,128 @@ export async function runOpenWithProvider(
 
   console.log(`Connecting to ${providerName} browser...`);
 
-  let browser: Browser | null = null;
-  try {
-    browser = await tryConnectToCDP(
-      providerSession.cdpEndpoint,
-      logger,
-      30_000,
-    );
-    if (!browser) {
+  // Spawn daemon in connect mode — it handles the CDP connection,
+  // page discovery, telemetry, and navigation.
+  const runLogPath = logFileForSession(session);
+  const daemonEntryPath = fileURLToPath(
+    new URL("./daemon/daemon.js", import.meta.url),
+  );
+  const require = createRequire(import.meta.url);
+  const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
+  const daemonConfig = {
+    mode: "connect" as const,
+    session,
+    cdpEndpoint: providerSession.cdpEndpoint,
+    url,
+  };
+
+  const childStderrFd = openSync(runLogPath, "a");
+  const child = spawn(
+    process.execPath,
+    [
+      "--import",
+      tsxImportPath,
+      daemonEntryPath,
+      JSON.stringify(daemonConfig),
+    ],
+    {
+      detached: true,
+      stdio: ["ignore", "ignore", childStderrFd],
+    },
+  );
+  child.unref();
+  closeSync(childStderrFd);
+
+  logger.info("open-provider-child-spawned", { pid: child.pid, session });
+
+  let childSpawnError: Error | null = null;
+  let childEarlyExit: {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+  } | null = null;
+
+  child.on("error", (err) => {
+    childSpawnError = err;
+    logger.error("open-provider-child-spawn-error", { error: err, session });
+  });
+
+  child.on("exit", (code, signal) => {
+    childEarlyExit = { code, signal };
+    logger.warn("open-provider-child-exited", {
+      code,
+      signal,
+      session,
+      pid: child.pid,
+    });
+  });
+
+  // Poll for daemon IPC readiness.
+  const daemonSocketPath = getDaemonSocketPath(session);
+  const client = new DaemonClient(daemonSocketPath);
+  const ipcMaxAttempts = 120;
+  const ipcPollIntervalMs = 250;
+  const ipcStartupTimeoutMs = ipcMaxAttempts * ipcPollIntervalMs;
+  let ipcReady = false;
+
+  for (let i = 0; i < ipcMaxAttempts; i++) {
+    const spawnError = childSpawnError as Error | null;
+    if (spawnError !== null) {
+      await provider.closeSession(providerSession.sessionId);
       throw new Error(
-        `Could not connect to ${providerName} browser at ${providerSession.cdpEndpoint}. The remote session was created but CDP connection failed.`,
+        `Failed to spawn provider daemon: ${spawnError.message}. Check logs: ${runLogPath}`,
       );
     }
 
-    const contexts = browser.contexts();
-    let page: Page;
-    if (contexts.length > 0 && contexts[0].pages().length > 0) {
-      page = contexts[0].pages()[0];
-    } else {
-      const context =
-        contexts.length > 0 ? contexts[0] : await browser.newContext();
-      page = await context.newPage();
-    }
-
-    await page.goto(url);
-    logger.info("open-provider-navigated", { url, session });
-
-    // Cloud sessions have no local port. Reconnection uses cdpEndpoint directly.
-    writeSessionState(
-      {
-        port: 0,
-        cdpEndpoint: providerSession.cdpEndpoint,
-        session,
-        startedAt: new Date().toISOString(),
-        status: "active",
-        mode: accessMode,
-        provider: {
-          name: providerName,
-          sessionId: providerSession.sessionId,
-        },
-      },
-      logger,
-    );
-
-    disconnectBrowser(browser, logger, session);
-  } catch (err) {
-    if (browser) {
-      disconnectBrowser(browser, logger, session);
-    }
-    // Clean up the remote session so it doesn't leak
-    logger.warn("open-provider-cleanup-after-error", {
-      provider: providerName,
-      sessionId: providerSession.sessionId,
-      error: err,
-    });
-    try {
+    const earlyExit = childEarlyExit as {
+      code: number | null;
+      signal: NodeJS.Signals | null;
+    } | null;
+    if (earlyExit !== null) {
+      const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
       await provider.closeSession(providerSession.sessionId);
-    } catch (cleanupErr) {
-      logger.warn("open-provider-cleanup-failed", {
-        provider: providerName,
-        sessionId: providerSession.sessionId,
-        error: cleanupErr,
+      throw new Error(
+        `Provider daemon exited before startup (status: ${status}). Check logs: ${runLogPath}`,
+      );
+    }
+
+    await new Promise((r) => setTimeout(r, ipcPollIntervalMs));
+    ipcReady = await client.ping();
+    if (ipcReady) break;
+
+    if (i > 0 && i % 10 === 0) {
+      logger.info("open-provider-waiting-for-daemon", {
+        attempt: i,
+        session,
       });
     }
-    throw err;
   }
+
+  if (!ipcReady) {
+    await provider.closeSession(providerSession.sessionId);
+    throw new Error(
+      `Provider daemon failed to start within ${Math.ceil(ipcStartupTimeoutMs / 1000)}s. Check logs: ${runLogPath}`,
+    );
+  }
+
+  logger.info("open-provider-ipc-ping-ok", { session, daemonSocketPath });
+
+  writeSessionState(
+    {
+      port: 0,
+      pid: child.pid!,
+      cdpEndpoint: providerSession.cdpEndpoint,
+      session,
+      startedAt: new Date().toISOString(),
+      status: "active",
+      mode: accessMode,
+      daemonSocketPath,
+      provider: {
+        name: providerName,
+        sessionId: providerSession.sessionId,
+      },
+    },
+    logger,
+  );
 
   logger.info("open-provider-success", {
     url,
@@ -781,9 +838,18 @@ export async function runClose(
     return;
   }
 
+  // Kill local daemon process if present (applies to both local and
+  // provider sessions — the daemon disconnects without closing the
+  // external browser).
+  if (state.pid != null) {
+    logger.info("close-killing", { session, pid: state.pid, port: state.port });
+    sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
+    await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+  }
+
+  // Close provider session if applicable (tears down the remote browser).
   let replayUrl: string | undefined;
   if (state.provider) {
-    // Cloud provider session — close via provider API, no local pid to kill
     logger.info("close-provider", {
       session,
       provider: state.provider.name,
@@ -800,19 +866,11 @@ export async function runClose(
         sessionId: state.provider.sessionId,
         error: err,
       });
-      // Preserve state with cleanup-failed status so the user can retry.
-      // The provider.sessionId is retained for manual or future cleanup.
       writeSessionState({ ...state, status: "cleanup-failed" }, logger);
       throw new Error(
         `Failed to close remote ${state.provider.name} session "${state.provider.sessionId}" for session "${session}". ` +
           `State preserved with status "cleanup-failed". Retry with: libretto close --session ${session}`,
       );
-    }
-  } else {
-    logger.info("close-killing", { session, pid: state.pid, port: state.port });
-    if (state.pid != null) {
-      sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
-      await waitForCloseSignalWindow(CLOSE_WAIT_MS);
     }
   }
 
@@ -972,22 +1030,20 @@ export async function runCloseAll(
     }
   }
 
-  // Send SIGTERM to local sessions
+  // Send SIGTERM to all daemon processes (both local and provider sessions).
   for (const target of closable) {
-    if (target.provider) continue; // already handled above
+    if (target.pid == null) continue;
     logger.info("close-all-sigterm", {
       session: target.session,
       pid: target.pid,
       port: target.port,
     });
-    if (target.pid != null) {
-      sendSignalToProcessGroupOrPid(
-        target.pid,
-        "SIGTERM",
-        logger,
-        target.session,
-      );
-    }
+    sendSignalToProcessGroupOrPid(
+      target.pid,
+      "SIGTERM",
+      logger,
+      target.session,
+    );
   }
 
   await waitForCloseSignalWindow(CLOSE_WAIT_MS);
