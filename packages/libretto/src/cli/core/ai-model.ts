@@ -5,7 +5,6 @@ import {
   parseModel,
   type Provider,
 } from "./resolve-model.js";
-import { loadEnv } from "../../shared/env/load-env.js";
 
 // Re-export so existing consumers (e.g. tests) don't break.
 export { parseDotEnvAssignment } from "../../shared/env/load-env.js";
@@ -148,6 +147,10 @@ function inferAutoSnapshotModel(): SnapshotApiModelSelection | null {
 /**
  * Resolve which API model to use for snapshot analysis.
  *
+ * Environment variables are loaded by the CLI entrypoint (`runLibrettoCLI` in
+ * `cli.ts`) before this resolver runs. Keep dotenv loading centralized there so
+ * model resolution and browser provider resolution share the same env setup.
+ *
  * Priority:
  * 1. snapshotModel from .libretto/config.json (set via `ai configure`)
  * 2. Auto-detect from available API credentials in env
@@ -155,8 +158,6 @@ function inferAutoSnapshotModel(): SnapshotApiModelSelection | null {
 export function resolveSnapshotApiModel(
   snapshotModel: string | null = readSnapshotModel(),
 ): SnapshotApiModelSelection | null {
-  loadEnv();
-
   if (snapshotModel) {
     const { provider } = parseModel(snapshotModel);
     return {
@@ -246,8 +247,6 @@ function readSnapshotModelSafely(
 export function resolveAiSetupStatus(
   configPath: string = LIBRETTO_CONFIG_PATH,
 ): AiSetupStatus {
-  loadEnv();
-
   const result = readSnapshotModelSafely(configPath);
 
   if (!result.ok) {

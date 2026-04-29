@@ -2,6 +2,7 @@ import { resolveAiSetupStatus } from "./core/ai-model.js";
 import { ensureLibrettoSetup } from "./core/context.js";
 import { createCLIApp } from "./router.js";
 import { warnIfInstalledSkillOutOfDate } from "./core/skill-version.js";
+import { loadEnv } from "../shared/env/load-env.js";
 
 function renderUsage(app: ReturnType<typeof createCLIApp>): string {
   return `${app.renderHelp()}
@@ -48,6 +49,7 @@ function isRootHelpRequest(rawArgs: readonly string[]): boolean {
 export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   let exitCode = 0;
+  loadEnv();
   ensureLibrettoSetup();
   const app = createCLIApp();
 

@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { describe, expect } from "vitest";
 import { normalizeDomain, normalizeUrl } from "../src/cli/core/browser.js";
 import { test } from "./fixtures.js";
@@ -78,6 +79,28 @@ describe("provider resolution via CLI", () => {
     expect(result.stderr).not.toContain("Invalid provider");
     // If it got past resolution to actually trying kernel, it won't mention browserbase
     expect(result.stderr).not.toContain("browserbase");
+  });
+
+  test("open loads Browserbase credentials from workspace .env", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await writeFile(
+      workspacePath(".env"),
+      [
+        "BROWSERBASE_API_KEY=test-key",
+        "BROWSERBASE_PROJECT_ID=test-project",
+        "BROWSERBASE_ENDPOINT=http://127.0.0.1:9",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await librettoCli(
+      "open https://example.com --provider browserbase",
+    );
+
+    expect(result.stderr).not.toContain("BROWSERBASE_API_KEY is required");
+    expect(result.stderr).not.toContain("BROWSERBASE_PROJECT_ID is required");
   });
 });
 
