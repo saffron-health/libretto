@@ -253,6 +253,7 @@ jobs:
 
             You are the guardian against complexity creep. Be thorough but pragmatic. Your review should make the code better, not just different.
         run: |
+          set -o pipefail
           curl -fsSL https://opencode.ai/install | bash
           cat > opencode-review-config.json <<'EOF'
           {
