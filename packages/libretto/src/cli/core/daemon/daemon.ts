@@ -43,47 +43,12 @@ import { wrapPageForActionLogging } from "../telemetry.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
-
-// ── Config schema ──────────────────────────────────────────────────────
-
-/**
- * Config for daemon-managed browser launch (`libretto open`).
- * The daemon owns the browser lifecycle and will close it on shutdown.
- */
-type DaemonLaunchConfig = {
-  port: number;
-  url: string;
-  session: string;
-  headed: boolean;
-  viewport: { width: number; height: number };
-  storageStatePath?: string;
-  windowPosition?: { x: number; y: number };
-};
-
-/**
- * Config for connecting to an externally managed browser (`libretto connect`).
- * The daemon borrows the CDP connection and will disconnect (not close) on
- * shutdown — the browser outlives the session.
- */
-type DaemonConnectConfig = {
-  mode: "connect";
-  session: string;
-  cdpEndpoint: string;
-  /** If set, the daemon navigates to this URL after connecting. */
-  url?: string;
-};
-
-/**
- * Discriminated union passed as JSON in `process.argv[2]`.
- * Launch configs omit `mode` for backward compatibility with existing
- * `runOpen()` callers — any config without `mode: "connect"` is treated
- * as a launch config.
- */
-type DaemonConfig = DaemonLaunchConfig | DaemonConnectConfig;
-
-function isConnectConfig(config: DaemonConfig): config is DaemonConnectConfig {
-  return "mode" in config && config.mode === "connect";
-}
+import {
+  isConnectConfig,
+  type DaemonConfig,
+  type DaemonLaunchConfig,
+  type DaemonConnectConfig,
+} from "./config.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -135,9 +100,18 @@ class BrowserDaemon {
     context: BrowserContext;
     page: Page;
     initialPages: Page[];
+    /** If set, navigate to this URL after telemetry but before starting IPC. */
+    navigateUrl?: string;
   }): Promise<BrowserDaemon> {
-    const { session, externallyManaged, browser, context, page, initialPages } =
-      args;
+    const {
+      session,
+      externallyManaged,
+      browser,
+      context,
+      page,
+      initialPages,
+      navigateUrl,
+    } = args;
 
     await mkdir(getSessionDir(session), { recursive: true });
 
@@ -173,6 +147,13 @@ class BrowserDaemon {
     context.on("page", (newPage) => {
       wrapPageForActionLogging(newPage, session);
     });
+
+    // Navigate after telemetry is installed (so we capture the initial
+    // page load) but before starting the IPC server (so callers polling
+    // for IPC readiness see a page that has already loaded).
+    if (navigateUrl) {
+      await page.goto(navigateUrl);
+    }
 
     // IPC server — handler is wired after construction to avoid a
     // circular type inference issue (daemon references itself).
@@ -251,9 +232,8 @@ class BrowserDaemon {
       context,
       page,
       initialPages: [page],
+      navigateUrl: config.url,
     });
-
-    await page.goto(config.url);
 
     daemon.logger.info("child-launched", {
       port: config.port,
@@ -289,11 +269,8 @@ class BrowserDaemon {
       page,
       initialPages:
         operationalPages.length > 0 ? operationalPages : [page],
+      navigateUrl: config.url,
     });
-
-    if (config.url) {
-      await page.goto(config.url);
-    }
 
     daemon.logger.info("child-connected", {
       cdpEndpoint: config.cdpEndpoint,

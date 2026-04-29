@@ -435,7 +435,7 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("open https://example.com", {
       PLAYWRIGHT_BROWSERS_PATH: "/definitely-not-real",
     });
-    expect(result.stderr).toContain("Browser child process exited before startup");
+    expect(result.stderr).toContain("Daemon exited before startup");
     expect(result.stderr).toContain("Check logs:");
   });
 
@@ -453,7 +453,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toContain(
       expectedSkillVersionWarning("0.0.0", cliVersion),
     );
-    expect(result.stderr).toContain("Browser child process exited before startup");
+    expect(result.stderr).toContain("Daemon exited before startup");
   });
 
   test("defaults sessioned browser commands to the default session", async ({

@@ -5,12 +5,9 @@ import {
   type CDPSession,
   type Page,
 } from "playwright";
-import { openSync, closeSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { createRequire } from "node:module";
 import { createServer } from "node:net";
-import { spawn } from "node:child_process";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import { PROFILES_DIR } from "./context.js";
@@ -27,7 +24,7 @@ import {
 } from "./session.js";
 import type { ProviderApi } from "./providers/types.js";
 import { getCloudProviderApi } from "./providers/index.js";
-import { getDaemonSocketPath, DaemonClient } from "./daemon/index.js";
+import { DaemonClient, spawnSessionDaemon } from "./daemon/index.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const FORCE_CLOSE_WAIT_MS = 300;
@@ -435,151 +432,47 @@ export async function runOpen(
   }
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
-  const daemonEntryPath = fileURLToPath(
-    new URL("./daemon/daemon.js", import.meta.url),
-  );
-  const require = createRequire(import.meta.url);
-  const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
-  const daemonConfig = {
-    port,
-    url,
-    session,
-    headed,
-    viewport,
-    storageStatePath: useProfile ? profilePath : undefined,
-    windowPosition,
-  };
-
-  const childStderrFd = openSync(runLogPath, "a");
-
-  const child = spawn(
-    process.execPath,
-    ["--import", tsxImportPath, daemonEntryPath, JSON.stringify(daemonConfig)],
-    {
-      detached: true,
-      stdio: ["ignore", "ignore", childStderrFd],
-    },
-  );
-  child.unref();
-  closeSync(childStderrFd);
-
-  logger.info("open-child-spawned", { pid: child.pid, port, session });
-
-  let childSpawnError: Error | null = null;
-  let childEarlyExit: {
-    code: number | null;
-    signal: NodeJS.Signals | null;
-  } | null = null;
-
-  child.on("error", (err) => {
-    childSpawnError = err;
-    logger.error("open-child-spawn-error", { error: err, session, port });
-  });
-
-  child.on("exit", (code, signal) => {
-    childEarlyExit = { code, signal };
-    logger.warn("open-child-exited", {
-      code,
-      signal,
-      session,
+  // Spawn daemon and wait for IPC readiness. The daemon launches
+  // Chromium internally — IPC readiness implies the browser is up,
+  // so no separate CDP polling is needed.
+  const { pid, socketPath: daemonSocketPath } = await spawnSessionDaemon({
+    config: {
       port,
-      pid: child.pid,
-    });
+      url,
+      session,
+      headed,
+      viewport,
+      storageStatePath: useProfile ? profilePath : undefined,
+      windowPosition,
+    },
+    session,
+    logger,
+    logPath: runLogPath,
+    ipcTimeoutMs: 15_000,
   });
 
-  const cdpPollIntervalMs = 500;
-  const cdpMaxAttempts = 30;
-  const cdpStartupTimeoutMs = cdpPollIntervalMs * cdpMaxAttempts;
+  writeSessionState(
+    {
+      port,
+      pid,
+      session,
+      startedAt: new Date().toISOString(),
+      status: "active",
+      mode: accessMode,
+      viewport,
+      daemonSocketPath,
+    },
+    logger,
+  );
 
-  for (let i = 0; i < cdpMaxAttempts; i++) {
-    const spawnError = childSpawnError as Error | null;
-    if (spawnError !== null) {
-      const errWithCode = spawnError as Error & { code?: string };
-      const hint =
-        errWithCode.code === "ENOENT"
-          ? " Ensure Node.js is available in PATH for child processes."
-          : "";
-      throw new Error(
-        `Failed to launch browser child process: ${spawnError.message}.${hint} Check logs: ${runLogPath}`,
-      );
-    }
-
-    const earlyExit = childEarlyExit as {
-      code: number | null;
-      signal: NodeJS.Signals | null;
-    } | null;
-    if (earlyExit !== null) {
-      const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
-      throw new Error(
-        `Browser child process exited before startup (status: ${status}). Check logs: ${runLogPath}`,
-      );
-    }
-
-    await new Promise((r) => setTimeout(r, cdpPollIntervalMs));
-    const ready = await fetch(`http://127.0.0.1:${port}/json/version`)
-      .then(() => true)
-      .catch(() => false);
-    if (i > 0 && i % 5 === 0) {
-      logger.info("open-waiting-for-cdp", { attempt: i, port, session });
-    }
-    if (ready) {
-      const daemonSocketPath = getDaemonSocketPath(session);
-      writeSessionState(
-        {
-          port,
-          pid: child.pid!,
-          session,
-          startedAt: new Date().toISOString(),
-          status: "active",
-          mode: accessMode,
-          viewport,
-          daemonSocketPath,
-        },
-        logger,
-      );
-
-      // Wait for the daemon's IPC server to become reachable.
-      const client = new DaemonClient(daemonSocketPath);
-      const ipcMaxAttempts = 20;
-      const ipcPollIntervalMs = 250;
-      let ipcReady = false;
-      for (let j = 0; j < ipcMaxAttempts; j++) {
-        ipcReady = await client.ping();
-        if (ipcReady) break;
-        await new Promise((r) => setTimeout(r, ipcPollIntervalMs));
-      }
-      if (!ipcReady) {
-        logger.warn("open-ipc-ping-failed", {
-          session,
-          daemonSocketPath,
-          attempts: ipcMaxAttempts,
-        });
-      } else {
-        logger.info("open-ipc-ping-ok", { session, daemonSocketPath });
-      }
-
-      logger.info("open-success", {
-        url,
-        mode: browserMode,
-        session,
-        port,
-        pid: child.pid,
-      });
-      console.log(`Browser open (${browserMode}): ${url}`);
-
-      return;
-    }
-  }
-
-  logger.error("open-timeout", {
+  logger.info("open-success", {
+    url,
+    mode: browserMode,
     session,
     port,
-    pid: child.pid,
-    attempts: cdpMaxAttempts,
+    pid,
   });
-  throw new Error(
-    `Failed to connect to browser after ${Math.ceil(cdpStartupTimeoutMs / 1000)}s. Check startup logs: ${runLogPath}`,
-  );
+  console.log(`Browser open (${browserMode}): ${url}`);
 }
 
 export async function runOpenWithProvider(
@@ -612,115 +505,25 @@ export async function runOpenWithProvider(
 
   console.log(`Connecting to ${providerName} browser...`);
 
-  // Spawn daemon in connect mode — it handles the CDP connection,
-  // page discovery, telemetry, and navigation.
   const runLogPath = logFileForSession(session);
-  const daemonEntryPath = fileURLToPath(
-    new URL("./daemon/daemon.js", import.meta.url),
-  );
-  const require = createRequire(import.meta.url);
-  const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
-  const daemonConfig = {
-    mode: "connect" as const,
-    session,
-    cdpEndpoint: providerSession.cdpEndpoint,
-    url,
-  };
-
-  const childStderrFd = openSync(runLogPath, "a");
-  const child = spawn(
-    process.execPath,
-    [
-      "--import",
-      tsxImportPath,
-      daemonEntryPath,
-      JSON.stringify(daemonConfig),
-    ],
-    {
-      detached: true,
-      stdio: ["ignore", "ignore", childStderrFd],
-    },
-  );
-  child.unref();
-  closeSync(childStderrFd);
-
-  logger.info("open-provider-child-spawned", { pid: child.pid, session });
-
-  let childSpawnError: Error | null = null;
-  let childEarlyExit: {
-    code: number | null;
-    signal: NodeJS.Signals | null;
-  } | null = null;
-
-  child.on("error", (err) => {
-    childSpawnError = err;
-    logger.error("open-provider-child-spawn-error", { error: err, session });
-  });
-
-  child.on("exit", (code, signal) => {
-    childEarlyExit = { code, signal };
-    logger.warn("open-provider-child-exited", {
-      code,
-      signal,
+  const { pid, socketPath: daemonSocketPath } = await spawnSessionDaemon({
+    config: {
+      mode: "connect" as const,
       session,
-      pid: child.pid,
-    });
+      cdpEndpoint: providerSession.cdpEndpoint,
+      url,
+    },
+    session,
+    logger,
+    logPath: runLogPath,
+    ipcTimeoutMs: 30_000,
+    onFailure: () => provider.closeSession(providerSession.sessionId),
   });
-
-  // Poll for daemon IPC readiness.
-  const daemonSocketPath = getDaemonSocketPath(session);
-  const client = new DaemonClient(daemonSocketPath);
-  const ipcMaxAttempts = 120;
-  const ipcPollIntervalMs = 250;
-  const ipcStartupTimeoutMs = ipcMaxAttempts * ipcPollIntervalMs;
-  let ipcReady = false;
-
-  for (let i = 0; i < ipcMaxAttempts; i++) {
-    const spawnError = childSpawnError as Error | null;
-    if (spawnError !== null) {
-      await provider.closeSession(providerSession.sessionId);
-      throw new Error(
-        `Failed to spawn provider daemon: ${spawnError.message}. Check logs: ${runLogPath}`,
-      );
-    }
-
-    const earlyExit = childEarlyExit as {
-      code: number | null;
-      signal: NodeJS.Signals | null;
-    } | null;
-    if (earlyExit !== null) {
-      const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
-      await provider.closeSession(providerSession.sessionId);
-      throw new Error(
-        `Provider daemon exited before startup (status: ${status}). Check logs: ${runLogPath}`,
-      );
-    }
-
-    await new Promise((r) => setTimeout(r, ipcPollIntervalMs));
-    ipcReady = await client.ping();
-    if (ipcReady) break;
-
-    if (i > 0 && i % 10 === 0) {
-      logger.info("open-provider-waiting-for-daemon", {
-        attempt: i,
-        session,
-      });
-    }
-  }
-
-  if (!ipcReady) {
-    await provider.closeSession(providerSession.sessionId);
-    throw new Error(
-      `Provider daemon failed to start within ${Math.ceil(ipcStartupTimeoutMs / 1000)}s. Check logs: ${runLogPath}`,
-    );
-  }
-
-  logger.info("open-provider-ipc-ping-ok", { session, daemonSocketPath });
 
   writeSessionState(
     {
       port: 0,
-      pid: child.pid!,
+      pid,
       cdpEndpoint: providerSession.cdpEndpoint,
       session,
       startedAt: new Date().toISOString(),
@@ -1188,114 +991,20 @@ export async function runConnect(
     });
   }
 
-  // Spawn daemon in connect mode — it handles the CDP connection,
-  // page discovery, telemetry, and IPC server.
   const runLogPath = logFileForSession(session);
-  const daemonEntryPath = fileURLToPath(
-    new URL("./daemon/daemon.js", import.meta.url),
-  );
-  const require = createRequire(import.meta.url);
-  const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
-  const daemonConfig = {
-    mode: "connect" as const,
-    session,
-    cdpEndpoint: endpoint,
-  };
-
-  const childStderrFd = openSync(runLogPath, "a");
-  const child = spawn(
-    process.execPath,
-    [
-      "--import",
-      tsxImportPath,
-      daemonEntryPath,
-      JSON.stringify(daemonConfig),
-    ],
-    {
-      detached: true,
-      stdio: ["ignore", "ignore", childStderrFd],
-    },
-  );
-  child.unref();
-  closeSync(childStderrFd);
-
-  logger.info("connect-child-spawned", { pid: child.pid, session });
-
-  let childSpawnError: Error | null = null;
-  let childEarlyExit: {
-    code: number | null;
-    signal: NodeJS.Signals | null;
-  } | null = null;
-
-  child.on("error", (err) => {
-    childSpawnError = err;
-    logger.error("connect-child-spawn-error", { error: err, session });
-  });
-
-  child.on("exit", (code, signal) => {
-    childEarlyExit = { code, signal };
-    logger.warn("connect-child-exited", {
-      code,
-      signal,
+  const { pid, socketPath: daemonSocketPath, client } =
+    await spawnSessionDaemon({
+      config: { mode: "connect" as const, session, cdpEndpoint: endpoint },
       session,
-      pid: child.pid,
+      logger,
+      logPath: runLogPath,
+      ipcTimeoutMs: 10_000,
     });
-  });
-
-  // Poll for daemon IPC readiness (no CDP polling needed — the daemon
-  // connects to the endpoint itself).
-  const daemonSocketPath = getDaemonSocketPath(session);
-  const client = new DaemonClient(daemonSocketPath);
-  const ipcMaxAttempts = 40;
-  const ipcPollIntervalMs = 250;
-  const ipcStartupTimeoutMs = ipcMaxAttempts * ipcPollIntervalMs;
-  let ipcReady = false;
-
-  for (let i = 0; i < ipcMaxAttempts; i++) {
-    const spawnError = childSpawnError as Error | null;
-    if (spawnError !== null) {
-      const errWithCode = spawnError as Error & { code?: string };
-      const hint =
-        errWithCode.code === "ENOENT"
-          ? " Ensure Node.js is available in PATH for child processes."
-          : "";
-      throw new Error(
-        `Failed to spawn connect daemon: ${spawnError.message}.${hint} Check logs: ${runLogPath}`,
-      );
-    }
-
-    const earlyExit = childEarlyExit as {
-      code: number | null;
-      signal: NodeJS.Signals | null;
-    } | null;
-    if (earlyExit !== null) {
-      const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
-      throw new Error(
-        `Connect daemon exited before startup (status: ${status}). Check logs: ${runLogPath}`,
-      );
-    }
-
-    await new Promise((r) => setTimeout(r, ipcPollIntervalMs));
-    ipcReady = await client.ping();
-    if (ipcReady) break;
-
-    if (i > 0 && i % 10 === 0) {
-      logger.info("connect-waiting-for-daemon", { attempt: i, session });
-    }
-  }
-
-  if (!ipcReady) {
-    throw new Error(
-      `Connect daemon failed to start within ${Math.ceil(ipcStartupTimeoutMs / 1000)}s. Check logs: ${runLogPath}`,
-    );
-  }
-
-  logger.info("connect-ipc-ping-ok", { session, daemonSocketPath });
 
   writeSessionState(
     {
       port,
-      pid: child.pid!,
+      pid,
       cdpEndpoint: endpoint,
       session,
       startedAt: new Date().toISOString(),
