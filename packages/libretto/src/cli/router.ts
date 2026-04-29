@@ -1,5 +1,6 @@
 import { aiCommands } from "./commands/ai.js";
 import { authCommands } from "./commands/auth.js";
+import { billingCommands } from "./commands/billing.js";
 import { browserCommands } from "./commands/browser.js";
 import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
@@ -14,6 +15,7 @@ export const cliRoutes = {
   ...executionCommands,
   ai: aiCommands,
   auth: authCommands,
+  billing: billingCommands,
   setup: setupCommand,
   status: statusCommand,
   snapshot: snapshotCommand,
