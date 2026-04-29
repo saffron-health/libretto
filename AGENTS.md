@@ -40,6 +40,8 @@ pnpm --filter libretto test -- test/multi-page.spec.ts
 pnpm --filter libretto test -- test/stateful.spec.ts
 ```
 
+- Do not pipe test commands through `grep`, `tail`, or other filters. The test reporter is minimal and token-efficient by default.
+
 Local CLI invocation:
 
 ```bash

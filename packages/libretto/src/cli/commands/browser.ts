@@ -80,6 +80,10 @@ export const openInput = SimpleCLI.input({
       name: "write-access",
       help: "Create the session in write-access mode (overrides config default)",
     }),
+    authProfile: SimpleCLI.option(z.string().optional(), {
+      name: "auth-profile",
+      help: "Override the domain used for auth profile lookup (e.g. use login.example.com's profile when opening app.example.com)",
+    }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
@@ -91,7 +95,7 @@ export const openInput = SimpleCLI.input({
 })
   .refine(
     (input) => Boolean(input.url),
-    `Usage: libretto open <url> [--headless] [--read-only|--write-access] [--viewport WxH] [--session <name>]`,
+    `Usage: libretto open <url> [--headless] [--read-only|--write-access] [--auth-profile <domain>] [--viewport WxH] [--session <name>]`,
   )
   .refine(
     (input) => !(input.headed && input.headless),
@@ -103,7 +107,8 @@ export const openInput = SimpleCLI.input({
   );
 
 export const openCommand = SimpleCLI.command({
-  description: "Launch browser and open URL (headed by default)",
+  description:
+    "Launch browser and open URL (headed by default). Automatically loads a saved auth profile for the URL's domain if one exists.",
 })
   .input(openInput)
   .use(withAutoSession())
@@ -120,6 +125,7 @@ export const openCommand = SimpleCLI.command({
           input.readOnly,
           input.writeAccess,
         ),
+        authProfileDomain: input.authProfile,
       });
     } else {
       const provider = getCloudProviderApi(providerName);

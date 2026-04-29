@@ -13,6 +13,19 @@ metadata:
 - Use Libretto commands to inspect the site and open pages, observe state, inspect requests, and prototype interactions.
 - Libretto work must end in script changes. Create or edit the workflow file instead of stopping at interactive exploration.
 
+## Shipped Source & Documentation
+
+The npm package includes `src/` (full TypeScript source) and `docs/` for deeper understanding of internals and design decisions. Read these when you need implementation context beyond what this skill file covers. Resolve paths from the package root (e.g. `node_modules/libretto/`).
+
+Full documentation is published at [libretto.sh](https://libretto.sh). Available pages:
+
+- Get started: [introduction](https://libretto.sh/get-started/introduction), [installation](https://libretto.sh/get-started/installation), [configuration](https://libretto.sh/get-started/configuration)
+- Fundamentals: [core concepts](https://libretto.sh/fundamentals/core-concepts), [how workflow generation works](https://libretto.sh/fundamentals/how-workflow-generation-works), [automation and bot detection](https://libretto.sh/fundamentals/automation-and-bot-detection), [website authentication](https://libretto.sh/fundamentals/website-authentication)
+- Workflow guides: [one-shot generation](https://libretto.sh/workflow-guides/one-shot-workflow-generation), [interactive building](https://libretto.sh/workflow-guides/interactive-workflow-building), [debugging workflows](https://libretto.sh/workflow-guides/debugging-workflows), [convert to network requests](https://libretto.sh/workflow-guides/convert-to-network-requests)
+- CLI reference: [open and connect](https://libretto.sh/cli-reference/open-and-connect), [sessions](https://libretto.sh/cli-reference/sessions), [profiles](https://libretto.sh/cli-reference/profiles), [snapshot](https://libretto.sh/cli-reference/snapshot), [exec](https://libretto.sh/cli-reference/exec), [run and resume](https://libretto.sh/cli-reference/run-and-resume), [session logs](https://libretto.sh/cli-reference/session-logs), [pages](https://libretto.sh/cli-reference/pages)
+- Library API: [workflow](https://libretto.sh/library-api/workflow), [AI extraction](https://libretto.sh/library-api/ai-extraction), [network requests](https://libretto.sh/library-api/network-requests), [file downloads](https://libretto.sh/library-api/file-downloads)
+- Hosting: [introduction](https://libretto.sh/hosting/introduction), [GCP](https://libretto.sh/hosting/gcp), [AWS](https://libretto.sh/hosting/aws)
+
 ## Default Integration Approach
 
 - Prefer network requests first for new integrations unless the user explicitly asks for Playwright or UI automation, then do not use the site's internal API.
