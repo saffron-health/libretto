@@ -38,6 +38,15 @@ type ExecMode = "exec" | "readonly-exec";
 const require = moduleBuiltin.createRequire(import.meta.url);
 const tsxCliPath = require.resolve("tsx/cli");
 
+function writeDaemonExecOutput(output?: { stdout: string; stderr: string }) {
+  if (output?.stdout) {
+    process.stdout.write(output.stdout);
+  }
+  if (output?.stderr) {
+    process.stderr.write(output.stderr);
+  }
+}
+
 async function execViaDaemon(
   code: string,
   session: string,
@@ -65,7 +74,7 @@ async function execViaDaemon(
 
   const client = new DaemonClient(daemonSocketPath);
 
-  const { result, output } =
+  const response =
     mode === "exec"
       ? await client.exec({
           code: cleanedCode,
@@ -77,17 +86,19 @@ async function execViaDaemon(
           pageId: options.pageId,
         });
 
+  if (!response.ok) {
+    writeDaemonExecOutput(response.output);
+    throw new Error(response.message);
+  }
+
+  const { result, output } = response.data;
+  writeDaemonExecOutput(output);
+
   logger.info(`${mode}-success`, {
     session,
     hasResult: result !== undefined,
     via: "daemon",
   });
-  if (output?.stdout) {
-    process.stdout.write(output.stdout);
-  }
-  if (output?.stderr) {
-    process.stderr.write(output.stderr);
-  }
   if (result !== undefined) {
     console.log(
       typeof result === "string" ? result : JSON.stringify(result, null, 2),

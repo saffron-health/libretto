@@ -66,6 +66,21 @@ describe("daemon IPC", () => {
     expect(result.stdout).toContain("hello from exec");
   }, 45_000);
 
+  test("exec prints console output before errors through daemon IPC", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-console-error";
+    const url = await writeFixturePage(workspacePath, "exec-console-error");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec "console.log('before exec error'); throw new Error('expected exec failure')" --session ${session}`,
+    );
+    expect(result.stdout).toContain("before exec error");
+    expect(result.stderr).toContain("expected exec failure");
+  }, 45_000);
+
   test("exec persists state across calls", async ({
     librettoCli,
     workspacePath,
@@ -112,6 +127,24 @@ describe("daemon IPC", () => {
       `readonly-exec "console.log('hello from readonly')" --session ${session}`,
     );
     expect(result.stdout).toContain("hello from readonly");
+  }, 45_000);
+
+  test("readonly-exec prints console output before errors through daemon IPC", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-readonly-console-error";
+    const url = await writeFixturePage(
+      workspacePath,
+      "readonly-console-error",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `readonly-exec "console.warn('before readonly error'); throw new Error('expected readonly failure')" --session ${session}`,
+    );
+    expect(result.stderr).toContain("before readonly error");
+    expect(result.stderr).toContain("expected readonly failure");
   }, 45_000);
 
   test("snapshot through daemon IPC fails at analysis, not at daemon layer", async ({

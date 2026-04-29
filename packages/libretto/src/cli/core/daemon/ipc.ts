@@ -3,6 +3,10 @@ import { createServer, connect as netConnect, type Server } from "node:net";
 import { unlink } from "node:fs/promises";
 import { REPO_ROOT } from "../context.js";
 
+export type DaemonExecOutput = { stdout: string; stderr: string };
+
+type ErrorWithOutput = Error & { output?: DaemonExecOutput };
+
 // ---------------------------------------------------------------------------
 // Request types — one shape per daemon command
 // ---------------------------------------------------------------------------
@@ -26,7 +30,26 @@ export type DaemonRequest =
 
 export type DaemonResponse =
   | { id: string; type: "result"; data: unknown }
-  | { id: string; type: "error"; message: string };
+  | {
+      id: string;
+      type: "error";
+      message: string;
+      output?: DaemonExecOutput;
+    };
+
+export class DaemonClientError extends Error {
+  constructor(
+    message: string,
+    readonly output?: DaemonExecOutput,
+  ) {
+    super(message);
+    this.name = "DaemonClientError";
+  }
+}
+
+export type DaemonCommandResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; message: string; output?: DaemonExecOutput };
 
 // ---------------------------------------------------------------------------
 // Socket path resolution
@@ -97,6 +120,10 @@ export class DaemonServer {
               id,
               type: "error",
               message: err instanceof Error ? err.message : String(err),
+              output:
+                err instanceof Error
+                  ? (err as ErrorWithOutput).output
+                  : undefined,
             };
           }
           socket.end(JSON.stringify(response) + "\n");
@@ -136,10 +163,10 @@ export class DaemonServer {
 export type DaemonResultMap = {
   ping: { protocolVersion: number };
   pages: Array<{ id: string; url: string; active: boolean }>;
-  exec: { result: unknown; output?: { stdout: string; stderr: string } };
+  exec: { result: unknown; output?: DaemonExecOutput };
   "readonly-exec": {
     result: unknown;
-    output?: { stdout: string; stderr: string };
+    output?: DaemonExecOutput;
   };
   snapshot: {
     pngPath: string;
@@ -198,9 +225,23 @@ export class DaemonClient {
   ): Promise<DaemonResultMap[C]> {
     const response = await this.send(request);
     if (response.type === "error") {
-      throw new Error(response.message);
+      throw new DaemonClientError(response.message, response.output);
     }
     return response.data as DaemonResultMap[C];
+  }
+
+  private async sendResult<C extends DaemonRequest["command"]>(
+    request: DaemonRequest & { command: C },
+  ): Promise<DaemonCommandResult<DaemonResultMap[C]>> {
+    const response = await this.send(request);
+    if (response.type === "error") {
+      return {
+        ok: false,
+        message: response.message,
+        output: response.output,
+      };
+    }
+    return { ok: true, data: response.data as DaemonResultMap[C] };
   }
 
   async ping(): Promise<boolean> {
@@ -220,8 +261,8 @@ export class DaemonClient {
     code: string;
     pageId?: string;
     visualize?: boolean;
-  }): Promise<DaemonResultMap["exec"]> {
-    return this.sendOrThrow({
+  }): Promise<DaemonCommandResult<DaemonResultMap["exec"]>> {
+    return this.sendResult({
       id: this.generateId(),
       command: "exec",
       ...args,
@@ -231,8 +272,8 @@ export class DaemonClient {
   async readonlyExec(args: {
     code: string;
     pageId?: string;
-  }): Promise<DaemonResultMap["readonly-exec"]> {
-    return this.sendOrThrow({
+  }): Promise<DaemonCommandResult<DaemonResultMap["readonly-exec"]>> {
+    return this.sendResult({
       id: this.generateId(),
       command: "readonly-exec",
       ...args,

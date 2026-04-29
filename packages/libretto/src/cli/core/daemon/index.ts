@@ -1,7 +1,10 @@
 export {
   DaemonServer,
   DaemonClient,
+  DaemonClientError,
   getDaemonSocketPath,
+  type DaemonCommandResult,
+  type DaemonExecOutput,
   type DaemonRequest,
   type DaemonResponse,
   type DaemonResultMap,

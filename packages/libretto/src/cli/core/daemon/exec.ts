@@ -13,6 +13,16 @@ type ExecOutput = {
   stderr: string;
 };
 
+export class DaemonExecError extends Error {
+  constructor(
+    message: string,
+    readonly output: ExecOutput,
+  ) {
+    super(message);
+    this.name = "DaemonExecError";
+  }
+}
+
 type ExecResponse = {
   result: unknown;
   output: ExecOutput;
@@ -89,8 +99,15 @@ export async function handleExec(
 
   const helperNames = Object.keys(helpers);
   const fn = compileExecFunction(cleaned, helperNames);
-  const result = await fn(...Object.values(helpers));
-  return { result, output: buffered.output };
+  try {
+    const result = await fn(...Object.values(helpers));
+    return { result, output: buffered.output };
+  } catch (error) {
+    throw new DaemonExecError(
+      error instanceof Error ? error.message : String(error),
+      buffered.output,
+    );
+  }
 }
 
 export async function handleReadonlyExec(
@@ -104,6 +121,13 @@ export async function handleReadonlyExec(
   });
   const helperNames = Object.keys(helpers);
   const fn = compileExecFunction(cleaned, helperNames);
-  const result = await fn(...Object.values(helpers));
-  return { result, output: buffered.output };
+  try {
+    const result = await fn(...Object.values(helpers));
+    return { result, output: buffered.output };
+  } catch (error) {
+    throw new DaemonExecError(
+      error instanceof Error ? error.message : String(error),
+      buffered.output,
+    );
+  }
 }
