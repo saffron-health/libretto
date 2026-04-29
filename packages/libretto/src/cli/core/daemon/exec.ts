@@ -1,10 +1,7 @@
 import type { Browser, BrowserContext, Page } from "playwright";
 import { format, formatWithOptions, type InspectOptions } from "node:util";
 import { installInstrumentation } from "../../../shared/instrumentation/index.js";
-import {
-  compileExecFunction,
-  stripEmptyCatchHandlers,
-} from "../exec-compiler.js";
+import { compileExecFunction } from "../exec-compiler.js";
 import { createReadonlyExecHelpers } from "../readonly-exec.js";
 import { readNetworkLog, readActionLog } from "../telemetry.js";
 
@@ -61,7 +58,6 @@ export async function handleExec(
   session: string,
   visualize?: boolean,
 ): Promise<ExecResponse> {
-  const { cleaned } = stripEmptyCatchHandlers(code);
   const buffered = createBufferedConsole();
 
   if (visualize) {
@@ -98,7 +94,7 @@ export async function handleExec(
   };
 
   const helperNames = Object.keys(helpers);
-  const fn = compileExecFunction(cleaned, helperNames);
+  const fn = compileExecFunction(code, helperNames);
   try {
     const result = await fn(...Object.values(helpers));
     return { result, output: buffered.output };
@@ -114,13 +110,12 @@ export async function handleReadonlyExec(
   targetPage: Page,
   code: string,
 ): Promise<ExecResponse> {
-  const { cleaned } = stripEmptyCatchHandlers(code);
   const buffered = createBufferedConsole();
   const helpers = createReadonlyExecHelpers(targetPage, {
     console: buffered.console,
   });
   const helperNames = Object.keys(helpers);
-  const fn = compileExecFunction(cleaned, helperNames);
+  const fn = compileExecFunction(code, helperNames);
   try {
     const result = await fn(...Object.values(helpers));
     return { result, output: buffered.output };
