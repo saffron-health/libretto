@@ -38,7 +38,7 @@
     "check:skills": "pnpm run check:mirrors",
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
-    "test": "pnpm run build && vitest run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "cli": "node dist/index.js",
     "generate-changelog": "tsx scripts/generate-changelog.ts",
