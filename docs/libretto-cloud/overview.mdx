@@ -1,0 +1,169 @@
+---
+title: Libretto Cloud
+sidebarTitle: Overview
+hidden: true
+---
+
+> Use Libretto Cloud to deploy workflows, run them through a managed API, investigate failures, and manage your account.
+
+This section covers Libretto Cloud. If you want to self-host, go to the [self-hosting overview](/hosting/introduction). The Libretto Cloud API URL is `https://api.libretto.sh`.
+
+### Why use Libretto Cloud
+
+Use Libretto Cloud when you want to ship and run workflows without owning the runtime infrastructure yourself.
+
+- Libretto Cloud runs the browser layer for you, so you do not have to manage proxies, browser sessions, or CAPTCHA handling yourself.
+- When a run fails, Libretto Cloud automatically analyzes the failure and emails you a summary, along with the recordings, screenshots, logs, and other debug context you need to understand what broke.
+- You can build, debug, and deploy workflow packages from the same CLI instead of stitching together separate tools for local development, browsers, and hosting.
+
+### Set up Libretto Cloud
+
+<Steps>
+  <Step title="Create a user account and organization">
+    Create a new Libretto Cloud account with:
+
+    ```bash theme={null}
+    npx libretto experimental auth signup
+    ```
+
+    If you are joining an existing organization, use `accept-invite` instead.
+
+    See [Create a new user account and organization](/libretto-cloud/authentication#create-a-new-user-account-and-organization).
+  </Step>
+
+  <Step title="Create an API key">
+    Issue an API key for your project or environment:
+
+    ```bash theme={null}
+    npx libretto experimental auth api-key issue --label laptop-dev
+    ```
+
+    Store the printed key as `LIBRETTO_API_KEY` in your `.env` file:
+
+    ```bash theme={null}
+    # .env
+    LIBRETTO_API_KEY=<issued-key>
+    ```
+
+    See [Issue an API key](/libretto-cloud/authentication#issue-an-api-key).
+  </Step>
+
+  <Step title="Set up a webhook">
+    If you want your system to receive results and failure responses from your browser automations, create a webhook endpoint so Libretto Cloud can send `job.completed` and `job.failed` events back to you:
+
+    ```bash theme={null}
+    curl -X POST "https://api.libretto.sh/v1/webhooks/create" \
+      -H "x-api-key: $LIBRETTO_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "json": {
+          "url": "https://example.com/libretto/webhooks",
+          "signing_secret": "replace-with-your-secret",
+          "description": "production job webhooks",
+          "active": true
+        }
+      }'
+    ```
+
+    Stored tenant webhooks are best for long-lived destinations. Per-job or per-schedule callbacks are better for one-off or dev endpoints.
+
+    See [Create a stored webhook endpoint](/libretto-cloud-api/webhooks#create-a-stored-webhook-endpoint).
+  </Step>
+
+  <Step title="Deploy a workflow">
+    Change into the workflow package directory before deploying. The directory you pass to `deploy` is the package directory that gets bundled and uploaded, and it must contain `package.json`:
+
+    ```text
+    my-automations/
+    ├── package.json
+    ├── index.ts
+    └── src/
+        └── workflows/
+            └── check-eligibility.ts
+    ```
+
+    Then run deploy from that directory:
+
+    ```bash theme={null}
+    cd my-automations
+    npx libretto experimental deploy .
+    ```
+
+    See [Expected deploy directory](/libretto-cloud/deployments#expected-deploy-directory) and [Deploy workflows](/libretto-cloud/deployments#deploy-workflows).
+  </Step>
+
+  <Step title="Run the workflow">
+    After deploy, call the Libretto Cloud jobs API with the workflow name declared in your code:
+
+    ```bash theme={null}
+    curl -X POST "https://api.libretto.sh/v1/jobs/create" \
+      -H "x-api-key: $LIBRETTO_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "json": {
+          "workflow": "check-eligibility",
+          "params": {
+            "memberId": "12345"
+          },
+          "timeout_seconds": 300
+        }
+      }'
+    ```
+
+    Then fetch the result with the returned job id:
+
+    ```bash theme={null}
+    curl -X POST "https://api.libretto.sh/v1/jobs/get" \
+      -H "x-api-key: $LIBRETTO_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "json": {
+          "id": "<job-id>"
+        }
+      }'
+    ```
+
+    See [Run a deployed workflow](/libretto-cloud/deployments#run-a-deployed-workflow) and [Jobs](/libretto-cloud-api/jobs-and-logs#jobs).
+  </Step>
+</Steps>
+
+### Libretto Cloud
+
+<CardGroup cols={3}>
+  <Card title="Authentication" icon="key" href="/libretto-cloud/authentication">
+    Sign in, invite teammates, and issue API keys.
+  </Card>
+
+  <Card title="Deployments" icon="rocket" href="/libretto-cloud/deployments">
+    Deploy workflow bundles and investigate hosted failures.
+  </Card>
+
+  <Card title="Billing" icon="credit-card" href="/libretto-cloud/billing">
+    Check plan status and manage payment details.
+  </Card>
+
+</CardGroup>
+
+### Libretto Cloud API
+
+<CardGroup cols={3}>
+  <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
+    See the API base URL, envelope, and auth model.
+  </Card>
+
+  <Card title="Webhooks" icon="webhook" href="/libretto-cloud-api/webhooks">
+    Configure tenant-level webhook delivery for job results.
+  </Card>
+
+  <Card title="Jobs and Logs" icon="terminal" href="/libretto-cloud-api/jobs-and-logs">
+    Invoke deployed workflows and inspect job state.
+  </Card>
+</CardGroup>
+
+### Hosting
+
+The managed platform is one way to run Libretto. If you need to host the runtime yourself, use:
+
+- [Self-hosting overview](/hosting/introduction)
+- [Deploy on GCP](/hosting/gcp)
+- [Deploy on AWS](/hosting/aws)

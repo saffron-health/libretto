@@ -1,0 +1,74 @@
+---
+title: Libretto Cloud API
+sidebarTitle: Overview
+hidden: true
+---
+
+> Use the Libretto Cloud HTTP API to create accounts, manage deployments, run workflows, and inspect results.
+
+The Libretto Cloud API base URL is `https://api.libretto.sh`.
+
+### Request format
+
+All documented Libretto Cloud API routes in this section are `POST` requests.
+
+Authenticated routes use:
+
+- `x-api-key: <api-key>`
+- `Content-Type: application/json`
+- a JSON body shaped like `{ "json": { ... } }`
+
+For example:
+
+```bash
+curl -X POST "https://api.libretto.sh/v1/jobs/get" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "id": "<job-id>"
+    }
+  }'
+```
+
+### Authentication rules
+
+- `POST /v1/auth/*` routes are public and do not require `x-api-key`.
+- All other `POST /v1/*` routes require `x-api-key`.
+- The API key must belong to a verified user account.
+
+Use the [Libretto Cloud authentication](/libretto-cloud/authentication) page to sign up, log in, invite users, and issue API keys.
+
+### Included routes
+
+This section documents the public `/v1/*` routes exposed by Libretto Cloud in this checkout. Billing is managed through the plans flow and does not currently expose public `/v1/billing/*` routes here.
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/libretto-cloud-api/authentication">
+    Public account-creation endpoints.
+  </Card>
+
+  <Card title="Sessions" icon="browser" href="/libretto-cloud-api/sessions">
+    Create and close cloud browser sessions.
+  </Card>
+
+  <Card title="Deployments and Workflows" icon="rocket" href="/libretto-cloud-api/deployments-and-workflows">
+    Upload bundles, build workflows, and inspect workflow state.
+  </Card>
+
+  <Card title="Jobs and Logs" icon="terminal" href="/libretto-cloud-api/jobs-and-logs">
+    Start jobs, poll results, inspect debug reports, and fetch logs.
+  </Card>
+
+  <Card title="Credentials" icon="lock" href="/libretto-cloud-api/credentials">
+    Store and manage cloud credentials.
+  </Card>
+
+  <Card title="Webhooks" icon="webhook" href="/libretto-cloud-api/webhooks">
+    Configure tenant-level job result webhooks.
+  </Card>
+
+  <Card title="Schedules" icon="clock" href="/libretto-cloud-api/schedules">
+    Run workflows on a recurring cron-based interval.
+  </Card>
+</CardGroup>

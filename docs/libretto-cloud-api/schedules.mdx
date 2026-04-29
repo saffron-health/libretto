@@ -1,0 +1,133 @@
+---
+title: Libretto Cloud API schedules
+hidden: true
+---
+
+> Use the schedules API to run a deployed workflow on a recurring cron-based interval.
+
+All routes on this page require `x-api-key`.
+
+### Callback behavior
+
+Schedules create jobs in the future. Each schedule can carry its own `callback_url` and `callback_secret`.
+
+If a scheduled job has a callback configured, that per-job callback takes precedence over stored tenant webhook endpoints. Use schedule-level callbacks when you want recurring jobs to report to a specific endpoint.
+
+### POST `/v1/schedules/create`
+
+Create a recurring schedule for a deployed workflow.
+
+Request fields:
+
+- `workflow`
+- `params`
+- `cron_expr`
+- `timezone`: optional, default `UTC`
+- `timeout_seconds`: optional, default `900`
+- `callback_url`: optional
+- `callback_secret`: optional
+- `skip_callbacks`: optional, default `false`
+- `enabled`: optional, default `true`
+
+If you set `callback_url`, you must also set `callback_secret`.
+
+Response fields:
+
+- `success`
+- `schedule`
+
+### POST `/v1/schedules/list`
+
+List schedules for the current tenant.
+
+Request fields:
+
+- `enabled`: optional boolean filter
+- `workflow`: optional workflow-name filter
+- `limit`: optional page size, default `50`, max `200`
+
+Response fields:
+
+- `schedules`
+
+### POST `/v1/schedules/get`
+
+Fetch one schedule.
+
+Request fields:
+
+- `id`
+
+Response fields:
+
+- `schedule`
+
+### POST `/v1/schedules/update`
+
+Update a schedule.
+
+Request fields:
+
+- `id`
+- `params`: optional
+- `cron_expr`: optional
+- `timezone`: optional
+- `timeout_seconds`: optional
+- `callback_url`: optional string or `null`
+- `callback_secret`: optional string or `null`
+- `skip_callbacks`: optional
+- `enabled`: optional
+
+To clear the callback, set both `callback_url` and `callback_secret` to `null`.
+
+Response fields:
+
+- `schedule`
+
+### POST `/v1/schedules/delete`
+
+Delete a schedule.
+
+Request fields:
+
+- `id`
+
+Response fields:
+
+- `success`
+- `id`
+
+### Shared schedule response shape
+
+The `schedule` object returned by the schedules endpoints includes:
+
+- `id`
+- `workflow`
+- `params`
+- `cron_expr`
+- `timezone`
+- `timeout_seconds`
+- `callback_url`
+- `skip_callbacks`
+- `enabled`
+- `next_fire_at`
+- `last_fire_at`
+- `last_job_id`
+- `last_error`
+- `consecutive_failures`
+- `created_at`
+- `updated_at`
+
+<CardGroup cols={3}>
+  <Card title="Webhooks" icon="webhook" href="/libretto-cloud-api/webhooks">
+    Compare stored tenant webhooks with schedule-level callbacks.
+  </Card>
+
+  <Card title="Deployments and Workflows" icon="rocket" href="/libretto-cloud-api/deployments-and-workflows">
+    Manage the workflows that schedules invoke.
+  </Card>
+
+  <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
+    See the shared request format.
+  </Card>
+</CardGroup>

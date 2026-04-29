@@ -1,25 +1,23 @@
 ---
-title: Hosted authentication
+title: Libretto Cloud authentication
 hidden: true
 ---
 
-> Create or join a hosted organization, store a local session, and issue API keys for hosted runs.
+> Create or join a Libretto Cloud organization, store a local session, and issue API keys for cloud runs.
 
 ### Before you start
-
-Hosted Libretto CLI commands use `https://api.libretto.sh` automatically.
 
 The examples below use `npx libretto`. If `libretto` is already on your `PATH`, drop `npx`.
 
 ### Create a new user account and organization
 
-Use `auth signup` when you are creating a brand new hosted organization:
+Use `auth signup` when you are creating a brand new Libretto Cloud organization:
 
 ```bash theme={null}
 npx libretto experimental auth signup
 ```
 
-The CLI prompts for your name, email, password, organization name, organization slug, and the alert email that Hosted Libretto should use for hosted workflow failure notifications. After the account is created, it waits for email verification and stores the hosted session locally in `~/.libretto/auth.json`.
+The CLI prompts for your name, email, password, organization name, organization slug, and the alert email that Libretto Cloud should use for workflow failure notifications. After the account is created, it waits for email verification and stores the session locally in `~/.libretto/auth.json`.
 
 <Note>
   A Libretto user can only belong to one organization at a time. If your team already has an organization, use an invite instead of creating a second account.
@@ -35,7 +33,7 @@ Use `auth login` when the account already exists:
 npx libretto experimental auth login
 ```
 
-This stores a new hosted session in `~/.libretto/auth.json`. If the account is not verified yet, the CLI re-sends the verification email.
+This stores a new Libretto Cloud session in `~/.libretto/auth.json`. If the account is not verified yet, the CLI re-sends the verification email.
 
 To clear local credentials:
 
@@ -45,7 +43,7 @@ npx libretto experimental auth logout
 
 ### Check the active identity
 
-Use `whoami` to confirm which hosted account the CLI is using:
+Use `whoami` to confirm which Libretto Cloud account the CLI is using:
 
 ```bash theme={null}
 npx libretto experimental auth whoami
@@ -77,7 +75,7 @@ If you are already logged in, `accept-invite` only works when that account is no
 
 ### Issue an API key
 
-Use API keys for project `.env` files, CI, or other non-interactive hosted runs:
+Use API keys for project `.env` files, CI, or other non-interactive Libretto Cloud runs:
 
 ```bash theme={null}
 npx libretto experimental auth api-key issue --label laptop-dev
@@ -105,15 +103,15 @@ npx libretto experimental auth api-key revoke <key-id>
 
 ### Troubleshooting
 
-- If signup fails because the email already exists, log in to that account or delete the existing hosted account before retrying.
+- If signup fails because the email already exists, log in to that account or delete the existing Libretto Cloud account before retrying.
 - If an invite fails for a logged-in user, make sure that user is not already a member of another Libretto organization.
 
 <CardGroup cols={2}>
-  <Card title="Deployments" icon="rocket" href="/hosted-libretto/deployments">
-    Deploy workflows to Hosted Libretto and investigate hosted runs.
+  <Card title="Deployments" icon="rocket" href="/libretto-cloud/deployments">
+    Deploy workflows to Libretto Cloud and investigate cloud runs.
   </Card>
 
-  <Card title="Hosted billing" icon="credit-card" href="/hosted-libretto/billing">
+  <Card title="Libretto Cloud billing" icon="credit-card" href="/libretto-cloud/billing">
     Open the plans page and manage your subscription.
   </Card>
 

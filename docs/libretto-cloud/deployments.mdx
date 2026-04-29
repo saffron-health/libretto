@@ -1,13 +1,13 @@
 ---
-title: Hosted deployments
+title: Libretto Cloud deployments
 hidden: true
 ---
 
-> Deploy workflow bundles to the hosted platform, then use the platform's failure emails and debug tools when runs break.
+> Deploy workflow bundles to Libretto Cloud, then use the failure emails and debug tools when runs break.
 
 ### Before you deploy
 
-Hosted Libretto CLI commands and API requests use `https://api.libretto.sh`. Issue an API key for the deployment environment:
+Libretto Cloud commands and API requests use `https://api.libretto.sh`. Issue an API key for the deployment environment:
 
 ```bash theme={null}
 export LIBRETTO_API_KEY=<issued-api-key>
@@ -35,22 +35,39 @@ my-automations/
         └── submit-prior-auth.ts
 ```
 
-Each workflow file should default-export a `workflow(...)`. Then `index.ts` should export the workflows you want Hosted Libretto to discover:
+Each workflow file should default-export a `workflow(...)`. Then `index.ts` should export the workflows you want Libretto Cloud to discover:
 
 ```ts theme={null}
 export { default as checkEligibility } from "./src/workflows/check-eligibility";
 export { default as submitPriorAuth } from "./src/workflows/submit-prior-auth";
 ```
 
-The hosted API uses the workflow name from the `workflow("...")` call inside the file, not the filename or the export alias from `index.ts`.
+The API uses the workflow name from the `workflow("...")` call inside the file, not the filename or the export alias from `index.ts`.
 
 If your workflows live in a package inside a monorepo, run `deploy` against that package directory instead of the monorepo root.
 
-### Deploy workflows
+The deploy command has two separate path concepts:
 
-Use `deploy` to upload a hosted workflow bundle:
+- The positional argument is the package directory to bundle and upload. That directory must contain `package.json`.
+- `--entry-point` is the file inside that package directory that Libretto should use for workflow discovery.
+
+For example:
 
 ```bash theme={null}
+npx libretto experimental deploy my-automations --entry-point src/workflows/check-eligibility.ts
+```
+
+In that command:
+
+- `my-automations` is the package directory
+- `src/workflows/check-eligibility.ts` is the entry file relative to `my-automations`
+
+### Deploy workflows
+
+Use `deploy` to upload a workflow bundle to Libretto Cloud:
+
+```bash theme={null}
+cd my-automations
 npx libretto experimental deploy .
 ```
 
@@ -60,15 +77,17 @@ That command expects:
 - `./index.ts` to be the deploy entry point
 - `index.ts` to export the workflows that should be deployed
 
-You can also set a description and point `--entry-point` at a different file relative to the deploy directory:
+The positional argument to `deploy` is the source directory to package and upload. It is not the path to a workflow file.
+
+If you want to deploy from a different entry file, keep the source directory as the package root and use `--entry-point` relative to that directory:
 
 ```bash theme={null}
-npx libretto experimental deploy . \
+npx libretto experimental deploy my-automations \
   --description "payer portal workflows" \
   --entry-point src/workflows/check-eligibility.ts
 ```
 
-The CLI bundles the deploy artifact, uploads it to the hosted platform, then waits for the build to finish. When the build is ready, it prints the deployment id and the discovered workflow names.
+The CLI bundles the deploy artifact, uploads it to Libretto Cloud, then waits for the build to finish. When the build is ready, it prints the deployment id and the discovered workflow names.
 
 ### Run a deployed workflow
 
@@ -126,9 +145,9 @@ curl -X POST "https://api.libretto.sh/v1/jobs/get" \
 
 The `workflow` value must match the workflow name declared in code and discovered during deploy, not the deployment id, filename, or export alias.
 
-### Investigate hosted failures
+### Investigate cloud failures
 
-When a hosted workflow job fails, the platform emails the configured debug recipient with:
+When a Libretto Cloud workflow job fails, the platform emails the configured debug recipient with:
 
 - A short diagnosis.
 - A handoff prompt for a local coding agent.
@@ -140,7 +159,7 @@ For the local debugging flow, see [Debugging workflows](/workflow-guides/debuggi
 
 ### Hosting options
 
-Hosted Libretto is the managed path. If you would rather run Libretto on infrastructure you control, use the self-hosting docs instead:
+Libretto Cloud is the managed path. If you would rather run Libretto on infrastructure you control, use the self-hosting docs instead:
 
 - [Self-hosting overview](/hosting/introduction)
 - [Deploy on GCP](/hosting/gcp)
@@ -151,15 +170,15 @@ Hosted Libretto is the managed path. If you would rather run Libretto on infrast
 </Note>
 
 <CardGroup cols={3}>
-  <Card title="Hosted overview" icon="book-open" href="/hosted-libretto/overview">
-    Start with the high-level hosted workflow.
+  <Card title="Libretto Cloud overview" icon="book-open" href="/libretto-cloud/overview">
+    Start with the high-level cloud workflow.
   </Card>
 
-  <Card title="Authentication" icon="key" href="/hosted-libretto/authentication">
+  <Card title="Authentication" icon="key" href="/libretto-cloud/authentication">
     Create accounts, join organizations, and issue API keys.
   </Card>
 
-  <Card title="Hosted billing" icon="credit-card" href="/hosted-libretto/billing">
+  <Card title="Libretto Cloud billing" icon="credit-card" href="/libretto-cloud/billing">
     Manage plans and open the billing portal.
   </Card>
 

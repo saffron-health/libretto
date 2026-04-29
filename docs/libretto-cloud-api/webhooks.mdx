@@ -1,0 +1,121 @@
+---
+title: Libretto Cloud API webhooks
+hidden: true
+---
+
+> Use the webhooks API to store tenant-level job result destinations that receive `job.completed` and `job.failed` events.
+
+All routes on this page require `x-api-key`.
+
+### How webhook delivery works
+
+Libretto Cloud supports multiple stored webhook endpoints per tenant. Every active stored endpoint receives the event payload.
+
+Webhook delivery order is:
+
+1. If a job has `callback_url` and `callback_secret`, Libretto Cloud delivers only to that per-job callback.
+2. Otherwise, Libretto Cloud delivers to every active stored webhook endpoint for the tenant.
+3. If `skip_callbacks` is true, Libretto Cloud does not deliver callbacks or stored webhooks.
+
+Use stored webhook endpoints for long-lived production destinations. Use `callback_url` and `callback_secret` on `jobs/create` or `schedules/create` when you want a one-off or environment-specific callback, such as a dev endpoint.
+
+### Create a stored webhook endpoint
+
+Use `POST /v1/webhooks/create` to create a stored webhook endpoint.
+
+### POST `/v1/webhooks/create`
+
+Create a stored webhook endpoint.
+
+Request fields:
+
+- `url`
+- `signing_secret`
+- `description`: optional
+- `active`: optional, default `true`
+
+Response fields:
+
+- `success`
+- `webhook_endpoint_id`
+- `message`
+
+### POST `/v1/webhooks/list`
+
+List stored webhook endpoints for the current tenant.
+
+Response fields:
+
+- `webhook_endpoints`
+
+Each endpoint entry includes:
+
+- `webhook_endpoint_id`
+- `url`
+- `description`
+- `active`
+- `created_at`
+- `updated_at`
+
+### POST `/v1/webhooks/update`
+
+Update a stored webhook endpoint.
+
+Request fields:
+
+- `id`
+- `url`: optional
+- `signing_secret`: optional
+- `description`: optional
+- `active`: optional
+
+Response fields:
+
+- `success`
+- `message`
+
+### POST `/v1/webhooks/delete`
+
+Delete a stored webhook endpoint.
+
+Request fields:
+
+- `id`
+
+Response fields:
+
+- `success`
+- `message`
+
+### Delivered payload
+
+Stored webhook endpoints receive:
+
+- `event`: `job.completed` or `job.failed`
+- `job_id`
+- `nonce`
+- `workflow`
+- `deployment_id`
+- `status`
+- `result`
+- `error`
+- `mapped_stack`
+
+The request includes:
+
+- `x-webhook-signature`: HMAC SHA-256 of the JSON body using the stored `signing_secret`
+- `x-event-type`: the event name
+
+<CardGroup cols={3}>
+  <Card title="Jobs and Logs" icon="terminal" href="/libretto-cloud-api/jobs-and-logs">
+    See the jobs API that triggers webhook delivery.
+  </Card>
+
+  <Card title="Schedules" icon="clock" href="/libretto-cloud-api/schedules">
+    Use per-schedule callbacks for recurring runs.
+  </Card>
+
+  <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
+    See the shared request format.
+  </Card>
+</CardGroup>

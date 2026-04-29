@@ -1,19 +1,19 @@
 ---
-title: Hosted billing
+title: Libretto Cloud billing
 hidden: true
 ---
 
-> View your current hosted plan, open the Libretto plans page, and manage payment details through Stripe.
+> View your current cloud plan, open the Libretto plans page, and manage payment details through Stripe.
 
 Only organization owners can view billing status or open billing-management links.
 
 <Warning>
-  These commands are for Hosted Libretto accounts with billing enabled. If your CLI does not expose `experimental billing`, ask the Libretto team.
+  Sign up or log in to your Libretto Cloud account before using these commands.
 </Warning>
 
 ### Open the plans page
 
-Use `billing portal` to print a short-lived link to Libretto's hosted plans page:
+Use `billing portal` to print a short-lived link to Libretto's plans page:
 
 ```bash theme={null}
 npx libretto experimental billing portal
@@ -44,16 +44,16 @@ Period:  ends 2026-05-21
 
 If cancellation is already scheduled, the command prints that too.
 
-### Hosted usage limits
+### Cloud usage limits
 
-These limits apply to Hosted Libretto. Local browser sessions on your own machine do not count toward hosted billing.
+These limits apply to Libretto Cloud. Local browser sessions on your own machine do not count toward cloud billing.
 
 #### What counts toward usage
 
-Hosted browser hours accrue when Hosted Libretto provisions a browser session for:
+Browser hours accrue when Libretto Cloud provisions a browser session for:
 
-- A hosted browser session opened through the managed platform.
-- A hosted workflow job that needs a browser session.
+- A browser session opened through Libretto Cloud.
+- A workflow job that needs a browser session.
 
 #### How usage is measured
 
@@ -61,7 +61,7 @@ Hosted usage is measured per browser session, from the time a session starts unt
 
 Each session is billed by the minute and rounds up to the next whole minute, which is the same general metering model used by other hosted browser providers.
 
-If your organization exceeds its plan limit, Hosted Libretto will not spin up new browser sessions until you move to a plan with more capacity.
+If your organization exceeds its plan limit, Libretto Cloud will not spin up new browser sessions until you move to a plan with more capacity.
 
 ### Change plans, payment methods, invoices, and cancellation
 
@@ -78,11 +78,11 @@ For BAA and Enterprise, please reach out to us at `team@saffron.health`.
 - If you can authenticate but still cannot access billing, confirm that your user is an organization owner.
 
 <CardGroup cols={2}>
-  <Card title="Authentication" icon="key" href="/hosted-libretto/authentication">
-    Manage hosted login state, invites, and API keys.
+  <Card title="Authentication" icon="key" href="/libretto-cloud/authentication">
+    Manage cloud login state, invites, and API keys.
   </Card>
 
-  <Card title="Deployments" icon="rocket" href="/hosted-libretto/deployments">
-    Deploy workflows and invoke them on the hosted platform.
+  <Card title="Deployments" icon="rocket" href="/libretto-cloud/deployments">
+    Deploy workflows and invoke them on Libretto Cloud.
   </Card>
 </CardGroup>
