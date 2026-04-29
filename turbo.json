@@ -10,8 +10,8 @@
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
-      "outputs": []
+      "dependsOn": ["build"],
+      "cache": false
     },
     "benchmarks": {
       "dependsOn": ["^build"],

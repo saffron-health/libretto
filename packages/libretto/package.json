@@ -38,7 +38,7 @@
     "check:skills": "pnpm run check:mirrors",
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
-    "test": "pnpm run build && vitest run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "cli": "node dist/index.js",
     "generate-changelog": "tsx scripts/generate-changelog.ts",
@@ -80,7 +80,7 @@
     "openai": "^6.29.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.5"
   },
   "dependencies": {
     "ai": "^6.0.116",
