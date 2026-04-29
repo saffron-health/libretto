@@ -114,6 +114,25 @@ describe("basic CLI subprocess behavior", () => {
     );
   });
 
+  test("setup loads snapshot API credentials from workspace .env", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    await writeFile(workspacePath(".env"), "OPENAI_API_KEY=test-openai-key\n");
+
+    const result = await librettoCli("setup --skip-browsers", {
+      OPENAI_API_KEY: undefined,
+      ANTHROPIC_API_KEY: undefined,
+      GEMINI_API_KEY: undefined,
+      GOOGLE_GENERATIVE_AI_API_KEY: undefined,
+      GOOGLE_CLOUD_PROJECT: undefined,
+      GCLOUD_PROJECT: undefined,
+    });
+
+    expect(result.stdout).toContain("Using OpenAI");
+    expect(result.stdout).toContain("Detected OPENAI_API_KEY");
+  });
+
   test("setup auto-pins default model when OPENAI_API_KEY is present", async ({
     librettoCli,
   }) => {
