@@ -1,8 +1,6 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
-import { connect, disconnectBrowser } from "../core/browser.js";
-import { getSessionSnapshotRunDir } from "../core/context.js";
 import { condenseDom } from "../../shared/condense-dom/condense-dom.js";
 import { readSessionState } from "../core/session.js";
 import {
@@ -17,10 +15,6 @@ import { resolveSnapshotApiModelOrThrow } from "../core/ai-model.js";
 import { DaemonClient } from "../core/daemon-ipc.js";
 
 export const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
-
-function generateSnapshotRunId(): string {
-  return `snapshot-${Date.now()}`;
-}
 
 type SnapshotViewportMetrics = {
   configuredWidth: number | null;
@@ -115,139 +109,7 @@ export async function forceSnapshotViewport(
   });
 }
 
-async function captureScreenshot(
-  session: string,
-  logger: LoggerApi,
-  pageId?: string,
-): Promise<ScreenshotPair> {
-  logger.info("screenshot-start", { session, pageId });
-  const snapshotRunId = generateSnapshotRunId();
-  const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);
-  mkdirSync(snapshotRunDir, { recursive: true });
-  const { browser, page } = await connect(session, logger, 10000, {
-    pageId,
-    requireSinglePage: true,
-  });
-
-  try {
-    let title: string | null = null;
-    try {
-      title = await page.title();
-    } catch (error) {
-      logger.warn("screenshot-title-read-failed", {
-        session,
-        pageId,
-        error,
-      });
-    }
-
-    let pageUrl: string | null = null;
-    try {
-      pageUrl = page.url();
-    } catch (error) {
-      logger.warn("screenshot-url-read-failed", {
-        session,
-        pageId,
-        error,
-      });
-    }
-
-    const pngPath = `${snapshotRunDir}/page.png`;
-    const htmlPath = `${snapshotRunDir}/page.html`;
-    const condensedHtmlPath = `${snapshotRunDir}/page.condensed.html`;
-
-    const RENDER_SETTLE_TIMEOUT_MS = 10_000;
-    await Promise.race([
-      page.waitForLoadState("networkidle").catch(() => {}),
-      new Promise((resolve) => setTimeout(resolve, RENDER_SETTLE_TIMEOUT_MS)),
-    ]);
-
-    const restoreViewport = resolveSnapshotViewport(session, logger);
-    const viewportMetrics = await readSnapshotViewportMetrics(page);
-    logger.info("screenshot-viewport-metrics", {
-      session,
-      pageId,
-      restoreViewport,
-      ...viewportMetrics,
-    });
-    await forceSnapshotViewport(
-      page,
-      restoreViewport,
-      logger,
-      session,
-      pageId,
-      shouldForceSnapshotViewport(viewportMetrics)
-        ? "preflight-invalid-viewport"
-        : "preflight-normalize-viewport",
-    );
-
-    try {
-      await page.screenshot({ path: pngPath });
-    } catch (error) {
-      if (!isZeroWidthScreenshotError(error)) {
-        throw error;
-      }
-      await forceSnapshotViewport(
-        page,
-        restoreViewport,
-        logger,
-        session,
-        pageId,
-        "retry-after-zero-width-screenshot-error",
-      );
-      await page.screenshot({ path: pngPath });
-    }
-
-    const htmlContent = await page.content();
-    const fs = await import("node:fs/promises");
-    await fs.writeFile(htmlPath, htmlContent);
-
-    // Write condensed DOM
-    const condenseResult = condenseDom(htmlContent);
-    await fs.writeFile(condensedHtmlPath, condenseResult.html);
-
-    logger.info("screenshot-success", {
-      session,
-      pageUrl,
-      title,
-      pngPath,
-      htmlPath,
-      condensedHtmlPath,
-      snapshotRunId,
-      domCondenseStats: {
-        originalLength: condenseResult.originalLength,
-        condensedLength: condenseResult.condensedLength,
-        reductions: condenseResult.reductions,
-      },
-    });
-    return { pngPath, htmlPath, condensedHtmlPath, baseName: snapshotRunId };
-  } catch (err) {
-    let pageAlive = false;
-    let browserConnected = false;
-    try {
-      browserConnected = browser.isConnected();
-      pageAlive = !page.isClosed();
-    } catch {}
-    logger.error("screenshot-error", {
-      error: err,
-      session,
-      pageAlive,
-      browserConnected,
-      pageUrl: (() => {
-        try {
-          return page.url();
-        } catch {
-          return null;
-        }
-      })(),
-    });
-    throw err;
-  } finally {
-    disconnectBrowser(browser, logger, session);
-  }
-}
-
-async function captureSnapshotViaDaemon(
+async function captureSnapshot(
   session: string,
   logger: LoggerApi,
   daemonSocketPath: string,
@@ -295,29 +157,16 @@ async function runSnapshot(
   const snapshotModel = readSnapshotModel();
   resolveSnapshotApiModelOrThrow(snapshotModel);
 
-  // Route through daemon for open-based sessions, direct CDP for connect-based sessions.
   const state = readSessionState(session, logger);
-  let screenshotResult: ScreenshotPair;
-  if (state?.daemonSocketPath) {
-    // Daemon-backed session (created via `libretto open`).
-    screenshotResult = await captureSnapshotViaDaemon(
-      session,
-      logger,
-      state.daemonSocketPath,
-      pageId,
-    );
-  } else if (state?.cdpEndpoint) {
-    // Connect-based or provider session — use direct CDP.
-    screenshotResult = await captureScreenshot(session, logger, pageId);
-  } else {
-    // Open-based session missing its daemon socket — state is corrupt or daemon crashed.
+  if (!state?.daemonSocketPath) {
     throw new Error(
       `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
         `Close and reopen the session: libretto close --session ${session}`,
     );
   }
 
-  const { pngPath, htmlPath, condensedHtmlPath } = screenshotResult;
+  const { pngPath, htmlPath, condensedHtmlPath } =
+    await captureSnapshot(session, logger, state.daemonSocketPath, pageId);
 
   console.log("Screenshot saved:");
   console.log(`  PNG:             ${pngPath}`);

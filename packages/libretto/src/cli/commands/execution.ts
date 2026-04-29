@@ -52,7 +52,7 @@ type ExecMode = "exec" | "readonly-exec";
 const require = moduleBuiltin.createRequire(import.meta.url);
 const tsxCliPath = require.resolve("tsx/cli");
 
-async function runExecViaDaemon(
+async function execViaDaemon(
   code: string,
   session: string,
   daemonSocketPath: string,
@@ -105,7 +105,11 @@ async function runExecViaDaemon(
   }
 }
 
-async function runExecViaConnect(
+/**
+ * Direct CDP connect path for connect-based sessions (created via `libretto connect`).
+ * These sessions have no daemon process — exec runs via a fresh CDP connection.
+ */
+async function execViaDirectCDP(
   code: string,
   session: string,
   logger: LoggerApi,
@@ -256,15 +260,12 @@ async function runExec(
 ): Promise<void> {
   const state = readSessionStateOrThrow(session);
   if (state.daemonSocketPath) {
-    // Daemon-backed session (created via `libretto open`).
-    return runExecViaDaemon(code, session, state.daemonSocketPath, logger, options);
+    return execViaDaemon(code, session, state.daemonSocketPath, logger, options);
   }
+  // Connect-based sessions (libretto connect) have cdpEndpoint but no daemon.
   if (state.cdpEndpoint) {
-    // Connect-based or provider session — use direct CDP.
-    return runExecViaConnect(code, session, logger, options);
+    return execViaDirectCDP(code, session, logger, options);
   }
-  // Open-based session missing its daemon socket — state is corrupt or daemon crashed.
-  // Fail instead of silently degrading to a fresh CDP connection (which would lose aria-refs).
   throw new Error(
     `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
       `Close and reopen the session: libretto close --session ${session}`,

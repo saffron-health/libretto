@@ -346,20 +346,14 @@ export async function runPages(
   const state = readSessionStateOrThrow(session);
   let pageSummaries: OpenPageSummary[];
 
-  if (state.daemonSocketPath) {
-    // Daemon-backed session (created via `libretto open`) — daemon tracks its own page IDs.
-    const client = new DaemonClient(state.daemonSocketPath);
-    pageSummaries = await client.pages();
-  } else if (state.cdpEndpoint) {
-    // Connect-based or provider session — use CDP target IDs.
-    pageSummaries = await listOpenPages(session, logger);
-  } else {
-    // Open-based session missing its daemon socket — state is corrupt or daemon crashed.
+  if (!state.daemonSocketPath) {
     throw new Error(
       `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
         `Close and reopen the session: libretto close --session ${session}`,
     );
   }
+  const client = new DaemonClient(state.daemonSocketPath);
+  pageSummaries = await client.pages();
 
   if (pageSummaries.length === 0) {
     console.log("No pages found.");

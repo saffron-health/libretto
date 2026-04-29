@@ -207,23 +207,31 @@ Both paths return `ScreenshotPair` and feed into the same `runApiInterpret` call
 - [x] Implement `snapshot` handler in `BrowserDaemon.dispatchCommand` that performs viewport normalization, screenshot, and `page.content()` capture. Write artifacts to the session snapshot directory. Return `{ pngPath, htmlPath, snapshotRunId, pageUrl, title }`.
 - [x] Reuse shared viewport normalization and zero-width screenshot retry helpers from `snapshot.ts` in the daemon handler (no code duplication).
 - [x] Replace hand-rolled daemon logging with proper `LoggerApi` via `createLoggerForSession`.
-- [x] Update the `snapshot` command in `snapshot.ts`: when `state.daemonSocketPath` is present, use `DaemonClient`. CLI reads `htmlPath`, runs `condenseDom`, writes `condensedHtmlPath`, then calls `runApiInterpret` as before. For `connect`-based sessions (no `daemonSocketPath`), use the existing `captureScreenshot()` path.
+- [x] Update the `snapshot` command in `snapshot.ts`: when `state.daemonSocketPath` is present, use `DaemonClient`. CLI reads `htmlPath`, runs `condenseDom`, writes `condensedHtmlPath`, then calls `runApiInterpret` as before. (Connect fallback removed in Phase 5.)
 - [x] `pnpm --filter libretto type-check` — passes.
 - [x] Add test to `test/daemon-ipc.spec.ts`: open headless → snapshot → verify snapshot PNG, HTML, and condensed HTML files exist on disk.
 - [x] All 5 daemon IPC tests pass. Full suite: 200 passed, 0 failed.
 
-### Phase 5: Remove connect fallback for daemon-backed sessions
+### Phase 5: Remove connect fallback for daemon-backed sessions ✅
 
-Remove the CDP connect/disconnect fallback from `open`-based sessions. The daemon is the exclusive implementation — if the daemon is unreachable, the command fails instead of silently falling back to a fresh CDP connection (which would lose aria-refs and state).
+Removed the CDP connect/disconnect fallback from `snapshot` and `pages` entirely. For `exec`/`readonly-exec`, the direct CDP path is retained only for connect-based sessions (`state.cdpEndpoint`); open-based sessions without `daemonSocketPath` now fail instead of silently degrading.
 
-Currently, each command checks `state.daemonSocketPath` and branches: daemon path vs connect path. The connect path (`connect()` + `disconnectBrowser()` in `browser.ts`) is still reachable for `open`-based sessions in theory, since `daemonSocketPath` is the only gate. This phase removes the connect path for daemon-backed sessions entirely, so `connect()`/`disconnectBrowser()` are only used by `connect`-based sessions.
+**Files modified:**
 
-- [x] Remove `runExecViaConnect` from `execution.ts`. Replace `runExec` branching with: `if (!state.daemonSocketPath) throw new Error("...")` for `open` sessions, or route `connect`-based sessions through a separate `connect`-only path.
-- [x] Remove the `listOpenPages` fallback from `runPages`. Daemon-backed sessions use `client.pages()`; connect-based sessions use `listOpenPages`.
-- [x] Remove the `captureScreenshot` fallback from `snapshot.ts`. Same pattern.
-- [x] Audit all remaining `connect()` / `disconnectBrowser()` imports in command files. They should only be reachable for `connect`-based sessions (`save` command, etc.).
-- [x] Run `pnpm --filter libretto test` — all tests pass.
-- [x] Run `pnpm --filter libretto type-check` — passes.
+- `packages/libretto/src/cli/commands/execution.ts` — deleted old `runExecViaConnect`/`runExecViaDaemon` naming. `runExec` routes to `execViaDaemon` (daemon sessions), `execViaDirectCDP` (connect sessions with `cdpEndpoint`), or throws if neither is available. Removed `connect`/`disconnectBrowser` imports from the daemon path; they are only used inside `execViaDirectCDP`.
+- `packages/libretto/src/cli/commands/snapshot.ts` — deleted `captureScreenshot` (direct CDP path), `generateSnapshotRunId`, and `connect`/`disconnectBrowser`/`mkdirSync`/`getSessionSnapshotRunDir` imports. Renamed `captureSnapshotViaDaemon` → `captureSnapshot` (it's the only path now). `runSnapshot` throws if no `daemonSocketPath`.
+- `packages/libretto/src/cli/core/browser.ts` — `runPages` throws if no `daemonSocketPath`. The `listOpenPages` fallback branch is removed.
+
+**Why `exec` retains a connect path:** Connect-based sessions (`libretto connect`) have no daemon process but still need `exec`/`readonly-exec`. An existing test (`read-only guard also applies to remote CDP-backed sessions`) exercises this path. `snapshot` and `pages` have no connect-session tests and are daemon-only.
+
+**Checklist:**
+
+- [x] Delete `captureScreenshot` from `snapshot.ts`. `captureSnapshotViaDaemon` renamed to `captureSnapshot` — daemon is the only snapshot path.
+- [x] Delete `listOpenPages` fallback from `runPages`. Daemon is the only pages path.
+- [x] In `execution.ts`, `runExec` routes: `daemonSocketPath` → `execViaDaemon`, `cdpEndpoint` → `execViaDirectCDP`, else → error. Renamed `runExecViaDaemon` → `execViaDaemon`, `runExecViaConnect` → `execViaDirectCDP`.
+- [x] `connect()`/`disconnectBrowser()` imports removed from `snapshot.ts`. In `execution.ts` they are only reachable inside `execViaDirectCDP` (connect sessions).
+- [x] `pnpm --filter libretto test` — 200 passed, 0 failed.
+- [x] `pnpm --filter libretto type-check` — passes.
 
 ### Phase 6: Reorganize daemon into `src/cli/core/daemon/`
 
