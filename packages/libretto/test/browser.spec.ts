@@ -97,6 +97,11 @@ describe("provider resolution via CLI", () => {
 
     const result = await librettoCli(
       "open https://example.com --provider browserbase",
+      {
+        BROWSERBASE_API_KEY: undefined,
+        BROWSERBASE_PROJECT_ID: undefined,
+        BROWSERBASE_ENDPOINT: undefined,
+      },
     );
 
     expect(result.stderr).not.toContain("BROWSERBASE_API_KEY is required");

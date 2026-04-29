@@ -121,11 +121,12 @@ describe("basic CLI subprocess behavior", () => {
     await writeFile(workspacePath(".env"), "OPENAI_API_KEY=test-openai-key\n");
 
     const result = await librettoCli("setup --skip-browsers", {
-      ANTHROPIC_API_KEY: "",
-      GEMINI_API_KEY: "",
-      GOOGLE_GENERATIVE_AI_API_KEY: "",
-      GOOGLE_CLOUD_PROJECT: "",
-      GCLOUD_PROJECT: "",
+      OPENAI_API_KEY: undefined,
+      ANTHROPIC_API_KEY: undefined,
+      GEMINI_API_KEY: undefined,
+      GOOGLE_GENERATIVE_AI_API_KEY: undefined,
+      GOOGLE_CLOUD_PROJECT: undefined,
+      GCLOUD_PROJECT: undefined,
     });
 
     expect(result.stdout).toContain("Using OpenAI");

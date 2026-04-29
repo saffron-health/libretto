@@ -24,7 +24,7 @@ type CliFixtures = {
   librettoRuntimePath: string;
   librettoCli: (
     command: string,
-    env?: Record<string, string>,
+    env?: Record<string, string | undefined>,
     stdinText?: string,
   ) => Promise<SpawnResult>;
   writeWorkflow: (
@@ -120,16 +120,25 @@ async function execProcess(
   command: string,
   args: string[],
   cwd: string,
-  env?: Record<string, string>,
+  env?: Record<string, string | undefined>,
   stdinText?: string,
 ): Promise<SpawnResult> {
+  const childEnv: NodeJS.ProcessEnv = { ...process.env };
+  for (const [key, value] of Object.entries(env ?? {})) {
+    if (value === undefined) {
+      delete childEnv[key];
+    } else {
+      childEnv[key] = value;
+    }
+  }
+
   return await new Promise<SpawnResult>((resolveResult, reject) => {
     const child = execFile(
       command,
       args,
       {
         cwd,
-        env: { ...process.env, ...env },
+        env: childEnv,
         maxBuffer: 10 * 1024 * 1024,
       },
       (error, stdout, stderr) => {
@@ -295,7 +304,7 @@ export const test = base.extend<CliFixtures>({
     await use(
       async (
         command: string,
-        env?: Record<string, string>,
+        env?: Record<string, string | undefined>,
         stdinText?: string,
       ) => {
         return await execProcess(
