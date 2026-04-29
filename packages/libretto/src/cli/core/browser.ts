@@ -1131,8 +1131,9 @@ export async function runConnect(
     `Connecting to CDP endpoint at ${endpoint} (session: ${session})...`,
   );
 
-  // Verify the CDP endpoint is reachable (HTTP only — WebSocket
-  // endpoints are validated by the Playwright connect call below).
+  // Fast-fail: verify the CDP endpoint is reachable before spawning
+  // the daemon (HTTP only — WebSocket endpoints are validated by the
+  // daemon's connectOverCDP call).
   if (!isWebSocket) {
     const versionUrl = `${parsedUrl.protocol}//${parsedUrl.host}/json/version`;
     try {
@@ -1152,41 +1153,133 @@ export async function runConnect(
     });
   }
 
-  // Connect via CDP using the full endpoint URL
-  const browser = await tryConnectToCDP(endpoint, logger, 10_000);
-  if (!browser) {
+  // Spawn daemon in connect mode — it handles the CDP connection,
+  // page discovery, telemetry, and IPC server.
+  const runLogPath = logFileForSession(session);
+  const daemonEntryPath = fileURLToPath(
+    new URL("./daemon/daemon.js", import.meta.url),
+  );
+  const require = createRequire(import.meta.url);
+  const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
+  const daemonConfig = {
+    mode: "connect" as const,
+    session,
+    cdpEndpoint: endpoint,
+  };
+
+  const childStderrFd = openSync(runLogPath, "a");
+  const child = spawn(
+    process.execPath,
+    [
+      "--import",
+      tsxImportPath,
+      daemonEntryPath,
+      JSON.stringify(daemonConfig),
+    ],
+    {
+      detached: true,
+      stdio: ["ignore", "ignore", childStderrFd],
+    },
+  );
+  child.unref();
+  closeSync(childStderrFd);
+
+  logger.info("connect-child-spawned", { pid: child.pid, session });
+
+  let childSpawnError: Error | null = null;
+  let childEarlyExit: {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+  } | null = null;
+
+  child.on("error", (err) => {
+    childSpawnError = err;
+    logger.error("connect-child-spawn-error", { error: err, session });
+  });
+
+  child.on("exit", (code, signal) => {
+    childEarlyExit = { code, signal };
+    logger.warn("connect-child-exited", {
+      code,
+      signal,
+      session,
+      pid: child.pid,
+    });
+  });
+
+  // Poll for daemon IPC readiness (no CDP polling needed — the daemon
+  // connects to the endpoint itself).
+  const daemonSocketPath = getDaemonSocketPath(session);
+  const client = new DaemonClient(daemonSocketPath);
+  const ipcMaxAttempts = 40;
+  const ipcPollIntervalMs = 250;
+  const ipcStartupTimeoutMs = ipcMaxAttempts * ipcPollIntervalMs;
+  let ipcReady = false;
+
+  for (let i = 0; i < ipcMaxAttempts; i++) {
+    const spawnError = childSpawnError as Error | null;
+    if (spawnError !== null) {
+      const errWithCode = spawnError as Error & { code?: string };
+      const hint =
+        errWithCode.code === "ENOENT"
+          ? " Ensure Node.js is available in PATH for child processes."
+          : "";
+      throw new Error(
+        `Failed to spawn connect daemon: ${spawnError.message}.${hint} Check logs: ${runLogPath}`,
+      );
+    }
+
+    const earlyExit = childEarlyExit as {
+      code: number | null;
+      signal: NodeJS.Signals | null;
+    } | null;
+    if (earlyExit !== null) {
+      const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
+      throw new Error(
+        `Connect daemon exited before startup (status: ${status}). Check logs: ${runLogPath}`,
+      );
+    }
+
+    await new Promise((r) => setTimeout(r, ipcPollIntervalMs));
+    ipcReady = await client.ping();
+    if (ipcReady) break;
+
+    if (i > 0 && i % 10 === 0) {
+      logger.info("connect-waiting-for-daemon", { attempt: i, session });
+    }
+  }
+
+  if (!ipcReady) {
     throw new Error(
-      `CDP endpoint at ${endpoint} is reachable but Playwright could not connect. Check that the URL is a Chrome DevTools Protocol endpoint.`,
+      `Connect daemon failed to start within ${Math.ceil(ipcStartupTimeoutMs / 1000)}s. Check logs: ${runLogPath}`,
     );
   }
 
-  const pages = resolveOperationalPages(browser);
-  logger.info("connect-pages", {
-    session,
-    pageCount: pages.length,
-    urls: pages.map((p) => p.url()),
-  });
-
-  disconnectBrowser(browser, logger, session);
+  logger.info("connect-ipc-ping-ok", { session, daemonSocketPath });
 
   writeSessionState(
     {
       port,
+      pid: child.pid!,
       cdpEndpoint: endpoint,
       session,
       startedAt: new Date().toISOString(),
       status: "active",
       mode: accessMode,
+      daemonSocketPath,
     },
     logger,
   );
+
+  // Query the daemon for discovered pages.
+  const pages = await client.pages();
 
   logger.info("connect-success", { cdpUrl: endpoint, session, port });
   console.log(`Connected to ${endpoint} (session: ${session})`);
   console.log(`  Pages found: ${pages.length}`);
   if (pages.length > 0) {
     for (const p of pages.slice(0, 5)) {
-      console.log(`    ${p.url()}`);
+      console.log(`    ${p.url}`);
     }
     if (pages.length > 5) {
       console.log(`    ... and ${pages.length - 5} more`);
