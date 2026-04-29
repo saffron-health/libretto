@@ -23,7 +23,7 @@ Use `auth signup` when you are creating a brand new hosted organization:
 npx libretto experimental auth signup --api-url "$LIBRETTO_API_URL"
 ```
 
-The CLI prompts for your name, email, password, organization name, and organization slug. After the account is created, it waits for email verification and stores the hosted session locally in `~/.libretto/auth.json`.
+The CLI prompts for your name, email, password, organization name, organization slug, and the alert email that Hosted Libretto should use for hosted workflow failure notifications. After the account is created, it waits for email verification and stores the hosted session locally in `~/.libretto/auth.json`.
 
 <Note>
   A Libretto user can only belong to one organization at a time. If your team already has an organization, use an invite instead of creating a second account.

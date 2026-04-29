@@ -243,6 +243,10 @@ export const signupCommand = SimpleCLI.command({
     const orgName = await prompt("Organization name:");
     const defaultSlug = slugify(orgName);
     let orgSlug = (await prompt("Organization slug:", { defaultValue: defaultSlug })).toLowerCase();
+    const debugNotificationEmail = await prompt(
+      "Alert email (for hosted workflow failures):",
+      { defaultValue: email },
+    );
 
     console.log();
     console.log("Creating account...");
@@ -262,14 +266,15 @@ export const signupCommand = SimpleCLI.command({
           apiUrl,
           path: "/v1/auth/signupAndCreateOrg",
           input: {
-            name,
-            email,
-            password,
-            organizationName: orgName,
-            organizationSlug: orgSlug,
-          },
-          unauthenticated: true,
-        });
+          name,
+          email,
+          password,
+          organizationName: orgName,
+          organizationSlug: orgSlug,
+          debugNotificationEmail,
+        },
+        unauthenticated: true,
+      });
         break;
       } catch (e) {
         if (
