@@ -34,7 +34,7 @@ import {
   compileExecFunction,
   stripEmptyCatchHandlers,
 } from "../core/exec-compiler.js";
-import { DaemonClient } from "../core/daemon-ipc.js";
+import { DaemonClient } from "../core/daemon/index.js";
 import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {

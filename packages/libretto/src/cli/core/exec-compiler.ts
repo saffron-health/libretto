@@ -1,7 +1,7 @@
 /**
  * Shared exec compilation utilities.
  *
- * Used by both the daemon (browser-daemon.ts) and the connect-based
+ * Used by both the daemon (daemon/exec.ts) and the connect-based
  * session path (execution.ts) to compile user-provided code strings
  * into callable async functions.
  */

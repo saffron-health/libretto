@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServer, connect as netConnect, type Server } from "node:net";
 import { unlink } from "node:fs/promises";
-import { REPO_ROOT } from "./context.js";
+import { REPO_ROOT } from "../context.js";
 
 // ---------------------------------------------------------------------------
 // Request types — one shape per daemon command
@@ -236,9 +236,11 @@ export class DaemonClient {
     });
   }
 
-  async snapshot(args: {
-    pageId?: string;
-  } = {}): Promise<DaemonResultMap["snapshot"]> {
+  async snapshot(
+    args: {
+      pageId?: string;
+    } = {},
+  ): Promise<DaemonResultMap["snapshot"]> {
     return this.sendOrThrow({
       id: this.generateId(),
       command: "snapshot",

@@ -244,15 +244,15 @@ Daemon code is currently spread across `browser-daemon.ts`, `daemon-ipc.ts`, and
 - `src/cli/core/daemon/exec.ts` — `handleExec()` and `handleReadonlyExec()` extracted from `BrowserDaemon`.
 - `src/cli/core/daemon/pages.ts` — `handlePages()` extracted from `BrowserDaemon`.
 
-- [ ] Create `src/cli/core/daemon/` directory structure with `index.ts`, `daemon.ts`, `ipc.ts`, `snapshot.ts`, `exec.ts`, `pages.ts`.
-- [ ] Move `DaemonServer`, `DaemonClient`, protocol types, and `getDaemonSocketPath` from `daemon-ipc.ts` → `daemon/ipc.ts`.
-- [ ] Extract `handleSnapshot`, `handleExec`/`handleReadonlyExec`, `handlePages` from `BrowserDaemon` class into `daemon/snapshot.ts`, `daemon/exec.ts`, `daemon/pages.ts`.
-- [ ] Move `BrowserDaemon` class (lifecycle, dispatch, page tracking) from `browser-daemon.ts` → `daemon/daemon.ts`. Handler methods delegate to the extracted modules.
-- [ ] Create `daemon/index.ts` that re-exports the public API (`DaemonServer`, `DaemonClient`, `DaemonResultMap`, `getDaemonSocketPath`, types).
-- [ ] Delete old `browser-daemon.ts` and `daemon-ipc.ts`.
-- [ ] Update all imports across the codebase (`browser.ts`, `execution.ts`, `snapshot.ts`, `context.ts`, tests, etc.) to use `./daemon/index.js` or specific submodules.
-- [ ] Run `pnpm --filter libretto test` — all tests pass.
-- [ ] Run `pnpm --filter libretto type-check` — passes.
+- [x] Create `src/cli/core/daemon/` directory structure with `index.ts`, `daemon.ts`, `ipc.ts`, `snapshot.ts`, `exec.ts`, `pages.ts`.
+- [x] Move `DaemonServer`, `DaemonClient`, protocol types, and `getDaemonSocketPath` from `daemon-ipc.ts` → `daemon/ipc.ts`.
+- [x] Extract `handleSnapshot`, `handleExec`/`handleReadonlyExec`, `handlePages` from `BrowserDaemon` class into `daemon/snapshot.ts`, `daemon/exec.ts`, `daemon/pages.ts`.
+- [x] Move `BrowserDaemon` class (lifecycle, dispatch, page tracking) from `browser-daemon.ts` → `daemon/daemon.ts`. Handler methods delegate to the extracted modules.
+- [x] Create `daemon/index.ts` that re-exports the public API (`DaemonServer`, `DaemonClient`, `DaemonResultMap`, `getDaemonSocketPath`, types).
+- [x] Delete old `browser-daemon.ts` and `daemon-ipc.ts`.
+- [x] Update all imports across the codebase (`browser.ts`, `execution.ts`, `snapshot.ts`, `exec-compiler.ts`) to use `./daemon/index.js` or `./daemon/daemon.js`.
+- [x] Run `pnpm --filter libretto test` — 200 passed, 0 failed.
+- [x] Run `pnpm --filter libretto type-check` — passes.
 
 ### Phase 7: SKILL.md update and full verification
 

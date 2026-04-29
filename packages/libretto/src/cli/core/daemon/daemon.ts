@@ -20,35 +20,24 @@ import {
   type Page,
 } from "playwright";
 import { mkdir } from "node:fs/promises";
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
-import { installSessionTelemetry } from "./session-telemetry.js";
+import { appendFileSync } from "node:fs";
+import { installSessionTelemetry } from "../session-telemetry.js";
 import {
   createLoggerForSession,
   getSessionDir,
   getSessionNetworkLogPath,
   getSessionActionsLogPath,
-  getSessionSnapshotRunDir,
-} from "./context.js";
-import type { LoggerApi } from "../../shared/logger/index.js";
+} from "../context.js";
+import type { LoggerApi } from "../../../shared/logger/index.js";
 import {
   DaemonServer,
   getDaemonSocketPath,
   type DaemonRequest,
-} from "./daemon-ipc.js";
-import { installInstrumentation } from "../../shared/instrumentation/index.js";
-import {
-  compileExecFunction,
-  stripEmptyCatchHandlers,
-} from "./exec-compiler.js";
-import { createReadonlyExecHelpers } from "./readonly-exec.js";
-import { readNetworkLog, readActionLog, wrapPageForActionLogging } from "./telemetry.js";
-import {
-  resolveSnapshotViewport,
-  readSnapshotViewportMetrics,
-  shouldForceSnapshotViewport,
-  isZeroWidthScreenshotError,
-  forceSnapshotViewport,
-} from "../commands/snapshot.js";
+} from "./ipc.js";
+import { wrapPageForActionLogging } from "../telemetry.js";
+import { handlePages } from "./pages.js";
+import { handleExec, handleReadonlyExec } from "./exec.js";
+import { handleSnapshot } from "./snapshot.js";
 
 // ── Config schema ──────────────────────────────────────────────────────
 
@@ -158,7 +147,14 @@ class BrowserDaemon {
       handler(request),
     );
     const logger = createLoggerForSession(config.session);
-    const daemon = new BrowserDaemon(config, browser, context, page, ipcServer, logger);
+    const daemon = new BrowserDaemon(
+      config,
+      browser,
+      context,
+      page,
+      ipcServer,
+      logger,
+    );
 
     // Track the initial page and auto-track any pages opened later.
     daemon.trackPage(page);
@@ -226,7 +222,10 @@ class BrowserDaemon {
       this.dispatchCommand(request),
       new Promise<never>((_resolve, reject) => {
         setTimeout(
-          () => reject(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`)),
+          () =>
+            reject(
+              new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`),
+            ),
           REQUEST_TIMEOUT_MS,
         );
       }),
@@ -236,174 +235,34 @@ class BrowserDaemon {
   private async dispatchCommand(request: DaemonRequest): Promise<unknown> {
     switch (request.command) {
       case "pages":
-        return this.handlePages();
+        return handlePages(this.pageById, this.page);
       case "exec":
-        return this.handleExec(request.code, request.pageId, request.visualize);
+        return handleExec(
+          this.resolveTargetPage(request.pageId),
+          request.code,
+          this.context,
+          this.browser,
+          this.execState,
+          this.config.session,
+          request.visualize,
+        );
       case "readonly-exec":
-        return this.handleReadonlyExec(request.code, request.pageId);
+        return handleReadonlyExec(
+          this.resolveTargetPage(request.pageId),
+          request.code,
+        );
       case "snapshot":
-        return this.handleSnapshot(request.pageId);
+        return handleSnapshot(
+          this.resolveTargetPage(request.pageId),
+          this.config.session,
+          this.logger,
+          request.pageId,
+        );
       default:
-        throw new Error(`Unknown command: ${(request as { command: string }).command}`);
+        throw new Error(
+          `Unknown command: ${(request as { command: string }).command}`,
+        );
     }
-  }
-
-  private handlePages(): unknown {
-    const results: Array<{ id: string; url: string; active: boolean }> = [];
-    for (const [id, page] of this.pageById) {
-      const url = page.url();
-      if (url.startsWith("devtools://") || url.startsWith("chrome-error://")) continue;
-      results.push({ id, url, active: page === this.page });
-    }
-    return results;
-  }
-
-  private async handleExec(
-    code: string,
-    pageId?: string,
-    visualize?: boolean,
-  ): Promise<unknown> {
-    const targetPage = this.resolveTargetPage(pageId);
-    const { cleaned } = stripEmptyCatchHandlers(code);
-
-    if (visualize) {
-      await installInstrumentation(targetPage, { visualize: true });
-    }
-
-    const session = this.config.session;
-    const networkLog = (
-      opts: {
-        last?: number;
-        filter?: string;
-        method?: string;
-        pageId?: string;
-      } = {},
-    ) => readNetworkLog(session, opts);
-
-    const actionLog = (
-      opts: {
-        last?: number;
-        filter?: string;
-        action?: string;
-        source?: string;
-        pageId?: string;
-      } = {},
-    ) => readActionLog(session, opts);
-
-    const helpers = {
-      page: targetPage,
-      context: this.context,
-      browser: this.browser,
-      state: this.execState,
-      networkLog,
-      actionLog,
-    };
-
-    const helperNames = Object.keys(helpers);
-    const fn = compileExecFunction(cleaned, helperNames);
-    const result = await fn(...Object.values(helpers));
-    return { result };
-  }
-
-  private async handleReadonlyExec(code: string, pageId?: string): Promise<unknown> {
-    const targetPage = this.resolveTargetPage(pageId);
-    const { cleaned } = stripEmptyCatchHandlers(code);
-    const helpers = createReadonlyExecHelpers(targetPage);
-    const helperNames = Object.keys(helpers);
-    const fn = compileExecFunction(cleaned, helperNames);
-    const result = await fn(...Object.values(helpers));
-    return { result };
-  }
-
-  // ── Snapshot ─────────────────────────────────────────────────────────
-
-  private static readonly RENDER_SETTLE_TIMEOUT_MS = 10_000;
-
-  private async handleSnapshot(pageId?: string): Promise<unknown> {
-    const targetPage = this.resolveTargetPage(pageId);
-    const session = this.config.session;
-    const logger = this.logger;
-    const snapshotRunId = `snapshot-${Date.now()}`;
-    const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);
-    mkdirSync(snapshotRunDir, { recursive: true });
-
-    // Capture title and URL early, before viewport normalization
-    // (matches captureScreenshot ordering).
-    let title: string | null = null;
-    try {
-      title = await targetPage.title();
-    } catch (error) {
-      logger.warn("screenshot-title-read-failed", { session, pageId, error });
-    }
-
-    let pageUrl: string | null = null;
-    try {
-      pageUrl = targetPage.url();
-    } catch (error) {
-      logger.warn("screenshot-url-read-failed", { session, pageId, error });
-    }
-
-    const pngPath = `${snapshotRunDir}/page.png`;
-    const htmlPath = `${snapshotRunDir}/page.html`;
-
-    // Wait for network to settle before capturing.
-    await Promise.race([
-      targetPage.waitForLoadState("networkidle").catch(() => {}),
-      new Promise((resolve) => setTimeout(resolve, BrowserDaemon.RENDER_SETTLE_TIMEOUT_MS)),
-    ]);
-
-    // Viewport normalization — uses shared helpers from snapshot.ts.
-    const restoreViewport = resolveSnapshotViewport(session, logger);
-    const viewportMetrics = await readSnapshotViewportMetrics(targetPage);
-    logger.info("screenshot-viewport-metrics", {
-      session,
-      pageId,
-      restoreViewport,
-      ...viewportMetrics,
-    });
-    await forceSnapshotViewport(
-      targetPage,
-      restoreViewport,
-      logger,
-      session,
-      pageId,
-      shouldForceSnapshotViewport(viewportMetrics)
-        ? "preflight-invalid-viewport"
-        : "preflight-normalize-viewport",
-    );
-
-    // Screenshot with zero-width retry.
-    try {
-      await targetPage.screenshot({ path: pngPath });
-    } catch (error) {
-      if (!isZeroWidthScreenshotError(error)) {
-        throw error;
-      }
-      await forceSnapshotViewport(
-        targetPage,
-        restoreViewport,
-        logger,
-        session,
-        pageId,
-        "retry-after-zero-width-screenshot-error",
-      );
-      await targetPage.screenshot({ path: pngPath });
-    }
-
-    // Capture HTML content.
-    const htmlContent = await targetPage.content();
-    writeFileSync(htmlPath, htmlContent);
-
-    logger.info("screenshot-success", {
-      session,
-      pageUrl,
-      title,
-      pngPath,
-      htmlPath,
-      snapshotRunId,
-    });
-
-    return { pngPath, htmlPath, snapshotRunId, pageUrl: pageUrl ?? "", title: title ?? "" };
   }
 }
 

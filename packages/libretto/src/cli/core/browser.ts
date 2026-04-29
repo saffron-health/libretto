@@ -27,7 +27,7 @@ import {
 } from "./session.js";
 import type { ProviderApi } from "./providers/types.js";
 import { getCloudProviderApi } from "./providers/index.js";
-import { getDaemonSocketPath, DaemonClient } from "./daemon-ipc.js";
+import { getDaemonSocketPath, DaemonClient } from "./daemon/index.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const FORCE_CLOSE_WAIT_MS = 300;
@@ -457,7 +457,7 @@ export async function runOpen(
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
   const daemonEntryPath = fileURLToPath(
-    new URL("./browser-daemon.js", import.meta.url),
+    new URL("./daemon/daemon.js", import.meta.url),
   );
   const require = createRequire(import.meta.url);
   const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
