@@ -313,6 +313,11 @@ class BrowserDaemon {
           `Multiple pages are open in session "${this.session}". Pass --page <id> to target a page (run "libretto pages --session ${this.session}" to list ids).`,
         );
       }
+      // Return the single tracked page rather than `this.page` — the
+      // initial page may have been closed and replaced by a new one.
+      if (this.pageById.size === 1) {
+        return this.pageById.values().next().value!;
+      }
       return this.page;
     }
     const page = this.pageById.get(pageId);

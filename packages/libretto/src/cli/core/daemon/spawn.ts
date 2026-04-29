@@ -154,6 +154,12 @@ export async function spawnSessionDaemon(
   }
 
   if (!ipcReady) {
+    // Kill the orphaned daemon process before reporting failure.
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // Process may have already exited.
+    }
     await onFailure?.();
     throw new Error(
       `Daemon failed to start within ${Math.ceil(ipcTimeoutMs / 1000)}s. Check logs: ${logPath}`,

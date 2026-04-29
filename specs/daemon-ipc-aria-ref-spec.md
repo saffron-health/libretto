@@ -8,20 +8,19 @@ This was confirmed empirically: in the Playwright AI barbershop benchmark, `page
 
 ## Solution overview
 
-Route `snapshot`, `exec`, `readonly-exec`, and `pages` commands through the browser daemon via a Unix domain socket IPC channel. The daemon already holds a persistent `Page` object; adding an IPC server lets CLI commands operate on that same Page, preserving the aria-ref map across calls. The daemon is the implementation for these commands — the existing client-side CDP connect/disconnect code for `exec`, `snapshot`, `pages`, and `readonly-exec` is replaced, not wrapped in a fallback. Sessions created via `libretto connect` (no daemon) retain their own direct CDP path since they have no daemon process.
+Route `snapshot`, `exec`, `readonly-exec`, and `pages` commands through the browser daemon via a Unix domain socket IPC channel. The daemon already holds a persistent `Page` object; adding an IPC server lets CLI commands operate on that same Page, preserving the aria-ref map across calls. The daemon is the implementation for these commands — the existing client-side CDP connect/disconnect code for `exec`, `snapshot`, `pages`, and `readonly-exec` is replaced, not wrapped in a fallback. All session types (`open`, `connect`, and provider-based) now spawn a daemon process.
 
 ## Goals
 
 - `exec` can use `[ref=eN]` selectors from a preceding `snapshot` call within the same daemon session.
 - `libretto snapshot`, `exec`, `readonly-exec`, and `pages` work identically from the user's perspective.
-- The daemon is the implementation for `open`-based sessions. The existing client-side CDP connect/disconnect code in `browser.ts` and `execution.ts` is moved to the daemon — not kept as a fallback.
-- Sessions created via `libretto connect` retain their own direct CDP path (they have no daemon process).
+- The daemon is the implementation for all session types (`open`, `connect`, provider). The existing client-side CDP connect/disconnect code in `browser.ts` and `execution.ts` is moved to the daemon — not kept as a fallback.
 
 ## Non-goals
 
 - No migrations or backfills.
 - No changes to the `run` command or its worker process (it manages its own browser lifecycle).
-- No changes to `connect`-based sessions (they don't use the local daemon).
+- ~~No changes to `connect`-based sessions~~ — `connect` and provider sessions now also use the daemon (connect mode).
 - No remote/network-accessible IPC — Unix socket is local-only.
 - No multi-command streaming, cancellation, or advanced RPC — one request per connection.
 
