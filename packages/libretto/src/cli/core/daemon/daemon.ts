@@ -1,16 +1,21 @@
 /**
  * Browser daemon process.
  *
- * Launched as a detached child process by `runOpen()` in `browser.ts`.
- * Receives configuration as a JSON string in `process.argv[2]`.
+ * Launched as a detached child process by `runOpen()` or `runConnect()` in
+ * `browser.ts`. Receives configuration as a JSON string in `process.argv[2]`.
  *
- * Responsibilities:
- * - Launch Chromium with the specified settings
- * - Create a browser context and page
- * - Install session telemetry (network/action logging)
- * - Serve IPC commands over a Unix domain socket
- * - Navigate to the requested URL
- * - Stay alive until the browser disconnects or a signal is received
+ * Two modes:
+ * - **Launch** (`libretto open`): launches Chromium, owns the browser
+ *   lifecycle, and closes it on shutdown.
+ * - **Connect** (`libretto connect`): connects to an existing CDP endpoint,
+ *   discovers pages, and disconnects (without closing the browser) on
+ *   shutdown. The browser is externally managed.
+ *
+ * In both modes the daemon:
+ * - Installs session telemetry (network/action logging)
+ * - Serves IPC commands (exec, readonly-exec, pages, snapshot) over a
+ *   Unix domain socket
+ * - Stays alive until the browser disconnects or a signal is received
  */
 
 import {
@@ -41,7 +46,11 @@ import { handleSnapshot } from "./snapshot.js";
 
 // ── Config schema ──────────────────────────────────────────────────────
 
-type DaemonConfig = {
+/**
+ * Config for daemon-managed browser launch (`libretto open`).
+ * The daemon owns the browser lifecycle and will close it on shutdown.
+ */
+type DaemonLaunchConfig = {
   port: number;
   url: string;
   session: string;
@@ -50,6 +59,34 @@ type DaemonConfig = {
   storageStatePath?: string;
   windowPosition?: { x: number; y: number };
 };
+
+/**
+ * Config for connecting to an externally managed browser (`libretto connect`).
+ * The daemon borrows the CDP connection and will disconnect (not close) on
+ * shutdown — the browser outlives the session.
+ */
+type DaemonConnectConfig = {
+  mode: "connect";
+  session: string;
+  cdpEndpoint: string;
+};
+
+/**
+ * Discriminated union passed as JSON in `process.argv[2]`.
+ * Launch configs omit `mode` for backward compatibility with existing
+ * `runOpen()` callers — any config without `mode: "connect"` is treated
+ * as a launch config.
+ */
+type DaemonConfig = DaemonLaunchConfig | DaemonConnectConfig;
+
+function isConnectConfig(config: DaemonConfig): config is DaemonConnectConfig {
+  return "mode" in config && config.mode === "connect";
+}
+
+function isOperationalPage(page: Page): boolean {
+  const url = page.url();
+  return !url.startsWith("devtools://") && !url.startsWith("chrome-error://");
+}
 
 type TelemetryEntry = Record<string, unknown>;
 
@@ -64,7 +101,8 @@ class BrowserDaemon {
   private readonly pageById = new Map<string, Page>();
 
   private constructor(
-    private readonly config: DaemonConfig,
+    private readonly session: string,
+    private readonly externallyManaged: boolean,
     private readonly browser: Browser,
     private readonly context: BrowserContext,
     private readonly page: Page,
@@ -81,10 +119,98 @@ class BrowserDaemon {
     return id;
   }
 
-  static async create(config: DaemonConfig): Promise<BrowserDaemon> {
-    await mkdir(getSessionDir(config.session), { recursive: true });
+  // ── Shared initialization ──────────────────────────────────────────
 
-    // Launch browser
+  /**
+   * Common setup after the mode-specific code has obtained a browser,
+   * context, and page(s). Installs telemetry, action logging, IPC
+   * server, page tracking, and the browser disconnect handler.
+   */
+  private static async initialize(args: {
+    session: string;
+    externallyManaged: boolean;
+    browser: Browser;
+    context: BrowserContext;
+    page: Page;
+    initialPages: Page[];
+  }): Promise<BrowserDaemon> {
+    const { session, externallyManaged, browser, context, page, initialPages } =
+      args;
+
+    await mkdir(getSessionDir(session), { recursive: true });
+
+    // Telemetry — may fail on connect-mode reconnections where
+    // exposeFunction bindings already exist; log and continue.
+    const networkLogFile = getSessionNetworkLogPath(session);
+    const actionsLogFile = getSessionActionsLogPath(session);
+    const logger = createLoggerForSession(session);
+
+    try {
+      await installSessionTelemetry({
+        context,
+        initialPage: page,
+        includeUserDomActions: true,
+        logAction: (entry: TelemetryEntry) => {
+          appendFileSync(actionsLogFile, JSON.stringify(entry) + "\n");
+        },
+        logNetwork: (entry: TelemetryEntry) => {
+          appendFileSync(networkLogFile, JSON.stringify(entry) + "\n");
+        },
+      });
+    } catch (err) {
+      logger.warn("telemetry-install-failed", {
+        session,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Action logging — wrap known pages and any future pages.
+    for (const p of initialPages) {
+      wrapPageForActionLogging(p, session);
+    }
+    context.on("page", (newPage) => {
+      wrapPageForActionLogging(newPage, session);
+    });
+
+    // IPC server — handler is wired after construction to avoid a
+    // circular type inference issue (daemon references itself).
+    const socketPath = getDaemonSocketPath(session);
+    let handler: (request: DaemonRequest) => Promise<unknown>;
+    const ipcServer = new DaemonServer(socketPath, (request) =>
+      handler(request),
+    );
+    const daemon = new BrowserDaemon(
+      session,
+      externallyManaged,
+      browser,
+      context,
+      page,
+      ipcServer,
+      logger,
+    );
+
+    // Track known pages and auto-track any pages opened later.
+    for (const p of initialPages) {
+      daemon.trackPage(p);
+    }
+    context.on("page", (newPage) => {
+      daemon.trackPage(newPage);
+    });
+
+    handler = (request) => daemon.handleRequest(request);
+    await ipcServer.listen();
+    daemon.logger.info("ipc-server-listening", { socketPath });
+
+    browser.on("disconnected", () => {
+      void daemon.shutdown("browser-disconnected-exiting", false);
+    });
+
+    return daemon;
+  }
+
+  // ── Launch mode ────────────────────────────────────────────────────
+
+  static async launchBrowser(config: DaemonLaunchConfig): Promise<BrowserDaemon> {
     const windowPositionArg = config.windowPosition
       ? `--window-position=${config.windowPosition.x},${config.windowPosition.y}`
       : undefined;
@@ -100,7 +226,6 @@ class BrowserDaemon {
       ],
     });
 
-    // Create context & page
     const context = await browser.newContext({
       ...(config.storageStatePath
         ? { storageState: config.storageStatePath }
@@ -117,60 +242,15 @@ class BrowserDaemon {
     page.setDefaultTimeout(30000);
     page.setDefaultNavigationTimeout(45000);
 
-    // Telemetry
-    const networkLogFile = getSessionNetworkLogPath(config.session);
-    const actionsLogFile = getSessionActionsLogPath(config.session);
-
-    await installSessionTelemetry({
-      context,
-      initialPage: page,
-      includeUserDomActions: true,
-      logAction: (entry: TelemetryEntry) => {
-        appendFileSync(actionsLogFile, JSON.stringify(entry) + "\n");
-      },
-      logNetwork: (entry: TelemetryEntry) => {
-        appendFileSync(networkLogFile, JSON.stringify(entry) + "\n");
-      },
-    });
-
-    // Action logging — wrap the initial page and any future pages.
-    wrapPageForActionLogging(page, config.session);
-    context.on("page", (newPage) => {
-      wrapPageForActionLogging(newPage, config.session);
-    });
-
-    // IPC server — handler is wired after construction to avoid a
-    // circular type inference issue (daemon references itself).
-    const socketPath = getDaemonSocketPath(config.session);
-    let handler: (request: DaemonRequest) => Promise<unknown>;
-    const ipcServer = new DaemonServer(socketPath, (request) =>
-      handler(request),
-    );
-    const logger = createLoggerForSession(config.session);
-    const daemon = new BrowserDaemon(
-      config,
+    const daemon = await BrowserDaemon.initialize({
+      session: config.session,
+      externallyManaged: false,
       browser,
       context,
       page,
-      ipcServer,
-      logger,
-    );
-
-    // Track the initial page and auto-track any pages opened later.
-    daemon.trackPage(page);
-    context.on("page", (newPage) => {
-      daemon.trackPage(newPage);
-    });
-    handler = (request) => daemon.handleRequest(request);
-    await ipcServer.listen();
-    daemon.logger.info("ipc-server-listening", { socketPath });
-
-    // Wire browser disconnect after daemon is constructed
-    browser.on("disconnected", () => {
-      void daemon.shutdown("browser-disconnected-exiting", false);
+      initialPages: [page],
     });
 
-    // Navigate
     await page.goto(config.url);
 
     daemon.logger.info("child-launched", {
@@ -182,12 +262,62 @@ class BrowserDaemon {
     return daemon;
   }
 
+  // ── Connect mode ───────────────────────────────────────────────────
+
+  static async connectToEndpoint(
+    config: DaemonConnectConfig,
+  ): Promise<BrowserDaemon> {
+    const browser = await chromium.connectOverCDP(config.cdpEndpoint);
+
+    // Discover existing contexts and pages.
+    const contexts = browser.contexts();
+    const context =
+      contexts.length > 0 ? contexts[0] : await browser.newContext();
+    const operationalPages = context.pages().filter(isOperationalPage);
+    const page =
+      operationalPages.length > 0
+        ? operationalPages[operationalPages.length - 1]
+        : await context.newPage();
+
+    const daemon = await BrowserDaemon.initialize({
+      session: config.session,
+      externallyManaged: true,
+      browser,
+      context,
+      page,
+      initialPages:
+        operationalPages.length > 0 ? operationalPages : [page],
+    });
+
+    daemon.logger.info("child-connected", {
+      cdpEndpoint: config.cdpEndpoint,
+      pid: process.pid,
+      session: config.session,
+    });
+
+    return daemon;
+  }
+
   // ── Lifecycle ──────────────────────────────────────────────────────
 
   async shutdown(reason: string, closeBrowser: boolean): Promise<void> {
-    this.logger.info(reason, { port: this.config.port });
+    this.logger.info(reason, { session: this.session });
     await this.ipcServer.close();
-    if (closeBrowser) await this.browser.close();
+    if (!closeBrowser) return;
+    if (this.externallyManaged) {
+      // Drop the CDP pipe without killing the external browser.
+      try {
+        (
+          this.browser as unknown as {
+            _connection?: { close(): void };
+          }
+        )._connection?.close();
+      } catch {
+        // Connection may already be closed.
+      }
+    } else {
+      await this.browser.close();
+    }
   }
 
   // ── Page resolution ────────────────────────────────────────────────
@@ -196,7 +326,7 @@ class BrowserDaemon {
     if (!pageId) {
       if (this.pageById.size > 1) {
         throw new Error(
-          `Multiple pages are open in session "${this.config.session}". Pass --page <id> to target a page (run "libretto pages --session ${this.config.session}" to list ids).`,
+          `Multiple pages are open in session "${this.session}". Pass --page <id> to target a page (run "libretto pages --session ${this.session}" to list ids).`,
         );
       }
       return this.page;
@@ -204,7 +334,7 @@ class BrowserDaemon {
     const page = this.pageById.get(pageId);
     if (!page) {
       throw new Error(
-        `Page "${pageId}" was not found in session "${this.config.session}". Run "libretto pages --session ${this.config.session}" to list ids.`,
+        `Page "${pageId}" was not found in session "${this.session}". Run "libretto pages --session ${this.session}" to list ids.`,
       );
     }
     return page;
@@ -243,7 +373,7 @@ class BrowserDaemon {
           this.context,
           this.browser,
           this.execState,
-          this.config.session,
+          this.session,
           request.visualize,
         );
       case "readonly-exec":
@@ -254,7 +384,7 @@ class BrowserDaemon {
       case "snapshot":
         return handleSnapshot(
           this.resolveTargetPage(request.pageId),
-          this.config.session,
+          this.session,
           this.logger,
           request.pageId,
         );
@@ -269,8 +399,11 @@ class BrowserDaemon {
 // ── Main ───────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const config: DaemonConfig = JSON.parse(process.argv[2]);
-  const daemon = await BrowserDaemon.create(config);
+  const config = JSON.parse(process.argv[2]) as DaemonConfig;
+
+  const daemon = isConnectConfig(config)
+    ? await BrowserDaemon.connectToEndpoint(config)
+    : await BrowserDaemon.launchBrowser(config);
 
   process.on("SIGTERM", () => {
     void daemon.shutdown("child-sigterm", true);
@@ -293,7 +426,7 @@ async function main(): Promise<void> {
     daemon.logger.info("child-exit", {
       code,
       pid: process.pid,
-      port: config.port,
+      session: config.session,
     });
   });
 
