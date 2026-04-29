@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { connect, disconnectBrowser } from "../core/browser.js";
@@ -14,8 +14,9 @@ import { pageOption, sessionOption, withRequiredSession } from "./shared.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readSnapshotModel } from "../core/config.js";
 import { resolveSnapshotApiModelOrThrow } from "../core/ai-model.js";
+import { DaemonClient } from "../core/daemon-ipc.js";
 
-const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
+export const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
 
 function generateSnapshotRunId(): string {
   return `snapshot-${Date.now()}`;
@@ -28,11 +29,11 @@ type SnapshotViewportMetrics = {
   innerHeight: number | null;
 };
 
-function isZeroViewport(value: number | null): boolean {
+export function isZeroViewport(value: number | null): boolean {
   return typeof value === "number" && value <= 0;
 }
 
-function shouldForceSnapshotViewport(
+export function shouldForceSnapshotViewport(
   metrics: SnapshotViewportMetrics,
 ): boolean {
   return (
@@ -43,14 +44,14 @@ function shouldForceSnapshotViewport(
   );
 }
 
-function isZeroWidthScreenshotError(error: unknown): boolean {
+export function isZeroWidthScreenshotError(error: unknown): boolean {
   return (
     error instanceof Error &&
     error.message.includes("Cannot take screenshot with 0 width")
   );
 }
 
-async function readSnapshotViewportMetrics(page: {
+export async function readSnapshotViewportMetrics(page: {
   viewportSize(): { width: number; height: number } | null;
   evaluate<T>(pageFunction: () => T | Promise<T>): Promise<T>;
 }): Promise<SnapshotViewportMetrics> {
@@ -75,7 +76,7 @@ async function readSnapshotViewportMetrics(page: {
   };
 }
 
-function resolveSnapshotViewport(
+export function resolveSnapshotViewport(
   session: string,
   logger: LoggerApi,
 ): { width: number; height: number } {
@@ -95,7 +96,7 @@ function resolveSnapshotViewport(
   return FALLBACK_SNAPSHOT_VIEWPORT;
 }
 
-async function forceSnapshotViewport(
+export async function forceSnapshotViewport(
   page: {
     setViewportSize(size: { width: number; height: number }): Promise<void>;
   },
@@ -246,6 +247,41 @@ async function captureScreenshot(
   }
 }
 
+async function captureSnapshotViaDaemon(
+  session: string,
+  logger: LoggerApi,
+  daemonSocketPath: string,
+  pageId?: string,
+): Promise<ScreenshotPair> {
+  logger.info("snapshot-via-daemon", { session, pageId });
+  const client = new DaemonClient(daemonSocketPath);
+  const { pngPath, htmlPath, snapshotRunId, pageUrl, title } =
+    await client.snapshot({ pageId });
+
+  // condenseDom runs in the CLI process, not the daemon.
+  const htmlContent = readFileSync(htmlPath, "utf8");
+  const condenseResult = condenseDom(htmlContent);
+  const condensedHtmlPath = htmlPath.replace(/\.html$/, ".condensed.html");
+  writeFileSync(condensedHtmlPath, condenseResult.html);
+
+  logger.info("snapshot-daemon-success", {
+    session,
+    pageUrl,
+    title,
+    pngPath,
+    htmlPath,
+    condensedHtmlPath,
+    snapshotRunId,
+    domCondenseStats: {
+      originalLength: condenseResult.originalLength,
+      condensedLength: condenseResult.condensedLength,
+      reductions: condenseResult.reductions,
+    },
+  });
+
+  return { pngPath, htmlPath, condensedHtmlPath, baseName: snapshotRunId };
+}
+
 async function runSnapshot(
   session: string,
   logger: LoggerApi,
@@ -259,11 +295,29 @@ async function runSnapshot(
   const snapshotModel = readSnapshotModel();
   resolveSnapshotApiModelOrThrow(snapshotModel);
 
-  const { pngPath, htmlPath, condensedHtmlPath } = await captureScreenshot(
-    session,
-    logger,
-    pageId,
-  );
+  // Route through daemon for open-based sessions, direct CDP for connect-based sessions.
+  const state = readSessionState(session, logger);
+  let screenshotResult: ScreenshotPair;
+  if (state?.daemonSocketPath) {
+    // Daemon-backed session (created via `libretto open`).
+    screenshotResult = await captureSnapshotViaDaemon(
+      session,
+      logger,
+      state.daemonSocketPath,
+      pageId,
+    );
+  } else if (state?.cdpEndpoint) {
+    // Connect-based or provider session — use direct CDP.
+    screenshotResult = await captureScreenshot(session, logger, pageId);
+  } else {
+    // Open-based session missing its daemon socket — state is corrupt or daemon crashed.
+    throw new Error(
+      `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
+        `Close and reopen the session: libretto close --session ${session}`,
+    );
+  }
+
+  const { pngPath, htmlPath, condensedHtmlPath } = screenshotResult;
 
   console.log("Screenshot saved:");
   console.log(`  PNG:             ${pngPath}`);

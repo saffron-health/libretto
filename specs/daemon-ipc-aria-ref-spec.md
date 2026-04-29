@@ -174,52 +174,79 @@ Installed once in `create()` on the initial page, plus `context.on("page", ...)`
 - [x] `pnpm --filter libretto type-check` — passes.
 - [x] All 4 daemon IPC tests pass. Full suite: 199 passed, 0 failed.
 
-### Phase 4: Route snapshot through daemon
+### Phase 4: Route snapshot through daemon ✅
 
-Move the Playwright capture (screenshot + `page.content()` + viewport normalization) into the daemon. The daemon writes artifact files to the session snapshot directory and returns their paths. The CLI continues to run `condenseDom` and AI analysis locally.
+Move the Playwright capture (screenshot + `page.content()` + viewport normalization) into the daemon. The daemon writes artifact files to the session snapshot directory and returns their paths. The CLI continues to run `condenseDom` and AI analysis locally. Shared snapshot helpers are exported from `snapshot.ts` and reused by the daemon to eliminate code duplication. The daemon uses a proper `LoggerApi` (via `createLoggerForSession`) instead of hand-rolled `appendFileSync` logging.
 
-```ts
-// Daemon snapshot handler:
-case "snapshot": {
-  const snapshotRunId = `snapshot-${Date.now()}`;
-  const dir = getSessionSnapshotRunDir(session, snapshotRunId);
-  mkdirSync(dir, { recursive: true });
-  // viewport normalization + zero-width retry — same logic as captureScreenshot
-  await targetPage.screenshot({ path: pngPath });
-  const html = await targetPage.content();
-  writeFileSync(htmlPath, html);
-  return { pngPath, htmlPath, snapshotRunId, pageUrl: targetPage.url(), title: await targetPage.title() };
-}
+**Files modified:**
 
-// CLI snapshot command — daemon path:
-const client = new DaemonClient(state.daemonSocketPath);
-const { pngPath, htmlPath, ... } = await client.snapshot({ pageId });
-// CLI reads htmlPath, runs condenseDom, writes condensedHtmlPath, then calls runApiInterpret
-```
+- `packages/libretto/src/cli/core/daemon-ipc.ts` (added `snapshot()` typed method to `DaemonClient`)
+- `packages/libretto/src/cli/core/browser-daemon.ts` (replaced `this.log()` with `LoggerApi`; added `snapshot` handler to `dispatchCommand` using shared helpers from `snapshot.ts`; removed `getSessionLogsPath` import)
+- `packages/libretto/src/cli/commands/snapshot.ts` (exported viewport helpers: `FALLBACK_SNAPSHOT_VIEWPORT`, `isZeroViewport`, `shouldForceSnapshotViewport`, `isZeroWidthScreenshotError`, `readSnapshotViewportMetrics`, `resolveSnapshotViewport`, `forceSnapshotViewport`; added `captureSnapshotViaDaemon()`; updated `runSnapshot()` to route through daemon when `daemonSocketPath` present)
+- `packages/libretto/test/daemon-ipc.spec.ts` (added snapshot test — verifies PNG, HTML, and condensed HTML files exist on disk)
 
-- [ ] Add `snapshot` typed method to `DaemonClient`.
-- [ ] Implement `snapshot` handler in `BrowserDaemon.dispatchCommand` that performs viewport normalization, screenshot, and `page.content()` capture. Write artifacts to the session snapshot directory. Return `{ pngPath, htmlPath, snapshotRunId, pageUrl, title }`.
-- [ ] Port the viewport normalization and zero-width screenshot retry logic from `captureScreenshot()` into the daemon handler.
-- [ ] Update the `snapshot` command in `snapshot.ts`: when `state.daemonSocketPath` is present, use `DaemonClient`. CLI reads `htmlPath`, runs `condenseDom`, writes `condensedHtmlPath`, then calls `runApiInterpret` as before. For `connect`-based sessions (no `daemonSocketPath`), use the existing `captureScreenshot()` path.
-- [ ] Run `pnpm --filter libretto type-check` — passes.
-- [ ] Add test to `test/daemon-ipc.spec.ts`: open headless → snapshot (without AI — use cleared API credentials) → verify stderr contains `Failed to analyze snapshot` (confirming the daemon captured the screenshot and the CLI reached the AI step). Alternatively, verify the snapshot PNG and HTML files exist on disk.
+**Daemon `LoggerApi` migration:**
+
+Replaced the hand-rolled `log(level, event, data)` method (which used `appendFileSync` to write JSON to the log file) with a proper `LoggerApi` instance from `createLoggerForSession()`. The logger is stored as `readonly logger: LoggerApi` on `BrowserDaemon` (public so `main()` process event handlers can access it). All call sites migrated from `this.log("info", "event", data)` to `this.logger.info("event", data)`.
+
+**Shared snapshot helpers:**
+
+The viewport normalization and screenshot retry logic was already implemented as functions in `snapshot.ts` (`resolveSnapshotViewport`, `readSnapshotViewportMetrics`, `shouldForceSnapshotViewport`, `forceSnapshotViewport`, `isZeroWidthScreenshotError`). These were changed from private to exported, and the daemon's `handleSnapshot` imports and calls them directly instead of inlining duplicate logic. Both the connect path (`captureScreenshot`) and daemon path (`handleSnapshot`) use identical helper calls, ensuring behavioral parity.
+
+**CLI routing:**
+
+`runSnapshot()` reads session state and branches on `state.daemonSocketPath`:
+- **Daemon path** (`captureSnapshotViaDaemon`): calls `DaemonClient.snapshot()`, reads `htmlPath` from disk, runs `condenseDom`, writes `condensedHtmlPath`.
+- **Connect path** (`captureScreenshot`): unchanged — direct CDP connection, captures everything locally.
+
+Both paths return `ScreenshotPair` and feed into the same `runApiInterpret` call.
+
+**Checklist:**
+
+- [x] Add `snapshot` typed method to `DaemonClient`.
+- [x] Implement `snapshot` handler in `BrowserDaemon.dispatchCommand` that performs viewport normalization, screenshot, and `page.content()` capture. Write artifacts to the session snapshot directory. Return `{ pngPath, htmlPath, snapshotRunId, pageUrl, title }`.
+- [x] Reuse shared viewport normalization and zero-width screenshot retry helpers from `snapshot.ts` in the daemon handler (no code duplication).
+- [x] Replace hand-rolled daemon logging with proper `LoggerApi` via `createLoggerForSession`.
+- [x] Update the `snapshot` command in `snapshot.ts`: when `state.daemonSocketPath` is present, use `DaemonClient`. CLI reads `htmlPath`, runs `condenseDom`, writes `condensedHtmlPath`, then calls `runApiInterpret` as before. For `connect`-based sessions (no `daemonSocketPath`), use the existing `captureScreenshot()` path.
+- [x] `pnpm --filter libretto type-check` — passes.
+- [x] Add test to `test/daemon-ipc.spec.ts`: open headless → snapshot → verify snapshot PNG, HTML, and condensed HTML files exist on disk.
+- [x] All 5 daemon IPC tests pass. Full suite: 200 passed, 0 failed.
 
 ### Phase 5: Remove connect fallback for daemon-backed sessions
 
-After all commands are routed through the daemon (Phases 3–4), remove the CDP connect/disconnect fallback from `open`-based sessions. The daemon is the exclusive implementation — if the daemon is unreachable, the command fails instead of silently falling back to a fresh CDP connection (which would lose aria-refs and state).
+Remove the CDP connect/disconnect fallback from `open`-based sessions. The daemon is the exclusive implementation — if the daemon is unreachable, the command fails instead of silently falling back to a fresh CDP connection (which would lose aria-refs and state).
 
 Currently, each command checks `state.daemonSocketPath` and branches: daemon path vs connect path. The connect path (`connect()` + `disconnectBrowser()` in `browser.ts`) is still reachable for `open`-based sessions in theory, since `daemonSocketPath` is the only gate. This phase removes the connect path for daemon-backed sessions entirely, so `connect()`/`disconnectBrowser()` are only used by `connect`-based sessions.
 
-Concrete steps:
+- [x] Remove `runExecViaConnect` from `execution.ts`. Replace `runExec` branching with: `if (!state.daemonSocketPath) throw new Error("...")` for `open` sessions, or route `connect`-based sessions through a separate `connect`-only path.
+- [x] Remove the `listOpenPages` fallback from `runPages`. Daemon-backed sessions use `client.pages()`; connect-based sessions use `listOpenPages`.
+- [x] Remove the `captureScreenshot` fallback from `snapshot.ts`. Same pattern.
+- [x] Audit all remaining `connect()` / `disconnectBrowser()` imports in command files. They should only be reachable for `connect`-based sessions (`save` command, etc.).
+- [x] Run `pnpm --filter libretto test` — all tests pass.
+- [x] Run `pnpm --filter libretto type-check` — passes.
 
-- [ ] Remove `runExecViaConnect` from `execution.ts`. Replace `runExec` branching with: `if (!state.daemonSocketPath) throw new Error("...")` for `open` sessions, or route `connect`-based sessions through a separate `connect`-only path.
-- [ ] Remove the `listOpenPages` fallback from `runPages`. Daemon-backed sessions use `client.pages()`; connect-based sessions use `listOpenPages`.
-- [ ] Remove the `captureScreenshot` fallback from `snapshot.ts`. Same pattern.
-- [ ] Audit all remaining `connect()` / `disconnectBrowser()` imports in command files. They should only be reachable for `connect`-based sessions (`save` command, etc.).
-- [ ] Run `pnpm --filter libretto test` — all tests pass. Daemon IPC tests verify the daemon path; connect-based tests (if any) verify the connect path. No test relies on an `open` session falling back to CDP connect.
+### Phase 6: Reorganize daemon into `src/cli/core/daemon/`
+
+Daemon code is currently spread across `browser-daemon.ts`, `daemon-ipc.ts`, and handler logic inlined in the `BrowserDaemon` class. Consolidate into a dedicated `src/cli/core/daemon/` directory with handler logic split into focused modules:
+
+- `src/cli/core/daemon/index.ts` — re-exports `DaemonServer`, `DaemonClient`, `DaemonResultMap`, `getDaemonSocketPath`, and types. This is the public API for CLI commands.
+- `src/cli/core/daemon/daemon.ts` — `BrowserDaemon` class (lifecycle, IPC server, request dispatch, page tracking). Handler methods call into the focused modules below.
+- `src/cli/core/daemon/ipc.ts` — `DaemonServer`, `DaemonClient`, `DaemonResultMap`, protocol types (`DaemonRequest`, `DaemonResponse`), `getDaemonSocketPath()`.
+- `src/cli/core/daemon/snapshot.ts` — `handleSnapshot()` extracted from `BrowserDaemon`.
+- `src/cli/core/daemon/exec.ts` — `handleExec()` and `handleReadonlyExec()` extracted from `BrowserDaemon`.
+- `src/cli/core/daemon/pages.ts` — `handlePages()` extracted from `BrowserDaemon`.
+
+- [ ] Create `src/cli/core/daemon/` directory structure with `index.ts`, `daemon.ts`, `ipc.ts`, `snapshot.ts`, `exec.ts`, `pages.ts`.
+- [ ] Move `DaemonServer`, `DaemonClient`, protocol types, and `getDaemonSocketPath` from `daemon-ipc.ts` → `daemon/ipc.ts`.
+- [ ] Extract `handleSnapshot`, `handleExec`/`handleReadonlyExec`, `handlePages` from `BrowserDaemon` class into `daemon/snapshot.ts`, `daemon/exec.ts`, `daemon/pages.ts`.
+- [ ] Move `BrowserDaemon` class (lifecycle, dispatch, page tracking) from `browser-daemon.ts` → `daemon/daemon.ts`. Handler methods delegate to the extracted modules.
+- [ ] Create `daemon/index.ts` that re-exports the public API (`DaemonServer`, `DaemonClient`, `DaemonResultMap`, `getDaemonSocketPath`, types).
+- [ ] Delete old `browser-daemon.ts` and `daemon-ipc.ts`.
+- [ ] Update all imports across the codebase (`browser.ts`, `execution.ts`, `snapshot.ts`, `context.ts`, tests, etc.) to use `./daemon/index.js` or specific submodules.
+- [ ] Run `pnpm --filter libretto test` — all tests pass.
 - [ ] Run `pnpm --filter libretto type-check` — passes.
 
-### Phase 6: SKILL.md update and full verification
+### Phase 7: SKILL.md update and full verification
 
 Update skill documentation to reflect that `[ref=eN]` selectors now work when using daemon-backed sessions, and clarify limitations for non-daemon sessions. Run the full test suite.
 

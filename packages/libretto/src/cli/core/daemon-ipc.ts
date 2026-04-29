@@ -235,4 +235,14 @@ export class DaemonClient {
       ...args,
     });
   }
+
+  async snapshot(args: {
+    pageId?: string;
+  } = {}): Promise<DaemonResultMap["snapshot"]> {
+    return this.sendOrThrow({
+      id: this.generateId(),
+      command: "snapshot",
+      ...args,
+    });
+  }
 }

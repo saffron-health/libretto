@@ -20,14 +20,16 @@ import {
   type Page,
 } from "playwright";
 import { mkdir } from "node:fs/promises";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { installSessionTelemetry } from "./session-telemetry.js";
 import {
+  createLoggerForSession,
   getSessionDir,
-  getSessionLogsPath,
   getSessionNetworkLogPath,
   getSessionActionsLogPath,
+  getSessionSnapshotRunDir,
 } from "./context.js";
+import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   DaemonServer,
   getDaemonSocketPath,
@@ -40,6 +42,13 @@ import {
 } from "./exec-compiler.js";
 import { createReadonlyExecHelpers } from "./readonly-exec.js";
 import { readNetworkLog, readActionLog, wrapPageForActionLogging } from "./telemetry.js";
+import {
+  resolveSnapshotViewport,
+  readSnapshotViewportMetrics,
+  shouldForceSnapshotViewport,
+  isZeroWidthScreenshotError,
+  forceSnapshotViewport,
+} from "../commands/snapshot.js";
 
 // ── Config schema ──────────────────────────────────────────────────────
 
@@ -61,7 +70,7 @@ const PROTOCOL_VERSION = 1;
 const REQUEST_TIMEOUT_MS = 60_000;
 
 class BrowserDaemon {
-  private readonly logFile: string;
+  readonly logger: LoggerApi;
   private readonly execState: Record<string, unknown> = {};
   private readonly pageById = new Map<string, Page>();
 
@@ -71,8 +80,9 @@ class BrowserDaemon {
     private readonly context: BrowserContext,
     private readonly page: Page,
     private readonly ipcServer: DaemonServer,
+    logger: LoggerApi,
   ) {
-    this.logFile = getSessionLogsPath(config.session);
+    this.logger = logger.withScope("child");
   }
 
   private trackPage(page: Page): string {
@@ -147,7 +157,8 @@ class BrowserDaemon {
     const ipcServer = new DaemonServer(socketPath, (request) =>
       handler(request),
     );
-    const daemon = new BrowserDaemon(config, browser, context, page, ipcServer);
+    const logger = createLoggerForSession(config.session);
+    const daemon = new BrowserDaemon(config, browser, context, page, ipcServer, logger);
 
     // Track the initial page and auto-track any pages opened later.
     daemon.trackPage(page);
@@ -156,7 +167,7 @@ class BrowserDaemon {
     });
     handler = (request) => daemon.handleRequest(request);
     await ipcServer.listen();
-    daemon.log("info", "ipc-server-listening", { socketPath });
+    daemon.logger.info("ipc-server-listening", { socketPath });
 
     // Wire browser disconnect after daemon is constructed
     browser.on("disconnected", () => {
@@ -166,7 +177,7 @@ class BrowserDaemon {
     // Navigate
     await page.goto(config.url);
 
-    daemon.log("info", "child-launched", {
+    daemon.logger.info("child-launched", {
       port: config.port,
       pid: process.pid,
       session: config.session,
@@ -175,24 +186,10 @@ class BrowserDaemon {
     return daemon;
   }
 
-  // ── Logging ────────────────────────────────────────────────────────
-
-  log(level: string, event: string, data: Record<string, unknown> = {}): void {
-    const entry = JSON.stringify({
-      timestamp: new Date().toISOString(),
-      id: Math.random().toString(36).slice(2, 10),
-      level,
-      scope: "libretto.child",
-      event,
-      data,
-    });
-    appendFileSync(this.logFile, entry + "\n");
-  }
-
   // ── Lifecycle ──────────────────────────────────────────────────────
 
   async shutdown(reason: string, closeBrowser: boolean): Promise<void> {
-    this.log("info", reason, { port: this.config.port });
+    this.logger.info(reason, { port: this.config.port });
     await this.ipcServer.close();
     if (closeBrowser) await this.browser.close();
   }
@@ -244,6 +241,8 @@ class BrowserDaemon {
         return this.handleExec(request.code, request.pageId, request.visualize);
       case "readonly-exec":
         return this.handleReadonlyExec(request.code, request.pageId);
+      case "snapshot":
+        return this.handleSnapshot(request.pageId);
       default:
         throw new Error(`Unknown command: ${(request as { command: string }).command}`);
     }
@@ -315,6 +314,97 @@ class BrowserDaemon {
     const result = await fn(...Object.values(helpers));
     return { result };
   }
+
+  // ── Snapshot ─────────────────────────────────────────────────────────
+
+  private static readonly RENDER_SETTLE_TIMEOUT_MS = 10_000;
+
+  private async handleSnapshot(pageId?: string): Promise<unknown> {
+    const targetPage = this.resolveTargetPage(pageId);
+    const session = this.config.session;
+    const logger = this.logger;
+    const snapshotRunId = `snapshot-${Date.now()}`;
+    const snapshotRunDir = getSessionSnapshotRunDir(session, snapshotRunId);
+    mkdirSync(snapshotRunDir, { recursive: true });
+
+    // Capture title and URL early, before viewport normalization
+    // (matches captureScreenshot ordering).
+    let title: string | null = null;
+    try {
+      title = await targetPage.title();
+    } catch (error) {
+      logger.warn("screenshot-title-read-failed", { session, pageId, error });
+    }
+
+    let pageUrl: string | null = null;
+    try {
+      pageUrl = targetPage.url();
+    } catch (error) {
+      logger.warn("screenshot-url-read-failed", { session, pageId, error });
+    }
+
+    const pngPath = `${snapshotRunDir}/page.png`;
+    const htmlPath = `${snapshotRunDir}/page.html`;
+
+    // Wait for network to settle before capturing.
+    await Promise.race([
+      targetPage.waitForLoadState("networkidle").catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, BrowserDaemon.RENDER_SETTLE_TIMEOUT_MS)),
+    ]);
+
+    // Viewport normalization — uses shared helpers from snapshot.ts.
+    const restoreViewport = resolveSnapshotViewport(session, logger);
+    const viewportMetrics = await readSnapshotViewportMetrics(targetPage);
+    logger.info("screenshot-viewport-metrics", {
+      session,
+      pageId,
+      restoreViewport,
+      ...viewportMetrics,
+    });
+    await forceSnapshotViewport(
+      targetPage,
+      restoreViewport,
+      logger,
+      session,
+      pageId,
+      shouldForceSnapshotViewport(viewportMetrics)
+        ? "preflight-invalid-viewport"
+        : "preflight-normalize-viewport",
+    );
+
+    // Screenshot with zero-width retry.
+    try {
+      await targetPage.screenshot({ path: pngPath });
+    } catch (error) {
+      if (!isZeroWidthScreenshotError(error)) {
+        throw error;
+      }
+      await forceSnapshotViewport(
+        targetPage,
+        restoreViewport,
+        logger,
+        session,
+        pageId,
+        "retry-after-zero-width-screenshot-error",
+      );
+      await targetPage.screenshot({ path: pngPath });
+    }
+
+    // Capture HTML content.
+    const htmlContent = await targetPage.content();
+    writeFileSync(htmlPath, htmlContent);
+
+    logger.info("screenshot-success", {
+      session,
+      pageUrl,
+      title,
+      pngPath,
+      htmlPath,
+      snapshotRunId,
+    });
+
+    return { pngPath, htmlPath, snapshotRunId, pageUrl: pageUrl ?? "", title: title ?? "" };
+  }
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
@@ -332,19 +422,16 @@ async function main(): Promise<void> {
   });
 
   process.on("uncaughtException", (err) => {
-    daemon.log("error", "uncaught-exception", {
-      message: err.message,
-      stack: err.stack,
-    });
+    daemon.logger.error("uncaught-exception", err);
     process.exit(1);
   });
 
   process.on("unhandledRejection", (reason) => {
-    daemon.log("warn", "unhandled-rejection", { reason: String(reason) });
+    daemon.logger.warn("unhandled-rejection", { reason: String(reason) });
   });
 
   process.on("exit", (code) => {
-    daemon.log("info", "child-exit", {
+    daemon.logger.info("child-exit", {
       code,
       pid: process.pid,
       port: config.port,

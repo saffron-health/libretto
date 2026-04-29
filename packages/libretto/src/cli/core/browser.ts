@@ -347,12 +347,18 @@ export async function runPages(
   let pageSummaries: OpenPageSummary[];
 
   if (state.daemonSocketPath) {
-    // Daemon-backed session — daemon tracks its own page IDs.
+    // Daemon-backed session (created via `libretto open`) — daemon tracks its own page IDs.
     const client = new DaemonClient(state.daemonSocketPath);
     pageSummaries = await client.pages();
-  } else {
-    // Connect-based session — use CDP target IDs.
+  } else if (state.cdpEndpoint) {
+    // Connect-based or provider session — use CDP target IDs.
     pageSummaries = await listOpenPages(session, logger);
+  } else {
+    // Open-based session missing its daemon socket — state is corrupt or daemon crashed.
+    throw new Error(
+      `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
+        `Close and reopen the session: libretto close --session ${session}`,
+    );
   }
 
   if (pageSummaries.length === 0) {

@@ -256,9 +256,19 @@ async function runExec(
 ): Promise<void> {
   const state = readSessionStateOrThrow(session);
   if (state.daemonSocketPath) {
+    // Daemon-backed session (created via `libretto open`).
     return runExecViaDaemon(code, session, state.daemonSocketPath, logger, options);
   }
-  return runExecViaConnect(code, session, logger, options);
+  if (state.cdpEndpoint) {
+    // Connect-based or provider session — use direct CDP.
+    return runExecViaConnect(code, session, logger, options);
+  }
+  // Open-based session missing its daemon socket — state is corrupt or daemon crashed.
+  // Fail instead of silently degrading to a fresh CDP connection (which would lose aria-refs).
+  throw new Error(
+    `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
+      `Close and reopen the session: libretto close --session ${session}`,
+  );
 }
 
 function parseJsonArg(label: string, raw: string): unknown {
