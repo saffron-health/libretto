@@ -73,15 +73,10 @@ jobs:
           git config --global user.name "opencode-agent[bot]"
           git config --global user.email "opencode-agent[bot]@users.noreply.github.com"
 
-      - uses: anomalyco/opencode/github@latest
-        continue-on-error: true
+      - name: Generate OpenCode review
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GIT_AUTHOR_NAME: opencode-agent[bot]
-          GIT_AUTHOR_EMAIL: opencode-agent[bot]@users.noreply.github.com
-          GIT_COMMITTER_NAME: opencode-agent[bot]
-          GIT_COMMITTER_EMAIL: opencode-agent[bot]@users.noreply.github.com
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           OPENCODE_CONFIG_CONTENT: |
             {
@@ -92,16 +87,11 @@ jobs:
                 "bash": {
                   "*": "deny",
                   "gh pr view *": "allow",
-                  "gh pr diff *": "allow",
-                  "gh api *": "allow"
+                  "gh pr diff *": "allow"
                 }
               }
             }
-        with:
-          model: openai/gpt-5.3-codex
-          agent: codex
-          use_github_token: "true"
-          prompt: |
+          PROMPT: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ steps.pr.outputs.number }}
             PR TITLE: ${{ steps.pr.outputs.title }}
@@ -280,6 +270,12 @@ jobs:
             6. Remember: Perfect is the enemy of good. Focus on what matters.
 
             You are the guardian against complexity creep. Be thorough but pragmatic. Your review should make the code better, not just different.
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          "$HOME/.opencode/bin/opencode" run \
+            --model openai/gpt-5.3-codex \
+            --agent plan \
+            "$PROMPT" | tee opencode-review.md
 
       - name: Upsert sticky OpenCode review comment
         uses: actions/github-script@v7
@@ -289,11 +285,26 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            const fs = require("fs");
             const marker = "<!-- opencode-review -->";
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const issueNumber = parseInt(process.env.PR_NUMBER, 10);
             const runPath = `/${owner}/${repo}/actions/runs/${process.env.RUN_ID}`;
+
+            if (!fs.existsSync("opencode-review.md")) {
+              core.setFailed("OpenCode review output file was not created");
+              return;
+            }
+
+            const sourceBodyRaw = fs.readFileSync("opencode-review.md", "utf8").trim();
+            if (!sourceBodyRaw.includes("# OpenCode Review")) {
+              core.setFailed("OpenCode review output did not contain the expected review heading");
+              return;
+            }
+
+            const sourceBody = `${sourceBodyRaw}\n\n[github run](${runPath})`;
+            const stickyBody = `${marker}\n${sourceBody}`;
 
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner,
@@ -302,29 +313,10 @@ jobs:
               per_page: 100,
             });
 
-            const source = comments
-              .filter((comment) => {
-                const body = comment.body ?? "";
-                return body.includes("# OpenCode Review") && body.includes(runPath);
-              })
-              .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0];
-
-            if (source === undefined) {
-              core.setFailed(`No OpenCode review comment found for run path ${runPath}`);
-              return;
-            }
-
-            const sourceBodyRaw = source.body ?? "";
-            const sourceBody = sourceBodyRaw.startsWith(marker)
-              ? sourceBodyRaw.slice(marker.length).trimStart()
-              : sourceBodyRaw;
-            const stickyBody = `${marker}\n${sourceBody}`;
-
             const existingSticky = comments
               .filter((comment) => (comment.body ?? "").startsWith(marker))
               .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0];
 
-            let stickyCommentId;
             if (existingSticky !== undefined) {
               await github.rest.issues.updateComment({
                 owner,
@@ -332,21 +324,11 @@ jobs:
                 comment_id: existingSticky.id,
                 body: stickyBody,
               });
-              stickyCommentId = existingSticky.id;
             } else {
-              const created = await github.rest.issues.createComment({
+              await github.rest.issues.createComment({
                 owner,
                 repo,
                 issue_number: issueNumber,
                 body: stickyBody,
-              });
-              stickyCommentId = created.data.id;
-            }
-
-            if (source.id !== stickyCommentId) {
-              await github.rest.issues.deleteComment({
-                owner,
-                repo,
-                comment_id: source.id,
               });
             }
