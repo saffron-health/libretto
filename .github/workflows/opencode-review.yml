@@ -74,6 +74,7 @@ jobs:
           git config --global user.email "opencode-agent[bot]@users.noreply.github.com"
 
       - uses: anomalyco/opencode/github@latest
+        continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -91,6 +92,17 @@ jobs:
             PR NUMBER: ${{ steps.pr.outputs.number }}
             PR TITLE: ${{ steps.pr.outputs.title }}
             PR DESCRIPTION: ${{ steps.pr.outputs.body }}
+
+            IMPORTANT: This is a review-only workflow.
+
+            Do not edit files.
+            Do not write patches.
+            Do not commit.
+            Do not push.
+            Do not create or update branches.
+            Do not attempt to fix issues you find.
+
+            Your only job is to inspect the pull request and produce the review markdown requested below.
 
             You are an expert code reviewer specializing in evaluating implementations for simplicity and correctness. Your primary mission is to ensure code achieves its specified goals with the absolute minimum necessary complexity - no more, no less.
 
@@ -284,7 +296,7 @@ jobs:
               .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0];
 
             if (source === undefined) {
-              core.warning(`No OpenCode review comment found for run path ${runPath}`);
+              core.setFailed(`No OpenCode review comment found for run path ${runPath}`);
               return;
             }
 
