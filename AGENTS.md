@@ -34,10 +34,8 @@ Targeted (most common during development):
 ```bash
 pnpm sync:mirrors
 pnpm check:mirrors
-pnpm --filter libretto type-check
-pnpm --filter libretto test -- test/basic.spec.ts
-pnpm --filter libretto test -- test/multi-page.spec.ts
-pnpm --filter libretto test -- test/stateful.spec.ts
+pnpm -s type-check --filter=libretto
+pnpm -s test --filter=libretto
 ```
 
 - Do not pipe test commands through `grep`, `tail`, or other filters. The test reporter is minimal and token-efficient by default.
