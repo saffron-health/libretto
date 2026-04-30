@@ -1074,6 +1074,8 @@ export default workflow("main", async ({ page }) => {
       `
 export default workflow("main", async (ctx) => {
   await ctx.page.goto("https://example.com");
+  const debugPage = await ctx.page.context().newPage();
+  await debugPage.goto("data:text/html,<title>Debug Target</title>");
   await ctx.page.locator("[").click();
 });
 `,
@@ -1086,6 +1088,11 @@ export default workflow("main", async (ctx) => {
     expect(runResult.stderr).toContain("Browser is still open.");
     expect(runResult.stderr).toContain("use `exec` to inspect it");
     expect(runResult.stderr).toContain("Call `run` to re-run the workflow.");
+
+    const execResult = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(execResult.stdout).toMatch(/Example Domain|Debug Target/);
 
     const rerunResult = await librettoCli(
       `run "${integrationFilePath}" --session ${session} --headless`,
