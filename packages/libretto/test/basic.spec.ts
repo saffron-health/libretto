@@ -1087,6 +1087,11 @@ export default workflow("main", async (ctx) => {
     expect(runResult.stderr).toContain("use `exec` to inspect it");
     expect(runResult.stderr).toContain("Call `run` to re-run the workflow.");
 
+    const execResult = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(execResult.stdout).toContain("Example Domain");
+
     const rerunResult = await librettoCli(
       `run "${integrationFilePath}" --session ${session} --headless`,
     );
