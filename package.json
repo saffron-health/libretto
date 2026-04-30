@@ -24,7 +24,7 @@
     "sync-skills": "pnpm run sync:mirrors",
     "check:skills": "pnpm run check:mirrors",
     "type-check": "turbo run type-check",
-    "test": "turbo run test",
+    "test": "turbo run test --log-order=grouped",
     "prepare-release": "bash ./scripts/prepare-release.sh",
     "evals": "turbo run evals --filter=@libretto/evals --",
     "benchmarks": "turbo run benchmarks --filter=@libretto/benchmarks --",
