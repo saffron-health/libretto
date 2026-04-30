@@ -3,7 +3,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "outputLogs": "errors-only"
     },
     "type-check": {
       "dependsOn": ["build"],
@@ -11,7 +12,8 @@
     },
     "test": {
       "dependsOn": ["build"],
-      "cache": false
+      "cache": false,
+      "outputLogs": "errors-only"
     },
     "benchmarks": {
       "dependsOn": ["^build"],
