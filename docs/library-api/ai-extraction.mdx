@@ -6,6 +6,19 @@ title: AI Extraction
 
 `extractFromPage()` combines a screenshot with DOM content and sends both to an LLM to extract structured data matching a Zod schema. Because the visual analysis happens in a separate LLM call, it keeps your coding agent's context window free of raw HTML.
 
+<Warning>
+  For production workflows, start with the most deterministic source of data:
+
+  - Use captured network requests when the site already returns the data you need as JSON or another structured response.
+  - Use Playwright locators and selectors when the content is visible in stable DOM elements.
+  - Use regular code or regex to normalize the extracted text when the formatting rules are straightforward.
+  - Use a structured LLM call only for formatting or interpretation that is hard to express deterministically.
+
+  Use `extractFromPage()` as the fallback when the page is easier to interpret
+  visually or structurally than it is to parse through network responses or
+  selectors. This path is not fully deterministic.
+</Warning>
+
 ### `extractFromPage()`
 
 ```typescript theme={null}

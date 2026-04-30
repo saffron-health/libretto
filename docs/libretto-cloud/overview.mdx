@@ -6,6 +6,11 @@ hidden: true
 
 > Use Libretto Cloud to deploy workflows, run them through a managed API, investigate failures, and manage your account.
 
+<Warning>
+  Libretto Cloud is in beta and under active development. APIs and behavior may
+  change as the managed platform evolves.
+</Warning>
+
 This section covers Libretto Cloud. If you want to self-host, go to the [self-hosting overview](/hosting/introduction). The Libretto Cloud API URL is `https://api.libretto.sh`.
 
 ### Why use Libretto Cloud
@@ -127,7 +132,7 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
   </Step>
 </Steps>
 
-### Libretto Cloud
+### Libretto Cloud CLI
 
 <CardGroup cols={3}>
   <Card title="Authentication" icon="key" href="/libretto-cloud/authentication">
@@ -146,24 +151,11 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
 
 ### Libretto Cloud API
 
-<CardGroup cols={3}>
-  <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
-    See the API base URL, envelope, and auth model.
-  </Card>
-
-  <Card title="Webhooks" icon="webhook" href="/libretto-cloud-api/webhooks">
-    Configure tenant-level webhook delivery for job results.
-  </Card>
-
-  <Card title="Jobs and Logs" icon="terminal" href="/libretto-cloud-api/jobs-and-logs">
-    Invoke deployed workflows and inspect job state.
-  </Card>
-</CardGroup>
-
-### Hosting
-
-The managed platform is one way to run Libretto. If you need to host the runtime yourself, use:
-
-- [Self-hosting overview](/hosting/introduction)
-- [Deploy on GCP](/hosting/gcp)
-- [Deploy on AWS](/hosting/aws)
+- [Overview](/libretto-cloud-api/overview)
+- [Authentication](/libretto-cloud-api/authentication)
+- [Sessions](/libretto-cloud-api/sessions)
+- [Deployments and Workflows](/libretto-cloud-api/deployments-and-workflows)
+- [Jobs and Logs](/libretto-cloud-api/jobs-and-logs)
+- [Credentials](/libretto-cloud-api/credentials)
+- [Webhooks](/libretto-cloud-api/webhooks)
+- [Schedules](/libretto-cloud-api/schedules)
