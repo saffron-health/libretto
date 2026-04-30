@@ -2,7 +2,26 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+resolve_root_dir() {
+    local fallback_root="$1"
+    local common_git_dir
+
+    # Resolve from the caller's current Git checkout instead of from whichever
+    # .bin/wt happened to be first on PATH. This keeps worktrees as siblings
+    # under the main checkout even when PATH still contains another worktree's
+    # .bin directory.
+    common_git_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+    if [ -n "$common_git_dir" ] && [ "$(basename "$common_git_dir")" = ".git" ]; then
+        dirname "$common_git_dir"
+        return
+    fi
+
+    echo "$fallback_root"
+}
+
+ROOT_DIR="$(resolve_root_dir "$SCRIPT_ROOT_DIR")"
 WORKTREES_DIR="$ROOT_DIR/.worktrees"
 
 usage() {
@@ -80,18 +99,6 @@ find_worktree_for_branch() {
     return 1
 }
 
-mtime_epoch() {
-    local path="$1"
-    case "$(uname -s)" in
-        Darwin)
-            stat -f "%m" "$path"
-            ;;
-        *)
-            stat -c "%Y" "$path"
-            ;;
-    esac
-}
-
 format_epoch() {
     local epoch="$1"
     case "$(uname -s)" in
@@ -102,6 +109,27 @@ format_epoch() {
             date -d "@$epoch" "+%b %d, %Y %H:%M"
             ;;
     esac
+}
+
+last_activity_epoch() {
+    local wt_path="$1"
+    local epoch
+    local reflog_selector
+
+    # Fast approximation of the old "newest tracked file mtime" behavior.
+    # Scanning every tracked file in every worktree made `wt list` slow enough
+    # to feel hung on large checkouts.
+    reflog_selector=$(git -C "$wt_path" reflog -1 --date=unix --format=%gd HEAD 2>/dev/null || true)
+    if [ -n "$reflog_selector" ]; then
+        epoch="${reflog_selector#*@{}"
+        epoch="${epoch%\}}"
+    fi
+
+    if [[ ! "$epoch" =~ ^[0-9]+$ ]]; then
+        epoch=$(git -C "$wt_path" log -1 --format=%ct HEAD 2>/dev/null || true)
+    fi
+
+    echo "${epoch:-0}"
 }
 
 cmd_new() {
@@ -232,10 +260,7 @@ cmd_list() {
         local wt_path="${entry%%|*}"
         local branch="${entry##*|}"
         local epoch
-        epoch=$(git -C "$wt_path" ls-files -z 2>/dev/null | while IFS= read -r -d '' file; do
-            mtime_epoch "$wt_path/$file"
-        done | sort -rn | head -1)
-        epoch="${epoch:-0}"
+        epoch=$(last_activity_epoch "$wt_path")
         local last_updated
         last_updated=$(format_epoch "$epoch" 2>/dev/null || echo "—")
         rows+=("$epoch|$last_updated|$branch|$wt_path")
