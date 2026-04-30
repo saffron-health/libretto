@@ -5,12 +5,9 @@ import {
   type CDPSession,
   type Page,
 } from "playwright";
-import { openSync, closeSync, existsSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { createRequire } from "node:module";
 import { createServer } from "node:net";
-import { spawn } from "node:child_process";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import { PROFILES_DIR } from "./context.js";
@@ -27,6 +24,7 @@ import {
 } from "./session.js";
 import type { ProviderApi } from "./providers/types.js";
 import { getCloudProviderApi } from "./providers/index.js";
+import { DaemonClient, spawnSessionDaemon } from "./daemon/index.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const FORCE_CLOSE_WAIT_MS = 300;
@@ -202,27 +200,6 @@ async function resolvePageReferences(pages: Page[]): Promise<PageReference[]> {
   return refs;
 }
 
-export async function listOpenPages(
-  session: string,
-  logger: LoggerApi,
-): Promise<OpenPageSummary[]> {
-  const { browser, page: activePage } = await connect(session, logger);
-  try {
-    const pages = browser
-      .contexts()
-      .flatMap((ctx) => ctx.pages())
-      .filter(isOperationalPage);
-    const pageRefs = await resolvePageReferences(pages);
-    return pageRefs.map(({ id, page }) => ({
-      id,
-      url: page.url(),
-      active: page === activePage,
-    }));
-  } finally {
-    disconnectBrowser(browser, logger, session);
-  }
-}
-
 export async function connect(
   session: string,
   logger: LoggerApi,
@@ -341,7 +318,18 @@ export async function runPages(
   logger: LoggerApi,
 ): Promise<void> {
   logger.info("pages-start", { session });
-  const pageSummaries = await listOpenPages(session, logger);
+
+  const state = readSessionStateOrThrow(session);
+  let pageSummaries: OpenPageSummary[];
+
+  if (!state.daemonSocketPath) {
+    throw new Error(
+      `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
+        `Close and reopen the session: libretto close --session ${session}`,
+    );
+  }
+  const client = new DaemonClient(state.daemonSocketPath);
+  pageSummaries = await client.pages();
 
   if (pageSummaries.length === 0) {
     console.log("No pages found.");
@@ -462,129 +450,51 @@ export async function runOpen(
   }
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
-  const daemonEntryPath = fileURLToPath(
-    new URL("./browser-daemon.js", import.meta.url),
-  );
-  const require = createRequire(import.meta.url);
-  const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
-  const daemonConfig = {
-    port,
-    url,
-    session,
-    headed,
-    viewport,
-    storageStatePath: useProfile ? profilePath : undefined,
-    windowPosition,
-  };
-
-  const childStderrFd = openSync(runLogPath, "a");
-
-  const child = spawn(
-    process.execPath,
-    ["--import", tsxImportPath, daemonEntryPath, JSON.stringify(daemonConfig)],
-    {
-      detached: true,
-      stdio: ["ignore", "ignore", childStderrFd],
-    },
-  );
-  child.unref();
-  closeSync(childStderrFd);
-
-  logger.info("open-child-spawned", { pid: child.pid, port, session });
-
-  let childSpawnError: Error | null = null;
-  let childEarlyExit: {
-    code: number | null;
-    signal: NodeJS.Signals | null;
-  } | null = null;
-
-  child.on("error", (err) => {
-    childSpawnError = err;
-    logger.error("open-child-spawn-error", { error: err, session, port });
-  });
-
-  child.on("exit", (code, signal) => {
-    childEarlyExit = { code, signal };
-    logger.warn("open-child-exited", {
-      code,
-      signal,
-      session,
+  // Spawn daemon and wait for IPC readiness. The daemon launches
+  // Chromium internally — IPC readiness implies the browser is up,
+  // so no separate CDP polling is needed.
+  const { pid, socketPath: daemonSocketPath } = await spawnSessionDaemon({
+    config: {
       port,
-      pid: child.pid,
-    });
+      url,
+      session,
+      headed,
+      viewport,
+      storageStatePath: useProfile ? profilePath : undefined,
+      windowPosition,
+    },
+    session,
+    logger,
+    logPath: runLogPath,
+    // The daemon launches Chromium, installs telemetry, navigates to
+    // the URL, and only then starts IPC. Navigation alone can take up
+    // to 45s (page.setDefaultNavigationTimeout), so the IPC timeout
+    // must cover launch + navigation.
+    ipcTimeoutMs: 60_000,
   });
 
-  const cdpPollIntervalMs = 500;
-  const cdpMaxAttempts = 30;
-  const cdpStartupTimeoutMs = cdpPollIntervalMs * cdpMaxAttempts;
+  writeSessionState(
+    {
+      port,
+      pid,
+      session,
+      startedAt: new Date().toISOString(),
+      status: "active",
+      mode: accessMode,
+      viewport,
+      daemonSocketPath,
+    },
+    logger,
+  );
 
-  for (let i = 0; i < cdpMaxAttempts; i++) {
-    const spawnError = childSpawnError as Error | null;
-    if (spawnError !== null) {
-      const errWithCode = spawnError as Error & { code?: string };
-      const hint =
-        errWithCode.code === "ENOENT"
-          ? " Ensure Node.js is available in PATH for child processes."
-          : "";
-      throw new Error(
-        `Failed to launch browser child process: ${spawnError.message}.${hint} Check logs: ${runLogPath}`,
-      );
-    }
-
-    const earlyExit = childEarlyExit as {
-      code: number | null;
-      signal: NodeJS.Signals | null;
-    } | null;
-    if (earlyExit !== null) {
-      const status = earlyExit.code ?? earlyExit.signal ?? "unknown";
-      throw new Error(
-        `Browser child process exited before startup (status: ${status}). Check logs: ${runLogPath}`,
-      );
-    }
-
-    await new Promise((r) => setTimeout(r, cdpPollIntervalMs));
-    const ready = await fetch(`http://127.0.0.1:${port}/json/version`)
-      .then(() => true)
-      .catch(() => false);
-    if (i > 0 && i % 5 === 0) {
-      logger.info("open-waiting-for-cdp", { attempt: i, port, session });
-    }
-    if (ready) {
-      writeSessionState(
-        {
-          port,
-          pid: child.pid!,
-          session,
-          startedAt: new Date().toISOString(),
-          status: "active",
-          mode: accessMode,
-          viewport,
-        },
-        logger,
-      );
-      logger.info("open-success", {
-        url,
-        mode: browserMode,
-        session,
-        port,
-        pid: child.pid,
-      });
-      console.log(`Browser open (${browserMode}): ${url}`);
-
-      await new Promise((r) => setTimeout(r, 2000));
-      return;
-    }
-  }
-
-  logger.error("open-timeout", {
+  logger.info("open-success", {
+    url,
+    mode: browserMode,
     session,
     port,
-    pid: child.pid,
-    attempts: cdpMaxAttempts,
+    pid,
   });
-  throw new Error(
-    `Failed to connect to browser after ${Math.ceil(cdpStartupTimeoutMs / 1000)}s. Check startup logs: ${runLogPath}`,
-  );
+  console.log(`Browser open (${browserMode}): ${url}`);
 }
 
 export async function runOpenWithProvider(
@@ -617,71 +527,39 @@ export async function runOpenWithProvider(
 
   console.log(`Connecting to ${providerName} browser...`);
 
-  let browser: Browser | null = null;
-  try {
-    browser = await tryConnectToCDP(
-      providerSession.cdpEndpoint,
-      logger,
-      30_000,
-    );
-    if (!browser) {
-      throw new Error(
-        `Could not connect to ${providerName} browser at ${providerSession.cdpEndpoint}. The remote session was created but CDP connection failed.`,
-      );
-    }
+  const runLogPath = logFileForSession(session);
+  const { pid, socketPath: daemonSocketPath } = await spawnSessionDaemon({
+    config: {
+      mode: "connect" as const,
+      session,
+      cdpEndpoint: providerSession.cdpEndpoint,
+      url,
+    },
+    session,
+    logger,
+    logPath: runLogPath,
+    // Remote CDP connection + navigation; must cover both.
+    ipcTimeoutMs: 60_000,
+    onFailure: () => provider.closeSession(providerSession.sessionId),
+  });
 
-    const contexts = browser.contexts();
-    let page: Page;
-    if (contexts.length > 0 && contexts[0].pages().length > 0) {
-      page = contexts[0].pages()[0];
-    } else {
-      const context =
-        contexts.length > 0 ? contexts[0] : await browser.newContext();
-      page = await context.newPage();
-    }
-
-    await page.goto(url);
-    logger.info("open-provider-navigated", { url, session });
-
-    // Cloud sessions have no local port. Reconnection uses cdpEndpoint directly.
-    writeSessionState(
-      {
-        port: 0,
-        cdpEndpoint: providerSession.cdpEndpoint,
-        session,
-        startedAt: new Date().toISOString(),
-        status: "active",
-        mode: accessMode,
-        provider: {
-          name: providerName,
-          sessionId: providerSession.sessionId,
-        },
-      },
-      logger,
-    );
-
-    disconnectBrowser(browser, logger, session);
-  } catch (err) {
-    if (browser) {
-      disconnectBrowser(browser, logger, session);
-    }
-    // Clean up the remote session so it doesn't leak
-    logger.warn("open-provider-cleanup-after-error", {
-      provider: providerName,
-      sessionId: providerSession.sessionId,
-      error: err,
-    });
-    try {
-      await provider.closeSession(providerSession.sessionId);
-    } catch (cleanupErr) {
-      logger.warn("open-provider-cleanup-failed", {
-        provider: providerName,
+  writeSessionState(
+    {
+      port: 0,
+      pid,
+      cdpEndpoint: providerSession.cdpEndpoint,
+      session,
+      startedAt: new Date().toISOString(),
+      status: "active",
+      mode: accessMode,
+      daemonSocketPath,
+      provider: {
+        name: providerName,
         sessionId: providerSession.sessionId,
-        error: cleanupErr,
-      });
-    }
-    throw err;
-  }
+      },
+    },
+    logger,
+  );
 
   logger.info("open-provider-success", {
     url,
@@ -786,9 +664,18 @@ export async function runClose(
     return;
   }
 
+  // Kill local daemon process if present (applies to both local and
+  // provider sessions — the daemon disconnects without closing the
+  // external browser).
+  if (state.pid != null) {
+    logger.info("close-killing", { session, pid: state.pid, port: state.port });
+    sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
+    await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+  }
+
+  // Close provider session if applicable (tears down the remote browser).
   let replayUrl: string | undefined;
   if (state.provider) {
-    // Cloud provider session — close via provider API, no local pid to kill
     logger.info("close-provider", {
       session,
       provider: state.provider.name,
@@ -805,22 +692,15 @@ export async function runClose(
         sessionId: state.provider.sessionId,
         error: err,
       });
-      // Preserve state with cleanup-failed status so the user can retry.
-      // The provider.sessionId is retained for manual or future cleanup.
       writeSessionState({ ...state, status: "cleanup-failed" }, logger);
       throw new Error(
         `Failed to close remote ${state.provider.name} session "${state.provider.sessionId}" for session "${session}". ` +
           `State preserved with status "cleanup-failed". Retry with: libretto close --session ${session}`,
       );
     }
-  } else {
-    logger.info("close-killing", { session, pid: state.pid, port: state.port });
-    if (state.pid != null) {
-      sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
-      await waitForCloseSignalWindow(CLOSE_WAIT_MS);
-    }
   }
 
+  unlinkDaemonSocket(state.daemonSocketPath, logger, session);
   clearSessionState(session, logger);
   logger.info("close-success", { session, replayUrl });
   console.log(`Browser closed (session: ${session}).`);
@@ -834,6 +714,7 @@ type ClosableSession = {
   pid?: number;
   port: number;
   provider?: { name: string; sessionId: string };
+  daemonSocketPath?: string;
 };
 
 function waitForCloseSignalWindow(ms: number): Promise<void> {
@@ -887,10 +768,30 @@ function resolveClosableSessions(logger: LoggerApi): {
       pid: state.pid,
       port: state.port,
       provider: state.provider,
+      daemonSocketPath: state.daemonSocketPath,
     });
   }
 
   return { closable, clearedUnreadableStates };
+}
+
+function unlinkDaemonSocket(
+  socketPath: string | undefined,
+  logger: LoggerApi,
+  session: string,
+): void {
+  if (!socketPath) return;
+  try {
+    unlinkSync(socketPath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      logger.warn("close-socket-unlink-failed", {
+        session,
+        socketPath,
+        error: err,
+      });
+    }
+  }
 }
 
 function clearStoppedSessionStates(
@@ -902,6 +803,7 @@ function clearStoppedSessionStates(
   for (const session of sessions) {
     if (skip?.has(session.session)) continue;
     if (session.pid == null || !isPidRunning(session.pid)) {
+      unlinkDaemonSocket(session.daemonSocketPath, logger, session.session);
       clearSessionState(session.session, logger);
       cleared += 1;
     }
@@ -962,22 +864,20 @@ export async function runCloseAll(
     }
   }
 
-  // Send SIGTERM to local sessions
+  // Send SIGTERM to all daemon processes (both local and provider sessions).
   for (const target of closable) {
-    if (target.provider) continue; // already handled above
+    if (target.pid == null) continue;
     logger.info("close-all-sigterm", {
       session: target.session,
       pid: target.pid,
       port: target.port,
     });
-    if (target.pid != null) {
-      sendSignalToProcessGroupOrPid(
-        target.pid,
-        "SIGTERM",
-        logger,
-        target.session,
-      );
-    }
+    sendSignalToProcessGroupOrPid(
+      target.pid,
+      "SIGTERM",
+      logger,
+      target.session,
+    );
   }
 
   await waitForCloseSignalWindow(CLOSE_WAIT_MS);
@@ -1100,8 +1000,9 @@ export async function runConnect(
     `Connecting to CDP endpoint at ${endpoint} (session: ${session})...`,
   );
 
-  // Verify the CDP endpoint is reachable (HTTP only — WebSocket
-  // endpoints are validated by the Playwright connect call below).
+  // Fast-fail: verify the CDP endpoint is reachable before spawning
+  // the daemon (HTTP only — WebSocket endpoints are validated by the
+  // daemon's connectOverCDP call).
   if (!isWebSocket) {
     const versionUrl = `${parsedUrl.protocol}//${parsedUrl.host}/json/version`;
     try {
@@ -1121,41 +1022,39 @@ export async function runConnect(
     });
   }
 
-  // Connect via CDP using the full endpoint URL
-  const browser = await tryConnectToCDP(endpoint, logger, 10_000);
-  if (!browser) {
-    throw new Error(
-      `CDP endpoint at ${endpoint} is reachable but Playwright could not connect. Check that the URL is a Chrome DevTools Protocol endpoint.`,
-    );
-  }
-
-  const pages = resolveOperationalPages(browser);
-  logger.info("connect-pages", {
-    session,
-    pageCount: pages.length,
-    urls: pages.map((p) => p.url()),
-  });
-
-  disconnectBrowser(browser, logger, session);
+  const runLogPath = logFileForSession(session);
+  const { pid, socketPath: daemonSocketPath, client } =
+    await spawnSessionDaemon({
+      config: { mode: "connect" as const, session, cdpEndpoint: endpoint },
+      session,
+      logger,
+      logPath: runLogPath,
+      ipcTimeoutMs: 10_000,
+    });
 
   writeSessionState(
     {
       port,
+      pid,
       cdpEndpoint: endpoint,
       session,
       startedAt: new Date().toISOString(),
       status: "active",
       mode: accessMode,
+      daemonSocketPath,
     },
     logger,
   );
+
+  // Query the daemon for discovered pages.
+  const pages = await client.pages();
 
   logger.info("connect-success", { cdpUrl: endpoint, session, port });
   console.log(`Connected to ${endpoint} (session: ${session})`);
   console.log(`  Pages found: ${pages.length}`);
   if (pages.length > 0) {
     for (const p of pages.slice(0, 5)) {
-      console.log(`    ${p.url()}`);
+      console.log(`    ${p.url}`);
     }
     if (pages.length > 5) {
       console.log(`    ... and ${pages.length - 5} more`);

@@ -3,13 +3,8 @@ import { spawn } from "node:child_process";
 import * as moduleBuiltin from "node:module";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { installInstrumentation } from "../../shared/instrumentation/index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
-import {
-  connect,
-  disconnectBrowser,
-  resolveViewport,
-} from "../core/browser.js";
+import { resolveViewport } from "../core/browser.js";
 import { parseViewportArg } from "./browser.js";
 import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
@@ -17,18 +12,15 @@ import {
   assertSessionAllowsCommand,
   clearSessionState,
   readSessionState,
+  readSessionStateOrThrow,
   setSessionStatus,
   type SessionState,
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
-import {
-  readActionLog,
-  readNetworkLog,
-  wrapPageForActionLogging,
-} from "../core/telemetry.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { resolveProviderName, getCloudProviderApi } from "../core/providers/index.js";
-import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
+import { stripEmptyCatchHandlers } from "../core/exec-compiler.js";
+import { DaemonClient } from "../core/daemon/index.js";
 import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
@@ -38,170 +30,82 @@ import {
   withRequiredSession,
 } from "./shared.js";
 
-type ExecFunction = (...args: unknown[]) => Promise<unknown>;
 type RunIntegrationCommandRequest = RunIntegrationWorkerRequest & {
   tsconfigPath?: string;
 };
 type ExecMode = "exec" | "readonly-exec";
 
-type StripTypeScriptTypesFn = (
-  code: string,
-  options?: { mode?: "strip" | "transform" },
-) => string;
-
-const stripTypeScriptTypes = (
-  moduleBuiltin as { stripTypeScriptTypes?: StripTypeScriptTypesFn }
-).stripTypeScriptTypes;
 const require = moduleBuiltin.createRequire(import.meta.url);
 const tsxCliPath = require.resolve("tsx/cli");
 
-function withSuppressedStripTypeScriptWarning<T>(action: () => T): T {
-  type EmitWarningFn = (...args: unknown[]) => void;
-  const mutableProcess = process as unknown as { emitWarning: EmitWarningFn };
-  const originalEmitWarning = mutableProcess.emitWarning;
-
-  mutableProcess.emitWarning = (...args: unknown[]) => {
-    const warning = args[0];
-    const typeOrOptions = args[1];
-    const warningMessage =
-      typeof warning === "string"
-        ? warning
-        : warning instanceof Error
-          ? warning.message
-          : "";
-    const warningType =
-      typeof typeOrOptions === "string"
-        ? typeOrOptions
-        : typeof typeOrOptions === "object" &&
-            typeOrOptions !== null &&
-            "type" in typeOrOptions &&
-            typeof (typeOrOptions as { type?: unknown }).type === "string"
-          ? ((typeOrOptions as { type?: string }).type ?? "")
-          : "";
-
-    if (
-      warningType === "ExperimentalWarning" &&
-      warningMessage.includes("stripTypeScriptTypes")
-    ) {
-      return;
-    }
-    originalEmitWarning(...args);
-  };
-
-  try {
-    return action();
-  } finally {
-    mutableProcess.emitWarning = originalEmitWarning;
+function writeDaemonExecOutput(output?: { stdout: string; stderr: string }) {
+  if (output?.stdout) {
+    process.stdout.write(output.stdout);
+  }
+  if (output?.stderr) {
+    process.stderr.write(output.stderr);
   }
 }
 
-function compileTypeScriptExecFunction(
+async function execViaDaemon(
   code: string,
-  helperNames: string[],
-): ExecFunction | null {
-  if (!stripTypeScriptTypes) return null;
+  session: string,
+  daemonSocketPath: string,
+  logger: LoggerApi,
+  options: {
+    visualize?: boolean;
+    pageId?: string;
+    mode?: ExecMode;
+  },
+): Promise<void> {
+  const mode = options.mode ?? "exec";
+  const { cleaned: cleanedCode, strippedCount } = stripEmptyCatchHandlers(code);
+  if (strippedCount > 0) {
+    console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
+  }
+  logger.info(`${mode}-start`, {
+    session,
+    codeLength: cleanedCode.length,
+    codePreview: cleanedCode.slice(0, 200),
+    visualize: options.visualize,
+    pageId: options.pageId,
+    via: "daemon",
+  });
 
-  const wrappedSource = `(async function __librettoExec(${helperNames.join(", ")}) {\n${code}\n})`;
-  const jsSource = withSuppressedStripTypeScriptWarning(() =>
-    stripTypeScriptTypes(wrappedSource, { mode: "strip" }),
-  );
-  const createFunction = new Function(
-    `return ${jsSource}`,
-  ) as () => ExecFunction;
-  return createFunction();
-}
+  const client = new DaemonClient(daemonSocketPath);
 
-function compileExecFunction(
-  code: string,
-  helperNames: string[],
-): ExecFunction {
-  const typeStripped = compileTypeScriptExecFunction(code, helperNames);
-  if (typeStripped) return typeStripped;
+  const response =
+    mode === "exec"
+      ? await client.exec({
+          code: cleanedCode,
+          pageId: options.pageId,
+          visualize: options.visualize,
+        })
+      : await client.readonlyExec({
+          code: cleanedCode,
+          pageId: options.pageId,
+        });
 
-  const AsyncFunction = Object.getPrototypeOf(async function () {})
-    .constructor as new (...args: string[]) => ExecFunction;
-  return new AsyncFunction(...helperNames, code);
-}
-
-/**
- * Strip `.catch(() => {})` / `?.catch(() => {})` from executable code,
- * skipping occurrences inside string literals (single, double, backtick)
- * and single-line / multi-line comments so we never corrupt non-code text.
- */
-function stripEmptyCatchHandlers(code: string): {
-  cleaned: string;
-  strippedCount: number;
-} {
-  const catchRe = /\??\s*\.catch\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/g;
-  let strippedCount = 0;
-  let result = "";
-  let i = 0;
-
-  while (i < code.length) {
-    // Single-line comment
-    if (code[i] === "/" && code[i + 1] === "/") {
-      const end = code.indexOf("\n", i);
-      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 1);
-      result += slice;
-      i += slice.length;
-      continue;
-    }
-    // Multi-line comment
-    if (code[i] === "/" && code[i + 1] === "*") {
-      const end = code.indexOf("*/", i + 2);
-      const slice = end === -1 ? code.slice(i) : code.slice(i, end + 2);
-      result += slice;
-      i += slice.length;
-      continue;
-    }
-    // String literals
-    if (code[i] === '"' || code[i] === "'" || code[i] === "`") {
-      const quote = code[i];
-      let j = i + 1;
-      while (j < code.length) {
-        if (code[j] === "\\" && quote !== "`") {
-          j += 2;
-          continue;
-        }
-        if (code[j] === "\\" && quote === "`") {
-          j += 2;
-          continue;
-        }
-        if (code[j] === quote) {
-          j++;
-          break;
-        }
-        // Template literal interpolation — skip nested braces
-        if (quote === "`" && code[j] === "$" && code[j + 1] === "{") {
-          let depth = 1;
-          j += 2;
-          while (j < code.length && depth > 0) {
-            if (code[j] === "{") depth++;
-            else if (code[j] === "}") depth--;
-            j++;
-          }
-          continue;
-        }
-        j++;
-      }
-      result += code.slice(i, j);
-      i = j;
-      continue;
-    }
-    // Try to match the catch pattern at the current position
-    catchRe.lastIndex = i;
-    const match = catchRe.exec(code);
-    if (match && match.index === i) {
-      strippedCount++;
-      i += match[0].length;
-      continue;
-    }
-    // Regular character
-    result += code[i];
-    i++;
+  if (!response.ok) {
+    writeDaemonExecOutput(response.output);
+    throw new Error(response.message);
   }
 
-  return { cleaned: result, strippedCount };
+  const { result, output } = response.data;
+  writeDaemonExecOutput(output);
+
+  logger.info(`${mode}-success`, {
+    session,
+    hasResult: result !== undefined,
+    via: "daemon",
+  });
+  if (result !== undefined) {
+    console.log(
+      typeof result === "string" ? result : JSON.stringify(result, null, 2),
+    );
+  } else {
+    console.log("Executed successfully");
+  }
 }
 
 async function runExec(
@@ -214,140 +118,14 @@ async function runExec(
     mode?: ExecMode;
   } = {},
 ): Promise<void> {
-  const visualize = options.visualize ?? false;
-  const pageId = options.pageId;
-  const mode = options.mode ?? "exec";
-  const { cleaned: cleanedCode, strippedCount } = stripEmptyCatchHandlers(code);
-  if (strippedCount > 0) {
-    console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
+  const state = readSessionStateOrThrow(session);
+  if (!state.daemonSocketPath) {
+    throw new Error(
+      `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
+        `Close and reopen the session: libretto close --session ${session}`,
+    );
   }
-  logger.info(`${mode}-start`, {
-    session,
-    codeLength: cleanedCode.length,
-    codePreview: cleanedCode.slice(0, 200),
-    visualize,
-    pageId,
-  });
-  const {
-    browser,
-    context,
-    page,
-    pageId: resolvedPageId,
-  } = await connect(session, logger, 10000, {
-    pageId,
-    requireSinglePage: true,
-  });
-
-  const STALL_THRESHOLD_MS = 60_000;
-  let lastActivityTs = Date.now();
-  const onActivity = () => {
-    lastActivityTs = Date.now();
-  };
-
-  const stallInterval = setInterval(() => {
-    const silenceMs = Date.now() - lastActivityTs;
-    if (silenceMs >= STALL_THRESHOLD_MS) {
-      logger.warn(`${mode}-stall-warning`, {
-        session,
-        silenceMs,
-        codePreview: cleanedCode.slice(0, 200),
-      });
-      console.warn(
-        `[stall-warning] No Playwright activity for ${Math.round(silenceMs / 1000)}s — ${mode} may be hung (code: ${cleanedCode.slice(0, 100)}...)`,
-      );
-    }
-  }, STALL_THRESHOLD_MS);
-
-  const execStartTs = Date.now();
-  const sigintHandler = () => {
-    logger.info(`${mode}-interrupted`, {
-      session,
-      duration: Date.now() - execStartTs,
-      codePreview: cleanedCode.slice(0, 200),
-    });
-  };
-  process.on("SIGINT", sigintHandler);
-
-  if (mode === "exec") {
-    wrapPageForActionLogging(page, session, resolvedPageId, onActivity);
-  }
-
-  if (visualize && mode === "exec") {
-    await installInstrumentation(page, { visualize: true, logger });
-  }
-
-  try {
-    const helpers =
-      mode === "readonly-exec"
-        ? createReadonlyExecHelpers(page, { onActivity })
-        : (() => {
-            const execState: Record<string, unknown> = {};
-
-            const networkLog = (
-              opts: {
-                last?: number;
-                filter?: string;
-                method?: string;
-                pageId?: string;
-              } = {},
-            ) => {
-              return readNetworkLog(session, opts);
-            };
-
-            const actionLog = (
-              opts: {
-                last?: number;
-                filter?: string;
-                action?: string;
-                source?: string;
-                pageId?: string;
-              } = {},
-            ) => {
-              return readActionLog(session, opts);
-            };
-
-            return {
-              page,
-              context,
-              state: execState,
-              browser,
-              networkLog,
-              actionLog,
-              console,
-              setTimeout,
-              setInterval,
-              clearTimeout,
-              clearInterval,
-              fetch,
-              URL,
-              Buffer,
-            };
-          })();
-
-    const helperNames = Object.keys(helpers);
-    const fn = compileExecFunction(cleanedCode, helperNames);
-
-    const result = await fn(...Object.values(helpers));
-    logger.info(`${mode}-success`, { session, hasResult: result !== undefined });
-    if (result !== undefined) {
-      console.log(
-        typeof result === "string" ? result : JSON.stringify(result, null, 2),
-      );
-    } else {
-      console.log("Executed successfully");
-    }
-  } catch (err) {
-    logger.error(`${mode}-error`, {
-      error: err,
-      session,
-      codePreview: cleanedCode.slice(0, 200),
-    });
-    throw err;
-  } finally {
-    clearInterval(stallInterval);
-    process.removeListener("SIGINT", sigintHandler);
-    disconnectBrowser(browser, logger, session);
-  }
+  return execViaDaemon(code, session, state.daemonSocketPath, logger, options);
 }
 
 function parseJsonArg(label: string, raw: string): unknown {
