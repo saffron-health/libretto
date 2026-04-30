@@ -114,12 +114,18 @@ format_epoch() {
 last_activity_epoch() {
     local wt_path="$1"
     local epoch
+    local reflog_selector
 
     # Fast approximation of the old "newest tracked file mtime" behavior.
     # Scanning every tracked file in every worktree made `wt list` slow enough
     # to feel hung on large checkouts.
-    epoch=$(git -C "$wt_path" reflog -1 --format=%ct HEAD 2>/dev/null || true)
-    if [ -z "$epoch" ]; then
+    reflog_selector=$(git -C "$wt_path" reflog -1 --date=unix --format=%gd HEAD 2>/dev/null || true)
+    if [ -n "$reflog_selector" ]; then
+        epoch="${reflog_selector#*@{}"
+        epoch="${epoch%\}}"
+    fi
+
+    if [[ ! "$epoch" =~ ^[0-9]+$ ]]; then
         epoch=$(git -C "$wt_path" log -1 --format=%ct HEAD 2>/dev/null || true)
     fi
 
