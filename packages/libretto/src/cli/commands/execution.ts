@@ -155,7 +155,6 @@ async function execViaCdpFallback(
     pageId: resolvedPageId,
   } = await connect(session, logger, 10000, {
     pageId,
-    requireSinglePage: true,
   });
 
   const STALL_THRESHOLD_MS = 60_000;
