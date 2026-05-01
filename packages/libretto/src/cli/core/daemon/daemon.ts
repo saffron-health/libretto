@@ -24,7 +24,7 @@ import {
   type BrowserContext,
   type Page,
 } from "playwright";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { appendFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
 import type { LibrettoWorkflowContext } from "../../../index.js";
@@ -44,6 +44,7 @@ import { wrapPageForActionLogging } from "../telemetry.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
+import { getPauseSignalPaths } from "../pause-signals.js";
 import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,
@@ -62,6 +63,53 @@ function isOperationalPage(page: Page): boolean {
 }
 
 type TelemetryEntry = Record<string, unknown>;
+
+function mirrorStdoutToFile(filePath: string): () => void {
+  const stdout = process.stdout;
+  const originalWrite = stdout.write.bind(stdout);
+
+  stdout.write = ((chunk: unknown, ...args: unknown[]) => {
+    try {
+      const buffer = Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(String(chunk), "utf8");
+      appendFileSync(filePath, buffer);
+    } catch {
+      // Ignore log mirroring failures; primary stdout should still flow.
+    }
+    return originalWrite(
+      chunk as string | Uint8Array,
+      ...(args as [BufferEncoding?, ((error?: Error | null) => void)?]),
+    );
+  }) as typeof stdout.write;
+
+  return () => {
+    stdout.write = originalWrite as typeof stdout.write;
+  };
+}
+
+async function writeWorkflowFailureSignal(args: {
+  session: string;
+  error: unknown;
+  phase: "setup" | "workflow";
+}): Promise<void> {
+  const signalPaths = getPauseSignalPaths(args.session);
+  const errorMessage =
+    args.error instanceof Error ? args.error.message : String(args.error);
+  await writeFile(
+    signalPaths.failedSignalPath,
+    JSON.stringify(
+      {
+        failedAt: new Date().toISOString(),
+        message: errorMessage,
+        phase: args.phase,
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+}
 
 // ── BrowserDaemon ──────────────────────────────────────────────────────
 
@@ -406,47 +454,74 @@ class BrowserDaemon {
     workflow: DaemonWorkflowConfig;
     headed: boolean;
   }): Promise<void> {
-    const absolutePath = getAbsoluteIntegrationPath(
-      args.workflow.integrationPath,
-    );
-    const workflow = await loadDefaultWorkflow(absolutePath);
-    const workflowLogger = this.logger.withScope("integration-run", {
-      integrationPath: absolutePath,
-      workflowName: workflow.name,
-      session: this.session,
-    });
-
-    console.log(
-      `Running workflow "${workflow.name}" from ${absolutePath} (${args.headed ? "headed" : "headless"})...`,
-    );
-
-    if (args.headed && args.workflow.visualize !== false) {
-      await installHeadedWorkflowVisualization({
-        context: this.context,
-        logger: workflowLogger,
+    const signalPaths = getPauseSignalPaths(this.session);
+    const restoreStdout = mirrorStdoutToFile(signalPaths.outputSignalPath);
+    try {
+      const absolutePath = getAbsoluteIntegrationPath(
+        args.workflow.integrationPath,
+      );
+      const workflow = await loadDefaultWorkflow(absolutePath);
+      const workflowLogger = this.logger.withScope("integration-run", {
+        integrationPath: absolutePath,
+        workflowName: workflow.name,
+        session: this.session,
       });
-    }
 
-    // tsx/esbuild can inject __name() wrappers when keepNames is true.
-    // Playwright serializes callbacks via Function#toString() into the browser
-    // context, which lacks __name, causing ReferenceError without this polyfill.
-    await this.context.addInitScript(() => {
-      (globalThis as Record<string, unknown>).__name = (
-        target: unknown,
-        value: string,
-      ) =>
-        Object.defineProperty(target as object, "name", {
-          value,
-          configurable: true,
+      console.log(
+        `Running workflow "${workflow.name}" from ${absolutePath} (${args.headed ? "headed" : "headless"})...`,
+      );
+
+      if (args.headed && args.workflow.visualize !== false) {
+        await installHeadedWorkflowVisualization({
+          context: this.context,
+          logger: workflowLogger,
         });
-    });
+      }
 
-    const workflowContext: LibrettoWorkflowContext = {
-      session: this.session,
-      page: this.page,
-    };
+      // tsx/esbuild can inject __name() wrappers when keepNames is true.
+      // Playwright serializes callbacks via Function#toString() into the browser
+      // context, which lacks __name, causing ReferenceError without this polyfill.
+      await this.context.addInitScript(() => {
+        (globalThis as Record<string, unknown>).__name = (
+          target: unknown,
+          value: string,
+        ) =>
+          Object.defineProperty(target as object, "name", {
+            value,
+            configurable: true,
+          });
+      });
 
-    await workflow.run(workflowContext, args.workflow.params ?? {});
+      const workflowContext: LibrettoWorkflowContext = {
+        session: this.session,
+        page: this.page,
+      };
+
+      try {
+        await workflow.run(workflowContext, args.workflow.params ?? {});
+      } catch (error) {
+        await writeWorkflowFailureSignal({
+          session: this.session,
+          error,
+          phase: "workflow",
+        });
+        return;
+      }
+
+      await writeFile(
+        signalPaths.completedSignalPath,
+        JSON.stringify({ completedAt: new Date().toISOString() }, null, 2),
+        "utf8",
+      );
+    } catch (error) {
+      await writeWorkflowFailureSignal({
+        session: this.session,
+        error,
+        phase: "setup",
+      });
+    } finally {
+      restoreStdout();
+    }
   }
 }
 
