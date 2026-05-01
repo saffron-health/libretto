@@ -7,6 +7,7 @@ import {
 } from "../core/config.js";
 import { LIBRETTO_CONFIG_PATH } from "../core/context.js";
 import { DEFAULT_SNAPSHOT_MODELS } from "../core/ai-model.js";
+import { librettoCommand } from "../core/package-manager.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
 const PROVIDER_ALIASES: Record<string, string> = {
@@ -63,7 +64,7 @@ export function runAiConfigure(
   } = {},
 ): void {
   const configureCommandName =
-    options.configureCommandName ?? "npx libretto ai configure";
+    options.configureCommandName ?? librettoCommand("ai configure");
   const configPath = options.configPath ?? LIBRETTO_CONFIG_PATH;
 
   const presetArg = input.preset?.trim();
@@ -135,7 +136,7 @@ export const aiCommands = SimpleCLI.group({
             preset: input.preset,
           },
           {
-            configureCommandName: `libretto ai configure`,
+            configureCommandName: librettoCommand("ai configure"),
           },
         );
       }),

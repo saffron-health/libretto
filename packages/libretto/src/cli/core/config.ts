@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import { SessionAccessModeSchema } from "../../shared/state/index.js";
 import { LIBRETTO_CONFIG_PATH } from "./context.js";
+import { librettoCommand } from "./package-manager.js";
 
 export const CURRENT_CONFIG_VERSION = 1;
 
@@ -67,7 +68,7 @@ function invalidConfigError(configPath: string, detail?: string): Error {
       '  - "snapshotModel", "viewport", "windowPosition", and "sessionMode" are optional.',
       '  - "snapshotModel" must be a provider/model string like "openai/gpt-5.4" or "anthropic/claude-sonnet-4-6".',
       "Fix the file to match this shape, or delete it and rerun:",
-      `  npx libretto ai configure openai | anthropic | gemini | vertex | openrouter`,
+      `  ${librettoCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}`,
     ]
       .filter(Boolean)
       .join("\n"),

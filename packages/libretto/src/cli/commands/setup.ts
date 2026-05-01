@@ -1,10 +1,5 @@
 import { createInterface } from "node:readline";
-import {
-  cpSync,
-  existsSync,
-  readdirSync,
-  rmSync,
-} from "node:fs";
+import { cpSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +14,11 @@ import {
   DEFAULT_SNAPSHOT_MODELS,
   resolveAiSetupStatus,
 } from "../core/ai-model.js";
+import {
+  detectProjectPackageManager,
+  installCommand,
+  librettoCommand,
+} from "../core/package-manager.js";
 import type { Provider } from "../core/resolve-model.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
@@ -29,26 +29,6 @@ const PROVIDER_SDK_PACKAGES: Record<Provider, string> = {
   vertex: "@ai-sdk/google-vertex",
   openrouter: "@ai-sdk/openai",
 };
-
-function detectPackageManager(): string {
-  if (existsSync(join(REPO_ROOT, "pnpm-lock.yaml"))) return "pnpm";
-  if (existsSync(join(REPO_ROOT, "yarn.lock"))) return "yarn";
-  if (existsSync(join(REPO_ROOT, "bun.lockb"))) return "bun";
-  return "npm";
-}
-
-function installCommand(pkgManager: string): string {
-  switch (pkgManager) {
-    case "yarn":
-      return "yarn add";
-    case "bun":
-      return "bun add";
-    case "pnpm":
-      return "pnpm add";
-    default:
-      return "npm install";
-  }
-}
 
 function isSdkInstalled(sdkPackage: string): boolean {
   try {
@@ -66,7 +46,7 @@ function installSdkIfNeeded(provider: Provider): void {
   const sdkPackage = PROVIDER_SDK_PACKAGES[provider];
   if (isSdkInstalled(sdkPackage)) return;
 
-  const pkgManager = detectPackageManager();
+  const pkgManager = detectProjectPackageManager();
   const cmd = installCommand(pkgManager);
   console.log(`\nInstalling ${sdkPackage}...`);
   const result = spawnSync(cmd, [sdkPackage], {
@@ -177,7 +157,7 @@ function printHealthySummary(status: AiSetupStatus & { kind: "ready" }): void {
     console.log(`✓ Using ${providerLabel(status.provider)} (${status.model}).`);
   }
   console.log(
-    "To change: npx libretto ai configure openai | anthropic | gemini | vertex | openrouter",
+    `To change: ${librettoCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}`,
   );
 }
 
@@ -254,14 +234,16 @@ function printSnapshotApiStatus(): boolean {
     console.log();
     console.log(formatMissingCredentialsMessage(plan));
     console.log(
-      `  To fix: add ${plan.envVar} to .env, or run \`npx libretto setup\` interactively to repair.`,
+      `  To fix: add ${plan.envVar} to .env, or run \`${librettoCommand("setup")}\` interactively to repair.`,
     );
     return false;
   }
 
   if (plan.kind === "repair-invalid-config") {
     printInvalidAiConfigWarning(status);
-    console.log("  Run `npx libretto setup` interactively to reconfigure.");
+    console.log(
+      `  Run \`${librettoCommand("setup")}\` interactively to reconfigure.`,
+    );
     return false;
   }
 
@@ -275,10 +257,10 @@ function printSnapshotApiStatus(): boolean {
     "    GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
   );
   console.log(
-    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter` to set a specific model.",
+    `  Or run \`${librettoCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}\` to set a specific model.`,
   );
   console.log(
-    "  Run `npx libretto setup` interactively to set up credentials.",
+    `  Run \`${librettoCommand("setup")}\` interactively to set up credentials.`,
   );
   return false;
 }
@@ -324,14 +306,14 @@ async function promptProviderSelection(
 
 function printSkipMessage(): void {
   console.log(
-    "\nSkipped. You can set up API credentials later by rerunning `npx libretto setup`.",
+    `\nSkipped. You can set up API credentials later by rerunning \`${librettoCommand("setup")}\`.`,
   );
   console.log("Or add credentials directly to your .env file:");
   console.log("  OPENAI_API_KEY=...");
   console.log("  ANTHROPIC_API_KEY=...");
   console.log("  GEMINI_API_KEY=...");
   console.log(
-    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter` to set a specific model.",
+    `  Or run \`${librettoCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}\` to set a specific model.`,
   );
 }
 
@@ -442,7 +424,7 @@ function copySkills(): void {
       "\n⚠️ No .agents/ or .claude/ directory found. Libretto skills were not installed.",
     );
     console.log(
-      "  Create one of these directories in your repo root and rerun `npx libretto setup` to install skills:",
+      `  Create one of these directories in your repo root and rerun \`${librettoCommand("setup")}\` to install skills:`,
     );
     console.log(`    mkdir ${join(REPO_ROOT, ".claude")}`);
     return;
@@ -510,7 +492,7 @@ export const setupCommand = SimpleCLI.command({
       const ready = printSnapshotApiStatus();
       if (!ready) {
         console.log(
-          "\nIf you're an agent, request the user to run `npx libretto setup`.",
+          `\nIf you're an agent, request the user to run \`${librettoCommand("setup")}\`.`,
         );
       }
     }
