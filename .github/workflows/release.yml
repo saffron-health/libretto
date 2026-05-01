@@ -197,3 +197,46 @@ jobs:
               --target "${GITHUB_SHA}" \
               --notes-file "$RUNNER_TEMP/changelog.md"
           fi
+
+      - name: Notify Discord
+        if: needs.verify.outputs.release_exists != 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          release_url="$(gh release view "${{ needs.verify.outputs.tag }}" --json url -q .url)"
+          title="Libretto ${{ needs.verify.outputs.tag }}"
+
+          python3 - "$RUNNER_TEMP/changelog.md" "$RUNNER_TEMP/discord.json" "$title" "$release_url" <<'PY'
+          import json
+          import sys
+
+          changelog_path, payload_path, title, release_url = sys.argv[1:]
+          notes = open(changelog_path, encoding="utf-8").read().strip()
+          description = f"{notes}\n\n{release_url}"
+          if len(description) > 4096:
+              suffix = f"\n\n…\n\nRead the full release notes: {release_url}"
+              description = description[: 4096 - len(suffix)].rstrip() + suffix
+
+          payload = {
+              "embeds": [
+                  {
+                      "title": title,
+                      "description": description,
+                      "url": release_url,
+                      "color": 5793266,
+                  }
+              ],
+              "allowed_mentions": {"parse": []},
+          }
+
+          with open(payload_path, "w", encoding="utf-8") as handle:
+              json.dump(payload, handle)
+          PY
+
+          curl -fsS \
+            -H "Content-Type: application/json" \
+            -d @"$RUNNER_TEMP/discord.json" \
+            "$DISCORD_WEBHOOK_URL"
