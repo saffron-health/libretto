@@ -33,6 +33,8 @@ export type DaemonWorkflowConfig = {
   integrationPath: string;
   params?: unknown;
   visualize?: boolean;
+  stayOpenOnSuccess?: boolean;
+  tsconfigPath?: string;
 };
 
 export type DaemonConfig = {

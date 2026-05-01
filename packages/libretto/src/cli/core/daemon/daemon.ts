@@ -27,6 +27,7 @@ import {
 import { mkdir } from "node:fs/promises";
 import { appendFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
+import type { LibrettoWorkflowContext } from "../../../index.js";
 import {
   createLoggerForSession,
   getSessionDir,
@@ -47,7 +48,13 @@ import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,
   type DaemonBrowserConnectConfig,
+  type DaemonWorkflowConfig,
 } from "./config.js";
+import {
+  getAbsoluteIntegrationPath,
+  installHeadedWorkflowVisualization,
+  loadDefaultWorkflow,
+} from "../../workers/run-integration-runtime.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -394,12 +401,61 @@ class BrowserDaemon {
         );
     }
   }
+
+  async runWorkflow(args: {
+    workflow: DaemonWorkflowConfig;
+    headed: boolean;
+  }): Promise<void> {
+    const absolutePath = getAbsoluteIntegrationPath(
+      args.workflow.integrationPath,
+    );
+    const workflow = await loadDefaultWorkflow(absolutePath);
+    const workflowLogger = this.logger.withScope("integration-run", {
+      integrationPath: absolutePath,
+      workflowName: workflow.name,
+      session: this.session,
+    });
+
+    console.log(
+      `Running workflow "${workflow.name}" from ${absolutePath} (${args.headed ? "headed" : "headless"})...`,
+    );
+
+    if (args.headed && args.workflow.visualize !== false) {
+      await installHeadedWorkflowVisualization({
+        context: this.context,
+        logger: workflowLogger,
+      });
+    }
+
+    // tsx/esbuild can inject __name() wrappers when keepNames is true.
+    // Playwright serializes callbacks via Function#toString() into the browser
+    // context, which lacks __name, causing ReferenceError without this polyfill.
+    await this.context.addInitScript(() => {
+      (globalThis as Record<string, unknown>).__name = (
+        target: unknown,
+        value: string,
+      ) =>
+        Object.defineProperty(target as object, "name", {
+          value,
+          configurable: true,
+        });
+    });
+
+    const workflowContext: LibrettoWorkflowContext = {
+      session: this.session,
+      page: this.page,
+    };
+
+    await workflow.run(workflowContext, args.workflow.params ?? {});
+  }
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const config = JSON.parse(process.argv[2]) as DaemonConfig;
+  const headed =
+    config.browser.kind === "launch" ? config.browser.headed : false;
 
   const daemon =
     config.browser.kind === "connect"
@@ -411,6 +467,16 @@ async function main(): Promise<void> {
           session: config.session,
           browser: config.browser,
         });
+
+  if (config.workflow) {
+    void daemon
+      .runWorkflow({ workflow: config.workflow, headed })
+      .catch((error) => {
+        daemon.logger.error("workflow-failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }
 
   process.on("SIGTERM", () => {
     void daemon.shutdown("child-sigterm", true);

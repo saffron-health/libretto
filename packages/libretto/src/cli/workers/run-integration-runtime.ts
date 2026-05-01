@@ -152,7 +152,7 @@ function getMissingLocalAuthProfileError(args: {
   ].join("\n");
 }
 
-function getAbsoluteIntegrationPath(integrationPath: string): string {
+export function getAbsoluteIntegrationPath(integrationPath: string): string {
   const absolutePath = isAbsolute(integrationPath)
     ? integrationPath
     : resolve(cwd(), integrationPath);
@@ -162,7 +162,7 @@ function getAbsoluteIntegrationPath(integrationPath: string): string {
   return absolutePath;
 }
 
-async function loadDefaultWorkflow(
+export async function loadDefaultWorkflow(
   absolutePath: string,
 ): Promise<LoadedLibrettoWorkflow> {
   let loadedModule: Record<string, unknown>;
