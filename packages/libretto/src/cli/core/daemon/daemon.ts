@@ -44,10 +44,9 @@ import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
 import {
-  isConnectConfig,
   type DaemonConfig,
-  type DaemonLaunchConfig,
-  type DaemonConnectConfig,
+  type DaemonBrowserLaunchConfig,
+  type DaemonBrowserConnectConfig,
 } from "./config.js";
 
 function isOperationalPage(page: Page): boolean {
@@ -179,6 +178,7 @@ class BrowserDaemon {
 
     handler = (request) => daemon.handleRequest(request);
     await ipcServer.listen();
+    process.send?.({ type: "ready", socketPath });
     daemon.logger.info("ipc-server-listening", { socketPath });
 
     browser.on("disconnected", () => {
@@ -190,7 +190,11 @@ class BrowserDaemon {
 
   // ── Launch mode ────────────────────────────────────────────────────
 
-  static async launchBrowser(config: DaemonLaunchConfig): Promise<BrowserDaemon> {
+  static async launchBrowser(args: {
+    session: string;
+    browser: DaemonBrowserLaunchConfig;
+  }): Promise<BrowserDaemon> {
+    const { session, browser: config } = args;
     const windowPositionArg = config.windowPosition
       ? `--window-position=${config.windowPosition.x},${config.windowPosition.y}`
       : undefined;
@@ -199,7 +203,9 @@ class BrowserDaemon {
       headless: !config.headed,
       args: [
         "--disable-blink-features=AutomationControlled",
-        `--remote-debugging-port=${config.port}`,
+        ...(config.remoteDebuggingPort
+          ? [`--remote-debugging-port=${config.remoteDebuggingPort}`]
+          : []),
         "--remote-debugging-address=127.0.0.1",
         "--no-focus-on-check",
         ...(windowPositionArg ? [windowPositionArg] : []),
@@ -223,19 +229,19 @@ class BrowserDaemon {
     page.setDefaultNavigationTimeout(45000);
 
     const daemon = await BrowserDaemon.initialize({
-      session: config.session,
+      session,
       externallyManaged: false,
       browser,
       context,
       page,
       initialPages: [page],
-      navigateUrl: config.url,
+      navigateUrl: config.initialUrl,
     });
 
     daemon.logger.info("child-launched", {
-      port: config.port,
+      port: config.remoteDebuggingPort,
       pid: process.pid,
-      session: config.session,
+      session,
     });
 
     return daemon;
@@ -244,8 +250,12 @@ class BrowserDaemon {
   // ── Connect mode ───────────────────────────────────────────────────
 
   static async connectToEndpoint(
-    config: DaemonConnectConfig,
+    args: {
+      session: string;
+      browser: DaemonBrowserConnectConfig;
+    },
   ): Promise<BrowserDaemon> {
+    const { session, browser: config } = args;
     const browser = await chromium.connectOverCDP(config.cdpEndpoint);
 
     // Discover existing contexts and pages.
@@ -259,21 +269,20 @@ class BrowserDaemon {
         : await context.newPage();
 
     const daemon = await BrowserDaemon.initialize({
-      session: config.session,
+      session,
       externallyManaged: true,
       browser,
       context,
       page,
-      initialPages:
-        operationalPages.length > 0 ? operationalPages : [page],
-      navigateUrl: config.url,
+      initialPages: operationalPages.length > 0 ? operationalPages : [page],
+      navigateUrl: config.initialUrl,
     });
 
     daemon.logger.info("child-connected", {
       cdpEndpoint: config.cdpEndpoint,
-      url: config.url,
+      url: config.initialUrl,
       pid: process.pid,
-      session: config.session,
+      session,
     });
 
     return daemon;
@@ -392,9 +401,16 @@ class BrowserDaemon {
 async function main(): Promise<void> {
   const config = JSON.parse(process.argv[2]) as DaemonConfig;
 
-  const daemon = isConnectConfig(config)
-    ? await BrowserDaemon.connectToEndpoint(config)
-    : await BrowserDaemon.launchBrowser(config);
+  const daemon =
+    config.browser.kind === "connect"
+      ? await BrowserDaemon.connectToEndpoint({
+          session: config.session,
+          browser: config.browser,
+        })
+      : await BrowserDaemon.launchBrowser({
+          session: config.session,
+          browser: config.browser,
+        });
 
   process.on("SIGTERM", () => {
     void daemon.shutdown("child-sigterm", true);

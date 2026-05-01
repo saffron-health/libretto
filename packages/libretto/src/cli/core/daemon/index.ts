@@ -3,6 +3,8 @@ export {
   DaemonClient,
   DaemonClientError,
   getDaemonSocketPath,
+  type DaemonClientSpawnOptions,
+  type DaemonClientSpawnResult,
   type DaemonCommandResult,
   type DaemonExecOutput,
   type DaemonRequest,
@@ -12,13 +14,8 @@ export {
 } from "./ipc.js";
 
 export {
-  type DaemonLaunchConfig,
-  type DaemonConnectConfig,
+  type DaemonBrowserLaunchConfig,
+  type DaemonBrowserConnectConfig,
+  type DaemonWorkflowConfig,
   type DaemonConfig,
 } from "./config.js";
-
-export {
-  spawnSessionDaemon,
-  type SpawnSessionDaemonOptions,
-  type SpawnSessionDaemonResult,
-} from "./spawn.js";

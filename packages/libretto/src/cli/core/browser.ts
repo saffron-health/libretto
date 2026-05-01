@@ -24,7 +24,7 @@ import {
 } from "./session.js";
 import type { ProviderApi } from "./providers/types.js";
 import { getCloudProviderApi } from "./providers/index.js";
-import { DaemonClient, spawnSessionDaemon } from "./daemon/index.js";
+import { DaemonClient } from "./daemon/index.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const FORCE_CLOSE_WAIT_MS = 300;
@@ -453,24 +453,26 @@ export async function runOpen(
   // Spawn daemon and wait for IPC readiness. The daemon launches
   // Chromium internally — IPC readiness implies the browser is up,
   // so no separate CDP polling is needed.
-  const { pid, socketPath: daemonSocketPath } = await spawnSessionDaemon({
+  const { pid, socketPath: daemonSocketPath } = await DaemonClient.spawn({
     config: {
-      port,
-      url,
       session,
-      headed,
-      viewport,
-      storageStatePath: useProfile ? profilePath : undefined,
-      windowPosition,
+      browser: {
+        kind: "launch",
+        headed,
+        viewport,
+        storageStatePath: useProfile ? profilePath : undefined,
+        windowPosition,
+        remoteDebuggingPort: port,
+        initialUrl: url,
+      },
     },
-    session,
     logger,
     logPath: runLogPath,
     // The daemon launches Chromium, installs telemetry, navigates to
     // the URL, and only then starts IPC. Navigation alone can take up
     // to 45s (page.setDefaultNavigationTimeout), so the IPC timeout
     // must cover launch + navigation.
-    ipcTimeoutMs: 60_000,
+    startupTimeoutMs: 60_000,
   });
 
   writeSessionState(
@@ -528,18 +530,19 @@ export async function runOpenWithProvider(
   console.log(`Connecting to ${providerName} browser...`);
 
   const runLogPath = logFileForSession(session);
-  const { pid, socketPath: daemonSocketPath } = await spawnSessionDaemon({
+  const { pid, socketPath: daemonSocketPath } = await DaemonClient.spawn({
     config: {
-      mode: "connect" as const,
       session,
-      cdpEndpoint: providerSession.cdpEndpoint,
-      url,
+      browser: {
+        kind: "connect",
+        cdpEndpoint: providerSession.cdpEndpoint,
+        initialUrl: url,
+      },
     },
-    session,
     logger,
     logPath: runLogPath,
     // Remote CDP connection + navigation; must cover both.
-    ipcTimeoutMs: 60_000,
+    startupTimeoutMs: 60_000,
     onFailure: () => provider.closeSession(providerSession.sessionId),
   });
 
@@ -1024,12 +1027,14 @@ export async function runConnect(
 
   const runLogPath = logFileForSession(session);
   const { pid, socketPath: daemonSocketPath, client } =
-    await spawnSessionDaemon({
-      config: { mode: "connect" as const, session, cdpEndpoint: endpoint },
-      session,
+    await DaemonClient.spawn({
+      config: {
+        session,
+        browser: { kind: "connect", cdpEndpoint: endpoint },
+      },
       logger,
       logPath: runLogPath,
-      ipcTimeoutMs: 10_000,
+      startupTimeoutMs: 10_000,
     });
 
   writeSessionState(
