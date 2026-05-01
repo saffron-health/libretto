@@ -38,7 +38,7 @@ export type SpawnSessionDaemonOptions = {
 export type SpawnSessionDaemonResult = {
   /** PID of the detached daemon child process. */
   pid: number;
-  /** Unix domain socket path for daemon IPC. */
+  /** Platform-specific IPC endpoint for the daemon. */
   socketPath: string;
   /** Ready-to-use IPC client (already confirmed reachable via ping). */
   client: DaemonClient;

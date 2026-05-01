@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServer, connect as netConnect, type Server } from "node:net";
 import { unlink } from "node:fs/promises";
+import { homedir, userInfo } from "node:os";
 import { REPO_ROOT } from "../context.js";
 
 export type DaemonExecOutput = { stdout: string; stderr: string };
@@ -56,22 +57,58 @@ export type DaemonCommandResult<T> =
 // ---------------------------------------------------------------------------
 
 /**
- * Deterministic Unix domain socket path for a given session.
+ * Deterministic IPC endpoint for a given session.
  *
- * The path lives in `/tmp` to stay well under the macOS 104-byte Unix socket
- * path limit. The hash combines `REPO_ROOT` and the session name so different
- * repos (or sessions within the same repo) never collide.
+ * Unix-like platforms use a socket path in `/tmp` to stay well under the macOS
+ * 104-byte Unix socket path limit. Windows uses a named pipe path because
+ * filesystem Unix domain socket paths are not portable there.
+ *
+ * The hash combines `REPO_ROOT`, the session name, and a user key so different
+ * repos, sessions, or local users never collide.
  */
 export function getDaemonSocketPath(session: string): string {
+  const userKey = getDaemonUserKey();
   const hash = createHash("sha256")
-    .update(`${REPO_ROOT}:${session}`)
+    .update(`${REPO_ROOT}:${session}:${userKey}`)
     .digest("hex")
     .slice(0, 12);
-  return `/tmp/libretto-${process.getuid!()}-${hash}.sock`;
+
+  if (process.platform === "win32") {
+    return `\\\\.\\pipe\\libretto-${hash}`;
+  }
+
+  return `/tmp/libretto-${userKey}-${hash}.sock`;
+}
+
+function getDaemonUserKey(): string {
+  if (typeof process.getuid === "function") return String(process.getuid());
+
+  try {
+    const info = userInfo();
+    if (info.username) return info.username;
+  } catch {
+    // Fall back below.
+  }
+
+  return createHash("sha256").update(homedir()).digest("hex").slice(0, 12);
+}
+
+export function isWindowsNamedPipePath(socketPath: string): boolean {
+  return socketPath.startsWith("\\\\.\\pipe\\");
+}
+
+async function unlinkSocketFileIfNeeded(socketPath: string): Promise<void> {
+  if (isWindowsNamedPipePath(socketPath)) return;
+
+  try {
+    await unlink(socketPath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
-// DaemonServer — Unix domain socket server, NDJSON, one request per connection
+// DaemonServer — IPC server, NDJSON, one request per connection
 // ---------------------------------------------------------------------------
 
 export type RequestHandler = (request: DaemonRequest) => Promise<unknown>;
@@ -85,12 +122,7 @@ export class DaemonServer {
   ) {}
 
   async listen(): Promise<void> {
-    // Remove stale socket file if present.
-    try {
-      await unlink(this.socketPath);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-    }
+    await unlinkSocketFileIfNeeded(this.socketPath);
 
     const server = createServer((socket) => {
       let buffer = "";
@@ -148,11 +180,7 @@ export class DaemonServer {
       server.close((err) => (err ? reject(err) : resolve()));
     });
 
-    try {
-      await unlink(this.socketPath);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-    }
+    await unlinkSocketFileIfNeeded(this.socketPath);
   }
 }
 
@@ -178,7 +206,7 @@ export type DaemonResultMap = {
 };
 
 // ---------------------------------------------------------------------------
-// DaemonClient — connects to UDS, sends NDJSON request, reads response
+// DaemonClient — connects to IPC, sends NDJSON request, reads response
 // ---------------------------------------------------------------------------
 
 export class DaemonClient {
