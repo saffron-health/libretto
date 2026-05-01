@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
+import { runCommand } from "../src/cli/core/run-command.js";
 
 const packageJsonUrl = new URL("../package.json", import.meta.url);
 
@@ -40,7 +41,7 @@ function expectMissingSessionError(output: string, session: string): void {
   expect(output).toContain(`No session "${session}" found.`);
   expect(output).toContain("No active sessions.");
   expect(output).toContain("Start one with:");
-  expect(output).toContain(`libretto open <url> --session ${session}`);
+  expect(output).toContain(runCommand(`open <url> --session ${session}`));
 }
 
 async function readCliVersion(): Promise<string> {
@@ -74,7 +75,7 @@ function expectedSkillVersionWarning(
   skillVersion: string,
   cliVersion: string,
 ): string {
-  return `Warning: Your agent skill (${skillVersion}) is out of date with your Libretto CLI (${cliVersion}). Please run \`npx libretto setup\` to update your skills to the correct version.`;
+  return `Warning: Your agent skill (${skillVersion}) is out of date with your Libretto CLI (${cliVersion}). Please run \`${runCommand("setup")}\` to update your skills to the correct version.`;
 }
 
 describe("basic CLI subprocess behavior", () => {
@@ -110,7 +111,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Detected OPENAI_API_KEY");
     expect(result.stdout).toContain("config.json");
     expect(result.stdout).toContain(
-      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+      `To change: ${runCommand("ai configure openai | anthropic | gemini | vertex")}`,
     );
   });
 
@@ -163,7 +164,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(second.stdout).toContain("Using OpenAI");
     expect(second.stdout).toContain("config.json");
     expect(second.stdout).toContain(
-      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+      `To change: ${runCommand("ai configure openai | anthropic | gemini | vertex")}`,
     );
     // Should NOT contain the unconfigured prompts
     expect(second.stdout).not.toContain(
@@ -293,7 +294,7 @@ describe("basic CLI subprocess behavior", () => {
 
   test("prints usage for --help", async ({ librettoCli }) => {
     const result = await librettoCli("--help");
-    expect(result.stdout).toContain("Usage: libretto <command>");
+    expect(result.stdout).toContain(`Usage: ${runCommand()} <command>`);
     expect(result.stdout).toContain("readonly-exec");
     expect(result.stdout).toContain("snapshot");
     expect(result.stdout).toContain("Capture PNG + HTML");
@@ -305,7 +306,7 @@ describe("basic CLI subprocess behavior", () => {
 
   test("prints usage for help command", async ({ librettoCli }) => {
     const result = await librettoCli("help");
-    expect(result.stdout).toContain("Usage: libretto <command>");
+    expect(result.stdout).toContain(`Usage: ${runCommand()} <command>`);
     expect(result.stdout).toContain("Commands:");
     expect(result.stdout).toContain("open");
     expect(result.stdout).toContain("ai");
@@ -326,7 +327,7 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("help ai configure");
     expect(result.stdout).toContain("Configure AI runtime");
     expect(result.stdout).toContain(
-      "Usage: libretto ai configure [preset] [options]",
+      `Usage: ${runCommand("ai configure")} [preset] [options]`,
     );
     expect(result.stderr).toBe("");
   });
@@ -337,7 +338,7 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("help experimental");
     expect(result.stdout).toContain("Experimental commands");
     expect(result.stdout).toContain(
-      "Usage: libretto experimental <subcommand>",
+      `Usage: ${runCommand("experimental")} <subcommand>`,
     );
     expect(result.stdout).toContain("deploy");
     expect(result.stderr).toBe("");
@@ -351,7 +352,7 @@ describe("basic CLI subprocess behavior", () => {
       "Run the default-exported Libretto workflow from a file",
     );
     expect(result.stdout).toContain(
-      "Usage: libretto run [integrationFile] [options]",
+      `Usage: ${runCommand("run")} [integrationFile] [options]`,
     );
     expect(result.stdout).toContain("--read-only");
     expect(result.stdout).toContain("--no-visualize");
@@ -365,7 +366,7 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("help session-mode");
     expect(result.stdout).toContain("View or set the session access mode");
     expect(result.stdout).toContain(
-      "Usage: libretto session-mode [mode] [options]",
+      `Usage: ${runCommand("session-mode")} [mode] [options]`,
     );
     expect(result.stderr).toBe("");
   });
@@ -373,13 +374,13 @@ describe("basic CLI subprocess behavior", () => {
   test("fails unknown command with a clear error", async ({ librettoCli }) => {
     const result = await librettoCli("nope-command");
     expect(result.stderr).toContain("Unknown command: nope-command");
-    expect(result.stdout).toContain("Usage: libretto <command>");
+    expect(result.stdout).toContain(`Usage: ${runCommand()} <command>`);
   });
 
   test("fails open with missing url usage error", async ({ librettoCli }) => {
     const result = await librettoCli("open");
     expect(result.stderr).toContain(
-      "Usage: libretto open <url> [--headless] [--read-only|--write-access] [--auth-profile <domain>] [--viewport WxH] [--session <name>]",
+      `Usage: ${runCommand("open <url>")} [--headless] [--read-only|--write-access] [--auth-profile <domain>] [--viewport WxH] [--session <name>]`,
     );
   });
 
@@ -501,7 +502,7 @@ describe("basic CLI subprocess behavior", () => {
   test("fails exec with missing code usage error", async ({ librettoCli }) => {
     const result = await librettoCli("exec --session test");
     expect(result.stderr).toContain(
-      "Usage: libretto exec <code|-> [--session <name>] [--visualize]",
+      `Usage: ${runCommand("exec <code|->")} [--session <name>] [--visualize]`,
     );
   });
 
@@ -510,7 +511,7 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("exec --visualize --session test");
     expect(result.stderr).toContain(
-      "Usage: libretto exec <code|-> [--session <name>] [--visualize]",
+      `Usage: ${runCommand("exec <code|->")} [--session <name>] [--visualize]`,
     );
     expect(result.stderr).not.toContain(
       `Missing required --session for "exec".`,
@@ -522,7 +523,7 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const result = await librettoCli("readonly-exec --session test");
     expect(result.stderr).toContain(
-      "Usage: libretto readonly-exec <code|-> [--session <name>] [--page <id>]",
+      `Usage: ${runCommand("readonly-exec <code|->")} [--session <name>] [--page <id>]`,
     );
   });
 
@@ -902,9 +903,9 @@ export default workflow("main", async () => {
       'Local auth profile not found for domain "app.example.com".',
     );
     expect(result.stderr).toContain(
-      "libretto open https://app.example.com --headed --session",
+      runCommand("open https://app.example.com --headed --session"),
     );
-    expect(result.stderr).toContain("libretto save app.example.com --session");
+    expect(result.stderr).toContain(runCommand("save app.example.com --session"));
   });
 
   test("does not require local auth profile when auth metadata is absent", async ({
@@ -1104,7 +1105,7 @@ export default workflow("main", async (ctx) => {
   }) => {
     const result = await librettoCli("save --session test");
     expect(result.stderr).toContain(
-      "Usage: libretto save <url|domain> --session <name>",
+      `Usage: ${runCommand("save <url|domain>")} --session <name>`,
     );
   });
 

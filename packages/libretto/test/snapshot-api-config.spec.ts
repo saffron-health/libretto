@@ -6,6 +6,7 @@ import {
   resolveSnapshotApiModel,
 } from "../src/cli/core/ai-model.js";
 import { LIBRETTO_CONFIG_PATH } from "../src/cli/core/context.js";
+import { runCommand } from "../src/cli/core/run-command.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -112,7 +113,7 @@ describe("snapshot API model resolution", () => {
     clearProviderEnv();
 
     expect(() => resolveSnapshotApiModelOrThrow(null)).toThrowError(
-      "Failed to analyze snapshot because no snapshot analyzer is configured. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_CLOUD_PROJECT, or OPENROUTER_API_KEY to .env or as a shell environment variable, or choose a default model with `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter`. For more info, run `npx libretto setup`.",
+      `Failed to analyze snapshot because no snapshot analyzer is configured. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_CLOUD_PROJECT, or OPENROUTER_API_KEY to .env or as a shell environment variable, or choose a default model with \`${runCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}\`. For more info, run \`${runCommand("setup")}\`.`,
     );
   });
 
@@ -158,7 +159,7 @@ describe("snapshot API model resolution", () => {
     expect(() =>
       resolveSnapshotApiModelOrThrow("openai/gpt-5.4"),
     ).toThrowError(
-      `Failed to analyze snapshot because openai is configured in ${LIBRETTO_CONFIG_PATH}, but OPENAI_API_KEY is missing. Add OPENAI_API_KEY to .env or as a shell environment variable. For more info, run \`npx libretto setup\`.`,
+      `Failed to analyze snapshot because openai is configured in ${LIBRETTO_CONFIG_PATH}, but OPENAI_API_KEY is missing. Add OPENAI_API_KEY to .env or as a shell environment variable. For more info, run \`${runCommand("setup")}\`.`,
     );
   });
 });

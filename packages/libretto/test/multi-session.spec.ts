@@ -1,5 +1,6 @@
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
+import { runCommand } from "../src/cli/core/run-command.js";
 
 function extractReturnedSessionId(output: string): string | null {
   const patterns = [
@@ -178,6 +179,6 @@ export default workflow("main", async () => {
     expect(secondOpen.stderr).toContain(
       `Session "${session}" is already open and connected to`,
     );
-    expect(secondOpen.stderr).toContain(`libretto close --session ${session}`);
+    expect(secondOpen.stderr).toContain(runCommand(`close --session ${session}`));
   }, 60_000);
 });

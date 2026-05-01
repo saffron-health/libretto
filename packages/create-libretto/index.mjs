@@ -138,20 +138,9 @@ function addCommand(pkgManager) {
   }
 }
 
-/** Return the run command for scripts (used in next-steps messaging). */
+/** Return the run command for scripts (used in generated instructions). */
 function runCommand(pkgManager) {
-  switch (pkgManager) {
-    case "npm":
-      return "npx";
-    case "pnpm":
-      return "pnpm exec";
-    case "yarn":
-      return "yarn";
-    case "bun":
-      return "bunx";
-    default:
-      return "npx";
-  }
+  return execCommand(pkgManager);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,7 +412,7 @@ export async function scaffoldProject(
         stdio: "inherit",
       });
     } catch {
-      console.error(`\nFailed to run libretto setup.`);
+      console.error(`\nFailed to run Libretto setup.`);
       process.exit(1);
     }
 

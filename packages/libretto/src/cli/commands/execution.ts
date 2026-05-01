@@ -21,6 +21,7 @@ import { readLibrettoConfig } from "../core/config.js";
 import { resolveProviderName, getCloudProviderApi } from "../core/providers/index.js";
 import { stripEmptyCatchHandlers } from "../core/exec-compiler.js";
 import { DaemonClient } from "../core/daemon/index.js";
+import { runCommand as formatRunCommand } from "../core/run-command.js";
 import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
@@ -122,7 +123,7 @@ async function runExec(
   if (!state.daemonSocketPath) {
     throw new Error(
       `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
-        `Close and reopen the session: libretto close --session ${session}`,
+        `Close and reopen the session: ${formatRunCommand(`close --session ${session}`)}`,
     );
   }
   return execViaDaemon(code, session, state.daemonSocketPath, logger, options);
@@ -325,7 +326,7 @@ async function runResume(
 
   if (!existsSync(pausedSignalPath)) {
     throw new Error(
-      `Session "${session}" is not paused. Run "libretto run ... --session ${session}" and call pause("${session}") first.`,
+      `Session "${session}" is not paused. Run "${formatRunCommand(`run ... --session ${session}`)}" and call pause("${session}") first.`,
     );
   }
 
@@ -480,7 +481,7 @@ export const execInput = SimpleCLI.input({
   },
 }).refine(
   (input) => input.code !== undefined,
-  `Usage: libretto exec <code|-> [--session <name>] [--visualize]\n       echo '<code>' | libretto exec - [--session <name>] [--visualize]`,
+  `Usage: ${formatRunCommand("exec <code|->")} [--session <name>] [--visualize]\n       echo '<code>' | ${formatRunCommand("exec -")} [--session <name>] [--visualize]`,
 );
 
 export const execCommand = SimpleCLI.command({
@@ -521,7 +522,7 @@ export const readonlyExecInput = SimpleCLI.input({
   },
 }).refine(
   (input) => input.code !== undefined,
-  `Usage: libretto readonly-exec <code|-> [--session <name>] [--page <id>]\n       echo '<code>' | libretto readonly-exec - [--session <name>] [--page <id>]`,
+  `Usage: ${formatRunCommand("readonly-exec <code|->")} [--session <name>] [--page <id>]\n       echo '<code>' | ${formatRunCommand("readonly-exec -")} [--session <name>] [--page <id>]`,
 );
 
 export const readonlyExecCommand = SimpleCLI.command({
@@ -543,7 +544,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     });
   });
 
-const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--viewport WxH]`;
+const runUsage = `Usage: ${formatRunCommand("run <integrationFile>")} [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--viewport WxH]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [

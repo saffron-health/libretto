@@ -14,6 +14,7 @@ import {
   LIBRETTO_CONFIG_PATH,
   REPO_ROOT,
 } from "../core/context.js";
+import { runCommand } from "../core/run-command.js";
 import {
   type AiSetupStatus,
   DEFAULT_SNAPSHOT_MODELS,
@@ -177,7 +178,7 @@ function printHealthySummary(status: AiSetupStatus & { kind: "ready" }): void {
     console.log(`✓ Using ${providerLabel(status.provider)} (${status.model}).`);
   }
   console.log(
-    "To change: npx libretto ai configure openai | anthropic | gemini | vertex | openrouter",
+    `To change: ${runCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}`,
   );
 }
 
@@ -254,14 +255,14 @@ function printSnapshotApiStatus(): boolean {
     console.log();
     console.log(formatMissingCredentialsMessage(plan));
     console.log(
-      `  To fix: add ${plan.envVar} to .env, or run \`npx libretto setup\` interactively to repair.`,
+      `  To fix: add ${plan.envVar} to .env, or run \`${runCommand("setup")}\` interactively to repair.`,
     );
     return false;
   }
 
   if (plan.kind === "repair-invalid-config") {
     printInvalidAiConfigWarning(status);
-    console.log("  Run `npx libretto setup` interactively to reconfigure.");
+    console.log(`  Run \`${runCommand("setup")}\` interactively to reconfigure.`);
     return false;
   }
 
@@ -275,10 +276,10 @@ function printSnapshotApiStatus(): boolean {
     "    GOOGLE_CLOUD_PROJECT=...  # plus application default credentials for Vertex",
   );
   console.log(
-    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter` to set a specific model.",
+    `  Or run \`${runCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}\` to set a specific model.`,
   );
   console.log(
-    "  Run `npx libretto setup` interactively to set up credentials.",
+    `  Run \`${runCommand("setup")}\` interactively to set up credentials.`,
   );
   return false;
 }
@@ -324,14 +325,14 @@ async function promptProviderSelection(
 
 function printSkipMessage(): void {
   console.log(
-    "\nSkipped. You can set up API credentials later by rerunning `npx libretto setup`.",
+    `\nSkipped. You can set up API credentials later by rerunning \`${runCommand("setup")}\`.`,
   );
   console.log("Or add credentials directly to your .env file:");
   console.log("  OPENAI_API_KEY=...");
   console.log("  ANTHROPIC_API_KEY=...");
   console.log("  GEMINI_API_KEY=...");
   console.log(
-    "  Or run `npx libretto ai configure openai | anthropic | gemini | vertex | openrouter` to set a specific model.",
+    `  Or run \`${runCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}\` to set a specific model.`,
   );
 }
 
@@ -442,7 +443,7 @@ function copySkills(): void {
       "\n⚠️ No .agents/ or .claude/ directory found. Libretto skills were not installed.",
     );
     console.log(
-      "  Create one of these directories in your repo root and rerun `npx libretto setup` to install skills:",
+      `  Create one of these directories in your repo root and rerun \`${runCommand("setup")}\` to install skills:`,
     );
     console.log(`    mkdir ${join(REPO_ROOT, ".claude")}`);
     return;
@@ -510,7 +511,7 @@ export const setupCommand = SimpleCLI.command({
       const ready = printSnapshotApiStatus();
       if (!ready) {
         console.log(
-          "\nIf you're an agent, request the user to run `npx libretto setup`.",
+          `\nIf you're an agent, request the user to run \`${runCommand("setup")}\`.`,
         );
       }
     }

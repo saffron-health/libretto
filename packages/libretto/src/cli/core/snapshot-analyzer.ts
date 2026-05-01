@@ -17,6 +17,7 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
+import { runCommand } from "./run-command.js";
 // Used by the legacy CLI-agent path (UserCodingAgent) which is preserved but
 // not wired into the snapshot command. The active config schema (ai-config.ts)
 // no longer has preset/commandPrefix — this type is kept for the legacy code.
@@ -297,7 +298,7 @@ async function runExternalCommand(
       if (error.code === "ENOENT") {
         reject(
           new Error(
-            `Command not found: ${command}. Configure AI with 'libretto ai configure'.`,
+            `Command not found: ${command}. Configure AI with '${runCommand("ai configure")}'.`,
           ),
         );
         return;
@@ -830,7 +831,7 @@ export async function runInterpret(
   const configuredAgent = UserCodingAgent.getConfigured();
   if (!configuredAgent) {
     throw new Error(
-      "No AI config set. Run 'npx libretto ai configure codex' (or claude/gemini), or set API credentials in your .env file for direct API analysis.",
+      `No AI config set. Run '${runCommand("ai configure codex")}' (or claude/gemini), or set API credentials in your .env file for direct API analysis.`,
     );
   }
 
@@ -840,7 +841,7 @@ export async function runInterpret(
   // re-enabled, the caller must supply a valid provider/model-id string.
   throw new Error(
     "The CLI-agent snapshot analysis path is not active. " +
-      "Update your config to the current format with `npx libretto ai configure <provider>`, " +
+      `Update your config to the current format with \`${runCommand("ai configure <provider>")}\`, ` +
       "or set API credentials in .env for direct API analysis.",
   );
 

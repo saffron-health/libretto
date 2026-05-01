@@ -10,6 +10,7 @@
  */
 
 import { readAuthState, writeAuthState, type AuthState } from "./auth-storage.js";
+import { runCommand } from "./run-command.js";
 
 export const HOSTED_API_URL = "https://api.libretto.sh";
 
@@ -19,8 +20,8 @@ export const HOSTED_API_URL = "https://api.libretto.sh";
  */
 export const NOT_AUTHENTICATED_MESSAGE = [
   "Not authenticated.",
-  "  • Cookie expired or never set: run `libretto experimental auth login` to refresh it.",
-  "  • Or set LIBRETTO_API_KEY in your .env (issue one with `libretto experimental auth api-key issue --label <label>` after logging in).",
+  `  • Cookie expired or never set: run \`${runCommand("experimental auth login")}\` to refresh it.`,
+  `  • Or set LIBRETTO_API_KEY in your .env (issue one with \`${runCommand("experimental auth api-key issue --label <label>")}\` after logging in).`,
 ].join("\n");
 
 export type CredentialSource = "env-api-key" | "cookie" | "none";

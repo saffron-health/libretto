@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import { pathToFileURL } from "node:url";
 import { describe, expect, onTestFinished } from "vitest";
 import { test } from "./fixtures";
+import { runCommand } from "../src/cli/core/run-command.js";
 
 function extractReturnedSessionId(output: string): string | null {
   const patterns = [
@@ -39,7 +40,7 @@ function expectMissingSessionError(output: string, session: string): void {
   expect(output).toContain(`No session "${session}" found.`);
   expect(output).toContain("No active sessions.");
   expect(output).toContain("Start one with:");
-  expect(output).toContain(`libretto open <url> --session ${session}`);
+  expect(output).toContain(runCommand(`open <url> --session ${session}`));
 }
 
 function parseJsonStdout<T>(stdout: string): T {
@@ -142,7 +143,7 @@ describe("state-driven CLI subprocess behavior", () => {
       "Failed to analyze snapshot because no snapshot analyzer is configured.",
     );
     expect(snapshot.stderr).toContain(
-      "For more info, run `npx libretto setup`.",
+      `For more info, run \`${runCommand("setup")}\`.`,
     );
     expect(
       existsSync(workspacePath(".libretto", "sessions", session, "snapshots")),
@@ -191,7 +192,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(secondOpen.stderr).toContain(
       `Session "${session}" is already open and connected to`,
     );
-    expect(secondOpen.stderr).toContain(`libretto close --session ${session}`);
+    expect(secondOpen.stderr).toContain(runCommand(`close --session ${session}`));
   }, 45_000);
 
   test("shows recovery guidance when a session-backed command targets a missing session", async ({
@@ -223,7 +224,7 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("rejects close --force without --all", async ({ librettoCli }) => {
     const result = await librettoCli("close --force");
-    expect(result.stderr).toContain("Usage: libretto close --all [--force]");
+    expect(result.stderr).toContain(`Usage: ${runCommand("close --all")} [--force]`);
   });
 
   test("close --all closes active sessions", async ({ librettoCli }) => {
@@ -293,7 +294,7 @@ describe("state-driven CLI subprocess behavior", () => {
     });
     expect(status.stdout).toContain("AI configuration:");
     expect(status.stdout).toContain("No AI model configured");
-    expect(status.stdout).toContain("npx libretto setup");
+    expect(status.stdout).toContain(runCommand("setup"));
   });
 
   test("status shows configured model after setup pins it", async ({
@@ -313,7 +314,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(status.stdout).toContain("AI configuration:");
     expect(status.stdout).toContain("openai/gpt-5.4");
     expect(status.stdout).toContain(
-      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+      `To change: ${runCommand("ai configure openai | anthropic | gemini | vertex")}`,
     );
   });
 
@@ -402,7 +403,7 @@ describe("state-driven CLI subprocess behavior", () => {
       `Command "exec" is blocked for session "${session}" because it is in read-only mode.`,
     );
     expect(blockedExec.stderr).toContain(
-      `libretto session-mode write-access --session ${session}`,
+      runCommand(`session-mode write-access --session ${session}`),
     );
 
     const readonlyExec = await librettoCli(

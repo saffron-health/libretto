@@ -1,5 +1,6 @@
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
+import { runCommand } from "../src/cli/core/run-command.js";
 
 describe("multi-page CLI behavior", () => {
   test("pages lists open pages with ids and urls", async ({ librettoCli }) => {
@@ -83,7 +84,7 @@ describe("multi-page CLI behavior", () => {
     expect(execResult.stderr).toContain(
       `Page "${missingPageId}" was not found in session "${session}".`,
     );
-    expect(execResult.stderr).toContain(`libretto pages --session ${session}`);
+    expect(execResult.stderr).toContain(runCommand(`pages --session ${session}`));
 
   }, 45_000);
 });

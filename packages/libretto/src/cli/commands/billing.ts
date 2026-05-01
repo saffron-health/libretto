@@ -6,8 +6,8 @@
  * them switch between any of the configured Subscription Update
  * products (Free / Pro / Team).
  *
- *   libretto experimental billing portal   → Stripe Customer Portal
- *   libretto experimental billing status   → plan + usage + period end
+ *   npx libretto experimental billing portal   → Stripe Customer Portal
+ *   npx libretto experimental billing status   → plan + usage + period end
  *
  * `libretto init` is unchanged. New tenants start on Free automatically
  * (with a real Stripe Customer + Free Subscription created at signup).

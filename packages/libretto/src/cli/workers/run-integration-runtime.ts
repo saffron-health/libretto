@@ -29,6 +29,7 @@ import {
   getPauseSignalPaths,
   removeSignalIfExists,
 } from "../core/pause-signals.js";
+import { runCommand } from "../core/run-command.js";
 import { installSessionTelemetry } from "../core/session-telemetry.js";
 import type { RunIntegrationWorkerRequest } from "./run-integration-worker-protocol.js";
 
@@ -122,9 +123,9 @@ function getMissingLocalAuthProfileError(args: {
     `Local auth profile not found for domain "${args.normalizedDomain}".`,
     `Expected profile file: ${args.profilePath}`,
     "To create it:",
-    `  1. libretto open https://${args.normalizedDomain} --headed --session ${args.session}`,
+    `  1. ${runCommand(`open https://${args.normalizedDomain} --headed --session ${args.session}`)}`,
     "  2. Log in manually in the browser window.",
-    `  3. libretto save ${args.normalizedDomain} --session ${args.session}`,
+    `  3. ${runCommand(`save ${args.normalizedDomain} --session ${args.session}`)}`,
   ].join("\n");
 }
 
@@ -171,7 +172,7 @@ async function loadDefaultWorkflow(
   }
 
   throw new Error(
-    `No default-exported workflow found in ${absolutePath}. libretto run only uses the file's default export. Available named workflows: ${availableWorkflowNames.join(", ")}`,
+    `No default-exported workflow found in ${absolutePath}. ${runCommand("run")} only uses the file's default export. Available named workflows: ${availableWorkflowNames.join(", ")}`,
   );
 }
 

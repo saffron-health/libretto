@@ -43,6 +43,7 @@ import { wrapPageForActionLogging } from "../telemetry.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
+import { runCommand } from "../run-command.js";
 import {
   isConnectConfig,
   type DaemonConfig,
@@ -309,7 +310,7 @@ class BrowserDaemon {
     if (!pageId) {
       if (this.pageById.size > 1) {
         throw new Error(
-          `Multiple pages are open in session "${this.session}". Pass --page <id> to target a page (run "libretto pages --session ${this.session}" to list ids).`,
+          `Multiple pages are open in session "${this.session}". Pass --page <id> to target a page (run "${runCommand(`pages --session ${this.session}`)}" to list ids).`,
         );
       }
       // Return the single tracked page rather than `this.page` — the
@@ -322,7 +323,7 @@ class BrowserDaemon {
     const page = this.pageById.get(pageId);
     if (!page) {
       throw new Error(
-        `Page "${pageId}" was not found in session "${this.session}". Run "libretto pages --session ${this.session}" to list ids.`,
+        `Page "${pageId}" was not found in session "${this.session}". Run "${runCommand(`pages --session ${this.session}`)}" to list ids.`,
       );
     }
     return page;

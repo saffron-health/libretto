@@ -1,15 +1,15 @@
 /**
  * Experimental auth commands for the libretto hosted platform.
  *
- *   libretto experimental auth signup
- *   libretto experimental auth login
- *   libretto experimental auth logout
- *   libretto experimental auth invite <email> [--role member|admin|owner]
- *   libretto experimental auth accept-invite <tenantSlug> <invitationId>
- *   libretto experimental auth api-key issue [--label <label>]
- *   libretto experimental auth api-key list
- *   libretto experimental auth api-key revoke <id>
- *   libretto experimental auth whoami
+ *   npx libretto experimental auth signup
+ *   npx libretto experimental auth login
+ *   npx libretto experimental auth logout
+ *   npx libretto experimental auth invite <email> [--role member|admin|owner]
+ *   npx libretto experimental auth accept-invite <tenantSlug> <invitationId>
+ *   npx libretto experimental auth api-key issue [--label <label>]
+ *   npx libretto experimental auth api-key list
+ *   npx libretto experimental auth api-key revoke <id>
+ *   npx libretto experimental auth whoami
  *
  * Credentials live at ~/.libretto/auth.json (mode 0600). The CLI sends either
  * the stored API key or the stored session cookie depending on what's
@@ -36,6 +36,7 @@ import {
   type AuthState,
 } from "../core/auth-storage.js";
 import { prompt, promptPassword, slugify } from "../core/prompt.js";
+import { runCommand } from "../core/run-command.js";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -215,7 +216,7 @@ export const signupCommand = SimpleCLI.command({
     const name = await prompt("Your name:");
     if (name.toLowerCase() === "q" || name.length === 0) {
       console.log(
-        "OK — ask an existing teammate to run `libretto experimental auth invite <your-email>` and then run `libretto experimental auth accept-invite <slug> <invitation-id>` from this machine.",
+        `OK — ask an existing teammate to run \`${runCommand("experimental auth invite <your-email>")}\` and then run \`${runCommand("experimental auth accept-invite <slug> <invitation-id>")}\` from this machine.`,
       );
       return;
     }
@@ -294,7 +295,7 @@ export const signupCommand = SimpleCLI.command({
     console.log(`Session saved to ${authStatePath()}`);
     console.log();
     console.log("To generate an API key, run:");
-    console.log("  libretto experimental auth api-key issue --label <label>");
+    console.log(`  ${runCommand("experimental auth api-key issue --label <label>")}`);
     console.log("Then add LIBRETTO_API_KEY=<key> to your project's .env file.");
   });
 
@@ -475,7 +476,7 @@ export const inviteCommand = SimpleCLI.command({
     console.log();
     console.log("Tell them to run:");
     console.log(
-      `  libretto experimental auth accept-invite ${orgSlug} ${data.id}`,
+      `  ${runCommand(`experimental auth accept-invite ${orgSlug} ${data.id}`)}`,
     );
   });
 
@@ -611,7 +612,7 @@ export const acceptInviteCommand = SimpleCLI.command({
     console.log();
     console.log("Email verified. You're logged in and a member of the organization.");
     console.log("To generate an API key, run:");
-    console.log("  libretto experimental auth api-key issue --label <label>");
+    console.log(`  ${runCommand("experimental auth api-key issue --label <label>")}`);
     console.log("Then add LIBRETTO_API_KEY=<key> to your project's .env file.");
   });
 
@@ -740,7 +741,7 @@ export const whoamiCommand = SimpleCLI.command({
 
     if (credential.source === "none") {
       console.log(
-        "Not authenticated. Run `libretto experimental auth signup`, `login`, or set LIBRETTO_API_KEY in your env.",
+        `Not authenticated. Run \`${runCommand("experimental auth signup")}\`, \`${runCommand("experimental auth login")}\`, or set LIBRETTO_API_KEY in your env.`,
       );
       return;
     }

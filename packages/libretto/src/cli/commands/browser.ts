@@ -15,6 +15,7 @@ import {
 } from "../core/providers/index.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { createLoggerForSession, withSessionLogger } from "../core/context.js";
+import { runCommand } from "../core/run-command.js";
 import {
   type SessionAccessMode,
   assertSessionAvailableForStart,
@@ -95,7 +96,7 @@ export const openInput = SimpleCLI.input({
 })
   .refine(
     (input) => Boolean(input.url),
-    `Usage: libretto open <url> [--headless] [--read-only|--write-access] [--auth-profile <domain>] [--viewport WxH] [--session <name>]`,
+    `Usage: ${runCommand("open <url>")} [--headless] [--read-only|--write-access] [--auth-profile <domain>] [--viewport WxH] [--session <name>]`,
   )
   .refine(
     (input) => !(input.headed && input.headless),
@@ -160,7 +161,7 @@ export const connectInput = SimpleCLI.input({
 })
   .refine(
     (input) => Boolean(input.cdpUrl),
-    `Usage: libretto connect <cdp-url> [--read-only|--write-access] --session <name>`,
+    `Usage: ${runCommand("connect <cdp-url>")} [--read-only|--write-access] --session <name>`,
   )
   .refine(
     (input) => !(input.readOnly && input.writeAccess),
@@ -193,7 +194,7 @@ export const saveInput = SimpleCLI.input({
   },
 }).refine(
   (input) => Boolean(input.urlOrDomain),
-  `Usage: libretto save <url|domain> --session <name>`,
+  `Usage: ${runCommand("save <url|domain>")} --session <name>`,
 );
 
 export const saveCommand = SimpleCLI.command({
@@ -264,7 +265,7 @@ export const closeInput = SimpleCLI.input({
   },
 }).refine(
   (input) => input.all || input.session,
-  `Usage: libretto close <session>\nUsage: libretto close --all [--force]`,
+  `Usage: ${runCommand("close <session>")}\nUsage: ${runCommand("close --all")} [--force]`,
 );
 
 export const closeCommand = SimpleCLI.command({
@@ -273,7 +274,7 @@ export const closeCommand = SimpleCLI.command({
   .input(closeInput)
   .handle(async ({ input }) => {
     if (input.force && !input.all) {
-      throw new Error(`Usage: libretto close --all [--force]`);
+      throw new Error(`Usage: ${runCommand("close --all")} [--force]`);
     }
     if (input.all) {
       const logger = createLoggerForSession("cli");

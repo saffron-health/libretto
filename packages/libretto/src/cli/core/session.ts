@@ -22,6 +22,7 @@ import {
   type SessionStatus,
   type SessionState,
 } from "../../shared/state/index.js";
+import { runCommand } from "./run-command.js";
 
 const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
@@ -154,7 +155,7 @@ function throwSessionNotFoundError(session: string): never {
   }
   lines.push("");
   lines.push("Start one with:");
-  lines.push(`  libretto open <url> --session ${session}`);
+  lines.push(`  ${runCommand(`open <url> --session ${session}`)}`);
   throw new Error(lines.join("\n"));
 }
 
@@ -230,7 +231,7 @@ export function assertSessionAllowsCommand(
 
   const supportedModes = [...allowedModes].join(", ");
   throw new Error(
-    `Command "${commandName}" is blocked for session "${state.session}" because it is in ${mode} mode. Allowed modes for this command: ${supportedModes}. Run \`libretto session-mode write-access --session ${state.session}\` to unlock the session.`,
+    `Command "${commandName}" is blocked for session "${state.session}" because it is in ${mode} mode. Allowed modes for this command: ${supportedModes}. Run \`${runCommand(`session-mode write-access --session ${state.session}`)}\` to unlock the session.`,
   );
 }
 
@@ -281,7 +282,7 @@ export function assertSessionAvailableForStart(
   // if they have a provider field with a cdpEndpoint.
   if (existingState.provider && existingState.cdpEndpoint) {
     throw new Error(
-      `Session "${session}" is already open via ${existingState.provider.name} provider. Close it first with: libretto close --session ${session}`,
+      `Session "${session}" is already open via ${existingState.provider.name} provider. Close it first with: ${runCommand(`close --session ${session}`)}`,
     );
   }
 
@@ -291,6 +292,6 @@ export function assertSessionAvailableForStart(
   }
   const endpoint = `http://127.0.0.1:${existingState.port}`;
   throw new Error(
-    `Session "${session}" is already open and connected to ${endpoint} (pid ${existingState.pid}). Create a new session or close the current one with: libretto close --session ${session}`,
+    `Session "${session}" is already open and connected to ${endpoint} (pid ${existingState.pid}). Create a new session or close the current one with: ${runCommand(`close --session ${session}`)}`,
   );
 }

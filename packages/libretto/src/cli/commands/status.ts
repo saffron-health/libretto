@@ -1,5 +1,6 @@
 import { LIBRETTO_CONFIG_PATH } from "../core/context.js";
 import { type AiSetupStatus, resolveAiSetupStatus } from "../core/ai-model.js";
+import { runCommand } from "../core/run-command.js";
 import { listRunningSessions, type SessionState } from "../core/session.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
@@ -17,7 +18,7 @@ function printAiStatus(status: AiSetupStatus): void {
         console.log(`  Source: ${status.source}`);
       }
       console.log(
-        "  To change: npx libretto ai configure openai | anthropic | gemini | vertex | openrouter",
+        `  To change: ${runCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}`,
       );
       break;
 
@@ -25,7 +26,7 @@ function printAiStatus(status: AiSetupStatus): void {
       console.log(
         `  ✗ ${status.provider} is configured (model: ${status.model}), but credentials are missing.`,
       );
-      console.log("  Run `npx libretto setup` to repair.");
+      console.log(`  Run \`${runCommand("setup")}\` to repair.`);
       break;
 
     case "invalid-config":
@@ -33,13 +34,13 @@ function printAiStatus(status: AiSetupStatus): void {
       for (const line of status.message.split("\n")) {
         console.log(`    ${line}`);
       }
-      console.log("  Run `npx libretto setup` to reconfigure.");
+      console.log(`  Run \`${runCommand("setup")}\` to reconfigure.`);
       break;
 
     case "unconfigured":
       console.log("  ✗ No AI model configured.");
       console.log(
-        "  Run `npx libretto setup` or `npx libretto ai configure` to set up.",
+        `  Run \`${runCommand("setup")}\` or \`${runCommand("ai configure")}\` to set up.`,
       );
       break;
   }
