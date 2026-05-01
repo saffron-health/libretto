@@ -3,6 +3,7 @@ export {
   DaemonClient,
   DaemonClientError,
   getDaemonSocketPath,
+  isWindowsNamedPipePath,
   type DaemonCommandResult,
   type DaemonExecOutput,
   type DaemonRequest,

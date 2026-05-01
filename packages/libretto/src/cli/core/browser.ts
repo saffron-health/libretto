@@ -24,7 +24,11 @@ import {
 } from "./session.js";
 import type { ProviderApi } from "./providers/types.js";
 import { getCloudProviderApi } from "./providers/index.js";
-import { DaemonClient, spawnSessionDaemon } from "./daemon/index.js";
+import {
+  DaemonClient,
+  isWindowsNamedPipePath,
+  spawnSessionDaemon,
+} from "./daemon/index.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const FORCE_CLOSE_WAIT_MS = 300;
@@ -781,6 +785,8 @@ function unlinkDaemonSocket(
   session: string,
 ): void {
   if (!socketPath) return;
+  if (isWindowsNamedPipePath(socketPath)) return;
+
   try {
     unlinkSync(socketPath);
   } catch (err) {
