@@ -1,5 +1,6 @@
 import { readSnapshotModel } from "./config.js";
 import { LIBRETTO_CONFIG_PATH } from "./context.js";
+import { librettoCommand } from "./package-manager.js";
 import {
   hasProviderCredentials,
   parseModel,
@@ -80,7 +81,9 @@ function providerSetupSentence(provider: Provider): string {
 }
 
 function defaultModelCommandLine(): string {
-  return "npx libretto ai configure openai | anthropic | gemini | vertex | openrouter";
+  return librettoCommand(
+    "ai configure openai | anthropic | gemini | vertex | openrouter",
+  );
 }
 
 function providerMissingCredentialSummary(provider: Provider): string {
@@ -102,7 +105,7 @@ function noSnapshotApiConfiguredMessage(): string {
   return [
     "Failed to analyze snapshot because no snapshot analyzer is configured.",
     `Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_CLOUD_PROJECT, or OPENROUTER_API_KEY to .env or as a shell environment variable, or choose a default model with \`${defaultModelCommandLine()}\`.`,
-    "For more info, run `npx libretto setup`.",
+    `For more info, run \`${librettoCommand("setup")}\`.`,
   ].join(" ");
 }
 
@@ -116,7 +119,7 @@ function missingProviderSnapshotMessage(
   return [
     `Failed to analyze snapshot because ${selection.provider} is configured${configuredSource}, but ${providerMissingCredentialSummary(selection.provider)}.`,
     providerSetupSentence(selection.provider),
-    "For more info, run `npx libretto setup`.",
+    `For more info, run \`${librettoCommand("setup")}\`.`,
   ].join(" ");
 }
 

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { REPO_ROOT } from "./context.js";
+import { librettoCommand } from "./package-manager.js";
 
 type PackageManifest = {
   version?: string;
@@ -85,7 +86,7 @@ export function warnIfInstalledSkillOutOfDate(): void {
     }
 
     console.error(
-      `Warning: Your agent skill (${mismatch.installedVersion}) is out of date with your Libretto CLI (${mismatch.cliVersion}). Please run \`npx libretto setup\` to update your skills to the correct version.`,
+      `Warning: Your agent skill (${mismatch.installedVersion}) is out of date with your Libretto CLI (${mismatch.cliVersion}). Please run \`${librettoCommand("setup")}\` to update your skills to the correct version.`,
     );
   } catch {
     // Never block command execution on a best-effort skill version check.

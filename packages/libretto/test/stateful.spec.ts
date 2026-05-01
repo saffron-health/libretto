@@ -142,8 +142,9 @@ describe("state-driven CLI subprocess behavior", () => {
       "Failed to analyze snapshot because no snapshot analyzer is configured.",
     );
     expect(snapshot.stderr).toContain(
-      "For more info, run `npx libretto setup`.",
+      "For more info, run",
     );
+    expect(snapshot.stderr).toContain("libretto setup");
     expect(
       existsSync(workspacePath(".libretto", "sessions", session, "snapshots")),
     ).toBe(false);
@@ -223,7 +224,7 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("rejects close --force without --all", async ({ librettoCli }) => {
     const result = await librettoCli("close --force");
-    expect(result.stderr).toContain("Usage: libretto close --all [--force]");
+    expect(result.stderr).toContain("libretto close --all [--force]");
   });
 
   test("close --all closes active sessions", async ({ librettoCli }) => {
@@ -293,7 +294,7 @@ describe("state-driven CLI subprocess behavior", () => {
     });
     expect(status.stdout).toContain("AI configuration:");
     expect(status.stdout).toContain("No AI model configured");
-    expect(status.stdout).toContain("npx libretto setup");
+    expect(status.stdout).toContain("libretto setup");
   });
 
   test("status shows configured model after setup pins it", async ({
@@ -313,7 +314,7 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(status.stdout).toContain("AI configuration:");
     expect(status.stdout).toContain("openai/gpt-5.4");
     expect(status.stdout).toContain(
-      "To change: npx libretto ai configure openai | anthropic | gemini | vertex",
+      "libretto ai configure openai | anthropic | gemini | vertex",
     );
   });
 

@@ -8,4 +8,4 @@ A page's URL prefix must match its `docs.json` group name, lowercased and hyphen
 
 ## Testing
 
-You can test the docs site with Libretto itself. Start the dev server, then use `libretto open` to open the local URL and verify pages render correctly.
+You can test the docs site with Libretto itself. Start the dev server, then use `npx libretto open` to open the local URL and verify pages render correctly.

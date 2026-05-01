@@ -13,6 +13,7 @@ import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readSnapshotModel } from "../core/config.js";
 import { resolveSnapshotApiModelOrThrow } from "../core/ai-model.js";
 import { DaemonClient } from "../core/daemon/index.js";
+import { librettoCommand } from "../core/package-manager.js";
 
 export const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
 
@@ -161,7 +162,7 @@ async function runSnapshot(
   if (!state?.daemonSocketPath) {
     throw new Error(
       `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
-        `Close and reopen the session: libretto close --session ${session}`,
+        `Close and reopen the session: ${librettoCommand(`close --session ${session}`)}`,
     );
   }
 

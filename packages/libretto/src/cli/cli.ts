@@ -1,5 +1,6 @@
 import { resolveAiSetupStatus } from "./core/ai-model.js";
 import { ensureLibrettoSetup } from "./core/context.js";
+import { librettoCommand } from "./core/package-manager.js";
 import { createCLIApp } from "./router.js";
 import { warnIfInstalledSkillOutOfDate } from "./core/skill-version.js";
 import { loadEnv } from "../shared/env/load-env.js";
@@ -24,17 +25,17 @@ function printSetupAudit(): void {
       break;
     case "configured-missing-credentials":
       console.log(
-        `✗ ${status.provider} configured (model: ${status.model}), but credentials are missing. Run \`npx libretto setup\` to repair.`,
+        `✗ ${status.provider} configured (model: ${status.model}), but credentials are missing. Run \`${librettoCommand("setup")}\` to repair.`,
       );
       break;
     case "invalid-config":
       console.log(
-        `✗ AI config is invalid. Run \`npx libretto setup\` to reconfigure.`,
+        `✗ AI config is invalid. Run \`${librettoCommand("setup")}\` to reconfigure.`,
       );
       break;
     case "unconfigured":
       console.log(
-        `✗ No AI model configured. Run \`npx libretto setup\` or \`npx libretto ai configure\` to set up.`,
+        `✗ No AI model configured. Run \`${librettoCommand("setup")}\` or \`${librettoCommand("ai configure")}\` to set up.`,
       );
       break;
   }
