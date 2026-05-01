@@ -12,6 +12,7 @@ export const RunIntegrationWorkerRequestSchema = z.object({
   accessMode: SessionAccessModeSchema.default("write-access"),
   cdpEndpoint: z.string().optional(),
   provider: z.object({ name: z.string(), sessionId: z.string() }).optional(),
+  stayOpenOnSuccess: z.boolean().default(false),
 });
 
 export type RunIntegrationWorkerRequest = z.infer<

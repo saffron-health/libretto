@@ -399,6 +399,8 @@ type WaitForWorkflowOutcomeArgs = {
   pid: number;
 };
 
+type RunIntegrationResult = "completed" | "paused";
+
 type WorkflowOutcome = {
   status: "completed" | "paused" | "failed" | "exited";
   message?: string;
@@ -550,7 +552,7 @@ async function runResume(
 async function runIntegrationFromFile(
   args: RunIntegrationCommandRequest,
   logger: LoggerApi,
-): Promise<void> {
+): Promise<RunIntegrationResult> {
   await stopExistingFailedRunSession(args.session, logger);
   const signalPaths = getPauseSignalPaths(args.session);
   clearSignalIfExists(signalPaths.pausedSignalPath);
@@ -573,6 +575,7 @@ async function runIntegrationFromFile(
     accessMode: args.accessMode,
     cdpEndpoint: args.cdpEndpoint,
     provider: args.provider,
+    stayOpenOnSuccess: args.stayOpenOnSuccess,
   } satisfies RunIntegrationWorkerRequest);
   const worker = spawn(
     process.execPath,
@@ -596,7 +599,7 @@ async function runIntegrationFromFile(
   if (outcome.status === "paused") {
     setSessionStatus(args.session, "paused", logger);
     console.log("Workflow paused.");
-    return;
+    return "paused";
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
@@ -615,6 +618,12 @@ async function runIntegrationFromFile(
   }
   setSessionStatus(args.session, "completed", logger);
   console.log("Integration completed.");
+  if (args.stayOpenOnSuccess) {
+    console.log(
+      `Browser is still open for session "${args.session}". Close it with: libretto close --session ${args.session}`,
+    );
+  }
+  return "completed";
 }
 
 function readStdinSync(): string | null {
@@ -705,7 +714,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     });
   });
 
-const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--viewport WxH]`;
+const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -738,6 +747,10 @@ export const runInput = SimpleCLI.input({
     noVisualize: SimpleCLI.flag({
       name: "no-visualize",
       help: "Disable ghost cursor + highlight visualization in headed mode",
+    }),
+    stayOpenOnSuccess: SimpleCLI.flag({
+      name: "stay-open-on-success",
+      help: "Keep the browser session open after the workflow completes successfully",
     }),
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
@@ -839,8 +852,9 @@ export const runCommand = SimpleCLI.command({
       };
     }
 
+    let runResult: RunIntegrationResult | undefined;
     try {
-      await runIntegrationFromFile(
+      runResult = await runIntegrationFromFile(
         {
           integrationPath: input.integrationFile!,
           session: ctx.session,
@@ -853,11 +867,16 @@ export const runCommand = SimpleCLI.command({
           accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
           cdpEndpoint,
           provider: providerInfo,
+          stayOpenOnSuccess: input.stayOpenOnSuccess,
         },
         ctx.logger,
       );
     } finally {
-      if (provider && providerInfo) {
+      if (
+        provider &&
+        providerInfo &&
+        !(input.stayOpenOnSuccess && runResult === "completed")
+      ) {
         try {
           const result = await provider.closeSession(providerInfo.sessionId);
           if (result.replayUrl) {

@@ -355,6 +355,7 @@ describe("basic CLI subprocess behavior", () => {
     );
     expect(result.stdout).toContain("--read-only");
     expect(result.stdout).toContain("--no-visualize");
+    expect(result.stdout).toContain("--stay-open-on-success");
     expect(result.stdout).toContain(
       "Disable ghost cursor + highlight visualization in headed mode",
     );
@@ -1032,6 +1033,34 @@ export default workflow("main", async () => {
     expect(result.stdout).toContain("WORKFLOW_COMPLETES");
     expect(result.stdout).toContain("Integration completed.");
     expect(result.stdout).not.toContain("Workflow paused.");
+  }, 45_000);
+
+  test("run --stay-open-on-success keeps completed session available for inspection", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "stay-open-success-test";
+    const integrationFilePath = await writeWorkflow(
+      "integration-stay-open-success.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Stay Open Success</title>");
+  console.log("STAY_OPEN_WORKFLOW_COMPLETES");
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(result.stdout).toContain("STAY_OPEN_WORKFLOW_COMPLETES");
+    expect(result.stdout).toContain("Integration completed.");
+    expect(result.stdout).toContain("Browser is still open");
+
+    const inspected = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(inspected.stdout).toContain("Stay Open Success");
   }, 45_000);
 
   test("run succeeds with page.evaluate callbacks containing nested helpers (tsx __name shim)", async ({

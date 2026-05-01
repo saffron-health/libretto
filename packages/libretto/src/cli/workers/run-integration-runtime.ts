@@ -113,6 +113,30 @@ async function waitForFailureSessionRelease(args: {
   }
 }
 
+async function waitForSuccessfulSessionRelease(args: {
+  session: string;
+  expectedPid: number;
+  logger: LoggerApi;
+}): Promise<void> {
+  const { session, expectedPid, logger } = args;
+  logger.info("run-success-session-hold", { session, expectedPid });
+
+  while (true) {
+    const currentPid = readSessionStatePid(session);
+    if (currentPid !== expectedPid) {
+      logger.info("run-success-session-released", {
+        session,
+        expectedPid,
+        currentPid,
+      });
+      return;
+    }
+    await new Promise((resolveWait) =>
+      setTimeout(resolveWait, FAILURE_HOLD_POLL_INTERVAL_MS),
+    );
+  }
+}
+
 function getMissingLocalAuthProfileError(args: {
   normalizedDomain: string;
   profilePath: string;
@@ -309,6 +333,13 @@ async function runIntegrationInternal(
       JSON.stringify({ completedAt: new Date().toISOString() }, null, 2),
       "utf8",
     );
+    if (args.stayOpenOnSuccess) {
+      await waitForSuccessfulSessionRelease({
+        session: args.session,
+        expectedPid: process.pid,
+        logger,
+      });
+    }
     return { status: "completed" };
   } finally {
     restoreStdout();
