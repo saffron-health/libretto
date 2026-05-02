@@ -169,6 +169,62 @@ describe("daemon IPC", () => {
     expect(result.stderr).not.toContain("daemon may have crashed");
   }, 45_000);
 
+  test("exec without --page targets the original page after a workflow opens another page", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "daemon-primary-page-exec";
+    const integrationFilePath = await writeWorkflow(
+      "integration-primary-page-exec.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Original Primary Page</title>");
+  const popup = await page.context().newPage();
+  await popup.goto("data:text/html,<title>Secondary Debug Page</title>");
+});
+`,
+    );
+
+    const run = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(run.stdout).toContain("Integration completed.");
+
+    const result = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(result.stdout).toContain("Original Primary Page");
+    expect(result.stdout).not.toContain("Secondary Debug Page");
+  }, 45_000);
+
+  test("readonly-exec without --page targets the original page after a workflow opens another page", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "daemon-primary-page-readonly";
+    const integrationFilePath = await writeWorkflow(
+      "integration-primary-page-readonly.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Readonly Primary Page</title>");
+  const popup = await page.context().newPage();
+  await popup.goto("data:text/html,<title>Readonly Secondary Page</title>");
+});
+`,
+    );
+
+    const run = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(run.stdout).toContain("Integration completed.");
+
+    const result = await librettoCli(
+      `readonly-exec "return page.url()" --session ${session}`,
+    );
+    expect(result.stdout).toContain("Readonly Primary Page");
+    expect(result.stdout).not.toContain("Readonly Secondary Page");
+  }, 45_000);
+
   test("run --stay-open-on-success leaves a daemon-backed session for pages and snapshot", async ({
     librettoCli,
     writeWorkflow,
