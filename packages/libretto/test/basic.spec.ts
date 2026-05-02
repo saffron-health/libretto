@@ -1035,6 +1035,32 @@ export default workflow("main", async () => {
     expect(result.stdout).not.toContain("Workflow paused.");
   }, 45_000);
 
+  test("run closes completed sessions by default", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "complete-default-closes";
+    const integrationFilePath = await writeWorkflow(
+      "integration-complete-closes.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Default Close</title>");
+  console.log("DEFAULT_CLOSE_WORKFLOW_COMPLETES");
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless`,
+    );
+    expect(result.stdout).toContain("DEFAULT_CLOSE_WORKFLOW_COMPLETES");
+    expect(result.stdout).toContain("Integration completed.");
+    expect(result.stdout).toContain("Browser closed");
+
+    const pages = await librettoCli(`pages --session ${session}`);
+    expectMissingSessionError(pages.stderr, session);
+  }, 45_000);
+
   test("run --stay-open-on-success keeps completed session available for inspection", async ({
     librettoCli,
     writeWorkflow,

@@ -6,6 +6,7 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   connect,
   disconnectBrowser,
+  runClose,
   resolveViewport,
 } from "../core/browser.js";
 import { parseViewportArg } from "./browser.js";
@@ -642,6 +643,8 @@ async function runIntegrationFromFile(
     console.log(
       `Browser is still open for session "${args.session}". Close it with: libretto close --session ${args.session}`,
     );
+  } else {
+    await runClose(args.session, logger);
   }
   return "completed";
 }
@@ -892,10 +895,14 @@ export const runCommand = SimpleCLI.command({
         ctx.logger,
       );
     } finally {
+      const sessionState = readSessionState(ctx.session, ctx.logger);
+      const providerOwnedByOpenSession =
+        sessionState?.provider?.sessionId === providerInfo?.sessionId;
       if (
         provider &&
         providerInfo &&
-        !(input.stayOpenOnSuccess && runResult === "completed")
+        !providerOwnedByOpenSession &&
+        runResult === undefined
       ) {
         try {
           const result = await provider.closeSession(providerInfo.sessionId);
