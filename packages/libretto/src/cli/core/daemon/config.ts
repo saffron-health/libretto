@@ -29,6 +29,17 @@ export type DaemonBrowserConnectConfig = {
   initialUrl?: string;
 };
 
+/**
+ * Config for a daemon-owned cloud browser provider. The daemon creates the
+ * provider session during startup, connects over CDP, and closes the provider
+ * session during daemon shutdown.
+ */
+export type DaemonBrowserProviderConfig = {
+  kind: "provider";
+  providerName: string;
+  initialUrl?: string;
+};
+
 export type DaemonWorkflowConfig = {
   integrationPath: string;
   params?: unknown;
@@ -40,6 +51,9 @@ export type DaemonWorkflowConfig = {
 
 export type DaemonConfig = {
   session: string;
-  browser: DaemonBrowserLaunchConfig | DaemonBrowserConnectConfig;
+  browser:
+    | DaemonBrowserLaunchConfig
+    | DaemonBrowserConnectConfig
+    | DaemonBrowserProviderConfig;
   workflow?: DaemonWorkflowConfig;
 };

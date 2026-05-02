@@ -57,6 +57,12 @@ export class DaemonClientError extends Error {
 export type DaemonReadyMessage = {
   type: "ready";
   socketPath: string;
+  provider?: {
+    name: string;
+    sessionId: string;
+    cdpEndpoint: string;
+    liveViewUrl?: string;
+  };
 };
 
 export type DaemonStartupErrorMessage = {
@@ -93,6 +99,7 @@ export type DaemonClientSpawnOptions = {
 export type DaemonClientSpawnResult = {
   pid: number;
   socketPath: string;
+  provider?: DaemonReadyMessage["provider"];
   client: DaemonClient;
 };
 
@@ -263,7 +270,7 @@ export class DaemonClient {
     const pid = child.pid!;
     logger.info("daemon-spawned", { pid, session });
 
-    const socketPath = await DaemonClient.waitForReadyMessage({
+    const readyMessage = await DaemonClient.waitForReadyMessage({
       child,
       timeoutMs: startupTimeoutMs,
       formatTimeoutError: () =>
@@ -311,9 +318,10 @@ export class DaemonClient {
       throw error;
     });
 
-    const client = new DaemonClient(socketPath);
+    const client = new DaemonClient(readyMessage.socketPath);
+    const socketPath = readyMessage.socketPath;
     logger.info("daemon-ipc-ready", { session, socketPath });
-    return { pid, socketPath, client };
+    return { pid, socketPath, provider: readyMessage.provider, client };
   }
 
   static async waitForReadyMessage(args: {
@@ -332,7 +340,7 @@ export class DaemonClient {
       signal: NodeJS.Signals | null,
       ready: boolean,
     ) => void;
-  }): Promise<string> {
+  }): Promise<DaemonReadyMessage> {
     const {
       child,
       timeoutMs,
@@ -344,7 +352,7 @@ export class DaemonClient {
       onExit,
     } = args;
 
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<DaemonReadyMessage>((resolve, reject) => {
       let ready = false;
       let timeout: ReturnType<typeof setTimeout>;
 
@@ -371,7 +379,7 @@ export class DaemonClient {
         ready = true;
         cleanup();
         onReady?.(message);
-        resolve(message.socketPath);
+        resolve(message);
       };
 
       const onError = (error: Error): void => {

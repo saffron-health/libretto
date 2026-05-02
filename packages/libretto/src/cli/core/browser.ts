@@ -22,8 +22,6 @@ import {
   readSessionState,
   writeSessionState,
 } from "./session.js";
-import type { ProviderApi } from "./providers/types.js";
-import { getCloudProviderApi } from "./providers/index.js";
 import { DaemonClient } from "./daemon/index.js";
 
 const CLOSE_WAIT_MS = 1_500;
@@ -502,7 +500,6 @@ export async function runOpen(
 export async function runOpenWithProvider(
   rawUrl: string,
   providerName: string,
-  provider: ProviderApi,
   session: string,
   logger: LoggerApi,
   accessMode: SessionAccessMode = "write-access",
@@ -515,7 +512,34 @@ export async function runOpenWithProvider(
     `Creating ${providerName} browser session (session: ${session})...`,
   );
 
-  const providerSession = await provider.createSession();
+  console.log(`Connecting to ${providerName} browser...`);
+
+  const runLogPath = logFileForSession(session);
+  const {
+    pid,
+    socketPath: daemonSocketPath,
+    provider: providerSession,
+  } = await DaemonClient.spawn({
+    config: {
+      session,
+      browser: {
+        kind: "provider",
+        providerName,
+        initialUrl: url,
+      },
+    },
+    logger,
+    logPath: runLogPath,
+    // Remote CDP connection + navigation; must cover both.
+    startupTimeoutMs: 60_000,
+  });
+
+  if (!providerSession) {
+    throw new Error(
+      `Provider daemon did not return session metadata for ${providerName}.`,
+    );
+  }
+
   logger.info("open-provider-session-created", {
     provider: providerName,
     sessionId: providerSession.sessionId,
@@ -526,25 +550,6 @@ export async function runOpenWithProvider(
   if (providerSession.liveViewUrl) {
     console.log(`View live session: ${providerSession.liveViewUrl}`);
   }
-
-  console.log(`Connecting to ${providerName} browser...`);
-
-  const runLogPath = logFileForSession(session);
-  const { pid, socketPath: daemonSocketPath } = await DaemonClient.spawn({
-    config: {
-      session,
-      browser: {
-        kind: "connect",
-        cdpEndpoint: providerSession.cdpEndpoint,
-        initialUrl: url,
-      },
-    },
-    logger,
-    logPath: runLogPath,
-    // Remote CDP connection + navigation; must cover both.
-    startupTimeoutMs: 60_000,
-    onFailure: () => provider.closeSession(providerSession.sessionId),
-  });
 
   writeSessionState(
     {
@@ -676,31 +681,15 @@ export async function runClose(
     await waitForCloseSignalWindow(CLOSE_WAIT_MS);
   }
 
-  // Close provider session if applicable (tears down the remote browser).
+  // Provider-backed sessions are owned by the daemon. Killing the daemon above
+  // makes it close the remote provider session during shutdown.
   let replayUrl: string | undefined;
   if (state.provider) {
-    logger.info("close-provider", {
+    logger.info("close-provider-skipped-daemon-owned", {
       session,
       provider: state.provider.name,
       sessionId: state.provider.sessionId,
     });
-    try {
-      const provider = getCloudProviderApi(state.provider.name);
-      const result = await provider.closeSession(state.provider.sessionId);
-      replayUrl = result.replayUrl;
-    } catch (err) {
-      logger.warn("close-provider-error", {
-        session,
-        provider: state.provider.name,
-        sessionId: state.provider.sessionId,
-        error: err,
-      });
-      writeSessionState({ ...state, status: "cleanup-failed" }, logger);
-      throw new Error(
-        `Failed to close remote ${state.provider.name} session "${state.provider.sessionId}" for session "${session}". ` +
-          `State preserved with status "cleanup-failed". Retry with: libretto close --session ${session}`,
-      );
-    }
   }
 
   unlinkDaemonSocket(state.daemonSocketPath, logger, session);
@@ -831,41 +820,9 @@ export async function runCloseAll(
     return;
   }
 
-  // Close provider sessions via their APIs
+  // Provider sessions are owned by their daemons. Send SIGTERM below and let
+  // each daemon close its remote provider session during shutdown.
   const failedProviderSessions = new Set<string>();
-  const replayUrls: Array<{ session: string; replayUrl: string }> = [];
-  for (const target of closable) {
-    if (target.provider) {
-      logger.info("close-all-provider", {
-        session: target.session,
-        provider: target.provider.name,
-        sessionId: target.provider.sessionId,
-      });
-      try {
-        const provider = getCloudProviderApi(target.provider.name);
-        const result = await provider.closeSession(target.provider.sessionId);
-        if (result.replayUrl) {
-          replayUrls.push({
-            session: target.session,
-            replayUrl: result.replayUrl,
-          });
-        }
-      } catch (err) {
-        logger.warn("close-all-provider-error", {
-          session: target.session,
-          provider: target.provider.name,
-          sessionId: target.provider.sessionId,
-          error: err,
-        });
-        failedProviderSessions.add(target.session);
-        // Mark as cleanup-failed, preserving provider.sessionId for retry
-        const state = readSessionState(target.session, logger);
-        if (state) {
-          writeSessionState({ ...state, status: "cleanup-failed" }, logger);
-        }
-      }
-    }
-  }
 
   // Send SIGTERM to all daemon processes (both local and provider sessions).
   for (const target of closable) {
@@ -942,12 +899,6 @@ export async function runCloseAll(
 
   clearStoppedSessionStates(closable, logger, failedProviderSessions);
 
-  if (failedProviderSessions.size > 0) {
-    console.log(
-      `Warning: ${failedProviderSessions.size} provider session(s) failed remote cleanup and were preserved with status "cleanup-failed".`,
-    );
-  }
-
   if (clearedUnreadableStates > 0) {
     console.log(
       `Cleared ${clearedUnreadableStates} unreadable session state file(s).`,
@@ -957,9 +908,6 @@ export async function runCloseAll(
   console.log(`Closed ${closedCount} session(s).`);
   if (forceKilled > 0) {
     console.log(`Force-killed ${forceKilled} session(s).`);
-  }
-  for (const { session, replayUrl } of replayUrls) {
-    console.log(`View recording (${session}): ${replayUrl}`);
   }
 }
 

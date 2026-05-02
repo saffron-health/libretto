@@ -9,10 +9,7 @@ import {
   runPages,
   runSave,
 } from "../core/browser.js";
-import {
-  resolveProviderName,
-  getCloudProviderApi,
-} from "../core/providers/index.js";
+import { resolveProviderName } from "../core/providers/index.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { createLoggerForSession, withSessionLogger } from "../core/context.js";
 import {
@@ -128,11 +125,9 @@ export const openCommand = SimpleCLI.command({
         authProfileDomain: input.authProfile,
       });
     } else {
-      const provider = getCloudProviderApi(providerName);
       await runOpenWithProvider(
         input.url!,
         providerName,
-        provider,
         ctx.session,
         ctx.logger,
         resolveRequestedSessionMode(input.readOnly, input.writeAccess),

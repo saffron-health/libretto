@@ -24,7 +24,7 @@ import {
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
-import { resolveProviderName, getCloudProviderApi } from "../core/providers/index.js";
+import { resolveProviderName } from "../core/providers/index.js";
 import {
   compileExecFunction,
   stripEmptyCatchHandlers,
@@ -54,8 +54,7 @@ type RunIntegrationCommandRequest = {
   viewport?: { width: number; height: number };
   accessMode: SessionAccessMode;
   authProfileDomain?: string;
-  cdpEndpoint?: string;
-  provider?: { name: string; sessionId: string };
+  providerName?: string;
   stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
 };
@@ -573,11 +572,15 @@ async function runIntegrationFromFile(
   clearSignalIfExists(signalPaths.outputSignalPath);
 
   const runLogPath = logFileForSession(args.session);
-  const { pid, socketPath: daemonSocketPath } = await DaemonClient.spawn({
+  const {
+    pid,
+    socketPath: daemonSocketPath,
+    provider,
+  } = await DaemonClient.spawn({
     config: {
       session: args.session,
-      browser: args.cdpEndpoint
-        ? { kind: "connect", cdpEndpoint: args.cdpEndpoint }
+      browser: args.providerName
+        ? { kind: "provider", providerName: args.providerName }
         : {
             kind: "launch",
             headed: !args.headless,
@@ -601,17 +604,22 @@ async function runIntegrationFromFile(
     {
       port: 0,
       pid,
-      cdpEndpoint: args.cdpEndpoint,
+      cdpEndpoint: provider?.cdpEndpoint,
       session: args.session,
       startedAt: new Date().toISOString(),
       status: "active",
       mode: args.accessMode,
       viewport: args.viewport,
       daemonSocketPath,
-      provider: args.provider,
+      provider: provider
+        ? { name: provider.name, sessionId: provider.sessionId }
+        : undefined,
     },
     logger,
   );
+  if (provider?.liveViewUrl) {
+    console.log(`View live session: ${provider.liveViewUrl}`);
+  }
 
   const outcome = await waitForWorkflowOutcome({
     session: args.session,
@@ -849,74 +857,33 @@ export const runCommand = SimpleCLI.command({
     );
 
     const providerName = resolveProviderName(input.provider);
-    let cdpEndpoint: string | undefined;
-    let providerInfo: { name: string; sessionId: string } | undefined;
-    let provider: ReturnType<typeof getCloudProviderApi> | undefined;
-    if (providerName !== "local") {
-      provider = getCloudProviderApi(providerName);
+    const daemonProviderName = providerName === "local" ? undefined : providerName;
+    if (daemonProviderName) {
       console.log(
         `Creating ${providerName} browser session (session: ${ctx.session})...`,
       );
-      const providerSession = await provider.createSession();
-      ctx.logger.info("run-provider-session-created", {
+      ctx.logger.info("run-provider-session-requested", {
         provider: providerName,
-        sessionId: providerSession.sessionId,
-        cdpEndpoint: providerSession.cdpEndpoint,
-        liveViewUrl: providerSession.liveViewUrl,
       });
-      if (providerSession.liveViewUrl) {
-        console.log(`View live session: ${providerSession.liveViewUrl}`);
-      }
       console.log(`Connecting to ${providerName} browser...`);
-      cdpEndpoint = providerSession.cdpEndpoint;
-      providerInfo = {
-        name: providerName,
-        sessionId: providerSession.sessionId,
-      };
     }
 
-    let runResult: RunIntegrationResult | undefined;
-    try {
-      runResult = await runIntegrationFromFile(
-        {
-          integrationPath: input.integrationFile!,
-          session: ctx.session,
-          params,
-          tsconfigPath: input.tsconfig,
-          headless: cdpEndpoint ? true : (headlessMode ?? false),
-          visualize,
-          authProfileDomain: input.authProfile,
-          viewport,
-          accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
-          cdpEndpoint,
-          provider: providerInfo,
-          stayOpenOnSuccess: input.stayOpenOnSuccess,
-        },
-        ctx.logger,
-      );
-    } finally {
-      const sessionState = readSessionState(ctx.session, ctx.logger);
-      const providerOwnedByOpenSession =
-        sessionState?.provider?.sessionId === providerInfo?.sessionId;
-      if (
-        provider &&
-        providerInfo &&
-        !providerOwnedByOpenSession &&
-        runResult === undefined
-      ) {
-        try {
-          const result = await provider.closeSession(providerInfo.sessionId);
-          if (result.replayUrl) {
-            console.log(`View recording: ${result.replayUrl}`);
-          }
-        } catch (cleanupErr) {
-          console.error(
-            `Failed to clean up ${providerInfo.name} session ${providerInfo.sessionId}:`,
-            cleanupErr instanceof Error ? cleanupErr.message : cleanupErr,
-          );
-        }
-      }
-    }
+    await runIntegrationFromFile(
+      {
+        integrationPath: input.integrationFile!,
+        session: ctx.session,
+        params,
+        tsconfigPath: input.tsconfig,
+        headless: daemonProviderName ? true : (headlessMode ?? false),
+        visualize,
+        authProfileDomain: input.authProfile,
+        viewport,
+        accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
+        providerName: daemonProviderName,
+        stayOpenOnSuccess: input.stayOpenOnSuccess,
+      },
+      ctx.logger,
+    );
   });
 
 export const resumeInput = SimpleCLI.input({

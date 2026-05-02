@@ -55,8 +55,11 @@ import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,
   type DaemonBrowserConnectConfig,
+  type DaemonBrowserProviderConfig,
   type DaemonWorkflowConfig,
 } from "./config.js";
+import { getCloudProviderApi } from "../providers/index.js";
+import type { ProviderApi } from "../providers/types.js";
 import {
   getAbsoluteIntegrationPath,
   installHeadedWorkflowVisualization,
@@ -144,7 +147,9 @@ function resolveAuthProfileStorageStatePath(args: {
   session: string;
 }): string | undefined {
   if (!args.authProfileDomain) return undefined;
-  const normalizedDomain = normalizeDomain(normalizeUrl(args.authProfileDomain));
+  const normalizedDomain = normalizeDomain(
+    normalizeUrl(args.authProfileDomain),
+  );
   const profilePath = getProfilePath(normalizedDomain);
   if (!hasProfile(normalizedDomain)) {
     throw new UserFacingStartupError(
@@ -176,6 +181,11 @@ class BrowserDaemon {
     private readonly page: Page,
     private readonly ipcServer: DaemonServer,
     logger: LoggerApi,
+    private readonly providerSession?: {
+      provider: ProviderApi;
+      name: string;
+      sessionId: string;
+    },
   ) {
     this.logger = logger.withScope("child");
   }
@@ -205,6 +215,17 @@ class BrowserDaemon {
     initialPages: Page[];
     /** If set, navigate to this URL after telemetry but before starting IPC. */
     navigateUrl?: string;
+    readyProvider?: {
+      name: string;
+      sessionId: string;
+      cdpEndpoint: string;
+      liveViewUrl?: string;
+    };
+    providerSession?: {
+      provider: ProviderApi;
+      name: string;
+      sessionId: string;
+    };
   }): Promise<BrowserDaemon> {
     const {
       session,
@@ -214,6 +235,8 @@ class BrowserDaemon {
       page,
       initialPages,
       navigateUrl,
+      readyProvider,
+      providerSession,
     } = args;
 
     await mkdir(getSessionDir(session), { recursive: true });
@@ -258,6 +281,7 @@ class BrowserDaemon {
       page,
       ipcServer,
       logger,
+      providerSession,
     );
 
     // Action logging and page tracking must be registered before optional
@@ -280,7 +304,7 @@ class BrowserDaemon {
 
     handler = (request) => daemon.handleRequest(request);
     await ipcServer.listen();
-    process.send?.({ type: "ready", socketPath });
+    process.send?.({ type: "ready", socketPath, provider: readyProvider });
     daemon.logger.info("ipc-server-listening", { socketPath });
 
     browser.on("disconnected", () => {
@@ -357,12 +381,10 @@ class BrowserDaemon {
 
   // ── Connect mode ───────────────────────────────────────────────────
 
-  static async connectToEndpoint(
-    args: {
-      session: string;
-      browser: DaemonBrowserConnectConfig;
-    },
-  ): Promise<BrowserDaemon> {
+  static async connectToEndpoint(args: {
+    session: string;
+    browser: DaemonBrowserConnectConfig;
+  }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
     const browser = await chromium.connectOverCDP(config.cdpEndpoint);
 
@@ -396,6 +418,63 @@ class BrowserDaemon {
     return daemon;
   }
 
+  static async connectToProvider(args: {
+    session: string;
+    browser: DaemonBrowserProviderConfig;
+  }): Promise<BrowserDaemon> {
+    const { session, browser: config } = args;
+    const provider = getCloudProviderApi(config.providerName);
+    const providerSession = await provider.createSession();
+    try {
+      const browser = await chromium.connectOverCDP(
+        providerSession.cdpEndpoint,
+      );
+
+      const contexts = browser.contexts();
+      const context =
+        contexts.length > 0 ? contexts[0] : await browser.newContext();
+      const operationalPages = context.pages().filter(isOperationalPage);
+      const page =
+        operationalPages.length > 0
+          ? operationalPages[operationalPages.length - 1]
+          : await context.newPage();
+
+      const daemon = await BrowserDaemon.initialize({
+        session,
+        externallyManaged: true,
+        browser,
+        context,
+        page,
+        initialPages: operationalPages.length > 0 ? operationalPages : [page],
+        navigateUrl: config.initialUrl,
+        readyProvider: {
+          name: config.providerName,
+          sessionId: providerSession.sessionId,
+          cdpEndpoint: providerSession.cdpEndpoint,
+          liveViewUrl: providerSession.liveViewUrl,
+        },
+        providerSession: {
+          provider,
+          name: config.providerName,
+          sessionId: providerSession.sessionId,
+        },
+      });
+
+      daemon.logger.info("child-provider-connected", {
+        provider: config.providerName,
+        sessionId: providerSession.sessionId,
+        url: config.initialUrl,
+        pid: process.pid,
+        session,
+      });
+
+      return daemon;
+    } catch (error) {
+      await provider.closeSession(providerSession.sessionId);
+      throw error;
+    }
+  }
+
   // ── Lifecycle ──────────────────────────────────────────────────────
 
   async shutdown(reason: string, closeBrowser: boolean): Promise<void> {
@@ -403,20 +482,34 @@ class BrowserDaemon {
     this.shuttingDown = true;
     this.logger.info(reason, { session: this.session });
     await this.ipcServer.close();
-    if (!closeBrowser) return;
-    if (this.externallyManaged) {
-      // Drop the CDP pipe without killing the external browser.
-      try {
-        (
-          this.browser as unknown as {
-            _connection?: { close(): void };
-          }
-        )._connection?.close();
-      } catch {
-        // Connection may already be closed.
+    if (closeBrowser) {
+      if (this.externallyManaged) {
+        // Drop the CDP pipe without killing the external browser.
+        try {
+          (
+            this.browser as unknown as {
+              _connection?: { close(): void };
+            }
+          )._connection?.close();
+        } catch {
+          // Connection may already be closed.
+        }
+      } else {
+        await this.browser.close();
       }
-    } else {
-      await this.browser.close();
+    }
+    if (this.providerSession) {
+      const result = await this.providerSession.provider.closeSession(
+        this.providerSession.sessionId,
+      );
+      if (result.replayUrl) {
+        this.logger.info("provider-recording", {
+          session: this.session,
+          provider: this.providerSession.name,
+          sessionId: this.providerSession.sessionId,
+          replayUrl: result.replayUrl,
+        });
+      }
     }
   }
 
@@ -576,16 +669,21 @@ async function main(): Promise<void> {
     config.browser.kind === "launch" ? config.browser.headed : false;
 
   const daemon =
-    config.browser.kind === "connect"
-      ? await BrowserDaemon.connectToEndpoint({
+    config.browser.kind === "provider"
+      ? await BrowserDaemon.connectToProvider({
           session: config.session,
           browser: config.browser,
         })
-      : await BrowserDaemon.launchBrowser({
-          session: config.session,
-          browser: config.browser,
-          workflow: config.workflow,
-        });
+      : config.browser.kind === "connect"
+        ? await BrowserDaemon.connectToEndpoint({
+            session: config.session,
+            browser: config.browser,
+          })
+        : await BrowserDaemon.launchBrowser({
+            session: config.session,
+            browser: config.browser,
+            workflow: config.workflow,
+          });
 
   if (config.workflow) {
     void daemon
