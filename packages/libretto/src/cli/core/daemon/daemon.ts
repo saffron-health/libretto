@@ -27,7 +27,7 @@ import {
 import { mkdir, writeFile } from "node:fs/promises";
 import { appendFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
-import type { LibrettoWorkflowContext } from "../../../index.js";
+import type { LibrettoWorkflowContext } from "../../../shared/workflow/workflow.js";
 import {
   createLoggerForSession,
   getSessionDir,
@@ -41,6 +41,12 @@ import {
   type DaemonRequest,
 } from "./ipc.js";
 import { wrapPageForActionLogging } from "../telemetry.js";
+import {
+  getProfilePath,
+  hasProfile,
+  normalizeDomain,
+  normalizeUrl,
+} from "../browser.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
@@ -63,6 +69,13 @@ function isOperationalPage(page: Page): boolean {
 }
 
 type TelemetryEntry = Record<string, unknown>;
+
+class UserFacingStartupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UserFacingStartupError";
+  }
+}
 
 function mirrorStdoutToFile(filePath: string): () => void {
   const stdout = process.stdout;
@@ -109,6 +122,40 @@ async function writeWorkflowFailureSignal(args: {
     ),
     "utf8",
   );
+}
+
+function getMissingLocalAuthProfileError(args: {
+  normalizedDomain: string;
+  profilePath: string;
+  session: string;
+}): string {
+  return [
+    `Local auth profile not found for domain "${args.normalizedDomain}".`,
+    `Expected profile file: ${args.profilePath}`,
+    "To create it:",
+    `  1. libretto open https://${args.normalizedDomain} --headed --session ${args.session}`,
+    "  2. Log in manually in the browser window.",
+    `  3. libretto save ${args.normalizedDomain} --session ${args.session}`,
+  ].join("\n");
+}
+
+function resolveAuthProfileStorageStatePath(args: {
+  authProfileDomain?: string;
+  session: string;
+}): string | undefined {
+  if (!args.authProfileDomain) return undefined;
+  const normalizedDomain = normalizeDomain(normalizeUrl(args.authProfileDomain));
+  const profilePath = getProfilePath(normalizedDomain);
+  if (!hasProfile(normalizedDomain)) {
+    throw new UserFacingStartupError(
+      getMissingLocalAuthProfileError({
+        normalizedDomain,
+        profilePath,
+        session: args.session,
+      }),
+    );
+  }
+  return profilePath;
 }
 
 // ── BrowserDaemon ──────────────────────────────────────────────────────
@@ -248,6 +295,7 @@ class BrowserDaemon {
   static async launchBrowser(args: {
     session: string;
     browser: DaemonBrowserLaunchConfig;
+    workflow?: DaemonWorkflowConfig;
   }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
     const windowPositionArg = config.windowPosition
@@ -267,10 +315,15 @@ class BrowserDaemon {
       ],
     });
 
+    const storageStatePath =
+      config.storageStatePath ??
+      resolveAuthProfileStorageStatePath({
+        authProfileDomain: args.workflow?.authProfileDomain,
+        session,
+      });
+
     const context = await browser.newContext({
-      ...(config.storageStatePath
-        ? { storageState: config.storageStatePath }
-        : {}),
+      ...(storageStatePath ? { storageState: storageStatePath } : {}),
       viewport: {
         width: config.viewport.width,
         height: config.viewport.height,
@@ -371,16 +424,6 @@ class BrowserDaemon {
 
   private resolveTargetPage(pageId?: string): Page {
     if (!pageId) {
-      if (this.pageById.size > 1) {
-        throw new Error(
-          `Multiple pages are open in session "${this.session}". Pass --page <id> to target a page (run "libretto pages --session ${this.session}" to list ids).`,
-        );
-      }
-      // Return the single tracked page rather than `this.page` — the
-      // initial page may have been closed and replaced by a new one.
-      if (this.pageById.size === 1) {
-        return this.pageById.values().next().value!;
-      }
       return this.page;
     }
     const page = this.pageById.get(pageId);
@@ -541,6 +584,7 @@ async function main(): Promise<void> {
       : await BrowserDaemon.launchBrowser({
           session: config.session,
           browser: config.browser,
+          workflow: config.workflow,
         });
 
   if (config.workflow) {
@@ -583,4 +627,18 @@ async function main(): Promise<void> {
   // letting the process exit naturally.
 }
 
-await main();
+function reportStartupError(error: unknown): never {
+  if (error instanceof UserFacingStartupError) {
+    process.send?.({
+      type: "startup-error",
+      message: error.message,
+    });
+  }
+  process.exit(1);
+}
+
+try {
+  await main();
+} catch (error) {
+  reportStartupError(error);
+}

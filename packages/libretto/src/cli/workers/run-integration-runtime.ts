@@ -5,13 +5,15 @@ import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  getDefaultWorkflowFromModuleExports,
-  getWorkflowsFromModuleExports,
   instrumentContext,
   launchBrowser,
+} from "../../index.js";
+import {
+  getDefaultWorkflowFromModuleExports,
+  getWorkflowsFromModuleExports,
   type ExportedLibrettoWorkflow,
   type LibrettoWorkflowContext,
-} from "../../index.js";
+} from "../../shared/workflow/workflow.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { parseSessionStateContent } from "../../shared/state/index.js";
 import {

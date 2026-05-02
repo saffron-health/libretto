@@ -1,7 +1,5 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { spawn } from "node:child_process";
 import * as moduleBuiltin from "node:module";
-import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { installInstrumentation } from "../../shared/instrumentation/index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
@@ -16,9 +14,11 @@ import {
   assertSessionAvailableForStart,
   assertSessionAllowsCommand,
   clearSessionState,
+  logFileForSession,
   readSessionState,
   readSessionStateOrThrow,
   setSessionStatus,
+  writeSessionState,
   type SessionState,
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
@@ -35,7 +35,7 @@ import {
   readNetworkLog,
   wrapPageForActionLogging,
 } from "../core/telemetry.js";
-import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
+import type { SessionAccessMode } from "../../shared/state/index.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   pageOption,
@@ -44,13 +44,23 @@ import {
   withRequiredSession,
 } from "./shared.js";
 
-type RunIntegrationCommandRequest = RunIntegrationWorkerRequest & {
+type RunIntegrationCommandRequest = {
+  integrationPath: string;
+  session: string;
+  params: unknown;
+  headless: boolean;
+  visualize: boolean;
+  viewport?: { width: number; height: number };
+  accessMode: SessionAccessMode;
+  authProfileDomain?: string;
+  cdpEndpoint?: string;
+  provider?: { name: string; sessionId: string };
+  stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
 };
 type ExecMode = "exec" | "readonly-exec";
 
 const require = moduleBuiltin.createRequire(import.meta.url);
-const tsxCliPath = require.resolve("tsx/cli");
 
 function writeDaemonExecOutput(output?: { stdout: string; stderr: string }) {
   if (output?.stdout) {
@@ -561,40 +571,50 @@ async function runIntegrationFromFile(
   clearSignalIfExists(signalPaths.failedSignalPath);
   clearSignalIfExists(signalPaths.outputSignalPath);
 
-  const workerEntryPath = fileURLToPath(
-    new URL("../workers/run-integration-worker.js", import.meta.url),
-  );
-  const payload = JSON.stringify({
-    integrationPath: args.integrationPath,
-    session: args.session,
-    params: args.params,
-    headless: args.headless,
-    visualize: args.visualize,
-    authProfileDomain: args.authProfileDomain,
-    viewport: args.viewport,
-    accessMode: args.accessMode,
-    cdpEndpoint: args.cdpEndpoint,
-    provider: args.provider,
-    stayOpenOnSuccess: args.stayOpenOnSuccess,
-  } satisfies RunIntegrationWorkerRequest);
-  const worker = spawn(
-    process.execPath,
-    [
-      tsxCliPath,
-      ...(args.tsconfigPath ? ["--tsconfig", args.tsconfigPath] : []),
-      workerEntryPath,
-      payload,
-    ],
-    {
-      detached: true,
-      stdio: "ignore",
-      env: process.env,
+  const runLogPath = logFileForSession(args.session);
+  const { pid, socketPath: daemonSocketPath } = await DaemonClient.spawn({
+    config: {
+      session: args.session,
+      browser: args.cdpEndpoint
+        ? { kind: "connect", cdpEndpoint: args.cdpEndpoint }
+        : {
+            kind: "launch",
+            headed: !args.headless,
+            viewport: args.viewport ?? { width: 1366, height: 768 },
+          },
+      workflow: {
+        integrationPath: args.integrationPath,
+        params: args.params,
+        visualize: args.visualize,
+        stayOpenOnSuccess: args.stayOpenOnSuccess,
+        tsconfigPath: args.tsconfigPath,
+        authProfileDomain: args.authProfileDomain,
+      },
     },
+    logger,
+    logPath: runLogPath,
+    startupTimeoutMs: 60_000,
+  });
+
+  writeSessionState(
+    {
+      port: 0,
+      pid,
+      cdpEndpoint: args.cdpEndpoint,
+      session: args.session,
+      startedAt: new Date().toISOString(),
+      status: "active",
+      mode: args.accessMode,
+      viewport: args.viewport,
+      daemonSocketPath,
+      provider: args.provider,
+    },
+    logger,
   );
-  worker.unref();
+
   const outcome = await waitForWorkflowOutcome({
     session: args.session,
-    pid: worker.pid ?? 0,
+    pid,
   });
   if (outcome.status === "paused") {
     setSessionStatus(args.session, "paused", logger);

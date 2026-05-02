@@ -35,6 +35,7 @@ export type DaemonWorkflowConfig = {
   visualize?: boolean;
   stayOpenOnSuccess?: boolean;
   tsconfigPath?: string;
+  authProfileDomain?: string;
 };
 
 export type DaemonConfig = {

@@ -5,7 +5,7 @@ import { openSync, closeSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer, connect as netConnect, type Server } from "node:net";
 import { unlink } from "node:fs/promises";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import { REPO_ROOT } from "../context.js";
 import type { DaemonConfig } from "./config.js";
@@ -59,10 +59,23 @@ export type DaemonReadyMessage = {
   socketPath: string;
 };
 
+export type DaemonStartupErrorMessage = {
+  type: "startup-error";
+  message: string;
+};
+
 function isDaemonReadyMessage(message: unknown): message is DaemonReadyMessage {
   if (typeof message !== "object" || message === null) return false;
   const candidate = message as { type?: unknown; socketPath?: unknown };
   return candidate.type === "ready" && typeof candidate.socketPath === "string";
+}
+
+function isDaemonStartupErrorMessage(
+  message: unknown,
+): message is DaemonStartupErrorMessage {
+  if (typeof message !== "object" || message === null) return false;
+  const candidate = message as { type?: unknown; message?: unknown };
+  return candidate.type === "startup-error" && typeof candidate.message === "string";
 }
 
 export type DaemonCommandResult<T> =
@@ -227,12 +240,19 @@ export class DaemonClient {
       new URL("./daemon.js", import.meta.url),
     );
     const require = createRequire(import.meta.url);
-    const tsxImportPath = pathToFileURL(require.resolve("tsx/esm")).href;
+    const tsxCliPath = require.resolve("tsx/cli");
 
     const childStderrFd = openSync(logPath, "a");
     const child = spawn(
       process.execPath,
-      ["--import", tsxImportPath, daemonEntryPath, JSON.stringify(config)],
+      [
+        tsxCliPath,
+        ...(config.workflow?.tsconfigPath
+          ? ["--tsconfig", config.workflow.tsconfigPath]
+          : []),
+        daemonEntryPath,
+        JSON.stringify(config),
+      ],
       {
         detached: true,
         stdio: ["ignore", "ignore", childStderrFd, "ipc"],
@@ -343,6 +363,10 @@ export class DaemonClient {
       timeout = setTimeout(() => fail(formatTimeoutError()), timeoutMs);
 
       const onMessage = (message: unknown): void => {
+        if (isDaemonStartupErrorMessage(message)) {
+          fail(new Error(message.message));
+          return;
+        }
         if (!isDaemonReadyMessage(message)) return;
         ready = true;
         cleanup();
