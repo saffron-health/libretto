@@ -64,7 +64,7 @@ import {
   getAbsoluteIntegrationPath,
   installHeadedWorkflowVisualization,
   loadDefaultWorkflow,
-} from "../../workers/run-integration-runtime.js";
+} from "../workflow-runtime.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();

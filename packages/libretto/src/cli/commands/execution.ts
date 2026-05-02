@@ -539,6 +539,13 @@ async function runResume(
   if (outcome.status === "completed") {
     setSessionStatus(session, "completed", logger);
     console.log("Integration completed.");
+    if (sessionState.stayOpenOnSuccess) {
+      console.log(
+        `Browser is still open for session "${session}". Close it with: libretto close --session ${session}`,
+      );
+    } else {
+      await runClose(session, logger);
+    }
     return;
   }
   if (outcome.status === "failed") {
@@ -610,6 +617,7 @@ async function runIntegrationFromFile(
       status: "active",
       mode: args.accessMode,
       viewport: args.viewport,
+      stayOpenOnSuccess: args.stayOpenOnSuccess,
       daemonSocketPath,
       provider: provider
         ? { name: provider.name, sessionId: provider.sessionId }

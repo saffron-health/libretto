@@ -31,6 +31,7 @@ export const SessionStateFileSchema = z.object({
   status: SessionStatusSchema.optional(),
   mode: SessionAccessModeSchema.default("write-access"),
   viewport: SessionViewportSchema.optional(),
+  stayOpenOnSuccess: z.boolean().optional(),
   provider: ProviderStateSchema.optional(),
   daemonSocketPath: z.string().optional(),
 });
