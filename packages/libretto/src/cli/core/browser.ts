@@ -5,12 +5,12 @@ import {
   type CDPSession,
   type Page,
 } from "playwright";
-import { existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createServer } from "node:net";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
-import { PROFILES_DIR } from "./context.js";
+import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import {
   assertSessionAvailableForStart,
@@ -690,6 +690,7 @@ export async function runClose(
       provider: state.provider.name,
       sessionId: state.provider.sessionId,
     });
+    replayUrl = readProviderReplayUrl(session, logger);
   }
 
   unlinkDaemonSocket(state.daemonSocketPath, logger, session);
@@ -711,6 +712,26 @@ type ClosableSession = {
 
 function waitForCloseSignalWindow(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function readProviderReplayUrl(session: string, logger: LoggerApi): string | undefined {
+  const closePath = getSessionProviderClosePath(session);
+  if (!existsSync(closePath)) return undefined;
+  try {
+    const parsed = JSON.parse(readFileSync(closePath, "utf8")) as {
+      replayUrl?: unknown;
+    };
+    return typeof parsed.replayUrl === "string" && parsed.replayUrl.length > 0
+      ? parsed.replayUrl
+      : undefined;
+  } catch (err) {
+    logger.warn("provider-close-result-read-failed", {
+      session,
+      path: closePath,
+      error: err,
+    });
+    return undefined;
+  }
 }
 
 function sendSignalToProcessGroupOrPid(
@@ -897,6 +918,13 @@ export async function runCloseAll(
     }
   }
 
+  const replayUrls = closable
+    .filter((target) => target.provider)
+    .flatMap((target) => {
+      const replayUrl = readProviderReplayUrl(target.session, logger);
+      return replayUrl ? [{ session: target.session, replayUrl }] : [];
+    });
+
   clearStoppedSessionStates(closable, logger, failedProviderSessions);
 
   if (clearedUnreadableStates > 0) {
@@ -906,6 +934,11 @@ export async function runCloseAll(
   }
   const closedCount = closable.length - failedProviderSessions.size;
   console.log(`Closed ${closedCount} session(s).`);
+  for (const recording of replayUrls) {
+    console.log(
+      `View recording for session "${recording.session}": ${recording.replayUrl}`,
+    );
+  }
   if (forceKilled > 0) {
     console.log(`Force-killed ${forceKilled} session(s).`);
   }

@@ -38,6 +38,10 @@ export function getSessionActionsLogPath(session: string): string {
   return join(getSessionDir(session), "actions.jsonl");
 }
 
+export function getSessionProviderClosePath(session: string): string {
+  return join(getSessionDir(session), "provider-close.json");
+}
+
 export function getSessionSnapshotsDir(session: string): string {
   return join(getSessionDir(session), "snapshots");
 }

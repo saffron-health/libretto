@@ -25,7 +25,7 @@ import {
   type Page,
 } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
 import type { LibrettoWorkflowContext } from "../../../shared/workflow/workflow.js";
 import {
@@ -33,6 +33,7 @@ import {
   getSessionDir,
   getSessionNetworkLogPath,
   getSessionActionsLogPath,
+  getSessionProviderClosePath,
 } from "../context.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import {
@@ -510,6 +511,19 @@ class BrowserDaemon {
           replayUrl: result.replayUrl,
         });
       }
+      writeFileSync(
+        getSessionProviderClosePath(this.session),
+        JSON.stringify(
+          {
+            provider: this.providerSession.name,
+            sessionId: this.providerSession.sessionId,
+            replayUrl: result.replayUrl,
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
     }
   }
 
