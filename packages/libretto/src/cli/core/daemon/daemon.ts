@@ -52,6 +52,7 @@ import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
 import { getPauseSignalPaths } from "../pause-signals.js";
+import { librettoCommand } from "../package-manager.js";
 import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,
@@ -536,7 +537,7 @@ class BrowserDaemon {
     const page = this.pageById.get(pageId);
     if (!page) {
       throw new Error(
-        `Page "${pageId}" was not found in session "${this.session}". Run "libretto pages --session ${this.session}" to list ids.`,
+        `Page "${pageId}" was not found in session "${this.session}". Run "${librettoCommand(`pages --session ${this.session}`)}" to list ids.`,
       );
     }
     return page;

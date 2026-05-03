@@ -24,6 +24,7 @@ import {
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
+import { librettoCommand } from "../core/package-manager.js";
 import { resolveProviderName } from "../core/providers/index.js";
 import {
   compileExecFunction,
@@ -498,7 +499,7 @@ async function runResume(
 
   if (!existsSync(pausedSignalPath)) {
     throw new Error(
-      `Session "${session}" is not paused. Run "libretto run ... --session ${session}" and call pause("${session}") first.`,
+      `Session "${session}" is not paused. Run "${librettoCommand(`run ... --session ${session}`)}" and call pause("${session}") first.`,
     );
   }
 
@@ -689,7 +690,7 @@ export const execInput = SimpleCLI.input({
   },
 }).refine(
   (input) => input.code !== undefined,
-  `Usage: libretto exec <code|-> [--session <name>] [--visualize]\n       echo '<code>' | libretto exec - [--session <name>] [--visualize]`,
+  `Usage: ${librettoCommand("exec <code|-> [--session <name>] [--visualize]")}\n       echo '<code>' | ${librettoCommand("exec - [--session <name>] [--visualize]")}`,
 );
 
 export const execCommand = SimpleCLI.command({
@@ -730,7 +731,7 @@ export const readonlyExecInput = SimpleCLI.input({
   },
 }).refine(
   (input) => input.code !== undefined,
-  `Usage: libretto readonly-exec <code|-> [--session <name>] [--page <id>]\n       echo '<code>' | libretto readonly-exec - [--session <name>] [--page <id>]`,
+  `Usage: ${librettoCommand("readonly-exec <code|-> [--session <name>] [--page <id>]")}\n       echo '<code>' | ${librettoCommand("readonly-exec - [--session <name>] [--page <id>]")}`,
 );
 
 export const readonlyExecCommand = SimpleCLI.command({
@@ -752,7 +753,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     });
   });
 
-const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH]`;
+const runUsage = `Usage: ${librettoCommand("run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH]")}`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
