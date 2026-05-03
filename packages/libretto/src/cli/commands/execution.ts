@@ -30,10 +30,7 @@ import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { librettoCommand } from "../core/package-manager.js";
 import { resolveProviderName } from "../core/providers/index.js";
-import {
-  getAbsoluteIntegrationPath,
-  loadDefaultWorkflow,
-} from "../core/workflow-runtime.js";
+import { getAbsoluteIntegrationPath } from "../core/workflow-runtime.js";
 import {
   compileExecFunction,
   stripEmptyCatchHandlers,
@@ -589,9 +586,6 @@ async function runIntegrationFromFile(
   const absoluteIntegrationPath = getAbsoluteIntegrationPath(
     args.integrationPath,
   );
-  if (!args.tsconfigPath) {
-    await loadDefaultWorkflow(absoluteIntegrationPath);
-  }
   if (args.authProfileDomain) {
     const normalizedDomain = normalizeDomain(normalizeUrl(args.authProfileDomain));
     if (!hasProfile(normalizedDomain)) {

@@ -12,7 +12,7 @@ import {
 } from "../../shared/workflow/workflow.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 
-type LoadedLibrettoWorkflow = ExportedLibrettoWorkflow & {
+export type LoadedLibrettoWorkflow = ExportedLibrettoWorkflow & {
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 

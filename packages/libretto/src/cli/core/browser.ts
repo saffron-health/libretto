@@ -691,6 +691,13 @@ export async function runClose(
       provider: state.provider.name,
       sessionId: state.provider.sessionId,
     });
+    if (!hasProviderCloseResult(session)) {
+      writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+      throw new Error(
+        `Failed to confirm remote ${state.provider.name} session cleanup for session "${session}". ` +
+          `State preserved with status "cleanup-failed". Retry with: ${librettoCommand(`close --session ${session}`)}`,
+      );
+    }
     replayUrl = readProviderReplayUrl(session, logger);
   }
 
@@ -733,6 +740,10 @@ function readProviderReplayUrl(session: string, logger: LoggerApi): string | und
     });
     return undefined;
   }
+}
+
+function hasProviderCloseResult(session: string): boolean {
+  return existsSync(getSessionProviderClosePath(session));
 }
 
 function sendSignalToProcessGroupOrPid(

@@ -66,6 +66,7 @@ import {
   getAbsoluteIntegrationPath,
   installHeadedWorkflowVisualization,
   loadDefaultWorkflow,
+  type LoadedLibrettoWorkflow,
 } from "../workflow-runtime.js";
 
 function isOperationalPage(page: Page): boolean {
@@ -604,6 +605,7 @@ class BrowserDaemon {
   async runWorkflow(args: {
     workflow: DaemonWorkflowConfig;
     headed: boolean;
+    loadedWorkflow?: LoadedLibrettoWorkflow;
   }): Promise<void> {
     const signalPaths = getPauseSignalPaths(this.session);
     const restoreStdout = mirrorStdoutToFile(signalPaths.outputSignalPath);
@@ -611,7 +613,7 @@ class BrowserDaemon {
       const absolutePath = getAbsoluteIntegrationPath(
         args.workflow.integrationPath,
       );
-      const workflow = await loadDefaultWorkflow(absolutePath);
+      const workflow = args.loadedWorkflow ?? (await loadDefaultWorkflow(absolutePath));
       const workflowLogger = this.logger.withScope("integration-run", {
         integrationPath: absolutePath,
         workflowName: workflow.name,
@@ -683,6 +685,19 @@ async function main(): Promise<void> {
   const headed =
     config.browser.kind === "launch" ? config.browser.headed : false;
 
+  let loadedWorkflow: LoadedLibrettoWorkflow | undefined;
+  if (config.workflow) {
+    try {
+      loadedWorkflow = await loadDefaultWorkflow(
+        getAbsoluteIntegrationPath(config.workflow.integrationPath),
+      );
+    } catch (error) {
+      throw new UserFacingStartupError(
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
   const daemon =
     config.browser.kind === "provider"
       ? await BrowserDaemon.connectToProvider({
@@ -702,7 +717,7 @@ async function main(): Promise<void> {
 
   if (config.workflow) {
     void daemon
-      .runWorkflow({ workflow: config.workflow, headed })
+      .runWorkflow({ workflow: config.workflow, headed, loadedWorkflow })
       .catch((error) => {
         daemon.logger.error("workflow-failed", {
           error: error instanceof Error ? error.message : String(error),
