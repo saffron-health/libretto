@@ -99,7 +99,7 @@ export default workflow("main", async () => {
 
     const runSession = "run-write-access-session";
     const runResult = await librettoCli(
-      `run "${integrationFilePath}" --session ${runSession} --headless`,
+      `run "${integrationFilePath}" --session ${runSession} --headless --stay-open-on-success`,
     );
     expect(runResult.stdout).toContain("RUN_MODE_OK");
     expect(runResult.stdout).toContain("Integration completed.");
@@ -127,7 +127,7 @@ export default workflow("main", async () => {
 
     const session = "run-readonly-session";
     const runResult = await librettoCli(
-      `run "${integrationFilePath}" --session ${session} --headless --read-only`,
+      `run "${integrationFilePath}" --session ${session} --headless --read-only --stay-open-on-success`,
     );
     expect(runResult.stdout).toContain("RUN_READONLY_OK");
     expect(runResult.stdout).toContain("Integration completed.");

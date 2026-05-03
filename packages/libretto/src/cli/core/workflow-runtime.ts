@@ -48,7 +48,11 @@ export async function loadDefaultWorkflow(
     >;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const compileHint = isTsxCompileError(error) ? `\n${TSCONFIG_HINT}` : "";
+    const compileHint = isTsxCompileError(error)
+      ? `\n${TSCONFIG_HINT}`
+      : absolutePath.endsWith(".ts") || absolutePath.endsWith(".tsx")
+        ? `\n${TSCONFIG_HINT}`
+        : "";
     throw new Error(
       `Failed to import integration module at ${absolutePath}: ${message}${compileHint}`,
     );

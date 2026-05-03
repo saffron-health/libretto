@@ -47,10 +47,10 @@ describe("multi-page CLI behavior", () => {
     ).toBe(true);
   }, 45_000);
 
-  test("exec requires --page when multiple pages are open", async ({
+  test("exec without --page targets the primary page when multiple pages are open", async ({
     librettoCli,
   }) => {
-    const session = "multi-page-exec-requires-page";
+    const session = "multi-page-exec-primary-page";
     await librettoCli(
       `open https://example.com --headless --session ${session}`,
     );
@@ -62,10 +62,8 @@ describe("multi-page CLI behavior", () => {
     const result = await librettoCli(
       `exec "return await page.url()" --session ${session}`,
     );
-    expect(result.stderr).toContain(
-      `Multiple pages are open in session "${session}".`,
-    );
-    expect(result.stderr).toContain("Pass --page <id> to target a page");
+    expect(result.stdout).toContain("example.com");
+    expect(result.stdout).not.toContain("multi-page-secondary");
   }, 45_000);
 
   test("commands fail with a clear error for unknown page ids", async ({

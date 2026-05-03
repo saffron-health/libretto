@@ -27,6 +27,10 @@ import { readLibrettoConfig } from "../core/config.js";
 import { librettoCommand } from "../core/package-manager.js";
 import { resolveProviderName } from "../core/providers/index.js";
 import {
+  getAbsoluteIntegrationPath,
+  loadDefaultWorkflow,
+} from "../core/workflow-runtime.js";
+import {
   compileExecFunction,
   stripEmptyCatchHandlers,
 } from "../core/exec-compiler.js";
@@ -578,6 +582,13 @@ async function runIntegrationFromFile(
   clearSignalIfExists(signalPaths.failedSignalPath);
   clearSignalIfExists(signalPaths.outputSignalPath);
 
+  const absoluteIntegrationPath = getAbsoluteIntegrationPath(
+    args.integrationPath,
+  );
+  if (!args.tsconfigPath) {
+    await loadDefaultWorkflow(absoluteIntegrationPath);
+  }
+
   const runLogPath = logFileForSession(args.session);
   const {
     pid,
@@ -592,9 +603,9 @@ async function runIntegrationFromFile(
             kind: "launch",
             headed: !args.headless,
             viewport: args.viewport ?? { width: 1366, height: 768 },
-          },
+      },
       workflow: {
-        integrationPath: args.integrationPath,
+        integrationPath: absoluteIntegrationPath,
         params: args.params,
         visualize: args.visualize,
         stayOpenOnSuccess: args.stayOpenOnSuccess,
