@@ -6,6 +6,10 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   connect,
   disconnectBrowser,
+  getProfilePath,
+  hasProfile,
+  normalizeDomain,
+  normalizeUrl,
   runClose,
   resolveViewport,
 } from "../core/browser.js";
@@ -587,6 +591,22 @@ async function runIntegrationFromFile(
   );
   if (!args.tsconfigPath) {
     await loadDefaultWorkflow(absoluteIntegrationPath);
+  }
+  if (args.authProfileDomain) {
+    const normalizedDomain = normalizeDomain(normalizeUrl(args.authProfileDomain));
+    if (!hasProfile(normalizedDomain)) {
+      const profilePath = getProfilePath(normalizedDomain);
+      throw new Error(
+        [
+          `Local auth profile not found for domain "${normalizedDomain}".`,
+          `Expected profile file: ${profilePath}`,
+          "To create it:",
+          `  1. ${librettoCommand(`open https://${normalizedDomain} --headed --session ${args.session}`)}`,
+          "  2. Log in manually in the browser window.",
+          `  3. ${librettoCommand(`save ${normalizedDomain} --session ${args.session}`)}`,
+        ].join("\n"),
+      );
+    }
   }
 
   const runLogPath = logFileForSession(args.session);
