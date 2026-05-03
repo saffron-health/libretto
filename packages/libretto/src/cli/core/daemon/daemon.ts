@@ -25,7 +25,7 @@ import {
   type Page,
 } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
 import type { LibrettoWorkflowContext } from "../../../shared/workflow/workflow.js";
 import {
@@ -34,6 +34,7 @@ import {
   getSessionNetworkLogPath,
   getSessionActionsLogPath,
   getSessionProviderClosePath,
+  getSessionStatePath,
 } from "../context.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import {
@@ -75,6 +76,14 @@ function isOperationalPage(page: Page): boolean {
 }
 
 type TelemetryEntry = Record<string, unknown>;
+
+async function waitForSessionState(session: string): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    if (existsSync(getSessionStatePath(session))) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
 
 class UserFacingStartupError extends Error {
   constructor(message: string) {
@@ -716,8 +725,10 @@ async function main(): Promise<void> {
           });
 
   if (config.workflow) {
-    void daemon
-      .runWorkflow({ workflow: config.workflow, headed, loadedWorkflow })
+    void waitForSessionState(config.session)
+      .then(() =>
+        daemon.runWorkflow({ workflow: config.workflow!, headed, loadedWorkflow }),
+      )
       .catch((error) => {
         daemon.logger.error("workflow-failed", {
           error: error instanceof Error ? error.message : String(error),
