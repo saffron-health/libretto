@@ -112,6 +112,10 @@ export const deployInput = SimpleCLI.input({
       name: "entry-point",
       help: "Entry point file (default: index.ts)",
     }),
+    credentialId: SimpleCLI.option(z.string().optional(), {
+      name: "credential-id",
+      help: "Credential ID to attach to the deployed workflows",
+    }),
     external: SimpleCLI.option(
       z
         .string()
@@ -155,6 +159,7 @@ export const deployCommand = SimpleCLI.command({
       entry_point: entryPoint,
     };
     if (input.description) createPayload.description = input.description;
+    if (input.credentialId) createPayload.credential_id = input.credentialId;
 
     console.log("Uploading deployment...");
     const res = await postJson(
