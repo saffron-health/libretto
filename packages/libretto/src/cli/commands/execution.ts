@@ -286,10 +286,9 @@ async function runExec(
 ): Promise<void> {
   const state = readSessionStateOrThrow(session);
   if (!state.daemonSocketPath) {
-    // Compatibility fallback for failed runs created before `run` became
-    // daemon-backed: those session states can have a live CDP endpoint/port but
-    // no daemon socket. Keep `exec` inspection working until such sessions are
-    // gone. Context: https://www.notion.so/Make-libretto-run-daemon-backed-for-failed-workflow-inspection-352ac9fb35f181c1b7d3f08c0a735e9d
+    // Compatibility fallback for older sessions that predate daemon-backed
+    // command handling. Keep `exec` inspection working when state has a live
+    // CDP endpoint/port but no daemon socket.
     logger.warn(`${options.mode ?? "exec"}-daemon-socket-missing-cdp-fallback`, {
       session,
       hasCdpEndpoint: Boolean(state.cdpEndpoint),
