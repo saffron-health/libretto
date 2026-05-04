@@ -225,6 +225,33 @@ export default workflow("main", async ({ page }) => {
     expect(result.stdout).not.toContain("Readonly Secondary Page");
   }, 45_000);
 
+  test("exec without --page falls back to the remaining page when the original page is closed", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "daemon-primary-page-closed";
+    const integrationFilePath = await writeWorkflow(
+      "integration-primary-page-closed.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  const replacement = await page.context().newPage();
+  await replacement.goto("data:text/html,<title>Replacement Page</title>");
+  await page.close();
+});
+`,
+    );
+
+    const run = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(run.stdout).toContain("Integration completed.");
+
+    const result = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(result.stdout).toContain("Replacement Page");
+  }, 45_000);
+
   test("run --stay-open-on-success leaves a daemon-backed session for pages and snapshot", async ({
     librettoCli,
     writeWorkflow,

@@ -542,6 +542,13 @@ class BrowserDaemon {
 
   private resolveTargetPage(pageId?: string): Page {
     if (!pageId) {
+      if (this.page.isClosed()) {
+        const openPages = Array.from(this.pageById.values());
+        if (openPages.length === 1) return openPages[0];
+        throw new Error(
+          `The primary page for session "${this.session}" is closed. Run "${librettoCommand(`pages --session ${this.session}`)}" to choose a page id.`,
+        );
+      }
       return this.page;
     }
     const page = this.pageById.get(pageId);

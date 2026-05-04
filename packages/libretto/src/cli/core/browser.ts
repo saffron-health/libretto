@@ -748,6 +748,22 @@ async function waitForProviderCloseResult(
   }
 }
 
+async function waitForCloseAllTargets(
+  targets: ReadonlyArray<ClosableSession>,
+): Promise<void> {
+  const hasProviderSession = targets.some((target) => target.provider);
+  const deadline =
+    Date.now() + (hasProviderSession ? PROVIDER_CLOSE_WAIT_MS : CLOSE_WAIT_MS);
+  while (Date.now() < deadline) {
+    const stillWaiting = targets.some((target) => {
+      if (target.pid == null || !isPidRunning(target.pid)) return false;
+      return target.provider ? !hasProviderCloseResult(target.session) : true;
+    });
+    if (!stillWaiting) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 async function closeProviderSessionDirectly(
   session: string,
   providerState: { name: string; sessionId: string },
@@ -928,7 +944,17 @@ export async function runCloseAll(
     );
   }
 
-  await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+  await waitForCloseAllTargets(closable);
+
+  for (const target of closable) {
+    if (!target.provider || hasProviderCloseResult(target.session)) continue;
+    if (target.pid != null && isPidRunning(target.pid)) continue;
+    try {
+      await closeProviderSessionDirectly(target.session, target.provider, logger);
+    } catch {
+      failedProviderSessions.add(target.session);
+    }
+  }
 
   let survivors = closable.filter(
     (target) => target.pid != null && isPidRunning(target.pid),
