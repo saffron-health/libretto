@@ -24,7 +24,7 @@ import {
   readSessionState,
   writeSessionState,
 } from "./session.js";
-import { DaemonClient } from "./daemon/index.js";
+import { DaemonClient } from "./daemon/ipc.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const PROVIDER_CLOSE_WAIT_MS = 30_000;

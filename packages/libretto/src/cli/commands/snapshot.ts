@@ -12,7 +12,7 @@ import { pageOption, sessionOption, withRequiredSession } from "./shared.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readSnapshotModel } from "../core/config.js";
 import { resolveSnapshotApiModelOrThrow } from "../core/ai-model.js";
-import { DaemonClient } from "../core/daemon/index.js";
+import { DaemonClient } from "../core/daemon/ipc.js";
 import { librettoCommand } from "../core/package-manager.js";
 
 export const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;

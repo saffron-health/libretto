@@ -35,7 +35,7 @@ import {
   compileExecFunction,
   stripEmptyCatchHandlers,
 } from "../core/exec-compiler.js";
-import { DaemonClient } from "../core/daemon/index.js";
+import { DaemonClient } from "../core/daemon/ipc.js";
 import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
 import {
   readActionLog,

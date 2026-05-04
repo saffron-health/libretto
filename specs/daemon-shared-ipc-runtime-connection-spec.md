@@ -195,10 +195,10 @@ function createDaemonHandlers(
 
 Delete `packages/libretto/src/cli/core/daemon/index.ts` and import daemon modules directly. Barrel files hide module ownership and make refactors harder to review; direct imports keep callsites explicit within the package.
 
-- [ ] Replace imports from `packages/libretto/src/cli/core/daemon/index.ts` with direct imports from `daemon/ipc.ts` or `daemon/config.ts`.
-- [ ] Delete `packages/libretto/src/cli/core/daemon/index.ts`.
-- [ ] Run `rg "core/daemon/index|core/daemon\.js|from \".*daemon/index\.js\"|from \".*core/daemon\"" packages/libretto/src packages/libretto/test` and confirm no daemon barrel imports remain.
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
+- [x] Replace imports from `packages/libretto/src/cli/core/daemon/index.ts` with direct imports from `daemon/ipc.ts` or `daemon/config.ts`.
+- [x] Delete `packages/libretto/src/cli/core/daemon/index.ts`.
+- [x] Run `rg "core/daemon/index|core/daemon\.js|from \".*daemon/index\.js\"|from \".*core/daemon\"" packages/libretto/src packages/libretto/test` and confirm no daemon barrel imports remain.
+- [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 4: Introduce `WorkflowRunner` protocol and supervisor shell
 
