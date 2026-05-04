@@ -53,6 +53,10 @@ pnpm -s cli help
 - Do not add new dependencies without asking.
 - Do not remove or comment out code to "clean up" without asking — it may be there for a reason.
 
+## Testing
+
+- VERY IMPORTANT: read `docs/tests-guide.md` before updating tests at all.
+
 ## Style
 
 - Concise, technical prose. No filler or emoji.
