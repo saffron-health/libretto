@@ -907,6 +907,12 @@ function clearStoppedSessionStates(
   return cleared;
 }
 
+function markProviderCleanupFailed(session: string, logger: LoggerApi): void {
+  const state = readSessionState(session, logger);
+  if (!state) return;
+  writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+}
+
 export async function runCloseAll(
   logger: LoggerApi,
   options?: { force?: boolean },
@@ -952,6 +958,7 @@ export async function runCloseAll(
     try {
       await closeProviderSessionDirectly(target.session, target.provider, logger);
     } catch {
+      markProviderCleanupFailed(target.session, logger);
       failedProviderSessions.add(target.session);
     }
   }
@@ -1027,6 +1034,12 @@ export async function runCloseAll(
   }
   const closedCount = closable.length - failedProviderSessions.size;
   console.log(`Closed ${closedCount} session(s).`);
+  if (failedProviderSessions.size > 0) {
+    console.warn(
+      `Failed to confirm remote cleanup for ${failedProviderSessions.size} provider-backed session(s). ` +
+        `State preserved with status "cleanup-failed". Retry with: ${librettoCommand("close --all")}`,
+    );
+  }
   for (const recording of replayUrls) {
     console.log(
       `View recording for session "${recording.session}": ${recording.replayUrl}`,
