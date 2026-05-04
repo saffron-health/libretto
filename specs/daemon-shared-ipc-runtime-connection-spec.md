@@ -206,9 +206,11 @@ Define the parent/child workflow IPC contract and add a `WorkflowRunner` class t
 
 ```ts
 type WorkflowChildToParentApi = {
-  pause(args: { session: string; pausedAt: string; url?: string }): Promise<void>;
-  workflowCompleted(args: { completedAt: string }): void;
-  workflowFailed(args: { message: string; phase: "setup" | "workflow" }): void;
+  paused(args: { session: string; pausedAt: string; url?: string }): Promise<void>;
+  finished(args:
+    | { result: "completed"; completedAt: string }
+    | { result: "failed"; message: string; phase: "setup" | "workflow" }
+  ): void;
 };
 
 type WorkflowParentToChildApi = {
@@ -222,13 +224,12 @@ class WorkflowRunner {
 }
 ```
 
-- [ ] Add `packages/libretto/src/cli/core/workflow-runner/protocol.ts` with `WorkflowChildToParentApi`, `WorkflowParentToChildApi`, `WorkflowStatus`, and `WorkflowOutcome` types.
-- [ ] Add `packages/libretto/src/cli/core/workflow-runner/runner.ts` with a `WorkflowRunner` shell that owns child process state, stdout/stderr forwarding callbacks, status, and `resume()`.
-- [ ] Implement the parent-side `pause` handler so it sets status to paused, emits a paused outcome, and deliberately does not resolve until `resume()` is called.
-- [ ] Add child exit handling that reports an exited/failed outcome if the child exits before completion, failure, or pause is reported.
-- [ ] Do not move workflow execution out of `BrowserDaemon.runWorkflow` yet.
-- [ ] Add focused unit coverage for the `pause` handler: the child call remains pending until `WorkflowRunner.resume()` is invoked.
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
+- [x] Add `packages/libretto/src/cli/core/workflow-runner/runner.ts` with the parent/child IPC protocol types and a `WorkflowRunner` shell that owns child process state, stdout/stderr forwarding callbacks, status, and `resume()`.
+- [x] Implement the parent-side `pause` handler so it sets status to paused, emits a paused outcome, and deliberately does not resolve until `resume()` is called.
+- [x] Add child exit handling that reports an exited outcome if the child exits before reporting a terminal finished outcome, including while paused.
+- [x] Do not move workflow execution out of `BrowserDaemon.runWorkflow` yet.
+- [x] Defer standalone runner unit coverage until the libretto workflow child entrypoint exists, instead of testing private child-process IPC details.
+- [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 5: Run workflow code in a child process supervised by `WorkflowRunner`
 
@@ -269,8 +270,10 @@ Connect the child-runner outcomes to the daemon's `DaemonToCliApi` event stream.
 type DaemonToCliApi = {
   workflowOutput(args: { stream: "stdout" | "stderr"; text: string }): void;
   workflowPaused(args: { pausedAt: string; url?: string }): void;
-  workflowCompleted(args: { completedAt: string }): void;
-  workflowFailed(args: { message: string; phase: "setup" | "workflow" }): void;
+  workflowFinished(args:
+    | { result: "completed"; completedAt: string }
+    | { result: "failed"; message: string; phase: "setup" | "workflow" }
+  ): void;
 };
 
 async function waitForWorkflowOutcome(client: DaemonClient): Promise<WorkflowOutcome> {
@@ -280,7 +283,7 @@ async function waitForWorkflowOutcome(client: DaemonClient): Promise<WorkflowOut
 
 - [ ] Add optional CLI event handlers when constructing a daemon IPC client for `run` and `resume` paths.
 - [ ] Broadcast `WorkflowRunner` stdout/stderr events through `DaemonToCliApi.workflowOutput`.
-- [ ] Broadcast `WorkflowRunner` paused/completed/failed outcomes through `DaemonToCliApi`.
+- [ ] Broadcast `WorkflowRunner` paused/finished outcomes through `DaemonToCliApi`.
 - [ ] Update `waitForWorkflowOutcome` in `packages/libretto/src/cli/commands/execution.ts` to wait on daemon events and process liveness instead of signal files.
 - [ ] Remove `.paused` polling from `waitForWorkflowOutcome` once daemon pause events are authoritative.
 - [ ] Add or adjust behavior coverage where a workflow logs before completion and `librettoCli("run ...")` includes that output and `Integration completed.`.
@@ -315,7 +318,7 @@ class BrowserDaemon {
 
 ### Phase 8: Move `pause(session)` onto the workflow child parent IPC peer
 
-Remove the shared pause primitive's dependency on CLI internals by making it call the installed workflow parent peer from inside a workflow child. The parent `pause` handler resolves only when `WorkflowRunner.resume()` is called, so `await pause(session)` naturally suspends and continues workflow code.
+Remove the shared pause primitive's dependency on CLI internals by making it call the installed workflow parent peer from inside a workflow child. The parent `paused` handler resolves only when `WorkflowRunner.resume()` is called, so `await pause(session)` naturally suspends and continues workflow code.
 
 ```ts
 let workflowParentPeer: IpcPeer<WorkflowChildToParentApi> | undefined;
@@ -326,7 +329,7 @@ export function installWorkflowParentPeer(peer: IpcPeer<WorkflowChildToParentApi
 
 export async function pause(session: string): Promise<void> {
   if (process.env.NODE_ENV === "production") return;
-  await getWorkflowParentPeerOrThrow().call.pause({
+  await getWorkflowParentPeerOrThrow().call.paused({
     session,
     pausedAt: new Date().toISOString(),
     url: "unknown",
