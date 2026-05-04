@@ -50,6 +50,7 @@ pnpm -s cli help
 
 - TypeScript strict mode is enabled. Do not use `any` — use proper types or `unknown`.
 - Use `.js` extensions in import paths (ESM resolution requires it).
+- Do not add barrel files (`index.ts` re-exports). Import directly from source files within the same package.
 - Do not add new dependencies without asking.
 - Do not remove or comment out code to "clean up" without asking — it may be there for a reason.
 

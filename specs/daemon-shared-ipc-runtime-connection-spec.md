@@ -40,7 +40,7 @@ The first useful version should preserve the existing `DaemonClient` call surfac
 - `packages/libretto/src/cli/core/daemon/ipc.ts` — current custom daemon client/server protocol and spawn helper.
 - `packages/libretto/src/cli/core/daemon/daemon.ts` — daemon process, request dispatch, workflow execution, and shutdown behavior.
 - `packages/libretto/src/cli/core/daemon/config.ts` — daemon startup configuration passed to the child process.
-- `packages/libretto/src/cli/core/daemon/index.ts` — daemon module export surface.
+- `packages/libretto/src/cli/core/daemon/index.ts` — legacy daemon barrel to remove once imports are direct.
 - `packages/libretto/src/cli/core/workflow-runner/` — new parent/child workflow runner modules to add for workflow supervision and child-process IPC.
 - `packages/libretto/src/cli/commands/execution.ts` — `run`, `resume`, `exec`, and `readonly-exec` command behavior.
 - `packages/libretto/src/cli/core/browser.ts` — `open`, `connect`, `pages`, `snapshot`, `close`, and daemon spawn callsites.
@@ -135,6 +135,8 @@ Decision: keep a focused in-repo serializer instead of adding `serialize-error`.
 
 Introduce daemon API types that mirror the current daemon commands while preserving the public `DaemonClient` methods used by CLI commands. This lands typed protocol definitions without changing user-visible behavior.
 
+Completed: `packages/libretto/src/cli/core/daemon/ipc.ts` now owns the daemon protocol types and the `DaemonClient` wrapper over `createIpcPeer`. Clients connect with `await DaemonClient.connect(socketPath)`, then call the remote daemon through a concrete peer instead of a promise-valued member. `exec` and `readonlyExec` still model user-code failures as `DaemonCommandResult` values so captured stdout/stderr remain available to CLI callers; other daemon method errors use the shared IPC runtime's rejected-call behavior.
+
 ```ts
 type CliToDaemonApi = {
   ping(): { protocolVersion: number };
@@ -155,16 +157,18 @@ class DaemonClient {
 }
 ```
 
-- [ ] Add daemon protocol types, naming the request API `CliToDaemonApi` and the event API `DaemonToCliApi`, in `packages/libretto/src/cli/core/daemon/ipc.ts` or a focused sibling module.
-- [ ] Reimplement `DaemonClient.ping`, `pages`, `exec`, `readonlyExec`, and `snapshot` through `createIpcPeer` while keeping their current caller-facing return shapes.
-- [ ] Preserve `DaemonCommandResult` semantics for `exec` and `readonlyExec`, including returning captured stdout/stderr on user-code errors.
-- [ ] Keep `DaemonClient.spawn`, `waitForReadyMessage`, and `getDaemonSocketPath` behavior unchanged in this phase.
-- [ ] Verify existing daemon behavior with `pnpm -s test --filter=libretto -- daemon-ipc.spec.ts`.
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
+- [x] Add daemon protocol types, naming the request API `CliToDaemonApi` and the event API `DaemonToCliApi`, in `packages/libretto/src/cli/core/daemon/ipc.ts` or a focused sibling module.
+- [x] Reimplement `DaemonClient.ping`, `pages`, `exec`, `readonlyExec`, and `snapshot` through `createIpcPeer` while keeping their current caller-facing return shapes.
+- [x] Preserve `DaemonCommandResult` semantics for `exec` and `readonlyExec`, including returning captured stdout/stderr on user-code errors.
+- [x] Keep `DaemonClient.spawn`, `waitForReadyMessage`, and `getDaemonSocketPath` behavior unchanged in this phase.
+- [x] Verify existing daemon behavior with `pnpm -s test --filter=libretto -- daemon-ipc.spec.ts`.
+- [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 3: Replace the daemon server dispatcher with typed IPC handlers
 
 Move the daemon process from custom `DaemonServer` request handling to typed `shared/ipc` handlers. The CLI should still be able to run all existing daemon-backed commands after this phase.
+
+Completed: `packages/libretto/src/cli/core/daemon/daemon.ts` now creates an IPC socket server with `createIpcSocketServer`/`listenOnIpcSocket` and attaches typed `createIpcPeer` handlers for each connected CLI. The obsolete daemon-specific request/response parser and dispatcher were removed from `ipc.ts`; `pages` and `snapshot` let shared IPC serialize handler errors, while `exec` and `readonlyExec` convert user-code failures into explicit result values. IPC server lifecycle is owned by `BrowserDaemon.initialize()` and cleaned up through registered shutdown handlers rather than being stored on `BrowserDaemon` itself.
 
 ```ts
 function createDaemonHandlers(
@@ -180,12 +184,21 @@ function createDaemonHandlers(
 }
 ```
 
-- [ ] Replace `DaemonServer` usage in `packages/libretto/src/cli/core/daemon/daemon.ts` with the shared IPC socket server transport.
-- [ ] Move the current `dispatchCommand` cases into typed handler functions without changing page resolution, timeout, or error messages.
-- [ ] Keep the startup `process.send({ type: "ready", socketPath, provider })` handshake intact.
-- [ ] Ensure multiple client connections can call daemon methods during one daemon lifetime.
-- [ ] Remove or quarantine obsolete custom `DaemonRequest`/`DaemonResponse` parsing only after all callsites compile.
-- [ ] Verify `pnpm -s test --filter=libretto -- daemon-ipc.spec.ts multi-page.spec.ts stateful.spec.ts` passes.
+- [x] Replace `DaemonServer` usage in `packages/libretto/src/cli/core/daemon/daemon.ts` with the shared IPC socket server transport.
+- [x] Move the current `dispatchCommand` cases into typed handler functions without changing page resolution, timeout, or error messages.
+- [x] Keep the startup `process.send({ type: "ready", socketPath, provider })` handshake intact.
+- [x] Ensure multiple client connections can call daemon methods during one daemon lifetime.
+- [x] Remove or quarantine obsolete custom `DaemonRequest`/`DaemonResponse` parsing only after all callsites compile.
+- [x] Verify `pnpm -s test --filter=libretto -- daemon-ipc.spec.ts multi-page.spec.ts stateful.spec.ts socket-transport.spec.ts` passes.
+
+### Phase 3.1: Remove the daemon barrel module
+
+Delete `packages/libretto/src/cli/core/daemon/index.ts` and import daemon modules directly. Barrel files hide module ownership and make refactors harder to review; direct imports keep callsites explicit within the package.
+
+- [ ] Replace imports from `packages/libretto/src/cli/core/daemon/index.ts` with direct imports from `daemon/ipc.ts` or `daemon/config.ts`.
+- [ ] Delete `packages/libretto/src/cli/core/daemon/index.ts`.
+- [ ] Run `rg "core/daemon/index|core/daemon\.js|from \".*daemon/index\.js\"|from \".*core/daemon\"" packages/libretto/src packages/libretto/test` and confirm no daemon barrel imports remain.
+- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 4: Introduce `WorkflowRunner` protocol and supervisor shell
 

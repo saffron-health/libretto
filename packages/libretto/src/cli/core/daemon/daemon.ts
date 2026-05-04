@@ -29,6 +29,15 @@ import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
 import type { LibrettoWorkflowContext } from "../../../shared/workflow/workflow.js";
 import {
+  createIpcPeer,
+  type IpcPeer,
+  type IpcPeerHandlers,
+} from "../../../shared/ipc/ipc.js";
+import {
+  createIpcSocketServer,
+  listenOnIpcSocket,
+} from "../../../shared/ipc/socket-transport.js";
+import {
   createLoggerForSession,
   getSessionDir,
   getSessionNetworkLogPath,
@@ -38,9 +47,11 @@ import {
 } from "../context.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import {
-  DaemonServer,
   getDaemonSocketPath,
-  type DaemonRequest,
+  type CliToDaemonApi,
+  type DaemonExecOutput,
+  type DaemonExecResult,
+  type DaemonToCliApi,
 } from "./ipc.js";
 import { wrapPageForActionLogging } from "../telemetry.js";
 import {
@@ -76,6 +87,7 @@ function isOperationalPage(page: Page): boolean {
 }
 
 type TelemetryEntry = Record<string, unknown>;
+type ErrorWithOutput = Error & { output?: DaemonExecOutput };
 
 async function waitForSessionState(session: string): Promise<void> {
   const deadline = Date.now() + 2_000;
@@ -184,6 +196,7 @@ class BrowserDaemon {
   readonly logger: LoggerApi;
   private readonly execState: Record<string, unknown> = {};
   private readonly pageById = new Map<string, Page>();
+  private readonly shutdownHandlers: Array<() => Promise<void> | void> = [];
 
   private constructor(
     private readonly session: string,
@@ -191,7 +204,6 @@ class BrowserDaemon {
     private readonly browser: Browser,
     private readonly context: BrowserContext,
     private readonly page: Page,
-    private readonly ipcServer: DaemonServer,
     logger: LoggerApi,
     private readonly providerSession?: {
       provider: ProviderApi;
@@ -278,20 +290,15 @@ class BrowserDaemon {
       });
     }
 
-    // IPC server — handler is wired after construction to avoid a
-    // circular type inference issue (daemon references itself).
+    // IPC server — typed handlers are attached per client connection so one
+    // daemon lifetime can serve multiple CLI invocations.
     const socketPath = getDaemonSocketPath(session);
-    let handler: (request: DaemonRequest) => Promise<unknown>;
-    const ipcServer = new DaemonServer(socketPath, (request) =>
-      handler(request),
-    );
     const daemon = new BrowserDaemon(
       session,
       externallyManaged,
       browser,
       context,
       page,
-      ipcServer,
       logger,
       providerSession,
     );
@@ -314,8 +321,29 @@ class BrowserDaemon {
       await page.goto(navigateUrl);
     }
 
-    handler = (request) => daemon.handleRequest(request);
-    await ipcServer.listen();
+    const connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
+    const ipcServer = createIpcSocketServer((transport) => {
+      const cli = createIpcPeer<DaemonToCliApi, CliToDaemonApi>(
+        transport,
+        daemon.createIpcHandlers(),
+      );
+      const stopTracking = transport.onClose?.(() => {
+        connectedClis.delete(cli);
+        stopTracking?.();
+      });
+      connectedClis.add(cli);
+    });
+    daemon.registerShutdownHandler(async () => {
+      for (const cli of connectedClis) {
+        cli.destroy();
+      }
+      connectedClis.clear();
+      await new Promise<void>((resolve, reject) => {
+        ipcServer.close((error) => (error ? reject(error) : resolve()));
+      });
+    });
+
+    await listenOnIpcSocket(ipcServer, socketPath);
     process.send?.({ type: "ready", socketPath, provider: readyProvider });
     daemon.logger.info("ipc-server-listening", { socketPath });
 
@@ -489,11 +517,17 @@ class BrowserDaemon {
 
   // ── Lifecycle ──────────────────────────────────────────────────────
 
+  registerShutdownHandler(handler: () => Promise<void> | void): void {
+    this.shutdownHandlers.push(handler);
+  }
+
   async shutdown(reason: string, closeBrowser: boolean): Promise<void> {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
     this.logger.info(reason, { session: this.session });
-    await this.ipcServer.close();
+    for (const handler of this.shutdownHandlers) {
+      await handler();
+    }
     if (closeBrowser) {
       if (this.externallyManaged) {
         // Drop the CDP pipe without killing the external browser.
@@ -560,62 +594,90 @@ class BrowserDaemon {
     return page;
   }
 
-  // ── IPC handler ────────────────────────────────────────────────────
+  // ── IPC handlers ───────────────────────────────────────────────────
 
-  private async handleRequest(request: DaemonRequest): Promise<unknown> {
-    if (request.command === "ping") {
-      return { protocolVersion: PROTOCOL_VERSION };
-    }
+  private createIpcHandlers(): IpcPeerHandlers<CliToDaemonApi> {
+    return {
+      ping: () => ({ protocolVersion: PROTOCOL_VERSION }),
+      pages: () =>
+        this.withRequestTimeout(() => handlePages(this.pageById, this.page)),
+      exec: (args) => this.runExec(args),
+      readonlyExec: (args) => this.runReadonlyExec(args),
+      snapshot: (args) =>
+        this.withRequestTimeout(() =>
+          handleSnapshot(
+            this.resolveTargetPage(args.pageId),
+            this.session,
+            this.logger,
+            args.pageId,
+          ),
+        ),
+    };
+  }
 
+  private async withRequestTimeout<T>(
+    operation: () => Promise<T> | T,
+  ): Promise<T> {
     // All non-ping commands get a timeout guard. The timer is cleared
     // when the command settles to avoid orphaned timers that would
     // keep the event loop alive after shutdown.
-    let timerId: ReturnType<typeof setTimeout>;
-    return Promise.race([
-      this.dispatchCommand(request).finally(() => clearTimeout(timerId)),
-      new Promise<never>((_resolve, reject) => {
-        timerId = setTimeout(
-          () =>
-            reject(
-              new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`),
-            ),
-          REQUEST_TIMEOUT_MS,
-        );
-      }),
-    ]);
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timerId = setTimeout(
+        () =>
+          reject(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`)),
+        REQUEST_TIMEOUT_MS,
+      );
+    });
+
+    try {
+      return await Promise.race([operation(), timeout]);
+    } finally {
+      if (timerId) clearTimeout(timerId);
+    }
   }
 
-  private async dispatchCommand(request: DaemonRequest): Promise<unknown> {
-    switch (request.command) {
-      case "pages":
-        return handlePages(this.pageById, this.page);
-      case "exec":
-        return handleExec(
-          this.resolveTargetPage(request.pageId),
-          request.code,
+  private async runExec(
+    args: Parameters<CliToDaemonApi["exec"]>[0],
+  ): Promise<DaemonExecResult> {
+    try {
+      const data = await this.withRequestTimeout(() =>
+        handleExec(
+          this.resolveTargetPage(args.pageId),
+          args.code,
           this.context,
           this.browser,
           this.execState,
           this.session,
-          request.visualize,
-        );
-      case "readonly-exec":
-        return handleReadonlyExec(
-          this.resolveTargetPage(request.pageId),
-          request.code,
-        );
-      case "snapshot":
-        return handleSnapshot(
-          this.resolveTargetPage(request.pageId),
-          this.session,
-          this.logger,
-          request.pageId,
-        );
-      default:
-        throw new Error(
-          `Unknown command: ${(request as { command: string }).command}`,
-        );
+          args.visualize,
+        ),
+      );
+      return { ok: true, data };
+    } catch (error) {
+      return this.createExecErrorResult(error);
     }
+  }
+
+  private async runReadonlyExec(
+    args: Parameters<CliToDaemonApi["readonlyExec"]>[0],
+  ): Promise<DaemonExecResult> {
+    try {
+      const data = await this.withRequestTimeout(() =>
+        handleReadonlyExec(this.resolveTargetPage(args.pageId), args.code),
+      );
+      return { ok: true, data };
+    } catch (error) {
+      return this.createExecErrorResult(error);
+    }
+  }
+
+  private createExecErrorResult(error: unknown): DaemonExecResult {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+      output:
+        error instanceof Error ? (error as ErrorWithOutput).output : undefined,
+    };
   }
 
   async runWorkflow(args: {

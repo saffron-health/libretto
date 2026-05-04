@@ -71,16 +71,29 @@ export async function connectToIpcSocket(
   return createJsonSocketTransport(socket);
 }
 
+export function createIpcSocketServer(
+  onConnection: (transport: IpcTransport<IpcProtocolMessage>) => void,
+): Server {
+  return createServer((socket) => {
+    onConnection(createJsonSocketTransport(socket));
+  });
+}
+
 export async function listenForIpcConnections(
   socketPath: string,
   onConnection: (transport: IpcTransport<IpcProtocolMessage>) => void,
 ): Promise<Server> {
+  const server = createIpcSocketServer(onConnection);
+  await listenOnIpcSocket(server, socketPath);
+  return server;
+}
+
+export async function listenOnIpcSocket(
+  server: Server,
+  socketPath: string,
+): Promise<void> {
   await mkdir(dirname(socketPath), { recursive: true });
   await rm(socketPath, { force: true });
-
-  const server = createServer((socket) => {
-    onConnection(createJsonSocketTransport(socket));
-  });
 
   const originalClose = server.close.bind(server);
   server.close = ((callback?: (error?: Error) => void) => {
@@ -103,8 +116,6 @@ export async function listenForIpcConnections(
     server.once("listening", onListening);
     server.listen(socketPath);
   });
-
-  return server;
 }
 
 async function connectSocket(socketPath: string): Promise<Socket> {

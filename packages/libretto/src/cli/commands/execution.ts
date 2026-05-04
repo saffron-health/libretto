@@ -102,7 +102,7 @@ async function execViaDaemon(
     via: "daemon",
   });
 
-  const client = new DaemonClient(daemonSocketPath);
+  const client = await DaemonClient.connect(daemonSocketPath);
 
   const response =
     mode === "exec"

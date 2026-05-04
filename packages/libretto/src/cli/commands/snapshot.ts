@@ -117,7 +117,7 @@ async function captureSnapshot(
   pageId?: string,
 ): Promise<ScreenshotPair> {
   logger.info("snapshot-via-daemon", { session, pageId });
-  const client = new DaemonClient(daemonSocketPath);
+  const client = await DaemonClient.connect(daemonSocketPath);
   const { pngPath, htmlPath, snapshotRunId, pageUrl, title } =
     await client.snapshot({ pageId });
 

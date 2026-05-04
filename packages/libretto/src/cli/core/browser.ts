@@ -329,7 +329,7 @@ export async function runPages(
         `Close and reopen the session: ${librettoCommand(`close --session ${session}`)}`,
     );
   }
-  const client = new DaemonClient(state.daemonSocketPath);
+  const client = await DaemonClient.connect(state.daemonSocketPath);
   pageSummaries = await client.pages();
 
   if (pageSummaries.length === 0) {

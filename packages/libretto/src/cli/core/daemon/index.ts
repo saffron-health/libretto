@@ -1,16 +1,21 @@
 export {
-  DaemonServer,
   DaemonClient,
   DaemonClientError,
   getDaemonSocketPath,
   type DaemonClientSpawnOptions,
   type DaemonClientSpawnResult,
   type DaemonCommandResult,
+  type DaemonExecArgs,
   type DaemonExecOutput,
-  type DaemonRequest,
-  type DaemonResponse,
+  type DaemonExecResult,
+  type DaemonExecSuccess,
+  type DaemonPageSummary,
+  type DaemonReadonlyExecArgs,
   type DaemonResultMap,
-  type RequestHandler,
+  type DaemonSnapshotArgs,
+  type DaemonSnapshotResult,
+  type CliToDaemonApi,
+  type DaemonToCliApi,
 } from "./ipc.js";
 
 export {
