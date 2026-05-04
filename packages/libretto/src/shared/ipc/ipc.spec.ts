@@ -13,6 +13,9 @@ type ApiA = {
 type ApiB = {
   add(left: number, right: number): Promise<number>;
   fail(): Promise<void>;
+  failWithCause(): Promise<void>;
+  failWithCode(): Promise<void>;
+  failWithNonError(): Promise<void>;
   wait(): Promise<string>;
 };
 
@@ -59,6 +62,21 @@ const test = base.extend<Fixtures>({
       async fail() {
         throw new Error("expected failure");
       },
+      async failWithCause() {
+        throw new Error("outer failure", {
+          cause: new Error("inner failure", {
+            cause: new TypeError("root failure"),
+          }),
+        });
+      },
+      async failWithCode() {
+        const error = new Error("coded failure") as Error & { code: string };
+        error.code = "ERR_EXPECTED";
+        throw error;
+      },
+      async failWithNonError() {
+        throw "plain failure";
+      },
       async wait() {
         return new Promise(() => {});
       },
@@ -86,6 +104,36 @@ test("rejects with the remote handler error", async ({ a }) => {
   await expect(a.call.fail()).rejects.toThrow("fail > expected failure");
 });
 
+test("rejects with the remote handler error cause chain", async ({ a }) => {
+  const error = await getRejectedError(a.call.failWithCause());
+
+  expect(error.message).toBe("failWithCause > outer failure");
+  expect(error.stack).toContain("outer failure");
+
+  const cause = getErrorCause(error);
+  expect(cause.message).toBe("inner failure");
+
+  const rootCause = getErrorCause(cause);
+  expect(rootCause.name).toBe("TypeError");
+  expect(rootCause.message).toBe("root failure");
+});
+
+test("rejects with the remote handler error code", async ({ a }) => {
+  const error = await getRejectedError(a.call.failWithCode());
+
+  expect(error.message).toBe("failWithCode > coded failure");
+  expect(error.code).toBe("ERR_EXPECTED");
+  expect(error.stack).toContain("coded failure");
+});
+
+test("rejects with a serialized non-error thrown value", async ({ a }) => {
+  const error = await getRejectedError(a.call.failWithNonError());
+
+  expect(error.name).toBe("NonError");
+  expect(error.message).toBe("failWithNonError > plain failure");
+  expect(error.stack).toContain("failWithNonError");
+});
+
 test("rejects pending calls when destroyed", async ({ a }) => {
   const result = a.call.wait();
 
@@ -93,3 +141,21 @@ test("rejects pending calls when destroyed", async ({ a }) => {
 
   await expect(result).rejects.toThrow("IPC peer destroyed");
 });
+
+async function getRejectedError(
+  promise: Promise<unknown>,
+): Promise<Error & { code?: unknown }> {
+  try {
+    await promise;
+  } catch (error) {
+    expect(error).toBeInstanceOf(Error);
+    return error as Error & { code?: unknown };
+  }
+
+  throw new Error("Expected promise to reject");
+}
+
+function getErrorCause(error: Error): Error {
+  expect(error.cause).toBeInstanceOf(Error);
+  return error.cause as Error;
+}

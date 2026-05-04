@@ -45,6 +45,9 @@ type SerializedError = {
   name: string;
   message: string;
   stack?: string;
+  code?: string | number;
+  cause?: SerializedError;
+  errors?: SerializedError[];
 };
 
 type IpcResponseMessage = {
@@ -192,17 +195,51 @@ export function createIpcPeer<
   return { call, destroy };
 }
 
-function serializeError(error: unknown): SerializedError {
+function serializeError(
+  error: unknown,
+  seen = new WeakSet<object>(),
+): SerializedError {
+  if (typeof error === "object" && error !== null) {
+    if (seen.has(error)) {
+      return {
+        name: "Error",
+        message: "[Circular]",
+      };
+    }
+
+    seen.add(error);
+  }
+
   if (error instanceof Error) {
-    return {
+    const serialized: SerializedError = {
       name: error.name,
       message: error.message,
       stack: error.stack,
     };
+
+    const errorWithCode = error as Error & { code?: unknown };
+    if (
+      typeof errorWithCode.code === "string" ||
+      typeof errorWithCode.code === "number"
+    ) {
+      serialized.code = errorWithCode.code;
+    }
+
+    if (error.cause !== undefined) {
+      serialized.cause = serializeError(error.cause, seen);
+    }
+
+    if (error instanceof AggregateError) {
+      serialized.errors = error.errors.map((aggregateError: unknown) =>
+        serializeError(aggregateError, seen),
+      );
+    }
+
+    return serialized;
   }
 
   return {
-    name: "Error",
+    name: "NonError",
     message: String(error),
   };
 }
@@ -211,10 +248,41 @@ function deserializeRemoteError(
   method: string,
   remoteError: SerializedError,
 ): Error {
-  const error = new Error(`${method} > ${remoteError.message}`);
-  error.name = remoteError.name;
+  const error = deserializeSerializedError(
+    remoteError,
+    `${method} > ${remoteError.message}`,
+  );
   error.stack = [new Error(method).stack, remoteError.stack]
     .filter((stack): stack is string => typeof stack === "string")
     .join("\n");
+  return error;
+}
+
+function deserializeSerializedError(
+  serialized: SerializedError,
+  message = serialized.message,
+): Error {
+  const cause = serialized.cause
+    ? deserializeSerializedError(serialized.cause)
+    : undefined;
+  const error =
+    serialized.name === "AggregateError" && serialized.errors
+      ? new AggregateError(
+          serialized.errors.map((aggregateError) =>
+            deserializeSerializedError(aggregateError),
+          ),
+          message,
+          { cause },
+        )
+      : new Error(message, { cause });
+
+  error.name = serialized.name;
+  error.stack = serialized.stack;
+
+  const errorWithCode = error as Error & { code?: string | number };
+  if (serialized.code !== undefined) {
+    errorWithCode.code = serialized.code;
+  }
+
   return error;
 }
