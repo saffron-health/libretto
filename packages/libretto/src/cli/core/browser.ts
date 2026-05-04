@@ -13,6 +13,7 @@ import type { SessionAccessMode } from "../../shared/state/index.js";
 import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import { librettoCommand } from "./package-manager.js";
+import { getCloudProviderApi } from "./providers/index.js";
 import {
   assertSessionAvailableForStart,
   clearSessionState,
@@ -26,6 +27,7 @@ import {
 import { DaemonClient } from "./daemon/index.js";
 
 const CLOSE_WAIT_MS = 1_500;
+const PROVIDER_CLOSE_WAIT_MS = 30_000;
 const FORCE_CLOSE_WAIT_MS = 300;
 
 async function pickFreePort(): Promise<number> {
@@ -673,13 +675,16 @@ export async function runClose(
     return;
   }
 
-  // Kill local daemon process if present (applies to both local and
-  // provider sessions — the daemon disconnects without closing the
-  // external browser).
+  // Kill local daemon process if present. For provider sessions, the daemon
+  // closes the remote browser during shutdown and writes provider-close.json.
   if (state.pid != null) {
     logger.info("close-killing", { session, pid: state.pid, port: state.port });
     sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
-    await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+    if (state.provider) {
+      await waitForProviderCloseResult(session, state.pid);
+    } else {
+      await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+    }
   }
 
   // Provider-backed sessions are owned by the daemon. Killing the daemon above
@@ -692,13 +697,23 @@ export async function runClose(
       sessionId: state.provider.sessionId,
     });
     if (!hasProviderCloseResult(session)) {
-      writeSessionState({ ...state, status: "cleanup-failed" }, logger);
-      throw new Error(
-        `Failed to confirm remote ${state.provider.name} session cleanup for session "${session}". ` +
-          `State preserved with status "cleanup-failed". Retry with: ${librettoCommand(`close --session ${session}`)}`,
-      );
+      if (state.pid == null || !isPidRunning(state.pid)) {
+        try {
+          replayUrl = await closeProviderSessionDirectly(session, state.provider, logger);
+        } catch (error) {
+          writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+          throw error;
+        }
+      } else {
+        writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+        throw new Error(
+          `Failed to confirm remote ${state.provider.name} session cleanup for session "${session}". ` +
+            `State preserved with status "cleanup-failed". Retry with: ${librettoCommand(`close --session ${session}`)}`,
+        );
+      }
+    } else {
+      replayUrl = readProviderReplayUrl(session, logger);
     }
-    replayUrl = readProviderReplayUrl(session, logger);
   }
 
   unlinkDaemonSocket(state.daemonSocketPath, logger, session);
@@ -720,6 +735,46 @@ type ClosableSession = {
 
 function waitForCloseSignalWindow(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function waitForProviderCloseResult(
+  session: string,
+  pid: number,
+): Promise<void> {
+  const deadline = Date.now() + PROVIDER_CLOSE_WAIT_MS;
+  while (Date.now() < deadline) {
+    if (hasProviderCloseResult(session) || !isPidRunning(pid)) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+async function closeProviderSessionDirectly(
+  session: string,
+  providerState: { name: string; sessionId: string },
+  logger: LoggerApi,
+): Promise<string | undefined> {
+  try {
+    const provider = getCloudProviderApi(providerState.name);
+    const result = await provider.closeSession(providerState.sessionId);
+    logger.info("close-provider-direct-fallback-success", {
+      session,
+      provider: providerState.name,
+      sessionId: providerState.sessionId,
+      replayUrl: result.replayUrl,
+    });
+    return result.replayUrl;
+  } catch (error) {
+    logger.warn("close-provider-direct-fallback-failed", {
+      session,
+      provider: providerState.name,
+      sessionId: providerState.sessionId,
+      error,
+    });
+    throw new Error(
+      `Failed to close remote ${providerState.name} session "${providerState.sessionId}" for session "${session}". ` +
+        `State preserved with status "cleanup-failed". Retry with: ${librettoCommand(`close --session ${session}`)}`,
+    );
+  }
 }
 
 function readProviderReplayUrl(session: string, logger: LoggerApi): string | undefined {

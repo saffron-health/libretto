@@ -337,9 +337,23 @@ async function stopExistingFailedRunSession(
     pid: existingState.pid,
     port: existingState.port,
   });
-  clearSessionState(session, logger);
+  if (existingState.pid == null) {
+    clearSessionState(session, logger);
+    return;
+  }
 
-  if (existingState.pid == null) return;
+  try {
+    process.kill(existingState.pid, "SIGTERM");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ESRCH") {
+      logger.warn("run-release-existing-failed-session-signal-failed", {
+        session,
+        pid: existingState.pid,
+        error,
+      });
+    }
+  }
 
   const stopDeadline = Date.now() + 3_000;
   while (isProcessRunning(existingState.pid) && Date.now() < stopDeadline) {
@@ -350,11 +364,11 @@ async function stopExistingFailedRunSession(
       session,
       pid: existingState.pid,
     });
-    console.warn(
-      `Existing failed workflow process for session "${session}" (pid ${existingState.pid}) is still shutting down; continuing.`,
+    throw new Error(
+      `Existing failed workflow process for session "${session}" (pid ${existingState.pid}) is still running. Close it with: ${librettoCommand(`close --session ${session}`)}`,
     );
-    return;
   }
+  clearSessionState(session, logger);
   console.log(
     `Closed existing failed workflow process for session "${session}" (pid ${existingState.pid}).`,
   );
