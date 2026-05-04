@@ -112,10 +112,21 @@ function createParentProcessIpcTransport(): IpcTransport<IpcProtocolMessage> {
 }
 ```
 
-- [ ] Add child-process IPC transport helpers under `packages/libretto/src/shared/ipc/`.
-- [ ] Filter incoming `process.on("message")` payloads so only `IpcProtocolMessage` values reach `createIpcPeer`.
-- [ ] Throw a clear error when the child-side transport is created without `process.send`.
-- [ ] Add unit coverage that a parent and forked child can call each other through `createIpcPeer`.
+- [x] Add child-process IPC transport helpers under `packages/libretto/src/shared/ipc/`.
+- [x] Filter incoming `process.on("message")` payloads so only `IpcProtocolMessage` values reach `createIpcPeer`.
+- [x] Throw a clear error when the child-side transport is created without `process.send`.
+- [x] Add unit coverage that a parent and forked child can call each other through `createIpcPeer`.
+- [x] Verify `pnpm -s type-check --filter=libretto` passes.
+
+### Phase 1.6: Evaluate richer IPC error serialization
+
+Decide whether the generic IPC peer should preserve richer error details across process and socket boundaries by adopting a focused error serialization library such as `serialize-error`, or by expanding the current in-repo serializer. Keep the wire protocol explicit and avoid changing daemon/workflow behavior unless the added error fidelity is intentionally accepted.
+
+- [ ] Compare the current `{ name, message, stack }` serializer with `serialize-error` for custom properties, `cause`, `AggregateError`, non-`Error` thrown values, circular references, and deserialization.
+- [ ] Decide whether richer metadata should be transmitted by default, considering user-visible debugging value and accidental exposure of sensitive error fields.
+- [ ] If adopting a dependency, verify its runtime constraints fit Libretto's supported Node versions and ESM packaging.
+- [ ] Update `SerializedError` and `deserializeRemoteError` in `packages/libretto/src/shared/ipc/ipc.ts` or introduce a focused internal error serialization module.
+- [ ] Add IPC unit coverage for at least nested `cause`, custom `code`, and non-`Error` thrown values.
 - [ ] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 2: Define the typed daemon protocol and wrap it in the existing `DaemonClient`
