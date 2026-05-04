@@ -83,12 +83,12 @@ async function listenForIpcConnections(
 }
 ```
 
-- [ ] Add a Node transport module under `packages/libretto/src/shared/ipc/` that adapts a `net.Socket` to `IpcTransport<IpcProtocolMessage>` using newline-delimited JSON framing.
-- [ ] Add helpers for connecting a client socket and accepting server connections without introducing daemon-specific types.
-- [ ] Ensure the server removes a stale Unix socket path before listening and unlinks it on close.
-- [ ] Add unit coverage that sends two concurrent calls over one socket and receives both responses correctly.
-- [ ] Add unit coverage that destroying one peer rejects pending calls when the socket closes.
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
+- [x] Add a Node transport module under `packages/libretto/src/shared/ipc/` that adapts a `net.Socket` to `IpcTransport<IpcProtocolMessage>` using newline-delimited JSON framing.
+- [x] Add helpers for connecting a client socket and accepting server connections without introducing daemon-specific types.
+- [x] Ensure the server removes a stale Unix socket path before listening and unlinks it on close.
+- [x] Add unit coverage that sends two concurrent calls over one socket and receives both responses correctly.
+- [x] Add unit coverage that destroying one peer rejects pending calls when the socket closes.
+- [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 1.5: Add a child-process transport for `shared/ipc`
 

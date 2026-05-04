@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 export type IpcTransport<T = unknown> = {
   send(message: T): void | Promise<void>;
   listen(callback: (message: T) => void): () => void;
+  onClose?(callback: (error?: Error) => void): () => void;
+  close?(): void;
 };
 
 type FunctionMap<T> = {
@@ -78,6 +80,9 @@ export function createIpcPeer<
     }
 
     handleResponse(message);
+  });
+  const stopCloseListener = transport.onClose?.((error) => {
+    destroy(error ?? new Error("IPC transport closed"));
   });
 
   async function handleRequest(message: IpcRequestMessage): Promise<void> {
@@ -170,13 +175,15 @@ export function createIpcPeer<
     },
   });
 
-  function destroy(): void {
+  function destroy(error = new Error("IPC peer destroyed")): void {
     if (destroyed) return;
     destroyed = true;
     stopListening();
+    stopCloseListener?.();
+    transport.close?.();
 
     for (const request of pending.values()) {
-      request.reject(new Error("IPC peer destroyed"));
+      request.reject(error);
     }
 
     pending.clear();
