@@ -5,14 +5,15 @@ import {
   type CDPSession,
   type Page,
 } from "playwright";
-import { existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createServer } from "node:net";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
-import { PROFILES_DIR } from "./context.js";
+import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import { librettoCommand } from "./package-manager.js";
+import { getCloudProviderApi } from "./providers/index.js";
 import {
   assertSessionAvailableForStart,
   clearSessionState,
@@ -23,11 +24,10 @@ import {
   readSessionState,
   writeSessionState,
 } from "./session.js";
-import type { ProviderApi } from "./providers/types.js";
-import { getCloudProviderApi } from "./providers/index.js";
-import { DaemonClient, spawnSessionDaemon } from "./daemon/index.js";
+import { DaemonClient } from "./daemon/index.js";
 
 const CLOSE_WAIT_MS = 1_500;
+const PROVIDER_CLOSE_WAIT_MS = 30_000;
 const FORCE_CLOSE_WAIT_MS = 300;
 
 async function pickFreePort(): Promise<number> {
@@ -454,24 +454,26 @@ export async function runOpen(
   // Spawn daemon and wait for IPC readiness. The daemon launches
   // Chromium internally — IPC readiness implies the browser is up,
   // so no separate CDP polling is needed.
-  const { pid, socketPath: daemonSocketPath } = await spawnSessionDaemon({
+  const { pid, socketPath: daemonSocketPath } = await DaemonClient.spawn({
     config: {
-      port,
-      url,
       session,
-      headed,
-      viewport,
-      storageStatePath: useProfile ? profilePath : undefined,
-      windowPosition,
+      browser: {
+        kind: "launch",
+        headed,
+        viewport,
+        storageStatePath: useProfile ? profilePath : undefined,
+        windowPosition,
+        remoteDebuggingPort: port,
+        initialUrl: url,
+      },
     },
-    session,
     logger,
     logPath: runLogPath,
     // The daemon launches Chromium, installs telemetry, navigates to
     // the URL, and only then starts IPC. Navigation alone can take up
     // to 45s (page.setDefaultNavigationTimeout), so the IPC timeout
     // must cover launch + navigation.
-    ipcTimeoutMs: 60_000,
+    startupTimeoutMs: 60_000,
   });
 
   writeSessionState(
@@ -501,7 +503,6 @@ export async function runOpen(
 export async function runOpenWithProvider(
   rawUrl: string,
   providerName: string,
-  provider: ProviderApi,
   session: string,
   logger: LoggerApi,
   accessMode: SessionAccessMode = "write-access",
@@ -514,7 +515,34 @@ export async function runOpenWithProvider(
     `Creating ${providerName} browser session (session: ${session})...`,
   );
 
-  const providerSession = await provider.createSession();
+  console.log(`Connecting to ${providerName} browser...`);
+
+  const runLogPath = logFileForSession(session);
+  const {
+    pid,
+    socketPath: daemonSocketPath,
+    provider: providerSession,
+  } = await DaemonClient.spawn({
+    config: {
+      session,
+      browser: {
+        kind: "provider",
+        providerName,
+        initialUrl: url,
+      },
+    },
+    logger,
+    logPath: runLogPath,
+    // Remote CDP connection + navigation; must cover both.
+    startupTimeoutMs: 60_000,
+  });
+
+  if (!providerSession) {
+    throw new Error(
+      `Provider daemon did not return session metadata for ${providerName}.`,
+    );
+  }
+
   logger.info("open-provider-session-created", {
     provider: providerName,
     sessionId: providerSession.sessionId,
@@ -525,24 +553,6 @@ export async function runOpenWithProvider(
   if (providerSession.liveViewUrl) {
     console.log(`View live session: ${providerSession.liveViewUrl}`);
   }
-
-  console.log(`Connecting to ${providerName} browser...`);
-
-  const runLogPath = logFileForSession(session);
-  const { pid, socketPath: daemonSocketPath } = await spawnSessionDaemon({
-    config: {
-      mode: "connect" as const,
-      session,
-      cdpEndpoint: providerSession.cdpEndpoint,
-      url,
-    },
-    session,
-    logger,
-    logPath: runLogPath,
-    // Remote CDP connection + navigation; must cover both.
-    ipcTimeoutMs: 60_000,
-    onFailure: () => provider.closeSession(providerSession.sessionId),
-  });
 
   writeSessionState(
     {
@@ -665,39 +675,44 @@ export async function runClose(
     return;
   }
 
-  // Kill local daemon process if present (applies to both local and
-  // provider sessions — the daemon disconnects without closing the
-  // external browser).
+  // Kill local daemon process if present. For provider sessions, the daemon
+  // closes the remote browser during shutdown and writes provider-close.json.
   if (state.pid != null) {
     logger.info("close-killing", { session, pid: state.pid, port: state.port });
     sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
-    await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+    if (state.provider) {
+      await waitForProviderCloseResult(session, state.pid);
+    } else {
+      await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+    }
   }
 
-  // Close provider session if applicable (tears down the remote browser).
+  // Provider-backed sessions are owned by the daemon. Killing the daemon above
+  // makes it close the remote provider session during shutdown.
   let replayUrl: string | undefined;
   if (state.provider) {
-    logger.info("close-provider", {
+    logger.info("close-provider-skipped-daemon-owned", {
       session,
       provider: state.provider.name,
       sessionId: state.provider.sessionId,
     });
-    try {
-      const provider = getCloudProviderApi(state.provider.name);
-      const result = await provider.closeSession(state.provider.sessionId);
-      replayUrl = result.replayUrl;
-    } catch (err) {
-      logger.warn("close-provider-error", {
-        session,
-        provider: state.provider.name,
-        sessionId: state.provider.sessionId,
-        error: err,
-      });
-      writeSessionState({ ...state, status: "cleanup-failed" }, logger);
-      throw new Error(
-        `Failed to close remote ${state.provider.name} session "${state.provider.sessionId}" for session "${session}". ` +
-          `State preserved with status "cleanup-failed". Retry with: ${librettoCommand(`close --session ${session}`)}`,
-      );
+    if (!hasProviderCloseResult(session)) {
+      if (state.pid == null || !isPidRunning(state.pid)) {
+        try {
+          replayUrl = await closeProviderSessionDirectly(session, state.provider, logger);
+        } catch (error) {
+          writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+          throw error;
+        }
+      } else {
+        writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+        throw new Error(
+          `Failed to confirm remote ${state.provider.name} session cleanup for session "${session}". ` +
+            `State preserved with status "cleanup-failed". Retry with: ${librettoCommand(`close --session ${session}`)}`,
+        );
+      }
+    } else {
+      replayUrl = readProviderReplayUrl(session, logger);
     }
   }
 
@@ -720,6 +735,86 @@ type ClosableSession = {
 
 function waitForCloseSignalWindow(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function waitForProviderCloseResult(
+  session: string,
+  pid: number,
+): Promise<void> {
+  const deadline = Date.now() + PROVIDER_CLOSE_WAIT_MS;
+  while (Date.now() < deadline) {
+    if (hasProviderCloseResult(session) || !isPidRunning(pid)) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+async function waitForCloseAllTargets(
+  targets: ReadonlyArray<ClosableSession>,
+): Promise<void> {
+  const hasProviderSession = targets.some((target) => target.provider);
+  const deadline =
+    Date.now() + (hasProviderSession ? PROVIDER_CLOSE_WAIT_MS : CLOSE_WAIT_MS);
+  while (Date.now() < deadline) {
+    const stillWaiting = targets.some((target) => {
+      if (target.pid == null || !isPidRunning(target.pid)) return false;
+      return target.provider ? !hasProviderCloseResult(target.session) : true;
+    });
+    if (!stillWaiting) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+async function closeProviderSessionDirectly(
+  session: string,
+  providerState: { name: string; sessionId: string },
+  logger: LoggerApi,
+): Promise<string | undefined> {
+  try {
+    const provider = getCloudProviderApi(providerState.name);
+    const result = await provider.closeSession(providerState.sessionId);
+    logger.info("close-provider-direct-fallback-success", {
+      session,
+      provider: providerState.name,
+      sessionId: providerState.sessionId,
+      replayUrl: result.replayUrl,
+    });
+    return result.replayUrl;
+  } catch (error) {
+    logger.warn("close-provider-direct-fallback-failed", {
+      session,
+      provider: providerState.name,
+      sessionId: providerState.sessionId,
+      error,
+    });
+    throw new Error(
+      `Failed to close remote ${providerState.name} session "${providerState.sessionId}" for session "${session}". ` +
+        `State preserved with status "cleanup-failed". Retry with: ${librettoCommand(`close --session ${session}`)}`,
+    );
+  }
+}
+
+function readProviderReplayUrl(session: string, logger: LoggerApi): string | undefined {
+  const closePath = getSessionProviderClosePath(session);
+  if (!existsSync(closePath)) return undefined;
+  try {
+    const parsed = JSON.parse(readFileSync(closePath, "utf8")) as {
+      replayUrl?: unknown;
+    };
+    return typeof parsed.replayUrl === "string" && parsed.replayUrl.length > 0
+      ? parsed.replayUrl
+      : undefined;
+  } catch (err) {
+    logger.warn("provider-close-result-read-failed", {
+      session,
+      path: closePath,
+      error: err,
+    });
+    return undefined;
+  }
+}
+
+function hasProviderCloseResult(session: string): boolean {
+  return existsSync(getSessionProviderClosePath(session));
 }
 
 function sendSignalToProcessGroupOrPid(
@@ -812,6 +907,12 @@ function clearStoppedSessionStates(
   return cleared;
 }
 
+function markProviderCleanupFailed(session: string, logger: LoggerApi): void {
+  const state = readSessionState(session, logger);
+  if (!state) return;
+  writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+}
+
 export async function runCloseAll(
   logger: LoggerApi,
   options?: { force?: boolean },
@@ -829,41 +930,9 @@ export async function runCloseAll(
     return;
   }
 
-  // Close provider sessions via their APIs
+  // Provider sessions are owned by their daemons. Send SIGTERM below and let
+  // each daemon close its remote provider session during shutdown.
   const failedProviderSessions = new Set<string>();
-  const replayUrls: Array<{ session: string; replayUrl: string }> = [];
-  for (const target of closable) {
-    if (target.provider) {
-      logger.info("close-all-provider", {
-        session: target.session,
-        provider: target.provider.name,
-        sessionId: target.provider.sessionId,
-      });
-      try {
-        const provider = getCloudProviderApi(target.provider.name);
-        const result = await provider.closeSession(target.provider.sessionId);
-        if (result.replayUrl) {
-          replayUrls.push({
-            session: target.session,
-            replayUrl: result.replayUrl,
-          });
-        }
-      } catch (err) {
-        logger.warn("close-all-provider-error", {
-          session: target.session,
-          provider: target.provider.name,
-          sessionId: target.provider.sessionId,
-          error: err,
-        });
-        failedProviderSessions.add(target.session);
-        // Mark as cleanup-failed, preserving provider.sessionId for retry
-        const state = readSessionState(target.session, logger);
-        if (state) {
-          writeSessionState({ ...state, status: "cleanup-failed" }, logger);
-        }
-      }
-    }
-  }
 
   // Send SIGTERM to all daemon processes (both local and provider sessions).
   for (const target of closable) {
@@ -881,7 +950,18 @@ export async function runCloseAll(
     );
   }
 
-  await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+  await waitForCloseAllTargets(closable);
+
+  for (const target of closable) {
+    if (!target.provider || hasProviderCloseResult(target.session)) continue;
+    if (target.pid != null && isPidRunning(target.pid)) continue;
+    try {
+      await closeProviderSessionDirectly(target.session, target.provider, logger);
+    } catch {
+      markProviderCleanupFailed(target.session, logger);
+      failedProviderSessions.add(target.session);
+    }
+  }
 
   let survivors = closable.filter(
     (target) => target.pid != null && isPidRunning(target.pid),
@@ -938,13 +1018,14 @@ export async function runCloseAll(
     }
   }
 
-  clearStoppedSessionStates(closable, logger, failedProviderSessions);
+  const replayUrls = closable
+    .filter((target) => target.provider)
+    .flatMap((target) => {
+      const replayUrl = readProviderReplayUrl(target.session, logger);
+      return replayUrl ? [{ session: target.session, replayUrl }] : [];
+    });
 
-  if (failedProviderSessions.size > 0) {
-    console.log(
-      `Warning: ${failedProviderSessions.size} provider session(s) failed remote cleanup and were preserved with status "cleanup-failed".`,
-    );
-  }
+  clearStoppedSessionStates(closable, logger, failedProviderSessions);
 
   if (clearedUnreadableStates > 0) {
     console.log(
@@ -953,11 +1034,19 @@ export async function runCloseAll(
   }
   const closedCount = closable.length - failedProviderSessions.size;
   console.log(`Closed ${closedCount} session(s).`);
+  if (failedProviderSessions.size > 0) {
+    console.warn(
+      `Failed to confirm remote cleanup for ${failedProviderSessions.size} provider-backed session(s). ` +
+        `State preserved with status "cleanup-failed". Retry with: ${librettoCommand("close --all")}`,
+    );
+  }
+  for (const recording of replayUrls) {
+    console.log(
+      `View recording for session "${recording.session}": ${recording.replayUrl}`,
+    );
+  }
   if (forceKilled > 0) {
     console.log(`Force-killed ${forceKilled} session(s).`);
-  }
-  for (const { session, replayUrl } of replayUrls) {
-    console.log(`View recording (${session}): ${replayUrl}`);
   }
 }
 
@@ -1025,12 +1114,14 @@ export async function runConnect(
 
   const runLogPath = logFileForSession(session);
   const { pid, socketPath: daemonSocketPath, client } =
-    await spawnSessionDaemon({
-      config: { mode: "connect" as const, session, cdpEndpoint: endpoint },
-      session,
+    await DaemonClient.spawn({
+      config: {
+        session,
+        browser: { kind: "connect", cdpEndpoint: endpoint },
+      },
       logger,
       logPath: runLogPath,
-      ipcTimeoutMs: 10_000,
+      startupTimeoutMs: 10_000,
     });
 
   writeSessionState(

@@ -8,14 +8,14 @@
  * Config for daemon-managed browser launch (`libretto open`).
  * The daemon owns the browser lifecycle and will close it on shutdown.
  */
-export type DaemonLaunchConfig = {
-  port: number;
-  url: string;
-  session: string;
+export type DaemonBrowserLaunchConfig = {
+  kind: "launch";
   headed: boolean;
   viewport: { width: number; height: number };
   storageStatePath?: string;
   windowPosition?: { x: number; y: number };
+  remoteDebuggingPort?: number;
+  initialUrl?: string;
 };
 
 /**
@@ -23,24 +23,37 @@ export type DaemonLaunchConfig = {
  * The daemon borrows the CDP connection and will disconnect (not close) on
  * shutdown — the browser outlives the session.
  */
-export type DaemonConnectConfig = {
-  mode: "connect";
-  session: string;
+export type DaemonBrowserConnectConfig = {
+  kind: "connect";
   cdpEndpoint: string;
-  /** If set, the daemon navigates to this URL after connecting. */
-  url?: string;
+  initialUrl?: string;
 };
 
 /**
- * Discriminated union passed as JSON in `process.argv[2]`.
- * Launch configs omit `mode` for backward compatibility with existing
- * `runOpen()` callers — any config without `mode: "connect"` is treated
- * as a launch config.
+ * Config for a daemon-owned cloud browser provider. The daemon creates the
+ * provider session during startup, connects over CDP, and closes the provider
+ * session during daemon shutdown.
  */
-export type DaemonConfig = DaemonLaunchConfig | DaemonConnectConfig;
+export type DaemonBrowserProviderConfig = {
+  kind: "provider";
+  providerName: string;
+  initialUrl?: string;
+};
 
-export function isConnectConfig(
-  config: DaemonConfig,
-): config is DaemonConnectConfig {
-  return "mode" in config && config.mode === "connect";
-}
+export type DaemonWorkflowConfig = {
+  integrationPath: string;
+  params?: unknown;
+  visualize?: boolean;
+  stayOpenOnSuccess?: boolean;
+  tsconfigPath?: string;
+  authProfileDomain?: string;
+};
+
+export type DaemonConfig = {
+  session: string;
+  browser:
+    | DaemonBrowserLaunchConfig
+    | DaemonBrowserConnectConfig
+    | DaemonBrowserProviderConfig;
+  workflow?: DaemonWorkflowConfig;
+};

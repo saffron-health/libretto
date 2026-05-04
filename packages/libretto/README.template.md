@@ -76,10 +76,14 @@ You can also use Libretto directly from the command line. All commands accept `-
 
 ```bash
 npx libretto open <url>                    # launch browser and open a URL
+npx libretto run ./integration.ts --headless # run a workflow and close on success
+npx libretto run ./integration.ts --headless --stay-open-on-success # keep a successful run inspectable
 npx libretto snapshot --objective "..."    # capture PNG + HTML and analyze with an LLM
 npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page
 npx libretto close                         # close the browser
 ```
+
+`run` sessions are inspectable through the same daemon-backed commands as `open` sessions. Successful runs close the browser by default; pass `--stay-open-on-success` to keep the browser open for `pages`, `snapshot`, and `exec`. Failed or paused workflows keep the browser open so you can inspect the exact page state before fixing or resuming the workflow.
 
 Run `npx libretto help` for the full list of commands.
 

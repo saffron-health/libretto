@@ -1,13 +1,16 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { spawn } from "node:child_process";
 import * as moduleBuiltin from "node:module";
-import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { installInstrumentation } from "../../shared/instrumentation/index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   connect,
   disconnectBrowser,
+  getProfilePath,
+  hasProfile,
+  normalizeDomain,
+  normalizeUrl,
+  runClose,
   resolveViewport,
 } from "../core/browser.js";
 import { parseViewportArg } from "./browser.js";
@@ -16,18 +19,18 @@ import {
   assertSessionAvailableForStart,
   assertSessionAllowsCommand,
   clearSessionState,
+  logFileForSession,
   readSessionState,
   readSessionStateOrThrow,
   setSessionStatus,
+  writeSessionState,
   type SessionState,
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { librettoCommand } from "../core/package-manager.js";
-import {
-  resolveProviderName,
-  getCloudProviderApi,
-} from "../core/providers/index.js";
+import { resolveProviderName } from "../core/providers/index.js";
+import { getAbsoluteIntegrationPath } from "../core/workflow-runtime.js";
 import {
   compileExecFunction,
   stripEmptyCatchHandlers,
@@ -39,7 +42,7 @@ import {
   readNetworkLog,
   wrapPageForActionLogging,
 } from "../core/telemetry.js";
-import type { RunIntegrationWorkerRequest } from "../workers/run-integration-worker-protocol.js";
+import type { SessionAccessMode } from "../../shared/state/index.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   pageOption,
@@ -48,13 +51,22 @@ import {
   withRequiredSession,
 } from "./shared.js";
 
-type RunIntegrationCommandRequest = RunIntegrationWorkerRequest & {
+type RunIntegrationCommandRequest = {
+  integrationPath: string;
+  session: string;
+  params: unknown;
+  headless: boolean;
+  visualize: boolean;
+  viewport?: { width: number; height: number };
+  accessMode: SessionAccessMode;
+  authProfileDomain?: string;
+  providerName?: string;
+  stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
 };
 type ExecMode = "exec" | "readonly-exec";
 
 const require = moduleBuiltin.createRequire(import.meta.url);
-const tsxCliPath = require.resolve("tsx/cli");
 
 function writeDaemonExecOutput(output?: { stdout: string; stderr: string }) {
   if (output?.stdout) {
@@ -280,10 +292,9 @@ async function runExec(
 ): Promise<void> {
   const state = readSessionStateOrThrow(session);
   if (!state.daemonSocketPath) {
-    // Compatibility fallback for failed runs created before `run` became
-    // daemon-backed: those session states can have a live CDP endpoint/port but
-    // no daemon socket. Keep `exec` inspection working until such sessions are
-    // gone. Context: https://www.notion.so/Make-libretto-run-daemon-backed-for-failed-workflow-inspection-352ac9fb35f181c1b7d3f08c0a735e9d
+    // Compatibility fallback for older sessions that predate daemon-backed
+    // command handling. Keep `exec` inspection working when state has a live
+    // CDP endpoint/port but no daemon socket.
     logger.warn(`${options.mode ?? "exec"}-daemon-socket-missing-cdp-fallback`, {
       session,
       hasCdpEndpoint: Boolean(state.cdpEndpoint),
@@ -326,9 +337,23 @@ async function stopExistingFailedRunSession(
     pid: existingState.pid,
     port: existingState.port,
   });
-  clearSessionState(session, logger);
+  if (existingState.pid == null) {
+    clearSessionState(session, logger);
+    return;
+  }
 
-  if (existingState.pid == null) return;
+  try {
+    process.kill(existingState.pid, "SIGTERM");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ESRCH") {
+      logger.warn("run-release-existing-failed-session-signal-failed", {
+        session,
+        pid: existingState.pid,
+        error,
+      });
+    }
+  }
 
   const stopDeadline = Date.now() + 3_000;
   while (isProcessRunning(existingState.pid) && Date.now() < stopDeadline) {
@@ -339,11 +364,11 @@ async function stopExistingFailedRunSession(
       session,
       pid: existingState.pid,
     });
-    console.warn(
-      `Existing failed workflow process for session "${session}" (pid ${existingState.pid}) is still shutting down; continuing.`,
+    throw new Error(
+      `Existing failed workflow process for session "${session}" (pid ${existingState.pid}) is still running. Close it with: ${librettoCommand(`close --session ${session}`)}`,
     );
-    return;
   }
+  clearSessionState(session, logger);
   console.log(
     `Closed existing failed workflow process for session "${session}" (pid ${existingState.pid}).`,
   );
@@ -402,6 +427,8 @@ type WaitForWorkflowOutcomeArgs = {
   session: string;
   pid: number;
 };
+
+type RunIntegrationResult = "completed" | "paused";
 
 type WorkflowOutcome = {
   status: "completed" | "paused" | "failed" | "exited";
@@ -531,6 +558,13 @@ async function runResume(
   if (outcome.status === "completed") {
     setSessionStatus(session, "completed", logger);
     console.log("Integration completed.");
+    if (sessionState.stayOpenOnSuccess) {
+      console.log(
+        `Browser is still open for session "${session}". Close it with: libretto close --session ${session}`,
+      );
+    } else {
+      await runClose(session, logger);
+    }
     return;
   }
   if (outcome.status === "failed") {
@@ -554,7 +588,7 @@ async function runResume(
 async function runIntegrationFromFile(
   args: RunIntegrationCommandRequest,
   logger: LoggerApi,
-): Promise<void> {
+): Promise<RunIntegrationResult> {
   await stopExistingFailedRunSession(args.session, logger);
   const signalPaths = getPauseSignalPaths(args.session);
   clearSignalIfExists(signalPaths.pausedSignalPath);
@@ -563,44 +597,85 @@ async function runIntegrationFromFile(
   clearSignalIfExists(signalPaths.failedSignalPath);
   clearSignalIfExists(signalPaths.outputSignalPath);
 
-  const workerEntryPath = fileURLToPath(
-    new URL("../workers/run-integration-worker.js", import.meta.url),
+  const absoluteIntegrationPath = getAbsoluteIntegrationPath(
+    args.integrationPath,
   );
-  const payload = JSON.stringify({
-    integrationPath: args.integrationPath,
-    session: args.session,
-    params: args.params,
-    headless: args.headless,
-    visualize: args.visualize,
-    authProfileDomain: args.authProfileDomain,
-    viewport: args.viewport,
-    accessMode: args.accessMode,
-    cdpEndpoint: args.cdpEndpoint,
-    provider: args.provider,
-  } satisfies RunIntegrationWorkerRequest);
-  const worker = spawn(
-    process.execPath,
-    [
-      tsxCliPath,
-      ...(args.tsconfigPath ? ["--tsconfig", args.tsconfigPath] : []),
-      workerEntryPath,
-      payload,
-    ],
-    {
-      detached: true,
-      stdio: "ignore",
-      env: process.env,
+  if (args.authProfileDomain) {
+    const normalizedDomain = normalizeDomain(normalizeUrl(args.authProfileDomain));
+    if (!hasProfile(normalizedDomain)) {
+      const profilePath = getProfilePath(normalizedDomain);
+      throw new Error(
+        [
+          `Local auth profile not found for domain "${normalizedDomain}".`,
+          `Expected profile file: ${profilePath}`,
+          "To create it:",
+          `  1. ${librettoCommand(`open https://${normalizedDomain} --headed --session ${args.session}`)}`,
+          "  2. Log in manually in the browser window.",
+          `  3. ${librettoCommand(`save ${normalizedDomain} --session ${args.session}`)}`,
+        ].join("\n"),
+      );
+    }
+  }
+
+  const runLogPath = logFileForSession(args.session);
+  const {
+    pid,
+    socketPath: daemonSocketPath,
+    provider,
+  } = await DaemonClient.spawn({
+    config: {
+      session: args.session,
+      browser: args.providerName
+        ? { kind: "provider", providerName: args.providerName }
+        : {
+            kind: "launch",
+            headed: !args.headless,
+            viewport: args.viewport ?? { width: 1366, height: 768 },
+      },
+      workflow: {
+        integrationPath: absoluteIntegrationPath,
+        params: args.params,
+        visualize: args.visualize,
+        stayOpenOnSuccess: args.stayOpenOnSuccess,
+        tsconfigPath: args.tsconfigPath,
+        authProfileDomain: args.authProfileDomain,
+      },
     },
+    logger,
+    logPath: runLogPath,
+    startupTimeoutMs: 60_000,
+  });
+
+  writeSessionState(
+    {
+      port: 0,
+      pid,
+      cdpEndpoint: provider?.cdpEndpoint,
+      session: args.session,
+      startedAt: new Date().toISOString(),
+      status: "active",
+      mode: args.accessMode,
+      viewport: args.viewport,
+      stayOpenOnSuccess: args.stayOpenOnSuccess,
+      daemonSocketPath,
+      provider: provider
+        ? { name: provider.name, sessionId: provider.sessionId }
+        : undefined,
+    },
+    logger,
   );
-  worker.unref();
+  if (provider?.liveViewUrl) {
+    console.log(`View live session: ${provider.liveViewUrl}`);
+  }
+
   const outcome = await waitForWorkflowOutcome({
     session: args.session,
-    pid: worker.pid ?? 0,
+    pid,
   });
   if (outcome.status === "paused") {
     setSessionStatus(args.session, "paused", logger);
     console.log("Workflow paused.");
-    return;
+    return "paused";
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
@@ -619,6 +694,14 @@ async function runIntegrationFromFile(
   }
   setSessionStatus(args.session, "completed", logger);
   console.log("Integration completed.");
+  if (args.stayOpenOnSuccess) {
+    console.log(
+      `Browser is still open for session "${args.session}". Close it with: libretto close --session ${args.session}`,
+    );
+  } else {
+    await runClose(args.session, logger);
+  }
+  return "completed";
 }
 
 function readStdinSync(): string | null {
@@ -709,7 +792,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     });
   });
 
-const runUsage = `Usage: ${librettoCommand("run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--viewport WxH]")}`;
+const runUsage = `Usage: ${librettoCommand("run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH]")}`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -742,6 +825,10 @@ export const runInput = SimpleCLI.input({
     noVisualize: SimpleCLI.flag({
       name: "no-visualize",
       help: "Disable ghost cursor + highlight visualization in headed mode",
+    }),
+    stayOpenOnSuccess: SimpleCLI.flag({
+      name: "stay-open-on-success",
+      help: "Keep the browser session open after the workflow completes successfully",
     }),
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
@@ -817,64 +904,33 @@ export const runCommand = SimpleCLI.command({
     );
 
     const providerName = resolveProviderName(input.provider);
-    let cdpEndpoint: string | undefined;
-    let providerInfo: { name: string; sessionId: string } | undefined;
-    let provider: ReturnType<typeof getCloudProviderApi> | undefined;
-    if (providerName !== "local") {
-      provider = getCloudProviderApi(providerName);
+    const daemonProviderName = providerName === "local" ? undefined : providerName;
+    if (daemonProviderName) {
       console.log(
         `Creating ${providerName} browser session (session: ${ctx.session})...`,
       );
-      const providerSession = await provider.createSession();
-      ctx.logger.info("run-provider-session-created", {
+      ctx.logger.info("run-provider-session-requested", {
         provider: providerName,
-        sessionId: providerSession.sessionId,
-        cdpEndpoint: providerSession.cdpEndpoint,
-        liveViewUrl: providerSession.liveViewUrl,
       });
-      if (providerSession.liveViewUrl) {
-        console.log(`View live session: ${providerSession.liveViewUrl}`);
-      }
       console.log(`Connecting to ${providerName} browser...`);
-      cdpEndpoint = providerSession.cdpEndpoint;
-      providerInfo = {
-        name: providerName,
-        sessionId: providerSession.sessionId,
-      };
     }
 
-    try {
-      await runIntegrationFromFile(
-        {
-          integrationPath: input.integrationFile!,
-          session: ctx.session,
-          params,
-          tsconfigPath: input.tsconfig,
-          headless: cdpEndpoint ? true : (headlessMode ?? false),
-          visualize,
-          authProfileDomain: input.authProfile,
-          viewport,
-          accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
-          cdpEndpoint,
-          provider: providerInfo,
-        },
-        ctx.logger,
-      );
-    } finally {
-      if (provider && providerInfo) {
-        try {
-          const result = await provider.closeSession(providerInfo.sessionId);
-          if (result.replayUrl) {
-            console.log(`View recording: ${result.replayUrl}`);
-          }
-        } catch (cleanupErr) {
-          console.error(
-            `Failed to clean up ${providerInfo.name} session ${providerInfo.sessionId}:`,
-            cleanupErr instanceof Error ? cleanupErr.message : cleanupErr,
-          );
-        }
-      }
-    }
+    await runIntegrationFromFile(
+      {
+        integrationPath: input.integrationFile!,
+        session: ctx.session,
+        params,
+        tsconfigPath: input.tsconfig,
+        headless: daemonProviderName ? true : (headlessMode ?? false),
+        visualize,
+        authProfileDomain: input.authProfile,
+        viewport,
+        accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
+        providerName: daemonProviderName,
+        stayOpenOnSuccess: input.stayOpenOnSuccess,
+      },
+      ctx.logger,
+    );
   });
 
 export const resumeInput = SimpleCLI.input({

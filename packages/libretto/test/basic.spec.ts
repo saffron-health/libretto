@@ -366,6 +366,7 @@ describe("basic CLI subprocess behavior", () => {
     );
     expect(result.stdout).toContain("--read-only");
     expect(result.stdout).toContain("--no-visualize");
+    expect(result.stdout).toContain("--stay-open-on-success");
     expect(result.stdout).toContain(
       "Disable ghost cursor + highlight visualization in headed mode",
     );
@@ -1001,7 +1002,49 @@ export default workflow("main", async (ctx) => {
     expect(resumed.stdout).toContain(`Resume signal sent for session "${session}".`);
     expect(resumed.stdout).toContain("WORKFLOW_AFTER_RESUME");
     expect(resumed.stdout).toContain("Integration completed.");
+    expect(resumed.stdout).toContain("Browser closed");
     expect(resumed.stderr).toBe("");
+
+    const pages = await librettoCli(`pages --session ${session}`);
+    expectMissingSessionError(pages.stderr, session);
+  }, 45_000);
+
+  test("resume keeps browser open after paused stay-open run completes", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "pause-stay-open-resume";
+    const integrationFilePath = await writeWorkflow(
+      "integration-pause-stay-open-resume.mjs",
+      `
+let resumedOnce = false;
+
+export default workflow("main", async (ctx) => {
+  await ctx.page.goto("data:text/html,<title>Resume Stay Open</title>");
+  console.log("WORKFLOW_BEFORE_STAY_OPEN_PAUSE");
+  if (!resumedOnce) {
+    resumedOnce = true;
+    await pause(ctx.session);
+  }
+  console.log("WORKFLOW_AFTER_STAY_OPEN_RESUME");
+});
+`,
+      ["workflow", "pause"],
+    );
+
+    const paused = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(paused.stdout).toContain("WORKFLOW_BEFORE_STAY_OPEN_PAUSE");
+    expect(paused.stdout).toContain("Workflow paused.");
+
+    const resumed = await librettoCli(`resume --session ${session}`);
+    expect(resumed.stdout).toContain("WORKFLOW_AFTER_STAY_OPEN_RESUME");
+    expect(resumed.stdout).toContain("Integration completed.");
+    expect(resumed.stdout).toContain("Browser is still open");
+
+    const pages = await librettoCli(`pages --session ${session}`);
+    expect(pages.stdout).toContain("Open pages:");
   }, 45_000);
 
   test("pause reports running sessions when session id is missing", async ({
@@ -1047,6 +1090,60 @@ export default workflow("main", async () => {
     expect(result.stdout).toContain("WORKFLOW_COMPLETES");
     expect(result.stdout).toContain("Integration completed.");
     expect(result.stdout).not.toContain("Workflow paused.");
+  }, 45_000);
+
+  test("run closes completed sessions by default", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "complete-default-closes";
+    const integrationFilePath = await writeWorkflow(
+      "integration-complete-closes.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Default Close</title>");
+  console.log("DEFAULT_CLOSE_WORKFLOW_COMPLETES");
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless`,
+    );
+    expect(result.stdout).toContain("DEFAULT_CLOSE_WORKFLOW_COMPLETES");
+    expect(result.stdout).toContain("Integration completed.");
+    expect(result.stdout).toContain("Browser closed");
+
+    const pages = await librettoCli(`pages --session ${session}`);
+    expectMissingSessionError(pages.stderr, session);
+  }, 45_000);
+
+  test("run --stay-open-on-success keeps completed session available for inspection", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "stay-open-success-test";
+    const integrationFilePath = await writeWorkflow(
+      "integration-stay-open-success.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Stay Open Success</title>");
+  console.log("STAY_OPEN_WORKFLOW_COMPLETES");
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(result.stdout).toContain("STAY_OPEN_WORKFLOW_COMPLETES");
+    expect(result.stdout).toContain("Integration completed.");
+    expect(result.stdout).toContain("Browser is still open");
+
+    const inspected = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(inspected.stdout).toContain("Stay Open Success");
   }, 45_000);
 
   test("run succeeds with page.evaluate callbacks containing nested helpers (tsx __name shim)", async ({

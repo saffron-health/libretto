@@ -142,6 +142,7 @@ npx libretto exec --session debug-example --page <page-id> "return await page.ur
 
 - Use `run` to verify a workflow file after creating it or editing it, preferring `run --headless` for the normal fix/verify loop.
 - Plain `run` defaults to headed mode.
+- Successful runs close the browser by default. Pass `--stay-open-on-success` when you need to inspect the completed state with `pages`, `snapshot`, or `exec`.
 - Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.
 - If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
 - Insert `await pause(session)` statements in the workflow file when you need to stop at specific states for interactive debugging, like breakpoints in the browser flow.
@@ -151,6 +152,7 @@ npx libretto exec --session debug-example --page <page-id> "return await page.ur
 ```bash
 npx libretto run ./integration.ts --headless --params '{"status":"open"}'
 npx libretto run ./integration.ts --headless --read-only
+npx libretto run ./integration.ts --headless --stay-open-on-success
 npx libretto run ./integration.ts --auth-profile app.example.com
 ```
 

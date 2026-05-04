@@ -24,14 +24,17 @@ import {
   type BrowserContext,
   type Page,
 } from "playwright";
-import { mkdir } from "node:fs/promises";
-import { appendFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
+import type { LibrettoWorkflowContext } from "../../../shared/workflow/workflow.js";
 import {
   createLoggerForSession,
   getSessionDir,
   getSessionNetworkLogPath,
   getSessionActionsLogPath,
+  getSessionProviderClosePath,
+  getSessionStatePath,
 } from "../context.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import {
@@ -40,16 +43,32 @@ import {
   type DaemonRequest,
 } from "./ipc.js";
 import { wrapPageForActionLogging } from "../telemetry.js";
+import {
+  getProfilePath,
+  hasProfile,
+  normalizeDomain,
+  normalizeUrl,
+} from "../browser.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
+import { getPauseSignalPaths } from "../pause-signals.js";
 import { librettoCommand } from "../package-manager.js";
 import {
-  isConnectConfig,
   type DaemonConfig,
-  type DaemonLaunchConfig,
-  type DaemonConnectConfig,
+  type DaemonBrowserLaunchConfig,
+  type DaemonBrowserConnectConfig,
+  type DaemonBrowserProviderConfig,
+  type DaemonWorkflowConfig,
 } from "./config.js";
+import { getCloudProviderApi } from "../providers/index.js";
+import type { ProviderApi } from "../providers/types.js";
+import {
+  getAbsoluteIntegrationPath,
+  installHeadedWorkflowVisualization,
+  loadDefaultWorkflow,
+  type LoadedLibrettoWorkflow,
+} from "../workflow-runtime.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -57,6 +76,104 @@ function isOperationalPage(page: Page): boolean {
 }
 
 type TelemetryEntry = Record<string, unknown>;
+
+async function waitForSessionState(session: string): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    if (existsSync(getSessionStatePath(session))) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
+class UserFacingStartupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UserFacingStartupError";
+  }
+}
+
+function mirrorStdoutToFile(filePath: string): () => void {
+  const stdout = process.stdout;
+  const originalWrite = stdout.write.bind(stdout);
+
+  stdout.write = ((chunk: unknown, ...args: unknown[]) => {
+    try {
+      const buffer = Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(String(chunk), "utf8");
+      appendFileSync(filePath, buffer);
+    } catch {
+      // Ignore log mirroring failures; primary stdout should still flow.
+    }
+    return originalWrite(
+      chunk as string | Uint8Array,
+      ...(args as [BufferEncoding?, ((error?: Error | null) => void)?]),
+    );
+  }) as typeof stdout.write;
+
+  return () => {
+    stdout.write = originalWrite as typeof stdout.write;
+  };
+}
+
+async function writeWorkflowFailureSignal(args: {
+  session: string;
+  error: unknown;
+  phase: "setup" | "workflow";
+}): Promise<void> {
+  const signalPaths = getPauseSignalPaths(args.session);
+  const errorMessage =
+    args.error instanceof Error ? args.error.message : String(args.error);
+  await writeFile(
+    signalPaths.failedSignalPath,
+    JSON.stringify(
+      {
+        failedAt: new Date().toISOString(),
+        message: errorMessage,
+        phase: args.phase,
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+}
+
+function getMissingLocalAuthProfileError(args: {
+  normalizedDomain: string;
+  profilePath: string;
+  session: string;
+}): string {
+  return [
+    `Local auth profile not found for domain "${args.normalizedDomain}".`,
+    `Expected profile file: ${args.profilePath}`,
+    "To create it:",
+    `  1. libretto open https://${args.normalizedDomain} --headed --session ${args.session}`,
+    "  2. Log in manually in the browser window.",
+    `  3. libretto save ${args.normalizedDomain} --session ${args.session}`,
+  ].join("\n");
+}
+
+function resolveAuthProfileStorageStatePath(args: {
+  authProfileDomain?: string;
+  session: string;
+}): string | undefined {
+  if (!args.authProfileDomain) return undefined;
+  const normalizedDomain = normalizeDomain(
+    normalizeUrl(args.authProfileDomain),
+  );
+  const profilePath = getProfilePath(normalizedDomain);
+  if (!hasProfile(normalizedDomain)) {
+    throw new UserFacingStartupError(
+      getMissingLocalAuthProfileError({
+        normalizedDomain,
+        profilePath,
+        session: args.session,
+      }),
+    );
+  }
+  return profilePath;
+}
 
 // ── BrowserDaemon ──────────────────────────────────────────────────────
 
@@ -76,6 +193,11 @@ class BrowserDaemon {
     private readonly page: Page,
     private readonly ipcServer: DaemonServer,
     logger: LoggerApi,
+    private readonly providerSession?: {
+      provider: ProviderApi;
+      name: string;
+      sessionId: string;
+    },
   ) {
     this.logger = logger.withScope("child");
   }
@@ -105,6 +227,17 @@ class BrowserDaemon {
     initialPages: Page[];
     /** If set, navigate to this URL after telemetry but before starting IPC. */
     navigateUrl?: string;
+    readyProvider?: {
+      name: string;
+      sessionId: string;
+      cdpEndpoint: string;
+      liveViewUrl?: string;
+    };
+    providerSession?: {
+      provider: ProviderApi;
+      name: string;
+      sessionId: string;
+    };
   }): Promise<BrowserDaemon> {
     const {
       session,
@@ -114,6 +247,8 @@ class BrowserDaemon {
       page,
       initialPages,
       navigateUrl,
+      readyProvider,
+      providerSession,
     } = args;
 
     await mkdir(getSessionDir(session), { recursive: true });
@@ -158,6 +293,7 @@ class BrowserDaemon {
       page,
       ipcServer,
       logger,
+      providerSession,
     );
 
     // Action logging and page tracking must be registered before optional
@@ -180,6 +316,7 @@ class BrowserDaemon {
 
     handler = (request) => daemon.handleRequest(request);
     await ipcServer.listen();
+    process.send?.({ type: "ready", socketPath, provider: readyProvider });
     daemon.logger.info("ipc-server-listening", { socketPath });
 
     browser.on("disconnected", () => {
@@ -191,7 +328,12 @@ class BrowserDaemon {
 
   // ── Launch mode ────────────────────────────────────────────────────
 
-  static async launchBrowser(config: DaemonLaunchConfig): Promise<BrowserDaemon> {
+  static async launchBrowser(args: {
+    session: string;
+    browser: DaemonBrowserLaunchConfig;
+    workflow?: DaemonWorkflowConfig;
+  }): Promise<BrowserDaemon> {
+    const { session, browser: config } = args;
     const windowPositionArg = config.windowPosition
       ? `--window-position=${config.windowPosition.x},${config.windowPosition.y}`
       : undefined;
@@ -200,17 +342,24 @@ class BrowserDaemon {
       headless: !config.headed,
       args: [
         "--disable-blink-features=AutomationControlled",
-        `--remote-debugging-port=${config.port}`,
+        ...(config.remoteDebuggingPort
+          ? [`--remote-debugging-port=${config.remoteDebuggingPort}`]
+          : []),
         "--remote-debugging-address=127.0.0.1",
         "--no-focus-on-check",
         ...(windowPositionArg ? [windowPositionArg] : []),
       ],
     });
 
+    const storageStatePath =
+      config.storageStatePath ??
+      resolveAuthProfileStorageStatePath({
+        authProfileDomain: args.workflow?.authProfileDomain,
+        session,
+      });
+
     const context = await browser.newContext({
-      ...(config.storageStatePath
-        ? { storageState: config.storageStatePath }
-        : {}),
+      ...(storageStatePath ? { storageState: storageStatePath } : {}),
       viewport: {
         width: config.viewport.width,
         height: config.viewport.height,
@@ -224,19 +373,19 @@ class BrowserDaemon {
     page.setDefaultNavigationTimeout(45000);
 
     const daemon = await BrowserDaemon.initialize({
-      session: config.session,
+      session,
       externallyManaged: false,
       browser,
       context,
       page,
       initialPages: [page],
-      navigateUrl: config.url,
+      navigateUrl: config.initialUrl,
     });
 
     daemon.logger.info("child-launched", {
-      port: config.port,
+      port: config.remoteDebuggingPort,
       pid: process.pid,
-      session: config.session,
+      session,
     });
 
     return daemon;
@@ -244,9 +393,11 @@ class BrowserDaemon {
 
   // ── Connect mode ───────────────────────────────────────────────────
 
-  static async connectToEndpoint(
-    config: DaemonConnectConfig,
-  ): Promise<BrowserDaemon> {
+  static async connectToEndpoint(args: {
+    session: string;
+    browser: DaemonBrowserConnectConfig;
+  }): Promise<BrowserDaemon> {
+    const { session, browser: config } = args;
     const browser = await chromium.connectOverCDP(config.cdpEndpoint);
 
     // Discover existing contexts and pages.
@@ -260,24 +411,80 @@ class BrowserDaemon {
         : await context.newPage();
 
     const daemon = await BrowserDaemon.initialize({
-      session: config.session,
+      session,
       externallyManaged: true,
       browser,
       context,
       page,
-      initialPages:
-        operationalPages.length > 0 ? operationalPages : [page],
-      navigateUrl: config.url,
+      initialPages: operationalPages.length > 0 ? operationalPages : [page],
+      navigateUrl: config.initialUrl,
     });
 
     daemon.logger.info("child-connected", {
       cdpEndpoint: config.cdpEndpoint,
-      url: config.url,
+      url: config.initialUrl,
       pid: process.pid,
-      session: config.session,
+      session,
     });
 
     return daemon;
+  }
+
+  static async connectToProvider(args: {
+    session: string;
+    browser: DaemonBrowserProviderConfig;
+  }): Promise<BrowserDaemon> {
+    const { session, browser: config } = args;
+    const provider = getCloudProviderApi(config.providerName);
+    const providerSession = await provider.createSession();
+    try {
+      const browser = await chromium.connectOverCDP(
+        providerSession.cdpEndpoint,
+      );
+
+      const contexts = browser.contexts();
+      const context =
+        contexts.length > 0 ? contexts[0] : await browser.newContext();
+      const operationalPages = context.pages().filter(isOperationalPage);
+      const page =
+        operationalPages.length > 0
+          ? operationalPages[operationalPages.length - 1]
+          : await context.newPage();
+
+      const daemon = await BrowserDaemon.initialize({
+        session,
+        externallyManaged: true,
+        browser,
+        context,
+        page,
+        initialPages: operationalPages.length > 0 ? operationalPages : [page],
+        navigateUrl: config.initialUrl,
+        readyProvider: {
+          name: config.providerName,
+          sessionId: providerSession.sessionId,
+          cdpEndpoint: providerSession.cdpEndpoint,
+          liveViewUrl: providerSession.liveViewUrl,
+        },
+        providerSession: {
+          provider,
+          name: config.providerName,
+          sessionId: providerSession.sessionId,
+        },
+      });
+
+      daemon.logger.info("child-provider-connected", {
+        provider: config.providerName,
+        sessionId: providerSession.sessionId,
+        url: config.initialUrl,
+        pid: process.pid,
+        session,
+      });
+
+      return daemon;
+    } catch (error) {
+      await provider.closeSession(providerSession.sessionId);
+      throw error;
+    }
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────
@@ -287,20 +494,47 @@ class BrowserDaemon {
     this.shuttingDown = true;
     this.logger.info(reason, { session: this.session });
     await this.ipcServer.close();
-    if (!closeBrowser) return;
-    if (this.externallyManaged) {
-      // Drop the CDP pipe without killing the external browser.
-      try {
-        (
-          this.browser as unknown as {
-            _connection?: { close(): void };
-          }
-        )._connection?.close();
-      } catch {
-        // Connection may already be closed.
+    if (closeBrowser) {
+      if (this.externallyManaged) {
+        // Drop the CDP pipe without killing the external browser.
+        try {
+          (
+            this.browser as unknown as {
+              _connection?: { close(): void };
+            }
+          )._connection?.close();
+        } catch {
+          // Connection may already be closed.
+        }
+      } else {
+        await this.browser.close();
       }
-    } else {
-      await this.browser.close();
+    }
+    if (this.providerSession) {
+      const result = await this.providerSession.provider.closeSession(
+        this.providerSession.sessionId,
+      );
+      if (result.replayUrl) {
+        this.logger.info("provider-recording", {
+          session: this.session,
+          provider: this.providerSession.name,
+          sessionId: this.providerSession.sessionId,
+          replayUrl: result.replayUrl,
+        });
+      }
+      writeFileSync(
+        getSessionProviderClosePath(this.session),
+        JSON.stringify(
+          {
+            provider: this.providerSession.name,
+            sessionId: this.providerSession.sessionId,
+            replayUrl: result.replayUrl,
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
     }
   }
 
@@ -308,15 +542,12 @@ class BrowserDaemon {
 
   private resolveTargetPage(pageId?: string): Page {
     if (!pageId) {
-      if (this.pageById.size > 1) {
+      if (this.page.isClosed()) {
+        const openPages = Array.from(this.pageById.values());
+        if (openPages.length === 1) return openPages[0];
         throw new Error(
-          `Multiple pages are open in session "${this.session}". Pass --page <id> to target a page (run "${librettoCommand(`pages --session ${this.session}`)}" to list ids).`,
+          `The primary page for session "${this.session}" is closed. Run "${librettoCommand(`pages --session ${this.session}`)}" to choose a page id.`,
         );
-      }
-      // Return the single tracked page rather than `this.page` — the
-      // initial page may have been closed and replaced by a new one.
-      if (this.pageById.size === 1) {
-        return this.pageById.values().next().value!;
       }
       return this.page;
     }
@@ -386,16 +617,131 @@ class BrowserDaemon {
         );
     }
   }
+
+  async runWorkflow(args: {
+    workflow: DaemonWorkflowConfig;
+    headed: boolean;
+    loadedWorkflow?: LoadedLibrettoWorkflow;
+  }): Promise<void> {
+    const signalPaths = getPauseSignalPaths(this.session);
+    const restoreStdout = mirrorStdoutToFile(signalPaths.outputSignalPath);
+    try {
+      const absolutePath = getAbsoluteIntegrationPath(
+        args.workflow.integrationPath,
+      );
+      const workflow = args.loadedWorkflow ?? (await loadDefaultWorkflow(absolutePath));
+      const workflowLogger = this.logger.withScope("integration-run", {
+        integrationPath: absolutePath,
+        workflowName: workflow.name,
+        session: this.session,
+      });
+
+      console.log(
+        `Running workflow "${workflow.name}" from ${absolutePath} (${args.headed ? "headed" : "headless"})...`,
+      );
+
+      if (args.headed && args.workflow.visualize !== false) {
+        await installHeadedWorkflowVisualization({
+          context: this.context,
+          logger: workflowLogger,
+        });
+      }
+
+      // tsx/esbuild can inject __name() wrappers when keepNames is true.
+      // Playwright serializes callbacks via Function#toString() into the browser
+      // context, which lacks __name, causing ReferenceError without this polyfill.
+      await this.context.addInitScript(() => {
+        (globalThis as Record<string, unknown>).__name = (
+          target: unknown,
+          value: string,
+        ) =>
+          Object.defineProperty(target as object, "name", {
+            value,
+            configurable: true,
+          });
+      });
+
+      const workflowContext: LibrettoWorkflowContext = {
+        session: this.session,
+        page: this.page,
+      };
+
+      try {
+        await workflow.run(workflowContext, args.workflow.params ?? {});
+      } catch (error) {
+        await writeWorkflowFailureSignal({
+          session: this.session,
+          error,
+          phase: "workflow",
+        });
+        return;
+      }
+
+      await writeFile(
+        signalPaths.completedSignalPath,
+        JSON.stringify({ completedAt: new Date().toISOString() }, null, 2),
+        "utf8",
+      );
+    } catch (error) {
+      await writeWorkflowFailureSignal({
+        session: this.session,
+        error,
+        phase: "setup",
+      });
+    } finally {
+      restoreStdout();
+    }
+  }
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const config = JSON.parse(process.argv[2]) as DaemonConfig;
+  const headed =
+    config.browser.kind === "launch" ? config.browser.headed : false;
 
-  const daemon = isConnectConfig(config)
-    ? await BrowserDaemon.connectToEndpoint(config)
-    : await BrowserDaemon.launchBrowser(config);
+  let loadedWorkflow: LoadedLibrettoWorkflow | undefined;
+  if (config.workflow) {
+    try {
+      loadedWorkflow = await loadDefaultWorkflow(
+        getAbsoluteIntegrationPath(config.workflow.integrationPath),
+      );
+    } catch (error) {
+      throw new UserFacingStartupError(
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
+  const daemon =
+    config.browser.kind === "provider"
+      ? await BrowserDaemon.connectToProvider({
+          session: config.session,
+          browser: config.browser,
+        })
+      : config.browser.kind === "connect"
+        ? await BrowserDaemon.connectToEndpoint({
+            session: config.session,
+            browser: config.browser,
+          })
+        : await BrowserDaemon.launchBrowser({
+            session: config.session,
+            browser: config.browser,
+            workflow: config.workflow,
+          });
+
+  if (config.workflow) {
+    void waitForSessionState(config.session)
+      .then(() =>
+        daemon.runWorkflow({ workflow: config.workflow!, headed, loadedWorkflow }),
+      )
+      .catch((error) => {
+        daemon.logger.error("workflow-failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }
 
   process.on("SIGTERM", () => {
     void daemon.shutdown("child-sigterm", true);
@@ -427,4 +773,18 @@ async function main(): Promise<void> {
   // letting the process exit naturally.
 }
 
-await main();
+function reportStartupError(error: unknown): never {
+  if (error instanceof UserFacingStartupError) {
+    process.send?.({
+      type: "startup-error",
+      message: error.message,
+    });
+  }
+  process.exit(1);
+}
+
+try {
+  await main();
+} catch (error) {
+  reportStartupError(error);
+}

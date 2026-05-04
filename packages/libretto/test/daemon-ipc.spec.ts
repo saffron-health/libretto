@@ -169,6 +169,158 @@ describe("daemon IPC", () => {
     expect(result.stderr).not.toContain("daemon may have crashed");
   }, 45_000);
 
+  test("exec without --page targets the original page after a workflow opens another page", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "daemon-primary-page-exec";
+    const integrationFilePath = await writeWorkflow(
+      "integration-primary-page-exec.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Original Primary Page</title>");
+  const popup = await page.context().newPage();
+  await popup.goto("data:text/html,<title>Secondary Debug Page</title>");
+});
+`,
+    );
+
+    const run = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(run.stdout).toContain("Integration completed.");
+
+    const result = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(result.stdout).toContain("Original Primary Page");
+    expect(result.stdout).not.toContain("Secondary Debug Page");
+  }, 45_000);
+
+  test("readonly-exec without --page targets the original page after a workflow opens another page", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "daemon-primary-page-readonly";
+    const integrationFilePath = await writeWorkflow(
+      "integration-primary-page-readonly.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Readonly Primary Page</title>");
+  const popup = await page.context().newPage();
+  await popup.goto("data:text/html,<title>Readonly Secondary Page</title>");
+});
+`,
+    );
+
+    const run = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(run.stdout).toContain("Integration completed.");
+
+    const result = await librettoCli(
+      `readonly-exec "return page.url()" --session ${session}`,
+    );
+    expect(result.stdout).toContain("Readonly Primary Page");
+    expect(result.stdout).not.toContain("Readonly Secondary Page");
+  }, 45_000);
+
+  test("exec without --page falls back to the remaining page when the original page is closed", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "daemon-primary-page-closed";
+    const integrationFilePath = await writeWorkflow(
+      "integration-primary-page-closed.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  const replacement = await page.context().newPage();
+  await replacement.goto("data:text/html,<title>Replacement Page</title>");
+  await page.close();
+});
+`,
+    );
+
+    const run = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(run.stdout).toContain("Integration completed.");
+
+    const result = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(result.stdout).toContain("Replacement Page");
+  }, 45_000);
+
+  test("run --stay-open-on-success leaves a daemon-backed session for pages and snapshot", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "daemon-run-stay-open";
+    const integrationFilePath = await writeWorkflow(
+      "integration-daemon-run-stay-open.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Daemon Run Stay Open</title><h1>ready</h1>");
+  console.log("DAEMON_RUN_STAY_OPEN_READY");
+});
+`,
+    );
+
+    const run = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless --stay-open-on-success`,
+    );
+    expect(run.stdout).toContain("DAEMON_RUN_STAY_OPEN_READY");
+    expect(run.stdout).toContain("Integration completed.");
+    expect(run.stdout).toContain("Browser is still open");
+
+    const pages = await librettoCli(`pages --session ${session}`);
+    expect(pages.stdout).toContain("Open pages:");
+    expect(pages.stdout).toContain("Daemon Run Stay Open");
+    expect(pages.stderr).not.toContain("daemon socket");
+
+    const snapshot = await librettoCli(
+      `snapshot --session ${session} --objective "Find the heading" --context "Daemon-backed run session"`,
+    );
+    expect(snapshot.stderr).not.toContain("daemon socket");
+    expect(snapshot.stderr).not.toContain("daemon may have crashed");
+  }, 45_000);
+
+  test("failed run leaves a daemon-backed session for pages and snapshot", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "daemon-run-failure";
+    const integrationFilePath = await writeWorkflow(
+      "integration-daemon-run-failure.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  await page.goto("data:text/html,<title>Daemon Run Failure</title><h1>failure target</h1>");
+  console.log("DAEMON_RUN_FAILURE_READY");
+  throw new Error("expected daemon run failure");
+});
+`,
+    );
+
+    const run = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless`,
+    );
+    expect(run.stdout).toContain("DAEMON_RUN_FAILURE_READY");
+    expect(run.stderr).toContain("expected daemon run failure");
+    expect(run.stderr).toContain("Browser is still open.");
+
+    const pages = await librettoCli(`pages --session ${session}`);
+    expect(pages.stdout).toContain("Open pages:");
+    expect(pages.stdout).toContain("Daemon Run Failure");
+    expect(pages.stderr).not.toContain("daemon socket");
+
+    const snapshot = await librettoCli(
+      `snapshot --session ${session} --objective "Find the heading" --context "Daemon-backed failed run session"`,
+    );
+    expect(snapshot.stderr).not.toContain("daemon socket");
+    expect(snapshot.stderr).not.toContain("daemon may have crashed");
+  }, 45_000);
+
   test("exec preserves aria refs generated by a previous exec", async ({
     librettoCli,
     workspacePath,
