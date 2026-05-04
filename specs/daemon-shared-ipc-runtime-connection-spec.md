@@ -6,16 +6,16 @@ This duplication makes the browser daemon boundary harder to reason about and ke
 
 ## Solution overview
 
-Move the daemon command protocol onto the existing typed `shared/ipc` peer and use a persistent Unix-socket transport that supports bidirectional messages. Then introduce a `WorkflowRunner` supervisor that forks workflow code into a child process and uses the same `shared/ipc` peer over Node child-process IPC for pause/completion/failure messages.
+Move the daemon command protocol onto the existing typed `shared/ipc` peer and use a persistent Unix-socket transport that supports bidirectional messages. Then introduce a daemon-local `WorkflowController` that runs workflow code in the daemon process and owns pause/resume state through an installed process-local pause handler.
 
-The first useful version should preserve the existing `DaemonClient` call surface and CLI behavior, then remove signal-file control flow in small steps. The daemon stays responsible for browser/session lifetime and CLI IPC; `WorkflowRunner` becomes responsible for workflow child lifecycle, output forwarding, status, and resume.
+The first useful version should preserve the existing `DaemonClient` call surface and CLI behavior, then remove signal-file control flow in small steps. The daemon stays responsible for browser/session lifetime, workflow execution, CLI IPC, output forwarding, status, and resume. The earlier child-process workflow runner prototype is superseded because in-process execution matches current runtime behavior with fewer lifecycle and CDP reconnection risks.
 
 ## Goals
 
 - `open`, `connect`, `pages`, `exec`, `readonly-exec`, and `snapshot` use the typed `shared/ipc` protocol instead of the custom daemon request/response protocol.
 - `run` receives workflow output, completed, failed, and paused outcomes over the daemon connection instead of polling signal files.
-- `resume` reconnects to the daemon and resumes a paused workflow through the daemon-owned `WorkflowRunner` instead of writing a `.resume` file.
-- `pause(session)` no longer imports CLI internals or writes `.paused/.resume` files; in workflow children it pauses by making a parent IPC call that resolves only when resumed.
+- `resume` reconnects to the daemon and resumes a paused workflow through the daemon-owned `WorkflowController` instead of writing a `.resume` file.
+- `pause(session)` no longer imports CLI internals or writes `.paused/.resume` files; inside a daemon workflow it pauses by calling an installed process-local handler that resolves only when resumed.
 - Session state remains sufficient for a new CLI invocation to find the daemon socket and resume or inspect a session.
 - Existing user-visible command behavior remains stable unless this spec explicitly changes it.
 
@@ -27,7 +27,8 @@ The first useful version should preserve the existing `DaemonClient` call surfac
 - No public plugin API for daemon events.
 - No cloud or cross-machine transport support beyond the current local daemon model.
 - No change to the session access-mode permission model.
-- No generalized workflow job queue; `WorkflowRunner` supervises one workflow invocation for one daemon session.
+- No generalized workflow job queue; `WorkflowController` manages one workflow invocation for one daemon session.
+- No child-process workflow execution in this spec's v1 runtime path.
 
 ## Future work
 
@@ -39,9 +40,9 @@ The first useful version should preserve the existing `DaemonClient` call surfac
 - `packages/libretto/src/shared/ipc/ipc.spec.ts` — unit coverage for the generic IPC peer.
 - `packages/libretto/src/cli/core/daemon/ipc.ts` — current custom daemon client/server protocol and spawn helper.
 - `packages/libretto/src/cli/core/daemon/daemon.ts` — daemon process, request dispatch, workflow execution, and shutdown behavior.
-- `packages/libretto/src/cli/core/daemon/config.ts` — daemon startup configuration passed to the child process.
+- `packages/libretto/src/cli/core/daemon/config.ts` — daemon startup configuration passed to the detached daemon process.
 - `packages/libretto/src/cli/core/daemon/index.ts` — legacy daemon barrel to remove once imports are direct.
-- `packages/libretto/src/cli/core/workflow-runner/` — new parent/child workflow runner modules to add for workflow supervision and child-process IPC.
+- `packages/libretto/src/cli/core/workflow-runner/` — workflow coordination modules to replace with or reshape around a daemon-local `WorkflowController`.
 - `packages/libretto/src/cli/commands/execution.ts` — `run`, `resume`, `exec`, and `readonly-exec` command behavior.
 - `packages/libretto/src/cli/core/browser.ts` — `open`, `connect`, `pages`, `snapshot`, `close`, and daemon spawn callsites.
 - `packages/libretto/src/cli/core/pause-signals.ts` — signal-file helpers to stop using and eventually remove.
@@ -53,7 +54,7 @@ The first useful version should preserve the existing `DaemonClient` call surfac
 - `packages/libretto/test/stateful.spec.ts` — behavior coverage for session permissions and readonly execution.
 - `packages/libretto/test/multi-page.spec.ts` — behavior coverage for page listing and page targeting.
 - [Node net documentation](https://nodejs.org/api/net.html) — Unix domain socket server/client behavior and connection lifecycle.
-- [Node child_process documentation](https://nodejs.org/api/child_process.html) — daemon spawn, child IPC startup handshake, detached processes, and stdio configuration.
+- [Node child_process documentation](https://nodejs.org/api/child_process.html) — daemon spawn and detached daemon lifecycle; workflow code should not use a separate child process in this spec's v1 runtime path.
 
 ## Implementation
 
@@ -90,9 +91,9 @@ async function listenForIpcConnections(
 - [x] Add unit coverage that destroying one peer rejects pending calls when the socket closes.
 - [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
-### Phase 1.5: Add a child-process transport for `shared/ipc`
+### Phase 1.5: Add a generic child-process transport for `shared/ipc`
 
-Add a second transport adapter for Node child-process IPC so `WorkflowRunner` and the workflow child can use the same peer abstraction as daemon IPC. Keep it generic and independent from workflow concepts.
+Add a second transport adapter for Node child-process IPC so future process boundaries can use the same peer abstraction as daemon IPC. Keep it generic and independent from workflow concepts; the daemon workflow runtime no longer depends on this transport.
 
 ```ts
 function createChildProcessIpcTransport(
@@ -200,71 +201,71 @@ Delete `packages/libretto/src/cli/core/daemon/index.ts` and import daemon module
 - [x] Run `rg "core/daemon/index|core/daemon\.js|from \".*daemon/index\.js\"|from \".*core/daemon\"" packages/libretto/src packages/libretto/test` and confirm no daemon barrel imports remain.
 - [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
-### Phase 4: Introduce `WorkflowRunner` protocol and supervisor shell
+### Phase 4: Replace the child-process prototype with an in-process workflow controller
 
-Define the parent/child workflow IPC contract and add a `WorkflowRunner` class that can supervise a child process. Keep the existing in-daemon workflow execution path active until the child can reconnect to the browser in the next phase.
+Replace the workflow child/supervisor design with a daemon-local controller that runs workflow code against the daemon's existing `Page` object. Keep signal-file compatibility in this phase so current `run` and `resume` behavior remains observable while the runtime ownership changes.
 
 ```ts
-type WorkflowChildToParentApi = {
-  paused(args: { session: string; pausedAt: string; url?: string }): Promise<void>;
-  finished(args:
-    | { result: "completed"; completedAt: string }
-    | { result: "failed"; message: string; phase: "setup" | "workflow" }
-  ): void;
-};
+type WorkflowStatus =
+  | { state: "idle" }
+  | { state: "running" }
+  | { state: "paused"; session: string; pausedAt: string; url?: string }
+  | { state: "finished"; result: "completed"; completedAt: string }
+  | { state: "finished"; result: "failed"; message: string; phase: "setup" | "workflow" };
 
-type WorkflowParentToChildApi = {
-  shutdown(args: { reason: string }): void;
-};
-
-class WorkflowRunner {
-  start(): void;
+class WorkflowController {
+  start(args: { page: Page; context: BrowserContext; workflow: DaemonWorkflowConfig }): void;
+  pause(args: { session: string; pausedAt: string; url?: string }): Promise<void>;
   resume(): void;
   getStatus(): WorkflowStatus;
 }
 ```
 
-- [x] Add `packages/libretto/src/cli/core/workflow-runner/runner.ts` with the parent/child IPC protocol types and a `WorkflowRunner` shell that owns child process state, stdout/stderr forwarding callbacks, status, and `resume()`.
-- [x] Implement the parent-side `pause` handler so it sets status to paused, emits a paused outcome, and deliberately does not resolve until `resume()` is called.
-- [x] Add child exit handling that reports an exited outcome if the child exits before reporting a terminal finished outcome, including while paused.
-- [x] Do not move workflow execution out of `BrowserDaemon.runWorkflow` yet.
-- [x] Defer standalone runner unit coverage until the libretto workflow child entrypoint exists, instead of testing private child-process IPC details.
-- [x] Verify `pnpm -s type-check --filter=libretto` passes.
+- [ ] Remove child-fork-specific code from `packages/libretto/src/cli/core/workflow-runner/runner.ts` and do not add a workflow child entrypoint.
+- [ ] Rename or replace `WorkflowRunner` with a daemon-local `WorkflowController` that owns status, a single pending pause promise, completion/failure outcomes, and `resume()`.
+- [ ] Run the loaded workflow in the daemon process using the existing daemon `BrowserContext` and `Page` instead of reconnecting over CDP.
+- [ ] Keep headed workflow visualization, action logging, workflow params, and setup/workflow error phases equivalent to the existing `run` behavior.
+- [ ] Capture workflow `console.log` / `console.error` output while the workflow runs and forward it through the controller's output callback so `.output` compatibility remains intact.
+- [ ] Have `BrowserDaemon` instantiate and start the controller when `config.workflow` exists.
+- [ ] Continue writing `.paused`, `.completed`, `.failed`, and `.output` files from controller callbacks until daemon events replace polling.
+- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
+- [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts daemon-ipc.spec.ts` passes.
 
-### Phase 5: Run workflow code in a child process supervised by `WorkflowRunner`
+### Phase 5: Install a process-local pause handler for daemon workflows
 
-Move workflow execution into a child entrypoint. The child installs the child-side `shared/ipc` peer, connects to the daemon-owned browser over CDP, runs the workflow, and reports pause/completion/failure to `WorkflowRunner` over child-process IPC.
+Move `pause(session)` away from direct signal-file writes by letting daemon workflow execution install a process-local pause handler. During the transition, keep the file-based fallback for calls made outside a daemon-controlled workflow.
 
 ```ts
-type WorkflowChildConfig = {
+type ActivePauseHandler = (args: {
   session: string;
-  cdpEndpoint: string;
-  pageId?: string;
-  workflow: DaemonWorkflowConfig;
-};
+  pausedAt: string;
+  url?: string;
+}) => Promise<void>;
 
-async function runWorkflowChild(config: WorkflowChildConfig) {
-  const parent = createIpcPeer<WorkflowChildToParentApi, WorkflowParentToChildApi>(
-    createParentProcessIpcTransport(),
-    { shutdown: async () => process.exit(0) },
-  );
-  installWorkflowParentPeer(parent);
-  await runLoadedWorkflow(config);
+export function installPauseHandler(handler: ActivePauseHandler): () => void;
+
+export async function pause(session: string): Promise<void> {
+  const handler = getActivePauseHandler();
+  if (handler) {
+    await handler({ session, pausedAt: new Date().toISOString(), url: getCurrentUrl() });
+    return;
+  }
+  await pauseWithSignalFiles(session);
 }
 ```
 
-- [ ] Add `packages/libretto/src/cli/core/workflow-runner/child.ts` as the workflow child entrypoint.
-- [ ] Add a serializable `WorkflowChildConfig` that includes `session`, workflow config, CDP endpoint, and the page identity needed to resolve the target page.
-- [ ] Have the child connect to the daemon-owned browser over CDP instead of receiving in-memory Playwright objects.
-- [ ] Reuse existing workflow loading, visualization, and action logging behavior in the child process where the `Page` object lives.
-- [ ] Pipe child stdout/stderr through `WorkflowRunner` so output can be forwarded to daemon events without `.output` files.
-- [ ] Have `BrowserDaemon` instantiate and start `WorkflowRunner` when `config.workflow` exists.
-- [ ] Preserve current behavior-level run tests before removing signal-file compatibility.
-- [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts daemon-ipc.spec.ts` passes.
+- [ ] Add a small shared pause-handler module under `packages/libretto/src/shared/debug/` that stores the active handler and returns a cleanup function from installation.
+- [ ] Update `packages/libretto/src/shared/debug/pause.ts` to call the active handler before falling back to signal files.
+- [ ] Install the handler immediately before invoking `workflow.run(...)` and clear it in a `finally` block.
+- [ ] Have the installed handler delegate to `WorkflowController.pause(...)`, which emits a paused outcome and resolves only when `resume()` is called.
+- [ ] Include the current page URL when available so pause output remains useful.
+- [ ] Preserve the current `pause("")` validation behavior.
+- [ ] Add or adjust behavior coverage for normal `pause(ctx.session)` / `resume` flow through `librettoCli` while signal fallback still exists.
+- [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` and `pnpm -s type-check --filter=libretto` pass.
 
-### Phase 6: Send workflow output and outcomes from `WorkflowRunner` to CLI daemon events
+### Phase 6: Send workflow output and outcomes from the daemon to CLI events
 
-Connect the child-runner outcomes to the daemon's `DaemonToCliApi` event stream. This phase replaces `.output`, `.completed`, `.failed`, and `.paused` polling for `run` outcome detection.
+Connect the in-process controller outcomes to the daemon's `DaemonToCliApi` event stream. This phase makes daemon events authoritative for `run` outcome detection while preserving signal files as a temporary fallback.
 
 ```ts
 type DaemonToCliApi = {
@@ -276,23 +277,23 @@ type DaemonToCliApi = {
   ): void;
 };
 
-async function waitForWorkflowOutcome(client: DaemonClient): Promise<WorkflowOutcome> {
-  return client.waitForWorkflowEventOutcome();
+function broadcastWorkflowOutcome(outcome: WorkflowOutcome) {
+  for (const cli of connectedClis) cli.call.workflowFinished(toEvent(outcome));
 }
 ```
 
 - [ ] Add optional CLI event handlers when constructing a daemon IPC client for `run` and `resume` paths.
-- [ ] Broadcast `WorkflowRunner` stdout/stderr events through `DaemonToCliApi.workflowOutput`.
-- [ ] Broadcast `WorkflowRunner` paused/finished outcomes through `DaemonToCliApi`.
-- [ ] Update `waitForWorkflowOutcome` in `packages/libretto/src/cli/commands/execution.ts` to wait on daemon events and process liveness instead of signal files.
-- [ ] Remove `.paused` polling from `waitForWorkflowOutcome` once daemon pause events are authoritative.
+- [ ] Broadcast controller stdout/stderr events through `DaemonToCliApi.workflowOutput`.
+- [ ] Broadcast controller paused/completed/failed outcomes through `DaemonToCliApi`.
+- [ ] Update `waitForWorkflowOutcome` in `packages/libretto/src/cli/commands/execution.ts` to prefer daemon events and process liveness instead of signal files.
+- [ ] Keep signal polling as a compatibility fallback only when daemon events are unavailable.
 - [ ] Add or adjust behavior coverage where a workflow logs before completion and `librettoCli("run ...")` includes that output and `Integration completed.`.
 - [ ] Add behavior coverage for normal `pause(ctx.session)` flow where `librettoCli("run ...")` reports `Workflow paused.`.
 - [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts daemon-ipc.spec.ts` passes.
 
-### Phase 7: Resume paused workflow children over the daemon connection
+### Phase 7: Resume paused workflows over the daemon connection
 
-Expose `WorkflowRunner` status and resume through `CliToDaemonApi`. A new CLI invocation reconnects to the daemon socket, verifies the runner is paused, calls `resumeWorkflow()`, and then waits for the next daemon workflow event.
+Expose workflow status and resume through `CliToDaemonApi`. A new CLI invocation reconnects to the daemon socket, verifies that the controller is paused, calls `resumeWorkflow()`, and then waits for the next daemon workflow event.
 
 ```ts
 type CliToDaemonApi = {
@@ -302,45 +303,39 @@ type CliToDaemonApi = {
 
 class BrowserDaemon {
   resumeWorkflow() {
-    this.workflowRunner?.resume();
+    this.workflowController?.resume();
   }
 }
 ```
 
 - [ ] Add `getWorkflowStatus()` and `resumeWorkflow()` to the typed daemon API.
-- [ ] Delegate daemon `getWorkflowStatus()` and `resumeWorkflow()` to the active `WorkflowRunner`.
+- [ ] Delegate daemon `getWorkflowStatus()` and `resumeWorkflow()` to the active `WorkflowController`.
 - [ ] Change `runResume` in `packages/libretto/src/cli/commands/execution.ts` to connect to `sessionState.daemonSocketPath`, call `getWorkflowStatus()`, then call `resumeWorkflow()`.
 - [ ] Preserve current user-facing errors for sessions that are not paused or whose daemon process is no longer running.
 - [ ] After resuming, wait for daemon workflow events and keep existing behavior for completion, failure, second pause, and `--stay-open-on-success`.
-- [ ] Stop writing `.resume` from `runResume`.
+- [ ] Stop writing `.resume` from `runResume` once daemon resume is authoritative.
 - [ ] Add behavior coverage for a workflow that pauses twice: initial `run` reports `Workflow paused.`, first `resume` reports `Workflow paused.`, second `resume` reports `Integration completed.`.
 - [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` passes.
 
-### Phase 8: Move `pause(session)` onto the workflow child parent IPC peer
+### Phase 8: Remove signal-file pause/resume from the shared pause primitive
 
-Remove the shared pause primitive's dependency on CLI internals by making it call the installed workflow parent peer from inside a workflow child. The parent `paused` handler resolves only when `WorkflowRunner.resume()` is called, so `await pause(session)` naturally suspends and continues workflow code.
+After daemon event and resume paths are authoritative, remove the shared pause primitive's dependency on CLI internals. `pause(session)` should either use the active in-process handler or fail with clear guidance when called outside a Libretto workflow runtime.
 
 ```ts
-let workflowParentPeer: IpcPeer<WorkflowChildToParentApi> | undefined;
-
-export function installWorkflowParentPeer(peer: IpcPeer<WorkflowChildToParentApi>) {
-  workflowParentPeer = peer;
-}
-
 export async function pause(session: string): Promise<void> {
   if (process.env.NODE_ENV === "production") return;
-  await getWorkflowParentPeerOrThrow().call.paused({
-    session,
-    pausedAt: new Date().toISOString(),
-    url: "unknown",
-  });
+  assertValidSession(session);
+
+  const handler = getActivePauseHandler();
+  if (!handler) throw new Error("pause(session) can only suspend an active Libretto workflow.");
+
+  await handler({ session, pausedAt: new Date().toISOString() });
 }
 ```
 
-- [ ] Add a workflow child pause bridge module that has no imports from `packages/libretto/src/cli/core`.
-- [ ] Update `packages/libretto/src/shared/debug/pause.ts` to use the workflow parent peer for non-production pauses.
-- [ ] Install the workflow parent peer in the workflow child entrypoint before user workflow code runs.
-- [ ] Preserve helpful guidance when `pause(session)` is called outside a Libretto workflow child.
+- [ ] Remove imports from `packages/libretto/src/shared/debug/pause.ts` to `packages/libretto/src/cli/core/*` modules.
+- [ ] Remove the signal-file fallback from `pause(session)` after behavior-level run/resume tests pass through daemon IPC.
+- [ ] Preserve helpful guidance when `pause(session)` is called outside a Libretto workflow runtime.
 - [ ] Add behavior coverage for `pause("")` guidance and normal `pause(ctx.session)` / `resume` flow through `librettoCli`.
 - [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` and `pnpm -s type-check --filter=libretto` pass.
 
