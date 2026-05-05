@@ -613,21 +613,11 @@ class BrowserDaemon {
         ),
       getWorkflowStatus: () => this.getWorkflowStatus(),
       resumeWorkflow: () => this.resumeWorkflow(),
-      close: () => this.closeFromIpc(),
+      close: () =>
+        this.shutdown("ipc-close", true, {
+          keepIpcClientsAlive: true,
+        }),
     };
-  }
-
-  private async closeFromIpc(): Promise<DaemonCloseResult> {
-    if (this.providerSession) {
-      return this.shutdown("ipc-close", true, {
-        keepIpcClientsAlive: true,
-      });
-    }
-
-    setImmediate(() => {
-      void this.shutdown("ipc-close", true);
-    });
-    return {};
   }
 
   private async withRequestTimeout<T>(

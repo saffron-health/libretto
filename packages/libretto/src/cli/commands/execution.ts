@@ -514,9 +514,8 @@ async function runResume(
       );
     }
 
-    setSessionStatus(session, "active", logger);
-
     await client.resumeWorkflow();
+    setSessionStatus(session, "active", logger);
     console.log(`Resume requested for session "${session}".`);
 
     outcome = await waitForWorkflowOutcome(
