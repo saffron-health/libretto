@@ -10,7 +10,48 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.filter.outputs.tests }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect test-relevant changes
+        id: filter
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+            range="$base...$head"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            if [[ "$base" =~ ^0+$ ]]; then
+              base="$(git rev-list --max-parents=0 "$head")"
+            fi
+            range="$base..$head"
+          fi
+
+          git diff --name-only "$range" > changed-files.txt
+
+          tests=false
+          while IFS= read -r file; do
+            case "$file" in
+              package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|.github/workflows/cli-tests.yml|packages/libretto/package.json|packages/libretto/tsconfig.json|packages/libretto/vitest.config.*|packages/libretto/tsup.config.*|packages/libretto/src/*|packages/libretto/test/*|packages/libretto/scripts/*)
+                tests=true
+                break
+                ;;
+            esac
+          done < changed-files.txt
+
+          echo "tests=$tests" >> "$GITHUB_OUTPUT"
+
+  checks:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,6 +68,32 @@ jobs:
 
       - name: Check mirror parity
         run: pnpm check:mirrors
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run type checks
+        run: pnpm type-check
+
+      - name: Run lint checks
+        run: pnpm -r --if-present lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
