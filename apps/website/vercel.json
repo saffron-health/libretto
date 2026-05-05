@@ -13,6 +13,22 @@
   ],
   "rewrites": [
     {
+      "source": "/llms.txt",
+      "destination": "https://libretto.sh/docs/llms.txt"
+    },
+    {
+      "source": "/llms-full.txt",
+      "destination": "https://libretto.sh/docs/llms-full.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "https://libretto.sh/docs/sitemap.xml"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "https://libretto.sh/docs/robots.txt"
+    },
+    {
       "source": "/docs",
       "destination": "https://saffron-health-libretto-73.mintlify.dev/docs"
     },
