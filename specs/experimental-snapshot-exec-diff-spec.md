@@ -90,15 +90,15 @@ async function snapshot(page: Page): Promise<Snapshot> {
 }
 ```
 
-- [ ] Add `packages/libretto/src/shared/snapshot/types.ts`
-- [ ] Add `snapshot(page)`, `findSnapshotNodeByRef`, and `scopeSnapshotToRef` in `packages/libretto/src/shared/snapshot/capture-snapshot.ts`
-- [ ] Keep `Snapshot` as a tree type, not a pre-rendered string
-- [ ] Preserve the useful ref behavior from the worktree: `l<number>` assignment and numeric-suffix fallback for refs like `e16`
-- [ ] Reuse only the capture details from the worktree that are needed for the compact tree: accessibility role/name/value/state, useful DOM attributes, and enough metadata for clickable elements
-- [ ] Avoid adding renderer profile fields, alternate raw/default render models, or a `projected` argument
-- [ ] Treat `snapshot(page)` as daemon/internal machinery; compact snapshot CLI calls must go through daemon IPC
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes
-- [ ] Add focused coverage through user-level CLI tests in later phases rather than testing CDP internals directly
+- [x] Add `packages/libretto/src/shared/snapshot/types.ts`
+- [x] Add `snapshot(page)`, `findSnapshotNodeByRef`, and `scopeSnapshotToRef` in `packages/libretto/src/shared/snapshot/capture-snapshot.ts`
+- [x] Keep `Snapshot` as a tree type, not a pre-rendered string
+- [x] Preserve the useful ref behavior from the worktree: `l<number>` assignment and numeric-suffix fallback for refs like `e16`
+- [x] Reuse only the capture details from the worktree that are needed for the compact tree: accessibility role/name/value/state, useful DOM attributes, and enough metadata for clickable elements
+- [x] Avoid adding renderer profile fields, alternate raw/default render models, or a `projected` argument
+- [x] Treat `snapshot(page)` as daemon/internal machinery; compact snapshot CLI calls must go through daemon IPC
+- [x] Verify `pnpm -s type-check --filter=libretto` passes
+- [x] Add focused coverage through user-level CLI tests in later phases rather than testing CDP internals directly
 
 ### Phase 3: Add the single snapshot renderer and diff helper
 
