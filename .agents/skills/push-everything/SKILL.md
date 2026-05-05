@@ -61,6 +61,13 @@ EOF
 
 Do not report completion to the user until all required GitHub PR checks pass.
 
+Do not auto-commit or auto-push fixes for issues discovered after the initial push, including CI failures and AI review bot findings. If fixes are needed after CI or review feedback:
+
+1. Inspect the failure or review feedback.
+2. Apply the fixes locally without committing them.
+3. Report the fixes to the user and explicitly hand the changes back for review.
+4. Wait for the user to approve committing before committing, pushing, or restarting the CI loop.
+
 After every push:
 
 1. Watch PR checks with `gh pr checks --watch`.
@@ -71,14 +78,14 @@ After every push:
    - Commit the conflict resolution if needed, push, and restart this CI loop once.
 4. If checks are still not reported after that remediation pass, conclude no required checks are configured for this PR.
 5. If checks appear, wait for all required checks to complete.
-6. If any test or type-check command fails, inspect logs immediately, fix the issue, commit, push, and repeat this CI loop until checks pass.
+6. If any test or type-check command fails, inspect logs immediately, fix the issue locally, and hand the uncommitted fix back to the user for review. Do not commit, push, or repeat the CI loop until the user approves.
 7. If checks are blocked on AI review bots, wait for bot completion and read all bot reviews before reporting completion.
 
 AI review bot handling:
 
 1. Read every new AI review comment on the PR, including multiple reviews from multiple bots.
 2. Analyze each concern and classify it as valid, partially valid, or not valid.
-3. For valid or partially valid concerns, apply fixes, commit, push, and restart the CI loop.
+3. For valid or partially valid concerns, apply fixes locally and hand the uncommitted changes back to the user for review. Do not commit, push, or restart the CI loop until the user approves.
 4. For concerns that are not valid, explain why with concrete technical reasoning when you report status to the user.
 
 For follow-up edits in this session, continue to commit, push, and update the PR as needed. After each follow-up push, re-run the full check-wait loop above (`gh pr checks --watch` and retries) before reporting completion.
