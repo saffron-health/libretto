@@ -18,7 +18,7 @@ import {
   detectProjectPackageManager,
   installCommand,
   librettoCommand,
-} from "../core/package-manager.js";
+} from "../../shared/package-manager.js";
 import type { Provider } from "../core/resolve-model.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 

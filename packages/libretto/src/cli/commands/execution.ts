@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import * as moduleBuiltin from "node:module";
 import { z } from "zod";
 import { installInstrumentation } from "../../shared/instrumentation/index.js";
@@ -14,7 +14,6 @@ import {
   resolveViewport,
 } from "../core/browser.js";
 import { parseViewportArg } from "./browser.js";
-import { getPauseSignalPaths } from "../core/pause-signals.js";
 import {
   assertSessionAvailableForStart,
   assertSessionAllowsCommand,
@@ -28,14 +27,18 @@ import {
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
-import { librettoCommand } from "../core/package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 import { resolveProviderName } from "../core/providers/index.js";
 import { getAbsoluteIntegrationPath } from "../core/workflow-runtime.js";
 import {
   compileExecFunction,
   stripEmptyCatchHandlers,
 } from "../core/exec-compiler.js";
-import { DaemonClient } from "../core/daemon/index.js";
+import {
+  DaemonClient,
+  type DaemonExecResult,
+  type DaemonToCliApi,
+} from "../core/daemon/ipc.js";
 import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
 import {
   readActionLog,
@@ -102,19 +105,23 @@ async function execViaDaemon(
     via: "daemon",
   });
 
-  const client = new DaemonClient(daemonSocketPath);
-
-  const response =
-    mode === "exec"
-      ? await client.exec({
-          code: cleanedCode,
-          pageId: options.pageId,
-          visualize: options.visualize,
-        })
-      : await client.readonlyExec({
-          code: cleanedCode,
-          pageId: options.pageId,
-        });
+  const client = await DaemonClient.connect(daemonSocketPath);
+  let response: DaemonExecResult;
+  try {
+    response =
+      mode === "exec"
+        ? await client.exec({
+            code: cleanedCode,
+            pageId: options.pageId,
+            visualize: options.visualize,
+          })
+        : await client.readonlyExec({
+            code: cleanedCode,
+            pageId: options.pageId,
+          });
+  } finally {
+    client.destroy();
+  }
 
   if (!response.ok) {
     writeDaemonExecOutput(response.output);
@@ -374,60 +381,6 @@ async function stopExistingFailedRunSession(
   );
 }
 
-function readJsonFileIfExists(path: string): unknown {
-  if (!existsSync(path)) return null;
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as unknown;
-  } catch {
-    return null;
-  }
-}
-
-function readFailureDetails(path: string): {
-  message?: string;
-  phase?: "setup" | "workflow";
-} | null {
-  const raw = readJsonFileIfExists(path);
-  if (!raw || typeof raw !== "object") return null;
-
-  const message = (raw as { message?: unknown }).message;
-  const phase = (raw as { phase?: unknown }).phase;
-
-  return {
-    message: typeof message === "string" ? message : undefined,
-    phase: phase === "setup" || phase === "workflow" ? phase : undefined,
-  };
-}
-
-async function waitForFailureDetails(
-  path: string,
-  timeoutMs = 1_000,
-): Promise<{
-  message?: string;
-  phase?: "setup" | "workflow";
-} | null> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const details = readFailureDetails(path);
-    if (details?.message) return details;
-    await new Promise((resolveWait) => setTimeout(resolveWait, 25));
-  }
-  return readFailureDetails(path);
-}
-
-function streamOutputSince(path: string, offset: number): number {
-  if (!existsSync(path)) return offset;
-  const output = readFileSync(path);
-  if (output.length <= offset) return output.length;
-  process.stdout.write(output.subarray(offset));
-  return output.length;
-}
-
-type WaitForWorkflowOutcomeArgs = {
-  session: string;
-  pid: number;
-};
-
 type RunIntegrationResult = "completed" | "paused";
 
 type WorkflowOutcome = {
@@ -436,70 +389,68 @@ type WorkflowOutcome = {
   phase?: "setup" | "workflow";
 };
 
-function clearSignalIfExists(path: string): void {
-  if (!existsSync(path)) return;
-  try {
-    unlinkSync(path);
-  } catch {
-    // Ignore cleanup failures; next checks still validate actual state.
-  }
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve(value: T): void;
+};
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+function createWorkflowHandlers(
+  settleOutcome: (outcome: WorkflowOutcome) => void,
+): DaemonToCliApi {
+  return {
+    workflowOutput: (event) => {
+      const stream =
+        event.stream === "stdout" ? process.stdout : process.stderr;
+      stream.write(event.text);
+    },
+    workflowPaused: () => {
+      settleOutcome({ status: "paused" });
+    },
+    workflowFinished: (event) => {
+      if (event.result === "completed") {
+        settleOutcome({ status: "completed" });
+        return;
+      }
+      settleOutcome({
+        status: "failed",
+        message: event.message,
+        phase: event.phase,
+      });
+    },
+  };
 }
 
 async function waitForWorkflowOutcome(
-  args: WaitForWorkflowOutcomeArgs,
+  pid: number,
+  outcomePromise: Promise<WorkflowOutcome>,
 ): Promise<WorkflowOutcome> {
-  const signalPaths = getPauseSignalPaths(args.session);
-  if (args.pid <= 0) {
-    return { status: "exited" };
-  }
-  let outputOffset = 0;
+  let processExitInterval: ReturnType<typeof setInterval> | undefined;
 
-  while (true) {
-    outputOffset = streamOutputSince(
-      signalPaths.outputSignalPath,
-      outputOffset,
-    );
-
-    if (existsSync(signalPaths.failedSignalPath)) {
-      outputOffset = streamOutputSince(
-        signalPaths.outputSignalPath,
-        outputOffset,
-      );
-      const failureDetails = await waitForFailureDetails(
-        signalPaths.failedSignalPath,
-      );
-      return {
-        status: "failed",
-        message: failureDetails?.message,
-        phase: failureDetails?.phase,
-      };
+  const processExitPromise = new Promise<WorkflowOutcome>((resolve) => {
+    if (pid <= 0 || !isProcessRunning(pid)) {
+      resolve({ status: "exited" });
+      return;
     }
 
-    if (existsSync(signalPaths.completedSignalPath)) {
-      outputOffset = streamOutputSince(
-        signalPaths.outputSignalPath,
-        outputOffset,
-      );
-      return { status: "completed" };
-    }
+    processExitInterval = setInterval(() => {
+      if (!isProcessRunning(pid)) {
+        resolve({ status: "exited" });
+      }
+    }, 250);
+  });
 
-    if (existsSync(signalPaths.pausedSignalPath)) {
-      outputOffset = streamOutputSince(
-        signalPaths.outputSignalPath,
-        outputOffset,
-      );
-      return { status: "paused" };
-    }
-
-    if (!isProcessRunning(args.pid)) {
-      outputOffset = streamOutputSince(
-        signalPaths.outputSignalPath,
-        outputOffset,
-      );
-      return { status: "exited" };
-    }
-
-    await new Promise((resolveWait) => setTimeout(resolveWait, 250));
+  try {
+    return await Promise.race([outcomePromise, processExitPromise]);
+  } finally {
+    if (processExitInterval) clearInterval(processExitInterval);
   }
 }
 
@@ -508,52 +459,52 @@ async function runResume(
   logger: LoggerApi,
   sessionState: SessionState,
 ): Promise<void> {
-  const {
-    pausedSignalPath,
-    resumeSignalPath,
-    completedSignalPath,
-    failedSignalPath,
-    outputSignalPath,
-  } = getPauseSignalPaths(session);
-
-  if (!existsSync(pausedSignalPath)) {
-    throw new Error(
-      `Session "${session}" is not paused. Run "${librettoCommand(`run ... --session ${session}`)}" and call pause("${session}") first.`,
-    );
-  }
-
   if (sessionState.pid == null || !isProcessRunning(sessionState.pid)) {
     throw new Error(
       `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid ?? "unknown"} is not running).`,
     );
   }
 
-  // Clear stale pause/output markers before signaling resume so we always wait
-  // for the next pause/completion and only stream post-resume logs.
-  clearSignalIfExists(pausedSignalPath);
-  clearSignalIfExists(outputSignalPath);
-  clearSignalIfExists(completedSignalPath);
-  clearSignalIfExists(failedSignalPath);
-  setSessionStatus(session, "active", logger);
+  if (!sessionState.daemonSocketPath) {
+    throw new Error(
+      `No active paused workflow found for session "${session}" (daemon socket is missing).`,
+    );
+  }
 
-  writeFileSync(
-    resumeSignalPath,
-    JSON.stringify(
-      {
-        resumedAt: new Date().toISOString(),
-        sourcePid: process.pid,
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  );
-  console.log(`Resume signal sent for session "${session}".`);
+  const workflowOutcome = createDeferred<WorkflowOutcome>();
+  const handlers = createWorkflowHandlers(workflowOutcome.resolve);
+  let client: DaemonClient;
+  try {
+    client = await DaemonClient.connect(
+      sessionState.daemonSocketPath,
+      handlers,
+    );
+  } catch {
+    throw new Error(
+      `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid} is not running).`,
+    );
+  }
 
-  const outcome = await waitForWorkflowOutcome({
-    session,
-    pid: sessionState.pid!,
-  });
+  let outcome: WorkflowOutcome;
+  try {
+    const status = await client.getWorkflowStatus();
+    if (status.state !== "paused") {
+      throw new Error(
+        `Session "${session}" is not paused. Run "${librettoCommand(`run ... --session ${session}`)}" and call pause("${session}") first.`,
+      );
+    }
+
+    await client.resumeWorkflow();
+    setSessionStatus(session, "active", logger);
+    console.log(`Resume requested for session "${session}".`);
+
+    outcome = await waitForWorkflowOutcome(
+      sessionState.pid!,
+      workflowOutcome.promise,
+    );
+  } finally {
+    client.destroy();
+  }
 
   if (outcome.status === "completed") {
     setSessionStatus(session, "completed", logger);
@@ -578,7 +529,8 @@ async function runResume(
   if (outcome.status === "exited") {
     setSessionStatus(session, "exited", logger);
     throw new Error(
-      `Workflow process for session "${session}" exited before reporting completion or pause.`,
+      outcome.message ??
+        `Workflow process for session "${session}" exited before reporting completion or pause.`,
     );
   }
   setSessionStatus(session, "paused", logger);
@@ -590,12 +542,6 @@ async function runIntegrationFromFile(
   logger: LoggerApi,
 ): Promise<RunIntegrationResult> {
   await stopExistingFailedRunSession(args.session, logger);
-  const signalPaths = getPauseSignalPaths(args.session);
-  clearSignalIfExists(signalPaths.pausedSignalPath);
-  clearSignalIfExists(signalPaths.resumeSignalPath);
-  clearSignalIfExists(signalPaths.completedSignalPath);
-  clearSignalIfExists(signalPaths.failedSignalPath);
-  clearSignalIfExists(signalPaths.outputSignalPath);
 
   const absoluteIntegrationPath = getAbsoluteIntegrationPath(
     args.integrationPath,
@@ -618,10 +564,13 @@ async function runIntegrationFromFile(
   }
 
   const runLogPath = logFileForSession(args.session);
+  const workflowOutcome = createDeferred<WorkflowOutcome>();
+  const handlers = createWorkflowHandlers(workflowOutcome.resolve);
   const {
     pid,
     socketPath: daemonSocketPath,
     provider,
+    client,
   } = await DaemonClient.spawn({
     config: {
       session: args.session,
@@ -644,6 +593,7 @@ async function runIntegrationFromFile(
     logger,
     logPath: runLogPath,
     startupTimeoutMs: 60_000,
+    handlers,
   });
 
   writeSessionState(
@@ -668,10 +618,12 @@ async function runIntegrationFromFile(
     console.log(`View live session: ${provider.liveViewUrl}`);
   }
 
-  const outcome = await waitForWorkflowOutcome({
-    session: args.session,
-    pid,
-  });
+  let outcome: WorkflowOutcome;
+  try {
+    outcome = await waitForWorkflowOutcome(pid, workflowOutcome.promise);
+  } finally {
+    client.destroy();
+  }
   if (outcome.status === "paused") {
     setSessionStatus(args.session, "paused", logger);
     console.log("Workflow paused.");
@@ -689,7 +641,8 @@ async function runIntegrationFromFile(
   if (outcome.status === "exited") {
     setSessionStatus(args.session, "exited", logger);
     throw new Error(
-      "Workflow process exited before reporting completion or pause during run.",
+      outcome.message ??
+        "Workflow process exited before reporting completion or pause during run.",
     );
   }
   setSessionStatus(args.session, "completed", logger);

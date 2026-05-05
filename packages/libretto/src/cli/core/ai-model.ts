@@ -1,6 +1,6 @@
 import { readSnapshotModel } from "./config.js";
 import { LIBRETTO_CONFIG_PATH } from "./context.js";
-import { librettoCommand } from "./package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 import {
   hasProviderCredentials,
   parseModel,

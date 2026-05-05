@@ -1,6 +1,6 @@
 import { resolveAiSetupStatus } from "./core/ai-model.js";
 import { ensureLibrettoSetup } from "./core/context.js";
-import { librettoCommand } from "./core/package-manager.js";
+import { librettoCommand } from "../shared/package-manager.js";
 import { createCLIApp } from "./router.js";
 import { warnIfInstalledSkillOutOfDate } from "./core/skill-version.js";
 import { loadEnv } from "../shared/env/load-env.js";

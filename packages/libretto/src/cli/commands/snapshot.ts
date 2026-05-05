@@ -12,8 +12,8 @@ import { pageOption, sessionOption, withRequiredSession } from "./shared.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readSnapshotModel } from "../core/config.js";
 import { resolveSnapshotApiModelOrThrow } from "../core/ai-model.js";
-import { DaemonClient } from "../core/daemon/index.js";
-import { librettoCommand } from "../core/package-manager.js";
+import { DaemonClient } from "../core/daemon/ipc.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 
 export const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
 
@@ -117,9 +117,14 @@ async function captureSnapshot(
   pageId?: string,
 ): Promise<ScreenshotPair> {
   logger.info("snapshot-via-daemon", { session, pageId });
-  const client = new DaemonClient(daemonSocketPath);
-  const { pngPath, htmlPath, snapshotRunId, pageUrl, title } =
-    await client.snapshot({ pageId });
+  const client = await DaemonClient.connect(daemonSocketPath);
+  let snapshotResult: Awaited<ReturnType<DaemonClient["snapshot"]>>;
+  try {
+    snapshotResult = await client.snapshot({ pageId });
+  } finally {
+    client.destroy();
+  }
+  const { pngPath, htmlPath, snapshotRunId, pageUrl, title } = snapshotResult;
 
   // condenseDom runs in the CLI process, not the daemon.
   const htmlContent = readFileSync(htmlPath, "utf8");

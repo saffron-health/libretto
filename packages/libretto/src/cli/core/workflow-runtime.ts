@@ -8,13 +8,8 @@ import {
   getDefaultWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,
   type ExportedLibrettoWorkflow,
-  type LibrettoWorkflowContext,
 } from "../../shared/workflow/workflow.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
-
-export type LoadedLibrettoWorkflow = ExportedLibrettoWorkflow & {
-  run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
-};
 
 const TSCONFIG_HINT =
   "TypeScript compilation failed. Pass --tsconfig <path> to run against a specific tsconfig.";
@@ -39,7 +34,7 @@ export function getAbsoluteIntegrationPath(integrationPath: string): string {
 
 export async function loadDefaultWorkflow(
   absolutePath: string,
-): Promise<LoadedLibrettoWorkflow> {
+): Promise<ExportedLibrettoWorkflow> {
   let loadedModule: Record<string, unknown>;
   try {
     loadedModule = (await import(pathToFileURL(absolutePath).href)) as Record<
@@ -60,7 +55,7 @@ export async function loadDefaultWorkflow(
 
   const defaultWorkflow = getDefaultWorkflowFromModuleExports(loadedModule);
   if (defaultWorkflow) {
-    return defaultWorkflow as LoadedLibrettoWorkflow;
+    return defaultWorkflow;
   }
 
   const availableWorkflowNames = getWorkflowsFromModuleExports(loadedModule).map(

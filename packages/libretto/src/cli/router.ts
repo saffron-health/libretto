@@ -7,7 +7,7 @@ import { executionCommands } from "./commands/execution.js";
 import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
 import { snapshotCommand } from "./commands/snapshot.js";
-import { librettoCommand } from "./core/package-manager.js";
+import { librettoCommand } from "../shared/package-manager.js";
 import { SimpleCLI } from "./framework/simple-cli.js";
 
 export const cliRoutes = {

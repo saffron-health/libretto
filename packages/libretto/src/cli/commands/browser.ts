@@ -12,7 +12,7 @@ import {
 import { resolveProviderName } from "../core/providers/index.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { createLoggerForSession, withSessionLogger } from "../core/context.js";
-import { librettoCommand } from "../core/package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 import {
   type SessionAccessMode,
   assertSessionAvailableForStart,

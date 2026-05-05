@@ -1,32 +1,17 @@
-import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
-import { getSessionDir } from "../../cli/core/context.js";
-import {
-  getPauseSignalPaths,
-  removeSignalIfExists,
-} from "../../cli/core/pause-signals.js";
-import { listRunningSessions } from "../../cli/core/session.js";
+import { getActivePauseHandler } from "./pause-handler.js";
+import { librettoCommand } from "../package-manager.js";
 
 function throwMissingSessionError(): never {
-  const runningSessions = listRunningSessions();
-  const lines = ["pause(session) requires a non-empty session ID."];
-
-  if (runningSessions.length > 0) {
-    lines.push("", "Running sessions:");
-    for (const s of runningSessions) {
-      lines.push(`  ${s.session}`);
-    }
-  }
-
-  throw new Error(lines.join("\n"));
+  throw new Error(
+    `pause(session) requires a non-empty session ID. Pass ctx.session from inside your workflow: await pause(ctx.session). To list running sessions, run: ${librettoCommand("status")}.`,
+  );
 }
 
 /**
  * Standalone pause function.
  *
  * - In production (`NODE_ENV === "production"`), returns immediately (no-op).
- * - Otherwise, writes a `.paused` signal file and polls for a `.resume` signal,
- *   using the same file-based mechanism as the CLI runner.
+ * - Otherwise, delegates to the active Libretto workflow runtime pause handler.
  *
  * Import directly: `import { pause } from "libretto";`
  */
@@ -39,34 +24,15 @@ export async function pause(session: string): Promise<void> {
     throwMissingSessionError();
   }
 
-  const signalPaths = getPauseSignalPaths(session);
-  const { pausedSignalPath, resumeSignalPath } = signalPaths;
-
-  await mkdir(getSessionDir(session), { recursive: true });
-  await removeSignalIfExists(resumeSignalPath);
-
-  const details = {
-    sessionName: session,
-    pausedAt: new Date().toISOString(),
-    url: "unknown",
-  };
-
-  // Try to read the current page URL from the process (best-effort).
-  // The standalone pause doesn't have access to the page object,
-  // so we just record what we can.
-  await writeFile(pausedSignalPath, JSON.stringify(details, null, 2), "utf8");
-
-  console.log(`[pause] Paused (session: ${session})`);
-  console.log("[pause] Waiting for resume signal...");
-
-  const RESUME_POLL_INTERVAL_MS = 250;
-  while (!existsSync(resumeSignalPath)) {
-    await new Promise((resolve) =>
-      setTimeout(resolve, RESUME_POLL_INTERVAL_MS),
+  const handler = getActivePauseHandler();
+  if (!handler) {
+    throw new Error(
+      `pause(session) can only suspend an active Libretto workflow. Run the workflow with ${librettoCommand("run <integrationFile>")} and call pause(ctx.session) from inside the workflow.`,
     );
   }
 
-  await removeSignalIfExists(resumeSignalPath);
-  await removeSignalIfExists(pausedSignalPath);
-  console.log("[pause] Resume signal received. Continuing workflow...");
+  await handler({
+    session,
+    pausedAt: new Date().toISOString(),
+  });
 }

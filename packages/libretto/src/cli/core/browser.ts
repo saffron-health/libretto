@@ -12,7 +12,7 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
-import { librettoCommand } from "./package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 import { getCloudProviderApi } from "./providers/index.js";
 import {
   assertSessionAvailableForStart,
@@ -24,11 +24,13 @@ import {
   readSessionState,
   writeSessionState,
 } from "./session.js";
-import { DaemonClient } from "./daemon/index.js";
+import { DaemonClient } from "./daemon/ipc.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const PROVIDER_CLOSE_WAIT_MS = 30_000;
 const FORCE_CLOSE_WAIT_MS = 300;
+
+type CloseResult = { replayUrl?: string };
 
 async function pickFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
@@ -329,8 +331,12 @@ export async function runPages(
         `Close and reopen the session: ${librettoCommand(`close --session ${session}`)}`,
     );
   }
-  const client = new DaemonClient(state.daemonSocketPath);
-  pageSummaries = await client.pages();
+  const client = await DaemonClient.connect(state.daemonSocketPath);
+  try {
+    pageSummaries = await client.pages();
+  } finally {
+    client.destroy();
+  }
 
   if (pageSummaries.length === 0) {
     console.log("No pages found.");
@@ -454,27 +460,29 @@ export async function runOpen(
   // Spawn daemon and wait for IPC readiness. The daemon launches
   // Chromium internally — IPC readiness implies the browser is up,
   // so no separate CDP polling is needed.
-  const { pid, socketPath: daemonSocketPath } = await DaemonClient.spawn({
-    config: {
-      session,
-      browser: {
-        kind: "launch",
-        headed,
-        viewport,
-        storageStatePath: useProfile ? profilePath : undefined,
-        windowPosition,
-        remoteDebuggingPort: port,
-        initialUrl: url,
+  const { pid, socketPath: daemonSocketPath, client } =
+    await DaemonClient.spawn({
+      config: {
+        session,
+        browser: {
+          kind: "launch",
+          headed,
+          viewport,
+          storageStatePath: useProfile ? profilePath : undefined,
+          windowPosition,
+          remoteDebuggingPort: port,
+          initialUrl: url,
+        },
       },
-    },
-    logger,
-    logPath: runLogPath,
-    // The daemon launches Chromium, installs telemetry, navigates to
-    // the URL, and only then starts IPC. Navigation alone can take up
-    // to 45s (page.setDefaultNavigationTimeout), so the IPC timeout
-    // must cover launch + navigation.
-    startupTimeoutMs: 60_000,
-  });
+      logger,
+      logPath: runLogPath,
+      // The daemon launches Chromium, installs telemetry, navigates to
+      // the URL, and only then starts IPC. Navigation alone can take up
+      // to 45s (page.setDefaultNavigationTimeout), so the IPC timeout
+      // must cover launch + navigation.
+      startupTimeoutMs: 60_000,
+    });
+  client.destroy();
 
   writeSessionState(
     {
@@ -522,6 +530,7 @@ export async function runOpenWithProvider(
     pid,
     socketPath: daemonSocketPath,
     provider: providerSession,
+    client,
   } = await DaemonClient.spawn({
     config: {
       session,
@@ -536,6 +545,7 @@ export async function runOpenWithProvider(
     // Remote CDP connection + navigation; must cover both.
     startupTimeoutMs: 60_000,
   });
+  client.destroy();
 
   if (!providerSession) {
     throw new Error(
@@ -675,9 +685,30 @@ export async function runClose(
     return;
   }
 
-  // Kill local daemon process if present. For provider sessions, the daemon
-  // closes the remote browser during shutdown and writes provider-close.json.
-  if (state.pid != null) {
+  let replayUrl: string | undefined;
+  if (state.daemonSocketPath && state.pid != null && isPidRunning(state.pid)) {
+    try {
+      const result = await closeDaemonSession(
+        {
+          session,
+          pid: state.pid,
+          port: state.port,
+          provider: state.provider,
+          daemonSocketPath: state.daemonSocketPath,
+        },
+        logger,
+      );
+      replayUrl = result.replayUrl;
+      if (!state.provider) {
+        await waitForCloseSignalWindow(CLOSE_WAIT_MS);
+      }
+    } catch (error) {
+      if (state.provider) {
+        writeSessionState({ ...state, status: "cleanup-failed" }, logger);
+      }
+      throw formatDaemonCloseFailure(session, state.provider?.name, error);
+    }
+  } else if (state.pid != null) {
     logger.info("close-killing", { session, pid: state.pid, port: state.port });
     sendSignalToProcessGroupOrPid(state.pid, "SIGTERM", logger, session);
     if (state.provider) {
@@ -687,11 +718,8 @@ export async function runClose(
     }
   }
 
-  // Provider-backed sessions are owned by the daemon. Killing the daemon above
-  // makes it close the remote provider session during shutdown.
-  let replayUrl: string | undefined;
   if (state.provider) {
-    logger.info("close-provider-skipped-daemon-owned", {
+    logger.info("close-provider-daemon-owned", {
       session,
       provider: state.provider.name,
       sessionId: state.provider.sessionId,
@@ -712,7 +740,7 @@ export async function runClose(
         );
       }
     } else {
-      replayUrl = readProviderReplayUrl(session, logger);
+      replayUrl = replayUrl ?? readProviderReplayUrl(session, logger);
     }
   }
 
@@ -732,6 +760,70 @@ type ClosableSession = {
   provider?: { name: string; sessionId: string };
   daemonSocketPath?: string;
 };
+
+async function closeDaemonSession(
+  target: ClosableSession,
+  logger: LoggerApi,
+): Promise<CloseResult> {
+  if (!target.daemonSocketPath) {
+    throw new Error("session has no daemon socket path");
+  }
+
+  const timeoutMs = target.provider ? PROVIDER_CLOSE_WAIT_MS : CLOSE_WAIT_MS;
+  logger.info("close-daemon-ipc-start", {
+    session: target.session,
+    pid: target.pid,
+    provider: target.provider?.name,
+    timeoutMs,
+  });
+
+  let client: DaemonClient | undefined;
+  try {
+    client = await DaemonClient.connect(target.daemonSocketPath);
+    const result = await withTimeout(
+      client.close(),
+      timeoutMs,
+      `Daemon did not respond to close within ${timeoutMs}ms.`,
+    );
+    logger.info("close-daemon-ipc-success", {
+      session: target.session,
+      replayUrl: result.replayUrl,
+    });
+    return result;
+  } finally {
+    client?.destroy();
+  }
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function formatDaemonCloseFailure(
+  session: string,
+  providerName: string | undefined,
+  error: unknown,
+): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  const cleanupWarning = providerName
+    ? ` State preserved with status "cleanup-failed" because remote ${providerName} cleanup could not be confirmed.`
+    : " State preserved so you can retry or inspect the session.";
+  return new Error(
+    `Failed to close session "${session}" gracefully over daemon IPC: ${message}.${cleanupWarning} Retry with: ${librettoCommand(`close --session ${session}`)}`,
+  );
+}
 
 function waitForCloseSignalWindow(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -930,25 +1022,45 @@ export async function runCloseAll(
     return;
   }
 
-  // Provider sessions are owned by their daemons. Send SIGTERM below and let
-  // each daemon close its remote provider session during shutdown.
   const failedProviderSessions = new Set<string>();
+  const gracefulCloseFailures = new Map<string, Error>();
 
-  // Send SIGTERM to all daemon processes (both local and provider sessions).
-  for (const target of closable) {
-    if (target.pid == null) continue;
-    logger.info("close-all-sigterm", {
-      session: target.session,
-      pid: target.pid,
-      port: target.port,
-    });
-    sendSignalToProcessGroupOrPid(
-      target.pid,
-      "SIGTERM",
-      logger,
-      target.session,
-    );
-  }
+  await Promise.all(
+    closable.map(async (target) => {
+      if (target.pid == null) return;
+      if (target.daemonSocketPath && isPidRunning(target.pid)) {
+        try {
+          await closeDaemonSession(target, logger);
+          return;
+        } catch (error) {
+          const closeError = formatDaemonCloseFailure(
+            target.session,
+            target.provider?.name,
+            error,
+          );
+          gracefulCloseFailures.set(target.session, closeError);
+          logger.warn("close-all-daemon-ipc-failed", {
+            session: target.session,
+            pid: target.pid,
+            error: closeError.message,
+          });
+          if (!force) return;
+        }
+      }
+
+      logger.info("close-all-sigterm", {
+        session: target.session,
+        pid: target.pid,
+        port: target.port,
+      });
+      sendSignalToProcessGroupOrPid(
+        target.pid,
+        "SIGTERM",
+        logger,
+        target.session,
+      );
+    }),
+  );
 
   await waitForCloseAllTargets(closable);
 
@@ -966,16 +1078,22 @@ export async function runCloseAll(
   let survivors = closable.filter(
     (target) => target.pid != null && isPidRunning(target.pid),
   );
-  if (survivors.length > 0 && !force) {
+  if ((survivors.length > 0 || gracefulCloseFailures.size > 0) && !force) {
     const closed = clearStoppedSessionStates(
       closable,
       logger,
       failedProviderSessions,
     );
+    const failedSessions = Array.from(
+      new Set([
+        ...survivors.map((survivor) => survivor.session),
+        ...gracefulCloseFailures.keys(),
+      ]),
+    ).map((sessionName) => ({ session: sessionName }));
 
     throw new Error(
       [
-        `Failed to close ${survivors.length} session(s) gracefully: ${formatSessionList(survivors)}.`,
+        `Failed to close ${failedSessions.length} session(s) gracefully: ${formatSessionList(failedSessions)}.`,
         `Closed ${closed} session(s).`,
         `Retry with: ${librettoCommand("close --all --force")}`,
       ].join("\n"),
@@ -1139,7 +1257,12 @@ export async function runConnect(
   );
 
   // Query the daemon for discovered pages.
-  const pages = await client.pages();
+  let pages: OpenPageSummary[];
+  try {
+    pages = await client.pages();
+  } finally {
+    client.destroy();
+  }
 
   logger.info("connect-success", { cdpUrl: endpoint, session, port });
   console.log(`Connected to ${endpoint} (session: ${session})`);

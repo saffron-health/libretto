@@ -24,10 +24,18 @@ import {
   type BrowserContext,
   type Page,
 } from "playwright";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
-import type { LibrettoWorkflowContext } from "../../../shared/workflow/workflow.js";
+import {
+  createIpcPeer,
+  type IpcPeer,
+  type IpcPeerHandlers,
+} from "../../../shared/ipc/ipc.js";
+import {
+  createIpcSocketServer,
+  listenOnIpcSocket,
+} from "../../../shared/ipc/socket-transport.js";
 import {
   createLoggerForSession,
   getSessionDir,
@@ -37,10 +45,14 @@ import {
   getSessionStatePath,
 } from "../context.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
+import type { ExportedLibrettoWorkflow } from "../../../shared/workflow/workflow.js";
 import {
-  DaemonServer,
   getDaemonSocketPath,
-  type DaemonRequest,
+  type CliToDaemonApi,
+  type DaemonCloseResult,
+  type DaemonExecOutput,
+  type DaemonExecResult,
+  type DaemonToCliApi,
 } from "./ipc.js";
 import { wrapPageForActionLogging } from "../telemetry.js";
 import {
@@ -52,8 +64,7 @@ import {
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
-import { getPauseSignalPaths } from "../pause-signals.js";
-import { librettoCommand } from "../package-manager.js";
+import { librettoCommand } from "../../../shared/package-manager.js";
 import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,
@@ -65,10 +76,9 @@ import { getCloudProviderApi } from "../providers/index.js";
 import type { ProviderApi } from "../providers/types.js";
 import {
   getAbsoluteIntegrationPath,
-  installHeadedWorkflowVisualization,
   loadDefaultWorkflow,
-  type LoadedLibrettoWorkflow,
 } from "../workflow-runtime.js";
+import { WorkflowController } from "../workflow-runner/runner.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -76,6 +86,9 @@ function isOperationalPage(page: Page): boolean {
 }
 
 type TelemetryEntry = Record<string, unknown>;
+type ErrorWithOutput = Error & { output?: DaemonExecOutput };
+type ShutdownOptions = { keepIpcClientsAlive?: boolean };
+type ShutdownHandler = (options: ShutdownOptions) => Promise<void> | void;
 
 async function waitForSessionState(session: string): Promise<void> {
   const deadline = Date.now() + 2_000;
@@ -83,6 +96,9 @@ async function waitForSessionState(session: string): Promise<void> {
     if (existsSync(getSessionStatePath(session))) return;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
+  throw new Error(
+    `Session state was not written before workflow start for "${session}".`,
+  );
 }
 
 class UserFacingStartupError extends Error {
@@ -90,53 +106,6 @@ class UserFacingStartupError extends Error {
     super(message);
     this.name = "UserFacingStartupError";
   }
-}
-
-function mirrorStdoutToFile(filePath: string): () => void {
-  const stdout = process.stdout;
-  const originalWrite = stdout.write.bind(stdout);
-
-  stdout.write = ((chunk: unknown, ...args: unknown[]) => {
-    try {
-      const buffer = Buffer.isBuffer(chunk)
-        ? chunk
-        : Buffer.from(String(chunk), "utf8");
-      appendFileSync(filePath, buffer);
-    } catch {
-      // Ignore log mirroring failures; primary stdout should still flow.
-    }
-    return originalWrite(
-      chunk as string | Uint8Array,
-      ...(args as [BufferEncoding?, ((error?: Error | null) => void)?]),
-    );
-  }) as typeof stdout.write;
-
-  return () => {
-    stdout.write = originalWrite as typeof stdout.write;
-  };
-}
-
-async function writeWorkflowFailureSignal(args: {
-  session: string;
-  error: unknown;
-  phase: "setup" | "workflow";
-}): Promise<void> {
-  const signalPaths = getPauseSignalPaths(args.session);
-  const errorMessage =
-    args.error instanceof Error ? args.error.message : String(args.error);
-  await writeFile(
-    signalPaths.failedSignalPath,
-    JSON.stringify(
-      {
-        failedAt: new Date().toISOString(),
-        message: errorMessage,
-        phase: args.phase,
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  );
 }
 
 function getMissingLocalAuthProfileError(args: {
@@ -184,6 +153,10 @@ class BrowserDaemon {
   readonly logger: LoggerApi;
   private readonly execState: Record<string, unknown> = {};
   private readonly pageById = new Map<string, Page>();
+  private readonly shutdownHandlers: ShutdownHandler[] = [];
+  private readonly connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
+  private workflowController: WorkflowController | undefined;
+  private shutdownPromise: Promise<DaemonCloseResult> | undefined;
 
   private constructor(
     private readonly session: string,
@@ -191,7 +164,6 @@ class BrowserDaemon {
     private readonly browser: Browser,
     private readonly context: BrowserContext,
     private readonly page: Page,
-    private readonly ipcServer: DaemonServer,
     logger: LoggerApi,
     private readonly providerSession?: {
       provider: ProviderApi;
@@ -201,8 +173,6 @@ class BrowserDaemon {
   ) {
     this.logger = logger.withScope("child");
   }
-
-  private shuttingDown = false;
 
   private trackPage(page: Page): string {
     const id = `page-${Math.random().toString(36).slice(2, 5)}`;
@@ -278,20 +248,15 @@ class BrowserDaemon {
       });
     }
 
-    // IPC server — handler is wired after construction to avoid a
-    // circular type inference issue (daemon references itself).
+    // IPC server — typed handlers are attached per client connection so one
+    // daemon lifetime can serve multiple CLI invocations.
     const socketPath = getDaemonSocketPath(session);
-    let handler: (request: DaemonRequest) => Promise<unknown>;
-    const ipcServer = new DaemonServer(socketPath, (request) =>
-      handler(request),
-    );
     const daemon = new BrowserDaemon(
       session,
       externallyManaged,
       browser,
       context,
       page,
-      ipcServer,
       logger,
       providerSession,
     );
@@ -314,8 +279,41 @@ class BrowserDaemon {
       await page.goto(navigateUrl);
     }
 
-    handler = (request) => daemon.handleRequest(request);
-    await ipcServer.listen();
+    const ipcServer = createIpcSocketServer((transport) => {
+      const cli = createIpcPeer<DaemonToCliApi, CliToDaemonApi>(
+        transport,
+        daemon.createIpcHandlers(),
+      );
+      const stopTracking = transport.onClose?.(() => {
+        daemon.connectedClis.delete(cli);
+        stopTracking?.();
+      });
+      daemon.connectedClis.add(cli);
+    });
+    daemon.registerShutdownHandler(async (options) => {
+      if (!options.keepIpcClientsAlive) {
+        for (const cli of daemon.connectedClis) {
+          cli.destroy();
+        }
+        daemon.connectedClis.clear();
+      }
+      if (options.keepIpcClientsAlive) {
+        ipcServer.close((error) => {
+          if (error) {
+            daemon.logger.warn("ipc-server-close-failed", {
+              session,
+              error,
+            });
+          }
+        });
+        return;
+      }
+      await new Promise<void>((resolve, reject) => {
+        ipcServer.close((error) => (error ? reject(error) : resolve()));
+      });
+    });
+
+    await listenOnIpcSocket(ipcServer, socketPath);
     process.send?.({ type: "ready", socketPath, provider: readyProvider });
     daemon.logger.info("ipc-server-listening", { socketPath });
 
@@ -489,52 +487,87 @@ class BrowserDaemon {
 
   // ── Lifecycle ──────────────────────────────────────────────────────
 
-  async shutdown(reason: string, closeBrowser: boolean): Promise<void> {
-    if (this.shuttingDown) return;
-    this.shuttingDown = true;
-    this.logger.info(reason, { session: this.session });
-    await this.ipcServer.close();
-    if (closeBrowser) {
-      if (this.externallyManaged) {
-        // Drop the CDP pipe without killing the external browser.
-        try {
-          (
-            this.browser as unknown as {
-              _connection?: { close(): void };
-            }
-          )._connection?.close();
-        } catch {
-          // Connection may already be closed.
+  registerShutdownHandler(handler: ShutdownHandler): void {
+    this.shutdownHandlers.push(handler);
+  }
+
+  shutdown(
+    reason: string,
+    closeBrowser: boolean,
+    options: ShutdownOptions = {},
+  ): Promise<DaemonCloseResult> {
+    if (this.shutdownPromise) return this.shutdownPromise;
+    this.shutdownPromise = this.performShutdown(reason, closeBrowser, options);
+    return this.shutdownPromise;
+  }
+
+  private async performShutdown(
+    reason: string,
+    closeBrowser: boolean,
+    options: ShutdownOptions,
+  ): Promise<DaemonCloseResult> {
+    let replayUrl: string | undefined;
+    try {
+      this.logger.info(reason, { session: this.session });
+      for (const handler of this.shutdownHandlers) {
+        await handler(options);
+      }
+      if (closeBrowser) {
+        if (this.externallyManaged) {
+          // Playwright does not expose a public "detach from this CDP browser"
+          // API. Closing the private connection lets the daemon's event loop
+          // drain without asking Playwright to close the externally managed
+          // browser/provider session itself.
+          try {
+            (
+              this.browser as unknown as {
+                _connection?: { close(): void };
+              }
+            )._connection?.close();
+          } catch {
+            // Connection may already be closed.
+          }
+        } else {
+          await this.browser.close();
         }
-      } else {
-        await this.browser.close();
       }
-    }
-    if (this.providerSession) {
-      const result = await this.providerSession.provider.closeSession(
-        this.providerSession.sessionId,
-      );
-      if (result.replayUrl) {
-        this.logger.info("provider-recording", {
-          session: this.session,
-          provider: this.providerSession.name,
-          sessionId: this.providerSession.sessionId,
-          replayUrl: result.replayUrl,
-        });
-      }
-      writeFileSync(
-        getSessionProviderClosePath(this.session),
-        JSON.stringify(
-          {
+      if (this.providerSession) {
+        const result = await this.providerSession.provider.closeSession(
+          this.providerSession.sessionId,
+        );
+        replayUrl = result.replayUrl;
+        if (result.replayUrl) {
+          this.logger.info("provider-recording", {
+            session: this.session,
             provider: this.providerSession.name,
             sessionId: this.providerSession.sessionId,
             replayUrl: result.replayUrl,
-          },
-          null,
-          2,
-        ),
-        "utf8",
-      );
+          });
+        }
+        writeFileSync(
+          getSessionProviderClosePath(this.session),
+          JSON.stringify(
+            {
+              provider: this.providerSession.name,
+              sessionId: this.providerSession.sessionId,
+              replayUrl: result.replayUrl,
+            },
+            null,
+            2,
+          ),
+          "utf8",
+        );
+      }
+      return replayUrl ? { replayUrl } : {};
+    } finally {
+      if (options.keepIpcClientsAlive) {
+        setImmediate(() => {
+          for (const cli of this.connectedClis) {
+            cli.destroy();
+          }
+          this.connectedClis.clear();
+        });
+      }
     }
   }
 
@@ -560,136 +593,177 @@ class BrowserDaemon {
     return page;
   }
 
-  // ── IPC handler ────────────────────────────────────────────────────
+  // ── IPC handlers ───────────────────────────────────────────────────
 
-  private async handleRequest(request: DaemonRequest): Promise<unknown> {
-    if (request.command === "ping") {
-      return { protocolVersion: PROTOCOL_VERSION };
-    }
+  private createIpcHandlers(): IpcPeerHandlers<CliToDaemonApi> {
+    return {
+      ping: () => ({ protocolVersion: PROTOCOL_VERSION }),
+      pages: () =>
+        this.withRequestTimeout(() => handlePages(this.pageById, this.page)),
+      exec: (args) => this.runExec(args),
+      readonlyExec: (args) => this.runReadonlyExec(args),
+      snapshot: (args) =>
+        this.withRequestTimeout(() =>
+          handleSnapshot(
+            this.resolveTargetPage(args.pageId),
+            this.session,
+            this.logger,
+            args.pageId,
+          ),
+        ),
+      getWorkflowStatus: () => this.getWorkflowStatus(),
+      resumeWorkflow: () => this.resumeWorkflow(),
+      close: () =>
+        this.shutdown("ipc-close", true, {
+          keepIpcClientsAlive: true,
+        }),
+    };
+  }
 
+  private async withRequestTimeout<T>(
+    operation: () => Promise<T> | T,
+  ): Promise<T> {
     // All non-ping commands get a timeout guard. The timer is cleared
     // when the command settles to avoid orphaned timers that would
     // keep the event loop alive after shutdown.
-    let timerId: ReturnType<typeof setTimeout>;
-    return Promise.race([
-      this.dispatchCommand(request).finally(() => clearTimeout(timerId)),
-      new Promise<never>((_resolve, reject) => {
-        timerId = setTimeout(
-          () =>
-            reject(
-              new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`),
-            ),
-          REQUEST_TIMEOUT_MS,
-        );
-      }),
-    ]);
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timerId = setTimeout(
+        () =>
+          reject(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`)),
+        REQUEST_TIMEOUT_MS,
+      );
+    });
+
+    try {
+      return await Promise.race([operation(), timeout]);
+    } finally {
+      if (timerId) clearTimeout(timerId);
+    }
   }
 
-  private async dispatchCommand(request: DaemonRequest): Promise<unknown> {
-    switch (request.command) {
-      case "pages":
-        return handlePages(this.pageById, this.page);
-      case "exec":
-        return handleExec(
-          this.resolveTargetPage(request.pageId),
-          request.code,
+  private async runExec(
+    args: Parameters<CliToDaemonApi["exec"]>[0],
+  ): Promise<DaemonExecResult> {
+    try {
+      const data = await this.withRequestTimeout(() =>
+        handleExec(
+          this.resolveTargetPage(args.pageId),
+          args.code,
           this.context,
           this.browser,
           this.execState,
           this.session,
-          request.visualize,
-        );
-      case "readonly-exec":
-        return handleReadonlyExec(
-          this.resolveTargetPage(request.pageId),
-          request.code,
-        );
-      case "snapshot":
-        return handleSnapshot(
-          this.resolveTargetPage(request.pageId),
-          this.session,
-          this.logger,
-          request.pageId,
-        );
-      default:
-        throw new Error(
-          `Unknown command: ${(request as { command: string }).command}`,
-        );
+          args.visualize,
+        ),
+      );
+      return { ok: true, data };
+    } catch (error) {
+      return this.createExecErrorResult(error);
     }
   }
 
-  async runWorkflow(args: {
+  private async runReadonlyExec(
+    args: Parameters<CliToDaemonApi["readonlyExec"]>[0],
+  ): Promise<DaemonExecResult> {
+    try {
+      const data = await this.withRequestTimeout(() =>
+        handleReadonlyExec(this.resolveTargetPage(args.pageId), args.code),
+      );
+      return { ok: true, data };
+    } catch (error) {
+      return this.createExecErrorResult(error);
+    }
+  }
+
+  private createExecErrorResult(error: unknown): DaemonExecResult {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+      output:
+        error instanceof Error ? (error as ErrorWithOutput).output : undefined,
+    };
+  }
+
+  startWorkflow(args: {
     workflow: DaemonWorkflowConfig;
     headed: boolean;
-    loadedWorkflow?: LoadedLibrettoWorkflow;
-  }): Promise<void> {
-    const signalPaths = getPauseSignalPaths(this.session);
-    const restoreStdout = mirrorStdoutToFile(signalPaths.outputSignalPath);
-    try {
-      const absolutePath = getAbsoluteIntegrationPath(
-        args.workflow.integrationPath,
-      );
-      const workflow = args.loadedWorkflow ?? (await loadDefaultWorkflow(absolutePath));
-      const workflowLogger = this.logger.withScope("integration-run", {
-        integrationPath: absolutePath,
-        workflowName: workflow.name,
-        session: this.session,
-      });
+    loadedWorkflow?: ExportedLibrettoWorkflow;
+  }): void {
+    if (this.workflowController) {
+      throw new Error("Workflow controller has already started.");
+    }
 
-      console.log(
-        `Running workflow "${workflow.name}" from ${absolutePath} (${args.headed ? "headed" : "headless"})...`,
-      );
-
-      if (args.headed && args.workflow.visualize !== false) {
-        await installHeadedWorkflowVisualization({
-          context: this.context,
-          logger: workflowLogger,
-        });
-      }
-
-      // tsx/esbuild can inject __name() wrappers when keepNames is true.
-      // Playwright serializes callbacks via Function#toString() into the browser
-      // context, which lacks __name, causing ReferenceError without this polyfill.
-      await this.context.addInitScript(() => {
-        (globalThis as Record<string, unknown>).__name = (
-          target: unknown,
-          value: string,
-        ) =>
-          Object.defineProperty(target as object, "name", {
-            value,
-            configurable: true,
+    this.workflowController = new WorkflowController({
+      session: this.session,
+      headed: args.headed,
+      page: this.page,
+      context: this.context,
+      logger: this.logger,
+      onLog: (event) => {
+        this.broadcast("workflowOutput", event);
+      },
+      onOutcome: (outcome) => {
+        if (outcome.state === "paused") {
+          this.broadcast("workflowPaused", {
+            pausedAt: outcome.pausedAt,
+            url: outcome.url,
           });
-      });
+          return;
+        }
+        this.broadcast(
+          "workflowFinished",
+          outcome.result === "completed"
+            ? { result: "completed", completedAt: outcome.completedAt }
+            : {
+                result: "failed",
+                message: outcome.message,
+                phase: outcome.phase,
+              },
+        );
+      },
+    });
+    this.workflowController.start({
+      integrationPath: args.workflow.integrationPath,
+      params: args.workflow.params,
+      visualize: args.workflow.visualize,
+      loadedWorkflow: args.loadedWorkflow,
+    });
+  }
 
-      const workflowContext: LibrettoWorkflowContext = {
-        session: this.session,
-        page: this.page,
-      };
+  getWorkflowStatus(): ReturnType<WorkflowController["getStatus"]> {
+    return this.workflowController?.getStatus() ?? { state: "idle" };
+  }
 
-      try {
-        await workflow.run(workflowContext, args.workflow.params ?? {});
-      } catch (error) {
-        await writeWorkflowFailureSignal({
-          session: this.session,
-          error,
-          phase: "workflow",
+  resumeWorkflow(): void {
+    if (!this.workflowController) {
+      throw new Error("Workflow is not paused.");
+    }
+    this.workflowController.resume();
+  }
+
+  async broadcast<Name extends keyof DaemonToCliApi>(
+    name: Name,
+    message: Parameters<DaemonToCliApi[Name]>[0],
+  ): Promise<void> {
+    const results = await Promise.allSettled(
+      Array.from(this.connectedClis, (cli) => {
+        const call = cli.call[name] as (
+          message: Parameters<DaemonToCliApi[Name]>[0],
+        ) => Promise<void>;
+        return call(message);
+      }),
+    );
+    for (const result of results) {
+      if (result.status === "rejected") {
+        this.logger.warn("workflow-event-failed", {
+          event: name,
+          error:
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason),
         });
-        return;
       }
-
-      await writeFile(
-        signalPaths.completedSignalPath,
-        JSON.stringify({ completedAt: new Date().toISOString() }, null, 2),
-        "utf8",
-      );
-    } catch (error) {
-      await writeWorkflowFailureSignal({
-        session: this.session,
-        error,
-        phase: "setup",
-      });
-    } finally {
-      restoreStdout();
     }
   }
 }
@@ -701,7 +775,7 @@ async function main(): Promise<void> {
   const headed =
     config.browser.kind === "launch" ? config.browser.headed : false;
 
-  let loadedWorkflow: LoadedLibrettoWorkflow | undefined;
+  let loadedWorkflow: ExportedLibrettoWorkflow | undefined;
   if (config.workflow) {
     try {
       loadedWorkflow = await loadDefaultWorkflow(
@@ -734,12 +808,24 @@ async function main(): Promise<void> {
   if (config.workflow) {
     void waitForSessionState(config.session)
       .then(() =>
-        daemon.runWorkflow({ workflow: config.workflow!, headed, loadedWorkflow }),
+        daemon.startWorkflow({
+          workflow: config.workflow!,
+          headed,
+          loadedWorkflow,
+        }),
       )
       .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
         daemon.logger.error("workflow-failed", {
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
         });
+        return daemon
+          .broadcast("workflowFinished", {
+            result: "failed" as const,
+            message,
+            phase: "setup" as const,
+          })
+          .finally(() => daemon.shutdown("workflow-start-failed", true));
       });
   }
 

@@ -999,7 +999,7 @@ export default workflow("main", async (ctx) => {
     expect(paused.stdout).toContain("Workflow paused.");
 
     const resumed = await librettoCli(`resume --session ${session}`);
-    expect(resumed.stdout).toContain(`Resume signal sent for session "${session}".`);
+    expect(resumed.stdout).toContain(`Resume requested for session "${session}".`);
     expect(resumed.stdout).toContain("WORKFLOW_AFTER_RESUME");
     expect(resumed.stdout).toContain("Integration completed.");
     expect(resumed.stdout).toContain("Browser closed");
@@ -1007,6 +1007,46 @@ export default workflow("main", async (ctx) => {
 
     const pages = await librettoCli(`pages --session ${session}`);
     expectMissingSessionError(pages.stderr, session);
+  }, 45_000);
+
+  test("resume waits for a second pause before completing on the next resume", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "pause-twice-resume";
+    const integrationFilePath = await writeWorkflow(
+      "integration-pause-twice-resume.mjs",
+      `
+export default workflow("main", async (ctx) => {
+  console.log("WORKFLOW_BEFORE_FIRST_PAUSE");
+  await pause(ctx.session);
+  console.log("WORKFLOW_BEFORE_SECOND_PAUSE");
+  await pause(ctx.session);
+  console.log("WORKFLOW_AFTER_SECOND_RESUME");
+});
+`,
+      ["workflow", "pause"],
+    );
+
+    const paused = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless`,
+    );
+    expect(paused.stdout).toContain("WORKFLOW_BEFORE_FIRST_PAUSE");
+    expect(paused.stdout).toContain("Workflow paused.");
+    expect(paused.stdout).not.toContain("WORKFLOW_BEFORE_SECOND_PAUSE");
+    expect(paused.stdout).not.toContain("Integration completed.");
+
+    const pausedAgain = await librettoCli(`resume --session ${session}`);
+    expect(pausedAgain.stdout).toContain("WORKFLOW_BEFORE_SECOND_PAUSE");
+    expect(pausedAgain.stdout).toContain("Workflow paused.");
+    expect(pausedAgain.stdout).not.toContain("WORKFLOW_AFTER_SECOND_RESUME");
+    expect(pausedAgain.stdout).not.toContain("Integration completed.");
+
+    const completed = await librettoCli(`resume --session ${session}`);
+    expect(completed.stdout).toContain("WORKFLOW_AFTER_SECOND_RESUME");
+    expect(completed.stdout).toContain("Integration completed.");
+    expect(completed.stdout).toContain("Browser closed");
+    expect(completed.stderr).toBe("");
   }, 45_000);
 
   test("resume keeps browser open after paused stay-open run completes", async ({
@@ -1047,7 +1087,7 @@ export default workflow("main", async (ctx) => {
     expect(pages.stdout).toContain("Open pages:");
   }, 45_000);
 
-  test("pause reports running sessions when session id is missing", async ({
+  test("pause reports ctx.session guidance when session id is missing", async ({
     librettoCli,
     writeWorkflow,
   }) => {
@@ -1067,8 +1107,32 @@ export default workflow("main", async () => {
     expect(result.stderr).toContain(
       "pause(session) requires a non-empty session ID.",
     );
-    expect(result.stderr).toContain("Running sessions:");
-    expect(result.stderr).toContain("pause-test");
+    expect(result.stderr).toContain("pause(ctx.session)");
+    expect(result.stderr).toContain("libretto status");
+  }, 45_000);
+
+  test("pause reports workflow runtime guidance outside an active workflow", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const integrationFilePath = await writeWorkflow(
+      "integration-pause-outside-runtime.mjs",
+      `
+await pause("outside-runtime");
+
+export default workflow("main", async () => {});
+`,
+      ["workflow", "pause"],
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session pause-outside-runtime --headless`,
+    );
+    expect(result.stderr).toContain(
+      "pause(session) can only suspend an active Libretto workflow.",
+    );
+    expect(result.stderr).toContain("libretto run <integrationFile>");
+    expect(result.stderr).toContain("pause(ctx.session)");
   }, 45_000);
 
   test("completes workflow run when no pause is triggered", async ({
@@ -1080,6 +1144,7 @@ export default workflow("main", async () => {
       `
 export default workflow("main", async () => {
   console.log("WORKFLOW_COMPLETES");
+  console.error("WORKFLOW_STDERR_COMPLETES");
 });
 `,
     );
@@ -1089,6 +1154,7 @@ export default workflow("main", async () => {
     );
     expect(result.stdout).toContain("WORKFLOW_COMPLETES");
     expect(result.stdout).toContain("Integration completed.");
+    expect(result.stderr).toContain("WORKFLOW_STDERR_COMPLETES");
     expect(result.stdout).not.toContain("Workflow paused.");
   }, 45_000);
 
