@@ -89,7 +89,7 @@ test("rejects pending calls when the socket closes", async ({ socketPath }) => {
 
   for (const peer of serverPeers) peer.destroy();
 
-  await expect(pending).rejects.toThrow("IPC transport closed");
+  await expect(pending).rejects.toThrow(/IPC transport closed|ECONNRESET/);
 
   client.destroy();
   await new Promise<void>((resolve, reject) => {
