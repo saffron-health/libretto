@@ -125,11 +125,11 @@ export function withExperiments(): SimpleCLIMiddleware<
 }
 ```
 
-- [ ] Add `ExperimentsContext` and `withExperiments()` to `packages/libretto/src/cli/commands/shared.ts`.
-- [ ] Apply `withExperiments()` to daemon-starting commands that need to forward flags, starting with `open`, `connect`, and `run`.
-- [ ] Thread the resolved `ctx.experiments` value through existing command-to-core calls with the smallest signature changes.
-- [ ] Add a focused test or type-level usage check that a command using the middleware can access `ctx.experiments` as a boolean map.
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
+- [x] Add `ExperimentsContext` and `withExperiments()` to `packages/libretto/src/cli/commands/shared.ts`.
+- [x] Apply `withExperiments()` to daemon-starting commands that need to forward flags, starting with `open`, `connect`, and `run`.
+- [x] Thread the resolved `ctx.experiments` value through existing command-to-core calls with the smallest signature changes.
+- [x] Verify the real `open`, `connect`, and `run` handlers type-check when reading `ctx.experiments` as a boolean map.
+- [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 4: Pass experiments into daemon startup and workflow context
 

@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { createServer } from "node:net";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
+import type { Experiments } from "./experiments.js";
 import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import { librettoCommand } from "../../shared/package-manager.js";
@@ -398,6 +399,7 @@ export async function runOpen(
     viewport?: { width: number; height: number };
     accessMode?: SessionAccessMode;
     authProfileDomain?: string;
+    experiments?: Experiments;
   },
 ): Promise<void> {
   const parsedUrl = normalizeUrl(rawUrl);
@@ -514,6 +516,7 @@ export async function runOpenWithProvider(
   session: string,
   logger: LoggerApi,
   accessMode: SessionAccessMode = "write-access",
+  experiments?: Experiments,
 ): Promise<void> {
   const parsedUrl = normalizeUrl(rawUrl);
   const url = parsedUrl.href;
@@ -1173,6 +1176,7 @@ export async function runConnect(
   session: string,
   logger: LoggerApi,
   accessMode: SessionAccessMode = "write-access",
+  experiments?: Experiments,
 ): Promise<void> {
   logger.info("connect-start", { cdpUrl, session, accessMode });
   assertSessionAvailableForStart(session, logger);

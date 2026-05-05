@@ -46,11 +46,13 @@ import {
   wrapPageForActionLogging,
 } from "../core/telemetry.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
+import type { Experiments } from "../core/experiments.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   pageOption,
   sessionOption,
   withAutoSession,
+  withExperiments,
   withRequiredSession,
 } from "./shared.js";
 
@@ -66,6 +68,7 @@ type RunIntegrationCommandRequest = {
   providerName?: string;
   stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
+  experiments: Experiments;
 };
 type ExecMode = "exec" | "readonly-exec";
 
@@ -839,6 +842,7 @@ export const runCommand = SimpleCLI.command({
 })
   .input(runInput)
   .use(withAutoSession())
+  .use(withExperiments())
   .handle(async ({ input, ctx }) => {
     warnIfInstalledSkillOutOfDate();
     await stopExistingFailedRunSession(ctx.session, ctx.logger);
@@ -881,6 +885,7 @@ export const runCommand = SimpleCLI.command({
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
         providerName: daemonProviderName,
         stayOpenOnSuccess: input.stayOpenOnSuccess,
+        experiments: ctx.experiments,
       },
       ctx.logger,
     );
