@@ -324,9 +324,9 @@ class BrowserDaemon {
 }
 ```
 
-- [ ] After resuming, wait for daemon workflow events and keep existing behavior for completion, failure, second pause, and `--stay-open-on-success`.
-- [ ] Add behavior coverage for a workflow that pauses twice: initial `run` reports `Workflow paused.`, first `resume` reports `Workflow paused.`, second `resume` reports `Integration completed.`.
-- [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` passes.
+- [x] After resuming, wait for daemon workflow events and keep existing behavior for completion, failure, second pause, and `--stay-open-on-success`.
+- [x] Add behavior coverage for a workflow that pauses twice: initial `run` reports `Workflow paused.`, first `resume` reports `Workflow paused.`, second `resume` reports `Integration completed.`.
+- [x] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` passes.
 
 ### Phase 8: Decouple the shared pause primitive from CLI internals
 

@@ -1009,6 +1009,46 @@ export default workflow("main", async (ctx) => {
     expectMissingSessionError(pages.stderr, session);
   }, 45_000);
 
+  test("resume waits for a second pause before completing on the next resume", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "pause-twice-resume";
+    const integrationFilePath = await writeWorkflow(
+      "integration-pause-twice-resume.mjs",
+      `
+export default workflow("main", async (ctx) => {
+  console.log("WORKFLOW_BEFORE_FIRST_PAUSE");
+  await pause(ctx.session);
+  console.log("WORKFLOW_BEFORE_SECOND_PAUSE");
+  await pause(ctx.session);
+  console.log("WORKFLOW_AFTER_SECOND_RESUME");
+});
+`,
+      ["workflow", "pause"],
+    );
+
+    const paused = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless`,
+    );
+    expect(paused.stdout).toContain("WORKFLOW_BEFORE_FIRST_PAUSE");
+    expect(paused.stdout).toContain("Workflow paused.");
+    expect(paused.stdout).not.toContain("WORKFLOW_BEFORE_SECOND_PAUSE");
+    expect(paused.stdout).not.toContain("Integration completed.");
+
+    const pausedAgain = await librettoCli(`resume --session ${session}`);
+    expect(pausedAgain.stdout).toContain("WORKFLOW_BEFORE_SECOND_PAUSE");
+    expect(pausedAgain.stdout).toContain("Workflow paused.");
+    expect(pausedAgain.stdout).not.toContain("WORKFLOW_AFTER_SECOND_RESUME");
+    expect(pausedAgain.stdout).not.toContain("Integration completed.");
+
+    const completed = await librettoCli(`resume --session ${session}`);
+    expect(completed.stdout).toContain("WORKFLOW_AFTER_SECOND_RESUME");
+    expect(completed.stdout).toContain("Integration completed.");
+    expect(completed.stdout).toContain("Browser closed");
+    expect(completed.stderr).toBe("");
+  }, 45_000);
+
   test("resume keeps browser open after paused stay-open run completes", async ({
     librettoCli,
     writeWorkflow,
