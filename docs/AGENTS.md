@@ -1,5 +1,7 @@
 # Documentation Site (Mintlify)
 
+This top-level `docs/` directory is the user-facing Mintlify documentation site. Put internal implementation notes and maintainer references under the relevant package instead, such as `packages/libretto/docs/`.
+
 Config in `docs.json`. Preview with `pnpm docs:dev` (runs on `localhost:3000`).
 
 ## Sidebar group name must match the URL
