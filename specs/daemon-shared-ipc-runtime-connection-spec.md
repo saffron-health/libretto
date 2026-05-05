@@ -355,21 +355,21 @@ Use the same connection for controlled shutdown, especially provider-backed sess
 
 ```ts
 type CliToDaemonApi = {
-  close(args?: { closeBrowser?: boolean }): { replayUrl?: string };
+  close(): { replayUrl?: string };
 };
 
 async function closeDaemonSession(state: SessionState) {
   const client = await DaemonClient.connect(state.daemonSocketPath);
-  return client.close({ closeBrowser: true });
+  return client.close();
 }
 ```
 
-- [ ] Add `close()` to the typed daemon API and implement it through `BrowserDaemon.shutdown`.
-- [ ] Update `runClose` to close daemon-backed sessions through daemon `close()`.
-- [ ] Return provider replay URL from `close()` when available.
-- [ ] Preserve explicit `--force` behavior for daemon processes that do not respond within the existing close timeout.
-- [ ] Add behavior coverage that `close --session <name>` still reports `Browser closed` for a daemon-backed local session.
-- [ ] Verify `pnpm -s test --filter=libretto -- stateful.spec.ts daemon-ipc.spec.ts` passes.
+- [x] Add `close()` to the typed daemon API and implement it through `BrowserDaemon.shutdown`.
+- [x] Update `runClose` to close daemon-backed sessions through daemon `close()`.
+- [x] Return provider replay URL from `close()` when available.
+- [x] Preserve explicit `--force` behavior for daemon processes that do not respond within the existing close timeout.
+- [x] Add behavior coverage that `close --session <name>` still reports `Browser closed` for a daemon-backed local session.
+- [x] Verify `pnpm -s test --filter=libretto -- stateful.spec.ts daemon-ipc.spec.ts` passes.
 
 ### Phase 10: Remove signal-file control flow and stale path helpers
 

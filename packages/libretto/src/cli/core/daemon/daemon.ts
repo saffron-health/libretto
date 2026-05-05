@@ -49,6 +49,7 @@ import type { ExportedLibrettoWorkflow } from "../../../shared/workflow/workflow
 import {
   getDaemonSocketPath,
   type CliToDaemonApi,
+  type DaemonCloseResult,
   type DaemonExecOutput,
   type DaemonExecResult,
   type DaemonToCliApi,
@@ -86,6 +87,8 @@ function isOperationalPage(page: Page): boolean {
 
 type TelemetryEntry = Record<string, unknown>;
 type ErrorWithOutput = Error & { output?: DaemonExecOutput };
+type ShutdownOptions = { keepIpcClientsAlive?: boolean };
+type ShutdownHandler = (options: ShutdownOptions) => Promise<void> | void;
 
 async function waitForSessionState(session: string): Promise<void> {
   const deadline = Date.now() + 2_000;
@@ -150,9 +153,10 @@ class BrowserDaemon {
   readonly logger: LoggerApi;
   private readonly execState: Record<string, unknown> = {};
   private readonly pageById = new Map<string, Page>();
-  private readonly shutdownHandlers: Array<() => Promise<void> | void> = [];
+  private readonly shutdownHandlers: ShutdownHandler[] = [];
   private readonly connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
   private workflowController: WorkflowController | undefined;
+  private shutdownPromise: Promise<DaemonCloseResult> | undefined;
 
   private constructor(
     private readonly session: string,
@@ -169,8 +173,6 @@ class BrowserDaemon {
   ) {
     this.logger = logger.withScope("child");
   }
-
-  private shuttingDown = false;
 
   private trackPage(page: Page): string {
     const id = `page-${Math.random().toString(36).slice(2, 5)}`;
@@ -288,11 +290,13 @@ class BrowserDaemon {
       });
       daemon.connectedClis.add(cli);
     });
-    daemon.registerShutdownHandler(async () => {
-      for (const cli of daemon.connectedClis) {
-        cli.destroy();
+    daemon.registerShutdownHandler(async (options) => {
+      if (!options.keepIpcClientsAlive) {
+        for (const cli of daemon.connectedClis) {
+          cli.destroy();
+        }
+        daemon.connectedClis.clear();
       }
-      daemon.connectedClis.clear();
       await new Promise<void>((resolve, reject) => {
         ipcServer.close((error) => (error ? reject(error) : resolve()));
       });
@@ -472,58 +476,87 @@ class BrowserDaemon {
 
   // ── Lifecycle ──────────────────────────────────────────────────────
 
-  registerShutdownHandler(handler: () => Promise<void> | void): void {
+  registerShutdownHandler(handler: ShutdownHandler): void {
     this.shutdownHandlers.push(handler);
   }
 
-  async shutdown(reason: string, closeBrowser: boolean): Promise<void> {
-    if (this.shuttingDown) return;
-    this.shuttingDown = true;
-    this.logger.info(reason, { session: this.session });
-    for (const handler of this.shutdownHandlers) {
-      await handler();
-    }
-    if (closeBrowser) {
-      if (this.externallyManaged) {
-        // Drop the CDP pipe without killing the external browser.
-        try {
-          (
-            this.browser as unknown as {
-              _connection?: { close(): void };
-            }
-          )._connection?.close();
-        } catch {
-          // Connection may already be closed.
+  shutdown(
+    reason: string,
+    closeBrowser: boolean,
+    options: ShutdownOptions = {},
+  ): Promise<DaemonCloseResult> {
+    if (this.shutdownPromise) return this.shutdownPromise;
+    this.shutdownPromise = this.performShutdown(reason, closeBrowser, options);
+    return this.shutdownPromise;
+  }
+
+  private async performShutdown(
+    reason: string,
+    closeBrowser: boolean,
+    options: ShutdownOptions,
+  ): Promise<DaemonCloseResult> {
+    let replayUrl: string | undefined;
+    try {
+      this.logger.info(reason, { session: this.session });
+      for (const handler of this.shutdownHandlers) {
+        await handler(options);
+      }
+      if (closeBrowser) {
+        if (this.externallyManaged) {
+          // Playwright does not expose a public "detach from this CDP browser"
+          // API. Closing the private connection lets the daemon's event loop
+          // drain without asking Playwright to close the externally managed
+          // browser/provider session itself.
+          try {
+            (
+              this.browser as unknown as {
+                _connection?: { close(): void };
+              }
+            )._connection?.close();
+          } catch {
+            // Connection may already be closed.
+          }
+        } else {
+          await this.browser.close();
         }
-      } else {
-        await this.browser.close();
       }
-    }
-    if (this.providerSession) {
-      const result = await this.providerSession.provider.closeSession(
-        this.providerSession.sessionId,
-      );
-      if (result.replayUrl) {
-        this.logger.info("provider-recording", {
-          session: this.session,
-          provider: this.providerSession.name,
-          sessionId: this.providerSession.sessionId,
-          replayUrl: result.replayUrl,
-        });
-      }
-      writeFileSync(
-        getSessionProviderClosePath(this.session),
-        JSON.stringify(
-          {
+      if (this.providerSession) {
+        const result = await this.providerSession.provider.closeSession(
+          this.providerSession.sessionId,
+        );
+        replayUrl = result.replayUrl;
+        if (result.replayUrl) {
+          this.logger.info("provider-recording", {
+            session: this.session,
             provider: this.providerSession.name,
             sessionId: this.providerSession.sessionId,
             replayUrl: result.replayUrl,
-          },
-          null,
-          2,
-        ),
-        "utf8",
-      );
+          });
+        }
+        writeFileSync(
+          getSessionProviderClosePath(this.session),
+          JSON.stringify(
+            {
+              provider: this.providerSession.name,
+              sessionId: this.providerSession.sessionId,
+              replayUrl: result.replayUrl,
+            },
+            null,
+            2,
+          ),
+          "utf8",
+        );
+      }
+      return replayUrl ? { replayUrl } : {};
+    } finally {
+      if (options.keepIpcClientsAlive) {
+        setImmediate(() => {
+          for (const cli of this.connectedClis) {
+            cli.destroy();
+          }
+          this.connectedClis.clear();
+        });
+      }
     }
   }
 
@@ -569,7 +602,21 @@ class BrowserDaemon {
         ),
       getWorkflowStatus: () => this.getWorkflowStatus(),
       resumeWorkflow: () => this.resumeWorkflow(),
+      close: () => this.closeFromIpc(),
     };
+  }
+
+  private async closeFromIpc(): Promise<DaemonCloseResult> {
+    if (this.providerSession) {
+      return this.shutdown("ipc-close", true, {
+        keepIpcClientsAlive: true,
+      });
+    }
+
+    setImmediate(() => {
+      void this.shutdown("ipc-close", true);
+    });
+    return {};
   }
 
   private async withRequestTimeout<T>(

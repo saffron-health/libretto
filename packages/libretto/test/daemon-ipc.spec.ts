@@ -38,6 +38,18 @@ describe("daemon IPC", () => {
     expect(pages.stdout).toContain("pages.html");
   }, 45_000);
 
+  test("close reports Browser closed for a daemon-backed local session", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-close";
+    const url = await writeFixturePage(workspacePath, "close", "Close Test");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const close = await librettoCli(`close --session ${session}`);
+    expect(close.stdout).toContain(`Browser closed (session: ${session}).`);
+  }, 45_000);
+
   test("exec returns values through daemon IPC", async ({
     librettoCli,
     workspacePath,

@@ -38,6 +38,8 @@ export type DaemonSnapshotResult = {
   title: string;
 };
 
+export type DaemonCloseResult = { replayUrl?: string };
+
 export type DaemonCommandResult<T> =
   | { ok: true; data: T }
   | { ok: false; message: string; output?: DaemonExecOutput };
@@ -52,6 +54,7 @@ export type CliToDaemonApi = {
   snapshot(args: DaemonSnapshotArgs): DaemonSnapshotResult;
   getWorkflowStatus(): WorkflowStatus;
   resumeWorkflow(): void;
+  close(): DaemonCloseResult;
 };
 
 export type DaemonToCliApi = {
@@ -380,5 +383,13 @@ export class DaemonClient {
 
   async resumeWorkflow(): Promise<void> {
     await this.ipc.call.resumeWorkflow();
+  }
+
+  async close(): Promise<DaemonCloseResult> {
+    return this.ipc.call.close();
+  }
+
+  destroy(): void {
+    this.ipc.destroy();
   }
 }
