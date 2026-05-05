@@ -394,8 +394,6 @@ type Deferred<T> = {
   resolve(value: T): void;
 };
 
-const WORKFLOW_OUTCOME_TIMEOUT_MS = 10 * 60 * 1000;
-
 function createDeferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((resolvePromise) => {
@@ -435,7 +433,6 @@ async function waitForWorkflowOutcome(
   outcomePromise: Promise<WorkflowOutcome>,
 ): Promise<WorkflowOutcome> {
   let processExitInterval: ReturnType<typeof setInterval> | undefined;
-  let timeout: ReturnType<typeof setTimeout> | undefined;
 
   const processExitPromise = new Promise<WorkflowOutcome>((resolve) => {
     if (pid <= 0 || !isProcessRunning(pid)) {
@@ -450,27 +447,10 @@ async function waitForWorkflowOutcome(
     }, 250);
   });
 
-  const timeoutPromise = new Promise<WorkflowOutcome>((resolve) => {
-    timeout = setTimeout(
-      () =>
-        resolve({
-          status: "exited",
-          message:
-            "Workflow did not report completion or pause within 10 minutes.",
-        }),
-      WORKFLOW_OUTCOME_TIMEOUT_MS,
-    );
-  });
-
   try {
-    return await Promise.race([
-      outcomePromise,
-      processExitPromise,
-      timeoutPromise,
-    ]);
+    return await Promise.race([outcomePromise, processExitPromise]);
   } finally {
     if (processExitInterval) clearInterval(processExitInterval);
-    if (timeout) clearTimeout(timeout);
   }
 }
 
