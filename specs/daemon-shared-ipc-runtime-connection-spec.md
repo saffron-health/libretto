@@ -375,9 +375,9 @@ async function closeDaemonSession(state: SessionState) {
 
 Delete the signal-file code after all daemon workflow communication goes through IPC. Leave durable session state and normal logs intact.
 
-- [ ] Remove unused code from `packages/libretto/src/cli/core/pause-signals.ts` or delete the file if no imports remain.
-- [ ] Remove pause signal path helpers from `packages/libretto/src/shared/paths/paths.ts` if they are no longer used.
-- [ ] Remove signal cleanup, `streamOutputSince`, `readFailureDetails`, and signal polling helpers from `packages/libretto/src/cli/commands/execution.ts`.
-- [ ] Ensure tests do not assert internal `.libretto` file layout or signal-file existence.
-- [ ] Run `rg "pausedSignal|resumeSignal|completedSignal|failedSignal|outputSignal|getPauseSignalPaths|\.resume|\.paused" packages/libretto/src packages/libretto/test` and confirm only intentional documentation or migration notes remain.
-- [ ] Verify `pnpm -s test --filter=libretto` and `pnpm -s type-check --filter=libretto` pass.
+- [x] Remove unused code from `packages/libretto/src/cli/core/pause-signals.ts` or delete the file if no imports remain.
+- [x] Remove pause signal path helpers from `packages/libretto/src/shared/paths/paths.ts` if they are no longer used.
+- [x] Remove signal cleanup, `streamOutputSince`, `readFailureDetails`, and signal polling helpers from `packages/libretto/src/cli/commands/execution.ts`.
+- [x] Ensure tests do not assert internal `.libretto` file layout or signal-file existence.
+- [x] Run `rg "pausedSignal|resumeSignal|completedSignal|failedSignal|outputSignal|getPauseSignalPaths|\.resume|\.paused" packages/libretto/src packages/libretto/test` and confirm only intentional documentation or migration notes remain.
+- [x] Verify `pnpm -s test --filter=libretto` and `pnpm -s type-check --filter=libretto` pass.
