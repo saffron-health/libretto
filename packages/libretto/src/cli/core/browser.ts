@@ -1044,7 +1044,7 @@ export async function runCloseAll(
             pid: target.pid,
             error: closeError.message,
           });
-          return;
+          if (!force) return;
         }
       }
 

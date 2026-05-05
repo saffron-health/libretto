@@ -297,6 +297,17 @@ class BrowserDaemon {
         }
         daemon.connectedClis.clear();
       }
+      if (options.keepIpcClientsAlive) {
+        ipcServer.close((error) => {
+          if (error) {
+            daemon.logger.warn("ipc-server-close-failed", {
+              session,
+              error,
+            });
+          }
+        });
+        return;
+      }
       await new Promise<void>((resolve, reject) => {
         ipcServer.close((error) => (error ? reject(error) : resolve()));
       });

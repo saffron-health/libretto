@@ -505,20 +505,20 @@ async function runResume(
     );
   }
 
-  const status = await client.getWorkflowStatus();
-  if (status.state !== "paused") {
-    throw new Error(
-      `Session "${session}" is not paused. Run "${librettoCommand(`run ... --session ${session}`)}" and call pause("${session}") first.`,
-    );
-  }
-
-  setSessionStatus(session, "active", logger);
-
-  await client.resumeWorkflow();
-  console.log(`Resume requested for session "${session}".`);
-
   let outcome: WorkflowOutcome;
   try {
+    const status = await client.getWorkflowStatus();
+    if (status.state !== "paused") {
+      throw new Error(
+        `Session "${session}" is not paused. Run "${librettoCommand(`run ... --session ${session}`)}" and call pause("${session}") first.`,
+      );
+    }
+
+    setSessionStatus(session, "active", logger);
+
+    await client.resumeWorkflow();
+    console.log(`Resume requested for session "${session}".`);
+
     outcome = await waitForWorkflowOutcome(
       sessionState.pid!,
       workflowOutcome.promise,
