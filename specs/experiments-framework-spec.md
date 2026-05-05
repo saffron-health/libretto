@@ -131,9 +131,9 @@ export function withExperiments(): SimpleCLIMiddleware<
 - [x] Verify the real `open`, `connect`, and `run` handlers type-check when reading `ctx.experiments` as a boolean map.
 - [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
-### Phase 4: Pass experiments into daemon startup and workflow context
+### Phase 4: Pass experiments into daemon startup
 
-Serialize the resolved experiment snapshot in `DaemonConfig` so new daemon sessions receive the same flags as the CLI invocation that created them. Expose the snapshot on workflow context so daemon-hosted workflows can branch on flags.
+Serialize the resolved experiment snapshot in `DaemonConfig` so new daemon sessions receive the same flags as the CLI invocation that created them. Store the snapshot inside daemon internals for Libretto machinery only; do not expose experiments to user workflows.
 
 ```ts
 export type DaemonConfig = {
@@ -145,17 +145,11 @@ export type DaemonConfig = {
     | DaemonBrowserProviderConfig;
   workflow?: DaemonWorkflowConfig;
 };
-
-const workflowContext: LibrettoWorkflowContext = {
-  session: this.config.session,
-  page: this.config.page,
-  experiments: this.config.experiments,
-};
 ```
 
-- [ ] Add `experiments: Experiments` to `DaemonConfig` in `packages/libretto/src/cli/core/daemon/config.ts`.
-- [ ] Pass experiments in every `DaemonClient.spawn({ config })` call used by `open`, `connect`, provider-backed open, and `run`.
-- [ ] Store experiments on `BrowserDaemon` or `WorkflowControllerConfig`, whichever creates the smallest path to workflow context.
-- [ ] Extend `LibrettoWorkflowContext` in `packages/libretto/src/shared/workflow/workflow.ts` with `experiments: Experiments`.
-- [ ] Add a daemon/workflow test that enables a registered experiment, runs a workflow, and asserts the workflow can observe `ctx.experiments[experimentName] === true`.
-- [ ] Verify `pnpm -s test --filter=libretto` passes.
+- [x] Add `experiments: Experiments` to `DaemonConfig` in `packages/libretto/src/cli/core/daemon/config.ts`.
+- [x] Pass experiments in every `DaemonClient.spawn({ config })` call used by `open`, `connect`, provider-backed open, and `run`.
+- [x] Store experiments on `BrowserDaemon` for internal Libretto daemon machinery.
+- [x] Keep `LibrettoWorkflowContext` free of experiments; workflows should not receive feature flag internals.
+- [x] Add a daemon/workflow regression test that enables a registered experiment, runs a workflow, and asserts the workflow context does not expose experiments.
+- [x] Verify `pnpm -s test --filter=libretto` passes.

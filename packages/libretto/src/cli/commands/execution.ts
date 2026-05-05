@@ -577,6 +577,7 @@ async function runIntegrationFromFile(
   } = await DaemonClient.spawn({
     config: {
       session: args.session,
+      experiments: args.experiments,
       browser: args.providerName
         ? { kind: "provider", providerName: args.providerName }
         : {

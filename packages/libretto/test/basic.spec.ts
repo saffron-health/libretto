@@ -456,6 +456,28 @@ describe("basic CLI subprocess behavior", () => {
     expect(unknown.stderr).toContain("exampleExperiment");
   });
 
+  test("run does not expose enabled experiments to workflow context", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    await librettoCli("experiments enable exampleExperiment");
+    const integrationFilePath = await writeWorkflow(
+      "integration-experiment-context.mjs",
+      `
+export default workflow("main", async (ctx) => {
+  console.log("EXPERIMENTS_CONTEXT_TYPE", typeof ctx.experiments);
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session experiment-context-test --headless`,
+    );
+    expect(result.stdout).toContain("EXPERIMENTS_CONTEXT_TYPE undefined");
+    expect(result.stdout).toContain("Integration completed.");
+    expect(result.stderr).toBe("");
+  }, 45_000);
+
   test("fails unknown command with a clear error", async ({ librettoCli }) => {
     const result = await librettoCli("nope-command");
     expect(result.stderr).toContain("Unknown command: nope-command");

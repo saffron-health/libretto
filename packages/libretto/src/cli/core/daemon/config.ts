@@ -4,6 +4,8 @@
  * Serialized as JSON in `process.argv[2]` when spawning the daemon.
  */
 
+import type { Experiments } from "../experiments.js";
+
 /**
  * Config for daemon-managed browser launch (`libretto open`).
  * The daemon owns the browser lifecycle and will close it on shutdown.
@@ -51,6 +53,7 @@ export type DaemonWorkflowConfig = {
 
 export type DaemonConfig = {
   session: string;
+  experiments: Experiments;
   browser:
     | DaemonBrowserLaunchConfig
     | DaemonBrowserConnectConfig
