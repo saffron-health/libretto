@@ -34,7 +34,11 @@ import {
   compileExecFunction,
   stripEmptyCatchHandlers,
 } from "../core/exec-compiler.js";
-import { DaemonClient, type DaemonToCliApi } from "../core/daemon/ipc.js";
+import {
+  DaemonClient,
+  type DaemonExecResult,
+  type DaemonToCliApi,
+} from "../core/daemon/ipc.js";
 import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
 import {
   readActionLog,
@@ -102,18 +106,22 @@ async function execViaDaemon(
   });
 
   const client = await DaemonClient.connect(daemonSocketPath);
-
-  const response =
-    mode === "exec"
-      ? await client.exec({
-          code: cleanedCode,
-          pageId: options.pageId,
-          visualize: options.visualize,
-        })
-      : await client.readonlyExec({
-          code: cleanedCode,
-          pageId: options.pageId,
-        });
+  let response: DaemonExecResult;
+  try {
+    response =
+      mode === "exec"
+        ? await client.exec({
+            code: cleanedCode,
+            pageId: options.pageId,
+            visualize: options.visualize,
+          })
+        : await client.readonlyExec({
+            code: cleanedCode,
+            pageId: options.pageId,
+          });
+  } finally {
+    client.destroy();
+  }
 
   if (!response.ok) {
     writeDaemonExecOutput(response.output);
@@ -509,10 +517,15 @@ async function runResume(
   await client.resumeWorkflow();
   console.log(`Resume requested for session "${session}".`);
 
-  const outcome = await waitForWorkflowOutcome(
-    sessionState.pid!,
-    workflowOutcome.promise,
-  );
+  let outcome: WorkflowOutcome;
+  try {
+    outcome = await waitForWorkflowOutcome(
+      sessionState.pid!,
+      workflowOutcome.promise,
+    );
+  } finally {
+    client.destroy();
+  }
 
   if (outcome.status === "completed") {
     setSessionStatus(session, "completed", logger);
@@ -578,6 +591,7 @@ async function runIntegrationFromFile(
     pid,
     socketPath: daemonSocketPath,
     provider,
+    client,
   } = await DaemonClient.spawn({
     config: {
       session: args.session,
@@ -625,7 +639,12 @@ async function runIntegrationFromFile(
     console.log(`View live session: ${provider.liveViewUrl}`);
   }
 
-  const outcome = await waitForWorkflowOutcome(pid, workflowOutcome.promise);
+  let outcome: WorkflowOutcome;
+  try {
+    outcome = await waitForWorkflowOutcome(pid, workflowOutcome.promise);
+  } finally {
+    client.destroy();
+  }
   if (outcome.status === "paused") {
     setSessionStatus(args.session, "paused", logger);
     console.log("Workflow paused.");

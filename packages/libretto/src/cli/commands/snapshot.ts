@@ -118,8 +118,13 @@ async function captureSnapshot(
 ): Promise<ScreenshotPair> {
   logger.info("snapshot-via-daemon", { session, pageId });
   const client = await DaemonClient.connect(daemonSocketPath);
-  const { pngPath, htmlPath, snapshotRunId, pageUrl, title } =
-    await client.snapshot({ pageId });
+  let snapshotResult: Awaited<ReturnType<DaemonClient["snapshot"]>>;
+  try {
+    snapshotResult = await client.snapshot({ pageId });
+  } finally {
+    client.destroy();
+  }
+  const { pngPath, htmlPath, snapshotRunId, pageUrl, title } = snapshotResult;
 
   // condenseDom runs in the CLI process, not the daemon.
   const htmlContent = readFileSync(htmlPath, "utf8");

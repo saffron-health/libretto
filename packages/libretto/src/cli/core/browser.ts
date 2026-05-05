@@ -332,7 +332,11 @@ export async function runPages(
     );
   }
   const client = await DaemonClient.connect(state.daemonSocketPath);
-  pageSummaries = await client.pages();
+  try {
+    pageSummaries = await client.pages();
+  } finally {
+    client.destroy();
+  }
 
   if (pageSummaries.length === 0) {
     console.log("No pages found.");
@@ -456,27 +460,29 @@ export async function runOpen(
   // Spawn daemon and wait for IPC readiness. The daemon launches
   // Chromium internally — IPC readiness implies the browser is up,
   // so no separate CDP polling is needed.
-  const { pid, socketPath: daemonSocketPath } = await DaemonClient.spawn({
-    config: {
-      session,
-      browser: {
-        kind: "launch",
-        headed,
-        viewport,
-        storageStatePath: useProfile ? profilePath : undefined,
-        windowPosition,
-        remoteDebuggingPort: port,
-        initialUrl: url,
+  const { pid, socketPath: daemonSocketPath, client } =
+    await DaemonClient.spawn({
+      config: {
+        session,
+        browser: {
+          kind: "launch",
+          headed,
+          viewport,
+          storageStatePath: useProfile ? profilePath : undefined,
+          windowPosition,
+          remoteDebuggingPort: port,
+          initialUrl: url,
+        },
       },
-    },
-    logger,
-    logPath: runLogPath,
-    // The daemon launches Chromium, installs telemetry, navigates to
-    // the URL, and only then starts IPC. Navigation alone can take up
-    // to 45s (page.setDefaultNavigationTimeout), so the IPC timeout
-    // must cover launch + navigation.
-    startupTimeoutMs: 60_000,
-  });
+      logger,
+      logPath: runLogPath,
+      // The daemon launches Chromium, installs telemetry, navigates to
+      // the URL, and only then starts IPC. Navigation alone can take up
+      // to 45s (page.setDefaultNavigationTimeout), so the IPC timeout
+      // must cover launch + navigation.
+      startupTimeoutMs: 60_000,
+    });
+  client.destroy();
 
   writeSessionState(
     {
@@ -524,6 +530,7 @@ export async function runOpenWithProvider(
     pid,
     socketPath: daemonSocketPath,
     provider: providerSession,
+    client,
   } = await DaemonClient.spawn({
     config: {
       session,
@@ -538,6 +545,7 @@ export async function runOpenWithProvider(
     // Remote CDP connection + navigation; must cover both.
     startupTimeoutMs: 60_000,
   });
+  client.destroy();
 
   if (!providerSession) {
     throw new Error(
@@ -1249,7 +1257,12 @@ export async function runConnect(
   );
 
   // Query the daemon for discovered pages.
-  const pages = await client.pages();
+  let pages: OpenPageSummary[];
+  try {
+    pages = await client.pages();
+  } finally {
+    client.destroy();
+  }
 
   logger.info("connect-success", { cdpUrl: endpoint, session, port });
   console.log(`Connected to ${endpoint} (session: ${session})`);
