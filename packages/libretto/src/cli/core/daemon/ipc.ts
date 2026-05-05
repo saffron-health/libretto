@@ -54,7 +54,23 @@ export type CliToDaemonApi = {
   resumeWorkflow(): void;
 };
 
-export type DaemonToCliApi = Record<never, never>;
+export type DaemonToCliApi = {
+  workflowOutput(args: { stream: "stdout" | "stderr"; text: string }): void;
+  workflowPaused(args: { pausedAt: string; url?: string }): void;
+  workflowFinished(
+    args:
+      | { result: "completed"; completedAt: string }
+      | { result: "failed"; message: string; phase: "setup" | "workflow" },
+  ): void;
+};
+
+function createNoopDaemonToCliHandlers(): DaemonToCliApi {
+  return {
+    workflowOutput: () => {},
+    workflowPaused: () => {},
+    workflowFinished: () => {},
+  };
+}
 
 export class DaemonClientError extends Error {
   constructor(
@@ -103,6 +119,7 @@ export type DaemonClientSpawnOptions = {
   logger: LoggerApi;
   logPath: string;
   startupTimeoutMs: number;
+  handlers?: DaemonToCliApi;
   onFailure?: () => Promise<unknown>;
 };
 
@@ -151,17 +168,20 @@ export type DaemonResultMap = {
 export class DaemonClient {
   private constructor(private readonly ipc: IpcPeer<CliToDaemonApi>) {}
 
-  static async connect(socketPath: string): Promise<DaemonClient> {
+  static async connect(
+    socketPath: string,
+    handlers: DaemonToCliApi = createNoopDaemonToCliHandlers(),
+  ): Promise<DaemonClient> {
     const transport = await connectToIpcSocket(socketPath);
     return new DaemonClient(
-      createIpcPeer<CliToDaemonApi, DaemonToCliApi>(transport, {}),
+      createIpcPeer<CliToDaemonApi, DaemonToCliApi>(transport, handlers),
     );
   }
 
   static async spawn(
     options: DaemonClientSpawnOptions,
   ): Promise<DaemonClientSpawnResult> {
-    const { config, logger, logPath, startupTimeoutMs, onFailure } =
+    const { config, logger, logPath, startupTimeoutMs, handlers, onFailure } =
       options;
     const { session } = config;
 
@@ -240,7 +260,10 @@ export class DaemonClient {
       throw error;
     });
 
-    const client = await DaemonClient.connect(readyMessage.socketPath);
+    const client = await DaemonClient.connect(
+      readyMessage.socketPath,
+      handlers,
+    );
     const socketPath = readyMessage.socketPath;
     logger.info("daemon-ipc-ready", { session, socketPath });
     return { pid, socketPath, provider: readyMessage.provider, client };

@@ -298,14 +298,14 @@ function broadcastWorkflowOutcome(outcome: WorkflowOutcome) {
 }
 ```
 
-- [ ] Add optional CLI event handlers when constructing a daemon IPC client for `run` and `resume` paths.
-- [ ] Broadcast controller stdout/stderr events through `DaemonToCliApi.workflowOutput`.
-- [ ] Broadcast controller paused/completed/failed outcomes through `DaemonToCliApi`.
-- [ ] Update `waitForWorkflowOutcome` in `packages/libretto/src/cli/commands/execution.ts` to consume daemon events and process liveness instead of signal files.
-- [ ] Stop writing `.paused`, `.completed`, `.failed`, and `.output` files from controller callbacks once daemon events are wired.
-- [ ] Add or adjust behavior coverage where a workflow logs before completion and `librettoCli("run ...")` includes that output and `Integration completed.`.
-- [ ] Add behavior coverage for normal `pause(ctx.session)` flow where `librettoCli("run ...")` reports `Workflow paused.`.
-- [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts daemon-ipc.spec.ts` passes.
+- [x] Add optional CLI event handlers when constructing a daemon IPC client for `run` and `resume` paths.
+- [x] Broadcast controller stdout/stderr events through `DaemonToCliApi.workflowOutput`.
+- [x] Broadcast controller paused/completed/failed outcomes through `DaemonToCliApi`.
+- [x] Update `waitForWorkflowOutcome` in `packages/libretto/src/cli/commands/execution.ts` to consume daemon events and process liveness instead of signal files.
+- [x] Stop writing `.paused`, `.completed`, `.failed`, and `.output` files from controller callbacks once daemon events are wired.
+- [x] Add or adjust behavior coverage where a workflow logs before completion and `librettoCli("run ...")` includes that output and `Integration completed.`.
+- [x] Add behavior coverage for normal `pause(ctx.session)` flow where `librettoCli("run ...")` reports `Workflow paused.`.
+- [x] Verify `pnpm -s test --filter=libretto -- basic.spec.ts daemon-ipc.spec.ts` passes.
 
 ### Phase 7: Strengthen daemon resume behavior
 

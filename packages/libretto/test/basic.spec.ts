@@ -1080,6 +1080,7 @@ export default workflow("main", async () => {
       `
 export default workflow("main", async () => {
   console.log("WORKFLOW_COMPLETES");
+  console.error("WORKFLOW_STDERR_COMPLETES");
 });
 `,
     );
@@ -1089,6 +1090,7 @@ export default workflow("main", async () => {
     );
     expect(result.stdout).toContain("WORKFLOW_COMPLETES");
     expect(result.stdout).toContain("Integration completed.");
+    expect(result.stderr).toContain("WORKFLOW_STDERR_COMPLETES");
     expect(result.stdout).not.toContain("Workflow paused.");
   }, 45_000);
 

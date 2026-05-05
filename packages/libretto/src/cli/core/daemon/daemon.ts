@@ -24,7 +24,7 @@ import {
   type BrowserContext,
   type Page,
 } from "playwright";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
 import {
@@ -63,7 +63,6 @@ import {
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
-import { getPauseSignalPaths } from "../pause-signals.js";
 import { librettoCommand } from "../package-manager.js";
 import {
   type DaemonConfig,
@@ -78,10 +77,7 @@ import {
   getAbsoluteIntegrationPath,
   loadDefaultWorkflow,
 } from "../workflow-runtime.js";
-import {
-  WorkflowController,
-  type WorkflowOutcome,
-} from "../workflow-runner/runner.js";
+import { WorkflowController } from "../workflow-runner/runner.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -107,27 +103,6 @@ class UserFacingStartupError extends Error {
     super(message);
     this.name = "UserFacingStartupError";
   }
-}
-
-async function writeWorkflowFailureSignal(args: {
-  session: string;
-  message: string;
-  phase: "setup" | "workflow";
-}): Promise<void> {
-  const signalPaths = getPauseSignalPaths(args.session);
-  await writeFile(
-    signalPaths.failedSignalPath,
-    JSON.stringify(
-      {
-        failedAt: new Date().toISOString(),
-        message: args.message,
-        phase: args.phase,
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  );
 }
 
 function getMissingLocalAuthProfileError(args: {
@@ -176,6 +151,7 @@ class BrowserDaemon {
   private readonly execState: Record<string, unknown> = {};
   private readonly pageById = new Map<string, Page>();
   private readonly shutdownHandlers: Array<() => Promise<void> | void> = [];
+  private readonly connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
   private workflowController: WorkflowController | undefined;
 
   private constructor(
@@ -301,23 +277,22 @@ class BrowserDaemon {
       await page.goto(navigateUrl);
     }
 
-    const connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
     const ipcServer = createIpcSocketServer((transport) => {
       const cli = createIpcPeer<DaemonToCliApi, CliToDaemonApi>(
         transport,
         daemon.createIpcHandlers(),
       );
       const stopTracking = transport.onClose?.(() => {
-        connectedClis.delete(cli);
+        daemon.connectedClis.delete(cli);
         stopTracking?.();
       });
-      connectedClis.add(cli);
+      daemon.connectedClis.add(cli);
     });
     daemon.registerShutdownHandler(async () => {
-      for (const cli of connectedClis) {
+      for (const cli of daemon.connectedClis) {
         cli.destroy();
       }
-      connectedClis.clear();
+      daemon.connectedClis.clear();
       await new Promise<void>((resolve, reject) => {
         ipcServer.close((error) => (error ? reject(error) : resolve()));
       });
@@ -671,7 +646,6 @@ class BrowserDaemon {
       throw new Error("Workflow controller has already started.");
     }
 
-    const signalPaths = getPauseSignalPaths(this.session);
     this.workflowController = new WorkflowController({
       session: this.session,
       headed: args.headed,
@@ -679,14 +653,26 @@ class BrowserDaemon {
       context: this.context,
       logger: this.logger,
       onLog: (event) => {
-        appendFileSync(signalPaths.outputSignalPath, event.text);
+        this.broadcast("workflowOutput", event);
       },
       onOutcome: (outcome) => {
-        this.writeWorkflowOutcomeSignal(outcome).catch((error: unknown) => {
-          this.logger.warn("workflow-signal-write-failed", {
-            error: error instanceof Error ? error.message : String(error),
+        if (outcome.state === "paused") {
+          this.broadcast("workflowPaused", {
+            pausedAt: outcome.pausedAt,
+            url: outcome.url,
           });
-        });
+          return;
+        }
+        this.broadcast(
+          "workflowFinished",
+          outcome.result === "completed"
+            ? { result: "completed", completedAt: outcome.completedAt }
+            : {
+                result: "failed",
+                message: outcome.message,
+                phase: outcome.phase,
+              },
+        );
       },
     });
     this.workflowController.start({
@@ -708,36 +694,28 @@ class BrowserDaemon {
     this.workflowController.resume();
   }
 
-  private async writeWorkflowOutcomeSignal(
-    outcome: WorkflowOutcome,
+  async broadcast<Name extends keyof DaemonToCliApi>(
+    name: Name,
+    message: Parameters<DaemonToCliApi[Name]>[0],
   ): Promise<void> {
-    const signalPaths = getPauseSignalPaths(this.session);
-    if (outcome.state === "paused") {
-      await writeFile(
-        signalPaths.pausedSignalPath,
-        JSON.stringify(
-          {
-            sessionName: outcome.session,
-            pausedAt: outcome.pausedAt,
-            url: outcome.url ?? "unknown",
-          },
-          null,
-          2,
-        ),
-        "utf8",
-      );
-    } else if (outcome.result === "completed") {
-      await writeFile(
-        signalPaths.completedSignalPath,
-        JSON.stringify({ completedAt: outcome.completedAt }, null, 2),
-        "utf8",
-      );
-    } else {
-      await writeWorkflowFailureSignal({
-        session: this.session,
-        message: outcome.message,
-        phase: outcome.phase,
-      });
+    const results = await Promise.allSettled(
+      Array.from(this.connectedClis, (cli) => {
+        const call = cli.call[name] as (
+          message: Parameters<DaemonToCliApi[Name]>[0],
+        ) => Promise<void>;
+        return call(message);
+      }),
+    );
+    for (const result of results) {
+      if (result.status === "rejected") {
+        this.logger.warn("workflow-event-failed", {
+          event: name,
+          error:
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason),
+        });
+      }
     }
   }
 }
@@ -793,13 +771,13 @@ async function main(): Promise<void> {
         daemon.logger.error("workflow-failed", {
           error: message,
         });
-        void writeWorkflowFailureSignal({
-          session: config.session,
-          message,
-          phase: "setup",
-        }).finally(() => {
-          void daemon.shutdown("workflow-start-failed", true);
-        });
+        return daemon
+          .broadcast("workflowFinished", {
+            result: "failed" as const,
+            message,
+            phase: "setup" as const,
+          })
+          .finally(() => daemon.shutdown("workflow-start-failed", true));
       });
   }
 
