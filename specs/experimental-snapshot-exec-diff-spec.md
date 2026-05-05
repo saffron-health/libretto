@@ -69,10 +69,10 @@ export const EXPERIMENTS = {
 } as const;
 ```
 
-- [ ] Add `compactSnapshotFormat` to `packages/libretto/src/cli/core/experiments.ts` with `defaultValue: false`
-- [ ] Ensure `ExperimentName` and `Experiments` continue to infer from the registry without duplicated types
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes
-- [ ] Add or update a user-level experiment CLI test only if existing coverage does not already assert registry listing behavior
+- [x] Add `compactSnapshotFormat` to `packages/libretto/src/cli/core/experiments.ts` with `defaultValue: false`
+- [x] Ensure `ExperimentName` and `Experiments` continue to infer from the registry without duplicated types
+- [x] Verify `pnpm -s type-check --filter=libretto` passes
+- [x] Add or update a user-level experiment CLI test only if existing coverage does not already assert registry listing behavior
 
 ### Phase 2: Add the shared snapshot tree API
 

@@ -10,6 +10,12 @@ export const EXPERIMENTS = {
     description: "Example experiment flag for validating experiment plumbing.",
     defaultValue: false,
   },
+  compactSnapshotFormat: {
+    title: "Compact snapshot format",
+    description:
+      "Use compact accessibility snapshots and exec page-change diffs without an AI sub-agent.",
+    defaultValue: false,
+  },
 } as const satisfies Record<
   string,
   {
