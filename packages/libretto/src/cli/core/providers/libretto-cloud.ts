@@ -14,7 +14,7 @@ export function createLibrettoCloudProvider(): ProviderApi {
   return {
     async createSession() {
       const timeoutSeconds = Number(
-        process.env.LIBRETTO_TIMEOUT_SECONDS ?? 7200,
+        process.env.LIBRETTO_TIMEOUT_SECONDS ?? 5400,
       );
       const resp = await fetch(`${endpoint}/v1/sessions/create`, {
         method: "POST",
@@ -28,9 +28,7 @@ export function createLibrettoCloudProvider(): ProviderApi {
       });
       if (!resp.ok) {
         const body = await resp.text();
-        throw new Error(
-          `Libretto Cloud API error (${resp.status}): ${body}`,
-        );
+        throw new Error(`Libretto Cloud API error (${resp.status}): ${body}`);
       }
       const { json } = (await resp.json()) as {
         json: {
