@@ -265,19 +265,19 @@ export async function pause(session: string): Promise<void> {
 }
 ```
 
-- [ ] Add a small shared pause-handler module under `packages/libretto/src/shared/debug/` that stores the active handler and returns a cleanup function from installation.
-- [ ] Update `packages/libretto/src/shared/debug/pause.ts` to call the active handler and throw clear guidance when no handler is installed.
-- [ ] Install the handler immediately before invoking `workflow.run(...)` and clear it in a `finally` block.
-- [ ] Have the installed handler delegate to `WorkflowController.pause(...)`, which emits a paused outcome and resolves only when `resume()` is called.
-- [ ] Add `getWorkflowStatus()` and `resumeWorkflow()` to the typed daemon API.
-- [ ] Delegate daemon `getWorkflowStatus()` and `resumeWorkflow()` to the active `WorkflowController`.
-- [ ] Change `runResume` in `packages/libretto/src/cli/commands/execution.ts` to connect to `sessionState.daemonSocketPath`, call `getWorkflowStatus()`, then call `resumeWorkflow()`.
-- [ ] Stop writing `.resume` from `runResume`.
-- [ ] Include the current page URL when available so pause output remains useful.
-- [ ] Preserve the current `pause("")` validation behavior.
-- [ ] Preserve current user-facing errors for sessions that are not paused or whose daemon process is no longer running.
-- [ ] Add or adjust behavior coverage for normal `pause(ctx.session)` / `resume` flow through `librettoCli`.
-- [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` and `pnpm -s type-check --filter=libretto` pass.
+- [x] Add a small shared pause-handler module under `packages/libretto/src/shared/debug/` that stores the active handler and returns a cleanup function from installation.
+- [x] Update `packages/libretto/src/shared/debug/pause.ts` to call the active handler and throw clear guidance when no handler is installed.
+- [x] Install the handler immediately before invoking `workflow.run(...)` and clear it in a `finally` block.
+- [x] Have the installed handler delegate to `WorkflowController.pause(...)`, which emits a paused outcome and resolves only when `resume()` is called.
+- [x] Add `getWorkflowStatus()` and `resumeWorkflow()` to the typed daemon API.
+- [x] Delegate daemon `getWorkflowStatus()` and `resumeWorkflow()` to the active `WorkflowController`.
+- [x] Change `runResume` in `packages/libretto/src/cli/commands/execution.ts` to connect to `sessionState.daemonSocketPath`, call `getWorkflowStatus()`, then call `resumeWorkflow()`.
+- [x] Stop writing `.resume` from `runResume`.
+- [x] Include the current page URL when available so pause output remains useful.
+- [x] Preserve the current `pause("")` validation behavior.
+- [x] Preserve current user-facing errors for sessions that are not paused or whose daemon process is no longer running.
+- [x] Add or adjust behavior coverage for normal `pause(ctx.session)` / `resume` flow through `librettoCli`.
+- [x] Verify `pnpm -s --filter libretto test -- basic.spec.ts` and `pnpm -s type-check --filter=libretto` pass.
 
 ### Phase 6: Send workflow output and outcomes from the daemon to CLI events
 

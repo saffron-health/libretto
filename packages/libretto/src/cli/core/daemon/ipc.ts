@@ -8,6 +8,7 @@ import { createIpcPeer, type IpcPeer } from "../../../shared/ipc/ipc.js";
 import { connectToIpcSocket } from "../../../shared/ipc/socket-transport.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import { REPO_ROOT } from "../context.js";
+import type { WorkflowStatus } from "../workflow-runner/runner.js";
 import type { DaemonConfig } from "./config.js";
 
 export type DaemonExecOutput = { stdout: string; stderr: string };
@@ -49,6 +50,8 @@ export type CliToDaemonApi = {
   exec(args: DaemonExecArgs): DaemonExecResult;
   readonlyExec(args: DaemonReadonlyExecArgs): DaemonExecResult;
   snapshot(args: DaemonSnapshotArgs): DaemonSnapshotResult;
+  getWorkflowStatus(): WorkflowStatus;
+  resumeWorkflow(): void;
 };
 
 export type DaemonToCliApi = Record<never, never>;
@@ -146,7 +149,7 @@ export type DaemonResultMap = {
 // ---------------------------------------------------------------------------
 
 export class DaemonClient {
-  private constructor(private readonly daemon: IpcPeer<CliToDaemonApi>) {}
+  private constructor(private readonly ipc: IpcPeer<CliToDaemonApi>) {}
 
   static async connect(socketPath: string): Promise<DaemonClient> {
     const transport = await connectToIpcSocket(socketPath);
@@ -323,7 +326,7 @@ export class DaemonClient {
 
   async ping(): Promise<boolean> {
     try {
-      await this.daemon.call.ping();
+      await this.ipc.call.ping();
       return true;
     } catch {
       return false;
@@ -331,20 +334,28 @@ export class DaemonClient {
   }
 
   async pages(): Promise<DaemonResultMap["pages"]> {
-    return this.daemon.call.pages();
+    return this.ipc.call.pages();
   }
 
   async exec(args: DaemonExecArgs): Promise<DaemonExecResult> {
-    return this.daemon.call.exec(args);
+    return this.ipc.call.exec(args);
   }
 
   async readonlyExec(args: DaemonReadonlyExecArgs): Promise<DaemonExecResult> {
-    return this.daemon.call.readonlyExec(args);
+    return this.ipc.call.readonlyExec(args);
   }
 
   async snapshot(
     args: DaemonSnapshotArgs = {},
   ): Promise<DaemonResultMap["snapshot"]> {
-    return this.daemon.call.snapshot(args);
+    return this.ipc.call.snapshot(args);
+  }
+
+  async getWorkflowStatus(): Promise<WorkflowStatus> {
+    return this.ipc.call.getWorkflowStatus();
+  }
+
+  async resumeWorkflow(): Promise<void> {
+    await this.ipc.call.resumeWorkflow();
   }
 }

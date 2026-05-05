@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import * as moduleBuiltin from "node:module";
 import { z } from "zod";
 import { installInstrumentation } from "../../shared/instrumentation/index.js";
@@ -510,21 +510,36 @@ async function runResume(
 ): Promise<void> {
   const {
     pausedSignalPath,
-    resumeSignalPath,
     completedSignalPath,
     failedSignalPath,
     outputSignalPath,
   } = getPauseSignalPaths(session);
 
-  if (!existsSync(pausedSignalPath)) {
-    throw new Error(
-      `Session "${session}" is not paused. Run "${librettoCommand(`run ... --session ${session}`)}" and call pause("${session}") first.`,
-    );
-  }
-
   if (sessionState.pid == null || !isProcessRunning(sessionState.pid)) {
     throw new Error(
       `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid ?? "unknown"} is not running).`,
+    );
+  }
+
+  if (!sessionState.daemonSocketPath) {
+    throw new Error(
+      `No active paused workflow found for session "${session}" (daemon socket is missing).`,
+    );
+  }
+
+  let client: DaemonClient;
+  try {
+    client = await DaemonClient.connect(sessionState.daemonSocketPath);
+  } catch {
+    throw new Error(
+      `No active paused workflow found for session "${session}" (worker pid ${sessionState.pid} is not running).`,
+    );
+  }
+
+  const status = await client.getWorkflowStatus();
+  if (status.state !== "paused") {
+    throw new Error(
+      `Session "${session}" is not paused. Run "${librettoCommand(`run ... --session ${session}`)}" and call pause("${session}") first.`,
     );
   }
 
@@ -536,19 +551,8 @@ async function runResume(
   clearSignalIfExists(failedSignalPath);
   setSessionStatus(session, "active", logger);
 
-  writeFileSync(
-    resumeSignalPath,
-    JSON.stringify(
-      {
-        resumedAt: new Date().toISOString(),
-        sourcePid: process.pid,
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  );
-  console.log(`Resume signal sent for session "${session}".`);
+  await client.resumeWorkflow();
+  console.log(`Resume requested for session "${session}".`);
 
   const outcome = await waitForWorkflowOutcome({
     session,

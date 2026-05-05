@@ -1,5 +1,6 @@
 import type { BrowserContext, Page } from "playwright";
 import type { LoggerApi } from "../../../shared/logger/index.js";
+import { installPauseHandler } from "../../../shared/debug/pause-handler.js";
 import type {
   ExportedLibrettoWorkflow,
   LibrettoWorkflowContext,
@@ -155,6 +156,12 @@ export class WorkflowController {
         page: this.config.page,
       };
 
+      const uninstallPauseHandler = installPauseHandler((pauseArgs) =>
+        this.pause({
+          ...pauseArgs,
+          url: this.config.page.isClosed() ? undefined : this.config.page.url(),
+        }),
+      );
       try {
         await workflow.run(workflowContext, workflowConfig.params ?? {});
       } catch (error) {
@@ -165,6 +172,8 @@ export class WorkflowController {
           phase: "workflow",
         });
         return;
+      } finally {
+        uninstallPauseHandler();
       }
 
       this.emitOutcome({

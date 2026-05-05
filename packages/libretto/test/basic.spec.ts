@@ -999,7 +999,7 @@ export default workflow("main", async (ctx) => {
     expect(paused.stdout).toContain("Workflow paused.");
 
     const resumed = await librettoCli(`resume --session ${session}`);
-    expect(resumed.stdout).toContain(`Resume signal sent for session "${session}".`);
+    expect(resumed.stdout).toContain(`Resume requested for session "${session}".`);
     expect(resumed.stdout).toContain("WORKFLOW_AFTER_RESUME");
     expect(resumed.stdout).toContain("Integration completed.");
     expect(resumed.stdout).toContain("Browser closed");

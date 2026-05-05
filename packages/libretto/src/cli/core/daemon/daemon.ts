@@ -592,6 +592,8 @@ class BrowserDaemon {
             args.pageId,
           ),
         ),
+      getWorkflowStatus: () => this.getWorkflowStatus(),
+      resumeWorkflow: () => this.resumeWorkflow(),
     };
   }
 
@@ -693,6 +695,17 @@ class BrowserDaemon {
       visualize: args.workflow.visualize,
       loadedWorkflow: args.loadedWorkflow,
     });
+  }
+
+  getWorkflowStatus(): ReturnType<WorkflowController["getStatus"]> {
+    return this.workflowController?.getStatus() ?? { state: "idle" };
+  }
+
+  resumeWorkflow(): void {
+    if (!this.workflowController) {
+      throw new Error("Workflow is not paused.");
+    }
+    this.workflowController.resume();
   }
 
   private async writeWorkflowOutcomeSignal(
