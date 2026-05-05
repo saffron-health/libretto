@@ -96,13 +96,13 @@ export const experimentsCommand = SimpleCLI.command({
   });
 ```
 
-- [ ] Add `packages/libretto/src/cli/commands/experiments.ts` with list, enable, and disable behavior.
-- [ ] Register `experiments: experimentsCommand` in `packages/libretto/src/cli/router.ts`.
-- [ ] Make `libretto experiments` print each registered experiment in stable registry order with its state and description.
-- [ ] Make enable/disable output deterministic success text, for example `Experiment "x" enabled.`.
-- [ ] Make missing or unknown experiment names fail with actionable usage that includes `libretto experiments` and `libretto experiments enable <experiment>`.
-- [ ] Add user-level CLI tests in `packages/libretto/test/basic.spec.ts` for help visibility, listing, enabling, disabling, and unknown experiment failure.
-- [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` passes.
+- [x] Add `packages/libretto/src/cli/commands/experiments.ts` with list, enable, and disable behavior.
+- [x] Register `experiments: experimentsCommand` in `packages/libretto/src/cli/router.ts`.
+- [x] Make `libretto experiments` print each registered experiment in stable registry order with its state and description.
+- [x] Make enable/disable output deterministic success text, for example `Experiment "x" enabled.`.
+- [x] Make missing or unknown experiment names fail with actionable usage that includes `libretto experiments` and `libretto experiments enable <experiment>`.
+- [x] Add user-level CLI tests in `packages/libretto/test/basic.spec.ts` for help visibility, listing, enabling, disabling, and unknown experiment failure.
+- [x] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` passes.
 
 ### Phase 3: Add experiments middleware to CLI context
 

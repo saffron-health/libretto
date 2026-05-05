@@ -294,6 +294,8 @@ describe("basic CLI subprocess behavior", () => {
   test("prints usage for --help", async ({ librettoCli }) => {
     const result = await librettoCli("--help");
     expect(result.stdout).toContain("libretto <command>");
+    expect(result.stdout).toContain("experiments");
+    expect(result.stdout).toContain("List or update Libretto experiment flags");
     expect(result.stdout).toContain("readonly-exec");
     expect(result.stdout).toContain("snapshot");
     expect(result.stdout).toContain("Capture PNG + HTML");
@@ -380,6 +382,78 @@ describe("basic CLI subprocess behavior", () => {
       "libretto session-mode [mode] [options]",
     );
     expect(result.stderr).toBe("");
+  });
+
+  test("prints experiments help", async ({ librettoCli }) => {
+    const result = await librettoCli("help experiments");
+    expect(result.stdout).toContain("List or update Libretto experiment flags");
+    expect(result.stdout).toContain(
+      "libretto experiments [action] [experiment]",
+    );
+    expect(result.stdout).toContain("Action to apply");
+    expect(result.stdout).toContain("Experiment name");
+    expect(result.stderr).toBe("");
+  });
+
+  test("experiments lists registered experiments and updates state", async ({
+    librettoCli,
+  }) => {
+    const initial = await librettoCli("experiments");
+    expect(initial.stdout).toContain("Libretto experiments:");
+    expect(initial.stdout).toContain("exampleExperiment");
+    expect(initial.stdout).toContain("Example experiment");
+    expect(initial.stdout).toContain(
+      "Example experiment flag for validating experiment plumbing.",
+    );
+    expect(initial.stdout).toContain("disabled");
+    expect(initial.stderr).toBe("");
+
+    const enabled = await librettoCli("experiments enable exampleExperiment");
+    expect(enabled.stdout).toContain('Experiment "exampleExperiment" enabled.');
+    expect(enabled.stderr).toBe("");
+
+    const afterEnable = await librettoCli("experiments");
+    expect(afterEnable.stdout).toContain("exampleExperiment");
+    expect(afterEnable.stdout).toContain("enabled");
+    expect(afterEnable.stderr).toBe("");
+
+    const disabled = await librettoCli("experiments disable exampleExperiment");
+    expect(disabled.stdout).toContain(
+      'Experiment "exampleExperiment" disabled.',
+    );
+    expect(disabled.stderr).toBe("");
+
+    const afterDisable = await librettoCli("experiments");
+    expect(afterDisable.stdout).toContain("exampleExperiment");
+    expect(afterDisable.stdout).toContain("disabled");
+    expect(afterDisable.stderr).toBe("");
+  });
+
+  test("experiments rejects missing and unknown experiment names with usage", async ({
+    librettoCli,
+  }) => {
+    const missing = await librettoCli("experiments enable");
+    expect(missing.stderr).toContain("Missing experiment name for enable.");
+    expect(missing.stderr).toContain("libretto experiments");
+    expect(missing.stderr).toContain("libretto experiments enable <experiment>");
+    expect(missing.stderr).toContain("exampleExperiment");
+
+    const unknownAction = await librettoCli(
+      "experiments toggle exampleExperiment",
+    );
+    expect(unknownAction.stderr).toContain(
+      'Unknown experiments action "toggle".',
+    );
+    expect(unknownAction.stderr).toContain("libretto experiments");
+    expect(unknownAction.stderr).toContain(
+      "libretto experiments enable <experiment>",
+    );
+
+    const unknown = await librettoCli("experiments enable nopeExperiment");
+    expect(unknown.stderr).toContain('Unknown experiment "nopeExperiment".');
+    expect(unknown.stderr).toContain("libretto experiments");
+    expect(unknown.stderr).toContain("libretto experiments enable <experiment>");
+    expect(unknown.stderr).toContain("exampleExperiment");
   });
 
   test("fails unknown command with a clear error", async ({ librettoCli }) => {
