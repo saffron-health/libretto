@@ -27,7 +27,6 @@ import {
 import { mkdir, writeFile } from "node:fs/promises";
 import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { installSessionTelemetry } from "../session-telemetry.js";
-import type { LibrettoWorkflowContext } from "../../../shared/workflow/workflow.js";
 import {
   createIpcPeer,
   type IpcPeer,
@@ -46,6 +45,7 @@ import {
   getSessionStatePath,
 } from "../context.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
+import type { ExportedLibrettoWorkflow } from "../../../shared/workflow/workflow.js";
 import {
   getDaemonSocketPath,
   type CliToDaemonApi,
@@ -76,10 +76,12 @@ import { getCloudProviderApi } from "../providers/index.js";
 import type { ProviderApi } from "../providers/types.js";
 import {
   getAbsoluteIntegrationPath,
-  installHeadedWorkflowVisualization,
   loadDefaultWorkflow,
-  type LoadedLibrettoWorkflow,
 } from "../workflow-runtime.js";
+import {
+  WorkflowController,
+  type WorkflowOutcome,
+} from "../workflow-runner/runner.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -95,6 +97,9 @@ async function waitForSessionState(session: string): Promise<void> {
     if (existsSync(getSessionStatePath(session))) return;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
+  throw new Error(
+    `Session state was not written before workflow start for "${session}".`,
+  );
 }
 
 class UserFacingStartupError extends Error {
@@ -104,44 +109,18 @@ class UserFacingStartupError extends Error {
   }
 }
 
-function mirrorStdoutToFile(filePath: string): () => void {
-  const stdout = process.stdout;
-  const originalWrite = stdout.write.bind(stdout);
-
-  stdout.write = ((chunk: unknown, ...args: unknown[]) => {
-    try {
-      const buffer = Buffer.isBuffer(chunk)
-        ? chunk
-        : Buffer.from(String(chunk), "utf8");
-      appendFileSync(filePath, buffer);
-    } catch {
-      // Ignore log mirroring failures; primary stdout should still flow.
-    }
-    return originalWrite(
-      chunk as string | Uint8Array,
-      ...(args as [BufferEncoding?, ((error?: Error | null) => void)?]),
-    );
-  }) as typeof stdout.write;
-
-  return () => {
-    stdout.write = originalWrite as typeof stdout.write;
-  };
-}
-
 async function writeWorkflowFailureSignal(args: {
   session: string;
-  error: unknown;
+  message: string;
   phase: "setup" | "workflow";
 }): Promise<void> {
   const signalPaths = getPauseSignalPaths(args.session);
-  const errorMessage =
-    args.error instanceof Error ? args.error.message : String(args.error);
   await writeFile(
     signalPaths.failedSignalPath,
     JSON.stringify(
       {
         failedAt: new Date().toISOString(),
-        message: errorMessage,
+        message: args.message,
         phase: args.phase,
       },
       null,
@@ -197,6 +176,7 @@ class BrowserDaemon {
   private readonly execState: Record<string, unknown> = {};
   private readonly pageById = new Map<string, Page>();
   private readonly shutdownHandlers: Array<() => Promise<void> | void> = [];
+  private workflowController: WorkflowController | undefined;
 
   private constructor(
     private readonly session: string,
@@ -680,78 +660,71 @@ class BrowserDaemon {
     };
   }
 
-  async runWorkflow(args: {
+  startWorkflow(args: {
     workflow: DaemonWorkflowConfig;
     headed: boolean;
-    loadedWorkflow?: LoadedLibrettoWorkflow;
-  }): Promise<void> {
+    loadedWorkflow?: ExportedLibrettoWorkflow;
+  }): void {
+    if (this.workflowController) {
+      throw new Error("Workflow controller has already started.");
+    }
+
     const signalPaths = getPauseSignalPaths(this.session);
-    const restoreStdout = mirrorStdoutToFile(signalPaths.outputSignalPath);
-    try {
-      const absolutePath = getAbsoluteIntegrationPath(
-        args.workflow.integrationPath,
-      );
-      const workflow = args.loadedWorkflow ?? (await loadDefaultWorkflow(absolutePath));
-      const workflowLogger = this.logger.withScope("integration-run", {
-        integrationPath: absolutePath,
-        workflowName: workflow.name,
-        session: this.session,
-      });
-
-      console.log(
-        `Running workflow "${workflow.name}" from ${absolutePath} (${args.headed ? "headed" : "headless"})...`,
-      );
-
-      if (args.headed && args.workflow.visualize !== false) {
-        await installHeadedWorkflowVisualization({
-          context: this.context,
-          logger: workflowLogger,
-        });
-      }
-
-      // tsx/esbuild can inject __name() wrappers when keepNames is true.
-      // Playwright serializes callbacks via Function#toString() into the browser
-      // context, which lacks __name, causing ReferenceError without this polyfill.
-      await this.context.addInitScript(() => {
-        (globalThis as Record<string, unknown>).__name = (
-          target: unknown,
-          value: string,
-        ) =>
-          Object.defineProperty(target as object, "name", {
-            value,
-            configurable: true,
+    this.workflowController = new WorkflowController({
+      session: this.session,
+      headed: args.headed,
+      page: this.page,
+      context: this.context,
+      logger: this.logger,
+      onLog: (event) => {
+        appendFileSync(signalPaths.outputSignalPath, event.text);
+      },
+      onOutcome: (outcome) => {
+        this.writeWorkflowOutcomeSignal(outcome).catch((error: unknown) => {
+          this.logger.warn("workflow-signal-write-failed", {
+            error: error instanceof Error ? error.message : String(error),
           });
-      });
-
-      const workflowContext: LibrettoWorkflowContext = {
-        session: this.session,
-        page: this.page,
-      };
-
-      try {
-        await workflow.run(workflowContext, args.workflow.params ?? {});
-      } catch (error) {
-        await writeWorkflowFailureSignal({
-          session: this.session,
-          error,
-          phase: "workflow",
         });
-        return;
-      }
+      },
+    });
+    this.workflowController.start({
+      integrationPath: args.workflow.integrationPath,
+      params: args.workflow.params,
+      visualize: args.workflow.visualize,
+      loadedWorkflow: args.loadedWorkflow,
+    });
+  }
 
+  private async writeWorkflowOutcomeSignal(
+    outcome: WorkflowOutcome,
+  ): Promise<void> {
+    const signalPaths = getPauseSignalPaths(this.session);
+    if (outcome.state === "paused") {
       await writeFile(
-        signalPaths.completedSignalPath,
-        JSON.stringify({ completedAt: new Date().toISOString() }, null, 2),
+        signalPaths.pausedSignalPath,
+        JSON.stringify(
+          {
+            sessionName: outcome.session,
+            pausedAt: outcome.pausedAt,
+            url: outcome.url ?? "unknown",
+          },
+          null,
+          2,
+        ),
         "utf8",
       );
-    } catch (error) {
+    } else if (outcome.result === "completed") {
+      await writeFile(
+        signalPaths.completedSignalPath,
+        JSON.stringify({ completedAt: outcome.completedAt }, null, 2),
+        "utf8",
+      );
+    } else {
       await writeWorkflowFailureSignal({
         session: this.session,
-        error,
-        phase: "setup",
+        message: outcome.message,
+        phase: outcome.phase,
       });
-    } finally {
-      restoreStdout();
     }
   }
 }
@@ -763,7 +736,7 @@ async function main(): Promise<void> {
   const headed =
     config.browser.kind === "launch" ? config.browser.headed : false;
 
-  let loadedWorkflow: LoadedLibrettoWorkflow | undefined;
+  let loadedWorkflow: ExportedLibrettoWorkflow | undefined;
   if (config.workflow) {
     try {
       loadedWorkflow = await loadDefaultWorkflow(
@@ -796,11 +769,23 @@ async function main(): Promise<void> {
   if (config.workflow) {
     void waitForSessionState(config.session)
       .then(() =>
-        daemon.runWorkflow({ workflow: config.workflow!, headed, loadedWorkflow }),
+        daemon.startWorkflow({
+          workflow: config.workflow!,
+          headed,
+          loadedWorkflow,
+        }),
       )
       .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
         daemon.logger.error("workflow-failed", {
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
+        });
+        void writeWorkflowFailureSignal({
+          session: config.session,
+          message,
+          phase: "setup",
+        }).finally(() => {
+          void daemon.shutdown("workflow-start-failed", true);
         });
       });
   }

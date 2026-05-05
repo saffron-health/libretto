@@ -1,9 +1,14 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
-import { createIpcPeer, type IpcPeer } from "../../../shared/ipc/ipc.js";
-import { createChildProcessIpcTransport } from "../../../shared/ipc/child-process-transport.js";
-import type { DaemonWorkflowConfig } from "../daemon/config.js";
+import type { BrowserContext, Page } from "playwright";
+import type { LoggerApi } from "../../../shared/logger/index.js";
+import type {
+  ExportedLibrettoWorkflow,
+  LibrettoWorkflowContext,
+} from "../../../shared/workflow/workflow.js";
+import {
+  getAbsoluteIntegrationPath,
+  installHeadedWorkflowVisualization,
+  loadDefaultWorkflow,
+} from "../workflow-runtime.js";
 
 type WorkflowPausedState = {
   state: "paused";
@@ -20,98 +25,74 @@ type WorkflowFinishedState = {
   state: "finished";
 } & WorkflowFinishedArgs;
 
-type WorkflowExitedState = {
-  state: "exited";
-  exitedAt: string;
-  code: number | null;
-  signal: NodeJS.Signals | null;
-  message: string;
-};
-
-export type WorkflowOutcome =
-  | WorkflowPausedState
-  | WorkflowFinishedState
-  | WorkflowExitedState;
-
-export type WorkflowChildToParentApi = {
-  paused(args: Omit<WorkflowPausedState, "state">): Promise<void>;
-  finished(args: WorkflowFinishedArgs): void;
-};
-
-export type WorkflowParentToChildApi = {
-  shutdown(args: { reason: string }): void;
-};
+export type WorkflowOutcome = WorkflowPausedState | WorkflowFinishedState;
 
 export type WorkflowStatus =
   | { state: "idle" }
   | { state: "running" }
   | WorkflowOutcome;
 
-type WorkflowOutputEvent = {
+type WorkflowLogEvent = {
   stream: "stdout" | "stderr";
   text: string;
 };
 
-type WorkflowRunnerOptions = {
+export type WorkflowControllerConfig = {
   session: string;
-  workflow: DaemonWorkflowConfig;
-  cdpEndpoint: string;
-  pageId?: string;
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-  onOutput?: (event: WorkflowOutputEvent) => void;
+  headed: boolean;
+  page: Page;
+  context: BrowserContext;
+  logger: LoggerApi;
+  onLog?: (event: WorkflowLogEvent) => void;
   onOutcome?: (outcome: WorkflowOutcome) => void;
+};
+
+export type WorkflowStartConfig = {
+  integrationPath: string;
+  params?: unknown;
+  visualize?: boolean;
+  loadedWorkflow?: ExportedLibrettoWorkflow;
 };
 
 type PendingPause = {
   resolve(): void;
 };
 
-export class WorkflowRunner {
-  private child: ChildProcess | undefined;
-  private ipc: IpcPeer<WorkflowParentToChildApi> | undefined;
+type WritableStreamWithWrite = NodeJS.WriteStream & {
+  write: NodeJS.WriteStream["write"];
+};
+
+export class WorkflowController {
   private status: WorkflowStatus = { state: "idle" };
   private pendingPause: PendingPause | undefined;
+  private started = false;
 
-  constructor(private readonly options: WorkflowRunnerOptions) {}
+  constructor(private readonly config: WorkflowControllerConfig) {}
 
-  start(): void {
-    if (this.child) {
-      throw new Error("Workflow runner has already started.");
+  start(workflowConfig: WorkflowStartConfig): void {
+    if (this.started) {
+      throw new Error("Workflow controller has already started.");
     }
 
-    const childEntryPath = fileURLToPath(new URL("./child.js", import.meta.url));
-    const require = createRequire(import.meta.url);
-    const tsxCliPath = require.resolve("tsx/cli");
-
-    const child = spawn(
-      process.execPath,
-      [tsxCliPath, ...this.getChildArgs(childEntryPath)],
-      {
-        cwd: this.options.cwd,
-        env: this.options.env,
-        stdio: ["ignore", "pipe", "pipe", "ipc"],
-      },
-    );
-
-    this.child = child;
+    this.started = true;
     this.status = { state: "running" };
-    this.ipc = createIpcPeer<
-      WorkflowParentToChildApi,
-      WorkflowChildToParentApi
-    >(createChildProcessIpcTransport(child), {
-      paused: (args) => this.handlePaused(args),
-      finished: (args) => this.handleFinished(args),
-    });
+    void this.run(workflowConfig);
+  }
 
-    child.stdout?.on("data", (chunk: Buffer | string) => {
-      this.options.onOutput?.({ stream: "stdout", text: String(chunk) });
+  pause(args: {
+    session: string;
+    pausedAt: string;
+    url?: string;
+  }): Promise<void> {
+    if (this.pendingPause) {
+      throw new Error("Workflow is already paused.");
+    }
+
+    return new Promise<void>((resolve) => {
+      this.pendingPause = { resolve };
+      this.status = { state: "paused", ...args };
+      this.config.onOutcome?.(this.status);
     });
-    child.stderr?.on("data", (chunk: Buffer | string) => {
-      this.options.onOutput?.({ stream: "stderr", text: String(chunk) });
-    });
-    child.once("error", (error) => this.handleSpawnError(error));
-    child.once("exit", (code, signal) => this.handleExit(code, signal));
   }
 
   resume(): void {
@@ -129,67 +110,84 @@ export class WorkflowRunner {
     return this.status;
   }
 
-  async shutdown(reason: string): Promise<void> {
-    await this.ipc?.call.shutdown({ reason });
-  }
+  private async run(workflowConfig: WorkflowStartConfig): Promise<void> {
+    const restoreOutput = this.captureProcessOutput();
+    try {
+      const absolutePath = getAbsoluteIntegrationPath(
+        workflowConfig.integrationPath,
+      );
+      const workflow =
+        workflowConfig.loadedWorkflow ??
+        (await loadDefaultWorkflow(absolutePath));
+      const workflowLogger = this.config.logger.withScope("integration-run", {
+        integrationPath: absolutePath,
+        workflowName: workflow.name,
+        session: this.config.session,
+      });
 
-  private handlePaused(
-    args: Parameters<WorkflowChildToParentApi["paused"]>[0],
-  ): Promise<void> {
-    if (this.pendingPause) {
-      throw new Error("Workflow is already paused.");
+      console.log(
+        `Running workflow "${workflow.name}" from ${absolutePath} (${this.config.headed ? "headed" : "headless"})...`,
+      );
+
+      if (this.config.headed && workflowConfig.visualize !== false) {
+        await installHeadedWorkflowVisualization({
+          context: this.config.context,
+          logger: workflowLogger,
+        });
+      }
+
+      // tsx/esbuild can inject __name() wrappers when keepNames is true.
+      // Playwright serializes callbacks via Function#toString() into the browser
+      // context, which lacks __name, causing ReferenceError without this polyfill.
+      await this.config.context.addInitScript(() => {
+        (globalThis as Record<string, unknown>).__name = (
+          target: unknown,
+          value: string,
+        ) =>
+          Object.defineProperty(target as object, "name", {
+            value,
+            configurable: true,
+          });
+      });
+
+      const workflowContext: LibrettoWorkflowContext = {
+        session: this.config.session,
+        page: this.config.page,
+      };
+
+      try {
+        await workflow.run(workflowContext, workflowConfig.params ?? {});
+      } catch (error) {
+        this.emitOutcome({
+          state: "finished",
+          result: "failed",
+          message: error instanceof Error ? error.message : String(error),
+          phase: "workflow",
+        });
+        return;
+      }
+
+      this.emitOutcome({
+        state: "finished",
+        result: "completed",
+        completedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.emitOutcome({
+        state: "finished",
+        result: "failed",
+        message: error instanceof Error ? error.message : String(error),
+        phase: "setup",
+      });
+    } finally {
+      restoreOutput();
     }
-
-    this.emitEvent({ state: "paused", ...args });
-
-    return new Promise<void>((resolve) => {
-      this.pendingPause = { resolve };
-    });
   }
 
-  private handleFinished(
-    args: Parameters<WorkflowChildToParentApi["finished"]>[0],
-  ): void {
+  private emitOutcome(outcome: WorkflowOutcome): void {
     this.resolvePendingPause();
-    this.emitEvent({ state: "finished", ...args });
-  }
-
-  private handleSpawnError(error: Error): void {
-    if (this.isTerminal()) return;
-
-    this.emitEvent({
-      state: "finished",
-      result: "failed",
-      message: error.message,
-      phase: "setup",
-    });
-  }
-
-  private handleExit(code: number | null, signal: NodeJS.Signals | null): void {
-    this.ipc?.destroy();
-
-    if (this.status.state === "idle" || this.isTerminal()) {
-      return;
-    }
-
-    this.resolvePendingPause();
-
-    const exitedAt = new Date().toISOString();
-    const status =
-      code === null ? `signal ${signal ?? "unknown"}` : `code ${code}`;
-    const message = `Workflow child exited before reporting an outcome (${status}).`;
-    this.emitEvent({
-      state: "exited",
-      exitedAt,
-      code,
-      signal,
-      message,
-    });
-  }
-
-  private emitEvent(event: WorkflowOutcome): void {
-    this.status = event;
-    this.options.onOutcome?.(event);
+    this.status = outcome;
+    this.config.onOutcome?.(outcome);
   }
 
   private resolvePendingPause(): void {
@@ -200,22 +198,31 @@ export class WorkflowRunner {
     pendingPause.resolve();
   }
 
-  private isTerminal(): boolean {
-    return this.status.state === "finished" || this.status.state === "exited";
-  }
+  private captureProcessOutput(): () => void {
+    const stdout = process.stdout as WritableStreamWithWrite;
+    const stderr = process.stderr as WritableStreamWithWrite;
+    const originalStdoutWrite = stdout.write;
+    const originalStderrWrite = stderr.write;
 
-  private getChildArgs(childEntryPath: string): string[] {
-    return [
-      ...(this.options.workflow.tsconfigPath
-        ? ["--tsconfig", this.options.workflow.tsconfigPath]
-        : []),
-      childEntryPath,
-      JSON.stringify({
-        session: this.options.session,
-        workflow: this.options.workflow,
-        cdpEndpoint: this.options.cdpEndpoint,
-        pageId: this.options.pageId,
-      }),
-    ];
+    stdout.write = ((...writeArgs: Parameters<typeof stdout.write>) => {
+      const [chunk] = writeArgs;
+      this.config.onLog?.({ stream: "stdout", text: chunkToString(chunk) });
+      return Reflect.apply(originalStdoutWrite, stdout, writeArgs) as boolean;
+    }) as typeof stdout.write;
+
+    stderr.write = ((...writeArgs: Parameters<typeof stderr.write>) => {
+      const [chunk] = writeArgs;
+      this.config.onLog?.({ stream: "stderr", text: chunkToString(chunk) });
+      return Reflect.apply(originalStderrWrite, stderr, writeArgs) as boolean;
+    }) as typeof stderr.write;
+
+    return () => {
+      stdout.write = originalStdoutWrite;
+      stderr.write = originalStderrWrite;
+    };
   }
+}
+
+function chunkToString(chunk: unknown): string {
+  return Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
 }
