@@ -37,7 +37,24 @@ function createJsonSocketTransport(
           buffer = buffer.slice(newlineIndex + 1);
           if (line.length === 0) continue;
 
-          callback(JSON.parse(line) as IpcProtocolMessage);
+          let message: unknown;
+          try {
+            message = JSON.parse(line) as unknown;
+          } catch (error) {
+            socket.destroy(
+              new Error(
+                `Invalid IPC socket message: ${error instanceof Error ? error.message : String(error)}`,
+              ),
+            );
+            return;
+          }
+
+          if (!isIpcProtocolMessage(message)) {
+            socket.destroy(new Error("Invalid IPC socket protocol message."));
+            return;
+          }
+
+          callback(message);
         }
       };
 
@@ -134,4 +151,39 @@ async function connectSocket(socketPath: string): Promise<Socket> {
     socket.once("error", onError);
     socket.once("connect", onConnect);
   });
+}
+
+function isIpcProtocolMessage(message: unknown): message is IpcProtocolMessage {
+  if (!isRecord(message)) return false;
+
+  if (message.type === "ipc-request") {
+    return (
+      typeof message.id === "string" &&
+      typeof message.method === "string" &&
+      Array.isArray(message.args)
+    );
+  }
+
+  if (message.type === "ipc-response") {
+    return (
+      typeof message.id === "string" &&
+      typeof message.method === "string" &&
+      (message.error === undefined || isSerializedError(message.error))
+    );
+  }
+
+  return false;
+}
+
+function isSerializedError(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.name === "string" &&
+    typeof value.message === "string" &&
+    (value.stack === undefined || typeof value.stack === "string")
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
