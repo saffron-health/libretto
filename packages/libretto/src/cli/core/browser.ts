@@ -12,7 +12,7 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
-import { librettoCommand } from "./package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 import { getCloudProviderApi } from "./providers/index.js";
 import {
   assertSessionAvailableForStart,

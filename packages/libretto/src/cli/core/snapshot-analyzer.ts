@@ -17,7 +17,7 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
-import { librettoCommand } from "./package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 // Used by the legacy CLI-agent path (UserCodingAgent) which is preserved but
 // not wired into the snapshot command. The active config schema (ai-config.ts)
 // no longer has preset/commandPrefix — this type is kept for the legacy code.

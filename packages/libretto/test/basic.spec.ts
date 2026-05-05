@@ -1087,7 +1087,7 @@ export default workflow("main", async (ctx) => {
     expect(pages.stdout).toContain("Open pages:");
   }, 45_000);
 
-  test("pause reports running sessions when session id is missing", async ({
+  test("pause reports ctx.session guidance when session id is missing", async ({
     librettoCli,
     writeWorkflow,
   }) => {
@@ -1107,8 +1107,32 @@ export default workflow("main", async () => {
     expect(result.stderr).toContain(
       "pause(session) requires a non-empty session ID.",
     );
-    expect(result.stderr).toContain("Running sessions:");
-    expect(result.stderr).toContain("pause-test");
+    expect(result.stderr).toContain("pause(ctx.session)");
+    expect(result.stderr).toContain("libretto status");
+  }, 45_000);
+
+  test("pause reports workflow runtime guidance outside an active workflow", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const integrationFilePath = await writeWorkflow(
+      "integration-pause-outside-runtime.mjs",
+      `
+await pause("outside-runtime");
+
+export default workflow("main", async () => {});
+`,
+      ["workflow", "pause"],
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session pause-outside-runtime --headless`,
+    );
+    expect(result.stderr).toContain(
+      "pause(session) can only suspend an active Libretto workflow.",
+    );
+    expect(result.stderr).toContain("libretto run <integrationFile>");
+    expect(result.stderr).toContain("pause(ctx.session)");
   }, 45_000);
 
   test("completes workflow run when no pause is triggered", async ({

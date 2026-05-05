@@ -7,7 +7,7 @@ import {
 } from "../core/config.js";
 import { LIBRETTO_CONFIG_PATH } from "../core/context.js";
 import { DEFAULT_SNAPSHOT_MODELS } from "../core/ai-model.js";
-import { librettoCommand } from "../core/package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
 const PROVIDER_ALIASES: Record<string, string> = {

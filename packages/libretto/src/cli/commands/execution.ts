@@ -27,7 +27,7 @@ import {
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
-import { librettoCommand } from "../core/package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 import { resolveProviderName } from "../core/providers/index.js";
 import { getAbsoluteIntegrationPath } from "../core/workflow-runtime.js";
 import {

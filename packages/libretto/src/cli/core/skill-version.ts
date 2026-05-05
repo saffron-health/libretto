@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { REPO_ROOT } from "./context.js";
-import { librettoCommand } from "./package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 
 type PackageManifest = {
   version?: string;

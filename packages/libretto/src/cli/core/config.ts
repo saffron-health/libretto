@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import { SessionAccessModeSchema } from "../../shared/state/index.js";
 import { LIBRETTO_CONFIG_PATH } from "./context.js";
-import { librettoCommand } from "./package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 
 export const CURRENT_CONFIG_VERSION = 1;
 

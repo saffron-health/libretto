@@ -63,7 +63,7 @@ import {
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleSnapshot } from "./snapshot.js";
-import { librettoCommand } from "../package-manager.js";
+import { librettoCommand } from "../../../shared/package-manager.js";
 import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,

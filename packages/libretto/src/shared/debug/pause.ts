@@ -1,19 +1,10 @@
-import { listRunningSessions } from "../../cli/core/session.js";
-import { librettoCommand } from "../../cli/core/package-manager.js";
 import { getActivePauseHandler } from "./pause-handler.js";
+import { librettoCommand } from "../package-manager.js";
 
 function throwMissingSessionError(): never {
-  const runningSessions = listRunningSessions();
-  const lines = ["pause(session) requires a non-empty session ID."];
-
-  if (runningSessions.length > 0) {
-    lines.push("", "Running sessions:");
-    for (const s of runningSessions) {
-      lines.push(`  ${s.session}`);
-    }
-  }
-
-  throw new Error(lines.join("\n"));
+  throw new Error(
+    `pause(session) requires a non-empty session ID. Pass ctx.session from inside your workflow: await pause(ctx.session). To list running sessions, run: ${librettoCommand("status")}.`,
+  );
 }
 
 /**

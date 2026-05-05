@@ -1,6 +1,6 @@
 import { LIBRETTO_CONFIG_PATH } from "../core/context.js";
 import { type AiSetupStatus, resolveAiSetupStatus } from "../core/ai-model.js";
-import { librettoCommand } from "../core/package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 import { listRunningSessions, type SessionState } from "../core/session.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 

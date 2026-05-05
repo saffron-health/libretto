@@ -22,7 +22,7 @@ import {
   type SessionStatus,
   type SessionState,
 } from "../../shared/state/index.js";
-import { librettoCommand } from "./package-manager.js";
+import { librettoCommand } from "../../shared/package-manager.js";
 
 const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 

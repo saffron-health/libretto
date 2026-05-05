@@ -344,10 +344,10 @@ export async function pause(session: string): Promise<void> {
 }
 ```
 
-- [ ] Remove imports from `packages/libretto/src/shared/debug/pause.ts` to `packages/libretto/src/cli/core/*` modules.
-- [ ] Preserve helpful guidance when `pause(session)` is called outside a Libretto workflow runtime.
-- [ ] Add behavior coverage for `pause("")` guidance and normal `pause(ctx.session)` / `resume` flow through `librettoCli`.
-- [ ] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` and `pnpm -s type-check --filter=libretto` pass.
+- [x] Remove imports from `packages/libretto/src/shared/debug/pause.ts` to `packages/libretto/src/cli/core/*` modules.
+- [x] Preserve helpful guidance when `pause(session)` is called outside a Libretto workflow runtime.
+- [x] Add behavior coverage for `pause("")` guidance and normal `pause(ctx.session)` / `resume` flow through `librettoCli`.
+- [x] Verify `pnpm -s test --filter=libretto -- basic.spec.ts` and `pnpm -s type-check --filter=libretto` pass.
 
 ### Phase 9: Gracefully close daemon sessions over IPC
 

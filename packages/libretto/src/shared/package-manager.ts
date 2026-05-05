@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { resolveLibrettoRepoRoot } from "../../shared/paths/repo-root.js";
+import { resolveLibrettoRepoRoot } from "./paths/repo-root.js";
 
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
