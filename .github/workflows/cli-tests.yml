@@ -42,7 +42,7 @@ jobs:
           tests=false
           while IFS= read -r file; do
             case "$file" in
-              package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|.github/workflows/cli-tests.yml|packages/libretto/package.json|packages/libretto/tsconfig.json|packages/libretto/vitest.config.*|packages/libretto/tsup.config.*|packages/libretto/src/*|packages/libretto/test/*|packages/libretto/scripts/*)
+              package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|tsconfig.base.json|.github/workflows/cli-tests.yml|packages/libretto/package.json|packages/libretto/tsconfig.json|packages/libretto/vitest.config.*|packages/libretto/tsup.config.*|packages/libretto/src/*|packages/libretto/test/*|packages/libretto/scripts/*)
                 tests=true
                 break
                 ;;

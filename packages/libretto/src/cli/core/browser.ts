@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { createServer } from "node:net";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
+import type { Experiments } from "./experiments.js";
 import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import { librettoCommand } from "../../shared/package-manager.js";
@@ -394,10 +395,11 @@ export async function runOpen(
   headed: boolean,
   session: string,
   logger: LoggerApi,
-  options?: {
+  options: {
     viewport?: { width: number; height: number };
     accessMode?: SessionAccessMode;
     authProfileDomain?: string;
+    experiments: Experiments;
   },
 ): Promise<void> {
   const parsedUrl = normalizeUrl(rawUrl);
@@ -464,6 +466,7 @@ export async function runOpen(
     await DaemonClient.spawn({
       config: {
         session,
+        experiments: options.experiments,
         browser: {
           kind: "launch",
           headed,
@@ -513,7 +516,8 @@ export async function runOpenWithProvider(
   providerName: string,
   session: string,
   logger: LoggerApi,
-  accessMode: SessionAccessMode = "write-access",
+  accessMode: SessionAccessMode,
+  experiments: Experiments,
 ): Promise<void> {
   const parsedUrl = normalizeUrl(rawUrl);
   const url = parsedUrl.href;
@@ -534,6 +538,7 @@ export async function runOpenWithProvider(
   } = await DaemonClient.spawn({
     config: {
       session,
+      experiments,
       browser: {
         kind: "provider",
         providerName,
@@ -1172,7 +1177,8 @@ export async function runConnect(
   cdpUrl: string,
   session: string,
   logger: LoggerApi,
-  accessMode: SessionAccessMode = "write-access",
+  accessMode: SessionAccessMode,
+  experiments: Experiments,
 ): Promise<void> {
   logger.info("connect-start", { cdpUrl, session, accessMode });
   assertSessionAvailableForStart(session, logger);
@@ -1235,6 +1241,7 @@ export async function runConnect(
     await DaemonClient.spawn({
       config: {
         session,
+        experiments,
         browser: { kind: "connect", cdpEndpoint: endpoint },
       },
       logger,

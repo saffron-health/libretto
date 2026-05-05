@@ -4,6 +4,7 @@ import { billingCommands } from "./commands/billing.js";
 import { browserCommands } from "./commands/browser.js";
 import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
+import { experimentsCommand } from "./commands/experiments.js";
 import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
 import { snapshotCommand } from "./commands/snapshot.js";
@@ -13,6 +14,7 @@ import { SimpleCLI } from "./framework/simple-cli.js";
 export const cliRoutes = {
   ...browserCommands,
   deploy: deployCommand,
+  experiments: experimentsCommand,
   ...executionCommands,
   ai: aiCommands,
   auth: authCommands,

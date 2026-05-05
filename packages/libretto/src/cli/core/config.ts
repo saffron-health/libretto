@@ -27,6 +27,7 @@ export const LibrettoConfigSchema = z
     windowPosition: WindowPositionConfigSchema.optional(),
     provider: z.string().optional(),
     sessionMode: SessionAccessModeSchema.optional(),
+    experiments: z.record(z.string(), z.boolean()).optional(),
   })
   .passthrough();
 export type LibrettoConfig = z.infer<typeof LibrettoConfigSchema>;

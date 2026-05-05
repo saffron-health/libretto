@@ -12,7 +12,8 @@ This is a pnpm monorepo.
   - CLI source: `packages/libretto/src/cli/`
   - Tests: `packages/libretto/test/*.spec.ts`
 - `apps/website` — marketing site (Vite / vite-plus)
-- `docs/` — Mintlify documentation site
+- `docs/` — user-facing Mintlify documentation site
+- `packages/libretto/docs/` — internal package documentation for implementation notes and maintainer references
 - `benchmarks/` — benchmark suite (imports from `packages/libretto/src/`)
 - `evals/` — eval suite
 

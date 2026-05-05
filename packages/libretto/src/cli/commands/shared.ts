@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
+import type { Experiments } from "../core/experiments.js";
+import { resolveExperiments } from "../core/experiments.js";
 import { createLoggerForSession } from "../core/context.js";
 import {
   generateSessionName,
@@ -9,6 +11,8 @@ import {
 } from "../core/session.js";
 import {
   SimpleCLI,
+  type SimpleCLIMiddlewareArgs,
+  type SimpleCLIContext,
   type SimpleCLIMiddleware,
 } from "../framework/simple-cli.js";
 
@@ -32,6 +36,22 @@ export type SessionContext = {
 export type SessionStateContext = SessionContext & {
   sessionState: SessionState;
 };
+
+export type ExperimentsContext = {
+  experiments: Experiments;
+};
+
+export function withExperiments() {
+  return async <TInput, TContext extends SimpleCLIContext>({
+    ctx,
+  }: SimpleCLIMiddlewareArgs<
+    TInput,
+    TContext
+  >): Promise<TContext & ExperimentsContext> => ({
+    ...ctx,
+    experiments: resolveExperiments(),
+  });
+}
 
 export function withRequiredSession(): SimpleCLIMiddleware<
   { session?: string },

@@ -24,6 +24,7 @@ import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   sessionOption,
   withAutoSession,
+  withExperiments,
   withRequiredSession,
 } from "./shared.js";
 
@@ -110,6 +111,7 @@ export const openCommand = SimpleCLI.command({
 })
   .input(openInput)
   .use(withAutoSession())
+  .use(withExperiments())
   .handle(async ({ input, ctx }) => {
     warnIfInstalledSkillOutOfDate();
     assertSessionAvailableForStart(ctx.session, ctx.logger);
@@ -124,6 +126,7 @@ export const openCommand = SimpleCLI.command({
           input.writeAccess,
         ),
         authProfileDomain: input.authProfile,
+        experiments: ctx.experiments,
       });
     } else {
       await runOpenWithProvider(
@@ -132,6 +135,7 @@ export const openCommand = SimpleCLI.command({
         ctx.session,
         ctx.logger,
         resolveRequestedSessionMode(input.readOnly, input.writeAccess),
+        ctx.experiments,
       );
     }
   });
@@ -168,6 +172,7 @@ export const connectCommand = SimpleCLI.command({
 })
   .input(connectInput)
   .use(withAutoSession())
+  .use(withExperiments())
   .handle(async ({ input, ctx }) => {
     warnIfInstalledSkillOutOfDate();
     await runConnectWithLogger(
@@ -175,6 +180,7 @@ export const connectCommand = SimpleCLI.command({
       ctx.session,
       ctx.logger,
       resolveRequestedSessionMode(input.readOnly, input.writeAccess),
+      ctx.experiments,
     );
   });
 

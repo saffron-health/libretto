@@ -72,6 +72,7 @@ import {
   type DaemonBrowserProviderConfig,
   type DaemonWorkflowConfig,
 } from "./config.js";
+import type { Experiments } from "../experiments.js";
 import { getCloudProviderApi } from "../providers/index.js";
 import type { ProviderApi } from "../providers/types.js";
 import {
@@ -160,6 +161,7 @@ class BrowserDaemon {
 
   private constructor(
     private readonly session: string,
+    private readonly experiments: Experiments,
     private readonly externallyManaged: boolean,
     private readonly browser: Browser,
     private readonly context: BrowserContext,
@@ -190,6 +192,7 @@ class BrowserDaemon {
    */
   private static async initialize(args: {
     session: string;
+    experiments: Experiments;
     externallyManaged: boolean;
     browser: Browser;
     context: BrowserContext;
@@ -211,6 +214,7 @@ class BrowserDaemon {
   }): Promise<BrowserDaemon> {
     const {
       session,
+      experiments,
       externallyManaged,
       browser,
       context,
@@ -253,6 +257,7 @@ class BrowserDaemon {
     const socketPath = getDaemonSocketPath(session);
     const daemon = new BrowserDaemon(
       session,
+      experiments,
       externallyManaged,
       browser,
       context,
@@ -328,6 +333,7 @@ class BrowserDaemon {
 
   static async launchBrowser(args: {
     session: string;
+    experiments: Experiments;
     browser: DaemonBrowserLaunchConfig;
     workflow?: DaemonWorkflowConfig;
   }): Promise<BrowserDaemon> {
@@ -372,6 +378,7 @@ class BrowserDaemon {
 
     const daemon = await BrowserDaemon.initialize({
       session,
+      experiments: args.experiments,
       externallyManaged: false,
       browser,
       context,
@@ -393,6 +400,7 @@ class BrowserDaemon {
 
   static async connectToEndpoint(args: {
     session: string;
+    experiments: Experiments;
     browser: DaemonBrowserConnectConfig;
   }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
@@ -410,6 +418,7 @@ class BrowserDaemon {
 
     const daemon = await BrowserDaemon.initialize({
       session,
+      experiments: args.experiments,
       externallyManaged: true,
       browser,
       context,
@@ -430,6 +439,7 @@ class BrowserDaemon {
 
   static async connectToProvider(args: {
     session: string;
+    experiments: Experiments;
     browser: DaemonBrowserProviderConfig;
   }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
@@ -451,6 +461,7 @@ class BrowserDaemon {
 
       const daemon = await BrowserDaemon.initialize({
         session,
+        experiments: args.experiments,
         externallyManaged: true,
         browser,
         context,
@@ -792,15 +803,18 @@ async function main(): Promise<void> {
     config.browser.kind === "provider"
       ? await BrowserDaemon.connectToProvider({
           session: config.session,
+          experiments: config.experiments,
           browser: config.browser,
         })
       : config.browser.kind === "connect"
         ? await BrowserDaemon.connectToEndpoint({
             session: config.session,
+            experiments: config.experiments,
             browser: config.browser,
           })
         : await BrowserDaemon.launchBrowser({
             session: config.session,
+            experiments: config.experiments,
             browser: config.browser,
             workflow: config.workflow,
           });
