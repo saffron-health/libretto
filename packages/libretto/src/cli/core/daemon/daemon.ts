@@ -63,8 +63,9 @@ import {
 } from "../browser.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
-import { handleSnapshot } from "./snapshot.js";
+import { handleCompactSnapshot, handleSnapshot } from "./snapshot.js";
 import { librettoCommand } from "../../../shared/package-manager.js";
+import type { Snapshot } from "../../../shared/snapshot/types.js";
 import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,
@@ -158,6 +159,7 @@ class BrowserDaemon {
   private readonly connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
   private workflowController: WorkflowController | undefined;
   private shutdownPromise: Promise<DaemonCloseResult> | undefined;
+  private latestCompactSnapshot: Snapshot | null = null;
 
   private constructor(
     private readonly session: string,
@@ -613,15 +615,7 @@ class BrowserDaemon {
         this.withRequestTimeout(() => handlePages(this.pageById, this.page)),
       exec: (args) => this.runExec(args),
       readonlyExec: (args) => this.runReadonlyExec(args),
-      snapshot: (args) =>
-        this.withRequestTimeout(() =>
-          handleSnapshot(
-            this.resolveTargetPage(args.pageId),
-            this.session,
-            this.logger,
-            args.pageId,
-          ),
-        ),
+      snapshot: (args) => this.runSnapshot(args),
       getWorkflowStatus: () => this.getWorkflowStatus(),
       resumeWorkflow: () => this.resumeWorkflow(),
       close: () =>
@@ -629,6 +623,44 @@ class BrowserDaemon {
           keepIpcClientsAlive: true,
         }),
     };
+  }
+
+  private async runSnapshot(
+    args: Parameters<CliToDaemonApi["snapshot"]>[0],
+  ): Promise<ReturnType<CliToDaemonApi["snapshot"]>> {
+    if (args.mode === "compact") {
+      if (!this.experiments.compactSnapshotFormat) {
+        throw new Error(
+          `The compactSnapshotFormat experiment is not enabled for session "${this.session}". ` +
+            `Close and reopen the session after running ${librettoCommand("experiments enable compactSnapshotFormat")}.`,
+        );
+      }
+      const result = await this.withRequestTimeout(() =>
+        handleCompactSnapshot(
+          this.resolveTargetPage(args.pageId),
+          this.session,
+          this.logger,
+          {
+            pageId: args.pageId,
+            cachedSnapshot: this.latestCompactSnapshot,
+            useCachedSnapshot: args.useCachedSnapshot,
+          },
+        ),
+      );
+      if (!args.useCachedSnapshot) {
+        this.latestCompactSnapshot = result.snapshot;
+      }
+      return result;
+    }
+
+    return this.withRequestTimeout(() =>
+      handleSnapshot(
+        this.resolveTargetPage(args.pageId),
+        this.session,
+        this.logger,
+        args.pageId,
+      ),
+    );
   }
 
   private async withRequestTimeout<T>(

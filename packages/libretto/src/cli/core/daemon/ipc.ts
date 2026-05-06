@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { createIpcPeer, type IpcPeer } from "../../../shared/ipc/ipc.js";
 import { connectToIpcSocket } from "../../../shared/ipc/socket-transport.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
+import type { Snapshot } from "../../../shared/snapshot/types.js";
 import { REPO_ROOT } from "../context.js";
 import type { WorkflowStatus } from "../workflow-runner/runner.js";
 import type { DaemonConfig } from "./config.js";
@@ -23,20 +24,32 @@ export type DaemonExecArgs = {
 
 export type DaemonReadonlyExecArgs = { code: string; pageId?: string };
 
-export type DaemonSnapshotArgs = { pageId?: string };
+export type DaemonSnapshotArgs =
+  | { mode?: "legacy"; pageId?: string; useCachedSnapshot?: false }
+  | { mode: "compact"; pageId?: string; useCachedSnapshot?: boolean };
 
 export type DaemonExecSuccess = {
   result: unknown;
   output?: DaemonExecOutput;
 };
 
-export type DaemonSnapshotResult = {
+export type DaemonLegacySnapshotResult = {
   pngPath: string;
   htmlPath: string;
   snapshotRunId: string;
   pageUrl: string;
   title: string;
 };
+
+export type DaemonCompactSnapshotResult = {
+  mode: "compact";
+  pngPath: string;
+  snapshot: Snapshot;
+};
+
+export type DaemonSnapshotResult =
+  | DaemonLegacySnapshotResult
+  | DaemonCompactSnapshotResult;
 
 export type DaemonCloseResult = { replayUrl?: string };
 

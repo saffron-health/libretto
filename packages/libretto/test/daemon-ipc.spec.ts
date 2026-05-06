@@ -181,6 +181,80 @@ describe("daemon IPC", () => {
     expect(result.stderr).not.toContain("daemon may have crashed");
   }, 45_000);
 
+  test("compact snapshot prints screenshot path, tree, and subtree hint", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-compact-snapshot";
+    const url = await writeFixturePage(
+      workspacePath,
+      "compact-snapshot",
+      "Compact Snapshot Test",
+      `<main><h1>Compact Heading</h1><button>Save Changes</button></main>`,
+    );
+
+    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(`snapshot --session ${session}`);
+    expect(result.stdout).toContain("Screenshot at ");
+    expect(result.stdout.indexOf("Screenshot at ")).toBeLessThan(
+      result.stdout.indexOf("<page"),
+    );
+    expect(result.stdout).toContain("<page");
+    expect(result.stdout).toContain("# Compact Heading");
+    expect(result.stdout).toContain("Save Changes");
+    expect(result.stdout).toContain("Hint: Use ");
+    expect(result.stdout).toContain("snapshot <ref> --session");
+  }, 45_000);
+
+  test("compact snapshot ref uses cached full snapshot and scopes output", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-compact-snapshot-ref";
+    const url = await writeFixturePage(
+      workspacePath,
+      "compact-snapshot-ref",
+      "Compact Snapshot Ref Test",
+      `<main><h1>Scoped Page</h1><p>Sibling Details</p><button>Save Changes</button></main>`,
+    );
+
+    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const fullSnapshot = await librettoCli(`snapshot --session ${session}`);
+    const ref = fullSnapshot.stdout.match(/<button ref="([^"]+)"/)?.[1];
+    expect(ref).toBeTruthy();
+
+    const scopedSnapshot = await librettoCli(
+      `snapshot ${ref} --session ${session}`,
+    );
+    expect(scopedSnapshot.stdout).toContain("Screenshot at ");
+    expect(scopedSnapshot.stdout).toContain("Save Changes");
+    expect(scopedSnapshot.stdout).not.toContain("Sibling Details");
+  }, 45_000);
+
+  test("compact snapshot ref fails before a full compact snapshot is cached", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-compact-snapshot-ref-missing";
+    const url = await writeFixturePage(
+      workspacePath,
+      "compact-snapshot-ref-missing",
+      "Compact Snapshot Missing Ref Cache Test",
+      `<main><button>Save Changes</button></main>`,
+    );
+
+    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(`snapshot l1 --session ${session}`);
+    expect(result.stderr).toContain("No compact snapshot is cached");
+    expect(result.stderr).toContain(`snapshot --session ${session}`);
+  }, 45_000);
+
   test("exec without --page targets the original page after a workflow opens another page", async ({
     librettoCli,
     writeWorkflow,
