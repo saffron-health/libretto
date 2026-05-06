@@ -79,6 +79,7 @@
     "glimpseui": "^0.5.1",
     "google-auth-library": "^10.6.1",
     "openai": "^6.29.0",
+    "outdent": "^0.8.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.5"

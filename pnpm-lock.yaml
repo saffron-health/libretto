@@ -245,6 +245,9 @@ importers:
       openai:
         specifier: ^6.29.0
         version: 6.33.0(ws@8.20.0)(zod@4.3.6)
+      outdent:
+        specifier: ^0.8.0
+        version: 0.8.0
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)
@@ -6332,6 +6335,9 @@ packages:
 
   openid-client@6.8.2:
     resolution: {integrity: sha512-uOvTCndr4udZsKihJ68H9bUICrriHdUVJ6Az+4Ns6cW55rwM5h0bjVIzDz2SxgOI84LKjFyjOFvERLzdTUROGA==}
+
+  outdent@0.8.0:
+    resolution: {integrity: sha512-KiOAIsdpUTcAXuykya5fnVVT+/5uS0Q1mrkRHcF89tpieSmY33O/tmc54CqwA+bfhbtEfZUNLHaPUiB9X3jt1A==}
 
   own-keys@1.0.1:
     resolution: {integrity: sha512-qFOyK5PjiWZd+QQIh+1jhdb9LpxTF0qs7Pm8o5QHYZ0M3vKqSqzsZaEB6oWlxZ+q2sJBMI/Ktgd2N5ZwQoRHfg==}
@@ -15402,6 +15408,8 @@ snapshots:
     dependencies:
       jose: 6.2.2
       oauth4webapi: 3.8.5
+
+  outdent@0.8.0: {}
 
   own-keys@1.0.1:
     dependencies:
