@@ -98,7 +98,7 @@ async function snapshot(page: Page): Promise<Snapshot> {
 - [x] Avoid adding renderer profile fields, alternate raw/default render models, or a `projected` argument
 - [x] Treat `snapshot(page)` as daemon/internal machinery; compact snapshot CLI calls must go through daemon IPC
 - [x] Verify `pnpm -s type-check --filter=libretto` passes
-- [x] Add focused coverage through user-level CLI tests in later phases rather than testing CDP internals directly
+- [x] Add focused coverage through renderer/diff unit tests and later user-level CLI tests rather than testing CDP capture internals directly
 
 ### Phase 3: Add the single snapshot renderer and diff helper
 
@@ -115,15 +115,30 @@ function diffSnapshots(before: Snapshot, after: Snapshot): SnapshotDiff {
 }
 ```
 
-- [ ] Add `packages/libretto/src/shared/snapshot/render-snapshot.ts`
-- [ ] Add `packages/libretto/src/shared/snapshot/diff-snapshots.ts`
-- [ ] Match the intended compact snapshot format: page/frame tags, semantic role tags, heading text, refs, and a final subtree hint
-- [ ] Implement ref scoping in `renderSnapshot(snapshot, refId?)` by rendering a scoped view of the already-captured tree; do not recapture the page to satisfy a ref request
-- [ ] Keep only one rendering path; do not add `toRenderedSnapshot(snapshot, "projected")` or any equivalent profile switch
-- [ ] Include the minimal compaction needed for useful agent output: low-value wrapper flattening, clickable generic promotion, single-child chain folding, and child truncation summaries
-- [ ] Preserve the useful diff behavior from the worktree: structural tree comparison, `+`/`-`/`~` output or equivalent typed metadata, context ancestors, low-signal attr suppression, normalized href comparison, and diff truncation summaries
-- [ ] Add a small `renderSnapshotDiff(diff)` only if CLI output needs a separate formatting step; keep `diffSnapshots(before, after) -> SnapshotDiff` as the core API
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes
+- [x] Add `packages/libretto/src/shared/snapshot/render-snapshot.ts`
+- [x] Add `packages/libretto/src/shared/snapshot/diff-snapshots.ts`
+- [x] Match the intended compact snapshot format: page/frame tags, semantic role tags, heading text, refs, and a final subtree hint
+- [x] Implement ref scoping in `renderSnapshot(snapshot, refId?)` by rendering a scoped view of the already-captured tree; do not recapture the page to satisfy a ref request
+- [x] Keep only one rendering path; do not add `toRenderedSnapshot(snapshot, "projected")` or any equivalent profile switch
+- [x] Keep renderer module exports limited to APIs and types needed by `render-snapshot.ts` and `diff-snapshots.ts`; do not export private formatting helpers
+- [x] Include the minimal compaction needed for useful agent output: low-value wrapper flattening, clickable generic promotion, single-child chain folding, and child truncation summaries
+- [x] Preserve the useful diff behavior from the worktree: structural tree comparison, `+`/`-`/`~` output or equivalent typed metadata, context ancestors, low-signal attr suppression, normalized href comparison, and diff truncation summaries
+- [x] Add a small `renderSnapshotDiff(diff)` only if CLI output needs a separate formatting step; keep `diffSnapshots(before, after) -> SnapshotDiff` as the core API
+- [x] Verify `pnpm -s type-check --filter=libretto` passes
+
+### Phase 3.5: Add snapshot renderer and diff unit tests
+
+Add focused unit tests for the pure snapshot renderer and diff helpers. Use hand-built `Snapshot` fixtures so tests cover behavior without launching Playwright, opening CDP sessions, or asserting capture internals.
+
+- [ ] Add a unit test file under `packages/libretto/test/`, for example `snapshot-render-diff.spec.ts`
+- [ ] Cover `renderSnapshot(snapshot)` output for page/frame tags, heading text, refs, semantic role tags, and the final subtree hint
+- [ ] Cover `renderSnapshot(snapshot, refId)` scoping from an already-captured tree, including numeric-suffix fallback such as `e16` matching `l16`
+- [ ] Cover renderer compaction behavior that is easy to regress: low-value wrapper flattening, clickable generic promotion, single-child chain folding, and child truncation summaries
+- [ ] Cover `diffSnapshots(before, after)` and `renderSnapshotDiff(diff)` for unchanged, added, removed, and modified nodes with context ancestors
+- [ ] Cover diff signal handling for ref-only changes and href query/hash changes so low-signal differences do not produce noisy diffs
+- [ ] Keep tests behavior-focused; do not assert private helper names or CDP capture details
+- [ ] Run `pnpm -s test --filter=libretto -- snapshot-render-diff.spec.ts`
+- [ ] Run `pnpm -s type-check --filter=libretto`
 
 ### Phase 4: Add page stability waiting
 
