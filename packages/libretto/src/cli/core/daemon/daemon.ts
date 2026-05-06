@@ -68,7 +68,11 @@ import { librettoCommand } from "../../../shared/package-manager.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
 import { snapshot } from "../../../shared/snapshot/capture-snapshot.js";
 import { diffSnapshots } from "../../../shared/snapshot/diff-snapshots.js";
-import { waitForPageStable } from "../../../shared/snapshot/wait-for-page-stable.js";
+import {
+  installPageStabilityWaiter,
+  preparePageStabilityWait,
+  waitForPageStable,
+} from "../../../shared/snapshot/wait-for-page-stable.js";
 import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,
@@ -188,6 +192,16 @@ class BrowserDaemon {
     return id;
   }
 
+  private async installCompactSnapshotWaiter(page: Page): Promise<void> {
+    const result = await preparePageStabilityWait(page, { timeoutMs: 1_000 });
+    if (!result.ok) {
+      this.logger.warn("compact-snapshot-waiter-install-incomplete", {
+        session: this.session,
+        diagnostics: result.diagnostics,
+      });
+    }
+  }
+
   // ── Shared initialization ──────────────────────────────────────────
 
   /**
@@ -257,6 +271,10 @@ class BrowserDaemon {
       });
     }
 
+    if (experiments.compactSnapshotFormat) {
+      await context.addInitScript(installPageStabilityWaiter);
+    }
+
     // IPC server — typed handlers are attached per client connection so one
     // daemon lifetime can serve multiple CLI invocations.
     const socketPath = getDaemonSocketPath(session);
@@ -277,9 +295,19 @@ class BrowserDaemon {
       wrapPageForActionLogging(p, session);
       daemon.trackPage(p);
     }
+    if (experiments.compactSnapshotFormat) {
+      await Promise.all(
+        initialPages.map((initialPage) =>
+          daemon.installCompactSnapshotWaiter(initialPage),
+        ),
+      );
+    }
     context.on("page", (newPage) => {
       wrapPageForActionLogging(newPage, session);
       daemon.trackPage(newPage);
+      if (experiments.compactSnapshotFormat) {
+        void daemon.installCompactSnapshotWaiter(newPage);
+      }
     });
 
     // Navigate after telemetry is installed (so we capture the initial

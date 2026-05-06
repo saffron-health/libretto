@@ -25,6 +25,20 @@ type BrowserWaiterApi = {
   waitForStability(args: PageStabilityWaitArgs): Promise<string | null>;
 };
 
+export async function preparePageStabilityWait(
+  page: Page,
+  options: Pick<PageStabilityWaitOptions, "timeoutMs"> = {},
+): Promise<PageStabilityWaitResult> {
+  const diagnostic = await installBrowserStabilityWaiterOnPage(
+    page,
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  );
+  return {
+    ok: diagnostic === null,
+    diagnostics: diagnostic === null ? [] : [diagnostic],
+  };
+}
+
 export async function waitForPageStable(
   page: Page,
   options: PageStabilityWaitOptions = {},
@@ -77,8 +91,13 @@ async function waitForBrowserStability(
   let lastError: string | null = null;
 
   while (Date.now() < deadline) {
+    const installDiagnostic = await installBrowserStabilityWaiterOnPage(
+      page,
+      Math.max(0, deadline - Date.now()),
+    );
+    if (installDiagnostic) return installDiagnostic;
+
     try {
-      await page.evaluate(installBrowserStabilityWaiter);
       return await page.evaluate(runBrowserStabilityWait, {
         ...args,
         timeoutMs: Math.max(0, deadline - Date.now()),
@@ -97,7 +116,32 @@ async function waitForBrowserStability(
     : "Timed out waiting for page stability";
 }
 
-function installBrowserStabilityWaiter(): void {
+async function installBrowserStabilityWaiterOnPage(
+  page: Page,
+  timeoutMs: number,
+): Promise<string | null> {
+  const deadline = Date.now() + timeoutMs;
+  let lastError: string | null = null;
+
+  while (Date.now() < deadline) {
+    try {
+      await page.evaluate(installPageStabilityWaiter);
+      return null;
+    } catch (error) {
+      lastError = errorMessage(error);
+      if (!isRetryableExecutionContextError(lastError)) {
+        return `Failed to install page stability waiter: ${lastError}`;
+      }
+      await sleep(Math.min(100, Math.max(0, deadline - Date.now())));
+    }
+  }
+
+  return lastError
+    ? `Failed to install page stability waiter: ${lastError}`
+    : "Timed out installing page stability waiter";
+}
+
+export function installPageStabilityWaiter(): void {
   const symbol = Symbol.for("libretto.pageStabilityWaiter");
   const windowWithWaiter = window as Window & {
     [symbol]?: BrowserWaiterApi;

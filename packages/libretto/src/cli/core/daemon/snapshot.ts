@@ -81,19 +81,18 @@ export async function handleCompactSnapshot(
   pngPath: string;
   snapshot: Snapshot;
 }> {
-  const screenshot = await captureSnapshotScreenshot(
-    targetPage,
-    session,
-    logger,
-    options.pageId,
-  );
-
   if (options.useCachedSnapshot) {
     if (!options.cachedSnapshot) {
       throw new Error(
         `No compact snapshot is cached for session "${session}". Run ${librettoCommand(`snapshot --session ${session}`)} first.`,
       );
     }
+    const screenshot = await captureSnapshotScreenshot(
+      targetPage,
+      session,
+      logger,
+      options.pageId,
+    );
     return {
       mode: "compact",
       pngPath: screenshot.pngPath,
@@ -109,6 +108,13 @@ export async function handleCompactSnapshot(
       diagnostics: waitResult.diagnostics,
     });
   }
+
+  const screenshot = await captureSnapshotScreenshot(
+    targetPage,
+    session,
+    logger,
+    options.pageId,
+  );
 
   return {
     mode: "compact",
