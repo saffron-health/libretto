@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import {
@@ -13,18 +14,28 @@ import {
 import { createEvalContext } from "./fixtures.js";
 import { takeRecordedScores, type EvalScoreRecord } from "./scoring.js";
 import {
+  takeRecordedEvalCalls,
+  type EvalCallRecord,
+} from "./run-recorder.js";
+import {
   evalAuthProfilePath,
   hasEvalAuthProfile,
   loginAuthProfile,
   missingAuthProfileMessage,
   normalizeAuthProfileDomain,
 } from "./auth-profiles.js";
+import {
+  aggregateMetrics,
+  setEvalArtifactPaths,
+  type EvalMetrics,
+} from "./artifacts.js";
 
 type RunCliOptions = {
   command: "run";
   outputDir: string;
   fileFilters: string[];
   testNamePattern: string | null;
+  model: string;
 };
 
 type ProfilesStatusCliOptions = {
@@ -49,25 +60,140 @@ type CaseResult = {
   startedAt: string;
   finishedAt: string;
   durationMs: number;
+  score: {
+    passed: number;
+    total: number;
+    percent: number;
+  };
+  agentMetrics: EvalMetrics;
+  judgeMetrics: EvalMetrics;
+  artifacts: {
+    result: string;
+    transcript: string;
+    agentEvents: string;
+    agentTranscript: string;
+    judgeEvents: string;
+    judgeTranscript: string;
+  };
+  calls: EvalCallRecord[];
   scores: EvalScoreRecord[];
   error?: string;
   skipReason?: string;
 };
 
+type RunSummary = {
+  generatedAt: string;
+  runId: string;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  selectedModel: string;
+  totals: {
+    cases: number;
+    completed: number;
+    skipped: number;
+    errored: number;
+    scorePassed: number;
+    scoreTotal: number;
+    scorePercent: number;
+  };
+  metrics: {
+    agent: EvalMetrics;
+    judge: EvalMetrics;
+    combined: EvalMetrics;
+  };
+  cases: Array<{
+    id: string;
+    name: string;
+    status: CaseResult["status"];
+    durationMs: number;
+    score: CaseResult["score"];
+    agentMetrics: EvalMetrics;
+    judgeMetrics: EvalMetrics;
+    artifacts: CaseResult["artifacts"];
+    error?: string;
+    skipReason?: string;
+  }>;
+};
+
 const here = fileURLToPath(new URL(".", import.meta.url));
 const evalsRoot = resolve(here);
 const repoRoot = resolve(evalsRoot, "..");
+const DEFAULT_EVAL_MODEL = "openai/gpt-5.5";
+
+function gitSha(): string | null {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function relativeArtifact(outputDir: string, artifactPath: string): string {
+  return toPosixPath(relative(outputDir, artifactPath));
+}
+
+function formatDuration(durationMs: number | null): string {
+  if (durationMs == null) return "-";
+  const totalSeconds = Math.round(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
+function formatUsd(value: number | null): string {
+  return value == null ? "-" : `$${value.toFixed(4)}`;
+}
+
+function formatInteger(value: number | null): string {
+  return value == null ? "-" : value.toLocaleString("en-US");
+}
+
+function scorePercent(passed: number, total: number): number {
+  return total > 0 ? Number(((passed / total) * 100).toFixed(2)) : 0;
+}
+
+function metricArtifactsForCase(
+  outputDir: string,
+  id: string,
+): CaseResult["artifacts"] {
+  const caseDir = join(outputDir, "cases", id);
+  return {
+    result: relativeArtifact(outputDir, join(caseDir, "result.json")),
+    transcript: relativeArtifact(outputDir, join(caseDir, "transcript.jsonl")),
+    agentEvents: relativeArtifact(
+      outputDir,
+      join(caseDir, "agent-events.jsonl"),
+    ),
+    agentTranscript: relativeArtifact(
+      outputDir,
+      join(caseDir, "agent-transcript.md"),
+    ),
+    judgeEvents: relativeArtifact(
+      outputDir,
+      join(caseDir, "judge-events.jsonl"),
+    ),
+    judgeTranscript: relativeArtifact(
+      outputDir,
+      join(caseDir, "judge-transcript.md"),
+    ),
+  };
+}
 
 function usage(): string {
   return [
     "Usage:",
-    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>]",
+    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>]",
     "  pnpm evals profiles status",
     "  pnpm evals profiles login <domain>",
     "",
     "Examples:",
     "  pnpm evals",
-    "  pnpm evals run -t network",
+    "  pnpm evals run -t network --model openai/gpt-5.5",
     "  pnpm evals basic.eval.ts --output temp/eval-run",
     "  pnpm evals profiles status",
     "  pnpm evals profiles login linkedin.com",
@@ -107,6 +233,7 @@ function parseArgs(argv: string[]): CliOptions {
 
   let outputDir: string | null = null;
   let testNamePattern: string | null = null;
+  let model = DEFAULT_EVAL_MODEL;
   const fileFilters: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
@@ -135,6 +262,18 @@ function parseArgs(argv: string[]): CliOptions {
       testNamePattern = arg.slice("--testNamePattern=".length);
       continue;
     }
+    if (arg === "--model") {
+      const value = args[index + 1];
+      if (!value) throw new Error("--model requires a provider/model value.");
+      model = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--model=")) {
+      model = arg.slice("--model=".length);
+      if (!model) throw new Error("--model requires a provider/model value.");
+      continue;
+    }
     if (arg.startsWith("-")) {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -149,6 +288,7 @@ function parseArgs(argv: string[]): CliOptions {
     ),
     fileFilters,
     testNamePattern,
+    model,
   };
 }
 
@@ -288,26 +428,117 @@ async function writeJson(path: string, value: unknown): Promise<void> {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function sensitiveEnvValues(): string[] {
+  return Object.entries(process.env)
+    .filter(
+      ([name, value]) =>
+        /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)/i.test(name) &&
+        typeof value === "string" &&
+        value.length >= 8,
+    )
+    .map(([, value]) => value as string)
+    .sort((a, b) => b.length - a.length);
+}
+
+function redactString(value: string, secrets: string[]): string {
+  return secrets.reduce(
+    (text, secret) => text.split(secret).join("[REDACTED]"),
+    value,
+  );
+}
+
+function redactForSummary(
+  value: unknown,
+  secrets = sensitiveEnvValues(),
+): unknown {
+  if (typeof value === "string") return redactString(value, secrets);
+  if (Array.isArray(value)) {
+    return value.map((item) => redactForSummary(item, secrets));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [
+        key,
+        redactForSummary(nested, secrets),
+      ]),
+    );
+  }
+  return value;
+}
+
+async function writeRedactedJson(path: string, value: unknown): Promise<void> {
+  await writeJson(path, redactForSummary(value));
+}
+
+function buildSummaryMarkdown(summary: RunSummary): string {
+  const score = `${summary.totals.scorePassed}/${summary.totals.scoreTotal}`;
+  const lines = [
+    "# Eval Summary",
+    "",
+    `- Run ID: \`${summary.runId}\``,
+    `- Model: \`${summary.selectedModel}\``,
+    `- Duration: \`${formatDuration(summary.durationMs)}\``,
+    `- Cases completed: \`${summary.totals.completed}\``,
+    `- Cases errored: \`${summary.totals.errored}\``,
+    `- Cases skipped: \`${summary.totals.skipped}\``,
+    `- Score: \`${score}\` criteria (\`${summary.totals.scorePercent}%\`)`,
+    "",
+    "Scoring is informational. Low scores do not fail the eval command; setup or runtime errors do.",
+    "",
+    "## Metrics",
+    "",
+    `- Total cost: \`${formatUsd(summary.metrics.combined.totalCostUsd)}\``,
+    `- Total tokens: \`${formatInteger(summary.metrics.combined.totalTokens)}\``,
+    `- Input tokens: \`${formatInteger(summary.metrics.combined.inputTokens)}\``,
+    `- Output tokens: \`${formatInteger(summary.metrics.combined.outputTokens)}\``,
+    `- Cache read tokens: \`${formatInteger(summary.metrics.combined.cacheReadTokens)}\``,
+    `- Cache write tokens: \`${formatInteger(summary.metrics.combined.cacheWriteTokens)}\``,
+    `- Tool calls: \`${summary.metrics.combined.totalToolCalls}\``,
+    "",
+    "## Cases",
+    "",
+    "| Case | Status | Score | Duration | Cost | Tokens | Tool calls | Artifacts |",
+    "|---|---|---:|---:|---:|---:|---:|---|",
+  ];
+
+  for (const result of summary.cases) {
+    const caseScore = `${result.score.passed}/${result.score.total}`;
+    lines.push(
+      `| \`${result.name}\` | ${result.status} | \`${caseScore}\` | \`${formatDuration(result.durationMs)}\` | \`${formatUsd(result.agentMetrics.totalCostUsd)}\` | \`${formatInteger(result.agentMetrics.totalTokens)}\` | \`${result.agentMetrics.totalToolCalls}\` | \`${result.artifacts.result}\` |`,
+    );
+  }
+
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
 async function runCase(
   evalCase: EvalCaseRecord,
   id: string,
   outputDir: string,
+  model: string,
 ): Promise<CaseResult> {
   const startedMs = Date.now();
   const startedAt = new Date(startedMs).toISOString();
   const caseDir = join(outputDir, "cases", id);
-  const previousScoreDir = process.env.LIBRETTO_EVAL_SCORE_DIR;
-  const previousTranscriptPath = process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH;
-  process.env.LIBRETTO_EVAL_SCORE_DIR = join(caseDir, "scores");
-  process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH = join(caseDir, "transcript.jsonl");
+  const artifacts = metricArtifactsForCase(outputDir, id);
+  await rm(caseDir, { recursive: true, force: true });
+  await mkdir(caseDir, { recursive: true });
+  setEvalArtifactPaths({
+    transcript: join(caseDir, "transcript.jsonl"),
+    agentEvents: join(caseDir, "agent-events.jsonl"),
+    agentTranscript: join(caseDir, "agent-transcript.md"),
+    judgeEvents: join(caseDir, "judge-events.jsonl"),
+    judgeTranscript: join(caseDir, "judge-transcript.md"),
+  });
   takeRecordedScores();
+  takeRecordedEvalCalls();
 
   let status: CaseResult["status"] = "completed";
   let errorMessage: string | undefined;
   let cleanupErrorMessage: string | undefined;
   let context: Awaited<ReturnType<typeof createEvalContext>> | null = null;
   try {
-    context = await createEvalContext(evalCase);
+    context = await createEvalContext(evalCase, { model });
     await evalCase.run(context);
   } catch (error) {
     status = "error";
@@ -319,20 +550,25 @@ async function runCase(
       status = "error";
       cleanupErrorMessage = `Cleanup failed:\n${formatError(error)}`;
     } finally {
-      if (previousScoreDir === undefined) {
-        delete process.env.LIBRETTO_EVAL_SCORE_DIR;
-      } else {
-        process.env.LIBRETTO_EVAL_SCORE_DIR = previousScoreDir;
-      }
-      if (previousTranscriptPath === undefined) {
-        delete process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH;
-      } else {
-        process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH = previousTranscriptPath;
-      }
+      setEvalArtifactPaths(null);
     }
   }
 
   const finishedMs = Date.now();
+  const scores = takeRecordedScores();
+  const calls = takeRecordedEvalCalls();
+  const scorePassed = scores.reduce((total, score) => total + score.passed, 0);
+  const scoreTotal = scores.reduce((total, score) => total + score.total, 0);
+  const agentMetrics = aggregateMetrics(
+    calls
+      .filter((call) => call.source === "agent")
+      .map((call) => call.metrics),
+  );
+  const judgeMetrics = aggregateMetrics(
+    calls
+      .filter((call) => call.source === "judge")
+      .map((call) => call.metrics),
+  );
   const combinedError = [errorMessage, cleanupErrorMessage]
     .filter((message) => message && message.length > 0)
     .join("\n\n");
@@ -344,7 +580,16 @@ async function runCase(
     startedAt,
     finishedAt: new Date(finishedMs).toISOString(),
     durationMs: finishedMs - startedMs,
-    scores: takeRecordedScores(),
+    score: {
+      passed: scorePassed,
+      total: scoreTotal,
+      percent: scorePercent(scorePassed, scoreTotal),
+    },
+    agentMetrics,
+    judgeMetrics,
+    artifacts,
+    calls,
+    scores,
     ...(combinedError ? { error: combinedError } : {}),
   };
   await writeJson(join(caseDir, "result.json"), result);
@@ -360,7 +605,8 @@ async function run(options: CliOptions): Promise<number> {
     return 0;
   }
 
-  const startedAt = new Date().toISOString();
+  const startedMs = Date.now();
+  const startedAt = new Date(startedMs).toISOString();
   const files = await discoverEvalFiles(options.fileFilters);
   if (files.length === 0) {
     throw new Error("No eval files matched the provided filters.");
@@ -385,7 +631,7 @@ async function run(options: CliOptions): Promise<number> {
       throw new Error(`Failed to allocate result ID for ${evalCase.name}`);
     }
     process.stdout.write(`\n▶ ${evalCase.name}\n`);
-    const result = await runCase(evalCase, id, options.outputDir);
+    const result = await runCase(evalCase, id, options.outputDir, options.model);
     results.push(result);
     if (result.status === "completed") {
       process.stdout.write(`✓ ${evalCase.name}\n`);
@@ -394,7 +640,9 @@ async function run(options: CliOptions): Promise<number> {
         `- ${evalCase.name} skipped: ${result.skipReason ?? "No reason provided."}\n`,
       );
     } else {
-      process.stdout.write(`✗ ${evalCase.name}\n${result.error ?? "Unknown error"}\n`);
+      process.stdout.write(
+        `✗ ${evalCase.name}\n${result.error ?? "Unknown error"}\n`,
+      );
     }
   }
 
@@ -404,23 +652,34 @@ async function run(options: CliOptions): Promise<number> {
   const skipped = results.filter((result) => result.status === "skipped").length;
   const errored = results.filter((result) => result.status === "error").length;
   const scorePassed = results.reduce(
-    (total, result) =>
-      total + result.scores.reduce((sum, score) => sum + score.passed, 0),
+    (total, result) => total + result.score.passed,
     0,
   );
   const scoreTotal = results.reduce(
-    (total, result) =>
-      total + result.scores.reduce((sum, score) => sum + score.total, 0),
+    (total, result) => total + result.score.total,
     0,
   );
-  const runRecord = {
-    command: options.command,
+  const finishedAt = new Date().toISOString();
+  const durationMs = Date.now() - startedMs;
+  const runId = relative(repoRoot, options.outputDir).startsWith("evals/runs/")
+    ? toPosixPath(relative(join(repoRoot, "evals", "runs"), options.outputDir))
+    : dirname(options.outputDir) === join(repoRoot, "evals", "runs")
+      ? options.outputDir.split(sep).at(-1) ?? options.outputDir
+      : options.outputDir.split(sep).at(-1) ?? options.outputDir;
+  const agentMetrics = aggregateMetrics(
+    results.map((result) => result.agentMetrics),
+  );
+  const judgeMetrics = aggregateMetrics(
+    results.map((result) => result.judgeMetrics),
+  );
+  const combinedMetrics = aggregateMetrics([agentMetrics, judgeMetrics]);
+  const summary: RunSummary = {
+    generatedAt: finishedAt,
+    runId,
     startedAt,
-    finishedAt: new Date().toISOString(),
-    outputDir: options.outputDir,
-    fileFilters: options.fileFilters,
-    testNamePattern: options.testNamePattern,
-    selectedModel: process.env.LIBRETTO_EVAL_MODEL?.trim() || "openai/gpt-5.5",
+    finishedAt,
+    durationMs,
+    selectedModel: options.model,
     totals: {
       cases: results.length,
       completed,
@@ -428,12 +687,49 @@ async function run(options: CliOptions): Promise<number> {
       errored,
       scorePassed,
       scoreTotal,
+      scorePercent: scorePercent(scorePassed, scoreTotal),
     },
+    metrics: {
+      agent: agentMetrics,
+      judge: judgeMetrics,
+      combined: combinedMetrics,
+    },
+    cases: results.map((result) => ({
+      id: result.id,
+      name: result.name,
+      status: result.status,
+      durationMs: result.durationMs,
+      score: result.score,
+      agentMetrics: result.agentMetrics,
+      judgeMetrics: result.judgeMetrics,
+      artifacts: result.artifacts,
+      ...(result.error ? { error: result.error } : {}),
+      ...(result.skipReason ? { skipReason: result.skipReason } : {}),
+    })),
+  };
+  const runRecord = {
+    runId,
+    command: options.command,
+    startedAt,
+    finishedAt,
+    durationMs,
+    gitSha: gitSha(),
+    outputDir: options.outputDir,
+    fileFilters: options.fileFilters,
+    testNamePattern: options.testNamePattern,
+    selectedModel: options.model,
+    totals: summary.totals,
+    metrics: summary.metrics,
     cases: results,
   };
 
   await writeJson(join(options.outputDir, "run.json"), runRecord);
-  await writeJson(join(options.outputDir, "summary.json"), runRecord.totals);
+  await writeRedactedJson(join(options.outputDir, "summary.json"), summary);
+  await writeFile(
+    join(options.outputDir, "summary.md"),
+    redactString(buildSummaryMarkdown(summary), sensitiveEnvValues()),
+    "utf8",
+  );
 
   process.stdout.write(
     `\nCompleted ${completed}/${results.length} eval case(s); score ${scorePassed}/${scoreTotal}; ${skipped} skipped; ${errored} error(s).\n`,

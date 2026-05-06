@@ -4,15 +4,15 @@ The current eval system does not give a trustworthy signal about Libretto agent 
 
 ## Solution overview
 
-Use the Pi SDK for the agent under evaluation and replace Vitest with a small purpose-built eval runner. Eval files register cases through `evalCase({ name, authProfile? }, run)`; `authProfile` is a required domain when present. The eval CLI imports discovered eval files, collects registered cases, applies `.only` and simple filters, preflights required auth profiles, runs cases, and writes artifacts. Auth profiles live in gitignored `evals/profiles/`, private eval cases live in gitignored `evals/private/`, run artifacts live in gitignored `evals/runs/`, and `pnpm evals` runs every discovered eval case. Model selection stays harness-level: default to `openai/gpt-5.5` with medium reasoning, and allow temporary overrides with `LIBRETTO_EVAL_MODEL=<provider/model-id>`.
+Use the Pi SDK for the agent under evaluation and replace Vitest with a small purpose-built eval runner. Eval files register cases through `evalCase({ name, authProfile? }, run)`; `authProfile` is a required domain when present. The eval CLI imports discovered eval files, collects registered cases, applies `.only` and simple filters, preflights required auth profiles, runs cases, and writes artifacts. Auth profiles live in gitignored `evals/profiles/`, private eval cases live in gitignored `evals/private/`, run artifacts live in gitignored `evals/runs/`, and `pnpm evals` runs every discovered eval case. Model selection stays run-level: default to `openai/gpt-5.5` with medium reasoning, and allow temporary overrides with `--model <provider/model-id>`.
 
 ## Goals
 
 - Maintainers can run all available evals with `pnpm evals`.
 - The three current basic eval cases remain the core suite: LinkedIn generation/amendment, broken-selector debugging, and network conversion.
-- The smoke eval is removed because it only validates harness wiring.
+- A minimal smoke eval is checked in to validate harness/scorer/artifact wiring with a trivial prompt.
 - The eval harness uses the Pi SDK instead of `@anthropic-ai/claude-agent-sdk`.
-- Maintainers get `openai/gpt-5.5` with medium reasoning by default, with temporary model overrides available via `LIBRETTO_EVAL_MODEL=<provider/model-id>`.
+- Maintainers get `openai/gpt-5.5` with medium reasoning by default, with temporary model overrides available via `--model <provider/model-id>`.
 - Checked-in evals can require local auth profiles without becoming private.
 - Auth requirements are defined in code with `evalCase({ name, authProfile })`, not buried only in prompt text.
 - `pnpm evals profiles status` reports which auth profiles are required and which are present locally.
@@ -39,7 +39,7 @@ Use the Pi SDK for the agent under evaluation and replace Vitest with a small pu
 
 ## Current eval case audit
 
-- `evals/smoke.eval.ts` / `runs a single-turn eval with libretto skill context` should be removed. It verifies that the harness can inject skill docs and score a response, but it is not a product-quality eval.
+- `evals/smoke.eval.ts` / `hookup smoke trivial agent and scorer` should stay checked in as a cheap wiring check for agent execution, judge scoring, and artifact recording.
 - `evals/basic.eval.ts` / `linkedin scrape generation and amendment` should stay checked in and declare `authProfile: "linkedin.com"`. The profile becomes a preflight requirement instead of a prompt-only convention.
 - `evals/basic.eval.ts` / `broken selector debugging on a government website` should stay as a core eval. It exercises run-diagnose-edit-rerun behavior on a broken workflow.
 - `evals/basic.eval.ts` / `convert browser workflow to network requests` should stay as a core eval. It exercises code conversion from browser DOM scraping to a network-first implementation.
@@ -97,20 +97,21 @@ evals/runs/2026-05-05T12-30-00Z-anthropic-claude-opus-4-5/
 
 ### Phase 1: Remove eval code and cases we are not keeping
 
-Start by cutting the current suite down to the three useful cases so later harness and CLI work has a small, clear target. Keep the old harness temporarily if needed to avoid mixing deletion with the Pi SDK replacement.
+Start by cutting the current suite down to the three useful product cases plus one minimal wiring smoke case. Keep the old harness temporarily if needed to avoid mixing deletion with the Pi SDK replacement.
 
 ```ts
 // Remaining checked-in cases after this phase:
+// - hookup smoke trivial agent and scorer
 // - linkedin scrape generation and amendment
 // - broken selector debugging on a government website
 // - convert browser workflow to network requests
 ```
 
-- [x] Delete `evals/smoke.eval.ts`.
-- [x] Keep the three `evals/basic.eval.ts` cases as the only checked-in eval cases.
+- [x] Replace the old `evals/smoke.eval.ts` with a trivial checked-in harness/scorer hookup smoke case.
+- [x] Keep the three `evals/basic.eval.ts` cases as the checked-in product eval cases.
 - [x] Remove smoke-only assertions and summary expectations if any are added elsewhere.
 - [x] Verify `pnpm evals` still starts the eval runner, even if later phases change the harness.
-- [x] Success criteria: searching `evals/` shows only the three basic eval cases as checked-in eval cases.
+- [x] Success criteria: searching `evals/` shows the smoke case plus the three basic eval cases as checked-in eval cases.
 
 ### Phase 2: Replace the agent harness with the Pi SDK
 
@@ -167,7 +168,7 @@ function formatMessagesForEvaluation(messages: AgentSession["messages"]) {
 - [x] Let `DefaultResourceLoader` discover `.agents/skills` in the temp workspace instead of manually appending Libretto skill markdown to the system prompt.
 - [x] Use only the Pi SDK tools needed by the evals: `read`, `write`, `edit`, and `bash`.
 - [x] Default evaluated agent and judge sessions to `openai/gpt-5.5` with medium reasoning.
-- [x] Resolve the default or `LIBRETTO_EVAL_MODEL="provider/model-id"` selector through `ModelRegistry.find(provider, modelId)` and pass it into every evaluated Pi agent and judge session for that run.
+- [x] Resolve the default or `--model provider/model-id` selector through `ModelRegistry.find(provider, modelId)` and pass it into every evaluated Pi agent and judge session for that run.
 - [x] Keep the scoring API shape (`response.score([...])`) but implement judge calls through Pi as well.
 - [x] Make scoring record verdicts and reasons without throwing when criteria fail.
 - [x] Remove `assertPerfectScore`; eval cases should call `recordScore` for informational score records.
@@ -175,7 +176,7 @@ function formatMessagesForEvaluation(messages: AgentSession["messages"]) {
 - [x] Use Pi SDK conversation helpers (`convertToLlm` and `serializeConversation`) for scoring transcripts instead of custom message parsing.
 - [x] Keep `evals/package.json` calling Vitest directly for Phase 2; do not add a `--model` wrapper or custom eval CLI before Phase 3.
 - [x] Success criteria: one existing basic eval can run end-to-end through Pi SDK with the same prompt text.
-- [x] Success criteria: `LIBRETTO_EVAL_MODEL=<provider/model-id> pnpm evals` changes the Pi model used for evaluated agent sessions.
+- [x] Success criteria: `pnpm evals --model <provider/model-id>` changes the Pi model used for evaluated agent sessions.
 
 ### Phase 3: Replace Vitest with a purpose-built eval runner
 
@@ -207,7 +208,7 @@ export const evalCase = Object.assign(
 - [x] Change `evals/package.json` so its `evals` script calls the eval CLI.
 - [x] Remove Vitest from `evals/package.json` and delete `evals/vitest.config.ts` after the custom runner is wired.
 - [x] Support `pnpm evals` and `pnpm evals run` as aliases for running all evals.
-- [x] Keep model selection in the Pi SDK harness, defaulting to `openai/gpt-5.5` with medium reasoning and accepting `LIBRETTO_EVAL_MODEL=<provider/model-id>` for temporary overrides.
+- [x] Keep model selection in the Pi SDK harness, defaulting to `openai/gpt-5.5` with medium reasoning and accepting `--model <provider/model-id>` for temporary overrides.
 - [x] Support `pnpm evals --output <dir>` and `pnpm evals run --output <dir>` as runner-level run artifact output selection.
 - [x] Support file filters as positional arguments and `-t` / `--testNamePattern` for case-name filtering.
 - [x] Run cases serially by default; do not add a worker pool in v1.
@@ -293,21 +294,21 @@ type EvalMetrics = {
 };
 ```
 
-- [ ] Add an eval run recorder that wraps each `harness.send()` and `response.score()` call.
-- [ ] Create one run directory per invocation under `evals/runs/<run-id>/` by default, or under the CLI-provided `--output <dir>`.
-- [ ] Write run-level `run.json`, `summary.json`, and `summary.md` files.
-- [ ] Write per-case `cases/<case-id>/result.json` records.
-- [ ] Persist Pi `message_end` usage fields when available: input tokens, output tokens, cache read/write tokens, total tokens, and cost.
-- [ ] Persist model/provider, response ID, stop reason, turn count, session ID, and error state when available from Pi events/messages.
-- [ ] Count tool calls from `tool_execution_start` / `tool_execution_end`; include total calls, counts by tool name, and failed calls.
-- [ ] Store full raw event JSONL and formatted transcript artifacts under a per-case artifact directory.
+- [x] Add an eval run recorder that wraps each `harness.send()` and `response.score()` call.
+- [x] Create one run directory per invocation under `evals/runs/<run-id>/` by default, or under the CLI-provided `--output <dir>`.
+- [x] Write run-level `run.json`, `summary.json`, and `summary.md` files.
+- [x] Write per-case `cases/<case-id>/result.json` records.
+- [x] Persist Pi `message_end` usage fields when available: input tokens, output tokens, cache read/write tokens, total tokens, and cost.
+- [x] Persist model/provider, response ID, stop reason, turn count, session ID, and error state when available from Pi events/messages.
+- [x] Count tool calls from `tool_execution_start` / `tool_execution_end`; include total calls, counts by tool name, and failed calls.
+- [x] Store full raw event JSONL and formatted transcript artifacts under a per-case artifact directory.
 - [x] Write per-case `transcript.jsonl` during execution with agent and judge user prompts plus raw Pi `message_end`, `tool_execution_start`, and `tool_execution_end` events.
-- [ ] Store judge prompt/model/result/rationale and judge metrics separately from agent metrics.
+- [x] Store judge prompt/model/result/rationale and judge metrics separately from agent metrics.
 - [x] Stream compact human-readable progress while evals run: clipped user prompts, assistant responses, and tool calls such as `-> bash ...` or `-> read ...`.
-- [ ] Redact known sensitive values before writing CI-uploaded summaries.
-- [ ] Success criteria: each score record includes duration, model usage, token totals, cost estimate, turns, and tool-call counts when Pi provides them.
-- [ ] Success criteria: a run with missing usage metadata records nullable metrics instead of crashing.
-- [ ] Success criteria: `pnpm evals --output temp/eval-run` writes `run.json`, `summary.json`, and per-case `result.json` records under `temp/eval-run`.
+- [x] Redact known sensitive values before writing CI-uploaded summaries.
+- [x] Success criteria: each score record includes duration, model usage, token totals, cost estimate, turns, and tool-call counts when Pi provides them.
+- [x] Success criteria: a run with missing usage metadata records nullable metrics instead of crashing.
+- [x] Success criteria: `pnpm evals --output temp/eval-run` writes `run.json`, `summary.json`, and per-case `result.json` records under `temp/eval-run`.
 
 ### Phase 7: Update summaries, CI, and docs
 

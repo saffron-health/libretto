@@ -30,8 +30,6 @@
         "GOOGLE_CLOUD_LOCATION",
         "GOOGLE_CLOUD_PROJECT",
         "GOOGLE_GENERATIVE_AI_API_KEY",
-        "LIBRETTO_EVAL_MODEL",
-        "LIBRETTO_EVAL_VERBOSE",
         "OPENAI_API_KEY"
       ]
     }

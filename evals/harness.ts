@@ -14,6 +14,12 @@ import {
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
+import {
+  getEvalArtifactPaths,
+  metricsFromEvents,
+  type EvalMetrics,
+} from "./artifacts.js";
+import { recordEvalCall } from "./run-recorder.js";
 
 const EvaluationVerdictSchema = z.object({
   success: z.boolean(),
@@ -52,6 +58,25 @@ type EvaluationVerdict = z.infer<typeof EvaluationVerdictSchema>;
 export type ScoredCriterion = z.infer<typeof ScoredCriterionSchema>;
 export type TranscriptScore = z.infer<typeof TranscriptScoreSchema>;
 export type EvalModelSelector = `${string}/${string}`;
+
+export type EvalJudgeRecord = {
+  prompt: string;
+  model: EvalModelSelector;
+  sessionId: string;
+  result: string;
+  rationale: string | null;
+  metrics: EvalMetrics;
+};
+
+export type EvalScoreMetadata = {
+  agent: {
+    prompt: string;
+    model: EvalModelSelector;
+    sessionId: string;
+    metrics: EvalMetrics;
+  };
+  judge: EvalJudgeRecord;
+};
 
 type PiMessage = AgentSession["messages"][number];
 type PiTool = NonNullable<CreateAgentSessionOptions["tools"]>[number];
@@ -208,36 +233,41 @@ function formatToolErrorProgress(toolName: string, result: unknown): string {
   );
 }
 
-function transcriptPath(): string | null {
-  const path = process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH?.trim();
-  return path && path.length > 0 ? path : null;
+function appendJsonl(
+  path: string | null,
+  record: Record<string, unknown>,
+): void {
+  if (!path) return;
+  mkdirSync(dirname(path), { recursive: true });
+  appendFileSync(
+    path,
+    `${JSON.stringify(
+      { timestamp: new Date().toISOString(), ...record },
+      (_key, value: unknown) =>
+        typeof value === "bigint" ? value.toString() : value,
+    )}\n`,
+    "utf8",
+  );
+}
+
+function appendMarkdown(path: string | null, markdown: string): void {
+  if (!path) return;
+  mkdirSync(dirname(path), { recursive: true });
+  appendFileSync(path, markdown, "utf8");
 }
 
 function appendTranscriptRecord(record: Record<string, unknown>): void {
-  const path = transcriptPath();
+  const path = getEvalArtifactPaths()?.transcript ?? null;
   if (!path) return;
   mkdirSync(dirname(path), { recursive: true });
   try {
-    appendFileSync(
-      path,
-      `${JSON.stringify(
-        { timestamp: new Date().toISOString(), ...record },
-        (_key, value: unknown) =>
-          typeof value === "bigint" ? value.toString() : value,
-      )}\n`,
-      "utf8",
-    );
+    appendJsonl(path, record);
   } catch (error) {
-    appendFileSync(
-      path,
-      `${JSON.stringify({
-        timestamp: new Date().toISOString(),
-        source: record.source,
-        type: "transcript_write_error",
-        error: error instanceof Error ? error.message : String(error),
-      })}\n`,
-      "utf8",
-    );
+    appendJsonl(path, {
+      source: record.source,
+      type: "transcript_write_error",
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -250,6 +280,53 @@ function recordEvent(
   event: AgentSessionEvent,
 ): void {
   appendTranscriptRecord({ source, type: "event", event });
+}
+
+function recordRawEvent(
+  source: "agent" | "judge",
+  event: AgentSessionEvent,
+): void {
+  const paths = getEvalArtifactPaths();
+  appendJsonl(
+    source === "agent"
+      ? (paths?.agentEvents ?? null)
+      : (paths?.judgeEvents ?? null),
+    { source, event },
+  );
+}
+
+function recordTranscriptMarkdown(opts: {
+  source: "agent" | "judge";
+  prompt: string;
+  transcript: string;
+  startedAt: string;
+  finishedAt: string;
+}): void {
+  const paths = getEvalArtifactPaths();
+  appendMarkdown(
+    opts.source === "agent"
+      ? (paths?.agentTranscript ?? null)
+      : (paths?.judgeTranscript ?? null),
+    [
+      `## ${opts.source === "agent" ? "Agent" : "Judge"} turn`,
+      "",
+      `- Started: ${opts.startedAt}`,
+      `- Finished: ${opts.finishedAt}`,
+      "",
+      "### Prompt",
+      "",
+      "```text",
+      opts.prompt.trim(),
+      "```",
+      "",
+      "### Transcript",
+      "",
+      "```text",
+      opts.transcript.trim(),
+      "```",
+      "",
+    ].join("\n"),
+  );
 }
 
 function parseModelSelector(selector: string): EvalModelSelector {
@@ -403,6 +480,8 @@ async function runPiJudge(opts: {
   text: string;
   events: AgentSessionEvent[];
   messages: PiMessage[];
+  sessionId: string;
+  durationMs: number;
 }> {
   const session = await createPiEvalSession({
     cwd: opts.cwd,
@@ -410,9 +489,13 @@ async function runPiJudge(opts: {
     tools: [],
   });
   const events: AgentSessionEvent[] = [];
+  const startedMs = Date.now();
+  const startedAt = new Date(startedMs).toISOString();
+  let callRecorded = false;
   const unsubscribe = session.subscribe((event) => {
+    events.push(event);
+    recordRawEvent("judge", event);
     if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
-      events.push(event);
       recordEvent("judge", event);
     }
     if (event.type === "tool_execution_start") {
@@ -428,16 +511,94 @@ async function runPiJudge(opts: {
     logUserProgress(opts.prompt);
     recordUserPrompt("judge", opts.prompt);
     await session.prompt(opts.prompt);
+    const finishedMs = Date.now();
     const messages = [...session.messages];
     const errorMessage = extractAssistantError(messages);
     if (errorMessage) {
+      recordEvalCall({
+        source: "judge",
+        prompt: opts.prompt,
+        model: opts.model ?? DEFAULT_EVAL_MODEL,
+        sessionId: session.sessionId,
+        metrics: metricsFromEvents({
+          events,
+          durationMs: finishedMs - startedMs,
+          sessionId: session.sessionId,
+          modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+          error: errorMessage,
+        }),
+        error: errorMessage,
+      });
+      callRecorded = true;
       throw new Error(errorMessage);
     }
     const text = extractLastAssistantText(messages);
     if (!text) {
+      const error = "Judge failed: no assistant response from Pi session.";
+      recordEvalCall({
+        source: "judge",
+        prompt: opts.prompt,
+        model: opts.model ?? DEFAULT_EVAL_MODEL,
+        sessionId: session.sessionId,
+        metrics: metricsFromEvents({
+          events,
+          durationMs: finishedMs - startedMs,
+          sessionId: session.sessionId,
+          modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+          error,
+        }),
+        error,
+      });
+      callRecorded = true;
       throw new Error("Judge failed: no assistant response from Pi session.");
     }
-    return { text, events, messages };
+    recordTranscriptMarkdown({
+      source: "judge",
+      prompt: opts.prompt,
+      transcript: formatMessagesForEvaluation(messages),
+      startedAt,
+      finishedAt: new Date(finishedMs).toISOString(),
+    });
+    recordEvalCall({
+      source: "judge",
+      prompt: opts.prompt,
+      model: opts.model ?? DEFAULT_EVAL_MODEL,
+      sessionId: session.sessionId,
+      metrics: metricsFromEvents({
+        events,
+        durationMs: finishedMs - startedMs,
+        sessionId: session.sessionId,
+        modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+      }),
+      error: null,
+    });
+    callRecorded = true;
+    return {
+      text,
+      events,
+      messages,
+      sessionId: session.sessionId,
+      durationMs: finishedMs - startedMs,
+    };
+  } catch (error) {
+    if (!callRecorded) {
+      const message = error instanceof Error ? error.message : String(error);
+      recordEvalCall({
+        source: "judge",
+        prompt: opts.prompt,
+        model: opts.model ?? DEFAULT_EVAL_MODEL,
+        sessionId: session.sessionId,
+        metrics: metricsFromEvents({
+          events,
+          durationMs: Date.now() - startedMs,
+          sessionId: session.sessionId,
+          modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+          error: message,
+        }),
+        error: message,
+      });
+    }
+    throw error;
   } finally {
     unsubscribe();
     session.dispose();
@@ -491,7 +652,7 @@ async function scoreTranscript(opts: {
   transcript: string;
   cwd: string;
   model?: EvalModelSelector;
-}): Promise<TranscriptScore> {
+}): Promise<TranscriptScore & { judge: EvalJudgeRecord }> {
   const normalizedCriteria = opts.criteria
     .map((criterion) => criterion.trim())
     .filter((criterion) => criterion.length > 0);
@@ -568,12 +729,28 @@ async function scoreTranscript(opts: {
   const total = criteria.length;
   const passed = criteria.filter((criterion) => criterion.pass).length;
   const percent = Math.round((passed / total) * 100);
-  return TranscriptScoreSchema.parse({
+  const score = TranscriptScoreSchema.parse({
     criteria,
     passed,
     total,
     percent,
   });
+  return {
+    ...score,
+    judge: {
+      prompt,
+      model: opts.model ?? DEFAULT_EVAL_MODEL,
+      sessionId: result.sessionId,
+      result: result.text,
+      rationale: criteria.map((criterion) => criterion.reason).join("\n"),
+      metrics: metricsFromEvents({
+        events: result.events,
+        durationMs: result.durationMs,
+        sessionId: result.sessionId,
+        modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+      }),
+    },
+  };
 }
 
 export class EvalResponse {
@@ -584,8 +761,9 @@ export class EvalResponse {
   readonly transcript: string;
   readonly totalCostUsd: number | null;
   readonly usage: PiUsageSummary;
+  readonly metrics: EvalMetrics;
   private readonly cwd: string;
-  private readonly model?: EvalModelSelector;
+  private readonly model: EvalModelSelector;
 
   constructor(opts: {
     prompt: string;
@@ -593,7 +771,9 @@ export class EvalResponse {
     events: AgentSessionEvent[];
     sessionId: string;
     cwd: string;
-    model?: EvalModelSelector;
+    model: EvalModelSelector;
+    durationMs: number | null;
+    error?: string | null;
   }) {
     this.prompt = opts.prompt;
     this.messages = opts.messages;
@@ -602,6 +782,13 @@ export class EvalResponse {
     this.transcript = formatMessagesForEvaluation(opts.messages);
     this.usage = summarizeUsageFromEvents(opts.events);
     this.totalCostUsd = this.usage.totalCostUsd;
+    this.metrics = metricsFromEvents({
+      events: opts.events,
+      durationMs: opts.durationMs,
+      sessionId: opts.sessionId,
+      modelSelector: opts.model,
+      error: opts.error,
+    });
     this.cwd = opts.cwd;
     this.model = opts.model;
   }
@@ -619,19 +806,28 @@ export class EvalResponse {
     return verdict;
   }
 
-  async score(criteria: string[]): Promise<TranscriptScore> {
-    return await scoreTranscript({
+  async score(criteria: string[]): Promise<TranscriptScore & EvalScoreMetadata> {
+    const score = await scoreTranscript({
       criteria,
       transcript: this.transcript,
       cwd: this.cwd,
       model: this.model,
     });
+    return {
+      ...score,
+      agent: {
+        prompt: this.prompt,
+        model: this.model,
+        sessionId: this.sessionId,
+        metrics: this.metrics,
+      },
+    };
   }
 }
 
 export class PiEvalHarness {
   private readonly cwd: string;
-  private readonly model?: EvalModelSelector;
+  private readonly model: EvalModelSelector;
   private readonly stopOnFinalResult: boolean;
   private session: AgentSession | null = null;
 
@@ -654,8 +850,9 @@ export class PiEvalHarness {
 
     const events: AgentSessionEvent[] = [];
     const unsubscribe = this.session.subscribe((event) => {
+      events.push(event);
+      recordRawEvent("agent", event);
       if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
-        events.push(event);
         recordEvent("agent", event);
       }
       if (event.type === "tool_execution_start") {
@@ -668,32 +865,46 @@ export class PiEvalHarness {
     });
 
     try {
+      const startedMs = Date.now();
+      const startedAt = new Date(startedMs).toISOString();
+      let callRecorded = false;
+      const buildResponse = (error: string | null = null) => {
+        if (!this.session) {
+          throw new Error("Eval harness session ended before response recording.");
+        }
+        return new EvalResponse({
+          prompt,
+          messages: [...this.session.messages],
+          events,
+          sessionId: this.session.sessionId,
+          cwd: this.cwd,
+          model: this.model,
+          durationMs: Date.now() - startedMs,
+          error,
+        });
+      };
+      const recordAgentCall = (response: EvalResponse, error: string | null) => {
+        if (callRecorded) return;
+        recordEvalCall({
+          source: "agent",
+          prompt,
+          model: this.model,
+          sessionId: response.sessionId,
+          metrics: response.metrics,
+          error,
+        });
+        callRecorded = true;
+      };
       logUserProgress(prompt);
       recordUserPrompt("agent", prompt);
       const update = async () => {
         if (!sendOptions.onUpdate || !this.session) return;
-        await sendOptions.onUpdate(
-          new EvalResponse({
-            prompt,
-            messages: [...this.session.messages],
-            events: [...events],
-            sessionId: this.session.sessionId,
-            cwd: this.cwd,
-            model: this.model,
-          }),
-        );
+        await sendOptions.onUpdate(buildResponse());
       };
 
       const progressUnsubscribe = this.session.subscribe((event) => {
         if (this.stopOnFinalResult && event.type === "message_end") {
-          const response = new EvalResponse({
-            prompt,
-            messages: [...this.session!.messages],
-            events: [...events],
-            sessionId: this.session!.sessionId,
-            cwd: this.cwd,
-            model: this.model,
-          });
+          const response = buildResponse();
           if (extractFinalResultLine(response.transcript) !== null) {
             void this.session!.abort().catch(() => {});
           }
@@ -703,24 +914,66 @@ export class PiEvalHarness {
 
       try {
         await this.session.prompt(prompt);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const response = buildResponse(message);
+        recordAgentCall(response, message);
+        recordTranscriptMarkdown({
+          source: "agent",
+          prompt,
+          transcript: response.transcript,
+          startedAt,
+          finishedAt: new Date().toISOString(),
+        });
+        throw error;
       } finally {
         progressUnsubscribe();
       }
 
+      const finishedMs = Date.now();
+
       const messages = [...this.session.messages];
       const errorMessage = extractAssistantError(messages);
       if (errorMessage) {
+        const response = new EvalResponse({
+          prompt,
+          messages,
+          events,
+          sessionId: this.session.sessionId,
+          cwd: this.cwd,
+          model: this.model,
+          durationMs: finishedMs - startedMs,
+          error: errorMessage,
+        });
+        recordAgentCall(response, errorMessage);
+        recordTranscriptMarkdown({
+          source: "agent",
+          prompt,
+          transcript: response.transcript,
+          startedAt,
+          finishedAt: new Date(finishedMs).toISOString(),
+        });
         throw new Error(errorMessage);
       }
 
-      return new EvalResponse({
+      const response = new EvalResponse({
         prompt,
         messages,
         events,
         sessionId: this.session.sessionId,
         cwd: this.cwd,
         model: this.model,
+        durationMs: finishedMs - startedMs,
       });
+      recordAgentCall(response, null);
+      recordTranscriptMarkdown({
+        source: "agent",
+        prompt,
+        transcript: response.transcript,
+        startedAt,
+        finishedAt: new Date(finishedMs).toISOString(),
+      });
+      return response;
     } finally {
       unsubscribe();
     }

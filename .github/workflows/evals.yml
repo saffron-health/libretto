@@ -62,10 +62,7 @@ jobs:
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          LIBRETTO_EVAL_SCORE_DIR: ${{ runner.temp }}/eval-scores
-          LIBRETTO_EVAL_STRICT: "false"
         run: |
-          mkdir -p "${LIBRETTO_EVAL_SCORE_DIR}"
           pnpm eval
 
       - name: Summarize eval scores

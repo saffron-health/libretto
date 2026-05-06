@@ -20,6 +20,10 @@ export type EvalContext = {
   dispose: () => Promise<void>;
 };
 
+export type CreateEvalContextOptions = {
+  model?: string;
+};
+
 const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(here, "..");
 const referencesRoot = resolve(repoRoot, "evals", "references");
@@ -51,6 +55,7 @@ function assertWithinRoot(
 
 export async function createEvalContext(
   evalCase: EvalCaseRecord,
+  options: CreateEvalContextOptions = {},
 ): Promise<EvalContext> {
   const evalWorkspaceDir = workspaceDirForCase(evalCase);
   const workspaceName = stableHash(
@@ -76,7 +81,7 @@ export async function createEvalContext(
 
   const harness = new PiEvalHarness({
     cwd: evalWorkspaceDir,
-    model: process.env.LIBRETTO_EVAL_MODEL?.trim() || undefined,
+    model: options.model,
   });
 
   return {
