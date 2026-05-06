@@ -239,18 +239,18 @@ async function provisionAuthProfile(domain: string, evalWorkspaceDir: string) {
 ```
 
 - [x] Add `authProfile: "linkedin.com"` to the LinkedIn case.
-- [ ] Normalize auth profile domains the same way Libretto does for `--auth-profile` where possible.
-- [ ] Look up profiles only in `evals/profiles/<domain>.json`.
-- [ ] Copy the profile into `<workspace>/.libretto/profiles/<domain>.json` before constructing `PiEvalHarness`.
-- [ ] Fail required missing profiles before launching Pi with a message that includes `pnpm evals profiles login <domain>`.
-- [ ] Implement `pnpm evals profiles status` by importing discovered eval files and reading required auth profiles from the eval-case registry.
-- [ ] Fail registration when `authProfile` is present but is not a non-empty string.
-- [ ] Report each required domain, the cases that require it, whether `evals/profiles/<domain>.json` exists, and the next command to create it.
-- [ ] Implement `pnpm evals profiles login <domain>` as an interactive local command that opens `https://<domain>` headed, waits for the maintainer to finish login, saves the Libretto profile, copies it to `evals/profiles/<domain>.json`, and closes the session.
-- [ ] Ensure profile JSON is never written to score records, summaries, or CI artifacts.
-- [ ] Success criteria: LinkedIn fails before launching Pi when `evals/profiles/linkedin.com.json` is missing.
-- [ ] Success criteria: `profiles status` lists `linkedin.com` as missing/present based on `evals/profiles/linkedin.com.json`.
-- [ ] Success criteria: `profiles login linkedin.com` creates or refreshes `evals/profiles/linkedin.com.json` after manual login.
+- [x] Normalize auth profile domains the same way Libretto does for `--auth-profile` where possible.
+- [x] Look up profiles only in `evals/profiles/<domain>.json`.
+- [x] Copy the profile into `<workspace>/.libretto/profiles/<domain>.json` before constructing `PiEvalHarness`.
+- [x] Fail required missing profiles before launching Pi with a message that includes `pnpm evals profiles login <domain>`.
+- [x] Implement `pnpm evals profiles status` by importing discovered eval files and reading required auth profiles from the eval-case registry.
+- [x] Fail registration when `authProfile` is present but is not a non-empty string.
+- [x] Report each required domain, the cases that require it, whether `evals/profiles/<domain>.json` exists, and the next command to create it.
+- [x] Implement `pnpm evals profiles login <domain>` as an interactive local command that opens `https://<domain>` headed, waits for the maintainer to finish login, saves the Libretto profile, copies it to `evals/profiles/<domain>.json`, and closes the session.
+- [x] Ensure profile JSON is never written to score records, summaries, or CI artifacts.
+- [x] Success criteria: LinkedIn fails before launching Pi when `evals/profiles/linkedin.com.json` is missing.
+- [x] Success criteria: `profiles status` lists `linkedin.com` as missing/present based on `evals/profiles/linkedin.com.json`.
+- [ ] Success criteria: `profiles login linkedin.com` creates or refreshes `evals/profiles/linkedin.com.json` after manual login. (Implemented; not manually run in this session because it requires interactive LinkedIn login.)
 
 ### Phase 5: Add private eval support
 
@@ -301,7 +301,9 @@ type EvalMetrics = {
 - [ ] Persist model/provider, response ID, stop reason, turn count, session ID, and error state when available from Pi events/messages.
 - [ ] Count tool calls from `tool_execution_start` / `tool_execution_end`; include total calls, counts by tool name, and failed calls.
 - [ ] Store full raw event JSONL and formatted transcript artifacts under a per-case artifact directory.
+- [x] Write per-case `transcript.jsonl` during execution with agent and judge user prompts plus raw Pi `message_end`, `tool_execution_start`, and `tool_execution_end` events.
 - [ ] Store judge prompt/model/result/rationale and judge metrics separately from agent metrics.
+- [x] Stream compact human-readable progress while evals run: clipped user prompts, assistant responses, and tool calls such as `-> bash ...` or `-> read ...`.
 - [ ] Redact known sensitive values before writing CI-uploaded summaries.
 - [ ] Success criteria: each score record includes duration, model usage, token totals, cost estimate, turns, and tool-call counts when Pi provides them.
 - [ ] Success criteria: a run with missing usage metadata records nullable metrics instead of crashing.

@@ -12,13 +12,34 @@ import {
 } from "./eval-case.js";
 import { createEvalContext } from "./fixtures.js";
 import { takeRecordedScores, type EvalScoreRecord } from "./scoring.js";
+import {
+  evalAuthProfilePath,
+  hasEvalAuthProfile,
+  loginAuthProfile,
+  missingAuthProfileMessage,
+  normalizeAuthProfileDomain,
+} from "./auth-profiles.js";
 
-type CliOptions = {
+type RunCliOptions = {
   command: "run";
   outputDir: string;
   fileFilters: string[];
   testNamePattern: string | null;
 };
+
+type ProfilesStatusCliOptions = {
+  command: "profiles-status";
+};
+
+type ProfilesLoginCliOptions = {
+  command: "profiles-login";
+  domain: string;
+};
+
+type CliOptions =
+  | RunCliOptions
+  | ProfilesStatusCliOptions
+  | ProfilesLoginCliOptions;
 
 type CaseResult = {
   id: string;
@@ -41,11 +62,15 @@ function usage(): string {
   return [
     "Usage:",
     "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>]",
+    "  pnpm evals profiles status",
+    "  pnpm evals profiles login <domain>",
     "",
     "Examples:",
     "  pnpm evals",
     "  pnpm evals run -t network",
     "  pnpm evals basic.eval.ts --output temp/eval-run",
+    "  pnpm evals profiles status",
+    "  pnpm evals profiles login linkedin.com",
   ].join("\n");
 }
 
@@ -59,7 +84,25 @@ function parseArgs(argv: string[]): CliOptions {
   if (first === "run") {
     args.shift();
   } else if (first === "profiles") {
-    throw new Error("profiles commands are not implemented until Phase 4.");
+    args.shift();
+    const subcommand = args.shift();
+    if (subcommand === "status") {
+      if (args.length > 0) {
+        throw new Error("profiles status does not accept extra arguments.");
+      }
+      return { command: "profiles-status" };
+    }
+    if (subcommand === "login") {
+      const domain = args.shift();
+      if (!domain || args.length > 0) {
+        throw new Error("Usage: pnpm evals profiles login <domain>");
+      }
+      return {
+        command: "profiles-login",
+        domain: normalizeAuthProfileDomain(domain),
+      };
+    }
+    throw new Error("Expected profiles subcommand: status or login.");
   }
 
   let outputDir: string | null = null;
@@ -212,6 +255,28 @@ function caseIds(cases: EvalCaseRecord[]): Map<EvalCaseRecord, string> {
   return ids;
 }
 
+function casesByRequiredProfile(
+  cases: EvalCaseRecord[],
+): Map<string, EvalCaseRecord[]> {
+  const byDomain = new Map<string, EvalCaseRecord[]>();
+  for (const evalCase of cases) {
+    if (!evalCase.authProfile) continue;
+    const casesForDomain = byDomain.get(evalCase.authProfile) ?? [];
+    casesForDomain.push(evalCase);
+    byDomain.set(evalCase.authProfile, casesForDomain);
+  }
+  return byDomain;
+}
+
+function preflightRequiredProfiles(cases: EvalCaseRecord[]): void {
+  const missing = Array.from(casesByRequiredProfile(cases).keys()).filter(
+    (domain) => !hasEvalAuthProfile(domain),
+  );
+  if (missing.length === 0) return;
+
+  throw new Error(missing.map(missingAuthProfileMessage).join("\n\n"));
+}
+
 function formatError(error: unknown): string {
   if (error instanceof Error) {
     return error.stack ?? error.message;
@@ -233,32 +298,10 @@ async function runCase(
   const startedAt = new Date(startedMs).toISOString();
   const caseDir = join(outputDir, "cases", id);
   const previousScoreDir = process.env.LIBRETTO_EVAL_SCORE_DIR;
+  const previousTranscriptPath = process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH;
   process.env.LIBRETTO_EVAL_SCORE_DIR = join(caseDir, "scores");
+  process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH = join(caseDir, "transcript.jsonl");
   takeRecordedScores();
-
-  if (evalCase.authProfile) {
-    const finishedMs = Date.now();
-    const result: CaseResult = {
-      id,
-      name: evalCase.name,
-      file: evalCase.filePath ? relative(repoRoot, evalCase.filePath) : null,
-      status: "skipped",
-      startedAt,
-      finishedAt: new Date(finishedMs).toISOString(),
-      durationMs: finishedMs - startedMs,
-      scores: [],
-      skipReason:
-        `Requires auth profile ${evalCase.authProfile}; ` +
-        "auth profile provisioning is implemented in Phase 4.",
-    };
-    if (previousScoreDir === undefined) {
-      delete process.env.LIBRETTO_EVAL_SCORE_DIR;
-    } else {
-      process.env.LIBRETTO_EVAL_SCORE_DIR = previousScoreDir;
-    }
-    await writeJson(join(caseDir, "result.json"), result);
-    return result;
-  }
 
   let status: CaseResult["status"] = "completed";
   let errorMessage: string | undefined;
@@ -281,6 +324,11 @@ async function runCase(
         delete process.env.LIBRETTO_EVAL_SCORE_DIR;
       } else {
         process.env.LIBRETTO_EVAL_SCORE_DIR = previousScoreDir;
+      }
+      if (previousTranscriptPath === undefined) {
+        delete process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH;
+      } else {
+        process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH = previousTranscriptPath;
       }
     }
   }
@@ -305,6 +353,14 @@ async function runCase(
 }
 
 async function run(options: CliOptions): Promise<number> {
+  if (options.command === "profiles-status") {
+    return await profilesStatus();
+  }
+  if (options.command === "profiles-login") {
+    await loginAuthProfile(options.domain);
+    return 0;
+  }
+
   const startedAt = new Date().toISOString();
   const files = await discoverEvalFiles(options.fileFilters);
   if (files.length === 0) {
@@ -316,6 +372,7 @@ async function run(options: CliOptions): Promise<number> {
   if (selectedCases.length === 0) {
     throw new Error("No eval cases matched the provided filters.");
   }
+  preflightRequiredProfiles(selectedCases);
 
   await mkdir(options.outputDir, { recursive: true });
   process.stdout.write(`Running ${selectedCases.length} eval case(s)\n`);
@@ -325,22 +382,38 @@ async function run(options: CliOptions): Promise<number> {
   const results: CaseResult[] = [];
   for (const evalCase of selectedCases) {
     const id = ids.get(evalCase);
-    if (!id) throw new Error(`Failed to allocate result ID for ${evalCase.name}`);
+    if (!id) {
+      throw new Error(`Failed to allocate result ID for ${evalCase.name}`);
+    }
     process.stdout.write(`\n▶ ${evalCase.name}\n`);
     const result = await runCase(evalCase, id, options.outputDir);
     results.push(result);
     if (result.status === "completed") {
       process.stdout.write(`✓ ${evalCase.name}\n`);
     } else if (result.status === "skipped") {
-      process.stdout.write(`- ${evalCase.name} skipped: ${result.skipReason ?? "No reason provided."}\n`);
+      process.stdout.write(
+        `- ${evalCase.name} skipped: ${result.skipReason ?? "No reason provided."}\n`,
+      );
     } else {
       process.stdout.write(`✗ ${evalCase.name}\n${result.error ?? "Unknown error"}\n`);
     }
   }
 
-  const completed = results.filter((result) => result.status === "completed").length;
+  const completed = results.filter(
+    (result) => result.status === "completed",
+  ).length;
   const skipped = results.filter((result) => result.status === "skipped").length;
   const errored = results.filter((result) => result.status === "error").length;
+  const scorePassed = results.reduce(
+    (total, result) =>
+      total + result.scores.reduce((sum, score) => sum + score.passed, 0),
+    0,
+  );
+  const scoreTotal = results.reduce(
+    (total, result) =>
+      total + result.scores.reduce((sum, score) => sum + score.total, 0),
+    0,
+  );
   const runRecord = {
     command: options.command,
     startedAt,
@@ -354,6 +427,8 @@ async function run(options: CliOptions): Promise<number> {
       completed,
       skipped,
       errored,
+      scorePassed,
+      scoreTotal,
     },
     cases: results,
   };
@@ -362,9 +437,47 @@ async function run(options: CliOptions): Promise<number> {
   await writeJson(join(options.outputDir, "summary.json"), runRecord.totals);
 
   process.stdout.write(
-    `\nCompleted ${completed}/${results.length} eval case(s); ${skipped} skipped; ${errored} error(s).\n`,
+    `\nCompleted ${completed}/${results.length} eval case(s); score ${scorePassed}/${scoreTotal}; ${skipped} skipped; ${errored} error(s).\n`,
   );
   return errored > 0 ? 1 : 0;
+}
+
+async function profilesStatus(): Promise<number> {
+  const files = await discoverEvalFiles([]);
+  if (files.length === 0) {
+    throw new Error("No eval files found.");
+  }
+
+  const registeredCases = await importEvalFiles(files);
+  const byDomain = casesByRequiredProfile(registeredCases);
+  if (byDomain.size === 0) {
+    process.stdout.write(
+      "No auth profiles are required by discovered eval cases.\n",
+    );
+    return 0;
+  }
+
+  process.stdout.write("Eval auth profiles:\n");
+  for (const [domain, cases] of Array.from(byDomain.entries()).sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  )) {
+    const profilePath = evalAuthProfilePath(domain);
+    const exists = hasEvalAuthProfile(domain);
+    process.stdout.write(`\n${domain}\n`);
+    process.stdout.write(`  Status: ${exists ? "present" : "missing"}\n`);
+    process.stdout.write(`  Profile: ${profilePath}\n`);
+    process.stdout.write("  Required by:\n");
+    for (const evalCase of cases) {
+      const file = evalCase.filePath
+        ? relative(repoRoot, evalCase.filePath)
+        : "unknown file";
+      process.stdout.write(`    - ${evalCase.name} (${file})\n`);
+    }
+    process.stdout.write(
+      `  Create/refresh: pnpm evals profiles login ${domain}\n`,
+    );
+  }
+  return 0;
 }
 
 try {

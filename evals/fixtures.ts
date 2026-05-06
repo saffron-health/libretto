@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { PiEvalHarness } from "./harness.js";
 import { createTmpWorkspace } from "@libretto/dev-tools/tmp-workspace";
 import type { EvalCaseRecord } from "./eval-case.js";
+import { provisionAuthProfile } from "./auth-profiles.js";
 
 export type EvalContext = {
   harness: PiEvalHarness;
@@ -67,6 +68,10 @@ export async function createEvalContext(
   } catch (error) {
     await rm(evalWorkspaceDir, { recursive: true, force: true });
     throw error;
+  }
+
+  if (evalCase.authProfile) {
+    await provisionAuthProfile(evalCase.authProfile, evalWorkspaceDir);
   }
 
   const harness = new PiEvalHarness({

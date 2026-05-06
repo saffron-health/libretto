@@ -1,4 +1,5 @@
 import type { EvalContext } from "./fixtures.js";
+import { normalizeAuthProfileDomain } from "./auth-profiles.js";
 
 export type EvalCaseOptions = {
   name: string;
@@ -32,9 +33,21 @@ function registerEvalCase(
     throw new Error("evalCase requires a non-empty name.");
   }
 
+  let authProfile: string | undefined;
+  if (options.authProfile !== undefined) {
+    if (typeof options.authProfile !== "string") {
+      throw new Error("evalCase authProfile must be a non-empty string.");
+    }
+    const trimmedAuthProfile = options.authProfile.trim();
+    if (trimmedAuthProfile.length === 0) {
+      throw new Error("evalCase authProfile must be a non-empty string.");
+    }
+    authProfile = normalizeAuthProfileDomain(trimmedAuthProfile);
+  }
+
   registry.push({
     name,
-    authProfile: options.authProfile,
+    authProfile,
     only: registerOptions.only === true,
     filePath: currentImportFilePath,
     run,

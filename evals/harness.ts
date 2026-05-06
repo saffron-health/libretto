@@ -11,7 +11,8 @@ import {
   type AgentSessionEvent,
   type CreateAgentSessionOptions,
 } from "@mariozechner/pi-coding-agent";
-import { join } from "node:path";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { z } from "zod";
 
 const EvaluationVerdictSchema = z.object({
@@ -40,7 +41,12 @@ const TRANSCRIPT_EVENT_TYPES = new Set<AgentSessionEvent["type"]>([
   "tool_execution_start",
   "tool_execution_end",
 ]);
-const VERBOSE_EVAL_LOGS = process.env.LIBRETTO_EVAL_VERBOSE === "1";
+const PROGRESS_TEXT_CHARS = 240;
+const PROGRESS_TOOL_ARGS_CHARS = 180;
+const PROGRESS_TOOL_ERROR_CHARS = 360;
+const ANSI_BOLD = "\x1b[1m";
+const ANSI_RED = "\x1b[31m";
+const ANSI_RESET = "\x1b[0m";
 
 type EvaluationVerdict = z.infer<typeof EvaluationVerdictSchema>;
 export type ScoredCriterion = z.infer<typeof ScoredCriterionSchema>;
@@ -90,10 +96,160 @@ function extractFinalResultLine(transcript: string): string | null {
   return finalResultLine ?? null;
 }
 
-function logVerbose(message: string): void {
-  if (VERBOSE_EVAL_LOGS) {
-    process.stderr.write(`[eval] ${message}\n`);
+function compactText(text: string, maxChars: number): string {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxChars) return compact;
+  return `${compact.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function stringifyForProgress(value: unknown): string {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
   }
+}
+
+function contentText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .flatMap((block) => {
+      if (!isRecord(block)) return [];
+      if (block.type === "text" && typeof block.text === "string") {
+        return [block.text];
+      }
+      if (block.type === "image") return ["[image]"];
+      return [];
+    })
+    .join("\n");
+}
+
+function assistantMessageText(message: PiMessage): string {
+  if (messageRole(message) !== "assistant") return "";
+  return contentText((message as { content?: unknown }).content);
+}
+
+function logProgress(line: string): void {
+  process.stdout.write(`${line}\n`);
+}
+
+function red(text: string): string {
+  return `${ANSI_RED}${text}${ANSI_RESET}`;
+}
+
+function bold(text: string): string {
+  return `${ANSI_BOLD}${text}${ANSI_RESET}`;
+}
+
+function logUserProgress(prompt: string): void {
+  logProgress(`user: ${compactText(prompt, PROGRESS_TEXT_CHARS)}`);
+}
+
+function logAssistantProgress(message: PiMessage): void {
+  const text = compactText(assistantMessageText(message), PROGRESS_TEXT_CHARS);
+  if (text.length > 0) {
+    logProgress(text);
+  }
+}
+
+function progressArg(args: unknown, keys: string[]): string | null {
+  if (!isRecord(args)) return null;
+  for (const key of keys) {
+    const value = args[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function formatToolProgress(toolName: string, args: unknown): string {
+  const focusedArg =
+    progressArg(args, ["command", "path", "filePath"]) ??
+    stringifyForProgress(args);
+  const compactArgs = compactText(focusedArg, PROGRESS_TOOL_ARGS_CHARS);
+  const label = bold(toolName);
+  return compactArgs ? `-> ${label} ${compactArgs}` : `-> ${label}`;
+}
+
+function toolResultText(result: unknown): string {
+  if (typeof result === "string") return result;
+  if (!isRecord(result)) return stringifyForProgress(result);
+
+  const content = contentText(result.content);
+  if (content) return content;
+
+  const fields = ["error", "message", "stderr", "stdout"];
+  for (const field of fields) {
+    const value = result[field];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return stringifyForProgress(result);
+}
+
+function formatToolErrorProgress(toolName: string, result: unknown): string {
+  const errorText = compactText(
+    toolResultText(result),
+    PROGRESS_TOOL_ERROR_CHARS,
+  );
+  return red(
+    errorText
+      ? `-> ${bold(toolName)} error: ${errorText}`
+      : `-> ${bold(toolName)} error`,
+  );
+}
+
+function transcriptPath(): string | null {
+  const path = process.env.LIBRETTO_EVAL_TRANSCRIPT_PATH?.trim();
+  return path && path.length > 0 ? path : null;
+}
+
+function appendTranscriptRecord(record: Record<string, unknown>): void {
+  const path = transcriptPath();
+  if (!path) return;
+  mkdirSync(dirname(path), { recursive: true });
+  try {
+    appendFileSync(
+      path,
+      `${JSON.stringify(
+        { timestamp: new Date().toISOString(), ...record },
+        (_key, value: unknown) =>
+          typeof value === "bigint" ? value.toString() : value,
+      )}\n`,
+      "utf8",
+    );
+  } catch (error) {
+    appendFileSync(
+      path,
+      `${JSON.stringify({
+        timestamp: new Date().toISOString(),
+        source: record.source,
+        type: "transcript_write_error",
+        error: error instanceof Error ? error.message : String(error),
+      })}\n`,
+      "utf8",
+    );
+  }
+}
+
+function recordUserPrompt(source: "agent" | "judge", prompt: string): void {
+  appendTranscriptRecord({ source, type: "user", prompt });
+}
+
+function recordEvent(
+  source: "agent" | "judge",
+  event: AgentSessionEvent,
+): void {
+  appendTranscriptRecord({ source, type: "event", event });
 }
 
 function parseModelSelector(selector: string): EvalModelSelector {
@@ -257,10 +413,20 @@ async function runPiJudge(opts: {
   const unsubscribe = session.subscribe((event) => {
     if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
       events.push(event);
+      recordEvent("judge", event);
+    }
+    if (event.type === "tool_execution_start") {
+      logProgress(formatToolProgress(event.toolName, event.args));
+    } else if (event.type === "tool_execution_end" && event.isError) {
+      logProgress(formatToolErrorProgress(event.toolName, event.result));
+    } else if (event.type === "message_end") {
+      logAssistantProgress(event.message);
     }
   });
 
   try {
+    logUserProgress(opts.prompt);
+    recordUserPrompt("judge", opts.prompt);
     await session.prompt(opts.prompt);
     const messages = [...session.messages];
     const errorMessage = extractAssistantError(messages);
@@ -490,21 +656,20 @@ export class PiEvalHarness {
     const unsubscribe = this.session.subscribe((event) => {
       if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
         events.push(event);
+        recordEvent("agent", event);
       }
       if (event.type === "tool_execution_start") {
-        logVerbose(`tool start: ${event.toolName}`);
-      } else if (event.type === "tool_execution_end") {
-        logVerbose(`tool end: ${event.toolName}${event.isError ? " (error)" : ""}`);
+        logProgress(formatToolProgress(event.toolName, event.args));
+      } else if (event.type === "tool_execution_end" && event.isError) {
+        logProgress(formatToolErrorProgress(event.toolName, event.result));
       } else if (event.type === "message_end") {
-        const role =
-          event.message && typeof event.message === "object" && "role" in event.message
-            ? event.message.role
-            : "unknown";
-        logVerbose(`message end: ${role}`);
+        logAssistantProgress(event.message);
       }
     });
 
     try {
+      logUserProgress(prompt);
+      recordUserPrompt("agent", prompt);
       const update = async () => {
         if (!sendOptions.onUpdate || !this.session) return;
         await sendOptions.onUpdate(

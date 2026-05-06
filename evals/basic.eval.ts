@@ -7,8 +7,9 @@ evalCase(
     name: "linkedin scrape generation and amendment",
     authProfile: "linkedin.com",
   },
-  async ({ harness, evalWorkspaceDir, evalWorkspacePath, repoRoot }) => {
+  async ({ harness, evalWorkspaceDir, evalWorkspacePath }) => {
     const workflowPath = evalWorkspacePath("linkedin/linkedin-posts.mjs");
+    const runCommand = `pnpm exec libretto run "${workflowPath}" --params '{"maxPosts":10,"maxComments":25,"maxReposts":25}' --headless --auth-profile linkedin.com`;
 
     const createResponse = await harness.send(outdent`
       You're in this workspace: ${evalWorkspaceDir}.
@@ -19,7 +20,7 @@ evalCase(
 
       Use \`import { workflow } from "libretto"\`.
 
-      Run it once headless with auth profile linkedin.com using: pnpm --dir "${repoRoot}" --filter libretto cli -- run "${workflowPath}" scrapeLinkedInPosts --params '{"maxPosts":10,"maxComments":25,"maxReposts":25}' --headless --auth-profile linkedin.com
+      Run it once from this workspace, headless with auth profile linkedin.com, using: ${runCommand}
 
       Tell me what happened.
     `);
@@ -36,7 +37,7 @@ evalCase(
 
       Please include the tagline for each post author, and for the first 10 commenters click into their profiles and collect their taglines.
 
-      Run it again with: pnpm --dir "${repoRoot}" --filter libretto cli -- run "${workflowPath}" scrapeLinkedInPosts --params '{"maxPosts":10,"maxComments":25,"maxReposts":25}' --headless --auth-profile linkedin.com
+      Run it again from this workspace with: ${runCommand}
 
       Give me a quick summary.
     `);
@@ -52,11 +53,12 @@ evalCase(
 
 evalCase(
   { name: "broken selector debugging on a government website" },
-  async ({ harness, copyEvalReference, repoRoot }) => {
+  async ({ harness, copyEvalReference }) => {
     const workflowPath = await copyEvalReference(
       "broken-selector/usa-gov-broken-selector.mjs",
       "scenarios/broken-selector/usa-gov-workflow.mjs",
     );
+    const runCommand = `pnpm exec libretto run "${workflowPath}" --headless --params '{"query":"passport renewal"}'`;
 
     const response = await harness.send(outdent`
       This workflow is broken: ${workflowPath}.
@@ -65,7 +67,7 @@ evalCase(
 
       Can you run it, figure out what's failing, fix it in place, and rerun it so it works?
 
-      Use this command to run: pnpm --dir "${repoRoot}" --filter libretto cli -- run "${workflowPath}" extractUsaGovTopic --headless --params '{"query":"passport renewal"}'
+      Use this command from this workspace to run: ${runCommand}
     `);
 
     const score = await response.score([
@@ -80,18 +82,19 @@ evalCase(
 
 evalCase(
   { name: "convert browser workflow to network requests" },
-  async ({ harness, copyEvalReference, repoRoot }) => {
+  async ({ harness, copyEvalReference }) => {
     const workflowPath = await copyEvalReference(
       "network-conversion/weather-alerts-dom.mjs",
       "scenarios/network-conversion/weather-alerts.mjs",
     );
+    const runCommand = `pnpm exec libretto run "${workflowPath}" --params '{"state":"CA","limit":5}' --headless`;
 
     const response = await harness.send(outdent`
       Can you convert this workflow to use network requests instead of DOM scraping? ${workflowPath}
 
       Keep the same export name and output shape.
 
-      After updating, run: pnpm --dir "${repoRoot}" --filter libretto cli -- run "${workflowPath}" collectWeatherAlertsFromDom --params '{"state":"CA","limit":5}' --headless
+      After updating, run this command from this workspace: ${runCommand}
 
       Share what you changed and what happened on run.
     `);
