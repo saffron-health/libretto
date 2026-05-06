@@ -68,7 +68,7 @@ function printExperimentDescription(
   console.log("");
   if (experiments[name]) {
     console.log(
-      "This experiment is enabled, so Libretto’s expected usage will deviate from the skill. Use Libretto differently with these instructions:",
+      "Since this experiment is enabled, Libretto’s expected usage deviates from the skill. Use these instructions where they differ:",
     );
     console.log("");
   }

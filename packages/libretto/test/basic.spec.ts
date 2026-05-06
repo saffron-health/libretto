@@ -405,9 +405,11 @@ describe("basic CLI subprocess behavior", () => {
     );
     expect(enabled.stdout).toContain("Status: enabled");
     expect(enabled.stdout).toContain(
-      "This experiment is enabled, so Libretto’s expected usage will deviate from the skill.",
+      "Since this experiment is enabled, Libretto’s expected usage deviates from the skill.",
     );
-    expect(enabled.stdout).toContain("How to enable it:");
+    expect(enabled.stdout).toContain(
+      "Compared with the skill's documented behavior:",
+    );
     expect(enabled.stderr).toBe("");
 
     const described = await librettoCli(
