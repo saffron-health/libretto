@@ -255,9 +255,9 @@ export {
 } from "./shared/snapshot/capture-snapshot.js";
 ```
 
-- [ ] Export snapshot helpers from `packages/libretto/src/index.ts` only if external package consumers or tests need them
-- [ ] Skip this phase if all usage stays inside CLI/daemon internals
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes
+- [x] Export snapshot helpers from `packages/libretto/src/index.ts` only if external package consumers or tests need them
+- [x] Skip this phase if all usage stays inside CLI/daemon internals
+- [x] Verify `pnpm -s type-check --filter=libretto` passes
 
 ### Phase 8: Update skill/docs guidance for the experiment
 
