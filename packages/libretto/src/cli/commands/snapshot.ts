@@ -8,12 +8,18 @@ import {
   type ScreenshotPair,
 } from "../core/snapshot-analyzer.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
-import { pageOption, sessionOption, withRequiredSession } from "./shared.js";
+import {
+  pageOption,
+  sessionOption,
+  withExperiments,
+  withRequiredSession,
+} from "./shared.js";
 import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
 import { readSnapshotModel } from "../core/config.js";
 import { resolveSnapshotApiModelOrThrow } from "../core/ai-model.js";
 import { DaemonClient } from "../core/daemon/ipc.js";
 import { librettoCommand } from "../../shared/package-manager.js";
+import { renderSnapshot } from "../../shared/snapshot/render-snapshot.js";
 
 export const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
 
@@ -124,6 +130,9 @@ async function captureSnapshot(
   } finally {
     client.destroy();
   }
+  if (!("htmlPath" in snapshotResult)) {
+    throw new Error("Daemon returned a compact snapshot for a legacy request.");
+  }
   const { pngPath, htmlPath, snapshotRunId, pageUrl, title } = snapshotResult;
 
   // condenseDom runs in the CLI process, not the daemon.
@@ -154,9 +163,16 @@ async function runSnapshot(
   session: string,
   logger: LoggerApi,
   pageId: string | undefined,
-  objective: string,
-  context: string,
+  objective: string | undefined,
+  context: string | undefined,
 ): Promise<void> {
+  if (objective === undefined) {
+    throw new Error("Missing required option --objective.");
+  }
+  if (context === undefined) {
+    throw new Error("Missing required option --context.");
+  }
+
   const normalizedObjective = objective.trim();
   const normalizedContext = context.trim();
 
@@ -195,13 +211,61 @@ async function runSnapshot(
   await runApiInterpret(interpretArgs, logger, snapshotModel);
 }
 
+async function runCompactSnapshot(
+  args: {
+    session: string;
+    daemonSocketPath?: string;
+    logger: LoggerApi;
+    pageId?: string;
+    ref?: string;
+  },
+): Promise<void> {
+  if (!args.daemonSocketPath) {
+    throw new Error(
+      `Session "${args.session}" has no daemon socket. The browser daemon may have crashed. ` +
+        `Close and reopen the session: ${librettoCommand(`close --session ${args.session}`)}`,
+    );
+  }
+
+  args.logger.info("compact-snapshot-via-daemon", {
+    session: args.session,
+    pageId: args.pageId,
+    ref: args.ref,
+  });
+
+  const client = await DaemonClient.connect(args.daemonSocketPath);
+  let result: Awaited<ReturnType<DaemonClient["snapshot"]>>;
+  try {
+    result = await client.snapshot({
+      mode: "compact",
+      pageId: args.pageId,
+      useCachedSnapshot: args.ref !== undefined,
+    });
+  } finally {
+    client.destroy();
+  }
+  if (!("mode" in result) || result.mode !== "compact") {
+    throw new Error("Daemon returned a legacy snapshot for a compact request.");
+  }
+
+  console.log(`Screenshot at ${result.pngPath}`);
+  console.log(renderSnapshot(result.snapshot, args.ref));
+  console.log(
+    `Hint: Use ${librettoCommand(`snapshot <ref> --session ${args.session}`)} to inspect a subtree.`,
+  );
+}
+
 export const snapshotInput = SimpleCLI.input({
-  positionals: [],
+  positionals: [
+    SimpleCLI.positional("ref", z.string().optional(), {
+      help: "Optional element ref to scope output to that subtree (for example, l16 or e16)",
+    }),
+  ],
   named: {
     session: sessionOption(),
     page: pageOption(),
-    objective: SimpleCLI.option(z.string()),
-    context: SimpleCLI.option(z.string()),
+    objective: SimpleCLI.option(z.string().optional()),
+    context: SimpleCLI.option(z.string().optional()),
   },
 });
 
@@ -210,7 +274,25 @@ export const snapshotCommand = SimpleCLI.command({
 })
   .input(snapshotInput)
   .use(withRequiredSession())
+  .use(withExperiments())
   .handle(async ({ input, ctx }) => {
+    if (ctx.experiments.compactSnapshotFormat) {
+      await runCompactSnapshot({
+        session: ctx.session,
+        daemonSocketPath: ctx.sessionState.daemonSocketPath,
+        logger: ctx.logger,
+        pageId: input.page,
+        ref: input.ref,
+      });
+      return;
+    }
+
+    if (input.ref) {
+      throw new Error(
+        `Snapshot refs require the compactSnapshotFormat experiment. Enable it with ${librettoCommand("experiments enable compactSnapshotFormat")}.`,
+      );
+    }
+
     await runSnapshot(
       ctx.session,
       ctx.logger,

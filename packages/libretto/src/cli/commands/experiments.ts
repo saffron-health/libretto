@@ -15,6 +15,7 @@ const experimentNames = Object.keys(EXPERIMENTS) as ExperimentName[];
 const experimentsUsage = [
   "Usage:",
   `  ${librettoCommand("experiments")}`,
+  `  ${librettoCommand("experiments describe <experiment>")}`,
   `  ${librettoCommand("experiments enable <experiment>")}`,
   `  ${librettoCommand("experiments disable <experiment>")}`,
 ].join("\n");
@@ -53,8 +54,15 @@ function printExperiments(experiments: Experiments): void {
     console.log(
       `- ${name}: ${experiments[name] ? "enabled" : "disabled"} — ${metadata.title}`,
     );
-    console.log(`  ${metadata.description}`);
+    console.log(`  ${metadata.oneSentenceDescription}`);
   }
+}
+
+function printExperimentDescription(name: ExperimentName): void {
+  const metadata = EXPERIMENTS[name];
+  console.log(`${metadata.title} (${name})`);
+  console.log("");
+  console.log(metadata.docs);
 }
 
 export const experimentsCommand = SimpleCLI.command({
@@ -67,7 +75,11 @@ export const experimentsCommand = SimpleCLI.command({
       return;
     }
 
-    if (input.action !== "enable" && input.action !== "disable") {
+    if (
+      input.action !== "describe" &&
+      input.action !== "enable" &&
+      input.action !== "disable"
+    ) {
       throw experimentUsageError(`Unknown experiments action "${input.action}".`);
     }
 
@@ -79,6 +91,11 @@ export const experimentsCommand = SimpleCLI.command({
 
     if (!isExperimentName(input.experiment)) {
       throw experimentUsageError(`Unknown experiment "${input.experiment}".`);
+    }
+
+    if (input.action === "describe") {
+      printExperimentDescription(input.experiment);
+      return;
     }
 
     setExperimentEnabled(input.experiment, input.action === "enable");

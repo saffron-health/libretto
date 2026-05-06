@@ -85,10 +85,6 @@ High-level end-user stories that must be true when the spec is complete.
 
 What is deliberately out of scope. Always includes "no migrations or backfills" unless the user requested them.
 
-## Future work
-
-Items identified during implementation that are valuable but non-blocking. Big features, refactors, or cleanup that can be done after the spec is complete. Only added during implementation, not during initial spec creation.
-
 ## Important files/docs/websites for implementation
 
 A list of all the files that are involved in the implementation. Also included should be any docs files or external links to documentation. Each doc should be annotated with a brief sentence about what it is (and if its not obvious, why it's relevant).
@@ -102,6 +98,21 @@ Each phase heading must be followed by a short one- to two-sentence description 
 Each implementation phase must include success criteria as task items alongside the implementation tasks. Success criteria are verifiable assertions: quick checks ("ensure X is in package.json"), unit tests to write and run, or manual user stories. They should be the minimum set needed to confirm the phase is correctly done.
 
 When a phase is centered on writing or changing code paths, include a short TypeScript code sample in that phase. The sample should show caller-facing interfaces and/or key implementation pieces using high-level descriptive function names. Keep each sample under 30 lines and treat it as a sketch, not production-ready code.
+
+Phase code samples should show where new code interleaves with existing code. Include the file path in a comment, preserve the surrounding class/function/control-flow shape, and use `...` for unchanged existing code rather than replacing the surrounding context with standalone snippets.
+
+```ts
+// packages/libretto/src/daemon/client.ts
+class DaemonClient {
+  ...
+
+  async findSession(id: string) {
+    ...
+    const session = await this.readSession(id);
+    return normalizeSession(session);
+  }
+}
+```
 
 If a phase is documentation-only, infra-only, or otherwise not code-centric, skip the code sample for that phase.
 
