@@ -150,7 +150,7 @@ Keep `renderSnapshot` itself pure: it should render only the snapshot tree. Comm
 
 ### Phase 4: Add page stability waiting
 
-Add a small page stability wait helper for the daemon paths that capture compact snapshots. Do not add a combined `stableSnapshot` abstraction; each caller should explicitly wait for page stability and then call `snapshot(page)` so the capture flow stays obvious.
+Add a small page stability wait helper for the daemon paths that capture compact snapshots. Use an Alumnium-style browser-side waiter: inject an idempotent script that tracks page load, DOM mutation idle, pending DOM resources, and pending `fetch`/`XMLHttpRequest` activity before resolving stability. Do not add a combined `stableSnapshot` abstraction; each caller should explicitly wait for page stability and then call `snapshot(page)` so the capture flow stays obvious.
 
 ```ts
 async function captureCompactSnapshot(page: Page): Promise<Snapshot> {
@@ -160,12 +160,12 @@ async function captureCompactSnapshot(page: Page): Promise<Snapshot> {
 }
 ```
 
-- [ ] Add a page stability helper, for example `waitForPageStable(page)`, under `packages/libretto/src/shared/snapshot/`
-- [ ] Preserve the useful behavior from the worktree: bounded wait, load-state checks, DOM mutation idle, minimum wait, and pending resource checks
-- [ ] Treat stability failures as warnings for snapshot command and exec diff; do not fail the command only because stability timed out
-- [ ] Inline the caller flow in daemon code as `waitForPageStable(page)` followed by `snapshot(page)` before user-requested compact snapshots and before exec after-snapshots
-- [ ] Do not add a `stableSnapshot`, `captureStableSnapshot`, or equivalent helper that combines waiting and capture
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes
+- [x] Add a page stability helper, for example `waitForPageStable(page)`, under `packages/libretto/src/shared/snapshot/`
+- [x] Preserve the useful behavior from the worktree and Alumnium research: bounded wait, load-state checks, DOM mutation idle, minimum wait, pending resource checks, and browser-side `fetch`/`XMLHttpRequest` tracking
+- [x] Treat stability failures as warnings for snapshot command and exec diff; do not fail the command only because stability timed out
+- [x] Inline the caller flow in daemon code as `waitForPageStable(page)` followed by `snapshot(page)` before user-requested compact snapshots and before exec after-snapshots. Compact daemon snapshot and exec-diff paths are added in later phases; those callers will use this helper inline rather than a combined capture helper.
+- [x] Do not add a `stableSnapshot`, `captureStableSnapshot`, or equivalent helper that combines waiting and capture
+- [x] Verify `pnpm -s type-check --filter=libretto` passes
 
 ### Phase 5: Gate daemon-backed `libretto snapshot [ref]` behind the experiment
 
