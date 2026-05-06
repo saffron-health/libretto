@@ -35,6 +35,7 @@ None yet.
 
 - `packages/libretto/docs/experiments.md` — experiment registry, CLI, config, and daemon plumbing conventions.
 - `docs/tests-guide.md` — testing rules for user-level CLI tests.
+- `packages/libretto/package.json` — add test-only dev dependencies such as `outdent` when needed.
 - `packages/libretto/src/cli/core/experiments.ts` — add the new internal experiment flag.
 - `packages/libretto/src/cli/commands/experiments.ts` — listing/enable/disable output will include the new flag automatically through the registry.
 - `packages/libretto/src/cli/commands/snapshot.ts` — switch snapshot command parsing and dispatch based on the experiment while preserving default AI analysis behavior.
@@ -117,7 +118,7 @@ function diffSnapshots(before: Snapshot, after: Snapshot): SnapshotDiff {
 
 - [x] Add `packages/libretto/src/shared/snapshot/render-snapshot.ts`
 - [x] Add `packages/libretto/src/shared/snapshot/diff-snapshots.ts`
-- [x] Match the intended compact snapshot format: page/frame tags, semantic role tags, heading text, refs, and a final subtree hint
+- [x] Match the intended compact snapshot format: page/frame tags, semantic role tags, heading text, and refs
 - [x] Implement ref scoping in `renderSnapshot(snapshot, refId?)` by rendering a scoped view of the already-captured tree; do not recapture the page to satisfy a ref request
 - [x] Keep only one rendering path; do not add `toRenderedSnapshot(snapshot, "projected")` or any equivalent profile switch
 - [x] Keep renderer module exports limited to APIs and types needed by `render-snapshot.ts` and `diff-snapshots.ts`; do not export private formatting helpers
@@ -126,19 +127,26 @@ function diffSnapshots(before: Snapshot, after: Snapshot): SnapshotDiff {
 - [x] Add a small `renderSnapshotDiff(diff)` only if CLI output needs a separate formatting step; keep `diffSnapshots(before, after) -> SnapshotDiff` as the core API
 - [x] Verify `pnpm -s type-check --filter=libretto` passes
 
-### Phase 3.5: Add snapshot renderer and diff unit tests
+### Phase 3.5: Replace renderer/diff tests with browser-backed HTML fixtures
 
-Add focused unit tests for the pure snapshot renderer and diff helpers. Use hand-built `Snapshot` fixtures so tests cover behavior without launching Playwright, opening CDP sessions, or asserting capture internals.
+Add focused renderer and diff tests that read like real pages. The tests should render HTML in Playwright, call the existing `snapshot(page)` capture helper, then assert `renderSnapshot(snapshot, refId?)` and `renderSnapshotDiff(diffSnapshots(before, after))`. This keeps fixtures easy to copy from real HTML while avoiding a second hand-maintained HTML or accessibility parser in tests.
 
-- [ ] Add a unit test file under `packages/libretto/test/`, for example `snapshot-render-diff.spec.ts`
-- [ ] Cover `renderSnapshot(snapshot)` output for page/frame tags, heading text, refs, semantic role tags, and the final subtree hint
-- [ ] Cover `renderSnapshot(snapshot, refId)` scoping from an already-captured tree, including numeric-suffix fallback such as `e16` matching `l16`
-- [ ] Cover renderer compaction behavior that is easy to regress: low-value wrapper flattening, clickable generic promotion, single-child chain folding, and child truncation summaries
-- [ ] Cover `diffSnapshots(before, after)` and `renderSnapshotDiff(diff)` for unchanged, added, removed, and modified nodes with context ancestors
-- [ ] Cover diff signal handling for ref-only changes and href query/hash changes so low-signal differences do not produce noisy diffs
-- [ ] Keep tests behavior-focused; do not assert private helper names or CDP capture details
-- [ ] Run `pnpm -s test --filter=libretto -- snapshot-render-diff.spec.ts`
-- [ ] Run `pnpm -s type-check --filter=libretto`
+Keep `renderSnapshot` itself pure: it should render only the snapshot tree. Command guidance such as the subtree hint belongs in the higher-level compact snapshot command output, not in the shared renderer.
+
+- [x] Add `outdent` as a `packages/libretto` dev dependency for readable HTML and expected-output fixtures
+- [x] Add or update a colocated test file, for example `packages/libretto/src/shared/snapshot/snapshot.spec.ts`
+- [x] Add browser-backed helpers such as `expectSnapshot(html)` and `expectSnapshotDiff(beforeHtml, afterHtml)` that render HTML with Playwright, call `snapshot(page)`, then compare the rendered snapshot/diff output
+- [x] Do not require helpers to load a fake URL just to set page metadata; use the simplest Playwright setup that lets copied HTML render reliably, and treat the page URL as incidental test output
+- [x] Use `<title>` metadata from the fixture HTML for snapshot titles
+- [x] Cover `renderSnapshot(snapshot)` output for page/frame tags, heading text, refs, and semantic role tags
+- [x] Cover `renderSnapshot(snapshot, refId)` scoping from an already-captured tree, including numeric-suffix fallback such as `e16` matching `l16`
+- [x] Cover renderer compaction behavior that is easy to regress: low-value wrapper flattening, clickable generic promotion, single-child chain folding, and child truncation summaries
+- [x] Cover `diffSnapshots(before, after)` and `renderSnapshotDiff(diff)` for unchanged, added, removed, and modified nodes with context ancestors
+- [x] Cover diff signal handling for ref-only changes and href query/hash changes so low-signal differences do not produce noisy diffs; use direct `Snapshot` fixtures only for edge cases that cannot be expressed through real rendered HTML
+- [x] Remove the subtree hint from `renderSnapshot`; keep the hint requirement in the later compact snapshot CLI/daemon phase
+- [x] Keep tests behavior-focused; do not assert private helper names or CDP capture details
+- [x] Run `pnpm -s test --filter=libretto -- snapshot-render-diff.spec.ts`
+- [x] Run `pnpm -s type-check --filter=libretto`
 
 ### Phase 4: Add page stability waiting
 
@@ -190,6 +198,7 @@ async function runCompactSnapshot(input: SnapshotInput, ctx: SnapshotContext) {
 - [ ] Extend daemon snapshot IPC args/results to support compact snapshot requests and a cached-snapshot request flag for `snapshot <ref>`
 - [ ] In `packages/libretto/src/cli/core/daemon/snapshot.ts`, keep the existing PNG+HTML return shape for default mode and add a compact return shape containing a screenshot `pngPath` and full `Snapshot` tree
 - [ ] For every compact `snapshot` command, capture a screenshot before returning and print it in CLI output before the tree as `Screenshot at <path>`
+- [ ] After compact snapshot output, print the subtree guidance hint at the CLI/daemon output layer rather than from `renderSnapshot`; use `librettoCommand(...)` for the command text
 - [ ] Reuse the existing screenshot viewport normalization and zero-width retry behavior where practical; do not create a separate screenshot abstraction unless duplication becomes unavoidable
 - [ ] In `packages/libretto/src/cli/core/daemon/daemon.ts`, store the latest full compact snapshot in daemon memory after each unscoped compact `snapshot` command
 - [ ] If a ref is requested, do not capture a new snapshot tree; capture only the screenshot, return the latest cached full snapshot, then let `renderSnapshot(snapshot, refId)` scope it

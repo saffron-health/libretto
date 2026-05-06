@@ -12,8 +12,6 @@ const MAX_SUMMARY_TEXT_CHARS = 80;
 const MAX_HREF_CHARS = 96;
 const MAX_ACTIONS_IN_SUMMARY = 3;
 const MAX_ACTION_LABEL_CHARS = 80;
-const SNAPSHOT_HINT =
-  "Hint: Use libretto snapshot <ref> --session <name> to snapshot a subtree.";
 
 const PRESERVE_CHILDREN_BY_ROLE = new Set([
   "document",
@@ -157,7 +155,6 @@ export function renderSnapshot(snapshot: Snapshot, refId?: string): string {
     renderFrame(frame, 1, lines);
   }
   lines.push("</page>");
-  lines.push(SNAPSHOT_HINT);
   return lines.join("\n");
 }
 
