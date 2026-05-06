@@ -52,8 +52,9 @@ function createProcessIpcTransport(
       return () => target.off("message", onMessage);
     },
     onClose(callback) {
-      target.on("disconnect", callback);
-      return () => target.off("disconnect", callback);
+      const onDisconnect = () => callback();
+      target.on("disconnect", onDisconnect);
+      return () => target.off("disconnect", onDisconnect);
     },
     close,
   };

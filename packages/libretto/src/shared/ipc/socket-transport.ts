@@ -66,9 +66,7 @@ function createJsonSocketTransport(
       const onError = (error: Error) => {
         closeError = error;
       };
-      const onClose = () => {
-        callback(closeError);
-      };
+      const onClose = () => callback(closeError);
 
       socket.on("error", onError);
       socket.on("close", onClose);

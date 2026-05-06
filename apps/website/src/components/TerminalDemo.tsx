@@ -119,10 +119,8 @@ function useTerminalAnimation(
     setAnimationDone(false);
 
     async function run() {
-      const sleep = (ms: number) =>
-        new Promise((r) => setTimeout(r, ms));
-      const isCancelled = () =>
-        generationRef.current !== gen;
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const isCancelled = () => generationRef.current !== gen;
 
       if (skipTyping) {
         setPromptSubmitted(true);
@@ -308,10 +306,8 @@ export function TerminalDemo() {
       extraStreamingRef.current = "";
 
       async function stream() {
-        const sleep = (ms: number) =>
-          new Promise((r) => setTimeout(r, ms));
-        const isStale = () =>
-          extraGenRef.current !== gen;
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+        const isStale = () => extraGenRef.current !== gen;
         await sleep(400);
         if (isStale()) return;
         setIsExtraStreaming(true);
