@@ -263,8 +263,8 @@ export {
 
 Document how maintainers enable and try the experiment without changing the public docs for the stable snapshot analysis path. Keep mirrored skill files in sync through the source skill file and mirror command.
 
-- [ ] Update `packages/libretto/skills/libretto/SKILL.md` with the experimental `snapshot [ref]` and `exec` diff behavior only if skill guidance should mention experiments
-- [ ] Do not hand-edit `.agents/skills/` or `.claude/skills/`; run `pnpm sync:mirrors` after editing the source skill file
-- [ ] Avoid changing Mintlify user docs unless the experiment is intended to be user-facing
-- [ ] Run `pnpm check:mirrors` if mirrored skill files change
-- [ ] Run `pnpm -s type-check --filter=libretto`
+- [x] Leave `packages/libretto/skills/libretto/SKILL.md` unchanged because skill guidance should not mention the experiment yet
+- [x] Do not hand-edit `.agents/skills/` or `.claude/skills/`; run `pnpm sync:mirrors` after editing the source skill file
+- [x] Avoid changing Mintlify user docs unless the experiment is intended to be user-facing
+- [x] Run `pnpm check:mirrors` if mirrored skill files change
+- [x] Run `pnpm -s type-check --filter=libretto`
