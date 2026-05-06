@@ -181,7 +181,6 @@ async function collectEvalFiles(dir: string): Promise<string[]> {
   const files: string[] = [];
   const ignoredTopLevelDirs = new Set([
     "node_modules",
-    "private",
     "profiles",
     "runs",
   ]);

@@ -268,13 +268,13 @@ evalCase(
 );
 ```
 
-- [ ] Ensure `evals/private/**/*.eval.ts` is discovered by the eval CLI when the directory exists.
-- [ ] Document that `evals/private/` is always gitignored and may contain ordinary `evalCase` files.
-- [ ] Make `profiles status` discover and import both checked-in evals and `evals/private/` when present.
-- [ ] Confirm private cases can use the same `authProfile` provisioning from `evals/profiles/`.
-- [ ] Add no pull/push/sync behavior for profiles or private cases in v1.
-- [ ] Success criteria: adding `evals/private/example.eval.ts` makes `pnpm evals` run it without any suite flag.
-- [ ] Success criteria: deleting `evals/private/` leaves `pnpm evals` running only checked-in cases.
+- [x] Ensure `evals/private/**/*.eval.ts` is discovered by the eval CLI when the directory exists.
+- [x] Document that `evals/private/` is always gitignored and may contain ordinary `evalCase` files.
+- [x] Make `profiles status` discover and import both checked-in evals and `evals/private/` when present.
+- [x] Confirm private cases can use the same `authProfile` provisioning from `evals/profiles/`.
+- [x] Add no pull/push/sync behavior for profiles or private cases in v1.
+- [x] Success criteria: adding `evals/private/example.eval.ts` makes `pnpm evals` run it without any suite flag.
+- [x] Success criteria: deleting `evals/private/` leaves `pnpm evals` running only checked-in cases.
 
 ### Phase 6: Record full eval metrics and artifacts
 
