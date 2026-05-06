@@ -58,11 +58,21 @@ function printExperiments(experiments: Experiments): void {
   }
 }
 
-function printExperimentDescription(name: ExperimentName): void {
+function printExperimentDescription(
+  name: ExperimentName,
+  experiments: Experiments,
+): void {
   const metadata = EXPERIMENTS[name];
   console.log(`${metadata.title} (${name})`);
+  console.log(`Status: ${experiments[name] ? "enabled" : "disabled"}`);
   console.log("");
-  console.log(metadata.docs);
+  if (experiments[name]) {
+    console.log(
+      "Since this experiment is enabled, Libretto’s expected usage deviates from the skill. Use these instructions where they differ:",
+    );
+    console.log("");
+  }
+  console.log(metadata.docs ?? metadata.oneSentenceDescription);
 }
 
 export const experimentsCommand = SimpleCLI.command({
@@ -94,10 +104,17 @@ export const experimentsCommand = SimpleCLI.command({
     }
 
     if (input.action === "describe") {
-      printExperimentDescription(input.experiment);
+      printExperimentDescription(input.experiment, resolveExperiments());
       return;
     }
 
-    setExperimentEnabled(input.experiment, input.action === "enable");
+    const experiments = setExperimentEnabled(
+      input.experiment,
+      input.action === "enable",
+    );
     console.log(`Experiment "${input.experiment}" ${input.action}d.`);
+    if (input.action === "enable") {
+      console.log("");
+      printExperimentDescription(input.experiment, experiments);
+    }
   });

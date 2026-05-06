@@ -193,7 +193,7 @@ describe("daemon IPC", () => {
       `<main><h1>Compact Heading</h1><button>Save Changes</button></main>`,
     );
 
-    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(`snapshot --session ${session}`);
@@ -220,7 +220,7 @@ describe("daemon IPC", () => {
       `<main><h1>Scoped Page</h1><p>Sibling Details</p><button>Save Changes</button></main>`,
     );
 
-    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const fullSnapshot = await librettoCli(`snapshot --session ${session}`);
@@ -253,7 +253,7 @@ describe("daemon IPC", () => {
       `<main><button>Second Page Button</button></main>`,
     );
 
-    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${firstUrl}" --headless --session ${session}`);
     await librettoCli(
       `exec "const p = await context.newPage(); await p.goto('${secondUrl}')" --session ${session}`,
@@ -295,7 +295,7 @@ describe("daemon IPC", () => {
       `<main><button>Save Changes</button></main>`,
     );
 
-    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(`snapshot l1 --session ${session}`);
@@ -315,7 +315,7 @@ describe("daemon IPC", () => {
       `<main><h1>Before Heading</h1><button>Save Changes</button></main>`,
     );
 
-    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const beforeSnapshot = await librettoCli(`snapshot --session ${session}`);
@@ -342,7 +342,7 @@ describe("daemon IPC", () => {
       `<main><h1>Stable Heading</h1></main>`,
     );
 
-    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(
@@ -365,7 +365,7 @@ describe("daemon IPC", () => {
       `<main><h1>Closing Page</h1></main>`,
     );
 
-    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(
@@ -388,7 +388,7 @@ describe("daemon IPC", () => {
       `<main><h1>Readonly Heading</h1><button>Cache Target</button></main>`,
     );
 
-    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const fullSnapshot = await librettoCli(`snapshot --session ${session}`);

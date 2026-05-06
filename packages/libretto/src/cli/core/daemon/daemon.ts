@@ -271,7 +271,7 @@ class BrowserDaemon {
       });
     }
 
-    if (experiments.compactSnapshotFormat) {
+    if (experiments["compact-snapshot-format"]) {
       await context.addInitScript(installPageStabilityWaiter);
     }
 
@@ -295,7 +295,7 @@ class BrowserDaemon {
       wrapPageForActionLogging(p, session);
       daemon.trackPage(p);
     }
-    if (experiments.compactSnapshotFormat) {
+    if (experiments["compact-snapshot-format"]) {
       await Promise.all(
         initialPages.map((initialPage) =>
           daemon.installCompactSnapshotWaiter(initialPage),
@@ -305,7 +305,7 @@ class BrowserDaemon {
     context.on("page", (newPage) => {
       wrapPageForActionLogging(newPage, session);
       daemon.trackPage(newPage);
-      if (experiments.compactSnapshotFormat) {
+      if (experiments["compact-snapshot-format"]) {
         void daemon.installCompactSnapshotWaiter(newPage);
       }
     });
@@ -660,10 +660,10 @@ class BrowserDaemon {
     args: Parameters<CliToDaemonApi["snapshot"]>[0],
   ): Promise<ReturnType<CliToDaemonApi["snapshot"]>> {
     if (args.mode === "compact") {
-      if (!this.experiments.compactSnapshotFormat) {
+      if (!this.experiments["compact-snapshot-format"]) {
         throw new Error(
-          `The compactSnapshotFormat experiment is not enabled for session "${this.session}". ` +
-            `Close and reopen the session after running ${librettoCommand("experiments enable compactSnapshotFormat")}.`,
+          `The compact-snapshot-format experiment is not enabled for session "${this.session}". ` +
+            `Close and reopen the session after running ${librettoCommand("experiments enable compact-snapshot-format")}.`,
         );
       }
       const targetPage = this.resolveTargetPage(args.pageId);
@@ -720,7 +720,7 @@ class BrowserDaemon {
   private async runExec(
     args: Parameters<CliToDaemonApi["exec"]>[0],
   ): Promise<DaemonExecResult> {
-    if (this.experiments.compactSnapshotFormat) {
+    if (this.experiments["compact-snapshot-format"]) {
       return this.runCompactExec(args);
     }
 
