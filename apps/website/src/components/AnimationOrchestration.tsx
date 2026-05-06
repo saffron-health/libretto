@@ -35,7 +35,8 @@ export function OrchestrationContainer({
     let cancelled = false;
 
     async function run() {
-      const selector = (name: string) => `[data-animate='${name}']`;
+      const selector = (name: string) =>
+        `[data-animate='${name}']`;
 
       // ── 1. Title: word-by-word ──
       await animate(

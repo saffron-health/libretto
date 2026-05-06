@@ -216,8 +216,10 @@ export function CodebaseAnimation() {
     const id = ++runIdRef.current;
 
     async function run() {
-      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-      const isCancelled = () => cancelRef.current || runIdRef.current !== id;
+      const sleep = (ms: number) =>
+        new Promise((r) => setTimeout(r, ms));
+      const isCancelled = () =>
+        cancelRef.current || runIdRef.current !== id;
 
       // Reset
       setVisibleText("");

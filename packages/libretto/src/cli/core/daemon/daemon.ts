@@ -831,17 +831,17 @@ class BrowserDaemon {
       context: this.context,
       logger: this.logger,
       onLog: (event) => {
-        this.broadcast("workflowOutput", event);
+        void this.broadcast("workflowOutput", event);
       },
       onOutcome: (outcome) => {
         if (outcome.state === "paused") {
-          this.broadcast("workflowPaused", {
+          void this.broadcast("workflowPaused", {
             pausedAt: outcome.pausedAt,
             url: outcome.url,
           });
           return;
         }
-        this.broadcast(
+        void this.broadcast(
           "workflowFinished",
           outcome.result === "completed"
             ? { result: "completed", completedAt: outcome.completedAt }

@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "lint": "lintcn lint --tsconfig tsconfig.json",
     "evals": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
