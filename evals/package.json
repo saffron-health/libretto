@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "evals": "vitest run --config vitest.config.ts"
+    "evals": "pnpm --filter @libretto/dev-tools --filter libretto build && tsx cli.ts"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "^0.70.6",
-    "vitest": "^4.1.0",
+    "outdent": "^0.8.0",
+    "tsx": "^4.21.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

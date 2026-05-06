@@ -13,6 +13,8 @@ export type EvalScoreRecord = {
   failures: EvalFailureRecord[];
 };
 
+const recordedScores: EvalScoreRecord[] = [];
+
 function getScoreDir(): string | null {
   const value = process.env.LIBRETTO_EVAL_SCORE_DIR;
   if (typeof value !== "string") return null;
@@ -34,6 +36,7 @@ function toRecord(name: string, score: TranscriptScore): EvalScoreRecord {
 
 export function recordScore(name: string, score: TranscriptScore): EvalScoreRecord {
   const record = toRecord(name, score);
+  recordedScores.push(record);
   const scoreDir = getScoreDir();
   if (!scoreDir) return record;
 
@@ -51,4 +54,8 @@ export function recordScore(name: string, score: TranscriptScore): EvalScoreReco
   );
 
   return record;
+}
+
+export function takeRecordedScores(): EvalScoreRecord[] {
+  return recordedScores.splice(0, recordedScores.length);
 }

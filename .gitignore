@@ -8,6 +8,9 @@ dist/
 .env
 temp/
 benchmarks/**/runs/
+evals/profiles/
+evals/private/
+evals/runs/
 tmp/
 .turbo/
 .worktrees/

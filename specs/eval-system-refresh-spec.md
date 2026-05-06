@@ -90,7 +90,7 @@ evals/runs/2026-05-05T12-30-00Z-anthropic-claude-opus-4-5/
 - `run.json` stores run-level metadata: run ID, started/finished timestamps, git SHA when available, CLI args, selected model, output directory, and totals.
 - `summary.json` and `summary.md` store aggregated score and metrics for humans and CI comments.
 - Each `cases/<case-id>/result.json` stores case metadata, execution status, score, agent metrics, judge metrics, tool counts, and links to local artifacts. Low scores are data in this file, not test failures.
-- Case execution status is independent from score: `completed` means the eval ran and recorded results, while `error` means setup, agent execution, scoring infrastructure, or artifact writing failed.
+- Case execution status is independent from score: `completed` means the eval ran and recorded results, `skipped` means the runner intentionally did not launch the case, and `error` means setup, agent execution, scoring infrastructure, or artifact writing failed.
 - `agent-events.jsonl` and `judge-events.jsonl` store raw Pi events for debugging.
 - `agent-transcript.md` and `judge-transcript.md` store readable transcripts used for review.
 - CI uploads `summary.*` and redacted result records; raw profile files are never copied into the run directory or uploaded.
@@ -179,7 +179,7 @@ function formatMessagesForEvaluation(messages: AgentSession["messages"]) {
 
 ### Phase 3: Replace Vitest with a purpose-built eval runner
 
-Add the simple `evalCase` registry and a small `pnpm evals ...` CLI that imports eval files, collects registered cases, applies local filters, runs cases, and writes execution status. This phase should not introduce auth or private-case behavior yet; it should make the normal non-auth eval flow pleasant and focused.
+Add the simple `evalCase` registry and a small `pnpm evals ...` CLI that imports eval files, collects registered cases, applies local filters, runs cases, and writes execution status. This phase should not introduce auth profile provisioning or private-case behavior yet; it should make the normal non-auth eval flow pleasant and focused. Auth-required cases may declare `authProfile`, but the Phase 3 runner records them as skipped until Phase 4 adds profile preflight and workspace provisioning.
 
 ```ts
 type EvalCaseOptions = {
@@ -196,25 +196,26 @@ export const evalCase = Object.assign(
 );
 ```
 
-- [ ] Add `.gitignore` entries for `evals/profiles/`, `evals/private/`, and `evals/runs/`.
-- [ ] Add `evalCase({ name, authProfile? }, run)` in `evals/` backed by an in-memory registry.
-- [ ] Implement `evalCase.only({ name, authProfile? }, run)` by registering the case with an `only` flag.
-- [ ] Add a discovery function that imports checked-in `evals/**/*.eval.ts` files and excludes `evals/private/` until Phase 5.
-- [ ] Add `tsx` to `evals/package.json` and use it to run the TypeScript eval CLI and import TypeScript eval files.
-- [ ] Convert the three cases in `evals/basic.eval.ts` to `evalCase`.
-- [ ] Replace the Vitest fixture extension in `evals/fixtures.ts` with a runner-owned `createEvalContext(case)` helper that creates the temp workspace, copy-reference helper, paths, and `PiEvalHarness` for each case.
-- [ ] Add an eval CLI script in `evals/`.
-- [ ] Change `evals/package.json` so its `evals` script calls the eval CLI.
-- [ ] Remove Vitest from `evals/package.json` and delete `evals/vitest.config.ts` after the custom runner is wired.
-- [ ] Support `pnpm evals` and `pnpm evals run` as aliases for running all evals.
-- [ ] Keep model selection in the Pi SDK harness, defaulting to `openai/gpt-5.5` with medium reasoning and accepting `LIBRETTO_EVAL_MODEL=<provider/model-id>` for temporary overrides.
-- [ ] Support `pnpm evals --output <dir>` and `pnpm evals run --output <dir>` as runner-level run artifact output selection.
-- [ ] Support file filters as positional arguments and `-t` / `--testNamePattern` for case-name filtering.
-- [ ] Run cases serially by default; do not add a worker pool in v1.
-- [ ] Treat low scores as recorded data, not CLI failures.
-- [ ] Success criteria: `pnpm evals` runs all three converted cases.
-- [ ] Success criteria: `evalCase.only` runs only that case locally.
-- [ ] Success criteria: `pnpm evals run -t network` focuses by test name.
+- [x] Add `.gitignore` entries for `evals/profiles/`, `evals/private/`, and `evals/runs/`.
+- [x] Add `evalCase({ name, authProfile? }, run)` in `evals/` backed by an in-memory registry.
+- [x] Implement `evalCase.only({ name, authProfile? }, run)` by registering the case with an `only` flag.
+- [x] Add a discovery function that imports checked-in `evals/**/*.eval.ts` files and excludes `evals/private/` until Phase 5.
+- [x] Add `tsx` to `evals/package.json` and use it to run the TypeScript eval CLI and import TypeScript eval files.
+- [x] Convert the three cases in `evals/basic.eval.ts` to `evalCase`.
+- [x] Replace the Vitest fixture extension in `evals/fixtures.ts` with a runner-owned `createEvalContext(case)` helper that creates the temp workspace, copy-reference helper, paths, and `PiEvalHarness` for each case.
+- [x] Add an eval CLI script in `evals/`.
+- [x] Change `evals/package.json` so its `evals` script calls the eval CLI.
+- [x] Remove Vitest from `evals/package.json` and delete `evals/vitest.config.ts` after the custom runner is wired.
+- [x] Support `pnpm evals` and `pnpm evals run` as aliases for running all evals.
+- [x] Keep model selection in the Pi SDK harness, defaulting to `openai/gpt-5.5` with medium reasoning and accepting `LIBRETTO_EVAL_MODEL=<provider/model-id>` for temporary overrides.
+- [x] Support `pnpm evals --output <dir>` and `pnpm evals run --output <dir>` as runner-level run artifact output selection.
+- [x] Support file filters as positional arguments and `-t` / `--testNamePattern` for case-name filtering.
+- [x] Run cases serially by default; do not add a worker pool in v1.
+- [x] Treat low scores as recorded data, not CLI failures.
+- [x] Skip auth-required cases with an explicit result record until Phase 4 provisions `evals/profiles/<domain>.json` into eval workspaces.
+- [x] Success criteria: `pnpm evals` discovers all three converted cases and runs the non-auth cases without treating the LinkedIn auth requirement as a runner failure.
+- [x] Success criteria: `evalCase.only` runs only that case locally.
+- [x] Success criteria: `pnpm evals run -t network` focuses by test name.
 
 ### Phase 4: Add authenticated eval support
 
@@ -237,7 +238,7 @@ async function provisionAuthProfile(domain: string, evalWorkspaceDir: string) {
 }
 ```
 
-- [ ] Add `authProfile: "linkedin.com"` to the LinkedIn case.
+- [x] Add `authProfile: "linkedin.com"` to the LinkedIn case.
 - [ ] Normalize auth profile domains the same way Libretto does for `--auth-profile` where possible.
 - [ ] Look up profiles only in `evals/profiles/<domain>.json`.
 - [ ] Copy the profile into `<workspace>/.libretto/profiles/<domain>.json` before constructing `PiEvalHarness`.

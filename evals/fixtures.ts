@@ -1,13 +1,13 @@
-import { cp, mkdir, rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { cp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { test as base } from "vitest";
 import { PiEvalHarness } from "./harness.js";
 import { createTmpWorkspace } from "@libretto/dev-tools/tmp-workspace";
+import type { EvalCaseRecord } from "./eval-case.js";
 
-type EvalFixtures = {
+export type EvalContext = {
   harness: PiEvalHarness;
   repoRoot: string;
   evalWorkspaceDir: string;
@@ -16,6 +16,7 @@ type EvalFixtures = {
     sourceRelativePath: string,
     destinationRelativePath?: string,
   ) => Promise<string>;
+  dispose: () => Promise<void>;
 };
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -27,13 +28,10 @@ function stableHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
-function workspaceDirForTask(
-  task: Readonly<{ fullName: string; file: { filepath: string } }>,
-): string {
-  const stableId = stableHash(`${task.file.filepath}::${task.fullName}`).slice(
-    0,
-    16,
-  );
+function workspaceDirForCase(evalCase: EvalCaseRecord): string {
+  const stableId = stableHash(
+    `${evalCase.filePath ?? "unknown"}::${evalCase.name}`,
+  ).slice(0, 16);
   return join(DETERMINISTIC_WORKSPACE_ROOT, stableId);
 }
 
@@ -50,65 +48,62 @@ function assertWithinRoot(
   }
 }
 
-export const test = base.extend<EvalFixtures>({
-  repoRoot: async ({}, use) => {
-    await use(repoRoot);
-  },
-  evalWorkspaceDir: async ({ task }, use) => {
-    const workspaceDir = workspaceDirForTask(task);
-    await rm(workspaceDir, { recursive: true, force: true });
+export async function createEvalContext(
+  evalCase: EvalCaseRecord,
+): Promise<EvalContext> {
+  const evalWorkspaceDir = workspaceDirForCase(evalCase);
+  const workspaceName = stableHash(
+    `${evalCase.filePath ?? "unknown"}::${evalCase.name}`,
+  ).slice(0, 16);
+  await rm(evalWorkspaceDir, { recursive: true, force: true });
+  try {
     await createTmpWorkspace({
-      name: stableHash(`${task.file.filepath}::${task.fullName}`).slice(0, 16),
+      name: workspaceName,
       parentDir: DETERMINISTIC_WORKSPACE_ROOT,
       skipBrowsers: true,
       skipBuild: true,
       quiet: true,
     });
-    try {
-      await use(workspaceDir);
-    } finally {
-      await rm(workspaceDir, { recursive: true, force: true });
-    }
-  },
+  } catch (error) {
+    await rm(evalWorkspaceDir, { recursive: true, force: true });
+    throw error;
+  }
 
-  evalWorkspacePath: async ({ evalWorkspaceDir }, use) => {
-    await use((...parts: string[]) => join(evalWorkspaceDir, ...parts));
-  },
+  const harness = new PiEvalHarness({
+    cwd: evalWorkspaceDir,
+    model: process.env.LIBRETTO_EVAL_MODEL?.trim() || undefined,
+  });
 
-  copyEvalReference: async ({ evalWorkspaceDir }, use) => {
-    await use(
-      async (sourceRelativePath: string, destinationRelativePath?: string) => {
-        const sourcePath = resolve(referencesRoot, sourceRelativePath);
-        assertWithinRoot(referencesRoot, sourcePath, "Reference source path");
+  return {
+    harness,
+    repoRoot,
+    evalWorkspaceDir,
+    evalWorkspacePath: (...parts: string[]) => join(evalWorkspaceDir, ...parts),
+    copyEvalReference: async (
+      sourceRelativePath: string,
+      destinationRelativePath?: string,
+    ) => {
+      const sourcePath = resolve(referencesRoot, sourceRelativePath);
+      assertWithinRoot(referencesRoot, sourcePath, "Reference source path");
 
-        const targetRelative = destinationRelativePath ?? sourceRelativePath;
-        const targetPath = resolve(evalWorkspaceDir, targetRelative);
-        assertWithinRoot(
-          evalWorkspaceDir,
-          targetPath,
-          "Workspace destination path",
-        );
+      const targetRelative = destinationRelativePath ?? sourceRelativePath;
+      const targetPath = resolve(evalWorkspaceDir, targetRelative);
+      assertWithinRoot(
+        evalWorkspaceDir,
+        targetPath,
+        "Workspace destination path",
+      );
 
-        await mkdir(dirname(targetPath), { recursive: true });
-        await cp(sourcePath, targetPath, {
-          recursive: true,
-          force: true,
-        });
-        return targetPath;
-      },
-    );
-  },
-  harness: async ({ evalWorkspaceDir }, use) => {
-    const harness = new PiEvalHarness({
-      cwd: evalWorkspaceDir,
-      model: process.env.LIBRETTO_EVAL_MODEL?.trim() || undefined,
-    });
-    try {
-      await use(harness);
-    } finally {
+      await mkdir(dirname(targetPath), { recursive: true });
+      await cp(sourcePath, targetPath, {
+        recursive: true,
+        force: true,
+      });
+      return targetPath;
+    },
+    dispose: async () => {
       harness.dispose();
-    }
-  },
-});
-
-export { expect } from "vitest";
+      await rm(evalWorkspaceDir, { recursive: true, force: true });
+    },
+  };
+}
