@@ -235,6 +235,54 @@ describe("daemon IPC", () => {
     expect(scopedSnapshot.stdout).not.toContain("Sibling Details");
   }, 45_000);
 
+  test("compact snapshot refs only reuse cache for the same page", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-compact-snapshot-page-cache";
+    const firstUrl = await writeFixturePage(
+      workspacePath,
+      "compact-snapshot-page-cache-first",
+      "Compact Snapshot First Page",
+      `<main><button>First Page Button</button></main>`,
+    );
+    const secondUrl = await writeFixturePage(
+      workspacePath,
+      "compact-snapshot-page-cache-second",
+      "Compact Snapshot Second Page",
+      `<main><button>Second Page Button</button></main>`,
+    );
+
+    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli(`open "${firstUrl}" --headless --session ${session}`);
+    await librettoCli(
+      `exec "const p = await context.newPage(); await p.goto('${secondUrl}')" --session ${session}`,
+    );
+
+    const pages = await librettoCli(`pages --session ${session}`);
+    const firstPageId = pages.stdout
+      .split("\n")
+      .find((line) => line.includes("compact-snapshot-page-cache-first"))
+      ?.match(/id=(\S+)/)?.[1];
+    const secondPageId = pages.stdout
+      .split("\n")
+      .find((line) => line.includes("compact-snapshot-page-cache-second"))
+      ?.match(/id=(\S+)/)?.[1];
+    expect(firstPageId).toBeTruthy();
+    expect(secondPageId).toBeTruthy();
+
+    const firstSnapshot = await librettoCli(
+      `snapshot --session ${session} --page ${firstPageId}`,
+    );
+    const ref = firstSnapshot.stdout.match(/<button ref="([^"]+)"/)?.[1];
+    expect(ref).toBeTruthy();
+
+    const secondScopedSnapshot = await librettoCli(
+      `snapshot ${ref} --session ${session} --page ${secondPageId}`,
+    );
+    expect(secondScopedSnapshot.stderr).toContain("No compact snapshot is cached");
+  }, 45_000);
+
   test("compact snapshot ref fails before a full compact snapshot is cached", async ({
     librettoCli,
     workspacePath,

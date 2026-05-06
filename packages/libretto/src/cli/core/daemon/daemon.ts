@@ -166,7 +166,7 @@ class BrowserDaemon {
   private readonly connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
   private workflowController: WorkflowController | undefined;
   private shutdownPromise: Promise<DaemonCloseResult> | undefined;
-  private latestCompactSnapshot: Snapshot | null = null;
+  private readonly latestCompactSnapshotByPage = new WeakMap<Page, Snapshot>();
 
   private constructor(
     private readonly session: string,
@@ -666,20 +666,21 @@ class BrowserDaemon {
             `Close and reopen the session after running ${librettoCommand("experiments enable compactSnapshotFormat")}.`,
         );
       }
+      const targetPage = this.resolveTargetPage(args.pageId);
       const result = await this.withRequestTimeout(() =>
         handleCompactSnapshot(
-          this.resolveTargetPage(args.pageId),
+          targetPage,
           this.session,
           this.logger,
           {
             pageId: args.pageId,
-            cachedSnapshot: this.latestCompactSnapshot,
+            cachedSnapshot: this.latestCompactSnapshotByPage.get(targetPage),
             useCachedSnapshot: args.useCachedSnapshot,
           },
         ),
       );
       if (!args.useCachedSnapshot) {
-        this.latestCompactSnapshot = result.snapshot;
+        this.latestCompactSnapshotByPage.set(targetPage, result.snapshot);
       }
       return result;
     }
@@ -744,12 +745,15 @@ class BrowserDaemon {
   private async runCompactExec(
     args: Parameters<CliToDaemonApi["exec"]>[0],
   ): Promise<DaemonExecResult> {
+    let targetPage: Page | undefined;
     try {
-      const targetPage = this.resolveTargetPage(args.pageId);
+      targetPage = this.resolveTargetPage(args.pageId);
+      const page = targetPage;
       const data = await this.withRequestTimeout(async () => {
-        const before = this.latestCompactSnapshot ?? (await snapshot(targetPage));
+        const before =
+          this.latestCompactSnapshotByPage.get(page) ?? (await snapshot(page));
         const result = await handleExec(
-          targetPage,
+          page,
           args.code,
           this.context,
           this.browser,
@@ -758,7 +762,7 @@ class BrowserDaemon {
           args.visualize,
         );
 
-        const waitResult = await waitForPageStable(targetPage);
+        const waitResult = await waitForPageStable(page);
         if (!waitResult.ok) {
           this.logger.warn("compact-exec-stability-wait-incomplete", {
             session: this.session,
@@ -767,14 +771,14 @@ class BrowserDaemon {
           });
         }
 
-        const after = await snapshot(targetPage);
+        const after = await snapshot(page);
         const snapshotDiff = diffSnapshots(before, after);
-        this.latestCompactSnapshot = after;
+        this.latestCompactSnapshotByPage.set(page, after);
         return { ...result, snapshotDiff };
       });
       return { ok: true, data };
     } catch (error) {
-      this.latestCompactSnapshot = null;
+      if (targetPage) this.latestCompactSnapshotByPage.delete(targetPage);
       return this.createExecErrorResult(error);
     }
   }
