@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { createIpcPeer, type IpcPeer } from "../../../shared/ipc/ipc.js";
 import { connectToIpcSocket } from "../../../shared/ipc/socket-transport.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
+import type { SnapshotDiff } from "../../../shared/snapshot/diff-snapshots.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
 import { REPO_ROOT } from "../context.js";
 import type { WorkflowStatus } from "../workflow-runner/runner.js";
@@ -31,6 +32,7 @@ export type DaemonSnapshotArgs =
 export type DaemonExecSuccess = {
   result: unknown;
   output?: DaemonExecOutput;
+  snapshotDiff?: SnapshotDiff;
 };
 
 export type DaemonLegacySnapshotResult = {

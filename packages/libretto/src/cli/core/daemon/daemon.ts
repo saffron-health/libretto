@@ -66,6 +66,9 @@ import { handleExec, handleReadonlyExec } from "./exec.js";
 import { handleCompactSnapshot, handleSnapshot } from "./snapshot.js";
 import { librettoCommand } from "../../../shared/package-manager.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
+import { snapshot } from "../../../shared/snapshot/capture-snapshot.js";
+import { diffSnapshots } from "../../../shared/snapshot/diff-snapshots.js";
+import { waitForPageStable } from "../../../shared/snapshot/wait-for-page-stable.js";
 import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,
@@ -688,6 +691,10 @@ class BrowserDaemon {
   private async runExec(
     args: Parameters<CliToDaemonApi["exec"]>[0],
   ): Promise<DaemonExecResult> {
+    if (this.experiments.compactSnapshotFormat) {
+      return this.runCompactExec(args);
+    }
+
     try {
       const data = await this.withRequestTimeout(() =>
         handleExec(
@@ -702,6 +709,44 @@ class BrowserDaemon {
       );
       return { ok: true, data };
     } catch (error) {
+      return this.createExecErrorResult(error);
+    }
+  }
+
+  private async runCompactExec(
+    args: Parameters<CliToDaemonApi["exec"]>[0],
+  ): Promise<DaemonExecResult> {
+    try {
+      const targetPage = this.resolveTargetPage(args.pageId);
+      const data = await this.withRequestTimeout(async () => {
+        const before = this.latestCompactSnapshot ?? (await snapshot(targetPage));
+        const result = await handleExec(
+          targetPage,
+          args.code,
+          this.context,
+          this.browser,
+          this.execState,
+          this.session,
+          args.visualize,
+        );
+
+        const waitResult = await waitForPageStable(targetPage);
+        if (!waitResult.ok) {
+          this.logger.warn("compact-exec-stability-wait-incomplete", {
+            session: this.session,
+            pageId: args.pageId,
+            diagnostics: waitResult.diagnostics,
+          });
+        }
+
+        const after = await snapshot(targetPage);
+        const snapshotDiff = diffSnapshots(before, after);
+        this.latestCompactSnapshot = after;
+        return { ...result, snapshotDiff };
+      });
+      return { ok: true, data };
+    } catch (error) {
+      this.latestCompactSnapshot = null;
       return this.createExecErrorResult(error);
     }
   }

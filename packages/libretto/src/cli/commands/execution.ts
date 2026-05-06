@@ -28,6 +28,7 @@ import {
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { librettoCommand } from "../../shared/package-manager.js";
+import { renderSnapshotDiff } from "../../shared/snapshot/diff-snapshots.js";
 import { resolveProviderName } from "../core/providers/index.js";
 import { getAbsoluteIntegrationPath } from "../core/workflow-runtime.js";
 import {
@@ -36,6 +37,7 @@ import {
 } from "../core/exec-compiler.js";
 import {
   DaemonClient,
+  type DaemonExecSuccess,
   type DaemonExecResult,
   type DaemonToCliApi,
 } from "../core/daemon/ipc.js";
@@ -81,6 +83,16 @@ function writeDaemonExecOutput(output?: { stdout: string; stderr: string }) {
   if (output?.stderr) {
     process.stderr.write(output.stderr);
   }
+}
+
+function writeDaemonSnapshotDiff(
+  snapshotDiff: DaemonExecSuccess["snapshotDiff"],
+) {
+  if (!snapshotDiff) return;
+  const renderedDiff = renderSnapshotDiff(snapshotDiff);
+  if (!renderedDiff) return;
+  console.log("Page changes:");
+  console.log(renderedDiff);
 }
 
 async function execViaDaemon(
@@ -131,7 +143,7 @@ async function execViaDaemon(
     throw new Error(response.message);
   }
 
-  const { result, output } = response.data;
+  const { result, output, snapshotDiff } = response.data;
   writeDaemonExecOutput(output);
 
   logger.info(`${mode}-success`, {
@@ -146,6 +158,7 @@ async function execViaDaemon(
   } else {
     console.log("Executed successfully");
   }
+  writeDaemonSnapshotDiff(snapshotDiff);
 }
 
 async function execViaCdpFallback(

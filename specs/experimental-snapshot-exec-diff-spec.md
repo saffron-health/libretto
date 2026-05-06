@@ -226,20 +226,20 @@ async function handleCompactExec(args: ExecArgs, cache: SnapshotCache) {
 }
 ```
 
-- [ ] Add daemon-owned snapshot cache state in `packages/libretto/src/cli/core/daemon/daemon.ts`, for example `latestCompactSnapshot: Snapshot | null`
-- [ ] Pass the cached before snapshot into the exec handler or keep the cache orchestration in daemon before/after calling `handleExec`
-- [ ] If no cached snapshot exists, capture a fresh before snapshot immediately before running user exec code
-- [ ] Always diff full snapshots; scoped `snapshot <ref>` must not replace the cache with a subtree
-- [ ] Run user exec code exactly once and preserve existing result/output/error behavior
-- [ ] After successful exec, wait for page stability, capture the after snapshot, and compute `diffSnapshots(before, after)`
-- [ ] Return the diff with the exec result and print user-visible page changes after normal exec output
-- [ ] Replace the daemon cache with the after snapshot after successful exec
-- [ ] Invalidate the daemon cache on exec failure unless an after snapshot is deliberately captured and stored; keep v1 simple by clearing it on failure
-- [ ] Ensure `readonly-exec` never captures, invalidates, or prints page-change diffs
-- [ ] Add a user-level daemon-backed test where `snapshot` is run first, then `exec` mutates the page, and the exec diff reflects the change from the previously returned snapshot
-- [ ] Add a user-level daemon-backed test where `exec` is run without a previous snapshot and still prints a diff by capturing its own before-state
-- [ ] Add a user-level daemon-backed test that `readonly-exec` does not print page changes and does not invalidate the snapshot cache
-- [ ] Run `pnpm -s test --filter=libretto -- daemon-ipc.spec.ts`
+- [x] Add daemon-owned snapshot cache state in `packages/libretto/src/cli/core/daemon/daemon.ts`, for example `latestCompactSnapshot: Snapshot | null`
+- [x] Pass the cached before snapshot into the exec handler or keep the cache orchestration in daemon before/after calling `handleExec`
+- [x] If no cached snapshot exists, capture a fresh before snapshot immediately before running user exec code
+- [x] Always diff full snapshots; scoped `snapshot <ref>` must not replace the cache with a subtree
+- [x] Run user exec code exactly once and preserve existing result/output/error behavior
+- [x] After successful exec, wait for page stability, capture the after snapshot, and compute `diffSnapshots(before, after)`
+- [x] Return the diff with the exec result and print user-visible page changes after normal exec output
+- [x] Replace the daemon cache with the after snapshot after successful exec
+- [x] Invalidate the daemon cache on exec failure unless an after snapshot is deliberately captured and stored; keep v1 simple by clearing it on failure
+- [x] Ensure `readonly-exec` never captures, invalidates, or prints page-change diffs
+- [x] Add a user-level daemon-backed test where `snapshot` is run first, then `exec` mutates the page, and the exec diff reflects the change from the previously returned snapshot
+- [x] Add a user-level daemon-backed test where `exec` is run without a previous snapshot and still prints a diff by capturing its own before-state
+- [x] Add a user-level daemon-backed test that `readonly-exec` does not print page changes and does not invalidate the snapshot cache
+- [x] Run `pnpm -s test --filter=libretto -- daemon-ipc.spec.ts`
 
 ### Phase 7: Keep package exports minimal
 
