@@ -7,13 +7,14 @@ import {
 export const EXPERIMENTS = {
   exampleExperiment: {
     title: "Example experiment",
-    description: "Example experiment flag for validating experiment plumbing.",
+    oneSentenceDescription:
+      "Example experiment flag for validating experiment plumbing.",
     docs: "Example experiment flag for validating experiment plumbing.",
     defaultValue: false,
   },
   compactSnapshotFormat: {
     title: "Compact snapshot format",
-    description:
+    oneSentenceDescription:
       "Use compact accessibility snapshots and exec page-change diffs without an AI sub-agent.",
     docs: [
       "Compact snapshot format replaces the default snapshot analysis path for daemon-backed sessions while enabled.",
@@ -50,7 +51,7 @@ export const EXPERIMENTS = {
   string,
   {
     title: string;
-    description: string;
+    oneSentenceDescription: string;
     docs?: string;
     defaultValue: boolean;
   }

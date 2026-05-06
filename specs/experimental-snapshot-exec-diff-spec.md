@@ -63,7 +63,7 @@ export const EXPERIMENTS = {
   },
   compactSnapshotFormat: {
     title: "Compact snapshot format",
-    description:
+    oneSentenceDescription:
       "Use compact accessibility snapshots and exec page-change diffs without an AI sub-agent.",
     defaultValue: false,
   },
@@ -192,23 +192,24 @@ async function runCompactSnapshot(input: SnapshotInput, ctx: SnapshotContext) {
 }
 ```
 
-- [ ] Add `withExperiments()` to `snapshotCommand`
-- [ ] Change `objective` and `context` input fields to optional at parse time, then require them in the disabled/default path with the existing error wording as closely as possible
-- [ ] Add optional positional `ref` and reject it with an actionable error when the experiment is disabled
-- [ ] Extend daemon snapshot IPC args/results to support compact snapshot requests and a cached-snapshot request flag for `snapshot <ref>`
-- [ ] In `packages/libretto/src/cli/core/daemon/snapshot.ts`, keep the existing PNG+HTML return shape for default mode and add a compact return shape containing a screenshot `pngPath` and full `Snapshot` tree
-- [ ] For every compact `snapshot` command, capture a screenshot before returning and print it in CLI output before the tree as `Screenshot at <path>`
-- [ ] After compact snapshot output, print the subtree guidance hint at the CLI/daemon output layer rather than from `renderSnapshot`; use `librettoCommand(...)` for the command text
-- [ ] Reuse the existing screenshot viewport normalization and zero-width retry behavior where practical; do not create a separate screenshot abstraction unless duplication becomes unavoidable
-- [ ] In `packages/libretto/src/cli/core/daemon/daemon.ts`, store the latest full compact snapshot in daemon memory after each unscoped compact `snapshot` command
-- [ ] If a ref is requested, do not capture a new snapshot tree; capture only the screenshot, return the latest cached full snapshot, then let `renderSnapshot(snapshot, refId)` scope it
-- [ ] If a ref is requested and no compact snapshot is cached, throw an actionable error telling the user to run `libretto snapshot --session <name>` first
-- [ ] Keep compact snapshot capture inside the daemon; the CLI must not use `connect()` or open a second browser/CDP connection
-- [ ] Verify disabled behavior with an existing or updated test: `snapshot --session <name>` still reports missing `--objective`
-- [ ] Add a user-level daemon-backed test that enables the experiment, opens a fixture page, runs `snapshot --session <name>`, and sees `Screenshot at ` before compact output such as `<page`, `# Heading`, and the subtree hint
-- [ ] Add a user-level daemon-backed test that runs `snapshot <ref> --session <name>` after a previous full snapshot and sees only the expected subtree text
-- [ ] Add a user-level daemon-backed test that `snapshot <ref> --session <name>` fails before any compact snapshot has been cached
-- [ ] Run `pnpm -s test --filter=libretto -- daemon-ipc.spec.ts stateful.spec.ts` or the closest existing targeted test command supported by the repo
+- [x] Add `withExperiments()` to `snapshotCommand`
+- [x] Change `objective` and `context` input fields to optional at parse time, then require them in the disabled/default path with the existing error wording as closely as possible
+- [x] Add optional positional `ref` and reject it with an actionable error when the experiment is disabled
+- [x] Extend daemon snapshot IPC args/results to support compact snapshot requests and a cached-snapshot request flag for `snapshot <ref>`
+- [x] In `packages/libretto/src/cli/core/daemon/snapshot.ts`, keep the existing PNG+HTML return shape for default mode and add a compact return shape containing a screenshot `pngPath` and full `Snapshot` tree
+- [x] For every compact `snapshot` command, capture a screenshot before returning and print it in CLI output before the tree as `Screenshot at <path>`
+- [x] After compact snapshot output, print the subtree guidance hint at the CLI/daemon output layer rather than from `renderSnapshot`; use `librettoCommand(...)` for the command text
+- [x] Reuse the existing screenshot viewport normalization and zero-width retry behavior where practical; do not create a separate screenshot abstraction unless duplication becomes unavoidable
+- [x] In `packages/libretto/src/cli/core/daemon/daemon.ts`, store the latest full compact snapshot in daemon memory after each unscoped compact `snapshot` command
+- [x] If a ref is requested, do not capture a new snapshot tree; capture only the screenshot, return the latest cached full snapshot, then let `renderSnapshot(snapshot, refId)` scope it
+- [x] If a ref is requested and no compact snapshot is cached, throw an actionable error telling the user to run `libretto snapshot --session <name>` first
+- [x] Keep compact snapshot capture inside the daemon; the CLI must not use `connect()` or open a second browser/CDP connection
+- [x] Verify disabled behavior with an existing or updated test: `snapshot --session <name>` still reports missing `--objective`
+- [x] Add a user-level daemon-backed test that enables the experiment, opens a fixture page, runs `snapshot --session <name>`, and sees `Screenshot at ` before compact output such as `<page`, `# Heading`, and the subtree hint
+- [x] Add a user-level daemon-backed test that runs `snapshot <ref> --session <name>` after a previous full snapshot and sees only the expected subtree text
+- [x] Add a user-level daemon-backed test that `snapshot <ref> --session <name>` fails before any compact snapshot has been cached
+- [x] Add experiment description docs discoverable with `libretto experiments describe compactSnapshotFormat`
+- [x] Run `pnpm -s test --filter=libretto -- daemon-ipc.spec.ts stateful.spec.ts` or the closest existing targeted test command supported by the repo
 
 ### Phase 6: Use the daemon snapshot cache for exec diffs
 

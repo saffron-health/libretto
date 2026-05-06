@@ -54,7 +54,7 @@ function printExperiments(experiments: Experiments): void {
     console.log(
       `- ${name}: ${experiments[name] ? "enabled" : "disabled"} — ${metadata.title}`,
     );
-    console.log(`  ${metadata.description}`);
+    console.log(`  ${metadata.oneSentenceDescription}`);
   }
 }
 
