@@ -353,6 +353,29 @@ describe("daemon IPC", () => {
     expect(result.stdout).toContain("New Content");
   }, 45_000);
 
+  test("compact exec preserves successful results when diff capture fails", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-compact-exec-diff-fails";
+    const url = await writeFixturePage(
+      workspacePath,
+      "compact-exec-diff-fails",
+      "Compact Exec Diff Fails Test",
+      `<main><h1>Closing Page</h1></main>`,
+    );
+
+    await librettoCli("experiments enable compactSnapshotFormat");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec "await page.close(); return 'closed ok'" --session ${session}`,
+    );
+    expect(result.stdout).toContain("closed ok");
+    expect(result.stdout).not.toContain("Page changes:");
+    expect(result.stderr).not.toContain("Target page, context or browser has been closed");
+  }, 45_000);
+
   test("readonly-exec does not print page changes or invalidate the snapshot cache", async ({
     librettoCli,
     workspacePath,

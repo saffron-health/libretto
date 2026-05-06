@@ -762,19 +762,29 @@ class BrowserDaemon {
           args.visualize,
         );
 
-        const waitResult = await waitForPageStable(page);
-        if (!waitResult.ok) {
-          this.logger.warn("compact-exec-stability-wait-incomplete", {
+        try {
+          const waitResult = await waitForPageStable(page);
+          if (!waitResult.ok) {
+            this.logger.warn("compact-exec-stability-wait-incomplete", {
+              session: this.session,
+              pageId: args.pageId,
+              diagnostics: waitResult.diagnostics,
+            });
+          }
+
+          const after = await snapshot(page);
+          const snapshotDiff = diffSnapshots(before, after);
+          this.latestCompactSnapshotByPage.set(page, after);
+          return { ...result, snapshotDiff };
+        } catch (error) {
+          this.latestCompactSnapshotByPage.delete(page);
+          this.logger.warn("compact-exec-diff-failed", {
             session: this.session,
             pageId: args.pageId,
-            diagnostics: waitResult.diagnostics,
+            error: error instanceof Error ? error.message : String(error),
           });
+          return result;
         }
-
-        const after = await snapshot(page);
-        const snapshotDiff = diffSnapshots(before, after);
-        this.latestCompactSnapshotByPage.set(page, after);
-        return { ...result, snapshotDiff };
       });
       return { ok: true, data };
     } catch (error) {
