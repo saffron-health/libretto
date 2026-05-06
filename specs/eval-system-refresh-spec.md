@@ -4,7 +4,7 @@ The current eval system does not give a trustworthy signal about Libretto agent 
 
 ## Solution overview
 
-Keep Vitest as the test runner, but use the Pi SDK for the agent under evaluation. Eval cases use a small `evalCase({ name, authProfile? }, run)` wrapper; `authProfile` is a required domain when present. Auth profiles live in gitignored `evals/profiles/`, private eval cases live in gitignored `evals/private/`, run artifacts live in gitignored `evals/runs/`, and `pnpm evals` runs every discovered eval case. Model selection is a runner-level CLI option such as `pnpm evals --model anthropic/claude-opus-4-5`, not per-case metadata.
+Use the Pi SDK for the agent under evaluation and replace Vitest with a small purpose-built eval runner. Eval files register cases through `evalCase({ name, authProfile? }, run)`; `authProfile` is a required domain when present. The eval CLI imports discovered eval files, collects registered cases, applies `.only` and simple filters, preflights required auth profiles, runs cases, and writes artifacts. Auth profiles live in gitignored `evals/profiles/`, private eval cases live in gitignored `evals/private/`, run artifacts live in gitignored `evals/runs/`, and `pnpm evals` runs every discovered eval case. Model selection stays harness-level: default to `openai/gpt-5.5` with medium reasoning, and allow temporary overrides with `LIBRETTO_EVAL_MODEL=<provider/model-id>`.
 
 ## Goals
 
@@ -12,7 +12,7 @@ Keep Vitest as the test runner, but use the Pi SDK for the agent under evaluatio
 - The three current basic eval cases remain the core suite: LinkedIn generation/amendment, broken-selector debugging, and network conversion.
 - The smoke eval is removed because it only validates harness wiring.
 - The eval harness uses the Pi SDK instead of `@anthropic-ai/claude-agent-sdk`.
-- Maintainers can select the evaluated model for a run with `pnpm evals --model <provider/model-id>`, while the default continues to use normal Pi model resolution.
+- Maintainers get `openai/gpt-5.5` with medium reasoning by default, with temporary model overrides available via `LIBRETTO_EVAL_MODEL=<provider/model-id>`.
 - Checked-in evals can require local auth profiles without becoming private.
 - Auth requirements are defined in code with `evalCase({ name, authProfile })`, not buried only in prompt text.
 - `pnpm evals profiles status` reports which auth profiles are required and which are present locally.
@@ -28,7 +28,7 @@ Keep Vitest as the test runner, but use the Pi SDK for the agent under evaluatio
 - No automatic login bypass, CAPTCHA solving, MFA automation, or credential harvesting.
 - No suite taxonomy or suite-selection flags in v1; if `evals/private/` exists, its cases run too.
 - No per-case model selection in v1.
-- No replacement of Vitest as the outer test runner.
+- No general-purpose test-runner features in v1: no watch mode, snapshots, nested suites, retries, custom reporters, or worker pool.
 
 ## Future work
 
@@ -49,10 +49,12 @@ Keep Vitest as the test runner, but use the Pi SDK for the agent under evaluatio
 - `evals/harness.ts` — current Claude Agent SDK harness; replace with a Pi SDK harness.
 - `evals/fixtures.ts` — temp workspace creation, Libretto skill setup, copied reference fixtures, and current harness fixture setup.
 - `evals/scoring.ts` — current score-record writer and assertion helper; replace assertion-oriented behavior with richer result recording.
-- `evals/vitest.config.ts` — current Vitest configuration for `**/*.eval.ts`; should continue discovering `evals/private/**/*.eval.ts` when present.
+- `evals/vitest.config.ts` — current Vitest configuration; remove after the custom eval runner replaces Vitest.
+- `evals/eval-case.ts` — new eval-case registry and `evalCase.only` implementation.
+- `evals/cli.ts` — new eval CLI that discovers cases, preflights profiles, runs cases, and writes artifacts.
 - `evals/basic.eval.ts` and `evals/smoke.eval.ts` — current eval cases to convert/remove.
 - `evals/references/` — checked-in fixture workflows used by the basic evals.
-- `evals/package.json` — route `pnpm evals ...` to the eval CLI and add Pi SDK dependency.
+- `evals/package.json` — route `pnpm evals ...` to the eval CLI, add `tsx`, and remove Vitest after the custom runner is wired.
 - `package.json` and `turbo.json` — root `pnpm evals` wiring and Turbo task configuration.
 - `.github/workflows/evals.yml` — CI command, summary, artifact upload, non-strict reporting, and zero-record enforcement.
 - `.gitignore` — add `evals/profiles/`, `evals/private/`, and `evals/runs/`.
@@ -63,9 +65,7 @@ Keep Vitest as the test runner, but use the Pi SDK for the agent under evaluatio
 - `benchmarks/webVoyager/runner.ts` — richer Pi event usage summarization for input/output/cache token metrics.
 - Pi SDK docs: `/Users/tanishqkancharla/.nvm/versions/node/v23.7.0/lib/node_modules/@mariozechner/pi-coding-agent/docs/sdk.md` — `createAgentSession`, model registry, tools, events, sessions, settings, and resource loading.
 - Pi SDK examples: `/Users/tanishqkancharla/.nvm/versions/node/v23.7.0/lib/node_modules/@mariozechner/pi-coding-agent/examples/sdk/` — custom model, tools, skills, sessions, and full-control examples.
-- Vitest programmatic API docs: `https://vitest.dev/guide/advanced/` — `startVitest` / `createVitest` usage from a custom CLI.
-- Vitest filtering docs: `https://vitest.dev/guide/filtering` — `.only` behavior and `allowOnly` caveats.
-- Vitest advanced API docs: `https://vitest.dev/api/advanced/vitest` — collection/listing APIs and their limitations.
+- `tsx` package docs: used only to run the TypeScript eval CLI and import TypeScript eval files without a separate build step.
 
 ## Implementation
 
@@ -118,6 +118,8 @@ Swap `@anthropic-ai/claude-agent-sdk` for the Pi SDK in the eval harness. The Pi
 
 ```ts
 type EvalModelSelector = `${string}/${string}`;
+const DEFAULT_EVAL_MODEL: EvalModelSelector = "openai/gpt-5.5";
+const DEFAULT_THINKING_LEVEL = "medium";
 
 async function createPiEvalSession(opts: {
   cwd: string;
@@ -125,35 +127,59 @@ async function createPiEvalSession(opts: {
 }) {
   const authStorage = AuthStorage.create();
   const modelRegistry = ModelRegistry.create(authStorage);
-  const model = opts.model
-    ? resolvePiModel(modelRegistry, opts.model)
-    : undefined;
+  const model = resolvePiModel(modelRegistry, opts.model ?? DEFAULT_EVAL_MODEL);
+  const agentDir = join(opts.cwd, ".pi");
+  const settingsManager = SettingsManager.inMemory({
+    compaction: { enabled: false },
+  });
+  const resourceLoader = new DefaultResourceLoader({
+    cwd: opts.cwd,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+  });
+  await resourceLoader.reload();
 
   return createAgentSession({
     cwd: opts.cwd,
+    agentDir,
     model,
+    thinkingLevel: DEFAULT_THINKING_LEVEL,
     authStorage,
     modelRegistry,
+    resourceLoader,
+    settingsManager,
     sessionManager: SessionManager.inMemory(opts.cwd),
-    tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
+    tools: ["read", "write", "edit", "bash"],
   });
+}
+
+function formatMessagesForEvaluation(messages: AgentSession["messages"]) {
+  return serializeConversation(convertToLlm(messages)).trim();
 }
 ```
 
-- [ ] Add `@mariozechner/pi-coding-agent` to `evals/package.json` and remove the direct `@anthropic-ai/claude-agent-sdk` dependency after the replacement is complete.
-- [ ] Implement a `PiEvalHarness` that supports the current `harness.send(...)` and multi-turn session behavior.
-- [ ] Use `SessionManager.inMemory(evalWorkspaceDir)` so eval runs do not depend on persistent Pi session files.
-- [ ] Let `DefaultResourceLoader` discover `.agents/skills` in the temp workspace instead of manually appending Libretto skill markdown to the system prompt.
-- [ ] Resolve the runner-level `--model "provider/model-id"` through `ModelRegistry.find(provider, modelId)` and pass it into every evaluated Pi agent session for that run.
-- [ ] Keep the scoring API shape (`response.score([...])`) but implement judge calls through Pi as well.
-- [ ] Make scoring record verdicts and reasons without throwing when criteria fail.
-- [ ] Capture Pi `AgentSessionEvent` records for raw transcripts and metrics.
-- [ ] Success criteria: one existing basic eval can run end-to-end through Pi SDK with the same prompt text.
-- [ ] Success criteria: `pnpm evals --model <provider/model-id>` changes the Pi model used for evaluated agent sessions.
+- [x] Add `@mariozechner/pi-coding-agent` to `evals/package.json` and remove the direct `@anthropic-ai/claude-agent-sdk` dependency after the replacement is complete.
+- [x] Use a Pi SDK version whose built-in model registry includes `openai/gpt-5.5`.
+- [x] Implement a `PiEvalHarness` that supports the current `harness.send(...)` and multi-turn session behavior.
+- [x] Use `SessionManager.inMemory(evalWorkspaceDir)` so eval runs do not depend on persistent Pi session files.
+- [x] Use an eval-workspace-local Pi `agentDir` and an isolated `DefaultResourceLoader` so eval runs do not depend on global extensions or persistent local Pi state.
+- [x] Let `DefaultResourceLoader` discover `.agents/skills` in the temp workspace instead of manually appending Libretto skill markdown to the system prompt.
+- [x] Use only the Pi SDK tools needed by the evals: `read`, `write`, `edit`, and `bash`.
+- [x] Default evaluated agent and judge sessions to `openai/gpt-5.5` with medium reasoning.
+- [x] Resolve the default or `LIBRETTO_EVAL_MODEL="provider/model-id"` selector through `ModelRegistry.find(provider, modelId)` and pass it into every evaluated Pi agent and judge session for that run.
+- [x] Keep the scoring API shape (`response.score([...])`) but implement judge calls through Pi as well.
+- [x] Make scoring record verdicts and reasons without throwing when criteria fail.
+- [x] Remove `assertPerfectScore`; eval cases should call `recordScore` for informational score records.
+- [x] Capture Pi `AgentSessionEvent` records for raw transcripts and metrics.
+- [x] Use Pi SDK conversation helpers (`convertToLlm` and `serializeConversation`) for scoring transcripts instead of custom message parsing.
+- [x] Keep `evals/package.json` calling Vitest directly for Phase 2; do not add a `--model` wrapper or custom eval CLI before Phase 3.
+- [x] Success criteria: one existing basic eval can run end-to-end through Pi SDK with the same prompt text.
+- [x] Success criteria: `LIBRETTO_EVAL_MODEL=<provider/model-id> pnpm evals` changes the Pi model used for evaluated agent sessions.
 
-### Phase 3: Get the `evals/` MVP and CLI shape working
+### Phase 3: Replace Vitest with a purpose-built eval runner
 
-Add the simple `evalCase` wrapper and the `pnpm evals ...` CLI in front of Vitest. This phase should not introduce auth or private-case behavior yet; it should make the normal non-auth eval flow pleasant and focused.
+Add the simple `evalCase` registry and a small `pnpm evals ...` CLI that imports eval files, collects registered cases, applies local filters, runs cases, and writes execution status. This phase should not introduce auth or private-case behavior yet; it should make the normal non-auth eval flow pleasant and focused.
 
 ```ts
 type EvalCaseOptions = {
@@ -162,26 +188,30 @@ type EvalCaseOptions = {
 };
 
 export const evalCase = Object.assign(
-  (options: EvalCaseOptions, run: EvalCaseFn) =>
-    registerEvalCase(test, options, run),
+  (options: EvalCaseOptions, run: EvalCaseFn) => registerEvalCase(options, run),
   {
     only: (options: EvalCaseOptions, run: EvalCaseFn) =>
-      registerEvalCase(test.only, options, run),
+      registerEvalCase(options, run, { only: true }),
   },
 );
 ```
 
 - [ ] Add `.gitignore` entries for `evals/profiles/`, `evals/private/`, and `evals/runs/`.
-- [ ] Add `evalCase({ name, authProfile? }, run)` in `evals/`.
-- [ ] Implement `evalCase.only({ name, authProfile? }, run)` by delegating to Vitest `test.only`.
+- [ ] Add `evalCase({ name, authProfile? }, run)` in `evals/` backed by an in-memory registry.
+- [ ] Implement `evalCase.only({ name, authProfile? }, run)` by registering the case with an `only` flag.
+- [ ] Add a discovery function that imports checked-in `evals/**/*.eval.ts` files and excludes `evals/private/` until Phase 5.
+- [ ] Add `tsx` to `evals/package.json` and use it to run the TypeScript eval CLI and import TypeScript eval files.
 - [ ] Convert the three cases in `evals/basic.eval.ts` to `evalCase`.
+- [ ] Replace the Vitest fixture extension in `evals/fixtures.ts` with a runner-owned `createEvalContext(case)` helper that creates the temp workspace, copy-reference helper, paths, and `PiEvalHarness` for each case.
 - [ ] Add an eval CLI script in `evals/`.
 - [ ] Change `evals/package.json` so its `evals` script calls the eval CLI.
+- [ ] Remove Vitest from `evals/package.json` and delete `evals/vitest.config.ts` after the custom runner is wired.
 - [ ] Support `pnpm evals` and `pnpm evals run` as aliases for running all evals.
-- [ ] Support `pnpm evals --model <provider/model-id>` and `pnpm evals run --model <provider/model-id>` as runner-level model selection.
+- [ ] Keep model selection in the Pi SDK harness, defaulting to `openai/gpt-5.5` with medium reasoning and accepting `LIBRETTO_EVAL_MODEL=<provider/model-id>` for temporary overrides.
 - [ ] Support `pnpm evals --output <dir>` and `pnpm evals run --output <dir>` as runner-level run artifact output selection.
-- [ ] Use `startVitest("test", filters, { config: "vitest.config.ts", watch: false })` from `vitest/node` for one-shot eval runs.
-- [ ] Pass through Vitest file filters and `-t` / `--testNamePattern` via `parseCLI` or equivalent parsing.
+- [ ] Support file filters as positional arguments and `-t` / `--testNamePattern` for case-name filtering.
+- [ ] Run cases serially by default; do not add a worker pool in v1.
+- [ ] Treat low scores as recorded data, not CLI failures.
 - [ ] Success criteria: `pnpm evals` runs all three converted cases.
 - [ ] Success criteria: `evalCase.only` runs only that case locally.
 - [ ] Success criteria: `pnpm evals run -t network` focuses by test name.
@@ -212,8 +242,8 @@ async function provisionAuthProfile(domain: string, evalWorkspaceDir: string) {
 - [ ] Look up profiles only in `evals/profiles/<domain>.json`.
 - [ ] Copy the profile into `<workspace>/.libretto/profiles/<domain>.json` before constructing `PiEvalHarness`.
 - [ ] Fail required missing profiles before launching Pi with a message that includes `pnpm evals profiles login <domain>`.
-- [ ] Implement `pnpm evals profiles status` by scanning `evalCase({ name, authProfile })` calls for literal auth-profile domains.
-- [ ] Keep the scanner intentionally narrow: `authProfile` must be a literal string for status to see it.
+- [ ] Implement `pnpm evals profiles status` by importing discovered eval files and reading required auth profiles from the eval-case registry.
+- [ ] Fail registration when `authProfile` is present but is not a non-empty string.
 - [ ] Report each required domain, the cases that require it, whether `evals/profiles/<domain>.json` exists, and the next command to create it.
 - [ ] Implement `pnpm evals profiles login <domain>` as an interactive local command that opens `https://<domain>` headed, waits for the maintainer to finish login, saves the Libretto profile, copies it to `evals/profiles/<domain>.json`, and closes the session.
 - [ ] Ensure profile JSON is never written to score records, summaries, or CI artifacts.
@@ -223,7 +253,7 @@ async function provisionAuthProfile(domain: string, evalWorkspaceDir: string) {
 
 ### Phase 5: Add private eval support
 
-Enable maintainer-local private cases by relying on the same `evalCase` API and Vitest discovery. There is no separate suite mechanism: private cases are just gitignored eval files that run when present.
+Enable maintainer-local private cases by relying on the same `evalCase` API and custom discovery. There is no separate suite mechanism: private cases are just gitignored eval files that run when present.
 
 ```ts
 // evals/private/some-private-case.eval.ts
@@ -237,9 +267,9 @@ evalCase(
 );
 ```
 
-- [ ] Ensure `evals/private/**/*.eval.ts` is discovered by the existing Vitest include pattern.
+- [ ] Ensure `evals/private/**/*.eval.ts` is discovered by the eval CLI when the directory exists.
 - [ ] Document that `evals/private/` is always gitignored and may contain ordinary `evalCase` files.
-- [ ] Make `profiles status` scan both checked-in evals and `evals/private/` when present.
+- [ ] Make `profiles status` discover and import both checked-in evals and `evals/private/` when present.
 - [ ] Confirm private cases can use the same `authProfile` provisioning from `evals/profiles/`.
 - [ ] Add no pull/push/sync behavior for profiles or private cases in v1.
 - [ ] Success criteria: adding `evals/private/example.eval.ts` makes `pnpm evals` run it without any suite flag.
@@ -316,7 +346,7 @@ Scoring is informational. Low scores do not fail the eval command; setup or runt
 - [ ] Change `.github/workflows/evals.yml` to run `pnpm evals` instead of `pnpm eval`.
 - [ ] Remove score strictness as an execution gate; fail CI only when the runner crashes, required setup is missing, result records are malformed, or zero completed records are produced.
 - [ ] Upload summaries and redacted artifacts from the run output directory, but never upload `evals/profiles/`.
-- [ ] Document the eval CLI in `evals/README.md`: run all evals, focus with `.only` or Vitest filters, check profiles, create profiles, and add private eval files.
+- [ ] Document the eval CLI in `evals/README.md`: run all evals, focus with `.only`, file filters, or `-t`, check profiles, create profiles, and add private eval files.
 - [ ] Update `packages/libretto/docs/releasing.md` so it matches the real eval workflow; do not claim baseline comparison until it is actually wired.
 - [ ] Success criteria: CI summary includes score, duration, token, cost, and tool-call metrics without exposing profile data.
 - [ ] Success criteria: docs explain that `evals/profiles/` and `evals/private/` are always gitignored local maintainer directories.

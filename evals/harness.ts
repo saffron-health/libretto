@@ -1,16 +1,17 @@
-import { randomUUID } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import {
-  query,
-  type Options,
-  type PermissionMode,
-  type NonNullableUsage,
-  type ModelUsage,
-  type SDKAssistantMessage,
-  type SDKMessage,
-  type SDKResultMessage,
-  type SettingSource,
-} from "@anthropic-ai/claude-agent-sdk";
+  AuthStorage,
+  convertToLlm,
+  createAgentSession,
+  DefaultResourceLoader,
+  ModelRegistry,
+  serializeConversation,
+  SessionManager,
+  SettingsManager,
+  type AgentSession,
+  type AgentSessionEvent,
+  type CreateAgentSessionOptions,
+} from "@mariozechner/pi-coding-agent";
+import { join } from "node:path";
 import { z } from "zod";
 
 const EvaluationVerdictSchema = z.object({
@@ -29,17 +30,44 @@ const TranscriptScoreSchema = z.object({
   percent: z.number().min(0).max(100),
 });
 
-const EVAL_GCP_PROJECT = "saffron-health";
-const ANTHROPIC_API_KEY_SECRET_NAME = "anthropic-api-key";
-
-let didAttemptSecretLoad = false;
-
 const MAX_TRANSCRIPT_CHARS = 20_000;
-const MAX_TOOL_RESULT_CHARS = 4_000;
+const DEFAULT_EVAL_MODEL: EvalModelSelector = "openai/gpt-5.5";
+const DEFAULT_THINKING_LEVEL = "medium" satisfies NonNullable<
+  CreateAgentSessionOptions["thinkingLevel"]
+>;
+const TRANSCRIPT_EVENT_TYPES = new Set<AgentSessionEvent["type"]>([
+  "message_end",
+  "tool_execution_start",
+  "tool_execution_end",
+]);
+const VERBOSE_EVAL_LOGS = process.env.LIBRETTO_EVAL_VERBOSE === "1";
 
 type EvaluationVerdict = z.infer<typeof EvaluationVerdictSchema>;
 export type ScoredCriterion = z.infer<typeof ScoredCriterionSchema>;
 export type TranscriptScore = z.infer<typeof TranscriptScoreSchema>;
+export type EvalModelSelector = `${string}/${string}`;
+
+type PiMessage = AgentSession["messages"][number];
+type PiTool = NonNullable<CreateAgentSessionOptions["tools"]>[number];
+
+type PiUsageSummary = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalTokens: number;
+  totalCostUsd: number | null;
+};
+
+export type PiEvalHarnessOptions = {
+  cwd: string;
+  model?: string;
+  stopOnFinalResult?: boolean;
+};
+
+export type PiEvalHarnessSendOptions = {
+  onUpdate?: (response: EvalResponse) => void | Promise<void>;
+};
 
 function clip(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
@@ -62,174 +90,208 @@ function extractFinalResultLine(transcript: string): string | null {
   return finalResultLine ?? null;
 }
 
-function asJson(value: unknown): string {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
+function logVerbose(message: string): void {
+  if (VERBOSE_EVAL_LOGS) {
+    process.stderr.write(`[eval] ${message}\n`);
   }
 }
 
-function getSecret(secretName: string): string {
-  const result = spawnSync(
-    "gcloud",
-    [
-      "secrets",
-      "versions",
-      "access",
-      "latest",
-      `--project=${EVAL_GCP_PROJECT}`,
-      `--secret=${secretName}`,
-    ],
-    { encoding: "utf8" },
-  );
-  if (result.status === 0 && result.stdout.trim().length > 0) {
-    return result.stdout.trim();
+function parseModelSelector(selector: string): EvalModelSelector {
+  const trimmed = selector.trim();
+  const slash = trimmed.indexOf("/");
+  if (slash <= 0 || slash === trimmed.length - 1) {
+    throw new Error(
+      `Invalid eval model "${selector}". Expected "provider/model-id".`,
+    );
   }
-  return "";
+  return trimmed as EvalModelSelector;
 }
 
-function ensureClaudeAuthEnvFromSecretIfNeeded(): void {
-  if (didAttemptSecretLoad) return;
-  didAttemptSecretLoad = true;
-
-  if (typeof process.env.ANTHROPIC_API_KEY === "string" && process.env.ANTHROPIC_API_KEY.trim().length > 0) {
-    return;
+function resolvePiModel(
+  modelRegistry: ModelRegistry,
+  selector: EvalModelSelector,
+): NonNullable<ReturnType<ModelRegistry["find"]>> {
+  const slash = selector.indexOf("/");
+  const provider = selector.slice(0, slash);
+  const modelId = selector.slice(slash + 1);
+  const model = modelRegistry.find(provider, modelId);
+  if (!model) {
+    throw new Error(`Unknown Pi model: ${selector}`);
   }
-
-  const value = getSecret(ANTHROPIC_API_KEY_SECRET_NAME);
-  if (value) {
-    process.env.ANTHROPIC_API_KEY = value;
-  }
+  return model;
 }
 
-function hasAnthropicApiKey(): boolean {
-  const value = process.env.ANTHROPIC_API_KEY;
-  return typeof value === "string" && value.trim().length > 0;
+async function createPiEvalSession(opts: {
+  cwd: string;
+  model?: EvalModelSelector;
+  tools?: PiTool[];
+}): Promise<AgentSession> {
+  const authStorage = AuthStorage.create();
+  const modelRegistry = ModelRegistry.create(authStorage);
+  const model = resolvePiModel(modelRegistry, opts.model ?? DEFAULT_EVAL_MODEL);
+  const agentDir = join(opts.cwd, ".pi");
+  const settingsManager = SettingsManager.inMemory({
+    compaction: { enabled: false },
+  });
+  const resourceLoader = new DefaultResourceLoader({
+    cwd: opts.cwd,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+  });
+  await resourceLoader.reload();
+  const { session } = await createAgentSession({
+    cwd: opts.cwd,
+    agentDir,
+    model,
+    thinkingLevel: DEFAULT_THINKING_LEVEL,
+    authStorage,
+    modelRegistry,
+    resourceLoader,
+    settingsManager,
+    sessionManager: SessionManager.inMemory(opts.cwd),
+    tools:
+      opts.tools ??
+      ["read", "write", "edit", "bash"],
+  });
+  return session;
 }
 
-function extractSessionId(messages: SDKMessage[]): string | null {
+function messageRole(message: PiMessage): string | undefined {
+  return message && typeof message === "object" && "role" in message
+    ? message.role
+    : undefined;
+}
+
+function formatMessagesForEvaluation(messages: PiMessage[]): string {
+  return serializeConversation(convertToLlm(messages)).trim();
+}
+
+function extractLastAssistantText(messages: PiMessage[]): string | null {
+  const llmMessages = convertToLlm(messages);
+  for (let i = llmMessages.length - 1; i >= 0; i -= 1) {
+    const message = llmMessages[i];
+    if (message.role !== "assistant") continue;
+    const text = message.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text.trim())
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+    if (text) return text;
+  }
+  return null;
+}
+
+function extractAssistantError(messages: PiMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const candidate = messages[i];
+    const message = messages[i];
+    if (messageRole(message) !== "assistant") continue;
+    const errorMessage = (message as { errorMessage?: unknown }).errorMessage;
+    if (typeof errorMessage === "string" && errorMessage.trim().length > 0) {
+      return errorMessage.trim();
+    }
+  }
+  return null;
+}
+
+function summarizeUsageFromEvents(events: AgentSessionEvent[]): PiUsageSummary {
+  const summary: PiUsageSummary = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 0,
+    totalCostUsd: null,
+  };
+
+  for (const event of events) {
+    if (event.type !== "message_end") continue;
+    const message = event.message;
+    if (messageRole(message) !== "assistant") continue;
+    const usage = (
+      message as {
+        usage?: {
+          input?: number;
+          output?: number;
+          cacheRead?: number;
+          cacheWrite?: number;
+          totalTokens?: number;
+          cost?: { total?: number };
+        };
+      }
+    ).usage;
+    if (!usage) continue;
+
+    summary.inputTokens += usage.input ?? 0;
+    summary.outputTokens += usage.output ?? 0;
+    summary.cacheReadTokens += usage.cacheRead ?? 0;
+    summary.cacheWriteTokens += usage.cacheWrite ?? 0;
+    summary.totalTokens += usage.totalTokens ?? 0;
     if (
-      candidate &&
-      typeof candidate === "object" &&
-      "session_id" in candidate &&
-      typeof candidate.session_id === "string" &&
-      candidate.session_id.length > 0
+      typeof usage.cost?.total === "number" &&
+      Number.isFinite(usage.cost.total)
     ) {
-      return candidate.session_id;
+      summary.totalCostUsd = (summary.totalCostUsd ?? 0) + usage.cost.total;
     }
   }
-  return null;
+
+  return summary;
 }
 
-function extractResultMessage(messages: SDKMessage[]): SDKResultMessage | null {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const candidate = messages[i];
-    if (candidate.type === "result") {
-      return candidate;
+async function runPiJudge(opts: {
+  prompt: string;
+  cwd: string;
+  model?: EvalModelSelector;
+}): Promise<{
+  text: string;
+  events: AgentSessionEvent[];
+  messages: PiMessage[];
+}> {
+  const session = await createPiEvalSession({
+    cwd: opts.cwd,
+    model: opts.model,
+    tools: [],
+  });
+  const events: AgentSessionEvent[] = [];
+  const unsubscribe = session.subscribe((event) => {
+    if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
+      events.push(event);
     }
+  });
+
+  try {
+    await session.prompt(opts.prompt);
+    const messages = [...session.messages];
+    const errorMessage = extractAssistantError(messages);
+    if (errorMessage) {
+      throw new Error(errorMessage);
+    }
+    const text = extractLastAssistantText(messages);
+    if (!text) {
+      throw new Error("Judge failed: no assistant response from Pi session.");
+    }
+    return { text, events, messages };
+  } finally {
+    unsubscribe();
+    session.dispose();
   }
-  return null;
 }
 
-function extractAssistantText(message: SDKAssistantMessage): string {
-  const content = message.message.content;
-  if (!Array.isArray(content)) return "";
-
-  const parts: string[] = [];
-  for (const block of content) {
-    if (!block || typeof block !== "object") continue;
-        const typedBlock = block as unknown as Record<string, unknown>;
-    if (typedBlock.type === "text" && typeof typedBlock.text === "string") {
-      parts.push(typedBlock.text);
-      continue;
-    }
-    if (typedBlock.type === "tool_use") {
-      const name =
-        typeof typedBlock.name === "string" && typedBlock.name.length > 0
-          ? typedBlock.name
-          : "unknown_tool";
-      parts.push(`[tool_use:${name}] ${asJson(typedBlock.input)}`);
-    }
-  }
-  return parts.join("\n").trim();
-}
-
-function extractUserToolResultText(message: SDKMessage): string {
-  if (message.type !== "user") return "";
-  const content = message.message.content;
-  if (!Array.isArray(content)) return "";
-
-  const parts: string[] = [];
-  for (const block of content) {
-    if (!block || typeof block !== "object") continue;
-      const typedBlock = block as unknown as Record<string, unknown>;
-    if (typedBlock.type !== "tool_result") continue;
-
-    const contentValue = typedBlock.content;
-    if (typeof contentValue === "string" && contentValue.trim().length > 0) {
-      parts.push(clip(contentValue.trim(), MAX_TOOL_RESULT_CHARS));
-      continue;
-    }
-
-    if (Array.isArray(contentValue)) {
-      for (const item of contentValue) {
-        if (!item || typeof item !== "object") continue;
-        const typedItem = item as Record<string, unknown>;
-        if (typedItem.type === "text" && typeof typedItem.text === "string") {
-          parts.push(clip(typedItem.text.trim(), MAX_TOOL_RESULT_CHARS));
-        }
-      }
-    }
-  }
-
-  return parts.filter(Boolean).join("\n").trim();
-}
-
-function formatMessagesForEvaluation(messages: SDKMessage[]): string {
-  const lines: string[] = [];
-  for (const message of messages) {
-    switch (message.type) {
-      case "assistant": {
-        const assistantText = extractAssistantText(message);
-        if (assistantText) {
-          lines.push(`assistant:\n${assistantText}`);
-        }
-        break;
-      }
-      case "user": {
-        const toolResultText = extractUserToolResultText(message);
-        if (toolResultText) {
-          lines.push(`tool_result:\n${toolResultText}`);
-        }
-        break;
-      }
-      case "tool_use_summary": {
-        lines.push(`tool_use_summary:\n${message.summary}`);
-        break;
-      }
-      case "result": {
-        if (message.subtype === "success") {
-          lines.push(`result:\n${message.result}`);
-        } else {
-          lines.push(`result_error:\n${message.errors.join("\n")}`);
-        }
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  return lines.join("\n\n").trim();
+function parseJsonObject(text: string): unknown {
+  const raw = text.trim();
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  const candidate =
+    start >= 0 && end >= start ? raw.slice(start, end + 1) : raw;
+  return JSON.parse(candidate) as unknown;
 }
 
 async function evaluateTranscript(opts: {
   assertion: string;
   transcript: string;
   cwd: string;
-  model?: string;
+  model?: EvalModelSelector;
 }): Promise<EvaluationVerdict> {
   const prompt = [
     "Evaluate whether TRANSCRIPT satisfies ASSERTION.",
@@ -241,57 +303,28 @@ async function evaluateTranscript(opts: {
     `TRANSCRIPT:\n${clip(opts.transcript, MAX_TRANSCRIPT_CHARS)}`,
   ].join("\n");
 
-  const messages: SDKMessage[] = [];
-  for await (const message of query({
+  const result = await runPiJudge({
     prompt,
-    options: {
-      cwd: opts.cwd,
-      model: opts.model,
-      tools: [],
-      maxTurns: 1,
-      persistSession: false,
-      permissionMode: "dontAsk",
-    },
-  })) {
-    messages.push(message);
-  }
+    cwd: opts.cwd,
+    model: opts.model,
+  });
 
-  const result = extractResultMessage(messages);
-  if (!result) {
-    throw new Error("Evaluation failed: no result message from SDK.");
-  }
-  if (result.subtype !== "success") {
-    const details = result.errors.filter((err) => err.trim().length > 0).join("\n");
+  const parsed = EvaluationVerdictSchema.safeParse(
+    parseJsonObject(result.text),
+  );
+  if (!parsed.success) {
     throw new Error(
-      [
-        `Evaluation failed with subtype "${result.subtype}".`,
-        details || "No error details were provided by the SDK.",
-      ].join("\n"),
+      `Evaluation returned invalid schema output: ${result.text}`,
     );
   }
-
-  try {
-    const raw = result.result.trim();
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    const candidate = start >= 0 && end >= start ? raw.slice(start, end + 1) : raw;
-    const parsed = JSON.parse(candidate);
-    const fallback = EvaluationVerdictSchema.safeParse(parsed);
-    if (fallback.success) {
-      return fallback.data;
-    }
-  } catch {
-    // Fall through to explicit error.
-  }
-
-  throw new Error(`Evaluation returned invalid schema output: ${result.result}`);
+  return parsed.data;
 }
 
 async function scoreTranscript(opts: {
   criteria: string[];
   transcript: string;
   cwd: string;
-  model?: string;
+  model?: EvalModelSelector;
 }): Promise<TranscriptScore> {
   const normalizedCriteria = opts.criteria
     .map((criterion) => criterion.trim())
@@ -312,42 +345,15 @@ async function scoreTranscript(opts: {
     `TRANSCRIPT:\n${clip(opts.transcript, MAX_TRANSCRIPT_CHARS)}`,
   ].join("\n");
 
-  const messages: SDKMessage[] = [];
-  for await (const message of query({
+  const result = await runPiJudge({
     prompt,
-    options: {
-      cwd: opts.cwd,
-      model: opts.model,
-      tools: [],
-      maxTurns: 1,
-      persistSession: false,
-      permissionMode: "dontAsk",
-    },
-  })) {
-    messages.push(message);
-  }
-
-  const result = extractResultMessage(messages);
-  if (!result) {
-    throw new Error("Scoring failed: no result message from SDK.");
-  }
-  if (result.subtype !== "success") {
-    const details = result.errors.filter((err) => err.trim().length > 0).join("\n");
-    throw new Error(
-      [
-        `Scoring failed with subtype "${result.subtype}".`,
-        details || "No error details were provided by the SDK.",
-      ].join("\n"),
-    );
-  }
+    cwd: opts.cwd,
+    model: opts.model,
+  });
 
   let parsedCriteria: ScoredCriterion[] | null = null;
   try {
-    const raw = result.result.trim();
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    const candidate = start >= 0 && end >= start ? raw.slice(start, end + 1) : raw;
-    const parsed = JSON.parse(candidate) as unknown;
+    const parsed = parseJsonObject(result.text);
     if (
       parsed &&
       typeof parsed === "object" &&
@@ -355,7 +361,9 @@ async function scoreTranscript(opts: {
       Array.isArray((parsed as { criteria?: unknown }).criteria)
     ) {
       const schema = z.array(ScoredCriterionSchema);
-      const parsedArray = schema.safeParse((parsed as { criteria: unknown }).criteria);
+      const parsedArray = schema.safeParse(
+        (parsed as { criteria: unknown }).criteria,
+      );
       if (parsedArray.success) {
         parsedCriteria = parsedArray.data;
       }
@@ -365,7 +373,7 @@ async function scoreTranscript(opts: {
   }
 
   if (!parsedCriteria) {
-    throw new Error(`Scoring returned invalid schema output: ${result.result}`);
+    throw new Error(`Scoring returned invalid schema output: ${result.text}`);
   }
 
   const byCriterion = new Map<string, ScoredCriterion>();
@@ -402,63 +410,32 @@ async function scoreTranscript(opts: {
   });
 }
 
-export function ensureClaudeAuthConfigured(): void {
-  ensureClaudeAuthEnvFromSecretIfNeeded();
-  if (hasAnthropicApiKey()) return;
-  throw new Error(
-    [
-      "Claude eval configuration missing.",
-      `Expected to load ANTHROPIC_API_KEY from gcloud secret "${ANTHROPIC_API_KEY_SECRET_NAME}" in project "${EVAL_GCP_PROJECT}", or have ANTHROPIC_API_KEY already set.`,
-      "Ensure gcloud is installed/authenticated and the secret exists with at least one enabled version.",
-    ].join("\n"),
-  );
-}
-
-export type ClaudeEvalHarnessOptions = {
-  cwd: string;
-  systemPromptAppend?: string;
-  model?: string;
-  maxTurns?: number;
-  permissionMode?: PermissionMode;
-  settingSources?: SettingSource[];
-  allowedTools?: string[];
-  stopOnFinalResult?: boolean;
-};
-
-export type ClaudeEvalHarnessSendOptions = {
-  onUpdate?: (response: EvalResponse) => void | Promise<void>;
-};
-
 export class EvalResponse {
   readonly prompt: string;
-  readonly messages: SDKMessage[];
-  readonly sessionId: string | null;
+  readonly messages: PiMessage[];
+  readonly events: AgentSessionEvent[];
+  readonly sessionId: string;
   readonly transcript: string;
-  readonly result: SDKResultMessage | null;
   readonly totalCostUsd: number | null;
-  readonly usage: NonNullableUsage | null;
-  readonly modelUsage: Record<string, ModelUsage> | null;
+  readonly usage: PiUsageSummary;
   private readonly cwd: string;
-  private readonly model?: string;
+  private readonly model?: EvalModelSelector;
 
   constructor(opts: {
     prompt: string;
-    messages: SDKMessage[];
-    sessionId: string | null;
+    messages: PiMessage[];
+    events: AgentSessionEvent[];
+    sessionId: string;
     cwd: string;
-    model?: string;
+    model?: EvalModelSelector;
   }) {
     this.prompt = opts.prompt;
     this.messages = opts.messages;
+    this.events = opts.events;
     this.sessionId = opts.sessionId;
     this.transcript = formatMessagesForEvaluation(opts.messages);
-    this.result = extractResultMessage(opts.messages);
-    this.totalCostUsd =
-      this.result && typeof this.result.total_cost_usd === "number"
-        ? this.result.total_cost_usd
-        : null;
-    this.usage = this.result?.usage ?? null;
-    this.modelUsage = this.result?.modelUsage ?? null;
+    this.usage = summarizeUsageFromEvents(opts.events);
+    this.totalCostUsd = this.usage.totalCostUsd;
     this.cwd = opts.cwd;
     this.model = opts.model;
   }
@@ -486,108 +463,106 @@ export class EvalResponse {
   }
 }
 
-export class ClaudeEvalHarness {
+export class PiEvalHarness {
   private readonly cwd: string;
-  private readonly model?: string;
-  private readonly maxTurns: number;
-  private readonly permissionMode: PermissionMode;
-  private readonly settingSources: SettingSource[];
-  private readonly systemPromptAppend: string | null;
-  private readonly allowedTools: string[];
+  private readonly model?: EvalModelSelector;
   private readonly stopOnFinalResult: boolean;
-  private sessionId: string;
-  private hasStarted = false;
+  private session: AgentSession | null = null;
 
-  constructor(options: ClaudeEvalHarnessOptions) {
+  constructor(options: PiEvalHarnessOptions) {
     this.cwd = options.cwd;
-    this.model = options.model;
-    this.maxTurns = options.maxTurns ?? 20;
-    this.permissionMode = options.permissionMode ?? "bypassPermissions";
-    this.settingSources = options.settingSources ?? ["project"];
-    this.allowedTools = options.allowedTools ?? [];
-    this.systemPromptAppend = options.systemPromptAppend?.trim() || null;
+    this.model = options.model
+      ? parseModelSelector(options.model)
+      : DEFAULT_EVAL_MODEL;
     this.stopOnFinalResult = options.stopOnFinalResult === true;
-
-    this.sessionId = randomUUID();
   }
 
   async send(
     prompt: string,
-    sendOptions: ClaudeEvalHarnessSendOptions = {},
+    sendOptions: PiEvalHarnessSendOptions = {},
   ): Promise<EvalResponse> {
-    const options: Options = {
+    this.session ??= await createPiEvalSession({
       cwd: this.cwd,
       model: this.model,
-      maxTurns: this.maxTurns,
-      tools: { type: "preset", preset: "claude_code" },
-      settingSources: this.settingSources,
-      permissionMode: this.permissionMode,
-      allowedTools: this.allowedTools,
-    };
+    });
 
-    if (this.systemPromptAppend) {
-      options.systemPrompt = {
-        type: "preset",
-        preset: "claude_code",
-        append: this.systemPromptAppend,
-      };
-    }
-
-    if (this.permissionMode === "bypassPermissions") {
-      options.allowDangerouslySkipPermissions = true;
-    }
-
-    if (this.hasStarted) {
-      options.resume = this.sessionId;
-    } else {
-      options.sessionId = this.sessionId;
-    }
-
-    const messages: SDKMessage[] = [];
-    for await (const message of query({ prompt, options })) {
-      messages.push(message);
-
-      const seenSessionId = extractSessionId(messages);
-      if (seenSessionId) {
-        this.sessionId = seenSessionId;
-        this.hasStarted = true;
+    const events: AgentSessionEvent[] = [];
+    const unsubscribe = this.session.subscribe((event) => {
+      if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
+        events.push(event);
       }
+      if (event.type === "tool_execution_start") {
+        logVerbose(`tool start: ${event.toolName}`);
+      } else if (event.type === "tool_execution_end") {
+        logVerbose(`tool end: ${event.toolName}${event.isError ? " (error)" : ""}`);
+      } else if (event.type === "message_end") {
+        const role =
+          event.message && typeof event.message === "object" && "role" in event.message
+            ? event.message.role
+            : "unknown";
+        logVerbose(`message end: ${role}`);
+      }
+    });
 
-      if (sendOptions.onUpdate) {
+    try {
+      const update = async () => {
+        if (!sendOptions.onUpdate || !this.session) return;
         await sendOptions.onUpdate(
           new EvalResponse({
             prompt,
-            messages: [...messages],
-            sessionId: seenSessionId ?? this.sessionId,
+            messages: [...this.session.messages],
+            events: [...events],
+            sessionId: this.session.sessionId,
             cwd: this.cwd,
             model: this.model,
           }),
         );
+      };
+
+      const progressUnsubscribe = this.session.subscribe((event) => {
+        if (this.stopOnFinalResult && event.type === "message_end") {
+          const response = new EvalResponse({
+            prompt,
+            messages: [...this.session!.messages],
+            events: [...events],
+            sessionId: this.session!.sessionId,
+            cwd: this.cwd,
+            model: this.model,
+          });
+          if (extractFinalResultLine(response.transcript) !== null) {
+            void this.session!.abort().catch(() => {});
+          }
+        }
+        void update();
+      });
+
+      try {
+        await this.session.prompt(prompt);
+      } finally {
+        progressUnsubscribe();
       }
 
-      if (
-        this.stopOnFinalResult &&
-        message.type === "result" &&
-        message.subtype === "success" &&
-        extractFinalResultLine(message.result) !== null
-      ) {
-        break;
+      const messages = [...this.session.messages];
+      const errorMessage = extractAssistantError(messages);
+      if (errorMessage) {
+        throw new Error(errorMessage);
       }
-    }
 
-    const seenSessionId = extractSessionId(messages);
-    if (seenSessionId) {
-      this.sessionId = seenSessionId;
-      this.hasStarted = true;
+      return new EvalResponse({
+        prompt,
+        messages,
+        events,
+        sessionId: this.session.sessionId,
+        cwd: this.cwd,
+        model: this.model,
+      });
+    } finally {
+      unsubscribe();
     }
+  }
 
-    const response = new EvalResponse({
-      prompt,
-      messages,
-      sessionId: seenSessionId ?? this.sessionId,
-      cwd: this.cwd,
-      model: this.model,
-    });
-    return response;
+  dispose(): void {
+    this.session?.dispose();
+    this.session = null;
   }
 }

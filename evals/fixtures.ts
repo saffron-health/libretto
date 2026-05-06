@@ -1,14 +1,14 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { test as base } from "vitest";
-import { ClaudeEvalHarness, ensureClaudeAuthConfigured } from "./harness.js";
+import { PiEvalHarness } from "./harness.js";
 import { createTmpWorkspace } from "@libretto/dev-tools/tmp-workspace";
 
 type EvalFixtures = {
-  harness: ClaudeEvalHarness;
+  harness: PiEvalHarness;
   repoRoot: string;
   evalWorkspaceDir: string;
   evalWorkspacePath: (...parts: string[]) => string;
@@ -20,32 +20,8 @@ type EvalFixtures = {
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(here, "..");
-const librettoPackageRoot = resolve(repoRoot, "packages", "libretto");
-const skillPath = resolve(
-  librettoPackageRoot,
-  "skills",
-  "libretto",
-  "SKILL.md",
-);
 const referencesRoot = resolve(repoRoot, "evals", "references");
 const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-eval-workspaces");
-
-let cachedSkillMarkdown: string | null = null;
-
-async function getSkillMarkdown(): Promise<string> {
-  if (cachedSkillMarkdown !== null) return cachedSkillMarkdown;
-  cachedSkillMarkdown = await readFile(skillPath, "utf8");
-  return cachedSkillMarkdown;
-}
-
-async function getInlineSkillSystemPrompt(): Promise<string> {
-  return [
-    "Use the following Libretto skill documentation as in-session guidance.",
-    "<libretto_skill>",
-    await getSkillMarkdown(),
-    "</libretto_skill>",
-  ].join("\n");
-}
 
 function stableHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
@@ -123,13 +99,15 @@ export const test = base.extend<EvalFixtures>({
     );
   },
   harness: async ({ evalWorkspaceDir }, use) => {
-    ensureClaudeAuthConfigured();
-    const harness = new ClaudeEvalHarness({
+    const harness = new PiEvalHarness({
       cwd: evalWorkspaceDir,
       model: process.env.LIBRETTO_EVAL_MODEL?.trim() || undefined,
-      systemPromptAppend: await getInlineSkillSystemPrompt(),
     });
-    await use(harness);
+    try {
+      await use(harness);
+    } finally {
+      harness.dispose();
+    }
   },
 });
 

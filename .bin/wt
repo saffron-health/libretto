@@ -309,7 +309,7 @@ cmd_prune() {
 
     # Get branches merged into origin/main (detects regular merges)
     local merged
-    merged=$(git branch --merged origin/main | sed 's/^[* ] //' | grep -v '^\(main\|master\)$' || true)
+    merged=$(git branch --merged origin/main | sed 's/^[*+ ] //' | grep -v '^\(main\|master\)$' || true)
 
     # Parse worktrees in .worktrees/
     local worktrees

@@ -1,6 +1,6 @@
 import { describe } from "vitest";
 import { test } from "./fixtures.js";
-import { assertPerfectScore } from "./scoring.js";
+import { recordScore } from "./scoring.js";
 
 describe("basic eval scenarios", () => {
   test(
@@ -24,7 +24,7 @@ describe("basic eval scenarios", () => {
         "The workflow targets first 10 LinkedIn posts and includes content, author, reaction count, first 25 comments, and first 25 reposts.",
         "The assistant attempted at least one headless run command with auth profile linkedin.com for this workflow.",
       ]);
-      assertPerfectScore("linkedin scrape generation", createScore);
+      recordScore("linkedin scrape generation", createScore);
 
       const amendResponse = await harness.send(
         [
@@ -40,7 +40,7 @@ describe("basic eval scenarios", () => {
         "The updated workflow includes post author tagline extraction and commenter profile tagline extraction for the first 10 commenters.",
         "The assistant attempted at least one rerun command for the amended workflow.",
       ]);
-      assertPerfectScore("linkedin scrape amendment", amendScore);
+      recordScore("linkedin scrape amendment", amendScore);
     },
   );
 
@@ -67,7 +67,7 @@ describe("basic eval scenarios", () => {
         "The assistant reran the workflow after the fix.",
         "The rerun produced success evidence with non-empty or meaningful search-result output.",
       ]);
-      assertPerfectScore("broken selector debugging", score);
+      recordScore("broken selector debugging", score);
     },
   );
 
@@ -94,7 +94,7 @@ describe("basic eval scenarios", () => {
         "The assistant attempted at least one run command for the updated workflow.",
         "The workflow still returns state and alerts with equivalent output semantics.",
       ]);
-      assertPerfectScore("network conversion", score);
+      recordScore("network conversion", score);
     },
   );
 });

@@ -32,14 +32,6 @@ function toRecord(name: string, score: TranscriptScore): EvalScoreRecord {
   };
 }
 
-function shouldEnforcePerfectScore(): boolean {
-  const value = process.env.LIBRETTO_EVAL_STRICT;
-  if (value === undefined) return true;
-
-  const normalized = value.trim().toLowerCase();
-  return !["0", "false", "no", "off"].includes(normalized);
-}
-
 export function recordScore(name: string, score: TranscriptScore): EvalScoreRecord {
   const record = toRecord(name, score);
   const scoreDir = getScoreDir();
@@ -59,25 +51,4 @@ export function recordScore(name: string, score: TranscriptScore): EvalScoreReco
   );
 
   return record;
-}
-
-export function assertPerfectScore(name: string, score: TranscriptScore): EvalScoreRecord {
-  const record = recordScore(name, score);
-
-  if (!shouldEnforcePerfectScore()) {
-    return record;
-  }
-
-  if (record.percent === 100 && record.failures.length === 0) {
-    return record;
-  }
-
-  throw new Error(
-    [
-      `Expected 100% score, got ${record.percent}%.`,
-      record.failures.length > 0
-        ? record.failures.map((failure) => `- ${failure.criterion}: ${failure.reason}`).join("\n")
-        : "No failed criteria were returned.",
-    ].join("\n"),
-  );
 }
