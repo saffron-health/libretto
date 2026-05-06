@@ -5,14 +5,7 @@ import {
 } from "./config.js";
 
 export const EXPERIMENTS = {
-  exampleExperiment: {
-    title: "Example experiment",
-    oneSentenceDescription:
-      "Example experiment flag for validating experiment plumbing.",
-    docs: "Example experiment flag for validating experiment plumbing.",
-    defaultValue: false,
-  },
-  compactSnapshotFormat: {
+  "compact-snapshot-format": {
     title: "Compact snapshot format",
     oneSentenceDescription:
       "Use compact accessibility snapshots and exec page-change diffs without an AI sub-agent.",
@@ -20,7 +13,7 @@ export const EXPERIMENTS = {
       "Compact snapshot format replaces the default snapshot analysis path for daemon-backed sessions while enabled.",
       "",
       "How to enable it:",
-      "  1. libretto experiments enable compactSnapshotFormat",
+      "  1. libretto experiments enable compact-snapshot-format",
       "  2. Open a new daemon-backed session after enabling the experiment.",
       "     Existing sessions keep the experiment settings they started with.",
       "",

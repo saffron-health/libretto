@@ -12,7 +12,7 @@ Do not add experiments to `LibrettoWorkflowContext` in `packages/libretto/src/sh
 
 The experiment registry lives in `packages/libretto/src/cli/core/experiments.ts`.
 
-- Add each flag to `EXPERIMENTS` with a stable name, title, description, and `defaultValue`.
+- Add each flag to `EXPERIMENTS` with a stable hyphenated slug, title, description, and `defaultValue`.
 - Use the exported `ExperimentName` and `Experiments` types instead of duplicating flag shapes.
 - Use `resolveExperiments()` to read the resolved boolean snapshot.
 - Use `setExperimentEnabled()` to persist an override and reject unknown flag names.
@@ -25,7 +25,7 @@ Example workspace state:
 {
   "version": 1,
   "experiments": {
-    "exampleExperiment": true
+    "compact-snapshot-format": true
   }
 }
 ```
@@ -36,11 +36,12 @@ Example workspace state:
 
 ```bash
 npx libretto experiments
+npx libretto experiments describe <experiment>
 npx libretto experiments enable <experiment>
 npx libretto experiments disable <experiment>
 ```
 
-The command is implemented in `packages/libretto/src/cli/commands/experiments.ts` and registered as a top-level command. Listing prints registered experiments in registry order with their enabled/disabled state and description. Enable/disable persists the override to `.libretto/config.json` and prints deterministic success text.
+The command is implemented in `packages/libretto/src/cli/commands/experiments.ts` and registered as a top-level command. Listing prints registered experiments in registry order with their enabled/disabled state and description. `describe` prints the experiment status and full instructions. `enable` persists the override to `.libretto/config.json` and prints the full description with a prelude that the enabled experiment changes expected Libretto usage from the skill. `disable` persists the override and prints deterministic success text.
 
 Invalid actions, missing experiment names, and unknown experiment names should fail with actionable usage that includes the available experiment names.
 
