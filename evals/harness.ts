@@ -37,11 +37,6 @@ const DEFAULT_EVAL_MODEL: EvalModelSelector = "openai/gpt-5.5";
 const DEFAULT_THINKING_LEVEL = "medium" satisfies NonNullable<
   CreateAgentSessionOptions["thinkingLevel"]
 >;
-const TRANSCRIPT_EVENT_TYPES = new Set<AgentSessionEvent["type"]>([
-  "message_end",
-  "tool_execution_start",
-  "tool_execution_end",
-]);
 const PROGRESS_TEXT_CHARS = 240;
 const PROGRESS_TOOL_ARGS_CHARS = 180;
 const PROGRESS_TOOL_ERROR_CHARS = 360;
@@ -234,21 +229,6 @@ function appendMarkdown(path: string | null, markdown: string): void {
   if (!path) return;
   mkdirSync(dirname(path), { recursive: true });
   appendFileSync(path, markdown, "utf8");
-}
-
-function appendTranscriptRecord(record: Record<string, unknown>): void {
-  void record;
-}
-
-function recordUserPrompt(source: "agent" | "judge", prompt: string): void {
-  appendTranscriptRecord({ source, type: "user", prompt });
-}
-
-function recordEvent(
-  source: "agent" | "judge",
-  event: AgentSessionEvent,
-): void {
-  appendTranscriptRecord({ source, type: "event", event });
 }
 
 function recordRawEvent(
@@ -464,9 +444,6 @@ async function runPiJudge(opts: {
   const unsubscribe = session.subscribe((event) => {
     events.push(event);
     recordRawEvent("judge", event);
-    if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
-      recordEvent("judge", event);
-    }
     if (event.type === "tool_execution_start") {
       logProgress(formatToolProgress(event.toolName, event.args));
     } else if (event.type === "tool_execution_end" && event.isError) {
@@ -478,7 +455,6 @@ async function runPiJudge(opts: {
 
   try {
     logUserProgress(opts.prompt);
-    recordUserPrompt("judge", opts.prompt);
     await session.prompt(opts.prompt);
     const finishedMs = Date.now();
     const messages = [...session.messages];
@@ -585,7 +561,6 @@ function parseJsonObject(text: string): unknown {
 
 async function scoreTranscript(opts: {
   criteria: string[];
-  transcript: string;
   cwd: string;
   model?: EvalModelSelector;
 }): Promise<z.infer<typeof TranscriptScoreSchema> & { judge: EvalJudgeRecord }> {
@@ -745,7 +720,6 @@ export class EvalResponse {
   async score(criteria: string[]): Promise<EvalScore> {
     const score = await scoreTranscript({
       criteria,
-      transcript: this.transcript,
       cwd: this.cwd,
       model: this.model,
     });
@@ -788,9 +762,6 @@ export class PiEvalHarness {
     const unsubscribe = this.session.subscribe((event) => {
       events.push(event);
       recordRawEvent("agent", event);
-      if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
-        recordEvent("agent", event);
-      }
       if (event.type === "tool_execution_start") {
         logProgress(formatToolProgress(event.toolName, event.args));
       } else if (event.type === "tool_execution_end" && event.isError) {
@@ -832,7 +803,6 @@ export class PiEvalHarness {
         callRecorded = true;
       };
       logUserProgress(prompt);
-      recordUserPrompt("agent", prompt);
       const update = async () => {
         if (!sendOptions.onUpdate || !this.session) return;
         await sendOptions.onUpdate(buildResponse());

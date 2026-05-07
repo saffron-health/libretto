@@ -22,30 +22,16 @@ This is a pnpm monorepo.
 Root (runs across all packages):
 
 ```bash
-pnpm i
-pnpm build
-pnpm type-check
-pnpm test
+pnpm -s type-check
+pnpm -s test
+pnpm -s lint
+pnpm -s cli
 ```
 
 - Prefer `pnpm -s <script>` (or `pnpm --silent ...`) for routine scripted commands when you want less pnpm noise in logs.
 
-Targeted (most common during development):
-
-```bash
-pnpm sync:mirrors
-pnpm check:mirrors
-pnpm -s type-check --filter=libretto
-pnpm -s test --filter=libretto
-```
-
 - Do not pipe test commands through `grep`, `tail`, or other filters. The test reporter is minimal and token-efficient by default.
-
-Local CLI invocation:
-
-```bash
-pnpm -s cli help
-```
+- Use `pnpm -s cli` to build and run the local development version of libretto.
 
 ## Code Quality
 
@@ -66,24 +52,14 @@ pnpm -s cli help
 - Prefer small, focused functions over large ones.
 - Name things for what they do, not how they're implemented.
 
-## **CRITICAL** Forbidden Actions **CRITICAL**
+## **FORBIDDEN** Actions
 
 - NEVER manually edit the `version` field in `packages/libretto/package.json`. Use `pnpm prepare-release`.
 - NEVER hand-edit mirrored files in `.agents/skills/` or `.claude/skills/`. Edit the source in `packages/libretto/skills/` and run `pnpm sync:mirrors`.
 - NEVER run `pnpm build` just to type-check. Use `pnpm type-check` instead.
 - NEVER use `git add -A` or `git add .` — only stage the files you changed.
 
-## Releasing
-
-To bump the version and create a release PR, run from the repo root:
-
-```bash
-pnpm prepare-release [patch|minor|major]
-```
-
-This command handles the version bump, SKILL.md version updates, mirror syncing, and PR creation.
-
-## Skill Documentation Source of Truth
+## Skill Mirrors
 
 - Edit `packages/libretto/README.template.md` directly for README changes, then run `pnpm sync:mirrors`.
 - Edit `packages/libretto/skills/libretto/SKILL.md` directly.

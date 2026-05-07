@@ -8,15 +8,10 @@ export type EvalArtifactPaths = {
   judgeTranscript: string;
 };
 
-let currentArtifactPaths: EvalArtifactPaths | null = null;
 const artifactPathsStorage = new AsyncLocalStorage<EvalArtifactPaths | null>();
 
-export function setEvalArtifactPaths(paths: EvalArtifactPaths | null): void {
-  currentArtifactPaths = paths;
-}
-
 export function getEvalArtifactPaths(): EvalArtifactPaths | null {
-  return artifactPathsStorage.getStore() ?? currentArtifactPaths;
+  return artifactPathsStorage.getStore() ?? null;
 }
 
 export async function withEvalArtifactPaths<T>(
