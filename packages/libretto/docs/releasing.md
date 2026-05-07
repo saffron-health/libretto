@@ -89,7 +89,7 @@ This makes the workflow safe to re-run after partial failures. For example, if n
 
 `.github/workflows/evals.yml` now runs automatically for release PRs and for qualifying pushes to `main`.
 
-- It runs `pnpm evals --output <runner-temp>/eval-run`.
+- It runs `pnpm evals --no-auth --output <runner-temp>/eval-run` so CI only runs cases that do not require local auth profiles.
 - It validates and renders the CI report with `pnpm evals summary <runner-temp>/eval-run`.
 - It writes a GitHub step summary and a sticky PR comment with aggregate score, duration, token, cost, and tool-call metrics.
 - It uploads summary files and per-case result records from the run output directory. Raw transcripts and local profile files are not uploaded.

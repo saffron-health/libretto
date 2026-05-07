@@ -62,7 +62,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          pnpm evals --output "${RUNNER_TEMP}/eval-run"
+          pnpm evals --no-auth --output "${RUNNER_TEMP}/eval-run"
 
       - name: Summarize eval results
         id: summarize_evals

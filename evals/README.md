@@ -19,6 +19,12 @@ pnpm evals
 pnpm evals run
 ```
 
+Run only cases that do not declare an auth profile:
+
+```bash
+pnpm evals --no-auth
+```
+
 Focus by file path or substring:
 
 ```bash

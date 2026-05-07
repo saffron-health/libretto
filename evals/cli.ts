@@ -36,6 +36,7 @@ type RunCliOptions = {
   fileFilters: string[];
   testNamePattern: string | null;
   model: string;
+  noAuth: boolean;
 };
 
 type ProfilesStatusCliOptions = {
@@ -197,13 +198,14 @@ function metricArtifactsForCase(
 function usage(): string {
   return [
     "Usage:",
-    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>]",
+    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>] [--no-auth]",
     "  pnpm evals summary [run-dir] [--allow-empty]",
     "  pnpm evals profiles status",
     "  pnpm evals profiles login <domain>",
     "",
     "Examples:",
     "  pnpm evals",
+    "  pnpm evals --no-auth",
     "  pnpm evals run -t network --model openai/gpt-5.5",
     "  pnpm evals basic.eval.ts --output temp/eval-run",
     "  pnpm evals summary",
@@ -264,11 +266,16 @@ function parseArgs(argv: string[]): CliOptions {
   let outputDir: string | null = null;
   let testNamePattern: string | null = null;
   let model = DEFAULT_EVAL_MODEL;
+  let noAuth = false;
   const fileFilters: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--") continue;
+    if (arg === "--no-auth") {
+      noAuth = true;
+      continue;
+    }
     if (arg === "--output") {
       const value = args[index + 1];
       if (!value) throw new Error("--output requires a directory.");
@@ -319,6 +326,7 @@ function parseArgs(argv: string[]): CliOptions {
     fileFilters,
     testNamePattern,
     model,
+    noAuth,
   };
 }
 
@@ -380,6 +388,7 @@ async function discoverEvalFiles(fileFilters: string[]): Promise<string[]> {
 async function importEvalFiles(files: string[]): Promise<EvalCaseRecord[]> {
   for (const file of files) {
     await withEvalFileRegistration(file, async () => {
+      // @lintc-ignore Human-approved: eval files are intentionally discovered and loaded dynamically by the eval CLI.
       await import(pathToFileURL(file).href);
     });
   }
@@ -398,10 +407,14 @@ function filterByName(
 function selectCases(
   cases: EvalCaseRecord[],
   testNamePattern: string | null,
+  noAuth: boolean,
 ): EvalCaseRecord[] {
   const nameFiltered = filterByName(cases, testNamePattern);
-  const onlyCases = nameFiltered.filter((evalCase) => evalCase.only);
-  return onlyCases.length > 0 ? onlyCases : nameFiltered;
+  const authFiltered = noAuth
+    ? nameFiltered.filter((evalCase) => !evalCase.authProfile)
+    : nameFiltered;
+  const onlyCases = authFiltered.filter((evalCase) => evalCase.only);
+  return onlyCases.length > 0 ? onlyCases : authFiltered;
 }
 
 function slugify(input: string): string {
@@ -952,9 +965,17 @@ async function run(options: CliOptions): Promise<number> {
   }
 
   const registeredCases = await importEvalFiles(files);
-  const selectedCases = selectCases(registeredCases, options.testNamePattern);
+  const selectedCases = selectCases(
+    registeredCases,
+    options.testNamePattern,
+    options.noAuth,
+  );
   if (selectedCases.length === 0) {
-    throw new Error("No eval cases matched the provided filters.");
+    throw new Error(
+      options.noAuth
+        ? "No eval cases without auth matched the provided filters."
+        : "No eval cases matched the provided filters.",
+    );
   }
   preflightRequiredProfiles(selectedCases);
 
@@ -1075,6 +1096,7 @@ async function run(options: CliOptions): Promise<number> {
     fileFilters: options.fileFilters,
     testNamePattern: options.testNamePattern,
     selectedModel: options.model,
+    noAuth: options.noAuth,
     totals: summary.totals,
     metrics: summary.metrics,
     cases: summary.cases,
