@@ -1,21 +1,24 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
 export type EvalArtifactPaths = {
   transcript: string;
-  agentEvents: string;
-  agentTranscript: string;
+  transcriptMarkdown: string;
   judgeEvents: string;
   judgeTranscript: string;
 };
 
-let currentArtifactPaths: EvalArtifactPaths | null = null;
-
-export function setEvalArtifactPaths(paths: EvalArtifactPaths | null): void {
-  currentArtifactPaths = paths;
-}
+const artifactPathsStorage = new AsyncLocalStorage<EvalArtifactPaths | null>();
 
 export function getEvalArtifactPaths(): EvalArtifactPaths | null {
-  return currentArtifactPaths;
+  return artifactPathsStorage.getStore() ?? null;
+}
+
+export async function withEvalArtifactPaths<T>(
+  paths: EvalArtifactPaths,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return await artifactPathsStorage.run(paths, fn);
 }
 
 export type EvalUsageTurn = {

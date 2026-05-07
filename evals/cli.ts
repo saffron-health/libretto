@@ -12,9 +12,14 @@ import {
   type EvalCaseRecord,
 } from "./eval-case.js";
 import { createEvalContext } from "./fixtures.js";
-import { takeRecordedScores, type EvalScoreRecord } from "./scoring.js";
+import {
+  takeRecordedScores,
+  withScoreRecording,
+  type EvalScoreRecord,
+} from "./scoring.js";
 import {
   takeRecordedEvalCalls,
+  withEvalCallRecording,
   type EvalCallRecord,
 } from "./run-recorder.js";
 import {
@@ -26,7 +31,7 @@ import {
 } from "./auth-profiles.js";
 import {
   aggregateMetrics,
-  setEvalArtifactPaths,
+  withEvalArtifactPaths,
   type EvalMetrics,
 } from "./artifacts.js";
 
@@ -78,8 +83,7 @@ type CaseResult = {
   artifacts: {
     result: string;
     transcript: string;
-    agentEvents: string;
-    agentTranscript: string;
+    transcriptMarkdown: string;
     judgeEvents: string;
     judgeTranscript: string;
   };
@@ -176,13 +180,9 @@ function metricArtifactsForCase(
   return {
     result: relativeArtifact(outputDir, join(caseDir, "result.json")),
     transcript: relativeArtifact(outputDir, join(caseDir, "transcript.jsonl")),
-    agentEvents: relativeArtifact(
+    transcriptMarkdown: relativeArtifact(
       outputDir,
-      join(caseDir, "agent-events.jsonl"),
-    ),
-    agentTranscript: relativeArtifact(
-      outputDir,
-      join(caseDir, "agent-transcript.md"),
+      join(caseDir, "transcript.md"),
     ),
     judgeEvents: relativeArtifact(
       outputDir,
@@ -680,40 +680,48 @@ async function runCase(
   const artifacts = metricArtifactsForCase(outputDir, id);
   await rm(caseDir, { recursive: true, force: true });
   await mkdir(caseDir, { recursive: true });
-  setEvalArtifactPaths({
+  const artifactPaths = {
     transcript: join(caseDir, "transcript.jsonl"),
-    agentEvents: join(caseDir, "agent-events.jsonl"),
-    agentTranscript: join(caseDir, "agent-transcript.md"),
+    transcriptMarkdown: join(caseDir, "transcript.md"),
     judgeEvents: join(caseDir, "judge-events.jsonl"),
     judgeTranscript: join(caseDir, "judge-transcript.md"),
-  });
-  takeRecordedScores();
-  takeRecordedEvalCalls();
+  };
 
   let status: CaseResult["status"] = "completed";
   let errorMessage: string | undefined;
   let cleanupErrorMessage: string | undefined;
   let context: Awaited<ReturnType<typeof createEvalContext>> | null = null;
-  try {
-    context = await createEvalContext(evalCase, { model });
-    await evalCase.run(context);
-  } catch (error) {
-    status = "error";
-    errorMessage = formatError(error);
-  } finally {
-    try {
-      await context?.dispose();
-    } catch (error) {
-      status = "error";
-      cleanupErrorMessage = `Cleanup failed:\n${formatError(error)}`;
-    } finally {
-      setEvalArtifactPaths(null);
-    }
-  }
+  let scores: EvalScoreRecord[] = [];
+  let calls: EvalCallRecord[] = [];
+
+  await withScoreRecording(async () => {
+    await withEvalCallRecording(async () => {
+      await withEvalArtifactPaths(artifactPaths, async () => {
+        takeRecordedScores();
+        takeRecordedEvalCalls();
+
+        try {
+          context = await createEvalContext(evalCase, { model });
+          await evalCase.run(context);
+        } catch (error) {
+          status = "error";
+          errorMessage = formatError(error);
+        } finally {
+          try {
+            await context?.dispose();
+          } catch (error) {
+            status = "error";
+            cleanupErrorMessage = `Cleanup failed:\n${formatError(error)}`;
+          }
+        }
+
+        scores = takeRecordedScores();
+        calls = takeRecordedEvalCalls();
+      });
+    });
+  });
 
   const finishedMs = Date.now();
-  const scores = takeRecordedScores();
-  const calls = takeRecordedEvalCalls();
   const scorePassed = scores.reduce((total, score) => total + score.passed, 0);
   const scoreTotal = scores.reduce((total, score) => total + score.total, 0);
   const agentMetrics = aggregateMetrics(
@@ -769,8 +777,7 @@ function artifactRecord(value: unknown, label: string): CaseResult["artifacts"] 
   return {
     result: artifactPath("result"),
     transcript: artifactPath("transcript"),
-    agentEvents: artifactPath("agentEvents"),
-    agentTranscript: artifactPath("agentTranscript"),
+    transcriptMarkdown: artifactPath("transcriptMarkdown"),
     judgeEvents: artifactPath("judgeEvents"),
     judgeTranscript: artifactPath("judgeTranscript"),
   };
@@ -947,6 +954,41 @@ async function runSummary(options: SummaryCliOptions): Promise<number> {
   return 0;
 }
 
+async function runSelectedCases(
+  selectedCases: EvalCaseRecord[],
+  ids: Map<EvalCaseRecord, string>,
+  options: RunCliOptions,
+): Promise<CaseResult[]> {
+  return await Promise.all(
+    selectedCases.map(async (evalCase) => {
+      const id = ids.get(evalCase);
+      if (!id) {
+        throw new Error(`Failed to allocate result ID for ${evalCase.name}`);
+      }
+
+      process.stdout.write(`\n▶ ${evalCase.name}\n`);
+      const result = await runCase(
+        evalCase,
+        id,
+        options.outputDir,
+        options.model,
+      );
+      if (result.status === "completed") {
+        process.stdout.write(`✓ ${evalCase.name}\n`);
+      } else if (result.status === "skipped") {
+        process.stdout.write(
+          `- ${evalCase.name} skipped: ${result.skipReason ?? "No reason provided."}\n`,
+        );
+      } else {
+        process.stdout.write(
+          `✗ ${evalCase.name}\n${result.error ?? "Unknown error"}\n`,
+        );
+      }
+      return result;
+    }),
+  );
+}
+
 async function run(options: CliOptions): Promise<number> {
   if (options.command === "summary") {
     return await runSummary(options);
@@ -983,30 +1025,11 @@ async function run(options: CliOptions): Promise<number> {
 
   await mkdir(options.outputDir, { recursive: true });
   process.stdout.write(`Running ${selectedCases.length} eval case(s)\n`);
+  process.stdout.write("Execution: parallel\n");
   process.stdout.write(`Output: ${options.outputDir}\n`);
 
   const ids = caseIds(selectedCases);
-  const results: CaseResult[] = [];
-  for (const evalCase of selectedCases) {
-    const id = ids.get(evalCase);
-    if (!id) {
-      throw new Error(`Failed to allocate result ID for ${evalCase.name}`);
-    }
-    process.stdout.write(`\n▶ ${evalCase.name}\n`);
-    const result = await runCase(evalCase, id, options.outputDir, options.model);
-    results.push(result);
-    if (result.status === "completed") {
-      process.stdout.write(`✓ ${evalCase.name}\n`);
-    } else if (result.status === "skipped") {
-      process.stdout.write(
-        `- ${evalCase.name} skipped: ${result.skipReason ?? "No reason provided."}\n`,
-      );
-    } else {
-      process.stdout.write(
-        `✗ ${evalCase.name}\n${result.error ?? "Unknown error"}\n`,
-      );
-    }
-  }
+  const results = await runSelectedCases(selectedCases, ids, options);
 
   const completed = results.filter(
     (result) => result.status === "completed",

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { EvalJudgeRecord, EvalScore, ScoredCriterion } from "./harness.js";
 import type { EvalMetrics } from "./artifacts.js";
 
@@ -20,6 +21,11 @@ export type EvalScoreRecord = {
 };
 
 const recordedScores: EvalScoreRecord[] = [];
+const scoreStorage = new AsyncLocalStorage<EvalScoreRecord[]>();
+
+function currentRecordedScores(): EvalScoreRecord[] {
+  return scoreStorage.getStore() ?? recordedScores;
+}
 
 function toRecord(name: string, score: EvalScore): EvalScoreRecord {
   return {
@@ -38,10 +44,17 @@ function toRecord(name: string, score: EvalScore): EvalScoreRecord {
 
 export function recordScore(name: string, score: EvalScore): EvalScoreRecord {
   const record = toRecord(name, score);
-  recordedScores.push(record);
+  currentRecordedScores().push(record);
   return record;
 }
 
 export function takeRecordedScores(): EvalScoreRecord[] {
-  return recordedScores.splice(0, recordedScores.length);
+  const scores = currentRecordedScores();
+  return scores.splice(0, scores.length);
+}
+
+export async function withScoreRecording<T>(
+  fn: () => Promise<T>,
+): Promise<T> {
+  return await scoreStorage.run([], fn);
 }
