@@ -161,7 +161,7 @@ npx libretto connect ws://127.0.0.1:9223 --session another-session
 Once connected, all session-scoped commands work normally against the attached browser:
 
 - `exec`: run Playwright TypeScript code
-- `snapshot`: capture a screenshot and analyze the page
+- `snapshot`: capture a screenshot and compact accessibility tree
 - `pages`: list open pages
 
 <Warning>
@@ -175,10 +175,7 @@ Once connected, all session-scoped commands work normally against the attached b
 npx libretto connect http://127.0.0.1:9222 --session chrome-debug
 
 # Inspect the attached page
-npx libretto snapshot \
-  --session chrome-debug \
-  --objective "What is the current page state?" \
-  --context "Just attached to a running browser."
+npx libretto snapshot --session chrome-debug
 
 # Run code against it
 npx libretto exec --session chrome-debug "return await page.url()"
@@ -190,6 +187,6 @@ npx libretto exec --session chrome-debug "return await page.url()"
   </Card>
 
   <Card title="snapshot" icon="camera" href="./snapshot">
-    Capture a screenshot and analyze page state.
+    Capture a screenshot and compact accessibility tree.
   </Card>
 </CardGroup>

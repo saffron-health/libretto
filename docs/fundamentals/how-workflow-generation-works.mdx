@@ -14,13 +14,13 @@ Sessions track all state (network traffic, actions, snapshots) in `.libretto/ses
 
 If the site requires authentication, the agent opens the browser in headed mode and asks you to log in. It cannot handle login flows on its own because most login pages include CAPTCHAs or multi-factor prompts that require a human.
 
-### 2. Page snapshot and analysis
+### 2. Page snapshot
 
-Rather than reading the full page DOM, the agent captures a screenshot and a condensed HTML snapshot, then sends both to an AI model for analysis. The model returns a structured summary of selectors, interactive elements, and visible state.
+Rather than reading the full page DOM, the agent captures a screenshot and compact accessibility snapshot. The snapshot output gives the agent a token-efficient view of selectors, interactive elements, and visible state.
 
-The condensed snapshot strips away irrelevant markup while preserving the information the agent needs to reason about what's on the page and how to interact with it. This keeps the agent's context window small while still giving it a detailed understanding of the page.
+The compact snapshot strips away irrelevant markup while preserving the information the agent needs to reason about what's on the page and how to interact with it. This keeps the agent's context window small while still giving it a detailed understanding of the page.
 
-The agent snapshots frequently: before its first interaction, after navigation, and any time it needs to understand what changed. Each snapshot includes an objective ("Find the search input") and context ("I just opened the homepage") so the analysis is focused on what the agent is actually trying to do.
+The agent snapshots frequently: before its first interaction, after navigation, and any time it needs to understand what changed. For large pages, it can inspect a subtree from the latest full snapshot by passing a printed ref back to `snapshot`.
 
 ### 3. Interaction prototyping
 

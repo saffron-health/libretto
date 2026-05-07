@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import { getSessionSnapshotRunDir } from "../context.js";
 import {
@@ -24,48 +24,6 @@ type SnapshotScreenshot = {
   pageUrl: string;
   title: string;
 };
-
-export async function handleSnapshot(
-  targetPage: Page,
-  session: string,
-  logger: LoggerApi,
-  pageId?: string,
-): Promise<{
-  pngPath: string;
-  htmlPath: string;
-  snapshotRunId: string;
-  pageUrl: string;
-  title: string;
-}> {
-  const screenshot = await captureSnapshotScreenshot(
-    targetPage,
-    session,
-    logger,
-    pageId,
-  );
-  const htmlPath = `${getSessionSnapshotRunDir(
-    session,
-    screenshot.snapshotRunId,
-  )}/page.html`;
-
-  // Capture HTML content.
-  const htmlContent = await targetPage.content();
-  writeFileSync(htmlPath, htmlContent);
-
-  logger.info("screenshot-success", {
-    session,
-    pageUrl: screenshot.pageUrl,
-    title: screenshot.title,
-    pngPath: screenshot.pngPath,
-    htmlPath,
-    snapshotRunId: screenshot.snapshotRunId,
-  });
-
-  return {
-    ...screenshot,
-    htmlPath,
-  };
-}
 
 export async function handleCompactSnapshot(
   targetPage: Page,

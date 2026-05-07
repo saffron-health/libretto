@@ -51,9 +51,7 @@ Use one session per app:
 npx libretto connect http://127.0.0.1:9222 --session slack-desktop
 npx libretto pages --session slack-desktop
 npx libretto exec "return await page.title()" --session slack-desktop
-npx libretto snapshot --session slack-desktop \
-  --objective "Identify the main content area" \
-  --context "Connected to the Slack desktop app and need to orient on the current view."
+npx libretto snapshot --session slack-desktop
 ```
 
 ## Interaction examples
@@ -67,9 +65,7 @@ npx libretto exec "await page.keyboard.press('Enter')" --session slack-desktop
 When selectors are unstable, inspect first:
 
 ```bash
-npx libretto snapshot --session slack-desktop \
-  --objective "Find clickable elements near the search area" \
-  --context "Trying to locate the search input after clicking the search button."
+npx libretto snapshot --session slack-desktop
 npx libretto exec "return await page.content()" --session slack-desktop
 ```
 
@@ -80,9 +76,7 @@ Electron apps often have multiple windows/pages. Use `pages` to list them and `-
 ```bash
 npx libretto pages --session slack-desktop
 npx libretto exec --session slack-desktop --page <page-id> "return await page.url()"
-npx libretto snapshot --session slack-desktop --page <page-id> \
-  --objective "Describe the current view" \
-  --context "Inspecting a specific Electron window."
+npx libretto snapshot --session slack-desktop --page <page-id>
 ```
 
 ## Troubleshooting

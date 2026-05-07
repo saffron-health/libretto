@@ -63,7 +63,7 @@ import {
 } from "../browser.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
-import { handleCompactSnapshot, handleSnapshot } from "./snapshot.js";
+import { handleCompactSnapshot } from "./snapshot.js";
 import { librettoCommand } from "../../../shared/package-manager.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
 import { snapshot } from "../../../shared/snapshot/capture-snapshot.js";
@@ -271,9 +271,7 @@ class BrowserDaemon {
       });
     }
 
-    if (experiments["compact-snapshot-format"]) {
-      await context.addInitScript(installPageStabilityWaiter);
-    }
+    await context.addInitScript(installPageStabilityWaiter);
 
     // IPC server — typed handlers are attached per client connection so one
     // daemon lifetime can serve multiple CLI invocations.
@@ -295,19 +293,15 @@ class BrowserDaemon {
       wrapPageForActionLogging(p, session);
       daemon.trackPage(p);
     }
-    if (experiments["compact-snapshot-format"]) {
-      await Promise.all(
-        initialPages.map((initialPage) =>
-          daemon.installCompactSnapshotWaiter(initialPage),
-        ),
-      );
-    }
+    await Promise.all(
+      initialPages.map((initialPage) =>
+        daemon.installCompactSnapshotWaiter(initialPage),
+      ),
+    );
     context.on("page", (newPage) => {
       wrapPageForActionLogging(newPage, session);
       daemon.trackPage(newPage);
-      if (experiments["compact-snapshot-format"]) {
-        void daemon.installCompactSnapshotWaiter(newPage);
-      }
+      void daemon.installCompactSnapshotWaiter(newPage);
     });
 
     // Navigate after telemetry is installed (so we capture the initial
@@ -659,40 +653,23 @@ class BrowserDaemon {
   private async runSnapshot(
     args: Parameters<CliToDaemonApi["snapshot"]>[0],
   ): Promise<ReturnType<CliToDaemonApi["snapshot"]>> {
-    if (args.mode === "compact") {
-      if (!this.experiments["compact-snapshot-format"]) {
-        throw new Error(
-          `The compact-snapshot-format experiment is not enabled for session "${this.session}". ` +
-            `Close and reopen the session after running ${librettoCommand("experiments enable compact-snapshot-format")}.`,
-        );
-      }
-      const targetPage = this.resolveTargetPage(args.pageId);
-      const result = await this.withRequestTimeout(() =>
-        handleCompactSnapshot(
-          targetPage,
-          this.session,
-          this.logger,
-          {
-            pageId: args.pageId,
-            cachedSnapshot: this.latestCompactSnapshotByPage.get(targetPage),
-            useCachedSnapshot: args.useCachedSnapshot,
-          },
-        ),
-      );
-      if (!args.useCachedSnapshot) {
-        this.latestCompactSnapshotByPage.set(targetPage, result.snapshot);
-      }
-      return result;
-    }
-
-    return this.withRequestTimeout(() =>
-      handleSnapshot(
-        this.resolveTargetPage(args.pageId),
+    const targetPage = this.resolveTargetPage(args.pageId);
+    const result = await this.withRequestTimeout(() =>
+      handleCompactSnapshot(
+        targetPage,
         this.session,
         this.logger,
-        args.pageId,
+        {
+          pageId: args.pageId,
+          cachedSnapshot: this.latestCompactSnapshotByPage.get(targetPage),
+          useCachedSnapshot: args.useCachedSnapshot,
+        },
       ),
     );
+    if (!args.useCachedSnapshot) {
+      this.latestCompactSnapshotByPage.set(targetPage, result.snapshot);
+    }
+    return result;
   }
 
   private async withRequestTimeout<T>(
@@ -720,26 +697,7 @@ class BrowserDaemon {
   private async runExec(
     args: Parameters<CliToDaemonApi["exec"]>[0],
   ): Promise<DaemonExecResult> {
-    if (this.experiments["compact-snapshot-format"]) {
-      return this.runCompactExec(args);
-    }
-
-    try {
-      const data = await this.withRequestTimeout(() =>
-        handleExec(
-          this.resolveTargetPage(args.pageId),
-          args.code,
-          this.context,
-          this.browser,
-          this.execState,
-          this.session,
-          args.visualize,
-        ),
-      );
-      return { ok: true, data };
-    } catch (error) {
-      return this.createExecErrorResult(error);
-    }
+    return this.runCompactExec(args);
   }
 
   private async runCompactExec(

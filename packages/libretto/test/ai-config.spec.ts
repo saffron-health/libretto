@@ -30,8 +30,8 @@ describe("ai config validation output", () => {
       expect(message).toContain(`Config is invalid at ${configPath}.`);
       expect(message).toContain("Expected config example:");
       expect(message).toContain('"version": 1');
-      expect(message).toContain('"snapshotModel": "openai/gpt-5.4"');
       expect(message).toContain('"viewport": {');
+      expect(message).toContain('"sessionMode": "write-access"');
       expect(message).toContain('"windowPosition": {');
       expect(message).not.toContain('"$schema"');
     } finally {
