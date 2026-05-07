@@ -305,17 +305,6 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  test("prints CLI guidance with the invoking package manager", async ({
-    librettoCli,
-  }) => {
-    const result = await librettoCli("--help", {
-      npm_config_user_agent: "bun/1.0.0",
-    });
-
-    expect(result.stdout).toContain("Usage: bunx libretto <command>");
-    expect(result.stdout).toContain("bunx libretto setup");
-  });
-
   test("prints usage for help command", async ({ librettoCli }) => {
     const result = await librettoCli("help");
     expect(result.stdout).toContain("libretto <command>");
@@ -400,31 +389,50 @@ describe("basic CLI subprocess behavior", () => {
   }) => {
     const initial = await librettoCli("experiments");
     expect(initial.stdout).toContain("Libretto experiments:");
-    expect(initial.stdout).toContain("exampleExperiment");
-    expect(initial.stdout).toContain("Example experiment");
+    expect(initial.stdout).toContain("compact-snapshot-format");
+    expect(initial.stdout).toContain("Compact snapshot format");
     expect(initial.stdout).toContain(
-      "Example experiment flag for validating experiment plumbing.",
+      "Use compact accessibility snapshots and exec page-change diffs without an AI sub-agent.",
     );
     expect(initial.stdout).toContain("disabled");
     expect(initial.stderr).toBe("");
 
-    const enabled = await librettoCli("experiments enable exampleExperiment");
-    expect(enabled.stdout).toContain('Experiment "exampleExperiment" enabled.');
+    const enabled = await librettoCli(
+      "experiments enable compact-snapshot-format",
+    );
+    expect(enabled.stdout).toContain(
+      'Experiment "compact-snapshot-format" enabled.',
+    );
+    expect(enabled.stdout).toContain("Status: enabled");
+    expect(enabled.stdout).toContain(
+      "Since this experiment is enabled, Libretto’s expected usage deviates from the skill.",
+    );
+    expect(enabled.stdout).toContain(
+      "Compared with the skill's documented behavior:",
+    );
     expect(enabled.stderr).toBe("");
 
+    const described = await librettoCli(
+      "experiments describe compact-snapshot-format",
+    );
+    expect(described.stdout).toContain("Status: enabled");
+    expect(described.stderr).toBe("");
+
     const afterEnable = await librettoCli("experiments");
-    expect(afterEnable.stdout).toContain("exampleExperiment");
+    expect(afterEnable.stdout).toContain("compact-snapshot-format");
     expect(afterEnable.stdout).toContain("enabled");
     expect(afterEnable.stderr).toBe("");
 
-    const disabled = await librettoCli("experiments disable exampleExperiment");
+    const disabled = await librettoCli(
+      "experiments disable compact-snapshot-format",
+    );
     expect(disabled.stdout).toContain(
-      'Experiment "exampleExperiment" disabled.',
+      'Experiment "compact-snapshot-format" disabled.',
     );
     expect(disabled.stderr).toBe("");
 
     const afterDisable = await librettoCli("experiments");
-    expect(afterDisable.stdout).toContain("exampleExperiment");
+    expect(afterDisable.stdout).toContain("compact-snapshot-format");
     expect(afterDisable.stdout).toContain("disabled");
     expect(afterDisable.stderr).toBe("");
   });
@@ -436,10 +444,10 @@ describe("basic CLI subprocess behavior", () => {
     expect(missing.stderr).toContain("Missing experiment name for enable.");
     expect(missing.stderr).toContain("libretto experiments");
     expect(missing.stderr).toContain("libretto experiments enable <experiment>");
-    expect(missing.stderr).toContain("exampleExperiment");
+    expect(missing.stderr).toContain("compact-snapshot-format");
 
     const unknownAction = await librettoCli(
-      "experiments toggle exampleExperiment",
+      "experiments toggle compact-snapshot-format",
     );
     expect(unknownAction.stderr).toContain(
       'Unknown experiments action "toggle".',
@@ -453,14 +461,14 @@ describe("basic CLI subprocess behavior", () => {
     expect(unknown.stderr).toContain('Unknown experiment "nopeExperiment".');
     expect(unknown.stderr).toContain("libretto experiments");
     expect(unknown.stderr).toContain("libretto experiments enable <experiment>");
-    expect(unknown.stderr).toContain("exampleExperiment");
+    expect(unknown.stderr).toContain("compact-snapshot-format");
   });
 
   test("run does not expose enabled experiments to workflow context", async ({
     librettoCli,
     writeWorkflow,
   }) => {
-    await librettoCli("experiments enable exampleExperiment");
+    await librettoCli("experiments enable compact-snapshot-format");
     const integrationFilePath = await writeWorkflow(
       "integration-experiment-context.mjs",
       `

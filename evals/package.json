@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "evals": "tsx cli.ts"
+    "evals": "tsx cli.ts",
+    "lint": "lintcn lint --tsconfig tsconfig.json"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "^0.70.6",

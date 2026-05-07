@@ -276,7 +276,7 @@ export const snapshotCommand = SimpleCLI.command({
   .use(withRequiredSession())
   .use(withExperiments())
   .handle(async ({ input, ctx }) => {
-    if (ctx.experiments.compactSnapshotFormat) {
+    if (ctx.experiments["compact-snapshot-format"]) {
       await runCompactSnapshot({
         session: ctx.session,
         daemonSocketPath: ctx.sessionState.daemonSocketPath,
@@ -289,7 +289,7 @@ export const snapshotCommand = SimpleCLI.command({
 
     if (input.ref) {
       throw new Error(
-        `Snapshot refs require the compactSnapshotFormat experiment. Enable it with ${librettoCommand("experiments enable compactSnapshotFormat")}.`,
+        `Snapshot refs require the compact-snapshot-format experiment. Enable it with ${librettoCommand("experiments enable compact-snapshot-format")}.`,
       );
     }
 

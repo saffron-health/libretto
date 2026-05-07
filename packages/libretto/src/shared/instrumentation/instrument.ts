@@ -131,12 +131,12 @@ function wrapLocatorActions(
       try {
         const result = await orig(...args);
         if (opts.visualize) {
-          enqueue(page, () => visualizeAfterAction(page));
+          void enqueue(page, () => visualizeAfterAction(page));
         }
         return result;
       } catch (err: any) {
         if (opts.visualize) {
-          enqueue(page, () => visualizeAfterAction(page));
+          void enqueue(page, () => visualizeAfterAction(page));
         }
         // Enrich timeout errors for pointer actions
         if (POINTER_ACTIONS.has(method) && isTimeoutError(err)) {
@@ -323,12 +323,12 @@ export async function installInstrumentation(
       try {
         const result = await orig(...args);
         if (visualize) {
-          enqueue(page, () => visualizeAfterAction(page));
+          void enqueue(page, () => visualizeAfterAction(page));
         }
         return result;
       } catch (err: any) {
         if (visualize) {
-          enqueue(page, () => visualizeAfterAction(page));
+          void enqueue(page, () => visualizeAfterAction(page));
         }
         if (
           POINTER_ACTIONS.has(method) &&

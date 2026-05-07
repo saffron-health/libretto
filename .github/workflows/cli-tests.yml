@@ -76,7 +76,7 @@ jobs:
         run: pnpm type-check
 
       - name: Run lint checks
-        run: pnpm -r --if-present lint
+        run: pnpm lint
 
   test:
     runs-on: ubuntu-latest
