@@ -400,8 +400,10 @@ function filterByName(
   testNamePattern: string | null,
 ): EvalCaseRecord[] {
   if (!testNamePattern) return cases;
-  const pattern = new RegExp(testNamePattern, "i");
-  return cases.filter((evalCase) => pattern.test(evalCase.name));
+  const normalizedPattern = testNamePattern.toLowerCase();
+  return cases.filter((evalCase) =>
+    evalCase.name.toLowerCase().includes(normalizedPattern),
+  );
 }
 
 function selectCases(
