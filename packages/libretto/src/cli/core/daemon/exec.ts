@@ -4,6 +4,7 @@ import { installInstrumentation } from "../../../shared/instrumentation/index.js
 import { compileExecFunction } from "../exec-compiler.js";
 import { createReadonlyExecHelpers } from "../readonly-exec.js";
 import { readNetworkLog, readActionLog } from "../telemetry.js";
+import type { DaemonExecRepl } from "./exec-repl.js";
 
 type ExecOutput = {
   stdout: string;
@@ -55,6 +56,7 @@ export async function handleExec(
   context: BrowserContext,
   browser: Browser,
   execState: Record<string, unknown>,
+  execRepl: DaemonExecRepl,
   session: string,
   visualize?: boolean,
 ): Promise<ExecResponse> {
@@ -93,10 +95,8 @@ export async function handleExec(
     actionLog,
   };
 
-  const helperNames = Object.keys(helpers);
-  const fn = compileExecFunction(code, helperNames);
   try {
-    const result = await fn(...Object.values(helpers));
+    const result = await execRepl.run(code, helpers);
     return { result, output: buffered.output };
   } catch (error) {
     throw new DaemonExecError(

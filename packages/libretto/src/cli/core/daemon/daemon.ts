@@ -63,6 +63,7 @@ import {
 } from "../browser.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
+import { DaemonExecRepl } from "./exec-repl.js";
 import { handleCompactSnapshot, handleSnapshot } from "./snapshot.js";
 import { librettoCommand } from "../../../shared/package-manager.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
@@ -161,6 +162,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 class BrowserDaemon {
   readonly logger: LoggerApi;
   private readonly execState: Record<string, unknown> = {};
+  private readonly execRepl = new DaemonExecRepl();
   private readonly pageById = new Map<string, Page>();
   private readonly shutdownHandlers: ShutdownHandler[] = [];
   private readonly connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
@@ -732,6 +734,7 @@ class BrowserDaemon {
           this.context,
           this.browser,
           this.execState,
+          this.execRepl,
           this.session,
           args.visualize,
         ),
@@ -758,6 +761,7 @@ class BrowserDaemon {
           this.context,
           this.browser,
           this.execState,
+          this.execRepl,
           this.session,
           args.visualize,
         );

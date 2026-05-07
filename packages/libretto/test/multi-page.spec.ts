@@ -19,7 +19,7 @@ describe("multi-page CLI behavior", () => {
     expect(singlePageLines).toHaveLength(2);
 
     await librettoCli(
-      `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'); return context.pages().length;" --session ${session}`,
+      `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'), context.pages().length" --session ${session}`,
     );
 
     const multiplePagesResult = await librettoCli(`pages --session ${session}`);
@@ -56,11 +56,11 @@ describe("multi-page CLI behavior", () => {
     );
 
     await librettoCli(
-      `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'); return context.pages().length;" --session ${session}`,
+      `exec "const p = await context.newPage(); await p.goto('data:text/html,multi-page-secondary'), context.pages().length" --session ${session}`,
     );
 
     const result = await librettoCli(
-      `exec "return await page.url()" --session ${session}`,
+      `exec "page.url()" --session ${session}`,
     );
     expect(result.stdout).toContain("example.com");
     expect(result.stdout).not.toContain("multi-page-secondary");
@@ -76,7 +76,7 @@ describe("multi-page CLI behavior", () => {
     );
 
     const execResult = await librettoCli(
-      `exec "return page.url()" --session ${session} --page ${missingPageId}`,
+      `exec "page.url()" --session ${session} --page ${missingPageId}`,
     );
     expect(execResult.stderr).toContain(
       `Page "${missingPageId}" was not found in session "${session}".`,
