@@ -19,6 +19,8 @@ pnpm evals
 pnpm evals run
 ```
 
+Cases run in parallel by default.
+
 Run only cases that do not declare an auth profile:
 
 ```bash

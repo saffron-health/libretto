@@ -21,10 +21,6 @@ import {
 } from "./artifacts.js";
 import { recordEvalCall } from "./run-recorder.js";
 
-const EvaluationVerdictSchema = z.object({
-  success: z.boolean(),
-  reason: z.string().trim().min(1),
-});
 const ScoredCriterionSchema = z.object({
   criterion: z.string().trim().min(1),
   pass: z.boolean(),
@@ -37,7 +33,6 @@ const TranscriptScoreSchema = z.object({
   percent: z.number().min(0).max(100),
 });
 
-const MAX_TRANSCRIPT_CHARS = 20_000;
 const DEFAULT_EVAL_MODEL: EvalModelSelector = "openai/gpt-5.5";
 const DEFAULT_THINKING_LEVEL = "medium" satisfies NonNullable<
   CreateAgentSessionOptions["thinkingLevel"]
@@ -54,7 +49,6 @@ const ANSI_BOLD = "\x1b[1m";
 const ANSI_RED = "\x1b[31m";
 const ANSI_RESET = "\x1b[0m";
 
-type EvaluationVerdict = z.infer<typeof EvaluationVerdictSchema>;
 export type ScoredCriterion = z.infer<typeof ScoredCriterionSchema>;
 export type EvalModelSelector = `${string}/${string}`;
 
@@ -98,19 +92,6 @@ export type PiEvalHarnessOptions = {
 export type PiEvalHarnessSendOptions = {
   onUpdate?: (response: EvalResponse) => void | Promise<void>;
 };
-
-function clip(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  const headChars = Math.max(1, Math.floor(maxChars / 2));
-  const tailChars = Math.max(1, maxChars - headChars);
-  return [
-    text.slice(0, headChars),
-    "",
-    `[truncated: showing first ${headChars} chars and last ${tailChars} chars of ${text.length}]`,
-    "",
-    text.slice(-tailChars),
-  ].join("\n");
-}
 
 function extractFinalResultLine(transcript: string): string | null {
   const finalResultLine = transcript
@@ -256,18 +237,7 @@ function appendMarkdown(path: string | null, markdown: string): void {
 }
 
 function appendTranscriptRecord(record: Record<string, unknown>): void {
-  const path = getEvalArtifactPaths()?.transcript ?? null;
-  if (!path) return;
-  mkdirSync(dirname(path), { recursive: true });
-  try {
-    appendJsonl(path, record);
-  } catch (error) {
-    appendJsonl(path, {
-      source: record.source,
-      type: "transcript_write_error",
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  void record;
 }
 
 function recordUserPrompt(source: "agent" | "judge", prompt: string): void {
@@ -288,7 +258,7 @@ function recordRawEvent(
   const paths = getEvalArtifactPaths();
   appendJsonl(
     source === "agent"
-      ? (paths?.agentEvents ?? null)
+      ? (paths?.transcript ?? null)
       : (paths?.judgeEvents ?? null),
     { source, event },
   );
@@ -304,7 +274,7 @@ function recordTranscriptMarkdown(opts: {
   const paths = getEvalArtifactPaths();
   appendMarkdown(
     opts.source === "agent"
-      ? (paths?.agentTranscript ?? null)
+      ? (paths?.transcriptMarkdown ?? null)
       : (paths?.judgeTranscript ?? null),
     [
       `## ${opts.source === "agent" ? "Agent" : "Judge"} turn`,
@@ -485,7 +455,7 @@ async function runPiJudge(opts: {
   const session = await createPiEvalSession({
     cwd: opts.cwd,
     model: opts.model,
-    tools: [],
+    tools: ["read", "bash"],
   });
   const events: AgentSessionEvent[] = [];
   const startedMs = Date.now();
@@ -613,39 +583,6 @@ function parseJsonObject(text: string): unknown {
   return JSON.parse(candidate) as unknown;
 }
 
-async function evaluateTranscript(opts: {
-  assertion: string;
-  transcript: string;
-  cwd: string;
-  model?: EvalModelSelector;
-}): Promise<EvaluationVerdict> {
-  const prompt = [
-    "Evaluate whether TRANSCRIPT satisfies ASSERTION.",
-    "Return only JSON with keys: success (boolean), reason (string).",
-    "Be strict and set success=false if evidence is missing.",
-    "",
-    `ASSERTION:\n${opts.assertion}`,
-    "",
-    `TRANSCRIPT:\n${clip(opts.transcript, MAX_TRANSCRIPT_CHARS)}`,
-  ].join("\n");
-
-  const result = await runPiJudge({
-    prompt,
-    cwd: opts.cwd,
-    model: opts.model,
-  });
-
-  const parsed = EvaluationVerdictSchema.safeParse(
-    parseJsonObject(result.text),
-  );
-  if (!parsed.success) {
-    throw new Error(
-      `Evaluation returned invalid schema output: ${result.text}`,
-    );
-  }
-  return parsed.data;
-}
-
 async function scoreTranscript(opts: {
   criteria: string[];
   transcript: string;
@@ -659,17 +596,30 @@ async function scoreTranscript(opts: {
     throw new Error("score() requires at least one non-empty criterion.");
   }
 
-  const prompt = [
-    "Score whether TRANSCRIPT satisfies each criterion in CRITERIA.",
-    "Return only JSON with key `criteria` where each item is:",
-    "{ criterion: <exact criterion string>, pass: <boolean>, reason: <string> }",
-    "Use the exact criterion text; do not rewrite criterion names.",
-    "Be strict and mark pass=false when evidence is missing.",
-    "",
-    `CRITERIA:\n${JSON.stringify(normalizedCriteria, null, 2)}`,
-    "",
-    `TRANSCRIPT:\n${clip(opts.transcript, MAX_TRANSCRIPT_CHARS)}`,
-  ].join("\n");
+  const artifactPaths = getEvalArtifactPaths();
+  const caseDir = artifactPaths ? dirname(artifactPaths.transcript) : null;
+
+  const prompt = caseDir
+    ? [
+        "Score whether the eval run artifacts satisfy each criterion in CRITERIA.",
+        "Use the read and bash tools to inspect files in CASE_DIR.",
+        "Prioritize CASE_DIR/transcript.jsonl, which is the raw agent event stream and includes full tool call arguments.",
+        "Use jq with bash to query transcript.jsonl when you need structured evidence from tool calls or events.",
+        "Use CASE_DIR/transcript.md as a human-readable secondary view.",
+        "Return only JSON with key `criteria` where each item is:",
+        "{ criterion: <exact criterion string>, pass: <boolean>, reason: <string> }",
+        "Use the exact criterion text; do not rewrite criterion names.",
+        "Be strict and mark pass=false when evidence is missing from the artifacts.",
+        "",
+        `CASE_DIR:
+${caseDir}`,
+        "",
+        `CRITERIA:
+${JSON.stringify(normalizedCriteria, null, 2)}`,
+      ].join("\n")
+    : (() => {
+        throw new Error("score() requires eval artifact paths.");
+      })();
 
   const result = await runPiJudge({
     prompt,
@@ -790,19 +740,6 @@ export class EvalResponse {
     });
     this.cwd = opts.cwd;
     this.model = opts.model;
-  }
-
-  async evaluate(assertion: string): Promise<EvaluationVerdict> {
-    const verdict = await evaluateTranscript({
-      assertion,
-      transcript: this.transcript,
-      cwd: this.cwd,
-      model: this.model,
-    });
-    if (!verdict.success) {
-      throw new Error(verdict.reason);
-    }
-    return verdict;
   }
 
   async score(criteria: string[]): Promise<EvalScore> {
