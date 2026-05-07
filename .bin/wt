@@ -400,8 +400,10 @@ cmd_prune() {
                 remove_args+=("--force")
             fi
             remove_args+=("$wt_path")
+            run_hook beforeDestroy "$wt_path"
             if git "${remove_args[@]}" 2>/dev/null; then
                 git branch -D "$branch" 2>/dev/null || true
+                run_hook afterDestroy "$ROOT_DIR"
                 ((pruned++))
             else
                 echo "  Failed to remove worktree: $branch"
