@@ -10,7 +10,7 @@ const STEP_PAUSE_AFTER_CHECK_MS = 400;
 const SUCCESS_HOLD_MS = 3000;
 const RESET_PAUSE_MS = 600;
 
-const TEAL = "oklch(0.55 0.15 175)";
+const ACCENT = "#16857F";
 const GREEN = "oklch(0.55 0.16 155)";
 
 const STEPS = [
@@ -36,7 +36,7 @@ function useBrailleFrame(): string {
 
 function BrailleSpinner() {
   const char = useBrailleFrame();
-  return <span style={{ color: TEAL }}>{char}</span>;
+  return <span style={{ color: ACCENT }}>{char}</span>;
 }
 
 // ── Step Icon (spinner → checkmark crossfade) ────────────────────────────────
@@ -156,8 +156,8 @@ function MockWebsitePanel() {
         style={{
           left: "-20%",
           right: "-20%",
-          background: `linear-gradient(to right, transparent, ${TEAL}, transparent)`,
-          boxShadow: `0 0 10px 3px ${TEAL}55`,
+          background: `linear-gradient(to right, transparent, ${ACCENT}, transparent)`,
+          boxShadow: `0 0 10px 3px ${ACCENT}55`,
         }}
         initial={{ top: "10%" }}
         animate={{ top: "88%" }}
@@ -169,13 +169,13 @@ function MockWebsitePanel() {
         }}
       />
 
-      {/* Subtle teal overlay tint following scan line — adds glow feel */}
+      {/* Subtle accent overlay tint following scan line — adds glow feel */}
       <motion.div
         className="pointer-events-none absolute h-12 -translate-y-1/2"
         style={{
           left: "-20%",
           right: "-20%",
-          background: `linear-gradient(to bottom, transparent, ${TEAL}0a, transparent)`,
+          background: `linear-gradient(to bottom, transparent, ${ACCENT}0a, transparent)`,
         }}
         initial={{ top: "10%" }}
         animate={{ top: "88%" }}

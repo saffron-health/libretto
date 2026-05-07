@@ -30,7 +30,7 @@ function CheckIcon() {
       fill="none"
       className="shrink-0"
     >
-      <circle cx="9" cy="9" r="9" fill="rgba(0, 140, 120, 1)" />
+      <circle cx="9" cy="9" r="9" fill="#16857F" />
       <path
         d="M5.5 9.5L7.5 11.5L12.5 6.5"
         stroke="white"
@@ -44,19 +44,20 @@ function CheckIcon() {
 
 export function BattleTestedBanner() {
   return (
-    <section className="px-8 py-16">
-      <div className="mx-auto max-w-[1000px] rounded-2xl border border-ink/8 bg-ink/[0.03] px-6 py-14 md:px-16 md:py-20">
+    <section className="warm-section-grid px-5 py-20 md:px-8 md:py-24">
+      <div className="dark-panel-grid mx-auto max-w-[1120px] rounded-[14px] border border-cream/10 px-6 py-12 text-cream shadow-[0_28px_100px_rgba(44,33,22,0.18)] md:px-12 md:py-14">
         <div className="flex flex-col gap-12 md:flex-row md:items-center md:justify-between md:gap-16">
           {/* Text — left */}
-          <div className="space-y-4 md:max-w-[440px]">
-            <SectionHeading size="sm">
+          <div className="space-y-4 md:max-w-[460px]">
+            <div className="h-1.5 w-14 rounded-full bg-accent-rust" />
+            <SectionHeading size="sm" className="!text-cream">
               Battle-tested on the worst of the web
             </SectionHeading>
-            <Text as="p" size="md" className="leading-relaxed text-muted">
+            <Text as="p" size="md" className="leading-relaxed text-cream/64">
               Libretto was initially built as an internal tool for automating
               complex healthcare portals where nothing else worked.
             </Text>
-            <Text as="p" size="md" className="leading-relaxed text-muted">
+            <Text as="p" size="md" className="leading-relaxed text-cream/64">
               It&apos;s built to handle shadow DOMs, iframes, bot detection, and
               unusable APIs.
             </Text>
@@ -64,16 +65,19 @@ export function BattleTestedBanner() {
 
           {/* Integration logos — 2-column grid on all breakpoints, below text on mobile */}
           <div className="flex w-full min-w-0 flex-1 items-center justify-center">
-            <div className="grid w-full grid-cols-2 gap-x-3 gap-y-5 sm:gap-x-6 md:gap-x-10 md:gap-y-6">
+            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3">
               {integrations.map((integration) => (
-                <div key={integration.name} className="flex min-w-0 items-center gap-2 sm:gap-3 md:gap-4">
+                <div
+                  key={integration.name}
+                  className="flex min-w-0 items-center gap-2 rounded-lg border border-cream/10 bg-cream/[0.055] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:gap-3 md:gap-4"
+                >
                   <CheckIcon />
                   <img
                     src={integration.logo}
                     alt={integration.name}
                     width={integration.width}
                     height={integration.height}
-                    className="grayscale opacity-70 min-w-0 max-w-full h-auto"
+                    className="h-auto min-w-0 max-w-full grayscale invert opacity-60"
                   />
                 </div>
               ))}

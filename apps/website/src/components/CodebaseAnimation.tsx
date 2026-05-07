@@ -84,9 +84,9 @@ function highlightLine(line: string): TokenSpan[] {
         if (KEYWORDS.has(wp)) {
           spans.push({ text: wp, className: "text-purple-600/80" });
         } else if (TYPES.has(wp)) {
-          spans.push({ text: wp, className: "text-teal-600/80" });
+          spans.push({ text: wp, className: "text-accent/80" });
         } else if (/^\d+$/.test(wp)) {
-          spans.push({ text: wp, className: "text-orange-500/80" });
+          spans.push({ text: wp, className: "text-accent/80" });
         } else if (wp === "=>" || wp === "??") {
           spans.push({ text: wp, className: "text-purple-600/80" });
         } else {

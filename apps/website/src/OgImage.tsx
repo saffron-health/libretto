@@ -7,7 +7,7 @@ const OG_HEIGHT = 630;
 const SCALE = 2;
 
 const SITE_TITLE =
-  "Libretto — The AI Toolkit for Building Robust Web Integrations";
+  "Libretto — The AI Toolkit for Building Reliable Web Integrations";
 const SITE_DESCRIPTION =
   "An agent skill and token-efficient CLI that inspects live pages, reverse-engineers network requests, and ships production-ready integration workflows.";
 const SITE_URL = "libretto.sh";
@@ -92,9 +92,7 @@ function LinkedInPreview({ src }: { src: string }) {
           className="block w-full object-cover"
           style={{ height: imgHeight }}
         />
-        <div
-          style={{ height: 3, background: "rgb(0, 140, 120)" }}
-        />
+        <div style={{ height: 3, background: "#16857F" }} />
         <div className="px-3 py-2.5" style={{ background: "#f3f2ef" }}>
           <p
             className="truncate leading-5"
@@ -227,7 +225,7 @@ export function OgImage() {
               className="mt-8 font-serif font-extralight leading-snug text-muted"
               style={{ fontSize: 46 }}
             >
-              The AI Toolkit for Building Robust Web Integrations
+              The AI Toolkit for Building Reliable Web Integrations
             </p>
           </div>
 

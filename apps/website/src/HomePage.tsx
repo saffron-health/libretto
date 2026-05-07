@@ -68,7 +68,7 @@ function Hero({
               lineHeight: 1.1,
             }}
           >
-            The AI Toolkit for Building Robust Web Integrations
+            The AI Toolkit for Building Reliable Web Integrations
           </AnimatedTitle>
         </Text>
         <Text

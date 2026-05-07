@@ -32,7 +32,7 @@ function ThinkingLine({ done }: { done: boolean }) {
   return (
     <div className="flex items-center gap-2 text-ink/25">
       {done ? (
-        <span className="text-teal-600/60">✓</span>
+        <span className="text-accent/70">✓</span>
       ) : (
         <BrailleSpinner />
       )}
@@ -54,7 +54,7 @@ function ToolLine({ label, done }: { label: string; done: boolean }) {
           <BrailleSpinner />
         )
       ) : done ? (
-        <span className="text-teal-600/60">✓</span>
+        <span className="text-accent/70">✓</span>
       ) : (
         <BrailleSpinner />
       )}
@@ -404,8 +404,8 @@ export function TerminalDemo() {
             if (line.type === "user") {
               return (
                 <div key={i} className="flex gap-3 items-start">
-                  <div className="w-[3px] shrink-0 self-stretch bg-teal-500" />
-                  <span className="text-teal-700">{line.text}</span>
+                  <div className="w-[3px] shrink-0 self-stretch bg-accent" />
+                  <span className="text-accent">{line.text}</span>
                 </div>
               );
             }
@@ -445,8 +445,8 @@ export function TerminalDemo() {
             if (line.type === "user") {
               return (
                 <div key={`extra-${i}`} className="flex gap-3 items-start">
-                  <div className="w-[3px] shrink-0 self-stretch bg-teal-500" />
-                  <span className="text-teal-700">{line.text}</span>
+                  <div className="w-[3px] shrink-0 self-stretch bg-accent" />
+                  <span className="text-accent">{line.text}</span>
                 </div>
               );
             }

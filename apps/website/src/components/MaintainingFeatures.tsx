@@ -1,9 +1,8 @@
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { SectionHeading } from "./SectionHeading";
 import { Text } from "./Text";
 
-/** Matches TEAL_OUTER in CanvasAsciihedron */
-const teal = "rgba(40, 190, 160, 1)";
+const accent = "#16857F";
 
 /** Dice icon — represents deterministic outcomes */
 function MergeIcon({ className }: { className?: string }) {
@@ -25,9 +24,9 @@ function MergeIcon({ className }: { className?: string }) {
         strokeWidth="1.5"
       />
       <circle cx="9.25" cy="9.25" r="1.1" fill="currentColor" />
-      <circle cx="14.75" cy="9.25" r="1.1" fill={teal} />
+      <circle cx="14.75" cy="9.25" r="1.1" fill={accent} />
       <circle cx="12" cy="12" r="1.1" fill="currentColor" />
-      <circle cx="9.25" cy="14.75" r="1.1" fill={teal} />
+      <circle cx="9.25" cy="14.75" r="1.1" fill={accent} />
       <circle cx="14.75" cy="14.75" r="1.1" fill="currentColor" />
     </svg>
   );
@@ -58,7 +57,7 @@ function LayersIcon({ className }: { className?: string }) {
         strokeWidth="1.5"
       />
       <path
-        stroke={teal}
+        stroke={accent}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.5"
@@ -66,7 +65,7 @@ function LayersIcon({ className }: { className?: string }) {
       />
       <path
         d="M4.95 8.05A8 8 0 1 1 5.1 16.6"
-        stroke={teal}
+        stroke={accent}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.5"
@@ -92,7 +91,7 @@ function LogInIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="12" cy="12" r="2.25" stroke={teal} strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="2.25" stroke={accent} strokeWidth="1.5" />
     </svg>
   );
 }
@@ -126,38 +125,39 @@ const features: MaintainFeature[] = [
 
 export function MaintainingFeatures() {
   return (
-    <section className="px-8 py-24">
-      <div className="mx-auto max-w-[1000px]">
-        <div className="mb-16 text-center">
+    <section className="warm-section-grid px-5 py-20 md:px-8 md:py-24">
+      <div className="mx-auto max-w-[1120px]">
+        <div className="mb-12 grid gap-6 md:grid-cols-[0.7fr_1fr] md:items-end">
           <SectionHeading className="mb-4">
             Effortless debugging
           </SectionHeading>
           <Text
             as="p"
             size="md"
-            className="mx-auto max-w-[520px] leading-relaxed text-muted"
+            className="max-w-[560px] leading-relaxed text-muted md:justify-self-end"
           >
             Browser automations inevitably hit unexpected edge cases, and
             Libretto makes them easy to diagnose and fast to fix.
           </Text>
         </div>
 
-        <div className="grid gap-10 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
-          {features.map((f, i) => (
-            <Fragment key={f.title}>
-              {i > 0 && (
-                <div className="hidden w-px self-center bg-ink/10 md:block md:h-[60%]" />
-              )}
-              <div className="px-2">
-                <div className="mb-4">{f.icon}</div>
-                <Text as="h3" size="md" className="mb-2 font-medium text-ink">
-                  {f.title}
-                </Text>
-                <Text as="p" size="sm" className="leading-relaxed text-muted">
-                  {f.description}
-                </Text>
+        <div className="grid gap-3 md:grid-cols-3 md:gap-4">
+          {features.map((f) => (
+            <div
+              key={f.title}
+              className="relative rounded-[12px] border border-ink/10 bg-[#f8f4eb]/92 p-6 shadow-[0_18px_60px_rgba(44,33,22,0.045)] md:p-7"
+            >
+              <div className="mb-7 h-1 w-12 rounded-full bg-accent-rust" />
+              <div className="mb-7 flex h-11 w-11 items-center justify-center rounded-lg border border-ink/10 bg-cream/72 text-ink/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+                {f.icon}
               </div>
-            </Fragment>
+              <Text as="h3" size="md" className="mb-2 font-medium text-ink">
+                {f.title}
+              </Text>
+              <Text as="p" size="sm" className="leading-relaxed text-muted">
+                {f.description}
+              </Text>
+            </div>
           ))}
         </div>
       </div>

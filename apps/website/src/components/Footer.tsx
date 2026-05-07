@@ -4,8 +4,8 @@ import { DISCORD_URL, NPM_URL, REPO_URL } from "../site";
 
 export function Footer() {
   return (
-    <footer className="px-8 pb-8 pt-20">
-      <div className="mx-auto mb-12 h-px w-[160px] bg-ink/10" />
+    <footer className="warm-section-grid px-8 pb-8 pt-2">
+      <div className="mx-auto mb-8 h-px max-w-[800px] bg-ink/10" />
       <div className="mx-auto flex max-w-[800px] items-center justify-between">
         <Text size="xs" className="text-muted/50">
           © {new Date().getFullYear()} Saffron Health

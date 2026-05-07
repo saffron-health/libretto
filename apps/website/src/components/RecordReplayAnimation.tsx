@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "recording" | "thinking" | "replaying" | "done";
 
-const ACCENT = "oklch(0.55 0.15 175)"; // teal agent cursor
+const ACCENT = "#16857F";
 
 // Resting positions (outside the panel)
 const DEV_HOME = { x: 88, y: 35 }; // right side
@@ -182,7 +182,7 @@ function StatusBadge({ phase }: StatusLabelProps) {
       : phase === "thinking"
         ? "text-amber-500"
         : phase === "replaying"
-          ? "text-teal-600"
+          ? "text-accent"
           : "text-green-600";
 
   const icon =
@@ -193,7 +193,7 @@ function StatusBadge({ phase }: StatusLabelProps) {
         <BrainIcon />
       </span>
     ) : phase === "replaying" ? (
-      <span className="text-teal-600">
+      <span className="text-accent">
         <ChevronsIcon />
       </span>
     ) : (
@@ -649,7 +649,7 @@ export function RecordReplayAnimation() {
         <CursorShape color="#ef4444" label="You" labelClassName="bg-red-500" />
       </motion.div>
 
-      {/* Agent cursor (teal) — always rendered, opacity reflects active state */}
+      {/* Agent cursor — always rendered, opacity reflects active state */}
       <motion.div
         className="pointer-events-none absolute z-10"
         animate={{
@@ -663,7 +663,7 @@ export function RecordReplayAnimation() {
         <CursorShape
           color={ACCENT}
           label="Agent"
-          labelClassName="bg-teal-600"
+          labelClassName="bg-accent"
         />
       </motion.div>
     </div>

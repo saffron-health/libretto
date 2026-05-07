@@ -149,12 +149,15 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
 
 export function FAQ() {
   return (
-    <section className="px-8 py-24">
-      <div className="mx-auto max-w-[680px]">
-        <SectionHeading className="mb-10 text-center">
-          Frequently asked questions
-        </SectionHeading>
-        <div className="border-t border-ink/8">
+    <section className="warm-section-grid px-5 py-16 md:px-8 md:py-20">
+      <div className="mx-auto grid max-w-[1120px] gap-8 rounded-[14px] border border-ink/10 bg-[#f8f4eb]/88 p-6 shadow-[0_20px_80px_rgba(44,33,22,0.055)] md:grid-cols-[0.72fr_1fr] md:p-10">
+        <div>
+          <div className="mb-8 h-1.5 w-14 rounded-full bg-accent-rust" />
+          <SectionHeading>
+            Frequently asked questions
+          </SectionHeading>
+        </div>
+        <div className="rounded-xl border border-ink/8 bg-cream/72 px-5 md:px-7">
           {faqs.map((faq) => (
             <FAQAccordionItem key={faq.id} item={faq} />
           ))}

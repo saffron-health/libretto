@@ -1167,7 +1167,7 @@ export function CanvasAsciihedron({
         return ((h >> 16) ^ h) >>> 0;
       };
 
-      // Returns: 0 = normal, 1 = inner teal, 2 = outer teal
+      // Returns: 0 = normal, 1 = inner accent, 2 = outer accent
       // Check cursor proximity AND wake particles for trail effect
       const scrambleLevel = (
         col: number,
@@ -1215,8 +1215,8 @@ export function CanvasAsciihedron({
       };
 
       const BASE_OPACITY = params.baseOpacity;
-      const TEAL_INNER = `rgba(0, 140, 120, 1)`;
-      const TEAL_OUTER = `rgba(40, 190, 160, 1)`;
+      const ACCENT_INNER = `rgba(22, 133, 127, 1)`;
+      const ACCENT_OUTER = `rgba(46, 165, 159, 1)`;
 
 
       // Glow pass (additive) — depth-modulated
@@ -1264,7 +1264,7 @@ export function CanvasAsciihedron({
 
           const level = scrambleLevel(col, row, dist, baseX, baseY);
           if (level > 0) {
-            context.fillStyle = level === 1 ? TEAL_INNER : TEAL_OUTER;
+            context.fillStyle = level === 1 ? ACCENT_INNER : ACCENT_OUTER;
             const char = getScrambledChar(shadeIndex, col, row);
             context.fillText(char, baseX / glyphScaleX, baseY);
           } else {
