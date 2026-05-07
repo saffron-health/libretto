@@ -26,7 +26,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
       {
         label:
-          'bash: npx libretto snapshot --objective "Find 2BR apartment listings"',
+          "bash: npx libretto snapshot --session craigslist",
         durationMs: 1200,
       },
       {
@@ -59,7 +59,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
       {
         label:
-          'bash: npx libretto snapshot --objective "Find pending connection requests"',
+          "bash: npx libretto snapshot --session linkedin",
         durationMs: 1400,
       },
       {
@@ -69,7 +69,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
       {
         label:
-          'bash: npx libretto snapshot --objective "List all pending invitations with name, headline, and mutual connections"',
+          "bash: npx libretto snapshot --session linkedin",
         durationMs: 1200,
       },
       {
@@ -103,7 +103,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
       {
         label:
-          'bash: npx libretto snapshot --objective "Find the login form"',
+          "bash: npx libretto snapshot --session availity",
         durationMs: 1000,
       },
       {
@@ -113,7 +113,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
       {
         label:
-          'bash: npx libretto snapshot --objective "Locate insurance tab in patient chart"',
+          "bash: npx libretto snapshot --session availity",
         durationMs: 1300,
       },
       {
@@ -148,7 +148,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
       {
         label:
-          'bash: npx libretto snapshot --objective "Find the claim search form"',
+          "bash: npx libretto snapshot --session claim-status",
         durationMs: 1200,
       },
       {
@@ -163,7 +163,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
       {
         label:
-          'bash: npx libretto snapshot --objective "Extract claim status, payment details, and denial codes"',
+          "bash: npx libretto snapshot --session claim-status",
         durationMs: 1400,
       },
       {
@@ -192,7 +192,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
       {
         label:
-          'bash: npx libretto snapshot --objective "Find the authorizations section"',
+          "bash: npx libretto snapshot --session prior-auth",
         durationMs: 1200,
       },
       {
@@ -202,7 +202,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
       {
         label:
-          'bash: npx libretto snapshot --objective "Map out the prior auth form fields"',
+          "bash: npx libretto snapshot --session prior-auth",
         durationMs: 1400,
       },
       {
