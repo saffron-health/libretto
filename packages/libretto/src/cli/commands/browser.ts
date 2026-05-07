@@ -11,7 +11,7 @@ import {
 } from "../core/browser.js";
 import { resolveProviderName } from "../core/providers/index.js";
 import { readLibrettoConfig } from "../core/config.js";
-import { createLoggerForSession, withSessionLogger } from "../core/context.js";
+import { createLoggerForSession } from "../core/context.js";
 import { librettoCommand } from "../../shared/package-manager.js";
 import {
   type SessionAccessMode,
@@ -295,9 +295,3 @@ export const browserCommands = {
   "session-mode": sessionModeCommand,
   close: closeCommand,
 };
-
-export async function runClose(session: string): Promise<void> {
-  await withSessionLogger(session, async (logger) => {
-    await runCloseWithLogger(session, logger);
-  });
-}
