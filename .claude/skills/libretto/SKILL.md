@@ -37,6 +37,10 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 - Use `npx libretto setup` for first-time workspace onboarding. It installs Chromium and syncs skills.
 - Use `npx libretto status` to inspect open sessions without triggering setup.
 
+## Experiments
+
+- Use `npx libretto experiments` to list internal feature flags and `npx libretto experiments describe <name>` for usage notes when an experiment is enabled.
+
 ## Working Rules
 
 - Announce which session you are using and what page you are on.
