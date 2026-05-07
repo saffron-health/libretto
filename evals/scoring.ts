@@ -1,9 +1,4 @@
-import type {
-  EvalJudgeRecord,
-  EvalScoreMetadata,
-  ScoredCriterion,
-  TranscriptScore,
-} from "./harness.js";
+import type { EvalJudgeRecord, EvalScore, ScoredCriterion } from "./harness.js";
 import type { EvalMetrics } from "./artifacts.js";
 
 type EvalFailureRecord = Pick<ScoredCriterion, "criterion" | "reason">;
@@ -20,20 +15,13 @@ export type EvalScoreRecord = {
     model: string;
     sessionId: string;
     metrics: EvalMetrics;
-  } | null;
-  judge: EvalJudgeRecord | null;
+  };
+  judge: EvalJudgeRecord;
 };
 
 const recordedScores: EvalScoreRecord[] = [];
 
-function hasScoreMetadata(
-  score: TranscriptScore,
-): score is TranscriptScore & EvalScoreMetadata {
-  return "agent" in score && "judge" in score;
-}
-
-function toRecord(name: string, score: TranscriptScore): EvalScoreRecord {
-  const metadata = hasScoreMetadata(score) ? score : null;
+function toRecord(name: string, score: EvalScore): EvalScoreRecord {
   return {
     name,
     passed: score.passed,
@@ -43,12 +31,12 @@ function toRecord(name: string, score: TranscriptScore): EvalScoreRecord {
     failures: score.criteria
       .filter((criterion) => !criterion.pass)
       .map(({ criterion, reason }) => ({ criterion, reason })),
-    agent: metadata?.agent ?? null,
-    judge: metadata?.judge ?? null,
+    agent: score.agent,
+    judge: score.judge,
   };
 }
 
-export function recordScore(name: string, score: TranscriptScore): EvalScoreRecord {
+export function recordScore(name: string, score: EvalScore): EvalScoreRecord {
   const record = toRecord(name, score);
   recordedScores.push(record);
   return record;

@@ -8,7 +8,6 @@ on:
     paths:
       - "package.json"
       - "evals/**"
-      - "packages/libretto/scripts/summarize-evals.mjs"
       - ".github/workflows/evals.yml"
   pull_request:
     branches:
@@ -46,11 +45,11 @@ jobs:
 
       - name: Validate eval credentials
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-            echo "ANTHROPIC_API_KEY secret is required to run evals." >&2
+          if [ -z "${OPENAI_API_KEY:-}" ]; then
+            echo "OPENAI_API_KEY secret is required to run evals." >&2
             exit 1
           fi
 
@@ -61,34 +60,43 @@ jobs:
         id: run_evals
         continue-on-error: true
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          pnpm eval
+          pnpm evals --output "${RUNNER_TEMP}/eval-run"
 
-      - name: Summarize eval scores
+      - name: Summarize eval results
+        id: summarize_evals
         if: always()
+        continue-on-error: true
         run: |
-          node packages/libretto/scripts/summarize-evals.mjs \
-            "${RUNNER_TEMP}/eval-scores" \
-            "${RUNNER_TEMP}/eval-summary.json" \
-            > "${RUNNER_TEMP}/eval-summary.md"
-          cat "${RUNNER_TEMP}/eval-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          if pnpm evals summary "${RUNNER_TEMP}/eval-run"; then
+            cat "${RUNNER_TEMP}/eval-run/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Eval summary generation failed. The eval runner may have crashed before producing completed records." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
-      - name: Upload eval summary artifact
+      - name: Upload eval artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eval-summary
+          name: eval-results
           path: |
-            ${{ runner.temp }}/eval-summary.json
-            ${{ runner.temp }}/eval-summary.md
+            ${{ runner.temp }}/eval-run/run.json
+            ${{ runner.temp }}/eval-run/summary.json
+            ${{ runner.temp }}/eval-run/summary.md
+            ${{ runner.temp }}/eval-run/cases/**/result.json
+            !${{ runner.temp }}/eval-run/cases/**/transcript.jsonl
+            !${{ runner.temp }}/eval-run/cases/**/*events.jsonl
+            !${{ runner.temp }}/eval-run/cases/**/*transcript.md
 
       - name: Post sticky eval summary comment
         if: always() && github.event_name == 'pull_request'
         continue-on-error: true
         uses: actions/github-script@v7
         env:
-          EVAL_SUMMARY_PATH: ${{ runner.temp }}/eval-summary.md
+          EVAL_SUMMARY_PATH: ${{ runner.temp }}/eval-run/summary.md
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           github-token: ${{ github.token }}
@@ -96,6 +104,10 @@ jobs:
             const fs = require("node:fs");
 
             const marker = "<!-- libretto-eval-results -->";
+            if (!fs.existsSync(process.env.EVAL_SUMMARY_PATH)) {
+              core.warning(`Eval summary not found: ${process.env.EVAL_SUMMARY_PATH}`);
+              return;
+            }
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const issueNumber = context.payload.pull_request.number;
@@ -141,5 +153,9 @@ jobs:
         run: |
           if [ "${{ steps.run_evals.outcome }}" != "success" ]; then
             echo "Eval run failed. See logs and the eval summary for details." >&2
+            exit 1
+          fi
+          if [ "${{ steps.summarize_evals.outcome }}" != "success" ]; then
+            echo "Eval summary validation failed. The run may have produced malformed or zero completed records." >&2
             exit 1
           fi

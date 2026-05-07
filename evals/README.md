@@ -6,11 +6,77 @@ Run all discovered eval cases from the repo root:
 pnpm evals
 ```
 
-The runner imports `evals/**/*.eval.ts` and registers cases through `evalCase`. If `evals/private/` exists, matching `evals/private/**/*.eval.ts` files are imported too and run with the same command. There is no suite flag for private cases.
+The runner imports `evals/**/*.eval.ts` and registers cases through `evalCase`. It writes each run to `evals/runs/<run-id>/` by default, including `run.json`, `summary.json`, `summary.md`, and per-case `cases/<case-id>/result.json` records plus local debugging transcripts.
+
+Scoring is informational. Low scores are recorded in the run artifacts; the command fails only for setup or execution errors such as missing required auth profiles, harness crashes, malformed records, or zero completed cases.
+
+## Running and focusing cases
+
+Run all available cases:
+
+```bash
+pnpm evals
+pnpm evals run
+```
+
+Focus by file path or substring:
+
+```bash
+pnpm evals basic.eval.ts
+pnpm evals evals/smoke.eval.ts
+```
+
+Focus by case name with `-t` / `--testNamePattern`:
+
+```bash
+pnpm evals run -t network
+pnpm evals --testNamePattern "broken selector"
+```
+
+Temporarily focus from code with `evalCase.only(...)`. Do not commit `.only` unless the narrowed run is intentional.
+
+Write artifacts to a specific directory:
+
+```bash
+pnpm evals --output temp/eval-run
+```
+
+Regenerate a CI-style markdown/JSON summary for the latest run, or for a specific run directory:
+
+```bash
+pnpm evals summary > temp/eval-summary.md
+pnpm evals summary temp/eval-run > temp/eval-summary.md
+```
+
+This also rewrites `<run-dir>/summary.json` and `<run-dir>/summary.md`. It fails if the run has no completed result records. Pass `--allow-empty` only when intentionally inspecting an empty run directory.
+
+Override the default evaluated agent and judge model (`openai/gpt-5.5`):
+
+```bash
+pnpm evals --model openai/gpt-5.5
+```
+
+## Auth profiles
+
+Checked-in and private cases can declare `authProfile: "domain.com"`. Required profiles are local maintainer files stored in `evals/profiles/<domain>.json`. The whole `evals/profiles/` directory is always gitignored and must not be committed.
+
+Check which profiles are required and whether they exist locally:
+
+```bash
+pnpm evals profiles status
+```
+
+Create or refresh a profile interactively:
+
+```bash
+pnpm evals profiles login linkedin.com
+```
+
+The login command opens `https://<domain>` in a headed browser, waits for you to finish login, saves the Libretto profile, and copies it to `evals/profiles/<domain>.json`.
 
 ## Private local cases
 
-`evals/private/` is always gitignored. Use it for maintainer-only evals that should stay local, such as workflows against private portals or accounts.
+`evals/private/` is always gitignored. Use it for maintainer-only evals that should stay local, such as workflows against private portals or accounts. If the directory exists, matching `evals/private/**/*.eval.ts` files run automatically with `pnpm evals`; there is no suite flag for private cases.
 
 ```ts
 // evals/private/portal.eval.ts

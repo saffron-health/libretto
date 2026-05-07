@@ -56,7 +56,6 @@ const ANSI_RESET = "\x1b[0m";
 
 type EvaluationVerdict = z.infer<typeof EvaluationVerdictSchema>;
 export type ScoredCriterion = z.infer<typeof ScoredCriterionSchema>;
-export type TranscriptScore = z.infer<typeof TranscriptScoreSchema>;
 export type EvalModelSelector = `${string}/${string}`;
 
 export type EvalJudgeRecord = {
@@ -68,7 +67,7 @@ export type EvalJudgeRecord = {
   metrics: EvalMetrics;
 };
 
-export type EvalScoreMetadata = {
+export type EvalScore = z.infer<typeof TranscriptScoreSchema> & {
   agent: {
     prompt: string;
     model: EvalModelSelector;
@@ -652,7 +651,7 @@ async function scoreTranscript(opts: {
   transcript: string;
   cwd: string;
   model?: EvalModelSelector;
-}): Promise<TranscriptScore & { judge: EvalJudgeRecord }> {
+}): Promise<z.infer<typeof TranscriptScoreSchema> & { judge: EvalJudgeRecord }> {
   const normalizedCriteria = opts.criteria
     .map((criterion) => criterion.trim())
     .filter((criterion) => criterion.length > 0);
@@ -806,7 +805,7 @@ export class EvalResponse {
     return verdict;
   }
 
-  async score(criteria: string[]): Promise<TranscriptScore & EvalScoreMetadata> {
+  async score(criteria: string[]): Promise<EvalScore> {
     const score = await scoreTranscript({
       criteria,
       transcript: this.transcript,

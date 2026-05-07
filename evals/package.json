@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "evals": "pnpm --filter @libretto/dev-tools --filter libretto build && tsx cli.ts"
+    "evals": "tsx cli.ts"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "^0.70.6",

@@ -3,7 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import {
@@ -47,10 +47,17 @@ type ProfilesLoginCliOptions = {
   domain: string;
 };
 
+type SummaryCliOptions = {
+  command: "summary";
+  runDir: string | null;
+  allowEmpty: boolean;
+};
+
 type CliOptions =
   | RunCliOptions
   | ProfilesStatusCliOptions
-  | ProfilesLoginCliOptions;
+  | ProfilesLoginCliOptions
+  | SummaryCliOptions;
 
 type CaseResult = {
   id: string;
@@ -87,6 +94,8 @@ type RunSummary = {
   startedAt: string;
   finishedAt: string;
   durationMs: number;
+  totalCaseDurationMs: number;
+  averageCompletedDurationMs: number | null;
   selectedModel: string;
   totals: {
     cases: number;
@@ -110,6 +119,7 @@ type RunSummary = {
     score: CaseResult["score"];
     agentMetrics: EvalMetrics;
     judgeMetrics: EvalMetrics;
+    combinedMetrics: EvalMetrics;
     artifacts: CaseResult["artifacts"];
     error?: string;
     skipReason?: string;
@@ -188,6 +198,7 @@ function usage(): string {
   return [
     "Usage:",
     "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>]",
+    "  pnpm evals summary [run-dir] [--allow-empty]",
     "  pnpm evals profiles status",
     "  pnpm evals profiles login <domain>",
     "",
@@ -195,6 +206,8 @@ function usage(): string {
     "  pnpm evals",
     "  pnpm evals run -t network --model openai/gpt-5.5",
     "  pnpm evals basic.eval.ts --output temp/eval-run",
+    "  pnpm evals summary",
+    "  pnpm evals summary temp/eval-run",
     "  pnpm evals profiles status",
     "  pnpm evals profiles login linkedin.com",
   ].join("\n");
@@ -209,6 +222,23 @@ function parseArgs(argv: string[]): CliOptions {
   }
   if (first === "run") {
     args.shift();
+  } else if (first === "summary") {
+    args.shift();
+    const allowEmptyIndex = args.indexOf("--allow-empty");
+    const allowEmpty = allowEmptyIndex >= 0;
+    if (allowEmpty) {
+      args.splice(allowEmptyIndex, 1);
+    }
+    if (args.length > 1) {
+      throw new Error(
+        "Usage: pnpm evals summary [run-dir] [--allow-empty]",
+      );
+    }
+    return {
+      command: "summary",
+      runDir: args[0] ? resolve(repoRoot, args[0]) : null,
+      allowEmpty,
+    };
   } else if (first === "profiles") {
     args.shift();
     const subcommand = args.shift();
@@ -428,6 +458,116 @@ async function writeJson(path: string, value: unknown): Promise<void> {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+async function readJson(path: string): Promise<unknown> {
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as unknown;
+  } catch (error) {
+    throw new Error(`Failed to read JSON from ${path}: ${formatError(error)}`);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (isRecord(value)) return value;
+  throw new Error(`${label} must be an object.`);
+}
+
+function requireString(value: unknown, label: string): string {
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  throw new Error(`${label} must be a non-empty string.`);
+}
+
+function requireFiniteNumber(value: unknown, label: string): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  throw new Error(`${label} must be a finite number.`);
+}
+
+function optionalFiniteNumber(value: unknown, label: string): number | null {
+  if (value == null) return null;
+  return requireFiniteNumber(value, label);
+}
+
+function requireNonNegativeInteger(value: unknown, label: string): number {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
+    return value;
+  }
+  throw new Error(`${label} must be a non-negative integer.`);
+}
+
+function optionalString(value: unknown, label: string): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  throw new Error(`${label} must be a string or null.`);
+}
+
+function stringArray(value: unknown, label: string): string[] {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`${label} must be an array of strings.`);
+  }
+  return value;
+}
+
+function numberMap(value: unknown, label: string): Record<string, number> {
+  const record = value == null ? {} : requireRecord(value, label);
+  return Object.fromEntries(
+    Object.entries(record).map(([key, count]) => [
+      key,
+      requireNonNegativeInteger(count, `${label}.${key}`),
+    ]),
+  );
+}
+
+function metricsFromResult(value: unknown, label: string): EvalMetrics {
+  const metrics = requireRecord(value, label);
+  return {
+    durationMs: optionalFiniteNumber(metrics.durationMs, `${label}.durationMs`),
+    inputTokens: optionalFiniteNumber(metrics.inputTokens, `${label}.inputTokens`),
+    outputTokens: optionalFiniteNumber(metrics.outputTokens, `${label}.outputTokens`),
+    cacheReadTokens: optionalFiniteNumber(
+      metrics.cacheReadTokens,
+      `${label}.cacheReadTokens`,
+    ),
+    cacheWriteTokens: optionalFiniteNumber(
+      metrics.cacheWriteTokens,
+      `${label}.cacheWriteTokens`,
+    ),
+    totalTokens: optionalFiniteNumber(metrics.totalTokens, `${label}.totalTokens`),
+    totalCostUsd: optionalFiniteNumber(
+      metrics.totalCostUsd,
+      `${label}.totalCostUsd`,
+    ),
+    turns: requireNonNegativeInteger(metrics.turns, `${label}.turns`),
+    turnsWithUsage: requireNonNegativeInteger(
+      metrics.turnsWithUsage,
+      `${label}.turnsWithUsage`,
+    ),
+    toolCalls: numberMap(metrics.toolCalls, `${label}.toolCalls`),
+    totalToolCalls: requireNonNegativeInteger(
+      metrics.totalToolCalls,
+      `${label}.totalToolCalls`,
+    ),
+    failedToolCalls: requireNonNegativeInteger(
+      metrics.failedToolCalls,
+      `${label}.failedToolCalls`,
+    ),
+    failedToolCallsByName: numberMap(
+      metrics.failedToolCallsByName,
+      `${label}.failedToolCallsByName`,
+    ),
+    model: optionalString(metrics.model, `${label}.model`),
+    provider: optionalString(metrics.provider, `${label}.provider`),
+    responseIds: stringArray(metrics.responseIds, `${label}.responseIds`),
+    stopReasons: stringArray(metrics.stopReasons, `${label}.stopReasons`),
+    sessionId: optionalString(metrics.sessionId, `${label}.sessionId`),
+    error: optionalString(metrics.error, `${label}.error`),
+    usageTurns: [],
+  };
+}
+
 function sensitiveEnvValues(): string[] {
   return Object.entries(process.env)
     .filter(
@@ -478,6 +618,8 @@ function buildSummaryMarkdown(summary: RunSummary): string {
     `- Run ID: \`${summary.runId}\``,
     `- Model: \`${summary.selectedModel}\``,
     `- Duration: \`${formatDuration(summary.durationMs)}\``,
+    `- Total case duration: \`${formatDuration(summary.totalCaseDurationMs)}\``,
+    `- Average completed case duration: \`${formatDuration(summary.averageCompletedDurationMs)}\``,
     `- Cases completed: \`${summary.totals.completed}\``,
     `- Cases errored: \`${summary.totals.errored}\``,
     `- Cases skipped: \`${summary.totals.skipped}\``,
@@ -504,7 +646,7 @@ function buildSummaryMarkdown(summary: RunSummary): string {
   for (const result of summary.cases) {
     const caseScore = `${result.score.passed}/${result.score.total}`;
     lines.push(
-      `| \`${result.name}\` | ${result.status} | \`${caseScore}\` | \`${formatDuration(result.durationMs)}\` | \`${formatUsd(result.agentMetrics.totalCostUsd)}\` | \`${formatInteger(result.agentMetrics.totalTokens)}\` | \`${result.agentMetrics.totalToolCalls}\` | \`${result.artifacts.result}\` |`,
+      `| \`${result.name}\` | ${result.status} | \`${caseScore}\` | \`${formatDuration(result.durationMs)}\` | \`${formatUsd(result.combinedMetrics.totalCostUsd)}\` | \`${formatInteger(result.combinedMetrics.totalTokens)}\` | \`${result.combinedMetrics.totalToolCalls}\` | \`${result.artifacts.result}\` |`,
     );
   }
 
@@ -592,11 +734,208 @@ async function runCase(
     scores,
     ...(combinedError ? { error: combinedError } : {}),
   };
-  await writeJson(join(caseDir, "result.json"), result);
+  await writeRedactedJson(join(caseDir, "result.json"), result);
   return result;
 }
 
+function caseStatus(value: unknown, label: string): CaseResult["status"] {
+  if (value === "completed" || value === "error" || value === "skipped") {
+    return value;
+  }
+  throw new Error(`${label} must be completed, error, or skipped.`);
+}
+
+function artifactRecord(value: unknown, label: string): CaseResult["artifacts"] {
+  const artifacts = value == null ? {} : requireRecord(value, label);
+  const artifactPath = (key: string): string => {
+    const path = artifacts[key];
+    return typeof path === "string" && path.trim().length > 0 ? path : "-";
+  };
+  return {
+    result: artifactPath("result"),
+    transcript: artifactPath("transcript"),
+    agentEvents: artifactPath("agentEvents"),
+    agentTranscript: artifactPath("agentTranscript"),
+    judgeEvents: artifactPath("judgeEvents"),
+    judgeTranscript: artifactPath("judgeTranscript"),
+  };
+}
+
+function summaryCaseFromResult(
+  value: unknown,
+  label: string,
+): RunSummary["cases"][number] {
+  const result = requireRecord(value, label);
+  const score = requireRecord(result.score, `${label}.score`);
+  const agentMetrics = metricsFromResult(
+    result.agentMetrics,
+    `${label}.agentMetrics`,
+  );
+  const judgeMetrics = metricsFromResult(
+    result.judgeMetrics,
+    `${label}.judgeMetrics`,
+  );
+  return {
+    id: requireString(result.id, `${label}.id`),
+    name: requireString(result.name, `${label}.name`),
+    status: caseStatus(result.status, `${label}.status`),
+    durationMs: requireFiniteNumber(result.durationMs, `${label}.durationMs`),
+    score: {
+      passed: requireNonNegativeInteger(score.passed, `${label}.score.passed`),
+      total: requireNonNegativeInteger(score.total, `${label}.score.total`),
+      percent: requireFiniteNumber(score.percent, `${label}.score.percent`),
+    },
+    agentMetrics,
+    judgeMetrics,
+    combinedMetrics: aggregateMetrics([agentMetrics, judgeMetrics]),
+    artifacts: artifactRecord(result.artifacts, `${label}.artifacts`),
+    ...(typeof result.error === "string" ? { error: result.error } : {}),
+    ...(typeof result.skipReason === "string"
+      ? { skipReason: result.skipReason }
+      : {}),
+  };
+}
+
+async function loadSummaryCases(
+  runDir: string,
+): Promise<RunSummary["cases"]> {
+  const casesDir = join(runDir, "cases");
+  if (!existsSync(casesDir)) return [];
+
+  const entries = await readdir(casesDir, { withFileTypes: true });
+  const cases = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const resultPath = join(casesDir, entry.name, "result.json");
+        if (!existsSync(resultPath)) return null;
+        return summaryCaseFromResult(await readJson(resultPath), resultPath);
+      }),
+  );
+  return cases
+    .filter((result): result is RunSummary["cases"][number] => result !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function readRunRecord(runDir: string): Promise<Record<string, unknown>> {
+  const runPath = join(runDir, "run.json");
+  if (!existsSync(runPath)) return {};
+  return requireRecord(await readJson(runPath), runPath);
+}
+
+async function latestRunDir(): Promise<string> {
+  const runsDir = join(evalsRoot, "runs");
+  if (!existsSync(runsDir)) {
+    throw new Error("No eval runs found. Run pnpm evals first.");
+  }
+
+  const entries = await readdir(runsDir, { withFileTypes: true });
+  const runDirs = (
+    await Promise.all(
+      entries
+        .filter((entry) => entry.isDirectory())
+        .map(async (entry) => {
+          const path = join(runsDir, entry.name);
+          const runRecord = await readRunRecord(path);
+          return typeof runRecord.startedAt === "string"
+            ? { path, startedAt: runRecord.startedAt }
+            : null;
+        }),
+    )
+  ).filter((run): run is { path: string; startedAt: string } => run !== null);
+  const latest = runDirs.sort((a, b) =>
+    b.startedAt.localeCompare(a.startedAt),
+  )[0];
+  if (!latest) {
+    throw new Error("No eval runs found. Run pnpm evals first.");
+  }
+  return latest.path;
+}
+
+async function runSummary(options: SummaryCliOptions): Promise<number> {
+  const runDir = options.runDir ?? (await latestRunDir());
+  const cases = await loadSummaryCases(runDir);
+  const completed = cases.filter((result) => result.status === "completed");
+  if (cases.length === 0 && !options.allowEmpty) {
+    throw new Error("Eval summary generation failed: no result records were found.");
+  }
+  if (completed.length === 0 && !options.allowEmpty) {
+    throw new Error(
+      "Eval summary generation failed: zero completed eval records were produced.",
+    );
+  }
+
+  const runRecord = await readRunRecord(runDir);
+  const scorePassed = cases.reduce(
+    (total, result) => total + result.score.passed,
+    0,
+  );
+  const scoreTotal = cases.reduce(
+    (total, result) => total + result.score.total,
+    0,
+  );
+  const agentMetrics = aggregateMetrics(
+    cases.map((result) => result.agentMetrics),
+  );
+  const judgeMetrics = aggregateMetrics(
+    cases.map((result) => result.judgeMetrics),
+  );
+  const totalCaseDurationMs = cases.reduce(
+    (total, result) => total + result.durationMs,
+    0,
+  );
+  const summary: RunSummary = {
+    generatedAt: new Date().toISOString(),
+    runId:
+      typeof runRecord.runId === "string"
+        ? runRecord.runId
+        : (runDir.split(sep).at(-1) ?? runDir),
+    startedAt:
+      typeof runRecord.startedAt === "string" ? runRecord.startedAt : "",
+    finishedAt:
+      typeof runRecord.finishedAt === "string" ? runRecord.finishedAt : "",
+    durationMs:
+      typeof runRecord.durationMs === "number" && Number.isFinite(runRecord.durationMs)
+        ? runRecord.durationMs
+        : totalCaseDurationMs,
+    totalCaseDurationMs,
+    averageCompletedDurationMs:
+      completed.length > 0
+        ? Math.round(
+            completed.reduce((total, result) => total + result.durationMs, 0) /
+              completed.length,
+          )
+        : null,
+    selectedModel:
+      typeof runRecord.selectedModel === "string" ? runRecord.selectedModel : "-",
+    totals: {
+      cases: cases.length,
+      completed: completed.length,
+      skipped: cases.filter((result) => result.status === "skipped").length,
+      errored: cases.filter((result) => result.status === "error").length,
+      scorePassed,
+      scoreTotal,
+      scorePercent: scorePercent(scorePassed, scoreTotal),
+    },
+    metrics: {
+      agent: agentMetrics,
+      judge: judgeMetrics,
+      combined: aggregateMetrics([agentMetrics, judgeMetrics]),
+    },
+    cases,
+  };
+
+  await writeRedactedJson(join(runDir, "summary.json"), summary);
+  const markdown = redactString(buildSummaryMarkdown(summary), sensitiveEnvValues());
+  await writeFile(join(runDir, "summary.md"), markdown, "utf8");
+  process.stdout.write(markdown);
+  return 0;
+}
+
 async function run(options: CliOptions): Promise<number> {
+  if (options.command === "summary") {
+    return await runSummary(options);
+  }
   if (options.command === "profiles-status") {
     return await profilesStatus();
   }
@@ -673,12 +1012,26 @@ async function run(options: CliOptions): Promise<number> {
     results.map((result) => result.judgeMetrics),
   );
   const combinedMetrics = aggregateMetrics([agentMetrics, judgeMetrics]);
+  const totalCaseDurationMs = results.reduce(
+    (total, result) => total + result.durationMs,
+    0,
+  );
   const summary: RunSummary = {
     generatedAt: finishedAt,
     runId,
     startedAt,
     finishedAt,
     durationMs,
+    totalCaseDurationMs,
+    averageCompletedDurationMs:
+      completed > 0
+        ? Math.round(
+            results
+              .filter((result) => result.status === "completed")
+              .reduce((total, result) => total + result.durationMs, 0) /
+              completed,
+          )
+        : null,
     selectedModel: options.model,
     totals: {
       cases: results.length,
@@ -702,6 +1055,10 @@ async function run(options: CliOptions): Promise<number> {
       score: result.score,
       agentMetrics: result.agentMetrics,
       judgeMetrics: result.judgeMetrics,
+      combinedMetrics: aggregateMetrics([
+        result.agentMetrics,
+        result.judgeMetrics,
+      ]),
       artifacts: result.artifacts,
       ...(result.error ? { error: result.error } : {}),
       ...(result.skipReason ? { skipReason: result.skipReason } : {}),
@@ -720,7 +1077,7 @@ async function run(options: CliOptions): Promise<number> {
     selectedModel: options.model,
     totals: summary.totals,
     metrics: summary.metrics,
-    cases: results,
+    cases: summary.cases,
   };
 
   await writeJson(join(options.outputDir, "run.json"), runRecord);

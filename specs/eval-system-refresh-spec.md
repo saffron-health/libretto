@@ -51,14 +51,13 @@ Use the Pi SDK for the agent under evaluation and replace Vitest with a small pu
 - `evals/scoring.ts` — current score-record writer and assertion helper; replace assertion-oriented behavior with richer result recording.
 - `evals/vitest.config.ts` — current Vitest configuration; remove after the custom eval runner replaces Vitest.
 - `evals/eval-case.ts` — new eval-case registry and `evalCase.only` implementation.
-- `evals/cli.ts` — new eval CLI that discovers cases, preflights profiles, runs cases, and writes artifacts.
+- `evals/cli.ts` — new eval CLI that discovers cases, preflights profiles, runs cases, writes artifacts, and regenerates CI summaries.
 - `evals/basic.eval.ts` and `evals/smoke.eval.ts` — current eval cases to convert/remove.
 - `evals/references/` — checked-in fixture workflows used by the basic evals.
 - `evals/package.json` — route `pnpm evals ...` to the eval CLI, add `tsx`, and remove Vitest after the custom runner is wired.
 - `package.json` and `turbo.json` — root `pnpm evals` wiring and Turbo task configuration.
 - `.github/workflows/evals.yml` — CI command, summary, artifact upload, non-strict reporting, and zero-record enforcement.
 - `.gitignore` — add `evals/profiles/`, `evals/private/`, and `evals/runs/`.
-- `packages/libretto/scripts/summarize-evals.mjs` — extend markdown/JSON summaries with metrics and zero-record validation.
 - `packages/dev-tools/src/tmp-workspace.ts` — shared temp workspace setup that creates `.agents/skills/`, `.libretto/profiles/`, and installs local Libretto.
 - `packages/libretto/src/cli/commands/browser.ts` and `packages/libretto/src/cli/core/browser.ts` — existing `open`, `save`, profile normalization, and profile-save behavior reused by `pnpm evals profiles login <domain>`.
 - `benchmarks/webVoyager/agentic-evaluator/runner.ts` — existing in-repo Pi SDK usage with `createAgentSession`, custom model selection, tools, event capture, timeouts, and token/cost summarization.
@@ -344,13 +343,13 @@ Scoring is informational. Low scores do not fail the eval command; setup or runt
 | `convert browser workflow to network requests` | completed | `0/1` | `2m 31s` | `$0.3923` | `69,454` | `8` | `cases/convert-browser-workflow-to-network-requests/result.json` |
 ```
 
-- [ ] Keep `summary.md` to the top-level run summary, metrics section, and cases table; put detailed failed criteria and transcripts in per-case artifacts instead.
-- [ ] Extend `packages/libretto/scripts/summarize-evals.mjs` to report aggregate score, total/average duration, total tokens, input/output/cache tokens, total cost, tool-call count, and per-case table rows.
-- [ ] Make summary generation fail on an empty score directory unless explicitly allowed.
-- [ ] Change `.github/workflows/evals.yml` to run `pnpm evals` instead of `pnpm eval`.
-- [ ] Remove score strictness as an execution gate; fail CI only when the runner crashes, required setup is missing, result records are malformed, or zero completed records are produced.
-- [ ] Upload summaries and redacted artifacts from the run output directory, but never upload `evals/profiles/`.
-- [ ] Document the eval CLI in `evals/README.md`: run all evals, focus with `.only`, file filters, or `-t`, check profiles, create profiles, and add private eval files.
-- [ ] Update `packages/libretto/docs/releasing.md` so it matches the real eval workflow; do not claim baseline comparison until it is actually wired.
-- [ ] Success criteria: CI summary includes score, duration, token, cost, and tool-call metrics without exposing profile data.
-- [ ] Success criteria: docs explain that `evals/profiles/` and `evals/private/` are always gitignored local maintainer directories.
+- [x] Keep `summary.md` to the top-level run summary, metrics section, and cases table; put detailed failed criteria and transcripts in per-case artifacts instead.
+- [x] Add `pnpm evals summary [run-dir]` to report aggregate score, duration, total tokens, input/output/cache tokens, total cost, tool-call count, and per-case table rows.
+- [x] Make summary generation fail on an empty score directory unless explicitly allowed.
+- [x] Change `.github/workflows/evals.yml` to run `pnpm evals` instead of `pnpm eval`.
+- [x] Remove score strictness as an execution gate; fail CI only when the runner crashes, required setup is missing, result records are malformed, or zero completed records are produced.
+- [x] Upload summaries and redacted artifacts from the run output directory, but never upload `evals/profiles/`.
+- [x] Document the eval CLI in `evals/README.md`: run all evals, focus with `.only`, file filters, or `-t`, check profiles, create profiles, and add private eval files.
+- [x] Update `packages/libretto/docs/releasing.md` so it matches the real eval workflow; do not claim baseline comparison until it is actually wired.
+- [x] Success criteria: CI summary includes score, duration, token, cost, and tool-call metrics without exposing profile data.
+- [x] Success criteria: docs explain that `evals/profiles/` and `evals/private/` are always gitignored local maintainer directories.
