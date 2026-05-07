@@ -34,10 +34,8 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 
 ## Setup
 
-- Use `npx libretto setup` for first-time workspace onboarding. It installs Chromium, syncs skills, and pins the default snapshot model to `.libretto/config.json` when provider credentials are available.
-- Re-running `setup` on a healthy workspace shows the current configuration. If credentials are missing for a configured provider, it offers an interactive repair flow.
-- Use `npx libretto status` to inspect AI configuration health and open sessions without triggering setup.
-- Use `npx libretto ai configure openai|anthropic|gemini|vertex` to explicitly change the snapshot model or provider (advanced override).
+- Use `npx libretto setup` for first-time workspace onboarding. It installs Chromium and syncs skills.
+- Use `npx libretto status` to inspect open sessions without triggering setup.
 
 ## Working Rules
 
@@ -95,20 +93,15 @@ npx libretto session-mode --session my-session
 ### `snapshot`
 
 - Use `snapshot` as the primary page observation tool.
-- Always provide both `--objective` and `--context`.
-- A single snapshot objective can include multiple questions or analysis tasks.
+- Run `snapshot` without `--objective` or `--context`; the command prints a screenshot path and compact accessibility tree for the current page.
+- Run `snapshot <ref>` to inspect a subtree from the latest full snapshot. Use ref forms printed in the tree, such as `l16`; numeric-suffix aliases such as `e16` also match `l16`.
+- Run an unscoped snapshot before using refs. Subtree snapshots capture a fresh screenshot but reuse the latest cached tree.
 - Use it before guessing at selectors, after workflow failures, and whenever the visible page state is unclear.
-- When analysis is involved, expect it to take time. Use a timeout of at least 2 minutes for shell-wrapped calls.
 
 ```bash
-npx libretto snapshot \
-  --objective "Find the sign-in form and submit button" \
-  --context "I just opened the login page and need the email field, password field, and submit button."
-npx libretto snapshot \
-  --session debug-example \
-  --page <page-id> \
-  --objective "Explain why the table is empty" \
-  --context "I opened the referrals page, applied filters, and expected rows to appear."
+npx libretto snapshot --session debug-example
+npx libretto snapshot <ref> --session debug-example
+npx libretto snapshot --session debug-example --page <page-id>
 ```
 
 ### `exec`
@@ -120,6 +113,7 @@ npx libretto snapshot \
 - Let failures throw. Do not hide `exec` failures with `try/catch` or `.catch()`.
 - Do not run multiple `exec` commands in parallel.
 - Do not use `exec` in read-only diagnosis flows. Use `readonly-exec` from the `libretto-readonly` skill for those sessions.
+- After successful mutations, `exec` prints page-change diffs from compact snapshots.
 
 ```bash
 npx libretto exec "return await page.url()"
@@ -227,7 +221,7 @@ Key fields: `ts` (ISO timestamp), `method` (HTTP method, e.g. `GET`, `POST`), `u
 Assistant: I'll inspect the real site first if needed, but before I finish I'll create `target-workflow.ts` so the task produces reusable automation code.
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
 Assistant: [Reads `references/site-security-review.md` before choosing between passive network inspection, direct browser fetch calls, and Playwright-first automation]
-Assistant: [Runs `npx libretto snapshot --objective "Find the next required action" --context "We are starting the workflow from the landing page and need the first meaningful step."`]
+Assistant: [Runs `npx libretto snapshot --session <session>`]
 Assistant: [Uses `snapshot` and `exec` as needed to understand the site and decide the implementation path]
 Assistant: [Reads `references/code-generation-rules.md` before writing production workflow code]
 Assistant: I found the working path. I'll now create the workflow file and verify it.
@@ -247,7 +241,7 @@ To watch it yourself in a browser, run: npx libretto run ./target-workflow.ts --
 Assistant: I'll reproduce the failure first so we can inspect the exact browser state it leaves behind.
 Assistant: [Runs `npx libretto run ./integration.ts --session debug-flow --headed`]
 Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
-Assistant: [Runs `npx libretto snapshot --session debug-flow --objective "Find the blocking error or broken selector target" --context "The workflow just failed after trying to continue from the review step, and I need to identify the visible blocker on the current page."`]
+Assistant: [Runs `npx libretto snapshot --session debug-flow`]
 Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
 Assistant: [Reads `references/code-generation-rules.md` before patching the workflow file]
 Assistant: I found the issue. I'll patch the workflow code and verify.
@@ -261,7 +255,7 @@ To watch it yourself in a browser, run: npx libretto run ./integration.ts --head
 
 ## References
 
-- Read `references/configuration-file-reference.md` when you need to inspect or change `.libretto/config.json` for snapshot model selection or viewport defaults.
+- Read `references/configuration-file-reference.md` when you need to inspect or change `.libretto/config.json` for viewport or session defaults.
 - Read `references/site-security-review.md` before reviewing the site's security posture and deciding whether to lead with network requests, passive interception, or Playwright DOM automation on a new site.
 - Read `references/code-generation-rules.md` before writing or editing production workflow files.
 - Read `references/auth-profiles.md` when auth-profile behavior is relevant.

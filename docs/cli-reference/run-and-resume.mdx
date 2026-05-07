@@ -82,10 +82,7 @@ When a workflow fails, Libretto keeps the browser open at the point of failure. 
 npx libretto run ./integration.ts --session debug-flow --headed
 
 # Inspect the failure state
-npx libretto snapshot \
-  --session debug-flow \
-  --objective "Find the blocking error or broken selector target" \
-  --context "The workflow failed after trying to continue from the review step."
+npx libretto snapshot --session debug-flow
 
 # Prototype a fix
 npx libretto exec --session debug-flow "return await page.locator('.error-message').textContent()"
@@ -185,10 +182,7 @@ export default workflow("myWorkflow", async (ctx, input) => {
 
   <Step title="Inspect the paused page state">
     ```bash  theme={null}
-    npx libretto snapshot \
-      --session debug-flow \
-      --objective "What is on the page and what is the next required action?" \
-      --context "The workflow paused before the submit step."
+    npx libretto snapshot --session debug-flow
 
     npx libretto exec --session debug-flow "return await page.url()"
     ```

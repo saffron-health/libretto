@@ -78,7 +78,7 @@ function expectedSkillVersionWarning(
 }
 
 describe("basic CLI subprocess behavior", () => {
-  test("setup explains snapshot API env setup when no credentials are configured", async ({
+  test("setup completes without AI configuration", async ({
     librettoCli,
   }) => {
     const result = await librettoCli("setup --skip-browsers", {
@@ -91,132 +91,11 @@ describe("basic CLI subprocess behavior", () => {
       GCLOUD_PROJECT: "",
     });
 
-    expect(result.stdout).toContain("sub-agent to analyze DOM snapshots");
-    expect(result.stdout).toContain("No snapshot API credentials detected.");
-    expect(result.stdout).toContain("OPENAI_API_KEY=...");
-    expect(result.stdout).toContain("ANTHROPIC_API_KEY=...");
-    expect(result.stdout).toContain("GEMINI_API_KEY=...");
-  });
-
-  test("setup reports when snapshot API credentials are already ready", async ({
-    librettoCli,
-  }) => {
-    const result = await librettoCli("setup --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "test-openai-key",
-    });
-
-    expect(result.stdout).toContain("Using OpenAI");
-    expect(result.stdout).toContain("Detected OPENAI_API_KEY");
-    expect(result.stdout).toContain("config.json");
-    expect(result.stdout).toContain(
-      "libretto ai configure openai | anthropic | gemini | vertex",
-    );
-  });
-
-  test("setup loads snapshot API credentials from workspace .env", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    await writeFile(workspacePath(".env"), "OPENAI_API_KEY=test-openai-key\n");
-
-    const result = await librettoCli("setup --skip-browsers", {
-      OPENAI_API_KEY: undefined,
-      ANTHROPIC_API_KEY: undefined,
-      GEMINI_API_KEY: undefined,
-      GOOGLE_GENERATIVE_AI_API_KEY: undefined,
-      GOOGLE_CLOUD_PROJECT: undefined,
-      GCLOUD_PROJECT: undefined,
-    });
-
-    expect(result.stdout).toContain("Using OpenAI");
-    expect(result.stdout).toContain("Detected OPENAI_API_KEY");
-  });
-
-  test("setup auto-pins default model when OPENAI_API_KEY is present", async ({
-    librettoCli,
-  }) => {
-    const result = await librettoCli("setup --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "test-openai-key",
-    });
-
-    expect(result.stdout).toContain("Using OpenAI");
-    expect(result.stdout).toContain("config.json");
-  });
-
-  test("setup rerun shows healthy summary without re-prompting", async ({
-    librettoCli,
-  }) => {
-    // First run: pins the model
-    const first = await librettoCli("setup --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "test-openai-key",
-    });
-    expect(first.stdout).toContain("Using OpenAI");
-
-    // Second run: should show healthy summary, not re-prompt
-    const second = await librettoCli("setup --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "test-openai-key",
-    });
-    expect(second.stdout).toContain("Using OpenAI");
-    expect(second.stdout).toContain("config.json");
-    expect(second.stdout).toContain(
-      "libretto ai configure openai | anthropic | gemini | vertex",
-    );
-    // Should NOT contain the unconfigured prompts
-    expect(second.stdout).not.toContain(
-      "No snapshot API credentials detected.",
-    );
-  });
-
-  test("setup shows provider-specific message when pinned OpenAI + missing key + Anthropic present", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    // Pin OpenAI in config, but only provide Anthropic key
-    await mkdir(workspacePath(".libretto"), { recursive: true });
-    await writeFile(
-      workspacePath(".libretto", "config.json"),
-      JSON.stringify({
-        version: 1,
-        snapshotModel: "openai/gpt-5.4",
-      }),
-      "utf8",
-    );
-
-    const result = await librettoCli("setup --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "",
-      ANTHROPIC_API_KEY: "test-anthropic-key",
-    });
-
-    // Should name the configured provider and missing env var
-    expect(result.stdout).toContain("openai is configured");
-    expect(result.stdout).toContain("OPENAI_API_KEY is not set");
-    // Should NOT show the generic unconfigured message
-    expect(result.stdout).not.toContain("No snapshot API credentials detected");
-  });
-
-  test("setup shows invalid config warning in non-TTY mode", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    await mkdir(workspacePath(".libretto"), { recursive: true });
-    await writeFile(
-      workspacePath(".libretto", "config.json"),
-      "{not-valid-json}",
-      "utf8",
-    );
-
-    const result = await librettoCli("setup --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "test-key",
-    });
-
-    expect(result.stdout).toContain("AI config is invalid");
-    expect(result.stdout).toContain("reconfigure");
+    expect(result.stdout).toContain("Skipping browser installation");
+    expect(result.stdout).toContain("Config set up at");
+    expect(result.stdout).toContain("libretto setup complete");
+    expect(result.stdout).not.toContain("snapshot API credentials");
+    expect(result.stdout).not.toContain("AI config");
   });
 
   test("setup copies skill files without confirmation when agent dirs exist", async ({
@@ -298,7 +177,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("List or update Libretto experiment flags");
     expect(result.stdout).toContain("readonly-exec");
     expect(result.stdout).toContain("snapshot");
-    expect(result.stdout).toContain("Capture PNG + HTML");
+    expect(result.stdout).toContain("compact accessibility snapshot");
     expect(result.stdout).not.toContain("cloud <subcommand>");
     expect(result.stdout).toContain("experimental <subcommand>");
     expect(result.stdout).toContain("Docs (agent-friendly): https://libretto.sh/docs");
@@ -318,7 +197,7 @@ describe("basic CLI subprocess behavior", () => {
   test("prints scoped help for status command", async ({ librettoCli }) => {
     const result = await librettoCli("help status");
     expect(result.stdout).toContain("Show workspace status");
-    expect(result.stdout).toContain("AI configuration");
+    expect(result.stdout).toContain("open sessions");
     expect(result.stderr).toBe("");
   });
 
@@ -326,7 +205,7 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const result = await librettoCli("help ai configure");
-    expect(result.stdout).toContain("Configure AI runtime");
+    expect(result.stdout).toContain("Manage deprecated snapshotModel config");
     expect(result.stdout).toContain(
       "libretto ai configure [preset] [options]",
     );
@@ -384,57 +263,12 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  test("experiments lists registered experiments and updates state", async ({
+  test("experiments reports no registered experiments", async ({
     librettoCli,
   }) => {
     const initial = await librettoCli("experiments");
     expect(initial.stdout).toContain("Libretto experiments:");
-    expect(initial.stdout).toContain("compact-snapshot-format");
-    expect(initial.stdout).toContain("Compact snapshot format");
-    expect(initial.stdout).toContain(
-      "Use compact accessibility snapshots and exec page-change diffs without an AI sub-agent.",
-    );
-    expect(initial.stdout).toContain("disabled");
     expect(initial.stderr).toBe("");
-
-    const enabled = await librettoCli(
-      "experiments enable compact-snapshot-format",
-    );
-    expect(enabled.stdout).toContain(
-      'Experiment "compact-snapshot-format" enabled.',
-    );
-    expect(enabled.stdout).toContain("Status: enabled");
-    expect(enabled.stdout).toContain(
-      "Since this experiment is enabled, Libretto’s expected usage deviates from the skill.",
-    );
-    expect(enabled.stdout).toContain(
-      "Compared with the skill's documented behavior:",
-    );
-    expect(enabled.stderr).toBe("");
-
-    const described = await librettoCli(
-      "experiments describe compact-snapshot-format",
-    );
-    expect(described.stdout).toContain("Status: enabled");
-    expect(described.stderr).toBe("");
-
-    const afterEnable = await librettoCli("experiments");
-    expect(afterEnable.stdout).toContain("compact-snapshot-format");
-    expect(afterEnable.stdout).toContain("enabled");
-    expect(afterEnable.stderr).toBe("");
-
-    const disabled = await librettoCli(
-      "experiments disable compact-snapshot-format",
-    );
-    expect(disabled.stdout).toContain(
-      'Experiment "compact-snapshot-format" disabled.',
-    );
-    expect(disabled.stderr).toBe("");
-
-    const afterDisable = await librettoCli("experiments");
-    expect(afterDisable.stdout).toContain("compact-snapshot-format");
-    expect(afterDisable.stdout).toContain("disabled");
-    expect(afterDisable.stderr).toBe("");
   });
 
   test("experiments rejects missing and unknown experiment names with usage", async ({
@@ -444,10 +278,9 @@ describe("basic CLI subprocess behavior", () => {
     expect(missing.stderr).toContain("Missing experiment name for enable.");
     expect(missing.stderr).toContain("libretto experiments");
     expect(missing.stderr).toContain("libretto experiments enable <experiment>");
-    expect(missing.stderr).toContain("compact-snapshot-format");
 
     const unknownAction = await librettoCli(
-      "experiments toggle compact-snapshot-format",
+      "experiments toggle oldExperiment",
     );
     expect(unknownAction.stderr).toContain(
       'Unknown experiments action "toggle".',
@@ -461,14 +294,12 @@ describe("basic CLI subprocess behavior", () => {
     expect(unknown.stderr).toContain('Unknown experiment "nopeExperiment".');
     expect(unknown.stderr).toContain("libretto experiments");
     expect(unknown.stderr).toContain("libretto experiments enable <experiment>");
-    expect(unknown.stderr).toContain("compact-snapshot-format");
   });
 
-  test("run does not expose enabled experiments to workflow context", async ({
+  test("run does not expose experiments to workflow context", async ({
     librettoCli,
     writeWorkflow,
   }) => {
-    await librettoCli("experiments enable compact-snapshot-format");
     const integrationFilePath = await writeWorkflow(
       "integration-experiment-context.mjs",
       `

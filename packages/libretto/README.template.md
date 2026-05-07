@@ -28,19 +28,14 @@ https://github.com/user-attachments/assets/9b9a0ab3-5133-4b20-b3be-459943349d18
 ```bash
 npm install libretto
 
-# First-time onboarding: install skill, download Chromium, and pin the default snapshot model
+# First-time onboarding: install skills and download Chromium
 npx libretto setup
 
 # Check workspace readiness at any time
 npx libretto status
-
-# Manually change the snapshot analysis model (advanced override)
-npx libretto ai configure <openai | anthropic | gemini | vertex>
 ```
 
-`setup` detects available provider credentials (e.g. `OPENAI_API_KEY`) and automatically pins the default model to `.libretto/config.json`. Re-running `setup` on a healthy workspace shows the current configuration instead of re-prompting. If credentials are missing for a previously configured provider, `setup` offers an interactive repair flow.
-
-Use `ai configure` when you want to explicitly switch providers or set a custom model string.
+`setup` creates the `.libretto/` directory, installs agent skills, and downloads Chromium unless you pass `--skip-browsers`.
 
 ## Use cases
 
@@ -78,7 +73,7 @@ You can also use Libretto directly from the command line. All commands accept `-
 npx libretto open <url>                    # launch browser and open a URL
 npx libretto run ./integration.ts --headless # run a workflow and close on success
 npx libretto run ./integration.ts --headless --stay-open-on-success # keep a successful run inspectable
-npx libretto snapshot --objective "..."    # capture PNG + HTML and analyze with an LLM
+npx libretto snapshot --session <name>     # capture a screenshot and compact accessibility tree
 npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page
 npx libretto close                         # close the browser
 ```

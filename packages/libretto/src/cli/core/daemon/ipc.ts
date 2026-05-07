@@ -387,7 +387,7 @@ export class DaemonClient {
   }
 
   async snapshot(
-    args: DaemonSnapshotArgs = {},
+    args: DaemonSnapshotArgs = { mode: "compact" },
   ): Promise<DaemonResultMap["snapshot"]> {
     return this.ipc.call.snapshot(args);
   }

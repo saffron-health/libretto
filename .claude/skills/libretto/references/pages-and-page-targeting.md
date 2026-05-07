@@ -19,7 +19,7 @@ Use this reference when a Libretto session has multiple open pages and you need 
 ```bash
 npx libretto pages --session debug-flow
 npx libretto exec --session debug-flow --page <page-id> "return await page.url()"
-npx libretto snapshot --session debug-flow --page <page-id> --objective "Find the active form"
+npx libretto snapshot --session debug-flow --page <page-id>
 ```
 
 ## Notes

@@ -1,5 +1,4 @@
 import { createServer } from "node:http";
-import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { pathToFileURL } from "node:url";
@@ -47,15 +46,23 @@ function parseJsonStdout<T>(stdout: string): T {
 }
 
 describe("state-driven CLI subprocess behavior", () => {
-  test("shows missing AI config", async ({ librettoCli }) => {
+  test("shows missing deprecated snapshot model config", async ({
+    librettoCli,
+  }) => {
     const result = await librettoCli("ai configure");
-    expect(result.stdout).toContain("No snapshot model set.");
+    expect(result.stdout).toContain(
+      "No deprecated snapshot model config is set.",
+    );
     expect(result.stderr).toBe("");
   });
 
-  test("configures, shows, and clears AI config", async ({ librettoCli }) => {
+  test("configures, shows, and clears deprecated snapshot model config", async ({
+    librettoCli,
+  }) => {
     const configure = await librettoCli("ai configure openai");
-    expect(configure.stdout).toContain("Snapshot model saved.");
+    expect(configure.stdout).toContain(
+      "Deprecated snapshot model config saved.",
+    );
     expect(configure.stdout).toContain("Snapshot model: openai/gpt-5.4");
     expect(configure.stderr).toBe("");
 
@@ -68,13 +75,15 @@ describe("state-driven CLI subprocess behavior", () => {
     expect(clear.stderr).toBe("");
 
     const showAfterClear = await librettoCli("ai configure");
-    expect(showAfterClear.stdout).toContain("No snapshot model set.");
+    expect(showAfterClear.stdout).toContain(
+      "No deprecated snapshot model config is set.",
+    );
     expect(showAfterClear.stderr).toBe("");
   });
 
   test("configures anthropic provider", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure anthropic");
-    expect(configure.stdout).toContain("Snapshot model saved.");
+    expect(configure.stdout).toContain("Deprecated snapshot model config saved.");
 
     const show = await librettoCli("ai configure");
     expect(show.stdout).toContain("Snapshot model: anthropic/claude-sonnet-4-6");
@@ -82,7 +91,7 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("configures gemini provider", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure gemini");
-    expect(configure.stdout).toContain("Snapshot model saved.");
+    expect(configure.stdout).toContain("Deprecated snapshot model config saved.");
 
     const show = await librettoCli("ai configure");
     expect(show.stdout).toContain("Snapshot model: google/gemini-3-flash-preview");
@@ -90,7 +99,7 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("configures vertex provider", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure vertex");
-    expect(configure.stdout).toContain("Snapshot model saved.");
+    expect(configure.stdout).toContain("Deprecated snapshot model config saved.");
 
     const show = await librettoCli("ai configure");
     expect(show.stdout).toContain("Snapshot model: vertex/gemini-2.5-flash");
@@ -98,13 +107,13 @@ describe("state-driven CLI subprocess behavior", () => {
 
   test("configures custom model string", async ({ librettoCli }) => {
     const configure = await librettoCli("ai configure openai/gpt-4o");
-    expect(configure.stdout).toContain("Snapshot model saved.");
+    expect(configure.stdout).toContain("Deprecated snapshot model config saved.");
 
     const show = await librettoCli("ai configure");
     expect(show.stdout).toContain("Snapshot model: openai/gpt-4o");
   });
 
-  test("snapshot without --objective shows a clear error", async ({
+  test("snapshot without --objective prints compact output", async ({
     librettoCli,
   }) => {
     const session = "snapshot-no-objective";
@@ -113,12 +122,12 @@ describe("state-driven CLI subprocess behavior", () => {
     );
 
     const snapshot = await librettoCli(`snapshot --session ${session}`);
-    expect(snapshot.stderr).toContain("Missing required option --objective.");
+    expect(snapshot.stdout).toContain("Screenshot at ");
+    expect(snapshot.stdout).toContain("<page");
   }, 45_000);
 
-  test("snapshot --objective requires API credentials", async ({
+  test("snapshot ignores legacy --objective and --context", async ({
     librettoCli,
-    workspacePath,
   }) => {
     const session = "snapshot-no-creds";
     await librettoCli(
@@ -137,20 +146,11 @@ describe("state-driven CLI subprocess behavior", () => {
         GCLOUD_PROJECT: "",
       },
     );
-    expect(snapshot.stdout).not.toContain("Screenshot saved:");
-    expect(snapshot.stderr).toContain(
-      "Failed to analyze snapshot because no snapshot analyzer is configured.",
-    );
-    expect(snapshot.stderr).toContain(
-      "For more info, run",
-    );
-    expect(snapshot.stderr).toContain("libretto setup");
-    expect(
-      existsSync(workspacePath(".libretto", "sessions", session, "snapshots")),
-    ).toBe(false);
+    expect(snapshot.stdout).toContain("Screenshot at ");
+    expect(snapshot.stdout).toContain("<page");
   }, 45_000);
 
-  test("shows a clear error when --context is provided without --objective", async ({
+  test("snapshot accepts legacy --context without --objective", async ({
     librettoCli,
   }) => {
     const session = "snapshot-context-only";
@@ -161,7 +161,8 @@ describe("state-driven CLI subprocess behavior", () => {
     const snapshot = await librettoCli(
       `snapshot --context "extra context only" --session ${session}`,
     );
-    expect(snapshot.stderr).toContain("Missing required option --objective.");
+    expect(snapshot.stdout).toContain("Screenshot at ");
+    expect(snapshot.stdout).toContain("<page");
   }, 45_000);
 
   test("open without --session auto-generates a session", async ({
@@ -253,21 +254,14 @@ describe("state-driven CLI subprocess behavior", () => {
   }, 45_000);
 
 
-  test("status shows AI config and open sessions", async ({ librettoCli }) => {
-    // Configure AI model
-    const configure = await librettoCli("ai configure openai");
-    expect(configure.stdout).toContain("Snapshot model saved.");
-
+  test("status shows open sessions", async ({ librettoCli }) => {
     // Open a headless session
     const session = "status-test-session";
     await librettoCli(
       `open https://example.com --headless --session ${session}`,
     );
 
-    // Run status and verify both AI model and session appear
     const status = await librettoCli("status");
-    expect(status.stdout).toContain("AI configuration:");
-    expect(status.stdout).toContain("openai/gpt-5.4");
     expect(status.stdout).toContain("Open sessions:");
     expect(status.stdout).toContain(session);
     expect(status.stdout).toContain("http://127.0.0.1:");
@@ -279,45 +273,6 @@ describe("state-driven CLI subprocess behavior", () => {
     const status = await librettoCli("status");
     expect(status.stdout).toContain("No open sessions.");
   });
-
-  test("status shows unconfigured AI when no credentials or config exist", async ({
-    librettoCli,
-  }) => {
-    const status = await librettoCli("status", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "",
-      ANTHROPIC_API_KEY: "",
-      GEMINI_API_KEY: "",
-      GOOGLE_GENERATIVE_AI_API_KEY: "",
-      GOOGLE_CLOUD_PROJECT: "",
-      GCLOUD_PROJECT: "",
-    });
-    expect(status.stdout).toContain("AI configuration:");
-    expect(status.stdout).toContain("No AI model configured");
-    expect(status.stdout).toContain("libretto setup");
-  });
-
-  test("status shows configured model after setup pins it", async ({
-    librettoCli,
-  }) => {
-    // Run setup to pin the model
-    await librettoCli("setup --skip-browsers", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "test-openai-key",
-    });
-
-    // Status should reflect the pinned model
-    const status = await librettoCli("status", {
-      LIBRETTO_DISABLE_DOTENV: "1",
-      OPENAI_API_KEY: "test-openai-key",
-    });
-    expect(status.stdout).toContain("AI configuration:");
-    expect(status.stdout).toContain("openai/gpt-5.4");
-    expect(status.stdout).toContain(
-      "libretto ai configure openai | anthropic | gemini | vertex",
-    );
-  });
-
 
   test("open and connect sessions default to write-access and support --read-only", async ({
     librettoCli,

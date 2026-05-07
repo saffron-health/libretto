@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect } from "vitest";
@@ -13,106 +13,15 @@ const LINKEDIN_PROFILE_PATH = resolve(
 );
 const liveSnapshotTest = existsSync(LINKEDIN_PROFILE_PATH) ? test : test.skip;
 
-const ENV_KEYS = [
-  "OPENAI_API_KEY",
-  "ANTHROPIC_API_KEY",
-  "GEMINI_API_KEY",
-  "GOOGLE_GENERATIVE_AI_API_KEY",
-  "GOOGLE_CLOUD_PROJECT",
-  "GCLOUD_PROJECT",
-] as const;
-
-function loadEnvFile(): Record<string, string> {
-  const envPath = resolve(REPO_ROOT, ".env");
-  const env: Record<string, string> = {};
-  if (!existsSync(envPath)) return env;
-  for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx < 1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const value = trimmed.slice(eqIdx + 1).trim();
-    if (key) env[key] = value;
-  }
-  return env;
-}
-
-const dotEnv = loadEnvFile();
-
-function buildProviderEnv(...keys: string[]): Record<string, string> {
-  const env: Record<string, string> = { LIBRETTO_DISABLE_DOTENV: "1" };
-  for (const key of keys) {
-    const value = dotEnv[key] || process.env[key];
-    if (value) env[key] = value;
-  }
-  for (const key of ENV_KEYS) {
-    if (!(key in env)) env[key] = "";
-  }
-  return env;
-}
-
-const allProviderEnv = buildProviderEnv(...ENV_KEYS);
-
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 }
 
-function expectLinkedInSelectorOutput(output: string): void {
-  expect(output).toContain("Analysis:");
-  expect(output).toMatch(
-    /Selectors:|\[(data-testid|data-test|aria-label|name)=|#[A-Za-z][\w-]*/,
-  );
-  expect(output.toLowerCase()).toMatch(/post|author|name|content|text/);
-}
-
-type ProviderTestConfig = {
-  name: string;
-  model: string;
-  envKeys: string[];
-};
-
-const PROVIDERS: ProviderTestConfig[] = [
-  {
-    name: "OpenAI",
-    model: "openai/gpt-5.4",
-    envKeys: ["OPENAI_API_KEY"],
-  },
-  {
-    name: "Anthropic",
-    model: "anthropic/claude-sonnet-4-6",
-    envKeys: ["ANTHROPIC_API_KEY"],
-  },
-  {
-    name: "Google Gemini",
-    model: "google/gemini-2.5-flash",
-    envKeys: ["GEMINI_API_KEY"],
-  },
-  {
-    name: "Google Vertex AI",
-    model: "vertex/gemini-2.5-pro",
-    envKeys: ["GOOGLE_CLOUD_PROJECT"],
-  },
-];
-
-function hasProviderKeys(config: ProviderTestConfig): boolean {
-  return config.envKeys.some((key) => Boolean(dotEnv[key] || process.env[key]));
-}
-
-const hasAnyProviderKey = ENV_KEYS.some((key) =>
-  Boolean(dotEnv[key] || process.env[key]),
-);
-
-describe("snapshot e2e – live site analysis", () => {
+describe("snapshot e2e – live site compact output", () => {
   liveSnapshotTest(
-    "linkedin feed: identifies selectors (auto-detected provider)",
+    "linkedin feed: prints a compact page snapshot",
     async ({ librettoCli, seedProfile }) => {
-      if (!hasAnyProviderKey) {
-        console.log("[linkedin/auto] skipped: no API credentials available");
-        return;
-      }
-
-      const session = "snapshot-e2e-linkedin-auto";
+      const session = "snapshot-e2e-linkedin-compact";
       await seedProfile("linkedin.com", LINKEDIN_PROFILE_PATH);
 
       await librettoCli(
@@ -122,65 +31,20 @@ describe("snapshot e2e – live site analysis", () => {
       await sleep(PAGE_SETTLE_MS);
 
       const snapshotStart = Date.now();
-      const snapshot = await librettoCli(
-        `snapshot --session ${session} --context "LinkedIn feed scraping" --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
-        allProviderEnv,
-      );
+      const snapshot = await librettoCli(`snapshot --session ${session}`);
       const snapshotDurationMs = Date.now() - snapshotStart;
 
       await librettoCli(`close --session ${session}`);
 
       const output = `${snapshot.stdout}\n${snapshot.stderr}`;
 
-      console.log(`[linkedin/auto] snapshot took ${snapshotDurationMs}ms`);
-      console.log(`[linkedin/auto] output:\n${output}`);
+      console.log(`[linkedin/compact] snapshot took ${snapshotDurationMs}ms`);
+      console.log(`[linkedin/compact] output:\n${output}`);
 
-      expectLinkedInSelectorOutput(output);
+      expect(output).toContain("Screenshot at ");
+      expect(output).toContain("<page");
+      expect(output.toLowerCase()).toContain("linkedin");
     },
     SNAPSHOT_TIMEOUT,
   );
-
-  for (const provider of PROVIDERS) {
-    liveSnapshotTest(
-      `linkedin feed: identifies selectors via ${provider.name}`,
-      async ({ librettoCli, seedProfile }) => {
-        if (!hasProviderKeys(provider)) {
-          console.log(
-            `[linkedin/${provider.name}] skipped: missing ${provider.envKeys.join(", ")}`,
-          );
-          return;
-        }
-
-        const session = `snapshot-e2e-linkedin-${provider.name.toLowerCase().replace(/\s+/g, "-")}`;
-        await seedProfile("linkedin.com", LINKEDIN_PROFILE_PATH);
-
-        await librettoCli(`ai configure ${provider.model}`);
-        await librettoCli(
-          `open https://www.linkedin.com/feed/ --headless --session ${session}`,
-        );
-
-        await sleep(PAGE_SETTLE_MS);
-
-        const providerEnv = buildProviderEnv(...provider.envKeys);
-        const snapshotStart = Date.now();
-        const snapshot = await librettoCli(
-          `snapshot --session ${session} --context "LinkedIn feed scraping" --objective "Identify CSS selectors for: (1) individual post content text and (2) the name of the poster for each post in the LinkedIn feed."`,
-          providerEnv,
-        );
-        const snapshotDurationMs = Date.now() - snapshotStart;
-
-        await librettoCli(`close --session ${session}`);
-
-        const output = `${snapshot.stdout}\n${snapshot.stderr}`;
-
-        console.log(
-          `[linkedin/${provider.name}] snapshot took ${snapshotDurationMs}ms`,
-        );
-        console.log(`[linkedin/${provider.name}] output:\n${output}`);
-
-        expectLinkedInSelectorOutput(output);
-      },
-      SNAPSHOT_TIMEOUT,
-    );
-  }
 });

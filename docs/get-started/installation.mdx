@@ -21,24 +21,13 @@ Use this if you want Libretto to scaffold a new package with directory structure
     npm create libretto@latest my-project
     ```
 
-    This scaffolds a package directory, installs dependencies, downloads Chromium, sets up the `.libretto/` directory, copies agent skill files, and walks you through configuring a snapshot analysis model.
+    This scaffolds a package directory, installs dependencies, downloads Chromium, sets up the `.libretto/` directory, and copies agent skill files.
 
     <Note>
       Run this yourself in a terminal — not through an agent. It may prompt for
       input and starts a Chromium download that takes a moment.
     </Note>
 
-  </Step>
-
-  <Step title="Set your API key">
-    Libretto uses an AI model to analyze page snapshots during workflow generation. Add the API key for your chosen provider to a `.env` file in your project root:
-
-    ```bash theme={null}
-    # .env
-    OPENAI_API_KEY=sk-...
-    ```
-
-    See the [AI Provider Reference](/get-started/configuration#ai-provider-reference) for the full list of supported providers and their environment variables.
   </Step>
 
   <Step title="Run a workflow">
@@ -67,24 +56,13 @@ If you already have a Node.js package that you plan to use for Libretto automati
     npx libretto setup
     ```
 
-    This downloads Chromium, creates the `.libretto/` directory, copies agent skill files, and walks you through configuring a snapshot analysis model.
+    This downloads Chromium, creates the `.libretto/` directory, and copies agent skill files.
 
     <Note>
       Run this yourself in a terminal — not through an agent. It may prompt for
       input and starts a Chromium download that takes a moment.
     </Note>
 
-  </Step>
-
-  <Step title="Set your API key">
-    Libretto uses an AI model to analyze page snapshots during workflow generation. Add the API key for your chosen provider to a `.env` file in your project root:
-
-    ```bash theme={null}
-    # .env
-    OPENAI_API_KEY=sk-...
-    ```
-
-    See the [AI Provider Reference](/get-started/configuration#ai-provider-reference) for the full list of supported providers and their environment variables.
   </Step>
 
   <Step title="Create a workflow">

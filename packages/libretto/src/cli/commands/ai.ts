@@ -30,6 +30,7 @@ function formatConfigureProviders(separator = " | "): string {
 function printSnapshotModelConfig(model: string, configPath: string): void {
   console.log(`Snapshot model: ${model}`);
   console.log(`Config file: ${configPath}`);
+  console.log("Deprecated: snapshotModel is ignored by snapshot.");
 }
 
 /**
@@ -73,10 +74,10 @@ export function runAiConfigure(
     const model = readSnapshotModel(configPath);
     if (!model) {
       console.log(
-        `No snapshot model set. Choose a default model: ${configureCommandName} ${formatConfigureProviders()}`,
+        "No deprecated snapshot model config is set. The snapshot command does not require one.",
       );
       console.log(
-        "Provider credentials still come from your shell or .env file.",
+        `To write the deprecated key anyway: ${configureCommandName} ${formatConfigureProviders()}`,
       );
       return;
     }
@@ -107,7 +108,7 @@ export function runAiConfigure(
   }
 
   writeSnapshotModel(model, configPath);
-  console.log("Snapshot model saved.");
+  console.log("Deprecated snapshot model config saved.");
   printSnapshotModelConfig(model, configPath);
 }
 
@@ -118,15 +119,15 @@ export const aiConfigureInput = SimpleCLI.input({
     }),
   ],
   named: {
-    clear: SimpleCLI.flag({ help: "Clear existing AI config" }),
+    clear: SimpleCLI.flag({ help: "Clear deprecated snapshotModel config" }),
   },
 });
 
 export const aiCommands = SimpleCLI.group({
-  description: "AI commands",
+  description: "Deprecated AI configuration commands",
   routes: {
     configure: SimpleCLI.command({
-      description: "Configure AI runtime",
+      description: "Manage deprecated snapshotModel config",
     })
       .input(aiConfigureInput)
       .handle(async ({ input }) => {
