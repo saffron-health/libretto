@@ -1,0 +1,8 @@
+{
+  "hooks": {
+    "beforeCreate": [],
+    "afterCreate": ["pnpm i", "pnpm build"],
+    "beforeDestroy": [],
+    "afterDestroy": []
+  }
+}
