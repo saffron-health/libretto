@@ -24,7 +24,7 @@ This repo does not publish from local machines and does not push directly to `ma
 
 GitHub Actions needs these repository secrets:
 
-- `OPENAI_API_KEY`: used by the existing test suite during the release workflow.
+- `OPENAI_API_KEY`: used by the existing test suite during the release workflow and by the eval workflow's default `openai/gpt-5.5` model.
 
 The release workflow uses a GitHub Actions environment named `release`. Create that environment in the repository settings (no required reviewers — access is controlled by branch protection on `main` instead).
 
@@ -69,7 +69,7 @@ The root `scripts/prepare-release.sh` script does the following:
 6. Commits the version bump.
 7. Pushes the branch and opens a PR to `main` with the `release` label.
 
-Release PRs also run the eval workflow. That workflow compares the current eval score against the latest successful `main` baseline and fails if the score drifts by more than 5 percentage points in either direction.
+Release PRs also run the eval workflow. That workflow records score, duration, token, cost, and tool-call metrics for review. Scores are informational: low scores do not fail the workflow, but setup/runtime failures and zero completed records do.
 
 ## Merge behavior
 
@@ -89,11 +89,13 @@ This makes the workflow safe to re-run after partial failures. For example, if n
 
 `.github/workflows/evals.yml` now runs automatically for release PRs and for qualifying pushes to `main`.
 
-- On `main`, it records the current eval summary as the baseline artifact for future release PRs.
-- On release PRs, it runs evals again and compares the overall score against the latest successful `main` baseline.
-- If the score moves outside a `+/-5%` window, the eval job fails and flags the release PR.
+- It runs `pnpm evals --no-auth --output <runner-temp>/eval-run` so CI only runs cases that do not require local auth profiles.
+- It validates and renders the CI report with `pnpm evals summary <runner-temp>/eval-run`.
+- It writes a GitHub step summary and a sticky PR comment with aggregate score, duration, token, cost, and tool-call metrics.
+- It uploads summary files and per-case result records from the run output directory. Raw transcripts and local profile files are not uploaded.
+- It fails when the eval runner crashes, required setup is missing, result records are malformed, or zero completed records are produced.
 
-If no successful baseline artifact exists yet, the release PR eval job reports that and skips the comparison for that run.
+There is no baseline comparison gate yet. Add one only after the eval records and metrics are stable enough to compare reliably.
 
 ## Changelog behavior
 

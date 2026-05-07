@@ -1,14 +1,15 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { cp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { test as base } from "vitest";
-import { ClaudeEvalHarness, ensureClaudeAuthConfigured } from "./harness.js";
+import { PiEvalHarness } from "./harness.js";
 import { createTmpWorkspace } from "@libretto/dev-tools/tmp-workspace";
+import type { EvalCaseRecord } from "./eval-case.js";
+import { provisionAuthProfile } from "./auth-profiles.js";
 
-type EvalFixtures = {
-  harness: ClaudeEvalHarness;
+export type EvalContext = {
+  harness: PiEvalHarness;
   repoRoot: string;
   evalWorkspaceDir: string;
   evalWorkspacePath: (...parts: string[]) => string;
@@ -16,48 +17,26 @@ type EvalFixtures = {
     sourceRelativePath: string,
     destinationRelativePath?: string,
   ) => Promise<string>;
+  dispose: () => Promise<void>;
+};
+
+export type CreateEvalContextOptions = {
+  model?: string;
 };
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(here, "..");
-const librettoPackageRoot = resolve(repoRoot, "packages", "libretto");
-const skillPath = resolve(
-  librettoPackageRoot,
-  "skills",
-  "libretto",
-  "SKILL.md",
-);
 const referencesRoot = resolve(repoRoot, "evals", "references");
 const DETERMINISTIC_WORKSPACE_ROOT = join(tmpdir(), "libretto-eval-workspaces");
-
-let cachedSkillMarkdown: string | null = null;
-
-async function getSkillMarkdown(): Promise<string> {
-  if (cachedSkillMarkdown !== null) return cachedSkillMarkdown;
-  cachedSkillMarkdown = await readFile(skillPath, "utf8");
-  return cachedSkillMarkdown;
-}
-
-async function getInlineSkillSystemPrompt(): Promise<string> {
-  return [
-    "Use the following Libretto skill documentation as in-session guidance.",
-    "<libretto_skill>",
-    await getSkillMarkdown(),
-    "</libretto_skill>",
-  ].join("\n");
-}
 
 function stableHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
-function workspaceDirForTask(
-  task: Readonly<{ fullName: string; file: { filepath: string } }>,
-): string {
-  const stableId = stableHash(`${task.file.filepath}::${task.fullName}`).slice(
-    0,
-    16,
-  );
+function workspaceDirForCase(evalCase: EvalCaseRecord): string {
+  const stableId = stableHash(
+    `${evalCase.filePath ?? "unknown"}::${evalCase.name}`,
+  ).slice(0, 16);
   return join(DETERMINISTIC_WORKSPACE_ROOT, stableId);
 }
 
@@ -74,63 +53,67 @@ function assertWithinRoot(
   }
 }
 
-export const test = base.extend<EvalFixtures>({
-  repoRoot: async ({}, use) => {
-    await use(repoRoot);
-  },
-  evalWorkspaceDir: async ({ task }, use) => {
-    const workspaceDir = workspaceDirForTask(task);
-    await rm(workspaceDir, { recursive: true, force: true });
+export async function createEvalContext(
+  evalCase: EvalCaseRecord,
+  options: CreateEvalContextOptions = {},
+): Promise<EvalContext> {
+  const evalWorkspaceDir = workspaceDirForCase(evalCase);
+  const workspaceName = stableHash(
+    `${evalCase.filePath ?? "unknown"}::${evalCase.name}`,
+  ).slice(0, 16);
+  await rm(evalWorkspaceDir, { recursive: true, force: true });
+  try {
     await createTmpWorkspace({
-      name: stableHash(`${task.file.filepath}::${task.fullName}`).slice(0, 16),
+      name: workspaceName,
       parentDir: DETERMINISTIC_WORKSPACE_ROOT,
       skipBrowsers: true,
       skipBuild: true,
       quiet: true,
     });
-    try {
-      await use(workspaceDir);
-    } finally {
-      await rm(workspaceDir, { recursive: true, force: true });
-    }
-  },
+  } catch (error) {
+    await rm(evalWorkspaceDir, { recursive: true, force: true });
+    throw error;
+  }
 
-  evalWorkspacePath: async ({ evalWorkspaceDir }, use) => {
-    await use((...parts: string[]) => join(evalWorkspaceDir, ...parts));
-  },
+  if (evalCase.authProfile) {
+    await provisionAuthProfile(evalCase.authProfile, evalWorkspaceDir);
+  }
 
-  copyEvalReference: async ({ evalWorkspaceDir }, use) => {
-    await use(
-      async (sourceRelativePath: string, destinationRelativePath?: string) => {
-        const sourcePath = resolve(referencesRoot, sourceRelativePath);
-        assertWithinRoot(referencesRoot, sourcePath, "Reference source path");
+  const harness = new PiEvalHarness({
+    cwd: evalWorkspaceDir,
+    model: options.model,
+  });
 
-        const targetRelative = destinationRelativePath ?? sourceRelativePath;
-        const targetPath = resolve(evalWorkspaceDir, targetRelative);
-        assertWithinRoot(
-          evalWorkspaceDir,
-          targetPath,
-          "Workspace destination path",
-        );
+  return {
+    harness,
+    repoRoot,
+    evalWorkspaceDir,
+    evalWorkspacePath: (...parts: string[]) => join(evalWorkspaceDir, ...parts),
+    copyEvalReference: async (
+      sourceRelativePath: string,
+      destinationRelativePath?: string,
+    ) => {
+      const sourcePath = resolve(referencesRoot, sourceRelativePath);
+      assertWithinRoot(referencesRoot, sourcePath, "Reference source path");
 
-        await mkdir(dirname(targetPath), { recursive: true });
-        await cp(sourcePath, targetPath, {
-          recursive: true,
-          force: true,
-        });
-        return targetPath;
-      },
-    );
-  },
-  harness: async ({ evalWorkspaceDir }, use) => {
-    ensureClaudeAuthConfigured();
-    const harness = new ClaudeEvalHarness({
-      cwd: evalWorkspaceDir,
-      model: process.env.LIBRETTO_EVAL_MODEL?.trim() || undefined,
-      systemPromptAppend: await getInlineSkillSystemPrompt(),
-    });
-    await use(harness);
-  },
-});
+      const targetRelative = destinationRelativePath ?? sourceRelativePath;
+      const targetPath = resolve(evalWorkspaceDir, targetRelative);
+      assertWithinRoot(
+        evalWorkspaceDir,
+        targetPath,
+        "Workspace destination path",
+      );
 
-export { expect } from "vitest";
+      await mkdir(dirname(targetPath), { recursive: true });
+      await cp(sourcePath, targetPath, {
+        recursive: true,
+        force: true,
+      });
+      return targetPath;
+    },
+    dispose: async () => {
+      harness.dispose();
+      await rm(evalWorkspaceDir, { recursive: true, force: true });
+    },
+  };
+}

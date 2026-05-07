@@ -1,17 +1,25 @@
-import { randomUUID } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import {
-  query,
-  type Options,
-  type PermissionMode,
-  type NonNullableUsage,
-  type ModelUsage,
-  type SDKAssistantMessage,
-  type SDKMessage,
-  type SDKResultMessage,
-  type SettingSource,
-} from "@anthropic-ai/claude-agent-sdk";
+  AuthStorage,
+  convertToLlm,
+  createAgentSession,
+  DefaultResourceLoader,
+  ModelRegistry,
+  serializeConversation,
+  SessionManager,
+  SettingsManager,
+  type AgentSession,
+  type AgentSessionEvent,
+  type CreateAgentSessionOptions,
+} from "@mariozechner/pi-coding-agent";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { z } from "zod";
+import {
+  getEvalArtifactPaths,
+  metricsFromEvents,
+  type EvalMetrics,
+} from "./artifacts.js";
+import { recordEvalCall } from "./run-recorder.js";
 
 const EvaluationVerdictSchema = z.object({
   success: z.boolean(),
@@ -29,17 +37,67 @@ const TranscriptScoreSchema = z.object({
   percent: z.number().min(0).max(100),
 });
 
-const EVAL_GCP_PROJECT = "saffron-health";
-const ANTHROPIC_API_KEY_SECRET_NAME = "anthropic-api-key";
-
-let didAttemptSecretLoad = false;
-
 const MAX_TRANSCRIPT_CHARS = 20_000;
-const MAX_TOOL_RESULT_CHARS = 4_000;
+const DEFAULT_EVAL_MODEL: EvalModelSelector = "openai/gpt-5.5";
+const DEFAULT_THINKING_LEVEL = "medium" satisfies NonNullable<
+  CreateAgentSessionOptions["thinkingLevel"]
+>;
+const TRANSCRIPT_EVENT_TYPES = new Set<AgentSessionEvent["type"]>([
+  "message_end",
+  "tool_execution_start",
+  "tool_execution_end",
+]);
+const PROGRESS_TEXT_CHARS = 240;
+const PROGRESS_TOOL_ARGS_CHARS = 180;
+const PROGRESS_TOOL_ERROR_CHARS = 360;
+const ANSI_BOLD = "\x1b[1m";
+const ANSI_RED = "\x1b[31m";
+const ANSI_RESET = "\x1b[0m";
 
 type EvaluationVerdict = z.infer<typeof EvaluationVerdictSchema>;
 export type ScoredCriterion = z.infer<typeof ScoredCriterionSchema>;
-export type TranscriptScore = z.infer<typeof TranscriptScoreSchema>;
+export type EvalModelSelector = `${string}/${string}`;
+
+export type EvalJudgeRecord = {
+  prompt: string;
+  model: EvalModelSelector;
+  sessionId: string;
+  result: string;
+  rationale: string | null;
+  metrics: EvalMetrics;
+};
+
+export type EvalScore = z.infer<typeof TranscriptScoreSchema> & {
+  agent: {
+    prompt: string;
+    model: EvalModelSelector;
+    sessionId: string;
+    metrics: EvalMetrics;
+  };
+  judge: EvalJudgeRecord;
+};
+
+type PiMessage = AgentSession["messages"][number];
+type PiTool = NonNullable<CreateAgentSessionOptions["tools"]>[number];
+
+type PiUsageSummary = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalTokens: number;
+  totalCostUsd: number | null;
+};
+
+export type PiEvalHarnessOptions = {
+  cwd: string;
+  model?: string;
+  stopOnFinalResult?: boolean;
+};
+
+export type PiEvalHarnessSendOptions = {
+  onUpdate?: (response: EvalResponse) => void | Promise<void>;
+};
 
 function clip(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
@@ -62,7 +120,18 @@ function extractFinalResultLine(transcript: string): string | null {
   return finalResultLine ?? null;
 }
 
-function asJson(value: unknown): string {
+function compactText(text: string, maxChars: number): string {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxChars) return compact;
+  return `${compact.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function stringifyForProgress(value: unknown): string {
+  if (typeof value === "string") return value;
   try {
     return JSON.stringify(value);
   } catch {
@@ -70,166 +139,485 @@ function asJson(value: unknown): string {
   }
 }
 
-function getSecret(secretName: string): string {
-  const result = spawnSync(
-    "gcloud",
-    [
-      "secrets",
-      "versions",
-      "access",
-      "latest",
-      `--project=${EVAL_GCP_PROJECT}`,
-      `--secret=${secretName}`,
-    ],
-    { encoding: "utf8" },
+function contentText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .flatMap((block) => {
+      if (!isRecord(block)) return [];
+      if (block.type === "text" && typeof block.text === "string") {
+        return [block.text];
+      }
+      if (block.type === "image") return ["[image]"];
+      return [];
+    })
+    .join("\n");
+}
+
+function assistantMessageText(message: PiMessage): string {
+  if (messageRole(message) !== "assistant") return "";
+  return contentText((message as { content?: unknown }).content);
+}
+
+function logProgress(line: string): void {
+  process.stdout.write(`${line}\n`);
+}
+
+function red(text: string): string {
+  return `${ANSI_RED}${text}${ANSI_RESET}`;
+}
+
+function bold(text: string): string {
+  return `${ANSI_BOLD}${text}${ANSI_RESET}`;
+}
+
+function logUserProgress(prompt: string): void {
+  logProgress(`user: ${compactText(prompt, PROGRESS_TEXT_CHARS)}`);
+}
+
+function logAssistantProgress(message: PiMessage): void {
+  const text = compactText(assistantMessageText(message), PROGRESS_TEXT_CHARS);
+  if (text.length > 0) {
+    logProgress(text);
+  }
+}
+
+function progressArg(args: unknown, keys: string[]): string | null {
+  if (!isRecord(args)) return null;
+  for (const key of keys) {
+    const value = args[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function formatToolProgress(toolName: string, args: unknown): string {
+  const focusedArg =
+    progressArg(args, ["command", "path", "filePath"]) ??
+    stringifyForProgress(args);
+  const compactArgs = compactText(focusedArg, PROGRESS_TOOL_ARGS_CHARS);
+  const label = bold(toolName);
+  return compactArgs ? `-> ${label} ${compactArgs}` : `-> ${label}`;
+}
+
+function toolResultText(result: unknown): string {
+  if (typeof result === "string") return result;
+  if (!isRecord(result)) return stringifyForProgress(result);
+
+  const content = contentText(result.content);
+  if (content) return content;
+
+  const fields = ["error", "message", "stderr", "stdout"];
+  for (const field of fields) {
+    const value = result[field];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return stringifyForProgress(result);
+}
+
+function formatToolErrorProgress(toolName: string, result: unknown): string {
+  const errorText = compactText(
+    toolResultText(result),
+    PROGRESS_TOOL_ERROR_CHARS,
   );
-  if (result.status === 0 && result.stdout.trim().length > 0) {
-    return result.stdout.trim();
-  }
-  return "";
+  return red(
+    errorText
+      ? `-> ${bold(toolName)} error: ${errorText}`
+      : `-> ${bold(toolName)} error`,
+  );
 }
 
-function ensureClaudeAuthEnvFromSecretIfNeeded(): void {
-  if (didAttemptSecretLoad) return;
-  didAttemptSecretLoad = true;
+function appendJsonl(
+  path: string | null,
+  record: Record<string, unknown>,
+): void {
+  if (!path) return;
+  mkdirSync(dirname(path), { recursive: true });
+  appendFileSync(
+    path,
+    `${JSON.stringify(
+      { timestamp: new Date().toISOString(), ...record },
+      (_key, value: unknown) =>
+        typeof value === "bigint" ? value.toString() : value,
+    )}\n`,
+    "utf8",
+  );
+}
 
-  if (typeof process.env.ANTHROPIC_API_KEY === "string" && process.env.ANTHROPIC_API_KEY.trim().length > 0) {
-    return;
-  }
+function appendMarkdown(path: string | null, markdown: string): void {
+  if (!path) return;
+  mkdirSync(dirname(path), { recursive: true });
+  appendFileSync(path, markdown, "utf8");
+}
 
-  const value = getSecret(ANTHROPIC_API_KEY_SECRET_NAME);
-  if (value) {
-    process.env.ANTHROPIC_API_KEY = value;
+function appendTranscriptRecord(record: Record<string, unknown>): void {
+  const path = getEvalArtifactPaths()?.transcript ?? null;
+  if (!path) return;
+  mkdirSync(dirname(path), { recursive: true });
+  try {
+    appendJsonl(path, record);
+  } catch (error) {
+    appendJsonl(path, {
+      source: record.source,
+      type: "transcript_write_error",
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
-function hasAnthropicApiKey(): boolean {
-  const value = process.env.ANTHROPIC_API_KEY;
-  return typeof value === "string" && value.trim().length > 0;
+function recordUserPrompt(source: "agent" | "judge", prompt: string): void {
+  appendTranscriptRecord({ source, type: "user", prompt });
 }
 
-function extractSessionId(messages: SDKMessage[]): string | null {
+function recordEvent(
+  source: "agent" | "judge",
+  event: AgentSessionEvent,
+): void {
+  appendTranscriptRecord({ source, type: "event", event });
+}
+
+function recordRawEvent(
+  source: "agent" | "judge",
+  event: AgentSessionEvent,
+): void {
+  const paths = getEvalArtifactPaths();
+  appendJsonl(
+    source === "agent"
+      ? (paths?.agentEvents ?? null)
+      : (paths?.judgeEvents ?? null),
+    { source, event },
+  );
+}
+
+function recordTranscriptMarkdown(opts: {
+  source: "agent" | "judge";
+  prompt: string;
+  transcript: string;
+  startedAt: string;
+  finishedAt: string;
+}): void {
+  const paths = getEvalArtifactPaths();
+  appendMarkdown(
+    opts.source === "agent"
+      ? (paths?.agentTranscript ?? null)
+      : (paths?.judgeTranscript ?? null),
+    [
+      `## ${opts.source === "agent" ? "Agent" : "Judge"} turn`,
+      "",
+      `- Started: ${opts.startedAt}`,
+      `- Finished: ${opts.finishedAt}`,
+      "",
+      "### Prompt",
+      "",
+      "```text",
+      opts.prompt.trim(),
+      "```",
+      "",
+      "### Transcript",
+      "",
+      "```text",
+      opts.transcript.trim(),
+      "```",
+      "",
+    ].join("\n"),
+  );
+}
+
+function parseModelSelector(selector: string): EvalModelSelector {
+  const trimmed = selector.trim();
+  const slash = trimmed.indexOf("/");
+  if (slash <= 0 || slash === trimmed.length - 1) {
+    throw new Error(
+      `Invalid eval model "${selector}". Expected "provider/model-id".`,
+    );
+  }
+  return trimmed as EvalModelSelector;
+}
+
+function resolvePiModel(
+  modelRegistry: ModelRegistry,
+  selector: EvalModelSelector,
+): NonNullable<ReturnType<ModelRegistry["find"]>> {
+  const slash = selector.indexOf("/");
+  const provider = selector.slice(0, slash);
+  const modelId = selector.slice(slash + 1);
+  const model = modelRegistry.find(provider, modelId);
+  if (!model) {
+    throw new Error(`Unknown Pi model: ${selector}`);
+  }
+  return model;
+}
+
+async function createPiEvalSession(opts: {
+  cwd: string;
+  model?: EvalModelSelector;
+  tools?: PiTool[];
+}): Promise<AgentSession> {
+  const authStorage = AuthStorage.create();
+  const modelRegistry = ModelRegistry.create(authStorage);
+  const model = resolvePiModel(modelRegistry, opts.model ?? DEFAULT_EVAL_MODEL);
+  const agentDir = join(opts.cwd, ".pi");
+  const settingsManager = SettingsManager.inMemory({
+    compaction: { enabled: false },
+  });
+  const resourceLoader = new DefaultResourceLoader({
+    cwd: opts.cwd,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+  });
+  await resourceLoader.reload();
+  const { session } = await createAgentSession({
+    cwd: opts.cwd,
+    agentDir,
+    model,
+    thinkingLevel: DEFAULT_THINKING_LEVEL,
+    authStorage,
+    modelRegistry,
+    resourceLoader,
+    settingsManager,
+    sessionManager: SessionManager.inMemory(opts.cwd),
+    tools:
+      opts.tools ??
+      ["read", "write", "edit", "bash"],
+  });
+  return session;
+}
+
+function messageRole(message: PiMessage): string | undefined {
+  return message && typeof message === "object" && "role" in message
+    ? message.role
+    : undefined;
+}
+
+function formatMessagesForEvaluation(messages: PiMessage[]): string {
+  return serializeConversation(convertToLlm(messages)).trim();
+}
+
+function extractLastAssistantText(messages: PiMessage[]): string | null {
+  const llmMessages = convertToLlm(messages);
+  for (let i = llmMessages.length - 1; i >= 0; i -= 1) {
+    const message = llmMessages[i];
+    if (message.role !== "assistant") continue;
+    const text = message.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text.trim())
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+    if (text) return text;
+  }
+  return null;
+}
+
+function extractAssistantError(messages: PiMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const candidate = messages[i];
+    const message = messages[i];
+    if (messageRole(message) !== "assistant") continue;
+    const errorMessage = (message as { errorMessage?: unknown }).errorMessage;
+    if (typeof errorMessage === "string" && errorMessage.trim().length > 0) {
+      return errorMessage.trim();
+    }
+  }
+  return null;
+}
+
+function summarizeUsageFromEvents(events: AgentSessionEvent[]): PiUsageSummary {
+  const summary: PiUsageSummary = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 0,
+    totalCostUsd: null,
+  };
+
+  for (const event of events) {
+    if (event.type !== "message_end") continue;
+    const message = event.message;
+    if (messageRole(message) !== "assistant") continue;
+    const usage = (
+      message as {
+        usage?: {
+          input?: number;
+          output?: number;
+          cacheRead?: number;
+          cacheWrite?: number;
+          totalTokens?: number;
+          cost?: { total?: number };
+        };
+      }
+    ).usage;
+    if (!usage) continue;
+
+    summary.inputTokens += usage.input ?? 0;
+    summary.outputTokens += usage.output ?? 0;
+    summary.cacheReadTokens += usage.cacheRead ?? 0;
+    summary.cacheWriteTokens += usage.cacheWrite ?? 0;
+    summary.totalTokens += usage.totalTokens ?? 0;
     if (
-      candidate &&
-      typeof candidate === "object" &&
-      "session_id" in candidate &&
-      typeof candidate.session_id === "string" &&
-      candidate.session_id.length > 0
+      typeof usage.cost?.total === "number" &&
+      Number.isFinite(usage.cost.total)
     ) {
-      return candidate.session_id;
+      summary.totalCostUsd = (summary.totalCostUsd ?? 0) + usage.cost.total;
     }
   }
-  return null;
+
+  return summary;
 }
 
-function extractResultMessage(messages: SDKMessage[]): SDKResultMessage | null {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const candidate = messages[i];
-    if (candidate.type === "result") {
-      return candidate;
+async function runPiJudge(opts: {
+  prompt: string;
+  cwd: string;
+  model?: EvalModelSelector;
+}): Promise<{
+  text: string;
+  events: AgentSessionEvent[];
+  messages: PiMessage[];
+  sessionId: string;
+  durationMs: number;
+}> {
+  const session = await createPiEvalSession({
+    cwd: opts.cwd,
+    model: opts.model,
+    tools: [],
+  });
+  const events: AgentSessionEvent[] = [];
+  const startedMs = Date.now();
+  const startedAt = new Date(startedMs).toISOString();
+  let callRecorded = false;
+  const unsubscribe = session.subscribe((event) => {
+    events.push(event);
+    recordRawEvent("judge", event);
+    if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
+      recordEvent("judge", event);
     }
+    if (event.type === "tool_execution_start") {
+      logProgress(formatToolProgress(event.toolName, event.args));
+    } else if (event.type === "tool_execution_end" && event.isError) {
+      logProgress(formatToolErrorProgress(event.toolName, event.result));
+    } else if (event.type === "message_end") {
+      logAssistantProgress(event.message);
+    }
+  });
+
+  try {
+    logUserProgress(opts.prompt);
+    recordUserPrompt("judge", opts.prompt);
+    await session.prompt(opts.prompt);
+    const finishedMs = Date.now();
+    const messages = [...session.messages];
+    const errorMessage = extractAssistantError(messages);
+    if (errorMessage) {
+      recordEvalCall({
+        source: "judge",
+        prompt: opts.prompt,
+        model: opts.model ?? DEFAULT_EVAL_MODEL,
+        sessionId: session.sessionId,
+        metrics: metricsFromEvents({
+          events,
+          durationMs: finishedMs - startedMs,
+          sessionId: session.sessionId,
+          modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+          error: errorMessage,
+        }),
+        error: errorMessage,
+      });
+      callRecorded = true;
+      throw new Error(errorMessage);
+    }
+    const text = extractLastAssistantText(messages);
+    if (!text) {
+      const error = "Judge failed: no assistant response from Pi session.";
+      recordEvalCall({
+        source: "judge",
+        prompt: opts.prompt,
+        model: opts.model ?? DEFAULT_EVAL_MODEL,
+        sessionId: session.sessionId,
+        metrics: metricsFromEvents({
+          events,
+          durationMs: finishedMs - startedMs,
+          sessionId: session.sessionId,
+          modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+          error,
+        }),
+        error,
+      });
+      callRecorded = true;
+      throw new Error("Judge failed: no assistant response from Pi session.");
+    }
+    recordTranscriptMarkdown({
+      source: "judge",
+      prompt: opts.prompt,
+      transcript: formatMessagesForEvaluation(messages),
+      startedAt,
+      finishedAt: new Date(finishedMs).toISOString(),
+    });
+    recordEvalCall({
+      source: "judge",
+      prompt: opts.prompt,
+      model: opts.model ?? DEFAULT_EVAL_MODEL,
+      sessionId: session.sessionId,
+      metrics: metricsFromEvents({
+        events,
+        durationMs: finishedMs - startedMs,
+        sessionId: session.sessionId,
+        modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+      }),
+      error: null,
+    });
+    callRecorded = true;
+    return {
+      text,
+      events,
+      messages,
+      sessionId: session.sessionId,
+      durationMs: finishedMs - startedMs,
+    };
+  } catch (error) {
+    if (!callRecorded) {
+      const message = error instanceof Error ? error.message : String(error);
+      recordEvalCall({
+        source: "judge",
+        prompt: opts.prompt,
+        model: opts.model ?? DEFAULT_EVAL_MODEL,
+        sessionId: session.sessionId,
+        metrics: metricsFromEvents({
+          events,
+          durationMs: Date.now() - startedMs,
+          sessionId: session.sessionId,
+          modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+          error: message,
+        }),
+        error: message,
+      });
+    }
+    throw error;
+  } finally {
+    unsubscribe();
+    session.dispose();
   }
-  return null;
 }
 
-function extractAssistantText(message: SDKAssistantMessage): string {
-  const content = message.message.content;
-  if (!Array.isArray(content)) return "";
-
-  const parts: string[] = [];
-  for (const block of content) {
-    if (!block || typeof block !== "object") continue;
-        const typedBlock = block as unknown as Record<string, unknown>;
-    if (typedBlock.type === "text" && typeof typedBlock.text === "string") {
-      parts.push(typedBlock.text);
-      continue;
-    }
-    if (typedBlock.type === "tool_use") {
-      const name =
-        typeof typedBlock.name === "string" && typedBlock.name.length > 0
-          ? typedBlock.name
-          : "unknown_tool";
-      parts.push(`[tool_use:${name}] ${asJson(typedBlock.input)}`);
-    }
-  }
-  return parts.join("\n").trim();
-}
-
-function extractUserToolResultText(message: SDKMessage): string {
-  if (message.type !== "user") return "";
-  const content = message.message.content;
-  if (!Array.isArray(content)) return "";
-
-  const parts: string[] = [];
-  for (const block of content) {
-    if (!block || typeof block !== "object") continue;
-      const typedBlock = block as unknown as Record<string, unknown>;
-    if (typedBlock.type !== "tool_result") continue;
-
-    const contentValue = typedBlock.content;
-    if (typeof contentValue === "string" && contentValue.trim().length > 0) {
-      parts.push(clip(contentValue.trim(), MAX_TOOL_RESULT_CHARS));
-      continue;
-    }
-
-    if (Array.isArray(contentValue)) {
-      for (const item of contentValue) {
-        if (!item || typeof item !== "object") continue;
-        const typedItem = item as Record<string, unknown>;
-        if (typedItem.type === "text" && typeof typedItem.text === "string") {
-          parts.push(clip(typedItem.text.trim(), MAX_TOOL_RESULT_CHARS));
-        }
-      }
-    }
-  }
-
-  return parts.filter(Boolean).join("\n").trim();
-}
-
-function formatMessagesForEvaluation(messages: SDKMessage[]): string {
-  const lines: string[] = [];
-  for (const message of messages) {
-    switch (message.type) {
-      case "assistant": {
-        const assistantText = extractAssistantText(message);
-        if (assistantText) {
-          lines.push(`assistant:\n${assistantText}`);
-        }
-        break;
-      }
-      case "user": {
-        const toolResultText = extractUserToolResultText(message);
-        if (toolResultText) {
-          lines.push(`tool_result:\n${toolResultText}`);
-        }
-        break;
-      }
-      case "tool_use_summary": {
-        lines.push(`tool_use_summary:\n${message.summary}`);
-        break;
-      }
-      case "result": {
-        if (message.subtype === "success") {
-          lines.push(`result:\n${message.result}`);
-        } else {
-          lines.push(`result_error:\n${message.errors.join("\n")}`);
-        }
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  return lines.join("\n\n").trim();
+function parseJsonObject(text: string): unknown {
+  const raw = text.trim();
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  const candidate =
+    start >= 0 && end >= start ? raw.slice(start, end + 1) : raw;
+  return JSON.parse(candidate) as unknown;
 }
 
 async function evaluateTranscript(opts: {
   assertion: string;
   transcript: string;
   cwd: string;
-  model?: string;
+  model?: EvalModelSelector;
 }): Promise<EvaluationVerdict> {
   const prompt = [
     "Evaluate whether TRANSCRIPT satisfies ASSERTION.",
@@ -241,58 +629,29 @@ async function evaluateTranscript(opts: {
     `TRANSCRIPT:\n${clip(opts.transcript, MAX_TRANSCRIPT_CHARS)}`,
   ].join("\n");
 
-  const messages: SDKMessage[] = [];
-  for await (const message of query({
+  const result = await runPiJudge({
     prompt,
-    options: {
-      cwd: opts.cwd,
-      model: opts.model,
-      tools: [],
-      maxTurns: 1,
-      persistSession: false,
-      permissionMode: "dontAsk",
-    },
-  })) {
-    messages.push(message);
-  }
+    cwd: opts.cwd,
+    model: opts.model,
+  });
 
-  const result = extractResultMessage(messages);
-  if (!result) {
-    throw new Error("Evaluation failed: no result message from SDK.");
-  }
-  if (result.subtype !== "success") {
-    const details = result.errors.filter((err) => err.trim().length > 0).join("\n");
+  const parsed = EvaluationVerdictSchema.safeParse(
+    parseJsonObject(result.text),
+  );
+  if (!parsed.success) {
     throw new Error(
-      [
-        `Evaluation failed with subtype "${result.subtype}".`,
-        details || "No error details were provided by the SDK.",
-      ].join("\n"),
+      `Evaluation returned invalid schema output: ${result.text}`,
     );
   }
-
-  try {
-    const raw = result.result.trim();
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    const candidate = start >= 0 && end >= start ? raw.slice(start, end + 1) : raw;
-    const parsed = JSON.parse(candidate);
-    const fallback = EvaluationVerdictSchema.safeParse(parsed);
-    if (fallback.success) {
-      return fallback.data;
-    }
-  } catch {
-    // Fall through to explicit error.
-  }
-
-  throw new Error(`Evaluation returned invalid schema output: ${result.result}`);
+  return parsed.data;
 }
 
 async function scoreTranscript(opts: {
   criteria: string[];
   transcript: string;
   cwd: string;
-  model?: string;
-}): Promise<TranscriptScore> {
+  model?: EvalModelSelector;
+}): Promise<z.infer<typeof TranscriptScoreSchema> & { judge: EvalJudgeRecord }> {
   const normalizedCriteria = opts.criteria
     .map((criterion) => criterion.trim())
     .filter((criterion) => criterion.length > 0);
@@ -312,42 +671,15 @@ async function scoreTranscript(opts: {
     `TRANSCRIPT:\n${clip(opts.transcript, MAX_TRANSCRIPT_CHARS)}`,
   ].join("\n");
 
-  const messages: SDKMessage[] = [];
-  for await (const message of query({
+  const result = await runPiJudge({
     prompt,
-    options: {
-      cwd: opts.cwd,
-      model: opts.model,
-      tools: [],
-      maxTurns: 1,
-      persistSession: false,
-      permissionMode: "dontAsk",
-    },
-  })) {
-    messages.push(message);
-  }
-
-  const result = extractResultMessage(messages);
-  if (!result) {
-    throw new Error("Scoring failed: no result message from SDK.");
-  }
-  if (result.subtype !== "success") {
-    const details = result.errors.filter((err) => err.trim().length > 0).join("\n");
-    throw new Error(
-      [
-        `Scoring failed with subtype "${result.subtype}".`,
-        details || "No error details were provided by the SDK.",
-      ].join("\n"),
-    );
-  }
+    cwd: opts.cwd,
+    model: opts.model,
+  });
 
   let parsedCriteria: ScoredCriterion[] | null = null;
   try {
-    const raw = result.result.trim();
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    const candidate = start >= 0 && end >= start ? raw.slice(start, end + 1) : raw;
-    const parsed = JSON.parse(candidate) as unknown;
+    const parsed = parseJsonObject(result.text);
     if (
       parsed &&
       typeof parsed === "object" &&
@@ -355,7 +687,9 @@ async function scoreTranscript(opts: {
       Array.isArray((parsed as { criteria?: unknown }).criteria)
     ) {
       const schema = z.array(ScoredCriterionSchema);
-      const parsedArray = schema.safeParse((parsed as { criteria: unknown }).criteria);
+      const parsedArray = schema.safeParse(
+        (parsed as { criteria: unknown }).criteria,
+      );
       if (parsedArray.success) {
         parsedCriteria = parsedArray.data;
       }
@@ -365,7 +699,7 @@ async function scoreTranscript(opts: {
   }
 
   if (!parsedCriteria) {
-    throw new Error(`Scoring returned invalid schema output: ${result.result}`);
+    throw new Error(`Scoring returned invalid schema output: ${result.text}`);
   }
 
   const byCriterion = new Map<string, ScoredCriterion>();
@@ -394,71 +728,66 @@ async function scoreTranscript(opts: {
   const total = criteria.length;
   const passed = criteria.filter((criterion) => criterion.pass).length;
   const percent = Math.round((passed / total) * 100);
-  return TranscriptScoreSchema.parse({
+  const score = TranscriptScoreSchema.parse({
     criteria,
     passed,
     total,
     percent,
   });
+  return {
+    ...score,
+    judge: {
+      prompt,
+      model: opts.model ?? DEFAULT_EVAL_MODEL,
+      sessionId: result.sessionId,
+      result: result.text,
+      rationale: criteria.map((criterion) => criterion.reason).join("\n"),
+      metrics: metricsFromEvents({
+        events: result.events,
+        durationMs: result.durationMs,
+        sessionId: result.sessionId,
+        modelSelector: opts.model ?? DEFAULT_EVAL_MODEL,
+      }),
+    },
+  };
 }
-
-export function ensureClaudeAuthConfigured(): void {
-  ensureClaudeAuthEnvFromSecretIfNeeded();
-  if (hasAnthropicApiKey()) return;
-  throw new Error(
-    [
-      "Claude eval configuration missing.",
-      `Expected to load ANTHROPIC_API_KEY from gcloud secret "${ANTHROPIC_API_KEY_SECRET_NAME}" in project "${EVAL_GCP_PROJECT}", or have ANTHROPIC_API_KEY already set.`,
-      "Ensure gcloud is installed/authenticated and the secret exists with at least one enabled version.",
-    ].join("\n"),
-  );
-}
-
-export type ClaudeEvalHarnessOptions = {
-  cwd: string;
-  systemPromptAppend?: string;
-  model?: string;
-  maxTurns?: number;
-  permissionMode?: PermissionMode;
-  settingSources?: SettingSource[];
-  allowedTools?: string[];
-  stopOnFinalResult?: boolean;
-};
-
-export type ClaudeEvalHarnessSendOptions = {
-  onUpdate?: (response: EvalResponse) => void | Promise<void>;
-};
 
 export class EvalResponse {
   readonly prompt: string;
-  readonly messages: SDKMessage[];
-  readonly sessionId: string | null;
+  readonly messages: PiMessage[];
+  readonly events: AgentSessionEvent[];
+  readonly sessionId: string;
   readonly transcript: string;
-  readonly result: SDKResultMessage | null;
   readonly totalCostUsd: number | null;
-  readonly usage: NonNullableUsage | null;
-  readonly modelUsage: Record<string, ModelUsage> | null;
+  readonly usage: PiUsageSummary;
+  readonly metrics: EvalMetrics;
   private readonly cwd: string;
-  private readonly model?: string;
+  private readonly model: EvalModelSelector;
 
   constructor(opts: {
     prompt: string;
-    messages: SDKMessage[];
-    sessionId: string | null;
+    messages: PiMessage[];
+    events: AgentSessionEvent[];
+    sessionId: string;
     cwd: string;
-    model?: string;
+    model: EvalModelSelector;
+    durationMs: number | null;
+    error?: string | null;
   }) {
     this.prompt = opts.prompt;
     this.messages = opts.messages;
+    this.events = opts.events;
     this.sessionId = opts.sessionId;
     this.transcript = formatMessagesForEvaluation(opts.messages);
-    this.result = extractResultMessage(opts.messages);
-    this.totalCostUsd =
-      this.result && typeof this.result.total_cost_usd === "number"
-        ? this.result.total_cost_usd
-        : null;
-    this.usage = this.result?.usage ?? null;
-    this.modelUsage = this.result?.modelUsage ?? null;
+    this.usage = summarizeUsageFromEvents(opts.events);
+    this.totalCostUsd = this.usage.totalCostUsd;
+    this.metrics = metricsFromEvents({
+      events: opts.events,
+      durationMs: opts.durationMs,
+      sessionId: opts.sessionId,
+      modelSelector: opts.model,
+      error: opts.error,
+    });
     this.cwd = opts.cwd;
     this.model = opts.model;
   }
@@ -476,118 +805,181 @@ export class EvalResponse {
     return verdict;
   }
 
-  async score(criteria: string[]): Promise<TranscriptScore> {
-    return await scoreTranscript({
+  async score(criteria: string[]): Promise<EvalScore> {
+    const score = await scoreTranscript({
       criteria,
       transcript: this.transcript,
       cwd: this.cwd,
       model: this.model,
     });
+    return {
+      ...score,
+      agent: {
+        prompt: this.prompt,
+        model: this.model,
+        sessionId: this.sessionId,
+        metrics: this.metrics,
+      },
+    };
   }
 }
 
-export class ClaudeEvalHarness {
+export class PiEvalHarness {
   private readonly cwd: string;
-  private readonly model?: string;
-  private readonly maxTurns: number;
-  private readonly permissionMode: PermissionMode;
-  private readonly settingSources: SettingSource[];
-  private readonly systemPromptAppend: string | null;
-  private readonly allowedTools: string[];
+  private readonly model: EvalModelSelector;
   private readonly stopOnFinalResult: boolean;
-  private sessionId: string;
-  private hasStarted = false;
+  private session: AgentSession | null = null;
 
-  constructor(options: ClaudeEvalHarnessOptions) {
+  constructor(options: PiEvalHarnessOptions) {
     this.cwd = options.cwd;
-    this.model = options.model;
-    this.maxTurns = options.maxTurns ?? 20;
-    this.permissionMode = options.permissionMode ?? "bypassPermissions";
-    this.settingSources = options.settingSources ?? ["project"];
-    this.allowedTools = options.allowedTools ?? [];
-    this.systemPromptAppend = options.systemPromptAppend?.trim() || null;
+    this.model = options.model
+      ? parseModelSelector(options.model)
+      : DEFAULT_EVAL_MODEL;
     this.stopOnFinalResult = options.stopOnFinalResult === true;
-
-    this.sessionId = randomUUID();
   }
 
   async send(
     prompt: string,
-    sendOptions: ClaudeEvalHarnessSendOptions = {},
+    sendOptions: PiEvalHarnessSendOptions = {},
   ): Promise<EvalResponse> {
-    const options: Options = {
-      cwd: this.cwd,
-      model: this.model,
-      maxTurns: this.maxTurns,
-      tools: { type: "preset", preset: "claude_code" },
-      settingSources: this.settingSources,
-      permissionMode: this.permissionMode,
-      allowedTools: this.allowedTools,
-    };
-
-    if (this.systemPromptAppend) {
-      options.systemPrompt = {
-        type: "preset",
-        preset: "claude_code",
-        append: this.systemPromptAppend,
-      };
-    }
-
-    if (this.permissionMode === "bypassPermissions") {
-      options.allowDangerouslySkipPermissions = true;
-    }
-
-    if (this.hasStarted) {
-      options.resume = this.sessionId;
-    } else {
-      options.sessionId = this.sessionId;
-    }
-
-    const messages: SDKMessage[] = [];
-    for await (const message of query({ prompt, options })) {
-      messages.push(message);
-
-      const seenSessionId = extractSessionId(messages);
-      if (seenSessionId) {
-        this.sessionId = seenSessionId;
-        this.hasStarted = true;
-      }
-
-      if (sendOptions.onUpdate) {
-        await sendOptions.onUpdate(
-          new EvalResponse({
-            prompt,
-            messages: [...messages],
-            sessionId: seenSessionId ?? this.sessionId,
-            cwd: this.cwd,
-            model: this.model,
-          }),
-        );
-      }
-
-      if (
-        this.stopOnFinalResult &&
-        message.type === "result" &&
-        message.subtype === "success" &&
-        extractFinalResultLine(message.result) !== null
-      ) {
-        break;
-      }
-    }
-
-    const seenSessionId = extractSessionId(messages);
-    if (seenSessionId) {
-      this.sessionId = seenSessionId;
-      this.hasStarted = true;
-    }
-
-    const response = new EvalResponse({
-      prompt,
-      messages,
-      sessionId: seenSessionId ?? this.sessionId,
+    this.session ??= await createPiEvalSession({
       cwd: this.cwd,
       model: this.model,
     });
-    return response;
+
+    const events: AgentSessionEvent[] = [];
+    const unsubscribe = this.session.subscribe((event) => {
+      events.push(event);
+      recordRawEvent("agent", event);
+      if (TRANSCRIPT_EVENT_TYPES.has(event.type)) {
+        recordEvent("agent", event);
+      }
+      if (event.type === "tool_execution_start") {
+        logProgress(formatToolProgress(event.toolName, event.args));
+      } else if (event.type === "tool_execution_end" && event.isError) {
+        logProgress(formatToolErrorProgress(event.toolName, event.result));
+      } else if (event.type === "message_end") {
+        logAssistantProgress(event.message);
+      }
+    });
+
+    try {
+      const startedMs = Date.now();
+      const startedAt = new Date(startedMs).toISOString();
+      let callRecorded = false;
+      const buildResponse = (error: string | null = null) => {
+        if (!this.session) {
+          throw new Error("Eval harness session ended before response recording.");
+        }
+        return new EvalResponse({
+          prompt,
+          messages: [...this.session.messages],
+          events,
+          sessionId: this.session.sessionId,
+          cwd: this.cwd,
+          model: this.model,
+          durationMs: Date.now() - startedMs,
+          error,
+        });
+      };
+      const recordAgentCall = (response: EvalResponse, error: string | null) => {
+        if (callRecorded) return;
+        recordEvalCall({
+          source: "agent",
+          prompt,
+          model: this.model,
+          sessionId: response.sessionId,
+          metrics: response.metrics,
+          error,
+        });
+        callRecorded = true;
+      };
+      logUserProgress(prompt);
+      recordUserPrompt("agent", prompt);
+      const update = async () => {
+        if (!sendOptions.onUpdate || !this.session) return;
+        await sendOptions.onUpdate(buildResponse());
+      };
+
+      const progressUnsubscribe = this.session.subscribe((event) => {
+        if (this.stopOnFinalResult && event.type === "message_end") {
+          const response = buildResponse();
+          if (extractFinalResultLine(response.transcript) !== null) {
+            void this.session!.abort().catch(() => {});
+          }
+        }
+        void update();
+      });
+
+      try {
+        await this.session.prompt(prompt);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const response = buildResponse(message);
+        recordAgentCall(response, message);
+        recordTranscriptMarkdown({
+          source: "agent",
+          prompt,
+          transcript: response.transcript,
+          startedAt,
+          finishedAt: new Date().toISOString(),
+        });
+        throw error;
+      } finally {
+        progressUnsubscribe();
+      }
+
+      const finishedMs = Date.now();
+
+      const messages = [...this.session.messages];
+      const errorMessage = extractAssistantError(messages);
+      if (errorMessage) {
+        const response = new EvalResponse({
+          prompt,
+          messages,
+          events,
+          sessionId: this.session.sessionId,
+          cwd: this.cwd,
+          model: this.model,
+          durationMs: finishedMs - startedMs,
+          error: errorMessage,
+        });
+        recordAgentCall(response, errorMessage);
+        recordTranscriptMarkdown({
+          source: "agent",
+          prompt,
+          transcript: response.transcript,
+          startedAt,
+          finishedAt: new Date(finishedMs).toISOString(),
+        });
+        throw new Error(errorMessage);
+      }
+
+      const response = new EvalResponse({
+        prompt,
+        messages,
+        events,
+        sessionId: this.session.sessionId,
+        cwd: this.cwd,
+        model: this.model,
+        durationMs: finishedMs - startedMs,
+      });
+      recordAgentCall(response, null);
+      recordTranscriptMarkdown({
+        source: "agent",
+        prompt,
+        transcript: response.transcript,
+        startedAt,
+        finishedAt: new Date(finishedMs).toISOString(),
+      });
+      return response;
+    } finally {
+      unsubscribe();
+    }
+  }
+
+  dispose(): void {
+    this.session?.dispose();
+    this.session = null;
   }
 }
