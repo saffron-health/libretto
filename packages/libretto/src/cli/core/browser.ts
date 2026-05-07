@@ -6,6 +6,7 @@ import {
   type Page,
 } from "playwright";
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createServer } from "node:net";
 import type { LoggerApi } from "../../shared/logger/index.js";
@@ -657,9 +658,8 @@ export async function runSave(
     }
 
     const state = { cookies, origins };
-    const fs = await import("node:fs/promises");
-    await fs.mkdir(dirname(profilePath), { recursive: true });
-    await fs.writeFile(profilePath, JSON.stringify(state, null, 2));
+    await mkdir(dirname(profilePath), { recursive: true });
+    await writeFile(profilePath, JSON.stringify(state, null, 2));
 
     logger.info("save-success", {
       domain,

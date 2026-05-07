@@ -37,6 +37,7 @@ export async function loadDefaultWorkflow(
 ): Promise<ExportedLibrettoWorkflow> {
   let loadedModule: Record<string, unknown>;
   try {
+    // @lintc-ignore Human-approved: user workflow files must be loaded dynamically from the CLI argument.
     loadedModule = (await import(pathToFileURL(absolutePath).href)) as Record<
       string,
       unknown
