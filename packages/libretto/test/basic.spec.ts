@@ -189,7 +189,6 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("libretto <command>");
     expect(result.stdout).toContain("Commands:");
     expect(result.stdout).toContain("open");
-    expect(result.stdout).toContain("ai");
     expect(result.stdout).toContain("status");
     expect(result.stderr).toBe("");
   });
@@ -198,17 +197,6 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("help status");
     expect(result.stdout).toContain("Show workspace status");
     expect(result.stdout).toContain("open sessions");
-    expect(result.stderr).toBe("");
-  });
-
-  test("prints scoped help for migrated SimpleCLI commands", async ({
-    librettoCli,
-  }) => {
-    const result = await librettoCli("help ai configure");
-    expect(result.stdout).toContain("Manage deprecated snapshotModel config");
-    expect(result.stdout).toContain(
-      "libretto ai configure [preset] [options]",
-    );
     expect(result.stderr).toBe("");
   });
 

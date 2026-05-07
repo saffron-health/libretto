@@ -49,12 +49,7 @@ npx libretto pages --session failed-job-debug
 ### `snapshot`
 
 - Use `snapshot` as the first high-level observation tool.
-- Run `snapshot` without `--objective` or `--context`; it prints a screenshot path and compact accessibility tree.
 - Run `snapshot <ref>` to inspect a subtree from the latest full snapshot.
-
-```bash
-npx libretto snapshot --session failed-job-debug
-```
 
 ### `readonly-exec`
 

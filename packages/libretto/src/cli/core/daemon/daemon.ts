@@ -63,7 +63,7 @@ import {
 } from "../browser.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
-import { handleCompactSnapshot, handleSnapshot } from "./snapshot.js";
+import { handleCompactSnapshot } from "./snapshot.js";
 import { librettoCommand } from "../../../shared/package-manager.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
 import { snapshot } from "../../../shared/snapshot/capture-snapshot.js";
@@ -653,34 +653,23 @@ class BrowserDaemon {
   private async runSnapshot(
     args: Parameters<CliToDaemonApi["snapshot"]>[0],
   ): Promise<ReturnType<CliToDaemonApi["snapshot"]>> {
-    if (args.mode === "compact") {
-      const targetPage = this.resolveTargetPage(args.pageId);
-      const result = await this.withRequestTimeout(() =>
-        handleCompactSnapshot(
-          targetPage,
-          this.session,
-          this.logger,
-          {
-            pageId: args.pageId,
-            cachedSnapshot: this.latestCompactSnapshotByPage.get(targetPage),
-            useCachedSnapshot: args.useCachedSnapshot,
-          },
-        ),
-      );
-      if (!args.useCachedSnapshot) {
-        this.latestCompactSnapshotByPage.set(targetPage, result.snapshot);
-      }
-      return result;
-    }
-
-    return this.withRequestTimeout(() =>
-      handleSnapshot(
-        this.resolveTargetPage(args.pageId),
+    const targetPage = this.resolveTargetPage(args.pageId);
+    const result = await this.withRequestTimeout(() =>
+      handleCompactSnapshot(
+        targetPage,
         this.session,
         this.logger,
-        args.pageId,
+        {
+          pageId: args.pageId,
+          cachedSnapshot: this.latestCompactSnapshotByPage.get(targetPage),
+          useCachedSnapshot: args.useCachedSnapshot,
+        },
       ),
     );
+    if (!args.useCachedSnapshot) {
+      this.latestCompactSnapshotByPage.set(targetPage, result.snapshot);
+    }
+    return result;
   }
 
   private async withRequestTimeout<T>(

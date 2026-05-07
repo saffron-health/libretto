@@ -132,17 +132,12 @@ async function runCompactSnapshot(
   let result: Awaited<ReturnType<DaemonClient["snapshot"]>>;
   try {
     result = await client.snapshot({
-      mode: "compact",
       pageId: args.pageId,
       useCachedSnapshot: args.ref !== undefined,
     });
   } finally {
     client.destroy();
   }
-  if (!("mode" in result) || result.mode !== "compact") {
-    throw new Error("Daemon returned a legacy snapshot for a compact request.");
-  }
-
   console.log(`Screenshot at ${result.pngPath}`);
   console.log(renderSnapshot(result.snapshot, args.ref));
   console.log(

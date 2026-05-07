@@ -25,9 +25,10 @@ export type DaemonExecArgs = {
 
 export type DaemonReadonlyExecArgs = { code: string; pageId?: string };
 
-export type DaemonSnapshotArgs =
-  | { mode?: "legacy"; pageId?: string; useCachedSnapshot?: false }
-  | { mode: "compact"; pageId?: string; useCachedSnapshot?: boolean };
+export type DaemonSnapshotArgs = {
+  pageId?: string;
+  useCachedSnapshot?: boolean;
+};
 
 export type DaemonExecSuccess = {
   result: unknown;
@@ -35,23 +36,11 @@ export type DaemonExecSuccess = {
   snapshotDiff?: SnapshotDiff;
 };
 
-export type DaemonLegacySnapshotResult = {
-  pngPath: string;
-  htmlPath: string;
-  snapshotRunId: string;
-  pageUrl: string;
-  title: string;
-};
-
-export type DaemonCompactSnapshotResult = {
+export type DaemonSnapshotResult = {
   mode: "compact";
   pngPath: string;
   snapshot: Snapshot;
 };
-
-export type DaemonSnapshotResult =
-  | DaemonLegacySnapshotResult
-  | DaemonCompactSnapshotResult;
 
 export type DaemonCloseResult = { replayUrl?: string };
 
@@ -387,7 +376,7 @@ export class DaemonClient {
   }
 
   async snapshot(
-    args: DaemonSnapshotArgs = { mode: "compact" },
+    args: DaemonSnapshotArgs = {},
   ): Promise<DaemonResultMap["snapshot"]> {
     return this.ipc.call.snapshot(args);
   }
