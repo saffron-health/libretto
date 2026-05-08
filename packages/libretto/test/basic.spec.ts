@@ -373,7 +373,7 @@ export default workflow("main", async (ctx) => {
     expect(opened.stdout).not.toContain("Loading saved profile");
 
     const title = await librettoCli(
-      `exec "return await page.title()" --session ${session}`,
+      `exec "await page.title()" --session ${session}`,
     );
     expect(title.stderr).toBe("");
     expect(title.stdout).toContain("Local File Title");
@@ -486,7 +486,7 @@ export default workflow("main", async (ctx) => {
     const result = await librettoCli(
       `exec - --session ${session}`,
       undefined,
-      "return 1;",
+      "1;",
     );
     expect(result.stdout).toContain("1");
     expect(result.stderr).toBe("");
@@ -1130,7 +1130,7 @@ export default workflow("main", async ({ page }) => {
     expect(result.stdout).toContain("Browser is still open");
 
     const inspected = await librettoCli(
-      `exec "return await page.title()" --session ${session}`,
+      `exec "await page.title()" --session ${session}`,
     );
     expect(inspected.stdout).toContain("Stay Open Success");
   }, 45_000);
@@ -1191,7 +1191,7 @@ export default workflow("main", async (ctx) => {
     expect(runResult.stderr).toContain("Call `run` to re-run the workflow.");
 
     const execResult = await librettoCli(
-      `exec "return await page.title()" --session ${session}`,
+      `exec "await page.title()" --session ${session}`,
     );
     expect(execResult.stdout).toMatch(/Example Domain|Debug Target/);
 

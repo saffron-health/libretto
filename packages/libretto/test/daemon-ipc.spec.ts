@@ -59,7 +59,7 @@ describe("daemon IPC", () => {
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(
-      `exec "return await page.title()" --session ${session}`,
+      `exec "await page.title()" --session ${session}`,
     );
     expect(result.stdout).toContain("Exec Test");
   }, 45_000);
@@ -93,20 +93,174 @@ describe("daemon IPC", () => {
     expect(result.stderr).toContain("expected exec failure");
   }, 45_000);
 
-  test("exec persists state across calls", async ({
+  test("exec persists bindings across calls", async ({
     librettoCli,
     workspacePath,
   }) => {
-    const session = "daemon-ipc-exec-state";
-    const url = await writeFixturePage(workspacePath, "state", "State Test");
+    const session = "daemon-ipc-exec-bindings";
+    const url = await writeFixturePage(workspacePath, "bindings", "Binding Test");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
-    await librettoCli(`exec "state.x = 42" --session ${session}`);
+    await librettoCli(`exec "let x = 42" --session ${session}`);
 
     const result = await librettoCli(
-      `exec "return state.x" --session ${session}`,
+      `exec "x" --session ${session}`,
     );
     expect(result.stdout).toContain("42");
+  }, 45_000);
+
+  test("exec persists helper declarations across calls", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-helpers";
+    const url = await writeFixturePage(workspacePath, "helpers", "Helper Test");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    await librettoCli(
+      `exec - --session ${session}`,
+      undefined,
+      `async function pageTitleWithPrefix(prefix: string): Promise<string> {
+  return prefix + await page.title();
+}
+`,
+    );
+
+    const result = await librettoCli(
+      `exec "await pageTitleWithPrefix('title: ')" --session ${session}`,
+    );
+    expect(result.stdout).toContain("title: Helper Test");
+  }, 45_000);
+
+  test("exec exposes the current page main frame", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-frame-helper";
+    const url = await writeFixturePage(
+      workspacePath,
+      "frame-helper",
+      "Frame Helper Test",
+      "<h1>Frame Heading</h1>",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec "await frame.locator('h1').textContent()" --session ${session}`,
+    );
+    expect(result.stdout).toContain("Frame Heading");
+  }, 45_000);
+
+  test("exec stdin waits for every complete statement before resolving", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-stdin-all-statements";
+    const url = await writeFixturePage(
+      workspacePath,
+      "stdin-all-statements",
+      "Multi Statement Test",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec - --session ${session}`,
+      undefined,
+      `console.log('first statement');
+console.log('second statement');
+await page.title();
+`,
+    );
+    expect(result.stdout).toContain("first statement");
+    expect(result.stdout).toContain("second statement");
+    expect(result.stdout).toContain("Multi Statement Test");
+  }, 45_000);
+
+  test("exec stdin reports errors after earlier complete statements", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-stdin-late-error";
+    const url = await writeFixturePage(
+      workspacePath,
+      "stdin-late-error",
+      "Late Error Test",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec - --session ${session}`,
+      undefined,
+      `console.log('before late error');
+throw new Error('expected late exec failure');
+`,
+    );
+    expect(result.stdout).toContain("before late error");
+    expect(result.stderr).toContain("expected late exec failure");
+  }, 45_000);
+
+  test("exec rejects top-level return with REPL-style guidance", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-top-level-return";
+    const url = await writeFixturePage(
+      workspacePath,
+      "top-level-return",
+      "Return Test",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec "return await page.title()" --session ${session}`,
+    );
+    expect(result.stderr).toContain("Return statement is not allowed here");
+    expect(result.stderr).toContain("Hint: top-level return isn't supported");
+    expect(result.stderr).toContain("exec is a REPL-style environment");
+    expect(result.stderr).toContain("await page.title()");
+  }, 45_000);
+
+  test("exec reports JavaScript syntax errors", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-js-syntax-error";
+    const url = await writeFixturePage(
+      workspacePath,
+      "js-syntax-error",
+      "JavaScript Syntax Error Test",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec "const value = ;" --session ${session}`,
+    );
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("Expression expected");
+  }, 45_000);
+
+  test("exec reports TypeScript syntax errors", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-ts-syntax-error";
+    const url = await writeFixturePage(
+      workspacePath,
+      "ts-syntax-error",
+      "TypeScript Syntax Error Test",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec - --session ${session}`,
+      undefined,
+      `function broken(value: string {
+  return value;
+}
+`,
+    );
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("Expected ',', got '{'");
   }, 45_000);
 
   test("readonly-exec works through daemon IPC", async ({
@@ -295,7 +449,7 @@ describe("daemon IPC", () => {
     expect(beforeSnapshot.stdout).toContain("Before Heading");
 
     const result = await librettoCli(
-      `exec "await page.locator('h1').evaluate((node) => node.textContent = 'After Heading')" --session ${session}`,
+      `exec "await page.locator('h1').evaluate((node) => { node.textContent = 'After Heading'; })" --session ${session}`,
     );
     expect(result.stdout).toContain("Executed successfully");
     expect(result.stdout).toContain("Page changes:");
@@ -340,7 +494,7 @@ describe("daemon IPC", () => {
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(
-      `exec "await page.close(); return 'closed ok'" --session ${session}`,
+      `exec "await page.close(), 'closed ok'" --session ${session}`,
     );
     expect(result.stdout).toContain("closed ok");
     expect(result.stdout).not.toContain("Page changes:");
@@ -399,7 +553,7 @@ export default workflow("main", async ({ page }) => {
     expect(run.stdout).toContain("Integration completed.");
 
     const result = await librettoCli(
-      `exec "return await page.title()" --session ${session}`,
+      `exec "await page.title()" --session ${session}`,
     );
     expect(result.stdout).toContain("Original Primary Page");
     expect(result.stdout).not.toContain("Secondary Debug Page");
@@ -455,7 +609,7 @@ export default workflow("main", async ({ page }) => {
     expect(run.stdout).toContain("Integration completed.");
 
     const result = await librettoCli(
-      `exec "return await page.title()" --session ${session}`,
+      `exec "await page.title()" --session ${session}`,
     );
     expect(result.stdout).toContain("Replacement Page");
   }, 45_000);
@@ -539,13 +693,13 @@ export default workflow("main", async ({ page }) => {
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const snapshot = await librettoCli(
-      `exec "return (await page._snapshotForAI({ track: 'response' })).full" --session ${session}`,
+      `exec "(await page._snapshotForAI({ track: 'response' })).full" --session ${session}`,
     );
     expect(snapshot.stdout).toContain("Click target");
     expect(snapshot.stdout).toContain("ref=e2");
 
     const result = await librettoCli(
-      `exec "return await page.locator('aria-ref=e2').textContent()" --session ${session}`,
+      `exec "await page.locator('aria-ref=e2').textContent()" --session ${session}`,
     );
     expect(result.stdout).toContain("Click target");
   }, 45_000);

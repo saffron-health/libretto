@@ -183,7 +183,7 @@ npx libretto connect http://127.0.0.1:9222 --session chrome-debug
 npx libretto snapshot --session chrome-debug
 
 # Run code against it
-npx libretto exec --session chrome-debug "return await page.url()"
+npx libretto exec --session chrome-debug "await page.url()"
 ```
 
 <CardGroup cols={2}>
