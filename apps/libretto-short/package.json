@@ -1,0 +1,33 @@
+{
+  "name": "libretto-short",
+  "version": "1.0.0",
+  "description": "My Remotion video",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.454",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "remotion": "4.0.454"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.454",
+    "@types/react": "19.2.14",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "render": "remotion render LibrettoShort out/libretto-short-2x.mp4 && ffmpeg -y -i out/libretto-short-2x.mp4 -vf scale=1920:1080:flags=lanczos -c:v libx264 -preset slow -crf 16 -pix_fmt yuv420p -an out/libretto-short.mp4",
+    "still": "remotion still LibrettoShort out/frame.png --frame=126",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}

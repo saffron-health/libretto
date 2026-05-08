@@ -7,209 +7,129 @@ argument-hint: "[wait for edits from CSS Studio]"
 
 ## Overview
 
-CSS Studio is a visual editor that lets users edit CSS properties, HTML attributes, text content, and CSS variables on a live page. When connected via MCP, edits made in the panel are sent as structured data describing the change. You, the agent, implement these changes as you best see fit based on the existing document and project structure.
+CSS Studio is a visual editor that lets users edit CSS properties, HTML attributes, text content, and CSS variables on a live page. When connected via MCP, edits made in the panel are sent as structured data describing the change.
 
-## Connect
+## On connect
 
-The first time the `css-studio` tool is called, the MCP server will connect to the editor.
+Your **first** `css-studio` call must be `announce`:
 
-After the initial call, check whether your environment supports channel events (development channels). If it does:
+```
+css-studio({ action: "announce", capabilities: { subagent: true, backgroundSubagents: true, channelEvents: true, ask: true } })
+```
 
--   **Channel events (preferred)**: Changes arrive as `notifications/claude/channel` events containing a JSON object with a `changes` array. Apply these changes immediately when received. Do NOT poll — just wait for events after the initial connection call.
+- `subagent` — `true` if you can spawn subagents via a Task/Agent tool.
+- `backgroundSubagents` — `true` **only** if your host's subagent spawn is *detached* so your turn continues immediately while the subagent runs (e.g. a `run_in_background: true` flag or equivalent capability). This is what enables parallel tasks. If you have such a capability, announce `true` and use it; if your spawn primitive blocks the parent, announce `false` or omit — tasks then route in **linear mode** and the hub queues them FIFO on this thread. That's correct behaviour — just no parallelism.
+- `channelEvents` — `true` if your environment delivers `notifications/claude/channel` notifications.
+- `ask` — `true` if you can block on a user answer.
 
-If your environment does not support channel events:
+Before entering the main loop, tell the user: *"Starting CSS Studio in parallel mode."* (you announced `backgroundSubagents: true`) or *"Starting CSS Studio in linear mode."* — then immediately make the first `get` call in the same turn.
 
--   **Polling (fallback)**: Call `css-studio` repeatedly to poll for the next batch of changes. **Always use a timeout of 60 seconds per call.** The tool will return empty when there are no pending changes — this is normal. **Never stop polling due to timeouts or empty responses, and never reduce the timeout duration.** Keep calling `css-studio` with a 60-second timeout indefinitely until the user explicitly ends the session. Blocking the chat is the success case for polling. By explicitly running this skill, users are opting this agent in to blocking input apart from returns from the MCP tool. DO NOT stop early just to update the user, NEVER stop early for any reason except the user manually interrupting. If the environment stops the run after N polls or T minutes, say so and tell the user to send /studio again to resume — though if it is in your capability, resume the poll in this instance.
+## Main loop
 
-## Changes
+**Immediately after `announce` (and the one-line status message), call `css-studio({ action: "get", timeout: 60000 })`.** Do not end the turn on a status message alone — the status line is not a tool call and the server cannot wake you without a pending `get`.
 
-Changes made in the editor are received in an event-ordered array.
+Then keep calling `get` in a loop forever:
 
-**Response format:**
+- Empty responses are normal; just call `get` again.
+- Never reduce the timeout below 60000.
+- Never exit the loop except on user interrupt.
+- Channel notifications (`notifications/claude/channel`) may arrive while a `get` is in flight — they unblock it early so the task is delivered without waiting out the poll. They do **not** replace the poll loop; the loop is mandatory.
+
+## Tasks
+
+Every task arrives with a `mode`. The task carries a `payload` object — the canonical, deduped data the subagent needs (or you need, in linear mode).
+
+### `mode: "orchestrator"`
+
+**Spawn one subagent per task — immediately, detached, with the shortest possible prompt.** When a task arrives, your very next action is the sub-agent spawn call. Do not write preamble, commentary, or a status line first — any delay is user-visible.
+
+The task carries **`subagentPromptPath`**: an absolute path to a file the hub has already written containing the full subagent instructions + payload. Your Task prompt is a single short directive pointing at that path — **do not inline the header or the payload.** Inlining them costs 25–60 seconds of token generation per task (measured); the file-based form takes ~1–2 seconds.
+
+**You MUST spawn in background mode.** You only get `mode: "orchestrator"` tasks because you announced `backgroundSubagents: true`. Spawning blocking would serialise every incoming task behind this one and defeat the independent-chat architecture.
+
+**Spawn call shape:**
+
+```
+Task({
+  subagent_type: "general-purpose",
+  description: "CSS Studio task",
+  prompt: "Read the file at " + task.subagentPromptPath + " and follow the instructions within. Do not narrate, summarise, or ask me questions — act on the instructions directly.",
+  run_in_background: true,
+})
+```
+
+Use your host's detached/background spawn capability (`run_in_background` or equivalent) — if it's available, use it. The prompt shape stays the same. The hub already marks the task as responding on dispatch; you don't need to emit `set-task-responding` yourself.
+
+After the spawn call returns (it returns immediately — the subagent runs in parallel), **loop straight back to `css-studio({ action: "get" })`**. When the backgrounded subagent eventually finishes you'll see a completion notification — **ignore it.** All progress, accept/revert, and final status were delivered directly to the server by the subagent's curl POSTs; the hub needs nothing from you.
+
+### `mode: "linear"`
+
+Handle the task inline. The `payload` has everything:
+
+1. Call `css-studio({ action: "claim-request", requestId: task.id })`.
+2. Set a name: `css-studio({ action: "set-task-name", taskId: task.id, name: "…" })`.
+3. Set the initial verb: `css-studio({ action: "set-task-responding", taskId: task.id, active: true, verb: "Reading source" })`.
+4. Apply `payload.edits` in order, then implement `payload.prompt`. Target elements via `payload.attachments[edit.attachment]`. Read any images in `payload.imageAttachments[]` with your Read tool.
+   - **Re-dispatched tasks:** if `payload.messages` already contains `role: "agent"` replies, the user sent follow-ups while you were working on an earlier turn. Respond to the newest user message(s) that came after your last agent reply — don't re-implement `payload.prompt` and don't re-apply edits you already applied.
+5. **Every progress message must include `nextVerb`** describing what you're about to do next. Use fresh verbs — "Searching files", "Editing src/foo.tsx", "Running tests". **Format `text` as markdown** — backticks around filenames, selectors, CSS properties; `**bold**`; `-` lists.
+   `css-studio({ action: "send-task-message", taskId: task.id, text: "Located the CTA in `src/cta.tsx`", nextVerb: "Editing styles" })`
+   **Post at least once per minute.** The server reaps silent tasks as failed after ~15 minutes; if you're about to start a single long step (big grep, multi-file edit, test run), post a progress message first — the `nextVerb` alone keeps the task alive.
+6. If you need the user to disambiguate: `css-studio({ action: "ask", taskId: task.id, question: "…", options: ["…"] })`. Blocks until they answer.
+7. On success: `css-studio({ action: "complete-request", requestId: task.id, text: "summary" })`. For `kind: "variant"`, include `result: { html: "<css-studio-variants>…" }`.
+8. If your source-code search for the target element fails, **before panicking** call `css-studio({ action: "describe-element", taskId: task.id })` to fetch live DOM info and retry.
+9. Still unresolved? `css-studio({ action: "panic", taskId: task.id, reason: "element_not_found", element: "…" })`; clear with `calm` once fixed.
+10. On failure: `css-studio({ action: "fail-request", requestId: task.id, error: "…" })`.
+
+## Kinds
+
+- `prompt` — free-form instruction. Interpret and implement on the target element(s).
+- `variant` — generate 3-5 design variants. Return a `<css-studio-variants>` wrapper in `result.html` — DO NOT edit source.
+  - Variant follow-ups (`Apply variant "X" to …`, `Generate more variants based on "X"`, `Retry applying variant "X" …`) arrive as plain prompt tasks with **no HTML in the text** — the chosen variant's name is the only reference. Fetch the variant bundle HTML with `css-studio({ action: "get", type: "variant", element: "<selector>" })` and pass it into the subagent's prompt so it can locate the chosen variant by `data-name`.
+- `responsive` — add responsive styles (breakpoints / fluid values) for the element. The latest message's `viewport` is the current context.
+
+## Change types (legacy `changes` array — panel edits not wrapped in a task)
+
+Diff-style edits carry `from` and `to` as separate fields so the values can contain any characters (including arrows). Non-diff edits use `value`.
 
 ```json
-{
-    "url": "http://localhost:3000/page",
-    "viewport": { "width": 1440, "height": 900 },
-    "changes": [
-        {
-            "type": "style",
-            "path": "main > section.hero",
-            "element": "div.card:nth-of-type(2)",
-            "name": "background-color",
-            "value": "#fff → #f0f0f0"
-        }
-    ]
-}
+{ "changes": [ { "type": "style", "path": "main > section.hero", "element": "div.card:nth-of-type(2)", "name": "background-color", "from": "#fff", "to": "#f0f0f0" } ] }
 ```
 
-`url` and `viewport` are included on the first response and whenever they change. Omitted otherwise — assume the same values for subsequent responses.
+| type | element | name | payload |
+| --- | --- | --- | --- |
+| `style` | CSS selector | CSS property | `from`, `to` |
+| `text` | CSS selector | — | `from`, `to` |
+| `attr` | CSS selector | attribute name | `from`, `to` |
+| `attr-delete` | CSS selector | attribute name | — |
+| `attr-rename` | CSS selector | old attribute name | `value` = new name |
+| `delete` | CSS selector | — | — |
+| `tag` | CSS selector | — | `from`, `to` |
+| `add-child` / `add-sibling` | CSS selector | — | `value` = new tag |
+| `duplicate` | CSS selector | — | — |
+| `token` | — | CSS variable | `from`, `to` |
+| `token-rename` | — | old variable name | `value` = new name |
+| `keyframe` | — | @keyframes name | `value` = full CSS |
 
-The response may also include a `messages` array — free-text messages sent by the user from the chat panel:
+For `text` edits, each Change targets **one block** — a single `<p>`, heading (`<h1>`–`<h6>`), `<li>`, `<blockquote>`, `<pre>`, etc. The `element` selector (with `:nth-of-type` when needed) is the block itself, NOT a container like `<article>` or wrapping `<div>`. `from` and `to` carry the **complete prior and new markdown of that block** — inline formatting appears as `**bold**`, `*italic*`, `\`code\``, `[label](url)`, `~~strike~~`; blocks as `# heading`, `- list`. The strings are NOT stripped to a slice, so the full surrounding text is available as context.
 
-```json
-{
-    "changes": [],
-    "messages": [
-        { "text": "Can you make the header sticky?", "attachments": [{ "nodeId": 42, "label": "header.main" }] }
-    ]
-}
-```
+To apply: locate the source element matching `element` (use `from` to disambiguate if multiple match within the scope) and replace its inner text with `to`, **converting markdown formatting into whatever syntax the source uses** — HTML tags for .html/.jsx/.tsx, literal markdown for .md/.mdx, etc. Do NOT touch sibling blocks; they emit their own Changes if they changed.
 
-When `messages` is present, treat each message as a direct instruction. Use the `label` field of any attachments to identify the target element. Always respond to user messages by calling `css-studio({ action: "message", text: "..." })` so the user sees your reply in the chat panel.
+A single inline-edit can produce **multiple `text` Changes** (one per modified block). Apply each independently in order. Special cases: `from: ""` means **insert** `to` as new text/block inside `element` (added paragraph, or loose text typed into a container). `to: ""` means **remove** the `from` text from `element` (deleted block) — `element` falls back to the editing root in this case, so use `from` as the find anchor. `precedingText` (when present on an insert or delete) carries the last few words of the preceding block in the original layout. Use it to locate the position in source: for inserts, place the new block immediately after the source block ending with those words; for deletes, remove the source block immediately after the one ending with those words (use `from` to confirm it's the right block).
 
-### Change types
-
-| type          | element      | name              | value       |
-| ------------- | ------------ | ----------------- | ----------- |
-| `style`       | CSS selector | CSS property name | `old → new` |
-| `text`        | CSS selector | —                 | `old → new` |
-| `attr`        | CSS selector | attribute name    | `old → new` |
-| `attr-delete` | CSS selector | attribute name    | —           |
-| `delete`      | CSS selector | —                 | —           |
-| `tag`         | CSS selector | —                 | `old → new` |
-| `add-child`   | CSS selector | —                 | tag name    |
-| `add-sibling` | CSS selector | —                 | tag name    |
-| `duplicate`   | CSS selector | —                 | —           |
-| `token`       | —            | CSS variable name | `old → new` |
-| `keyframe`    | —            | @keyframes name   | full CSS    |
-
-The `element` field uses the most specific identifier available: `tag#id`, `tag[data-testid="x"]`, or `tag.class1.class2`.
-
-## Workflow
-
-1. Call `css-studio` once to establish the connection
-2. If channels are supported, wait for channel events. If not, poll by calling `css-studio` again.
-3. Apply received changes to the matching source files
-4. If polling, repeat from step 2.
-
-## Editing
-
-### Element identification
-
-Each change includes an `element` field and optionally a `path` field to help locate the right element in source code.
-
-**`element`** — the target element, using the most specific identifier available:
-
--   `tag#id` — when the element has an id
--   `tag[data-testid="x"]` or `tag[data-id="x"]` — when a data attribute is present
--   `tag.class1.class2` — fallback to class names
-
-When the element has same-tag siblings, `:nth-of-type(n)` is appended (e.g. `li.item:nth-of-type(3)`).
-
-**`path`** — up to 3 ancestor selectors (excluding `html`/`body`) joined with `>`, providing structural context.
-
-### Component information (React)
-
-When the page uses React in development mode, changes include additional fields:
-
--   `component` — the React component name (e.g. `"Card"`, `"Header"`)
--   `source` — the source file and line number (e.g. `"src/components/Card.tsx:42"`)
-
-When these fields are present, use them to locate the element in source code directly instead of searching by CSS selector. The `source` field points to the component definition, which is usually the file you need to edit.
-
-#### Keyframe changes
-
-A `keyframe` change contains the full updated CSS for a `@keyframes` rule. The `name` field is the rule name (e.g. `"pulse"`) and the `value` field contains the complete `@keyframes` block. Find the existing `@keyframes` rule in source code and replace it entirely with the provided CSS.
-
-#### Tag changes
-
-A `tag` change means the user changed an element's HTML tag (e.g. `div → section`). Find the element in source code and change its opening and closing tags. Preserve all attributes, classes, and children.
-
-#### Adding elements
-
-`add-child` and `add-sibling` changes mean the user added a new empty `<div>` as a child or sibling of the identified element.
-
-#### Duplicating elements
-
-A `duplicate` change means the user cloned an element. If the element is rendered from a data structure (e.g. an array passed to `.map()`), duplicate the corresponding entry in the data structure rather than duplicating markup.
-
-#### Error reporting
-
-If you cannot find an element in source code:
-
-```
-css-studio({ action: "panic", reason: "element_not_found", element: "div.card:nth-of-type(2)" })
-```
-
-Once resolved, clear the error:
-
-```
-css-studio({ action: "calm" })
-```
-
-#### Asking the user
-
-When you need the user to disambiguate between options (e.g. which element is the one they edited, which file to apply changes to), use the `ask` action instead of panicking:
-
-```
-css-studio({ action: "ask", question: "Which element is the site header?", options: ["header.main-header", "div.nav-wrapper", "nav#primary-nav"] })
-```
-
-The call blocks until the user selects an option. The response contains their choice:
-
-```json
-{ "answer": "nav#primary-nav" }
-```
-
-Prefer `ask` over `panic` when the situation is resolvable by user input. Reserve `panic` for hard failures only.
-
-#### Chat
-
-CSS Studio has a chat panel where users can send you free-text messages (optionally with element attachments). You can also send messages back.
-
-**Sending a message to the user:**
-
-```
-css-studio({ action: "message", text: "Done — I've updated the card layout." })
-```
-
-The message appears in the chat panel immediately.
-
-**Indicating you're working:**
-
-```
-css-studio({ action: "responding" })
-```
-
-This shows a "responding" indicator in the chat panel. It clears automatically when you send a message. You can also clear it explicitly with `css-studio({ action: "responding", active: false })`.
-
-**Waiting for a user message:**
-
-```
-css-studio({ action: "chat", timeout: 60000 })
-```
-
-This blocks until the user sends a message in the chat panel. The response contains:
-
-```json
-{ "text": "Can you make the header sticky?", "attachments": [{ "nodeId": 42, "label": "header.main" }] }
-```
-
-`attachments` is present when the user attached elements to their message (via the element prompt icon). Treat `text` as a direct instruction, using the attached element labels for context.
-
-**Recommended pattern:** After applying changes, send a brief confirmation message. When waiting between poll cycles, you can optionally call `chat` alongside `get` to handle both style edits and chat messages. However, you cannot call both simultaneously — prefer `get` for the primary poll loop and check chat messages between edit batches.
-
-### Implementing
-
-Always implement based on the existing codebase styles. For instance, if an element is styled with Tailwind classes, don't add changes via the `style` tag. Add, remove or change existing Tailwind classes. Likewise if we have a CSS stylesheet and the convention is to make all styles there, this is where edits should be.
-
-### Responsive styles
-
-The `viewport` field tells you the screen size the user is editing at. Consider this when deciding where to apply style changes.
+Loose `changes` (no task wrapper) are keystroke edits. Apply them to source; don't claim a task.
 
 ## Rules
 
--   **Every change is intentional.** Never skip, deduplicate, or second-guess a change — apply it as received.
--   Prefer minimal changes. Don't refactor surrounding code.
--   Don't add comments explaining the changes.
--   Preserve existing code patterns (CSS modules, Tailwind, styled-components, inline styles, etc).
+- **Every change is intentional.** Never skip or second-guess.
+- Prefer minimal changes. Don't refactor. Don't add explanatory comments.
+- Preserve existing code patterns (CSS modules, Tailwind, styled-components, inline styles).
+- **If the `css-studio` tool returns an error**, tell the user what failed — don't leave them waiting silently.
+- **Always complete or fail a linear task you've claimed** — never leave one `in-progress`, or the element stays visually locked in the panel.
+- **You are the implementer. Speak in first person about your own work.** When the user accepts a variant or sends a follow-up, you apply it yourself — there is no separate "apply flow" or other agent to hand off to. Don't refer to yourself as "CSS Studio" and don't describe the work as being handed off to some other system. Just say what you're doing: "Applying to `src/foo.css`…".
 
 ## If MCP tools aren't available
 
-If the `css-studio` tool is not found, tell the user:
-
-> The CSS Studio MCP server is not installed. Install it by running:
+> The CSS Studio MCP server is not installed. Install it with:
 >
 > ```
 > npx cssstudio install

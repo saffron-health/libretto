@@ -1,0 +1,146 @@
+@font-face {
+  font-family: "PP Editorial New";
+  src: url("../public/fonts/PPEditorialNew-Ultralight.otf") format("opentype");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PP Editorial New";
+  src: url("../public/fonts/PPEditorialNew-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --cream: oklch(0.966 0.005 106.5);
+  --ink: oklch(0.153 0.006 107.1);
+  --muted: oklch(0.394 0.023 107.4);
+  --faint: oklch(0.6 0.015 107);
+  --accent: oklch(0.47 0.075 165);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.render-canvas {
+  background: var(--cream);
+}
+
+.scene {
+  position: relative;
+  overflow: hidden;
+  width: 1920px;
+  height: 1080px;
+  transform: scale(2);
+  transform-origin: top left;
+  background:
+    radial-gradient(
+      circle at 50% 47%,
+      oklch(0.991 0.007 106.5) 0%,
+      oklch(0.974 0.006 106.5) 38%,
+      var(--cream) 78%
+    ),
+    var(--cream);
+  color: var(--ink);
+}
+
+.paper-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.2;
+  background-image:
+    linear-gradient(rgba(21, 21, 19, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(21, 21, 19, 0.025) 1px, transparent 1px);
+  background-size:
+    42px 42px,
+    42px 42px;
+  mask-image: radial-gradient(circle at center, black, transparent 82%);
+}
+
+.ascii-shape {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max-content;
+  margin: 0;
+  color: var(--ink);
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 0.88;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: pre;
+  transform-origin: center;
+  filter: blur(0.1px);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.copy-stack {
+  position: absolute;
+  left: 118px;
+  right: 118px;
+  top: 283px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 72px;
+  z-index: 2;
+}
+
+.copy-line {
+  max-width: 1060px;
+  color: var(--ink);
+  font-family: "PP Editorial New", "Newsreader", Georgia, serif;
+  font-weight: 200;
+  letter-spacing: 0;
+  text-wrap: balance;
+  text-shadow:
+    0 0 22px var(--cream),
+    0 0 42px var(--cream),
+    0 0 70px var(--cream);
+  transform-origin: left center;
+  will-change: opacity;
+}
+
+.copy-line--headline {
+  font-size: 100px;
+  line-height: 1.02;
+}
+
+.copy-line--subhead {
+  max-width: 900px;
+  color: var(--accent);
+  font-size: 54px;
+  line-height: 1.08;
+  text-shadow:
+    0 0 18px var(--cream),
+    0 0 36px var(--cream);
+}
+
+.copy-line--brand {
+  margin-top: 100px;
+  font-size: 116px;
+  line-height: 0.88;
+}
+
+.corner-mark {
+  position: absolute;
+  top: 70px;
+  left: 76px;
+  color: var(--faint);
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0;
+}
