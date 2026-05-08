@@ -873,12 +873,20 @@ function createProviderStartupCleanup(args: {
   getProviderSession: () => ProviderSession | undefined;
 }): { dispose: () => void } {
   let disposed = false;
+  let fallbackExit: NodeJS.Timeout | undefined;
 
   const requestClose = (reason: string): void => {
     if (disposed) return;
     disposed = true;
+    process.exitCode = reason === "received SIGINT" ? 130 : 1;
     const providerSession = args.getProviderSession();
-    if (!providerSession) return;
+    if (!providerSession) {
+      fallbackExit = setTimeout(() => {
+        process.exit(process.exitCode);
+      }, 5_000);
+      fallbackExit.unref();
+      return;
+    }
 
     void args.provider
       .closeSession(providerSession.sessionId)
@@ -901,6 +909,7 @@ function createProviderStartupCleanup(args: {
   return {
     dispose: () => {
       disposed = true;
+      if (fallbackExit) clearTimeout(fallbackExit);
       process.off("disconnect", onDisconnect);
       process.off("SIGINT", onSigint);
       process.off("SIGTERM", onSigterm);
@@ -1009,7 +1018,9 @@ function reportStartupError(error: unknown): never {
       message: error.message,
     });
   }
-  process.exit(1);
+  process.exit(
+    process.exitCode && process.exitCode !== 0 ? process.exitCode : 1,
+  );
 }
 
 try {
