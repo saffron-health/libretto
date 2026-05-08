@@ -82,7 +82,7 @@ import {
 } from "./config.js";
 import type { Experiments } from "../experiments.js";
 import { getCloudProviderApi } from "../providers/index.js";
-import type { ProviderApi } from "../providers/types.js";
+import type { ProviderApi, ProviderSession } from "../providers/types.js";
 import {
   getAbsoluteIntegrationPath,
   loadDefaultWorkflow,
@@ -230,6 +230,7 @@ class BrowserDaemon {
       name: string;
       sessionId: string;
     };
+    beforeReady?: () => void;
   }): Promise<BrowserDaemon> {
     const {
       session,
@@ -242,6 +243,7 @@ class BrowserDaemon {
       navigateUrl,
       readyProvider,
       providerSession,
+      beforeReady,
     } = args;
 
     await mkdir(getSessionDir(session), { recursive: true });
@@ -346,6 +348,7 @@ class BrowserDaemon {
     });
 
     await listenOnIpcSocket(ipcServer, socketPath);
+    beforeReady?.();
     process.send?.({ type: "ready", socketPath, provider: readyProvider });
     daemon.logger.info("ipc-server-listening", { socketPath });
 
@@ -471,8 +474,13 @@ class BrowserDaemon {
   }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
     const provider = getCloudProviderApi(config.providerName);
-    const providerSession = await provider.createSession();
+    let providerSession: ProviderSession | undefined;
+    const startupCleanup = createProviderStartupCleanup({
+      provider,
+      getProviderSession: () => providerSession,
+    });
     try {
+      providerSession = await provider.createSession();
       const browser = await chromium.connectOverCDP(
         providerSession.cdpEndpoint,
       );
@@ -506,6 +514,7 @@ class BrowserDaemon {
           name: config.providerName,
           sessionId: providerSession.sessionId,
         },
+        beforeReady: startupCleanup.dispose,
       });
 
       daemon.logger.info("child-provider-connected", {
@@ -518,7 +527,10 @@ class BrowserDaemon {
 
       return daemon;
     } catch (error) {
-      await provider.closeSession(providerSession.sessionId);
+      startupCleanup.dispose();
+      if (providerSession) {
+        await provider.closeSession(providerSession.sessionId);
+      }
       throw error;
     }
   }
@@ -854,6 +866,46 @@ class BrowserDaemon {
       }
     }
   }
+}
+
+function createProviderStartupCleanup(args: {
+  provider: ProviderApi;
+  getProviderSession: () => ProviderSession | undefined;
+}): { dispose: () => void } {
+  let disposed = false;
+
+  const requestClose = (reason: string): void => {
+    if (disposed) return;
+    disposed = true;
+    const providerSession = args.getProviderSession();
+    if (!providerSession) return;
+
+    void args.provider
+      .closeSession(providerSession.sessionId)
+      .catch(() => {})
+      .finally(() => {
+        process.exit(reason === "received SIGINT" ? 130 : 1);
+      });
+  };
+
+  const onDisconnect = (): void => requestClose("parent command disconnected");
+  const onSigint = (): void => requestClose("received SIGINT");
+  const onSigterm = (): void => requestClose("received SIGTERM");
+
+  if (typeof process.send === "function") {
+    process.once("disconnect", onDisconnect);
+  }
+  process.once("SIGINT", onSigint);
+  process.once("SIGTERM", onSigterm);
+
+  return {
+    dispose: () => {
+      disposed = true;
+      process.off("disconnect", onDisconnect);
+      process.off("SIGINT", onSigint);
+      process.off("SIGTERM", onSigterm);
+    },
+  };
 }
 
 // ── Main ───────────────────────────────────────────────────────────────

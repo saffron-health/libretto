@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
-import { describe, expect } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { normalizeDomain, normalizeUrl } from "../src/cli/core/browser.js";
+import { createLibrettoCloudProvider } from "../src/cli/core/providers/libretto-cloud.js";
 import { test } from "./fixtures.js";
 
 describe("browser URL normalization", () => {
@@ -166,3 +167,149 @@ describe("provider session guards", () => {
     expect(result.stderr).toContain("kernel");
   });
 });
+
+describe("Libretto Cloud provider", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("waits for queued sessions to receive a CDP URL", async () => {
+    vi.stubEnv("LIBRETTO_API_KEY", "test-key");
+    vi.stubEnv("LIBRETTO_TIMEOUT_SECONDS", "123");
+    vi.stubEnv("LIBRETTO_CLOUD_SESSION_POLL_INTERVAL_MS", "1");
+
+    let getCalls = 0;
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/v1/sessions/create") {
+          return jsonResponse({
+            json: {
+              session_id: "session-queued",
+              status: "queued",
+              cdp_url: null,
+              live_view_url: null,
+              recording_url: null,
+            },
+          });
+        }
+        if (pathname === "/v1/sessions/get") {
+          getCalls += 1;
+          return jsonResponse({
+            json: {
+              session_id: "session-queued",
+              status: getCalls === 1 ? "queued" : "open",
+              cdp_url:
+                getCalls === 1
+                  ? null
+                  : "wss://cloud.example.test/devtools/session-queued",
+              live_view_url:
+                getCalls === 1 ? null : "https://cloud.example.test/live",
+              recording_url: null,
+            },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await createLibrettoCloudProvider().createSession();
+
+    expect(session).toEqual({
+      sessionId: "session-queued",
+      cdpEndpoint: "wss://cloud.example.test/devtools/session-queued",
+      liveViewUrl: "https://cloud.example.test/live",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
+      json: { timeout_seconds: 123 },
+    });
+  });
+
+  it("closes a queued session when the parent command disconnects before CDP is ready", async () => {
+    vi.stubEnv("LIBRETTO_API_KEY", "test-key");
+    vi.stubEnv("LIBRETTO_CLOUD_SESSION_POLL_INTERVAL_MS", "1");
+
+    const originalSend = process.send;
+    const sendMock = vi.fn();
+    (process as typeof process & { send?: typeof process.send }).send =
+      sendMock;
+    let closeCallFinished = false;
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/v1/sessions/create") {
+          return jsonResponse({
+            json: {
+              session_id: "session-cancelled",
+              status: "queued",
+              cdp_url: null,
+              live_view_url: null,
+              recording_url: null,
+            },
+          });
+        }
+        if (pathname === "/v1/sessions/get") {
+          return jsonResponse({
+            json: {
+              session_id: "session-cancelled",
+              status: "queued",
+              cdp_url: null,
+              live_view_url: null,
+              recording_url: null,
+            },
+          });
+        }
+        if (pathname === "/v1/sessions/close") {
+          closeCallFinished = true;
+          return jsonResponse({ json: { replay_url: null } });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const sessionPromise = createLibrettoCloudProvider().createSession();
+
+      await waitFor(() =>
+        sendMock.mock.calls.some(([message]) =>
+          JSON.stringify(message).includes("Waiting for browser capacity"),
+        ),
+      );
+      process.emit("disconnect");
+
+      await expect(sessionPromise).rejects.toThrow(
+        "cancelled before browser capacity was available",
+      );
+      expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname))
+        .toContain("/v1/sessions/close");
+      expect(closeCallFinished).toBe(true);
+    } finally {
+      process.send = originalSend;
+    }
+  });
+});
+
+async function readJsonBody(init: unknown): Promise<unknown> {
+  return JSON.parse(String((init as { body?: unknown })?.body));
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  const deadline = Date.now() + 100;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+  throw new Error("Timed out waiting for condition");
+}
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}

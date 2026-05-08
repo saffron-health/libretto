@@ -15,7 +15,10 @@ import type { Experiments } from "./experiments.js";
 import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import { librettoCommand } from "../../shared/package-manager.js";
-import { getCloudProviderApi } from "./providers/index.js";
+import {
+  getCloudProviderApi,
+  getProviderStartupTimeoutMs,
+} from "./providers/index.js";
 import {
   assertSessionAvailableForStart,
   clearSessionState,
@@ -548,8 +551,8 @@ export async function runOpenWithProvider(
     },
     logger,
     logPath: runLogPath,
-    // Remote CDP connection + navigation; must cover both.
-    startupTimeoutMs: 60_000,
+    // Remote provider creation can wait for cloud capacity before CDP exists.
+    startupTimeoutMs: getProviderStartupTimeoutMs(providerName),
   });
   client.destroy();
 

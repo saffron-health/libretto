@@ -4,9 +4,16 @@ import { createKernelProvider } from "./kernel.js";
 import { createLibrettoCloudProvider } from "./libretto-cloud.js";
 import type { ProviderApi } from "./types.js";
 
-const VALID_PROVIDERS = new Set(["local", "kernel", "browserbase", "libretto-cloud"] as const);
+const VALID_PROVIDERS = new Set([
+  "local",
+  "kernel",
+  "browserbase",
+  "libretto-cloud",
+] as const);
 export type ProviderName =
   typeof VALID_PROVIDERS extends Set<infer T> ? T : never;
+const DEFAULT_PROVIDER_STARTUP_TIMEOUT_MS = 60_000;
+const LIBRETTO_CLOUD_STARTUP_TIMEOUT_MS = 10 * 60_000;
 
 function assertValidProviderName(value: string, source: string): ProviderName {
   if (!VALID_PROVIDERS.has(value as ProviderName)) {
@@ -50,13 +57,19 @@ export function getCloudProviderApi(name: string): ProviderApi {
     case "browserbase":
       return createBrowserbaseProvider();
     case "libretto-cloud":
-      console.warn(
-        "Note: The libretto-cloud provider is in alpha.",
-      );
+      console.warn("Note: The libretto-cloud provider is in alpha.");
       return createLibrettoCloudProvider();
     default:
       throw new Error(
         `Unknown provider "${name}". Valid cloud providers: kernel, browserbase`,
       );
   }
+}
+
+export function getProviderStartupTimeoutMs(
+  providerName: string | undefined,
+): number {
+  return providerName === "libretto-cloud"
+    ? LIBRETTO_CLOUD_STARTUP_TIMEOUT_MS
+    : DEFAULT_PROVIDER_STARTUP_TIMEOUT_MS;
 }
