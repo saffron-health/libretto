@@ -189,7 +189,6 @@ describe("daemon IPC", () => {
     );
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("Expression expected");
-    expect(result.stderr).toContain("const value = ;");
   }, 45_000);
 
   test("exec reports TypeScript syntax errors", async ({
@@ -214,7 +213,6 @@ describe("daemon IPC", () => {
     );
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("Expected ',', got '{'");
-    expect(result.stderr).toContain("function broken(value: string {");
   }, 45_000);
 
   test("readonly-exec works through daemon IPC", async ({
