@@ -9,6 +9,7 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createServer } from "node:net";
+import { isWindowsNamedPipePath } from "../../shared/ipc/socket-transport.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import type { Experiments } from "./experiments.js";
@@ -977,6 +978,8 @@ function unlinkDaemonSocket(
   session: string,
 ): void {
   if (!socketPath) return;
+  if (isWindowsNamedPipePath(socketPath)) return;
+
   try {
     unlinkSync(socketPath);
   } catch (err) {
