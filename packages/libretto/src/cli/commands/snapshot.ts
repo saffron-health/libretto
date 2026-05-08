@@ -1,22 +1,12 @@
-import { readFileSync, writeFileSync } from "node:fs";
 import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
-import { condenseDom } from "../../shared/condense-dom/condense-dom.js";
 import { readSessionState } from "../core/session.js";
-import {
-  type InterpretArgs,
-  type ScreenshotPair,
-} from "../core/snapshot-analyzer.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   pageOption,
   sessionOption,
-  withExperiments,
   withRequiredSession,
 } from "./shared.js";
-import { runApiInterpret } from "../core/api-snapshot-analyzer.js";
-import { readSnapshotModel } from "../core/config.js";
-import { resolveSnapshotApiModelOrThrow } from "../core/ai-model.js";
 import { DaemonClient } from "../core/daemon/ipc.js";
 import { librettoCommand } from "../../shared/package-manager.js";
 import { renderSnapshot } from "../../shared/snapshot/render-snapshot.js";
@@ -116,101 +106,6 @@ export async function forceSnapshotViewport(
   });
 }
 
-async function captureSnapshot(
-  session: string,
-  logger: LoggerApi,
-  daemonSocketPath: string,
-  pageId?: string,
-): Promise<ScreenshotPair> {
-  logger.info("snapshot-via-daemon", { session, pageId });
-  const client = await DaemonClient.connect(daemonSocketPath);
-  let snapshotResult: Awaited<ReturnType<DaemonClient["snapshot"]>>;
-  try {
-    snapshotResult = await client.snapshot({ pageId });
-  } finally {
-    client.destroy();
-  }
-  if (!("htmlPath" in snapshotResult)) {
-    throw new Error("Daemon returned a compact snapshot for a legacy request.");
-  }
-  const { pngPath, htmlPath, snapshotRunId, pageUrl, title } = snapshotResult;
-
-  // condenseDom runs in the CLI process, not the daemon.
-  const htmlContent = readFileSync(htmlPath, "utf8");
-  const condenseResult = condenseDom(htmlContent);
-  const condensedHtmlPath = htmlPath.replace(/\.html$/, ".condensed.html");
-  writeFileSync(condensedHtmlPath, condenseResult.html);
-
-  logger.info("snapshot-daemon-success", {
-    session,
-    pageUrl,
-    title,
-    pngPath,
-    htmlPath,
-    condensedHtmlPath,
-    snapshotRunId,
-    domCondenseStats: {
-      originalLength: condenseResult.originalLength,
-      condensedLength: condenseResult.condensedLength,
-      reductions: condenseResult.reductions,
-    },
-  });
-
-  return { pngPath, htmlPath, condensedHtmlPath, baseName: snapshotRunId };
-}
-
-async function runSnapshot(
-  session: string,
-  logger: LoggerApi,
-  pageId: string | undefined,
-  objective: string | undefined,
-  context: string | undefined,
-): Promise<void> {
-  if (objective === undefined) {
-    throw new Error("Missing required option --objective.");
-  }
-  if (context === undefined) {
-    throw new Error("Missing required option --context.");
-  }
-
-  const normalizedObjective = objective.trim();
-  const normalizedContext = context.trim();
-
-  const snapshotModel = readSnapshotModel();
-  resolveSnapshotApiModelOrThrow(snapshotModel);
-
-  const state = readSessionState(session, logger);
-  if (!state?.daemonSocketPath) {
-    throw new Error(
-      `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
-        `Close and reopen the session: ${librettoCommand(`close --session ${session}`)}`,
-    );
-  }
-
-  const { pngPath, htmlPath, condensedHtmlPath } =
-    await captureSnapshot(session, logger, state.daemonSocketPath, pageId);
-
-  console.log("Screenshot saved:");
-  console.log(`  PNG:             ${pngPath}`);
-  console.log(`  HTML:            ${htmlPath}`);
-  console.log(`  Condensed HTML:  ${condensedHtmlPath}`);
-
-  const interpretArgs: InterpretArgs = {
-    objective: normalizedObjective,
-    session,
-    context: normalizedContext,
-    pngPath,
-    htmlPath,
-    condensedHtmlPath,
-  };
-
-  // Analysis uses direct API calls via the Vercel AI SDK (see api-snapshot-analyzer.ts).
-  // The legacy CLI-agent path (spawning codex/claude/gemini as a subprocess) is preserved
-  // in snapshot-analyzer.ts — to switch back, replace this call with:
-  //   await runInterpret(interpretArgs, logger);
-  await runApiInterpret(interpretArgs, logger, snapshotModel);
-}
-
 async function runCompactSnapshot(
   args: {
     session: string;
@@ -237,17 +132,12 @@ async function runCompactSnapshot(
   let result: Awaited<ReturnType<DaemonClient["snapshot"]>>;
   try {
     result = await client.snapshot({
-      mode: "compact",
       pageId: args.pageId,
       useCachedSnapshot: args.ref !== undefined,
     });
   } finally {
     client.destroy();
   }
-  if (!("mode" in result) || result.mode !== "compact") {
-    throw new Error("Daemon returned a legacy snapshot for a compact request.");
-  }
-
   console.log(`Screenshot at ${result.pngPath}`);
   console.log(renderSnapshot(result.snapshot, args.ref));
   console.log(
@@ -270,34 +160,16 @@ export const snapshotInput = SimpleCLI.input({
 });
 
 export const snapshotCommand = SimpleCLI.command({
-  description: "Capture PNG + HTML and analyze with --objective and --context",
+  description: "Capture a screenshot and compact accessibility snapshot",
 })
   .input(snapshotInput)
   .use(withRequiredSession())
-  .use(withExperiments())
   .handle(async ({ input, ctx }) => {
-    if (ctx.experiments["compact-snapshot-format"]) {
-      await runCompactSnapshot({
-        session: ctx.session,
-        daemonSocketPath: ctx.sessionState.daemonSocketPath,
-        logger: ctx.logger,
-        pageId: input.page,
-        ref: input.ref,
-      });
-      return;
-    }
-
-    if (input.ref) {
-      throw new Error(
-        `Snapshot refs require the compact-snapshot-format experiment. Enable it with ${librettoCommand("experiments enable compact-snapshot-format")}.`,
-      );
-    }
-
-    await runSnapshot(
-      ctx.session,
-      ctx.logger,
-      input.page,
-      input.objective,
-      input.context,
-    );
+    await runCompactSnapshot({
+      session: ctx.session,
+      daemonSocketPath: ctx.sessionState.daemonSocketPath,
+      logger: ctx.logger,
+      pageId: input.page,
+      ref: input.ref,
+    });
   });

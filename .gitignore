@@ -13,4 +13,6 @@ evals/private/
 evals/runs/
 tmp/
 .turbo/
-.worktrees/
+.fallow/
+.worktrees/*
+!.worktrees/config.json

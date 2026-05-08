@@ -1,6 +1,5 @@
 ---
-title: Libretto Cloud billing
-hidden: true
+title: Billing
 ---
 
 > View your current cloud plan, open the Libretto plans page, and manage payment details through Stripe.
@@ -37,8 +36,8 @@ npx libretto experimental billing status
 Example output:
 
 ```text
-Plan:    Pro (active)
-Usage:   37.40 / 100 browser hours this period
+Plan:    Team (active)
+Usage:   26.40 / 150 browser hours this period
 Period:  ends 2026-05-21
 ```
 
@@ -57,9 +56,15 @@ Browser hours accrue when Libretto Cloud provisions a browser session for:
 
 #### How usage is measured
 
-Hosted usage is measured per browser session, from the time a session starts until Libretto records it as closed.
+Hosted usage is measured per browser session, by the underlying browser provider's reported active running time. Time the browser spends in standby is not billed.
 
-Each session is billed by the minute and rounds up to the next whole minute, which is the same general metering model used by other hosted browser providers.
+Each session is billed by the second and rounds up to the next whole second, with a one-second minimum per session. Browser seconds are priced at $0.000185185 per second ($0.667 per browser hour), which is reflected in the included hours on each plan.
+
+#### Standby and idle time
+
+To keep costs predictable, browsers automatically drop into a standby state during periods of inactivity. While in standby, the session keeps its full state (open tabs, cookies, authenticated logins) but does not accrue any usage.
+
+A session enters standby after five seconds without an active Chrome DevTools Protocol or Live View client connection. Once it does, the session's inactivity timeout begins counting down toward automatic teardown. Reconnecting any client wakes the session immediately and metering resumes.
 
 If your organization exceeds its plan limit, Libretto Cloud will not spin up new browser sessions until you move to a plan with more capacity.
 
@@ -78,11 +83,11 @@ For BAA and Enterprise, please reach out to us at `team@saffron.health`.
 - If you can authenticate but still cannot access billing, confirm that your user is an organization owner.
 
 <CardGroup cols={2}>
-  <Card title="Authentication" icon="key" href="/libretto-cloud/authentication">
+  <Card title="Authentication" icon="key" href="/libretto-cloud-hosting/authentication">
     Manage cloud login state, invites, and API keys.
   </Card>
 
-  <Card title="Deployments" icon="rocket" href="/libretto-cloud/deployments">
+  <Card title="Deployments" icon="rocket" href="/libretto-cloud-hosting/deployments">
     Deploy workflows and invoke them on Libretto Cloud.
   </Card>
 </CardGroup>

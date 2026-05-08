@@ -23,6 +23,7 @@ resolve_root_dir() {
 
 ROOT_DIR="$(resolve_root_dir "$SCRIPT_ROOT_DIR")"
 WORKTREES_DIR="$ROOT_DIR/.worktrees"
+CONFIG_FILE="$WORKTREES_DIR/config.json"
 
 usage() {
     echo "Worktree manager"
@@ -38,6 +39,62 @@ usage() {
     exit 1
 }
 
+run_hook() {
+    local hook="$1"
+    local hook_dir="$2"
+
+    if [ ! -f "$CONFIG_FILE" ]; then
+        return
+    fi
+
+    local commands
+    if ! commands=$(python3 - "$CONFIG_FILE" "$hook" <<'PY'
+import json
+import sys
+
+config_path = sys.argv[1]
+hook_name = sys.argv[2]
+
+with open(config_path, encoding="utf-8") as f:
+    config = json.load(f)
+
+hooks = config.get("hooks", {})
+if not isinstance(hooks, dict):
+    raise SystemExit("config hooks must be an object")
+
+commands = hooks.get(hook_name, [])
+if not isinstance(commands, list):
+    raise SystemExit(f"hook {hook_name} must be an array")
+
+for command in commands:
+    if not isinstance(command, str):
+        raise SystemExit(f"hook {hook_name} entries must be strings")
+    print(command)
+PY
+    ); then
+        echo "Error: Failed to read $CONFIG_FILE hook '$hook'."
+        exit 1
+    fi
+
+    if [ -z "$commands" ]; then
+        return
+    fi
+
+    echo "Running $hook hooks..."
+    local command
+    while IFS= read -r command; do
+        [ -z "$command" ] && continue
+        echo "  $command"
+        (cd "$hook_dir" && bash -lc "$command")
+    done <<< "$commands"
+}
+
+open_worktree() {
+    local wt_path="$1"
+    cd "$wt_path"
+    exec "$SHELL"
+}
+
 ensure_worktree_path() {
     local wt_path="$1"
     mkdir -p "$WORKTREES_DIR"
@@ -45,8 +102,7 @@ ensure_worktree_path() {
 
     if [ -d "$wt_path" ]; then
         echo "Worktree already exists at $wt_path"
-        cd "$wt_path"
-        exec "$SHELL"
+        open_worktree "$wt_path"
     fi
 }
 
@@ -143,10 +199,11 @@ cmd_new() {
     ensure_worktree_path "$wt_path"
 
     git fetch origin main
+    run_hook beforeCreate "$ROOT_DIR"
     git worktree add -b "$branch" "$wt_path" origin/main
+    run_hook afterCreate "$wt_path"
     echo "Created worktree at $wt_path"
-    cd "$wt_path"
-    exec "$SHELL"
+    open_worktree "$wt_path"
 }
 
 cmd_from() {
@@ -194,8 +251,7 @@ cmd_from() {
     if [ -n "$existing_worktree" ]; then
         if [[ "$existing_worktree" == *".worktrees"* ]] && [ -d "$existing_worktree" ]; then
             echo "Worktree already exists at $existing_worktree"
-            cd "$existing_worktree"
-            exec "$SHELL"
+            open_worktree "$existing_worktree"
         fi
 
         echo "Error: Branch '$branch' is already checked out at $existing_worktree"
@@ -205,15 +261,16 @@ cmd_from() {
     local wt_path="$WORKTREES_DIR/$branch"
     ensure_worktree_path "$wt_path"
 
+    run_hook beforeCreate "$ROOT_DIR"
     if branch_exists_local "$branch"; then
         git worktree add "$wt_path" "$branch"
     else
         git worktree add --track -b "$branch" "$wt_path" "$branch_ref"
     fi
+    run_hook afterCreate "$wt_path"
 
     echo "Created worktree at $wt_path"
-    cd "$wt_path"
-    exec "$SHELL"
+    open_worktree "$wt_path"
 }
 
 cmd_list() {
@@ -343,8 +400,10 @@ cmd_prune() {
                 remove_args+=("--force")
             fi
             remove_args+=("$wt_path")
+            run_hook beforeDestroy "$wt_path"
             if git "${remove_args[@]}" 2>/dev/null; then
                 git branch -D "$branch" 2>/dev/null || true
+                run_hook afterDestroy "$ROOT_DIR"
                 ((pruned++))
             else
                 echo "  Failed to remove worktree: $branch"
@@ -413,6 +472,7 @@ cmd_close() {
     # Move back to the main repo root (not the worktree root, which is about to be deleted)
     local main_root
     main_root=$(git -C "$wt_path" worktree list --porcelain | head -1 | sed 's/^worktree //')
+    run_hook beforeDestroy "$wt_path"
     cd "$main_root"
 
     # Remove the worktree
@@ -424,6 +484,7 @@ cmd_close() {
 
     if git "${remove_args[@]}"; then
         echo "Closed worktree: $branch"
+        run_hook afterDestroy "$main_root"
         # Start a new shell at the repo root so the caller's shell isn't left in a deleted dir
         exec "$SHELL"
     else

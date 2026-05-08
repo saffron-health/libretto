@@ -26,9 +26,7 @@ npx libretto pages --session debug-example
 
 # Target a specific page
 npx libretto exec --session debug-example --page <page-id> "await page.url()"
-npx libretto snapshot --session debug-example --page <page-id> \
-  --objective "Find the active form" \
-  --context "A modal opened in a new tab."
+npx libretto snapshot --session debug-example --page <page-id>
 ```
 
 #### Flags

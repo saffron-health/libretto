@@ -4,7 +4,7 @@ description: "Read-only Libretto workflow for diagnosing live browser state with
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.6.12"
+  version: "0.6.13"
 ---
 
 ## How Libretto Read-Only Works
@@ -49,14 +49,7 @@ npx libretto pages --session failed-job-debug
 ### `snapshot`
 
 - Use `snapshot` as the first high-level observation tool.
-- Always provide both `--objective` and `--context`.
-
-```bash
-npx libretto snapshot \
-  --session failed-job-debug \
-  --objective "Identify the visible failure state and likely blocking UI condition" \
-  --context "The workflow already failed and the preserved browser must remain read-only."
-```
+- Run `snapshot <ref>` to inspect a subtree from the latest full snapshot.
 
 ### `readonly-exec`
 

@@ -3,7 +3,6 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import { SessionAccessModeSchema } from "../../shared/state/index.js";
 import { LIBRETTO_CONFIG_PATH } from "./context.js";
-import { librettoCommand } from "../../shared/package-manager.js";
 
 export const CURRENT_CONFIG_VERSION = 1;
 
@@ -42,7 +41,6 @@ function formatExpectedConfigExample(): string {
   return JSON.stringify(
     {
       version: CURRENT_CONFIG_VERSION,
-      snapshotModel: "openai/gpt-5.4",
       viewport: {
         width: 1280,
         height: 800,
@@ -66,10 +64,9 @@ function invalidConfigError(configPath: string, detail?: string): Error {
       "Expected config example:",
       formatExpectedConfigExample(),
       "Notes:",
-      '  - "snapshotModel", "viewport", "windowPosition", and "sessionMode" are optional.',
-      '  - "snapshotModel" must be a provider/model string like "openai/gpt-5.4" or "anthropic/claude-sonnet-4-6".',
-      "Fix the file to match this shape, or delete it and rerun:",
-      `  ${librettoCommand("ai configure openai | anthropic | gemini | vertex | openrouter")}`,
+      '  - "viewport", "windowPosition", and "sessionMode" are optional.',
+      '  - "snapshotModel" is deprecated and ignored by snapshot.',
+      "Fix the file to match this shape, or delete it and rerun setup.",
     ]
       .filter(Boolean)
       .join("\n"),

@@ -21,11 +21,11 @@ import { SimpleCLI } from "../framework/simple-cli.js";
 import {
   ApiCallError,
   betterAuthCall,
-  HOSTED_API_URL,
   NOT_AUTHENTICATED_MESSAGE,
   orpcCall,
   pickCredential,
   resolveApiUrl,
+  resolveHostedApiUrl,
 } from "../core/auth-fetch.js";
 import {
   authStatePath,
@@ -202,7 +202,7 @@ export const signupCommand = SimpleCLI.command({
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
   .handle(async () => {
-    const apiUrl = HOSTED_API_URL;
+    const apiUrl = resolveHostedApiUrl();
     console.log("Sign up for libretto cloud");
     console.log();
     console.log("Heads up: a libretto user can only belong to one organization.");
@@ -308,7 +308,7 @@ export const loginCommand = SimpleCLI.command({
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
   .handle(async () => {
-    const apiUrl = HOSTED_API_URL;
+    const apiUrl = resolveHostedApiUrl();
 
     const email = await prompt("Email:");
     const password = await promptPassword("Password:");
@@ -514,7 +514,7 @@ export const acceptInviteCommand = SimpleCLI.command({
   )
   .handle(async ({ input }) => {
     const stored = await readAuthState();
-    const apiUrl = HOSTED_API_URL;
+    const apiUrl = resolveHostedApiUrl();
     const credential = pickCredential(stored);
     const expectedTenantSlug = input.tenantSlug;
 
@@ -746,7 +746,7 @@ export const whoamiCommand = SimpleCLI.command({
     }
 
     console.log(`Auth source:      ${credential.source}`);
-    console.log(`API URL:          ${HOSTED_API_URL}`);
+    console.log(`API URL:          ${resolveHostedApiUrl()}`);
     console.log(
       `LIBRETTO_API_KEY: ${envKey ? `set in env (${envKey.slice(0, 6)}…)` : "not set in env"}`,
     );

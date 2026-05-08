@@ -267,28 +267,6 @@ describe("daemon IPC", () => {
     expect(result.stderr).toContain("expected readonly failure");
   }, 45_000);
 
-  test("snapshot through daemon IPC fails at analysis, not at daemon layer", async ({
-    librettoCli,
-    workspacePath,
-  }) => {
-    const session = "daemon-ipc-snapshot";
-    const url = await writeFixturePage(
-      workspacePath,
-      "snapshot",
-      "Snapshot Test",
-    );
-    await librettoCli(`open "${url}" --headless --session ${session}`);
-
-    // Without valid AI credentials the command fails at model
-    // validation or analysis — not at the daemon/IPC layer. Verify
-    // the error is NOT a daemon connection failure.
-    const result = await librettoCli(
-      `snapshot --session ${session} --objective "test" --context "test"`,
-    );
-    expect(result.stderr).not.toContain("daemon socket");
-    expect(result.stderr).not.toContain("daemon may have crashed");
-  }, 45_000);
-
   test("compact snapshot prints screenshot path, tree, and subtree hint", async ({
     librettoCli,
     workspacePath,
@@ -301,7 +279,6 @@ describe("daemon IPC", () => {
       `<main><h1>Compact Heading</h1><button>Save Changes</button></main>`,
     );
 
-    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(`snapshot --session ${session}`);
@@ -328,7 +305,6 @@ describe("daemon IPC", () => {
       `<main><h1>Scoped Page</h1><p>Sibling Details</p><button>Save Changes</button></main>`,
     );
 
-    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const fullSnapshot = await librettoCli(`snapshot --session ${session}`);
@@ -361,7 +337,6 @@ describe("daemon IPC", () => {
       `<main><button>Second Page Button</button></main>`,
     );
 
-    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${firstUrl}" --headless --session ${session}`);
     await librettoCli(
       `exec "const p = await context.newPage(); await p.goto('${secondUrl}')" --session ${session}`,
@@ -403,7 +378,6 @@ describe("daemon IPC", () => {
       `<main><button>Save Changes</button></main>`,
     );
 
-    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(`snapshot l1 --session ${session}`);
@@ -423,7 +397,6 @@ describe("daemon IPC", () => {
       `<main><h1>Before Heading</h1><button>Save Changes</button></main>`,
     );
 
-    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const beforeSnapshot = await librettoCli(`snapshot --session ${session}`);
@@ -450,7 +423,6 @@ describe("daemon IPC", () => {
       `<main><h1>Stable Heading</h1></main>`,
     );
 
-    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(
@@ -473,7 +445,6 @@ describe("daemon IPC", () => {
       `<main><h1>Closing Page</h1></main>`,
     );
 
-    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(
@@ -496,7 +467,6 @@ describe("daemon IPC", () => {
       `<main><h1>Readonly Heading</h1><button>Cache Target</button></main>`,
     );
 
-    await librettoCli("experiments enable compact-snapshot-format");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const fullSnapshot = await librettoCli(`snapshot --session ${session}`);
@@ -625,9 +595,7 @@ export default workflow("main", async ({ page }) => {
     expect(pages.stdout).toContain("Daemon Run Stay Open");
     expect(pages.stderr).not.toContain("daemon socket");
 
-    const snapshot = await librettoCli(
-      `snapshot --session ${session} --objective "Find the heading" --context "Daemon-backed run session"`,
-    );
+    const snapshot = await librettoCli(`snapshot --session ${session}`);
     expect(snapshot.stderr).not.toContain("daemon socket");
     expect(snapshot.stderr).not.toContain("daemon may have crashed");
   }, 45_000);
@@ -660,9 +628,7 @@ export default workflow("main", async ({ page }) => {
     expect(pages.stdout).toContain("Daemon Run Failure");
     expect(pages.stderr).not.toContain("daemon socket");
 
-    const snapshot = await librettoCli(
-      `snapshot --session ${session} --objective "Find the heading" --context "Daemon-backed failed run session"`,
-    );
+    const snapshot = await librettoCli(`snapshot --session ${session}`);
     expect(snapshot.stderr).not.toContain("daemon socket");
     expect(snapshot.stderr).not.toContain("daemon may have crashed");
   }, 45_000);
