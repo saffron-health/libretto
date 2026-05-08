@@ -93,18 +93,18 @@ describe("daemon IPC", () => {
     expect(result.stderr).toContain("expected exec failure");
   }, 45_000);
 
-  test("exec persists state across calls", async ({
+  test("exec persists bindings across calls", async ({
     librettoCli,
     workspacePath,
   }) => {
-    const session = "daemon-ipc-exec-state";
-    const url = await writeFixturePage(workspacePath, "state", "State Test");
+    const session = "daemon-ipc-exec-bindings";
+    const url = await writeFixturePage(workspacePath, "bindings", "Binding Test");
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
-    await librettoCli(`exec "state.x = 42" --session ${session}`);
+    await librettoCli(`exec "let x = 42" --session ${session}`);
 
     const result = await librettoCli(
-      `exec "state.x" --session ${session}`,
+      `exec "x" --session ${session}`,
     );
     expect(result.stdout).toContain("42");
   }, 45_000);
@@ -130,6 +130,25 @@ describe("daemon IPC", () => {
       `exec "await pageTitleWithPrefix('title: ')" --session ${session}`,
     );
     expect(result.stdout).toContain("title: Helper Test");
+  }, 45_000);
+
+  test("exec exposes the current page main frame", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-frame-helper";
+    const url = await writeFixturePage(
+      workspacePath,
+      "frame-helper",
+      "Frame Helper Test",
+      "<h1>Frame Heading</h1>",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec "await frame.locator('h1').textContent()" --session ${session}`,
+    );
+    expect(result.stdout).toContain("Frame Heading");
   }, 45_000);
 
   test("exec rejects top-level return with REPL-style guidance", async ({

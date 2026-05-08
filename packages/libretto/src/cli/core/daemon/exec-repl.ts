@@ -7,10 +7,28 @@ const TOP_LEVEL_RETURN_HINT =
   "Hint: top-level return isn't supported because exec is a REPL-style environment. Use the expression value instead, for example: await page.title()";
 const NO_RESULT = Symbol("NO_RESULT");
 
+type ReplOutput = {
+  stdout: string;
+  stderr: string;
+};
+
+export type DaemonExecReplResult = {
+  ok: true;
+  result: unknown;
+  output: ReplOutput;
+};
+
+export type DaemonExecReplFailure = {
+  ok: false;
+  error: Error;
+  output: ReplOutput;
+};
+
+export type DaemonExecReplResponse = DaemonExecReplResult | DaemonExecReplFailure;
+
 type ActiveEval = {
   output: string;
-  resolve: (value: unknown) => void;
-  reject: (error: Error) => void;
+  resolve: (value: DaemonExecReplResponse) => void;
 };
 
 function getErrorMessage(error: unknown): string {
@@ -58,6 +76,12 @@ function appendTopLevelReturnHint(error: unknown): Error {
   return new SyntaxError(`${message}\n\n${TOP_LEVEL_RETURN_HINT}`);
 }
 
+function getEvalStdout(output: string): string {
+  const promptIndex = output.indexOf(PROMPT);
+  const beforePrompt = promptIndex === -1 ? output : output.slice(0, promptIndex);
+  return beforePrompt.endsWith("\n") ? beforePrompt.slice(0, -1) : beforePrompt;
+}
+
 export class DaemonExecRepl {
   private readonly replServer: repl.REPLServer;
   private readonly input = new PassThrough();
@@ -67,7 +91,7 @@ export class DaemonExecRepl {
   private activeEval: ActiveEval | undefined;
   private lastResult: unknown = NO_RESULT;
 
-  constructor() {
+  constructor(globals: Record<string, unknown>) {
     this.ready = new Promise((resolve) => {
       this.readyResolve = resolve;
     });
@@ -85,27 +109,31 @@ export class DaemonExecRepl {
         return "";
       },
     });
+    Object.assign(this.replServer.context, globals);
   }
 
   async run(
     code: string,
     globals: Record<string, unknown>,
-  ): Promise<unknown> {
+  ): Promise<DaemonExecReplResponse> {
     Object.assign(this.replServer.context, globals);
 
     let jsCode: string;
     try {
       jsCode = stripTypeScriptExecCode(code);
     } catch (error) {
-      if (isTopLevelReturnError(error)) {
-        throw appendTopLevelReturnHint(error);
-      }
-      throw error;
+      return {
+        ok: false,
+        error: isTopLevelReturnError(error)
+          ? appendTopLevelReturnHint(error)
+          : toError(error),
+        output: { stdout: "", stderr: "" },
+      };
     }
 
     await this.ready;
-    return await new Promise<unknown>((resolve, reject) => {
-      this.activeEval = { output: "", resolve, reject };
+    return await new Promise<DaemonExecReplResponse>((resolve) => {
+      this.activeEval = { output: "", resolve };
       this.lastResult = NO_RESULT;
       this.input.write(`${jsCode}\n`);
     });
@@ -126,14 +154,14 @@ export class DaemonExecRepl {
 
     this.activeEval = undefined;
     const result = this.lastResult === NO_RESULT ? undefined : this.lastResult;
+    const output = { stdout: getEvalStdout(active.output), stderr: "" };
     if (isErrorLike(result)) {
-      active.reject(
-        isTopLevelReturnError(result)
-          ? appendTopLevelReturnHint(result)
-          : toError(result),
-      );
+      const error = isTopLevelReturnError(result)
+        ? appendTopLevelReturnHint(result)
+        : toError(result);
+      active.resolve({ ok: false, error, output });
       return;
     }
-    active.resolve(result);
+    active.resolve({ ok: true, result, output });
   }
 }

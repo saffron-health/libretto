@@ -161,8 +161,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 
 class BrowserDaemon {
   readonly logger: LoggerApi;
-  private readonly execState: Record<string, unknown> = {};
-  private readonly execRepl = new DaemonExecRepl();
+  private readonly execRepl: DaemonExecRepl;
   private readonly pageById = new Map<string, Page>();
   private readonly shutdownHandlers: ShutdownHandler[] = [];
   private readonly connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
@@ -185,6 +184,10 @@ class BrowserDaemon {
     },
   ) {
     this.logger = logger.withScope("child");
+    this.execRepl = new DaemonExecRepl({
+      browser: this.browser,
+      context: this.context,
+    });
   }
 
   private trackPage(page: Page): string {
@@ -731,11 +734,7 @@ class BrowserDaemon {
         handleExec(
           this.resolveTargetPage(args.pageId),
           args.code,
-          this.context,
-          this.browser,
-          this.execState,
           this.execRepl,
-          this.session,
           args.visualize,
         ),
       );
@@ -758,11 +757,7 @@ class BrowserDaemon {
         const result = await handleExec(
           page,
           args.code,
-          this.context,
-          this.browser,
-          this.execState,
           this.execRepl,
-          this.session,
           args.visualize,
         );
 

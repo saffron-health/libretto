@@ -1,9 +1,8 @@
-import type { Browser, BrowserContext, Page } from "playwright";
+import type { Page } from "playwright";
 import { format, formatWithOptions, type InspectOptions } from "node:util";
 import { installInstrumentation } from "../../../shared/instrumentation/index.js";
 import { compileExecFunction } from "../exec-compiler.js";
 import { createReadonlyExecHelpers } from "../readonly-exec.js";
-import { readNetworkLog, readActionLog } from "../telemetry.js";
 import type { DaemonExecRepl } from "./exec-repl.js";
 
 type ExecOutput = {
@@ -53,57 +52,23 @@ function createBufferedConsole(): { console: Console; output: ExecOutput } {
 export async function handleExec(
   targetPage: Page,
   code: string,
-  context: BrowserContext,
-  browser: Browser,
-  execState: Record<string, unknown>,
   execRepl: DaemonExecRepl,
-  session: string,
   visualize?: boolean,
 ): Promise<ExecResponse> {
-  const buffered = createBufferedConsole();
-
   if (visualize) {
     await installInstrumentation(targetPage, { visualize: true });
   }
 
-  const networkLog = (
-    opts: {
-      last?: number;
-      filter?: string;
-      method?: string;
-      pageId?: string;
-    } = {},
-  ) => readNetworkLog(session, opts);
-
-  const actionLog = (
-    opts: {
-      last?: number;
-      filter?: string;
-      action?: string;
-      source?: string;
-      pageId?: string;
-    } = {},
-  ) => readActionLog(session, opts);
-
   const helpers = {
     page: targetPage,
-    context,
-    browser,
-    state: execState,
-    console: buffered.console,
-    networkLog,
-    actionLog,
+    frame: targetPage.mainFrame(),
   };
 
-  try {
-    const result = await execRepl.run(code, helpers);
-    return { result, output: buffered.output };
-  } catch (error) {
-    throw new DaemonExecError(
-      error instanceof Error ? error.message : String(error),
-      buffered.output,
-    );
+  const result = await execRepl.run(code, helpers);
+  if (!result.ok) {
+    throw new DaemonExecError(result.error.message, result.output);
   }
+  return { result: result.result, output: result.output };
 }
 
 export async function handleReadonlyExec(
