@@ -37,8 +37,8 @@ npx libretto experimental billing status
 Example output:
 
 ```text
-Plan:    Pro (active)
-Usage:   12.40 / 30 browser hours this period
+Plan:    Team (active)
+Usage:   26.40 / 150 browser hours this period
 Period:  ends 2026-05-21
 ```
 
@@ -63,9 +63,9 @@ Each session is billed by the minute and rounds up to the next whole minute. Bro
 
 #### Standby and idle time
 
-To keep costs predictable, browsers automatically drop into a standby state during periods of inactivity. While in standby, the session keeps its full state — open tabs, cookies, authenticated logins — but does not accrue any usage.
+To keep costs predictable, browsers automatically drop into a standby state during periods of inactivity. While in standby, the session keeps its full state (open tabs, cookies, authenticated logins) but does not accrue any usage.
 
-A session enters standby a few seconds after the last Chrome DevTools Protocol or Live View client disconnects. Once it does, the session's inactivity timeout begins counting down toward automatic teardown. Reconnecting any client wakes the session immediately and metering resumes.
+A session enters standby after five seconds without an active Chrome DevTools Protocol or Live View client connection. Once it does, the session's inactivity timeout begins counting down toward automatic teardown. Reconnecting any client wakes the session immediately and metering resumes.
 
 If your organization exceeds its plan limit, Libretto Cloud will not spin up new browser sessions until you move to a plan with more capacity.
 
