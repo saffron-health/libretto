@@ -1,17 +1,16 @@
 ---
-title: Libretto Cloud
+title: Libretto Cloud Hosting
 sidebarTitle: Overview
-hidden: true
 ---
 
-> Use Libretto Cloud to deploy workflows, run them through a managed API, investigate failures, and manage your account.
+> The hosted platform for Libretto. Deploy workflows, run them through a managed API, schedule workflow runs, and investigate failures.
 
 <Warning>
   Libretto Cloud is in beta and under active development. APIs and behavior may
   change as the managed platform evolves.
 </Warning>
 
-This section covers Libretto Cloud. If you want to self-host, go to the [self-hosting overview](/hosting/introduction). The Libretto Cloud API URL is `https://api.libretto.sh`.
+Libretto Cloud is the easiest way to host and run workflows. Sign up, run one deploy command from the CLI, and your workflow is live behind a managed API. If you'd rather run workflows on infrastructure you control, see the [self-hosting overview](/self-hosting/introduction). The Libretto Cloud API URL is `https://api.libretto.sh`.
 
 ### Why use Libretto Cloud
 
@@ -33,7 +32,7 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
 
     If you are joining an existing organization, use `accept-invite` instead.
 
-    See [Create a new user account and organization](/libretto-cloud/authentication#create-a-new-user-account-and-organization).
+    See [Create a new user account and organization](/libretto-cloud-hosting/authentication#create-a-new-user-account-and-organization).
   </Step>
 
   <Step title="Create an API key">
@@ -50,7 +49,7 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
     LIBRETTO_API_KEY=<issued-key>
     ```
 
-    See [Issue an API key](/libretto-cloud/authentication#issue-an-api-key).
+    See [Issue an API key](/libretto-cloud-hosting/authentication#issue-an-api-key).
   </Step>
 
   <Step title="Set up a webhook">
@@ -94,7 +93,7 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
     npx libretto experimental deploy .
     ```
 
-    See [Expected deploy directory](/libretto-cloud/deployments#expected-deploy-directory) and [Deploy workflows](/libretto-cloud/deployments#deploy-workflows).
+    See [Expected deploy directory](/libretto-cloud-hosting/deployments#expected-deploy-directory) and [Deploy workflows](/libretto-cloud-hosting/deployments#deploy-workflows).
   </Step>
 
   <Step title="Run the workflow">
@@ -128,22 +127,22 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
       }'
     ```
 
-    See [Run a deployed workflow](/libretto-cloud/deployments#run-a-deployed-workflow) and [Jobs](/libretto-cloud-api/jobs-and-logs#jobs).
+    See [Run a deployed workflow](/libretto-cloud-hosting/deployments#run-a-deployed-workflow) and [Jobs](/libretto-cloud-api/jobs-and-logs#jobs).
   </Step>
 </Steps>
 
 ### Libretto Cloud CLI
 
 <CardGroup cols={3}>
-  <Card title="Authentication" icon="key" href="/libretto-cloud/authentication">
+  <Card title="Authentication" icon="key" href="/libretto-cloud-hosting/authentication">
     Sign in, invite teammates, and issue API keys.
   </Card>
 
-  <Card title="Deployments" icon="rocket" href="/libretto-cloud/deployments">
+  <Card title="Deployments" icon="rocket" href="/libretto-cloud-hosting/deployments">
     Deploy workflow bundles and investigate hosted failures.
   </Card>
 
-  <Card title="Billing" icon="credit-card" href="/libretto-cloud/billing">
+  <Card title="Billing" icon="credit-card" href="/libretto-cloud-hosting/billing">
     Check plan status and manage payment details.
   </Card>
 

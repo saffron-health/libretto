@@ -94,26 +94,24 @@
         ]
       },
       {
-        "group": "Hosting",
+        "group": "Libretto Cloud Hosting",
         "pages": [
-          "hosting/introduction",
-          "hosting/gcp",
-          "hosting/aws"
+          "libretto-cloud-hosting/overview",
+          "libretto-cloud-hosting/authentication",
+          "libretto-cloud-hosting/deployments",
+          "libretto-cloud-hosting/billing"
         ]
       },
       {
-        "group": "Libretto Cloud",
-        "hidden": true,
+        "group": "Self-hosting",
         "pages": [
-          "libretto-cloud/overview",
-          "libretto-cloud/authentication",
-          "libretto-cloud/deployments",
-          "libretto-cloud/billing"
+          "self-hosting/introduction",
+          "self-hosting/gcp",
+          "self-hosting/aws"
         ]
       },
       {
         "group": "Libretto Cloud API",
-        "hidden": true,
         "pages": [
           "libretto-cloud-api/overview",
           "libretto-cloud-api/authentication",
