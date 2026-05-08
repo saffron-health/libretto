@@ -878,9 +878,14 @@ function createProviderStartupCleanup(args: {
   const requestClose = (reason: string): void => {
     if (disposed) return;
     disposed = true;
+    // Startup cancellation should preserve the signal-style exit code even if
+    // provider.createSession() later rejects through the normal startup path.
     process.exitCode = reason === "received SIGINT" ? 130 : 1;
     const providerSession = args.getProviderSession();
     if (!providerSession) {
+      // If cancellation lands while createSession() is still awaiting provider
+      // capacity, provider-specific signal handlers may still need a tick to
+      // close a queued session id that this daemon has not received yet.
       fallbackExit = setTimeout(() => {
         process.exit(process.exitCode);
       }, 5_000);
@@ -900,6 +905,8 @@ function createProviderStartupCleanup(args: {
   const onSigint = (): void => requestClose("received SIGINT");
   const onSigterm = (): void => requestClose("received SIGTERM");
 
+  // These handlers only cover the pre-ready window. Once the daemon is ready,
+  // normal shutdown owns provider cleanup through BrowserDaemon.shutdown().
   if (typeof process.send === "function") {
     process.once("disconnect", onDisconnect);
   }
