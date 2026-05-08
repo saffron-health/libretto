@@ -26,6 +26,10 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 - Library API: [workflow](https://libretto.sh/library-api/workflow), [AI extraction](https://libretto.sh/library-api/ai-extraction), [network requests](https://libretto.sh/library-api/network-requests), [file downloads](https://libretto.sh/library-api/file-downloads)
 - Hosting: [introduction](https://libretto.sh/hosting/introduction), [GCP](https://libretto.sh/hosting/gcp), [AWS](https://libretto.sh/hosting/aws)
 
+## Hosted Cloud Platform
+
+For the hosted Libretto Cloud platform's APIs and documentation, fetch [https://libretto.sh/docs/llms.txt](https://libretto.sh/docs/llms.txt) and follow the relevant page links.
+
 ## Default Integration Approach
 
 - Prefer network requests first for new integrations unless the user explicitly asks for Playwright or UI automation, then do not use the site's internal API.
