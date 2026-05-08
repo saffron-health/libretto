@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import {
   createServer,
   createConnection,
@@ -6,7 +6,6 @@ import {
   type Socket,
 } from "node:net";
 import { dirname } from "node:path";
-import { mkdir } from "node:fs/promises";
 import type { IpcProtocolMessage, IpcTransport } from "./ipc.js";
 
 function createJsonSocketTransport(
@@ -109,13 +108,12 @@ export async function listenOnIpcSocket(
   server: Server,
   socketPath: string,
 ): Promise<void> {
-  await mkdir(dirname(socketPath), { recursive: true });
-  await rm(socketPath, { force: true });
+  await prepareIpcSocketPath(socketPath);
 
   const originalClose = server.close.bind(server);
   server.close = ((callback?: (error?: Error) => void) => {
     return originalClose((error?: Error) => {
-      void rm(socketPath, { force: true }).finally(() => callback?.(error));
+      void removeStaleSocketFile(socketPath).finally(() => callback?.(error));
     });
   }) as Server["close"];
 
@@ -133,6 +131,23 @@ export async function listenOnIpcSocket(
     server.once("listening", onListening);
     server.listen(socketPath);
   });
+}
+
+export function isWindowsNamedPipePath(socketPath: string): boolean {
+  return socketPath.startsWith("\\\\.\\pipe\\");
+}
+
+async function prepareIpcSocketPath(socketPath: string): Promise<void> {
+  if (isWindowsNamedPipePath(socketPath)) return;
+
+  await mkdir(dirname(socketPath), { recursive: true });
+  await removeStaleSocketFile(socketPath);
+}
+
+async function removeStaleSocketFile(socketPath: string): Promise<void> {
+  if (isWindowsNamedPipePath(socketPath)) return;
+
+  await rm(socketPath, { force: true });
 }
 
 async function connectSocket(socketPath: string): Promise<Socket> {

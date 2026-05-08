@@ -3,6 +3,7 @@ import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { openSync, closeSync } from "node:fs";
 import { createRequire } from "node:module";
+import { homedir, userInfo } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createIpcPeer, type IpcPeer } from "../../../shared/ipc/ipc.js";
 import { connectToIpcSocket } from "../../../shared/ipc/socket-transport.js";
@@ -157,18 +158,43 @@ export type DaemonClientSpawnResult = {
 // ---------------------------------------------------------------------------
 
 /**
- * Deterministic Unix domain socket path for a given session.
+ * Deterministic IPC endpoint for a given session.
  *
- * The path lives in `/tmp` to stay well under the macOS 104-byte Unix socket
- * path limit. The hash combines `REPO_ROOT` and the session name so different
- * repos (or sessions within the same repo) never collide.
+ * Unix-like platforms use a socket path in `/tmp` to stay well under the macOS
+ * 104-byte Unix socket path limit. Windows uses a named pipe path because
+ * filesystem Unix domain socket paths are not portable there.
+ *
+ * The hash combines `REPO_ROOT`, the session name, and a user key so different
+ * repos, sessions, or local users never collide.
  */
-export function getDaemonSocketPath(session: string): string {
+export function getDaemonSocketPath(
+  session: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const userKey = getDaemonUserKey();
   const hash = createHash("sha256")
-    .update(`${REPO_ROOT}:${session}`)
+    .update(`${REPO_ROOT}:${session}:${userKey}`)
     .digest("hex")
     .slice(0, 12);
-  return `/tmp/libretto-${process.getuid!()}-${hash}.sock`;
+
+  if (platform === "win32") {
+    return `\\\\.\\pipe\\libretto-${hash}`;
+  }
+
+  return `/tmp/libretto-${userKey}-${hash}.sock`;
+}
+
+function getDaemonUserKey(): string {
+  if (typeof process.getuid === "function") return String(process.getuid());
+
+  try {
+    const info = userInfo();
+    if (info.username) return info.username;
+  } catch {
+    // Fall back below.
+  }
+
+  return createHash("sha256").update(homedir()).digest("hex").slice(0, 12);
 }
 
 // ---------------------------------------------------------------------------
