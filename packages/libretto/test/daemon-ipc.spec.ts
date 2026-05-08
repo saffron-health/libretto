@@ -151,6 +151,54 @@ describe("daemon IPC", () => {
     expect(result.stdout).toContain("Frame Heading");
   }, 45_000);
 
+  test("exec stdin waits for every complete statement before resolving", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-stdin-all-statements";
+    const url = await writeFixturePage(
+      workspacePath,
+      "stdin-all-statements",
+      "Multi Statement Test",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec - --session ${session}`,
+      undefined,
+      `console.log('first statement');
+console.log('second statement');
+await page.title();
+`,
+    );
+    expect(result.stdout).toContain("first statement");
+    expect(result.stdout).toContain("second statement");
+    expect(result.stdout).toContain("Multi Statement Test");
+  }, 45_000);
+
+  test("exec stdin reports errors after earlier complete statements", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-stdin-late-error";
+    const url = await writeFixturePage(
+      workspacePath,
+      "stdin-late-error",
+      "Late Error Test",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec - --session ${session}`,
+      undefined,
+      `console.log('before late error');
+throw new Error('expected late exec failure');
+`,
+    );
+    expect(result.stdout).toContain("before late error");
+    expect(result.stderr).toContain("expected late exec failure");
+  }, 45_000);
+
   test("exec rejects top-level return with REPL-style guidance", async ({
     librettoCli,
     workspacePath,

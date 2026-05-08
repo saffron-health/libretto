@@ -1,5 +1,6 @@
 import * as repl from "node:repl";
 import { PassThrough } from "node:stream";
+import { format, formatWithOptions, type InspectOptions } from "node:util";
 import { stripTypeScriptExecCode } from "../exec-compiler.js";
 
 const PROMPT = "__LIBRETTO_EXEC_REPL_READY__";
@@ -28,6 +29,7 @@ export type DaemonExecReplResponse = DaemonExecReplResult | DaemonExecReplFailur
 
 type ActiveEval = {
   output: string;
+  consoleOutput: ReplOutput;
   resolve: (value: DaemonExecReplResponse) => void;
 };
 
@@ -76,10 +78,28 @@ function appendTopLevelReturnHint(error: unknown): Error {
   return new SyntaxError(`${message}\n\n${TOP_LEVEL_RETURN_HINT}`);
 }
 
-function getEvalStdout(output: string): string {
-  const promptIndex = output.indexOf(PROMPT);
-  const beforePrompt = promptIndex === -1 ? output : output.slice(0, promptIndex);
-  return beforePrompt.endsWith("\n") ? beforePrompt.slice(0, -1) : beforePrompt;
+function createBufferedConsole(): { console: Console; output: ReplOutput } {
+  const output: ReplOutput = { stdout: "", stderr: "" };
+  const writeStdout = (...args: unknown[]) => {
+    output.stdout += `${format(...args)}\n`;
+  };
+  const writeStderr = (...args: unknown[]) => {
+    output.stderr += `${format(...args)}\n`;
+  };
+
+  const bufferedConsole = {
+    ...globalThis.console,
+    log: writeStdout,
+    info: writeStdout,
+    debug: writeStdout,
+    dir: (value?: unknown, options?: InspectOptions) => {
+      output.stdout += `${formatWithOptions(options ?? {}, value)}\n`;
+    },
+    warn: writeStderr,
+    error: writeStderr,
+  } satisfies Console;
+
+  return { console: bufferedConsole, output };
 }
 
 export class DaemonExecRepl {
@@ -102,7 +122,7 @@ export class DaemonExecRepl {
       prompt: PROMPT,
       input: this.input,
       output: this.output,
-      terminal: false,
+      terminal: true,
       useGlobal: false,
       writer: (value: unknown) => {
         this.lastResult = value;
@@ -132,10 +152,12 @@ export class DaemonExecRepl {
     }
 
     await this.ready;
+    const buffered = createBufferedConsole();
+    Object.assign(this.replServer.context, { console: buffered.console });
     return await new Promise<DaemonExecReplResponse>((resolve) => {
-      this.activeEval = { output: "", resolve };
+      this.activeEval = { output: "", consoleOutput: buffered.output, resolve };
       this.lastResult = NO_RESULT;
-      this.input.write(`${jsCode}\n`);
+      this.input.write(`.editor\n${jsCode}\n\x04`);
     });
   }
 
@@ -154,7 +176,7 @@ export class DaemonExecRepl {
 
     this.activeEval = undefined;
     const result = this.lastResult === NO_RESULT ? undefined : this.lastResult;
-    const output = { stdout: getEvalStdout(active.output), stderr: "" };
+    const output = active.consoleOutput;
     if (isErrorLike(result)) {
       const error = isTopLevelReturnError(result)
         ? appendTopLevelReturnHint(result)
