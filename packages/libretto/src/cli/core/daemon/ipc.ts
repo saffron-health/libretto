@@ -337,6 +337,8 @@ export class DaemonClient {
         child.off("message", onMessage);
         child.off("error", onError);
         child.off("exit", onChildExit);
+        process.off("SIGINT", onParentSigint);
+        process.off("SIGTERM", onParentSigterm);
       };
 
       const fail = (error: Error): void => {
@@ -376,9 +378,22 @@ export class DaemonClient {
         fail(formatExitError(code, signal));
       };
 
+      const forwardSignalToChild = (signal: NodeJS.Signals): void => {
+        try {
+          child.kill(signal);
+        } catch {
+          // Child may have already exited.
+        }
+      };
+
+      const onParentSigint = (): void => forwardSignalToChild("SIGINT");
+      const onParentSigterm = (): void => forwardSignalToChild("SIGTERM");
+
       child.on("message", onMessage);
       child.on("error", onError);
       child.on("exit", onChildExit);
+      process.once("SIGINT", onParentSigint);
+      process.once("SIGTERM", onParentSigterm);
     });
   }
 

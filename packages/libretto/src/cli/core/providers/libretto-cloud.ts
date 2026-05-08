@@ -1,4 +1,4 @@
-import { HOSTED_API_URL } from "../auth-fetch.js";
+import { resolveHostedApiUrl } from "../auth-fetch.js";
 import type { ProviderApi } from "./types.js";
 
 type CloudSessionResponse = {
@@ -10,7 +10,7 @@ type CloudSessionResponse = {
 };
 
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
-const DEFAULT_BROWSER_SESSION_TIMEOUT_SECONDS = 7_200;
+const DEFAULT_BROWSER_SESSION_TIMEOUT_SECONDS = 3_600;
 const QUEUE_WAIT_TIMEOUT_MS = 10 * 60_000;
 
 export function createLibrettoCloudProvider(): ProviderApi {
@@ -19,7 +19,7 @@ export function createLibrettoCloudProvider(): ProviderApi {
     throw new Error(
       "LIBRETTO_API_KEY is required for the Libretto Cloud provider.",
     );
-  const endpoint = HOSTED_API_URL;
+  const endpoint = resolveHostedApiUrl();
 
   // The Libretto Cloud API is an oRPC RPCHandler, not plain REST, so inputs
   // must be wrapped as { json: ... } and outputs arrive the same way.
