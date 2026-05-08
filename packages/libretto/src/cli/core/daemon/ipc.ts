@@ -105,6 +105,11 @@ export type DaemonStartupErrorMessage = {
   message: string;
 };
 
+export type DaemonStartupStatusMessage = {
+  type: "startup-status";
+  message: string;
+};
+
 function isDaemonReadyMessage(message: unknown): message is DaemonReadyMessage {
   if (typeof message !== "object" || message === null) return false;
   const candidate = message as { type?: unknown; socketPath?: unknown };
@@ -118,6 +123,16 @@ function isDaemonStartupErrorMessage(
   const candidate = message as { type?: unknown; message?: unknown };
   return (
     candidate.type === "startup-error" && typeof candidate.message === "string"
+  );
+}
+
+function isDaemonStartupStatusMessage(
+  message: unknown,
+): message is DaemonStartupStatusMessage {
+  if (typeof message !== "object" || message === null) return false;
+  const candidate = message as { type?: unknown; message?: unknown };
+  return (
+    candidate.type === "startup-status" && typeof candidate.message === "string"
   );
 }
 
@@ -257,6 +272,13 @@ export class DaemonClient {
       onExit: (code, signal, ready) => {
         logger.warn("daemon-exit", { code, signal, session, pid, ready });
       },
+      onStatus: (message) => {
+        logger.info("daemon-startup-status", {
+          session,
+          message: message.message,
+        });
+        console.log(message.message);
+      },
     }).catch(async (error: unknown) => {
       try {
         process.kill(pid, "SIGTERM");
@@ -292,6 +314,7 @@ export class DaemonClient {
       signal: NodeJS.Signals | null,
       ready: boolean,
     ) => void;
+    onStatus?: (message: DaemonStartupStatusMessage) => void;
   }): Promise<DaemonReadyMessage> {
     const {
       child,
@@ -302,6 +325,7 @@ export class DaemonClient {
       onReady,
       onSpawnError,
       onExit,
+      onStatus,
     } = args;
 
     return new Promise<DaemonReadyMessage>((resolve, reject) => {
@@ -313,6 +337,8 @@ export class DaemonClient {
         child.off("message", onMessage);
         child.off("error", onError);
         child.off("exit", onChildExit);
+        process.off("SIGINT", onParentSigint);
+        process.off("SIGTERM", onParentSigterm);
       };
 
       const fail = (error: Error): void => {
@@ -325,6 +351,10 @@ export class DaemonClient {
       const onMessage = (message: unknown): void => {
         if (isDaemonStartupErrorMessage(message)) {
           fail(new Error(message.message));
+          return;
+        }
+        if (isDaemonStartupStatusMessage(message)) {
+          onStatus?.(message);
           return;
         }
         if (!isDaemonReadyMessage(message)) return;
@@ -348,9 +378,22 @@ export class DaemonClient {
         fail(formatExitError(code, signal));
       };
 
+      const forwardSignalToChild = (signal: NodeJS.Signals): void => {
+        try {
+          child.kill(signal);
+        } catch {
+          // Child may have already exited.
+        }
+      };
+
+      const onParentSigint = (): void => forwardSignalToChild("SIGINT");
+      const onParentSigterm = (): void => forwardSignalToChild("SIGTERM");
+
       child.on("message", onMessage);
       child.on("error", onError);
       child.on("exit", onChildExit);
+      process.once("SIGINT", onParentSigint);
+      process.once("SIGTERM", onParentSigterm);
     });
   }
 
