@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/fallow.schema.json",
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "ignorePatterns": ["docs/**", "specs/**", "apps/website/docs/**"],
   "duplicates": {
     "enabled": false,
