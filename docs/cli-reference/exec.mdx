@@ -2,12 +2,14 @@
 title: exec
 ---
 
-> Execute Playwright TypeScript code against the open browser page.
+> Execute Playwright TypeScript in a persistent REPL for an open browser page.
 
 The `exec` command runs TypeScript Playwright code against a live browser session. Use it to validate selectors, inspect page data, prototype individual steps, and experiment with interactions before encoding them in a workflow file.
 
+`exec` evaluates code in a persistent REPL scoped to the browser session. Values come from expressions, top-level `await` is supported, and declarations remain available to later `exec` calls in the same session.
+
 ```bash theme={null}
-npx libretto exec --session debug-example "return await page.url()"
+npx libretto exec --session debug-example "await page.url()"
 ```
 
 ### Usage
@@ -17,8 +19,8 @@ npx libretto exec --session debug-example "return await page.url()"
     Pass the code as a quoted string argument:
 
     ```bash  theme={null}
-    npx libretto exec --session debug-example "return await page.url()"
-    npx libretto exec --session debug-example "return await page.locator('button').count()"
+    npx libretto exec --session debug-example "await page.url()"
+    npx libretto exec --session debug-example "await page.locator('button').count()"
     npx libretto exec --session debug-example "await page.locator('button:has-text(\"Continue\")').click()"
     ```
 
@@ -28,19 +30,23 @@ npx libretto exec --session debug-example "return await page.url()"
     Pipe code into `exec -` for complex or multi-line scripts:
 
     ```bash  theme={null}
-    echo "return await page.url()" | npx libretto exec - --session debug-example
+    echo "await page.url()" | npx libretto exec - --session debug-example
     ```
 
     ```bash  theme={null}
     cat <<'EOF' | npx libretto exec - --session debug-example
-    const rows = await page.locator('table tbody tr').all();
-    const data = [];
-    for (const row of rows) {
-      const cells = await row.locator('td').allTextContents();
-      data.push(cells);
+    async function tableRows(selector: string) {
+      const rows = await page.locator(`${selector} tbody tr`).all();
+      const data = [];
+      for (const row of rows) {
+        const cells = await row.locator('td').allTextContents();
+        data.push(cells);
+      }
+      return data;
     }
-    return data;
     EOF
+
+    npx libretto exec --session debug-example "await tableRows('table')"
     ```
 
   </Tab>
@@ -50,22 +56,36 @@ npx libretto exec --session debug-example "return await page.url()"
 
 Inside the code you pass to `exec`, these variables are available without any imports:
 
-| Global          | Type                      | Description                                 |
-| --------------- | ------------------------- | ------------------------------------------- |
-| `page`          | `Page`                    | The active Playwright page                  |
-| `context`       | `BrowserContext`          | The browser context for the session         |
-| `browser`       | `Browser`                 | The browser instance                        |
-| `state`         | `Record<string, unknown>` | A mutable object scoped to this `exec` call |
-| `fetch`         | `typeof fetch`            | The global fetch function                   |
-| `Buffer`        | `typeof Buffer`           | Node.js `Buffer`                            |
-| `networkLog`    | `function`                | Read captured network log entries           |
-| `actionLog`     | `function`                | Read captured action log entries            |
-| `console`       | `Console`                 | Standard console (`log`, `warn`, `error`)   |
-| `setTimeout`    | `function`                | Schedule a callback after a delay           |
-| `setInterval`   | `function`                | Schedule a repeating callback               |
-| `clearTimeout`  | `function`                | Cancel a scheduled `setTimeout`             |
-| `clearInterval` | `function`                | Cancel a scheduled `setInterval`            |
-| `URL`           | `typeof URL`              | The WHATWG `URL` constructor                |
+| Global          | Type             | Description                               |
+| --------------- | ---------------- | ----------------------------------------- |
+| `page`          | `Page`           | The active Playwright page                |
+| `frame`         | `Frame`          | The active page's main frame              |
+| `context`       | `BrowserContext` | The browser context for the session       |
+| `browser`       | `Browser`        | The browser instance                      |
+| `fetch`         | `typeof fetch`   | The global fetch function                 |
+| `Buffer`        | `typeof Buffer`  | Node.js `Buffer`                          |
+| `console`       | `Console`        | Standard console (`log`, `warn`, `error`) |
+| `setTimeout`    | `function`       | Schedule a callback after a delay         |
+| `setInterval`   | `function`       | Schedule a repeating callback             |
+| `clearTimeout`  | `function`       | Cancel a scheduled `setTimeout`           |
+| `clearInterval` | `function`       | Cancel a scheduled `setInterval`          |
+| `URL`           | `typeof URL`     | The WHATWG `URL` constructor              |
+
+### Persistent REPL
+
+Each browser session has a persistent `exec` REPL. Define helper functions once, then reuse them in later calls:
+
+```bash theme={null}
+cat <<'EOF' | npx libretto exec - --session debug-example
+async function textOf(selector: string) {
+  return await page.locator(selector).textContent();
+}
+EOF
+
+npx libretto exec --session debug-example "await textOf('h1')"
+```
+
+The `page` and `frame` globals are refreshed for each call, including calls that use `--page <page-id>`.
 
 ### Flags
 
@@ -89,17 +109,17 @@ Inside the code you pass to `exec`, these variables are available without any im
 
 ### Return values
 
-If the code returns a value, `exec` prints it to stdout:
+If the code evaluates to a value, `exec` prints it to stdout:
 
 - Strings are printed as-is.
 - All other values are printed as pretty-printed JSON.
-- If the code returns nothing (`undefined`), `exec` prints `Executed successfully`.
+- If the code evaluates to `undefined`, `exec` prints `Executed successfully`.
 
 ```bash theme={null}
-npx libretto exec --session debug-example "return await page.title()"
+npx libretto exec --session debug-example "await page.title()"
 # My Page Title
 
-npx libretto exec --session debug-example "return await page.locator('li').count()"
+npx libretto exec --session debug-example "await page.locator('li').count()"
 # 12
 ```
 
@@ -120,30 +140,28 @@ npx libretto exec --session debug-example "return await page.locator('li').count
 - Use `exec -` (stdin) for complex multi-line scripts.
 - Validate a selector with `exec` before encoding it in a workflow file.
 - Use `exec` to prototype a single step, then move the working code into your `.ts` workflow file.
+- Do not use top-level `return`; write the expression you want to inspect.
 
 ### Examples
 
 ```bash theme={null}
-# Return the current URL
-npx libretto exec --session debug-example "return await page.url()"
+# Print the current URL
+npx libretto exec --session debug-example "await page.url()"
 
 # Count how many buttons are on the page
-npx libretto exec --session debug-example "return await page.locator('button').count()"
+npx libretto exec --session debug-example "await page.locator('button').count()"
 
 # Click a button
 npx libretto exec --session debug-example "await page.locator('button:has-text(\"Continue\")').click()"
 
 # Read a value from an input field
-npx libretto exec --session debug-example "return await page.locator('input[name=\"email\"]').inputValue()"
-
-# Run against a named session
-npx libretto exec --session debug-example "return await page.url()"
+npx libretto exec --session debug-example "await page.locator('input[name=\"email\"]').inputValue()"
 
 # Run against a specific page in a session
-npx libretto exec --session debug-example --page <page-id> "return await page.url()"
+npx libretto exec --session debug-example --page <page-id> "await page.url()"
 
 # Pipe from stdin (multi-line, named session)
-echo "return await page.url()" | npx libretto exec - --session debug-example
+echo "await page.url()" | npx libretto exec - --session debug-example
 ```
 
 <CardGroup cols={2}>

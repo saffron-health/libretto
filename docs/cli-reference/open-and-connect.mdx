@@ -181,7 +181,7 @@ npx libretto snapshot \
   --context "Just attached to a running browser."
 
 # Run code against it
-npx libretto exec --session chrome-debug "return await page.url()"
+npx libretto exec --session chrome-debug "await page.url()"
 ```
 
 <CardGroup cols={2}>

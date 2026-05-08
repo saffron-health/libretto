@@ -88,7 +88,7 @@ npx libretto snapshot \
   --context "The workflow failed after trying to continue from the review step."
 
 # Prototype a fix
-npx libretto exec --session debug-flow "return await page.locator('.error-message').textContent()"
+npx libretto exec --session debug-flow "await page.locator('.error-message').textContent()"
 
 # Re-run after fixing the code
 npx libretto run ./integration.ts --headless
@@ -190,7 +190,7 @@ export default workflow("myWorkflow", async (ctx, input) => {
       --objective "What is on the page and what is the next required action?" \
       --context "The workflow paused before the submit step."
 
-    npx libretto exec --session debug-flow "return await page.url()"
+    npx libretto exec --session debug-flow "await page.url()"
     ```
 
   </Step>
