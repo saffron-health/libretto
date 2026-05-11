@@ -54,21 +54,21 @@
         ]
       },
       {
-        "group": "Fundamentals",
-        "pages": [
-          "fundamentals/core-concepts",
-          "fundamentals/how-workflow-generation-works",
-          "fundamentals/automation-and-bot-detection",
-          "fundamentals/website-authentication"
-        ]
-      },
-      {
         "group": "Workflow guides",
         "pages": [
           "workflow-guides/one-shot-workflow-generation",
           "workflow-guides/interactive-workflow-building",
           "workflow-guides/debugging-workflows",
           "workflow-guides/convert-to-network-requests"
+        ]
+      },
+      {
+        "group": "Fundamentals",
+        "pages": [
+          "fundamentals/core-concepts",
+          "fundamentals/how-workflow-generation-works",
+          "fundamentals/automation-and-bot-detection",
+          "fundamentals/website-authentication"
         ]
       },
       {
@@ -94,16 +94,7 @@
         ]
       },
       {
-        "group": "Hosting",
-        "pages": [
-          "hosting/introduction",
-          "hosting/gcp",
-          "hosting/aws"
-        ]
-      },
-      {
         "group": "Libretto Cloud",
-        "hidden": true,
         "pages": [
           "libretto-cloud/overview",
           "libretto-cloud/authentication",
@@ -112,8 +103,21 @@
         ]
       },
       {
+        "group": "Hosting",
+        "pages": [
+          "hosting/introduction",
+          "hosting/gcp",
+          "hosting/aws"
+        ]
+      },
+      {
+        "group": "Alternative providers",
+        "pages": [
+          "alternative-providers/overview"
+        ]
+      },
+      {
         "group": "Libretto Cloud API",
-        "hidden": true,
         "pages": [
           "libretto-cloud-api/overview",
           "libretto-cloud-api/authentication",
