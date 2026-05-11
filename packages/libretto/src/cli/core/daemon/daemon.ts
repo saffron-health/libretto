@@ -63,6 +63,7 @@ import {
 } from "../browser.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
+import { DaemonExecRepl } from "./exec-repl.js";
 import { handleCompactSnapshot } from "./snapshot.js";
 import { librettoCommand } from "../../../shared/package-manager.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
@@ -82,7 +83,7 @@ import {
 } from "./config.js";
 import type { Experiments } from "../experiments.js";
 import { getCloudProviderApi } from "../providers/index.js";
-import type { ProviderApi } from "../providers/types.js";
+import type { ProviderApi, ProviderSession } from "../providers/types.js";
 import {
   getAbsoluteIntegrationPath,
   loadDefaultWorkflow,
@@ -160,7 +161,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 
 class BrowserDaemon {
   readonly logger: LoggerApi;
-  private readonly execState: Record<string, unknown> = {};
+  private readonly execRepl: DaemonExecRepl;
   private readonly pageById = new Map<string, Page>();
   private readonly shutdownHandlers: ShutdownHandler[] = [];
   private readonly connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
@@ -183,6 +184,10 @@ class BrowserDaemon {
     },
   ) {
     this.logger = logger.withScope("child");
+    this.execRepl = new DaemonExecRepl({
+      browser: this.browser,
+      context: this.context,
+    });
   }
 
   private trackPage(page: Page): string {
@@ -230,6 +235,7 @@ class BrowserDaemon {
       name: string;
       sessionId: string;
     };
+    beforeReady?: () => void;
   }): Promise<BrowserDaemon> {
     const {
       session,
@@ -242,6 +248,7 @@ class BrowserDaemon {
       navigateUrl,
       readyProvider,
       providerSession,
+      beforeReady,
     } = args;
 
     await mkdir(getSessionDir(session), { recursive: true });
@@ -346,6 +353,7 @@ class BrowserDaemon {
     });
 
     await listenOnIpcSocket(ipcServer, socketPath);
+    beforeReady?.();
     process.send?.({ type: "ready", socketPath, provider: readyProvider });
     daemon.logger.info("ipc-server-listening", { socketPath });
 
@@ -471,8 +479,13 @@ class BrowserDaemon {
   }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
     const provider = getCloudProviderApi(config.providerName);
-    const providerSession = await provider.createSession();
+    let providerSession: ProviderSession | undefined;
+    const startupCleanup = createProviderStartupCleanup({
+      provider,
+      getProviderSession: () => providerSession,
+    });
     try {
+      providerSession = await provider.createSession();
       const browser = await chromium.connectOverCDP(
         providerSession.cdpEndpoint,
       );
@@ -506,6 +519,7 @@ class BrowserDaemon {
           name: config.providerName,
           sessionId: providerSession.sessionId,
         },
+        beforeReady: startupCleanup.dispose,
       });
 
       daemon.logger.info("child-provider-connected", {
@@ -518,7 +532,10 @@ class BrowserDaemon {
 
       return daemon;
     } catch (error) {
-      await provider.closeSession(providerSession.sessionId);
+      startupCleanup.dispose();
+      if (providerSession) {
+        await provider.closeSession(providerSession.sessionId);
+      }
       throw error;
     }
   }
@@ -713,10 +730,7 @@ class BrowserDaemon {
         const result = await handleExec(
           page,
           args.code,
-          this.context,
-          this.browser,
-          this.execState,
-          this.session,
+          this.execRepl,
           args.visualize,
         );
 
@@ -856,6 +870,62 @@ class BrowserDaemon {
   }
 }
 
+function createProviderStartupCleanup(args: {
+  provider: ProviderApi;
+  getProviderSession: () => ProviderSession | undefined;
+}): { dispose: () => void } {
+  let disposed = false;
+  let fallbackExit: NodeJS.Timeout | undefined;
+
+  const requestClose = (reason: string): void => {
+    if (disposed) return;
+    disposed = true;
+    // Startup cancellation should preserve the signal-style exit code even if
+    // provider.createSession() later rejects through the normal startup path.
+    process.exitCode = reason === "received SIGINT" ? 130 : 1;
+    const providerSession = args.getProviderSession();
+    if (!providerSession) {
+      // If cancellation lands while createSession() is still awaiting provider
+      // capacity, provider-specific signal handlers may still need a tick to
+      // close a queued session id that this daemon has not received yet.
+      fallbackExit = setTimeout(() => {
+        process.exit(process.exitCode);
+      }, 5_000);
+      fallbackExit.unref();
+      return;
+    }
+
+    void args.provider
+      .closeSession(providerSession.sessionId)
+      .catch(() => {})
+      .finally(() => {
+        process.exit(reason === "received SIGINT" ? 130 : 1);
+      });
+  };
+
+  const onDisconnect = (): void => requestClose("parent command disconnected");
+  const onSigint = (): void => requestClose("received SIGINT");
+  const onSigterm = (): void => requestClose("received SIGTERM");
+
+  // These handlers only cover the pre-ready window. Once the daemon is ready,
+  // normal shutdown owns provider cleanup through BrowserDaemon.shutdown().
+  if (typeof process.send === "function") {
+    process.once("disconnect", onDisconnect);
+  }
+  process.once("SIGINT", onSigint);
+  process.once("SIGTERM", onSigterm);
+
+  return {
+    dispose: () => {
+      disposed = true;
+      if (fallbackExit) clearTimeout(fallbackExit);
+      process.off("disconnect", onDisconnect);
+      process.off("SIGINT", onSigint);
+      process.off("SIGTERM", onSigterm);
+    },
+  };
+}
+
 // ── Main ───────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -957,7 +1027,9 @@ function reportStartupError(error: unknown): never {
       message: error.message,
     });
   }
-  process.exit(1);
+  process.exit(
+    process.exitCode && process.exitCode !== 0 ? process.exitCode : 1,
+  );
 }
 
 try {

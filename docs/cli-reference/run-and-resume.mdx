@@ -85,7 +85,7 @@ npx libretto run ./integration.ts --session debug-flow --headed
 npx libretto snapshot --session debug-flow
 
 # Prototype a fix
-npx libretto exec --session debug-flow "return await page.locator('.error-message').textContent()"
+npx libretto exec --session debug-flow "await page.locator('.error-message').textContent()"
 
 # Re-run after fixing the code
 npx libretto run ./integration.ts --headless
@@ -184,7 +184,7 @@ export default workflow("myWorkflow", async (ctx, input) => {
     ```bash  theme={null}
     npx libretto snapshot --session debug-flow
 
-    npx libretto exec --session debug-flow "return await page.url()"
+    npx libretto exec --session debug-flow "await page.url()"
     ```
 
   </Step>

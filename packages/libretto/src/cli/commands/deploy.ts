@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { HOSTED_API_URL } from "../core/auth-fetch.js";
+import { resolveHostedApiUrl } from "../core/auth-fetch.js";
 import { buildHostedDeployTarball } from "../core/deploy-artifact.js";
 import { SimpleCLI } from "../framework/simple-cli.js";
 
@@ -28,7 +28,7 @@ function getConfig() {
     );
   }
 
-  return { apiUrl: HOSTED_API_URL, apiKey };
+  return { apiUrl: resolveHostedApiUrl(), apiKey };
 }
 
 async function postJson(

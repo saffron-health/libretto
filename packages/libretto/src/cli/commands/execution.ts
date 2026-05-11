@@ -29,7 +29,10 @@ import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { librettoCommand } from "../../shared/package-manager.js";
 import { renderSnapshotDiff } from "../../shared/snapshot/diff-snapshots.js";
-import { resolveProviderName } from "../core/providers/index.js";
+import {
+  getProviderStartupTimeoutMs,
+  resolveProviderName,
+} from "../core/providers/index.js";
 import { getAbsoluteIntegrationPath } from "../core/workflow-runtime.js";
 import {
   compileExecFunction,
@@ -609,7 +612,7 @@ async function runIntegrationFromFile(
     },
     logger,
     logPath: runLogPath,
-    startupTimeoutMs: 60_000,
+    startupTimeoutMs: getProviderStartupTimeoutMs(args.providerName),
     handlers,
   });
 

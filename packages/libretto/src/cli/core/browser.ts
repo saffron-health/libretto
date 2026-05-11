@@ -9,13 +9,17 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createServer } from "node:net";
+import { isWindowsNamedPipePath } from "../../shared/ipc/socket-transport.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import type { Experiments } from "./experiments.js";
 import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import { librettoCommand } from "../../shared/package-manager.js";
-import { getCloudProviderApi } from "./providers/index.js";
+import {
+  getCloudProviderApi,
+  getProviderStartupTimeoutMs,
+} from "./providers/index.js";
 import {
   assertSessionAvailableForStart,
   clearSessionState,
@@ -548,8 +552,8 @@ export async function runOpenWithProvider(
     },
     logger,
     logPath: runLogPath,
-    // Remote CDP connection + navigation; must cover both.
-    startupTimeoutMs: 60_000,
+    // Remote provider creation can wait for cloud capacity before CDP exists.
+    startupTimeoutMs: getProviderStartupTimeoutMs(providerName),
   });
   client.destroy();
 
@@ -974,6 +978,8 @@ function unlinkDaemonSocket(
   session: string,
 ): void {
   if (!socketPath) return;
+  if (isWindowsNamedPipePath(socketPath)) return;
+
   try {
     unlinkSync(socketPath);
   } catch (err) {

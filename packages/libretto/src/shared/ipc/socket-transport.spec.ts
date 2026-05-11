@@ -6,6 +6,7 @@ import { expect, test as base } from "vitest";
 import { createIpcPeer, type IpcPeer } from "./ipc.js";
 import {
   connectToIpcSocket,
+  isWindowsNamedPipePath,
   listenForIpcConnections,
 } from "./socket-transport.js";
 
@@ -62,6 +63,11 @@ test("sends concurrent calls over one socket", async ({ socketPath }) => {
     server.close((error) => (error ? reject(error) : resolve()));
   });
   await expect(stat(socketPath)).rejects.toThrow();
+});
+
+test("recognizes Windows named pipe paths", () => {
+  expect(isWindowsNamedPipePath("\\\\.\\pipe\\libretto-abc123")).toBe(true);
+  expect(isWindowsNamedPipePath("/tmp/libretto-501-abc123.sock")).toBe(false);
 });
 
 test("rejects pending calls when the socket closes", async ({ socketPath }) => {

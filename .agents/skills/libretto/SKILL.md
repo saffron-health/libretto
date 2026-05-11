@@ -113,17 +113,18 @@ npx libretto snapshot --session debug-example --page <page-id>
 - Use `exec` for focused inspection and short-lived interaction experiments.
 - Use `exec` to validate selectors, inspect data, or prototype a step before you encode it in the workflow file.
 - Use `exec -` to run multi-line scripts from stdin, especially when the code is too long or complex for a command line argument.
-- Available globals: `page`, `context`, `browser`, `state`, `fetch`, `Buffer`.
+- The `exec` REPL is persistent for each browser session. Define helper functions once and reuse them in later `exec` calls.
+- Available globals: `page`, `frame`, `context`, `browser`, `fetch`, `Buffer`.
 - Let failures throw. Do not hide `exec` failures with `try/catch` or `.catch()`.
 - Do not run multiple `exec` commands in parallel.
 - Do not use `exec` in read-only diagnosis flows. Use `readonly-exec` from the `libretto-readonly` skill for those sessions.
 - After successful mutations, `exec` prints page-change diffs from compact snapshots.
 
 ```bash
-npx libretto exec "return await page.url()"
-npx libretto exec "return await page.locator('button').count()"
+npx libretto exec "await page.url()"
 npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
-echo "return await page.url()" | npx libretto exec - --session debug-example
+echo "async function textOf(selector) { return await page.locator(selector).textContent(); }" | npx libretto exec - --session debug-example
+npx libretto exec --session debug-example "await textOf('h1')"
 ```
 
 ### `pages`
@@ -133,7 +134,7 @@ echo "return await page.url()" | npx libretto exec - --session debug-example
 
 ```bash
 npx libretto pages --session debug-example
-npx libretto exec --session debug-example --page <page-id> "return await page.url()"
+npx libretto exec --session debug-example --page <page-id> "await page.url()"
 ```
 
 ### `run`
@@ -265,3 +266,4 @@ To watch it yourself in a browser, run: npx libretto run ./integration.ts --head
 - Read `references/auth-profiles.md` when auth-profile behavior is relevant.
 - Read `references/pages-and-page-targeting.md` when a session has multiple open pages or you need `--page`.
 - Read `references/action-logs.md` for full action log field descriptions and user-vs-agent event semantics.
+- If the workflow code is deployed to the Libretto Cloud platform and you need to reference its API docs, fetch [https://libretto.sh/docs/llms.txt](https://libretto.sh/docs/llms.txt) and follow the relevant page links.

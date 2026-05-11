@@ -19,6 +19,13 @@ const stripTypeScriptTypes = (
   moduleBuiltin as { stripTypeScriptTypes?: StripTypeScriptTypesFn }
 ).stripTypeScriptTypes;
 
+export function stripTypeScriptExecCode(code: string): string {
+  if (!stripTypeScriptTypes) return code;
+  return withSuppressedStripTypeScriptWarning(() =>
+    stripTypeScriptTypes(code, { mode: "strip" }),
+  );
+}
+
 export function withSuppressedStripTypeScriptWarning<T>(action: () => T): T {
   type EmitWarningFn = (...args: unknown[]) => void;
   const mutableProcess = process as unknown as { emitWarning: EmitWarningFn };
@@ -66,9 +73,7 @@ export function compileTypeScriptExecFunction(
   if (!stripTypeScriptTypes) return null;
 
   const wrappedSource = `(async function __librettoExec(${helperNames.join(", ")}) {\n${code}\n})`;
-  const jsSource = withSuppressedStripTypeScriptWarning(() =>
-    stripTypeScriptTypes(wrappedSource, { mode: "strip" }),
-  );
+  const jsSource = stripTypeScriptExecCode(wrappedSource);
   const createFunction = new Function(
     `return ${jsSource}`,
   ) as () => ExecFunction;

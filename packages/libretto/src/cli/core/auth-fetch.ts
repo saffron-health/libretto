@@ -11,7 +11,11 @@
 
 import { readAuthState, writeAuthState, type AuthState } from "./auth-storage.js";
 
-export const HOSTED_API_URL = "https://api.libretto.sh";
+export const DEFAULT_HOSTED_API_URL = "https://api.libretto.sh";
+
+export function resolveHostedApiUrl(): string {
+  return process.env.LIBRETTO_API_URL?.trim() || DEFAULT_HOSTED_API_URL;
+}
 
 /**
  * Shared "you have no usable credential" message. Pointed at the two
@@ -41,7 +45,7 @@ export function pickCredential(state: AuthState | null): CredentialChoice {
 }
 
 export function resolveApiUrl(_state: AuthState | null): string {
-  return HOSTED_API_URL;
+  return resolveHostedApiUrl();
 }
 
 type FetchOptions = {

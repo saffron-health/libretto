@@ -47,7 +47,7 @@ npx libretto open https://example.com --headless --session debug-example
 </ParamField>
 
 <ParamField path="--provider, -p" type="string">
-  Browser provider to use. One of `local`, `kernel`, or `browserbase`. Defaults to `local`.
+  Browser provider to use. One of `local`, `kernel`, `browserbase`, or `libretto-cloud`. Defaults to `local`.
 
 **Resolution order:** `--provider` flag → `LIBRETTO_PROVIDER` env var → `provider` field in `.libretto/config.json` → `"local"`.
 
@@ -87,11 +87,12 @@ By default, `open` launches a local Chromium instance. You can instead run the b
 
 #### Available providers
 
-| Provider                 | Value         | Required environment variables                  |
-| ------------------------ | ------------- | ----------------------------------------------- |
-| Local Chromium (default) | `local`       | None                                            |
-| Kernel                   | `kernel`      | `KERNEL_API_KEY`                                |
-| Browserbase              | `browserbase` | `BROWSERBASE_API_KEY`, `BROWSERBASE_PROJECT_ID` |
+| Provider                 | Value             | Required environment variables                  |
+| ------------------------ | ----------------- | ----------------------------------------------- |
+| Local Chromium (default) | `local`           | None                                            |
+| Kernel                   | `kernel`          | `KERNEL_API_KEY`                                |
+| Browserbase              | `browserbase`     | `BROWSERBASE_API_KEY`, `BROWSERBASE_PROJECT_ID` |
+| Libretto Cloud           | `libretto-cloud`  | `LIBRETTO_API_KEY`                              |
 
 #### Configuration
 
@@ -114,6 +115,10 @@ npx libretto open https://example.com --provider kernel
 export BROWSERBASE_API_KEY="your-key"
 export BROWSERBASE_PROJECT_ID="your-project-id"
 npx libretto open https://example.com -p browserbase
+
+# Open with Libretto Cloud
+export LIBRETTO_API_KEY="your-key"
+npx libretto open https://example.com --provider libretto-cloud
 
 # Set provider via config so you don't need the flag every time
 # .libretto/config.json: { "version": 1, "provider": "kernel" }
@@ -178,7 +183,7 @@ npx libretto connect http://127.0.0.1:9222 --session chrome-debug
 npx libretto snapshot --session chrome-debug
 
 # Run code against it
-npx libretto exec --session chrome-debug "return await page.url()"
+npx libretto exec --session chrome-debug "await page.url()"
 ```
 
 <CardGroup cols={2}>

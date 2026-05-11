@@ -577,6 +577,10 @@ export function useKonamiPane() {
 
       const expected = KONAMI_SEQUENCE[konamiIndexRef.current];
       if (e.key === expected) {
+        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+          e.preventDefault();
+        }
+
         const nextIndex = konamiIndexRef.current + 1;
         konamiIndexRef.current = nextIndex;
         setKonamiProgress(
@@ -643,8 +647,8 @@ export function KonamiOverlay({
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className={`inline-flex h-5 items-center justify-center rounded border px-1.5 py-0.5 transition-colors duration-200 ${
               completed
-                ? "border-green-900/20 bg-green-500/15 text-green-950/80"
-                : "border-ink/[0.08] bg-ink/[0.025] text-ink/55"
+                ? "border-green-900/20 bg-green-500/25 text-green-950/80"
+                : "border-ink/[0.08] bg-ink/[0.08] text-ink/55"
             }`}
           >
             {label}
