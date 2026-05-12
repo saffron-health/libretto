@@ -8,7 +8,7 @@ import {
   REPO_ROOT,
 } from "../core/context.js";
 import { librettoCommand } from "../../shared/package-manager.js";
-import { SimpleCLI } from "../framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 
 function installBrowsers(): void {
   console.log("Installing Playwright Chromium...");

@@ -15,7 +15,7 @@
  * Auth: requires a session cookie (or LIBRETTO_API_KEY).
  */
 
-import { SimpleCLI } from "../framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 import {
   NOT_AUTHENTICATED_MESSAGE,
   orpcCall,
@@ -71,7 +71,6 @@ function formatLimit(limit: number | null): string {
 
 export const billingPortalCommand = SimpleCLI.command({
   description: "Open the libretto plans page (current plan + switch options)",
-  experimental: true,
 })
   .handle(async () => {
     const { apiUrl, credential } = await requireAuth();
@@ -97,7 +96,6 @@ export const billingPortalCommand = SimpleCLI.command({
 
 export const billingStatusCommand = SimpleCLI.command({
   description: "Print the current plan, status, and browser-hour usage",
-  experimental: true,
 })
   .handle(async () => {
     const { apiUrl, credential } = await requireAuth();

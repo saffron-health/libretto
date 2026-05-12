@@ -8,7 +8,7 @@ import {
   type ExperimentName,
   type Experiments,
 } from "../core/experiments.js";
-import { SimpleCLI } from "../framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 
 const experimentNames = Object.keys(EXPERIMENTS) as ExperimentName[];
 
