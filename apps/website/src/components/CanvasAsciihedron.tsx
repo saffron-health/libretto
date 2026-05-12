@@ -647,8 +647,8 @@ export function KonamiOverlay({
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className={`inline-flex h-5 items-center justify-center rounded border px-1.5 py-0.5 transition-colors duration-200 ${
               completed
-                ? "border-green-900/20 bg-green-500/25 text-green-950/80"
-                : "border-ink/[0.08] bg-ink/[0.08] text-ink/55"
+                ? "border-accent-dim bg-accent-dim text-white"
+                : "border-ink/20 bg-ink/15 text-white"
             }`}
           >
             {label}
@@ -728,8 +728,8 @@ export function CanvasAsciihedron({
       zoom: ZOOM,
       baseOpacity: baseOpacityProp ?? 0.12,
       faceBorderBoost: FACE_BORDER_BOOST,
-      depthMin: 0.15,
-      depthMax: 0.9,
+      depthMin: 0.05,
+      depthMax: 1.3,
       // Scramble
       innerRadius: 1,
       outerRadius: 3,
@@ -1219,8 +1219,8 @@ export function CanvasAsciihedron({
       };
 
       const BASE_OPACITY = params.baseOpacity;
-      const TEAL_INNER = `rgba(0, 140, 120, 1)`;
-      const TEAL_OUTER = `rgba(40, 190, 160, 1)`;
+      const TEAL_INNER = `rgb(220, 180, 50)`;
+      const TEAL_OUTER = `rgb(240, 210, 80)`;
 
 
       // Glow pass (additive) — depth-modulated

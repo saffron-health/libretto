@@ -3,7 +3,7 @@ import { SectionHeading } from "./SectionHeading";
 import { Text } from "./Text";
 
 /** Matches TEAL_OUTER in CanvasAsciihedron */
-const teal = "rgba(40, 190, 160, 1)";
+const teal = "oklch(0.82 0.20 145)";
 
 /** Dice icon — represents deterministic outcomes */
 function MergeIcon({ className }: { className?: string }) {
@@ -107,35 +107,36 @@ const features: MaintainFeature[] = [
   {
     title: "Deterministic failures",
     description:
-      "Runtime agents introduce nondeterminism that makes failures hard to reproduce. Libretto generates deterministic code, so failures are repeatable and easy to fix.",
+      "Every failure is reproducible. No flaky AI calls in the hot path means bugs are consistent and fixable.",
     icon: <MergeIcon className="text-ink/40" />,
   },
   {
     title: "Agent-friendly debugging",
     description:
-      "When something breaks, the agent reruns the workflow and inserts pause statements to step through and debug the failure, just like a developer would.",
+      "The agent reruns broken workflows with pause statements to step through failures, just like a developer would.",
     icon: <LayersIcon className="text-ink/40" />,
   },
   {
     title: "Read-only mode",
     description:
-      "Enable read-only mode to restrict the agent to only observing the page. It won't fill out incorrect information or submit something unexpected.",
+      "Restrict the agent to observation only. It can inspect the page but won't fill forms or submit data.",
     icon: <LogInIcon className="text-ink/40" />,
   },
 ];
 
 export function MaintainingFeatures() {
   return (
-    <section className="px-8 py-24">
+    <section className="section-crt px-8 py-24">
       <div className="mx-auto max-w-[1000px]">
         <div className="mb-16 text-center">
+          <span className="mb-3 block font-mono text-base text-amber">// MAINTAIN --</span>
           <SectionHeading className="mb-4">
             Effortless debugging
           </SectionHeading>
           <Text
             as="p"
             size="md"
-            className="mx-auto max-w-[520px] leading-relaxed text-muted"
+            className="mx-auto max-w-[580px] leading-relaxed text-muted [text-wrap:balance]"
           >
             Browser automations inevitably hit unexpected edge cases, and
             Libretto makes them easy to diagnose and fast to fix.
@@ -150,7 +151,7 @@ export function MaintainingFeatures() {
               )}
               <div className="px-2">
                 <div className="mb-4">{f.icon}</div>
-                <Text as="h3" size="md" className="mb-2 font-medium text-ink">
+                <Text as="h3" size="sm" className="mb-2 font-medium text-ink">
                   {f.title}
                 </Text>
                 <Text as="p" size="sm" className="leading-relaxed text-muted">

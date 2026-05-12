@@ -15,7 +15,7 @@ export function InstallSnippet() {
 
   return (
     <div className="flex justify-center mb-6">
-      <div className="relative rounded-xl shadow-sm bg-white font-mono text-[13px] text-ink/80 px-5 py-4 pr-12">
+      <div className="relative rounded-xl shadow-sm bg-panel border border-accent/20 font-mono text-[13px] text-ink/80 px-5 py-4 pr-12">
         <button
           type="button"
           onClick={handleCopy}

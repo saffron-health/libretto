@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { RefreshIcon } from "../icons";
 import { workflowExamples, type WorkflowExample } from "./workflowExamples";
+import { CRTVignette } from "./CRTVignette.js";
 
 type Line =
   | { type: "user"; text: string }
@@ -23,7 +24,7 @@ function BrailleSpinner() {
 function Cursor({ dark }: { dark?: boolean }) {
   return (
     <span
-      className={`inline-block w-[7px] h-[1.15em] align-text-bottom animate-blink ${dark ? "bg-cream/50" : "bg-ink/50"}`}
+      className={`inline-block w-[7px] h-[1.15em] align-text-bottom animate-blink ${dark ? "bg-accent/50" : "bg-accent/60"}`}
     />
   );
 }
@@ -32,7 +33,7 @@ function ThinkingLine({ done }: { done: boolean }) {
   return (
     <div className="flex items-center gap-2 text-ink/25">
       {done ? (
-        <span className="text-teal-600/60">✓</span>
+        <span className="text-accent/70">✓</span>
       ) : (
         <BrailleSpinner />
       )}
@@ -49,12 +50,12 @@ function ToolLine({ label, done }: { label: string; done: boolean }) {
     <div className="flex items-start gap-2 text-ink/25">
       {isBash ? (
         done ? (
-          <span className="text-ink/30 select-none inline-block w-[1ch] text-center">$</span>
+          <span className="text-ink/25 select-none inline-block w-[1ch] text-center">$</span>
         ) : (
           <BrailleSpinner />
         )
       ) : done ? (
-        <span className="text-teal-600/60">✓</span>
+        <span className="text-accent/70">✓</span>
       ) : (
         <BrailleSpinner />
       )}
@@ -337,22 +338,22 @@ export function TerminalDemo() {
 
   return (
     <div className="mx-auto max-w-[600px] mt-16">
-      <div className="rounded-xl border border-ink/[0.08] bg-white shadow-lg overflow-hidden flex flex-col font-mono text-[13px] h-[580px]">
+      <div className="crt-monitor relative overflow-hidden flex flex-col font-mono text-[13px] h-[580px]">
         {/* Title bar */}
-        <div className="relative flex items-center px-3 py-1.5 bg-ink/[0.02]">
+        <div className="relative flex items-center px-3 py-1.5 bg-black/20">
           <div className="flex gap-1.5">
-            <div className="size-2.5 rounded-full bg-ink/10" />
-            <div className="size-2.5 rounded-full bg-ink/10" />
-            <div className="size-2.5 rounded-full bg-ink/10" />
+            <div className="size-2.5 rounded-full bg-ink/20" />
+            <div className="size-2.5 rounded-full bg-ink/20" />
+            <div className="size-2.5 rounded-full bg-ink/20" />
           </div>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="flex items-center gap-1.5">
               <img
                 src="/claude-code-logo.svg"
                 alt="Claude Code"
-                className="h-3.5 w-auto opacity-70"
+                className="h-3.5 w-auto opacity-50"
               />
-              <span className="font-sans text-[13px] font-[450] text-ink/50">
+              <span className="font-sans text-[13px] font-[450] text-ink/40">
                 Claude Code
               </span>
             </div>
@@ -368,7 +369,7 @@ export function TerminalDemo() {
               setUserInput("");
               setAnimationKey((k) => k + 1);
             }}
-            className={`ml-auto p-1 rounded-md text-ink/30 hover:text-ink/60 hover:bg-ink/[0.05] transition-all duration-300 cursor-pointer ${animationDone ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+            className={`ml-auto p-1 rounded-md text-ink/30 hover:text-ink/60 hover:bg-ink/[0.08] transition-all duration-300 cursor-pointer ${animationDone ? "opacity-100" : "opacity-0 pointer-events-none"}`}
             aria-label="Replay animation"
           >
             <RefreshIcon className="size-3.5" />
@@ -376,16 +377,16 @@ export function TerminalDemo() {
         </div>
 
         {/* macOS-style tab bar */}
-        <div className="flex border-y border-ink/[0.08] bg-ink/[0.04] overflow-x-auto scrollbar-none">
+        <div className="flex border-y border-ink/[0.06] bg-black/15 overflow-x-auto scrollbar-none">
           {workflowExamples.map((ex, i) => (
             <button
               key={ex.id}
               type="button"
               onClick={() => handleTabClick(i)}
-              className={`flex-1 min-w-fit px-3 py-1.5 text-[11.5px] font-sans font-medium transition-colors duration-100 ease-out whitespace-nowrap border-r border-ink/[0.08] last:border-r-0 ${
+              className={`flex-1 min-w-fit px-3 py-1.5 text-[11.5px] font-sans font-medium transition-colors duration-100 ease-out whitespace-nowrap border-r border-ink/[0.06] last:border-r-0 ${
                 i === activeIndex
-                  ? "bg-white text-ink/70"
-                  : "text-ink/35 hover:text-ink/50 hover:bg-ink/[0.02]"
+                  ? "bg-panel text-ink/70"
+                  : "text-ink/30 hover:text-ink/50 hover:bg-ink/[0.04]"
               }`}
             >
               {ex.tab}
@@ -404,8 +405,8 @@ export function TerminalDemo() {
             if (line.type === "user") {
               return (
                 <div key={i} className="flex gap-3 items-start">
-                  <div className="w-[3px] shrink-0 self-stretch bg-teal-500" />
-                  <span className="text-teal-700">{line.text}</span>
+                  <div className="w-[3px] shrink-0 self-stretch bg-accent" />
+                  <span className="text-accent-bright">{line.text}</span>
                 </div>
               );
             }
@@ -424,7 +425,7 @@ export function TerminalDemo() {
             }
             if (line.type === "interrupted") {
               return (
-                <div key={i} className="text-red-400 text-[12px] mb-1">
+                <div key={i} className="text-red-400/80 text-[12px] mb-1">
                   Interrupted
                 </div>
               );
@@ -445,8 +446,8 @@ export function TerminalDemo() {
             if (line.type === "user") {
               return (
                 <div key={`extra-${i}`} className="flex gap-3 items-start">
-                  <div className="w-[3px] shrink-0 self-stretch bg-teal-500" />
-                  <span className="text-teal-700">{line.text}</span>
+                  <div className="w-[3px] shrink-0 self-stretch bg-accent" />
+                  <span className="text-accent-bright">{line.text}</span>
                 </div>
               );
             }
@@ -464,7 +465,7 @@ export function TerminalDemo() {
               return (
                 <div
                   key={`extra-${i}`}
-                  className="text-red-400 text-[12px] mb-1"
+                  className="text-red-400/80 text-[12px] mb-1"
                 >
                   Interrupted
                 </div>
@@ -483,7 +484,7 @@ export function TerminalDemo() {
         </div>
 
         {/* Prompt box */}
-        <div className="border-t border-ink/[0.1] text-[12.5px] max-h-[30%] flex flex-col">
+        <div className="border-t border-ink/[0.08] text-[12.5px] max-h-[30%] flex flex-col">
           {!promptSubmitted ? (
             <div className="min-h-[24px] px-5 py-3 text-ink/70 leading-[1.65]">
               {promptText}
@@ -512,11 +513,12 @@ export function TerminalDemo() {
                 }}
                 placeholder="Ask a question…"
                 rows={1}
-                className="w-full px-5 py-3 bg-transparent text-ink/70 placeholder:text-ink/20 outline-none leading-[1.65] resize-none overflow-y-auto"
+                className="w-full px-5 py-3 bg-transparent text-ink/70 placeholder:text-ink/15 outline-none leading-[1.65] resize-none overflow-y-auto"
               />
             </form>
           )}
         </div>
+        <CRTVignette />
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Text } from "./Text";
 import { Button } from "./Button";
 import { GitHubStarIcon, NpmIcon } from "../icons";
@@ -6,6 +6,100 @@ import { AnimationTarget } from "./AnimationOrchestration";
 import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
 import { AppLink } from "../routing";
 import { MobileMenu } from "./MobileMenu";
+
+const GLITCH_CHARS = "@#$%&*+=<>{}[]|/\\~^!?";
+
+function useGlitchText(text: string) {
+  const [display, setDisplay] = useState(text);
+  const [hovered, setHovered] = useState(false);
+  const frameRef = useRef(0);
+  const rafRef = useRef<number>(0);
+
+  const onEnter = useCallback(() => setHovered(true), []);
+  const onLeave = useCallback(() => {
+    setHovered(false);
+    setDisplay(text);
+    cancelAnimationFrame(rafRef.current);
+    frameRef.current = 0;
+  }, [text]);
+
+  useEffect(() => {
+    if (!hovered) return;
+
+    const chars = text.split("");
+    // Each character gets a random settle time (in ms)
+    const settleTimes = chars.map(() => 150 + Math.random() * 350);
+    const start = performance.now();
+    let settled = false;
+
+    let lastUpdate = 0;
+    const INTERVAL = 60; // ms between character changes
+
+    function tick(now: number) {
+      const elapsed = now - start;
+
+      if (now - lastUpdate >= INTERVAL) {
+        lastUpdate = now;
+        const result = chars.map((ch, i) => {
+          if (ch === " ") return " ";
+          if (elapsed >= settleTimes[i]) return ch;
+          return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
+        });
+        setDisplay(result.join(""));
+
+        if (result.every((ch, i) => ch === chars[i])) {
+          settled = true;
+          return;
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (!settled) cancelAnimationFrame(rafRef.current);
+    };
+  }, [hovered, text]);
+
+  const isScrambling = hovered && display !== text;
+
+  return { display, isScrambling, hovered, onEnter, onLeave };
+}
+
+function GlitchNavLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: string;
+}) {
+  const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText(children);
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="no-underline"
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <Text
+        size="sm"
+        className={`font-medium transition-colors duration-75 ${
+          isScrambling
+            ? "text-amber font-mono"
+            : hovered
+              ? "text-accent-bright"
+              : "text-ink"
+        }`}
+      >
+        {display}
+      </Text>
+    </a>
+  );
+}
 
 function useGitHubStars(repo: string) {
   const [stars, setStars] = useState<number | null>(null);
@@ -44,31 +138,13 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
       <div className="relative mx-auto flex max-w-[800px] items-center justify-between">
         <div className="flex items-center gap-10">
           <AppLink href="/" className="no-underline">
-            <Text size="xl" style="serif" className="text-ink font-[200]">
+            <Text size="xl" style="serif" className="text-ink font-[300] crt-glow-sm">
               Libretto
             </Text>
           </AppLink>
           <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
-            <a
-              href={DISCUSSIONS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="no-underline"
-            >
-              <Text size="sm" className="font-medium text-ink">
-                Forum
-              </Text>
-            </a>
-            <a
-              href={RELEASES_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="no-underline"
-            >
-              <Text size="sm" className="font-medium text-ink">
-                Changelog
-              </Text>
-            </a>
+            <GlitchNavLink href={DISCUSSIONS_URL}>Forum</GlitchNavLink>
+            <GlitchNavLink href={RELEASES_URL}>Changelog</GlitchNavLink>
           </div>
         </div>
         <div className="flex items-center gap-4">

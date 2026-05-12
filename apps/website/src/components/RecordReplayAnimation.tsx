@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "recording" | "thinking" | "replaying" | "done";
 
-const ACCENT = "oklch(0.55 0.15 175)"; // teal agent cursor
+const ACCENT = "oklch(0.82 0.20 145)"; // phosphor green agent cursor
 
 // Resting positions (outside the panel)
 const DEV_HOME = { x: 88, y: 35 }; // right side
@@ -24,8 +24,8 @@ const PANEL_WIDTH_CLASS = "w-[72%] sm:w-[60%] md:w-[55%]";
 function RecordDot() {
   return (
     <span className="relative flex size-2">
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-      <span className="relative inline-flex size-2 rounded-full bg-red-500" />
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400/70 opacity-75" />
+      <span className="relative inline-flex size-2 rounded-full bg-red-400" />
     </span>
   );
 }
@@ -178,11 +178,11 @@ function StatusBadge({ phase }: StatusLabelProps) {
 
   const colorClass =
     phase === "recording"
-      ? "text-red-500"
+      ? "text-red-400"
       : phase === "thinking"
         ? "text-amber-500"
         : phase === "replaying"
-          ? "text-teal-600"
+          ? "text-accent"
           : "text-green-600";
 
   const icon =
@@ -193,7 +193,7 @@ function StatusBadge({ phase }: StatusLabelProps) {
         <BrainIcon />
       </span>
     ) : phase === "replaying" ? (
-      <span className="text-teal-600">
+      <span className="text-accent">
         <ChevronsIcon />
       </span>
     ) : (
@@ -226,25 +226,25 @@ function StatusBadge({ phase }: StatusLabelProps) {
 function PatientDetailPane() {
   return (
     <motion.div
-      className="absolute inset-0 z-10 flex items-center justify-center bg-black/5"
+      className="absolute inset-0 z-10 flex items-center justify-center bg-black/30"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
     >
       <motion.div
-        className="flex h-[76%] w-[76%] flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white p-3 shadow-xs sm:h-[80%] sm:w-[80%] sm:shadow-sm"
+        className="flex h-[76%] w-[76%] flex-col overflow-hidden rounded-lg border border-ink/10 bg-panel p-3 shadow-xs sm:h-[80%] sm:w-[80%] sm:shadow-sm"
         initial={{ opacity: 0, scale: 0.95, y: 6 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 6 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
       >
         {/* Header */}
-        <div className="mb-3 flex items-center gap-2 border-b border-black/[0.06] pb-2">
-          <div className="size-8 shrink-0 rounded-full bg-black/10" />
+        <div className="mb-3 flex items-center gap-2 border-b border-ink/10 pb-2">
+          <div className="size-8 shrink-0 rounded-full bg-ink/15" />
           <div className="flex flex-col gap-0.5">
-            <div className="h-2.5 w-24 rounded-full bg-black/15" />
-            <div className="h-1.5 w-16 rounded-full bg-black/08" />
+            <div className="h-2.5 w-24 rounded-full bg-ink/20" />
+            <div className="h-1.5 w-16 rounded-full bg-ink/10" />
           </div>
         </div>
 
@@ -257,10 +257,10 @@ function PatientDetailPane() {
             { label: "Provider", width: "w-20" },
           ].map((row) => (
             <div key={row.label} className="flex items-center gap-3">
-              <span className="w-14 text-[9px] font-medium text-black/30">
+              <span className="w-14 text-[9px] font-medium text-ink/30">
                 {row.label}
               </span>
-              <div className={`h-2 ${row.width} rounded-full bg-black/10`} />
+              <div className={`h-2 ${row.width} rounded-full bg-ink/15`} />
             </div>
           ))}
         </div>
@@ -526,16 +526,16 @@ export function RecordReplayAnimation() {
 
         {/* Mock website panel — centered, wider on mobile, constrained height */}
         <div
-          className={`relative ${PANEL_WIDTH_CLASS} mb-6 max-h-[72%] overflow-hidden rounded-xl border border-black/[0.08] bg-white/80 p-3 shadow-sm sm:max-h-[70%]`}
+          className={`relative ${PANEL_WIDTH_CLASS} mb-6 max-h-[72%] overflow-hidden rounded-xl border border-ink/10 bg-panel/80 p-3 shadow-sm sm:max-h-[70%]`}
         >
           {/* Search bar row */}
           <div className="flex gap-2">
             <div
               ref={searchInputRef}
-              className="flex flex-1 items-center rounded-lg border border-black/10 bg-white px-2 py-1.5 text-xs text-black/30 shadow-xs"
+              className="flex flex-1 items-center rounded-lg border border-ink/15 bg-bg/10 px-2 py-1.5 text-xs text-ink/25 shadow-xs"
             >
               <svg
-                className="mr-2 shrink-0 text-black/20"
+                className="mr-2 shrink-0 text-ink/15"
                 width="12"
                 height="12"
                 viewBox="0 0 24 24"
@@ -548,10 +548,10 @@ export function RecordReplayAnimation() {
               </svg>
               <span className="min-w-0 flex-1 truncate">
                 {searchText || (
-                  <span className="text-black/25">Search patients</span>
+                  <span className="text-ink/20">Search patients</span>
                 )}
                 {searchText && (
-                  <span className="inline-block w-px animate-pulse bg-black/50">
+                  <span className="inline-block w-px animate-pulse bg-accent/50">
                     &nbsp;
                   </span>
                 )}
@@ -559,7 +559,7 @@ export function RecordReplayAnimation() {
             </div>
             <button
               ref={searchButtonRef}
-              className="rounded-lg bg-black/80 px-2 py-1 text-[10px] font-medium text-white shadow-sm"
+              className="rounded-lg bg-accent/70 px-2 py-1 text-[10px] font-medium text-white shadow-sm"
             >
               Search
             </button>
@@ -601,7 +601,7 @@ export function RecordReplayAnimation() {
                     <motion.div
                       key={i}
                       ref={i === 0 ? setFirstResultRef : undefined}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-black/[0.06] bg-white px-3 py-2.5 shadow-sm"
+                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-ink/10 bg-panel px-3 py-2.5 shadow-sm"
                       initial={{ opacity: 0, y: -8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
@@ -611,14 +611,14 @@ export function RecordReplayAnimation() {
                         ease: "easeOut",
                       }}
                     >
-                      <div className="size-6 shrink-0 rounded-full bg-black/10" />
+                      <div className="size-6 shrink-0 rounded-full bg-ink/15" />
                       <div className="flex flex-1 flex-col gap-1">
                         <div
-                          className="h-2 rounded-full bg-black/15"
+                          className="h-2 rounded-full bg-ink/15"
                           style={{ width: `${width}%` }}
                         />
                         <div
-                          className="h-1.5 rounded-full bg-black/08"
+                          className="h-1.5 rounded-full bg-ink/8"
                           style={{ width: `${width * 0.6}%` }}
                         />
                       </div>
@@ -663,7 +663,7 @@ export function RecordReplayAnimation() {
         <CursorShape
           color={ACCENT}
           label="Agent"
-          labelClassName="bg-teal-600"
+          labelClassName="bg-accent"
         />
       </motion.div>
     </div>

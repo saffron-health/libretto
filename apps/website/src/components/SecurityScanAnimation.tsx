@@ -10,8 +10,8 @@ const STEP_PAUSE_AFTER_CHECK_MS = 400;
 const SUCCESS_HOLD_MS = 3000;
 const RESET_PAUSE_MS = 600;
 
-const TEAL = "oklch(0.55 0.15 175)";
-const GREEN = "oklch(0.55 0.16 155)";
+const TEAL = "oklch(0.82 0.20 145)";
+const GREEN = "oklch(0.86 0.22 145)";
 
 const STEPS = [
   "Grepping network requests",
@@ -114,40 +114,40 @@ function StepRow({
 function MockWebsitePanel() {
   return (
     <div
-      className="relative min-w-[76%] flex-1 overflow-visible rounded-lg border border-ink/10 bg-white/60 sm:min-w-0"
+      className="relative min-w-[76%] flex-1 overflow-visible rounded-lg border border-ink/15 bg-panel/60 sm:min-w-0"
       style={{ alignSelf: "safe center" }}
     >
       {/* Placeholder layout lines */}
       <div className="flex flex-col gap-2 p-4 pt-5">
         {/* Nav bar suggestion */}
         <div className="mb-3 flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-ink/10" />
-          <div className="h-1.5 w-16 rounded bg-ink/10" />
+          <div className="h-2 w-2 rounded-full bg-ink/15" />
+          <div className="h-1.5 w-16 rounded bg-ink/15" />
           <div className="ml-auto flex gap-1.5">
-            <div className="h-1.5 w-8 rounded bg-ink/8" />
-            <div className="h-1.5 w-8 rounded bg-ink/8" />
-            <div className="h-1.5 w-8 rounded bg-ink/8" />
+            <div className="h-1.5 w-8 rounded bg-ink/10" />
+            <div className="h-1.5 w-8 rounded bg-ink/10" />
+            <div className="h-1.5 w-8 rounded bg-ink/10" />
           </div>
         </div>
         {/* Hero block */}
-        <div className="h-2 w-3/4 rounded bg-ink/10" />
-        <div className="h-2 w-1/2 rounded bg-ink/8" />
-        <div className="mt-1 h-1.5 w-full rounded bg-ink/6" />
-        <div className="h-1.5 w-5/6 rounded bg-ink/6" />
-        <div className="h-1.5 w-4/6 rounded bg-ink/6" />
+        <div className="h-2 w-3/4 rounded bg-ink/15" />
+        <div className="h-2 w-1/2 rounded bg-ink/10" />
+        <div className="mt-1 h-1.5 w-full rounded bg-ink/8" />
+        <div className="h-1.5 w-5/6 rounded bg-ink/8" />
+        <div className="h-1.5 w-4/6 rounded bg-ink/8" />
         {/* Button suggestion */}
-        <div className="mt-2 h-4 w-16 rounded bg-ink/10" />
+        <div className="mt-2 h-4 w-16 rounded bg-ink/15" />
         {/* Card row */}
         <div className="mt-3 grid grid-cols-3 gap-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="flex flex-col gap-1 rounded bg-ink/4 p-1.5">
-              <div className="h-1.5 w-full rounded bg-ink/8" />
-              <div className="h-1.5 w-4/5 rounded bg-ink/6" />
+            <div key={i} className="flex flex-col gap-1 rounded bg-ink/6 p-1.5">
+              <div className="h-1.5 w-full rounded bg-ink/10" />
+              <div className="h-1.5 w-4/5 rounded bg-ink/8" />
             </div>
           ))}
         </div>
-        <div className="mt-2 h-1.5 w-full rounded bg-ink/6" />
-        <div className="h-1.5 w-3/4 rounded bg-ink/6" />
+        <div className="mt-2 h-1.5 w-full rounded bg-ink/8" />
+        <div className="h-1.5 w-3/4 rounded bg-ink/8" />
       </div>
 
       {/* Scan line */}

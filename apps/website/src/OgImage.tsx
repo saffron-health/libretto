@@ -214,7 +214,7 @@ export function OgImage() {
       >
         <div
           style={{ width: OG_WIDTH, height: OG_HEIGHT }}
-          className="relative overflow-hidden bg-cream"
+          className="relative overflow-hidden bg-bg"
         >
           <div className="absolute inset-y-0 left-0 z-10 flex w-[540px] flex-col justify-center pl-16 pr-8">
             <h1

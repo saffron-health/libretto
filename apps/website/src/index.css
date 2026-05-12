@@ -8,65 +8,37 @@
   }
 }
 
-/* PP Editorial New font family */
+/* Fonts:
+   - Fraunces (serif) loaded via Google Fonts in index.html
+   - Commit Mono (monospace) self-hosted variable font
+*/
 @font-face {
-  font-family: "PP Editorial New";
-  src: url("/fonts/PPEditorialNew-Ultralight.otf") format("opentype");
-  font-weight: 200;
+  font-family: "Commit Mono";
+  src: url("/fonts/CommitMono-VF.woff2") format("woff2-variations");
+  font-weight: 200 800;
   font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "PP Editorial New";
-  src: url("/fonts/PPEditorialNew-UltralightItalic.otf") format("opentype");
-  font-weight: 200;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "PP Editorial New";
-  src: url("/fonts/PPEditorialNew-Regular.otf") format("opentype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "PP Editorial New";
-  src: url("/fonts/PPEditorialNew-Italic.otf") format("opentype");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "PP Editorial New";
-  src: url("/fonts/PPEditorialNew-Ultrabold.otf") format("opentype");
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "PP Editorial New";
-  src: url("/fonts/PPEditorialNew-UltraboldItalic.otf") format("opentype");
-  font-weight: 800;
-  font-style: italic;
   font-display: swap;
 }
 
 @theme {
   --font-sans:
-    "Inter", -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", sans-serif;
-  --font-serif: "PP Editorial New", "Newsreader", serif;
+    "Commit Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", monospace;
+  --font-serif: "Fraunces", "Newsreader", Georgia, serif;
+  --font-mono:
+    "Commit Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", monospace;
 
-  --color-cream: oklch(0.966 0.005 106.5);
-  --color-ink: oklch(0.153 0.006 107.1);
-  --color-muted: oklch(0.394 0.023 107.4);
-  --color-faint: oklch(0.6 0.015 107);
+  --color-bg: oklch(0.16 0.012 240);
+  --color-ink: oklch(0.94 0.02 90);
+  --color-muted: oklch(0.68 0.04 90);
+  --color-faint: oklch(0.48 0.02 90);
+  --color-panel: oklch(0.20 0.014 240);
+  --color-panel-hi: oklch(0.24 0.016 240);
+  --color-accent: oklch(0.82 0.20 145);
+  --color-accent-bright: oklch(0.86 0.22 145);
+  --color-accent-dim: oklch(0.50 0.12 145);
+  --color-amber: oklch(0.75 0.15 80);
 }
 
 html {
@@ -74,7 +46,7 @@ html {
 }
 
 body {
-  background: var(--color-cream);
+  background: var(--color-bg);
   color: var(--color-ink);
 }
 
@@ -83,7 +55,7 @@ body {
   min-width: fit-content;
   border: 0;
   cursor: pointer;
-  color: var(--color-cream);
+  color: oklch(0.16 0.012 240);
   font-family: var(--font-sans);
   letter-spacing: 0.01em;
   line-height: 1;
@@ -92,26 +64,14 @@ body {
   background:
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.14) 0%,
-      rgba(255, 255, 255, 0.03) 100%
-    ),
-    linear-gradient(
-      180deg,
-      oklch(0.248 0.007 107.1) 0%,
-      oklch(0.176 0.006 107.1) 100%
-    ),
-    radial-gradient(
-      130% 160% at 50% 0%,
-      oklch(0.288 0.008 107.1) 0%,
-      oklch(0.22 0.007 107.1) 46%,
-      oklch(0.156 0.006 107.1) 100%
+      oklch(0.82 0.20 145 / 0.95) 0%,
+      oklch(0.65 0.16 145 / 0.95) 100%
     );
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.16),
-    inset 0 0 0 1px oklch(0.418 0.009 107.1 / 0.72),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.24),
-    0 1px 1px rgba(17, 17, 17, 0.16),
-    0 12px 28px rgba(17, 17, 17, 0.09);
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px oklch(0.82 0.20 145 / 0.5),
+    0 0 20px oklch(0.82 0.20 145 / 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.3);
   transition:
     background 120ms ease-in-out,
     box-shadow 120ms ease-in-out,
@@ -123,61 +83,36 @@ body {
   background:
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.18) 0%,
-      rgba(255, 255, 255, 0.04) 100%
-    ),
-    linear-gradient(
-      180deg,
-      oklch(0.268 0.007 107.1) 0%,
-      oklch(0.192 0.006 107.1) 100%
-    ),
-    radial-gradient(
-      130% 160% at 50% 0%,
-      oklch(0.308 0.008 107.1) 0%,
-      oklch(0.236 0.007 107.1) 46%,
-      oklch(0.17 0.006 107.1) 100%
+      oklch(0.86 0.22 145 / 0.95) 0%,
+      oklch(0.70 0.18 145 / 0.95) 100%
     );
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.18),
-    inset 0 0 0 1px oklch(0.49 0.01 107.1 / 0.84),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.24),
-    0 1px 1px rgba(17, 17, 17, 0.16),
-    0 14px 30px rgba(17, 17, 17, 0.12);
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px oklch(0.86 0.22 145 / 0.6),
+    0 0 28px oklch(0.82 0.20 145 / 0.3),
+    0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .libretto-button[aria-pressed="true"] {
   background:
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.2) 0%,
-      rgba(255, 255, 255, 0.05) 100%
-    ),
-    linear-gradient(
-      180deg,
-      oklch(0.276 0.008 107.1) 0%,
-      oklch(0.2 0.006 107.1) 100%
-    ),
-    radial-gradient(
-      130% 160% at 50% 0%,
-      oklch(0.318 0.009 107.1) 0%,
-      oklch(0.246 0.007 107.1) 46%,
-      oklch(0.176 0.006 107.1) 100%
+      oklch(0.86 0.22 145 / 0.95) 0%,
+      oklch(0.70 0.18 145 / 0.95) 100%
     );
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.2),
-    inset 0 0 0 1px oklch(0.53 0.011 107.1 / 0.9),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
-    0 0 0 1px oklch(0.68 0.009 107.1 / 0.12),
-    0 14px 30px rgba(17, 17, 17, 0.12);
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px oklch(0.86 0.22 145 / 0.6),
+    0 0 28px oklch(0.82 0.20 145 / 0.3),
+    0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .libretto-button:focus-visible {
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.2),
-    inset 0 0 0 1px oklch(0.53 0.011 107.1 / 0.9),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
-    0 0 0 3px oklch(0.735 0.01 107.1 / 0.28),
-    0 14px 30px rgba(17, 17, 17, 0.12);
+    inset 0 0 0 1px oklch(0.82 0.20 145 / 0.7),
+    0 0 0 3px oklch(0.82 0.20 145 / 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .libretto-button:active {
@@ -185,25 +120,14 @@ body {
   background:
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.02) 100%
-    ),
-    linear-gradient(
-      180deg,
-      oklch(0.228 0.007 107.1) 0%,
-      oklch(0.166 0.006 107.1) 100%
-    ),
-    radial-gradient(
-      130% 160% at 50% 0%,
-      oklch(0.268 0.008 107.1) 0%,
-      oklch(0.208 0.007 107.1) 46%,
-      oklch(0.152 0.006 107.1) 100%
+      oklch(0.72 0.18 145 / 0.95) 0%,
+      oklch(0.58 0.14 145 / 0.95) 100%
     );
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.13),
-    inset 0 0 0 1px oklch(0.43 0.009 107.1 / 0.78),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.28),
-    0 8px 18px rgba(17, 17, 17, 0.09);
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px oklch(0.72 0.18 145 / 0.5),
+    0 0 16px oklch(0.82 0.20 145 / 0.15),
+    0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .libretto-button:disabled,
@@ -218,16 +142,22 @@ body {
   min-height: 2.25rem;
   padding-inline: 1.375rem;
   border-radius: 8px;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 500;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .libretto-button--sm {
   min-height: 1.9375rem;
   padding-inline: 0.9375rem;
   border-radius: 8px;
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
   font-weight: 500;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .libretto-button--secondary {
@@ -249,11 +179,11 @@ body {
   background: transparent;
   color: var(--color-ink);
   box-shadow: none;
-  text-decoration-color: oklch(0.55 0.15 175);
+  text-decoration-color: oklch(0.82 0.20 145);
 }
 
 .libretto-button--secondary:focus-visible {
-  box-shadow: 0 0 0 2px oklch(0.55 0.15 175 / 0.4);
+  box-shadow: 0 0 0 2px oklch(0.82 0.20 145 / 0.4);
 }
 
 .libretto-button--secondary:active {
@@ -261,7 +191,7 @@ body {
   color: var(--color-ink);
   box-shadow: none;
   transform: none;
-  text-decoration-color: oklch(0.55 0.15 175);
+  text-decoration-color: oklch(0.82 0.20 145);
 }
 
 @keyframes blink {
@@ -309,11 +239,11 @@ body {
 }
 
 .copy-icon-btn:hover {
-  background-color: rgba(0, 0, 0, 0.06);
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 .copy-icon-btn:hover div {
-  color: rgba(0, 0, 0, 0.8);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .grain {
@@ -327,8 +257,230 @@ body {
   inset: -1px;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 128px 128px;
-  opacity: 0.06;
+  opacity: 0.04;
   pointer-events: none;
-  mix-blend-mode: multiply;
+  mix-blend-mode: screen;
   z-index: 1;
+}
+
+/* ── Section CRT glow ── */
+
+.section-crt {
+  position: relative;
+}
+
+.section-crt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 80px, oklch(0.82 0.20 145 / 0.04), transparent 50%);
+}
+
+.section-crt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0.015) 0px,
+      rgb(255 255 255 / 0.015) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  background-size: 100% 4px;
+  animation: crt-scanline-scroll 10s linear infinite;
+  opacity: 0.4;
+}
+
+/* ── Section rails (vertical dotted borders) ── */
+
+.section-rails::before,
+.section-rails::after {
+  content: "";
+  position: absolute;
+  top: -120px;
+  bottom: 0;
+  width: 1px;
+  background: repeating-linear-gradient(
+    to bottom,
+    oklch(0.94 0.02 90 / 0.12) 0px,
+    oklch(0.94 0.02 90 / 0.12) 12px,
+    transparent 12px,
+    transparent 24px
+  );
+  mask-image: linear-gradient(to bottom, transparent 0px, black 120px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 120px);
+}
+
+.section-rails::before { left: 0; }
+.section-rails::after { right: 0; }
+
+/* ── Footer hollow logo ── */
+
+.footer-hollow-logo {
+  color: transparent;
+  -webkit-text-stroke: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      oklch(0.90 0.18 80 / 0.8) 0px,
+      oklch(0.90 0.18 80 / 0.8) 2px,
+      oklch(0.90 0.18 80 / 0.15) 2px,
+      oklch(0.90 0.18 80 / 0.15) 6px
+    );
+  background-size: 100% 6px;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: crt-scanline-scroll 10s linear infinite;
+}
+
+/* ── CRT global effects ── */
+
+.crt-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% 0%, oklch(0.22 0.018 145 / 0.5), transparent 50%),
+    var(--color-bg);
+}
+
+.crt-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, transparent 55%, rgb(0 0 0 / 0.5) 100%);
+  opacity: 0.65;
+}
+
+
+
+.crt-page::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 51;
+  pointer-events: none;
+  background: oklch(0.82 0.20 145 / 0.02);
+  animation: crt-flicker 7s steps(1, end) infinite;
+}
+
+.crt-glow {
+  text-shadow:
+    0 0 12px oklch(0.86 0.22 145 / 0.5),
+    0 0 32px oklch(0.86 0.22 145 / 0.2);
+}
+
+.crt-glow-sm {
+  text-shadow:
+    0 0 8px oklch(0.86 0.22 145 / 0.35),
+    0 0 18px oklch(0.86 0.22 145 / 0.12);
+}
+
+.crt-monitor {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid oklch(0.82 0.20 145 / 0.2);
+  border-radius: 1rem;
+  background:
+    radial-gradient(ellipse at 50% 50%, oklch(0.82 0.20 145 / 0.06), transparent 50%),
+    linear-gradient(180deg, var(--color-panel-hi), var(--color-panel));
+  box-shadow:
+    inset 0 0 28px rgb(0 0 0 / 0.5),
+    inset 0 0 0 1px rgb(255 255 255 / 0.03),
+    0 0 24px oklch(0.82 0.20 145 / 0.08);
+}
+
+.crt-monitor::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0.04) 0px,
+      rgb(255 255 255 / 0.04) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  background-size: 100% 4px;
+  opacity: 0.5;
+  animation: crt-scanline-scroll 6s linear infinite;
+}
+
+.crt-monitor::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 21;
+  pointer-events: none;
+}
+
+.crt-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 22;
+  pointer-events: none;
+}
+
+@keyframes crt-scanline-scroll {
+  from { background-position: 0 0; }
+  to { background-position: 0 24px; }
+}
+
+@keyframes crt-flicker {
+  0%, 100% { opacity: 0.03; }
+  8% { opacity: 0.05; }
+  9% { opacity: 0.02; }
+  10% { opacity: 0.04; }
+  48% { opacity: 0.025; }
+  49% { opacity: 0.055; }
+  50% { opacity: 0.03; }
+}
+
+@keyframes crt-boot {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.01);
+    filter: brightness(3) blur(3px);
+  }
+  15% {
+    opacity: 1;
+    transform: scaleY(1.03);
+    filter: brightness(1.5) blur(1px);
+  }
+  30% {
+    transform: scaleY(0.97);
+    filter: brightness(1.1) blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+    filter: brightness(1) blur(0);
+  }
+}
+
+.crt-boot {
+  animation: crt-boot 800ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crt-boot {
+    animation: none;
+  }
+  .crt-page::after {
+    animation: none;
+  }
+  .crt-monitor::before {
+    animation: none;
+  }
 }
