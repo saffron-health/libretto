@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from "react";
-import { CRTVignette } from "./CRTVignette.js";
+import { CRTShader } from "./CRTShader.js";
 
 export function CRTMonitor({
   children,
@@ -8,7 +8,7 @@ export function CRTMonitor({
   return (
     <div className={`crt-monitor ${className}`}>
       {children}
-      <CRTVignette />
+      <CRTShader />
     </div>
   );
 }

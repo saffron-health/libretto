@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { RefreshIcon } from "../icons";
 import { workflowExamples, type WorkflowExample } from "./workflowExamples";
-import { CRTVignette } from "./CRTVignette.js";
+import { CRTShader } from "./CRTShader.js";
 
 type Line =
   | { type: "user"; text: string }
@@ -518,7 +518,7 @@ export function TerminalDemo() {
             </form>
           )}
         </div>
-        <CRTVignette />
+        <CRTShader />
       </div>
     </div>
   );

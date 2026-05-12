@@ -126,24 +126,7 @@ const integrations: Integration[] = [
 ];
 
 function CheckIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      fill="none"
-      className="shrink-0"
-    >
-      <circle cx="9" cy="9" r="9" fill="rgb(80, 200, 100)" />
-      <path
-        d="M5.5 9.5L7.5 11.5L12.5 6.5"
-        stroke="white"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <span className="shrink-0 text-accent-dim text-sm">✓</span>;
 }
 
 export function BattleTestedBanner() {

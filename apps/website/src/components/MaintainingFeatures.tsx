@@ -1,126 +1,27 @@
-import { Fragment, type ReactNode } from "react";
 import { SectionHeading } from "./SectionHeading";
 import { Text } from "./Text";
+import { CRTMonitor } from "./CRTMonitor";
 
-/** Matches TEAL_OUTER in CanvasAsciihedron */
-const teal = "oklch(0.82 0.20 145)";
-
-/** Dice icon — represents deterministic outcomes */
-function MergeIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="32"
-      height="32"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <rect
-        x="5.25"
-        y="5.25"
-        width="13.5"
-        height="13.5"
-        rx="3"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <circle cx="9.25" cy="9.25" r="1.1" fill="currentColor" />
-      <circle cx="14.75" cy="9.25" r="1.1" fill={teal} />
-      <circle cx="12" cy="12" r="1.1" fill="currentColor" />
-      <circle cx="9.25" cy="14.75" r="1.1" fill={teal} />
-      <circle cx="14.75" cy="14.75" r="1.1" fill="currentColor" />
-    </svg>
-  );
-}
-
-/** Clock with loop arrow — represents repeatable debugging */
-function LayersIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="32"
-      height="32"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="4.75"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M12 9.5V12L13.75 13.75"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-      <path
-        stroke={teal}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-        d="M7.25 7.75H4.75V5.25"
-      />
-      <path
-        d="M4.95 8.05A8 8 0 1 1 5.1 16.6"
-        stroke={teal}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-/** Eye icon — represents safe observation without interaction */
-function LogInIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="32"
-      height="32"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <path
-        d="M3.25 12C4.9 8.95 8.12 7 12 7C15.88 7 19.1 8.95 20.75 12C19.1 15.05 15.88 17 12 17C8.12 17 4.9 15.05 3.25 12Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="2.25" stroke={teal} strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-interface MaintainFeature {
-  title: string;
+interface HelpFlag {
+  flag: string;
   description: string;
-  icon: ReactNode;
 }
 
-const features: MaintainFeature[] = [
+const flags: HelpFlag[] = [
   {
-    title: "Deterministic failures",
+    flag: "--deterministic",
     description:
       "Every failure is reproducible. No flaky AI calls in the hot path means bugs are consistent and fixable.",
-    icon: <MergeIcon className="text-ink/40" />,
   },
   {
-    title: "Agent-friendly debugging",
+    flag: "--agent-debug",
     description:
       "The agent reruns broken workflows with pause statements to step through failures, just like a developer would.",
-    icon: <LayersIcon className="text-ink/40" />,
   },
   {
-    title: "Read-only mode",
+    flag: "--read-only",
     description:
       "Restrict the agent to observation only. It can inspect the page but won't fill forms or submit data.",
-    icon: <LogInIcon className="text-ink/40" />,
   },
 ];
 
@@ -128,7 +29,7 @@ export function MaintainingFeatures() {
   return (
     <section className="section-crt px-8 py-24">
       <div className="mx-auto max-w-[1000px]">
-        <div className="mb-16 text-center">
+        <div className="mb-12 text-center">
           <span className="mb-3 block font-mono text-base text-amber">// MAINTAIN --</span>
           <SectionHeading className="mb-4">
             Effortless debugging
@@ -143,24 +44,36 @@ export function MaintainingFeatures() {
           </Text>
         </div>
 
-        <div className="grid gap-10 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
-          {features.map((f, i) => (
-            <Fragment key={f.title}>
-              {i > 0 && (
-                <div className="hidden w-px self-center bg-ink/10 md:block md:h-[60%]" />
-              )}
-              <div className="px-2">
-                <div className="mb-4">{f.icon}</div>
-                <Text as="h3" size="sm" className="mb-2 font-medium text-ink">
-                  {f.title}
-                </Text>
-                <Text as="p" size="sm" className="leading-relaxed text-muted">
-                  {f.description}
-                </Text>
+        <CRTMonitor className="mx-auto max-w-[680px]">
+          <div className="relative z-10 font-mono text-[13px]">
+            {/* Title bar */}
+            <div className="flex items-center gap-2 border-b border-ink/10 px-5 py-2.5 text-ink/30">
+              <span className="size-2.5 rounded-full bg-ink/20" />
+              <span className="size-2.5 rounded-full bg-ink/20" />
+              <span className="size-2.5 rounded-full bg-ink/20" />
+              <span className="ml-2 text-[11px] text-ink/25">libretto --help</span>
+            </div>
+            {/* Body */}
+            <div className="px-5 py-5">
+              <div className="mb-5 flex items-center gap-2">
+                <span className="inline-block size-[6px] rounded-full bg-accent" />
+                <span className="text-accent/60 text-xs tracking-widest uppercase">Capabilities</span>
               </div>
-            </Fragment>
-          ))}
-        </div>
+              <div className="flex flex-col gap-4">
+                {flags.map((f) => (
+                  <div key={f.flag}>
+                    <div className="text-accent">{f.flag}</div>
+                    <div className="mt-1 pl-4 text-muted leading-relaxed">{f.description}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 flex items-center gap-1 text-ink/20">
+                <span>$</span>
+                <span className="inline-block w-[6px] h-[14px] bg-accent/50 animate-blink" />
+              </div>
+            </div>
+          </div>
+        </CRTMonitor>
       </div>
     </section>
   );

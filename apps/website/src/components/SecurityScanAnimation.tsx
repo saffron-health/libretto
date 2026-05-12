@@ -114,40 +114,40 @@ function StepRow({
 function MockWebsitePanel() {
   return (
     <div
-      className="relative min-w-[76%] flex-1 overflow-visible rounded-lg border border-ink/15 bg-panel/60 sm:min-w-0"
+      className="relative min-w-[76%] flex-1 overflow-visible border border-accent/25 bg-bg/60 sm:min-w-0"
       style={{ alignSelf: "safe center" }}
     >
       {/* Placeholder layout lines */}
       <div className="flex flex-col gap-2 p-4 pt-5">
         {/* Nav bar suggestion */}
         <div className="mb-3 flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-ink/15" />
-          <div className="h-1.5 w-16 rounded bg-ink/15" />
+          <div className="h-2 w-2 bg-accent/12" />
+          <div className="h-1.5 w-16 bg-accent/10" />
           <div className="ml-auto flex gap-1.5">
-            <div className="h-1.5 w-8 rounded bg-ink/10" />
-            <div className="h-1.5 w-8 rounded bg-ink/10" />
-            <div className="h-1.5 w-8 rounded bg-ink/10" />
+            <div className="h-1.5 w-8 bg-accent/8" />
+            <div className="h-1.5 w-8 bg-accent/8" />
+            <div className="h-1.5 w-8 bg-accent/8" />
           </div>
         </div>
         {/* Hero block */}
-        <div className="h-2 w-3/4 rounded bg-ink/15" />
-        <div className="h-2 w-1/2 rounded bg-ink/10" />
-        <div className="mt-1 h-1.5 w-full rounded bg-ink/8" />
-        <div className="h-1.5 w-5/6 rounded bg-ink/8" />
-        <div className="h-1.5 w-4/6 rounded bg-ink/8" />
+        <div className="h-2 w-3/4 bg-accent/12" />
+        <div className="h-2 w-1/2 bg-accent/8" />
+        <div className="mt-1 h-1.5 w-full bg-accent/6" />
+        <div className="h-1.5 w-5/6 bg-accent/6" />
+        <div className="h-1.5 w-4/6 bg-accent/6" />
         {/* Button suggestion */}
-        <div className="mt-2 h-4 w-16 rounded bg-ink/15" />
+        <div className="mt-2 h-4 w-16 bg-accent/15" />
         {/* Card row */}
         <div className="mt-3 grid grid-cols-3 gap-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="flex flex-col gap-1 rounded bg-ink/6 p-1.5">
-              <div className="h-1.5 w-full rounded bg-ink/10" />
-              <div className="h-1.5 w-4/5 rounded bg-ink/8" />
+            <div key={i} className="flex flex-col gap-1 bg-accent/5 p-1.5">
+              <div className="h-1.5 w-full bg-accent/8" />
+              <div className="h-1.5 w-4/5 bg-accent/6" />
             </div>
           ))}
         </div>
-        <div className="mt-2 h-1.5 w-full rounded bg-ink/8" />
-        <div className="h-1.5 w-3/4 rounded bg-ink/8" />
+        <div className="mt-2 h-1.5 w-full bg-accent/6" />
+        <div className="h-1.5 w-3/4 bg-accent/6" />
       </div>
 
       {/* Scan line */}

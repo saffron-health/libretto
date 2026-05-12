@@ -31,7 +31,7 @@
 
   --color-bg: oklch(0.16 0.012 240);
   --color-ink: oklch(0.94 0.02 90);
-  --color-muted: oklch(0.68 0.04 90);
+  --color-muted: oklch(0.71 0.01 176.78);
   --color-faint: oklch(0.48 0.02 90);
   --color-panel: oklch(0.20 0.014 240);
   --color-panel-hi: oklch(0.24 0.016 240);
@@ -39,6 +39,7 @@
   --color-accent-bright: oklch(0.86 0.22 145);
   --color-accent-dim: oklch(0.50 0.12 145);
   --color-amber: oklch(0.75 0.15 80);
+  --color-rule: oklch(0.30 0.005 240);
 }
 
 html {
@@ -205,7 +206,7 @@ body {
 }
 
 .animate-blink {
-  animation: blink 1s step-end infinite;
+  animation: blink 1.6s step-end infinite;
 }
 
 @keyframes thinking-dot {
@@ -275,7 +276,7 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 50% 80px, oklch(0.82 0.20 145 / 0.04), transparent 50%);
+    radial-gradient(ellipse at 50% 80px, oklch(0.82 0.20 145 / 0.08), transparent 50%);
 }
 
 .section-crt::after {
@@ -286,14 +287,14 @@ body {
   background:
     repeating-linear-gradient(
       to bottom,
-      rgb(255 255 255 / 0.015) 0px,
-      rgb(255 255 255 / 0.015) 1px,
+      rgb(255 255 255 / 0.025) 0px,
+      rgb(255 255 255 / 0.025) 1px,
       transparent 1px,
       transparent 4px
     );
   background-size: 100% 4px;
   animation: crt-scanline-scroll 10s linear infinite;
-  opacity: 0.4;
+  opacity: 0.6;
 }
 
 /* ── Section rails (vertical dotted borders) ── */
@@ -345,7 +346,7 @@ body {
   isolation: isolate;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 50% 0%, oklch(0.22 0.018 145 / 0.5), transparent 50%),
+    radial-gradient(ellipse at 50% 0%, oklch(0.25 0.04 145 / 0.7), transparent 50%),
     var(--color-bg);
 }
 
@@ -387,49 +388,18 @@ body {
 .crt-monitor {
   position: relative;
   overflow: hidden;
+  background: oklch(0.10 0.01 240);
   border: 1px solid oklch(0.82 0.20 145 / 0.2);
-  border-radius: 1rem;
-  background:
-    radial-gradient(ellipse at 50% 50%, oklch(0.82 0.20 145 / 0.06), transparent 50%),
-    linear-gradient(180deg, var(--color-panel-hi), var(--color-panel));
+  border-radius: 6px;
   box-shadow:
-    inset 0 0 28px rgb(0 0 0 / 0.5),
-    inset 0 0 0 1px rgb(255 255 255 / 0.03),
-    0 0 24px oklch(0.82 0.20 145 / 0.08);
+    0 0 15px oklch(0.82 0.20 145 / 0.08),
+    0 0 40px oklch(0.82 0.20 145 / 0.04),
+    inset 0 0 30px rgb(0 0 0 / 0.4);
 }
 
-.crt-monitor::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  pointer-events: none;
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      rgb(255 255 255 / 0.04) 0px,
-      rgb(255 255 255 / 0.04) 1px,
-      transparent 1px,
-      transparent 4px
-    );
-  background-size: 100% 4px;
-  opacity: 0.5;
-  animation: crt-scanline-scroll 6s linear infinite;
-}
-
+.crt-monitor::before,
 .crt-monitor::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 21;
-  pointer-events: none;
-}
-
-.crt-vignette {
-  position: absolute;
-  inset: 0;
-  z-index: 22;
-  pointer-events: none;
+  display: none;
 }
 
 @keyframes crt-scanline-scroll {
@@ -480,7 +450,5 @@ body {
   .crt-page::after {
     animation: none;
   }
-  .crt-monitor::before {
-    animation: none;
-  }
+
 }

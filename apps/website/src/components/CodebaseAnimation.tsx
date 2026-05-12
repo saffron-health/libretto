@@ -56,46 +56,9 @@ export const extractReferrals = new LibrettoWorkflow(
 
 type TokenSpan = { text: string; className: string };
 
-const KEYWORDS = new Set([
-  "import",
-  "from",
-  "export",
-  "const",
-  "new",
-  "async",
-  "await",
-  "return",
-  "type",
-]);
-const TYPES = new Set(["LibrettoWorkflow", "Referral", "Referral[]"]);
 
 function highlightLine(line: string): TokenSpan[] {
-  const spans: TokenSpan[] = [];
-
-  // String literals
-  const parts = line.split(/(["'`](?:[^"'`\\]|\\.)*["'`])/g);
-  for (const part of parts) {
-    if (/^["'`]/.test(part)) {
-      spans.push({ text: part, className: "text-amber-400/80" });
-    } else {
-      // Split by words
-      const wordParts = part.split(/(\b\w+\b)/g);
-      for (const wp of wordParts) {
-        if (KEYWORDS.has(wp)) {
-          spans.push({ text: wp, className: "text-purple-400/80" });
-        } else if (TYPES.has(wp)) {
-          spans.push({ text: wp, className: "text-accent/80" });
-        } else if (/^\d+$/.test(wp)) {
-          spans.push({ text: wp, className: "text-orange-400/80" });
-        } else if (wp === "=>" || wp === "??") {
-          spans.push({ text: wp, className: "text-purple-400/80" });
-        } else {
-          spans.push({ text: wp, className: "text-ink/50" });
-        }
-      }
-    }
-  }
-  return spans;
+  return [{ text: line, className: "text-ink/50" }];
 }
 
 // ---------------------------------------------------------------------------
