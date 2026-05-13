@@ -45,7 +45,7 @@ export function MaintainingFeatures() {
         </div>
 
         <CRTMonitor className="mx-auto max-w-[680px]">
-          <div className="relative z-10 font-mono text-[13px]">
+          <div className="relative z-10 font-mono text-base">
             {/* Title bar */}
             <div className="flex items-center gap-2 border-b border-ink/10 px-5 py-2.5 text-ink/30">
               <span className="size-2.5 rounded-full bg-ink/20" />
@@ -56,14 +56,14 @@ export function MaintainingFeatures() {
             {/* Body */}
             <div className="px-5 py-5">
               <div className="mb-5 flex items-center gap-2">
-                <span className="inline-block size-[6px] rounded-full bg-accent" />
-                <span className="text-accent/60 text-xs tracking-widest uppercase">Capabilities</span>
+                <span className="inline-block size-[6px] rounded-full bg-amber" />
+                <span className="text-amber text-xs tracking-widest uppercase">Capabilities</span>
               </div>
               <div className="flex flex-col gap-4">
                 {flags.map((f) => (
                   <div key={f.flag}>
                     <div className="text-accent">{f.flag}</div>
-                    <div className="mt-1 pl-4 text-muted leading-relaxed">{f.description}</div>
+                    <div className="mt-1 text-muted leading-relaxed" style={{ paddingLeft: "2ch" }}>{f.description}</div>
                   </div>
                 ))}
               </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { RefreshIcon } from "../icons";
 import { workflowExamples, type WorkflowExample } from "./workflowExamples";
-import { CRTShader } from "./CRTShader.js";
+import { CRTMonitor } from "./CRTMonitor.js";
 
 type Line =
   | { type: "user"; text: string }
@@ -338,7 +338,7 @@ export function TerminalDemo() {
 
   return (
     <div className="mx-auto max-w-[600px] mt-16">
-      <div className="crt-monitor relative overflow-hidden flex flex-col font-mono text-[13px] h-[580px]">
+      <CRTMonitor className="relative overflow-hidden flex flex-col font-mono text-[13px] h-[580px]">
         {/* Title bar */}
         <div className="relative flex items-center px-3 py-1.5 bg-black/20">
           <div className="flex gap-1.5">
@@ -518,8 +518,7 @@ export function TerminalDemo() {
             </form>
           )}
         </div>
-        <CRTShader />
-      </div>
+      </CRTMonitor>
     </div>
   );
 }

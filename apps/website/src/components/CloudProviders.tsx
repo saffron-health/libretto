@@ -40,7 +40,7 @@ export function CloudProviders() {
               className="flex h-28 items-center justify-center border-ink/8 [&:not(:last-child)]:border-r max-md:[&:nth-child(2)]:border-r-0 max-md:[&:nth-child(-n+2)]:border-b"
               style={{
                 background:
-                  "repeating-linear-gradient(315deg, oklch(0.94 0.02 90 / 0.03) 0, oklch(0.94 0.02 90 / 0.03) 1px, transparent 0, transparent 50%)",
+                  "repeating-linear-gradient(315deg, color-mix(in oklch, var(--color-gray-12) 3%, transparent) 0, color-mix(in oklch, var(--color-gray-12) 3%, transparent) 1px, transparent 0, transparent 50%)",
                 backgroundSize: "8px 8px",
               }}
             >

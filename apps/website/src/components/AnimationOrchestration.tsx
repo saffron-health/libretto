@@ -43,8 +43,8 @@ export function OrchestrationContainer({
         selector(AnimationTarget.AsciiLogo),
         {
           filter: [
-            "drop-shadow(0 0 12px oklch(0.85 0.17 80 / 0.5)) drop-shadow(0 0 32px oklch(0.85 0.17 80 / 0.25))",
-            "drop-shadow(0 0 0px oklch(0.85 0.17 80 / 0)) drop-shadow(0 0 0px oklch(0.85 0.17 80 / 0))",
+            "drop-shadow(0 0 12px color-mix(in oklch, var(--color-amber-bright) 50%, transparent)) drop-shadow(0 0 32px color-mix(in oklch, var(--color-amber-bright) 25%, transparent))",
+            "drop-shadow(0 0 0px color-mix(in oklch, var(--color-amber-bright) 0%, transparent)) drop-shadow(0 0 0px color-mix(in oklch, var(--color-amber-bright) 0%, transparent))",
           ],
         },
         { duration: 3, ease: "easeOut" },

@@ -29,26 +29,113 @@
     "Commit Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco,
     Consolas, "Liberation Mono", monospace;
 
-  --color-bg: oklch(0.16 0.012 240);
-  --color-ink: oklch(0.94 0.02 90);
-  --color-muted: oklch(0.71 0.01 176.78);
-  --color-faint: oklch(0.48 0.02 90);
-  --color-panel: oklch(0.20 0.014 240);
-  --color-panel-hi: oklch(0.24 0.016 240);
-  --color-accent: oklch(0.82 0.20 145);
-  --color-accent-bright: oklch(0.86 0.22 145);
-  --color-accent-dim: oklch(0.50 0.12 145);
+  /* ── Gray scale (green-tinted) ── */
+  --color-gray-1: #0f120f;
+  --color-gray-2: #171917;
+  --color-gray-3: #202320;
+  --color-gray-4: #262a26;
+  --color-gray-5: #2d322d;
+  --color-gray-6: #363b36;
+  --color-gray-7: #424a42;
+  --color-gray-8: #596359;
+  --color-gray-9: #637263;
+  --color-gray-10: #717f71;
+  --color-gray-11: #abb7ab;
+  --color-gray-12: #ebeeeb;
+
+  /* ── Green scale ── */
+  --color-green-1: #0c130c;
+  --color-green-2: #121b12;
+  --color-green-3: #142d16;
+  --color-green-4: #123c17;
+  --color-green-5: #184a1e;
+  --color-green-6: #205926;
+  --color-green-7: #286a2f;
+  --color-green-8: #2e7e37;
+  --color-green-9: #12ce41;
+  --color-green-10: #38be4c;
+  --color-green-11: #2fdb4f;
+  --color-green-12: #aff4b2;
+
+  /* ── Semantic tokens (hex fallbacks for Tailwind static analysis) ── */
+  --color-bg: #111;
+  --color-ink: #ebeeeb;
+  --color-muted: #abb7ab;
+  --color-faint: #596359;
+  --color-panel: #171917;
+  --color-panel-hi: #202320;
+  --color-accent: #12ce41;
+  --color-accent-bright: #2fdb4f;
+  --color-accent-dim: #2e7e37;
   --color-amber: oklch(0.75 0.15 80);
-  --color-rule: oklch(0.30 0.005 240);
+  --color-amber-bright: oklch(0.90 0.18 80);
+  --color-rule: #262a26;
+}
+
+/* Semantic tokens via var() so P3 scale overrides cascade automatically */
+:root {
+  --color-bg: #111;
+  --color-ink: var(--color-gray-12);
+  --color-muted: var(--color-gray-11);
+  --color-faint: var(--color-gray-8);
+  --color-panel: var(--color-gray-2);
+  --color-panel-hi: var(--color-gray-3);
+  --color-accent: var(--color-green-9);
+  --color-accent-bright: var(--color-green-11);
+  --color-accent-dim: var(--color-green-8);
+  --color-rule: var(--color-gray-4);
+
+  --green-surface: #13251380;
+  --green-contrast: #fff;
+  --gray-surface: rgba(0, 0, 0, 0.05);
+  --gray-contrast: #fff;
+}
+
+/* ── Wide-gamut P3 overrides ── */
+@supports (color: color(display-p3 1 1 1)) {
+  @media (color-gamut: p3) {
+    :root {
+      --color-gray-1: oklch(17.8% 0.0069 145.3);
+      --color-gray-2: oklch(21.1% 0.0066 145.3);
+      --color-gray-3: oklch(25.1% 0.0082 145.3);
+      --color-gray-4: oklch(28.1% 0.009 145.3);
+      --color-gray-5: oklch(31% 0.0105 145.3);
+      --color-gray-6: oklch(34.6% 0.0123 145.3);
+      --color-gray-7: oklch(39.9% 0.0155 145.3);
+      --color-gray-8: oklch(48.8% 0.0199 145.3);
+      --color-gray-9: oklch(53.5% 0.0283 145.3);
+      --color-gray-10: oklch(58.1% 0.0263 145.3);
+      --color-gray-11: oklch(76.6% 0.0205 145.3);
+      --color-gray-12: oklch(94.7% 0.0054 145.3);
+
+      --color-green-1: oklch(17.8% 0.0174 145.4);
+      --color-green-2: oklch(21.1% 0.0219 145.4);
+      --color-green-3: oklch(27.1% 0.0531 145.4);
+      --color-green-4: oklch(31.8% 0.0784 145.4);
+      --color-green-5: oklch(36.5% 0.0903 145.4);
+      --color-green-6: oklch(41.3% 0.1002 145.4);
+      --color-green-7: oklch(46.7% 0.1133 145.4);
+      --color-green-8: oklch(52.7% 0.1316 145.4);
+      --color-green-9: oklch(74.2% 0.2266 145.4);
+      --color-green-10: oklch(70.6% 0.1932 145.4);
+      --color-green-11: oklch(78% 0.2266 145.4);
+      --color-green-12: oklch(90.5% 0.1132 145.4);
+
+      --green-surface: color(display-p3 0.0863 0.1412 0.0784 / 0.5);
+      --gray-surface: color(display-p3 0 0 0 / 5%);
+    }
+  }
 }
 
 html {
   scroll-behavior: smooth;
+  font-size: 15px;
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-ink);
+  font-feature-settings: "ss01" 1;
 }
 
 .libretto-button {
@@ -56,7 +143,7 @@ body {
   min-width: fit-content;
   border: 0;
   cursor: pointer;
-  color: oklch(0.16 0.012 240);
+  color: var(--color-ink);
   font-family: var(--font-sans);
   letter-spacing: 0.01em;
   line-height: 1;
@@ -65,13 +152,13 @@ body {
   background:
     linear-gradient(
       180deg,
-      oklch(0.82 0.20 145 / 0.95) 0%,
-      oklch(0.65 0.16 145 / 0.95) 100%
+      color-mix(in oklch, var(--color-green-9) 95%, transparent) 0%,
+      color-mix(in oklch, var(--color-green-8) 95%, transparent) 100%
     );
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.18),
-    inset 0 0 0 1px oklch(0.82 0.20 145 / 0.5),
-    0 0 20px oklch(0.82 0.20 145 / 0.2),
+    inset 0 0 0 1px color-mix(in oklch, var(--color-green-9) 50%, transparent),
+    0 0 20px color-mix(in oklch, var(--color-green-9) 20%, transparent),
     0 2px 8px rgba(0, 0, 0, 0.3);
   transition:
     background 120ms ease-in-out,
@@ -84,13 +171,13 @@ body {
   background:
     linear-gradient(
       180deg,
-      oklch(0.86 0.22 145 / 0.95) 0%,
-      oklch(0.70 0.18 145 / 0.95) 100%
+      color-mix(in oklch, var(--color-green-11) 95%, transparent) 0%,
+      color-mix(in oklch, var(--color-green-9) 95%, transparent) 100%
     );
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 1px oklch(0.86 0.22 145 / 0.6),
-    0 0 28px oklch(0.82 0.20 145 / 0.3),
+    inset 0 0 0 1px color-mix(in oklch, var(--color-green-11) 60%, transparent),
+    0 0 28px color-mix(in oklch, var(--color-green-9) 30%, transparent),
     0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
@@ -98,21 +185,21 @@ body {
   background:
     linear-gradient(
       180deg,
-      oklch(0.86 0.22 145 / 0.95) 0%,
-      oklch(0.70 0.18 145 / 0.95) 100%
+      color-mix(in oklch, var(--color-green-11) 95%, transparent) 0%,
+      color-mix(in oklch, var(--color-green-9) 95%, transparent) 100%
     );
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 1px oklch(0.86 0.22 145 / 0.6),
-    0 0 28px oklch(0.82 0.20 145 / 0.3),
+    inset 0 0 0 1px color-mix(in oklch, var(--color-green-11) 60%, transparent),
+    0 0 28px color-mix(in oklch, var(--color-green-9) 30%, transparent),
     0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .libretto-button:focus-visible {
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.2),
-    inset 0 0 0 1px oklch(0.82 0.20 145 / 0.7),
-    0 0 0 3px oklch(0.82 0.20 145 / 0.3),
+    inset 0 0 0 1px color-mix(in oklch, var(--color-green-9) 70%, transparent),
+    0 0 0 3px color-mix(in oklch, var(--color-green-9) 30%, transparent),
     0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
@@ -121,13 +208,13 @@ body {
   background:
     linear-gradient(
       180deg,
-      oklch(0.72 0.18 145 / 0.95) 0%,
-      oklch(0.58 0.14 145 / 0.95) 100%
+      color-mix(in oklch, var(--color-green-10) 95%, transparent) 0%,
+      color-mix(in oklch, var(--color-green-7) 95%, transparent) 100%
     );
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.12),
-    inset 0 0 0 1px oklch(0.72 0.18 145 / 0.5),
-    0 0 16px oklch(0.82 0.20 145 / 0.15),
+    inset 0 0 0 1px color-mix(in oklch, var(--color-green-10) 50%, transparent),
+    0 0 16px color-mix(in oklch, var(--color-green-9) 15%, transparent),
     0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
@@ -135,7 +222,7 @@ body {
 .libretto-button[aria-disabled="true"] {
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.1),
-    inset 0 0 0 1px oklch(0.37 0.008 107.1 / 0.42),
+    inset 0 0 0 1px color-mix(in oklch, var(--color-gray-7) 42%, transparent),
     0 6px 14px rgba(17, 17, 17, 0.06);
 }
 
@@ -180,11 +267,11 @@ body {
   background: transparent;
   color: var(--color-ink);
   box-shadow: none;
-  text-decoration-color: oklch(0.82 0.20 145);
+  text-decoration-color: var(--color-accent);
 }
 
 .libretto-button--secondary:focus-visible {
-  box-shadow: 0 0 0 2px oklch(0.82 0.20 145 / 0.4);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-green-9) 40%, transparent);
 }
 
 .libretto-button--secondary:active {
@@ -192,7 +279,7 @@ body {
   color: var(--color-ink);
   box-shadow: none;
   transform: none;
-  text-decoration-color: oklch(0.82 0.20 145);
+  text-decoration-color: var(--color-accent);
 }
 
 @keyframes blink {
@@ -276,7 +363,7 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 50% 80px, oklch(0.82 0.20 145 / 0.08), transparent 50%);
+    radial-gradient(ellipse at 50% 80px, color-mix(in oklch, var(--color-green-9) 8%, transparent), transparent 50%);
 }
 
 .section-crt::after {
@@ -308,8 +395,8 @@ body {
   width: 1px;
   background: repeating-linear-gradient(
     to bottom,
-    oklch(0.94 0.02 90 / 0.12) 0px,
-    oklch(0.94 0.02 90 / 0.12) 12px,
+    color-mix(in oklch, var(--color-gray-12) 12%, transparent) 0px,
+    color-mix(in oklch, var(--color-gray-12) 12%, transparent) 12px,
     transparent 12px,
     transparent 24px
   );
@@ -328,10 +415,10 @@ body {
   background:
     repeating-linear-gradient(
       to bottom,
-      oklch(0.90 0.18 80 / 0.8) 0px,
-      oklch(0.90 0.18 80 / 0.8) 2px,
-      oklch(0.90 0.18 80 / 0.15) 2px,
-      oklch(0.90 0.18 80 / 0.15) 6px
+      color-mix(in oklch, var(--color-amber-bright) 80%, transparent) 0px,
+      color-mix(in oklch, var(--color-amber-bright) 80%, transparent) 2px,
+      color-mix(in oklch, var(--color-amber-bright) 15%, transparent) 2px,
+      color-mix(in oklch, var(--color-amber-bright) 15%, transparent) 6px
     );
   background-size: 100% 6px;
   -webkit-background-clip: text;
@@ -346,7 +433,7 @@ body {
   isolation: isolate;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 50% 0%, oklch(0.25 0.04 145 / 0.7), transparent 50%),
+    radial-gradient(ellipse at 50% 0%, color-mix(in oklch, var(--color-green-3) 70%, transparent), transparent 50%),
     var(--color-bg);
 }
 
@@ -369,31 +456,31 @@ body {
   inset: 0;
   z-index: 51;
   pointer-events: none;
-  background: oklch(0.82 0.20 145 / 0.02);
+  background: color-mix(in oklch, var(--color-green-9) 2%, transparent);
   animation: crt-flicker 7s steps(1, end) infinite;
 }
 
 .crt-glow {
   text-shadow:
-    0 0 12px oklch(0.86 0.22 145 / 0.5),
-    0 0 32px oklch(0.86 0.22 145 / 0.2);
+    0 0 12px color-mix(in oklch, var(--color-green-11) 50%, transparent),
+    0 0 32px color-mix(in oklch, var(--color-green-11) 20%, transparent);
 }
 
 .crt-glow-sm {
   text-shadow:
-    0 0 8px oklch(0.86 0.22 145 / 0.35),
-    0 0 18px oklch(0.86 0.22 145 / 0.12);
+    0 0 8px color-mix(in oklch, var(--color-green-11) 35%, transparent),
+    0 0 18px color-mix(in oklch, var(--color-green-11) 12%, transparent);
 }
 
 .crt-monitor {
   position: relative;
   overflow: hidden;
-  background: oklch(0.10 0.01 240);
-  border: 1px solid oklch(0.82 0.20 145 / 0.2);
+  background: var(--color-green-1);
+  border: 1px solid color-mix(in oklch, var(--color-green-9) 20%, transparent);
   border-radius: 6px;
   box-shadow:
-    0 0 15px oklch(0.82 0.20 145 / 0.08),
-    0 0 40px oklch(0.82 0.20 145 / 0.04),
+    0 0 15px color-mix(in oklch, var(--color-green-9) 8%, transparent),
+    0 0 40px color-mix(in oklch, var(--color-green-9) 4%, transparent),
     inset 0 0 30px rgb(0 0 0 / 0.4);
 }
 

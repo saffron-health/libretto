@@ -127,6 +127,11 @@
     "global": {
       "anchors": [
         {
+          "anchor": "Schedule a call",
+          "href": "https://cal.com/team/saffron-health/libretto-demo",
+          "icon": "phone"
+        },
+        {
           "anchor": "GitHub",
           "href": "https://github.com/saffron-health/libretto",
           "icon": "github"

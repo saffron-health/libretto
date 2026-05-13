@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "recording" | "thinking" | "replaying" | "done";
 
-const ACCENT = "oklch(0.82 0.20 145)"; // phosphor green agent cursor
+const ACCENT = "var(--color-green-9)";
 
 // Resting positions (outside the panel)
 const DEV_HOME = { x: 88, y: 35 }; // right side
@@ -124,7 +124,7 @@ function CursorShape({
         />
       </svg>
       <span
-        className={`absolute top-full mt-0.5 whitespace-nowrap px-1.5 py-0.5 text-[9px] font-medium leading-none text-white ${labelSide === "left" ? "right-0 mr-2" : "left-0 ml-2"} ${labelClassName}`}
+        className={`absolute top-full mt-0.5 whitespace-nowrap px-1.5 py-0.5 text-[9px] font-medium leading-none text-ink ${labelSide === "left" ? "right-0 mr-2" : "left-0 ml-2"} ${labelClassName}`}
       >
         {label}
       </span>

@@ -16,7 +16,7 @@ function MatrixBackground() {
     if (!ctx) return;
 
     let animId: number;
-    const CELL = 10;
+    const CELL = 8;
     let cols = 0;
     let rows = 0;
     // Each column has a "drop" that falls down, leaving a fading trail
@@ -36,7 +36,7 @@ function MatrixBackground() {
       rows = Math.ceil(rect.height / CELL);
       drops = Array.from({ length: cols }, () => ({
         y: Math.random() * rows * 2 - rows, // stagger start positions, some offscreen
-        speed: 0.08 + Math.random() * 0.15,
+        speed: 0.10 + Math.random() * 0.18,
         chars: Array.from({ length: rows }, randomChar),
       }));
     }
@@ -67,7 +67,7 @@ function MatrixBackground() {
           const dist = headY - y;
           if (dist < 0 || dist > STREAK_LENGTH) {
             // Background: very faint static char
-            ctx!.fillStyle = "rgba(140, 230, 120, 0.025)";
+            ctx!.fillStyle = "rgba(140, 230, 120, 0.045)";
             ctx!.fillText(drop.chars[y], x * CELL, y * CELL);
             continue;
           }
@@ -77,9 +77,9 @@ function MatrixBackground() {
           if (dist === 0) {
             // Randomly mutate the head character
             if (Math.random() < 0.3) drop.chars[y] = randomChar();
-            ctx!.fillStyle = "rgba(200, 255, 200, 0.18)";
+            ctx!.fillStyle = "rgba(200, 255, 200, 0.32)";
           } else {
-            const alpha = 0.12 * (1 - t * t);
+            const alpha = 0.20 * (1 - t * t);
             ctx!.fillStyle = `rgba(140, 230, 120, ${alpha})`;
           }
           ctx!.fillText(drop.chars[y], x * CELL, y * CELL);
@@ -105,33 +105,24 @@ function MatrixBackground() {
   );
 }
 
-interface Integration {
-  name: string;
-  logo: string;
-  /** Explicit pixel dimensions — computed from native aspect ratio × target scale */
-  width: number;
-  height: number;
-}
-
-// Width derived from each logo's native aspect ratio; height tuned for visual balance.
-const integrations: Integration[] = [
-  { name: "athenahealth", logo: "/logos/athenahealth.png", width: 174, height: 24 },
-  { name: "eClinicalWorks", logo: "/logos/eclinicalworks.png", width: 160, height: 19 },
-  { name: "UnitedHealthcare", logo: "/logos/uhc.png", width: 98, height: 31 },
-  { name: "Availity", logo: "/logos/availity.png", width: 109, height: 34 },
-  { name: "LinkedIn", logo: "/logos/linkedin.svg", width: 95, height: 24 },
-  { name: "Reddit", logo: "/logos/reddit.svg", width: 83, height: 24 },
-  { name: "X", logo: "/logos/x.svg", width: 34, height: 31 },
-  { name: "eBay", logo: "/logos/ebay.svg", width: 72, height: 29 },
+const integrationTree = [
+  {
+    group: "healthcare",
+    sites: ["athenahealth.com", "eclinicalworks.com", "uhc.com", "availity.com"],
+  },
+  {
+    group: "social",
+    sites: ["linkedin.com", "reddit.com", "x.com"],
+  },
+  {
+    group: "ecommerce",
+    sites: ["ebay.com", "craigslist.org"],
+  },
 ];
-
-function CheckIcon() {
-  return <span className="shrink-0 text-accent-dim text-sm">✓</span>;
-}
 
 export function BattleTestedBanner() {
   return (
-    <section className="relative overflow-hidden py-16" style={{ background: "oklch(0.12 0.01 240)" }}>
+    <section className="relative overflow-hidden py-16" style={{ background: "#000" }}>
       <MatrixBackground />
       <div className="relative z-10 mx-auto max-w-[1000px] px-8">
         <div className="flex flex-col gap-12 md:flex-row md:items-center md:justify-between md:gap-16">
@@ -151,20 +142,23 @@ export function BattleTestedBanner() {
           </div>
 
           {/* Integration logos — 2-column grid on all breakpoints, below text on mobile */}
-          <div className="flex w-full min-w-0 flex-1 items-center justify-center">
-            <div className="grid w-full grid-cols-2 gap-x-3 gap-y-5 sm:gap-x-6 md:gap-x-10 md:gap-y-6">
-              {integrations.map((integration) => (
-                <div key={integration.name} className="flex min-w-0 items-center gap-2 sm:gap-3 md:gap-4">
-                  <CheckIcon />
-                  <img
-                    src={integration.logo}
-                    alt={integration.name}
-                    width={integration.width}
-                    height={integration.height}
-                    className="grayscale opacity-50 invert min-w-0 max-w-full h-auto"
-                  />
+          <div className="flex min-w-0 flex-1 justify-center">
+            <div className="font-mono text-base">
+              {integrationTree.map((group, gi) => (
+                <div key={group.group} className={gi > 0 ? "mt-3" : ""}>
+                  <div className="text-faint">{group.group}/</div>
+                  {group.sites.map((url, si) => {
+                    const isLast = si === group.sites.length - 1;
+                    return (
+                      <div key={url} className="flex items-center">
+                        <span className="text-faint w-4 text-center">{isLast ? "└" : "├"}</span>
+                        <span className="ml-1 text-muted">{url}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
+              <p className="mt-4 text-faint">...and many more</p>
             </div>
           </div>
         </div>

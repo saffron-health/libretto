@@ -10,8 +10,8 @@ const STEP_PAUSE_AFTER_CHECK_MS = 400;
 const SUCCESS_HOLD_MS = 3000;
 const RESET_PAUSE_MS = 600;
 
-const TEAL = "oklch(0.82 0.20 145)";
-const GREEN = "oklch(0.86 0.22 145)";
+const TEAL = "var(--color-green-9)";
+const GREEN = "var(--color-green-11)";
 
 const STEPS = [
   "Grepping network requests",

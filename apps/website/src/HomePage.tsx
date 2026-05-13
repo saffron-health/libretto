@@ -40,7 +40,7 @@ function SectionDivider({ caution }: { caution?: boolean } = {}) {
       className="relative h-8 w-full border-y border-rule"
       style={{
         background:
-          "repeating-linear-gradient(315deg, oklch(0.82 0.20 145 / 0.08) 0, oklch(0.82 0.20 145 / 0.08) 1px, transparent 0, transparent 50%)",
+          "repeating-linear-gradient(315deg, color-mix(in oklch, var(--color-green-9) 8%, transparent) 0, color-mix(in oklch, var(--color-green-9) 8%, transparent) 1px, transparent 0, transparent 50%)",
         backgroundSize: "10px 10px",
       }}
     >
@@ -77,10 +77,10 @@ function Hero({
         className="pointer-events-none absolute inset-0 flex -translate-y-24 max-md:-translate-y-48 items-center justify-center select-none"
       >
         <CanvasAsciihedron
-          className="h-[1600px] w-[1600px] min-h-[1200px] min-w-[1200px] shrink-0 max-h-[180vw] max-w-[180vw] text-accent"
+          className="h-[1600px] w-[1600px] min-h-[1200px] min-w-[1200px] shrink-0 max-h-[180vw] max-w-[180vw] text-ink"
           showAnnotations={false}
           objectScale={1.2}
-          baseOpacity={0.16}
+          baseOpacity={0.11}
           paneUnlocked={paneUnlocked}
           onClosePane={onClosePane}
         />
@@ -91,7 +91,7 @@ function Hero({
         </div>
         <div
           data-animate={AnimationTarget.AsciiLogo}
-          style={{ filter: "drop-shadow(0 0 12px oklch(0.85 0.17 80 / 0.5)) drop-shadow(0 0 32px oklch(0.85 0.17 80 / 0.25))" }}
+          style={{ filter: "drop-shadow(0 0 12px color-mix(in oklch, var(--color-amber-bright) 50%, transparent)) drop-shadow(0 0 32px color-mix(in oklch, var(--color-amber-bright) 25%, transparent))" }}
           className="mb-10 flex justify-center overflow-hidden"
         >
           <AsciiLogo className="text-[5px] sm:text-[7px] md:text-[10px] lg:text-[13px]" />
@@ -130,19 +130,9 @@ function Hero({
             production-ready integration workflows.
           </span>
         </Text>
-        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
+        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-wrap items-center justify-center gap-6">
           <InstallSnippet />
-        </div>
-        <div
-          data-animate={AnimationTarget.Content}
-          style={{ opacity: 0 }}
-          className="mb-16 flex flex-col items-center gap-3"
-        >
-          <Button href="/docs/get-started/introduction">Go to docs</Button>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-faint">or</span>
-            <Button href="https://cal.com/team/saffron-health/libretto-demo" variant="secondary">book a demo</Button>
-          </div>
+          <Button href="/docs/get-started/introduction" variant="secondary">Go to docs</Button>
         </div>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
           <TerminalDemo />
@@ -166,9 +156,9 @@ export function HomePage() {
       <div className="section-rails relative mx-auto max-w-[1100px]">
         <SectionDivider />
         <FeatureRows />
-        <SectionDivider caution />
+        <SectionDivider />
         <BattleTestedBanner />
-        <SectionDivider caution />
+        <SectionDivider />
         <MaintainingFeatures />
         <SectionDivider />
         <CloudProviders />
