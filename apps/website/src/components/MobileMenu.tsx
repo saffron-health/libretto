@@ -73,7 +73,7 @@ function CloseIcon() {
 }
 
 const itemClass =
-  "flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-ink outline-none rounded-lg cursor-pointer data-[focused]:bg-ink/[0.06] data-[pressed]:bg-ink/[0.08]";
+  "flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-ink outline-none rounded-lg cursor-pointer data-[focused]:bg-ink/[0.08] data-[pressed]:bg-ink/[0.12]";
 
 export function MobileMenu({ stars }: { stars: string | null }) {
   const [animation, setAnimation] = useState<AnimationState>("unmounted");
@@ -112,7 +112,7 @@ export function MobileMenu({ stars }: { stars: string | null }) {
             }
           }}
           transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-          className="min-w-[180px] origin-top-right rounded-xl border border-ink/10 bg-cream p-1.5 shadow-lg shadow-ink/[0.08]"
+          className="min-w-[180px] origin-top-right rounded-xl border border-accent/20 bg-panel p-1.5 shadow-lg shadow-black/30"
         >
           <Menu className="outline-none">
             <MenuItem

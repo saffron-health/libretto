@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "recording" | "thinking" | "replaying" | "done";
 
-const ACCENT = "oklch(0.55 0.15 175)"; // teal agent cursor
+const ACCENT = "var(--color-green-9)";
 
 // Resting positions (outside the panel)
 const DEV_HOME = { x: 88, y: 35 }; // right side
@@ -24,8 +24,8 @@ const PANEL_WIDTH_CLASS = "w-[72%] sm:w-[60%] md:w-[55%]";
 function RecordDot() {
   return (
     <span className="relative flex size-2">
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-      <span className="relative inline-flex size-2 rounded-full bg-red-500" />
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400/70 opacity-75" />
+      <span className="relative inline-flex size-2 rounded-full bg-red-400" />
     </span>
   );
 }
@@ -124,7 +124,7 @@ function CursorShape({
         />
       </svg>
       <span
-        className={`absolute top-full mt-0.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-none text-white ${labelSide === "left" ? "right-0 mr-2" : "left-0 ml-2"} ${labelClassName}`}
+        className={`absolute top-full mt-0.5 whitespace-nowrap px-1.5 py-0.5 text-[9px] font-medium leading-none text-ink ${labelSide === "left" ? "right-0 mr-2" : "left-0 ml-2"} ${labelClassName}`}
       >
         {label}
       </span>
@@ -178,11 +178,11 @@ function StatusBadge({ phase }: StatusLabelProps) {
 
   const colorClass =
     phase === "recording"
-      ? "text-red-500"
+      ? "text-red-400"
       : phase === "thinking"
         ? "text-amber-500"
         : phase === "replaying"
-          ? "text-teal-600"
+          ? "text-accent"
           : "text-green-600";
 
   const icon =
@@ -193,7 +193,7 @@ function StatusBadge({ phase }: StatusLabelProps) {
         <BrainIcon />
       </span>
     ) : phase === "replaying" ? (
-      <span className="text-teal-600">
+      <span className="text-accent">
         <ChevronsIcon />
       </span>
     ) : (
@@ -225,26 +225,14 @@ function StatusBadge({ phase }: StatusLabelProps) {
 
 function PatientDetailPane() {
   return (
-    <motion.div
-      className="absolute inset-0 z-10 flex items-center justify-center bg-black/5"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-    >
-      <motion.div
-        className="flex h-[76%] w-[76%] flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white p-3 shadow-xs sm:h-[80%] sm:w-[80%] sm:shadow-sm"
-        initial={{ opacity: 0, scale: 0.95, y: 6 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 6 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
-      >
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
+      <div className="flex h-[76%] w-[76%] flex-col overflow-hidden border border-accent/20 bg-bg p-3 sm:h-[80%] sm:w-[80%]">
         {/* Header */}
-        <div className="mb-3 flex items-center gap-2 border-b border-black/[0.06] pb-2">
-          <div className="size-8 shrink-0 rounded-full bg-black/10" />
+        <div className="mb-3 flex items-center gap-2 border-b border-accent/15 pb-2">
+          <div className="size-8 shrink-0 bg-accent/8" />
           <div className="flex flex-col gap-0.5">
-            <div className="h-2.5 w-24 rounded-full bg-black/15" />
-            <div className="h-1.5 w-16 rounded-full bg-black/08" />
+            <div className="h-2.5 w-24 bg-accent/10" />
+            <div className="h-1.5 w-16 bg-accent/6" />
           </div>
         </div>
 
@@ -257,15 +245,15 @@ function PatientDetailPane() {
             { label: "Provider", width: "w-20" },
           ].map((row) => (
             <div key={row.label} className="flex items-center gap-3">
-              <span className="w-14 text-[9px] font-medium text-black/30">
+              <span className="w-14 text-[9px] font-medium text-accent/30">
                 {row.label}
               </span>
-              <div className={`h-2 ${row.width} rounded-full bg-black/10`} />
+              <div className={`h-2 ${row.width} bg-accent/10`} />
             </div>
           ))}
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
@@ -526,32 +514,21 @@ export function RecordReplayAnimation() {
 
         {/* Mock website panel — centered, wider on mobile, constrained height */}
         <div
-          className={`relative ${PANEL_WIDTH_CLASS} mb-6 max-h-[72%] overflow-hidden rounded-xl border border-black/[0.08] bg-white/80 p-3 shadow-sm sm:max-h-[70%]`}
+          className={`relative ${PANEL_WIDTH_CLASS} mb-6 max-h-[72%] overflow-hidden border border-accent/25 p-3 sm:max-h-[70%]`}
         >
           {/* Search bar row */}
           <div className="flex gap-2">
             <div
               ref={searchInputRef}
-              className="flex flex-1 items-center rounded-lg border border-black/10 bg-white px-2 py-1.5 text-xs text-black/30 shadow-xs"
+              className="flex flex-1 items-center border border-accent/20 px-2 py-1.5 text-xs text-accent/40"
             >
-              <svg
-                className="mr-2 shrink-0 text-black/20"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="M16.5 16.5L21 21" />
-              </svg>
+              <span className="mr-2 shrink-0 text-accent/25">▸</span>
               <span className="min-w-0 flex-1 truncate">
                 {searchText || (
-                  <span className="text-black/25">Search patients</span>
+                  <span className="text-accent/20">Search patients</span>
                 )}
                 {searchText && (
-                  <span className="inline-block w-px animate-pulse bg-black/50">
+                  <span className="inline-block w-px bg-accent/60">
                     &nbsp;
                   </span>
                 )}
@@ -559,7 +536,7 @@ export function RecordReplayAnimation() {
             </div>
             <button
               ref={searchButtonRef}
-              className="rounded-lg bg-black/80 px-2 py-1 text-[10px] font-medium text-white shadow-sm"
+              className="border border-accent/30 bg-accent/15 px-2 py-1 text-[10px] font-medium text-accent/70"
             >
               Search
             </button>
@@ -576,16 +553,16 @@ export function RecordReplayAnimation() {
               {[80, 65, 72].map((width, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5"
+                  className="flex items-center gap-3 border border-transparent px-3 py-2.5"
                 >
-                  <div className="size-6 shrink-0 rounded-full" />
+                  <div className="size-6 shrink-0" />
                   <div className="flex flex-1 flex-col gap-1">
                     <div
-                      className="h-2 rounded-full"
+                      className="h-2"
                       style={{ width: `${width}%` }}
                     />
                     <div
-                      className="h-1.5 rounded-full"
+                      className="h-1.5"
                       style={{ width: `${width * 0.6}%` }}
                     />
                   </div>
@@ -593,45 +570,33 @@ export function RecordReplayAnimation() {
               ))}
             </div>
 
-            {/* Visible animated rows — absolutely positioned over the spacers */}
+            {/* Visible rows — absolutely positioned over the spacers */}
             <div className="absolute inset-0 space-y-2">
-              <AnimatePresence>
-                {showResults &&
-                  [80, 65, 72].map((width, i) => (
-                    <motion.div
-                      key={i}
-                      ref={i === 0 ? setFirstResultRef : undefined}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-black/[0.06] bg-white px-3 py-2.5 shadow-sm"
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{
-                        delay: i * 0.08,
-                        duration: 0.25,
-                        ease: "easeOut",
-                      }}
-                    >
-                      <div className="size-6 shrink-0 rounded-full bg-black/10" />
-                      <div className="flex flex-1 flex-col gap-1">
-                        <div
-                          className="h-2 rounded-full bg-black/15"
-                          style={{ width: `${width}%` }}
-                        />
-                        <div
-                          className="h-1.5 rounded-full bg-black/08"
-                          style={{ width: `${width * 0.6}%` }}
-                        />
-                      </div>
-                    </motion.div>
-                  ))}
-              </AnimatePresence>
+              {showResults &&
+                [80, 65, 72].map((width, i) => (
+                  <div
+                    key={i}
+                    ref={i === 0 ? setFirstResultRef : undefined}
+                    className="flex cursor-pointer items-center gap-3 border border-accent/15 px-3 py-2.5"
+                  >
+                    <div className="size-6 shrink-0 bg-accent/8" />
+                    <div className="flex flex-1 flex-col gap-1">
+                      <div
+                        className="h-2 bg-accent/10"
+                        style={{ width: `${width}%` }}
+                      />
+                      <div
+                        className="h-1.5 bg-accent/6"
+                        style={{ width: `${width * 0.6}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
 
           {/* Patient detail overlay — shown after clicking a result */}
-          <AnimatePresence>
-            {showPatientDetail && <PatientDetailPane />}
-          </AnimatePresence>
+          {showPatientDetail && <PatientDetailPane />}
         </div>
       </div>
 
@@ -663,7 +628,7 @@ export function RecordReplayAnimation() {
         <CursorShape
           color={ACCENT}
           label="Agent"
-          labelClassName="bg-teal-600"
+          labelClassName="bg-accent"
         />
       </motion.div>
     </div>

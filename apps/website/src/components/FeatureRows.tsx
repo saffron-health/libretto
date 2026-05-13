@@ -4,6 +4,7 @@ import { Text } from "./Text.js";
 import { RecordReplayAnimation } from "./RecordReplayAnimation.js";
 import { SecurityScanAnimation } from "./SecurityScanAnimation.js";
 import { CodebaseAnimation } from "./CodebaseAnimation.js";
+import { CRTMonitor } from "./CRTMonitor.js";
 
 interface Feature {
   title: string;
@@ -34,19 +35,17 @@ const features: Feature[] = [
 
 export function FeatureRows() {
   return (
-    <section className="px-8 py-24">
+    <section className="section-crt px-8 py-24">
       <div className="mx-auto max-w-[1000px]">
-        {/* Divider */}
-        <div className="mx-auto mb-16 h-px w-[160px] bg-ink/10" />
-
         <div className="mb-20 text-center">
+          <span className="mb-3 block font-mono text-base text-amber">// BUILD --</span>
           <SectionHeading size="sm" className="mb-4">
             Build new automations easily
           </SectionHeading>
           <Text
             as="p"
             size="md"
-            className="mx-auto max-w-[520px] leading-relaxed text-muted"
+            className="mx-auto max-w-[580px] leading-relaxed text-muted [text-wrap:balance]"
           >
             Go from idea to production workflow in minutes, not days.
           </Text>
@@ -61,17 +60,18 @@ export function FeatureRows() {
                 className={`flex flex-col items-center gap-12 md:flex-row ${reversed ? "md:flex-row-reverse" : ""}`}
               >
                 <div className="flex-1">
-                  <Text as="h3" size="xl" className="mb-3 font-medium text-ink">
+                  <Text as="h3" size="md" className="mb-3 font-medium text-ink">
+                    <span className="text-amber">{String(i + 1).padStart(2, "0")}.</span>{" "}
                     {feature.title}
                   </Text>
-                  <Text as="p" size="md" className="leading-relaxed text-muted">
+                  <Text as="p" size="md" className="leading-relaxed text-muted [text-wrap:balance]">
                     {feature.description}
                   </Text>
                 </div>
 
-                <div className="flex aspect-[4/3] w-full flex-1 items-center justify-center overflow-hidden rounded-xl border border-ink/8 bg-ink/[0.03]">
+                <CRTMonitor className="flex aspect-[4/3] w-full flex-1 items-center justify-center">
                   {feature.animation}
-                </div>
+                </CRTMonitor>
               </div>
             );
           })}

@@ -13,6 +13,7 @@ import { useEffect, type PropsWithChildren } from "react";
 
 /** Animation target names — use as `data-animate={AnimationTarget.xxx}` */
 export const AnimationTarget = {
+  AsciiLogo: "ascii-logo",
   TitleWord: "title-word",
   Content: "content",
   Navbar: "navbar",
@@ -37,13 +38,25 @@ export function OrchestrationContainer({
     async function run() {
       const selector = (name: string) => `[data-animate='${name}']`;
 
-      // ── 1. Title: word-by-word ──
+      // ── 1. ASCII logo is already visible; glow slowly fades while rest animates ──
+      animate(
+        selector(AnimationTarget.AsciiLogo),
+        {
+          filter: [
+            "drop-shadow(0 0 12px color-mix(in oklch, var(--color-amber-bright) 50%, transparent)) drop-shadow(0 0 32px color-mix(in oklch, var(--color-amber-bright) 25%, transparent))",
+            "drop-shadow(0 0 0px color-mix(in oklch, var(--color-amber-bright) 0%, transparent)) drop-shadow(0 0 0px color-mix(in oklch, var(--color-amber-bright) 0%, transparent))",
+          ],
+        },
+        { duration: 3, ease: "easeOut" },
+      );
+
+      // ── 2. Title words fade in ──
       await animate(
         selector(AnimationTarget.TitleWord),
-        { opacity: [0, 1], y: [12, 0], filter: ["blur(4px)", "blur(0px)"] },
+        { opacity: [0, 1], y: [6, 0] },
         {
-          duration: 0.45,
-          delay: stagger(0.08, { startDelay: 0.15 }),
+          duration: 0.3,
+          delay: stagger(0.055, { startDelay: 0.3 }),
         },
       );
       if (cancelled) return;

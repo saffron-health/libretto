@@ -13,6 +13,7 @@ import {
   AnimationTarget,
 } from "./components/AnimationOrchestration";
 import { AnimatedTitle } from "./components/AnimatedTitle";
+import { AsciiLogo } from "./components/AsciiLogo";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 import { VersionBadge } from "./components/VersionBadge";
@@ -22,6 +23,19 @@ import { MaintainingFeatures } from "./components/MaintainingFeatures";
 import { CloudProviders } from "./components/CloudProviders";
 import { FAQ } from "./components/FAQ";
 import { CTA } from "./components/CTA";
+
+function SectionDivider() {
+  return (
+    <div
+      className="relative h-8 w-full border-y border-rule"
+      style={{
+        background:
+          "repeating-linear-gradient(315deg, color-mix(in oklch, var(--color-green-9) 8%, transparent) 0, color-mix(in oklch, var(--color-green-9) 8%, transparent) 1px, transparent 0, transparent 50%)",
+        backgroundSize: "10px 10px",
+      }}
+    />
+  );
+}
 
 function Hero({
   paneUnlocked,
@@ -46,6 +60,7 @@ function Hero({
           className="h-[1600px] w-[1600px] min-h-[1200px] min-w-[1200px] shrink-0 max-h-[180vw] max-w-[180vw] text-ink"
           showAnnotations={false}
           objectScale={1.2}
+          baseOpacity={0.11}
           paneUnlocked={paneUnlocked}
           onClosePane={onClosePane}
         />
@@ -54,18 +69,25 @@ function Hero({
         <div data-animate={AnimationTarget.Navbar} style={{ opacity: 0 }}>
           <VersionBadge />
         </div>
+        <div
+          data-animate={AnimationTarget.AsciiLogo}
+          style={{ filter: "drop-shadow(0 0 12px color-mix(in oklch, var(--color-amber-bright) 50%, transparent)) drop-shadow(0 0 32px color-mix(in oklch, var(--color-amber-bright) 25%, transparent))" }}
+          className="mb-10 flex justify-center overflow-hidden"
+        >
+          <AsciiLogo className="text-[5px] sm:text-[7px] md:text-[10px] lg:text-[13px]" />
+        </div>
         <Text
           as="h1"
           size="5xl"
           style="serif"
-          className="mx-auto mb-8 max-w-[800px] text-center tracking-[-0.03em] text-ink [text-wrap:balance]"
+          className="crt-glow mx-auto mb-8 max-w-[1000px] text-center tracking-[-0.04em] text-ink [text-wrap:balance]"
         >
           <AnimatedTitle
-            className="grain"
+            className=""
             style={{
               fontWeight: 300,
-              fontSize: "clamp(48px, 6vw, 72px)",
-              lineHeight: 1.1,
+              fontSize: "clamp(40px, 6vw, 80px)",
+              lineHeight: 1.05,
             }}
           >
             The AI Toolkit for Building Robust Web Integrations
@@ -76,7 +98,7 @@ function Hero({
           size="lg"
           data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
-          className="mx-auto mb-8 max-w-[560px] text-center leading-relaxed text-muted"
+          className="mx-auto mb-8 max-w-[580px] text-center leading-relaxed text-muted [text-wrap:balance]"
         >
           <span className="hidden md:inline">
             An agent skill and token-efficient CLI that inspects live pages,
@@ -88,19 +110,9 @@ function Hero({
             production-ready integration workflows.
           </span>
         </Text>
-        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
+        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-wrap items-center justify-center gap-6">
           <InstallSnippet />
-        </div>
-        <div
-          data-animate={AnimationTarget.Content}
-          style={{ opacity: 0 }}
-          className="mb-16 flex flex-col items-center gap-3"
-        >
-          <Button href="/docs/get-started/introduction">Go to docs</Button>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-faint">or</span>
-            <Button href="https://cal.com/team/saffron-health/libretto-demo" variant="secondary">book a demo</Button>
-          </div>
+          <Button href="/docs/get-started/introduction" variant="secondary">Go to docs</Button>
         </div>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
           <TerminalDemo />
@@ -115,19 +127,27 @@ export function HomePage() {
     useKonamiPane();
 
   return (
-    <OrchestrationContainer className="min-h-screen bg-cream text-ink">
+    <OrchestrationContainer className="crt-page min-h-screen bg-bg text-ink">
       {!paneUnlocked && (
         <KonamiOverlay progress={konamiProgress} completed={konamiCompleted} />
       )}
       <Navbar animate />
       <Hero paneUnlocked={paneUnlocked} onClosePane={closePane} />
-      <FeatureRows />
-      <BattleTestedBanner />
-      <MaintainingFeatures />
-      <CloudProviders />
-      <FAQ />
-      <CTA />
-      <Footer />
+      <div className="section-rails relative mx-auto max-w-[1100px]">
+        <SectionDivider />
+        <FeatureRows />
+        <SectionDivider />
+        <BattleTestedBanner />
+        <SectionDivider />
+        <MaintainingFeatures />
+        <SectionDivider />
+        <CloudProviders />
+        <SectionDivider />
+        <FAQ />
+        <SectionDivider />
+        <CTA />
+        <Footer />
+      </div>
     </OrchestrationContainer>
   );
 }
