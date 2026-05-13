@@ -30,10 +30,10 @@ export function CloudProviders() {
 
         <div className="mx-auto grid max-w-[700px] grid-cols-2 border border-ink/8 md:grid-cols-4">
           {[
-            <BrowserbaseLogo key="bb" className="h-8 w-auto text-ink/35" />,
-            <KernelLogo key="k" className="h-6 w-auto text-ink/35" />,
-            <AWSLogo key="aws" className="h-8 w-auto text-ink/35" />,
-            <GCPLogo key="gcp" className="h-8 w-auto text-ink/35" />,
+            <BrowserbaseLogo key="bb" className="h-7 w-auto text-ink/35" />,
+            <KernelLogo key="k" className="h-5 w-auto text-ink/35" />,
+            <AWSLogo key="aws" className="h-7 w-auto text-ink/35" />,
+            <GCPLogo key="gcp" className="h-7 w-auto text-ink/35" />,
           ].map((logo, i) => (
             <div
               key={i}
