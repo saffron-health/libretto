@@ -10,3 +10,15 @@ minimumReleaseAgeExclude:
   - libretto
 
 enablePrePostScripts: false
+
+blockExoticSubdeps: true
+
+allowBuilds:
+  esbuild: true
+  fallow: false
+  glimpseui: false
+  keytar: true
+  koffi: true
+  protobufjs: true
+  puppeteer: true
+  sharp: true
