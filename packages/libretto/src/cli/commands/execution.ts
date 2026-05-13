@@ -52,7 +52,7 @@ import {
 } from "../core/telemetry.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import type { Experiments } from "../core/experiments.js";
-import { SimpleCLI } from "../framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 import {
   pageOption,
   sessionOption,

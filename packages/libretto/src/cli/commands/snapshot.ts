@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import { readSessionState } from "../core/session.js";
-import { SimpleCLI } from "../framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 import {
   pageOption,
   sessionOption,
