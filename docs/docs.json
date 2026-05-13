@@ -63,7 +63,7 @@
         ]
       },
       {
-        "group": "Fundamentals",
+        "group": "Understand Libretto",
         "pages": [
           "fundamentals/core-concepts",
           "fundamentals/how-workflow-generation-works",
