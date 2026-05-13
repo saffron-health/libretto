@@ -56,46 +56,9 @@ export const extractReferrals = new LibrettoWorkflow(
 
 type TokenSpan = { text: string; className: string };
 
-const KEYWORDS = new Set([
-  "import",
-  "from",
-  "export",
-  "const",
-  "new",
-  "async",
-  "await",
-  "return",
-  "type",
-]);
-const TYPES = new Set(["LibrettoWorkflow", "Referral", "Referral[]"]);
 
 function highlightLine(line: string): TokenSpan[] {
-  const spans: TokenSpan[] = [];
-
-  // String literals
-  const parts = line.split(/(["'`](?:[^"'`\\]|\\.)*["'`])/g);
-  for (const part of parts) {
-    if (/^["'`]/.test(part)) {
-      spans.push({ text: part, className: "text-amber-600/80" });
-    } else {
-      // Split by words
-      const wordParts = part.split(/(\b\w+\b)/g);
-      for (const wp of wordParts) {
-        if (KEYWORDS.has(wp)) {
-          spans.push({ text: wp, className: "text-purple-600/80" });
-        } else if (TYPES.has(wp)) {
-          spans.push({ text: wp, className: "text-teal-600/80" });
-        } else if (/^\d+$/.test(wp)) {
-          spans.push({ text: wp, className: "text-orange-500/80" });
-        } else if (wp === "=>" || wp === "??") {
-          spans.push({ text: wp, className: "text-purple-600/80" });
-        } else {
-          spans.push({ text: wp, className: "text-ink/60" });
-        }
-      }
-    }
-  }
-  return spans;
+  return [{ text: line, className: "text-ink/50" }];
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +67,7 @@ function highlightLine(line: string): TokenSpan[] {
 
 function Cursor() {
   return (
-    <span className="inline-block w-[5px] h-[1.1em] align-text-bottom animate-blink bg-ink/40" />
+    <span className="inline-block w-[5px] h-[1.1em] align-text-bottom animate-blink bg-accent/60" />
   );
 }
 
@@ -121,10 +84,10 @@ function FileTree({ activeFile }: { activeFile: string }) {
           return (
             <div
               key={i}
-              className="flex items-center gap-1 py-[2px] text-[9px] font-medium text-ink/45"
+              className="flex items-center gap-1 py-[2px] text-[9px] font-medium text-ink/40"
               style={{ paddingLeft: `${entry.depth * 8 + 2}px` }}
             >
-              <span className="text-[7px] leading-none text-ink/25">›</span>
+              <span className="text-[7px] leading-none text-ink/20">›</span>
               {entry.name}
             </div>
           );
@@ -133,7 +96,7 @@ function FileTree({ activeFile }: { activeFile: string }) {
           <div
             key={i}
             className={`py-[2px] text-[9px] rounded-[3px] ${
-              isActive ? "bg-ink/[0.07] text-ink/65 font-medium px-1" : "text-ink/30"
+              isActive ? "bg-accent/10 text-accent/80 font-medium px-1" : "text-ink/25"
             }`}
             style={{ paddingLeft: `${entry.depth * 8 + 10}px` }}
           >
@@ -171,7 +134,7 @@ function EditorPane({
         {/* Line numbers */}
         <div className="shrink-0 pr-3 text-right select-none w-[2ch]" style={{ fontVariantNumeric: "tabular-nums" }}>
           {lines.map((_, i) => (
-            <div key={i} className="text-[10px] leading-[1.7] text-ink/15">
+            <div key={i} className="text-[10px] leading-[1.7] text-ink/20">
               {i + 1}
             </div>
           ))}
@@ -265,13 +228,13 @@ export function CodebaseAnimation() {
   return (
     <div className="w-full h-full flex flex-col">
       {/* Title bar */}
-      <div className="flex items-center px-2.5 py-1.5 border-b border-ink/[0.06] bg-ink/[0.02]">
+      <div className="flex items-center px-2.5 py-1.5 border-b border-ink/10 bg-black/20">
         <div className="flex gap-1">
           <div className="size-[7px] rounded-full bg-ink/10" />
           <div className="size-[7px] rounded-full bg-ink/10" />
           <div className="size-[7px] rounded-full bg-ink/10" />
         </div>
-        <span className="ml-3 text-[10px] text-ink/30 font-medium">
+        <span className="ml-3 text-[10px] text-ink/40 font-medium">
           extractReferrals.ts
         </span>
       </div>
@@ -279,7 +242,7 @@ export function CodebaseAnimation() {
       {/* Body: sidebar + editor */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-[26%] shrink-0 border-r border-ink/[0.06] bg-ink/[0.015] overflow-hidden">
+        <div className="w-[26%] shrink-0 border-r border-ink/10 bg-black/15 overflow-hidden">
           <FileTree activeFile="extractReferrals.ts" />
         </div>
 

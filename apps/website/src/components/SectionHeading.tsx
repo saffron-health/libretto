@@ -25,7 +25,7 @@ export function SectionHeading({
       as="h2"
       size="3xl"
       style="serif"
-      className={`tracking-[-0.02em] text-ink ${className}`}
+      className={`crt-glow capitalize underline decoration-accent decoration-2 underline-offset-8 tracking-[-0.02em] text-ink ${className}`}
       htmlStyle={{ fontWeight: 300, fontSize, lineHeight }}
     >
       {children}

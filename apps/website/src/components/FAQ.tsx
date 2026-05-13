@@ -4,7 +4,7 @@ import { Text } from "./Text";
 import { CrossfadeIcon } from "./CrossfadeIcon";
 import { REPO_URL, DISCORD_URL } from "../site";
 
-const linkClass = "underline text-ink/70 hover:text-ink transition-colors";
+const linkClass = "underline text-accent hover:text-accent-bright transition-colors";
 
 interface FAQItem {
   id: string;
@@ -34,7 +34,7 @@ const faqs: FAQItem[] = [
     question:
       "How is it different from existing tools like Stagehand or Browser-Use?",
     answer:
-      "Libretto is a CLI and skill that gives your coding agent tools to build new automations and debug scripts that fail. Tools like Stagehand and Browser-Use use AI at runtime to handle edge cases without human involvement. They also rely entirely on UI interactions, which makes them slow, expensive, and nondeterministic. Libretto generates deterministic scripts that can use both UI automation and direct network requests. When a script breaks, you use Libretto to diagnose and fix it. You can still add AI runtime logic since it's all just TypeScript, but it's not the default.",
+      "Tools like Stagehand and Browser-Use use AI at runtime to handle edge cases without human involvement. They also rely entirely on UI interactions, which makes them slow, expensive, and nondeterministic.\n\nLibretto generates deterministic scripts that can use both UI automation and direct network requests. When a script breaks, you use Libretto to diagnose and fix it. You can still add AI runtime logic since it's all just TypeScript, but it's not the default.",
   },
   {
     id: "providers",
@@ -121,9 +121,9 @@ function MinusIcon() {
 function FAQAccordionItem({ item }: { item: FAQItem }) {
   const [isExpanded, setIsExpanded] = useState(false);
   return (
-    <div className="border-b border-ink/8">
+    <div className="border-b border-ink/10">
       <button
-        className="flex w-full cursor-pointer items-center justify-between py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ink/20 rounded-sm"
+        className="flex w-full cursor-pointer items-center justify-between py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/30 rounded-sm"
         onClick={() => setIsExpanded(!isExpanded)}
         aria-expanded={isExpanded}
       >
@@ -138,7 +138,7 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
       </button>
       {isExpanded && (
         <div className="overflow-hidden">
-          <Text as="p" size="sm" className="pb-5 leading-relaxed text-muted">
+          <Text as="p" size="sm" className="pb-5 leading-relaxed text-muted whitespace-pre-line">
             {item.answer}
           </Text>
         </div>
@@ -149,12 +149,15 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
 
 export function FAQ() {
   return (
-    <section className="px-8 py-24">
-      <div className="mx-auto max-w-[680px]">
-        <SectionHeading className="mb-10 text-center">
-          Frequently asked questions
-        </SectionHeading>
-        <div className="border-t border-ink/8">
+    <section className="section-crt px-8 py-24">
+      <div className="mx-auto flex max-w-[1000px] flex-col gap-12 md:flex-row md:gap-16">
+        <div className="md:w-1/2 md:shrink-0 md:pt-5">
+          <span className="mb-3 block font-mono text-base text-amber">// FAQ --</span>
+          <SectionHeading>
+            Frequently asked questions
+          </SectionHeading>
+        </div>
+        <div className="md:w-1/2 border-t border-ink/10">
           {faqs.map((faq) => (
             <FAQAccordionItem key={faq.id} item={faq} />
           ))}

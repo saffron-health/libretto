@@ -10,7 +10,7 @@ export function NpmIcon(props: React.SVGProps<SVGSVGElement>) {
     >
       <path fill="currentColor" d="M0,0v6h5v1h4v-1h9v-6" />
       <path
-        fill="#FFFFFF"
+        fill="var(--color-bg)"
         d="M1,1v4h2v-3h1v3h1v-4h1v5h2v-4h1v2h-1v1h2v-4h1v4h2v-3h1v3h1v-3h1v3h1v-4"
       />
     </svg>

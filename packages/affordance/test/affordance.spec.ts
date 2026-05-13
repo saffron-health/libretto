@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   SimpleCLI,
   type SimpleCLIMiddleware,
-} from "../src/cli/framework/simple-cli.js";
+} from "../src/index.js";
 
 describe("SimpleCLI framework", () => {
   test("derives route keys and path tokens from tree keys", () => {
@@ -33,22 +33,26 @@ describe("SimpleCLI framework", () => {
     ]);
   });
 
-  test("prefixes experimental commands under the experimental namespace", async () => {
+  test("supports explicit experimental command groups", async () => {
     const noInput = SimpleCLI.input({ positionals: [], named: {} });
     const noop = SimpleCLI.command({ description: "noop" })
       .input(noInput)
       .handle(async () => {});
 
     const app = SimpleCLI.define("libretto", {
-      ai: SimpleCLI.group({
-        description: "AI commands",
+      experimental: SimpleCLI.group({
+        description: "Experimental commands",
         routes: {
-          configure: SimpleCLI.command({
-            description: "Configure AI runtime",
-            experimental: true,
-          })
-            .input(noInput)
-            .handle(async () => {}),
+          ai: SimpleCLI.group({
+            description: "AI commands",
+            routes: {
+              configure: SimpleCLI.command({
+                description: "Configure AI runtime",
+              })
+                .input(noInput)
+                .handle(async () => {}),
+            },
+          }),
         },
       }),
       open: noop,
