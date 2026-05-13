@@ -8,15 +8,20 @@ import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
 import { snapshotCommand } from "./commands/snapshot.js";
 import { librettoCommand } from "../shared/package-manager.js";
-import { SimpleCLI } from "./framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 
 export const cliRoutes = {
   ...browserCommands,
-  deploy: deployCommand,
+  experimental: SimpleCLI.group({
+    description: "Experimental commands",
+    routes: {
+      deploy: deployCommand,
+      auth: authCommands,
+      billing: billingCommands,
+    },
+  }),
   experiments: experimentsCommand,
   ...executionCommands,
-  auth: authCommands,
-  billing: billingCommands,
   setup: setupCommand,
   status: statusCommand,
   snapshot: snapshotCommand,

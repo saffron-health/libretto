@@ -14,7 +14,7 @@ import {
   type SimpleCLIMiddlewareArgs,
   type SimpleCLIContext,
   type SimpleCLIMiddleware,
-} from "../framework/simple-cli.js";
+} from "affordance";
 
 export function sessionOption(help = "Session name") {
   return SimpleCLI.option(z.string().optional(), { help });

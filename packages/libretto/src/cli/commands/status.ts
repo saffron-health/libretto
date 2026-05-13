@@ -1,5 +1,5 @@
 import { listRunningSessions, type SessionState } from "../core/session.js";
-import { SimpleCLI } from "../framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 
 // ── Session status printing ─────────────────────────────────────────────────
 

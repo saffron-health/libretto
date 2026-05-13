@@ -17,7 +17,7 @@
  */
 
 import { z } from "zod";
-import { SimpleCLI } from "../framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 import {
   ApiCallError,
   betterAuthCall,
@@ -198,7 +198,6 @@ async function issueApiKey(
 
 export const signupCommand = SimpleCLI.command({
   description: "Create a new hosted-platform account and organization",
-  experimental: true,
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
   .handle(async () => {
@@ -304,7 +303,6 @@ export const signupCommand = SimpleCLI.command({
 
 export const loginCommand = SimpleCLI.command({
   description: "Sign in to an existing hosted-platform account",
-  experimental: true,
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
   .handle(async () => {
@@ -375,7 +373,6 @@ export const loginCommand = SimpleCLI.command({
 
 export const logoutCommand = SimpleCLI.command({
   description: "Clear local libretto credentials",
-  experimental: true,
 })
   .handle(async () => {
     const state = await readAuthState();
@@ -400,7 +397,6 @@ export const logoutCommand = SimpleCLI.command({
 
 export const inviteCommand = SimpleCLI.command({
   description: "Invite a teammate to your active organization",
-  experimental: true,
 })
   .input(
     SimpleCLI.input({
@@ -485,7 +481,6 @@ export const inviteCommand = SimpleCLI.command({
 
 export const acceptInviteCommand = SimpleCLI.command({
   description: "Accept an organization invitation",
-  experimental: true,
 })
   .input(
     SimpleCLI.input({
@@ -621,7 +616,6 @@ export const acceptInviteCommand = SimpleCLI.command({
 
 export const apiKeyIssueCommand = SimpleCLI.command({
   description: "Issue a new API key for the active organization",
-  experimental: true,
 })
   .input(
     SimpleCLI.input({
@@ -658,7 +652,6 @@ export const apiKeyIssueCommand = SimpleCLI.command({
 
 export const apiKeyListCommand = SimpleCLI.command({
   description: "List API keys for the active organization",
-  experimental: true,
 })
   .handle(async () => {
     const stored = await readAuthState();
@@ -691,7 +684,6 @@ export const apiKeyListCommand = SimpleCLI.command({
 
 export const apiKeyRevokeCommand = SimpleCLI.command({
   description: "Revoke an API key by id",
-  experimental: true,
 })
   .input(
     SimpleCLI.input({
@@ -730,7 +722,6 @@ export const apiKeyRevokeCommand = SimpleCLI.command({
 
 export const whoamiCommand = SimpleCLI.command({
   description: "Print the active session and credential source",
-  experimental: true,
 })
   .handle(async () => {
     const stored = await readAuthState();

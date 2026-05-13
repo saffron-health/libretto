@@ -4,7 +4,6 @@ type RecordUnknown = Record<string, unknown>;
 
 export type SimpleCLICommandConfig = {
   description: string;
-  experimental?: boolean;
 };
 
 export type SimpleCLIInputRaw = {
@@ -112,7 +111,6 @@ export type SimpleCLIResolvedCommand = {
 };
 
 type InternalResolvedCommand = SimpleCLIResolvedCommand & {
-  experimental?: boolean;
   input?: SimpleCLIInput<unknown>;
   middlewares: AnySimpleCLIMiddleware[];
   handler: SimpleCLIHandler<unknown, SimpleCLIContext, unknown>;
@@ -154,9 +152,6 @@ type ExtractedGlobalArgs = {
   args: readonly string[];
   named: Readonly<Record<string, unknown>>;
 };
-
-const EXPERIMENTAL_COMMAND_PREFIX = "experimental";
-const EXPERIMENTAL_GROUP_DESCRIPTION = "Experimental commands";
 
 function toCamelCase(input: string): string {
   return input.replace(/-([a-zA-Z0-9])/g, (_match, letter: string) =>
@@ -881,43 +876,7 @@ export class SimpleCLIApp {
     label: string;
     description?: string;
   }> {
-    return this.getImmediateRouteEntries([]).filter((entry) => {
-      const token = entry.label.replace(/\s+<subcommand>$/, "");
-      const group = this.findGroupByPath([token]);
-      if (!group) {
-        return true;
-      }
-      if (token === EXPERIMENTAL_COMMAND_PREFIX) {
-        return this.groupHasExperimentalCommand(group.path);
-      }
-      return this.groupHasVisibleNonExperimentalCommand(group.path);
-    });
-  }
-
-  private groupHasVisibleNonExperimentalCommand(path: readonly string[]): boolean {
-    for (const routeEntry of this.routeEntries) {
-      if (routeEntry.kind !== "command") continue;
-      if (!pathStartsWith(routeEntry.path, path)) continue;
-      const command = this.findCommandByPath(routeEntry.path);
-      if (command && !command.experimental) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private groupHasExperimentalCommand(path: readonly string[]): boolean {
-    for (const routeEntry of this.routeEntries) {
-      if (routeEntry.kind !== "command") continue;
-      if (!pathStartsWith(routeEntry.path, path)) continue;
-      const command = this.findCommandByPath(routeEntry.path);
-      if (command?.experimental) {
-        return true;
-      }
-    }
-
-    return false;
+    return this.getImmediateRouteEntries([]);
   }
 
   private findBestMatchingCommand(
@@ -1134,15 +1093,11 @@ function collectRouteTree(
       );
     }
 
-    const rawPath = [...parentPath, token];
-    const path = command.config.experimental
-      ? [EXPERIMENTAL_COMMAND_PREFIX, ...rawPath]
-      : rawPath;
+    const path = [...parentPath, token];
     resolved.commands.push({
       routeKey: pathToRouteKey(path),
       path,
       description: command.config.description,
-      experimental: command.config.experimental,
       input: command.input,
       middlewares: mergeInheritedMiddlewares(
         parentMiddlewares,
@@ -1199,13 +1154,7 @@ function resolveGroupDescription(
   path: readonly string[],
   groupDescriptions: ReadonlyMap<string, string | undefined>,
 ): string | undefined {
-  if (path.length === 1 && path[0] === EXPERIMENTAL_COMMAND_PREFIX) {
-    return EXPERIMENTAL_GROUP_DESCRIPTION;
-  }
-
-  const originalPath =
-    path[0] === EXPERIMENTAL_COMMAND_PREFIX ? path.slice(1) : path;
-  return groupDescriptions.get(pathToRouteKey(originalPath));
+  return groupDescriptions.get(pathToRouteKey(path));
 }
 
 function mergeInheritedMiddlewares(

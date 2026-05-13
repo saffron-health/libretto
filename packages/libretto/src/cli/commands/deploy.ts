@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { resolveHostedApiUrl } from "../core/auth-fetch.js";
 import { buildHostedDeployTarball } from "../core/deploy-artifact.js";
-import { SimpleCLI } from "../framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 
 type DeploymentStatus = "building" | "ready" | "failed";
 
@@ -132,7 +132,6 @@ export const deployInput = SimpleCLI.input({
 
 export const deployCommand = SimpleCLI.command({
   description: "Deploy workflows to the hosted platform",
-  experimental: true,
 })
   .input(deployInput)
   .handle(async ({ input }) => {

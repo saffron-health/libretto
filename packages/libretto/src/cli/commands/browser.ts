@@ -20,7 +20,7 @@ import {
   validateSessionName,
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
-import { SimpleCLI } from "../framework/simple-cli.js";
+import { SimpleCLI } from "affordance";
 import {
   sessionOption,
   withAutoSession,

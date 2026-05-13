@@ -6,6 +6,7 @@ packages:
 
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
+  - affordance
   - libretto
 
 enablePrePostScripts: false
