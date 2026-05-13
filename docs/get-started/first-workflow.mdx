@@ -1,0 +1,48 @@
+---
+title: First workflow
+sidebarTitle: First workflow
+---
+
+> Step 2 of 3: author a minimal workflow, run it, and inspect the result.
+
+## 1) Create a workflow file
+
+Create `src/workflows/scrape-page.ts`:
+
+```ts src/workflows/scrape-page.ts
+import { workflow } from "libretto";
+
+export default workflow("scrape-page", async ({ page }) => {
+  await page.goto("https://example.com");
+  const title = await page.title();
+  console.log(`Page title: ${title}`);
+
+  return { title };
+});
+```
+
+## 2) Run it locally
+
+```bash theme={null}
+npx libretto run src/workflows/scrape-page.ts
+```
+
+## 3) Inspect page state when needed
+
+When a step fails or behaves unexpectedly, use snapshot to inspect the live page state quickly:
+
+```bash theme={null}
+npx libretto snapshot
+```
+
+Then prototype fixes with:
+
+```bash theme={null}
+npx libretto exec
+```
+
+When the prototype works, move the logic back into the workflow file and run again.
+
+<Card title="Next: Deploying" icon="arrow-right" href="/get-started/deploying">
+  Choose where to run workflows in production: Libretto Cloud or self-hosting.
+</Card>

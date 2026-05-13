@@ -1,0 +1,50 @@
+---
+title: Quickstart
+sidebarTitle: Quickstart
+---
+
+> Step 1 of 3: install Libretto and run your first workflow end to end.
+
+## 1) Create a new Libretto package
+
+```bash theme={null}
+npm create libretto@latest
+```
+
+You can pass a package name directly:
+
+```bash theme={null}
+npm create libretto@latest my-automations
+```
+
+This scaffolds a package, installs dependencies, runs setup, and downloads Chromium.
+
+<Note>
+  Run this in your own terminal (not through an agent). It may prompt for input
+  and takes a moment while Chromium downloads.
+</Note>
+
+## 2) Run the example workflow
+
+From the scaffolded package:
+
+```bash theme={null}
+npx libretto run src/workflows/star-repo.ts
+```
+
+This confirms your local setup works and shows the basic run loop.
+
+## 3) Optional: install into an existing package instead
+
+If you already have a Node.js package:
+
+```bash theme={null}
+npm install libretto
+npx libretto setup
+```
+
+Then create a workflow file and run it with `npx libretto run <path>`.
+
+<Card title="Next: First workflow" icon="arrow-right" href="/get-started/first-workflow">
+  Move from the scaffolded example to a minimal real workflow you can iterate on.
+</Card>

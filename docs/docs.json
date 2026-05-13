@@ -48,9 +48,9 @@
       {
         "group": "Get started",
         "pages": [
-          "get-started/introduction",
-          "get-started/installation",
-          "get-started/configuration"
+          "get-started/quickstart",
+          "get-started/first-workflow",
+          "get-started/deploying"
         ]
       },
       {
