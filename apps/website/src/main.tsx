@@ -4,13 +4,6 @@ import "./index.css";
 import { App } from "./App";
 import { IcosahedronDebug } from "./IcosahedronDebug";
 
-// Temporarily disabled.
-// if (import.meta.env.DEV) {
-//   void import("cssstudio").then(({ startStudio }) => {
-//     startStudio();
-//   });
-// }
-
 const path = window.location.pathname;
 
 // Dev-only lazy imports — fully tree-shaken from production builds
