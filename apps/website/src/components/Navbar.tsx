@@ -12,7 +12,6 @@ const GLITCH_CHARS = "@#$%&*+=<>{}[]|/\\~^!?";
 function useGlitchText(text: string) {
   const [display, setDisplay] = useState(text);
   const [hovered, setHovered] = useState(false);
-  const frameRef = useRef(0);
   const rafRef = useRef<number>(0);
 
   const onEnter = useCallback(() => setHovered(true), []);
@@ -20,7 +19,6 @@ function useGlitchText(text: string) {
     setHovered(false);
     setDisplay(text);
     cancelAnimationFrame(rafRef.current);
-    frameRef.current = 0;
   }, [text]);
 
   useEffect(() => {
