@@ -4,9 +4,9 @@
   "name": "Libretto",
   "description": "Toolkit for building, debugging, and maintaining browser automations.",
   "colors": {
-    "primary": "#5a5546",
-    "light": "#908879",
-    "dark": "#1e1d1a"
+    "primary": "#12ce41",
+    "light": "#2fdb4f",
+    "dark": "#12ce41"
   },
   "favicon": "/favicon.svg",
   "logo": {
@@ -16,23 +16,24 @@
   },
   "fonts": {
     "heading": {
-      "family": "PP Editorial New",
-      "source": "/fonts/PPEditorialNew-Regular.woff2",
+      "family": "Fraunces",
       "format": "woff2",
-      "weight": 400
+      "weight": 300
     },
     "body": {
-      "family": "Inter",
+      "family": "Commit Mono",
+      "source": "/fonts/CommitMono-VF.woff2",
+      "format": "woff2",
       "weight": 400
     }
   },
   "appearance": {
-    "default": "system"
+    "default": "dark"
   },
   "background": {
     "color": {
-      "light": "#f5f2ec",
-      "dark": "#1e1d1a"
+      "light": "#111111",
+      "dark": "#111111"
     }
   },
   "styling": {
@@ -127,11 +128,6 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Schedule a call",
-          "href": "https://cal.com/team/saffron-health/libretto-demo",
-          "icon": "phone"
-        },
-        {
           "anchor": "GitHub",
           "href": "https://github.com/saffron-health/libretto",
           "icon": "github"
@@ -150,6 +146,11 @@
           "anchor": "Discord",
           "href": "https://discord.gg/NYrG56hVDt",
           "icon": "discord"
+        },
+        {
+          "anchor": "Talk to a dev",
+          "href": "https://cal.com/team/saffron-health/libretto-demo",
+          "icon": "video"
         }
       ]
     }
