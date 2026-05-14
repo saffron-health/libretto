@@ -12,6 +12,7 @@ Libretto captures all network traffic during a browser session, so your agent ca
   Not every site is a good candidate for network conversion. Stay with browser automation if:
 
 - The site has enterprise bot protection (Akamai, PerimeterX, Shape Security) **and** monkey-patches `window.fetch` with call-stack inspection
+- The request you want to make is normally loaded as a document, script, image, stylesheet, or iframe rather than fetch/XHR
 - The site does API-level monitoring that correlates request timing to UI interactions
 - The data you need is rendered client-side and doesn't come from a clean API response
 
@@ -49,7 +50,7 @@ In these cases, stick with your existing Playwright automation or use passive in
   <Step title="Review the agent's approach">
     The agent reports what API endpoints it found and whether the site has bot protection. It recommends one of two approaches:
 
-    - **In-browser fetch**: call endpoints directly from within the browser's JavaScript context. The requests share the browser's cookies and TLS fingerprint, so they look identical to the site's own requests. Faster, but only safe when the site doesn't monitor for anomalous call patterns.
+    - **In-browser fetch**: call endpoints directly from within the browser's JavaScript context. The requests share the browser's cookies and TLS fingerprint, but they still look like fetch/XHR requests. Use this when the real site also calls that endpoint with fetch or XHR.
     - **Passive interception**: set up a `page.on('response', ...)` listener and let the site's own code make the requests. Zero detection risk because no extra requests are made, but you're limited to whatever requests the site naturally triggers. Safer, but less flexible. Use this when the site has bot protection.
 
     If the agent's recommendation looks reasonable, let it proceed. If you'd rather use one approach over the other, say so:
@@ -91,6 +92,7 @@ In these cases, stick with your existing Playwright automation or use passive in
 ### When to convert to network requests
 
 - The site exposes a usable JSON API behind the UI
+- The target requests are normally made with fetch/XHR by the site itself
 - You need to paginate deeply (fetching page 50 without clicking "next" 49 times)
 - You want data the UI doesn't display (hidden fields, metadata, IDs)
 - Speed and reliability matter more than DOM fidelity
