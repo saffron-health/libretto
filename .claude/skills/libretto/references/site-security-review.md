@@ -69,11 +69,11 @@ Common examples:
 | Stylesheet load | `sec-fetch-dest: style` |
 | Iframe load | `sec-fetch-dest: iframe` or `document`, `sec-fetch-mode: navigate` |
 
-Rule of thumb: match the browser primitive to the site's real request type. Use `page.goto()` or link clicks for page HTML. Use in-browser `fetch()` only for endpoints the real site calls with fetch/XHR. Let the DOM load scripts, images, stylesheets, and iframes naturally, or create the corresponding DOM element if you truly need that request type. Do not try to fix a mismatch by copying headers, because the browser controls the request-context headers.
+Rule of thumb: prefer network requests for data extraction when the site exposes real fetch/XHR endpoints, but keep normal browser primitives for everything else. Use `page.goto()` or link clicks for page HTML. Use in-browser `fetch()` only for endpoints the real site calls with fetch/XHR. Let the DOM load scripts, images, stylesheets, and iframes naturally, or create the corresponding DOM element if you truly need that request type. Do not try to fix a mismatch by copying headers, because the browser controls the request-context headers.
 
 ## Choosing a Data Capture Strategy
 
-Use the review above to decide what is safe to prioritize. Every integration uses Playwright to control the browser. The question is what to lean on for data capture: direct browser fetch calls, passive network interception, or DOM extraction. In practice, many integrations mix approaches, but the site-security review should tell you which approach is safest to try first.
+Use the review above to decide what is safe to prioritize. Every integration uses Playwright to control the browser. The question is what to lean on for data capture: direct browser fetch calls for real fetch/XHR endpoints, passive network interception, or DOM extraction. In practice, many integrations mix approaches, but the site-security review should tell you which approach is safest to try first.
 
 ### Strategy A: Prioritize `page.evaluate(fetch(...))`
 
@@ -86,6 +86,7 @@ When to prioritize this:
 - `fetch` is not monkey-patched
 - The API responses are parseable and useful
 - You need data that requires many API calls (deep pagination, bulk queries) where driving the UI would be slow
+- The user has not asked for Playwright-only or UI-only automation
 
 Why: maximum control and efficiency. You call exactly the endpoints you want with the parameters you want, skip UI rendering, and get structured JSON back. On sites without aggressive detection, this is the fastest and cleanest approach for real fetch/XHR endpoints.
 
@@ -129,8 +130,8 @@ Trade-off: it is slower, more fragile against DOM changes, and you only get data
 
 | Site Profile | Primary Strategy | Supplement With |
 | --- | --- | --- |
-| Fetch/XHR API endpoint, no bot protection, fetch not patched | A (`page.evaluate(fetch)`) | Playwright for navigation/auth |
-| Fetch/XHR API endpoint, fetch patched or bot protection detected | B (`page.on('response', ...)`) | Playwright for navigation; cautious use of `page.evaluate(fetch)` only if needed |
+| Fetch/XHR API endpoint, no bot protection, fetch not patched, request path workable | A (`page.evaluate(fetch)`) | Playwright for navigation/auth |
+| Fetch/XHR API endpoint, request path not workable, fetch patched, or bot protection detected | B (`page.on('response', ...)`) | Playwright for navigation; cautious use of `page.evaluate(fetch)` only if needed |
 | Page/document/script/image/style/iframe URL | Matching Playwright or DOM primitive | Passive interception when useful |
 | Server-rendered content (no API calls) | C (DOM extraction) | Playwright for all interaction |
 

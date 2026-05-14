@@ -117,6 +117,8 @@ Do not rely on broad DOM querying inside `page.evaluate()` for production flows 
 
 ## Network Request Methods
 
+Network request methods are for active fetch/XHR endpoints the site already uses. Prefer them for data extraction or form submissions when the security review shows the path is safe and workable.
+
 Before codifying a network request, confirm that the browser primitive matches how the site normally makes that request. Use `page.goto()` or link clicks for document navigation. Use `page.evaluate(fetch)` only for endpoints the site calls with fetch/XHR. Let the DOM load scripts, images, stylesheets, and iframes naturally, or create the corresponding DOM element if you truly need that request type.
 
 Do not use `fetch()` to avoid UI navigation for page HTML or asset URLs. The request still comes from the browser, but the browser marks it as fetch/XHR with different request-context headers than a navigation, script, image, stylesheet, or iframe load. Do not try to fix that by copying headers, because the browser controls the request context. Prefer passive network interception when the site's own UI already triggers the useful request.
