@@ -1,6 +1,6 @@
 # Site Security Review
 
-Purpose: You are connected to a live Chrome session on a target website. Your job is to review the site's bot-detection and security posture before committing to an integration strategy. Probe for bot protection, fetch interception, and challenge flows, then use that review to decide which integration approaches are safe and which one to try first for this site.
+Purpose: You are connected to a live Chrome session on a target website. Your job is to review the site's bot-detection and security posture before committing to an integration strategy. Probe for bot protection, fetch interception, request type matching, and challenge flows, then use that review to decide which integration approaches are safe and which one to try first for this site.
 
 After completing the probes below, produce a Site Assessment Summary (see the output format at the end of this document).
 
@@ -54,26 +54,44 @@ window.fetch.hasOwnProperty('prototype')
 
 Important: some sites use `Proxy` to wrap fetch, which makes `toString()` still return `"[native code]"`. The prototype check is a heuristic, not definitive. If you see any sign of fetch interception, treat it as patched.
 
+### Probe 3: Request Type Matching
+
+Compare the target request in `network.jsonl` before replacing it. Browsers attach request context metadata that describes what caused the request.
+
+Common examples:
+
+| Request Type | Typical Context |
+| --- | --- |
+| Page navigation | `sec-fetch-dest: document`, `sec-fetch-mode: navigate` |
+| Fetch/XHR | `sec-fetch-dest: empty`, `sec-fetch-mode: cors` or `same-origin` |
+| Script load | `sec-fetch-dest: script`, `sec-fetch-mode: no-cors` |
+| Image load | `sec-fetch-dest: image`, `sec-fetch-mode: no-cors` |
+| Stylesheet load | `sec-fetch-dest: style` |
+| Iframe load | `sec-fetch-dest: iframe` or `document`, `sec-fetch-mode: navigate` |
+
+Rule of thumb: match the browser primitive to the site's real request type. Use `page.goto()` or link clicks for page HTML. Use in-browser `fetch()` only for endpoints the real site calls with fetch/XHR. Let the DOM load scripts, images, stylesheets, and iframes naturally, or create the corresponding DOM element if you truly need that request type. Do not try to fix a mismatch by copying headers, because the browser controls the request-context headers.
+
 ## Choosing a Data Capture Strategy
 
 Use the review above to decide what is safe to prioritize. Every integration uses Playwright to control the browser. The question is what to lean on for data capture: direct browser fetch calls, passive network interception, or DOM extraction. In practice, many integrations mix approaches, but the site-security review should tell you which approach is safest to try first.
 
 ### Strategy A: Prioritize `page.evaluate(fetch(...))`
 
-Make fetch calls directly from within the browser's JavaScript context. The requests share the browser's TLS fingerprint, cookies, and origin. They look identical to requests the site's own JS would make.
+Make fetch calls directly from within the browser's JavaScript context. The requests share the browser's TLS fingerprint, cookies, and origin, but they still look like fetch/XHR requests. They match site behavior only when the real site calls that endpoint with fetch/XHR.
 
 When to prioritize this:
 
+- The target endpoint is normally called by the site with fetch/XHR
 - No enterprise bot protection is detected
 - `fetch` is not monkey-patched
 - The API responses are parseable and useful
 - You need data that requires many API calls (deep pagination, bulk queries) where driving the UI would be slow
 
-Why: maximum control and efficiency. You call exactly the endpoints you want with the parameters you want, skip UI rendering, and get structured JSON back. On sites without aggressive detection, this is the fastest and cleanest approach.
+Why: maximum control and efficiency. You call exactly the endpoints you want with the parameters you want, skip UI rendering, and get structured JSON back. On sites without aggressive detection, this is the fastest and cleanest approach for real fetch/XHR endpoints.
 
-Risk: if the site monitors fetch call stacks, your calls may be flagged because they do not originate from the site's bundled code. This is uncommon but exists on high-security sites.
+Risk: if you fetch a URL the site normally loads as a document, script, image, stylesheet, or iframe, the request context will not match normal browser behavior. Sites can also monitor fetch call stacks and flag calls that do not originate from the site's bundled code. This is uncommon but exists on high-security sites.
 
-You will still use Playwright for initial navigation, login/auth flows, cookie consent, and any UI interactions needed to establish session state before making fetch calls.
+You will still use Playwright for initial navigation, login/auth flows, cookie consent, and any browser primitive that should not be fetch.
 
 ### Strategy B: Prioritize `page.on('response', ...)`
 
@@ -111,10 +129,9 @@ Trade-off: it is slower, more fragile against DOM changes, and you only get data
 
 | Site Profile | Primary Strategy | Supplement With |
 | --- | --- | --- |
-| No bot protection, fetch not patched | A (`page.evaluate(fetch)`) | Playwright for navigation/auth |
-| No bot protection, fetch is patched | B (`page.on('response', ...)`) | Playwright for navigation; DOM extraction as fallback |
-| Bot protection detected, fetch not patched | B (`page.on('response', ...)`) | Playwright for navigation; cautious use of `page.evaluate(fetch)` only if needed |
-| Bot protection detected, fetch is patched | B (`page.on('response', ...)`) | Playwright for navigation; DOM extraction as fallback |
+| Fetch/XHR API endpoint, no bot protection, fetch not patched | A (`page.evaluate(fetch)`) | Playwright for navigation/auth |
+| Fetch/XHR API endpoint, fetch patched or bot protection detected | B (`page.on('response', ...)`) | Playwright for navigation; cautious use of `page.evaluate(fetch)` only if needed |
+| Page/document/script/image/style/iframe URL | Matching Playwright or DOM primitive | Passive interception when useful |
 | Server-rendered content (no API calls) | C (DOM extraction) | Playwright for all interaction |
 
 ## Output: Site Assessment Summary
@@ -127,6 +144,7 @@ After running the probes, produce a summary in this format. This assessment tell
 ### Bot Detection Profile
 - Enterprise bot protection: [None detected / Detected — describe what you found]
 - Fetch/XHR interception: [Native (not patched) / Patched — describe what you found]
+- Request type match: [Fetch/XHR API / Document navigation / Asset or iframe / Unknown]
 - Challenge pages: [None / Present — describe type]
 - Overall security posture: [None / Low / Moderate / High / Very High]
 

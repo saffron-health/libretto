@@ -28,9 +28,13 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 
 ## Default Integration Approach
 
-- Prefer network requests first for new integrations unless the user explicitly asks for Playwright or UI automation, then do not use the site's internal API.
-- Read `references/site-security-review.md` before committing to a network-first approach on a new site.
-- Fall back to passive interception or Playwright-driven UI automation when the security review rules network requests out, the request path is not workable, or the user explicitly asks for Playwright.
+- Choose the least bot-detectable method that matches how the site normally makes the request.
+- Use Playwright navigation (`page.goto()` or link clicks) for page HTML and navigation flows.
+- Use passive interception when the site's own UI naturally triggers the data-bearing requests.
+- Use in-browser `fetch()` only for endpoints the real site calls with fetch/XHR. Do not use `fetch()` for URLs normally loaded as documents, scripts, images, stylesheets, or iframes.
+- Do not try to fix request type mismatches by copying headers. Browsers set request-context headers based on the primitive that caused the request.
+- Read `references/site-security-review.md` before committing to a network-heavy approach on a new site.
+- Fall back to passive interception or Playwright-driven UI automation when request type, bot protection, or fetch interception makes direct browser fetch risky.
 
 ## Setup
 
