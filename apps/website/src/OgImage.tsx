@@ -243,11 +243,11 @@ export function OgImage() {
           style={{ width: OG_WIDTH, height: OG_HEIGHT }}
           className="relative overflow-hidden bg-bg"
         >
-          <div className="absolute inset-0 z-10 flex items-center justify-center px-10">
+          <div className="absolute inset-y-0 left-0 z-10 flex w-[690px] items-center pl-12">
             <pre
               aria-label="Don't make browser agents do a script's job"
               className="crt-glow whitespace-pre font-mono font-semibold leading-none tracking-[-0.05em] text-ink"
-              style={{ fontSize: 13 }}
+              style={{ fontSize: 9.5 }}
             >
               {TITLE_ASCII}
             </pre>
