@@ -10,7 +10,7 @@ The examples below use `npx libretto`. If `libretto` is already on your `PATH`, 
 
 ### Create a new user account and organization
 
-Use `npx libretto cloud auth signup` when you are creating a brand new Libretto Cloud organization:
+Use `auth signup` when you are creating a brand new Libretto Cloud organization:
 
 ```bash theme={null}
 npx libretto cloud auth signup
@@ -26,7 +26,7 @@ If the organization slug is already taken, the CLI re-prompts for just the slug 
 
 ### Log in to an existing account
 
-Use `npx libretto cloud auth login` when the account already exists:
+Use `auth login` when the account already exists:
 
 ```bash theme={null}
 npx libretto cloud auth login
@@ -42,7 +42,7 @@ npx libretto cloud auth logout
 
 ### Check the active identity
 
-Use `npx libretto cloud auth whoami` to confirm which Libretto Cloud account the CLI is using:
+Use `auth whoami` to confirm which Libretto Cloud account the CLI is using:
 
 ```bash theme={null}
 npx libretto cloud auth whoami
@@ -52,17 +52,17 @@ If `LIBRETTO_API_KEY` is set, the CLI prefers that key over the stored session c
 
 ### Invite a teammate
 
-Use `npx libretto cloud auth invite` from an account that can manage members in the active organization:
+Use `auth invite` from an account that can manage members in the active organization:
 
 ```bash theme={null}
 npx libretto cloud auth invite teammate@example.com --role member
 ```
 
-The command prints the invitation id and the organization slug that the recipient needs for `npx libretto cloud auth accept-invite`.
+The command prints the invitation id and the organization slug that the recipient needs for `auth accept-invite`.
 
 ### Accept an invite
 
-Use `npx libretto cloud auth accept-invite` when you are joining an existing organization:
+Use `auth accept-invite` when you are joining an existing organization:
 
 ```bash theme={null}
 npx libretto cloud auth accept-invite <tenant-slug> <invitation-id>
@@ -70,7 +70,7 @@ npx libretto cloud auth accept-invite <tenant-slug> <invitation-id>
 
 If you are not logged in yet, the CLI creates the account first, waits for email verification, and then saves the hosted session locally.
 
-If you are already logged in, `npx libretto cloud auth accept-invite` only works when that account is not already a member of another organization.
+If you are already logged in, `auth accept-invite` only works when that account is not already a member of another organization.
 
 ### Issue an API key
 

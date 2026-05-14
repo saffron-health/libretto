@@ -12,7 +12,7 @@ Only organization owners can view billing status or open billing-management link
 
 ### Open the plans page
 
-Use `npx libretto cloud billing portal` to print a short-lived link to Libretto's plans page:
+Use `billing portal` to print a short-lived link to Libretto's plans page:
 
 ```bash theme={null}
 npx libretto cloud billing portal
@@ -27,7 +27,7 @@ The page shows:
 
 ### Check the current plan and usage
 
-Use `npx libretto cloud billing status` to inspect the current plan, subscription status, usage, and period end:
+Use `billing status` to inspect the current plan, subscription status, usage, and period end:
 
 ```bash theme={null}
 npx libretto cloud billing status
@@ -69,13 +69,13 @@ Each session is billed by the second and rounds up to the next whole second, wit
 | Team       | $100          | 400                    |
 | Enterprise | Custom        | Custom                 |
 
-Run `npx libretto cloud billing portal` to compare and switch plans.
+Run `billing portal` to compare and switch plans.
 
 If your organization exceeds its plan limit, Libretto Cloud will not spin up new browser sessions until you move to a plan with more capacity.
 
 ### Change plans, payment methods, invoices, and cancellation
 
-Run `npx libretto cloud billing portal`, open the printed plans page, and use it to change plans or open Stripe's customer portal for payment details, invoices, and cancellation. After any plan change, run `npx libretto cloud billing status` again in your terminal to confirm the updated plan.
+Run `billing portal`, open the printed plans page, and use it to change plans or open Stripe's customer portal for payment details, invoices, and cancellation. After any plan change, run `billing status` again in your terminal to confirm the updated plan.
 
 ### BAA and Enterprise
 
@@ -83,7 +83,7 @@ For BAA and Enterprise, please reach out to us at `team@saffron.health`.
 
 ### Troubleshooting
 
-- If the plans link says it is expired or invalid, run `npx libretto cloud billing portal` again to get a fresh link.
+- If the plans link says it is expired or invalid, run `billing portal` again to get a fresh link.
 - If billing commands fail with an auth error, log in again or set `LIBRETTO_API_KEY`.
 - If you can authenticate but still cannot access billing, confirm that your user is an organization owner.
 
