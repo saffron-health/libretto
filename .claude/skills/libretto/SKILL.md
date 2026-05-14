@@ -28,13 +28,11 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 
 ## Default Integration Approach
 
-- Prefer network requests first for data extraction and form submission when the site exposes real fetch/XHR endpoints you can call from the browser context.
-- Use Playwright for navigation and non-fetch browser behavior. Use `page.goto()` or link clicks for page HTML, and let the DOM load scripts, images, stylesheets, and iframes naturally.
-- Use passive interception when the site's own UI naturally triggers the data-bearing requests.
-- Use in-browser `fetch()` only to replace requests the real site already makes with fetch/XHR. Do not use `fetch()` to load URLs normally requested as documents or assets.
-- Do not try to fix request type mismatches by copying headers. Browsers set request-context headers based on the primitive that caused the request.
-- Read `references/site-security-review.md` before committing to a fetch-based network path on a new site.
-- Fall back to passive interception or Playwright-driven UI automation when the security review rules fetch out, the request path is not workable, or the user explicitly asks for Playwright or UI automation.
+- Use Playwright for navigation, login/session setup, and non-fetch browser behavior. Use `page.goto()` or link clicks for documents, and let the DOM load assets naturally.
+- Prefer browser-context `fetch()` for data extraction and form submission only when the target is a real site fetch/XHR endpoint and `references/site-security-review.md` says the path is safe and workable.
+- Use passive interception when the UI already triggers useful fetch/XHR requests or active fetch is risky.
+- Fall back to Playwright UI automation when fetch is ruled out, the request path is not workable, or the user explicitly asks for Playwright/UI automation.
+- Do not copy headers to hide a request-type mismatch. Browsers set request-context headers from the primitive that caused the request.
 
 ## Setup
 
