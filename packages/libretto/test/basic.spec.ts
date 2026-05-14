@@ -234,6 +234,24 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).not.toContain("Bundling hosted deployment artifact");
   });
 
+  test("deploy with API key ignores broken local auth state", async ({
+    librettoCli,
+    workspaceDir,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(workspacePath(".libretto", "auth.json"), "{broken", "utf8");
+
+    const result = await librettoCli("cloud deploy .", {
+      HOME: workspaceDir,
+      LIBRETTO_API_KEY: "test-key",
+    });
+
+    expect(result.stderr).toContain("No package.json found");
+    expect(result.stderr).not.toContain("LIBRETTO_API_KEY is required");
+    expect(result.stderr).not.toContain("auth.json");
+  });
+
   test("prints run help with explicit visualization disable flag", async ({
     librettoCli,
   }) => {

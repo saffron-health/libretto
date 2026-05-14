@@ -14,7 +14,7 @@ LIBRETTO_API_KEY=<issued-api-key>
 
 ### Expected deploy directory
 
-`libretto cloud deploy` uploads one package directory at a time. That directory must contain:
+`npx libretto cloud deploy` uploads one package directory at a time. That directory must contain:
 
 - A `package.json`
 - An entry file for workflow discovery
@@ -43,7 +43,7 @@ export { default as submitPriorAuth } from "./src/workflows/submit-prior-auth";
 
 The API uses the workflow name from the `workflow("...")` call inside the file, not the filename or the export alias from `index.ts`.
 
-If your workflows live in a package inside a monorepo, run `libretto cloud deploy` against that package directory instead of the monorepo root.
+If your workflows live in a package inside a monorepo, run `npx libretto cloud deploy` against that package directory instead of the monorepo root.
 
 The deploy command has two separate path concepts:
 
@@ -63,7 +63,7 @@ In that command:
 
 ### Deploy workflows
 
-Use `libretto cloud deploy` to upload a workflow bundle to Libretto Cloud:
+Use `npx libretto cloud deploy` to upload a workflow bundle to Libretto Cloud:
 
 ```bash theme={null}
 cd my-automations

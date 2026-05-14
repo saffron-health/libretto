@@ -37,15 +37,24 @@ function deployApiKeyRequiredMessage(hasStoredSession: boolean): string {
 }
 
 async function requireDeployApiKey() {
-  const stored = await readAuthState();
-  const apiUrl = resolveApiUrl(stored);
   const apiKey = process.env.LIBRETTO_API_KEY?.trim();
 
   if (!apiKey) {
-    throw new Error(deployApiKeyRequiredMessage(Boolean(stored?.session)));
+    throw new Error(deployApiKeyRequiredMessage(await hasStoredCloudSession()));
   }
 
-  return { apiUrl, credential: { source: "env-api-key" as const, apiKey } };
+  return {
+    apiUrl: resolveApiUrl(null),
+    credential: { source: "env-api-key" as const, apiKey },
+  };
+}
+
+async function hasStoredCloudSession(): Promise<boolean> {
+  try {
+    return Boolean((await readAuthState())?.session);
+  } catch {
+    return false;
+  }
 }
 
 async function pollDeployment(
