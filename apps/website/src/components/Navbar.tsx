@@ -68,17 +68,19 @@ function useGlitchText(text: string) {
 function GlitchNavLink({
   href,
   children,
+  external = true,
 }: {
   href: string;
   children: string;
+  external?: boolean;
 }) {
   const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText(children);
 
   return (
-    <a
+    <AppLink
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener noreferrer" : undefined}
       className="no-underline"
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
@@ -86,16 +88,12 @@ function GlitchNavLink({
       <Text
         size="sm"
         className={`font-medium transition-colors duration-75 ${
-          isScrambling
-            ? "text-amber font-mono"
-            : hovered
-              ? "text-accent-bright"
-              : "text-ink"
+          isScrambling ? "text-amber font-mono" : hovered ? "text-accent-bright" : "text-ink"
         }`}
       >
         {display}
       </Text>
-    </a>
+    </AppLink>
   );
 }
 
@@ -141,6 +139,9 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             </Text>
           </AppLink>
           <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
+            <GlitchNavLink href="/blog" external={false}>
+              Blog
+            </GlitchNavLink>
             <GlitchNavLink href={DISCUSSIONS_URL}>Forum</GlitchNavLink>
             <GlitchNavLink href={RELEASES_URL}>Changelog</GlitchNavLink>
           </div>
@@ -162,9 +163,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             className="hidden items-center gap-1.5 text-ink/70 transition-colors hover:text-ink md:flex"
           >
             <GitHubStarIcon width={15} height={15} />
-            {stars !== null && (
-              <span className="text-sm font-medium">{formatStars(stars)}</span>
-            )}
+            {stars !== null && <span className="text-sm font-medium">{formatStars(stars)}</span>}
           </a>
           <Button href="/docs/get-started/introduction" size="sm">
             Go to docs

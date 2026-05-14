@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  MenuTrigger,
-  Menu,
-  MenuItem,
-  Popover,
-  Button as AriaButton,
-} from "react-aria-components";
+import { MenuTrigger, Menu, MenuItem, Popover, Button as AriaButton } from "react-aria-components";
 import { motion } from "motion/react";
 import { GitHubStarIcon, NpmIcon } from "../icons";
 import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
@@ -79,9 +73,7 @@ export function MobileMenu({ stars }: { stars: string | null }) {
   const [animation, setAnimation] = useState<AnimationState>("unmounted");
 
   return (
-    <MenuTrigger
-      onOpenChange={(isOpen) => setAnimation(isOpen ? "visible" : "hidden")}
-    >
+    <MenuTrigger onOpenChange={(isOpen) => setAnimation(isOpen ? "visible" : "hidden")}>
       <AriaButton
         aria-label="Menu"
         className="relative flex size-9 items-center justify-center rounded-lg text-ink outline-none hover:bg-ink/[0.06] focus-visible:ring-2 focus-visible:ring-ink/20"
@@ -115,6 +107,9 @@ export function MobileMenu({ stars }: { stars: string | null }) {
           className="min-w-[180px] origin-top-right rounded-xl border border-accent/20 bg-panel p-1.5 shadow-lg shadow-black/30"
         >
           <Menu className="outline-none">
+            <MenuItem href="/blog" className={itemClass}>
+              Blog
+            </MenuItem>
             <MenuItem
               href={DISCUSSIONS_URL}
               target="_blank"

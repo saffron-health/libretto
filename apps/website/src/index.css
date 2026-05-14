@@ -22,12 +22,12 @@
 
 @theme {
   --font-sans:
-    "Commit Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco,
-    Consolas, "Liberation Mono", monospace;
+    "Commit Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
   --font-serif: "Fraunces", "Newsreader", Georgia, serif;
   --font-mono:
-    "Commit Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco,
-    Consolas, "Liberation Mono", monospace;
+    "Commit Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
 
   /* ── Gray scale (green-tinted) ── */
   --color-gray-1: #0f120f;
@@ -68,7 +68,7 @@
   --color-accent-bright: #2fdb4f;
   --color-accent-dim: #2e7e37;
   --color-amber: oklch(0.75 0.15 80);
-  --color-amber-bright: oklch(0.90 0.18 80);
+  --color-amber-bright: oklch(0.9 0.18 80);
   --color-rule: #262a26;
 }
 
@@ -149,12 +149,11 @@ body {
   line-height: 1;
   text-decoration: none;
   text-rendering: geometricPrecision;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklch, var(--color-green-9) 95%, transparent) 0%,
-      color-mix(in oklch, var(--color-green-8) 95%, transparent) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-green-9) 95%, transparent) 0%,
+    color-mix(in oklch, var(--color-green-8) 95%, transparent) 100%
+  );
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.18),
     inset 0 0 0 1px color-mix(in oklch, var(--color-green-9) 50%, transparent),
@@ -168,12 +167,11 @@ body {
 }
 
 .libretto-button:hover {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklch, var(--color-green-11) 95%, transparent) 0%,
-      color-mix(in oklch, var(--color-green-9) 95%, transparent) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-green-11) 95%, transparent) 0%,
+    color-mix(in oklch, var(--color-green-9) 95%, transparent) 100%
+  );
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
     inset 0 0 0 1px color-mix(in oklch, var(--color-green-11) 60%, transparent),
@@ -182,12 +180,11 @@ body {
 }
 
 .libretto-button[aria-pressed="true"] {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklch, var(--color-green-11) 95%, transparent) 0%,
-      color-mix(in oklch, var(--color-green-9) 95%, transparent) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-green-11) 95%, transparent) 0%,
+    color-mix(in oklch, var(--color-green-9) 95%, transparent) 100%
+  );
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
     inset 0 0 0 1px color-mix(in oklch, var(--color-green-11) 60%, transparent),
@@ -205,12 +202,11 @@ body {
 
 .libretto-button:active {
   transform: translateY(1px);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklch, var(--color-green-10) 95%, transparent) 0%,
-      color-mix(in oklch, var(--color-green-7) 95%, transparent) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-green-10) 95%, transparent) 0%,
+    color-mix(in oklch, var(--color-green-7) 95%, transparent) 100%
+  );
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.12),
     inset 0 0 0 1px color-mix(in oklch, var(--color-green-10) 50%, transparent),
@@ -260,7 +256,9 @@ body {
   text-underline-offset: 3px;
   text-decoration-color: var(--color-muted);
   text-decoration-thickness: 1.5px;
-  transition: color 85ms ease-out, text-decoration-color 85ms ease-out;
+  transition:
+    color 85ms ease-out,
+    text-decoration-color 85ms ease-out;
 }
 
 .libretto-button--secondary:hover {
@@ -362,8 +360,11 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse at 50% 80px, color-mix(in oklch, var(--color-green-9) 8%, transparent), transparent 50%);
+  background: radial-gradient(
+    ellipse at 50% 80px,
+    color-mix(in oklch, var(--color-green-9) 8%, transparent),
+    transparent 50%
+  );
 }
 
 .section-crt::after {
@@ -371,14 +372,13 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      rgb(255 255 255 / 0.025) 0px,
-      rgb(255 255 255 / 0.025) 1px,
-      transparent 1px,
-      transparent 4px
-    );
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.025) 0px,
+    rgb(255 255 255 / 0.025) 1px,
+    transparent 1px,
+    transparent 4px
+  );
   background-size: 100% 4px;
   animation: crt-scanline-scroll 10s linear infinite;
   opacity: 0.6;
@@ -404,26 +404,41 @@ body {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 120px);
 }
 
-.section-rails::before { left: 0; }
-.section-rails::after { right: 0; }
+.section-rails::before {
+  left: 0;
+}
+.section-rails::after {
+  right: 0;
+}
 
 /* ── Footer hollow logo ── */
 
 .footer-hollow-logo {
   color: transparent;
   -webkit-text-stroke: 0;
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      color-mix(in oklch, var(--color-amber-bright) 80%, transparent) 0px,
-      color-mix(in oklch, var(--color-amber-bright) 80%, transparent) 2px,
-      color-mix(in oklch, var(--color-amber-bright) 15%, transparent) 2px,
-      color-mix(in oklch, var(--color-amber-bright) 15%, transparent) 6px
-    );
+  background: repeating-linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--color-amber-bright) 80%, transparent) 0px,
+    color-mix(in oklch, var(--color-amber-bright) 80%, transparent) 2px,
+    color-mix(in oklch, var(--color-amber-bright) 15%, transparent) 2px,
+    color-mix(in oklch, var(--color-amber-bright) 15%, transparent) 6px
+  );
   background-size: 100% 6px;
   -webkit-background-clip: text;
   background-clip: text;
   animation: crt-scanline-scroll 10s linear infinite;
+}
+
+/* ── Blog markdown ── */
+
+.blog-markdown > h2:first-child {
+  margin-top: 0;
+  margin-bottom: 2.25rem;
+  font-size: clamp(40px, 6vw, 72px);
+  line-height: 1;
+  text-shadow:
+    0 0 12px color-mix(in oklch, var(--color-green-11) 50%, transparent),
+    0 0 32px color-mix(in oklch, var(--color-green-11) 20%, transparent);
 }
 
 /* ── CRT global effects ── */
@@ -433,7 +448,11 @@ body {
   isolation: isolate;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 50% 0%, color-mix(in oklch, var(--color-green-3) 70%, transparent), transparent 50%),
+    radial-gradient(
+      ellipse at 50% 0%,
+      color-mix(in oklch, var(--color-green-3) 70%, transparent),
+      transparent 50%
+    ),
     var(--color-bg);
 }
 
@@ -443,12 +462,9 @@ body {
   inset: 0;
   z-index: 50;
   pointer-events: none;
-  background:
-    radial-gradient(circle at center, transparent 55%, rgb(0 0 0 / 0.5) 100%);
+  background: radial-gradient(circle at center, transparent 55%, rgb(0 0 0 / 0.5) 100%);
   opacity: 0.65;
 }
-
-
 
 .crt-page::after {
   content: "";
@@ -490,18 +506,37 @@ body {
 }
 
 @keyframes crt-scanline-scroll {
-  from { background-position: 0 0; }
-  to { background-position: 0 24px; }
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 24px;
+  }
 }
 
 @keyframes crt-flicker {
-  0%, 100% { opacity: 0.03; }
-  8% { opacity: 0.05; }
-  9% { opacity: 0.02; }
-  10% { opacity: 0.04; }
-  48% { opacity: 0.025; }
-  49% { opacity: 0.055; }
-  50% { opacity: 0.03; }
+  0%,
+  100% {
+    opacity: 0.03;
+  }
+  8% {
+    opacity: 0.05;
+  }
+  9% {
+    opacity: 0.02;
+  }
+  10% {
+    opacity: 0.04;
+  }
+  48% {
+    opacity: 0.025;
+  }
+  49% {
+    opacity: 0.055;
+  }
+  50% {
+    opacity: 0.03;
+  }
 }
 
 @keyframes crt-boot {
@@ -537,5 +572,4 @@ body {
   .crt-page::after {
     animation: none;
   }
-
 }
