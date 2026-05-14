@@ -32,7 +32,6 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 - Prefer browser-context `fetch()` for data extraction and form submission when the target is a real site fetch/XHR endpoint and `references/site-security-review.md` says the path is safe and workable.
 - Use passive interception when the UI already triggers useful fetch/XHR requests or active fetch is risky.
 - Fall back to Playwright UI automation when fetch is ruled out, the request path is not workable, or the user explicitly asks for Playwright/UI automation.
-- Do not copy headers to hide a request-type mismatch. Browsers set request-context headers from the primitive that caused the request.
 
 ## Setup
 
