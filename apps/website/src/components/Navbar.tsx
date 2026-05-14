@@ -166,7 +166,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
               <span className="text-sm font-medium">{formatStars(stars)}</span>
             )}
           </a>
-          <Button href="/docs/get-started/introduction" size="sm">
+          <Button href="/docs/get-started/quickstart" size="sm">
             Go to docs
           </Button>
           <div className="md:hidden">

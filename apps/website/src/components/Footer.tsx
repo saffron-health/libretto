@@ -62,7 +62,7 @@ export function Footer() {
             © {new Date().getFullYear()} Saffron Health
           </Text>
           <div className="flex gap-6">
-            <a href="/docs/get-started/introduction" className={linkClass}>
+            <a href="/docs/get-started/quickstart" className={linkClass}>
               Docs
             </a>
             <a
