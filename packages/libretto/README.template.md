@@ -4,6 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Discussions](https://img.shields.io/github/discussions/saffron-health/libretto)](https://github.com/saffron-health/libretto/discussions)
 [![Discord](https://img.shields.io/badge/Discord-Join%20chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/NYrG56hVDt)
+<a href="https://www.foundrlist.com/product/libretto?utm_source=badge&amp;utm_medium=embed" target="_blank" rel="noopener">
+  <img src="https://www.foundrlist.com/api/badge/libretto" alt="Featured on FoundrList" width="150" height="48" />
+</a>
 
 Libretto is a toolkit for building robust web integrations. It gives your coding agent a live browser and a token-efficient CLI to:
 
