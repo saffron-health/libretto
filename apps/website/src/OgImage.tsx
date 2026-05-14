@@ -6,11 +6,20 @@ const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
 const SCALE = 2;
 
-const SITE_TITLE =
-  "Libretto — The AI Toolkit for Building Robust Web Integrations";
+const SITE_TITLE = "Libretto — Don't make browser agents do a script's job";
 const SITE_DESCRIPTION =
-  "An agent skill and token-efficient CLI that inspects live pages, reverse-engineers network requests, and ships production-ready integration workflows.";
+  "Libretto is a CLI that lets coding agents inspect web pages, reverse-engineer APIs and build fast, cheap, and reliable automation scripts";
 const SITE_URL = "libretto.sh";
+
+const TITLE_ASCII = String.raw`██████╗  ██████╗ ███╗   ██╗████████╗
+██╔══██╗██╔═══██╗████╗  ██║╚══██╔══╝
+██║  ██║██║   ██║██╔██╗ ██║   ██║
+██║  ██║██║   ██║██║╚██╗██║   ██║
+██████╔╝╚██████╔╝██║ ╚████║   ██║
+╚═════╝  ╚═════╝ ╚═╝  ╚═══╝   ╚═╝
+
+MAKE BROWSER AGENTS
+DO A SCRIPT'S JOB`;
 
 /**
  * Captures the offscreen container with html2canvas, then composites the
@@ -216,18 +225,24 @@ export function OgImage() {
           style={{ width: OG_WIDTH, height: OG_HEIGHT }}
           className="relative overflow-hidden bg-bg"
         >
-          <div className="absolute inset-y-0 left-0 z-10 flex w-[540px] flex-col justify-center pl-16 pr-8">
-            <h1
-              className="font-serif font-extralight tracking-[-0.03em] text-ink"
-              style={{ fontSize: 112, lineHeight: 1.0 }}
-            >
+          <div className="absolute inset-y-0 left-0 z-10 flex w-[660px] flex-col justify-center pl-14 pr-8">
+            <p className="mb-8 font-mono text-sm uppercase tracking-[0.18em] text-accent">
               Libretto
-            </h1>
-            <p
-              className="mt-8 font-serif font-extralight leading-snug text-muted"
-              style={{ fontSize: 46 }}
+            </p>
+            <pre
+              aria-label="Don't make browser agents do a script's job"
+              className="crt-glow whitespace-pre font-mono font-semibold leading-none tracking-[-0.04em] text-ink"
+              style={{ fontSize: 20 }}
             >
-              The AI Toolkit for Building Robust Web Integrations
+              {TITLE_ASCII}
+            </pre>
+            <p
+              className="mt-9 max-w-[560px] font-serif font-extralight leading-tight text-muted"
+              style={{ fontSize: 34 }}
+            >
+              Libretto is a CLI that lets coding agents inspect web pages,
+              reverse-engineer APIs and build fast, cheap, and reliable
+              automation scripts
             </p>
           </div>
 
