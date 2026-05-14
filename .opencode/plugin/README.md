@@ -13,7 +13,3 @@ This directory contains the plugins currently shipped in this repository.
 ## no-dynamic-imports.ts
 
 **Purpose**: Blocks introducing dynamic `import()` usage in write/edit operations.
-
-## sound-notifications.ts
-
-**Purpose**: Provides audio feedback for selected agent events.
