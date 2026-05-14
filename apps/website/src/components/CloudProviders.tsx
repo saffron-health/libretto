@@ -13,17 +13,22 @@ import {
 const linkClass = "underline text-ink/70 transition-colors hover:text-ink";
 const DEPLOY_COMMAND = "libretto deploy";
 
-function DeployTerminal() {
-  const [copied, setCopied] = useState(false);
+const LOGOS = [
+  <BrowserbaseLogo key="bb" className="h-5 w-auto text-ink/35" />,
+  <KernelLogo key="k" className="h-4 w-auto text-ink/35" />,
+  <AWSLogo key="aws" className="h-9 w-auto text-ink/35" />,
+  <GCPLogo key="gcp" className="h-8 w-auto text-ink/35" />,
+];
 
+function CommandBox({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
   function handleCopy() {
-    void navigator.clipboard.writeText(DEPLOY_COMMAND);
+    void navigator.clipboard.writeText(command);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
-
   return (
-    <div className="relative w-full rounded-xl border border-accent/20 bg-panel px-5 py-4 pr-12 text-left font-mono text-[13px] text-ink/80 shadow-sm">
+    <div className="relative rounded-xl border border-accent/20 bg-panel px-5 py-4 pr-12 font-mono text-[13px] text-ink/80 shadow-sm">
       <button
         type="button"
         onClick={handleCopy}
@@ -32,7 +37,7 @@ function DeployTerminal() {
         <div className="relative size-[18px] shrink-0">
           <div
             className={classnames(
-              "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out will-change-[opacity,filter,scale]",
+              "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out",
               copied ? "scale-100 opacity-100" : "scale-[0.25] opacity-0",
             )}
           >
@@ -40,7 +45,7 @@ function DeployTerminal() {
           </div>
           <div
             className={classnames(
-              "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out will-change-[opacity,filter,scale]",
+              "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out",
               copied ? "scale-[0.25] opacity-0" : "scale-100 opacity-100",
             )}
           >
@@ -50,9 +55,40 @@ function DeployTerminal() {
       </button>
       <div className="flex items-center">
         <span className="w-4 select-none text-ink/20">$</span>
-        <span className="pl-2">{DEPLOY_COMMAND}</span>
+        <span className="pl-2">{command}</span>
       </div>
     </div>
+  );
+}
+
+function LogoTile({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-center border-ink/8 ${className}`}
+      style={{
+        background:
+          "repeating-linear-gradient(315deg, color-mix(in oklch, var(--color-gray-12) 3%, transparent) 0, color-mix(in oklch, var(--color-gray-12) 3%, transparent) 1px, transparent 0, transparent 50%)",
+        backgroundSize: "8px 8px",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function OrBadge({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center justify-center font-mono text-sm font-medium text-amber ${className}`}
+    >
+      OR
+    </span>
   );
 }
 
@@ -62,8 +98,12 @@ function ColumnHeading({ children }: { children: React.ReactNode }) {
       as="h3"
       size="2xl"
       style="serif"
-      className="crt-glow mb-3 tracking-[-0.02em] text-ink"
-      htmlStyle={{ fontWeight: 300 }}
+      className="crt-glow mb-3 text-ink"
+      htmlStyle={{
+        fontWeight: 300,
+        fontSize: "clamp(24px, 2.4vw, 32px)",
+        lineHeight: 1.15,
+      }}
     >
       {children}
     </Text>
@@ -74,71 +114,79 @@ export function CloudProviders() {
   return (
     <section className="section-crt px-8 py-24">
       <div className="mx-auto max-w-[1100px]">
-        <div className="mb-12 text-center">
+        <div className="mb-10 text-center">
           <span className="block font-mono text-base text-amber">
             // DEPLOY --
           </span>
         </div>
 
-        <div className="grid items-start gap-12 md:grid-cols-2 md:gap-14">
-          <div className="flex flex-col">
-            <ColumnHeading>Libretto Cloud</ColumnHeading>
-            <Text
-              as="p"
-              size="md"
-              className="mb-6 leading-relaxed text-muted [text-wrap:balance]"
-            >
-              Managed browsers that scale automatically, plus debugging agents
-              that auto-fix scripts when sites change. Read the{" "}
-              <a href="/docs/cloud" className={linkClass}>
-                cloud docs
-              </a>
-              .
-            </Text>
-            <div className="mt-auto">
-              <DeployTerminal />
-            </div>
+        <div className="relative grid gap-12 md:grid-cols-2 md:gap-16">
+          <div className="absolute left-1/2 top-0 bottom-0 hidden -translate-x-1/2 md:flex md:flex-col md:items-center">
+            <div className="h-full w-px bg-amber/25" />
+            <OrBadge className="absolute top-1/2 size-10 -translate-y-1/2 rounded-full border border-amber/40 bg-bg" />
           </div>
 
-          <div className="flex flex-col">
-            <ColumnHeading>Bring your own cloud</ColumnHeading>
+          <div className="md:pr-6">
+            <ColumnHeading>Deploy with one command</ColumnHeading>
             <Text
               as="p"
               size="md"
-              className="mb-6 leading-relaxed text-muted [text-wrap:balance]"
+              className="mb-5 leading-relaxed text-muted [text-wrap:balance]"
             >
-              Self-host on your existing infrastructure — no lock in. See the{" "}
-              <a
-                href="/docs/cli-reference/open-and-connect#cloud-browser-providers"
-                className={linkClass}
-              >
-                provider setup docs
-              </a>
-              .
+              Run your workflows on managed, headed browsers with residential
+              proxies. No infrastructure to set up.
             </Text>
-            <div className="mt-auto grid grid-cols-2 border border-ink/8">
-              {[
-                <BrowserbaseLogo
-                  key="bb"
-                  className="h-5 w-auto text-ink/35"
-                />,
-                <KernelLogo key="k" className="h-4 w-auto text-ink/35" />,
-                <AWSLogo key="aws" className="h-9 w-auto text-ink/35" />,
-                <GCPLogo key="gcp" className="h-8 w-auto text-ink/35" />,
-              ].map((logo, i) => (
-                <div
+            <ul className="mb-6 space-y-1.5 font-mono text-sm text-ink/55">
+              <li>→ Managed headed browsers, residential proxies included</li>
+              <li>
+                → Debugging agents that auto-fix scripts or email a full
+                analysis with video
+              </li>
+              <li>→ No browser pool to manage</li>
+            </ul>
+            <CommandBox command={DEPLOY_COMMAND} />
+            <a
+              href="/docs/cloud"
+              className={`${linkClass} mt-4 inline-block font-mono text-xs`}
+            >
+              cloud docs →
+            </a>
+          </div>
+
+          <OrBadge className="-my-4 self-center md:hidden" />
+
+          <div className="md:pl-6">
+            <ColumnHeading>Self-host</ColumnHeading>
+            <Text
+              as="p"
+              size="md"
+              className="mb-5 leading-relaxed text-muted [text-wrap:balance]"
+            >
+              Run Libretto workflows on infrastructure you control.
+            </Text>
+            <ul className="mb-6 space-y-1.5 font-mono text-sm text-ink/55">
+              <li>→ Connect Browserbase or Kernel with your API key</li>
+              <li>
+                → Or run the workflow as a container with guides for Cloud Run
+                and ECS
+              </li>
+            </ul>
+            <div className="grid grid-cols-4 border border-ink/8">
+              {LOGOS.map((logo, i) => (
+                <LogoTile
                   key={i}
-                  className="flex h-24 items-center justify-center border-ink/8 [&:nth-child(odd)]:border-r [&:nth-child(-n+2)]:border-b"
-                  style={{
-                    background:
-                      "repeating-linear-gradient(315deg, color-mix(in oklch, var(--color-gray-12) 3%, transparent) 0, color-mix(in oklch, var(--color-gray-12) 3%, transparent) 1px, transparent 0, transparent 50%)",
-                    backgroundSize: "8px 8px",
-                  }}
+                  className={`h-16 ${i < LOGOS.length - 1 ? "border-r" : ""}`}
                 >
                   {logo}
-                </div>
+                </LogoTile>
               ))}
             </div>
+            <a
+              href="/docs/cli-reference/open-and-connect#cloud-browser-providers"
+              className={`${linkClass} mt-4 inline-block font-mono text-xs`}
+            >
+              provider setup →
+            </a>
           </div>
         </div>
       </div>
