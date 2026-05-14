@@ -28,7 +28,7 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 
 ## Default Integration Approach
 
-- Use Playwright for navigation, login/session setup, and non-fetch browser behavior. Use `page.goto()` or link clicks for documents, and let the DOM load assets naturally.
+- Use Playwright for navigation and other non-fetch browser behavior, including document and asset loads.
 - Prefer browser-context `fetch()` for data extraction and form submission only when the target is a real site fetch/XHR endpoint and `references/site-security-review.md` says the path is safe and workable.
 - Use passive interception when the UI already triggers useful fetch/XHR requests or active fetch is risky.
 - Fall back to Playwright UI automation when fetch is ruled out, the request path is not workable, or the user explicitly asks for Playwright/UI automation.
