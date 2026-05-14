@@ -11,7 +11,7 @@ import {
 } from "../icons";
 
 const linkClass = "underline text-ink/70 transition-colors hover:text-ink";
-const DEPLOY_COMMAND = "libretto deploy";
+const DEPLOY_COMMAND = "libretto cloud deploy";
 
 const LOGOS = [
   <BrowserbaseLogo key="bb" className="h-5 w-auto text-ink/35" />,

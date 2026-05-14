@@ -1,7 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { resolveHostedApiUrl } from "../core/auth-fetch.js";
+import {
+  orpcCall,
+  resolveApiUrl,
+} from "../core/auth-fetch.js";
 import { buildHostedDeployTarball } from "../core/deploy-artifact.js";
+import { readAuthState } from "../core/auth-storage.js";
 import { SimpleCLI } from "affordance";
 
 type DeploymentStatus = "building" | "ready" | "failed";
@@ -19,37 +23,34 @@ function generateDeploymentName(): string {
   return `deploy-${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
 }
 
-function getConfig() {
-  const apiKey = process.env.LIBRETTO_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      "LIBRETTO_API_KEY environment variable is required.",
-    );
-  }
-
-  return { apiUrl: resolveHostedApiUrl(), apiKey };
+function deployApiKeyRequiredMessage(hasStoredSession: boolean): string {
+  return [
+    "LIBRETTO_API_KEY is required to deploy to Libretto Cloud.",
+    hasStoredSession
+      ? "A local cloud session is saved, but deploy endpoints require API-key auth."
+      : "No local cloud session was found.",
+    "  • New account: run `libretto cloud auth signup`, then verify your email.",
+    "  • Existing account: run `libretto cloud auth login`.",
+    "  • Generate a key: run `libretto cloud auth api-key issue --label <label>`.",
+    "  • Add it to your project .env file: `LIBRETTO_API_KEY=<issued-key>`.",
+  ].join("\n");
 }
 
-async function postJson(
-  apiUrl: string,
-  apiKey: string,
-  path: string,
-  input: Record<string, unknown> = {},
-): Promise<Response> {
-  return fetch(`${apiUrl}${path}`, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ json: input }),
-  });
+async function requireDeployApiKey() {
+  const stored = await readAuthState();
+  const apiUrl = resolveApiUrl(stored);
+  const apiKey = process.env.LIBRETTO_API_KEY?.trim();
+
+  if (!apiKey) {
+    throw new Error(deployApiKeyRequiredMessage(Boolean(stored?.session)));
+  }
+
+  return { apiUrl, credential: { source: "env-api-key" as const, apiKey } };
 }
 
 async function pollDeployment(
   apiUrl: string,
-  apiKey: string,
+  credential: { source: "env-api-key"; apiKey: string },
   deploymentId: string,
   pollIntervalMs: number,
   maxWaitMs: number,
@@ -68,18 +69,14 @@ async function pollDeployment(
 
     await new Promise((r) => setTimeout(r, pollIntervalMs));
 
-    const res = await postJson(apiUrl, apiKey, "/v1/deployments/sync", {
-      id: deploymentId,
+    deployment = await orpcCall<DeploymentResponse["json"]>({
+      apiUrl,
+      path: "/v1/deployments/sync",
+      input: { id: deploymentId },
+      credential,
     });
-    const body = (await res.json()) as DeploymentResponse;
-    if (res.status !== 200) {
-      throw new Error(
-        `Failed to sync deployment status (${res.status}): ${JSON.stringify(body)}`,
-      );
-    }
-    status = body.json.status;
-    workflows = body.json.workflows;
-    deployment = body.json;
+    status = deployment.status;
+    workflows = deployment.workflows;
     if (status === "ready" && readyAt === null) readyAt = Date.now();
     process.stdout.write(".");
   }
@@ -135,7 +132,7 @@ export const deployCommand = SimpleCLI.command({
 })
   .input(deployInput)
   .handle(async ({ input }) => {
-    const { apiUrl, apiKey } = getConfig();
+    const { apiUrl, credential } = await requireDeployApiKey();
     const deploymentName = generateDeploymentName();
 
     // Hosted deploy uploads a generated artifact with a deploy entrypoint and
@@ -156,20 +153,14 @@ export const deployCommand = SimpleCLI.command({
     if (input.description) createPayload.description = input.description;
 
     console.log("Uploading deployment...");
-    const res = await postJson(
+    const body = await orpcCall<DeploymentResponse["json"]>({
       apiUrl,
-      apiKey,
-      "/v1/deployments/create",
-      createPayload,
-    );
-    const body = (await res.json()) as DeploymentResponse;
-    if (res.status !== 200) {
-      throw new Error(
-        `Failed to create deployment (${res.status}): ${JSON.stringify(body)}`,
-      );
-    }
+      path: "/v1/deployments/create",
+      input: createPayload,
+      credential,
+    });
 
-    const { deployment_id, status } = body.json;
+    const { deployment_id, status } = body;
     console.log(`Deployment created: ${deployment_id}`);
     console.log(`Status: ${status}`);
 
@@ -177,7 +168,7 @@ export const deployCommand = SimpleCLI.command({
       process.stdout.write("Waiting for build");
       const deployment = await pollDeployment(
         apiUrl,
-        apiKey,
+        credential,
         deployment_id,
         10_000,
         5 * 60 * 1000,

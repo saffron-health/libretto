@@ -27,7 +27,7 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
     Create a new Libretto Cloud account with:
 
     ```bash theme={null}
-    npx libretto experimental auth signup
+    npx libretto cloud auth signup
     ```
 
     If you are joining an existing organization, use `accept-invite` instead.
@@ -39,12 +39,12 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
     Issue an API key for your project or environment:
 
     ```bash theme={null}
-    npx libretto experimental auth api-key issue --label laptop-dev
+    npx libretto cloud auth api-key issue --label laptop-dev
     ```
 
     Store the printed key as `LIBRETTO_API_KEY` in your `.env` file:
 
-    ```bash theme={null}
+    ```dotenv theme={null}
     # .env
     LIBRETTO_API_KEY=<issued-key>
     ```
@@ -90,7 +90,7 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
 
     ```bash theme={null}
     cd my-automations
-    npx libretto experimental deploy .
+    npx libretto cloud deploy .
     ```
 
     See [Expected deploy directory](/libretto-cloud-hosting/deployments#expected-deploy-directory) and [Deploy workflows](/libretto-cloud-hosting/deployments#deploy-workflows).

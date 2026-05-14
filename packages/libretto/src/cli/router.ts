@@ -12,8 +12,8 @@ import { SimpleCLI } from "affordance";
 
 export const cliRoutes = {
   ...browserCommands,
-  experimental: SimpleCLI.group({
-    description: "Experimental commands",
+  cloud: SimpleCLI.group({
+    description: "Libretto Cloud commands",
     routes: {
       deploy: deployCommand,
       auth: authCommands,

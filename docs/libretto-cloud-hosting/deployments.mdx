@@ -6,15 +6,15 @@ title: Deployments
 
 ### Before you deploy
 
-Libretto Cloud commands and API requests use `https://api.libretto.sh`. Issue an API key for the deployment environment:
+Libretto Cloud commands and API requests use `https://api.libretto.sh`. Issue an API key, then add it to your project `.env` file:
 
-```bash theme={null}
-export LIBRETTO_API_KEY=<issued-api-key>
+```dotenv theme={null}
+LIBRETTO_API_KEY=<issued-api-key>
 ```
 
 ### Expected deploy directory
 
-`libretto experimental deploy` uploads one package directory at a time. That directory must contain:
+`libretto cloud deploy` uploads one package directory at a time. That directory must contain:
 
 - A `package.json`
 - An entry file for workflow discovery
@@ -43,7 +43,7 @@ export { default as submitPriorAuth } from "./src/workflows/submit-prior-auth";
 
 The API uses the workflow name from the `workflow("...")` call inside the file, not the filename or the export alias from `index.ts`.
 
-If your workflows live in a package inside a monorepo, run `deploy` against that package directory instead of the monorepo root.
+If your workflows live in a package inside a monorepo, run `libretto cloud deploy` against that package directory instead of the monorepo root.
 
 The deploy command has two separate path concepts:
 
@@ -53,7 +53,7 @@ The deploy command has two separate path concepts:
 For example:
 
 ```bash theme={null}
-npx libretto experimental deploy my-automations --entry-point src/workflows/check-eligibility.ts
+npx libretto cloud deploy my-automations --entry-point src/workflows/check-eligibility.ts
 ```
 
 In that command:
@@ -63,11 +63,11 @@ In that command:
 
 ### Deploy workflows
 
-Use `deploy` to upload a workflow bundle to Libretto Cloud:
+Use `libretto cloud deploy` to upload a workflow bundle to Libretto Cloud:
 
 ```bash theme={null}
 cd my-automations
-npx libretto experimental deploy .
+npx libretto cloud deploy .
 ```
 
 That command expects:
@@ -81,7 +81,7 @@ The positional argument to `deploy` is the source directory to package and uploa
 If you want to deploy from a different entry file, keep the source directory as the package root and use `--entry-point` relative to that directory:
 
 ```bash theme={null}
-npx libretto experimental deploy my-automations \
+npx libretto cloud deploy my-automations \
   --description "payer portal workflows" \
   --entry-point src/workflows/check-eligibility.ts
 ```

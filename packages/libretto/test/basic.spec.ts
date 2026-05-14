@@ -178,8 +178,8 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("readonly-exec");
     expect(result.stdout).toContain("snapshot");
     expect(result.stdout).toContain("compact accessibility snapshot");
-    expect(result.stdout).not.toContain("cloud <subcommand>");
-    expect(result.stdout).toContain("experimental <subcommand>");
+    expect(result.stdout).toContain("cloud <subcommand>");
+    expect(result.stdout).not.toContain("experimental <subcommand>");
     expect(result.stdout).toContain("Docs (agent-friendly): https://libretto.sh/docs");
     expect(result.stderr).toBe("");
   });
@@ -200,16 +200,38 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  test("prints experimental group help with deploy listed under the new namespace", async ({
+  test("prints cloud group help with hosted commands", async ({
     librettoCli,
   }) => {
-    const result = await librettoCli("help experimental");
-    expect(result.stdout).toContain("Experimental commands");
+    const result = await librettoCli("help cloud");
+    expect(result.stdout).toContain("Libretto Cloud commands");
     expect(result.stdout).toContain(
-      "libretto experimental <subcommand>",
+      "libretto cloud <subcommand>",
     );
     expect(result.stdout).toContain("deploy");
+    expect(result.stdout).toContain("auth");
+    expect(result.stdout).toContain("billing");
     expect(result.stderr).toBe("");
+  });
+
+  test("deploy requires an API key and points users to signup", async ({
+    librettoCli,
+    workspaceDir,
+  }) => {
+    const result = await librettoCli("cloud deploy .", {
+      HOME: workspaceDir,
+      LIBRETTO_API_KEY: undefined,
+    });
+
+    expect(result.stderr).toContain(
+      "LIBRETTO_API_KEY is required to deploy to Libretto Cloud.",
+    );
+    expect(result.stderr).toContain("libretto cloud auth signup");
+    expect(result.stderr).toContain("libretto cloud auth login");
+    expect(result.stderr).toContain("libretto cloud auth api-key issue");
+    expect(result.stderr).toContain("LIBRETTO_API_KEY=<issued-key>");
+    expect(result.stderr).toContain(".env");
+    expect(result.stdout).not.toContain("Bundling hosted deployment artifact");
   });
 
   test("prints run help with explicit visualization disable flag", async ({
