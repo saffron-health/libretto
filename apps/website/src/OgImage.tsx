@@ -11,15 +11,33 @@ const SITE_DESCRIPTION =
   "Libretto is a CLI that lets coding agents inspect web pages, reverse-engineer APIs and build fast, cheap, and reliable automation scripts";
 const SITE_URL = "libretto.sh";
 
-const TITLE_ASCII = String.raw`██████╗  ██████╗ ███╗   ██╗████████╗
-██╔══██╗██╔═══██╗████╗  ██║╚══██╔══╝
-██║  ██║██║   ██║██╔██╗ ██║   ██║
-██║  ██║██║   ██║██║╚██╗██║   ██║
-██████╔╝╚██████╔╝██║ ╚████║   ██║
-╚═════╝  ╚═════╝ ╚═╝  ╚═══╝   ╚═╝
+const TITLE_ASCII = String.raw`██████╗  ██████╗ ███╗   ██╗██╗████████╗  ███╗   ███╗ █████╗ ██╗  ██╗███████╗
+██╔══██╗██╔═══██╗████╗  ██║╚═╝╚══██╔══╝  ████╗ ████║██╔══██╗██║ ██╔╝██╔════╝
+██║  ██║██║   ██║██╔██╗ ██║      ██║     ██╔████╔██║███████║█████╔╝ █████╗
+██║  ██║██║   ██║██║╚██╗██║      ██║     ██║╚██╔╝██║██╔══██║██╔═██╗ ██╔══╝
+██████╔╝╚██████╔╝██║ ╚████║      ██║     ██║ ╚═╝ ██║██║  ██║██║  ██╗███████╗
+╚═════╝  ╚═════╝ ╚═╝  ╚═══╝      ╚═╝     ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
 
-MAKE BROWSER AGENTS
-DO A SCRIPT'S JOB`;
+██████╗ ██████╗  ██████╗ ██╗    ██╗███████╗███████╗██████╗    █████╗  ██████╗ ███████╗███╗   ██╗████████╗███████╗
+██╔══██╗██╔══██╗██╔═══██╗██║    ██║██╔════╝██╔════╝██╔══██╗  ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝██╔════╝
+██████╔╝██████╔╝██║   ██║██║ █╗ ██║███████╗█████╗  ██████╔╝  ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   ███████╗
+██╔══██╗██╔══██╗██║   ██║██║███╗██║╚════██║██╔══╝  ██╔══██╗  ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   ╚════██║
+██████╔╝██║  ██║╚██████╔╝╚███╔███╔╝███████║███████╗██║  ██║  ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   ███████║
+╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ╚══╝╚══╝ ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝
+
+██████╗  ██████╗    █████╗    ███████╗ ██████╗██████╗ ██╗██████╗ ████████╗██╗███████╗
+██╔══██╗██╔═══██╗  ██╔══██╗   ██╔════╝██╔════╝██╔══██╗██║██╔══██╗╚══██╔══╝╚═╝██╔════╝
+██║  ██║██║   ██║  ███████║   ███████╗██║     ██████╔╝██║██████╔╝   ██║      ███████╗
+██║  ██║██║   ██║  ██╔══██║   ╚════██║██║     ██╔══██╗██║██╔═══╝    ██║      ╚════██║
+██████╔╝╚██████╔╝  ██║  ██║   ███████║╚██████╗██║  ██║██║██║        ██║      ███████║
+╚═════╝  ╚═════╝   ╚═╝  ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝╚═╝        ╚═╝      ╚══════╝
+
+     ██╗ ██████╗ ██████╗
+     ██║██╔═══██╗██╔══██╗
+     ██║██║   ██║██████╔╝
+██   ██║██║   ██║██╔══██╗
+╚█████╔╝╚██████╔╝██████╔╝
+ ╚════╝  ╚═════╝ ╚═════╝`;
 
 /**
  * Captures the offscreen container with html2canvas, then composites the
@@ -225,25 +243,14 @@ export function OgImage() {
           style={{ width: OG_WIDTH, height: OG_HEIGHT }}
           className="relative overflow-hidden bg-bg"
         >
-          <div className="absolute inset-y-0 left-0 z-10 flex w-[660px] flex-col justify-center pl-14 pr-8">
-            <p className="mb-8 font-mono text-sm uppercase tracking-[0.18em] text-accent">
-              Libretto
-            </p>
+          <div className="absolute inset-0 z-10 flex items-center justify-center px-10">
             <pre
               aria-label="Don't make browser agents do a script's job"
-              className="crt-glow whitespace-pre font-mono font-semibold leading-none tracking-[-0.04em] text-ink"
-              style={{ fontSize: 20 }}
+              className="crt-glow whitespace-pre font-mono font-semibold leading-none tracking-[-0.05em] text-ink"
+              style={{ fontSize: 13 }}
             >
               {TITLE_ASCII}
             </pre>
-            <p
-              className="mt-9 max-w-[560px] font-serif font-extralight leading-tight text-muted"
-              style={{ fontSize: 34 }}
-            >
-              Libretto is a CLI that lets coding agents inspect web pages,
-              reverse-engineer APIs and build fast, cheap, and reliable
-              automation scripts
-            </p>
           </div>
 
           {/* Asciihedron — much larger, extending well beyond the frame */}
