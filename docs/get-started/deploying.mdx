@@ -5,6 +5,28 @@ sidebarTitle: Deploying
 
 > Pick a production path and deploy.
 
+## Agent prompt
+
+```text
+Help me deploy my Libretto workflow and choose the right production path.
+
+First, ask me one question: do I want managed hosting (Libretto Cloud Hosting) or self-hosting?
+
+Then:
+- If I choose managed hosting, follow the Libretto Cloud Hosting docs to authenticate, deploy, and run a hosted workflow.
+- If I choose self-hosting, use the self-hosting docs and ask whether I want AWS or GCP, then guide me through that path.
+
+After setup, provide:
+1) commands executed
+2) files/config edited
+3) deployment/run status
+4) next recommended docs page
+
+Do not make unrelated changes.
+```
+
+## Manual
+
 Libretto has two production paths:
 
 - **Libretto Cloud Hosting**: managed infrastructure, fastest path to production.
@@ -28,9 +50,28 @@ Use this if you need to run everything in your own environment.
 
 ## After deployment
 
-Once deployed, use these sections as needed:
+Use these workflow guides to build, debug, and optimize production automations:
 
-- Task-oriented workflows: [Workflow guides](/workflow-guides/one-shot-workflow-generation)
+<CardGroup cols={2}>
+  <Card title="One-shot workflow generation" icon="bolt" href="/workflow-guides/one-shot-workflow-generation">
+    Give your agent a goal and a URL, then review the generated browser automation.
+  </Card>
+
+  <Card title="Interactive workflow building" icon="hand-pointer" href="/workflow-guides/interactive-workflow-building">
+    Demonstrate a workflow manually and let your agent turn the recorded steps into code.
+  </Card>
+
+  <Card title="Debugging workflows" icon="bug" href="/workflow-guides/debugging-workflows">
+    Reproduce failures, inspect live page state, and fix broken automations.
+  </Card>
+
+  <Card title="Convert to network requests" icon="network-wired" href="/workflow-guides/convert-to-network-requests">
+    Replace UI automation with direct API calls when a site exposes usable network traffic.
+  </Card>
+</CardGroup>
+
+Other references:
+
 - Conceptual model: [Understand Libretto](/fundamentals/core-concepts)
 - Command details: [CLI reference](/cli-reference/open-and-connect)
 - Runtime API details: [Library API](/library-api/workflow)
