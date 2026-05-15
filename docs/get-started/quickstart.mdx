@@ -1,0 +1,81 @@
+---
+title: Quickstart
+sidebarTitle: Quickstart
+---
+
+> Install Libretto and run your first workflow end to end.
+
+## Agent prompt
+
+```text
+Fetch and follow https://libretto.sh/start.md to set up Libretto and create a new browser automation.
+```
+
+## Manual
+
+<Steps>
+  <Step title="Choose a setup path">
+
+Decide whether you want to create a new Libretto package or add Libretto to an existing Node.js package.
+
+If you create a new package, choose where it should live and what it should be named. If you use an existing package, switch into that package directory before installing Libretto.
+  </Step>
+
+  <Step title="Option A: create a new Libretto package">
+
+From the directory where the new package should be created:
+
+```bash theme={null}
+npm create libretto@latest
+```
+
+You can pass a package name directly:
+
+```bash theme={null}
+npm create libretto@latest my-automations
+```
+
+This scaffolds a package, installs dependencies, runs setup, and downloads Chromium.
+  </Step>
+
+  <Step title="Option B: add Libretto to an existing package">
+
+From the existing package directory:
+
+```bash theme={null}
+npm install libretto
+npx libretto setup
+```
+
+Then create a workflow file and run it with `npx libretto run <path> --headless`.
+  </Step>
+
+  <Step title="Create and run a smoke workflow">
+
+Create `src/workflows/scrape-page.ts` in the package you set up:
+
+```ts src/workflows/scrape-page.ts
+import { workflow } from "libretto";
+
+export default workflow("scrape-page", async ({ page }) => {
+  await page.goto("https://example.com");
+  const title = await page.title();
+  console.log(`Page title: ${title}`);
+
+  return { title };
+});
+```
+
+Run it headless:
+
+```bash theme={null}
+npx libretto run src/workflows/scrape-page.ts --headless
+```
+
+This confirms your local setup works and shows the basic run loop.
+  </Step>
+</Steps>
+
+<Card title="Next: First workflow" icon="arrow-right" href="/get-started/first-workflow">
+  Expand the smoke workflow into a minimal real workflow you can iterate on.
+</Card>

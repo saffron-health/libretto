@@ -123,7 +123,7 @@ export function DocsPage({ pathname }: { pathname?: string }) {
 - [ ] Update docs link resolution so `#fragment` and `/docs/#fragment` still resolve within the current group when possible, and fall back to the generated cross-group heading lookup otherwise.
 - [ ] Remove unused exports such as `docsManifest`, `docsPages`, and `docsMdxContent` from the current content module.
 - [ ] Verify `pnpm --filter libretto-website type-check` passes after the docs app consumes generated content.
-- [ ] Run `pnpm --filter libretto-website dev`, open `/docs/get-started#quick-start` and `/docs/library-api#workflow`, and confirm the correct group loads and scrolls to the requested section.
+- [ ] Run `pnpm --filter libretto-website dev`, open `/docs/get-started#quick-start` and `/docs/reference/runtime/workflow`, and confirm the correct group loads and scrolls to the requested section.
 - [ ] Run `pnpm --filter libretto-website build` and confirm the built docs app still serves `/docs`, `/docs/<group>`, and hash-fragment links without route changes.
 
 ### Phase 3: Move docs content to repo-root `docs/` and delete the old in-app content source
@@ -141,7 +141,7 @@ order: 1
 Libretto is the AI toolkit for building and maintaining browser automations.
 ```
 
-- [ ] Create a repo-root `docs/` directory and move existing docs groups into top-level folders such as `docs/get-started/`, `docs/cli-reference/`, and `docs/library-api/`.
+- [ ] Create a repo-root `docs/` directory and move existing docs groups into top-level folders such as `docs/get-started/`, `docs/reference/cli/`, and `docs/reference/runtime/`.
 - [ ] Add `index.mdx` where a folder needs explicit group-level `title` or `order` metadata; otherwise rely on the folder slug.
 - [ ] Add lightweight frontmatter to migrated files where explicit `title`, `order`, `draft`, or `devOnly` behavior is needed.
 - [ ] Move the dev-only UI kit page into the new structure and mark it with `devOnly: true` instead of keeping a runtime-only manifest special case.

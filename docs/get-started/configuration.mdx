@@ -6,6 +6,19 @@ title: Configuration
 
 Both `npm create libretto@latest` and `npx libretto setup` handle initial configuration for you. The commands on this page are for changing settings after the fact.
 
+### Environment variables
+
+Libretto automatically loads the repo root `.env` file before running CLI commands. Put provider credentials there:
+
+```dotenv theme={null}
+# inside .env
+KERNEL_API_KEY=<kernel-api-key>
+BROWSERBASE_API_KEY=<browserbase-api-key>
+BROWSERBASE_PROJECT_ID=<browserbase-project-id>
+```
+
+Use `.libretto/config.json` for persistent workspace preferences like the default browser provider.
+
 ### Config file reference
 
 The config file is at `.libretto/config.json`. You can edit it directly.

@@ -22,7 +22,7 @@ const faqs: FAQItem[] = [
         gives your coding agent a live browser and a CLI to inspect pages,
         capture network traffic, record user actions, and turn them into
         deterministic automation scripts. Check out the{" "}
-        <a href="/docs/get-started/introduction" className={linkClass}>
+        <a href="/docs/get-started/quickstart" className={linkClass}>
           docs
         </a>{" "}
         to get started.
@@ -83,7 +83,7 @@ const faqs: FAQItem[] = [
           GitHub
         </a>
         , or read through the{" "}
-        <a href="/docs/get-started/introduction" className={linkClass}>
+        <a href="/docs/get-started/quickstart" className={linkClass}>
           docs
         </a>
         .

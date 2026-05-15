@@ -106,7 +106,7 @@ function Hero({
         </Text>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-wrap items-center justify-center gap-6">
           <InstallSnippet />
-          <Button href="/docs/get-started/introduction" variant="secondary">Go to docs</Button>
+          <Button href="/docs/get-started/quickstart" variant="secondary">Go to docs</Button>
         </div>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
           <TerminalDemo />

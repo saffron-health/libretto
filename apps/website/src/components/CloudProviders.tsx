@@ -11,7 +11,7 @@ import {
 } from "../icons";
 
 const linkClass = "underline text-ink/70 transition-colors hover:text-ink";
-const DEPLOY_COMMAND = "libretto deploy";
+const DEPLOY_COMMAND = "libretto cloud deploy";
 
 const LOGOS = [
   <BrowserbaseLogo key="bb" className="h-5 w-auto text-ink/35" />,
@@ -146,7 +146,7 @@ export function CloudProviders() {
             </ul>
             <CommandBox command={DEPLOY_COMMAND} />
             <a
-              href="/docs/cloud"
+              href="/docs/libretto-cloud-hosting/overview"
               className={`${linkClass} mt-4 inline-block font-mono text-xs`}
             >
               cloud docs →
@@ -156,13 +156,14 @@ export function CloudProviders() {
           <OrBadge className="-my-4 self-center md:hidden" />
 
           <div className="md:pl-6">
-            <ColumnHeading>Self-host</ColumnHeading>
+            <ColumnHeading>Alternative providers</ColumnHeading>
             <Text
               as="p"
               size="md"
               className="mb-5 leading-relaxed text-muted [text-wrap:balance]"
             >
-              Run Libretto workflows on infrastructure you control.
+              Run browsers with Kernel or Browserbase, or run workflows on
+              infrastructure you control.
             </Text>
             <ul className="mb-6 space-y-1.5 font-mono text-sm text-ink/55">
               <li>→ Connect Browserbase or Kernel with your API key</li>
@@ -182,7 +183,7 @@ export function CloudProviders() {
               ))}
             </div>
             <a
-              href="/docs/cli-reference/open-and-connect#cloud-browser-providers"
+              href="/docs/alternative-providers/overview"
               className={`${linkClass} mt-4 inline-block font-mono text-xs`}
             >
               provider setup →

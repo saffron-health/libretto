@@ -13,7 +13,7 @@ The examples below use `npx libretto`. If `libretto` is already on your `PATH`, 
 Use `auth signup` when you are creating a brand new Libretto Cloud organization:
 
 ```bash theme={null}
-npx libretto experimental auth signup
+npx libretto cloud auth signup
 ```
 
 The CLI prompts for your name, email, password, organization name, organization slug, and the alert email that Libretto Cloud should use for workflow failure notifications. After the account is created, it waits for email verification and stores the session locally in `~/.libretto/auth.json`.
@@ -29,7 +29,7 @@ If the organization slug is already taken, the CLI re-prompts for just the slug 
 Use `auth login` when the account already exists:
 
 ```bash theme={null}
-npx libretto experimental auth login
+npx libretto cloud auth login
 ```
 
 This stores a new Libretto Cloud session in `~/.libretto/auth.json`. If the account is not verified yet, the CLI re-sends the verification email.
@@ -37,67 +37,67 @@ This stores a new Libretto Cloud session in `~/.libretto/auth.json`. If the acco
 To clear local credentials:
 
 ```bash theme={null}
-npx libretto experimental auth logout
+npx libretto cloud auth logout
 ```
 
 ### Check the active identity
 
-Use `whoami` to confirm which Libretto Cloud account the CLI is using:
+Use `auth whoami` to confirm which Libretto Cloud account the CLI is using:
 
 ```bash theme={null}
-npx libretto experimental auth whoami
+npx libretto cloud auth whoami
 ```
 
 If `LIBRETTO_API_KEY` is set, the CLI prefers that key over the stored session cookie.
 
 ### Invite a teammate
 
-Use `invite` from an account that can manage members in the active organization:
+Use `auth invite` from an account that can manage members in the active organization:
 
 ```bash theme={null}
-npx libretto experimental auth invite teammate@example.com --role member
+npx libretto cloud auth invite teammate@example.com --role member
 ```
 
-The command prints the invitation id and the organization slug that the recipient needs for `accept-invite`.
+The command prints the invitation id and the organization slug that the recipient needs for `auth accept-invite`.
 
 ### Accept an invite
 
-Use `accept-invite` when you are joining an existing organization:
+Use `auth accept-invite` when you are joining an existing organization:
 
 ```bash theme={null}
-npx libretto experimental auth accept-invite <tenant-slug> <invitation-id>
+npx libretto cloud auth accept-invite <tenant-slug> <invitation-id>
 ```
 
 If you are not logged in yet, the CLI creates the account first, waits for email verification, and then saves the hosted session locally.
 
-If you are already logged in, `accept-invite` only works when that account is not already a member of another organization.
+If you are already logged in, `auth accept-invite` only works when that account is not already a member of another organization.
 
 ### Issue an API key
 
 Use API keys for project `.env` files, CI, or other non-interactive Libretto Cloud runs:
 
 ```bash theme={null}
-npx libretto experimental auth api-key issue --label laptop-dev
+npx libretto cloud auth api-key issue --label laptop-dev
 ```
 
 The command prints the raw key once. The CLI does not store that key on disk for you.
 
-Add it to your project:
+Add it to your project `.env` file:
 
-```bash theme={null}
+```dotenv theme={null}
 LIBRETTO_API_KEY=<issued-key>
 ```
 
 To inspect existing keys:
 
 ```bash theme={null}
-npx libretto experimental auth api-key list
+npx libretto cloud auth api-key list
 ```
 
 To revoke a key:
 
 ```bash theme={null}
-npx libretto experimental auth api-key revoke <key-id>
+npx libretto cloud auth api-key revoke <key-id>
 ```
 
 ### Troubleshooting

@@ -1,15 +1,15 @@
 /**
- * Experimental auth commands for the libretto hosted platform.
+ * Hosted-platform auth commands.
  *
- *   libretto experimental auth signup
- *   libretto experimental auth login
- *   libretto experimental auth logout
- *   libretto experimental auth invite <email> [--role member|admin|owner]
- *   libretto experimental auth accept-invite <tenantSlug> <invitationId>
- *   libretto experimental auth api-key issue [--label <label>]
- *   libretto experimental auth api-key list
- *   libretto experimental auth api-key revoke <id>
- *   libretto experimental auth whoami
+ *   libretto cloud auth signup
+ *   libretto cloud auth login
+ *   libretto cloud auth logout
+ *   libretto cloud auth invite <email> [--role member|admin|owner]
+ *   libretto cloud auth accept-invite <tenantSlug> <invitationId>
+ *   libretto cloud auth api-key issue [--label <label>]
+ *   libretto cloud auth api-key list
+ *   libretto cloud auth api-key revoke <id>
+ *   libretto cloud auth whoami
  *
  * Credentials live at ~/.libretto/auth.json (mode 0600). The CLI sends either
  * the stored API key or the stored session cookie depending on what's
@@ -214,7 +214,7 @@ export const signupCommand = SimpleCLI.command({
     const name = await prompt("Your name:");
     if (name.toLowerCase() === "q" || name.length === 0) {
       console.log(
-        "OK — ask an existing teammate to run `libretto experimental auth invite <your-email>` and then run `libretto experimental auth accept-invite <slug> <invitation-id>` from this machine.",
+        "OK — ask an existing teammate to run `libretto cloud auth invite <your-email>` and then run `libretto cloud auth accept-invite <slug> <invitation-id>` from this machine.",
       );
       return;
     }
@@ -293,7 +293,7 @@ export const signupCommand = SimpleCLI.command({
     console.log(`Session saved to ${authStatePath()}`);
     console.log();
     console.log("To generate an API key, run:");
-    console.log("  libretto experimental auth api-key issue --label <label>");
+    console.log("  libretto cloud auth api-key issue --label <label>");
     console.log("Then add LIBRETTO_API_KEY=<key> to your project's .env file.");
   });
 
@@ -471,7 +471,7 @@ export const inviteCommand = SimpleCLI.command({
     console.log();
     console.log("Tell them to run:");
     console.log(
-      `  libretto experimental auth accept-invite ${orgSlug} ${data.id}`,
+      `  libretto cloud auth accept-invite ${orgSlug} ${data.id}`,
     );
   });
 
@@ -530,7 +530,7 @@ export const acceptInviteCommand = SimpleCLI.command({
           [
             "You're already a member of an organization.",
             "A libretto user can only belong to one organization at a time.",
-            "To accept this invite: log out, delete the existing account, and re-run `auth accept-invite` with a new account (or a fresh email).",
+            "To accept this invite: log out, delete the existing account, and re-run `libretto cloud auth accept-invite` with a new account (or a fresh email).",
           ].join("\n"),
         );
       }
@@ -606,7 +606,7 @@ export const acceptInviteCommand = SimpleCLI.command({
     console.log();
     console.log("Email verified. You're logged in and a member of the organization.");
     console.log("To generate an API key, run:");
-    console.log("  libretto experimental auth api-key issue --label <label>");
+    console.log("  libretto cloud auth api-key issue --label <label>");
     console.log("Then add LIBRETTO_API_KEY=<key> to your project's .env file.");
   });
 
@@ -689,7 +689,7 @@ export const apiKeyRevokeCommand = SimpleCLI.command({
     SimpleCLI.input({
       positionals: [
         SimpleCLI.positional("id", z.string().min(1), {
-          help: "API key id (from `auth api-key list`).",
+          help: "API key id (from `libretto cloud auth api-key list`).",
         }),
       ],
       named: {},
@@ -712,7 +712,7 @@ export const apiKeyRevokeCommand = SimpleCLI.command({
 
     console.log(`API key ${input.id} revoked.`);
     console.log(
-      "If this key was in your .env, remove the LIBRETTO_API_KEY value and issue a new one with `auth api-key issue --label <label>`.",
+      "If this key was in your .env, remove the LIBRETTO_API_KEY value and issue a new one with `libretto cloud auth api-key issue --label <label>`.",
     );
   });
 
@@ -731,7 +731,7 @@ export const whoamiCommand = SimpleCLI.command({
 
     if (credential.source === "none") {
       console.log(
-        "Not authenticated. Run `libretto experimental auth signup`, `login`, or set LIBRETTO_API_KEY in your env.",
+        "Not authenticated. Run `libretto cloud auth signup`, `libretto cloud auth login`, or set LIBRETTO_API_KEY in your env.",
       );
       return;
     }

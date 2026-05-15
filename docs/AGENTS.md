@@ -4,9 +4,9 @@ This top-level `docs/` directory is the user-facing Mintlify documentation site.
 
 Config in `docs.json`. Preview with `pnpm docs:dev` (runs on `localhost:3000`).
 
-## Sidebar group name must match the URL
+## Navigation should follow URL structure
 
-A page's URL prefix must match its `docs.json` group name, lowercased and hyphenated. For example, group `"CLI reference"` maps to URL `/cli-reference/*`, with files at `docs/cli-reference/*.mdx`. When adding a page, put it in the matching folder and register it in `docs.json`.
+A page's file path determines its URL. When adding a page, put it in the folder for the intended URL and register it under the appropriate `docs.json` tab and group. For example, the `"Guides"` group contains `/guides/*` pages from `docs/guides/*.mdx`, while the `"Reference"` tab contains `/reference/cli/*` and `/reference/runtime/*` groups.
 
 ## Testing
 

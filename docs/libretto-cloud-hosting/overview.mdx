@@ -10,7 +10,7 @@ sidebarTitle: Overview
   change as the managed platform evolves.
 </Warning>
 
-Libretto Cloud is the easiest way to host and run workflows. Sign up, run one deploy command from the CLI, and your workflow is live behind a managed API. If you'd rather run workflows on infrastructure you control, see the [self-hosting overview](/self-hosting/introduction). The Libretto Cloud API URL is `https://api.libretto.sh`.
+Libretto Cloud is the easiest way to host and run workflows. Sign up, run one deploy command from the CLI, and your workflow is live behind a managed API. If you'd rather use a different browser or infrastructure provider, see [alternative providers](/alternative-providers/overview). The Libretto Cloud API URL is `https://api.libretto.sh`.
 
 ### Why use Libretto Cloud
 
@@ -27,10 +27,10 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
     Create a new Libretto Cloud account with:
 
     ```bash theme={null}
-    npx libretto experimental auth signup
+    npx libretto cloud auth signup
     ```
 
-    If you are joining an existing organization, use `accept-invite` instead.
+    If you are joining an existing organization, use `auth accept-invite` instead.
 
     See [Create a new user account and organization](/libretto-cloud-hosting/authentication#create-a-new-user-account-and-organization).
   </Step>
@@ -39,12 +39,12 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
     Issue an API key for your project or environment:
 
     ```bash theme={null}
-    npx libretto experimental auth api-key issue --label laptop-dev
+    npx libretto cloud auth api-key issue --label laptop-dev
     ```
 
     Store the printed key as `LIBRETTO_API_KEY` in your `.env` file:
 
-    ```bash theme={null}
+    ```dotenv theme={null}
     # .env
     LIBRETTO_API_KEY=<issued-key>
     ```
@@ -90,7 +90,7 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
 
     ```bash theme={null}
     cd my-automations
-    npx libretto experimental deploy .
+    npx libretto cloud deploy .
     ```
 
     See [Expected deploy directory](/libretto-cloud-hosting/deployments#expected-deploy-directory) and [Deploy workflows](/libretto-cloud-hosting/deployments#deploy-workflows).

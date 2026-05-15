@@ -178,8 +178,8 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("readonly-exec");
     expect(result.stdout).toContain("snapshot");
     expect(result.stdout).toContain("compact accessibility snapshot");
-    expect(result.stdout).not.toContain("cloud <subcommand>");
-    expect(result.stdout).toContain("experimental <subcommand>");
+    expect(result.stdout).toContain("cloud <subcommand>");
+    expect(result.stdout).not.toContain("experimental <subcommand>");
     expect(result.stdout).toContain("Docs (agent-friendly): https://libretto.sh/docs");
     expect(result.stderr).toBe("");
   });
@@ -200,16 +200,91 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  test("prints experimental group help with deploy listed under the new namespace", async ({
+  test("prints cloud group help with hosted commands", async ({
     librettoCli,
   }) => {
-    const result = await librettoCli("help experimental");
-    expect(result.stdout).toContain("Experimental commands");
+    const result = await librettoCli("help cloud");
+    expect(result.stdout).toContain("Libretto Cloud commands");
     expect(result.stdout).toContain(
-      "libretto experimental <subcommand>",
+      "libretto cloud <subcommand>",
     );
     expect(result.stdout).toContain("deploy");
+    expect(result.stdout).toContain("auth");
+    expect(result.stdout).toContain("billing");
     expect(result.stderr).toBe("");
+  });
+
+  test("deploy requires an API key and points users to signup", async ({
+    librettoCli,
+    workspaceDir,
+  }) => {
+    const result = await librettoCli("cloud deploy .", {
+      HOME: workspaceDir,
+      LIBRETTO_API_KEY: undefined,
+    });
+
+    expect(result.stderr).toContain(
+      "LIBRETTO_API_KEY is required to deploy to Libretto Cloud.",
+    );
+    expect(result.stderr).toContain("libretto cloud auth signup");
+    expect(result.stderr).toContain("libretto cloud auth login");
+    expect(result.stderr).toContain("libretto cloud auth api-key issue");
+    expect(result.stderr).toContain("LIBRETTO_API_KEY=<issued-key>");
+    expect(result.stderr).toContain(".env");
+    expect(result.stdout).not.toContain("Bundling hosted deployment artifact");
+  });
+
+  test("deploy requires only API key setup when already logged in", async ({
+    librettoCli,
+    workspaceDir,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(
+      workspacePath(".libretto", "auth.json"),
+      JSON.stringify({
+        apiUrl: "https://api.libretto.sh",
+        session: {
+          cookie: "better-auth.session_token=test-session",
+          userId: "user-test",
+          email: "user@example.com",
+          expiresAt: null,
+        },
+      }),
+      "utf8",
+    );
+
+    const result = await librettoCli("cloud deploy .", {
+      HOME: workspaceDir,
+      LIBRETTO_API_KEY: undefined,
+    });
+
+    expect(result.stderr).toContain(
+      "You are logged in locally, but deploy endpoints require API-key auth.",
+    );
+    expect(result.stderr).toContain("libretto cloud auth api-key issue");
+    expect(result.stderr).toContain("LIBRETTO_API_KEY=<issued-key>");
+    expect(result.stderr).not.toContain("libretto cloud auth signup");
+    expect(result.stderr).not.toContain("libretto cloud auth login");
+    expect(result.stdout).not.toContain("Bundling hosted deployment artifact");
+  });
+
+  test("deploy with API key ignores broken local auth state", async ({
+    librettoCli,
+    workspaceDir,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(workspacePath(".libretto", "auth.json"), "{broken", "utf8");
+
+    const result = await librettoCli("cloud deploy .", {
+      HOME: workspaceDir,
+      LIBRETTO_API_KEY: "test-key",
+    });
+
+    expect(result.stderr).toContain("No package.json found");
+    expect(result.stderr).not.toContain("LIBRETTO_API_KEY is required");
+    expect(result.stderr).not.toContain("auth.json");
   });
 
   test("prints run help with explicit visualization disable flag", async ({
@@ -311,11 +386,10 @@ export default workflow("main", async (ctx) => {
     expect(result.stdout).toContain("libretto <command>");
   });
 
-  test("fails open with missing url usage error", async ({ librettoCli }) => {
-    const result = await librettoCli("open");
-    expect(result.stderr).toContain(
-      "libretto open <url> [--headless] [--read-only|--write-access] [--auth-profile <domain>] [--viewport WxH] [--session <name>]",
-    );
+  test("open help shows url is optional", async ({ librettoCli }) => {
+    const result = await librettoCli("open --help");
+    expect(result.stdout).toContain("open [url] [options]");
+    expect(result.stdout).toContain("URL to open (defaults to about:blank)");
   });
 
   test("session-mode prints and updates the current session mode", async ({

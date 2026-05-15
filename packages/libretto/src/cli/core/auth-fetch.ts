@@ -23,8 +23,9 @@ export function resolveHostedApiUrl(): string {
  */
 export const NOT_AUTHENTICATED_MESSAGE = [
   "Not authenticated.",
-  "  • Cookie expired or never set: run `libretto experimental auth login` to refresh it.",
-  "  • Or set LIBRETTO_API_KEY in your .env (issue one with `libretto experimental auth api-key issue --label <label>` after logging in).",
+  "  • New account: run `libretto cloud auth signup`.",
+  "  • Existing account: run `libretto cloud auth login`.",
+  "  • Automation: set LIBRETTO_API_KEY in your env (issue one with `libretto cloud auth api-key issue --label <label>` after signing in).",
 ].join("\n");
 
 export type CredentialSource = "env-api-key" | "cookie" | "none";

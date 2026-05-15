@@ -60,10 +60,11 @@ Use the review above to decide what is safe to prioritize. Every integration use
 
 ### Strategy A: Prioritize `page.evaluate(fetch(...))`
 
-Make fetch calls directly from within the browser's JavaScript context. The requests share the browser's TLS fingerprint, cookies, and origin. They look identical to requests the site's own JS would make.
+Make fetch calls directly from within the browser's JavaScript context. Use this only for endpoints the site already calls with fetch/XHR, not for page navigation or asset loads.
 
 When to prioritize this:
 
+- The target endpoint is normally called by the site with fetch/XHR
 - No enterprise bot protection is detected
 - `fetch` is not monkey-patched
 - The API responses are parseable and useful
@@ -71,7 +72,7 @@ When to prioritize this:
 
 Why: maximum control and efficiency. You call exactly the endpoints you want with the parameters you want, skip UI rendering, and get structured JSON back. On sites without aggressive detection, this is the fastest and cleanest approach.
 
-Risk: if the site monitors fetch call stacks, your calls may be flagged because they do not originate from the site's bundled code. This is uncommon but exists on high-security sites.
+Risk: fetch is the wrong primitive for page HTML and asset URLs; use Playwright navigation or DOM-driven loads for those. Sites can also monitor fetch call stacks and flag calls that do not originate from the site's bundled code.
 
 You will still use Playwright for initial navigation, login/auth flows, cookie consent, and any UI interactions needed to establish session state before making fetch calls.
 
@@ -111,10 +112,9 @@ Trade-off: it is slower, more fragile against DOM changes, and you only get data
 
 | Site Profile | Primary Strategy | Supplement With |
 | --- | --- | --- |
-| No bot protection, fetch not patched | A (`page.evaluate(fetch)`) | Playwright for navigation/auth |
-| No bot protection, fetch is patched | B (`page.on('response', ...)`) | Playwright for navigation; DOM extraction as fallback |
-| Bot protection detected, fetch not patched | B (`page.on('response', ...)`) | Playwright for navigation; cautious use of `page.evaluate(fetch)` only if needed |
-| Bot protection detected, fetch is patched | B (`page.on('response', ...)`) | Playwright for navigation; DOM extraction as fallback |
+| No bot protection, fetch/XHR endpoint, fetch not patched | A (`page.evaluate(fetch)`) | Playwright for navigation/auth |
+| No bot protection, fetch is patched or endpoint is not fetch/XHR | B (`page.on('response', ...)`) | Playwright for navigation; DOM extraction as fallback |
+| Bot protection detected | B (`page.on('response', ...)`) | Playwright for navigation; cautious use of `page.evaluate(fetch)` only if needed |
 | Server-rendered content (no API calls) | C (DOM extraction) | Playwright for all interaction |
 
 ## Output: Site Assessment Summary
