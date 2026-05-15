@@ -7,13 +7,13 @@ Browser automations built with [Libretto](https://libretto.sh).
 Open a page interactively to inspect and prototype:
 
 ```bash
-{{runCommand}} libretto open https://example.com --headed
+libretto open https://example.com --headed
 ```
 
 Run a workflow:
 
 ```bash
-{{runCommand}} libretto run src/workflows/star-repo.ts
+libretto run src/workflows/star-repo.ts
 ```
 
 ## Agent Skills

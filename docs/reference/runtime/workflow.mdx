@@ -63,10 +63,10 @@ export default workflow<{ query: string }, string[]>(
 
 #### Running with the CLI
 
-Pass the file path to `npx libretto run`. The file must have a default-exported `workflow()`:
+Pass the file path to `libretto run`. The file must have a default-exported `workflow()`:
 
 ```bash theme={null}
-npx libretto run ./my-workflow.ts
+libretto run ./my-workflow.ts
 ```
 
 The CLI compiles the file with `tsx`, launches a Chromium browser, and calls your handler with the session context it constructs.
@@ -177,7 +177,7 @@ async function pause(session: string): Promise<void>;
 When called in a non-production environment, `pause()` writes a `.paused` signal file and polls for a `.resume` signal. Use the Libretto CLI to send the resume signal:
 
 ```bash theme={null}
-npx libretto resume --session <session-name>
+libretto resume --session <session-name>
 ```
 
 #### Example

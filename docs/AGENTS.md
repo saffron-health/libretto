@@ -10,4 +10,4 @@ A page's file path determines its URL. When adding a page, put it in the folder 
 
 ## Testing
 
-You can test the docs site with Libretto itself. Start the dev server, then use `npx libretto open` to open the local URL and verify pages render correctly.
+You can test the docs site with Libretto itself. Start the dev server, then use `libretto open` to open the local URL and verify pages render correctly.

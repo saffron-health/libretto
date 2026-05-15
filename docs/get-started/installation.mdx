@@ -3,6 +3,12 @@ title: Installation
 sidebarTitle: Installation
 ---
 
+Install the Libretto command once, then use `libretto` from any shell. This requires Node.js and npm on your machine.
+
+```bash theme={null}
+curl -fsSL https://libretto.sh/install.sh | bash
+```
+
 Already have a Node.js package and just want to install Libretto without scaffolding? [Skip to install into an existing package](#install-into-an-existing-package).
 
 ## Create a new package
@@ -29,7 +35,7 @@ Use this if you want Libretto to scaffold a new package with directory structure
     The scaffolded package includes an example workflow. Run it with:
 
     ```bash
-    npx libretto run src/workflows/star-repo.ts
+    libretto run src/workflows/star-repo.ts
     ```
 
   </Step>
@@ -48,7 +54,7 @@ If you already have a Node.js package that you plan to use for Libretto automati
 
   <Step title="Run setup">
     ```bash
-    npx libretto setup
+    libretto setup
     ```
 
     This downloads Chromium, creates the `.libretto/` directory, and copies agent skill files.
@@ -74,7 +80,7 @@ If you already have a Node.js package that you plan to use for Libretto automati
 
   <Step title="Run it">
     ```bash
-    npx libretto run src/workflows/scrape-page.ts
+    libretto run src/workflows/scrape-page.ts
     ```
 
   </Step>

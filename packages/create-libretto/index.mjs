@@ -138,22 +138,6 @@ function addCommand(pkgManager) {
   }
 }
 
-/** Return the run command for scripts (used in next-steps messaging). */
-function runCommand(pkgManager) {
-  switch (pkgManager) {
-    case "npm":
-      return "npx";
-    case "pnpm":
-      return "pnpm exec";
-    case "yarn":
-      return "yarn";
-    case "bun":
-      return "bunx";
-    default:
-      return "npx";
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Interactive prompt
 // ---------------------------------------------------------------------------
@@ -365,9 +349,10 @@ export async function scaffoldProject(
 
   // 4. Process README.md
   const readmePath = join(targetDir, "README.md");
-  const readmeContents = readFileSync(readmePath, "utf-8")
-    .replaceAll("{{projectName}}", projectName)
-    .replaceAll("{{runCommand}}", runCommand(pkgManager));
+  const readmeContents = readFileSync(readmePath, "utf-8").replaceAll(
+    "{{projectName}}",
+    projectName,
+  );
   writeFileSync(readmePath, readmeContents);
 
   // 5. Install dependencies & run setup
@@ -505,7 +490,6 @@ async function main() {
 
   await scaffoldProject(targetDir, projectName, pkgManager);
 
-  const run = runCommand(pkgManager);
   const relDir = relative(process.cwd(), targetDir) || projectName;
 
   console.log(
@@ -513,7 +497,7 @@ async function main() {
   );
   console.log(`Next steps:`);
   console.log(`  cd ${relDir}`);
-  console.log(`  ${run} libretto run src/workflows/star-repo.ts`);
+  console.log(`  libretto run src/workflows/star-repo.ts`);
   console.log();
 }
 

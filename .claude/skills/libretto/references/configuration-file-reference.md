@@ -12,8 +12,8 @@ Use this reference when you need to inspect or change workspace configuration fo
 
 Libretto reads workspace config from `.libretto/config.json`.
 
-- The file is created by `npx libretto setup` during first-time onboarding.
-- Use `npx libretto status` to inspect open sessions without changing anything.
+- The file is created by `libretto setup` during first-time onboarding.
+- Use `libretto status` to inspect open sessions without changing anything.
 - For first-time setup instructions, follow the main `SKILL.md` flow instead of expanding this reference.
 
 ## Supported Settings
@@ -42,16 +42,16 @@ Example:
 ## Common Commands
 
 ```bash
-npx libretto setup                                         # first-time onboarding
-npx libretto status                                        # inspect open sessions
-npx libretto open https://example.com --provider kernel
-npx libretto run ./integration.ts --provider browserbase
-npx libretto open https://example.com --viewport 1440x900
-npx libretto run ./integration.ts --viewport 1440x900
+libretto setup                                         # first-time onboarding
+libretto status                                        # inspect open sessions
+libretto open https://example.com --provider kernel
+libretto run ./integration.ts --provider browserbase
+libretto open https://example.com --viewport 1440x900
+libretto run ./integration.ts --viewport 1440x900
 ```
 
 ## Notes
 
 - If you want a persistent default provider for the workspace, add `provider` to `.libretto/config.json` instead of repeating `--provider` on every command.
 - If you want a persistent default viewport for the workspace, add `viewport` to `.libretto/config.json` instead of repeating `--viewport` on every command.
-- Run `npx libretto status` at any time to check open sessions.
+- Run `libretto status` at any time to check open sessions.

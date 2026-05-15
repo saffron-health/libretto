@@ -483,7 +483,7 @@ export default workflow("main", async (ctx) => {
       expectedSkillVersionWarning("0.0.0", cliVersion),
     );
     expect(result.stderr).toContain(
-      `Please run \`bunx libretto setup\` to update your skills to the correct version.`,
+      `Please run \`libretto setup\` to update your skills to the correct version.`,
     );
     expect(result.stderr).toContain("Daemon exited before startup");
   });

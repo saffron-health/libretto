@@ -36,12 +36,12 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 
 ## Setup
 
-- Use `npx libretto setup` for first-time workspace onboarding. It installs Chromium and syncs skills.
-- Use `npx libretto status` to inspect open sessions without triggering setup.
+- Use `libretto setup` for first-time workspace onboarding. It installs Chromium and syncs skills.
+- Use `libretto status` to inspect open sessions without triggering setup.
 
 ## Experiments
 
-- Use `npx libretto experiments` to list internal feature flags and `npx libretto experiments describe <name>` for usage notes when an experiment is enabled.
+- Use `libretto experiments` to list internal feature flags and `libretto experiments describe <name>` for usage notes when an experiment is enabled.
 
 ## Working Rules
 
@@ -67,9 +67,9 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 - Pass `--read-only` when you want the session locked for inspection from the moment it is created.
 
 ```bash
-npx libretto open https://example.com --headed
-npx libretto open https://example.com --headless --read-only --session readonly-example
-npx libretto open https://example.com --headless --session debug-example
+libretto open https://example.com --headed
+libretto open https://example.com --headless --read-only --session readonly-example
+libretto open https://example.com --headless --session debug-example
 ```
 
 ### `connect`
@@ -80,9 +80,9 @@ npx libretto open https://example.com --headless --session debug-example
 - Pass `--read-only` if the connected session must stay inspection-only from the start.
 
 ```bash
-npx libretto connect http://127.0.0.1:9222 --session my-session
-npx libretto connect http://127.0.0.1:9222 --read-only --session readonly-session
-npx libretto connect http://127.0.0.1:9223 --session another-session
+libretto connect http://127.0.0.1:9222 --session my-session
+libretto connect http://127.0.0.1:9222 --read-only --session readonly-session
+libretto connect http://127.0.0.1:9223 --session another-session
 ```
 
 ### `session-mode`
@@ -93,7 +93,7 @@ npx libretto connect http://127.0.0.1:9223 --session another-session
 - Pass `--read-only` or `--write-access` to override the config default for a single command.
 
 ```bash
-npx libretto session-mode --session my-session
+libretto session-mode --session my-session
 ```
 
 ### `snapshot`
@@ -105,9 +105,9 @@ npx libretto session-mode --session my-session
 - Use it before guessing at selectors, after workflow failures, and whenever the visible page state is unclear.
 
 ```bash
-npx libretto snapshot --session debug-example
-npx libretto snapshot <ref> --session debug-example
-npx libretto snapshot --session debug-example --page <page-id>
+libretto snapshot --session debug-example
+libretto snapshot <ref> --session debug-example
+libretto snapshot --session debug-example --page <page-id>
 ```
 
 ### `exec`
@@ -123,10 +123,10 @@ npx libretto snapshot --session debug-example --page <page-id>
 - After successful mutations, `exec` prints page-change diffs from compact snapshots.
 
 ```bash
-npx libretto exec "await page.url()"
-npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
-echo "async function textOf(selector) { return await page.locator(selector).textContent(); }" | npx libretto exec - --session debug-example
-npx libretto exec --session debug-example "await textOf('h1')"
+libretto exec "await page.url()"
+libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
+echo "async function textOf(selector) { return await page.locator(selector).textContent(); }" | libretto exec - --session debug-example
+libretto exec --session debug-example "await textOf('h1')"
 ```
 
 ### `pages`
@@ -135,8 +135,8 @@ npx libretto exec --session debug-example "await textOf('h1')"
 - If `exec` or `snapshot` complains about multiple pages, list page ids first and then pass `--page`.
 
 ```bash
-npx libretto pages --session debug-example
-npx libretto exec --session debug-example --page <page-id> "await page.url()"
+libretto pages --session debug-example
+libretto exec --session debug-example --page <page-id> "await page.url()"
 ```
 
 ### `run`
@@ -147,14 +147,14 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 - Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.
 - If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
 - Insert `await pause(session)` statements in the workflow file when you need to stop at specific states for interactive debugging, like breakpoints in the browser flow.
-- If the workflow pauses, resume it with `npx libretto resume --session <name>`.
+- If the workflow pauses, resume it with `libretto resume --session <name>`.
 - Re-run the same workflow after each fix to verify the browser behavior end to end.
 
 ```bash
-npx libretto run ./integration.ts --params '{"status":"open"}'
-npx libretto run ./integration.ts --read-only
-npx libretto run ./integration.ts --stay-open-on-success
-npx libretto run ./integration.ts --auth-profile app.example.com
+libretto run ./integration.ts --params '{"status":"open"}'
+libretto run ./integration.ts --read-only
+libretto run ./integration.ts --stay-open-on-success
+libretto run ./integration.ts --auth-profile app.example.com
 ```
 
 ### `resume`
@@ -165,7 +165,7 @@ npx libretto run ./integration.ts --auth-profile app.example.com
 - Keep resuming the same session until the workflow completes or pauses again.
 
 ```bash
-npx libretto resume --session debug-example
+libretto resume --session debug-example
 ```
 
 ### `save`
@@ -173,7 +173,7 @@ npx libretto resume --session debug-example
 - Use `save` only when the user explicitly asks to save or reuse authenticated browser state.
 
 ```bash
-npx libretto save app.example.com
+libretto save app.example.com
 ```
 
 ### `close`
@@ -182,8 +182,8 @@ npx libretto save app.example.com
 - `close --all` is available for workspace cleanup.
 
 ```bash
-npx libretto close --session debug-example
-npx libretto close --all
+libretto close --session debug-example
+libretto close --all
 ```
 
 ## Session Logs
@@ -226,17 +226,17 @@ Key fields: `ts` (ISO timestamp), `method` (HTTP method, e.g. `GET`, `POST`), `u
 <example>
 [Context: The user wants to build a new browser workflow and does not yet know the page structure]
 Assistant: I'll inspect the real site first if needed, but before I finish I'll create `target-workflow.ts` so the task produces reusable automation code.
-Assistant: [Runs `npx libretto open https://target.example.com --headed`]
+Assistant: [Runs `libretto open https://target.example.com --headed`]
 Assistant: [Reads `references/site-security-review.md` before choosing between passive network inspection, direct browser fetch calls, and Playwright-first automation]
-Assistant: [Runs `npx libretto snapshot --session <session>`]
+Assistant: [Runs `libretto snapshot --session <session>`]
 Assistant: [Uses `snapshot` and `exec` as needed to understand the site and decide the implementation path]
 Assistant: [Reads `references/code-generation-rules.md` before writing production workflow code]
 Assistant: I found the working path. I'll now create the workflow file and verify it.
 Assistant: [Creates or edits `target-workflow.ts` following `references/code-generation-rules.md`]
-Assistant: [Runs `npx libretto run ./target-workflow.ts --params '{"status":"open"}'` to validate]
+Assistant: [Runs `libretto run ./target-workflow.ts --params '{"status":"open"}'` to validate]
 Assistant: Validation passed. Here are the results:
 [Shows the output/results from the validation run]
-To run it again, use: npx libretto run ./target-workflow.ts --params '{"status":"open"}'
+To run it again, use: libretto run ./target-workflow.ts --params '{"status":"open"}'
 </example>
 ```
 
@@ -246,17 +246,17 @@ To run it again, use: npx libretto run ./target-workflow.ts --params '{"status":
 <example>
 [Context: The user has an existing Libretto workflow that is failing]
 Assistant: I'll reproduce the failure first so we can inspect the exact browser state it leaves behind.
-Assistant: [Runs `npx libretto run ./integration.ts --session debug-flow`]
+Assistant: [Runs `libretto run ./integration.ts --session debug-flow`]
 Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
-Assistant: [Runs `npx libretto snapshot --session debug-flow`]
-Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
+Assistant: [Runs `libretto snapshot --session debug-flow`]
+Assistant: [Runs `libretto exec --session debug-flow "...focused inspection or prototype..."`]
 Assistant: [Reads `references/code-generation-rules.md` before patching the workflow file]
 Assistant: I found the issue. I'll patch the workflow code and verify.
 Assistant: [Edits `integration.ts` following `references/code-generation-rules.md`]
-Assistant: [Runs `npx libretto run ./integration.ts` to validate the fix]
+Assistant: [Runs `libretto run ./integration.ts` to validate the fix]
 Assistant: Fix verified. Here are the results:
 [Shows the output/results from the validation run]
-To run it again, use: npx libretto run ./integration.ts
+To run it again, use: libretto run ./integration.ts
 </example>
 ```
 

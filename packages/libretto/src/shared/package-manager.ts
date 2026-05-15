@@ -54,23 +54,10 @@ export function installCommand(
   }
 }
 
-function librettoRunner(packageManager = detectPackageManager()): string {
-  switch (packageManager) {
-    case "pnpm":
-      return "pnpm exec";
-    case "yarn":
-      return "yarn";
-    case "bun":
-      return "bunx";
-    default:
-      return "npx";
-  }
-}
-
 export function librettoCommand(
   args = "",
-  packageManager = detectPackageManager(),
+  _packageManager?: PackageManager,
 ): string {
   const suffix = args.trim();
-  return `${librettoRunner(packageManager)} libretto${suffix ? ` ${suffix}` : ""}`;
+  return `libretto${suffix ? ` ${suffix}` : ""}`;
 }

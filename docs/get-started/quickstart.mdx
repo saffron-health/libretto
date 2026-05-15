@@ -13,6 +13,12 @@ Fetch and follow https://libretto.sh/start.md to set up Libretto and create a ne
 
 ## Manual
 
+Install the Libretto command once. This requires Node.js and npm on your machine.
+
+```bash theme={null}
+curl -fsSL https://libretto.sh/install.sh | bash
+```
+
 <Steps>
   <Step title="Choose a setup path">
 
@@ -40,14 +46,14 @@ This scaffolds a package, installs dependencies, runs setup, and downloads Chrom
 
   <Step title="Option B: add Libretto to an existing package">
 
-From the existing package directory:
+From the existing package directory, add Libretto as a dependency and run setup:
 
 ```bash theme={null}
 npm install libretto
-npx libretto setup
+libretto setup
 ```
 
-Then create a workflow file and run it with `npx libretto run <path> --headless`.
+Then create a workflow file and run it with `libretto run <path> --headless`.
   </Step>
 
   <Step title="Create and run a smoke workflow">
@@ -69,7 +75,7 @@ export default workflow("scrape-page", async ({ page }) => {
 Run it headless:
 
 ```bash theme={null}
-npx libretto run src/workflows/scrape-page.ts --headless
+libretto run src/workflows/scrape-page.ts --headless
 ```
 
 This confirms your local setup works and shows the basic run loop.

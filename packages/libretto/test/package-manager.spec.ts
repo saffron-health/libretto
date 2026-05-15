@@ -10,11 +10,10 @@ import {
 } from "../src/shared/package-manager.js";
 
 describe("package manager command rendering", () => {
-  it("renders libretto commands for supported package managers", () => {
-    expect(librettoCommand("setup", "npm")).toBe("npx libretto setup");
-    expect(librettoCommand("setup", "pnpm")).toBe("pnpm exec libretto setup");
-    expect(librettoCommand("setup", "yarn")).toBe("yarn libretto setup");
-    expect(librettoCommand("setup", "bun")).toBe("bunx libretto setup");
+  it("renders native libretto commands", () => {
+    expect(librettoCommand()).toBe("libretto");
+    expect(librettoCommand("setup")).toBe("libretto setup");
+    expect(librettoCommand("setup", "pnpm")).toBe("libretto setup");
   });
 
   it("detects the package manager from npm_config_user_agent", () => {
