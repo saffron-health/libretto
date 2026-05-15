@@ -386,11 +386,10 @@ export default workflow("main", async (ctx) => {
     expect(result.stdout).toContain("libretto <command>");
   });
 
-  test("fails open with missing url usage error", async ({ librettoCli }) => {
-    const result = await librettoCli("open");
-    expect(result.stderr).toContain(
-      "libretto open <url> [--headless] [--read-only|--write-access] [--auth-profile <domain>] [--viewport WxH] [--session <name>]",
-    );
+  test("open help shows url is optional", async ({ librettoCli }) => {
+    const result = await librettoCli("open --help");
+    expect(result.stdout).toContain("open [url] [options]");
+    expect(result.stdout).toContain("URL to open (defaults to about:blank)");
   });
 
   test("session-mode prints and updates the current session mode", async ({
