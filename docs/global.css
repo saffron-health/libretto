@@ -146,6 +146,7 @@ body {
 }
 
 #sidebar h5,
+#mobile-nav h5,
 .eyebrow {
   color: var(--color-faint) !important;
   font-family: var(--font-mono) !important;
@@ -156,6 +157,7 @@ body {
 }
 
 #sidebar a,
+#mobile-nav a,
 #navbar a,
 .mdx-content,
 #table-of-contents-layout {
@@ -163,18 +165,26 @@ body {
 }
 
 #sidebar a,
+#mobile-nav a,
 #navbar a {
   color: color-mix(in oklch, var(--color-ink) 70%, transparent);
 }
 
+#mobile-nav #sidebar-group a {
+  font-size: 0.875rem !important;
+}
+
 #sidebar a:hover,
+#mobile-nav a:hover,
 #navbar a:hover,
 .mdx-content a {
   color: var(--color-accent-bright) !important;
 }
 
 #sidebar [data-active="true"] a,
-#sidebar a[data-active="true"] {
+#sidebar a[data-active="true"],
+#mobile-nav [data-active="true"] a,
+#mobile-nav a[data-active="true"] {
   color: var(--color-accent-bright) !important;
   background: color-mix(
     in oklch,

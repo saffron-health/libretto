@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "maple",
+  "theme": "mint",
   "name": "Libretto",
   "description": "Toolkit for building, debugging, and maintaining browser automations.",
   "colors": {
@@ -46,89 +46,104 @@
     }
   },
   "navigation": {
-    "groups": [
+    "tabs": [
       {
-        "group": "Get started",
-        "pages": [
-          "get-started/quickstart",
-          "get-started/first-workflow",
-          "get-started/deploying"
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "get-started/quickstart",
+              "get-started/first-workflow",
+              "get-started/deploying"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/one-shot-workflow-generation",
+              "guides/interactive-workflow-building",
+              "guides/debugging-workflows",
+              "guides/convert-to-network-requests"
+            ]
+          },
+          {
+            "group": "Understand Libretto",
+            "pages": [
+              "understand-libretto/core-concepts",
+              "understand-libretto/how-workflow-generation-works",
+              "understand-libretto/automation-and-bot-detection",
+              "understand-libretto/website-authentication"
+            ]
+          }
         ]
       },
       {
-        "group": "Workflow guides",
-        "pages": [
-          "workflow-guides/one-shot-workflow-generation",
-          "workflow-guides/interactive-workflow-building",
-          "workflow-guides/debugging-workflows",
-          "workflow-guides/convert-to-network-requests"
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "CLI",
+            "pages": [
+              "reference/cli/open-and-connect",
+              "reference/cli/sessions",
+              "reference/cli/profiles",
+              "reference/cli/snapshot",
+              "reference/cli/exec",
+              "reference/cli/run-and-resume",
+              "reference/cli/session-logs",
+              "reference/cli/pages"
+            ]
+          },
+          {
+            "group": "Runtime",
+            "pages": [
+              "reference/runtime/workflow",
+              "reference/runtime/ai-extraction",
+              "reference/runtime/network-requests",
+              "reference/runtime/file-downloads"
+            ]
+          }
         ]
       },
       {
-        "group": "Understand Libretto",
-        "pages": [
-          "fundamentals/core-concepts",
-          "fundamentals/how-workflow-generation-works",
-          "fundamentals/automation-and-bot-detection",
-          "fundamentals/website-authentication"
-        ]
-      },
-      {
-        "group": "CLI reference",
-        "pages": [
-          "cli-reference/open-and-connect",
-          "cli-reference/sessions",
-          "cli-reference/profiles",
-          "cli-reference/snapshot",
-          "cli-reference/exec",
-          "cli-reference/run-and-resume",
-          "cli-reference/session-logs",
-          "cli-reference/pages"
-        ]
-      },
-      {
-        "group": "Library API",
-        "pages": [
-          "library-api/workflow",
-          "library-api/ai-extraction",
-          "library-api/network-requests",
-          "library-api/file-downloads"
-        ]
-      },
-      {
-        "group": "Libretto Cloud Hosting",
-        "pages": [
-          "libretto-cloud-hosting/overview",
-          "libretto-cloud-hosting/authentication",
-          "libretto-cloud-hosting/deployments",
-          "libretto-cloud-hosting/billing"
-        ]
-      },
-      {
-        "group": "Self-hosting",
-        "pages": [
-          "self-hosting/introduction",
-          "self-hosting/gcp",
-          "self-hosting/aws"
-        ]
-      },
-      {
-        "group": "Alternative providers",
-        "pages": [
-          "alternative-providers/overview"
-        ]
-      },
-      {
-        "group": "Libretto Cloud API",
-        "pages": [
-          "libretto-cloud-api/overview",
-          "libretto-cloud-api/authentication",
-          "libretto-cloud-api/sessions",
-          "libretto-cloud-api/deployments-and-workflows",
-          "libretto-cloud-api/jobs-and-logs",
-          "libretto-cloud-api/credentials",
-          "libretto-cloud-api/webhooks",
-          "libretto-cloud-api/schedules"
+        "tab": "Hosting",
+        "groups": [
+          {
+            "group": "Libretto Cloud Hosting",
+            "pages": [
+              "libretto-cloud-hosting/overview",
+              "libretto-cloud-hosting/authentication",
+              "libretto-cloud-hosting/deployments",
+              "libretto-cloud-hosting/billing"
+            ]
+          },
+          {
+            "group": "Self-hosting",
+            "pages": [
+              "self-hosting/introduction",
+              "self-hosting/gcp",
+              "self-hosting/aws"
+            ]
+          },
+          {
+            "group": "Alternative providers",
+            "pages": [
+              "alternative-providers/overview"
+            ]
+          },
+          {
+            "group": "Libretto Cloud API",
+            "pages": [
+              "libretto-cloud-api/overview",
+              "libretto-cloud-api/authentication",
+              "libretto-cloud-api/sessions",
+              "libretto-cloud-api/deployments-and-workflows",
+              "libretto-cloud-api/jobs-and-logs",
+              "libretto-cloud-api/credentials",
+              "libretto-cloud-api/webhooks",
+              "libretto-cloud-api/schedules"
+            ]
+          }
         ]
       }
     ],
@@ -164,7 +179,12 @@
   },
   "navbar": {},
   "contextual": {
-    "options": ["copy", "view", "chatgpt", "claude"]
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude"
+    ]
   },
   "footer": {
     "socials": {

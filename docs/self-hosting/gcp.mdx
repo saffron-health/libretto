@@ -233,5 +233,5 @@ gcloud run jobs execute browser-agent-job \
 - **Session logs:** upload `.libretto/sessions/<name>/logs.jsonl` to GCS at the end of each run if you want to keep them beyond the job's lifetime.
 
 <Tip>
-  Libretto writes detailed network, action, and snapshot logs under `.libretto/sessions/<name>/`. Pushing that directory to GCS on failure gives you a reproducible record for debugging. See [debugging workflows](/workflow-guides/debugging-workflows) for what to look at.
+  Libretto writes detailed network, action, and snapshot logs under `.libretto/sessions/<name>/`. Pushing that directory to GCS on failure gives you a reproducible record for debugging. See [debugging workflows](/guides/debugging-workflows) for what to look at.
 </Tip>
