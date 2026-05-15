@@ -120,8 +120,8 @@ Run a workflow:
 ## Learn more
 
 - [Libretto docs](https://libretto.sh)
-- [CLI reference](https://libretto.sh/cli-reference/open-and-connect)
-- [Workflow API](https://libretto.sh/library-api/workflow)
+- [CLI reference](https://libretto.sh/reference/cli/open-and-connect)
+- [Workflow API](https://libretto.sh/reference/runtime/workflow)
 ````
 
 - [x] Create `packages/create-libretto/template/package.json.template`:

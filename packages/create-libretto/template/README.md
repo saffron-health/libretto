@@ -24,6 +24,6 @@ Libretto ships with agent skills that let AI coding assistants (Claude Code, Cod
 
 - [Website](https://libretto.sh)
 - [Documentation](https://libretto.sh/get-started/introduction)
-- [CLI Reference](https://libretto.sh/cli-reference/open-and-connect)
-- [Library API Reference](https://libretto.sh/library-api/workflow)
+- [CLI Reference](https://libretto.sh/reference/cli/open-and-connect)
+- [Library API Reference](https://libretto.sh/reference/runtime/workflow)
 - [GitHub](https://github.com/saffron-health/libretto)

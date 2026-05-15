@@ -20,7 +20,7 @@ export function CloudProviders() {
           Libretto workflows can be hosted on your existing infrastructure - no
           lock in. See the{" "}
           <a
-            href="/docs/cli-reference/open-and-connect#cloud-browser-providers"
+            href="/docs/reference/cli/open-and-connect#cloud-browser-providers"
             className={linkClass}
           >
             docs for setting up a provider
