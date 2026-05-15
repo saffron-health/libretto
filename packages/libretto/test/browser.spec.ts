@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openInput } from "../src/cli/commands/browser.js";
 import { normalizeDomain, normalizeUrl } from "../src/cli/core/browser.js";
+import { resolveProviderName } from "../src/cli/core/providers/index.js";
 import { createLibrettoCloudProvider } from "../src/cli/core/providers/libretto-cloud.js";
 import { test } from "./fixtures.js";
 
@@ -69,14 +70,10 @@ describe("provider resolution via CLI", () => {
     expect(result.stderr).not.toContain("Invalid provider");
   });
 
-  test("LIBRETTO_PROVIDER env var rejects invalid values", async ({
-    librettoCli,
-  }) => {
-    const result = await librettoCli("open https://example.com", {
-      LIBRETTO_PROVIDER: "invalid",
-    });
-    expect(result.stderr).toContain('Invalid provider "invalid"');
-    expect(result.stderr).toContain("LIBRETTO_PROVIDER env var");
+  test("LIBRETTO_PROVIDER env var rejects invalid values", () => {
+    vi.stubEnv("LIBRETTO_PROVIDER", "invalid");
+    expect(() => resolveProviderName()).toThrow('Invalid provider "invalid"');
+    expect(() => resolveProviderName()).toThrow("LIBRETTO_PROVIDER env var");
   });
 
   test("--provider flag overrides LIBRETTO_PROVIDER env var", async ({

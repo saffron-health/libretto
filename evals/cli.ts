@@ -41,6 +41,7 @@ type RunCliOptions = {
   fileFilters: string[];
   testNamePattern: string | null;
   model: string;
+  provider: BrowserProviderName | null;
   noAuth: boolean;
 };
 
@@ -102,6 +103,7 @@ type RunSummary = {
   totalCaseDurationMs: number;
   averageCompletedDurationMs: number | null;
   selectedModel: string;
+  selectedProvider: BrowserProviderName;
   totals: {
     cases: number;
     completed: number;
@@ -136,6 +138,28 @@ const evalsRoot = resolve(here);
 const repoRoot = resolve(evalsRoot, "..");
 const DEFAULT_EVAL_MODEL = "openai/gpt-5.5";
 const DEFAULT_OPENAI_SECRET_NAME = "libretto-test-openai-api-key";
+const BROWSER_PROVIDER_NAMES = [
+  "local",
+  "kernel",
+  "browserbase",
+  "libretto-cloud",
+] as const;
+type BrowserProviderName = (typeof BROWSER_PROVIDER_NAMES)[number];
+
+function parseBrowserProviderName(value: string): BrowserProviderName {
+  if (BROWSER_PROVIDER_NAMES.includes(value as BrowserProviderName)) {
+    return value as BrowserProviderName;
+  }
+  throw new Error(
+    `Invalid provider "${value}". Valid providers: ${BROWSER_PROVIDER_NAMES.join(", ")}`,
+  );
+}
+
+function selectedProviderName(
+  provider: BrowserProviderName | null,
+): BrowserProviderName {
+  return provider ?? "local";
+}
 
 function gitSha(): string | null {
   try {
@@ -199,7 +223,7 @@ function metricArtifactsForCase(
 function usage(): string {
   return [
     "Usage:",
-    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>] [--no-auth]",
+    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>] [--provider <browser-provider>] [--no-auth]",
     "  pnpm evals summary [run-dir] [--allow-empty]",
     "  pnpm evals profiles status",
     "  pnpm evals profiles login <domain>",
@@ -207,7 +231,7 @@ function usage(): string {
     "Examples:",
     "  pnpm evals",
     "  pnpm evals --no-auth",
-    "  pnpm evals run -t network --model openai/gpt-5.5",
+    "  pnpm evals run -t network --model openai/gpt-5.5 --provider kernel",
     "  pnpm evals basic.eval.ts --output temp/eval-run",
     "  pnpm evals summary",
     "  pnpm evals summary temp/eval-run",
@@ -267,6 +291,7 @@ function parseArgs(argv: string[]): CliOptions {
   let outputDir: string | null = null;
   let testNamePattern: string | null = null;
   let model = DEFAULT_EVAL_MODEL;
+  let provider: BrowserProviderName | null = null;
   let noAuth = false;
   const fileFilters: string[] = [];
 
@@ -312,6 +337,23 @@ function parseArgs(argv: string[]): CliOptions {
       if (!model) throw new Error("--model requires a provider/model value.");
       continue;
     }
+    if (arg === "--provider") {
+      const value = args[index + 1];
+      if (!value) {
+        throw new Error("--provider requires a browser provider value.");
+      }
+      provider = parseBrowserProviderName(value);
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--provider=")) {
+      const value = arg.slice("--provider=".length);
+      if (!value) {
+        throw new Error("--provider requires a browser provider value.");
+      }
+      provider = parseBrowserProviderName(value);
+      continue;
+    }
     if (arg.startsWith("-")) {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -327,6 +369,7 @@ function parseArgs(argv: string[]): CliOptions {
     fileFilters,
     testNamePattern,
     model,
+    provider,
     noAuth,
   };
 }
@@ -707,6 +750,7 @@ function buildSummaryMarkdown(summary: RunSummary): string {
     "",
     `- Run ID: \`${summary.runId}\``,
     `- Model: \`${summary.selectedModel}\``,
+    `- Browser provider: \`${summary.selectedProvider}\``,
     `- Duration: \`${formatDuration(summary.durationMs)}\``,
     `- Total case duration: \`${formatDuration(summary.totalCaseDurationMs)}\``,
     `- Average completed case duration: \`${formatDuration(summary.averageCompletedDurationMs)}\``,
@@ -748,6 +792,7 @@ async function runCase(
   id: string,
   outputDir: string,
   model: string,
+  provider: BrowserProviderName | null,
 ): Promise<CaseResult> {
   const startedMs = Date.now();
   const startedAt = new Date(startedMs).toISOString();
@@ -776,7 +821,7 @@ async function runCase(
         takeRecordedEvalCalls();
 
         try {
-          context = await createEvalContext(evalCase, { model });
+          context = await createEvalContext(evalCase, { model, provider });
           await evalCase.run(context);
         } catch (error) {
           status = "error";
@@ -1005,6 +1050,10 @@ async function runSummary(options: SummaryCliOptions): Promise<number> {
         : null,
     selectedModel:
       typeof runRecord.selectedModel === "string" ? runRecord.selectedModel : "-",
+    selectedProvider:
+      typeof runRecord.selectedProvider === "string"
+        ? parseBrowserProviderName(runRecord.selectedProvider)
+        : "local",
     totals: {
       cases: cases.length,
       completed: completed.length,
@@ -1047,6 +1096,7 @@ async function runSelectedCases(
         id,
         options.outputDir,
         options.model,
+        options.provider,
       );
       if (result.status === "completed") {
         process.stdout.write(`✓ ${evalCase.name}\n`);
@@ -1102,6 +1152,9 @@ async function run(options: CliOptions): Promise<number> {
   await mkdir(options.outputDir, { recursive: true });
   process.stdout.write(`Running ${selectedCases.length} eval case(s)\n`);
   process.stdout.write("Execution: parallel\n");
+  process.stdout.write(
+    `Browser provider: ${selectedProviderName(options.provider)}\n`,
+  );
   process.stdout.write(`Output: ${options.outputDir}\n`);
 
   const ids = caseIds(selectedCases);
@@ -1155,6 +1208,7 @@ async function run(options: CliOptions): Promise<number> {
           )
         : null,
     selectedModel: options.model,
+    selectedProvider: selectedProviderName(options.provider),
     totals: {
       cases: results.length,
       completed,
@@ -1197,6 +1251,7 @@ async function run(options: CliOptions): Promise<number> {
     fileFilters: options.fileFilters,
     testNamePattern: options.testNamePattern,
     selectedModel: options.model,
+    selectedProvider: selectedProviderName(options.provider),
     noAuth: options.noAuth,
     totals: summary.totals,
     metrics: summary.metrics,
