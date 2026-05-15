@@ -28,10 +28,13 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 
 ## Default Integration Approach
 
-- Use Playwright for navigation and other non-fetch browser behavior, including document and asset loads.
-- Prefer browser-context `fetch()` for data extraction and form submission when the target is a real site fetch/XHR endpoint and `references/site-security-review.md` says the path is safe and workable.
-- Use passive interception when the UI already triggers useful fetch/XHR requests or active fetch is risky.
-- Fall back to Playwright UI automation when fetch is ruled out, the request path is not workable, or the user explicitly asks for Playwright/UI automation.
+1. **Default:** call the site's fetch/XHR endpoints via browser-context `fetch()`.
+2. If `references/site-security-review.md` (assess only once per site) rules `fetch()` unsafe, passively capture responses with `page.on('response', ...)`
+3. Fall back to Playwright UI automation.
+
+Mix strategies freely across steps on a site.
+
+Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first navigation — deep URLs on a cold session are commonly blocked by edge bot protection.
 
 ## Setup
 
@@ -66,9 +69,9 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 - Pass `--read-only` when you want the session locked for inspection from the moment it is created.
 
 ```bash
-npx libretto open https://example.com --headed
-npx libretto open https://example.com --headless --read-only --session readonly-example
-npx libretto open https://example.com --headless --session debug-example
+npx libretto open https://example.com
+npx libretto open https://example.com --read-only --session readonly-example
+npx libretto open https://example.com --session debug-example
 ```
 
 ### `connect`
@@ -140,8 +143,7 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 
 ### `run`
 
-- Use `run` to verify a workflow file after creating it or editing it. Use the same headed or headless mode for validation that the workflow run is already using.
-- Plain `run` defaults to headed mode. Do not use `--headless` unless the user asks for headless mode or the existing workflow run already uses it.
+- Use `run` to verify a workflow file after creating it or editing it. Use the same headed or headless mode for validation that the workflow run is already using. Plain `run` defaults to headed mode.
 - Successful runs close the browser by default. Pass `--stay-open-on-success` when you need to inspect the completed state with `pages`, `snapshot`, or `exec`.
 - Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.
 - If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
@@ -193,7 +195,7 @@ Session logs are JSONL files at `.libretto/sessions/<session>/`:
 
 - CLI logs are in `.libretto/sessions/<session>/logs.jsonl`.
 - Action logs are in `.libretto/sessions/<session>/actions.jsonl`.
-- Network logs are in `.libretto/sessions/<session>/network.jsonl`.
+- Network logs are in `.libretto/sessions/<session>/network.jsonl` and their corresponding raw request/response bodies are in `.libretto/sessions/<session>/raw-network/`.
 
 Use `jq` to query jsonl logs directly — for any filtering, slicing, or inspection task.
 
@@ -201,8 +203,11 @@ Use `jq` to query jsonl logs directly — for any filtering, slicing, or inspect
 # Last 20 action entries
 tail -n 20 .libretto/sessions/<session>/actions.jsonl | jq .
 
-# POST requests only
-jq 'select(.method == "POST")' .libretto/sessions/<session>/network.jsonl
+# POST requests with captured response previews
+jq 'select(.method == "POST" and .responseBodyPreview != null) | {id, resourceType, status, contentType, url, requestBodyPreview, responseBodyPreview, responseBodyPath}' .libretto/sessions/<session>/network.jsonl
+
+# Read a saved response sidecar
+gunzip -c .libretto/sessions/<session>/raw-network/000001.response.json.gz | jq .
 ```
 
 ### Action log (`actions.jsonl`)
@@ -213,7 +218,9 @@ Read `references/action-logs.md` for full field descriptions and user-vs-agent e
 
 ### Network log (`network.jsonl`)
 
-Key fields: `ts` (ISO timestamp), `method` (HTTP method, e.g. `GET`, `POST`), `url` (request URL), `status` (HTTP status code), `contentType` (response content type), `responseBody` (response body string, may be null).
+Libretto logs useful `document`, `xhr`, `fetch`, and non-noisy mutating requests; obvious static/media/tracking noise is skipped.
+
+Key fields: `id` (incrementing request id), `ts` (ISO timestamp), `pageId` (page target id), `method` (HTTP method, e.g. `GET`, `POST`), `url` (request URL), `resourceType` (browser resource type, e.g. `document`, `xhr`, `fetch`), `status` (HTTP status code, or null for failed requests), `statusText` (HTTP status text), `contentType` (response content type), `requestHeaders` (request headers), `responseHeaders` (response headers), `requestBodyPreview` (inline request body preview), `requestBodyPath` (gzipped full request body sidecar path), `requestBodyBytes` (request body byte size), `requestBodyTruncated` (true when the request body exceeded the save limit), `requestBodyOmittedReason` (why the request body was not captured), `responseBodyPreview` (inline response body preview), `responseBodyPath` (gzipped full response body sidecar path), `responseBodyBytes` (response body byte size), `responseBodyTruncated` (true when the response body exceeded the save limit), `responseBodyOmittedReason` (why the response body was not captured), and `errorText` (request failure or body read error).
 
 ## Examples
 

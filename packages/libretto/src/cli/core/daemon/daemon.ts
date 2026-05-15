@@ -39,6 +39,7 @@ import {
 import {
   createLoggerForSession,
   getSessionDir,
+  getSessionRawNetworkDir,
   getSessionNetworkLogPath,
   getSessionActionsLogPath,
   getSessionProviderClosePath,
@@ -256,6 +257,7 @@ class BrowserDaemon {
     // Telemetry — may fail on connect-mode reconnections where
     // exposeFunction bindings already exist; log and continue.
     const networkLogFile = getSessionNetworkLogPath(session);
+    const rawNetworkDir = getSessionRawNetworkDir(session);
     const actionsLogFile = getSessionActionsLogPath(session);
     const logger = createLoggerForSession(session);
 
@@ -264,6 +266,7 @@ class BrowserDaemon {
         context,
         initialPage: page,
         includeUserDomActions: true,
+        rawNetworkDir,
         logAction: (entry: TelemetryEntry) => {
           appendFileSync(actionsLogFile, JSON.stringify(entry) + "\n");
         },
