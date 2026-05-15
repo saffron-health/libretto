@@ -66,7 +66,6 @@ export async function createEvalContext(
     await createTmpWorkspace({
       name: workspaceName,
       parentDir: DETERMINISTIC_WORKSPACE_ROOT,
-      skipBrowsers: true,
       skipBuild: true,
       quiet: true,
     });

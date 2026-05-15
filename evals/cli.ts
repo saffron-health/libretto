@@ -135,6 +135,7 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const evalsRoot = resolve(here);
 const repoRoot = resolve(evalsRoot, "..");
 const DEFAULT_EVAL_MODEL = "openai/gpt-5.5";
+const DEFAULT_OPENAI_SECRET_NAME = "libretto-test-openai-api-key";
 
 function gitSha(): string | null {
   try {
@@ -461,11 +462,85 @@ function preflightRequiredProfiles(cases: EvalCaseRecord[]): void {
   throw new Error(missing.map(missingAuthProfileMessage).join("\n\n"));
 }
 
-function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.stack ?? error.message;
+function providerForModel(model: string): string {
+  return model.split("/", 1)[0]?.toLowerCase() || "";
+}
+
+function ensureOpenAiApiKey(): void {
+  if (process.env.OPENAI_API_KEY?.trim()) return;
+
+  const secretName =
+    process.env.LIBRETTO_EVAL_OPENAI_SECRET_NAME?.trim() ||
+    DEFAULT_OPENAI_SECRET_NAME;
+
+  try {
+    const apiKey = execFileSync(
+      "gcloud",
+      ["secrets", "versions", "access", "latest", `--secret=${secretName}`],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: process.env,
+      },
+    ).trim();
+    if (apiKey) {
+      process.env.OPENAI_API_KEY = apiKey;
+      process.stdout.write(`Loaded OPENAI_API_KEY from GCP secret ${secretName}.\n`);
+      return;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      [
+        "OpenAI eval credentials are missing.",
+        `Tried GCP Secret Manager secret: ${secretName}`,
+        `Set OPENAI_API_KEY, grant access to ${secretName}, or set LIBRETTO_EVAL_OPENAI_SECRET_NAME to another secret name.`,
+        `Original error: ${message}`,
+      ].join("\n"),
+    );
   }
-  return String(error);
+
+  throw new Error(
+    [
+      "OpenAI eval credentials are missing.",
+      `GCP Secret Manager secret ${secretName} returned an empty value.`,
+      "Set OPENAI_API_KEY or update the secret value.",
+    ].join("\n"),
+  );
+}
+
+function ensureEvalModelCredentials(model: string): void {
+  if (providerForModel(model) === "openai") {
+    ensureOpenAiApiKey();
+  }
+}
+
+function missingApiKeyRecommendations(
+  message: string,
+  model: string | null,
+): string | null {
+  const provider = message.match(/No API key found for ([^.\s]+)\./)?.[1];
+  if (!provider) return null;
+
+  const envVar = `${provider.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_API_KEY`;
+  const selectedModel = model ?? DEFAULT_EVAL_MODEL;
+  return [
+    "Recommended next actions:",
+    `- Evals are running with model \`${selectedModel}\`, which requires credentials for \`${provider}\`.`,
+    `- For local runs, set \`${envVar}\` and rerun \`pnpm evals --no-auth\`.`,
+    `- For OpenAI evals, you can also authenticate with gcloud and grant access to the \`${DEFAULT_OPENAI_SECRET_NAME}\` Secret Manager secret.`,
+    "- To use a different provider, rerun with `pnpm evals --no-auth --model <provider/model>` and configure that provider's credentials.",
+    "- In GitHub Actions, add `OPENAI_API_KEY` as a repository secret or authenticate gcloud with access to the eval OpenAI secret.",
+  ].join("\n");
+}
+
+function formatError(error: unknown, options?: { model?: string }): string {
+  const base = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  const recommendations = missingApiKeyRecommendations(
+    base,
+    options?.model ?? null,
+  );
+  return recommendations ? `${base}\n\n${recommendations}` : base;
 }
 
 async function writeJson(path: string, value: unknown): Promise<void> {
@@ -705,7 +780,7 @@ async function runCase(
           await evalCase.run(context);
         } catch (error) {
           status = "error";
-          errorMessage = formatError(error);
+          errorMessage = formatError(error, { model });
         } finally {
           try {
             await context?.dispose();
@@ -1022,6 +1097,7 @@ async function run(options: CliOptions): Promise<number> {
     );
   }
   preflightRequiredProfiles(selectedCases);
+  ensureEvalModelCredentials(options.model);
 
   await mkdir(options.outputDir, { recursive: true });
   process.stdout.write(`Running ${selectedCases.length} eval case(s)\n`);
