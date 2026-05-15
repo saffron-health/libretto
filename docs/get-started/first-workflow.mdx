@@ -8,22 +8,7 @@ sidebarTitle: First workflow
 ## Agent prompt
 
 ```text
-Create and validate a first Libretto workflow in my project.
-
-1) Create src/workflows/scrape-page.ts with a workflow named "scrape-page" that:
-   - opens https://example.com
-   - reads the page title
-   - logs the title
-   - returns { title }
-2) Run: npx libretto run src/workflows/scrape-page.ts
-3) If it fails, debug using a named session:
-   - npx libretto open https://example.com --session debug-example
-   - npx libretto snapshot --session debug-example
-   - npx libretto exec --session debug-example "await page.url()"
-4) Apply fixes and re-run until the workflow succeeds.
-5) Summarize changes, run output, and any debugging steps used.
-
-Keep changes minimal and limited to this workflow task.
+Ask me what website and workflow I want to demonstrate. If I’m not sure, give me a few examples of simple workflows I could do. Then open a Libretto browser session for the site I choose. After I finish, create a Libretto workflow.
 ```
 
 ## Manual
