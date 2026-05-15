@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { openInput } from "../src/cli/commands/browser.js";
 import { normalizeDomain, normalizeUrl } from "../src/cli/core/browser.js";
 import { createLibrettoCloudProvider } from "../src/cli/core/providers/libretto-cloud.js";
 import { test } from "./fixtures.js";
@@ -31,9 +32,21 @@ describe("browser URL normalization", () => {
     );
   });
 
+  test("preserves about:blank", () => {
+    expect(normalizeUrl("about:blank").href).toBe("about:blank");
+  });
+
   test("normalizes www hostnames from parsed URLs", () => {
     expect(normalizeDomain(normalizeUrl("https://www.example.com/path"))).toBe(
       "example.com",
+    );
+  });
+});
+
+describe("open command input", () => {
+  test("defaults URL to about:blank", () => {
+    expect(openInput.parse({ positionals: [], named: {} }).url).toBe(
+      "about:blank",
     );
   });
 });

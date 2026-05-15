@@ -93,7 +93,8 @@ export function normalizeUrl(url: string): URL {
   if (
     parsedUrl.protocol === "http:" ||
     parsedUrl.protocol === "https:" ||
-    parsedUrl.protocol === "file:"
+    parsedUrl.protocol === "file:" ||
+    parsedUrl.href === "about:blank"
   ) {
     return parsedUrl;
   }
@@ -103,7 +104,7 @@ export function normalizeUrl(url: string): URL {
   }
 
   throw new Error(
-    `Unsupported URL protocol: ${parsedUrl.protocol}. Use http://, https://, or file://.`,
+    `Unsupported URL protocol: ${parsedUrl.protocol}. Use http://, https://, file://, or about:blank.`,
   );
 }
 
