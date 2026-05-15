@@ -29,6 +29,14 @@
       "destination": "https://libretto.sh/docs/robots.txt"
     },
     {
+      "source": "/blog",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/blog/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/docs",
       "destination": "https://saffron-health-libretto-73.mintlify.dev/docs"
     },

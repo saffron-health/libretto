@@ -6,7 +6,13 @@ title: Network requests
 
 ### `pageRequest()`
 
-Executes a `fetch()` call inside the browser context via `page.evaluate()`. Because the request runs inside the real browser process, it uses the browser's TLS fingerprint, cookies, and session. This avoids bot-detection issues that arise when making the same request from Node.js directly.
+Executes a `fetch()` call inside the browser context via `page.evaluate()`. Because the request runs inside the real browser process, it uses the browser's TLS fingerprint, cookies, and session. It still looks like a fetch/XHR request, so use it for endpoints the site normally calls with fetch or XHR.
+
+<Note>
+  `pageRequest()` is not a replacement for every browser request. For page HTML,
+  navigate with `page.goto()` or click a link. For images, scripts, stylesheets,
+  and iframes, let the DOM load the resource naturally when possible.
+</Note>
 
 ```typescript theme={null}
 async function pageRequest<T extends z.ZodType | undefined = undefined>(

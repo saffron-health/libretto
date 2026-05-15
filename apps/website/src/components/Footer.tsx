@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text } from "./Text";
 import { DiscordIcon, GitHubIcon, NpmIcon } from "../icons";
-import {
-  DISCORD_URL,
-  DISCUSSIONS_URL,
-  NPM_URL,
-  RELEASES_URL,
-  REPO_URL,
-} from "../site";
+import { DISCORD_URL, DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
 
 const LOGO = String.raw` ██╗     ██╗██████╗ ██████╗ ███████╗████████╗████████╗ ██████╗
  ██║     ██║██╔══██╗██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔═══██╗
@@ -18,8 +12,7 @@ const LOGO = String.raw` ██╗     ██╗██████╗ ███�
 
 const LOGO_COLS = 63; // widest line in the ASCII logo
 
-const linkClass =
-  "text-muted/60 transition-colors hover:text-accent-bright text-xs no-underline";
+const linkClass = "text-muted/60 transition-colors hover:text-accent-bright text-xs no-underline";
 
 function useLogoFontSize() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,6 +55,9 @@ export function Footer() {
             © {new Date().getFullYear()} Saffron Health
           </Text>
           <div className="flex gap-6">
+            <a href="/blog" className={linkClass}>
+              Blog
+            </a>
             <a href="/docs/get-started/introduction" className={linkClass}>
               Docs
             </a>
@@ -73,12 +69,7 @@ export function Footer() {
             >
               Forum
             </a>
-            <a
-              href={RELEASES_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={linkClass}
-            >
+            <a href={RELEASES_URL} target="_blank" rel="noopener noreferrer" className={linkClass}>
               Changelog
             </a>
           </div>
