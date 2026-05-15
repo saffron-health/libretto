@@ -41,6 +41,15 @@ pnpm evals run -t network
 pnpm evals --testNamePattern "broken selector"
 ```
 
+Run workflows against a specific browser provider:
+
+```bash
+pnpm evals --provider kernel
+pnpm evals --provider browserbase
+```
+
+The provider is written into the temporary eval workspace config for each case.
+
 Temporarily focus from code with `evalCase.only(...)`. Do not commit `.only` unless the narrowed run is intentional.
 
 Write artifacts to a specific directory:
