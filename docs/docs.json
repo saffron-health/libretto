@@ -118,17 +118,13 @@
             ]
           },
           {
-            "group": "Self-hosting",
-            "pages": [
-              "self-hosting/introduction",
-              "self-hosting/gcp",
-              "self-hosting/aws"
-            ]
-          },
-          {
             "group": "Alternative providers",
             "pages": [
-              "alternative-providers/overview"
+              "alternative-providers/overview",
+              "alternative-providers/kernel",
+              "alternative-providers/browserbase",
+              "alternative-providers/gcp",
+              "alternative-providers/aws"
             ]
           },
           {

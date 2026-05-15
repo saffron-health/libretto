@@ -25,7 +25,7 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 - CLI reference: [open and connect](https://libretto.sh/reference/cli/open-and-connect), [sessions](https://libretto.sh/reference/cli/sessions), [profiles](https://libretto.sh/reference/cli/profiles), [snapshot](https://libretto.sh/reference/cli/snapshot), [exec](https://libretto.sh/reference/cli/exec), [run and resume](https://libretto.sh/reference/cli/run-and-resume), [session logs](https://libretto.sh/reference/cli/session-logs), [pages](https://libretto.sh/reference/cli/pages)
 - Library API: [workflow](https://libretto.sh/reference/runtime/workflow), [AI extraction](https://libretto.sh/reference/runtime/ai-extraction), [network requests](https://libretto.sh/reference/runtime/network-requests), [file downloads](https://libretto.sh/reference/runtime/file-downloads)
 - Libretto Cloud Hosting: [overview](https://libretto.sh/libretto-cloud-hosting/overview), [authentication](https://libretto.sh/libretto-cloud-hosting/authentication), [deployments](https://libretto.sh/libretto-cloud-hosting/deployments)
-- Self-hosting: [introduction](https://libretto.sh/self-hosting/introduction), [GCP](https://libretto.sh/self-hosting/gcp), [AWS](https://libretto.sh/self-hosting/aws)
+- Alternative providers: [overview](https://libretto.sh/alternative-providers/overview), [Kernel](https://libretto.sh/alternative-providers/kernel), [Browserbase](https://libretto.sh/alternative-providers/browserbase), [GCP](https://libretto.sh/alternative-providers/gcp), [AWS](https://libretto.sh/alternative-providers/aws)
 
 ## Default Integration Approach
 

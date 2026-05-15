@@ -10,11 +10,11 @@ sidebarTitle: Deploying
 ```text
 Help me deploy my Libretto workflow and choose the right production path.
 
-First, ask me one question: do I want managed hosting (Libretto Cloud Hosting) or self-hosting?
+First, ask me one question: do I want managed hosting (Libretto Cloud Hosting) or an alternative provider?
 
 Then:
 - If I choose managed hosting, follow the Libretto Cloud Hosting docs to authenticate, deploy, and run a hosted workflow.
-- If I choose self-hosting, use the self-hosting docs and ask whether I want AWS or GCP, then guide me through that path.
+- If I choose an alternative provider, use the alternative providers docs and ask whether I want Kernel, Browserbase, AWS, or GCP, then guide me through that path.
 
 After setup, provide:
 1) commands executed
@@ -30,7 +30,7 @@ Do not make unrelated changes.
 Libretto has two production paths:
 
 - **Libretto Cloud Hosting**: managed infrastructure, fastest path to production.
-- **Self-hosting**: run Libretto on your own cloud infrastructure.
+- **Alternative providers**: run the browser on Kernel or Browserbase, or self-host the workflow runtime on AWS or GCP.
 
 ## Option A: Libretto Cloud Hosting (managed)
 
@@ -40,13 +40,15 @@ Start here if you want the shortest path from local workflow to hosted runs.
 - [Cloud authentication](/libretto-cloud-hosting/authentication)
 - [Cloud deployments](/libretto-cloud-hosting/deployments)
 
-## Option B: Self-hosting
+## Option B: Alternative providers
 
-Use this if you need to run everything in your own environment.
+Use this if you want a provider other than Libretto Cloud Hosting.
 
-- [Self-hosting overview](/self-hosting/introduction)
-- [Deploy on GCP](/self-hosting/gcp)
-- [Deploy on AWS](/self-hosting/aws)
+- [Alternative providers overview](/alternative-providers/overview)
+- [Kernel](/alternative-providers/kernel)
+- [Browserbase](/alternative-providers/browserbase)
+- [Deploy on GCP](/alternative-providers/gcp)
+- [Deploy on AWS](/alternative-providers/aws)
 
 ## After deployment
 
