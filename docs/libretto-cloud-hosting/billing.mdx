@@ -15,7 +15,7 @@ Only organization owners can view billing status or open billing-management link
 Use `billing portal` to print a short-lived link to Libretto's plans page:
 
 ```bash theme={null}
-npx libretto experimental billing portal
+npx libretto cloud billing portal
 ```
 
 The page shows:
@@ -30,7 +30,7 @@ The page shows:
 Use `billing status` to inspect the current plan, subscription status, usage, and period end:
 
 ```bash theme={null}
-npx libretto experimental billing status
+npx libretto cloud billing status
 ```
 
 Example output:
@@ -83,7 +83,7 @@ For BAA and Enterprise, please reach out to us at `team@saffron.health`.
 
 ### Troubleshooting
 
-- If the plans link says it is expired or invalid, run `npx libretto experimental billing portal` again to get a fresh link.
+- If the plans link says it is expired or invalid, run `billing portal` again to get a fresh link.
 - If billing commands fail with an auth error, log in again or set `LIBRETTO_API_KEY`.
 - If you can authenticate but still cannot access billing, confirm that your user is an organization owner.
 
