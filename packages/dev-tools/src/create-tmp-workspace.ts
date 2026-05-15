@@ -4,7 +4,6 @@
  *
  * The workspace is a minimal git repo with:
  * - package.json pointing to the local libretto package
- * - libretto configured with google-vertex/gemini-2.5-flash for snapshots
  * - Playwright browsers installed
  *
  * Usage:
