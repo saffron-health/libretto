@@ -17,7 +17,10 @@ For a new package:
 
 ```bash
 npm create libretto@latest <package-name>
+cd <package-name>
 ```
+
+After creating a new package, do all remaining setup and verification inside the created package directory.
 
 For an existing package:
 
@@ -30,7 +33,7 @@ Use equivalent pnpm, yarn, or bun commands when appropriate.
 
 ## 3. Read installed guidance
 
-After installation, read the installed skill before creating or editing workflow code:
+After installation, make sure your current directory is the package directory. Then read the installed skill before creating or editing workflow code:
 
 ```text
 node_modules/libretto/skills/libretto/SKILL.md
@@ -42,7 +45,7 @@ The package also includes docs under `node_modules/libretto/docs/`; use them onl
 
 For this smoke check, copy the workflow below directly; do not inspect the scaffolded example or read additional references unless validation fails.
 
-Create a minimal smoke workflow at `src/workflows/scrape-page.ts`:
+Create a minimal smoke workflow at `src/workflows/scrape-page.ts` inside the package directory:
 
 ```ts
 import { workflow } from "libretto";
