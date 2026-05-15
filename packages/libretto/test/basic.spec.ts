@@ -234,6 +234,41 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).not.toContain("Bundling hosted deployment artifact");
   });
 
+  test("deploy requires only API key setup when already logged in", async ({
+    librettoCli,
+    workspaceDir,
+    workspacePath,
+  }) => {
+    await mkdir(workspacePath(".libretto"), { recursive: true });
+    await writeFile(
+      workspacePath(".libretto", "auth.json"),
+      JSON.stringify({
+        apiUrl: "https://api.libretto.sh",
+        session: {
+          cookie: "better-auth.session_token=test-session",
+          userId: "user-test",
+          email: "user@example.com",
+          expiresAt: null,
+        },
+      }),
+      "utf8",
+    );
+
+    const result = await librettoCli("cloud deploy .", {
+      HOME: workspaceDir,
+      LIBRETTO_API_KEY: undefined,
+    });
+
+    expect(result.stderr).toContain(
+      "You are logged in locally, but deploy endpoints require API-key auth.",
+    );
+    expect(result.stderr).toContain("libretto cloud auth api-key issue");
+    expect(result.stderr).toContain("LIBRETTO_API_KEY=<issued-key>");
+    expect(result.stderr).not.toContain("libretto cloud auth signup");
+    expect(result.stderr).not.toContain("libretto cloud auth login");
+    expect(result.stdout).not.toContain("Bundling hosted deployment artifact");
+  });
+
   test("deploy with API key ignores broken local auth state", async ({
     librettoCli,
     workspaceDir,

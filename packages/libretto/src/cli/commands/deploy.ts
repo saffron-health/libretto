@@ -24,11 +24,18 @@ function generateDeploymentName(): string {
 }
 
 function deployApiKeyRequiredMessage(hasStoredSession: boolean): string {
+  if (hasStoredSession) {
+    return [
+      "LIBRETTO_API_KEY is required to deploy to Libretto Cloud.",
+      "You are logged in locally, but deploy endpoints require API-key auth.",
+      "  • Generate a key: run `libretto cloud auth api-key issue --label <label>`.",
+      "  • Add it to your project .env file: `LIBRETTO_API_KEY=<issued-key>`.",
+    ].join("\n");
+  }
+
   return [
     "LIBRETTO_API_KEY is required to deploy to Libretto Cloud.",
-    hasStoredSession
-      ? "A local cloud session is saved, but deploy endpoints require API-key auth."
-      : "No local cloud session was found.",
+    "No local cloud session was found.",
     "  • New account: run `libretto cloud auth signup`, then verify your email.",
     "  • Existing account: run `libretto cloud auth login`.",
     "  • Generate a key: run `libretto cloud auth api-key issue --label <label>`.",
