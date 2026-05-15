@@ -29,9 +29,10 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 
 ## Default Integration Approach
 
-- Prefer network requests first for new integrations unless the user explicitly asks for Playwright or UI automation, then do not use the site's internal API.
-- Read `references/site-security-review.md` before committing to a network-first approach on a new site.
-- Fall back to passive interception or Playwright-driven UI automation when the security review rules network requests out, the request path is not workable, or the user explicitly asks for Playwright.
+- Use Playwright for navigation and other non-fetch browser behavior, including document and asset loads.
+- Prefer browser-context `fetch()` for data extraction and form submission when the target is a real site fetch/XHR endpoint and `references/site-security-review.md` says the path is safe and workable.
+- Use passive interception when the UI already triggers useful fetch/XHR requests or active fetch is risky.
+- Fall back to Playwright UI automation when fetch is ruled out, the request path is not workable, or the user explicitly asks for Playwright/UI automation.
 
 ## Setup
 
@@ -49,8 +50,8 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 - Do not treat visibility as interactivity. If an element will not act, inspect blockers before retrying.
 - Defer repo/code review until you begin generating code, unless the user explicitly asks for it earlier.
 - Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code.
-- Validation requires a successful clean `run --headless` with confirmation of the actual returned output, not just process success. If the user wants to watch the finished workflow, do a final headed `run` after headless validation succeeds.
-- After validation, always show the user: (1) the output/results from the headless validation run, and (2) a headed version of the same command so they can re-run it themselves and watch the browser (e.g. replace `--headless` with `--headed`). Include any `--params` or `--auth-profile` flags the workflow needs.
+- Validation requires a successful clean `run` with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
+- After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--headed`, `--headless`, or `--auth-profile` flags the workflow needs.
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
@@ -140,8 +141,8 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 
 ### `run`
 
-- Use `run` to verify a workflow file after creating it or editing it, preferring `run --headless` for the normal fix/verify loop.
-- Plain `run` defaults to headed mode.
+- Use `run` to verify a workflow file after creating it or editing it. Use the same headed or headless mode for validation that the workflow run is already using.
+- Plain `run` defaults to headed mode. Do not use `--headless` unless the user asks for headless mode or the existing workflow run already uses it.
 - Successful runs close the browser by default. Pass `--stay-open-on-success` when you need to inspect the completed state with `pages`, `snapshot`, or `exec`.
 - Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.
 - If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
@@ -150,9 +151,9 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 - Re-run the same workflow after each fix to verify the browser behavior end to end.
 
 ```bash
-npx libretto run ./integration.ts --headless --params '{"status":"open"}'
-npx libretto run ./integration.ts --headless --read-only
-npx libretto run ./integration.ts --headless --stay-open-on-success
+npx libretto run ./integration.ts --params '{"status":"open"}'
+npx libretto run ./integration.ts --read-only
+npx libretto run ./integration.ts --stay-open-on-success
 npx libretto run ./integration.ts --auth-profile app.example.com
 ```
 
@@ -232,10 +233,10 @@ Assistant: [Uses `snapshot` and `exec` as needed to understand the site and deci
 Assistant: [Reads `references/code-generation-rules.md` before writing production workflow code]
 Assistant: I found the working path. I'll now create the workflow file and verify it.
 Assistant: [Creates or edits `target-workflow.ts` following `references/code-generation-rules.md`]
-Assistant: [Runs `npx libretto run ./target-workflow.ts --headless --params '{"status":"open"}'` to validate]
+Assistant: [Runs `npx libretto run ./target-workflow.ts --params '{"status":"open"}'` to validate]
 Assistant: Validation passed. Here are the results:
-[Shows the output/results from the headless run]
-To watch it yourself in a browser, run: npx libretto run ./target-workflow.ts --headed --params '{"status":"open"}'
+[Shows the output/results from the validation run]
+To run it again, use: npx libretto run ./target-workflow.ts --params '{"status":"open"}'
 </example>
 ```
 
@@ -245,17 +246,17 @@ To watch it yourself in a browser, run: npx libretto run ./target-workflow.ts --
 <example>
 [Context: The user has an existing Libretto workflow that is failing]
 Assistant: I'll reproduce the failure first so we can inspect the exact browser state it leaves behind.
-Assistant: [Runs `npx libretto run ./integration.ts --session debug-flow --headed`]
+Assistant: [Runs `npx libretto run ./integration.ts --session debug-flow`]
 Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
 Assistant: [Runs `npx libretto snapshot --session debug-flow`]
 Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
 Assistant: [Reads `references/code-generation-rules.md` before patching the workflow file]
 Assistant: I found the issue. I'll patch the workflow code and verify.
 Assistant: [Edits `integration.ts` following `references/code-generation-rules.md`]
-Assistant: [Runs `npx libretto run ./integration.ts --headless` to validate the fix]
+Assistant: [Runs `npx libretto run ./integration.ts` to validate the fix]
 Assistant: Fix verified. Here are the results:
-[Shows the output/results from the headless run]
-To watch it yourself in a browser, run: npx libretto run ./integration.ts --headed
+[Shows the output/results from the validation run]
+To run it again, use: npx libretto run ./integration.ts
 </example>
 ```
 

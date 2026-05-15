@@ -90,7 +90,7 @@ function Hero({
               lineHeight: 1.05,
             }}
           >
-            The AI Toolkit for Building Robust Web Integrations
+            Don't make browser agents do a script's job
           </AnimatedTitle>
         </Text>
         <Text
@@ -100,15 +100,9 @@ function Hero({
           htmlStyle={{ opacity: 0 }}
           className="mx-auto mb-8 max-w-[580px] text-center leading-relaxed text-muted [text-wrap:balance]"
         >
-          <span className="hidden md:inline">
-            An agent skill and token-efficient CLI that inspects live pages,
-            reverse-engineers network requests, and ships production-ready
-            integration workflows.
-          </span>
-          <span className="md:hidden">
-            An agent skill and CLI that inspects live pages and ships
-            production-ready integration workflows.
-          </span>
+          Libretto is a CLI that lets coding agents inspect web pages,
+          reverse-engineer APIs and build fast, cheap, and reliable automation
+          scripts
         </Text>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-wrap items-center justify-center gap-6">
           <InstallSnippet />

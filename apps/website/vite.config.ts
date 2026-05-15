@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   plugins: [tailwindcss(), react()],
+  server: { allowedHosts: ["codybot.exe.xyz"] },
   build: {
     rollupOptions: {
       input: fileURLToPath(new URL("./index.html", import.meta.url)),

@@ -12,7 +12,7 @@ Libretto supports four distinct approaches to capturing data and automating web 
 | -------------------------------------------- | ------------------ | --------------------------------------------------- |
 | Regular Playwright                           | Low-Moderate       | Simple DOM extraction, server-rendered sites        |
 | Passive interception (`page.on('response')`) | Low                | SPAs that load data via API calls during navigation |
-| In-browser fetch (`pageRequest()`)           | Low-Moderate    | Deep pagination, bulk queries without UI clicking   |
+| In-browser fetch (`pageRequest()`)           | Moderate           | API endpoints normally called with fetch/XHR        |
 | Direct HTTP from Node.js                     | Very high          | Sites with no bot detection where API speed matters |
 
 ### Assessing bot detection
@@ -28,6 +28,7 @@ Libretto captures all network traffic and page state during a session, which let
 
 - **Network log inspection.** Query `.libretto/sessions/<session>/network.jsonl` with `jq` to review all requests and responses. Look for calls to bot detection services (Cloudflare, Akamai, PerimeterX, DataDome) or challenge endpoints.
 - **Fetch patching check.** Run `npx libretto exec` to evaluate `window.fetch.toString()` in the browser console. If it returns actual JavaScript (not `"[native code]"`), the site monkey-patches fetch and you should prefer passive interception over in-browser fetch.
+- **Request type comparison.** Compare requests in `network.jsonl` before replacing browser behavior with `pageRequest()`. Browsers attach request-context headers that say what caused the request. A top-level navigation has `sec-fetch-dest: document` and `sec-fetch-mode: navigate`. A JavaScript fetch has `sec-fetch-dest: empty` and `sec-fetch-mode: cors` or `same-origin`. Script, image, stylesheet, and iframe loads have their own shapes too.
 - **Snapshot inspection.** Use `npx libretto snapshot` to check for challenge pages, CAPTCHAs, or interstitials that indicate detection.
 
 ***
@@ -122,7 +123,7 @@ Libretto captures all network traffic and page state during a session, which let
   </Tab>
 
   <Tab title="In-Browser Fetch">
-    Execute fetch calls from within the browser page's JavaScript context. The requests originate from the browser process itself with all the right credentials and fingerprints. Libretto's `pageRequest()` function provides a typed wrapper for this pattern.
+    Execute fetch calls from within the browser page's JavaScript context. The requests originate from the browser process with the browser's cookies, session, and TLS fingerprint. They still look like fetch/XHR requests. Libretto's `pageRequest()` function provides a typed wrapper for this pattern.
 
     ```typescript  theme={null}
     const data = await page.evaluate(async () => {
@@ -138,7 +139,7 @@ Libretto captures all network traffic and page state during a session, which let
 
     **Pros:**
 
-    * Requests come from the real browser with the same TLS fingerprint, cookies, origin, and HTTP/2 settings. From the server's perspective, it looks identical to a request the site's own JS would make.
+    * Requests come from the real browser with the same TLS fingerprint, cookies, origin, and HTTP/2 settings. This works best for endpoints the site's own app calls with fetch or XHR.
     * Full control over which endpoints you call and with what parameters, no need to trigger UI flows
     * Can call endpoints the UI doesn't naturally hit (e.g., fetch page 50 of results without clicking "next" 49 times)
     * Gets clean, structured API data (JSON)
@@ -147,17 +148,20 @@ Libretto captures all network traffic and page state during a session, which let
     **Cons:**
 
     * Requires understanding the site's API: you need to know the endpoint URLs, required headers, authentication tokens, and request body format. You'll need to reverse-engineer the site's network traffic first.
+    * Does not inherit the request type of the browser primitive the site normally uses. A browser fetch is sent as `resourceType: "fetch"` with headers like `sec-fetch-dest: empty` and `sec-fetch-mode: cors`, while a page navigation is sent as `resourceType: "document"` with `sec-fetch-dest: document`, `sec-fetch-mode: navigate`, `sec-fetch-user: ?1`, and `upgrade-insecure-requests: 1`. Script, image, CSS, and iframe loads have different request shapes too.
+    * Browser JavaScript generally cannot set the key `Sec-Fetch-*` headers manually. Copying headers into a fetch call usually does not make it look like a different kind of browser request.
     * Vulnerable to fetch/XHR monkey-patching. If the site wraps `window.fetch`, your calls may be intercepted and flagged because the call stack won't match the site's expected code paths.
+    * Riskier for full document URLs, such as search result pages. Use `page.goto()` and parse the loaded document, or capture the responses the site's own app naturally triggers.
     * Still requires a Playwright browser to be running (for the execution context)
     * API endpoints can change without notice
     * Must handle authentication tokens and CSRF tokens that the site's own code normally manages
 
-    **Bot detection risk: LOW to MODERATE**
+    **Bot detection risk: MODERATE**
 
-    The network-level risk is very low because the requests are genuine browser requests. The risk comes from browser fingerprinting (same as regular Playwright), fetch/XHR monkey-patching detecting unexpected call stacks, and timing/pattern analysis if your requests don't match normal UI flow patterns.
+    The requests are genuine browser requests, but they still expose a fetch/XHR request context. The risk comes from browser fingerprinting, request type mismatches, fetch/XHR monkey-patching, and timing or pattern analysis if your requests don't match normal UI flow.
 
     <Note>
-      Most sites do not implement fetch call stack monitoring. This approach is effectively undetectable on the vast majority of sites. Only sites with enterprise-grade bot protection from services like PerimeterX or Shape Security are likely to catch this.
+      Rule of thumb: match the browser primitive to the site's real request type. Use `page.goto()` or a link click for page HTML, `pageRequest()` for API requests the site normally makes with fetch/XHR, and passive interception when you can let the site's own code make the request.
     </Note>
   </Tab>
 
@@ -200,9 +204,9 @@ Libretto captures all network traffic and page state during a session, which let
 ### Decision guide
 
 <Tip>
-  **Recommended approach:** Use in-browser fetch (`pageRequest()`) for most sites. It gives you full control over which endpoints you call, structured JSON responses, and the real browser's network fingerprint.
+  **Recommended approach:** Use in-browser fetch (`pageRequest()`) for verified API endpoints that the site normally calls with fetch/XHR. It gives you full control over which endpoints you call, structured JSON responses, and the real browser's network fingerprint.
 
-  For high-security sites with aggressive bot detection (Cloudflare, Akamai, PerimeterX), use Regular Playwright for navigation and passive `page.on('response')` interception for data capture. This avoids making any extra requests that could trigger detection.
+  For high-security sites with aggressive bot detection (Cloudflare, Akamai, PerimeterX, DataDome), use Regular Playwright for navigation and passive `page.on('response')` interception for data capture. This avoids making any extra requests that could trigger detection.
 </Tip>
 
 **Use Regular Playwright when:**
@@ -223,6 +227,7 @@ Libretto captures all network traffic and page state during a session, which let
 
 * You need data from API endpoints that the UI doesn't naturally trigger (e.g., deep pagination, bulk exports)
 * You've verified the site doesn't monkey-patch `fetch` (or you can work around it)
+* You've verified the target endpoint is normally called with fetch/XHR, not loaded as a document, script, image, stylesheet, or iframe
 * You want maximum control over which data you fetch and when
 * You've already reverse-engineered the relevant API endpoints
 
