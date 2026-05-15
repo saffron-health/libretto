@@ -5,7 +5,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export type CreateTmpWorkspaceOptions = {
@@ -13,8 +13,6 @@ export type CreateTmpWorkspaceOptions = {
   name: string;
   /** Parent directory (default: <repoRoot>/tmp). */
   parentDir?: string;
-  /** Snapshot model (default: vertex/gemini-2.5-flash). */
-  snapshotModel?: string;
   /** Skip Playwright browser installation (default: false). */
   skipBrowsers?: boolean;
   /** Additional npm packages to install. */
@@ -58,43 +56,11 @@ function run(
   });
 }
 
-function resolveProviderPackage(model: string): string | null {
-  const provider = model.split("/", 1)[0]?.toLowerCase();
-  switch (provider) {
-    case "anthropic":
-      return "@ai-sdk/anthropic";
-    case "google":
-    case "gemini":
-      return "@ai-sdk/google";
-    case "vertex":
-      return "@ai-sdk/google-vertex";
-    case "openai":
-    case "codex":
-      return "@ai-sdk/openai";
-    default:
-      return null;
-  }
-}
-
-function resolveProviderInstallSpec(
-  model: string,
-  librettoPackageRoot: string,
-): string | null {
-  const packageName = resolveProviderPackage(model);
-  if (!packageName) return null;
-
-  const manifestPath = join(librettoPackageRoot, "package.json");
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
-  const version = manifest.peerDependencies?.[packageName];
-  return version ? `${packageName}@${version}` : packageName;
-}
-
 export async function createTmpWorkspace(
   options: CreateTmpWorkspaceOptions,
 ): Promise<string> {
   const repoRoot = findRepoRoot();
   const librettoPackageRoot = resolve(repoRoot, "packages", "libretto");
-  const snapshotModel = options.snapshotModel ?? "vertex/gemini-2.5-flash";
   const quiet = options.quiet ?? false;
   const parentDir = options.parentDir
     ? resolve(options.parentDir)
@@ -150,16 +116,12 @@ export async function createTmpWorkspace(
     "utf-8",
   );
 
-  // Install local libretto + provider package
-  const providerSpec = resolveProviderInstallSpec(
-    snapshotModel,
-    librettoPackageRoot,
-  );
+  // Install local libretto plus any caller-requested packages.
   const installArgs = [
     "add",
     "--lockfile=false",
+    "--ignore-scripts",
     `file:${librettoPackageRoot}`,
-    ...(providerSpec ? [providerSpec] : []),
     ...(options.extraPackages ?? []),
   ];
   log(`  Installing packages: pnpm ${installArgs.join(" ")}`);
@@ -176,15 +138,6 @@ export async function createTmpWorkspace(
   }
   log(`  Running npx ${setupArgs.join(" ")}...`);
   run(workspaceDir, "npx", setupArgs, quiet);
-
-  // Configure snapshot model
-  log(`  Configuring snapshot model: ${snapshotModel}`);
-  run(
-    workspaceDir,
-    "npx",
-    ["libretto", "ai", "configure", snapshotModel],
-    quiet,
-  );
 
   // Write .env with GCP project if available
   const projectId =
