@@ -765,7 +765,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     });
   });
 
-const runUsage = `Usage: ${librettoCommand("run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH]")}`;
+const runUsage = `Usage: ${librettoCommand("run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH] [--provider <provider>]")}`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
