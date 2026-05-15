@@ -1,0 +1,57 @@
+---
+title: Alternative providers
+sidebarTitle: Overview
+---
+
+> Run Libretto workflows somewhere other than Libretto Cloud Hosting.
+
+Libretto Cloud Hosting is the managed Libretto platform. Alternative providers are useful when you want to keep Libretto's CLI and workflow runtime, but choose a different browser or infrastructure layer.
+
+There are two common patterns:
+
+<CardGroup cols={2}>
+  <Card title="Managed browser providers" icon="cloud" href="/alternative-providers/kernel">
+    Kernel and Browserbase host the browser session. Libretto connects to that browser over CDP and runs the same local commands and workflow code.
+  </Card>
+
+  <Card title="Self-hosted cloud infrastructure" icon="server" href="/alternative-providers/gcp">
+    GCP and AWS run your workflow package as a container job. You own the runtime, scheduler, network, secrets, and artifacts.
+  </Card>
+</CardGroup>
+
+## Providers
+
+<CardGroup cols={2}>
+  <Card title="Kernel" href="/alternative-providers/kernel">
+    Use Kernel as the managed browser provider for `open` and `run`.
+  </Card>
+
+  <Card title="Browserbase" href="/alternative-providers/browserbase">
+    Use Browserbase as the managed browser provider for `open` and `run`.
+  </Card>
+
+  <Card title="GCP" icon="google" href="/alternative-providers/gcp">
+    Run workflows as Cloud Run Jobs with Artifact Registry, Cloud Build, and Secret Manager.
+  </Card>
+
+  <Card title="AWS" icon="aws" href="/alternative-providers/aws">
+    Run workflows as ECS Fargate tasks with ECR, CodeBuild, and Secrets Manager.
+  </Card>
+</CardGroup>
+
+## How provider selection works
+
+Libretto chooses a browser provider in this order:
+
+1. The `--provider` flag on `open` or `run`
+2. `LIBRETTO_PROVIDER` in the environment
+3. `provider` in `.libretto/config.json`
+4. `local`
+
+Put provider credentials in the repo root `.env` file. Libretto loads that file automatically before running CLI commands. Put the persistent provider choice in `.libretto/config.json` so `open` and `run` use the same browser provider without repeating `--provider`.
+
+## Choosing an option
+
+Use Kernel or Browserbase when you only want to move browser execution to a managed provider. Use GCP or AWS when you want to own the full workflow hosting stack.
+
+If you want Libretto to manage hosting, workflow deployment, job APIs, schedules, and failure diagnostics for you, use [Libretto Cloud Hosting](/libretto-cloud-hosting/overview).

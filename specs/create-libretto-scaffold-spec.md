@@ -12,7 +12,7 @@ Rewrite `create-libretto` to scaffold a complete project directory with template
 
 - A user runs `npm create libretto my-project` (or pnpm/yarn/bun equivalent) and gets a working project with an example workflow they can immediately run and deploy.
 - A user with an existing repo can follow a docs page to add Libretto manually.
-- The scaffolded project works with `npx libretto run` and `npx libretto experimental deploy` out of the box.
+- The scaffolded project works with `npx libretto run` and `npx libretto cloud deploy` out of the box.
 
 ## Non-goals
 
@@ -25,7 +25,7 @@ Rewrite `create-libretto` to scaffold a complete project directory with template
 
 - Template variants (e.g., minimal vs. full example).
 - Interactive add-on selection (auth profiles, cloud config).
-- `libretto experimental deploy` leaving experimental status.
+- Further improvements to `libretto cloud deploy`.
 
 ## Important files/docs/websites for implementation
 
@@ -35,7 +35,8 @@ Rewrite `create-libretto` to scaffold a complete project directory with template
 - `packages/libretto/src/cli/commands/setup.ts` — What `libretto setup` does (creates `.libretto/`, installs browsers, configures AI).
 - `packages/libretto/src/cli/core/deploy-artifact.ts` — Deploy reads `index.ts` as default entry point, discovers exported workflows.
 - `docs/docs.json` — Mintlify nav config (add new page).
-- `docs/get-started/introduction.mdx` — Current getting started page (update to reference both flows).
+- `docs/get-started/quickstart.mdx` — Current quickstart page for new projects.
+- `docs/get-started/first-workflow.mdx` — Follow-up page for turning a demonstrated browser flow into a workflow.
 - Vite's `pkgFromUserAgent()` pattern — `npm_config_user_agent` parsing for package manager detection.
 
 ## Implementation
@@ -114,14 +115,14 @@ Run a workflow:
 ## Deploy
 
 \```bash
-{{runCommand}} libretto experimental deploy .
+{{runCommand}} libretto cloud deploy .
 \```
 
 ## Learn more
 
 - [Libretto docs](https://libretto.sh)
-- [CLI reference](https://libretto.sh/cli-reference/open-and-connect)
-- [Workflow API](https://libretto.sh/library-api/workflow)
+- [CLI reference](https://libretto.sh/docs/reference/cli/open-and-connect)
+- [Workflow API](https://libretto.sh/docs/reference/runtime/workflow)
 ````
 
 - [x] Create `packages/create-libretto/template/package.json.template`:
@@ -191,25 +192,21 @@ function scaffoldProject(targetDir, projectName, pkgManager) {
 
 Intentionally skipped. The scaffolder logic is straightforward (`readFileSync` → `replaceAll` → `writeFileSync`) and the real failure modes (templates missing from published package, install/setup failures in real environments, OS path edge cases) aren't testable with unit tests using `skipInstall: true`. Not worth the maintenance cost.
 
-### Phase 4: Add "Manual setup" docs page for existing repos
+### Phase 4: Update quickstart docs for new and existing projects
 
-Add a Mintlify page explaining how to add Libretto to an existing project without the scaffolder, and update the introduction page to reference both flows.
+Update the current quickstart flow so it covers both creating a new Libretto package and adding Libretto to an existing Node.js package.
 
-- [x] Create `docs/get-started/manual-setup.mdx` covering:
-  - Install libretto: `npm install libretto`
-  - Run setup: `npx libretto setup`
-  - Create a workflow file with `import { workflow } from "libretto"` and `export default workflow(...)`
-  - Run it: `npx libretto run ./path/to/workflow.ts`
-  - Mention the `src/index.ts` re-export pattern for deploy
-- [x] Add `"get-started/manual-setup"` to `docs/docs.json` navigation under "Get started" group, after "introduction"
-- [x] Update `docs/get-started/introduction.mdx` to add a brief note after the setup section: "Already have a project? See [Manual setup](./manual-setup) to add Libretto to an existing repo."
-- [x] Verify docs build: `cd docs && npx @mintlify/cli validate` passes without errors
+- [x] Update `docs/get-started/quickstart.mdx` to show `npm create libretto@latest` for new packages.
+- [x] Include the existing-package path: `npm install libretto` followed by `npx libretto setup`.
+- [x] Create a smoke workflow with `import { workflow } from "libretto"` and `export default workflow(...)`.
+- [x] Run it with `npx libretto run src/workflows/scrape-page.ts --headless`.
+- [x] Verify docs build: `cd docs && npx --yes @mintlify/cli validate` passes without errors.
 
-### Phase 5: Update introduction docs to reflect new create flow
+### Phase 5: Update quickstart docs to reflect new create flow
 
-The introduction page currently says `npm init libretto@latest` runs in the current directory. Update it to reflect the new scaffolding behavior (creates a new directory).
+The quickstart page should explain that `npm create libretto@latest <package-name>` creates a new project directory, then the remaining commands run inside that package directory.
 
-- [ ] Update `docs/get-started/introduction.mdx` setup section to show `npm init libretto@latest my-project` with a project name argument
-- [ ] Update the description below it to mention the scaffolded files (package.json, example workflow, tsconfig)
-- [ ] Add the package manager alternatives: `pnpm create libretto my-project`, `yarn create libretto my-project`, `bunx create-libretto my-project`
-- [ ] Verify the intro page renders correctly with `cd docs && npx @mintlify/cli dev`
+- [x] Update `docs/get-started/quickstart.mdx` setup section to show `npm create libretto@latest my-project` with a project name argument.
+- [x] Update the description below it to mention the scaffolded files (package.json, example workflow, tsconfig).
+- [x] Add or preserve the existing-package setup path for users who already have a Node.js package.
+- [x] Verify the quickstart page renders correctly with `cd docs && npx --yes @mintlify/cli validate`.

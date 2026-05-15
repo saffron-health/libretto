@@ -65,12 +65,17 @@ npx libretto run <file> [flags]
   Disable ghost cursor and element highlight visualization in headed mode.
 </ParamField>
 
+<ParamField path="--provider" type="string">
+  Browser provider to use for this run. Must be `local`, `kernel`, `browserbase`,
+  or `libretto-cloud`. Overrides `LIBRETTO_PROVIDER` and the `provider` setting
+  in `.libretto/config.json`.
+</ParamField>
+
 <Info>
-  **Cloud browser providers:** The `run` command does not yet support the
-  `--provider` flag. Workflows always run against a local browser. Cloud
-  provider support for `run` is planned — see [open &
-  connect](/cli-reference/open-and-connect#cloud-browser-providers) for the
-  current provider support on `open`.
+  To keep local debugging and workflow runs on the same browser provider, set
+  `provider` in `.libretto/config.json`. See [Alternative
+  providers](/alternative-providers/overview) for Kernel, Browserbase, AWS, and
+  GCP setup.
 </Info>
 
 #### Behavior on failure

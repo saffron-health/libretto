@@ -58,7 +58,7 @@ export function Footer() {
             <a href="/blog" className={linkClass}>
               Blog
             </a>
-            <a href="/docs/get-started/introduction" className={linkClass}>
+            <a href="/docs/get-started/quickstart" className={linkClass}>
               Docs
             </a>
             <a

@@ -1,0 +1,79 @@
+---
+title: Deploying
+sidebarTitle: Deploying
+---
+
+> Pick a production path and deploy.
+
+## Agent prompt
+
+```text
+Help me deploy my Libretto workflow and choose the right production path.
+
+First, ask me one question: do I want managed hosting (Libretto Cloud Hosting) or an alternative provider?
+
+Then:
+- If I choose managed hosting, follow the Libretto Cloud Hosting docs to authenticate, deploy, and run a hosted workflow.
+- If I choose an alternative provider, use the alternative providers docs and ask whether I want Kernel, Browserbase, AWS, or GCP, then guide me through that path.
+
+After setup, provide:
+1) commands executed
+2) files/config edited
+3) deployment/run status
+4) next recommended docs page
+
+Do not make unrelated changes.
+```
+
+## Manual
+
+Libretto has two production paths:
+
+- **Libretto Cloud Hosting**: managed infrastructure, fastest path to production.
+- **Alternative providers**: run the browser on Kernel or Browserbase, or self-host the workflow runtime on AWS or GCP.
+
+## Option A: Libretto Cloud Hosting (managed)
+
+Start here if you want the shortest path from local workflow to hosted runs.
+
+- [Cloud overview](/libretto-cloud-hosting/overview)
+- [Cloud authentication](/libretto-cloud-hosting/authentication)
+- [Cloud deployments](/libretto-cloud-hosting/deployments)
+
+## Option B: Alternative providers
+
+Use this if you want a provider other than Libretto Cloud Hosting.
+
+- [Alternative providers overview](/alternative-providers/overview)
+- [Kernel](/alternative-providers/kernel)
+- [Browserbase](/alternative-providers/browserbase)
+- [Deploy on GCP](/alternative-providers/gcp)
+- [Deploy on AWS](/alternative-providers/aws)
+
+## After deployment
+
+Use these workflow guides to build, debug, and optimize production automations:
+
+<CardGroup cols={2}>
+  <Card title="One-shot workflow generation" icon="bolt" href="/guides/one-shot-workflow-generation">
+    Give your agent a goal and a URL, then review the generated browser automation.
+  </Card>
+
+  <Card title="Interactive workflow building" icon="hand-pointer" href="/guides/interactive-workflow-building">
+    Demonstrate a workflow manually and let your agent turn the recorded steps into code.
+  </Card>
+
+  <Card title="Debugging workflows" icon="bug" href="/guides/debugging-workflows">
+    Reproduce failures, inspect live page state, and fix broken automations.
+  </Card>
+
+  <Card title="Convert to network requests" icon="network-wired" href="/guides/convert-to-network-requests">
+    Replace UI automation with direct API calls when a site exposes usable network traffic.
+  </Card>
+</CardGroup>
+
+Other references:
+
+- Conceptual model: [Understand Libretto](/understand-libretto/core-concepts)
+- Command details: [CLI reference](/reference/cli/open-and-connect)
+- Runtime API details: [Library API](/reference/runtime/workflow)
