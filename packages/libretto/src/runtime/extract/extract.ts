@@ -3,7 +3,7 @@ import type z from "zod";
 import {
   type MinimalLogger,
   defaultLogger,
-} from "../../shared/logger/logger.js";
+} from "../logger/logger.js";
 import { generateObject, type LanguageModel } from "ai";
 
 export type ExtractOptions<T extends z.ZodType> = {

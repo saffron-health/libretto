@@ -7,7 +7,7 @@ import { experimentsCommand } from "./commands/experiments.js";
 import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
 import { snapshotCommand } from "./commands/snapshot.js";
-import { librettoCommand } from "../shared/package-manager.js";
+import { librettoCommand } from "./package-manager.js";
 import { SimpleCLI } from "affordance";
 
 export const cliRoutes = {

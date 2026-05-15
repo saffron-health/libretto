@@ -1,6 +1,6 @@
-# Shared IPC
+# CLI IPC
 
-This directory contains the generic typed IPC peer used across socket and child-process boundaries. Keep it transport-agnostic and avoid daemon-, workflow-, or CLI-specific behavior here.
+This directory contains the typed IPC peer used by CLI socket and child-process boundaries. Keep it transport-agnostic and avoid daemon- or workflow-specific behavior here.
 
 ## IpcPeer model
 

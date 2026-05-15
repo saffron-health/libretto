@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SessionAccessModeSchema } from "../../shared/state/index.js";
+import { SessionAccessModeSchema } from "../../runtime/state/index.js";
 import {
   runClose as runCloseWithLogger,
   runCloseAll as runCloseAllWithLogger,
@@ -12,7 +12,7 @@ import {
 import { resolveProviderName } from "../core/providers/index.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { createLoggerForSession } from "../core/context.js";
-import { librettoCommand } from "../../shared/package-manager.js";
+import { librettoCommand } from "../package-manager.js";
 import {
   type SessionAccessMode,
   assertSessionAvailableForStart,

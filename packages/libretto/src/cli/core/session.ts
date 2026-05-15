@@ -6,7 +6,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import type { LoggerApi } from "../../shared/logger/index.js";
+import type { LoggerApi } from "../../runtime/logger/index.js";
 import {
   getSessionDir,
   getSessionLogsPath,
@@ -21,8 +21,8 @@ import {
   type SessionAccessMode,
   type SessionStatus,
   type SessionState,
-} from "../../shared/state/index.js";
-import { librettoCommand } from "../../shared/package-manager.js";
+} from "../../runtime/state/index.js";
+import { librettoCommand } from "../package-manager.js";
 
 const SESSION_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 

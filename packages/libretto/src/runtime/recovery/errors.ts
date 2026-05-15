@@ -2,7 +2,7 @@ import type { Page } from "playwright";
 import {
   type MinimalLogger,
   defaultLogger,
-} from "../../shared/logger/logger.js";
+} from "../logger/logger.js";
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 

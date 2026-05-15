@@ -7,7 +7,7 @@ import {
   LIBRETTO_CONFIG_PATH,
   REPO_ROOT,
 } from "../core/context.js";
-import { librettoCommand } from "../../shared/package-manager.js";
+import { librettoCommand } from "../package-manager.js";
 import { SimpleCLI } from "affordance";
 
 function installBrowsers(): void {

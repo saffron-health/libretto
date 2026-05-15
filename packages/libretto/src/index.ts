@@ -9,12 +9,12 @@ export {
   type MinimalLogger,
   type LoggerSink,
   type LogOptions,
-} from "./shared/logger/logger.js";
+} from "./runtime/logger/logger.js";
 export {
   createFileLogSink,
   prettyConsoleSink,
   jsonlConsoleSink,
-} from "./shared/logger/sinks.js";
+} from "./runtime/logger/sinks.js";
 
 export {
   SESSION_STATE_VERSION,
@@ -26,7 +26,7 @@ export {
   type SessionStatus,
   type SessionState,
   type SessionStateFile,
-} from "./shared/state/index.js";
+} from "./runtime/state/index.js";
 
 // Recovery
 export { executeRecoveryAgent } from "./runtime/recovery/agent.js";
@@ -58,7 +58,7 @@ export {
 } from "./runtime/download/download.js";
 
 // Debug / Pause
-export { pause } from "./shared/debug/pause.js";
+export { pause } from "./runtime/debug/pause.js";
 
 // Instrumentation
 export {
@@ -67,7 +67,7 @@ export {
   instrumentContext,
   type InstrumentationOptions,
   type InstrumentedPage,
-} from "./shared/instrumentation/instrument.js";
+} from "./runtime/instrumentation/instrument.js";
 
 // Visualization
 export {
@@ -76,20 +76,20 @@ export {
   ghostClick,
   hideGhostCursor,
   type GhostCursorOptions,
-} from "./shared/visualization/ghost-cursor.js";
+} from "./runtime/visualization/ghost-cursor.js";
 export {
   ensureHighlightLayer,
   showHighlight,
   clearHighlights,
   type HighlightOptions,
-} from "./shared/visualization/highlight.js";
+} from "./runtime/visualization/highlight.js";
 
 // Run helpers
 export {
   launchBrowser,
   type LaunchBrowserArgs,
   type BrowserSession,
-} from "./shared/run/api.js";
+} from "./runtime/run/api.js";
 
 // Workflow helpers
 export {
@@ -103,7 +103,7 @@ export {
   type ExportedLibrettoWorkflow,
   type LibrettoWorkflowContext,
   type LibrettoWorkflowHandler,
-} from "./shared/workflow/workflow.js";
+} from "./runtime/workflow/workflow.js";
 const isDirectExecution = (): boolean => {
   const entryArg = process.argv[1];
   if (!entryArg) {

@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 import { format, formatWithOptions, type InspectOptions } from "node:util";
-import { installInstrumentation } from "../../../shared/instrumentation/index.js";
+import { installInstrumentation } from "../../../runtime/instrumentation/index.js";
 import { compileExecFunction } from "../exec-compiler.js";
 import { createReadonlyExecHelpers } from "../readonly-exec.js";
 import type { DaemonExecRepl } from "./exec-repl.js";

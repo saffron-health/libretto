@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { librettoCommand } from "../../shared/package-manager.js";
+import { librettoCommand } from "../package-manager.js";
 import {
   EXPERIMENTS,
   isExperimentName,

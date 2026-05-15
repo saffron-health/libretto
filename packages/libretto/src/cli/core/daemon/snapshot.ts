@@ -1,13 +1,13 @@
 import type { Page } from "playwright";
 import { mkdirSync } from "node:fs";
-import type { LoggerApi } from "../../../shared/logger/index.js";
+import type { LoggerApi } from "../../../runtime/logger/index.js";
 import { getSessionSnapshotRunDir } from "../context.js";
 import {
   snapshot,
   type Snapshot,
-} from "../../../shared/snapshot/capture-snapshot.js";
-import { waitForPageStable } from "../../../shared/snapshot/wait-for-page-stable.js";
-import { librettoCommand } from "../../../shared/package-manager.js";
+} from "../../snapshot/capture-snapshot.js";
+import { waitForPageStable } from "../../snapshot/wait-for-page-stable.js";
+import { librettoCommand } from "../.././package-manager.js";
 import {
   resolveSnapshotViewport,
   readSnapshotViewportMetrics,

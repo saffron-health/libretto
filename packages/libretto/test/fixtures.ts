@@ -10,7 +10,7 @@ import {
   SESSION_STATE_VERSION,
   type SessionAccessMode,
   type SessionState,
-} from "../src/shared/state/index.js";
+} from "../src/runtime/state/index.js";
 
 type SpawnResult = {
   exitCode: number;

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { resolveLibrettoRepoRoot } from "../paths/repo-root.js";
+import { resolveLibrettoRepoRoot } from "../../runtime/paths/repo-root.js";
 
 const REPO_ROOT = resolveLibrettoRepoRoot();
 

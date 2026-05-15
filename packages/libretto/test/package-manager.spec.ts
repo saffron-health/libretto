@@ -7,7 +7,7 @@ import {
   detectPackageManager,
   installCommand,
   librettoCommand,
-} from "../src/shared/package-manager.js";
+} from "../src/cli/package-manager.js";
 
 describe("package manager command rendering", () => {
   it("renders libretto commands for supported package managers", () => {

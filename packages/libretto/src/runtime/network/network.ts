@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 import type z from "zod";
-import type { MinimalLogger } from "../../shared/logger/logger.js";
+import type { MinimalLogger } from "../logger/logger.js";
 
 export type RequestConfig = {
   url: string;

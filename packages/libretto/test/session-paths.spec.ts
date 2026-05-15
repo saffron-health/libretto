@@ -4,7 +4,7 @@ import { mkdtemp, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { ensureLibrettoSessionStatePath } from "../src/shared/paths/paths.js";
+import { ensureLibrettoSessionStatePath } from "../src/runtime/paths/paths.js";
 
 describe("session path resolution", () => {
   test("anchors session state at the git repo root when invoked from a nested package", async () => {

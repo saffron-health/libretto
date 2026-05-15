@@ -31,11 +31,11 @@ import {
   createIpcPeer,
   type IpcPeer,
   type IpcPeerHandlers,
-} from "../../../shared/ipc/ipc.js";
+} from "../../ipc/ipc.js";
 import {
   createIpcSocketServer,
   listenOnIpcSocket,
-} from "../../../shared/ipc/socket-transport.js";
+} from "../../ipc/socket-transport.js";
 import {
   createLoggerForSession,
   getSessionDir,
@@ -44,8 +44,8 @@ import {
   getSessionProviderClosePath,
   getSessionStatePath,
 } from "../context.js";
-import type { LoggerApi } from "../../../shared/logger/index.js";
-import type { ExportedLibrettoWorkflow } from "../../../shared/workflow/workflow.js";
+import type { LoggerApi } from "../../../runtime/logger/index.js";
+import type { ExportedLibrettoWorkflow } from "../../../runtime/workflow/workflow.js";
 import {
   getDaemonSocketPath,
   type CliToDaemonApi,
@@ -65,15 +65,15 @@ import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { DaemonExecRepl } from "./exec-repl.js";
 import { handleCompactSnapshot } from "./snapshot.js";
-import { librettoCommand } from "../../../shared/package-manager.js";
-import type { Snapshot } from "../../../shared/snapshot/types.js";
-import { snapshot } from "../../../shared/snapshot/capture-snapshot.js";
-import { diffSnapshots } from "../../../shared/snapshot/diff-snapshots.js";
+import { librettoCommand } from "../.././package-manager.js";
+import type { Snapshot } from "../../snapshot/types.js";
+import { snapshot } from "../../snapshot/capture-snapshot.js";
+import { diffSnapshots } from "../../snapshot/diff-snapshots.js";
 import {
   installPageStabilityWaiter,
   preparePageStabilityWait,
   waitForPageStable,
-} from "../../../shared/snapshot/wait-for-page-stable.js";
+} from "../../snapshot/wait-for-page-stable.js";
 import {
   type DaemonConfig,
   type DaemonBrowserLaunchConfig,

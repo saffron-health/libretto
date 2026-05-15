@@ -6,7 +6,7 @@ import {
   isObfuscatedClass,
   TEST_ATTRIBUTE_NAMES,
   TRUSTED_ATTRIBUTE_NAMES,
-} from "../../shared/dom-semantics.js";
+} from "../dom-semantics.js";
 
 type TelemetryEntry = Record<string, unknown>;
 

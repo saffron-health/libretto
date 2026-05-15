@@ -15,7 +15,7 @@ import { GoogleAuth } from "google-auth-library";
 import {
   SESSION_STATE_VERSION,
   type SessionStateFile,
-} from "../../packages/libretto/src/shared/state/session-state.js";
+} from "../../packages/libretto/src/runtime/state/session-state.js";
 
 // ---------------------------------------------------------------------------
 // Types

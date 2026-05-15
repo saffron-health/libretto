@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LoggerApi } from "../src/shared/logger/index.js";
+import type { LoggerApi } from "../src/runtime/logger/index.js";
 import { installHeadedWorkflowVisualization } from "../src/cli/core/workflow-runtime.js";
 
 function createLogger(): LoggerApi {

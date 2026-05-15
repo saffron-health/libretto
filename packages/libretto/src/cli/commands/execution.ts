@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import * as moduleBuiltin from "node:module";
 import { z } from "zod";
-import { installInstrumentation } from "../../shared/instrumentation/index.js";
-import type { LoggerApi } from "../../shared/logger/index.js";
+import { installInstrumentation } from "../../runtime/instrumentation/index.js";
+import type { LoggerApi } from "../../runtime/logger/index.js";
 import {
   connect,
   disconnectBrowser,
@@ -27,8 +27,8 @@ import {
 } from "../core/session.js";
 import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
-import { librettoCommand } from "../../shared/package-manager.js";
-import { renderSnapshotDiff } from "../../shared/snapshot/diff-snapshots.js";
+import { librettoCommand } from "../package-manager.js";
+import { renderSnapshotDiff } from "../snapshot/diff-snapshots.js";
 import {
   getProviderStartupTimeoutMs,
   resolveProviderName,
@@ -50,7 +50,7 @@ import {
   readNetworkLog,
   wrapPageForActionLogging,
 } from "../core/telemetry.js";
-import type { SessionAccessMode } from "../../shared/state/index.js";
+import type { SessionAccessMode } from "../../runtime/state/index.js";
 import type { Experiments } from "../core/experiments.js";
 import { SimpleCLI } from "affordance";
 import {

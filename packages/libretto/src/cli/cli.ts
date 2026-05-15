@@ -1,7 +1,7 @@
 import { ensureLibrettoSetup } from "./core/context.js";
 import { createCLIApp } from "./router.js";
 import { warnIfInstalledSkillOutOfDate } from "./core/skill-version.js";
-import { loadEnv } from "../shared/env/load-env.js";
+import { loadEnv } from "./env/load-env.js";
 
 function renderUsage(app: ReturnType<typeof createCLIApp>): string {
   return `${app.renderHelp()}

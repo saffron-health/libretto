@@ -20,7 +20,7 @@ import {
   getWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,
   LIBRETTO_WORKFLOW_BRAND,
-} from "../../shared/workflow/workflow.js";
+} from "../../runtime/workflow/workflow.js";
 
 type PackageManifest = {
   name?: string;

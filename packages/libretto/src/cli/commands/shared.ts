@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { LoggerApi } from "../../shared/logger/index.js";
+import type { LoggerApi } from "../../runtime/logger/index.js";
 import type { Experiments } from "../core/experiments.js";
 import { resolveExperiments } from "../core/experiments.js";
 import { createLoggerForSession } from "../core/context.js";

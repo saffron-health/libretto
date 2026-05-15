@@ -1,10 +1,10 @@
 import type { BrowserContext, Page } from "playwright";
-import type { LoggerApi } from "../../../shared/logger/index.js";
-import { installPauseHandler } from "../../../shared/debug/pause-handler.js";
+import type { LoggerApi } from "../../../runtime/logger/index.js";
+import { installPauseHandler } from "../../../runtime/debug/pause-handler.js";
 import type {
   ExportedLibrettoWorkflow,
   LibrettoWorkflowContext,
-} from "../../../shared/workflow/workflow.js";
+} from "../../../runtime/workflow/workflow.js";
 import {
   getAbsoluteIntegrationPath,
   installHeadedWorkflowVisualization,

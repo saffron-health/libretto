@@ -9,13 +9,13 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createServer } from "node:net";
-import { isWindowsNamedPipePath } from "../../shared/ipc/socket-transport.js";
-import type { LoggerApi } from "../../shared/logger/index.js";
-import type { SessionAccessMode } from "../../shared/state/index.js";
+import { isWindowsNamedPipePath } from "../ipc/socket-transport.js";
+import type { LoggerApi } from "../../runtime/logger/index.js";
+import type { SessionAccessMode } from "../../runtime/state/index.js";
 import type { Experiments } from "./experiments.js";
 import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
-import { librettoCommand } from "../../shared/package-manager.js";
+import { librettoCommand } from "../package-manager.js";
 import {
   getCloudProviderApi,
   getProviderStartupTimeoutMs,

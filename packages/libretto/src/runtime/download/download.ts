@@ -1,5 +1,5 @@
 import type { Page, Download } from "playwright";
-import type { MinimalLogger } from "../../shared/logger/logger.js";
+import type { MinimalLogger } from "../logger/logger.js";
 
 export type DownloadResult = {
   /** The raw file contents. */

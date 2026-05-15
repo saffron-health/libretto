@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { LoggerApi } from "../../shared/logger/index.js";
+import type { LoggerApi } from "../../runtime/logger/index.js";
 import { readSessionState } from "../core/session.js";
 import { SimpleCLI } from "affordance";
 import {
@@ -8,8 +8,8 @@ import {
   withRequiredSession,
 } from "./shared.js";
 import { DaemonClient } from "../core/daemon/ipc.js";
-import { librettoCommand } from "../../shared/package-manager.js";
-import { renderSnapshot } from "../../shared/snapshot/render-snapshot.js";
+import { librettoCommand } from "../package-manager.js";
+import { renderSnapshot } from "../snapshot/render-snapshot.js";
 
 export const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { installInstrumentation } from "../src/shared/instrumentation/instrument.js";
+import { installInstrumentation } from "../src/runtime/instrumentation/instrument.js";
 
 function createFakeLocator() {
   return {

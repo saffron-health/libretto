@@ -1,7 +1,7 @@
-import { Logger, createFileLogSink } from "../../shared/logger/index.js";
+import { Logger, createFileLogSink } from "../../runtime/logger/index.js";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolveLibrettoRepoRoot } from "../../shared/paths/repo-root.js";
+import { resolveLibrettoRepoRoot } from "../../runtime/paths/repo-root.js";
 import { validateSessionName } from "./session.js";
 
 export const REPO_ROOT = resolveLibrettoRepoRoot();

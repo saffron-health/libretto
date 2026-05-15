@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { SessionAccessModeSchema } from "../../shared/state/index.js";
+import { SessionAccessModeSchema } from "../../runtime/state/index.js";
 import { LIBRETTO_CONFIG_PATH } from "./context.js";
 
 export const CURRENT_CONFIG_VERSION = 1;

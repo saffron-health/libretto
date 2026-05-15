@@ -3,13 +3,13 @@ import { existsSync } from "node:fs";
 import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { instrumentContext } from "../../shared/instrumentation/instrument.js";
+import { instrumentContext } from "../../runtime/instrumentation/instrument.js";
 import {
   getDefaultWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,
   type ExportedLibrettoWorkflow,
-} from "../../shared/workflow/workflow.js";
-import type { LoggerApi } from "../../shared/logger/index.js";
+} from "../../runtime/workflow/workflow.js";
+import type { LoggerApi } from "../../runtime/logger/index.js";
 
 const TSCONFIG_HINT =
   "TypeScript compilation failed. Pass --tsconfig <path> to run against a specific tsconfig.";
