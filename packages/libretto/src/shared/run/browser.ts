@@ -12,7 +12,8 @@ import {
   type SessionAccessMode,
   SessionStateFileSchema,
 } from "../state/session-state.js";
-import { readLibrettoConfig } from "../../cli/core/config.js";
+
+type WindowPosition = { x: number; y: number };
 
 async function pickFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
@@ -38,6 +39,7 @@ export type LaunchBrowserArgs = {
   accessMode?: SessionAccessMode;
   cdpEndpoint?: string;
   provider?: { name: string; sessionId: string };
+  windowPosition?: WindowPosition;
 };
 
 export type BrowserSession = {
@@ -49,15 +51,11 @@ export type BrowserSession = {
   close: () => Promise<void>;
 };
 
-function resolveWindowPosition(): { x: number; y: number } | undefined {
-  return readLibrettoConfig().windowPosition;
-}
-
 async function applyWindowPosition(
   browser: Browser,
   context: BrowserContext,
   page: Page,
-  windowPosition: { x: number; y: number } | undefined,
+  windowPosition: WindowPosition | undefined,
 ): Promise<void> {
   if (!windowPosition) {
     return;
@@ -104,6 +102,7 @@ export async function launchBrowser({
   accessMode = "write-access",
   cdpEndpoint,
   provider,
+  windowPosition,
 }: LaunchBrowserArgs): Promise<BrowserSession> {
   // Cloud/remote mode: connect to an existing CDP endpoint instead of launching locally
   if (cdpEndpoint) {
@@ -147,15 +146,17 @@ export async function launchBrowser({
   }
 
   const debugPort = await pickFreePort();
-  const windowPosition = headless ? undefined : resolveWindowPosition();
+  const effectiveWindowPosition = headless ? undefined : windowPosition;
   const browser = await chromium.launch({
     headless,
     args: [
       "--disable-blink-features=AutomationControlled",
       `--remote-debugging-port=${debugPort}`,
       "--no-focus-on-check",
-      ...(windowPosition
-        ? [`--window-position=${windowPosition.x},${windowPosition.y}`]
+      ...(effectiveWindowPosition
+        ? [
+            `--window-position=${effectiveWindowPosition.x},${effectiveWindowPosition.y}`,
+          ]
         : []),
     ],
   });
@@ -165,7 +166,12 @@ export async function launchBrowser({
     ...(storageStatePath ? { storageState: storageStatePath } : {}),
   });
   const page = await context.newPage();
-  await applyWindowPosition(browser, context, page, windowPosition);
+  await applyWindowPosition(
+    browser,
+    context,
+    page,
+    effectiveWindowPosition,
+  );
   page.setDefaultTimeout(30_000);
   page.setDefaultNavigationTimeout(45_000);
 

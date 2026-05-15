@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { cwd } from "node:process";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { instrumentContext } from "../../index.js";
+import { instrumentContext } from "../../shared/instrumentation/instrument.js";
 import {
   getDefaultWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,

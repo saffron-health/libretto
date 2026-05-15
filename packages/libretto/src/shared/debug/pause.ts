@@ -1,5 +1,8 @@
 import { getActivePauseHandler } from "./pause-handler.js";
-import { librettoCommand } from "../package-manager.js";
+
+function librettoCommand(args: string): string {
+  return `libretto ${args}`;
+}
 
 function throwMissingSessionError(): never {
   throw new Error(

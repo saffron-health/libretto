@@ -1,3 +1,0 @@
-/**
- * Runtime configuration for libretto.
- */
