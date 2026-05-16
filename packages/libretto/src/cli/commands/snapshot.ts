@@ -8,7 +8,6 @@ import {
   withRequiredSession,
 } from "./shared.js";
 import { DaemonClient } from "../core/daemon/ipc.js";
-import { librettoCommand } from "../../shared/package-manager.js";
 import { renderSnapshot } from "../../shared/snapshot/render-snapshot.js";
 
 export const FALLBACK_SNAPSHOT_VIEWPORT = { width: 1280, height: 800 } as const;
@@ -118,7 +117,7 @@ async function runCompactSnapshot(
   if (!args.daemonSocketPath) {
     throw new Error(
       `Session "${args.session}" has no daemon socket. The browser daemon may have crashed. ` +
-        `Close and reopen the session: ${librettoCommand(`close --session ${args.session}`)}`,
+        `Close and reopen the session: libretto close --session ${args.session}`,
     );
   }
 
@@ -141,7 +140,7 @@ async function runCompactSnapshot(
   console.log(`Screenshot at ${result.pngPath}`);
   console.log(renderSnapshot(result.snapshot, args.ref));
   console.log(
-    `Hint: Use ${librettoCommand(`snapshot <ref> --session ${args.session}`)} to inspect a subtree.`,
+    `Hint: Use libretto snapshot <ref> --session ${args.session} to inspect a subtree.`,
   );
 }
 

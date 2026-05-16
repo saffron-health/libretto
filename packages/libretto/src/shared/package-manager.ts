@@ -53,11 +53,3 @@ export function installCommand(
       return "npm install";
   }
 }
-
-export function librettoCommand(
-  args = "",
-  _packageManager?: PackageManager,
-): string {
-  const suffix = args.trim();
-  return `libretto${suffix ? ` ${suffix}` : ""}`;
-}

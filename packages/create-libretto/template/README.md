@@ -4,6 +4,12 @@ Browser automations built with [Libretto](https://libretto.sh).
 
 ## Quick Start
 
+If `libretto` is not already on your `PATH`, install the command first:
+
+```bash
+curl -fsSL https://libretto.sh/install.sh | bash
+```
+
 Open a page interactively to inspect and prototype:
 
 ```bash

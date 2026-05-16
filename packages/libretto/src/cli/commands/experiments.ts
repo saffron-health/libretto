@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { librettoCommand } from "../../shared/package-manager.js";
 import {
   EXPERIMENTS,
   isExperimentName,
@@ -14,10 +13,10 @@ const experimentNames = Object.keys(EXPERIMENTS) as ExperimentName[];
 
 const experimentsUsage = [
   "Usage:",
-  `  ${librettoCommand("experiments")}`,
-  `  ${librettoCommand("experiments describe <experiment>")}`,
-  `  ${librettoCommand("experiments enable <experiment>")}`,
-  `  ${librettoCommand("experiments disable <experiment>")}`,
+  `  libretto experiments`,
+  `  libretto experiments describe <experiment>`,
+  `  libretto experiments enable <experiment>`,
+  `  libretto experiments disable <experiment>`,
 ].join("\n");
 
 export const experimentsInput = SimpleCLI.input({

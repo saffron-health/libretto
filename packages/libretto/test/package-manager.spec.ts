@@ -6,16 +6,9 @@ import {
   detectProjectPackageManager,
   detectPackageManager,
   installCommand,
-  librettoCommand,
 } from "../src/shared/package-manager.js";
 
-describe("package manager command rendering", () => {
-  it("renders native libretto commands", () => {
-    expect(librettoCommand()).toBe("libretto");
-    expect(librettoCommand("setup")).toBe("libretto setup");
-    expect(librettoCommand("setup", "pnpm")).toBe("libretto setup");
-  });
-
+describe("package manager detection", () => {
   it("detects the package manager from npm_config_user_agent", () => {
     expect(
       detectPackageManager("/tmp/no-lockfiles", {
