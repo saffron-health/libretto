@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execSync, spawn } from "node:child_process";
+import { execFileSync, execSync, spawn } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -98,18 +98,9 @@ export function detectPackageManager() {
   return "npm";
 }
 
-/** Return the exec command for running a local bin with the given package manager. */
-function execCommand(pkgManager) {
-  switch (pkgManager) {
-    case "pnpm":
-      return "pnpm exec";
-    case "yarn":
-      return "yarn";
-    case "bun":
-      return "bunx";
-    default:
-      return "npx";
-  }
+function localLibrettoBin(targetDir) {
+  const binName = process.platform === "win32" ? "libretto.cmd" : "libretto";
+  return join(targetDir, "node_modules", ".bin", binName);
 }
 
 /** Return the install command for the given package manager. */
@@ -403,7 +394,7 @@ export async function scaffoldProject(
     console.log();
 
     try {
-      execSync(`${execCommand(pkgManager)} libretto setup`, {
+      execFileSync(localLibrettoBin(targetDir), ["setup"], {
         cwd: targetDir,
         stdio: "inherit",
       });
