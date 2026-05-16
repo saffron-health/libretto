@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
-import { openSync, closeSync } from "node:fs";
+import { openSync, closeSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir, userInfo } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -71,6 +71,19 @@ export type DaemonToCliApi = {
       | { result: "failed"; message: string; phase: "setup" | "workflow" },
   ): void;
 };
+
+const DAEMON_LOG_EXCERPT_LINES = 20;
+
+function daemonLogExcerpt(logPath: string): string {
+  try {
+    const content = readFileSync(logPath, "utf8").trim();
+    if (!content) return "";
+    const lines = content.split("\n").slice(-DAEMON_LOG_EXCERPT_LINES);
+    return `\n\nLog excerpt:\n${lines.join("\n")}`;
+  } catch {
+    return "";
+  }
+}
 
 function createNoopDaemonToCliHandlers(): DaemonToCliApi {
   return {
@@ -265,7 +278,7 @@ export class DaemonClient {
       timeoutMs: startupTimeoutMs,
       formatTimeoutError: () =>
         new Error(
-          `Daemon failed to start within ${Math.ceil(startupTimeoutMs / 1000)}s. Check logs: ${logPath}`,
+          `Daemon failed to start within ${Math.ceil(startupTimeoutMs / 1000)}s. Check logs: ${logPath}${daemonLogExcerpt(logPath)}`,
         ),
       formatSpawnError: (error) => {
         const errWithCode = error as Error & { code?: string };
@@ -274,13 +287,13 @@ export class DaemonClient {
             ? " Ensure Node.js is available in PATH for child processes."
             : "";
         return new Error(
-          `Failed to spawn daemon: ${error.message}.${hint} Check logs: ${logPath}`,
+          `Failed to spawn daemon: ${error.message}.${hint} Check logs: ${logPath}${daemonLogExcerpt(logPath)}`,
         );
       },
       formatExitError: (code, signal) => {
         const status = code ?? signal ?? "unknown";
         return new Error(
-          `Daemon exited before startup (status: ${status}). Check logs: ${logPath}`,
+          `Daemon exited before startup (status: ${status}). Check logs: ${logPath}${daemonLogExcerpt(logPath)}`,
         );
       },
       onReady: (message) => {

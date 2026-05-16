@@ -1026,6 +1026,8 @@ function reportStartupError(error: unknown): never {
       type: "startup-error",
       message: error.message,
     });
+  } else {
+    console.error(error instanceof Error ? (error.stack ?? error.message) : error);
   }
   process.exit(
     process.exitCode && process.exitCode !== 0 ? process.exitCode : 1,
