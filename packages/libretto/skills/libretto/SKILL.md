@@ -142,6 +142,7 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 ### `run`
 
 - Use `run` to verify a workflow file after creating it or editing it. Use the same headed or headless mode for validation that the workflow run is already using.
+- Workflows define their input shape with a Zod schema (see `references/code-generation-rules.md`). `run` validates `--params` against that schema before calling the handler and prints a clear field-by-field error if the input doesn't match.
 - Plain `run` defaults to headed mode. Do not use `--headless` unless the user asks for headless mode or the existing workflow run already uses it.
 - Successful runs close the browser by default. Pass `--stay-open-on-success` when you need to inspect the completed state with `pages`, `snapshot`, or `exec`.
 - Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.

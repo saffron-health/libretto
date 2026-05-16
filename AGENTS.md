@@ -54,7 +54,8 @@ pnpm -s cli
 
 ## **FORBIDDEN** Actions
 
-- NEVER manually edit the `version` field in `packages/libretto/package.json`. Use `pnpm prepare-release`.
+- For stable releases on `main`: NEVER manually edit the `version` field in `packages/libretto/package.json`. Use `pnpm prepare-release` — that script opens a release PR, and CI publishes to npm under the `latest` dist-tag on merge.
+- For experimental pre-releases (e.g. validating a new API on a downstream consumer before promoting it to a stable release): manually edit `packages/libretto/package.json` `version` to a pre-release identifier like `0.6.16-experimental-<feature>.0`, then run `pnpm publish:experimental` from this repo root. That script derives the npm dist-tag from the pre-release identifier (between `-` and `.N`) and publishes locally — it does NOT touch `main` and does NOT use the GitHub Actions release workflow. Refuses to publish if the version isn't a pre-release.
 - NEVER hand-edit mirrored files in `.agents/skills/` or `.claude/skills/`. Edit the source in `packages/libretto/skills/` and run `pnpm sync:mirrors`.
 - NEVER run `pnpm build` just to type-check. Use `pnpm type-check` instead.
 - NEVER use `git add -A` or `git add .` — only stage the files you changed.
