@@ -78,6 +78,32 @@ function expectedSkillVersionWarning(
 }
 
 describe("basic CLI subprocess behavior", () => {
+  test("warns when invoked through a package manager exec command", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("help", {
+      npm_command: "exec",
+    });
+
+    expect(result.stderr).toContain(
+      "Warning: running Libretto through a package manager is deprecated",
+    );
+    expect(result.stderr).toContain("https://libretto.sh/install.sh");
+    expect(result.stdout).toContain("Usage: libretto <command>");
+  });
+
+  test("does not warn for package manager lifecycle commands", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("help", {
+      npm_command: "run-script",
+      npm_config_user_agent: "pnpm/11.1.1",
+    });
+
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("Usage: libretto <command>");
+  });
+
   test("setup completes without AI configuration", async ({
     librettoCli,
   }) => {
