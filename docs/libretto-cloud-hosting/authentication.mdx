@@ -34,6 +34,16 @@ npx libretto cloud auth login
 
 This stores a new Libretto Cloud session in `~/.libretto/auth.json`. If the account is not verified yet, the CLI re-sends the verification email.
 
+### Reset a forgotten password
+
+Use `auth forgot-password` to request a password reset email:
+
+```bash theme={null}
+npx libretto cloud auth forgot-password
+```
+
+After you choose a new password from the reset link, run `auth login` again to save a fresh local session.
+
 To clear local credentials:
 
 ```bash theme={null}
