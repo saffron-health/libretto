@@ -3,7 +3,6 @@
 set -euo pipefail
 
 readonly BASE_URL="${LIBRETTO_BASE_URL:-https://libretto.sh}"
-readonly INSTALL_DIR="${LIBRETTO_INSTALL_DIR:-/usr/local/bin}"
 readonly DATA_DIR="${LIBRETTO_DATA_DIR:-${HOME}/.libretto/native}"
 readonly REQUESTED_VERSION="${LIBRETTO_VERSION:-latest}"
 readonly PACKAGE_NAME="${LIBRETTO_PACKAGE:-libretto}"
@@ -53,6 +52,22 @@ function resolve_version() {
   fi
 }
 
+function default_install_dir() {
+  if [[ -n "${LIBRETTO_INSTALL_DIR:-}" ]]; then
+    printf '%s\n' "${LIBRETTO_INSTALL_DIR}"
+    return
+  fi
+
+  if [[ -d "/usr/local/bin" && -w "/usr/local/bin" ]]; then
+    printf '%s\n' "/usr/local/bin"
+    return
+  fi
+
+  printf '%s\n' "${HOME}/.local/bin"
+}
+
+readonly INSTALL_DIR="$(default_install_dir)"
+
 function install_shim() {
   local shim_path="$1"
   local destination_path="${INSTALL_DIR}/libretto"
@@ -64,8 +79,7 @@ function install_shim() {
   cat >&2 <<EOF
 error: Could not install the Libretto command to ${destination_path}
 
-The installer could not create or write to ${INSTALL_DIR}. This usually means the
-directory is owned by another user or requires administrator permissions.
+The installer could not create or write to ${INSTALL_DIR}.
 
 Choose a directory you can write to and re-run the installer with LIBRETTO_INSTALL_DIR:
 
@@ -128,7 +142,18 @@ case ":${PATH}:" in
   *":${INSTALL_DIR}:"*) ;;
   *)
     warn "${INSTALL_DIR} is not on your PATH. Add it before running libretto."
-    printf '\n' >&2
+    cat >&2 <<EOF
+
+  Add it to your current shell:
+
+    export PATH="${INSTALL_DIR}:\$PATH"
+
+  To make that permanent, add the same line to your shell profile, such as:
+
+    ~/.zshrc      # zsh
+    ~/.bashrc     # bash
+
+EOF
     ;;
 esac
 
