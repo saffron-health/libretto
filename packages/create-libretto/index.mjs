@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execFileSync, execSync, spawn } from "node:child_process";
+import { execSync, spawn, spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -101,6 +101,21 @@ export function detectPackageManager() {
 function localLibrettoBin(targetDir) {
   const binName = process.platform === "win32" ? "libretto.cmd" : "libretto";
   return join(targetDir, "node_modules", ".bin", binName);
+}
+
+function runLocalLibrettoSetup(targetDir) {
+  const result = spawnSync(localLibrettoBin(targetDir), ["setup"], {
+    cwd: targetDir,
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `libretto setup exited with status ${result.status ?? "unknown"}`,
+    );
+  }
 }
 
 /** Return the install command for the given package manager. */
@@ -394,10 +409,7 @@ export async function scaffoldProject(
     console.log();
 
     try {
-      execFileSync(localLibrettoBin(targetDir), ["setup"], {
-        cwd: targetDir,
-        stdio: "inherit",
-      });
+      runLocalLibrettoSetup(targetDir);
     } catch {
       console.error(`\nFailed to run libretto setup.`);
       process.exit(1);
