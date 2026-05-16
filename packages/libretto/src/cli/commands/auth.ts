@@ -375,18 +375,17 @@ export const forgotPasswordCommand = SimpleCLI.command({
   .handle(async () => {
     const apiUrl = resolveHostedApiUrl();
     const email = await prompt("Email:");
-    await betterAuthCall({
+    const result = await orpcCall<{ status: "sent" | "not_found" }>({
       apiUrl,
-      path: "/api/auth/request-password-reset",
-      input: {
-        email,
-        redirectTo: `${apiUrl}/auth/reset-password`,
-      },
+      path: "/v1/auth/requestPasswordReset",
+      input: { email },
       unauthenticated: true,
     });
-    console.log(
-      "If an account exists for that email, a password reset link has been sent.",
-    );
+    if (result.status === "not_found") {
+      console.log(`No Libretto account exists for ${email}.`);
+      return;
+    }
+    console.log(`Password reset link sent to ${email}.`);
   });
 
 // ---------------------------------------------------------------------------
