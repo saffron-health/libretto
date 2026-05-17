@@ -101,8 +101,7 @@ export const openInput = SimpleCLI.input({
   );
 
 export const openCommand = SimpleCLI.command({
-  description:
-    "Launch browser and open URL (headed by default). Automatically loads a saved auth profile for the URL's domain if one exists.",
+  description: "Launch browser and open URL",
 })
   .input(openInput)
   .use(withAutoSession())

@@ -597,4 +597,72 @@ describe("SimpleCLI framework", () => {
     const helpFromFlag = await app.run(["ai", "configure", "--help"]);
     expect(helpFromFlag).toBe(helpFromCommand);
   });
+
+  test("includes nearest help for unknown commands", async () => {
+    const noInput = SimpleCLI.input({ positionals: [], named: {} });
+    const app = SimpleCLI.define("libretto", {
+      cloud: SimpleCLI.group({
+        description: "Libretto Cloud commands",
+        routes: {
+          deploy: SimpleCLI.command({
+            description: "Deploy workflows to the hosted platform",
+          })
+            .input(noInput)
+            .handle(async () => {}),
+          auth: SimpleCLI.group({
+            description: "Hosted-platform auth commands",
+            routes: {
+              login: SimpleCLI.command({
+                description: "Log in to the hosted platform",
+              })
+                .input(noInput)
+                .handle(async () => {}),
+            },
+          }),
+        },
+      }),
+      open: SimpleCLI.command({ description: "Launch browser and open URL" })
+        .input(noInput)
+        .handle(async () => {}),
+    });
+
+    await expect(app.run(["opne"])).rejects.toThrow(
+      [
+        "Unknown command: opne",
+        "",
+        "Usage: libretto <command>",
+        "",
+        "Commands:",
+        "  cloud <subcommand>  Libretto Cloud commands",
+        "  open  Launch browser and open URL",
+      ].join("\n"),
+    );
+
+    await expect(app.run(["cloud", "opne"])).rejects.toThrow(
+      [
+        "Unknown command: cloud opne",
+        "",
+        "Libretto Cloud commands",
+        "",
+        "Usage: libretto cloud <subcommand>",
+        "",
+        "Commands:",
+        "  deploy  Deploy workflows to the hosted platform",
+        "  auth <subcommand>  Hosted-platform auth commands",
+      ].join("\n"),
+    );
+
+    await expect(app.run(["cloud", "auth", "logni"])).rejects.toThrow(
+      [
+        "Unknown command: cloud auth logni",
+        "",
+        "Hosted-platform auth commands",
+        "",
+        "Usage: libretto cloud auth <subcommand>",
+        "",
+        "Commands:",
+        "  login  Log in to the hosted platform",
+      ].join("\n"),
+    );
+  });
 });

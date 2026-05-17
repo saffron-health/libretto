@@ -2,6 +2,11 @@
 
 A small TypeScript framework for building agent-friendly CLIs with typed command inputs, nested route groups, middleware, and generated help.
 
+Affordance is intentionally opinionated: CLIs should be easy for agents to
+recover from. Unknown commands include the most relevant help text by default.
+For example, `mycli cloud deplot` reports the unknown command and shows
+`mycli cloud <subcommand>` help instead of sending the agent back to root help.
+
 ## Install
 
 ```sh
@@ -32,4 +37,27 @@ const app = SimpleCLI.define("mycli", {
 });
 
 await app.run(process.argv.slice(2));
+```
+
+## Unknown Commands
+
+When command resolution fails, Affordance includes scoped help in the thrown
+error message:
+
+- Unknown root commands show root help.
+- Unknown commands below a group show the nearest group help.
+- Unknown commands below nested groups show the deepest matching group help.
+
+For a route tree with `cloud deploy` and `cloud auth login`, a typo like
+`mycli cloud auth logni` produces:
+
+```text
+Unknown command: cloud auth logni
+
+Auth commands
+
+Usage: mycli cloud auth <subcommand>
+
+Commands:
+  login  Log in
 ```

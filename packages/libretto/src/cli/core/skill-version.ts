@@ -14,7 +14,7 @@ const INSTALLED_SKILL_PATHS = [
 
 let cachedCliVersion: string | null = null;
 
-function readCurrentCliVersion(): string {
+export function readCurrentCliVersion(): string {
   if (cachedCliVersion) {
     return cachedCliVersion;
   }

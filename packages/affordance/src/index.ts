@@ -534,7 +534,21 @@ export class SimpleCLIApp {
       if (exactGroup) {
         throw new Error(this.renderGroupHelp(exactGroup));
       }
-      throw new Error(`Unknown command: ${args.join(" ")}`);
+      const nearestGroup = this.findNearestGroupByPath(args);
+      if (nearestGroup) {
+        throw new Error(
+          [
+            `Unknown command: ${args.join(" ")}`,
+            "",
+            this.renderGroupHelp(nearestGroup),
+          ].join("\n"),
+        );
+      }
+      throw new Error(
+        [`Unknown command: ${args.join(" ")}`, "", this.renderRootHelp()].join(
+          "\n",
+        ),
+      );
     }
 
     const rawInput = this.parseCommandInput(
@@ -907,6 +921,16 @@ export class SimpleCLIApp {
   ): InternalResolvedGroup | null {
     const routeKey = pathToRouteKey(path);
     return this.resolvedGroups.get(routeKey) ?? null;
+  }
+
+  private findNearestGroupByPath(
+    path: readonly string[],
+  ): InternalResolvedGroup | null {
+    for (let length = path.length - 1; length > 0; length -= 1) {
+      const group = this.findGroupByPath(path.slice(0, length));
+      if (group) return group;
+    }
+    return null;
   }
 }
 
