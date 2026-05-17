@@ -17,9 +17,9 @@ Use this reference only when the user explicitly asks to save or reuse local aut
 ## Commands
 
 ```bash
-npx libretto open https://app.example.com --headed
-npx libretto save app.example.com
-npx libretto run ./integration.ts --auth-profile app.example.com
+libretto open https://app.example.com --headed
+libretto save app.example.com
+libretto run ./integration.ts --auth-profile app.example.com
 ```
 
 ## Notes

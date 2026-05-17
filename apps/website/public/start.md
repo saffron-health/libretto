@@ -22,11 +22,17 @@ cd <package-name>
 
 After creating a new package, do all remaining setup and verification inside the created package directory.
 
+Install the Libretto command once if it is not already available. This requires Node.js and npm:
+
+```bash
+curl -fsSL https://libretto.sh/install.sh | bash
+```
+
 For an existing package:
 
 ```bash
 npm install libretto
-npx libretto setup
+libretto setup
 ```
 
 Use equivalent pnpm, yarn, or bun commands when appropriate.
@@ -62,7 +68,7 @@ export default workflow("scrape-page", async ({ page }) => {
 Run it:
 
 ```bash
-npx libretto run src/workflows/scrape-page.ts --headless
+libretto run src/workflows/scrape-page.ts --headless
 ```
 
 ## 5. Finish

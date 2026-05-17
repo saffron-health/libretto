@@ -42,7 +42,6 @@ Key points:
 
 - `workflow(name, { input, output }, handler)` takes a unique workflow name, a pair of Zod schemas describing input and output, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
 - At run time, Libretto validates `input` against `inputSchema` before calling the handler. Invalid input throws a clear error listing each failing field; the workflow handler never sees malformed input.
-- The hosted platform extracts both schemas at build time and exposes them via `POST /v1/workflows/get`, so API consumers can introspect the shape of any deployed workflow.
 - `npx libretto run ./file.ts` executes the file's default-exported workflow, so always use `export default workflow(...)`.
 - `ctx` provides `session` and `page`. Use `console.log`/`console.warn`/`console.error` for logging — the runtime wraps these with structured metadata automatically.
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI, then gets parsed through `inputSchema`.

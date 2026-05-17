@@ -40,7 +40,7 @@ pnpm -s cli
 - Do not add barrel files (`index.ts` re-exports). Import directly from source files within the same package.
 - Do not add new dependencies without asking.
 - Do not remove or comment out code to "clean up" without asking — it may be there for a reason.
-- When code prints user-facing Libretto CLI commands, use `librettoCommand` from `packages/libretto/src/shared/package-manager.ts` so guidance respects the user's package manager.
+- When code prints user-facing Libretto CLI commands, use the native `libretto` command in examples and guidance.
 
 ## Testing
 

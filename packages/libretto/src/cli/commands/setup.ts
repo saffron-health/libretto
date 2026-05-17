@@ -7,7 +7,6 @@ import {
   LIBRETTO_CONFIG_PATH,
   REPO_ROOT,
 } from "../core/context.js";
-import { librettoCommand } from "../../shared/package-manager.js";
 import { SimpleCLI } from "affordance";
 
 function installBrowsers(): void {
@@ -56,7 +55,7 @@ function copySkills(): void {
       "\n⚠️ No .agents/ or .claude/ directory found. Libretto skills were not installed.",
     );
     console.log(
-      `  Create one of these directories in your repo root and rerun \`${librettoCommand("setup")}\` to install skills:`,
+      `  Create one of these directories in your repo root and rerun \`libretto setup\` to install skills:`,
     );
     console.log(`    mkdir ${join(REPO_ROOT, ".claude")}`);
     return;

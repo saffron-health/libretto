@@ -1,9 +1,8 @@
 import { getActivePauseHandler } from "./pause-handler.js";
-import { librettoCommand } from "../package-manager.js";
 
 function throwMissingSessionError(): never {
   throw new Error(
-    `pause(session) requires a non-empty session ID. Pass ctx.session from inside your workflow: await pause(ctx.session). To list running sessions, run: ${librettoCommand("status")}.`,
+    `pause(session) requires a non-empty session ID. Pass ctx.session from inside your workflow: await pause(ctx.session). To list running sessions, run: libretto status.`,
   );
 }
 
@@ -27,7 +26,7 @@ export async function pause(session: string): Promise<void> {
   const handler = getActivePauseHandler();
   if (!handler) {
     throw new Error(
-      `pause(session) can only suspend an active Libretto workflow. Run the workflow with ${librettoCommand("run <integrationFile>")} and call pause(ctx.session) from inside the workflow.`,
+      `pause(session) can only suspend an active Libretto workflow. Run the workflow with libretto run <integrationFile> and call pause(ctx.session) from inside the workflow.`,
     );
   }
 

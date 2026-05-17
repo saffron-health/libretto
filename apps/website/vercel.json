@@ -18,6 +18,15 @@
           "value": "text/markdown; charset=utf-8"
         }
       ]
+    },
+    {
+      "source": "/install.sh",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/x-shellscript; charset=utf-8"
+        }
+      ]
     }
   ],
   "rewrites": [

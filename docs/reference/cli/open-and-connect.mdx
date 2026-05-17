@@ -9,8 +9,8 @@ title: open & connect
 The `open` command launches a browser and navigates to a URL, creating a new named session. It is the starting point for any interactive workflow: once a session is open, `exec`, `snapshot`, and `pages` all work against it.
 
 ```bash theme={null}
-npx libretto open https://example.com
-npx libretto open https://example.com --headless --session debug-example
+libretto open https://example.com
+libretto open https://example.com --headless --session debug-example
 ```
 
 #### When to use `open`
@@ -65,18 +65,18 @@ npx libretto open https://example.com --headless --session debug-example
 
 ```bash theme={null}
 # Open in headed mode (default)
-npx libretto open https://example.com --headed
+libretto open https://example.com --headed
 
 # Open in headless mode with an explicit session name
-npx libretto open https://example.com --headless --session debug-example
+libretto open https://example.com --headless --session debug-example
 
 # Open with a custom viewport
-npx libretto open https://example.com --viewport 1440x900 --session my-session
+libretto open https://example.com --viewport 1440x900 --session my-session
 
 # Open for a manual login flow, then save the session
-npx libretto open https://linkedin.com --headed --session app-login
+libretto open https://linkedin.com --headed --session app-login
 # ... user logs in ...
-npx libretto save linkedin.com --session app-login
+libretto save linkedin.com --session app-login
 ```
 
 ---
@@ -109,20 +109,20 @@ If none is set, the default is `local`.
 ```bash theme={null}
 # Open with Kernel cloud browser
 export KERNEL_API_KEY="your-key"
-npx libretto open https://example.com --provider kernel
+libretto open https://example.com --provider kernel
 
 # Open with Browserbase
 export BROWSERBASE_API_KEY="your-key"
 export BROWSERBASE_PROJECT_ID="your-project-id"
-npx libretto open https://example.com -p browserbase
+libretto open https://example.com -p browserbase
 
 # Open with Libretto Cloud
 export LIBRETTO_API_KEY="your-key"
-npx libretto open https://example.com --provider libretto-cloud
+libretto open https://example.com --provider libretto-cloud
 
 # Set provider via config so you don't need the flag every time
 # .libretto/config.json: { "version": 1, "provider": "kernel" }
-npx libretto open https://example.com
+libretto open https://example.com
 ```
 
 <Note>
@@ -138,8 +138,8 @@ npx libretto open https://example.com
 The `connect` command attaches to an existing Chrome DevTools Protocol (CDP) endpoint rather than launching a new browser. Use it to drive a browser that is already running, for example one started with `--remote-debugging-port`, an Electron application, or any other CDP-compatible target.
 
 ```bash theme={null}
-npx libretto connect http://127.0.0.1:9222 --session my-session
-npx libretto connect ws://127.0.0.1:9223 --session another-session
+libretto connect http://127.0.0.1:9222 --session my-session
+libretto connect ws://127.0.0.1:9223 --session another-session
 ```
 
 #### When to use `connect`
@@ -170,20 +170,20 @@ Once connected, all session-scoped commands work normally against the attached b
 - `pages`: list open pages
 
 <Warning>
-  Libretto does **not** manage the lifecycle of a connected process. Running `npx libretto close --session <name>` clears the Libretto session record but does **not** terminate the remote browser or Electron app.
+  Libretto does **not** manage the lifecycle of a connected process. Running `libretto close --session <name>` clears the Libretto session record but does **not** terminate the remote browser or Electron app.
 </Warning>
 
 #### Examples
 
 ```bash theme={null}
 # Attach to a Chrome instance started with --remote-debugging-port
-npx libretto connect http://127.0.0.1:9222 --session chrome-debug
+libretto connect http://127.0.0.1:9222 --session chrome-debug
 
 # Inspect the attached page
-npx libretto snapshot --session chrome-debug
+libretto snapshot --session chrome-debug
 
 # Run code against it
-npx libretto exec --session chrome-debug "await page.url()"
+libretto exec --session chrome-debug "await page.url()"
 ```
 
 <CardGroup cols={2}>
