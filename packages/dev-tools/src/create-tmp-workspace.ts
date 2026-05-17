@@ -71,7 +71,7 @@ async function main(): Promise<void> {
     const workspaceDir = await createTmpWorkspace(options);
     console.log(`\n✓ Workspace ready at: ${workspaceDir}`);
     console.log(`  cd ${workspaceDir}`);
-    console.log(`  npx libretto open <url>`);
+    console.log(`  libretto open <url>`);
   } catch (error) {
     console.error(
       `\nFailed to create workspace: ${error instanceof Error ? error.message : String(error)}`,
