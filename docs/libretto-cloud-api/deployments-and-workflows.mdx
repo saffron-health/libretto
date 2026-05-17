@@ -115,8 +115,8 @@ Response fields:
 - `deployment_built_at`
 - `created_at`
 - `updated_at`
-- `input_schema`: JSON Schema (Draft 2020-12) serialized from the workflow's Zod input schema at build time. `null` when the workflow was built without Zod schemas — either a pre-Zod-support deployment or a workflow that uses the 2-arg `workflow(name, handler)` form.
-- `output_schema`: JSON Schema serialized from the workflow's Zod output schema. `null` under the same conditions as `input_schema`.
+- `input_schema`: JSON Schema (Draft 2020-12) serialized from the workflow's Zod input schema at build time. `null` for legacy deployments built before Zod-schema workflows were supported.
+- `output_schema`: JSON Schema serialized from the workflow's Zod output schema. `null` for legacy deployments.
 
 Example response for a Zod-schema workflow:
 
