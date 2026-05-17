@@ -3,7 +3,6 @@ import {
   type LibrettoConfig,
   writeLibrettoConfig,
 } from "./config.js";
-import { librettoCommand } from "../../shared/package-manager.js";
 
 export type ExperimentMetadata = {
   title: string;
@@ -20,9 +19,9 @@ export const EXPERIMENTS: Readonly<Record<string, ExperimentMetadata>> = {
     docs: [
       "Adds a search command for inspecting the current page's HTML snapshot with a JavaScript regex.",
       "",
-      `Usage: ${librettoCommand("search <regex> --session <name> [--page <id>]")}`,
+      "Usage: libretto search <regex> --session <name> [--page <id>]",
       "",
-      "The command captures page HTML through read-only execution, condenses and formats it, then prints matching regions with up to five lines of surrounding context.",
+      "The command captures page HTML through read-only execution, condenses and formats it, then prints matching regions with up to four lines of surrounding context.",
     ].join("\n"),
     defaultValue: false,
   },

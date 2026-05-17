@@ -49,7 +49,7 @@ export function searchFormattedHtml(
     const startLine = Math.max(0, matchingIndex - contextLines);
     const endLine = Math.min(lines.length - 1, matchingIndex + contextLines);
     const previous = matches.at(-1);
-    if (previous && startLine <= previous.endLine + 1) {
+    if (previous && startLine <= previous.endLine) {
       previous.endLine = Math.max(previous.endLine, endLine + 1);
       previous.lines = lines.slice(previous.startLine - 1, previous.endLine);
       continue;

@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { DaemonClient } from "../core/daemon/ipc.js";
 import { resolveExperiments } from "../core/experiments.js";
-import { librettoCommand } from "../../shared/package-manager.js";
 import {
   formatHtmlForSearch,
   searchFormattedHtml,
@@ -21,7 +20,7 @@ export const searchInput = SimpleCLI.input({
   },
 }).refine(
   (input) => input.pattern !== undefined,
-  `Usage: ${librettoCommand("search <regex> --session <name> [--page <id>]")}`,
+  "Usage: libretto search <regex> --session <name> [--page <id>]",
 );
 
 export const searchCommand = SimpleCLI.command({
@@ -34,14 +33,14 @@ export const searchCommand = SimpleCLI.command({
       throw new Error(
         [
           'The "search" experiment is disabled.',
-          `Enable it with: ${librettoCommand("experiments enable search")}`,
+          "Enable it with: libretto experiments enable search",
         ].join("\n"),
       );
     }
 
     if (!ctx.sessionState.daemonSocketPath) {
       throw new Error(
-        `Session "${ctx.session}" has no daemon socket. Close and reopen it with: ${librettoCommand(`open <url> --session ${ctx.session}`)}`,
+        `Session "${ctx.session}" has no daemon socket. Close and reopen it with: libretto open <url> --session ${ctx.session}`,
       );
     }
 
