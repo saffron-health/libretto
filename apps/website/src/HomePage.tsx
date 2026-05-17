@@ -80,7 +80,7 @@ function Hero({
           as="h1"
           size="5xl"
           style="serif"
-          className="crt-glow mx-auto mb-8 max-w-[1000px] text-center tracking-[-0.04em] text-ink [text-wrap:balance]"
+          className="crt-glow mx-auto mb-8 max-w-[720px] text-center tracking-[-0.04em] text-ink [text-wrap:balance]"
         >
           <AnimatedTitle
             className=""
@@ -90,7 +90,7 @@ function Hero({
               lineHeight: 1.05,
             }}
           >
-            Don't make browser agents do a script's job
+            Turn website workflows into reliable APIs
           </AnimatedTitle>
         </Text>
         <Text
@@ -98,11 +98,10 @@ function Hero({
           size="lg"
           data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
-          className="mx-auto mb-8 max-w-[580px] text-center leading-relaxed text-muted [text-wrap:balance]"
+          className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:balance]"
         >
-          Libretto is a CLI that lets coding agents inspect web pages,
-          reverse-engineer APIs and build fast, cheap, and reliable automation
-          scripts
+          Libretto is an open-source CLI that lets agents turn website
+          workflows into fast, reusable scripts you can deploy
         </Text>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-col items-center justify-center gap-3">
           <InstallSnippet />

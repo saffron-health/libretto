@@ -282,6 +282,7 @@ body {
 
 .install-prompt {
   min-height: 2.5rem;
+  border-radius: 8px;
   border: 1px solid color-mix(in oklch, var(--color-gray-8) 64%, transparent);
   background: color-mix(in oklch, var(--color-gray-3) 86%, black);
   box-shadow:
@@ -293,6 +294,7 @@ body {
   display: inline-flex;
   align-items: center;
   min-width: 0;
+  flex: 1 1 auto;
   max-width: min(58vw, 27rem);
   padding-inline: 0.875rem;
   border-right: 1px solid color-mix(in oklch, var(--color-gray-8) 62%, transparent);
@@ -301,6 +303,14 @@ body {
   font-size: 0.75rem;
   letter-spacing: 0;
   line-height: 1;
+}
+
+.install-prompt__snippet-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .install-prompt__button.libretto-button {
