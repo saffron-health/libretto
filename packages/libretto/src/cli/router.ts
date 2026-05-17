@@ -8,7 +8,6 @@ import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
 import { snapshotCommand } from "./commands/snapshot.js";
 import { searchCommand } from "./commands/search.js";
-import { librettoCommand } from "../shared/package-manager.js";
 import { SimpleCLI } from "affordance";
 
 export const cliRoutes = {
@@ -30,5 +29,5 @@ export const cliRoutes = {
 };
 
 export function createCLIApp() {
-  return SimpleCLI.define(librettoCommand(), cliRoutes);
+  return SimpleCLI.define("libretto", cliRoutes);
 }

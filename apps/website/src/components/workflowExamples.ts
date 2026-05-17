@@ -21,21 +21,21 @@ export const workflowExamples: WorkflowExample[] = [
     thinkDurationMs: 1800,
     tools: [
       {
-        label: "bash: npx libretto open https://craigslist.org --headed",
+        label: "bash: libretto open https://craigslist.org --headed",
         durationMs: 1400,
       },
       {
         label:
-          "bash: npx libretto snapshot --session craigslist",
+          "bash: libretto snapshot --session craigslist",
         durationMs: 1200,
       },
       {
-        label: 'bash: npx libretto exec "await page.locator(…).click()"',
+        label: 'bash: libretto exec "await page.locator(…).click()"',
         durationMs: 900,
       },
       {
         label:
-          "bash: npx libretto exec \"return await page.locator('.cl-static-search-result').first().textContent()\"",
+          "bash: libretto exec \"return await page.locator('.cl-static-search-result').first().textContent()\"",
         durationMs: 800,
       },
       {
@@ -44,7 +44,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
     ],
     agentResponse:
-      "Created craigslist_2br_apartments.ts — a workflow that opens Craigslist, navigates to 2BR apartment listings, and scrapes the first 10 for title, price, location, and link.\n\nRun it anytime:\n  npx libretto run ./craigslist_2br_apartments.ts main --headless",
+      "Created craigslist_2br_apartments.ts — a workflow that opens Craigslist, navigates to 2BR apartment listings, and scrapes the first 10 for title, price, location, and link.\n\nRun it anytime:\n  libretto run ./craigslist_2br_apartments.ts main --headless",
   },
   {
     id: "linkedin",
@@ -54,32 +54,32 @@ export const workflowExamples: WorkflowExample[] = [
     thinkDurationMs: 2000,
     tools: [
       {
-        label: "bash: npx libretto open https://linkedin.com --headed",
+        label: "bash: libretto open https://linkedin.com --headed",
         durationMs: 1600,
       },
       {
         label:
-          "bash: npx libretto snapshot --session linkedin",
+          "bash: libretto snapshot --session linkedin",
         durationMs: 1400,
       },
       {
         label:
-          'bash: npx libretto exec "await page.goto(\'https://www.linkedin.com/mynetwork/invitation-manager/\')"',
+          'bash: libretto exec "await page.goto(\'https://www.linkedin.com/mynetwork/invitation-manager/\')"',
         durationMs: 1100,
       },
       {
         label:
-          "bash: npx libretto snapshot --session linkedin",
+          "bash: libretto snapshot --session linkedin",
         durationMs: 1200,
       },
       {
         label:
-          'bash: npx libretto exec "return await page.locator(\'.invitation-card\').all()"',
+          'bash: libretto exec "return await page.locator(\'.invitation-card\').all()"',
         durationMs: 900,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(…acceptBtn).click()"',
+          'bash: libretto exec "await page.locator(…acceptBtn).click()"',
         durationMs: 800,
       },
       {
@@ -88,7 +88,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
     ],
     agentResponse:
-      "Created linkedin_triage_connections.ts — a workflow that opens LinkedIn, reads each pending connection request's headline and industry, accepts healthcare/tech connections, and ignores the rest.\n\nRun it anytime:\n  npx libretto run ./linkedin_triage_connections.ts main --headed",
+      "Created linkedin_triage_connections.ts — a workflow that opens LinkedIn, reads each pending connection request's headline and industry, accepts healthcare/tech connections, and ignores the rest.\n\nRun it anytime:\n  libretto run ./linkedin_triage_connections.ts main --headed",
   },
   {
     id: "eclinicalworks",
@@ -98,32 +98,32 @@ export const workflowExamples: WorkflowExample[] = [
     thinkDurationMs: 2200,
     tools: [
       {
-        label: "bash: npx libretto open https://eclinicalworks.com --headed",
+        label: "bash: libretto open https://eclinicalworks.com --headed",
         durationMs: 1800,
       },
       {
         label:
-          "bash: npx libretto snapshot --session availity",
+          "bash: libretto snapshot --session availity",
         durationMs: 1000,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(\'#searchPatient\').fill(input.patientName)"',
+          'bash: libretto exec "await page.locator(\'#searchPatient\').fill(input.patientName)"',
         durationMs: 900,
       },
       {
         label:
-          "bash: npx libretto snapshot --session availity",
+          "bash: libretto snapshot --session availity",
         durationMs: 1300,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(\'[data-tab=insurance]\').click()"',
+          'bash: libretto exec "await page.locator(\'[data-tab=insurance]\').click()"',
         durationMs: 800,
       },
       {
         label:
-          'bash: npx libretto exec "return await page.locator(\'.insurance-detail\').textContent()"',
+          'bash: libretto exec "return await page.locator(\'.insurance-detail\').textContent()"',
         durationMs: 1000,
       },
       {
@@ -132,7 +132,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
     ],
     agentResponse:
-      "Created ecw_patient_insurance.ts — a workflow that logs into eClinicalWorks, searches for a patient by name and date of birth, navigates to their insurance tab, and extracts payer name, member ID, group number, and coverage dates.\n\nRun it anytime:\n  npx libretto run ./ecw_patient_insurance.ts main --headed",
+      "Created ecw_patient_insurance.ts — a workflow that logs into eClinicalWorks, searches for a patient by name and date of birth, navigates to their insurance tab, and extracts payer name, member ID, group number, and coverage dates.\n\nRun it anytime:\n  libretto run ./ecw_patient_insurance.ts main --headed",
   },
   {
     id: "uhc",
@@ -143,32 +143,32 @@ export const workflowExamples: WorkflowExample[] = [
     tools: [
       {
         label:
-          "bash: npx libretto open https://uhcprovider.com --headed",
+          "bash: libretto open https://uhcprovider.com --headed",
         durationMs: 1700,
       },
       {
         label:
-          "bash: npx libretto snapshot --session claim-status",
+          "bash: libretto snapshot --session claim-status",
         durationMs: 1200,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(\'#claimNumber\').fill(input.claimNumber)"',
+          'bash: libretto exec "await page.locator(\'#claimNumber\').fill(input.claimNumber)"',
         durationMs: 800,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(\'button:has-text(\"Search\")\').click()"',
+          'bash: libretto exec "await page.locator(\'button:has-text(\"Search\")\').click()"',
         durationMs: 900,
       },
       {
         label:
-          "bash: npx libretto snapshot --session claim-status",
+          "bash: libretto snapshot --session claim-status",
         durationMs: 1400,
       },
       {
         label:
-          'bash: npx libretto exec "return await page.locator(\'.claim-summary\').textContent()"',
+          'bash: libretto exec "return await page.locator(\'.claim-summary\').textContent()"',
         durationMs: 1000,
       },
       {
@@ -177,7 +177,7 @@ export const workflowExamples: WorkflowExample[] = [
       },
     ],
     agentResponse:
-      "Created uhc_claim_review.ts — a workflow that logs into the UHC provider portal, searches for a claim by number, and extracts the status, paid amount, patient responsibility, and any denial codes.\n\nRun it anytime:\n  npx libretto run ./uhc_claim_review.ts main --headed",
+      "Created uhc_claim_review.ts — a workflow that logs into the UHC provider portal, searches for a claim by number, and extracts the status, paid amount, patient responsibility, and any denial codes.\n\nRun it anytime:\n  libretto run ./uhc_claim_review.ts main --headed",
   },
   {
     id: "availity",
@@ -187,42 +187,42 @@ export const workflowExamples: WorkflowExample[] = [
     thinkDurationMs: 2200,
     tools: [
       {
-        label: "bash: npx libretto open https://availity.com --headed",
+        label: "bash: libretto open https://availity.com --headed",
         durationMs: 1800,
       },
       {
         label:
-          "bash: npx libretto snapshot --session prior-auth",
+          "bash: libretto snapshot --session prior-auth",
         durationMs: 1200,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(\'a:has-text(\"Authorizations & Referrals\")\').click()"',
+          'bash: libretto exec "await page.locator(\'a:has-text(\"Authorizations & Referrals\")\').click()"',
         durationMs: 900,
       },
       {
         label:
-          "bash: npx libretto snapshot --session prior-auth",
+          "bash: libretto snapshot --session prior-auth",
         durationMs: 1400,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(\'#memberId\').fill(input.memberId)"',
+          'bash: libretto exec "await page.locator(\'#memberId\').fill(input.memberId)"',
         durationMs: 700,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(\'#diagnosisCode\').fill(input.diagnosisCode)"',
+          'bash: libretto exec "await page.locator(\'#diagnosisCode\').fill(input.diagnosisCode)"',
         durationMs: 700,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(\'#referringProvider\').fill(input.referringNPI)"',
+          'bash: libretto exec "await page.locator(\'#referringProvider\').fill(input.referringNPI)"',
         durationMs: 700,
       },
       {
         label:
-          'bash: npx libretto exec "await page.locator(\'button:has-text(\"Submit\")\').click()"',
+          'bash: libretto exec "await page.locator(\'button:has-text(\"Submit\")\').click()"',
         durationMs: 900,
       },
       {
@@ -231,6 +231,6 @@ export const workflowExamples: WorkflowExample[] = [
       },
     ],
     agentResponse:
-      "Created availity_prior_auth.ts — a workflow that logs into Availity, navigates to Authorizations & Referrals, fills out a prior auth form with patient info, provider details, and diagnosis codes, then submits.\n\nRun it anytime:\n  npx libretto run ./availity_prior_auth.ts main --headed",
+      "Created availity_prior_auth.ts — a workflow that logs into Availity, navigates to Authorizations & Referrals, fills out a prior auth form with patient info, provider details, and diagnosis codes, then submits.\n\nRun it anytime:\n  libretto run ./availity_prior_auth.ts main --headed",
   },
 ];

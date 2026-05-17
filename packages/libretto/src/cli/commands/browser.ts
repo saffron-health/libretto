@@ -12,7 +12,6 @@ import {
 import { resolveProviderName } from "../core/providers/index.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { createLoggerForSession } from "../core/context.js";
-import { librettoCommand } from "../../shared/package-manager.js";
 import {
   type SessionAccessMode,
   assertSessionAvailableForStart,
@@ -156,7 +155,7 @@ export const connectInput = SimpleCLI.input({
 })
   .refine(
     (input) => Boolean(input.cdpUrl),
-    `Usage: ${librettoCommand("connect <cdp-url> [--read-only|--write-access] --session <name>")}`,
+    `Usage: libretto connect <cdp-url> [--read-only|--write-access] --session <name>`,
   )
   .refine(
     (input) => !(input.readOnly && input.writeAccess),
@@ -191,7 +190,7 @@ export const saveInput = SimpleCLI.input({
   },
 }).refine(
   (input) => Boolean(input.urlOrDomain),
-  `Usage: ${librettoCommand("save <url|domain> --session <name>")}`,
+  `Usage: libretto save <url|domain> --session <name>`,
 );
 
 export const saveCommand = SimpleCLI.command({
@@ -262,7 +261,7 @@ export const closeInput = SimpleCLI.input({
   },
 }).refine(
   (input) => input.all || input.session,
-  `Usage: ${librettoCommand("close <session>")}\nUsage: ${librettoCommand("close --all [--force]")}`,
+  `Usage: libretto close <session>\nUsage: libretto close --all [--force]`,
 );
 
 export const closeCommand = SimpleCLI.command({
@@ -271,7 +270,7 @@ export const closeCommand = SimpleCLI.command({
   .input(closeInput)
   .handle(async ({ input }) => {
     if (input.force && !input.all) {
-      throw new Error(`Usage: ${librettoCommand("close --all [--force]")}`);
+      throw new Error(`Usage: libretto close --all [--force]`);
     }
     if (input.all) {
       const logger = createLoggerForSession("cli");
