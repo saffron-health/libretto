@@ -14,7 +14,7 @@ export function InstallSnippet() {
   }
 
   return (
-    <div className="install-prompt inline-flex max-w-full items-stretch overflow-hidden rounded-lg">
+    <div className="install-prompt inline-flex max-w-full items-stretch overflow-hidden">
       <span className="install-prompt__snippet" aria-hidden="true">
         <span className="install-prompt__snippet-text">{PROMPT}</span>
       </span>
