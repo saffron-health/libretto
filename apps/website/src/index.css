@@ -296,7 +296,7 @@ body {
   max-width: min(58vw, 27rem);
   padding-inline: 0.875rem;
   border-right: 1px solid color-mix(in oklch, var(--color-gray-8) 62%, transparent);
-  color: var(--color-gray-12);
+  color: var(--color-faint);
   font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: 0;
