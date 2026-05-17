@@ -280,6 +280,52 @@ body {
   text-decoration-color: var(--color-accent);
 }
 
+.install-prompt {
+  min-height: 2.5rem;
+  border: 1px solid color-mix(in oklch, var(--color-gray-8) 64%, transparent);
+  background: color-mix(in oklch, var(--color-gray-3) 86%, black);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+.install-prompt__snippet {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: min(58vw, 27rem);
+  padding-inline: 0.875rem;
+  border-right: 1px solid color-mix(in oklch, var(--color-gray-8) 62%, transparent);
+  color: var(--color-gray-12);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.install-prompt__button.libretto-button {
+  min-height: auto;
+  border-radius: 0;
+  padding-inline: 1rem;
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px color-mix(in oklch, var(--color-green-9) 34%, transparent);
+}
+
+.install-prompt__button.libretto-button:hover {
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px color-mix(in oklch, var(--color-green-11) 46%, transparent);
+}
+
+.install-prompt__button.libretto-button:focus-visible {
+  z-index: 1;
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 0 1px color-mix(in oklch, var(--color-green-9) 58%, transparent),
+    0 0 0 3px color-mix(in oklch, var(--color-green-9) 30%, transparent);
+}
+
 @keyframes blink {
   0%,
   100% {

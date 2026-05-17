@@ -4,10 +4,10 @@ import {
   useKonamiPane,
   KonamiOverlay,
 } from "./components/CanvasAsciihedron";
-import { Button } from "./components/Button";
 import { Text } from "./components/Text";
 import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
+import { AppLink } from "./routing";
 import {
   OrchestrationContainer,
   AnimationTarget,
@@ -104,9 +104,17 @@ function Hero({
           reverse-engineer APIs and build fast, cheap, and reliable automation
           scripts
         </Text>
-        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-wrap items-center justify-center gap-6">
+        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-col items-center justify-center gap-3">
           <InstallSnippet />
-          <Button href="/docs/get-started/quickstart" variant="secondary">Go to docs</Button>
+          <div className="text-xs text-muted">
+            or{" "}
+            <AppLink
+              href="/docs/get-started/quickstart"
+              className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
+            >
+              go to docs
+            </AppLink>
+          </div>
         </div>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
           <TerminalDemo />
