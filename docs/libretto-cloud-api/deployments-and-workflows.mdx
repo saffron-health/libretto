@@ -100,7 +100,7 @@ Each `in_progress_builds` entry includes:
 
 #### POST `/v1/workflows/get`
 
-Return the deployment backing a single workflow name.
+Return the deployment backing a single workflow name, plus the JSON Schemas derived from the workflow's Zod input/output schemas.
 
 Request fields:
 
@@ -115,6 +115,42 @@ Response fields:
 - `deployment_built_at`
 - `created_at`
 - `updated_at`
+- `input_schema`: JSON Schema (Draft 2020-12) serialized from the workflow's Zod input schema at build time. `null` when the workflow was built without Zod schemas — either a pre-Zod-support deployment or a workflow that uses the 2-arg `workflow(name, handler)` form.
+- `output_schema`: JSON Schema serialized from the workflow's Zod output schema. `null` under the same conditions as `input_schema`.
+
+Example response for a Zod-schema workflow:
+
+```json
+{
+  "json": {
+    "workflow": "getExampleTitleAndUrl",
+    "deployment_id": "062874fc-4714-4bd5-932f-0ae61ed8d0f6",
+    "deployment_status": "ready",
+    "deployment_created_at": "2026-05-17T01:15:26.670Z",
+    "deployment_built_at": "2026-05-17T01:17:08.730Z",
+    "created_at": "2026-05-17T01:15:28.167Z",
+    "updated_at": "2026-05-17T01:17:31.314Z",
+    "input_schema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "url": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "required": ["title", "currentUrl"],
+      "properties": {
+        "title": { "type": "string" },
+        "currentUrl": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+```
 
 #### POST `/v1/workflows/delete`
 

@@ -3,7 +3,7 @@
 #
 # Usage:
 #   1. Manually edit packages/libretto/package.json `version` to a pre-release
-#      identifier, e.g. "0.6.16-experimental-zod.0". The pre-release identifier
+#      identifier, e.g. "0.6.16-experimental-zod.1". The pre-release identifier
 #      (the bit between "-" and ".N") becomes the npm dist-tag.
 #   2. Run `pnpm publish:experimental` from the libretto repo root.
 #
@@ -26,7 +26,7 @@ version="$(node -p "require('./${package_json_path}').version")"
 if [[ ! "$version" =~ -([^.]+)\.[0-9]+$ ]]; then
   echo "Refusing to publish: version '${version}' is not a pre-release." >&2
   echo "Manually set packages/libretto/package.json version to something like" >&2
-  echo "  0.6.16-experimental-zod.0" >&2
+  echo "  0.6.16-experimental-zod.1" >&2
   echo "before running this script, or use 'pnpm prepare-release' for stable releases." >&2
   exit 1
 fi
