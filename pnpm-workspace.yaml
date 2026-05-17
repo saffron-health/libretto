@@ -8,6 +8,8 @@ minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - affordance
   - libretto
+  - playwright
+  - playwright-core
 
 enablePrePostScripts: false
 
