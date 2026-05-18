@@ -55,23 +55,14 @@ After enough postmortems, our failures almost always fell into three buckets:
 
 None of these are problems a runtime agent is going to fix reliably. Popups are solvable with a lightweight detector. Slow rendering is solvable with smarter waits and retries. And the edge cases are the cases where you *want* a human in the loop, because the right resolution depends on context the agent doesn't have.
 
-## Where we landed: development-time AI + Playwright + network calls
+## Where we landed
 
-We ended up rewriting almost everything around a different philosophy: AI at development time, not runtime. Instead of an agent driving the browser live, we use Claude Code to generate and iterate on Playwright scripts. We step through workflows ourselves, leave comments, then run the recorded flow and have Claude connect to the running script to inspect logs and network requests as it builds the automation. When something breaks in production, the agent helps debug, but in the form of a PR back to the repo, not a live decision on a patient chart.
+We rewrote almost everything around a different philosophy: AI at development time, not runtime. The approach that worked:
 
-Where it made sense, we rebuilt integrations as direct network/API calls instead of UI automation. Faster, more reliable, easier to maintain. Some sites have anti-bot setups that make this the wrong call and you have to drive the UI. So we ended up with a hybrid: Playwright for UI, direct network calls where feasible, both living in the same script.
-
-Runtime AI didn't disappear entirely. We still use it in narrow, well-scoped places where the failure mode is bounded and the worst case is a retry. The popup detector, for example, takes a screenshot, uses coordinates to dismiss whatever appeared, and retries the original action. Runtime AI is fine when the worst case is a retry. It's not fine when the agent is making decisions you can't anticipate or review.
-
-## The better approach we landed on
-
-Once we put all the pieces together, the better approach became pretty clear. The way to reliably build and maintain these automations was:
-
-- Generate Playwright scripts ahead of time with a coding agent, instead of having an agent drive the browser live.
-- Have the agent record manual actions and inspect network requests as it writes the script, so you get a real script you can read and modify rather than opaque agent behavior.
-- Mix Playwright UI automation with direct network/API calls in the same script, so you get reliability and speed where the site allows it and fall back to the UI where it doesn't.
-- Use runtime AI only in narrow, bounded places where the worst case is a retry.
-- When something breaks in production, have the agent help debug by inspecting the failure and sending a PR back to the repo, not by making a live decision on real data.
+- **Generate Playwright scripts ahead of time with a coding agent**, instead of having an agent drive the browser live. We use Claude Code to step through workflows ourselves, leave comments, then have the agent connect to the running script to inspect logs and network requests as it writes the automation. You get a real script you can read and modify rather than opaque agent behavior.
+- **Mix Playwright UI automation with direct network/API calls in the same script.** Where it made sense, we rebuilt integrations as direct API calls — faster, more reliable, easier to maintain. Some sites have anti-bot setups that force you to drive the UI, so we ended up with a hybrid: Playwright for UI, network calls where feasible, both living in the same script.
+- **Use runtime AI only in narrow, bounded places where the worst case is a retry.** Our popup detector, for example, takes a screenshot, uses coordinates to dismiss whatever appeared, and retries the original action. Runtime AI is fine when the worst case is a retry — not when the agent is making decisions you can't anticipate or review.
+- **When something breaks in production, have the agent help debug by sending a PR back to the repo**, not by making a live decision on real data.
 
 This is what eventually became [Libretto](https://libretto.sh), the Skill + CLI we built internally and have since open-sourced. If you're building web automations, give it a try!`,
   }),
