@@ -165,7 +165,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             <GitHubStarIcon width={15} height={15} />
             {stars !== null && <span className="text-sm font-medium">{formatStars(stars)}</span>}
           </a>
-          <Button href="/docs/get-started/introduction" size="sm">
+          <Button href="/docs/get-started/quickstart" size="sm">
             Go to docs
           </Button>
           <div className="md:hidden">

@@ -53,7 +53,7 @@ The deploy command has two separate path concepts:
 For example:
 
 ```bash theme={null}
-npx libretto cloud deploy my-automations --entry-point src/workflows/check-eligibility.ts
+libretto cloud deploy my-automations --entry-point src/workflows/check-eligibility.ts
 ```
 
 In that command:
@@ -67,7 +67,7 @@ Use `cloud deploy` to upload a workflow bundle to Libretto Cloud:
 
 ```bash theme={null}
 cd my-automations
-npx libretto cloud deploy .
+libretto cloud deploy .
 ```
 
 That command expects:
@@ -81,7 +81,7 @@ The positional argument to `deploy` is the source directory to package and uploa
 If you want to deploy from a different entry file, keep the source directory as the package root and use `--entry-point` relative to that directory:
 
 ```bash theme={null}
-npx libretto cloud deploy my-automations \
+libretto cloud deploy my-automations \
   --description "payer portal workflows" \
   --entry-point src/workflows/check-eligibility.ts
 ```
@@ -154,18 +154,20 @@ When a Libretto Cloud workflow job fails, the platform emails the configured deb
 
 That email is designed to move the fix back into a local coding workflow quickly. After you receive it, use the local repo and Libretto tooling to inspect the failure and patch the workflow.
 
-For the local debugging flow, see [Debugging workflows](/workflow-guides/debugging-workflows).
+For the local debugging flow, see [Debugging workflows](/guides/debugging-workflows).
 
 ### Hosting options
 
-Libretto Cloud is the managed path. If you would rather run Libretto on infrastructure you control, use the self-hosting docs instead:
+Libretto Cloud is the managed path. If you would rather use a different browser or infrastructure provider, use the alternative providers docs instead:
 
-- [Self-hosting overview](/self-hosting/introduction)
-- [Deploy on GCP](/self-hosting/gcp)
-- [Deploy on AWS](/self-hosting/aws)
+- [Alternative providers overview](/alternative-providers/overview)
+- [Kernel](/alternative-providers/kernel)
+- [Browserbase](/alternative-providers/browserbase)
+- [Deploy on GCP](/alternative-providers/gcp)
+- [Deploy on AWS](/alternative-providers/aws)
 
 <Note>
-  This page covers the managed hosted-platform flow. The self-hosting pages are the right reference when you want to own the runtime, scheduler, and secrets infrastructure yourself.
+  This page covers the managed hosted-platform flow. The alternative provider pages are the right reference when you want a different managed browser provider or want to own the runtime, scheduler, and secrets infrastructure yourself.
 </Note>
 
 <CardGroup cols={3}>

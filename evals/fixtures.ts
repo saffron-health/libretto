@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -22,6 +22,7 @@ export type EvalContext = {
 
 export type CreateEvalContextOptions = {
   model?: string;
+  provider?: string | null;
 };
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -53,6 +54,21 @@ function assertWithinRoot(
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+async function readExistingLibrettoConfig(
+  configPath: string,
+): Promise<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(await readFile(configPath, "utf8")) as unknown;
+    return isRecord(parsed) ? parsed : { version: 1 };
+  } catch {
+    return { version: 1 };
+  }
+}
+
 export async function createEvalContext(
   evalCase: EvalCaseRecord,
   options: CreateEvalContextOptions = {},
@@ -66,7 +82,6 @@ export async function createEvalContext(
     await createTmpWorkspace({
       name: workspaceName,
       parentDir: DETERMINISTIC_WORKSPACE_ROOT,
-      skipBrowsers: true,
       skipBuild: true,
       quiet: true,
     });
@@ -77,6 +92,22 @@ export async function createEvalContext(
 
   if (evalCase.authProfile) {
     await provisionAuthProfile(evalCase.authProfile, evalWorkspaceDir);
+  }
+
+  if (options.provider) {
+    const configDir = join(evalWorkspaceDir, ".libretto");
+    const configPath = join(configDir, "config.json");
+    await mkdir(configDir, { recursive: true });
+    const config = await readExistingLibrettoConfig(configPath);
+    await writeFile(
+      configPath,
+      `${JSON.stringify(
+        { ...config, version: 1, provider: options.provider },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
   }
 
   const harness = new PiEvalHarness({

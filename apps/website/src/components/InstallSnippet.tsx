@@ -1,50 +1,30 @@
-import classnames from "classnames";
 import { useState } from "react";
-import { CheckIcon, CopyIcon } from "../icons";
+import { Button } from "./Button";
 
-const COMMAND = "npm create libretto@latest";
+const PROMPT =
+  "Fetch and follow https://libretto.sh/start.md to set up Libretto and create a new browser automation.";
 
 export function InstallSnippet() {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
-    void navigator.clipboard.writeText(COMMAND);
+    void navigator.clipboard.writeText(PROMPT);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
 
   return (
-    <div className="flex justify-center">
-      <div className="relative rounded-xl shadow-sm bg-panel border border-accent/20 font-mono text-[13px] text-ink/80 px-5 py-4 pr-12">
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="copy-icon-btn absolute top-2.5 right-2.5 size-7 flex items-center justify-center rounded-lg"
-        >
-          <div className="relative size-[18px] shrink-0">
-            <div
-              className={classnames(
-                "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out will-change-[opacity,filter,scale]",
-                copied ? "scale-100 opacity-100" : "scale-[0.25] opacity-0",
-              )}
-            >
-              <CheckIcon width={18} height={18} />
-            </div>
-            <div
-              className={classnames(
-                "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out will-change-[opacity,filter,scale]",
-                copied ? "scale-[0.25] opacity-0" : "scale-100 opacity-100",
-              )}
-            >
-              <CopyIcon width={18} height={18} className="translate-y-px" />
-            </div>
-          </div>
-        </button>
-        <div className="flex items-center">
-          <span className="select-none text-ink/20 w-4">$</span>
-          <span className="pl-2">{COMMAND}</span>
-        </div>
-      </div>
+    <div className="install-prompt inline-flex max-w-full items-stretch overflow-hidden">
+      <span className="install-prompt__snippet" aria-hidden="true">
+        <span className="install-prompt__snippet-text">{PROMPT}</span>
+      </span>
+      <Button
+        onClick={handleCopy}
+        aria-label="Copy Libretto setup prompt"
+        className="install-prompt__button"
+      >
+        {copied ? "Copied" : "Copy prompt"}
+      </Button>
     </div>
   );
 }

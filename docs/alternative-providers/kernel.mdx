@@ -1,0 +1,81 @@
+---
+title: Kernel
+sidebarTitle: Kernel
+---
+
+> Run Libretto sessions on Kernel's managed browser infrastructure.
+
+Kernel is a managed browser provider. Use it when you want Libretto's local CLI and workflow runtime, but you do not want to run Chromium on your own machine or cloud infrastructure.
+
+## Configure Kernel
+
+Create a Kernel API key, then add it to the repo root `.env` file. Libretto loads `.env` automatically before running CLI commands.
+
+```dotenv theme={null}
+# inside .env
+KERNEL_API_KEY=<kernel-api-key>
+```
+
+Optional Kernel settings can go in the same file:
+
+```dotenv theme={null}
+# inside .env
+KERNEL_HEADLESS=true
+KERNEL_STEALTH=false
+KERNEL_TIMEOUT_SECONDS=300
+```
+
+`KERNEL_ENDPOINT` is only needed if Kernel gives you a custom API endpoint.
+
+Then set Kernel as the workspace's default browser provider in `.libretto/config.json`:
+
+```json theme={null}
+{
+  "version": 1,
+  "provider": "kernel"
+}
+```
+
+You can also use `--provider kernel` on a single command instead of changing the config file.
+
+## Open a session
+
+Open a page with the configured Kernel provider:
+
+```bash theme={null}
+libretto open https://example.com --session kernel-demo
+```
+
+If you did not set `provider` in `.libretto/config.json`, pass it for this command instead:
+
+```bash theme={null}
+libretto open https://example.com --provider kernel --session kernel-demo
+```
+
+After the session is open, use the normal Libretto commands:
+
+```bash theme={null}
+libretto snapshot --session kernel-demo
+libretto exec --session kernel-demo "await page.title()"
+libretto close --session kernel-demo
+```
+
+## Run a workflow
+
+Run workflows normally when `provider` is set in `.libretto/config.json`:
+
+```bash theme={null}
+libretto run ./workflow.ts --headless
+```
+
+Or pass the provider for a single run:
+
+```bash theme={null}
+libretto run ./workflow.ts --provider kernel --headless
+```
+
+The workflow code does not need to change. Libretto creates the Kernel browser session, connects to it over CDP, runs the workflow, and closes the provider session when the run finishes.
+
+## When to use Kernel
+
+Choose Kernel when you want a managed browser runtime with minimal infrastructure work. If you need to own the container runtime, scheduler, network, and secrets layer yourself, use [GCP](/alternative-providers/gcp) or [AWS](/alternative-providers/aws) instead.

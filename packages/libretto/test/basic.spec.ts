@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import outdent from "outdent";
 import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
@@ -77,7 +78,62 @@ function expectedSkillVersionWarning(
   return `Warning: Your agent skill (${skillVersion}) is out of date with your Libretto CLI (${cliVersion}).`;
 }
 
+function expectedRootHelp(): string {
+  return `${outdent`
+    Usage: libretto <command>
+
+    Commands:
+      open  Launch browser and open URL
+      connect  Connect to an existing Chrome DevTools Protocol (CDP) endpoint
+      save  Save current browser session
+      pages  List open pages in the session
+      session-mode  View or set the session access mode
+      close  Close the browser
+      cloud <subcommand>  Deploy workflows and manage hosted Libretto
+      experiments  List or update Libretto experiment flags
+      exec  Execute Playwright TypeScript code
+      readonly-exec  Execute read-only Playwright inspection code
+      run  Run the default-exported Libretto workflow from a file
+      resume  Resume a paused workflow for the current session
+      search  Search the current page HTML snapshot
+      setup  Set up libretto in the current project
+      status  Show workspace status and open sessions
+      snapshot  Capture a screenshot and compact accessibility snapshot
+
+    Options:
+      --session <name>  Required for session-scoped commands
+      -h, --help
+      -v, --version
+  `}\n`;
+}
+
 describe("basic CLI subprocess behavior", () => {
+  test("warns when invoked through a package manager exec command", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("help", {
+      npm_command: "exec",
+    });
+
+    expect(result.stderr).toContain(
+      "Warning: running Libretto through a package manager is deprecated",
+    );
+    expect(result.stderr).toContain("https://libretto.sh/install.sh");
+    expect(result.stdout).toContain("Usage: libretto <command>");
+  });
+
+  test("does not warn for package manager lifecycle commands", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("help", {
+      npm_command: "run-script",
+      npm_config_user_agent: "pnpm/11.1.1",
+    });
+
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("Usage: libretto <command>");
+  });
+
   test("setup completes without AI configuration", async ({
     librettoCli,
   }) => {
@@ -172,25 +228,33 @@ describe("basic CLI subprocess behavior", () => {
 
   test("prints usage for --help", async ({ librettoCli }) => {
     const result = await librettoCli("--help");
-    expect(result.stdout).toContain("libretto <command>");
-    expect(result.stdout).toContain("experiments");
-    expect(result.stdout).toContain("List or update Libretto experiment flags");
-    expect(result.stdout).toContain("readonly-exec");
-    expect(result.stdout).toContain("snapshot");
-    expect(result.stdout).toContain("compact accessibility snapshot");
-    expect(result.stdout).toContain("cloud <subcommand>");
-    expect(result.stdout).not.toContain("experimental <subcommand>");
-    expect(result.stdout).toContain("Docs (agent-friendly): https://libretto.sh/docs");
+    expect(result.stdout).toBe(expectedRootHelp());
+    expect(result.stderr).toBe("");
+  });
+
+  test("prints usage for -h", async ({ librettoCli }) => {
+    const result = await librettoCli("-h");
+    expect(result.stdout).toBe(expectedRootHelp());
     expect(result.stderr).toBe("");
   });
 
   test("prints usage for help command", async ({ librettoCli }) => {
     const result = await librettoCli("help");
-    expect(result.stdout).toContain("libretto <command>");
-    expect(result.stdout).toContain("Commands:");
-    expect(result.stdout).toContain("open");
-    expect(result.stdout).toContain("status");
+    expect(result.stdout).toBe(expectedRootHelp());
     expect(result.stderr).toBe("");
+  });
+
+  test("prints package version", async ({ librettoCli }) => {
+    const cliVersion = await readCliVersion();
+
+    await expect(librettoCli("--version")).resolves.toMatchObject({
+      stdout: `${cliVersion}\n`,
+      stderr: "",
+    });
+    await expect(librettoCli("-v")).resolves.toMatchObject({
+      stdout: `${cliVersion}\n`,
+      stderr: "",
+    });
   });
 
   test("prints scoped help for status command", async ({ librettoCli }) => {
@@ -204,7 +268,9 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const result = await librettoCli("help cloud");
-    expect(result.stdout).toContain("Libretto Cloud commands");
+    expect(result.stdout).toContain(
+      "Deploy workflows and manage hosted Libretto",
+    );
     expect(result.stdout).toContain(
       "libretto cloud <subcommand>",
     );
@@ -326,12 +392,25 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  test("experiments reports no registered experiments", async ({
+  test("experiments reports registered experiment status", async ({
     librettoCli,
   }) => {
     const initial = await librettoCli("experiments");
     expect(initial.stdout).toContain("Libretto experiments:");
+    expect(initial.stdout).toContain("search: disabled");
     expect(initial.stderr).toBe("");
+  });
+
+  test("search points users to its experiment flag when disabled", async ({
+    librettoCli,
+    seedSessionState,
+  }) => {
+    const session = "search-disabled";
+    await seedSessionState({ session });
+
+    const result = await librettoCli(`search Needle --session ${session}`);
+    expect(result.stderr).toContain('The "search" experiment is disabled.');
+    expect(result.stderr).toContain("libretto experiments enable search");
   });
 
   test("experiments rejects missing and unknown experiment names with usage", async ({
@@ -386,11 +465,29 @@ export default workflow("main", async (ctx) => {
     expect(result.stdout).toContain("libretto <command>");
   });
 
-  test("fails open with missing url usage error", async ({ librettoCli }) => {
-    const result = await librettoCli("open");
-    expect(result.stderr).toContain(
-      "libretto open <url> [--headless] [--read-only|--write-access] [--auth-profile <domain>] [--viewport WxH] [--session <name>]",
-    );
+  test("fails unknown group command with scoped help", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("cloud opne");
+    expect(result.stderr).toBe(`${outdent`
+      Unknown command: cloud opne
+
+      Deploy workflows and manage hosted Libretto
+
+      Usage: libretto cloud <subcommand>
+
+      Commands:
+        deploy  Deploy workflows to the hosted platform
+        auth <subcommand>  Hosted-platform auth commands
+        billing <subcommand>  Hosted-platform subscription + usage commands
+    `}\n`);
+    expect(result.stdout).toBe("");
+  });
+
+  test("open help shows url is optional", async ({ librettoCli }) => {
+    const result = await librettoCli("open --help");
+    expect(result.stdout).toContain("open [url] [options]");
+    expect(result.stdout).toContain("URL to open (defaults to about:blank)");
   });
 
   test("session-mode prints and updates the current session mode", async ({
@@ -484,7 +581,7 @@ export default workflow("main", async (ctx) => {
       expectedSkillVersionWarning("0.0.0", cliVersion),
     );
     expect(result.stderr).toContain(
-      `Please run \`bunx libretto setup\` to update your skills to the correct version.`,
+      `Please run \`libretto setup\` to update your skills to the correct version.`,
     );
     expect(result.stderr).toContain("Daemon exited before startup");
   });

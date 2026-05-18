@@ -66,7 +66,6 @@ import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { DaemonExecRepl } from "./exec-repl.js";
 import { handleCompactSnapshot } from "./snapshot.js";
-import { librettoCommand } from "../../../shared/package-manager.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
 import { snapshot } from "../../../shared/snapshot/capture-snapshot.js";
 import { diffSnapshots } from "../../../shared/snapshot/diff-snapshots.js";
@@ -637,7 +636,7 @@ class BrowserDaemon {
         const openPages = Array.from(this.pageById.values());
         if (openPages.length === 1) return openPages[0];
         throw new Error(
-          `The primary page for session "${this.session}" is closed. Run "${librettoCommand(`pages --session ${this.session}`)}" to choose a page id.`,
+          `The primary page for session "${this.session}" is closed. Run "libretto pages --session ${this.session}" to choose a page id.`,
         );
       }
       return this.page;
@@ -645,7 +644,7 @@ class BrowserDaemon {
     const page = this.pageById.get(pageId);
     if (!page) {
       throw new Error(
-        `Page "${pageId}" was not found in session "${this.session}". Run "${librettoCommand(`pages --session ${this.session}`)}" to list ids.`,
+        `Page "${pageId}" was not found in session "${this.session}". Run "libretto pages --session ${this.session}" to list ids.`,
       );
     }
     return page;

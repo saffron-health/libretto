@@ -4,10 +4,10 @@ import {
   useKonamiPane,
   KonamiOverlay,
 } from "./components/CanvasAsciihedron";
-import { Button } from "./components/Button";
 import { Text } from "./components/Text";
 import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
+import { AppLink } from "./routing";
 import {
   OrchestrationContainer,
   AnimationTarget,
@@ -80,7 +80,7 @@ function Hero({
           as="h1"
           size="5xl"
           style="serif"
-          className="crt-glow mx-auto mb-8 max-w-[1000px] text-center tracking-[-0.04em] text-ink [text-wrap:balance]"
+          className="crt-glow mx-auto mb-8 max-w-[720px] text-center tracking-[-0.04em] text-ink [text-wrap:balance]"
         >
           <AnimatedTitle
             className=""
@@ -90,7 +90,7 @@ function Hero({
               lineHeight: 1.05,
             }}
           >
-            Don't make browser agents do a script's job
+            Turn website workflows into reliable APIs
           </AnimatedTitle>
         </Text>
         <Text
@@ -98,15 +98,22 @@ function Hero({
           size="lg"
           data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
-          className="mx-auto mb-8 max-w-[580px] text-center leading-relaxed text-muted [text-wrap:balance]"
+          className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:balance]"
         >
-          Libretto is a CLI that lets coding agents inspect web pages,
-          reverse-engineer APIs and build fast, cheap, and reliable automation
-          scripts
+          Libretto is an open-source CLI that lets agents turn website
+          workflows into fast, reusable scripts you can deploy
         </Text>
-        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-wrap items-center justify-center gap-6">
+        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-col items-center justify-center gap-3">
           <InstallSnippet />
-          <Button href="/docs/get-started/introduction" variant="secondary">Go to docs</Button>
+          <div className="text-xs text-muted">
+            or{" "}
+            <AppLink
+              href="/docs/get-started/quickstart"
+              className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
+            >
+              go to docs
+            </AppLink>
+          </div>
         </div>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
           <TerminalDemo />

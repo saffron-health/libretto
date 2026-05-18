@@ -2,13 +2,6 @@ name: Evals
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "package.json"
-      - "evals/**"
-      - ".github/workflows/evals.yml"
   pull_request:
     branches:
       - main
@@ -42,16 +35,6 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-
-      - name: Validate eval credentials
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -z "${OPENAI_API_KEY:-}" ]; then
-            echo "OPENAI_API_KEY secret is required to run evals." >&2
-            exit 1
-          fi
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

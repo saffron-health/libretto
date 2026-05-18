@@ -4,16 +4,22 @@ Browser automations built with [Libretto](https://libretto.sh).
 
 ## Quick Start
 
+If `libretto` is not already on your `PATH`, install the command first:
+
+```bash
+curl -fsSL https://libretto.sh/install.sh | bash
+```
+
 Open a page interactively to inspect and prototype:
 
 ```bash
-{{runCommand}} libretto open https://example.com --headed
+libretto open https://example.com --headed
 ```
 
 Run a workflow:
 
 ```bash
-{{runCommand}} libretto run src/workflows/star-repo.ts
+libretto run src/workflows/star-repo.ts
 ```
 
 ## Agent Skills
@@ -23,7 +29,7 @@ Libretto ships with agent skills that let AI coding assistants (Claude Code, Cod
 ## Links
 
 - [Website](https://libretto.sh)
-- [Documentation](https://libretto.sh/get-started/introduction)
-- [CLI Reference](https://libretto.sh/cli-reference/open-and-connect)
-- [Library API Reference](https://libretto.sh/library-api/workflow)
+- [Documentation](https://libretto.sh/docs/get-started/quickstart)
+- [CLI Reference](https://libretto.sh/docs/reference/cli/open-and-connect)
+- [Library API Reference](https://libretto.sh/docs/reference/runtime/workflow)
 - [GitHub](https://github.com/saffron-health/libretto)

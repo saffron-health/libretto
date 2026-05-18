@@ -35,10 +35,10 @@ Example workspace state:
 `libretto experiments` is the CLI surface for inspecting and changing workspace experiment overrides.
 
 ```bash
-npx libretto experiments
-npx libretto experiments describe <experiment>
-npx libretto experiments enable <experiment>
-npx libretto experiments disable <experiment>
+libretto experiments
+libretto experiments describe <experiment>
+libretto experiments enable <experiment>
+libretto experiments disable <experiment>
 ```
 
 The command is implemented in `packages/libretto/src/cli/commands/experiments.ts` and registered as a top-level command. Listing prints registered experiments in registry order with their enabled/disabled state and description. `describe` prints the experiment status and full instructions. `enable` persists the override to `.libretto/config.json` and prints the full description with a prelude that the enabled experiment changes expected Libretto usage from the skill. `disable` persists the override and prints deterministic success text.

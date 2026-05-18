@@ -1,0 +1,62 @@
+---
+title: First workflow
+sidebarTitle: First workflow
+---
+
+> Author a minimal workflow, run it, and inspect the result.
+
+## Agent prompt
+
+```text
+Ask me what website and workflow I want to demonstrate. If I’m not sure, give me a few examples of simple workflows I could do. Then open a Libretto browser session for the site I choose. After I finish, create a Libretto workflow.
+```
+
+## Manual
+
+<Steps>
+  <Step title="Create a workflow file">
+
+Create `src/workflows/scrape-page.ts`:
+
+```ts src/workflows/scrape-page.ts
+import { workflow } from "libretto";
+
+export default workflow("scrape-page", async ({ page }) => {
+  await page.goto("https://example.com");
+  const title = await page.title();
+  console.log(`Page title: ${title}`);
+
+  return { title };
+});
+```
+  </Step>
+
+  <Step title="Run it locally">
+
+```bash theme={null}
+libretto run src/workflows/scrape-page.ts
+```
+  </Step>
+
+  <Step title="Inspect page state when needed">
+
+When a step fails or behaves unexpectedly, open a named debug session first:
+
+```bash theme={null}
+libretto open https://example.com --session debug-example
+```
+
+Then inspect and prototype with the same session:
+
+```bash theme={null}
+libretto snapshot --session debug-example
+libretto exec --session debug-example "await page.url()"
+```
+
+When the prototype works, move the logic back into the workflow file and run again.
+  </Step>
+</Steps>
+
+<Card title="Next: Deploying" icon="arrow-right" href="/get-started/deploying">
+  Choose where to run workflows in production: Libretto Cloud Hosting or an alternative provider.
+</Card>

@@ -15,7 +15,6 @@ import type { SessionAccessMode } from "../../shared/state/index.js";
 import type { Experiments } from "./experiments.js";
 import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
-import { librettoCommand } from "../../shared/package-manager.js";
 import {
   getCloudProviderApi,
   getProviderStartupTimeoutMs,
@@ -93,7 +92,8 @@ export function normalizeUrl(url: string): URL {
   if (
     parsedUrl.protocol === "http:" ||
     parsedUrl.protocol === "https:" ||
-    parsedUrl.protocol === "file:"
+    parsedUrl.protocol === "file:" ||
+    parsedUrl.href === "about:blank"
   ) {
     return parsedUrl;
   }
@@ -103,7 +103,7 @@ export function normalizeUrl(url: string): URL {
   }
 
   throw new Error(
-    `Unsupported URL protocol: ${parsedUrl.protocol}. Use http://, https://, or file://.`,
+    `Unsupported URL protocol: ${parsedUrl.protocol}. Use http://, https://, file://, or about:blank.`,
   );
 }
 
@@ -239,14 +239,14 @@ export async function connect(
     if (state.provider) {
       throw new Error(
         `Could not connect to ${state.provider.name} session for "${session}" at ${endpoint}. ` +
-          `The remote session may still be active. Try again, or close with: ${librettoCommand(`close --session ${session}`)}`,
+          `The remote session may still be active. Try again, or close with: libretto close --session ${session}`,
       );
     }
 
     if (state.pid == null || !isPidRunning(state.pid)) {
       clearSessionState(session, logger);
       throw new Error(
-        `No browser running for session "${session}". Run '${librettoCommand(`open <url> --session ${session}`)}' first.`,
+        `No browser running for session "${session}". Run 'libretto open <url> --session ${session}' first.`,
       );
     }
 
@@ -282,7 +282,7 @@ export async function connect(
 
   if (options?.requireSinglePage && !options.pageId && pages.length > 1) {
     throw new Error(
-      `Multiple pages are open in session "${session}". Pass --page <id> to target a page (run "${librettoCommand(`pages --session ${session}`)}" to list ids).`,
+      `Multiple pages are open in session "${session}". Pass --page <id> to target a page (run "libretto pages --session ${session}" to list ids).`,
     );
   }
 
@@ -292,7 +292,7 @@ export async function connect(
     : pageRefs[pageRefs.length - 1]!;
   if (!pageRef) {
     throw new Error(
-      `Page "${options?.pageId}" was not found in session "${session}". Run "${librettoCommand(`pages --session ${session}`)}" to list ids.`,
+      `Page "${options?.pageId}" was not found in session "${session}". Run "libretto pages --session ${session}" to list ids.`,
     );
   }
   const page = pageRef.page;
@@ -334,7 +334,7 @@ export async function runPages(
   if (!state.daemonSocketPath) {
     throw new Error(
       `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
-        `Close and reopen the session: ${librettoCommand(`close --session ${session}`)}`,
+        `Close and reopen the session: libretto close --session ${session}`,
     );
   }
   const client = await DaemonClient.connect(state.daemonSocketPath);
@@ -437,8 +437,8 @@ export async function runOpen(
     if (!existsSync(authProfilePath)) {
       throw new Error(
         `No saved auth profile for "${authDomain}". ` +
-          `Save one first: ${librettoCommand(`open https://${authDomain} --headed --session <name>`)}, ` +
-          `log in, then run: ${librettoCommand(`save ${authDomain} --session <name>`)}`,
+          `Save one first: libretto open https://${authDomain} --headed --session <name>, ` +
+          `log in, then run: libretto save ${authDomain} --session <name>`,
       );
     }
   }
@@ -745,7 +745,7 @@ export async function runClose(
         writeSessionState({ ...state, status: "cleanup-failed" }, logger);
         throw new Error(
           `Failed to confirm remote ${state.provider.name} session cleanup for session "${session}". ` +
-            `State preserved with status "cleanup-failed". Retry with: ${librettoCommand(`close --session ${session}`)}`,
+            `State preserved with status "cleanup-failed". Retry with: libretto close --session ${session}`,
         );
       }
     } else {
@@ -830,7 +830,7 @@ function formatDaemonCloseFailure(
     ? ` State preserved with status "cleanup-failed" because remote ${providerName} cleanup could not be confirmed.`
     : " State preserved so you can retry or inspect the session.";
   return new Error(
-    `Failed to close session "${session}" gracefully over daemon IPC: ${message}.${cleanupWarning} Retry with: ${librettoCommand(`close --session ${session}`)}`,
+    `Failed to close session "${session}" gracefully over daemon IPC: ${message}.${cleanupWarning} Retry with: libretto close --session ${session}`,
   );
 }
 
@@ -889,7 +889,7 @@ async function closeProviderSessionDirectly(
     });
     throw new Error(
       `Failed to close remote ${providerState.name} session "${providerState.sessionId}" for session "${session}". ` +
-        `State preserved with status "cleanup-failed". Retry with: ${librettoCommand(`close --session ${session}`)}`,
+        `State preserved with status "cleanup-failed". Retry with: libretto close --session ${session}`,
     );
   }
 }
@@ -1106,7 +1106,7 @@ export async function runCloseAll(
       [
         `Failed to close ${failedSessions.length} session(s) gracefully: ${formatSessionList(failedSessions)}.`,
         `Closed ${closed} session(s).`,
-        `Retry with: ${librettoCommand("close --all --force")}`,
+        `Retry with: libretto close --all --force`,
       ].join("\n"),
     );
   }
@@ -1166,7 +1166,7 @@ export async function runCloseAll(
   if (failedProviderSessions.size > 0) {
     console.warn(
       `Failed to confirm remote cleanup for ${failedProviderSessions.size} provider-backed session(s). ` +
-        `State preserved with status "cleanup-failed". Retry with: ${librettoCommand("close --all")}`,
+        `State preserved with status "cleanup-failed". Retry with: libretto close --all`,
     );
   }
   for (const recording of replayUrls) {
@@ -1198,11 +1198,11 @@ export async function runConnect(
         `Invalid CDP URL: ${cdpUrl}`,
         ``,
         `Expected an HTTP or WebSocket URL pointing to a Chrome DevTools Protocol endpoint, for example:`,
-        `  ${librettoCommand("connect http://127.0.0.1:9222")}`,
-        `  ${librettoCommand("connect http://remote-host:9222")}`,
-        `  ${librettoCommand("connect http://remote-host:9222/devtools/browser/<id>")}`,
-        `  ${librettoCommand("connect ws://remote-host:9222/devtools/browser/<id>")}`,
-        `  ${librettoCommand("connect wss://remote-host/cdp-endpoint")}`,
+        `  libretto connect http://127.0.0.1:9222`,
+        `  libretto connect http://remote-host:9222`,
+        `  libretto connect http://remote-host:9222/devtools/browser/<id>`,
+        `  libretto connect ws://remote-host:9222/devtools/browser/<id>`,
+        `  libretto connect wss://remote-host/cdp-endpoint`,
       ].join("\n"),
     );
   }

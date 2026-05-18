@@ -39,7 +39,7 @@ In these cases, stick with your existing Playwright automation or use passive in
 
     ```bash  theme={null}
     # What the agent runs
-    npx libretto run ./integration.ts
+    libretto run ./integration.ts
     jq . .libretto/sessions/conversion-flow/network.jsonl
     ```
 
@@ -79,7 +79,7 @@ In these cases, stick with your existing Playwright automation or use passive in
 
     ```bash  theme={null}
     # What the agent runs
-    npx libretto run ./integration.ts --headless
+    libretto run ./integration.ts --headless
     ```
 
     If the output is wrong or incomplete, tell the agent what's off:

@@ -4,7 +4,7 @@ description: "Read-only Libretto workflow for diagnosing live browser state with
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.6.13"
+  version: "0.6.16"
 ---
 
 ## How Libretto Read-Only Works
@@ -34,7 +34,7 @@ metadata:
 - Libretto read-only mode is enforced through Libretto commands; direct CDP clients that skip Libretto are outside this boundary.
 
 ```bash
-npx libretto connect http://127.0.0.1:9222 --read-only --session failed-job-debug
+libretto connect http://127.0.0.1:9222 --read-only --session failed-job-debug
 ```
 
 ### `pages`
@@ -43,7 +43,7 @@ npx libretto connect http://127.0.0.1:9222 --read-only --session failed-job-debu
 - If `readonly-exec` or `snapshot` complains about multiple pages, list ids first and then pass `--page`.
 
 ```bash
-npx libretto pages --session failed-job-debug
+libretto pages --session failed-job-debug
 ```
 
 ### `snapshot`
@@ -68,15 +68,15 @@ Standard JS globals `console`, `URL`, `Buffer`, `setTimeout`, and `setInterval` 
 #### Examples
 
 ```bash
-npx libretto readonly-exec "return page.url()" --session failed-job-debug
-npx libretto readonly-exec "return await page.getByRole('heading').first().textContent()" --session failed-job-debug
+libretto readonly-exec "return page.url()" --session failed-job-debug
+libretto readonly-exec "return await page.getByRole('heading').first().textContent()" --session failed-job-debug
 
 # HTTP GET inspection
 echo "const r = await get('https://api.example.com/status'); return await r.json()" \
-  | npx libretto readonly-exec - --session failed-job-debug
+  | libretto readonly-exec - --session failed-job-debug
 
 # Scroll down to inspect below-the-fold content
-npx libretto readonly-exec "await scrollBy(0, 500)" --session failed-job-debug
+libretto readonly-exec "await scrollBy(0, 500)" --session failed-job-debug
 ```
 
 ### `close`
@@ -84,5 +84,5 @@ npx libretto readonly-exec "await scrollBy(0, 500)" --session failed-job-debug
 - Use `close` when the inspection session is no longer needed.
 
 ```bash
-npx libretto close --session failed-job-debug
+libretto close --session failed-job-debug
 ```

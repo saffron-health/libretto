@@ -3,6 +3,12 @@ title: Installation
 sidebarTitle: Installation
 ---
 
+Install the Libretto command once, then use `libretto` from any shell. This requires Node.js and npm on your machine.
+
+```bash theme={null}
+curl -fsSL https://libretto.sh/install.sh | bash
+```
+
 Already have a Node.js package and just want to install Libretto without scaffolding? [Skip to install into an existing package](#install-into-an-existing-package).
 
 ## Create a new package
@@ -15,7 +21,7 @@ Use this if you want Libretto to scaffold a new package with directory structure
     npm create libretto@latest
     ```
 
-    You'll be prompted for a package name (defaults to `my-automations`). You can also pass it directly:
+    You can also pass a package name directly:
 
     ```bash theme={null}
     npm create libretto@latest my-project
@@ -23,18 +29,13 @@ Use this if you want Libretto to scaffold a new package with directory structure
 
     This scaffolds a package directory, installs dependencies, downloads Chromium, sets up the `.libretto/` directory, and copies agent skill files.
 
-    <Note>
-      Run this yourself in a terminal — not through an agent. It may prompt for
-      input and starts a Chromium download that takes a moment.
-    </Note>
-
   </Step>
 
   <Step title="Run a workflow">
     The scaffolded package includes an example workflow. Run it with:
 
     ```bash
-    npx libretto run src/workflows/star-repo.ts
+    libretto run src/workflows/star-repo.ts
     ```
 
   </Step>
@@ -53,15 +54,10 @@ If you already have a Node.js package that you plan to use for Libretto automati
 
   <Step title="Run setup">
     ```bash
-    npx libretto setup
+    libretto setup
     ```
 
     This downloads Chromium, creates the `.libretto/` directory, and copies agent skill files.
-
-    <Note>
-      Run this yourself in a terminal — not through an agent. It may prompt for
-      input and starts a Chromium download that takes a moment.
-    </Note>
 
   </Step>
 
@@ -84,7 +80,7 @@ If you already have a Node.js package that you plan to use for Libretto automati
 
   <Step title="Run it">
     ```bash
-    npx libretto run src/workflows/scrape-page.ts
+    libretto run src/workflows/scrape-page.ts
     ```
 
   </Step>
@@ -94,11 +90,11 @@ If you already have a Node.js package that you plan to use for Libretto automati
   <Card
     title="CLI reference"
     icon="terminal"
-    href="../cli-reference/open-and-connect"
+    href="/reference/cli/open-and-connect"
   >
     Full reference for every Libretto command and flag.
   </Card>
-  <Card title="Workflow API" icon="code" href="../library-api/workflow">
+  <Card title="Workflow API" icon="code" href="/reference/runtime/workflow">
     Write workflow files with the typed `workflow()` API.
   </Card>
 </CardGroup>

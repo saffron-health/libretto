@@ -339,6 +339,37 @@ throw new Error('expected late exec failure');
     expect(result.stdout).toContain("snapshot <ref> --session");
   }, 45_000);
 
+  test("experimental search prints matching HTML context", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-search";
+    const url = await writeFixturePage(
+      workspacePath,
+      "search",
+      "Search Test",
+      [
+        "<main>",
+        "<h1>Search Heading</h1>",
+        '<section data-testid="billing-card">',
+        "<p>Invoice total is ready</p>",
+        "</section>",
+        "</main>",
+      ].join(""),
+    );
+    await librettoCli("experiments enable search");
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `search "billing-card|Invoice total" --session ${session}`,
+    );
+
+    expect(result.stdout).toContain('data-testid="billing-card"');
+    expect(result.stdout).toContain("Invoice total is ready");
+    expect(result.stdout).not.toContain("Lines ");
+    expect(result.stderr).toBe("");
+  }, 45_000);
+
   test("compact snapshot ref uses cached full snapshot and scopes output", async ({
     librettoCli,
     workspacePath,

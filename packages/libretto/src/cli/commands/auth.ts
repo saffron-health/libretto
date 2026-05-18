@@ -3,6 +3,7 @@
  *
  *   libretto cloud auth signup
  *   libretto cloud auth login
+ *   libretto cloud auth forgot-password
  *   libretto cloud auth logout
  *   libretto cloud auth invite <email> [--role member|admin|owner]
  *   libretto cloud auth accept-invite <tenantSlug> <invitationId>
@@ -365,6 +366,26 @@ export const loginCommand = SimpleCLI.command({
         );
       }
     }
+  });
+
+export const forgotPasswordCommand = SimpleCLI.command({
+  description: "Send a password reset email",
+})
+  .input(SimpleCLI.input({ positionals: [], named: {} }))
+  .handle(async () => {
+    const apiUrl = resolveHostedApiUrl();
+    const email = await prompt("Email:");
+    const result = await orpcCall<{ status: "sent" | "not_found" }>({
+      apiUrl,
+      path: "/v1/auth/requestPasswordReset",
+      input: { email },
+      unauthenticated: true,
+    });
+    if (result.status === "not_found") {
+      console.log(`No Libretto account exists for ${email}.`);
+      return;
+    }
+    console.log(`Password reset link sent to ${email}.`);
   });
 
 // ---------------------------------------------------------------------------
@@ -762,6 +783,7 @@ export const authCommands = SimpleCLI.group({
   routes: {
     signup: signupCommand,
     login: loginCommand,
+    "forgot-password": forgotPasswordCommand,
     logout: logoutCommand,
     invite: inviteCommand,
     "accept-invite": acceptInviteCommand,

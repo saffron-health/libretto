@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { z } from "zod";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
@@ -12,24 +13,98 @@ export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
   input: Input,
 ) => Promise<Output>;
 
-export class LibrettoWorkflow<Input = unknown, Output = unknown> {
+export type LibrettoWorkflowSchemas<
+  InputSchema extends z.ZodType,
+  OutputSchema extends z.ZodType,
+> = {
+  input: InputSchema;
+  output: OutputSchema;
+};
+
+// Thrown when input fails Zod validation. The runner surfaces `.message`
+// directly to the user, so we format issues into a single readable block.
+export class LibrettoWorkflowInputError extends Error {
+  public readonly workflowName: string;
+  public readonly zodError: z.ZodError;
+
+  constructor(workflowName: string, zodError: z.ZodError) {
+    super(formatZodErrorMessage(workflowName, zodError));
+    this.name = "LibrettoWorkflowInputError";
+    this.workflowName = workflowName;
+    this.zodError = zodError;
+  }
+}
+
+function formatZodErrorMessage(
+  workflowName: string,
+  zodError: z.ZodError,
+): string {
+  const lines = zodError.issues.map((issue) => {
+    const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
+    return `  - ${path}: ${issue.message}`;
+  });
+  return [
+    `Invalid input for workflow "${workflowName}":`,
+    ...lines,
+  ].join("\n");
+}
+
+export class LibrettoWorkflow<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+> {
   public readonly [LIBRETTO_WORKFLOW_BRAND] = true;
   public readonly name: string;
-  private readonly handler: LibrettoWorkflowHandler<Input, Output>;
+  // Optional so the legacy 2-arg `workflow(name, handler)` form still works
+  // for deployments that were built before Zod schemas were a thing.
+  public readonly inputSchema?: InputSchema;
+  // Metadata only — `run()` validates `input` against `inputSchema` but does
+  // not parse the handler's return value. The hosted platform serializes
+  // this schema to JSON Schema at build time and exposes it via
+  // /v1/workflows/get so API consumers know the workflow's output shape.
+  public readonly outputSchema?: OutputSchema;
+  private readonly handler: LibrettoWorkflowHandler<
+    z.infer<InputSchema>,
+    z.infer<OutputSchema>
+  >;
 
-  constructor(name: string, handler: LibrettoWorkflowHandler<Input, Output>) {
+  constructor(
+    name: string,
+    schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema> | undefined,
+    handler: LibrettoWorkflowHandler<
+      z.infer<InputSchema>,
+      z.infer<OutputSchema>
+    >,
+  ) {
     this.name = name;
+    this.inputSchema = schemas?.input;
+    this.outputSchema = schemas?.output;
     this.handler = handler;
   }
 
-  async run(ctx: LibrettoWorkflowContext, input: Input): Promise<Output> {
-    return this.handler(ctx, input);
+  async run(
+    ctx: LibrettoWorkflowContext,
+    input: unknown,
+  ): Promise<z.infer<OutputSchema>> {
+    let parsed: z.infer<InputSchema>;
+    if (this.inputSchema) {
+      const result = this.inputSchema.safeParse(input);
+      if (!result.success) {
+        throw new LibrettoWorkflowInputError(this.name, result.error);
+      }
+      parsed = result.data;
+    } else {
+      parsed = input as z.infer<InputSchema>;
+    }
+    return this.handler(ctx, parsed);
   }
 }
 
 export type ExportedLibrettoWorkflow = {
   readonly [LIBRETTO_WORKFLOW_BRAND]: true;
   readonly name: string;
+  readonly inputSchema?: z.ZodType;
+  readonly outputSchema?: z.ZodType;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -120,9 +195,41 @@ export function getWorkflowFromModuleExports(
   return null;
 }
 
+// Recommended 3-arg form: pass Zod schemas so input is validated at run time
+// and the hosted platform can expose typed I/O metadata via /v1/workflows/get.
+export function workflow<
+  InputSchema extends z.ZodType,
+  OutputSchema extends z.ZodType,
+>(
+  name: string,
+  schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema>,
+  handler: LibrettoWorkflowHandler<
+    z.infer<InputSchema>,
+    z.infer<OutputSchema>
+  >,
+): LibrettoWorkflow<InputSchema, OutputSchema>;
+
+// Legacy 2-arg form kept so deployments built before Zod schemas existed
+// continue to load. New code should always pass schemas.
 export function workflow<Input = unknown, Output = unknown>(
   name: string,
   handler: LibrettoWorkflowHandler<Input, Output>,
-): LibrettoWorkflow<Input, Output> {
-  return new LibrettoWorkflow(name, handler);
+): LibrettoWorkflow<z.ZodType<Input>, z.ZodType<Output>>;
+
+export function workflow(
+  name: string,
+  schemasOrHandler:
+    | LibrettoWorkflowSchemas<z.ZodType, z.ZodType>
+    | LibrettoWorkflowHandler,
+  maybeHandler?: LibrettoWorkflowHandler,
+): LibrettoWorkflow {
+  if (typeof schemasOrHandler === "function") {
+    return new LibrettoWorkflow(name, undefined, schemasOrHandler);
+  }
+  if (!maybeHandler) {
+    throw new Error(
+      `workflow("${name}") called with schemas but no handler. Pass the handler as the third argument.`,
+    );
+  }
+  return new LibrettoWorkflow(name, schemasOrHandler, maybeHandler);
 }

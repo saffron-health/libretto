@@ -12,7 +12,6 @@ import {
 import { resolveProviderName } from "../core/providers/index.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { createLoggerForSession } from "../core/context.js";
-import { librettoCommand } from "../../shared/package-manager.js";
 import {
   type SessionAccessMode,
   assertSessionAvailableForStart,
@@ -63,8 +62,8 @@ function resolveRequestedSessionMode(
 
 export const openInput = SimpleCLI.input({
   positionals: [
-    SimpleCLI.positional("url", z.string().optional(), {
-      help: "URL to open",
+    SimpleCLI.positional("url", z.string().default("about:blank"), {
+      help: "URL to open (defaults to about:blank)",
     }),
   ],
   named: {
@@ -93,10 +92,6 @@ export const openInput = SimpleCLI.input({
   },
 })
   .refine(
-    (input) => Boolean(input.url),
-    `Usage: ${librettoCommand("open <url> [--headless] [--read-only|--write-access] [--auth-profile <domain>] [--viewport WxH] [--session <name>]")}`,
-  )
-  .refine(
     (input) => !(input.headed && input.headless),
     "Cannot pass both --headed and --headless.",
   )
@@ -106,8 +101,7 @@ export const openInput = SimpleCLI.input({
   );
 
 export const openCommand = SimpleCLI.command({
-  description:
-    "Launch browser and open URL (headed by default). Automatically loads a saved auth profile for the URL's domain if one exists.",
+  description: "Launch browser and open URL",
 })
   .input(openInput)
   .use(withAutoSession())
@@ -119,7 +113,7 @@ export const openCommand = SimpleCLI.command({
     if (providerName === "local") {
       const headed = input.headed || !input.headless;
       const viewport = parseViewportArg(input.viewport);
-      await runOpen(input.url!, headed, ctx.session, ctx.logger, {
+      await runOpen(input.url, headed, ctx.session, ctx.logger, {
         viewport,
         accessMode: resolveRequestedSessionMode(
           input.readOnly,
@@ -130,7 +124,7 @@ export const openCommand = SimpleCLI.command({
       });
     } else {
       await runOpenWithProvider(
-        input.url!,
+        input.url,
         providerName,
         ctx.session,
         ctx.logger,
@@ -160,7 +154,7 @@ export const connectInput = SimpleCLI.input({
 })
   .refine(
     (input) => Boolean(input.cdpUrl),
-    `Usage: ${librettoCommand("connect <cdp-url> [--read-only|--write-access] --session <name>")}`,
+    `Usage: libretto connect <cdp-url> [--read-only|--write-access] --session <name>`,
   )
   .refine(
     (input) => !(input.readOnly && input.writeAccess),
@@ -195,7 +189,7 @@ export const saveInput = SimpleCLI.input({
   },
 }).refine(
   (input) => Boolean(input.urlOrDomain),
-  `Usage: ${librettoCommand("save <url|domain> --session <name>")}`,
+  `Usage: libretto save <url|domain> --session <name>`,
 );
 
 export const saveCommand = SimpleCLI.command({
@@ -266,7 +260,7 @@ export const closeInput = SimpleCLI.input({
   },
 }).refine(
   (input) => input.all || input.session,
-  `Usage: ${librettoCommand("close <session>")}\nUsage: ${librettoCommand("close --all [--force]")}`,
+  `Usage: libretto close <session>\nUsage: libretto close --all [--force]`,
 );
 
 export const closeCommand = SimpleCLI.command({
@@ -275,7 +269,7 @@ export const closeCommand = SimpleCLI.command({
   .input(closeInput)
   .handle(async ({ input }) => {
     if (input.force && !input.all) {
-      throw new Error(`Usage: ${librettoCommand("close --all [--force]")}`);
+      throw new Error(`Usage: libretto close --all [--force]`);
     }
     if (input.all) {
       const logger = createLoggerForSession("cli");

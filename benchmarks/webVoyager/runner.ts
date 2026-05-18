@@ -87,12 +87,9 @@ const BENCHMARK_MODEL_PROVIDER = "anthropic";
 const BENCHMARK_MODEL_ID = "claude-opus-4-6";
 const DEFAULT_GCP_PROJECT = "saffron-health";
 const DEFAULT_ANTHROPIC_SECRET_NAME = "anthropic-api-key";
-const BENCHMARK_SNAPSHOT_MODEL = "vertex/gemini-2.5-flash";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 const librettoPackageRoot = resolve(repoRoot, "packages", "libretto");
-const librettoPackageManifest = readLibrettoPackageManifest();
-const rootPackageManager = readRootPackageManager();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -125,37 +122,6 @@ function extractAssistantText(message: unknown): string {
     .trim();
 }
 
-function readLibrettoPackageManifest(): {
-  peerDependencies?: Record<string, string>;
-} {
-  try {
-    const packageJsonPath = resolve(librettoPackageRoot, "package.json");
-    return JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
-      peerDependencies?: Record<string, string>;
-    };
-  } catch {
-    return {};
-  }
-}
-
-function readRootPackageManager(): string {
-  try {
-    const packageJsonPath = resolve(repoRoot, "package.json");
-    const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
-      packageManager?: unknown;
-    };
-    return typeof parsed.packageManager === "string"
-      ? parsed.packageManager
-      : "pnpm@9.15.4";
-  } catch {
-    return "pnpm@9.15.4";
-  }
-}
-
-function resolveSnapshotModelForBenchmarkWorkspace(): string {
-  return BENCHMARK_SNAPSHOT_MODEL;
-}
-
 function resolveBenchmarkWorkspaceProjectId(): string | null {
   return (
     process.env.GOOGLE_CLOUD_PROJECT?.trim() ||
@@ -181,38 +147,6 @@ async function writeBenchmarkWorkspaceEnvFile(runDir: string): Promise<void> {
     ].join("\n"),
     "utf8",
   );
-}
-
-function resolveProviderPackageForModel(model: string): string | null {
-  const provider = model.split("/", 1)[0]?.toLowerCase();
-  if (!provider) {
-    return null;
-  }
-
-  switch (provider) {
-    case "anthropic":
-      return "@ai-sdk/anthropic";
-    case "google":
-    case "gemini":
-      return "@ai-sdk/google";
-    case "vertex":
-      return "@ai-sdk/google-vertex";
-    case "openai":
-    case "codex":
-      return "@ai-sdk/openai";
-    default:
-      return null;
-  }
-}
-
-function resolveProviderInstallSpec(model: string): string | null {
-  const packageName = resolveProviderPackageForModel(model);
-  if (!packageName) {
-    return null;
-  }
-
-  const version = librettoPackageManifest.peerDependencies?.[packageName];
-  return version ? `${packageName}@${version}` : packageName;
 }
 
 function runWorkspaceCommand(
@@ -576,7 +510,6 @@ async function prepareRunWorkspace(
   const parentDir = resolve(repoRoot, "benchmarks", BENCHMARK_NAME, "runs");
   const runDir = resolve(parentDir, runName);
   const { text: prompt, sessionName } = buildWebVoyagerPrompt(row);
-  const snapshotModel = resolveSnapshotModelForBenchmarkWorkspace();
 
   // Clean any previous run
   await rm(runDir, { recursive: true, force: true });
@@ -585,7 +518,6 @@ async function prepareRunWorkspace(
   await createTmpWorkspace({
     name: runName,
     parentDir,
-    snapshotModel,
     skipBrowsers: true,
     skipBuild: true,
     quiet: true,
@@ -600,7 +532,6 @@ async function prepareRunWorkspace(
       "",
       "- Use the libretto skill in this workspace.",
       "- Use the local CLI via `npx libretto ...`.",
-      `- Libretto snapshot analysis is preconfigured to \`${snapshotModel}\`; do not run \`libretto ai configure\` to change it.`,
       "- Do not inspect sibling benchmark files or parent benchmark directories to discover the answer.",
       "- End with a direct final answer to the task.",
       "",

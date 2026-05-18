@@ -1,0 +1,73 @@
+---
+title: Browserbase
+sidebarTitle: Browserbase
+---
+
+> Run Libretto sessions on Browserbase's managed browser infrastructure.
+
+Browserbase is a managed browser provider. Use it when you want Libretto's local CLI and workflow runtime, but want Browserbase to host the browser session.
+
+## Configure Browserbase
+
+Create a Browserbase API key and project, then add both values to the repo root `.env` file. Libretto loads `.env` automatically before running CLI commands.
+
+```dotenv theme={null}
+# inside .env
+BROWSERBASE_API_KEY=<browserbase-api-key>
+BROWSERBASE_PROJECT_ID=<browserbase-project-id>
+```
+
+`BROWSERBASE_ENDPOINT` is only needed if Browserbase gives you a custom API endpoint.
+
+Then set Browserbase as the workspace's default browser provider in `.libretto/config.json`:
+
+```json theme={null}
+{
+  "version": 1,
+  "provider": "browserbase"
+}
+```
+
+You can also use `--provider browserbase` on a single command instead of changing the config file.
+
+## Open a session
+
+Open a page with the configured Browserbase provider:
+
+```bash theme={null}
+libretto open https://example.com --session browserbase-demo
+```
+
+If you did not set `provider` in `.libretto/config.json`, pass it for this command instead:
+
+```bash theme={null}
+libretto open https://example.com --provider browserbase --session browserbase-demo
+```
+
+After the session is open, use the normal Libretto commands:
+
+```bash theme={null}
+libretto snapshot --session browserbase-demo
+libretto exec --session browserbase-demo "await page.title()"
+libretto close --session browserbase-demo
+```
+
+## Run a workflow
+
+Run workflows normally when `provider` is set in `.libretto/config.json`:
+
+```bash theme={null}
+libretto run ./workflow.ts --headless
+```
+
+Or pass the provider for a single run:
+
+```bash theme={null}
+libretto run ./workflow.ts --provider browserbase --headless
+```
+
+The workflow code does not need to change. Libretto creates the Browserbase browser session, connects to it over CDP, runs the workflow, and releases the provider session when the run finishes.
+
+## When to use Browserbase
+
+Choose Browserbase when you want a managed browser runtime and already use Browserbase for browser sessions. If you need to own the container runtime, scheduler, network, and secrets layer yourself, use [GCP](/alternative-providers/gcp) or [AWS](/alternative-providers/aws) instead.

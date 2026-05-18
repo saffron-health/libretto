@@ -7,7 +7,6 @@ import {
   type Snapshot,
 } from "../../../shared/snapshot/capture-snapshot.js";
 import { waitForPageStable } from "../../../shared/snapshot/wait-for-page-stable.js";
-import { librettoCommand } from "../../../shared/package-manager.js";
 import {
   resolveSnapshotViewport,
   readSnapshotViewportMetrics,
@@ -42,7 +41,7 @@ export async function handleCompactSnapshot(
   if (options.useCachedSnapshot) {
     if (!options.cachedSnapshot) {
       throw new Error(
-        `No compact snapshot is cached for session "${session}". Run ${librettoCommand(`snapshot --session ${session}`)} first.`,
+        `No compact snapshot is cached for session "${session}". Run libretto snapshot --session ${session} first.`,
       );
     }
     const screenshot = await captureSnapshotScreenshot(

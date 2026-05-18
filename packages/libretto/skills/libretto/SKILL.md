@@ -4,7 +4,7 @@ description: "Browser automation CLI for building, maintaining, and running brow
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.6.13"
+  version: "0.6.16"
 ---
 
 ## How Libretto Works
@@ -19,16 +19,17 @@ The npm package includes `src/` (full TypeScript source) and `docs/` for deeper 
 
 Full documentation is published at [libretto.sh](https://libretto.sh). Available pages:
 
-- Get started: [introduction](https://libretto.sh/get-started/introduction), [installation](https://libretto.sh/get-started/installation), [configuration](https://libretto.sh/get-started/configuration)
-- Fundamentals: [core concepts](https://libretto.sh/fundamentals/core-concepts), [how workflow generation works](https://libretto.sh/fundamentals/how-workflow-generation-works), [automation and bot detection](https://libretto.sh/fundamentals/automation-and-bot-detection), [website authentication](https://libretto.sh/fundamentals/website-authentication)
-- Workflow guides: [one-shot generation](https://libretto.sh/workflow-guides/one-shot-workflow-generation), [interactive building](https://libretto.sh/workflow-guides/interactive-workflow-building), [debugging workflows](https://libretto.sh/workflow-guides/debugging-workflows), [convert to network requests](https://libretto.sh/workflow-guides/convert-to-network-requests)
-- CLI reference: [open and connect](https://libretto.sh/cli-reference/open-and-connect), [sessions](https://libretto.sh/cli-reference/sessions), [profiles](https://libretto.sh/cli-reference/profiles), [snapshot](https://libretto.sh/cli-reference/snapshot), [exec](https://libretto.sh/cli-reference/exec), [run and resume](https://libretto.sh/cli-reference/run-and-resume), [session logs](https://libretto.sh/cli-reference/session-logs), [pages](https://libretto.sh/cli-reference/pages)
-- Library API: [workflow](https://libretto.sh/library-api/workflow), [AI extraction](https://libretto.sh/library-api/ai-extraction), [network requests](https://libretto.sh/library-api/network-requests), [file downloads](https://libretto.sh/library-api/file-downloads)
-- Hosting: [introduction](https://libretto.sh/hosting/introduction), [GCP](https://libretto.sh/hosting/gcp), [AWS](https://libretto.sh/hosting/aws)
+- Get started: [quickstart](https://libretto.sh/docs/get-started/quickstart), [first workflow](https://libretto.sh/docs/get-started/first-workflow), [deploying](https://libretto.sh/docs/get-started/deploying)
+- Fundamentals: [core concepts](https://libretto.sh/docs/understand-libretto/core-concepts), [how workflow generation works](https://libretto.sh/docs/understand-libretto/how-workflow-generation-works), [automation and bot detection](https://libretto.sh/docs/understand-libretto/automation-and-bot-detection), [website authentication](https://libretto.sh/docs/understand-libretto/website-authentication)
+- Workflow guides: [one-shot generation](https://libretto.sh/docs/guides/one-shot-workflow-generation), [interactive building](https://libretto.sh/docs/guides/interactive-workflow-building), [debugging workflows](https://libretto.sh/docs/guides/debugging-workflows), [convert to network requests](https://libretto.sh/docs/guides/convert-to-network-requests)
+- CLI reference: [open and connect](https://libretto.sh/docs/reference/cli/open-and-connect), [sessions](https://libretto.sh/docs/reference/cli/sessions), [profiles](https://libretto.sh/docs/reference/cli/profiles), [snapshot](https://libretto.sh/docs/reference/cli/snapshot), [exec](https://libretto.sh/docs/reference/cli/exec), [run and resume](https://libretto.sh/docs/reference/cli/run-and-resume), [session logs](https://libretto.sh/docs/reference/cli/session-logs), [pages](https://libretto.sh/docs/reference/cli/pages)
+- Library API: [workflow](https://libretto.sh/docs/reference/runtime/workflow), [AI extraction](https://libretto.sh/docs/reference/runtime/ai-extraction), [network requests](https://libretto.sh/docs/reference/runtime/network-requests), [file downloads](https://libretto.sh/docs/reference/runtime/file-downloads)
+- Libretto Cloud Hosting: [overview](https://libretto.sh/docs/libretto-cloud-hosting/overview), [authentication](https://libretto.sh/docs/libretto-cloud-hosting/authentication), [deployments](https://libretto.sh/docs/libretto-cloud-hosting/deployments)
+- Alternative providers: [overview](https://libretto.sh/docs/alternative-providers/overview), [Kernel](https://libretto.sh/docs/alternative-providers/kernel), [Browserbase](https://libretto.sh/docs/alternative-providers/browserbase), [GCP](https://libretto.sh/docs/alternative-providers/gcp), [AWS](https://libretto.sh/docs/alternative-providers/aws)
 
 ## Default Integration Approach
 
-1. **Default:** call the site's fetch/XHR endpoints via browser-context `fetch()`.
+1. Call the site's fetch/XHR endpoints via browser-context `fetch()`.
 2. If `references/site-security-review.md` (assess only once per site) rules `fetch()` unsafe, passively capture responses with `page.on('response', ...)`
 3. Fall back to Playwright UI automation.
 
@@ -38,12 +39,12 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 
 ## Setup
 
-- Use `npx libretto setup` for first-time workspace onboarding. It installs Chromium and syncs skills.
-- Use `npx libretto status` to inspect open sessions without triggering setup.
+- Use `libretto setup` for first-time workspace onboarding. It installs Chromium and syncs skills.
+- Use `libretto status` to inspect open sessions without triggering setup.
 
 ## Experiments
 
-- Use `npx libretto experiments` to list internal feature flags and `npx libretto experiments describe <name>` for usage notes when an experiment is enabled.
+- Use `libretto experiments` to list internal feature flags and `libretto experiments describe <name>` for usage notes when an experiment is enabled.
 
 ## Working Rules
 
@@ -82,9 +83,9 @@ npx libretto open https://example.com --session debug-example
 - Pass `--read-only` if the connected session must stay inspection-only from the start.
 
 ```bash
-npx libretto connect http://127.0.0.1:9222 --session my-session
-npx libretto connect http://127.0.0.1:9222 --read-only --session readonly-session
-npx libretto connect http://127.0.0.1:9223 --session another-session
+libretto connect http://127.0.0.1:9222 --session my-session
+libretto connect http://127.0.0.1:9222 --read-only --session readonly-session
+libretto connect http://127.0.0.1:9223 --session another-session
 ```
 
 ### `session-mode`
@@ -95,7 +96,7 @@ npx libretto connect http://127.0.0.1:9223 --session another-session
 - Pass `--read-only` or `--write-access` to override the config default for a single command.
 
 ```bash
-npx libretto session-mode --session my-session
+libretto session-mode --session my-session
 ```
 
 ### `snapshot`
@@ -107,9 +108,9 @@ npx libretto session-mode --session my-session
 - Use it before guessing at selectors, after workflow failures, and whenever the visible page state is unclear.
 
 ```bash
-npx libretto snapshot --session debug-example
-npx libretto snapshot <ref> --session debug-example
-npx libretto snapshot --session debug-example --page <page-id>
+libretto snapshot --session debug-example
+libretto snapshot <ref> --session debug-example
+libretto snapshot --session debug-example --page <page-id>
 ```
 
 ### `exec`
@@ -125,10 +126,10 @@ npx libretto snapshot --session debug-example --page <page-id>
 - After successful mutations, `exec` prints page-change diffs from compact snapshots.
 
 ```bash
-npx libretto exec "await page.url()"
-npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
-echo "async function textOf(selector) { return await page.locator(selector).textContent(); }" | npx libretto exec - --session debug-example
-npx libretto exec --session debug-example "await textOf('h1')"
+libretto exec "await page.url()"
+libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
+echo "async function textOf(selector) { return await page.locator(selector).textContent(); }" | libretto exec - --session debug-example
+libretto exec --session debug-example "await textOf('h1')"
 ```
 
 ### `pages`
@@ -137,25 +138,26 @@ npx libretto exec --session debug-example "await textOf('h1')"
 - If `exec` or `snapshot` complains about multiple pages, list page ids first and then pass `--page`.
 
 ```bash
-npx libretto pages --session debug-example
-npx libretto exec --session debug-example --page <page-id> "await page.url()"
+libretto pages --session debug-example
+libretto exec --session debug-example --page <page-id> "await page.url()"
 ```
 
 ### `run`
 
 - Use `run` to verify a workflow file after creating it or editing it. Use the same headed or headless mode for validation that the workflow run is already using. Plain `run` defaults to headed mode.
+- Workflows define their input shape with a Zod schema (see `references/code-generation-rules.md`). `run` validates `--params` against that schema before calling the handler and prints a clear field-by-field error if the input doesn't match.
 - Successful runs close the browser by default. Pass `--stay-open-on-success` when you need to inspect the completed state with `pages`, `snapshot`, or `exec`.
 - Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.
 - If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
 - Insert `await pause(session)` statements in the workflow file when you need to stop at specific states for interactive debugging, like breakpoints in the browser flow.
-- If the workflow pauses, resume it with `npx libretto resume --session <name>`.
+- If the workflow pauses, resume it with `libretto resume --session <name>`.
 - Re-run the same workflow after each fix to verify the browser behavior end to end.
 
 ```bash
-npx libretto run ./integration.ts --params '{"status":"open"}'
-npx libretto run ./integration.ts --read-only
-npx libretto run ./integration.ts --stay-open-on-success
-npx libretto run ./integration.ts --auth-profile app.example.com
+libretto run ./integration.ts --params '{"status":"open"}'
+libretto run ./integration.ts --read-only
+libretto run ./integration.ts --stay-open-on-success
+libretto run ./integration.ts --auth-profile app.example.com
 ```
 
 ### `resume`
@@ -166,7 +168,7 @@ npx libretto run ./integration.ts --auth-profile app.example.com
 - Keep resuming the same session until the workflow completes or pauses again.
 
 ```bash
-npx libretto resume --session debug-example
+libretto resume --session debug-example
 ```
 
 ### `save`
@@ -174,7 +176,7 @@ npx libretto resume --session debug-example
 - Use `save` only when the user explicitly asks to save or reuse authenticated browser state.
 
 ```bash
-npx libretto save app.example.com
+libretto save app.example.com
 ```
 
 ### `close`
@@ -183,8 +185,8 @@ npx libretto save app.example.com
 - `close --all` is available for workspace cleanup.
 
 ```bash
-npx libretto close --session debug-example
-npx libretto close --all
+libretto close --session debug-example
+libretto close --all
 ```
 
 ## Session Logs
@@ -232,17 +234,17 @@ Key fields: `id` (incrementing request id), `ts` (ISO timestamp), `pageId` (page
 <example>
 [Context: The user wants to build a new browser workflow and does not yet know the page structure]
 Assistant: I'll inspect the real site first if needed, but before I finish I'll create `target-workflow.ts` so the task produces reusable automation code.
-Assistant: [Runs `npx libretto open https://target.example.com --headed`]
+Assistant: [Runs `libretto open https://target.example.com --headed`]
 Assistant: [Reads `references/site-security-review.md` before choosing between passive network inspection, direct browser fetch calls, and Playwright-first automation]
-Assistant: [Runs `npx libretto snapshot --session <session>`]
+Assistant: [Runs `libretto snapshot --session <session>`]
 Assistant: [Uses `snapshot` and `exec` as needed to understand the site and decide the implementation path]
 Assistant: [Reads `references/code-generation-rules.md` before writing production workflow code]
 Assistant: I found the working path. I'll now create the workflow file and verify it.
 Assistant: [Creates or edits `target-workflow.ts` following `references/code-generation-rules.md`]
-Assistant: [Runs `npx libretto run ./target-workflow.ts --params '{"status":"open"}'` to validate]
+Assistant: [Runs `libretto run ./target-workflow.ts --params '{"status":"open"}'` to validate]
 Assistant: Validation passed. Here are the results:
 [Shows the output/results from the validation run]
-To run it again, use: npx libretto run ./target-workflow.ts --params '{"status":"open"}'
+To run it again, use: libretto run ./target-workflow.ts --params '{"status":"open"}'
 </example>
 ```
 
@@ -252,17 +254,17 @@ To run it again, use: npx libretto run ./target-workflow.ts --params '{"status":
 <example>
 [Context: The user has an existing Libretto workflow that is failing]
 Assistant: I'll reproduce the failure first so we can inspect the exact browser state it leaves behind.
-Assistant: [Runs `npx libretto run ./integration.ts --session debug-flow`]
+Assistant: [Runs `libretto run ./integration.ts --session debug-flow`]
 Assistant: The workflow failed and Libretto kept the browser open. I'll inspect the page state before changing code.
-Assistant: [Runs `npx libretto snapshot --session debug-flow`]
-Assistant: [Runs `npx libretto exec --session debug-flow "...focused inspection or prototype..."`]
+Assistant: [Runs `libretto snapshot --session debug-flow`]
+Assistant: [Runs `libretto exec --session debug-flow "...focused inspection or prototype..."`]
 Assistant: [Reads `references/code-generation-rules.md` before patching the workflow file]
 Assistant: I found the issue. I'll patch the workflow code and verify.
 Assistant: [Edits `integration.ts` following `references/code-generation-rules.md`]
-Assistant: [Runs `npx libretto run ./integration.ts` to validate the fix]
+Assistant: [Runs `libretto run ./integration.ts` to validate the fix]
 Assistant: Fix verified. Here are the results:
 [Shows the output/results from the validation run]
-To run it again, use: npx libretto run ./integration.ts
+To run it again, use: libretto run ./integration.ts
 </example>
 ```
 

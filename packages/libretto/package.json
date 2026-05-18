@@ -1,6 +1,6 @@
 {
   "name": "libretto",
-  "version": "0.6.13",
+  "version": "0.6.16",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
   "homepage": "https://libretto.sh",
@@ -85,7 +85,7 @@
     "vitest": "^4.1.5"
   },
   "dependencies": {
-    "affordance": "^0.1.0",
+    "affordance": "workspace:^",
     "ai": "^6.0.116",
     "esbuild": "^0.27.0",
     "playwright": "^1.58.2",
