@@ -125,7 +125,7 @@ jobs:
         if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
         run: |
           pnpm check:mirrors
-          pnpm --filter libretto build
+          pnpm --filter libretto... build
           pnpm --filter libretto type-check
           pnpm --filter libretto test
     outputs:
@@ -160,18 +160,28 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build publish artifacts
-        run: pnpm --filter libretto build
+        run: pnpm --filter libretto... build
+
+      - name: Publish affordance to npm
+        working-directory: packages/affordance
+        run: |
+          affordance_version="$(node -p "require('./package.json').version")"
+          if ! npm view "affordance@${affordance_version}" version >/dev/null 2>&1; then
+            pnpm publish --access public --no-git-checks
+          else
+            echo "affordance@${affordance_version} already published, skipping."
+          fi
 
       - name: Publish libretto to npm
         if: needs.verify.outputs.npm_exists != 'true'
         working-directory: packages/libretto
-        run: npm publish --access public
+        run: pnpm publish --access public --no-git-checks
 
       - name: Publish create-libretto to npm
         working-directory: packages/create-libretto
         run: |
           if ! npm view "create-libretto@${{ needs.verify.outputs.version }}" version >/dev/null 2>&1; then
-            npm publish --access public
+            pnpm publish --access public --no-git-checks
           else
             echo "create-libretto@${{ needs.verify.outputs.version }} already published, skipping."
           fi
