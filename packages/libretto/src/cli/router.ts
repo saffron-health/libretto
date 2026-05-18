@@ -13,7 +13,7 @@ import { SimpleCLI } from "affordance";
 export const cliRoutes = {
   ...browserCommands,
   cloud: SimpleCLI.group({
-    description: "Libretto Cloud commands",
+    description: "Deploy workflows and manage hosted Libretto",
     routes: {
       deploy: deployCommand,
       auth: authCommands,
@@ -29,5 +29,12 @@ export const cliRoutes = {
 };
 
 export function createCLIApp() {
-  return SimpleCLI.define("libretto", cliRoutes);
+  return SimpleCLI.define("libretto", cliRoutes, {
+    appendHelpText: [
+      "Options:",
+      "  --session <name>  Required for session-scoped commands",
+      "  -h, --help",
+      "  -v, --version",
+    ].join("\n"),
+  });
 }

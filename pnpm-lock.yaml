@@ -215,8 +215,8 @@ importers:
   packages/libretto:
     dependencies:
       affordance:
-        specifier: ^0.1.0
-        version: 0.1.0(zod@4.3.6)
+        specifier: workspace:^
+        version: link:../affordance
       ai:
         specifier: ^6.0.116
         version: 6.0.140(zod@4.3.6)

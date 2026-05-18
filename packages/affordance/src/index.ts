@@ -61,6 +61,7 @@ type SimpleCLIInputDefinition = {
 
 type SimpleCLIAppConfig = {
   globalNamed?: SimpleCLINamedDefinition;
+  appendHelpText?: string;
 };
 
 type InferPositionals<TDefs extends SimpleCLIPositionalsDefinition> = {
@@ -394,6 +395,7 @@ export class SimpleCLIApp {
   private readonly resolvedGroups = new Map<string, InternalResolvedGroup>();
   private readonly routeEntries: InternalResolvedRouteEntry[];
   private readonly globalNamed: SimpleCLINamedDefinition;
+  private readonly appendHelpText?: string;
 
   constructor(
     readonly name: string,
@@ -402,6 +404,7 @@ export class SimpleCLIApp {
   ) {
     const resolution = resolveRouteTree(routes);
     this.globalNamed = config.globalNamed ?? {};
+    this.appendHelpText = config.appendHelpText;
 
     for (const group of resolution.groups) {
       if (this.resolvedGroups.has(group.routeKey)) {
@@ -534,7 +537,21 @@ export class SimpleCLIApp {
       if (exactGroup) {
         throw new Error(this.renderGroupHelp(exactGroup));
       }
-      throw new Error(`Unknown command: ${args.join(" ")}`);
+      const nearestGroup = this.findNearestGroupByPath(args);
+      if (nearestGroup) {
+        throw new Error(
+          [
+            `Unknown command: ${args.join(" ")}`,
+            "",
+            this.renderGroupHelp(nearestGroup),
+          ].join("\n"),
+        );
+      }
+      throw new Error(
+        [`Unknown command: ${args.join(" ")}`, "", this.renderRootHelp()].join(
+          "\n",
+        ),
+      );
     }
 
     const rawInput = this.parseCommandInput(
@@ -767,6 +784,9 @@ export class SimpleCLIApp {
     for (const entry of this.getRootHelpEntries()) {
       lines.push(formatListEntry(entry.label, entry.description));
     }
+    if (this.appendHelpText) {
+      lines.push("", this.appendHelpText);
+    }
     return lines.join("\n");
   }
 
@@ -907,6 +927,16 @@ export class SimpleCLIApp {
   ): InternalResolvedGroup | null {
     const routeKey = pathToRouteKey(path);
     return this.resolvedGroups.get(routeKey) ?? null;
+  }
+
+  private findNearestGroupByPath(
+    path: readonly string[],
+  ): InternalResolvedGroup | null {
+    for (let length = path.length - 1; length > 0; length -= 1) {
+      const group = this.findGroupByPath(path.slice(0, length));
+      if (group) return group;
+    }
+    return null;
   }
 }
 
