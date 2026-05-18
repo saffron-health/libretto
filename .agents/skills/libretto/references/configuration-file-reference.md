@@ -6,7 +6,7 @@ Use this reference when you need to inspect or change workspace configuration fo
 
 - You want to understand where Libretto stores workspace-level settings.
 - You want a persistent default viewport for `open` or `run`.
-- You want a persistent default browser provider, such as Kernel or Browserbase.
+- You want a persistent default browser provider, such as Kernel, Browserbase, or Steel.
 
 ## File Location
 
@@ -18,7 +18,7 @@ Libretto reads workspace config from `.libretto/config.json`.
 
 ## Supported Settings
 
-- `provider` is an optional top-level setting used by `open` and `run` when you do not pass `--provider` and do not set `LIBRETTO_PROVIDER`. Must be `"local"`, `"kernel"`, `"browserbase"`, or `"libretto-cloud"`.
+- `provider` is an optional top-level setting used by `open` and `run` when you do not pass `--provider` and do not set `LIBRETTO_PROVIDER`. Must be `"local"`, `"kernel"`, `"browserbase"`, `"steel"`, or `"libretto-cloud"`.
 - Provider precedence is: CLI `--provider`, then `LIBRETTO_PROVIDER`, then `.libretto/config.json`, then `"local"`.
 - Provider credentials belong in the repo root `.env` file, which Libretto loads automatically before running CLI commands.
 - `viewport` is an optional top-level setting used by `open` and `run` when you do not pass `--viewport`.
@@ -46,6 +46,7 @@ libretto setup                                         # first-time onboarding
 libretto status                                        # inspect open sessions
 libretto open https://example.com --provider kernel
 libretto run ./integration.ts --provider browserbase
+libretto open https://example.com --provider steel
 libretto open https://example.com --viewport 1440x900
 libretto run ./integration.ts --viewport 1440x900
 ```

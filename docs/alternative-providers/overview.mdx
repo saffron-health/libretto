@@ -11,7 +11,7 @@ There are two common patterns:
 
 <CardGroup cols={2}>
   <Card title="Managed browser providers" icon="cloud" href="/alternative-providers/kernel">
-    Kernel and Browserbase host the browser session. Libretto connects to that browser over CDP and runs the same local commands and workflow code.
+    Kernel, Browserbase, and Steel host the browser session. Libretto connects to that browser over CDP and runs the same local commands and workflow code.
   </Card>
 
   <Card title="Self-hosted cloud infrastructure" icon="server" href="/alternative-providers/gcp">
@@ -28,6 +28,10 @@ There are two common patterns:
 
   <Card title="Browserbase" href="/alternative-providers/browserbase">
     Use Browserbase as the managed browser provider for `open` and `run`.
+  </Card>
+
+  <Card title="Steel" href="/alternative-providers/steel">
+    Use Steel as the managed browser provider for `open` and `run`.
   </Card>
 
   <Card title="GCP" icon="google" href="/alternative-providers/gcp">
@@ -52,6 +56,6 @@ Put provider credentials in the repo root `.env` file. Libretto loads that file 
 
 ## Choosing an option
 
-Use Kernel or Browserbase when you only want to move browser execution to a managed provider. Use GCP or AWS when you want to own the full workflow hosting stack.
+Use Kernel, Browserbase, or Steel when you only want to move browser execution to a managed provider. Use GCP or AWS when you want to own the full workflow hosting stack.
 
 If you want Libretto to manage hosting, workflow deployment, job APIs, schedules, and failure diagnostics for you, use [Libretto Cloud Hosting](/libretto-cloud-hosting/overview).

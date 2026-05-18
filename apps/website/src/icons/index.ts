@@ -10,3 +10,4 @@ export { KernelLogo } from "./KernelLogo";
 export { LinkedInIcon } from "./LinkedInIcon";
 export { NpmIcon } from "./NpmIcon";
 export { RefreshIcon } from "./RefreshIcon";
+export { SteelLogo } from "./SteelLogo";

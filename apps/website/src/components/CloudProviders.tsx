@@ -5,6 +5,7 @@ import {
   AWSLogo,
   KernelLogo,
   BrowserbaseLogo,
+  SteelLogo,
   GCPLogo,
   CheckIcon,
   CopyIcon,
@@ -16,6 +17,7 @@ const DEPLOY_COMMAND = "libretto cloud deploy";
 const LOGOS = [
   <BrowserbaseLogo key="bb" className="h-5 w-auto text-ink/35" />,
   <KernelLogo key="k" className="h-4 w-auto text-ink/35" />,
+  <SteelLogo key="steel" className="h-4 w-auto text-ink/35" />,
   <AWSLogo key="aws" className="h-9 w-auto text-ink/35" />,
   <GCPLogo key="gcp" className="h-8 w-auto text-ink/35" />,
 ];
@@ -162,17 +164,17 @@ export function CloudProviders() {
               size="md"
               className="mb-5 leading-relaxed text-muted [text-wrap:balance]"
             >
-              Run browsers with Kernel or Browserbase, or run workflows on
-              infrastructure you control.
+              Run browsers with Kernel, Browserbase, or Steel, or run workflows
+              on infrastructure you control.
             </Text>
             <ul className="mb-6 space-y-1.5 font-mono text-sm text-ink/55">
-              <li>→ Connect Browserbase or Kernel with your API key</li>
+              <li>→ Connect Browserbase, Kernel, or Steel with your API key</li>
               <li>
                 → Or run the workflow as a container with guides for Cloud Run
                 and ECS
               </li>
             </ul>
-            <div className="grid grid-cols-4 border border-ink/8">
+            <div className="grid grid-cols-5 border border-ink/8">
               {LOGOS.map((logo, i) => (
                 <LogoTile
                   key={i}

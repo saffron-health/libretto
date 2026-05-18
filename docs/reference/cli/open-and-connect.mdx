@@ -47,7 +47,7 @@ libretto open https://example.com --headless --session debug-example
 </ParamField>
 
 <ParamField path="--provider, -p" type="string">
-  Browser provider to use. One of `local`, `kernel`, `browserbase`, or `libretto-cloud`. Defaults to `local`.
+  Browser provider to use. One of `local`, `kernel`, `browserbase`, `steel`, or `libretto-cloud`. Defaults to `local`.
 
 **Resolution order:** `--provider` flag → `LIBRETTO_PROVIDER` env var → `provider` field in `.libretto/config.json` → `"local"`.
 
@@ -92,6 +92,7 @@ By default, `open` launches a local Chromium instance. You can instead run the b
 | Local Chromium (default) | `local`           | None                                            |
 | Kernel                   | `kernel`          | `KERNEL_API_KEY`                                |
 | Browserbase              | `browserbase`     | `BROWSERBASE_API_KEY`, `BROWSERBASE_PROJECT_ID` |
+| Steel                    | `steel`           | `STEEL_API_KEY`                                 |
 | Libretto Cloud           | `libretto-cloud`  | `LIBRETTO_API_KEY`                              |
 
 #### Configuration
@@ -115,6 +116,10 @@ libretto open https://example.com --provider kernel
 export BROWSERBASE_API_KEY="your-key"
 export BROWSERBASE_PROJECT_ID="your-project-id"
 libretto open https://example.com -p browserbase
+
+# Open with Steel
+export STEEL_API_KEY="your-key"
+libretto open https://example.com --provider steel
 
 # Open with Libretto Cloud
 export LIBRETTO_API_KEY="your-key"
