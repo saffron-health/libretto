@@ -2,15 +2,15 @@
 
 Install Libretto and verify that it runs end to end.
 
-## 1. Install the Libretto command
+## 1. Install the Libretto CLI
 
-Before anything else, install the global `libretto` command. This is required for every path below and must be run first. It is safe to rerun if Libretto is already installed. Requires Node.js and npm:
+Before anything else, install the global `libretto` CLI. This is required for every path below and must be run first. It is safe to rerun if Libretto is already installed. Requires Node.js and npm:
 
 ```bash
 curl -fsSL https://libretto.sh/install.sh | bash
 ```
 
-Verify the command is on PATH by running `libretto --help` before continuing.
+Verify the CLI is on PATH by running `libretto --help` before continuing.
 
 ## 2. Choose the target
 
