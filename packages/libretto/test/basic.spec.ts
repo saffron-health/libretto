@@ -95,6 +95,7 @@ function expectedRootHelp(): string {
       readonly-exec  Execute read-only Playwright inspection code
       run  Run the default-exported Libretto workflow from a file
       resume  Resume a paused workflow for the current session
+      search  Search the current page HTML snapshot
       setup  Set up libretto in the current project
       status  Show workspace status and open sessions
       snapshot  Capture a screenshot and compact accessibility snapshot
@@ -391,12 +392,25 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  test("experiments reports no registered experiments", async ({
+  test("experiments reports registered experiment status", async ({
     librettoCli,
   }) => {
     const initial = await librettoCli("experiments");
     expect(initial.stdout).toContain("Libretto experiments:");
+    expect(initial.stdout).toContain("search: disabled");
     expect(initial.stderr).toBe("");
+  });
+
+  test("search points users to its experiment flag when disabled", async ({
+    librettoCli,
+    seedSessionState,
+  }) => {
+    const session = "search-disabled";
+    await seedSessionState({ session });
+
+    const result = await librettoCli(`search Needle --session ${session}`);
+    expect(result.stderr).toContain('The "search" experiment is disabled.');
+    expect(result.stderr).toContain("libretto experiments enable search");
   });
 
   test("experiments rejects missing and unknown experiment names with usage", async ({

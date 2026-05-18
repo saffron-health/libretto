@@ -7,6 +7,7 @@ import { experimentsCommand } from "./commands/experiments.js";
 import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
 import { snapshotCommand } from "./commands/snapshot.js";
+import { searchCommand } from "./commands/search.js";
 import { SimpleCLI } from "affordance";
 
 export const cliRoutes = {
@@ -21,6 +22,7 @@ export const cliRoutes = {
   }),
   experiments: experimentsCommand,
   ...executionCommands,
+  search: searchCommand,
   setup: setupCommand,
   status: statusCommand,
   snapshot: snapshotCommand,
