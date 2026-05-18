@@ -17,7 +17,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 
 const ALLOWED_GH_SUBCOMMANDS = new Set(["pr"]);
 const ALLOWED_ACTIONS = new Set(["view", "diff"]);
-const SQUASH_MERGE_PR_NUMBER_PATTERN = /\(#(?<number>\d+)\)/;
+const SQUASH_MERGE_PR_NUMBER_PATTERN = /\(#(?<number>\d+)\)\s*$/;
 const MERGE_COMMIT_PR_NUMBER_PATTERN = /^Merge pull request #(?<number>\d+) /;
 
 interface GitHubRelease {
