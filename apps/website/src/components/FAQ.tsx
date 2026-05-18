@@ -49,6 +49,10 @@ const faqs: FAQItem[] = [
         <a href="https://www.kernel.computer/" className={linkClass}>
           Kernel
         </a>
+        , and{" "}
+        <a href="https://steel.dev/" className={linkClass}>
+          Steel
+        </a>
         {" "}to spin up browser sessions directly. Libretto can also connect to any
         browser that exposes a CDP endpoint, so you can run scripts against any
         arbitrary browser. Since the code lives in your repo, you can deploy it

@@ -810,7 +810,7 @@ export const runInput = SimpleCLI.input({
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
     provider: SimpleCLI.option(z.string().optional(), {
-      help: "Browser provider (local, kernel, browserbase)",
+      help: "Browser provider (local, kernel, browserbase, steel)",
       aliases: ["-p"],
     }),
   },

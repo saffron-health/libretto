@@ -15,6 +15,7 @@ Libretto automatically loads the repo root `.env` file before running CLI comman
 KERNEL_API_KEY=<kernel-api-key>
 BROWSERBASE_API_KEY=<browserbase-api-key>
 BROWSERBASE_PROJECT_ID=<browserbase-project-id>
+STEEL_API_KEY=<steel-api-key>
 ```
 
 Use `.libretto/config.json` for persistent workspace preferences like the default browser provider.
@@ -41,10 +42,10 @@ The config file is at `.libretto/config.json`. You can edit it directly.
 </ParamField>
 
 <ParamField path="provider" type="string">
-  Optional. The browser provider to use. Must be `"local"`, `"kernel"`, `"browserbase"`, or `"libretto-cloud"`. Defaults to `"local"`. Can be overridden per-command with `--provider` or the `LIBRETTO_PROVIDER` environment variable. Resolution order: `--provider` flag → `LIBRETTO_PROVIDER` env var → this config field → `"local"`.
+  Optional. The browser provider to use. Must be `"local"`, `"kernel"`, `"browserbase"`, `"steel"`, or `"libretto-cloud"`. Defaults to `"local"`. Can be overridden per-command with `--provider` or the `LIBRETTO_PROVIDER` environment variable. Resolution order: `--provider` flag → `LIBRETTO_PROVIDER` env var → this config field → `"local"`.
 
   <Note>
-    If you deploy to a cloud host using `kernel`, `browserbase`, or `libretto-cloud`, set `provider` here too. Then local `open`, `run`, and debugging use the same browser as production — the container's Chromium isn't identical to your local one, and the drift causes inconsistent rendering and timing.
+    If you deploy to a cloud host using `kernel`, `browserbase`, `steel`, or `libretto-cloud`, set `provider` here too. Then local `open`, `run`, and debugging use the same browser as production — the container's Chromium isn't identical to your local one, and the drift causes inconsistent rendering and timing.
   </Note>
 </ParamField>
 

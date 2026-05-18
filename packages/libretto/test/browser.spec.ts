@@ -4,6 +4,7 @@ import { openInput } from "../src/cli/commands/browser.js";
 import { normalizeDomain, normalizeUrl } from "../src/cli/core/browser.js";
 import { resolveProviderName } from "../src/cli/core/providers/index.js";
 import { createLibrettoCloudProvider } from "../src/cli/core/providers/libretto-cloud.js";
+import { createSteelProvider } from "../src/cli/core/providers/steel.js";
 import { test } from "./fixtures.js";
 
 describe("browser URL normalization", () => {
@@ -117,6 +118,105 @@ describe("provider resolution via CLI", () => {
 
     expect(result.stderr).not.toContain("BROWSERBASE_API_KEY is required");
     expect(result.stderr).not.toContain("BROWSERBASE_PROJECT_ID is required");
+  });
+});
+
+describe("Steel provider", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("creates sessions and builds the documented CDP endpoint", async () => {
+    vi.stubEnv("STEEL_API_KEY", "test-key");
+    vi.stubEnv("STEEL_BASE_URL", "https://steel.example.test");
+    vi.stubEnv("STEEL_CONNECT_URL", "wss://connect.example.test");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        if (new URL(String(url)).pathname === "/v1/sessions") {
+          return jsonResponse({
+            id: "session-ready",
+            sessionViewerUrl: "https://app.steel.dev/sessions/session-ready",
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await createSteelProvider().createSession();
+
+    expect(session).toEqual({
+      sessionId: "session-ready",
+      cdpEndpoint:
+        "wss://connect.example.test/?apiKey=test-key&sessionId=session-ready",
+      liveViewUrl: "https://app.steel.dev/sessions/session-ready",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://steel.example.test/v1/sessions",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "steel-api-key": "test-key",
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      }),
+    );
+  });
+
+  it("releases sessions through the Steel release endpoint", async () => {
+    vi.stubEnv("STEEL_API_KEY", "test-key");
+    vi.stubEnv("STEEL_BASE_URL", "https://steel.example.test");
+
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ success: true, message: "released" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createSteelProvider().closeSession("session-ready");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://steel.example.test/v1/sessions/session-ready/release",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "steel-api-key": "test-key",
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      }),
+    );
+  });
+
+  it("uses direct API key options before Steel environment variables", async () => {
+    vi.stubEnv("STEEL_API_KEY", "env-key");
+    vi.stubEnv("STEEL_BASE_URL", "https://steel.example.test");
+    vi.stubEnv("STEEL_CONNECT_URL", "wss://connect.example.test");
+
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        id: "session-ready",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await createSteelProvider({
+      apiKey: "option-key",
+    }).createSession();
+
+    expect(session.cdpEndpoint).toBe(
+      "wss://connect.example.test/?apiKey=option-key&sessionId=session-ready",
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://steel.example.test/v1/sessions",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "steel-api-key": "option-key",
+        }),
+      }),
+    );
   });
 });
 

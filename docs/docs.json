@@ -123,6 +123,7 @@
               "alternative-providers/overview",
               "alternative-providers/kernel",
               "alternative-providers/browserbase",
+              "alternative-providers/steel",
               "alternative-providers/gcp",
               "alternative-providers/aws"
             ]
