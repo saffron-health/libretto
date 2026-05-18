@@ -267,7 +267,9 @@ describe("basic CLI subprocess behavior", () => {
     librettoCli,
   }) => {
     const result = await librettoCli("help cloud");
-    expect(result.stdout).toContain("Libretto Cloud commands");
+    expect(result.stdout).toContain(
+      "Deploy workflows and manage hosted Libretto",
+    );
     expect(result.stdout).toContain(
       "libretto cloud <subcommand>",
     );

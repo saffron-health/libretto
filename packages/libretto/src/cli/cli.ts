@@ -6,17 +6,6 @@ import {
 } from "./core/skill-version.js";
 import { loadEnv } from "../shared/env/load-env.js";
 
-function renderUsage(app: ReturnType<typeof createCLIApp>): string {
-  return [
-    app.renderHelp(),
-    "",
-    "Options:",
-    "  --session <name>  Required for session-scoped commands",
-    "  -h, --help",
-    "  -v, --version",
-  ].join("\n");
-}
-
 function renderVersion(): string {
   return readCurrentCliVersion();
 }
@@ -43,7 +32,6 @@ function warnIfPackageManagerExec(): void {
 
 function isRootHelpRequest(rawArgs: readonly string[]): boolean {
   if (rawArgs.length === 0) return true;
-  if (rawArgs[0] === "--help" || rawArgs[0] === "-h") return true;
   return rawArgs[0] === "help" && rawArgs.length === 1;
 }
 
@@ -78,7 +66,7 @@ export async function runLibrettoCLI(): Promise<void> {
     }
 
     if (isRootHelpRequest(rawArgs)) {
-      console.log(renderUsage(app));
+      console.log(app.renderHelp());
       printSetupAudit();
       return;
     }
@@ -93,12 +81,12 @@ export async function runLibrettoCLI(): Promise<void> {
       if (hasRootHelp(message, app)) {
         const summary = message.split("\n", 1)[0] ?? message;
         console.error(`${summary}\n`);
-        console.log(renderUsage(app));
+        console.log(app.renderHelp());
       } else if (hasScopedHelp(message)) {
         console.error(message);
       } else {
         console.error(`${message}\n`);
-        console.log(renderUsage(app));
+        console.log(app.renderHelp());
       }
     } else {
       console.error(message);

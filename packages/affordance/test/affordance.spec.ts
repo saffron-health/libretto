@@ -541,6 +541,43 @@ describe("SimpleCLI framework", () => {
     );
   });
 
+  test("appends configured root help text", async () => {
+    const noInput = SimpleCLI.input({ positionals: [], named: {} });
+    const app = SimpleCLI.define(
+      "libretto",
+      {
+        open: SimpleCLI.command({ description: "Launch browser and open URL" })
+          .input(noInput)
+          .handle(async () => {}),
+      },
+      {
+        appendHelpText: [
+          "Options:",
+          "  --session <name>  Required for session-scoped commands",
+          "  -h, --help",
+        ].join("\n"),
+      },
+    );
+
+    const rootHelp = [
+      "Usage: libretto <command>",
+      "",
+      "Commands:",
+      "  open  Launch browser and open URL",
+      "",
+      "Options:",
+      "  --session <name>  Required for session-scoped commands",
+      "  -h, --help",
+    ].join("\n");
+
+    await expect(app.run(["help"])).resolves.toBe(rootHelp);
+    await expect(app.run(["--help"])).resolves.toBe(rootHelp);
+    await expect(app.run(["-h"])).resolves.toBe(rootHelp);
+    await expect(app.run(["opne"])).rejects.toThrow(
+      ["Unknown command: opne", "", rootHelp].join("\n"),
+    );
+  });
+
   test("renders command help from the route path description and parameters", async () => {
     const aiConfigureInput = SimpleCLI.input({
       positionals: [

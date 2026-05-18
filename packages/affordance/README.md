@@ -39,6 +39,25 @@ const app = SimpleCLI.define("mycli", {
 await app.run(process.argv.slice(2));
 ```
 
+## Root Help
+
+Affordance renders root help from the command tree, including one-line command
+descriptions. CLIs can append root-only help text for global options or
+agent-facing guidance:
+
+```ts
+const app = SimpleCLI.define("mycli", routes, {
+  appendHelpText: [
+    "Options:",
+    "  --profile <name>  Use a saved profile",
+    "  -h, --help",
+  ].join("\n"),
+});
+```
+
+The appended text is included in `mycli help`, `mycli --help`, `mycli -h`, and
+unknown root-command recovery output.
+
 ## Unknown Commands
 
 When command resolution fails, Affordance includes scoped help in the thrown

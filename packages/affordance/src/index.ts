@@ -61,6 +61,7 @@ type SimpleCLIInputDefinition = {
 
 type SimpleCLIAppConfig = {
   globalNamed?: SimpleCLINamedDefinition;
+  appendHelpText?: string;
 };
 
 type InferPositionals<TDefs extends SimpleCLIPositionalsDefinition> = {
@@ -394,6 +395,7 @@ export class SimpleCLIApp {
   private readonly resolvedGroups = new Map<string, InternalResolvedGroup>();
   private readonly routeEntries: InternalResolvedRouteEntry[];
   private readonly globalNamed: SimpleCLINamedDefinition;
+  private readonly appendHelpText?: string;
 
   constructor(
     readonly name: string,
@@ -402,6 +404,7 @@ export class SimpleCLIApp {
   ) {
     const resolution = resolveRouteTree(routes);
     this.globalNamed = config.globalNamed ?? {};
+    this.appendHelpText = config.appendHelpText;
 
     for (const group of resolution.groups) {
       if (this.resolvedGroups.has(group.routeKey)) {
@@ -780,6 +783,9 @@ export class SimpleCLIApp {
     const lines = [`Usage: ${this.name} <command>`, "", "Commands:"];
     for (const entry of this.getRootHelpEntries()) {
       lines.push(formatListEntry(entry.label, entry.description));
+    }
+    if (this.appendHelpText) {
+      lines.push("", this.appendHelpText);
     }
     return lines.join("\n");
   }

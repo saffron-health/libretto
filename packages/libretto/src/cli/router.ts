@@ -27,5 +27,12 @@ export const cliRoutes = {
 };
 
 export function createCLIApp() {
-  return SimpleCLI.define("libretto", cliRoutes);
+  return SimpleCLI.define("libretto", cliRoutes, {
+    appendHelpText: [
+      "Options:",
+      "  --session <name>  Required for session-scoped commands",
+      "  -h, --help",
+      "  -v, --version",
+    ].join("\n"),
+  });
 }
