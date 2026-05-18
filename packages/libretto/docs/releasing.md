@@ -35,12 +35,12 @@ On npm, configure each published package to trust this repository and workflow f
 - Workflow filename: `release.yml`
 - Environment name: `release`
 
-If you prefer the CLI, run one setup command per package:
+If you prefer the CLI, run one setup command per package with npm 11.10.0 or newer:
 
 ```bash
-npm trust github libretto --repo saffron-health/libretto --file release.yml --env release
-npm trust github affordance --repo saffron-health/libretto --file release.yml --env release
-npm trust github create-libretto --repo saffron-health/libretto --file release.yml --env release
+npx --yes npm@11.13.0 trust github libretto --repo saffron-health/libretto --file release.yml --env release --yes
+npx --yes npm@11.13.0 trust github affordance --repo saffron-health/libretto --file release.yml --env release --yes
+npx --yes npm@11.13.0 trust github create-libretto --repo saffron-health/libretto --file release.yml --env release --yes
 ```
 
 Trusted publishing only works on supported cloud-hosted runners. This workflow uses `ubuntu-latest`, which satisfies that requirement. npm also requires a recent toolchain for trusted publishing, so the publish job runs on Node 24.
