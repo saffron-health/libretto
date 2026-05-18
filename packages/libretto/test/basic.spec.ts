@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import outdent from "outdent";
@@ -99,6 +99,7 @@ function expectedRootHelp(): string {
       setup  Set up libretto in the current project
       status  Show workspace status and open sessions
       snapshot  Capture a screenshot and compact accessibility snapshot
+      update  Update Libretto to the latest version
 
     Options:
       --session <name>  Required for session-scoped commands
@@ -261,6 +262,52 @@ describe("basic CLI subprocess behavior", () => {
     const result = await librettoCli("help status");
     expect(result.stdout).toContain("Show workspace status");
     expect(result.stdout).toContain("open sessions");
+    expect(result.stderr).toBe("");
+  });
+
+  test("prints scoped help for update command", async ({ librettoCli }) => {
+    const result = await librettoCli("help update");
+    expect(result.stdout).toContain("Update Libretto to the latest version");
+    expect(result.stdout).toContain("--dry-run");
+    expect(result.stderr).toBe("");
+  });
+
+  test("update dry-run prints the installer command", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli("update --dry-run");
+    expect(result.stdout).toContain("Update command:");
+    expect(result.stdout).toContain(
+      "curl -fsSL https://libretto.sh/install.sh | bash",
+    );
+    expect(result.stdout).toContain("No changes made.");
+    expect(result.stderr).toBe("");
+  });
+
+  test("update skips installer when already on the latest version", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    const binDir = workspacePath("bin");
+    await mkdir(binDir, { recursive: true });
+    const npmPath = workspacePath("bin", "npm");
+    await writeFile(
+      npmPath,
+      `#!/usr/bin/env bash\nprintf '%s\\n' '${cliVersion}'\n`,
+      "utf8",
+    );
+    await chmod(npmPath, 0o755);
+
+    const result = await librettoCli("update", {
+      PATH: `${binDir}:${process.env.PATH ?? ""}`,
+    });
+
+    expect(result.stdout).toContain(`Current version: ${cliVersion}`);
+    expect(result.stdout).toContain(`Latest version: ${cliVersion}`);
+    expect(result.stdout).toContain("Libretto is already up to date");
+    expect(result.stdout).toContain("No further action required.");
+    expect(result.stdout).not.toContain("Updating Libretto to latest");
     expect(result.stderr).toBe("");
   });
 
