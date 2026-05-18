@@ -37,6 +37,13 @@ const faqs: FAQItem[] = [
       "Tools like Stagehand and Browser-Use use AI at runtime to handle edge cases without human involvement. They also rely entirely on UI interactions, which makes them slow, expensive, and nondeterministic.\n\nLibretto generates deterministic scripts that can use both UI automation and direct network requests. When a script breaks, you use Libretto to diagnose and fix it. You can still add AI runtime logic since it's all just TypeScript, but it's not the default.",
   },
   {
+    id: "diff-playwright",
+    question:
+      "How is it different from tools like playwright-cli, agent-browser, and dev-browser?",
+    answer:
+      "Libretto is both a runtime and a CLI, built around the workflow of writing reusable automation scripts.\n\nIt's optimized for that loop: a script validation loop that checks scripts run end-to-end, debugging with pause statements you can drop into your code, and the ability to record workflows in a real browser and turn them into scripts.\n\nWhen you're happy with a script, you can deploy it to the cloud and run it as a type-safe API with one command.",
+  },
+  {
     id: "providers",
     question: "What cloud providers do you support?",
     answer: (
