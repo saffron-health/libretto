@@ -2,7 +2,17 @@
 
 Install Libretto and verify that it runs end to end.
 
-## 1. Choose the target
+## 1. Install the Libretto CLI
+
+Before anything else, install the global `libretto` CLI. This is required for every path below and must be run first. It is safe to rerun if Libretto is already installed. Requires Node.js and npm:
+
+```bash
+curl -fsSL https://libretto.sh/install.sh | bash
+```
+
+Verify the CLI is on PATH by running `libretto --help` before continuing.
+
+## 2. Choose the target
 
 Inspect the current directory. Ask only for missing information:
 
@@ -11,7 +21,7 @@ Inspect the current directory. Ask only for missing information:
 
 Use the target project's package manager conventions. If the user already chose a path, location, name, or package manager, treat that as binding.
 
-## 2. Install
+## 3. Set up the package
 
 For a new package:
 
@@ -22,12 +32,6 @@ cd <package-name>
 
 After creating a new package, do all remaining setup and verification inside the created package directory.
 
-Install the Libretto command once if it is not already available. This requires Node.js and npm:
-
-```bash
-curl -fsSL https://libretto.sh/install.sh | bash
-```
-
 For an existing package:
 
 ```bash
@@ -37,7 +41,7 @@ libretto setup
 
 Use equivalent pnpm, yarn, or bun commands when appropriate.
 
-## 3. Read installed guidance
+## 4. Read installed guidance
 
 After installation, make sure your current directory is the package directory. Then read the installed skill before creating or editing workflow code:
 
@@ -47,7 +51,7 @@ node_modules/libretto/skills/libretto/SKILL.md
 
 The package also includes docs under `node_modules/libretto/docs/`; use them only when the skill or task requires more detail.
 
-## 4. Verify
+## 5. Verify
 
 For this smoke check, copy the workflow below directly; do not inspect the scaffolded example or read additional references unless validation fails.
 
@@ -71,7 +75,7 @@ Run it:
 libretto run src/workflows/scrape-page.ts --headless
 ```
 
-## 5. Finish
+## 6. Finish
 
 After verifying Libretto is setup and working properly, summarize the steps taken and offer some sample browser automations you could build next, such as:
 
