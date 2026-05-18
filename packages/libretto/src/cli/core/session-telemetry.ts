@@ -1,4 +1,7 @@
 import type { BrowserContext, Page } from "playwright";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 import {
   filterSemanticClasses,
   INTERACTIVE_ROLE_NAMES,
@@ -16,18 +19,69 @@ type InstallSessionTelemetryOptions = {
   logAction: (entry: TelemetryEntry) => void;
   logNetwork: (entry: TelemetryEntry) => void;
   includeUserDomActions?: boolean;
+  rawNetworkDir?: string;
 };
+
+const BODY_PREVIEW_CHARS = 4096;
+const MAX_SAVED_BODY_BYTES = 10 * 1024 * 1024;
+const LOG_RESOURCE_TYPES = new Set(["document", "xhr", "fetch"]);
+const SKIP_RESOURCE_TYPES = new Set(["image", "font", "media", "stylesheet"]);
+const NOISE_URL_RE =
+  /(google-analytics|googletagmanager|googleadservices|googlesyndication|doubleclick|facebook\.com\/tr|pinterest|criteo|snapchat|2mdn\.net|adtrafficquality|safeframe|recaptcha|analytics|beacon|pixel|\/ads?\/|\/collect|\/event|\/pagead\/|\/gmp\/conversion|\/ccm\/|\/rmkt\/|favicon|\.map(?:\?|$))/i;
+const TEXT_CONTENT_TYPE_RE =
+  /json|html|text|xml|graphql|javascript|x-www-form-urlencoded/i;
+
+function shouldLogNetworkEntry(
+  method: string,
+  url: string,
+  resourceType: string,
+): boolean {
+  if (url.startsWith("chrome-extension://")) return false;
+  if (NOISE_URL_RE.test(url)) return false;
+  if (resourceType === "ping") return false;
+  if (LOG_RESOURCE_TYPES.has(resourceType)) return true;
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) return true;
+  if (SKIP_RESOURCE_TYPES.has(resourceType)) return false;
+  return false;
+}
+
+function isTextLikeContentType(contentType: string | null): boolean {
+  return contentType !== null && TEXT_CONTENT_TYPE_RE.test(contentType);
+}
+
+function bodyPreview(value: string): string {
+  return value.slice(0, BODY_PREVIEW_CHARS);
+}
+
+function saveBodySidecar(
+  rawNetworkDir: string | undefined,
+  id: number,
+  kind: "request" | "response",
+  contentType: string | null,
+  body: string,
+): string | null {
+  if (!rawNetworkDir) return null;
+  mkdirSync(rawNetworkDir, { recursive: true });
+  const ext = contentType?.includes("json")
+    ? "json"
+    : contentType?.includes("html")
+      ? "html"
+      : "txt";
+  const filename = `${String(id).padStart(6, "0")}.${kind}.${ext}.gz`;
+  writeFileSync(join(rawNetworkDir, filename), gzipSync(body));
+  return `raw-network/${filename}`;
+}
 
 export async function installSessionTelemetry(
   options: InstallSessionTelemetryOptions,
 ): Promise<void> {
-  const STATIC_EXT_RE =
-    /\.(css|js|png|jpg|jpeg|gif|woff|woff2|ttf|ico|svg)(\?|$)/i;
-  const { context, initialPage, logAction, logNetwork } = options;
+  const { context, initialPage, logAction, logNetwork, rawNetworkDir } =
+    options;
   const includeUserDomActions = options.includeUserDomActions ?? false;
   const pageIdCache = new WeakMap<Page, string>();
   const wrappedPages = new WeakSet<Page>();
   const exposedPages = new WeakSet<Page>();
+  let networkId = 0;
 
   const resolvePageId = async (page: Page): Promise<string> => {
     if (pageIdCache.has(page)) return pageIdCache.get(page)!;
@@ -748,20 +802,129 @@ export async function installSessionTelemetry(
     page.on("response", async (response) => {
       const request = response.request();
       const url = request.url();
-      if (STATIC_EXT_RE.test(url) || url.startsWith("chrome-extension://"))
-        return;
+      const method = request.method();
+      const resourceType = request.resourceType();
+      if (!shouldLogNetworkEntry(method, url, resourceType)) return;
+
+      const id = ++networkId;
+      const requestHeaders = request.headers();
+      const responseHeaders = response.headers();
+      const contentType = responseHeaders["content-type"] ?? null;
+      const requestContentType = requestHeaders["content-type"] ?? null;
+      const requestBody = request.postData();
+      const requestBodyBytes =
+        requestBody === null ? null : Buffer.byteLength(requestBody);
+      let requestBodyPath: string | null = null;
+      let requestBodyOmittedReason: string | null = null;
+      let responseBodyPreview: string | null = null;
+      let responseBodyPath: string | null = null;
+      let responseBodyBytes: number | null = null;
+      let responseBodyTruncated = false;
+      let responseBodyOmittedReason: string | null = null;
+      let errorText: string | null = null;
+
+      if (requestBody === null) {
+        requestBodyOmittedReason = "no-request-body";
+      } else if (!isTextLikeContentType(requestContentType)) {
+        requestBodyOmittedReason = "binary-content-type";
+      } else if (requestBodyBytes !== null && requestBodyBytes > MAX_SAVED_BODY_BYTES) {
+        requestBodyOmittedReason = "body-too-large";
+      } else {
+        requestBodyPath = saveBodySidecar(
+          rawNetworkDir,
+          id,
+          "request",
+          requestContentType,
+          requestBody,
+        );
+      }
+
+      if (!isTextLikeContentType(contentType) || !LOG_RESOURCE_TYPES.has(resourceType)) {
+        responseBodyOmittedReason = "binary-content-type";
+      } else {
+        try {
+          const responseBody = await response.text();
+          responseBodyBytes = Buffer.byteLength(responseBody);
+          responseBodyPreview = bodyPreview(responseBody);
+          if (responseBodyBytes > MAX_SAVED_BODY_BYTES) {
+            responseBodyTruncated = true;
+            responseBodyOmittedReason = "body-too-large";
+          } else {
+            responseBodyPath = saveBodySidecar(
+              rawNetworkDir,
+              id,
+              "response",
+              contentType,
+              responseBody,
+            );
+          }
+        } catch (error: any) {
+          responseBodyOmittedReason = "read-error";
+          errorText = error?.message ?? String(error);
+        }
+      }
+
       emitNetwork({
+        id,
         pageId,
-        method: request.method(),
+        method,
         url,
+        resourceType,
         status: response.status(),
-        contentType: response.headers()["content-type"] ?? null,
-        postData:
-          request.method() === "POST" ||
-          request.method() === "PUT" ||
-          request.method() === "PATCH"
-            ? (request.postData() ?? "").substring(0, 2000)
-            : undefined,
+        statusText: response.statusText(),
+        contentType,
+        requestHeaders,
+        responseHeaders,
+        requestBodyPreview: requestBody ? bodyPreview(requestBody) : null,
+        requestBodyPath,
+        requestBodyBytes,
+        requestBodyTruncated:
+          requestBody !== null &&
+          requestBodyBytes !== null &&
+          requestBodyBytes > MAX_SAVED_BODY_BYTES,
+        requestBodyOmittedReason,
+        responseBodyPreview,
+        responseBodyPath,
+        responseBodyBytes,
+        responseBodyTruncated,
+        responseBodyOmittedReason,
+        errorText,
+        postData: requestBody ? bodyPreview(requestBody) : undefined,
+        responseBody: null,
+        size: null,
+        durationMs: null,
+      });
+    });
+
+    page.on("requestfailed", async (request) => {
+      const url = request.url();
+      const method = request.method();
+      const resourceType = request.resourceType();
+      if (!shouldLogNetworkEntry(method, url, resourceType)) return;
+
+      const id = ++networkId;
+      emitNetwork({
+        id,
+        pageId,
+        method,
+        url,
+        resourceType,
+        status: null,
+        statusText: null,
+        contentType: null,
+        requestHeaders: request.headers(),
+        responseHeaders: null,
+        requestBodyPreview: null,
+        requestBodyPath: null,
+        requestBodyBytes: null,
+        requestBodyTruncated: false,
+        requestBodyOmittedReason: null,
+        responseBodyPreview: null,
+        responseBodyPath: null,
+        responseBodyBytes: null,
+        responseBodyTruncated: false,
+        responseBodyOmittedReason: "request-failed",
+        errorText: request.failure()?.errorText ?? null,
         responseBody: null,
         size: null,
         durationMs: null,

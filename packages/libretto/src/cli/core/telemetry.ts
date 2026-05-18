@@ -11,16 +11,32 @@ import {
 import { assertSessionStateExistsOrThrow } from "./session.js";
 
 export type NetworkLogEntry = {
+  id?: number;
   ts: string;
   pageId?: string;
   method: string;
   url: string;
-  status: number;
+  resourceType?: string;
+  status: number | null;
+  statusText?: string | null;
   contentType: string | null;
+  requestHeaders?: Record<string, string> | null;
+  responseHeaders?: Record<string, string> | null;
+  requestBodyPreview?: string | null;
+  requestBodyPath?: string | null;
+  requestBodyBytes?: number | null;
+  requestBodyTruncated?: boolean;
+  requestBodyOmittedReason?: string | null;
+  responseBodyPreview?: string | null;
+  responseBodyPath?: string | null;
+  responseBodyBytes?: number | null;
+  responseBodyTruncated?: boolean;
+  responseBodyOmittedReason?: string | null;
+  errorText?: string | null;
   postData?: string;
   responseBody?: string | null;
-  size: number | null;
-  durationMs: number | null;
+  size?: number | null;
+  durationMs?: number | null;
 };
 
 export function readNetworkLog(

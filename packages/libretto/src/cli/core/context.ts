@@ -34,6 +34,10 @@ export function getSessionNetworkLogPath(session: string): string {
   return join(getSessionDir(session), "network.jsonl");
 }
 
+export function getSessionRawNetworkDir(session: string): string {
+  return join(getSessionDir(session), "raw-network");
+}
+
 export function getSessionActionsLogPath(session: string): string {
   return join(getSessionDir(session), "actions.jsonl");
 }
