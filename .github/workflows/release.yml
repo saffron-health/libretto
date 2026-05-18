@@ -125,7 +125,7 @@ jobs:
         if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
         run: |
           pnpm check:mirrors
-          pnpm --filter libretto build
+          pnpm --filter libretto... build
           pnpm --filter libretto type-check
           pnpm --filter libretto test
     outputs:
@@ -160,7 +160,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build publish artifacts
-        run: pnpm --filter libretto build
+        run: pnpm --filter libretto... build
 
       - name: Publish libretto to npm
         if: needs.verify.outputs.npm_exists != 'true'
