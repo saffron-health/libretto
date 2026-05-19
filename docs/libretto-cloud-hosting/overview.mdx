@@ -17,7 +17,8 @@ Libretto Cloud is the easiest way to host and run workflows. Sign up, run one de
 Use Libretto Cloud when you want to ship and run workflows without owning the runtime infrastructure yourself.
 
 - Libretto Cloud runs the browser layer for you, so you do not have to manage proxies, browser sessions, or CAPTCHA handling yourself.
-- When a run fails, Libretto Cloud automatically analyzes the failure and emails you a summary, along with the recordings, screenshots, logs, and other debug context you need to understand what broke.
+- By default, when a run fails, Libretto Cloud automatically analyzes the failure and emails you a summary, along with the recordings, screenshots, logs, and other debug context you need to understand what broke.
+- Deployments can also enable auto-repair, which routes failed jobs to the autofix agent instead of only sending debug context.
 - You can build, debug, and deploy workflow packages from the same CLI instead of stitching together separate tools for local development, browsers, and hosting.
 
 ### Set up Libretto Cloud
@@ -139,7 +140,11 @@ Use Libretto Cloud when you want to ship and run workflows without owning the ru
   </Card>
 
   <Card title="Deployments" icon="rocket" href="/libretto-cloud-hosting/deployments">
-    Deploy workflow bundles and investigate hosted failures.
+    Deploy workflow bundles to Libretto Cloud.
+  </Card>
+
+  <Card title="Observability and Debugging" icon="bug" href="/libretto-cloud-hosting/observability-and-debugging">
+    Debug workflow failures and investigate hosted workflow runs.
   </Card>
 
   <Card title="Billing" icon="credit-card" href="/libretto-cloud-hosting/billing">

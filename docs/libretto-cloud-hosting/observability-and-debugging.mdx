@@ -1,0 +1,55 @@
+---
+title: Observability and Debugging
+---
+
+> Debug workflow failures and investigate hosted workflow runs.
+
+### Recordings and debug context
+
+Every hosted workflow run captures a browser recording. Use it with job state, logs, screenshots, and failure reports to understand what happened during the run.
+
+Use `/v1/jobs/get` for status, params, timestamps, result or error, mapped stack, and `recording_url`.
+
+Use `/v1/jobs/debugReport` for failed-run diagnosis, fix instructions, artifact links, job error details, and auto-repair fields when available.
+
+Use `/v1/logs/list` for workflow logs and Libretto executor logs from the job, filtered by `jobId`, workflow, or severity.
+
+See [Jobs and Logs](/libretto-cloud-api/jobs-and-logs) for the full API reference.
+
+### Failure emails
+
+**By default**, when a Libretto Cloud workflow job fails, Libretto Cloud starts a debug agent to analyze the failed run. The agent emails the configured debug recipient with:
+
+- **A short diagnosis.** What failed and why.
+- **A handoff prompt for your local coding agent.** Includes the diagnosis and instructions for fixing the workflow.
+- **Links to relevant debug context.** Includes recordings, screenshots, and logs when available.
+
+The email is designed to move the fix back into a local coding workflow quickly. After you receive it, use the local repo and Libretto tooling to inspect the failure and patch the workflow.
+
+For the local debugging flow, see [Debugging workflows](/guides/debugging-workflows).
+
+### Auto-repair
+
+Auto-repair lets Libretto Cloud try to fix failed workflows for you. When a job fails, an autofix agent analyzes the run, edits the deployed workflow code, and publishes a replacement deployment when it has a fix.
+
+Use `--auto-repair` when deploying from the CLI:
+
+```bash theme={null}
+libretto cloud deploy my-automations --auto-repair
+```
+
+### Next steps
+
+<CardGroup cols={3}>
+  <Card title="Deployments" icon="rocket" href="/libretto-cloud-hosting/deployments">
+    Deploy workflow bundles and enable auto-repair.
+  </Card>
+
+  <Card title="Jobs and Logs" icon="terminal" href="/libretto-cloud-api/jobs-and-logs">
+    Invoke workflows and inspect job state.
+  </Card>
+
+  <Card title="Debugging workflows" icon="bug" href="/guides/debugging-workflows">
+    Use local tools to inspect and patch failed workflows.
+  </Card>
+</CardGroup>

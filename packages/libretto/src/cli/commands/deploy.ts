@@ -125,6 +125,10 @@ export const deployInput = SimpleCLI.input({
       name: "entry-point",
       help: "Entry point file (default: index.ts)",
     }),
+    autoRepair: SimpleCLI.flag({
+      name: "auto-repair",
+      help: "Route failed jobs for this deployment to autofix",
+    }),
     external: SimpleCLI.option(
       z
         .string()
@@ -167,6 +171,7 @@ export const deployCommand = SimpleCLI.command({
       entry_point: entryPoint,
     };
     if (input.description) createPayload.description = input.description;
+    if (input.autoRepair) createPayload.auto_repair = true;
 
     console.log("Uploading deployment...");
     const body = await orpcCall<DeploymentResponse["json"]>({

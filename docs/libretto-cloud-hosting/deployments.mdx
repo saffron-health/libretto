@@ -83,10 +83,13 @@ If you want to deploy from a different entry file, keep the source directory as 
 ```bash theme={null}
 libretto cloud deploy my-automations \
   --description "payer portal workflows" \
-  --entry-point src/workflows/check-eligibility.ts
+  --entry-point src/workflows/check-eligibility.ts \
+  --auto-repair
 ```
 
 The CLI bundles the deploy artifact, uploads it to Libretto Cloud, then waits for the build to finish. When the build is ready, it prints the deployment id and the discovered workflow names.
+
+Use `--auto-repair` when failed jobs from this deployment should route to the autofix agent instead of the readonly debug agent.
 
 ### Run a deployed workflow
 
@@ -144,18 +147,6 @@ curl -X POST "https://api.libretto.sh/v1/jobs/get" \
 
 The `workflow` value must match the workflow name declared in code and discovered during deploy, not the deployment id, filename, or export alias.
 
-### Investigate cloud failures
-
-When a Libretto Cloud workflow job fails, the platform emails the configured debug recipient with:
-
-- A short diagnosis.
-- A handoff prompt for a local coding agent.
-- Links to the relevant debug context, such as screenshots or recordings when available.
-
-That email is designed to move the fix back into a local coding workflow quickly. After you receive it, use the local repo and Libretto tooling to inspect the failure and patch the workflow.
-
-For the local debugging flow, see [Debugging workflows](/guides/debugging-workflows).
-
 ### Hosting options
 
 Libretto Cloud is the managed path. If you would rather use a different browser or infrastructure provider, use the alternative providers docs instead:
@@ -168,7 +159,10 @@ Libretto Cloud is the managed path. If you would rather use a different browser 
 - [Deploy on AWS](/alternative-providers/aws)
 
 <Note>
-  This page covers the managed hosted-platform flow. The alternative provider pages are the right reference when you want a different managed browser provider or want to own the runtime, scheduler, and secrets infrastructure yourself.
+  This page covers the managed hosted-platform flow. The alternative provider
+  pages are the right reference when you want a different managed browser
+  provider or want to own the runtime, scheduler, and secrets infrastructure
+  yourself.
 </Note>
 
 <CardGroup cols={3}>
@@ -176,12 +170,24 @@ Libretto Cloud is the managed path. If you would rather use a different browser 
     Start with the high-level cloud workflow.
   </Card>
 
-  <Card title="Authentication" icon="key" href="/libretto-cloud-hosting/authentication">
-    Create accounts, join organizations, and issue API keys.
-  </Card>
+<Card
+  title="Authentication"
+  icon="key"
+  href="/libretto-cloud-hosting/authentication"
+>
+  Create accounts, join organizations, and issue API keys.
+</Card>
 
-  <Card title="Billing" icon="credit-card" href="/libretto-cloud-hosting/billing">
-    Manage plans and open the billing portal.
-  </Card>
+<Card title="Billing" icon="credit-card" href="/libretto-cloud-hosting/billing">
+  Manage plans and open the billing portal.
+</Card>
+
+<Card
+  title="Observability and Debugging"
+  icon="bug"
+  href="/libretto-cloud-hosting/observability-and-debugging"
+>
+  Debug workflow failures and investigate hosted workflow runs.
+</Card>
 
 </CardGroup>
