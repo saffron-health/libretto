@@ -95,7 +95,7 @@ function expectVersionUpdateCommands(
   targetVersion: string,
 ): void {
   expect(stderr).toContain(
-    `global CLI:    npm install -g libretto@${targetVersion}`,
+    `global CLI:    curl -fsSL https://libretto.sh/install.sh | LIBRETTO_VERSION=${targetVersion} bash`,
   );
   expect(stderr).toContain(
     `local package: npm install libretto@${targetVersion}`,

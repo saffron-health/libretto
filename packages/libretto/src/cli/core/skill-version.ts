@@ -193,7 +193,7 @@ function formatVersionWarning(components: {
     )}`,
     "",
     "How to update:",
-    `  global CLI:    npm install -g libretto@${targetVersion}`,
+    `  global CLI:    curl -fsSL https://libretto.sh/install.sh | LIBRETTO_VERSION=${targetVersion} bash`,
     `  local package: npm install libretto@${targetVersion}`,
     "  agent skill:   libretto setup",
   ].join("\n");
