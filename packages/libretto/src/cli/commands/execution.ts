@@ -25,7 +25,7 @@ import {
   writeSessionState,
   type SessionState,
 } from "../core/session.js";
-import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
+import { warnIfLibrettoVersionsDiffer } from "../core/skill-version.js";
 import { readLibrettoConfig } from "../core/config.js";
 import { renderSnapshotDiff } from "../../shared/snapshot/diff-snapshots.js";
 import {
@@ -860,7 +860,7 @@ export const runCommand = SimpleCLI.command({
   .use(withAutoSession())
   .use(withExperiments())
   .handle(async ({ input, ctx }) => {
-    warnIfInstalledSkillOutOfDate();
+    warnIfLibrettoVersionsDiffer();
     await stopExistingFailedRunSession(ctx.session, ctx.logger);
     assertSessionAvailableForStart(ctx.session, ctx.logger);
 
