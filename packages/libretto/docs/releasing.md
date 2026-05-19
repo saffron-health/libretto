@@ -28,17 +28,19 @@ GitHub Actions needs these repository secrets:
 
 The release workflow uses a GitHub Actions environment named `release`. Create that environment in the repository settings (no required reviewers — access is controlled by branch protection on `main` instead).
 
-On npm, configure `libretto` to trust this repository and workflow for publishing. The trusted publisher fields should match:
+On npm, configure each published package to trust this repository and workflow for publishing:
 
 - Organization or user: `saffron-health`
 - Repository: `libretto`
 - Workflow filename: `release.yml`
 - Environment name: `release`
 
-If you prefer the CLI, the setup command is:
+If you prefer the CLI, run one setup command per package with npm 11.10.0 or newer:
 
 ```bash
-npm trust github libretto --repo saffron-health/libretto --file release.yml --env release
+npx --yes npm@11.13.0 trust github libretto --repo saffron-health/libretto --file release.yml --env release --yes
+npx --yes npm@11.13.0 trust github affordance --repo saffron-health/libretto --file release.yml --env release --yes
+npx --yes npm@11.13.0 trust github create-libretto --repo saffron-health/libretto --file release.yml --env release --yes
 ```
 
 Trusted publishing only works on supported cloud-hosted runners. This workflow uses `ubuntu-latest`, which satisfies that requirement. npm also requires a recent toolchain for trusted publishing, so the publish job runs on Node 24.
@@ -80,7 +82,7 @@ The workflow:
 1. Reads the version from `packages/libretto/package.json`.
 2. Checks whether that version already exists on npm and in GitHub Releases.
 3. Runs install, type-check, and tests for the `libretto` package in a verification job.
-4. Publishes `libretto@X.Y.Z` to npm from `packages/libretto` with trusted publishing if it is not already published.
+4. Publishes `affordance` first, then `libretto@X.Y.Z`, then `create-libretto@X.Y.Z` with trusted publishing.
 5. Creates GitHub release `vX.Y.Z` with generated release notes if it does not already exist.
 
 This makes the workflow safe to re-run after partial failures. For example, if npm publish succeeds but GitHub release creation fails, a re-run will skip npm and only create the missing release.

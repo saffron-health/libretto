@@ -5,7 +5,8 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 export type CreateTmpWorkspaceOptions = {
@@ -24,6 +25,13 @@ export type CreateTmpWorkspaceOptions = {
    *  parallel eval/benchmark runs where a prior step handles the build. */
   skipBuild?: boolean;
 };
+
+type PackageManifest = Record<string, unknown> & {
+  name: string;
+  version: string;
+};
+
+let packedPackageTarballsPromise: Promise<string[]> | null = null;
 
 function findRepoRoot(): string {
   const override = process.env.LIBRETTO_REPO_ROOT?.trim();
@@ -54,6 +62,57 @@ function run(
     stdio: quiet ? ["ignore", "pipe", "pipe"] : ["ignore", "inherit", "pipe"],
     encoding: "utf8",
   });
+}
+
+function parseManifest(raw: string, source: string): PackageManifest {
+  const parsed = JSON.parse(raw) as unknown;
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    typeof (parsed as { name?: unknown }).name !== "string" ||
+    typeof (parsed as { version?: unknown }).version !== "string"
+  ) {
+    throw new Error(`Invalid package manifest: ${source}`);
+  }
+  return parsed as PackageManifest;
+}
+
+function packageTarballName(manifest: PackageManifest): string {
+  return `${manifest.name.replace(/^@/, "").replace("/", "-")}-${manifest.version}.tgz`;
+}
+
+function packPackage(
+  packagePath: string,
+  destination: string,
+  quiet: boolean,
+): string {
+  const sourceManifest = parseManifest(
+    readFileSync(join(packagePath, "package.json"), "utf8"),
+    join(packagePath, "package.json"),
+  );
+
+  run(packagePath, "pnpm", ["pack", "--pack-destination", destination], quiet);
+
+  return join(destination, packageTarballName(sourceManifest));
+}
+
+async function getPackedPackageTarballs(
+  repoRoot: string,
+  quiet: boolean,
+): Promise<string[]> {
+  packedPackageTarballsPromise ??= Promise.resolve().then(() => {
+    const packDir = resolve(
+      tmpdir(),
+      `libretto-packed-packages-${process.pid}-${Date.now()}`,
+    );
+    mkdirSync(packDir, { recursive: true });
+
+    return [
+      packPackage(resolve(repoRoot, "packages", "affordance"), packDir, quiet),
+      packPackage(resolve(repoRoot, "packages", "libretto"), packDir, quiet),
+    ];
+  });
+  return packedPackageTarballsPromise;
 }
 
 export async function createTmpWorkspace(
@@ -117,11 +176,13 @@ export async function createTmpWorkspace(
   );
 
   // Install local libretto plus any caller-requested packages.
+  const packageTarballs = await getPackedPackageTarballs(repoRoot, quiet);
+
   const installArgs = [
     "add",
     "--lockfile=false",
     "--ignore-scripts",
-    `file:${librettoPackageRoot}`,
+    ...packageTarballs,
     ...(options.extraPackages ?? []),
   ];
   log(`  Installing packages: pnpm ${installArgs.join(" ")}`);
