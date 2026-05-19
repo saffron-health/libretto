@@ -89,6 +89,7 @@ import {
   loadDefaultWorkflow,
 } from "../workflow-runtime.js";
 import { WorkflowController } from "../workflow-runner/runner.js";
+import { validateWorkflowInput } from "../../../shared/workflow/workflow.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -941,6 +942,7 @@ async function main(): Promise<void> {
       loadedWorkflow = await loadDefaultWorkflow(
         getAbsoluteIntegrationPath(config.workflow.integrationPath),
       );
+      validateWorkflowInput(loadedWorkflow, config.workflow.params ?? {});
     } catch (error) {
       throw new UserFacingStartupError(
         error instanceof Error ? error.message : String(error),

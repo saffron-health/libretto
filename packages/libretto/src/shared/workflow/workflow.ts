@@ -49,6 +49,32 @@ function formatZodErrorMessage(
   ].join("\n");
 }
 
+function parseWorkflowInput<InputSchema extends z.ZodType>(
+  workflowName: string,
+  inputSchema: InputSchema | undefined,
+  input: unknown,
+): z.infer<InputSchema> {
+  if (!inputSchema) return input as z.infer<InputSchema>;
+
+  const result = inputSchema.safeParse(input);
+  if (!result.success) {
+    throw new LibrettoWorkflowInputError(workflowName, result.error);
+  }
+  return result.data;
+}
+
+export type WorkflowInputValidator = {
+  readonly name: string;
+  readonly inputSchema?: z.ZodType;
+};
+
+export function validateWorkflowInput(
+  workflow: WorkflowInputValidator,
+  input: unknown,
+): void {
+  parseWorkflowInput(workflow.name, workflow.inputSchema, input);
+}
+
 export class LibrettoWorkflow<
   InputSchema extends z.ZodType = z.ZodType<unknown>,
   OutputSchema extends z.ZodType = z.ZodType<unknown>,
@@ -86,16 +112,7 @@ export class LibrettoWorkflow<
     ctx: LibrettoWorkflowContext,
     input: unknown,
   ): Promise<z.infer<OutputSchema>> {
-    let parsed: z.infer<InputSchema>;
-    if (this.inputSchema) {
-      const result = this.inputSchema.safeParse(input);
-      if (!result.success) {
-        throw new LibrettoWorkflowInputError(this.name, result.error);
-      }
-      parsed = result.data;
-    } else {
-      parsed = input as z.infer<InputSchema>;
-    }
+    const parsed = parseWorkflowInput(this.name, this.inputSchema, input);
     return this.handler(ctx, parsed);
   }
 }

@@ -41,7 +41,7 @@ const faqs: FAQItem[] = [
     question:
       "How is it different from tools like playwright-cli, agent-browser, and dev-browser?",
     answer:
-      "Libretto is both a runtime and a CLI, built specifically for writing reusable automation scripts.\n\nIt comes out of the box with a script validation loop that checks scripts run end-to-end when you generate them or make edits, pause statements you drop into your code for step-through debugging, and a workflow recorder that captures actions in a real browser and turns them into scripts.\n\nWhen you're happy with a script, you deploy it to the cloud and run it as a type-safe API with one command.",
+      "Libretto is both a runtime and a CLI, built specifically for writing reusable automation scripts.\n\nIt comes out of the box with a script validation loop that checks scripts run end-to-end when you generate them or make edits, pause statements agents can drop into your code for step-through debugging, and a workflow recorder that captures actions in a real browser and turns them into scripts.\n\nWhen you're happy with a script, you deploy it to the cloud and run it as a type-safe API with one command.",
   },
   {
     id: "providers",

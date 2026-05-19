@@ -100,11 +100,13 @@ export {
   LibrettoWorkflow,
   LibrettoWorkflowInputError,
   LIBRETTO_WORKFLOW_BRAND,
+  validateWorkflowInput,
   workflow,
   type ExportedLibrettoWorkflow,
   type LibrettoWorkflowContext,
   type LibrettoWorkflowHandler,
   type LibrettoWorkflowSchemas,
+  type WorkflowInputValidator,
 } from "./shared/workflow/workflow.js";
 const isDirectExecution = (): boolean => {
   const entryArg = process.argv[1];

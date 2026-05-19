@@ -17,7 +17,7 @@ Request fields:
 - `description`: optional deployment description
 - `source`: base64-encoded gzip tarball
 - `entry_point`: optional entry file, default `index.ts`
-- `auto_repair`: optional boolean, default `false`
+- `auto_repair`: optional boolean, default `false`. When `true`, failed jobs for this deployment route to the autofix agent instead of the readonly debug agent.
 
 Response fields:
 
@@ -224,9 +224,9 @@ curl -X POST "https://api.libretto.sh/v1/deployments/sync" \
     Invoke workflows and inspect job state.
   </Card>
 
-  <Card title="Sessions" icon="browser" href="/libretto-cloud-api/sessions">
-    Create browser sessions directly.
-  </Card>
+<Card title="Sessions" icon="browser" href="/libretto-cloud-api/sessions">
+  Create browser sessions directly.
+</Card>
 
   <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
     See the shared request format.

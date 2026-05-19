@@ -24,6 +24,14 @@ Request fields:
 
 If you set `callback_url`, you must also set `callback_secret`.
 
+Callback delivery order:
+
+1. If the job has `callback_url` and `callback_secret`, Libretto Cloud delivers only to that per-job callback.
+2. Otherwise, Libretto Cloud delivers to every active stored webhook endpoint for the tenant.
+3. If `skip_callbacks` is true, Libretto Cloud does not deliver callbacks or stored webhooks.
+
+Use `callback_url` for one-off or environment-specific result delivery. Use stored webhook endpoints for long-lived production destinations. See [Webhooks](/libretto-cloud-api/webhooks) for payload fields and signature headers.
+
 Response fields:
 
 - `success`
@@ -160,7 +168,9 @@ curl -X POST "https://api.libretto.sh/v1/jobs/create" \
       "params": {
         "memberId": "12345"
       },
-      "timeout_seconds": 300
+      "timeout_seconds": 300,
+      "callback_url": "https://example.com/libretto/job-callback",
+      "callback_secret": "replace-with-your-secret"
     }
   }'
 ```
@@ -172,6 +182,10 @@ curl -X POST "https://api.libretto.sh/v1/jobs/create" \
 
   <Card title="Deployments and Workflows" icon="rocket" href="/libretto-cloud-api/deployments-and-workflows">
     Deploy workflows and inspect build state.
+  </Card>
+
+  <Card title="Webhooks" icon="webhook" href="/libretto-cloud-api/webhooks">
+    Configure tenant-level job result webhooks.
   </Card>
 
   <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">

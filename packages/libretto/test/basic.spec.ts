@@ -366,6 +366,22 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
+  test("prints deploy help with auto repair flag", async ({ librettoCli }) => {
+    const result = await librettoCli("help cloud deploy", {
+      npm_command: undefined,
+      npm_config_user_agent: undefined,
+    });
+    expect(result.stdout).toContain(
+      "Deploy workflows to the hosted platform",
+    );
+    expect(result.stdout).toContain("libretto cloud deploy [sourceDir]");
+    expect(result.stdout).toContain("--auto-repair");
+    expect(result.stdout).toContain(
+      "Route failed jobs for this deployment to autofix",
+    );
+    expect(result.stderr).toBe("");
+  });
+
   test("deploy requires an API key and points users to signup", async ({
     librettoCli,
     workspaceDir,
@@ -875,6 +891,39 @@ export default workflow("main", async (ctx) => {
   test("fails run with invalid JSON in --params", async ({ librettoCli }) => {
     const result = await librettoCli('run ./integration.ts --params "{not-json}"');
     expect(result.stderr).toContain("Invalid JSON in --params:");
+  });
+
+  test("validates workflow params before starting a browser session", async ({
+    librettoCli,
+    librettoRuntimePath,
+    writeWorkflowScript,
+  }) => {
+    await writeWorkflowScript(
+      "integration.ts",
+      outdent`
+        import { workflow } from "${librettoRuntimePath}";
+        import { z } from "zod";
+
+        export default workflow(
+          "main",
+          {
+            input: z.object({ url: z.string().url() }),
+            output: z.unknown(),
+          },
+          async () => "ok",
+        );
+      `,
+    );
+
+    const result = await librettoCli(
+      `run ./integration.ts --session validation-preflight --params '{"url":"not-url"}'`,
+    );
+    expect(result.stderr).toContain('Invalid input for workflow "main"');
+    expect(result.stderr).not.toContain("Browser is still open");
+    expect(result.stdout).not.toContain("Running workflow");
+
+    const pagesResult = await librettoCli("pages --session validation-preflight");
+    expectMissingSessionError(pagesResult.stderr, "validation-preflight");
   });
 
   test("fails fast for invalid session names before command execution", async ({
