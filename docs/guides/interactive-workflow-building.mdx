@@ -73,7 +73,7 @@ This approach combines your knowledge of the application (you drive the browser 
 
     ```bash  theme={null}
     # What the agent runs
-    libretto run ./get-insurance-id.ts --headless \
+    npx libretto run ./get-insurance-id.ts --headless \
       --params '{"patientName": "Jane Smith", "dob": "1985-04-12"}'
     ```
 
@@ -95,7 +95,7 @@ This approach combines your knowledge of the application (you drive the browser 
 ### Tips
 
 <Tip>
-  After you log in, tell the agent to save the session with `libretto save`.
+  After you log in, tell the agent to save the session with `npx libretto save`.
   Future runs can restore your login state so you don't have to authenticate
   every time.
 </Tip>

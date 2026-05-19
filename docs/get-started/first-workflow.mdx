@@ -34,7 +34,7 @@ export default workflow("scrape-page", async ({ page }) => {
   <Step title="Run it locally">
 
 ```bash theme={null}
-libretto run src/workflows/scrape-page.ts
+npx libretto run src/workflows/scrape-page.ts
 ```
   </Step>
 
@@ -43,14 +43,14 @@ libretto run src/workflows/scrape-page.ts
 When a step fails or behaves unexpectedly, open a named debug session first:
 
 ```bash theme={null}
-libretto open https://example.com --session debug-example
+npx libretto open https://example.com --session debug-example
 ```
 
 Then inspect and prototype with the same session:
 
 ```bash theme={null}
-libretto snapshot --session debug-example
-libretto exec --session debug-example "await page.url()"
+npx libretto snapshot --session debug-example
+npx libretto exec --session debug-example "await page.url()"
 ```
 
 When the prototype works, move the logic back into the workflow file and run again.

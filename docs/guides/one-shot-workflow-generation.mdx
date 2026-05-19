@@ -25,7 +25,7 @@ One-shot generation is the fastest way to go from an idea to a working automatio
 
     ```bash  theme={null}
     # What the agent runs behind the scenes
-    libretto open https://sfbay.craigslist.org --headless --session one-shot-flow
+    npx libretto open https://sfbay.craigslist.org --headless --session one-shot-flow
     ```
 
     <Note>
@@ -35,7 +35,7 @@ One-shot generation is the fastest way to go from an idea to a working automatio
   </Step>
 
   <Step title="The agent explores the page">
-    The agent takes snapshots and tests selectors against the live DOM. You'll see it running commands like `libretto snapshot` and `libretto exec` in your terminal.
+    The agent takes snapshots and tests selectors against the live DOM. You'll see it running commands like `npx libretto snapshot` and `npx libretto exec` in your terminal.
 
     You don't need to do anything during this phase, but you can redirect the agent if it seems stuck:
 
@@ -91,7 +91,7 @@ One-shot generation is the fastest way to go from an idea to a working automatio
 
     ```bash  theme={null}
     # What the agent runs
-    libretto run ./free-stuff.ts --headless
+    npx libretto run ./free-stuff.ts --headless
     ```
 
     If the output is wrong, tell the agent what's off:
@@ -113,14 +113,14 @@ One-shot generation is the fastest way to go from an idea to a working automatio
 ### Tips
 
 <Tip>
-  After you log in, tell the agent to save the session with `libretto save`.
+  After you log in, tell the agent to save the session with `npx libretto save`.
   Future runs can restore your login state so you don't have to authenticate
   every time.
 </Tip>
 
 <Note>
   Make sure your coding agent has the Libretto skill installed before starting.
-  Run `npm create libretto@latest` or `libretto setup` in your project root
+  Run `npm create libretto@latest` or `npx libretto setup` in your project root
   if you haven't already.
 </Note>
 

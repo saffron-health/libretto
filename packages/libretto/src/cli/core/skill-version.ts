@@ -89,115 +89,14 @@ function readInstalledSkillVersions(): string[] {
   return [...versions];
 }
 
-function parseVersion(version: string): {
-  major: number;
-  minor: number;
-  patch: number;
-  prerelease: string | null;
-} | null {
-  const match = version.match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/);
-  if (!match) {
-    return null;
-  }
-
-  return {
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
-    prerelease: match[4] ?? null,
-  };
-}
-
-function compareVersions(left: string, right: string): number {
-  const parsedLeft = parseVersion(left);
-  const parsedRight = parseVersion(right);
-  if (!parsedLeft || !parsedRight) {
-    return left.localeCompare(right);
-  }
-
-  for (const key of ["major", "minor", "patch"] as const) {
-    const diff = parsedLeft[key] - parsedRight[key];
-    if (diff !== 0) {
-      return diff;
-    }
-  }
-
-  if (parsedLeft.prerelease === parsedRight.prerelease) {
-    return 0;
-  }
-  if (parsedLeft.prerelease === null) {
-    return 1;
-  }
-  if (parsedRight.prerelease === null) {
-    return -1;
-  }
-  return parsedLeft.prerelease.localeCompare(parsedRight.prerelease);
-}
-
-function selectTargetVersion(versions: string[]): string {
-  const counts = new Map<string, number>();
-  for (const version of versions) {
-    counts.set(version, (counts.get(version) ?? 0) + 1);
-  }
-
-  const byCountThenVersion = [...counts.entries()].sort(
-    ([leftVersion, leftCount], [rightVersion, rightCount]) =>
-      rightCount - leftCount || compareVersions(rightVersion, leftVersion),
-  );
-
-  return byCountThenVersion[0]?.[0] ?? versions[0] ?? "latest";
-}
-
-function formatVersion(version: string, targetVersion: string): string {
-  return version === targetVersion ? version : `${version}  (out of date)`;
-}
-
 function formatSkillVersions(
   versions: string[],
-  targetVersion: string,
 ): string {
   if (versions.length === 0) {
     return "not installed";
   }
 
-  return versions
-    .map((version) => formatVersion(version, targetVersion))
-    .join(", ");
-}
-
-function formatUpdateInstructions(components: {
-  cliVersion: string;
-  localPackageVersion: string | null;
-  skillVersions: string[];
-  targetVersion: string;
-}): string[] {
-  const instructions: string[] = [];
-
-  if (components.cliVersion !== components.targetVersion) {
-    instructions.push(
-      `  global CLI:    curl -fsSL https://libretto.sh/install.sh | LIBRETTO_VERSION=${components.targetVersion} bash`,
-    );
-  }
-
-  if (
-    components.localPackageVersion &&
-    components.localPackageVersion !== components.targetVersion
-  ) {
-    instructions.push(
-      `  local package: npm install libretto@${components.targetVersion}`,
-    );
-  }
-
-  if (
-    components.skillVersions.length > 0 &&
-    components.skillVersions.some(
-      (skillVersion) => skillVersion !== components.targetVersion,
-    )
-  ) {
-    instructions.push("  agent skill:   libretto setup");
-  }
-
-  return instructions;
+  return versions.join(", ");
 }
 
 function formatVersionWarning(components: {
@@ -205,34 +104,16 @@ function formatVersionWarning(components: {
   localPackageVersion: string | null;
   skillVersions: string[];
 }): string {
-  const targetVersion = selectTargetVersion([
-    components.cliVersion,
-    ...(components.localPackageVersion ? [components.localPackageVersion] : []),
-    ...components.skillVersions,
-  ]);
   const skillLabel =
     components.skillVersions.length > 1 ? "agent skills" : "agent skill";
-  const updateInstructions = formatUpdateInstructions({
-    ...components,
-    targetVersion,
-  });
 
   return [
-    "WARNING: Libretto version mismatch detected.",
-    "",
-    `  global CLI:    ${formatVersion(components.cliVersion, targetVersion)}`,
+    "WARNING: Libretto skill version does not match the local package.",
     `  local package: ${
-      components.localPackageVersion
-        ? formatVersion(components.localPackageVersion, targetVersion)
-        : "not installed"
+      components.localPackageVersion ?? `${components.cliVersion}  (current command)`
     }`,
-    `  ${skillLabel}:   ${formatSkillVersions(
-      components.skillVersions,
-      targetVersion,
-    )}`,
-    "",
-    "How to update:",
-    ...updateInstructions,
+    `  ${skillLabel}:   ${formatSkillVersions(components.skillVersions)}`,
+    "Fix: run libretto setup",
   ].join("\n");
 }
 
@@ -240,14 +121,12 @@ export function warnIfLibrettoVersionsDiffer(): void {
   try {
     const cliVersion = readCurrentCliVersion();
     const localPackageVersion = readLocalPackageVersion();
+    const packageVersion = localPackageVersion ?? cliVersion;
     const skillVersions = readInstalledSkillVersions();
-    const observedVersions = new Set([
-      cliVersion,
-      ...(localPackageVersion ? [localPackageVersion] : []),
-      ...skillVersions,
-    ]);
-
-    if (observedVersions.size <= 1) {
+    if (
+      skillVersions.length === 0 ||
+      skillVersions.every((skillVersion) => skillVersion === packageVersion)
+    ) {
       return;
     }
 

@@ -2,26 +2,16 @@
 
 Install Libretto and verify that it runs end to end.
 
-## 1. Install the Libretto CLI
+## 1. Choose the target
 
-Before anything else, install the global `libretto` CLI. This is required for every path below and must be run first. It is safe to rerun if Libretto is already installed. Requires Node.js and npm:
-
-```bash
-curl -fsSL https://libretto.sh/install.sh | bash
-```
-
-Verify the CLI is on PATH by running `libretto --help` before continuing.
-
-## 2. Choose the target
-
-Inspect the current directory. Ask only for missing information:
+Libretto is installed into the target Node.js package. Inspect the current directory and ask only for missing information:
 
 - Create a new Libretto package? If so, where and what package name?
 - Add Libretto to an existing Node.js package? If so, which package directory?
 
 Use the target project's package manager conventions. If the user already chose a path, location, name, or package manager, treat that as binding.
 
-## 3. Set up the package
+## 2. Set up the package
 
 For a new package:
 
@@ -30,28 +20,27 @@ npm create libretto@latest <package-name>
 cd <package-name>
 ```
 
-After creating a new package, do all remaining setup and verification inside the created package directory.
-
 For an existing package:
 
 ```bash
 npm install libretto
-libretto setup
+npx libretto setup
 ```
 
 Use equivalent pnpm, yarn, or bun commands when appropriate.
 
-## 4. Read installed guidance
+## 3. Read installed guidance
 
-After installation, make sure your current directory is the package directory. Then read the installed skill before creating or editing workflow code:
+After installation, make sure your current directory is the package directory. Then read the repo-level skill that setup copied into the project before creating or editing workflow code. Use whichever path exists:
 
 ```text
-node_modules/libretto/skills/libretto/SKILL.md
+.agents/skills/libretto/SKILL.md
+.claude/skills/libretto/SKILL.md
 ```
 
-The package also includes docs under `node_modules/libretto/docs/`; use them only when the skill or task requires more detail.
+If neither path exists because the project has no `.agents/` or `.claude/` directory, create the appropriate agent directory and rerun `npx libretto setup`. The package also includes source docs under `node_modules/libretto/docs/`; use them only when the skill or task requires more detail.
 
-## 5. Verify
+## 4. Verify
 
 For this smoke check, copy the workflow below directly; do not inspect the scaffolded example or read additional references unless validation fails.
 
@@ -72,10 +61,10 @@ export default workflow("scrape-page", async ({ page }) => {
 Run it:
 
 ```bash
-libretto run src/workflows/scrape-page.ts --headless
+npx libretto run src/workflows/scrape-page.ts --headless
 ```
 
-## 6. Finish
+## 5. Finish
 
 After verifying Libretto is setup and working properly, summarize the steps taken and offer some sample browser automations you could build next, such as:
 

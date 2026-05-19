@@ -14,22 +14,6 @@ function printSetupAudit(): void {
   warnIfLibrettoVersionsDiffer();
 }
 
-function isPackageManagerExec(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.npm_command === "exec";
-}
-
-function warnIfPackageManagerExec(): void {
-  if (!isPackageManagerExec()) return;
-
-  console.error(
-    [
-      "Warning: running Libretto through a package manager is deprecated and will be removed in a future release.",
-      "Install the native command instead:",
-      "  curl -fsSL https://libretto.sh/install.sh | bash",
-    ].join("\n"),
-  );
-}
-
 function isRootHelpRequest(rawArgs: readonly string[]): boolean {
   if (rawArgs.length === 0) return true;
   return rawArgs[0] === "help" && rawArgs.length === 1;
@@ -55,7 +39,6 @@ export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   let exitCode = 0;
   loadEnv();
-  warnIfPackageManagerExec();
   ensureLibrettoSetup();
   const app = createCLIApp();
 
