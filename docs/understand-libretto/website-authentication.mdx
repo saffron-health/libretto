@@ -47,7 +47,7 @@ export const main = workflow<Input, { success: boolean }>(
 Invoke the workflow with credentials sourced from your environment:
 
 ```bash theme={null}
-libretto run ./portal-login.ts \
+npx libretto run ./portal-login.ts \
   --input '{"username":"'"$PORTAL_USERNAME"'","password":"'"$PORTAL_PASSWORD"'","totpSecret":"'"$PORTAL_TOTP_SECRET"'"}'
 ```
 
@@ -62,7 +62,7 @@ When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magi
 <Steps>
   <Step title="Open the site in headed mode">
     ```bash  theme={null}
-    libretto open https://portal.example.com --headed --session portal-login
+    npx libretto open https://portal.example.com --headed --session portal-login
     ```
 
     A visible Chromium window launches, pinned to the session `portal-login`.
@@ -74,7 +74,7 @@ When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magi
 
   <Step title="Save the session as a profile">
     ```bash  theme={null}
-    libretto save portal.example.com --session portal-login
+    npx libretto save portal.example.com --session portal-login
     ```
 
     Libretto writes the authenticated state to `.libretto/profiles/portal.example.com.json`.
@@ -82,7 +82,7 @@ When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magi
 
   <Step title="Reuse the profile in future runs">
     ```bash  theme={null}
-    libretto run ./report.ts --auth-profile portal.example.com
+    npx libretto run ./report.ts --auth-profile portal.example.com
     ```
 
     The run starts already signed in. No login step required.

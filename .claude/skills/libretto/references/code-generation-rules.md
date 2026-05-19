@@ -6,7 +6,7 @@ Follow the user's existing codebase conventions, abstractions, and patterns when
 
 ## Workflow File Structure
 
-Generated files must default-export a `workflow()` instance so they can be run via `libretto run <file>`. Workflows declare their input and output shapes as Zod schemas, which both type the handler and validate runtime input.
+Generated files must default-export a `workflow()` instance so they can be run via `npx libretto run <file>`. Workflows declare their input and output shapes as Zod schemas, which both type the handler and validate runtime input.
 
 Add `zod` (`^4.0.0`) to the workflow's `package.json` dependencies. Then import `workflow` from `"libretto"` and `z` from `"zod"`:
 
@@ -42,7 +42,7 @@ Key points:
 
 - `workflow(name, { input, output }, handler)` takes a unique workflow name, a pair of Zod schemas describing input and output, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
 - At run time, Libretto validates `input` against `inputSchema` before calling the handler. Invalid input throws a clear error listing each failing field; the workflow handler never sees malformed input.
-- `libretto run ./file.ts` executes the file's default-exported workflow, so always use `export default workflow(...)`.
+- `npx libretto run ./file.ts` executes the file's default-exported workflow, so always use `export default workflow(...)`.
 - `ctx` provides `session` and `page`. Use `console.log`/`console.warn`/`console.error` for logging — the runtime wraps these with structured metadata automatically.
 - `input` comes from `--params '{"query":"foo"}'` or `--params-file params.json` on the CLI, then gets parsed through `inputSchema`.
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.

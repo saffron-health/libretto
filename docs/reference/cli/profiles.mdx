@@ -9,7 +9,7 @@ title: profiles
 The `save` command saves the current browser session's cookies and localStorage as a named auth profile. Load the profile later with `--auth-profile` to skip manual login.
 
 ```bash theme={null}
-libretto save linkedin.com --session app-login
+npx libretto save linkedin.com --session app-login
 ```
 
 #### When to use `save`
@@ -19,7 +19,7 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
 <Steps>
   <Step title="Open the site in headed mode">
     ```bash  theme={null}
-    libretto open https://linkedin.com --headed --session app-login
+    npx libretto open https://linkedin.com --headed --session app-login
     ```
   </Step>
 
@@ -29,7 +29,7 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
 
   <Step title="Save the session">
     ```bash  theme={null}
-    libretto save linkedin.com --session app-login
+    npx libretto save linkedin.com --session app-login
     ```
 
     The profile is saved to `.libretto/profiles/linkedin.com.json`.
@@ -38,7 +38,7 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
 
   <Step title="Use the profile in future runs">
     ```bash  theme={null}
-    libretto run ./integration.ts --auth-profile linkedin.com
+    npx libretto run ./integration.ts --auth-profile linkedin.com
     ```
   </Step>
 </Steps>
@@ -51,7 +51,7 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
 </ParamField>
 
 <ParamField path="--session" type="string" required>
-  The session to save. Use the same name you passed to `libretto open
+  The session to save. Use the same name you passed to `npx libretto open
   --session`.
 </ParamField>
 

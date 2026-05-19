@@ -13,11 +13,7 @@ Fetch and follow https://libretto.sh/start.md to set up Libretto and create a ne
 
 ## Manual
 
-Install the Libretto command once. This requires Node.js and npm on your machine.
-
-```bash theme={null}
-curl -fsSL https://libretto.sh/install.sh | bash
-```
+Install Libretto into the Node.js package that contains your browser automations. Run Libretto commands with `npx libretto` from that package.
 
 <Steps>
   <Step title="Choose a setup path">
@@ -50,10 +46,10 @@ From the existing package directory, add Libretto as a dependency and run setup:
 
 ```bash theme={null}
 npm install libretto
-libretto setup
+npx libretto setup
 ```
 
-Then create a workflow file and run it with `libretto run <path> --headless`.
+Then create a workflow file and run it with `npx libretto run <path> --headless`.
   </Step>
 
   <Step title="Create and run a smoke workflow">
@@ -75,7 +71,7 @@ export default workflow("scrape-page", async ({ page }) => {
 Run it headless:
 
 ```bash theme={null}
-libretto run src/workflows/scrape-page.ts --headless
+npx libretto run src/workflows/scrape-page.ts --headless
 ```
 
 This confirms your local setup works and shows the basic run loop.

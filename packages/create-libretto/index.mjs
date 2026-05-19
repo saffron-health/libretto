@@ -500,8 +500,7 @@ async function main() {
   );
   console.log(`Next steps:`);
   console.log(`  cd ${relDir}`);
-  console.log(`  curl -fsSL https://libretto.sh/install.sh | bash  # if libretto is not already on your PATH`);
-  console.log(`  libretto run src/workflows/star-repo.ts`);
+  console.log(`  npx libretto run src/workflows/star-repo.ts`);
   console.log();
 }
 

@@ -28,17 +28,14 @@ https://github.com/user-attachments/assets/9b9a0ab3-5133-4b20-b3be-459943349d18
 ## Installation
 
 ```bash
-# Install the Libretto command once. Requires Node.js and npm.
-curl -fsSL https://libretto.sh/install.sh | bash
-
-# Add Libretto to your project
+# Add Libretto to your project. Requires Node.js and npm.
 npm install libretto
 
 # First-time onboarding: install skills and download Chromium
-libretto setup
+npx libretto setup
 
 # Check workspace readiness at any time
-libretto status
+npx libretto status
 ```
 
 `setup` creates the `.libretto/` directory, installs agent skills, and downloads Chromium unless you pass `--skip-browsers`.
@@ -76,17 +73,17 @@ Agents can use Libretto to reproduce the failure, pause the workflow at any poin
 You can also use Libretto directly from the command line. All commands accept `--session <name>` to target a specific session.
 
 ```bash
-libretto open <url>                    # launch browser and open a URL
-libretto run ./integration.ts --headless # run a workflow and close on success
-libretto run ./integration.ts --headless --stay-open-on-success # keep a successful run inspectable
-libretto snapshot --session <name>     # capture a screenshot and compact accessibility tree
-libretto exec "<code>"                 # execute Playwright TypeScript against the open page
-libretto close                         # close the browser
+npx libretto open <url>                    # launch browser and open a URL
+npx libretto run ./integration.ts --headless # run a workflow and close on success
+npx libretto run ./integration.ts --headless --stay-open-on-success # keep a successful run inspectable
+npx libretto snapshot --session <name>     # capture a screenshot and compact accessibility tree
+npx libretto exec "<code>"                 # execute Playwright TypeScript against the open page
+npx libretto close                         # close the browser
 ```
 
 `run` sessions are inspectable through the same daemon-backed commands as `open` sessions. Successful runs close the browser by default; pass `--stay-open-on-success` to keep the browser open for `pages`, `snapshot`, and `exec`. Failed or paused workflows keep the browser open so you can inspect the exact page state before fixing or resuming the workflow.
 
-Run `libretto help` for the full list of commands.
+Run `npx libretto help` for the full list of commands.
 
 ## Configuration
 

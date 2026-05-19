@@ -34,21 +34,21 @@ You can also use `--provider steel` on a single command instead of changing the 
 Open a page with the configured Steel provider:
 
 ```bash theme={null}
-libretto open https://example.com --session steel-demo
+npx libretto open https://example.com --session steel-demo
 ```
 
 If you did not set `provider` in `.libretto/config.json`, pass it for this command instead:
 
 ```bash theme={null}
-libretto open https://example.com --provider steel --session steel-demo
+npx libretto open https://example.com --provider steel --session steel-demo
 ```
 
 After the session is open, use the normal Libretto commands:
 
 ```bash theme={null}
-libretto snapshot --session steel-demo
-libretto exec --session steel-demo "await page.title()"
-libretto close --session steel-demo
+npx libretto snapshot --session steel-demo
+npx libretto exec --session steel-demo "await page.title()"
+npx libretto close --session steel-demo
 ```
 
 ## Run a workflow
@@ -56,13 +56,13 @@ libretto close --session steel-demo
 Run workflows normally when `provider` is set in `.libretto/config.json`:
 
 ```bash theme={null}
-libretto run ./workflow.ts --headless
+npx libretto run ./workflow.ts --headless
 ```
 
 Or pass the provider for a single run:
 
 ```bash theme={null}
-libretto run ./workflow.ts --provider steel --headless
+npx libretto run ./workflow.ts --provider steel --headless
 ```
 
 The workflow code does not need to change. Libretto creates the Steel browser session, connects to it over CDP, runs the workflow, and releases the provider session when the run finishes.
