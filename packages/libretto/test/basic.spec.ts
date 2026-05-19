@@ -90,17 +90,31 @@ function expectVersionWarningHeader(stderr: string): void {
   expect(stderr).toContain("How to update:");
 }
 
-function expectVersionUpdateCommands(
+function expectVersionUpdateCommand(
   stderr: string,
+  component: "global CLI" | "local package" | "agent skill",
   targetVersion: string,
 ): void {
-  expect(stderr).toContain(
-    `global CLI:    curl -fsSL https://libretto.sh/install.sh | LIBRETTO_VERSION=${targetVersion} bash`,
-  );
-  expect(stderr).toContain(
-    `local package: npm install libretto@${targetVersion}`,
-  );
-  expect(stderr).toContain("agent skill:   libretto setup");
+  const commands = {
+    "global CLI": `global CLI:    curl -fsSL https://libretto.sh/install.sh | LIBRETTO_VERSION=${targetVersion} bash`,
+    "local package": `local package: npm install libretto@${targetVersion}`,
+    "agent skill": "agent skill:   libretto setup",
+  };
+
+  expect(stderr).toContain(commands[component]);
+}
+
+function expectNoVersionUpdateCommand(
+  stderr: string,
+  component: "global CLI" | "local package" | "agent skill",
+): void {
+  const labels = {
+    "global CLI": "global CLI:    curl -fsSL",
+    "local package": "local package: npm install",
+    "agent skill": "agent skill:   libretto setup",
+  };
+
+  expect(stderr).not.toContain(labels[component]);
 }
 
 function expectedRootHelp(): string {
@@ -653,7 +667,9 @@ export default workflow("main", async (ctx) => {
     expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
     expect(result.stderr).toContain("local package: not installed");
     expect(result.stderr).toContain("agent skill:   0.0.0  (out of date)");
-    expectVersionUpdateCommands(result.stderr, cliVersion);
+    expectNoVersionUpdateCommand(result.stderr, "global CLI");
+    expectNoVersionUpdateCommand(result.stderr, "local package");
+    expectVersionUpdateCommand(result.stderr, "agent skill", cliVersion);
     expect(result.stderr).toContain("Daemon exited before startup");
   });
 
@@ -670,7 +686,9 @@ export default workflow("main", async (ctx) => {
     expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
     expect(result.stderr).toContain("local package: 0.0.0  (out of date)");
     expect(result.stderr).toContain("agent skill:   not installed");
-    expectVersionUpdateCommands(result.stderr, cliVersion);
+    expectNoVersionUpdateCommand(result.stderr, "global CLI");
+    expectVersionUpdateCommand(result.stderr, "local package", cliVersion);
+    expectNoVersionUpdateCommand(result.stderr, "agent skill");
     expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 
@@ -688,7 +706,9 @@ export default workflow("main", async (ctx) => {
     expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
     expect(result.stderr).toContain("local package: 0.0.0  (out of date)");
     expect(result.stderr).toContain(`agent skill:   ${cliVersion}`);
-    expectVersionUpdateCommands(result.stderr, cliVersion);
+    expectNoVersionUpdateCommand(result.stderr, "global CLI");
+    expectVersionUpdateCommand(result.stderr, "local package", cliVersion);
+    expectNoVersionUpdateCommand(result.stderr, "agent skill");
     expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 
@@ -709,7 +729,9 @@ export default workflow("main", async (ctx) => {
     );
     expect(result.stderr).toContain(`local package: ${projectVersion}`);
     expect(result.stderr).toContain(`agent skill:   ${projectVersion}`);
-    expectVersionUpdateCommands(result.stderr, projectVersion);
+    expectVersionUpdateCommand(result.stderr, "global CLI", projectVersion);
+    expectNoVersionUpdateCommand(result.stderr, "local package");
+    expectNoVersionUpdateCommand(result.stderr, "agent skill");
     expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 
@@ -811,7 +833,9 @@ export default workflow("main", async (ctx) => {
     expectVersionWarningHeader(result.stderr);
     expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
     expect(result.stderr).toContain("agent skill:   0.0.0  (out of date)");
-    expectVersionUpdateCommands(result.stderr, cliVersion);
+    expectNoVersionUpdateCommand(result.stderr, "global CLI");
+    expectNoVersionUpdateCommand(result.stderr, "local package");
+    expectVersionUpdateCommand(result.stderr, "agent skill", cliVersion);
     expect(result.stderr).toContain("Integration file does not exist:");
   });
 
@@ -827,7 +851,9 @@ export default workflow("main", async (ctx) => {
     expectVersionWarningHeader(result.stderr);
     expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
     expect(result.stderr).toContain("agent skill:   0.0.0  (out of date)");
-    expectVersionUpdateCommands(result.stderr, cliVersion);
+    expectNoVersionUpdateCommand(result.stderr, "global CLI");
+    expectNoVersionUpdateCommand(result.stderr, "local package");
+    expectVersionUpdateCommand(result.stderr, "agent skill", cliVersion);
     expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 

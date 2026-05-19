@@ -165,6 +165,41 @@ function formatSkillVersions(
     .join(", ");
 }
 
+function formatUpdateInstructions(components: {
+  cliVersion: string;
+  localPackageVersion: string | null;
+  skillVersions: string[];
+  targetVersion: string;
+}): string[] {
+  const instructions: string[] = [];
+
+  if (components.cliVersion !== components.targetVersion) {
+    instructions.push(
+      `  global CLI:    curl -fsSL https://libretto.sh/install.sh | LIBRETTO_VERSION=${components.targetVersion} bash`,
+    );
+  }
+
+  if (
+    components.localPackageVersion &&
+    components.localPackageVersion !== components.targetVersion
+  ) {
+    instructions.push(
+      `  local package: npm install libretto@${components.targetVersion}`,
+    );
+  }
+
+  if (
+    components.skillVersions.length > 0 &&
+    components.skillVersions.some(
+      (skillVersion) => skillVersion !== components.targetVersion,
+    )
+  ) {
+    instructions.push("  agent skill:   libretto setup");
+  }
+
+  return instructions;
+}
+
 function formatVersionWarning(components: {
   cliVersion: string;
   localPackageVersion: string | null;
@@ -177,6 +212,10 @@ function formatVersionWarning(components: {
   ]);
   const skillLabel =
     components.skillVersions.length > 1 ? "agent skills" : "agent skill";
+  const updateInstructions = formatUpdateInstructions({
+    ...components,
+    targetVersion,
+  });
 
   return [
     "WARNING: Libretto version mismatch detected.",
@@ -193,9 +232,7 @@ function formatVersionWarning(components: {
     )}`,
     "",
     "How to update:",
-    `  global CLI:    curl -fsSL https://libretto.sh/install.sh | LIBRETTO_VERSION=${targetVersion} bash`,
-    `  local package: npm install libretto@${targetVersion}`,
-    "  agent skill:   libretto setup",
+    ...updateInstructions,
   ].join("\n");
 }
 
