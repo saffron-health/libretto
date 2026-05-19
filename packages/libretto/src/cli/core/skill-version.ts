@@ -89,24 +89,114 @@ function readInstalledSkillVersions(): string[] {
   return [...versions];
 }
 
-function formatObservedVersions(components: {
+function parseVersion(version: string): {
+  major: number;
+  minor: number;
+  patch: number;
+  prerelease: string | null;
+} | null {
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    prerelease: match[4] ?? null,
+  };
+}
+
+function compareVersions(left: string, right: string): number {
+  const parsedLeft = parseVersion(left);
+  const parsedRight = parseVersion(right);
+  if (!parsedLeft || !parsedRight) {
+    return left.localeCompare(right);
+  }
+
+  for (const key of ["major", "minor", "patch"] as const) {
+    const diff = parsedLeft[key] - parsedRight[key];
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+
+  if (parsedLeft.prerelease === parsedRight.prerelease) {
+    return 0;
+  }
+  if (parsedLeft.prerelease === null) {
+    return 1;
+  }
+  if (parsedRight.prerelease === null) {
+    return -1;
+  }
+  return parsedLeft.prerelease.localeCompare(parsedRight.prerelease);
+}
+
+function selectTargetVersion(versions: string[]): string {
+  const counts = new Map<string, number>();
+  for (const version of versions) {
+    counts.set(version, (counts.get(version) ?? 0) + 1);
+  }
+
+  const byCountThenVersion = [...counts.entries()].sort(
+    ([leftVersion, leftCount], [rightVersion, rightCount]) =>
+      rightCount - leftCount || compareVersions(rightVersion, leftVersion),
+  );
+
+  return byCountThenVersion[0]?.[0] ?? versions[0] ?? "latest";
+}
+
+function formatVersion(version: string, targetVersion: string): string {
+  return version === targetVersion ? version : `${version}  (out of date)`;
+}
+
+function formatSkillVersions(
+  versions: string[],
+  targetVersion: string,
+): string {
+  if (versions.length === 0) {
+    return "not installed";
+  }
+
+  return versions
+    .map((version) => formatVersion(version, targetVersion))
+    .join(", ");
+}
+
+function formatVersionWarning(components: {
   cliVersion: string;
   localPackageVersion: string | null;
   skillVersions: string[];
 }): string {
-  const labels = [`global CLI ${components.cliVersion}`];
+  const targetVersion = selectTargetVersion([
+    components.cliVersion,
+    ...(components.localPackageVersion ? [components.localPackageVersion] : []),
+    ...components.skillVersions,
+  ]);
+  const skillLabel =
+    components.skillVersions.length > 1 ? "agent skills" : "agent skill";
 
-  if (components.localPackageVersion) {
-    labels.push(`local package ${components.localPackageVersion}`);
-  }
-
-  if (components.skillVersions.length === 1) {
-    labels.push(`agent skill ${components.skillVersions[0]}`);
-  } else if (components.skillVersions.length > 1) {
-    labels.push(`agent skills ${components.skillVersions.join(", ")}`);
-  }
-
-  return labels.join(", ");
+  return [
+    "WARNING: Libretto version mismatch detected.",
+    "",
+    `  global CLI:    ${formatVersion(components.cliVersion, targetVersion)}`,
+    `  local package: ${
+      components.localPackageVersion
+        ? formatVersion(components.localPackageVersion, targetVersion)
+        : "not installed"
+    }`,
+    `  ${skillLabel}:   ${formatSkillVersions(
+      components.skillVersions,
+      targetVersion,
+    )}`,
+    "",
+    "How to update:",
+    `  global CLI:    npm install -g libretto@${targetVersion}`,
+    `  local package: npm install libretto@${targetVersion}`,
+    "  agent skill:   libretto setup",
+  ].join("\n");
 }
 
 export function warnIfLibrettoVersionsDiffer(): void {
@@ -125,11 +215,11 @@ export function warnIfLibrettoVersionsDiffer(): void {
     }
 
     console.error(
-      `Warning: Libretto versions differ: ${formatObservedVersions({
+      formatVersionWarning({
         cliVersion,
         localPackageVersion,
         skillVersions,
-      })}. Use the same Libretto version globally and locally; run \`libretto setup\` after changing versions.`,
+      }),
     );
   } catch {
     // Never block command execution on a best-effort skill version check.

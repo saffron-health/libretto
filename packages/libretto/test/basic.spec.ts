@@ -85,8 +85,22 @@ async function seedLocalLibrettoPackageVersion(
   );
 }
 
-function expectedVersionWarning(versions: string): string {
-  return `Warning: Libretto versions differ: ${versions}.`;
+function expectVersionWarningHeader(stderr: string): void {
+  expect(stderr).toContain("WARNING: Libretto version mismatch detected.");
+  expect(stderr).toContain("How to update:");
+}
+
+function expectVersionUpdateCommands(
+  stderr: string,
+  targetVersion: string,
+): void {
+  expect(stderr).toContain(
+    `global CLI:    npm install -g libretto@${targetVersion}`,
+  );
+  expect(stderr).toContain(
+    `local package: npm install libretto@${targetVersion}`,
+  );
+  expect(stderr).toContain("agent skill:   libretto setup");
 }
 
 function expectedRootHelp(): string {
@@ -635,12 +649,11 @@ export default workflow("main", async (ctx) => {
       PLAYWRIGHT_BROWSERS_PATH: "/definitely-not-real",
     });
 
-    expect(result.stderr).toContain(
-      expectedVersionWarning(`global CLI ${cliVersion}, agent skill 0.0.0`),
-    );
-    expect(result.stderr).toContain(
-      `Use the same Libretto version globally and locally; run \`libretto setup\` after changing versions.`,
-    );
+    expectVersionWarningHeader(result.stderr);
+    expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
+    expect(result.stderr).toContain("local package: not installed");
+    expect(result.stderr).toContain("agent skill:   0.0.0  (out of date)");
+    expectVersionUpdateCommands(result.stderr, cliVersion);
     expect(result.stderr).toContain("Daemon exited before startup");
   });
 
@@ -653,13 +666,15 @@ export default workflow("main", async (ctx) => {
 
     const result = await librettoCli("connect not-a-url --session local");
 
-    expect(result.stderr).toContain(
-      expectedVersionWarning(`global CLI ${cliVersion}, local package 0.0.0`),
-    );
+    expectVersionWarningHeader(result.stderr);
+    expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
+    expect(result.stderr).toContain("local package: 0.0.0  (out of date)");
+    expect(result.stderr).toContain("agent skill:   not installed");
+    expectVersionUpdateCommands(result.stderr, cliVersion);
     expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 
-  test("warns when the local libretto package and installed skill versions differ", async ({
+  test("warns when the local libretto package is out of date with the installed skill", async ({
     librettoCli,
     workspacePath,
   }) => {
@@ -669,11 +684,32 @@ export default workflow("main", async (ctx) => {
 
     const result = await librettoCli("connect not-a-url --session skill-local");
 
+    expectVersionWarningHeader(result.stderr);
+    expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
+    expect(result.stderr).toContain("local package: 0.0.0  (out of date)");
+    expect(result.stderr).toContain(`agent skill:   ${cliVersion}`);
+    expectVersionUpdateCommands(result.stderr, cliVersion);
+    expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
+  });
+
+  test("warns when the global CLI is out of date with the local project", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const cliVersion = await readCliVersion();
+    const projectVersion = "9.9.9";
+    await seedLocalLibrettoPackageVersion(workspacePath, projectVersion);
+    await seedInstalledSkillVersion(workspacePath, ".agents", projectVersion);
+
+    const result = await librettoCli("connect not-a-url --session global-local");
+
+    expectVersionWarningHeader(result.stderr);
     expect(result.stderr).toContain(
-      expectedVersionWarning(
-        `global CLI ${cliVersion}, local package 0.0.0, agent skill ${cliVersion}`,
-      ),
+      `global CLI:    ${cliVersion}  (out of date)`,
     );
+    expect(result.stderr).toContain(`local package: ${projectVersion}`);
+    expect(result.stderr).toContain(`agent skill:   ${projectVersion}`);
+    expectVersionUpdateCommands(result.stderr, projectVersion);
     expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 
@@ -772,9 +808,10 @@ export default workflow("main", async (ctx) => {
 
     const result = await librettoCli("run ./integration.ts");
 
-    expect(result.stderr).toContain(
-      expectedVersionWarning(`global CLI ${cliVersion}, agent skill 0.0.0`),
-    );
+    expectVersionWarningHeader(result.stderr);
+    expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
+    expect(result.stderr).toContain("agent skill:   0.0.0  (out of date)");
+    expectVersionUpdateCommands(result.stderr, cliVersion);
     expect(result.stderr).toContain("Integration file does not exist:");
   });
 
@@ -787,9 +824,10 @@ export default workflow("main", async (ctx) => {
 
     const result = await librettoCli("connect not-a-url --session mismatch");
 
-    expect(result.stderr).toContain(
-      expectedVersionWarning(`global CLI ${cliVersion}, agent skill 0.0.0`),
-    );
+    expectVersionWarningHeader(result.stderr);
+    expect(result.stderr).toContain(`global CLI:    ${cliVersion}`);
+    expect(result.stderr).toContain("agent skill:   0.0.0  (out of date)");
+    expectVersionUpdateCommands(result.stderr, cliVersion);
     expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 
@@ -802,7 +840,9 @@ export default workflow("main", async (ctx) => {
 
     const result = await librettoCli("connect not-a-url --session matching");
 
-    expect(result.stderr).not.toContain("Warning: Libretto versions differ:");
+    expect(result.stderr).not.toContain(
+      "WARNING: Libretto version mismatch detected.",
+    );
     expect(result.stderr).toContain("Invalid CDP URL: not-a-url");
   });
 
