@@ -1,18 +1,18 @@
 /**
  * Hosted-platform billing commands. Stripe is the source of truth
  * for the plan catalog and is also where every tenant — including
- * Free — has a live Subscription. The portal command opens Libretto's
- * plans page, which shows the user's current plan, available plan
- * changes, and Stripe-backed payment/invoice management.
+ * Free — has a live Subscription. The Stripe Customer Portal is the
+ * single management UI: it shows the user's current plan and lets
+ * them switch between any of the configured Subscription Update
+ * products (Free / Pro / Team).
  *
- *   libretto cloud billing portal   → Libretto plans page
+ *   libretto cloud billing portal   → Stripe Customer Portal
  *   libretto cloud billing status   → plan + usage + period end
  *
  * `libretto init` is unchanged. New tenants start on Free automatically
  * (with a real Stripe Customer + Free Subscription created at signup).
  *
- * Auth: `status` accepts a session cookie or LIBRETTO_API_KEY. `portal`
- * requires a session cookie because it creates an interactive browser flow.
+ * Auth: requires a session cookie (or LIBRETTO_API_KEY).
  */
 
 import { SimpleCLI } from "affordance";
@@ -58,25 +58,6 @@ async function requireAuth(): Promise<{ apiUrl: string; credential: ReturnType<t
   return { apiUrl, credential };
 }
 
-async function requireSessionAuth(): Promise<{
-  apiUrl: string;
-  credential: { source: "cookie"; cookie: string };
-}> {
-  const stored = await readAuthState();
-  const apiUrl = resolveApiUrl(stored);
-  const cookie = stored?.session?.cookie;
-  if (!cookie) {
-    throw new Error(
-      [
-        "Billing portal requires an interactive login session.",
-        "Run `libretto cloud auth login`, then retry `libretto cloud billing portal`.",
-        "API keys can be used for `libretto cloud billing status`, but not for opening the browser billing portal.",
-      ].join("\n"),
-    );
-  }
-  return { apiUrl, credential: { source: "cookie", cookie } };
-}
-
 function formatLimit(limit: number | null): string {
   return limit === null ? "∞" : String(limit);
 }
@@ -92,7 +73,7 @@ export const billingPortalCommand = SimpleCLI.command({
   description: "Open the libretto plans page (current plan + switch options)",
 })
   .handle(async () => {
-    const { apiUrl, credential } = await requireSessionAuth();
+    const { apiUrl, credential } = await requireAuth();
     const { url } = await orpcCall<OpenPlansPageResponse>({
       apiUrl,
       path: "/v1/billing/openPlansPage",
