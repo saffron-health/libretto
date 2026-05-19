@@ -18,6 +18,8 @@ Use `billing portal` to print a short-lived link to Libretto's plans page:
 libretto cloud billing portal
 ```
 
+Because this opens an interactive browser flow, `billing portal` requires a saved login session from `libretto cloud auth login` or `libretto cloud auth signup`. API keys can be used for `billing status`, but not for opening the portal.
+
 The page shows:
 
 - Your current plan.
@@ -84,7 +86,8 @@ For BAA and Enterprise, please reach out to us at `team@saffron.health`.
 ### Troubleshooting
 
 - If the plans link says it is expired or invalid, run `billing portal` again to get a fresh link.
-- If billing commands fail with an auth error, log in again or set `LIBRETTO_API_KEY`.
+- If `billing portal` fails with an auth error, log in again with `libretto cloud auth login`.
+- If `billing status` fails with an auth error, log in again or set `LIBRETTO_API_KEY`.
 - If you can authenticate but still cannot access billing, confirm that your user is an organization owner.
 
 <CardGroup cols={2}>
