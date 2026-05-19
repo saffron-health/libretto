@@ -1,12 +1,11 @@
 /**
  * Hosted-platform billing commands. Stripe is the source of truth
  * for the plan catalog and is also where every tenant — including
- * Free — has a live Subscription. The Stripe Customer Portal is the
- * single management UI: it shows the user's current plan and lets
- * them switch between any of the configured Subscription Update
- * products (Free / Pro / Team).
+ * Free — has a live Subscription. The portal command opens Libretto's
+ * plans page, which shows the user's current plan, available plan
+ * changes, and Stripe-backed payment/invoice management.
  *
- *   libretto cloud billing portal   → Stripe Customer Portal
+ *   libretto cloud billing portal   → Libretto plans page
  *   libretto cloud billing status   → plan + usage + period end
  *
  * `libretto init` is unchanged. New tenants start on Free automatically
