@@ -83,8 +83,7 @@ If you want to deploy from a different entry file, keep the source directory as 
 ```bash theme={null}
 libretto cloud deploy my-automations \
   --description "payer portal workflows" \
-  --entry-point src/workflows/check-eligibility.ts \
-  --auto-repair
+  --entry-point src/workflows/check-eligibility.ts
 ```
 
 The CLI bundles the deploy artifact, uploads it to Libretto Cloud, then waits for the build to finish. When the build is ready, it prints the deployment id and the discovered workflow names.
