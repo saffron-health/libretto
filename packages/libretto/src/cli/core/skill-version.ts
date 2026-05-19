@@ -14,6 +14,17 @@ const INSTALLED_SKILL_PATHS = [
 
 let cachedCliVersion: string | null = null;
 
+function readPackageVersion(packageJsonPath: string): string | null {
+  if (!existsSync(packageJsonPath)) {
+    return null;
+  }
+
+  const manifest = JSON.parse(
+    readFileSync(packageJsonPath, "utf8"),
+  ) as PackageManifest;
+  return manifest.version?.trim() || null;
+}
+
 export function readCurrentCliVersion(): string {
   if (cachedCliVersion) {
     return cachedCliVersion;
@@ -22,18 +33,22 @@ export function readCurrentCliVersion(): string {
   const packageJsonPath = fileURLToPath(
     new URL("../../../package.json", import.meta.url),
   );
-  const manifest = JSON.parse(
-    readFileSync(packageJsonPath, "utf8"),
-  ) as PackageManifest;
+  const version = readPackageVersion(packageJsonPath);
 
-  if (!manifest.version) {
+  if (!version) {
     throw new Error(
       `Unable to determine current libretto version from ${packageJsonPath}.`,
     );
   }
 
-  cachedCliVersion = manifest.version;
+  cachedCliVersion = version;
   return cachedCliVersion;
+}
+
+function readLocalPackageVersion(): string | null {
+  return readPackageVersion(
+    join(REPO_ROOT, "node_modules", "libretto", "package.json"),
+  );
 }
 
 function readInstalledSkillVersion(skillPath: string): string | null {
@@ -60,32 +75,61 @@ function readInstalledSkillVersion(skillPath: string): string | null {
   return versionMatch?.[1]?.trim() ?? null;
 }
 
-function findInstalledSkillVersionMismatch(): {
-  installedVersion: string;
-  cliVersion: string;
-} | null {
-  const cliVersion = readCurrentCliVersion();
+function readInstalledSkillVersions(): string[] {
+  const versions = new Set<string>();
 
   for (const relativePathParts of INSTALLED_SKILL_PATHS) {
     const skillPath = join(REPO_ROOT, ...relativePathParts);
     const installedVersion = readInstalledSkillVersion(skillPath);
-    if (installedVersion && installedVersion !== cliVersion) {
-      return { installedVersion, cliVersion };
+    if (installedVersion) {
+      versions.add(installedVersion);
     }
   }
 
-  return null;
+  return [...versions];
 }
 
-export function warnIfInstalledSkillOutOfDate(): void {
+function formatObservedVersions(components: {
+  cliVersion: string;
+  localPackageVersion: string | null;
+  skillVersions: string[];
+}): string {
+  const labels = [`global CLI ${components.cliVersion}`];
+
+  if (components.localPackageVersion) {
+    labels.push(`local package ${components.localPackageVersion}`);
+  }
+
+  if (components.skillVersions.length === 1) {
+    labels.push(`agent skill ${components.skillVersions[0]}`);
+  } else if (components.skillVersions.length > 1) {
+    labels.push(`agent skills ${components.skillVersions.join(", ")}`);
+  }
+
+  return labels.join(", ");
+}
+
+export function warnIfLibrettoVersionsDiffer(): void {
   try {
-    const mismatch = findInstalledSkillVersionMismatch();
-    if (!mismatch) {
+    const cliVersion = readCurrentCliVersion();
+    const localPackageVersion = readLocalPackageVersion();
+    const skillVersions = readInstalledSkillVersions();
+    const observedVersions = new Set([
+      cliVersion,
+      ...(localPackageVersion ? [localPackageVersion] : []),
+      ...skillVersions,
+    ]);
+
+    if (observedVersions.size <= 1) {
       return;
     }
 
     console.error(
-      `Warning: Your agent skill (${mismatch.installedVersion}) is out of date with your Libretto CLI (${mismatch.cliVersion}). Please run \`libretto setup\` to update your skills to the correct version.`,
+      `Warning: Libretto versions differ: ${formatObservedVersions({
+        cliVersion,
+        localPackageVersion,
+        skillVersions,
+      })}. Use the same Libretto version globally and locally; run \`libretto setup\` after changing versions.`,
     );
   } catch {
     // Never block command execution on a best-effort skill version check.

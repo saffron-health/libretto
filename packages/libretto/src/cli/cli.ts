@@ -2,7 +2,7 @@ import { ensureLibrettoSetup } from "./core/context.js";
 import { createCLIApp } from "./router.js";
 import {
   readCurrentCliVersion,
-  warnIfInstalledSkillOutOfDate,
+  warnIfLibrettoVersionsDiffer,
 } from "./core/skill-version.js";
 import { loadEnv } from "../shared/env/load-env.js";
 
@@ -11,7 +11,7 @@ function renderVersion(): string {
 }
 
 function printSetupAudit(): void {
-  warnIfInstalledSkillOutOfDate();
+  warnIfLibrettoVersionsDiffer();
 }
 
 function isPackageManagerExec(env: NodeJS.ProcessEnv = process.env): boolean {

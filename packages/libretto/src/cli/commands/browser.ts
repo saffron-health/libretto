@@ -18,7 +18,7 @@ import {
   setSessionMode,
   validateSessionName,
 } from "../core/session.js";
-import { warnIfInstalledSkillOutOfDate } from "../core/skill-version.js";
+import { warnIfLibrettoVersionsDiffer } from "../core/skill-version.js";
 import { SimpleCLI } from "affordance";
 import {
   sessionOption,
@@ -107,7 +107,7 @@ export const openCommand = SimpleCLI.command({
   .use(withAutoSession())
   .use(withExperiments())
   .handle(async ({ input, ctx }) => {
-    warnIfInstalledSkillOutOfDate();
+    warnIfLibrettoVersionsDiffer();
     assertSessionAvailableForStart(ctx.session, ctx.logger);
     const providerName = resolveProviderName(input.provider);
     if (providerName === "local") {
@@ -168,7 +168,7 @@ export const connectCommand = SimpleCLI.command({
   .use(withAutoSession())
   .use(withExperiments())
   .handle(async ({ input, ctx }) => {
-    warnIfInstalledSkillOutOfDate();
+    warnIfLibrettoVersionsDiffer();
     await runConnectWithLogger(
       input.cdpUrl!,
       ctx.session,
