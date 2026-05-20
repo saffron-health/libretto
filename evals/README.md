@@ -19,7 +19,15 @@ pnpm evals
 pnpm evals run
 ```
 
-Cases run in parallel by default.
+Cases run in parallel by default, up to the CPU parallelism detected by Node.js.
+
+Repeat each selected case multiple times:
+
+```bash
+pnpm evals --repeat-count 3
+```
+
+Repeats run sequentially, with cases inside each repeat running up to the detected CPU parallelism. Run-level totals, infra counts, duration, and metrics are averaged per repeat so the aggregate fields stay comparable to a one-pass suite.
 
 Run only cases that do not declare an auth profile:
 

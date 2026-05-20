@@ -4,6 +4,16 @@ import type { EvalMetrics } from "./artifacts.js";
 
 type EvalFailureRecord = Pick<ScoredCriterion, "criterion" | "reason">;
 
+export type EvalInfraClassification =
+  | "clean-pass"
+  | "anti-bot-failure"
+  | "system-failure"
+  | "ordinary-failure";
+
+export type EvalScoreMetadata = {
+  infraClassification?: EvalInfraClassification;
+};
+
 export type EvalScoreRecord = {
   name: string;
   passed: number;
@@ -18,6 +28,7 @@ export type EvalScoreRecord = {
     metrics: EvalMetrics;
   };
   judge: EvalJudgeRecord;
+  infraClassification?: EvalInfraClassification;
 };
 
 const recordedScores: EvalScoreRecord[] = [];
@@ -27,7 +38,11 @@ function currentRecordedScores(): EvalScoreRecord[] {
   return scoreStorage.getStore() ?? recordedScores;
 }
 
-function toRecord(name: string, score: EvalScore): EvalScoreRecord {
+function toRecord(
+  name: string,
+  score: EvalScore,
+  metadata: EvalScoreMetadata = {},
+): EvalScoreRecord {
   return {
     name,
     passed: score.passed,
@@ -39,11 +54,18 @@ function toRecord(name: string, score: EvalScore): EvalScoreRecord {
       .map(({ criterion, reason }) => ({ criterion, reason })),
     agent: score.agent,
     judge: score.judge,
+    ...(metadata.infraClassification
+      ? { infraClassification: metadata.infraClassification }
+      : {}),
   };
 }
 
-export function recordScore(name: string, score: EvalScore): EvalScoreRecord {
-  const record = toRecord(name, score);
+export function recordScore(
+  name: string,
+  score: EvalScore,
+  metadata: EvalScoreMetadata = {},
+): EvalScoreRecord {
+  const record = toRecord(name, score, metadata);
   currentRecordedScores().push(record);
   return record;
 }

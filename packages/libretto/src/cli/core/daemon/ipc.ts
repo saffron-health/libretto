@@ -98,6 +98,7 @@ export type DaemonReadyMessage = {
     sessionId: string;
     cdpEndpoint: string;
     liveViewUrl?: string;
+    recordingUrl?: string;
   };
 };
 
