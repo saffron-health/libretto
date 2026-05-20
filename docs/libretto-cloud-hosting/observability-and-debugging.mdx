@@ -8,7 +8,9 @@ title: Observability and Debugging
 
 Every hosted workflow run captures a browser recording. Use it with job state, logs, screenshots, and failure reports to understand what happened during the run.
 
-Use `/v1/jobs/get` for status, params, timestamps, result or error, mapped stack, and `recording_url`.
+Use `/v1/jobs/get` for status, params, timestamps, result or error, and mapped stack.
+
+Use `/v1/recordings/get` with a `job_id` or `session_id` when you need a recording URL. Recording URLs are temporary; call the same endpoint again to generate a fresh URL after one expires.
 
 Use `/v1/jobs/debugReport` for failed-run diagnosis, fix instructions, artifact links, job error details, and auto-repair fields when available.
 

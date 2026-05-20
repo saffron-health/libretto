@@ -6,7 +6,6 @@ type CloudSessionResponse = {
   status: string;
   cdp_url: string | null;
   live_view_url: string | null;
-  recording_url: string | null;
 };
 
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
@@ -77,8 +76,11 @@ export function createLibrettoCloudProvider(): ProviderApi {
       };
     },
     async closeSession(sessionId) {
-      const json = await closeCloudSession(endpoint, apiKey, sessionId);
-      return { replayUrl: json.replay_url ?? undefined };
+      await closeCloudSession(endpoint, apiKey, sessionId);
+      const replayUrl = await getCloudRecordingUrl(endpoint, apiKey, sessionId).catch(
+        () => undefined,
+      );
+      return { replayUrl };
     },
   };
 }
@@ -172,7 +174,7 @@ async function closeCloudSession(
   endpoint: string,
   apiKey: string,
   sessionId: string,
-): Promise<{ replay_url: string | null }> {
+): Promise<void> {
   const resp = await fetch(`${endpoint}/v1/sessions/close`, {
     method: "POST",
     headers: {
@@ -187,10 +189,31 @@ async function closeCloudSession(
       `Libretto Cloud API error closing session ${sessionId} (${resp.status}): ${body}`,
     );
   }
+}
+
+async function getCloudRecordingUrl(
+  endpoint: string,
+  apiKey: string,
+  sessionId: string,
+): Promise<string | undefined> {
+  const resp = await fetch(`${endpoint}/v1/recordings/get`, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ json: { session_id: sessionId } }),
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(
+      `Libretto Cloud API error reading recording for session ${sessionId} (${resp.status}): ${body}`,
+    );
+  }
   const { json } = (await resp.json()) as {
-    json: { replay_url: string | null };
+    json: { recording_url: string | null };
   };
-  return json;
+  return json.recording_url ?? undefined;
 }
 
 function createStartupSessionCleanup(
