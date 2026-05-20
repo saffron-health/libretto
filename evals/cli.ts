@@ -16,7 +16,7 @@ import { createEvalContext } from "./fixtures.js";
 import {
   takeRecordedScores,
   withScoreRecording,
-  type EvalInfraClassification,
+  type InfraClassification,
   type EvalScoreRecord,
 } from "./scoring.js";
 import {
@@ -68,10 +68,6 @@ type CliOptions =
   | ProfilesStatusCliOptions
   | ProfilesLoginCliOptions
   | SummaryCliOptions;
-
-type InfraClassification =
-  | EvalInfraClassification
-  | "recovered-anti-bot-pass";
 
 type CaseResult = {
   id: string;
@@ -1169,7 +1165,6 @@ function infraClassification(
   if (value == null) return fallback;
   if (
     value === "clean-pass" ||
-    value === "recovered-anti-bot-pass" ||
     value === "anti-bot-failure" ||
     value === "system-failure" ||
     value === "ordinary-failure"

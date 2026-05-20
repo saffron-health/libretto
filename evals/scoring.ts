@@ -4,14 +4,14 @@ import type { EvalMetrics } from "./artifacts.js";
 
 type EvalFailureRecord = Pick<ScoredCriterion, "criterion" | "reason">;
 
-export type EvalInfraClassification =
+export type InfraClassification =
   | "clean-pass"
   | "anti-bot-failure"
   | "system-failure"
   | "ordinary-failure";
 
 export type EvalScoreMetadata = {
-  infraClassification?: EvalInfraClassification;
+  infraClassification?: InfraClassification;
 };
 
 export type EvalScoreRecord = {
@@ -28,7 +28,7 @@ export type EvalScoreRecord = {
     metrics: EvalMetrics;
   };
   judge: EvalJudgeRecord;
-  infraClassification?: EvalInfraClassification;
+  infraClassification?: InfraClassification;
 };
 
 const recordedScores: EvalScoreRecord[] = [];

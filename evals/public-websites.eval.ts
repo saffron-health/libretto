@@ -1,6 +1,6 @@
 import { evalCase } from "./eval-case.js";
 import type { EvalScore } from "./harness.js";
-import { recordScore, type EvalInfraClassification } from "./scoring.js";
+import { recordScore, type InfraClassification } from "./scoring.js";
 
 type WebsiteEval = {
   name: string;
@@ -125,7 +125,7 @@ const ANTI_BOT_CRITERION =
 
 function infraClassificationForScore(
   score: EvalScore,
-): EvalInfraClassification {
+): InfraClassification {
   const antiBotCriterion = score.criteria[1];
   if (antiBotCriterion && !antiBotCriterion.pass) return "anti-bot-failure";
   return score.passed === score.total ? "clean-pass" : "ordinary-failure";
