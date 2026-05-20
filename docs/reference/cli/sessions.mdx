@@ -30,8 +30,8 @@ Session directories are git-ignored. Each session runs an isolated browser insta
 The `close` command closes a browser session and cleans up its state.
 
 ```bash theme={null}
-libretto close --session debug-example
-libretto close --all
+npx libretto close --session debug-example
+npx libretto close --all
 ```
 
 #### When to use `close`
@@ -63,13 +63,13 @@ libretto close --all
 
 ```bash theme={null}
 # Close a named session
-libretto close --session debug-example
+npx libretto close --session debug-example
 
 # Close all sessions in the workspace
-libretto close --all
+npx libretto close --all
 
 # Close all sessions, force-killing any that are unresponsive
-libretto close --all --force
+npx libretto close --all --force
 ```
 
 ---
@@ -83,9 +83,9 @@ Read-only mode prevents any mutating browser actions (clicks, typing, navigation
 Pass `--read-only` to `open`, `connect`, or `run`:
 
 ```bash theme={null}
-libretto open https://example.com --read-only --session diag
-libretto connect ws://localhost:9222 --read-only --session remote-diag
-libretto run ./workflow.ts --read-only --session test-run
+npx libretto open https://example.com --read-only --session diag
+npx libretto connect ws://localhost:9222 --read-only --session remote-diag
+npx libretto run ./workflow.ts --read-only --session test-run
 ```
 
 You can also manually set `sessionMode` in `.libretto/config.json` to change the default for all new sessions:
@@ -105,13 +105,13 @@ View or change the mode of an existing session with `session-mode`:
 
 ```bash theme={null}
 # View current mode
-libretto session-mode --session my-session
+npx libretto session-mode --session my-session
 
 # Switch to read-only
-libretto session-mode read-only --session my-session
+npx libretto session-mode read-only --session my-session
 
 # Switch back to write-access
-libretto session-mode write-access --session my-session
+npx libretto session-mode write-access --session my-session
 ```
 
 #### What's allowed in read-only mode
@@ -140,11 +140,11 @@ Any mutating operation (click, fill, goto, reload, etc.) throws a `ReadonlyExecD
 
 ```bash theme={null}
 # Read page title
-libretto readonly-exec --session diag "return await page.title()"
+npx libretto readonly-exec --session diag "return await page.title()"
 
 # Check if an element is visible
-libretto readonly-exec --session diag "return await page.locator('#submit').isVisible()"
+npx libretto readonly-exec --session diag "return await page.locator('#submit').isVisible()"
 
 # Get text content of a section
-libretto readonly-exec --session diag "return await page.locator('.results').textContent()"
+npx libretto readonly-exec --session diag "return await page.locator('.results').textContent()"
 ```

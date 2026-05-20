@@ -1,53 +1,175 @@
 import type { ProviderApi } from "./types.js";
 
-const DEFAULT_KERNEL_API_ENDPOINT = "https://api.onkernel.com";
+export type KernelProviderOptions = {
+  apiKey?: string;
+  headless?: boolean;
+  stealth?: boolean;
+  timeoutSeconds?: number;
+  enableRecording?: boolean;
+};
 
-export function createKernelProvider(): ProviderApi {
-  const apiKey = process.env.KERNEL_API_KEY;
+type KernelBrowserResponse = {
+  session_id: string;
+  cdp_ws_url: string;
+  browser_live_view_url?: string | null;
+};
+
+type KernelReplayResponse = {
+  replay_id: string;
+  replay_view_url?: string | null;
+};
+
+function readBooleanEnv(name: string, defaultValue: boolean): boolean {
+  const value = process.env[name]?.trim().toLowerCase();
+  if (!value) return defaultValue;
+  return value === "1" || value === "true" || value === "yes";
+}
+
+function readTimeoutSeconds(options: KernelProviderOptions): number {
+  if (options.timeoutSeconds !== undefined) return options.timeoutSeconds;
+  return Number(process.env.KERNEL_TIMEOUT_SECONDS ?? 300);
+}
+
+async function kernelFetchJson<T>(
+  endpoint: string,
+  apiKey: string,
+  path: string,
+  init: RequestInit,
+): Promise<T> {
+  const resp = await fetch(`${endpoint}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      ...init.headers,
+    },
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Kernel API error (${resp.status}): ${body}`);
+  }
+  return (await resp.json()) as T;
+}
+
+async function kernelFetchNoBody(
+  endpoint: string,
+  apiKey: string,
+  path: string,
+  init: RequestInit,
+): Promise<void> {
+  const resp = await fetch(`${endpoint}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      ...init.headers,
+    },
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Kernel API error (${resp.status}): ${body}`);
+  }
+}
+
+function readEndpoint(): string {
+  return (
+    process.env.KERNEL_API_ENDPOINT?.trim() ||
+    process.env.KERNEL_ENDPOINT?.trim() ||
+    "https://api.onkernel.com"
+  );
+}
+
+export function createKernelProvider(
+  options: KernelProviderOptions = {},
+): ProviderApi {
+  const apiKey = options.apiKey ?? process.env.KERNEL_API_KEY;
   if (!apiKey)
     throw new Error("KERNEL_API_KEY is required for Kernel provider.");
-  const endpoint =
-    process.env.KERNEL_API_ENDPOINT?.trim() || DEFAULT_KERNEL_API_ENDPOINT;
+  const endpoint = readEndpoint();
+  const headless = options.headless ?? process.env.KERNEL_HEADLESS !== "false";
+  const stealth = options.stealth ?? readBooleanEnv("KERNEL_STEALTH", false);
+  const timeoutSeconds = readTimeoutSeconds(options);
+  const enableRecording =
+    options.enableRecording ?? readBooleanEnv("KERNEL_ENABLE_RECORDING", false);
+  const replays = new Map<
+    string,
+    {
+      replayId: string;
+      replayViewUrl?: string;
+    }
+  >();
 
   return {
     async createSession() {
-      const resp = await fetch(`${endpoint}/browsers`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
+      const json = await kernelFetchJson<KernelBrowserResponse>(
+        endpoint,
+        apiKey,
+        "/browsers",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            headless,
+            stealth,
+            timeout_seconds: timeoutSeconds,
+          }),
         },
-        body: JSON.stringify({
-          headless: process.env.KERNEL_HEADLESS !== "false",
-          stealth: process.env.KERNEL_STEALTH === "true",
-          timeout_seconds: Number(process.env.KERNEL_TIMEOUT_SECONDS ?? 300),
-        }),
-      });
-      if (!resp.ok) {
-        const body = await resp.text();
-        throw new Error(`Kernel API error (${resp.status}): ${body}`);
+      );
+
+      let replay: KernelReplayResponse | undefined;
+      if (enableRecording) {
+        try {
+          replay = await kernelFetchJson<KernelReplayResponse>(
+            endpoint,
+            apiKey,
+            `/browsers/${json.session_id}/replays`,
+            { method: "POST", body: JSON.stringify({}) },
+          );
+          replays.set(json.session_id, {
+            replayId: replay.replay_id,
+            replayViewUrl: replay.replay_view_url ?? undefined,
+          });
+        } catch (error) {
+          await kernelFetchNoBody(
+            endpoint,
+            apiKey,
+            `/browsers/${json.session_id}`,
+            { method: "DELETE" },
+          ).catch(() => {});
+          throw error;
+        }
       }
-      const json = (await resp.json()) as {
-        session_id: string;
-        cdp_ws_url: string;
-      };
+
       return {
         sessionId: json.session_id,
         cdpEndpoint: json.cdp_ws_url,
+        liveViewUrl: json.browser_live_view_url ?? undefined,
+        recordingUrl: replay?.replay_view_url ?? undefined,
       };
     },
     async closeSession(sessionId) {
-      const resp = await fetch(`${endpoint}/browsers/${sessionId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      if (!resp.ok) {
-        const body = await resp.text();
-        throw new Error(
-          `Kernel API error closing session ${sessionId} (${resp.status}): ${body}`,
-        );
+      const replay = replays.get(sessionId);
+      let replayStopError: unknown;
+      if (replay) {
+        try {
+          await kernelFetchNoBody(
+            endpoint,
+            apiKey,
+            `/browsers/${sessionId}/replays/${replay.replayId}/stop`,
+            { method: "POST" },
+          );
+        } catch (error) {
+          replayStopError = error;
+        }
       }
-      return {};
+
+      await kernelFetchNoBody(endpoint, apiKey, `/browsers/${sessionId}`, {
+        method: "DELETE",
+      });
+      replays.delete(sessionId);
+
+      if (replayStopError) {
+        throw replayStopError;
+      }
+      return { replayUrl: replay?.replayViewUrl };
     },
   };
 }

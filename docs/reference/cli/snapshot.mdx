@@ -9,7 +9,7 @@ The `snapshot` command is the primary page observation tool. It captures a scree
 Use `snapshot` before guessing at selectors, after workflow failures, and whenever the visible page state is unclear.
 
 ```bash theme={null}
-libretto snapshot --session debug-example
+npx libretto snapshot --session debug-example
 ```
 
 ### Arguments
@@ -29,7 +29,7 @@ libretto snapshot --session debug-example
 ### Optional flags
 
 <ParamField path="--page" type="string">
-  Target a specific page ID within the session. Use `libretto pages --session <name>` to list page IDs when a popup or new tab is open. See [pages](./pages) for details.
+  Target a specific page ID within the session. Use `npx libretto pages --session <name>` to list page IDs when a popup or new tab is open. See [pages](./pages) for details.
 </ParamField>
 
 ### What snapshot produces
@@ -62,13 +62,13 @@ The command prints:
 
 ```bash theme={null}
 # Basic snapshot
-libretto snapshot --session debug-example
+npx libretto snapshot --session debug-example
 
 # Snapshot a specific page in a multi-page session
-libretto snapshot --session debug-example --page <page-id>
+npx libretto snapshot --session debug-example --page <page-id>
 
 # Inspect a subtree from the latest full snapshot
-libretto snapshot <ref> --session debug-example
+npx libretto snapshot <ref> --session debug-example
 ```
 
 <CardGroup cols={2}>

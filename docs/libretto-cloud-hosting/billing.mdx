@@ -15,7 +15,7 @@ Only organization owners can view billing status or open billing-management link
 Use `billing portal` to print a short-lived link to Libretto's plans page:
 
 ```bash theme={null}
-libretto cloud billing portal
+npx libretto cloud billing portal
 ```
 
 The page shows:
@@ -30,7 +30,7 @@ The page shows:
 Use `billing status` to inspect the current plan, subscription status, usage, and period end:
 
 ```bash theme={null}
-libretto cloud billing status
+npx libretto cloud billing status
 ```
 
 Example output:
@@ -58,7 +58,7 @@ Browser hours accrue when Libretto Cloud provisions a browser session for:
 
 Hosted usage is measured per browser session, from the time a session starts until Libretto records it as closed.
 
-Each session is billed by the second and rounds up to the next whole second, with a one-second minimum per session. Browser seconds are priced at **$0.000069444 per second** (**$0.25 per browser hour**), which is reflected in the included hours on each plan.
+Each session is billed by the second and rounds up to the next whole second, with a one-second minimum per session. Browser seconds are priced at **\$0.000069444 per second** (**\$0.25 per browser hour**), which is reflected in the included hours on each plan.
 
 #### Plans and pricing
 

@@ -17,9 +17,9 @@ Use this reference when a Libretto session has multiple open pages and you need 
 ## Commands
 
 ```bash
-libretto pages --session debug-flow
-libretto exec --session debug-flow --page <page-id> "return await page.url()"
-libretto snapshot --session debug-flow --page <page-id>
+npx libretto pages --session debug-flow
+npx libretto exec --session debug-flow --page <page-id> "return await page.url()"
+npx libretto snapshot --session debug-flow --page <page-id>
 ```
 
 ## Notes

@@ -1,0 +1,54 @@
+---
+title: Recordings
+---
+
+> Use the recordings API to generate temporary browser links for hosted browser recordings.
+
+All routes on this page require `x-api-key`.
+
+### POST `/v1/recordings/get`
+
+Generate a recording URL for a job or browser session.
+
+Request fields:
+
+- `job_id`: optional job id
+- `session_id`: optional browser session id
+
+Provide exactly one of `job_id` or `session_id`.
+
+Response fields:
+
+- `recording_url`
+- `recording_url_expires_at`
+
+`recording_url` is `null` when no recording is available for the job or session. When Libretto returns a URL, treat it as an opaque browser link.
+
+Recording URLs are temporary. If a URL expires, call this route again with the same `job_id` or `session_id` to generate a fresh URL for the existing recording. The recording itself is not regenerated or deleted when a URL expires.
+
+Example:
+
+```bash
+curl -X POST "https://api.libretto.sh/v1/recordings/get" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "job_id": "<job-id>"
+    }
+  }'
+```
+
+<CardGroup cols={3}>
+  <Card title="Jobs and Logs" icon="terminal" href="/libretto-cloud-api/jobs-and-logs">
+    Run workflows and inspect job state.
+  </Card>
+
+  <Card title="Sessions" icon="browser" href="/libretto-cloud-api/sessions">
+    Create and close hosted browser sessions.
+  </Card>
+
+  <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
+    See the shared request format.
+  </Card>
+</CardGroup>

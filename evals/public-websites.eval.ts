@@ -6,7 +6,7 @@ import type { EvalAgentName } from "./agents.js";
 import { scoreTranscript, type EvalScore } from "./harness.js";
 import { getEvalArtifactPaths, type EvalMetrics } from "./artifacts.js";
 import { recordEvalCall } from "./run-recorder.js";
-import { recordScore, type EvalInfraClassification } from "./scoring.js";
+import { recordScore, type InfraClassification } from "./scoring.js";
 
 type WebsiteEval = {
   name: string;
@@ -127,11 +127,11 @@ const WEBSITE_EVALS: WebsiteEval[] = [
 const LIVE_PAGE_EVIDENCE_CRITERION =
   "The agent used the selected browser automation agent to reach the requested website or task area, perform the requested search or lookup, and return a plausible answer grounded in live page evidence. Be lenient about ambiguous result choice, sorting, availability, prices, or dynamic website content. Mark false if the run used the wrong website or task area, could not access the relevant page due to browser/provider issues, or returned an answer without evidence from the live page.";
 const ANTI_BOT_CRITERION =
-  "Mark false if the run encountered or reported an anti-bot block, including CAPTCHA, challenge, human verification, bot check, Access Denied, permission denied, blocked, 403/Forbidden, unusual traffic, or bot-detection pages, even if the agent later worked around it by opening another page, session, search result, mirror, or fallback source. Only mark true for a challenge if the configured browser provider visibly solved it automatically and the agent continued directly on the intended site from that solved page.";
+  "Mark false if the run encountered or reported an anti-bot block, including CAPTCHA, challenge, human verification, bot check, Access Denied, permission denied, blocked, 403/Forbidden, unusual traffic, or bot-detection pages, and the block was still present after the agent waited up to 3 minutes and checked the same intended site again. Mark false if the agent worked around an anti-bot block by opening another page, session, search result, mirror, API, cached copy, or fallback source. Mark true for a challenge if the configured browser provider visibly solved it automatically within the 3-minute wait and the agent continued directly on the intended site from that solved page.";
 
 function infraClassificationForScore(
   score: EvalScore,
-): EvalInfraClassification {
+): InfraClassification {
   const antiBotCriterion = score.criteria[1];
   if (antiBotCriterion && !antiBotCriterion.pass) return "anti-bot-failure";
   return score.passed === score.total ? "clean-pass" : "ordinary-failure";
@@ -149,7 +149,7 @@ function agentInstruction(agentName: EvalAgentName, browserProvider: string): st
       `Use the Browser Use local open-source agent with ${providerDescription}.`,
       "Do not use Libretto, search-result snippets, mirrors, APIs, cached copies, or unrelated fallback sources.",
       browserProvider === "kernel"
-        ? "If you see a CAPTCHA, challenge, bot-check, or human-verification page, wait briefly for Kernel to solve it automatically, then continue directly from the requested site. If you see Access Denied, permission denied, blocked, 403/Forbidden, unusual traffic, bot-detection, or an unsolved CAPTCHA/challenge, report that the task failed immediately."
+        ? "If you see a CAPTCHA, challenge, bot-check, human-verification page, Access Denied, permission denied, blocked, 403/Forbidden, unusual traffic, or bot-detection page, wait up to 3 minutes for Kernel to solve it automatically, then check the same intended site again. If the anti-bot page is gone, continue directly from the requested site. If the anti-bot page is still there after the 3-minute wait, report that the task failed immediately. Do not work around anti-bot blocks by opening another page, session, search result, mirror, API, cached copy, or fallback source."
         : `If you see a CAPTCHA, challenge, bot-check, human-verification page, Access Denied, permission denied, blocked, 403/Forbidden, unusual traffic, or bot-detection page, report that the task failed immediately because this Browser Use ${browserProvider} eval is not configured with CAPTCHA solving.`,
     ].join(" ");
   }
@@ -172,8 +172,9 @@ function agentInstruction(agentName: EvalAgentName, browserProvider: string): st
     return [
       `Use Libretto with the configured Kernel browser provider; do not switch to ${otherProviders}, search-result snippets, mirrors, APIs, cached copies, or unrelated fallback sources.`,
       "Kernel is expected to auto-solve CAPTCHA, challenge, bot-check, and human-verification pages.",
-      "If you see a CAPTCHA, challenge, bot-check, or human-verification page, wait briefly for the browser to solve it automatically, then continue directly from the requested site.",
-      "If you see Access Denied, permission denied, blocked, 403/Forbidden, unusual traffic, bot-detection, or an unsolved CAPTCHA/challenge, report that the task failed immediately.",
+      "If you see a CAPTCHA, challenge, bot-check, human-verification page, Access Denied, permission denied, blocked, 403/Forbidden, unusual traffic, or bot-detection page, wait up to 3 minutes for the browser provider to solve it automatically, then check the same intended site again.",
+      "If the anti-bot page is gone, continue directly from the requested site. If the anti-bot page is still there after the 3-minute wait, report that the task failed immediately.",
+      "Do not work around anti-bot blocks by opening another page, session, search result, mirror, API, cached copy, or fallback source.",
     ].join(" ");
   }
 

@@ -628,13 +628,20 @@ async function runIntegrationFromFile(
       stayOpenOnSuccess: args.stayOpenOnSuccess,
       daemonSocketPath,
       provider: provider
-        ? { name: provider.name, sessionId: provider.sessionId }
+        ? {
+            name: provider.name,
+            sessionId: provider.sessionId,
+            recordingUrl: provider.recordingUrl,
+          }
         : undefined,
     },
     logger,
   );
   if (provider?.liveViewUrl) {
     console.log(`View live session: ${provider.liveViewUrl}`);
+  }
+  if (provider?.recordingUrl) {
+    console.log(`View recording: ${provider.recordingUrl}`);
   }
 
   let outcome: WorkflowOutcome;

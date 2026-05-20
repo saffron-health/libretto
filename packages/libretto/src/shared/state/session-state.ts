@@ -19,6 +19,7 @@ export const SessionViewportSchema = z.object({
 export const ProviderStateSchema = z.object({
   name: z.string(),
   sessionId: z.string(),
+  recordingUrl: z.string().url().optional(),
 });
 
 export const SessionStateFileSchema = z.object({
@@ -38,6 +39,7 @@ export const SessionStateFileSchema = z.object({
 
 export type SessionStatus = z.infer<typeof SessionStatusSchema>;
 export type SessionAccessMode = z.infer<typeof SessionAccessModeSchema>;
+export type ProviderState = z.infer<typeof ProviderStateSchema>;
 export type SessionStateFile = z.infer<typeof SessionStateFileSchema>;
 export type SessionState = Omit<SessionStateFile, "version">;
 

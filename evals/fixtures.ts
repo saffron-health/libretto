@@ -132,6 +132,7 @@ export async function createEvalContext(
   const harness = new PiEvalHarness({
     cwd: evalWorkspaceDir,
     model: options.model,
+    browserProvider: options.provider,
   });
   const browserProvider = options.provider ?? "local";
   const agent =

@@ -9,7 +9,7 @@ title: pages
 The `pages` command lists all open pages (tabs) in a session and prints their IDs and URLs.
 
 ```bash theme={null}
-libretto pages --session debug-example
+npx libretto pages --session debug-example
 ```
 
 #### When to use `pages`
@@ -22,11 +22,11 @@ After running `pages`, pass the target page ID to other commands with `--page <p
 
 ```bash theme={null}
 # List pages
-libretto pages --session debug-example
+npx libretto pages --session debug-example
 
 # Target a specific page
-libretto exec --session debug-example --page <page-id> "await page.url()"
-libretto snapshot --session debug-example --page <page-id>
+npx libretto exec --session debug-example --page <page-id> "await page.url()"
+npx libretto snapshot --session debug-example --page <page-id>
 ```
 
 #### Flags

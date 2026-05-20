@@ -1,13 +1,25 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SimpleCLI } from "affordance";
-
-const UPDATE_COMMAND = "curl -fsSL https://libretto.sh/install.sh | bash";
+import { REPO_ROOT } from "../core/context.js";
+import {
+  detectProjectPackageManager,
+  installCommand,
+  type PackageManager,
+} from "../../shared/package-manager.js";
 
 type PackageManifest = {
   version?: string;
 };
+
+function packageInstallCommand(
+  packageManager: PackageManager,
+  packageSpec: string,
+): string {
+  return `${installCommand(packageManager)} ${packageSpec}`;
+}
 
 function readCurrentCliVersion(): string {
   const packageJsonPath = fileURLToPath(
@@ -24,6 +36,23 @@ function readCurrentCliVersion(): string {
   }
 
   return manifest.version;
+}
+
+function readPackageVersion(packageJsonPath: string): string | null {
+  try {
+    const manifest = JSON.parse(
+      readFileSync(packageJsonPath, "utf8"),
+    ) as PackageManifest;
+    return manifest.version?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function readLocalPackageVersion(): string | null {
+  return readPackageVersion(
+    join(REPO_ROOT, "node_modules", "libretto", "package.json"),
+  );
 }
 
 function readLatestNpmVersion(): string {
@@ -83,16 +112,17 @@ export const updateInput = SimpleCLI.input({
 function formatUpdateFailure(
   status: number | null,
   signal: string | null,
+  updateCommand: string,
 ): string {
   const knownState =
     status === null
-      ? `installer was interrupted${signal ? ` by ${signal}` : ""}.`
-      : `installer exited with status ${status}.`;
+      ? `package update was interrupted${signal ? ` by ${signal}` : ""}.`
+      : `package update exited with status ${status}.`;
 
   return [
     "Error: failed to update Libretto to the latest version.",
     `Known state: ${knownState}`,
-    `Try: ${UPDATE_COMMAND}`,
+    `Try: ${updateCommand}`,
     "Help: libretto help update",
   ].join("\n");
 }
@@ -102,48 +132,56 @@ export const updateCommand = SimpleCLI.command({
 })
   .input(updateInput)
   .handle(async ({ input }) => {
+    const packageManager = detectProjectPackageManager();
+    const updateCommand = packageInstallCommand(packageManager, "libretto@latest");
+
     if (input.dryRun) {
       console.log("Update command:");
-      console.log(`  ${UPDATE_COMMAND}`);
+      console.log(`  ${updateCommand}`);
       console.log("No changes made.");
       return;
     }
 
     const currentVersion = readCurrentCliVersion();
+    const localPackageVersion = readLocalPackageVersion();
+    const installedVersion = localPackageVersion ?? currentVersion;
     const latestVersion = readLatestNpmVersion();
-    console.log(`Current version: ${currentVersion}`);
+    console.log(`Current version: ${installedVersion}`);
     console.log(`Latest version: ${latestVersion}`);
 
-    if (currentVersion === latestVersion) {
-      console.log(`Libretto is already up to date (${currentVersion}).`);
+    if (localPackageVersion && installedVersion === latestVersion) {
+      console.log(`Libretto is already up to date (${installedVersion}).`);
       console.log("No further action required.");
       return;
     }
 
-    console.log("Updating Libretto to latest...");
-    const result = spawnSync("bash", ["-lc", UPDATE_COMMAND], {
+    if (!localPackageVersion) {
+      console.log("Local package: not installed");
+    }
+
+    console.log("Updating local Libretto package to latest...");
+    const result = spawnSync(updateCommand, {
       stdio: "inherit",
-      env: {
-        ...process.env,
-        LIBRETTO_VERSION: "latest",
-      },
+      shell: true,
     });
 
     if (result.error) {
       throw new Error(
         [
-          "Error: failed to start the Libretto installer.",
+          "Error: failed to start the Libretto package update.",
           `Known state: ${result.error.message}`,
-          `Try: ${UPDATE_COMMAND}`,
+          `Try: ${updateCommand}`,
           "Help: libretto help update",
         ].join("\n"),
       );
     }
 
     if (result.status !== 0) {
-      throw new Error(formatUpdateFailure(result.status, result.signal));
+      throw new Error(
+        formatUpdateFailure(result.status, result.signal, updateCommand),
+      );
     }
 
-    console.log("Libretto updated to latest.");
+    console.log("Local Libretto package updated to latest.");
     console.log("No further action required.");
   });
