@@ -2,7 +2,7 @@
 title: Sessions
 ---
 
-> Use the sessions API to create and close hosted browser sessions directly.
+> Use the sessions API to create, inspect, and close hosted browser sessions directly.
 
 All routes on this page require `x-api-key`.
 
@@ -18,9 +18,9 @@ Response fields:
 
 - `success`
 - `session_id`
+- `status`
 - `cdp_url`
 - `live_view_url`
-- `recording_url`
 
 Example:
 
@@ -35,9 +35,26 @@ curl -X POST "https://api.libretto.sh/v1/sessions/create" \
   }'
 ```
 
+### POST `/v1/sessions/get`
+
+Inspect a hosted browser session.
+
+Request fields:
+
+- `session_id`: session id returned from `sessions/create`
+
+Response fields:
+
+- `session_id`
+- `status`
+- `cdp_url`
+- `live_view_url`
+
+Use this route when `sessions/create` returned a queued or starting session and you need to poll for the CDP URL or live view URL.
+
 ### POST `/v1/sessions/close`
 
-Close a hosted browser session by provider session id.
+Close a hosted browser session by session id.
 
 Request fields:
 
@@ -47,7 +64,6 @@ Response fields:
 
 - `success`
 - `message`
-- `replay_url`
 
 Example:
 
@@ -69,6 +85,10 @@ curl -X POST "https://api.libretto.sh/v1/sessions/close" \
 
   <Card title="Jobs and Logs" icon="terminal" href="/libretto-cloud-api/jobs-and-logs">
     Run workflows and inspect results.
+  </Card>
+
+  <Card title="Recordings" icon="video" href="/libretto-cloud-api/recordings">
+    Generate recording URLs for jobs and browser sessions.
   </Card>
 
   <Card title="Deployments and Workflows" icon="rocket" href="/libretto-cloud-api/deployments-and-workflows">

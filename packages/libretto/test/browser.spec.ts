@@ -297,7 +297,6 @@ describe("Libretto Cloud provider", () => {
               status: "open",
               cdp_url: "wss://cloud.example.test/devtools/session-ready",
               live_view_url: null,
-              recording_url: null,
             },
           });
         }
@@ -330,7 +329,6 @@ describe("Libretto Cloud provider", () => {
               status: "queued",
               cdp_url: null,
               live_view_url: null,
-              recording_url: null,
             },
           });
         }
@@ -346,7 +344,6 @@ describe("Libretto Cloud provider", () => {
                   : "wss://cloud.example.test/devtools/session-queued",
               live_view_url:
                 getCalls === 1 ? null : "https://cloud.example.test/live",
-              recording_url: null,
             },
           });
         }
@@ -388,7 +385,6 @@ describe("Libretto Cloud provider", () => {
               status: "queued",
               cdp_url: null,
               live_view_url: null,
-              recording_url: null,
             },
           });
         }
@@ -399,13 +395,12 @@ describe("Libretto Cloud provider", () => {
               status: "queued",
               cdp_url: null,
               live_view_url: null,
-              recording_url: null,
             },
           });
         }
         if (pathname === "/v1/sessions/close") {
           closeCallFinished = true;
-          return jsonResponse({ json: { replay_url: null } });
+          return jsonResponse({ json: { success: true, message: "closed" } });
         }
         return new Response("not found", { status: 404 });
       },
@@ -431,6 +426,40 @@ describe("Libretto Cloud provider", () => {
     } finally {
       process.send = originalSend;
     }
+  });
+
+  it("fetches a recording URL after closing a cloud session", async () => {
+    vi.stubEnv("LIBRETTO_API_KEY", "test-key");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/v1/sessions/close") {
+          return jsonResponse({ json: { success: true, message: "closed" } });
+        }
+        if (pathname === "/v1/recordings/get") {
+          expect(await readJsonBody(init)).toEqual({
+            json: { session_id: "session-closed" },
+          });
+          return jsonResponse({
+            json: {
+              recording_url: "https://api.example.test/recordings/session-closed?t=signed",
+              recording_url_expires_at: "2026-05-27T00:00:00.000Z",
+            },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      createLibrettoCloudProvider().closeSession("session-closed"),
+    ).resolves.toEqual({
+      replayUrl: "https://api.example.test/recordings/session-closed?t=signed",
+    });
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname))
+      .toEqual(["/v1/sessions/close", "/v1/recordings/get"]);
   });
 });
 
