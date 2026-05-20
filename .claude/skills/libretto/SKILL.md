@@ -37,6 +37,12 @@ Mix strategies freely across steps on a site.
 
 Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first navigation — deep URLs on a cold session are commonly blocked by edge bot protection.
 
+## CAPTCHA Handling
+
+- If a CAPTCHA, Cloudflare challenge, or similar bot check appears in a local Chromium session, try to solve it in the visible browser and continue from the solved state.
+- If the same challenge appears while the session is using an external browser provider, wait up to 2 minutes for the provider's automatic CAPTCHA handling before deciding the workflow is blocked. Kernel stealth mode and Browserbase browser settings both document automatic CAPTCHA solving; Libretto Cloud manages CAPTCHA handling for hosted browser runs. See [Kernel stealth mode](https://www.kernel.sh/docs/browsers/bot-detection/stealth), [Browserbase core features](https://docs.browserbase.com/platform/browser/core-features/overview), and [Libretto Cloud overview](https://libretto.sh/docs/libretto-cloud-hosting/overview).
+- When a CAPTCHA was observed during exploration, generated workflow code should include an explicit timeout wait at that point with a comment explaining that cloud browser providers may auto-solve the challenge. Follow `references/code-generation-rules.md` for the code shape.
+
 ## Setup
 
 - Use the package manager convention for the target project. The examples use `npx libretto`; pnpm, yarn, and bun projects should use their equivalent package-manager execution form.

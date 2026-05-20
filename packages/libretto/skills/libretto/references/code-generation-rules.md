@@ -57,6 +57,21 @@ During the interactive `exec` phase, `page.evaluate` is fine for quick prototypi
 
 Before extracting data (for example text, rows, or field values), wait for the target content itself to be ready, not just its container.
 
+## CAPTCHA Waits
+
+If a CAPTCHA, Cloudflare challenge, or similar bot check appeared during exploration, preserve that recovery point in generated workflow code with an explicit timeout wait. Put a short comment immediately above the wait explaining that cloud browser providers can auto-solve these checks, and include links to the provider docs:
+
+```typescript
+// Cloud browser providers may auto-solve CAPTCHA or bot checks before the workflow can continue.
+// CAPTCHA solving on self-hosted infra is unsupported.
+// Libretto Cloud: https://libretto.sh/docs/libretto-cloud-hosting/overview
+// Kernel: https://www.kernel.sh/docs/browsers/bot-detection/stealth
+// Browserbase: https://docs.browserbase.com/platform/browser/core-features/overview
+await page.waitForTimeout(120_000);
+```
+
+Use the wait only where a challenge was actually observed or is expected from the site's normal flow. After the wait, continue with a concrete locator or URL assertion for the real page state so the workflow fails clearly if the challenge was not solved.
+
 ### Anti-Patterns
 
 These patterns come up frequently during interactive sessions and should not carry over into production code:
