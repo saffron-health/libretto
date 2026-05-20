@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { availableParallelism } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import {
@@ -15,6 +16,7 @@ import { createEvalContext } from "./fixtures.js";
 import {
   takeRecordedScores,
   withScoreRecording,
+  type InfraClassification,
   type EvalScoreRecord,
 } from "./scoring.js";
 import {
@@ -43,6 +45,7 @@ type RunCliOptions = {
   model: string;
   provider: BrowserProviderName | null;
   noAuth: boolean;
+  repeatCount: number;
 };
 
 type ProfilesStatusCliOptions = {
@@ -68,6 +71,9 @@ type CliOptions =
 
 type CaseResult = {
   id: string;
+  baseId: string;
+  repeatIndex: number;
+  repeatCount: number;
   name: string;
   file: string | null;
   status: "completed" | "error" | "skipped";
@@ -81,6 +87,8 @@ type CaseResult = {
   };
   agentMetrics: EvalMetrics;
   judgeMetrics: EvalMetrics;
+  recordingUrls: string[];
+  infraClassification: InfraClassification;
   artifacts: {
     result: string;
     transcript: string;
@@ -100,18 +108,27 @@ type RunSummary = {
   startedAt: string;
   finishedAt: string;
   durationMs: number;
+  repeatCount: number;
   totalCaseDurationMs: number;
   averageCompletedDurationMs: number | null;
   selectedModel: string;
   selectedProvider: BrowserProviderName;
   totals: {
     cases: number;
+    attempts: number;
     completed: number;
     skipped: number;
     errored: number;
     scorePassed: number;
     scoreTotal: number;
     scorePercent: number;
+  };
+  infra: {
+    browserSystemErrorCount: number;
+    cleanPassCount: number;
+    antiBotFailureCount: number;
+    systemFailureCount: number;
+    ordinaryFailureCount: number;
   };
   metrics: {
     agent: EvalMetrics;
@@ -120,6 +137,9 @@ type RunSummary = {
   };
   cases: Array<{
     id: string;
+    baseId: string;
+    repeatIndex: number;
+    repeatCount: number;
     name: string;
     status: CaseResult["status"];
     durationMs: number;
@@ -127,6 +147,8 @@ type RunSummary = {
     agentMetrics: EvalMetrics;
     judgeMetrics: EvalMetrics;
     combinedMetrics: EvalMetrics;
+    recordingUrls: string[];
+    infraClassification: InfraClassification;
     artifacts: CaseResult["artifacts"];
     error?: string;
     skipReason?: string;
@@ -142,6 +164,7 @@ const BROWSER_PROVIDER_NAMES = [
   "local",
   "kernel",
   "browserbase",
+  "steel",
   "libretto-cloud",
 ] as const;
 type BrowserProviderName = (typeof BROWSER_PROVIDER_NAMES)[number];
@@ -197,6 +220,104 @@ function scorePercent(passed: number, total: number): number {
   return total > 0 ? Number(((passed / total) * 100).toFixed(2)) : 0;
 }
 
+function parsePositiveInteger(value: string, option: string): number {
+  const parsed = Number(value);
+  if (Number.isInteger(parsed) && parsed > 0 && String(parsed) === value) {
+    return parsed;
+  }
+  throw new Error(`${option} must be a positive integer.`);
+}
+
+function averageValue(value: number, repeatCount: number): number {
+  return value / repeatCount;
+}
+
+function averageDuration(value: number, repeatCount: number): number {
+  return Math.round(value / repeatCount);
+}
+
+function averageOptionalValue(
+  value: number | null,
+  repeatCount: number,
+): number | null {
+  return value == null ? null : averageValue(value, repeatCount);
+}
+
+function averageNumberMap(
+  value: Record<string, number>,
+  repeatCount: number,
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(value).map(([key, count]) => [
+      key,
+      averageValue(count, repeatCount),
+    ]),
+  );
+}
+
+function averageMetrics(metrics: EvalMetrics, repeatCount: number): EvalMetrics {
+  if (repeatCount === 1) return metrics;
+  return {
+    ...metrics,
+    durationMs: averageOptionalValue(metrics.durationMs, repeatCount),
+    inputTokens: averageOptionalValue(metrics.inputTokens, repeatCount),
+    outputTokens: averageOptionalValue(metrics.outputTokens, repeatCount),
+    cacheReadTokens: averageOptionalValue(
+      metrics.cacheReadTokens,
+      repeatCount,
+    ),
+    cacheWriteTokens: averageOptionalValue(
+      metrics.cacheWriteTokens,
+      repeatCount,
+    ),
+    totalTokens: averageOptionalValue(metrics.totalTokens, repeatCount),
+    totalCostUsd: averageOptionalValue(metrics.totalCostUsd, repeatCount),
+    turns: averageValue(metrics.turns, repeatCount),
+    turnsWithUsage: averageValue(metrics.turnsWithUsage, repeatCount),
+    toolCalls: averageNumberMap(metrics.toolCalls, repeatCount),
+    totalToolCalls: averageValue(metrics.totalToolCalls, repeatCount),
+    failedToolCalls: averageValue(metrics.failedToolCalls, repeatCount),
+    failedToolCallsByName: averageNumberMap(
+      metrics.failedToolCallsByName,
+      repeatCount,
+    ),
+  };
+}
+
+function detectedEvalConcurrency(caseCount: number): {
+  availableParallelism: number;
+  maxParallelCases: number;
+} {
+  const detectedParallelism = Math.max(1, availableParallelism());
+  return {
+    availableParallelism: detectedParallelism,
+    maxParallelCases: Math.max(1, Math.min(caseCount, detectedParallelism)),
+  };
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= items.length) return;
+        results[index] = await mapper(items[index], index);
+      }
+    }),
+  );
+
+  return results;
+}
+
 function metricArtifactsForCase(
   outputDir: string,
   id: string,
@@ -223,7 +344,7 @@ function metricArtifactsForCase(
 function usage(): string {
   return [
     "Usage:",
-    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>] [--provider <browser-provider>] [--no-auth]",
+    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>] [--provider <browser-provider>] [--repeat-count <count>] [--no-auth]",
     "  pnpm evals summary [run-dir] [--allow-empty]",
     "  pnpm evals profiles status",
     "  pnpm evals profiles login <domain>",
@@ -232,6 +353,7 @@ function usage(): string {
     "  pnpm evals",
     "  pnpm evals --no-auth",
     "  pnpm evals run -t network --model openai/gpt-5.5 --provider kernel",
+    "  pnpm evals public-websites.eval.ts --provider kernel --repeat-count 3",
     "  pnpm evals basic.eval.ts --output temp/eval-run",
     "  pnpm evals summary",
     "  pnpm evals summary temp/eval-run",
@@ -293,6 +415,7 @@ function parseArgs(argv: string[]): CliOptions {
   let model = DEFAULT_EVAL_MODEL;
   let provider: BrowserProviderName | null = null;
   let noAuth = false;
+  let repeatCount = 1;
   const fileFilters: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
@@ -354,6 +477,19 @@ function parseArgs(argv: string[]): CliOptions {
       provider = parseBrowserProviderName(value);
       continue;
     }
+    if (arg === "--repeat-count") {
+      const value = args[index + 1];
+      if (!value) throw new Error("--repeat-count requires a count.");
+      repeatCount = parsePositiveInteger(value, "--repeat-count");
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--repeat-count=")) {
+      const value = arg.slice("--repeat-count=".length);
+      if (!value) throw new Error("--repeat-count requires a count.");
+      repeatCount = parsePositiveInteger(value, "--repeat-count");
+      continue;
+    }
     if (arg.startsWith("-")) {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -371,6 +507,7 @@ function parseArgs(argv: string[]): CliOptions {
     model,
     provider,
     noAuth,
+    repeatCount,
   };
 }
 
@@ -535,9 +672,10 @@ function ensureOpenAiApiKey(): void {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
       [
-        "OpenAI eval credentials are missing.",
+        "Could not load OpenAI eval credentials.",
+        "OPENAI_API_KEY is not set, and gcloud access to GCP Secret Manager failed.",
         `Tried GCP Secret Manager secret: ${secretName}`,
-        `Set OPENAI_API_KEY, grant access to ${secretName}, or set LIBRETTO_EVAL_OPENAI_SECRET_NAME to another secret name.`,
+        `Set OPENAI_API_KEY, grant gcloud access to ${secretName}, or set LIBRETTO_EVAL_OPENAI_SECRET_NAME to another secret name.`,
         `Original error: ${message}`,
       ].join("\n"),
     );
@@ -599,6 +737,99 @@ async function readJson(path: string): Promise<unknown> {
   }
 }
 
+async function recordingUrlsFromTranscript(path: string): Promise<string[]> {
+  const urls = new Set<string>();
+  let content: string;
+  try {
+    content = await readFile(path, "utf8");
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
+      return [];
+    }
+    throw error;
+  }
+  for (const line of content.split("\n")) {
+    if (line.trim().length === 0) continue;
+    let record: unknown;
+    try {
+      record = JSON.parse(line);
+    } catch (error) {
+      throw new Error(
+        `Failed to parse transcript JSON from ${path}: ${formatError(error)}`,
+      );
+    }
+    for (const url of recordingUrlsFromTranscriptRecord(record)) urls.add(url);
+  }
+  return Array.from(urls);
+}
+
+function recordingUrlsFromTranscriptRecord(record: unknown): string[] {
+  if (!isRecord(record) || !isRecord(record.event)) return [];
+
+  const urls = new Set<string>();
+  addRecordingUrl(urls, recordingUrlField(record.event));
+  if (isRecord(record.event.result)) {
+    addRecordingUrl(urls, recordingUrlField(record.event.result));
+    for (const text of toolResultContentText(record.event.result)) {
+      addRecordingUrl(urls, recordingUrlFromCliOutput(text));
+    }
+  }
+  return Array.from(urls);
+}
+
+function recordingUrlField(record: Record<string, unknown>): string | null {
+  for (const key of ["recordingUrl", "replayUrl", "replayViewUrl", "replay_view_url"]) {
+    const value = record[key];
+    if (typeof value === "string" && isHttpUrl(value)) return value;
+  }
+  return null;
+}
+
+function toolResultContentText(result: Record<string, unknown>): string[] {
+  if (!Array.isArray(result.content)) return [];
+  return result.content.flatMap((item) => {
+    if (!isRecord(item) || typeof item.text !== "string") return [];
+    return [item.text];
+  });
+}
+
+function recordingUrlFromCliOutput(text: string): string | null {
+  for (const line of text.split("\n")) {
+    const prefix = "View recording:";
+    const trimmed = line.trim();
+    if (!trimmed.startsWith(prefix)) continue;
+    const url = trimmed.slice(prefix.length).trim();
+    return isHttpUrl(url) ? url : null;
+  }
+  return null;
+}
+
+function addRecordingUrl(urls: Set<string>, url: string | null): void {
+  if (url) urls.add(url);
+}
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\/\S+$/.test(value);
+}
+
+function classifyInfraResult(
+  status: CaseResult["status"],
+  score: CaseResult["score"],
+  scores: EvalScoreRecord[],
+): InfraClassification {
+  const passed = status === "completed" && score.total > 0 && score.passed === score.total;
+  if (status === "error") return "system-failure";
+  const explicitClassification = scores.find(
+    (record) => record.infraClassification,
+  )?.infraClassification;
+  if (explicitClassification) return explicitClassification;
+  return passed ? "clean-pass" : "ordinary-failure";
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -628,6 +859,18 @@ function requireNonNegativeInteger(value: unknown, label: string): number {
     return value;
   }
   throw new Error(`${label} must be a non-negative integer.`);
+}
+
+function optionalPositiveInteger(
+  value: unknown,
+  fallback: number,
+  label: string,
+): number {
+  if (value == null) return fallback;
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+  throw new Error(`${label} must be a positive integer.`);
 }
 
 function optionalString(value: unknown, label: string): string | null {
@@ -751,15 +994,27 @@ function buildSummaryMarkdown(summary: RunSummary): string {
     `- Run ID: \`${summary.runId}\``,
     `- Model: \`${summary.selectedModel}\``,
     `- Browser provider: \`${summary.selectedProvider}\``,
+    `- Repeat count: \`${summary.repeatCount}\``,
     `- Duration: \`${formatDuration(summary.durationMs)}\``,
     `- Total case duration: \`${formatDuration(summary.totalCaseDurationMs)}\``,
     `- Average completed case duration: \`${formatDuration(summary.averageCompletedDurationMs)}\``,
+    `- Eval cases: \`${summary.totals.cases}\``,
+    `- Attempts: \`${summary.totals.attempts}\``,
     `- Cases completed: \`${summary.totals.completed}\``,
     `- Cases errored: \`${summary.totals.errored}\``,
     `- Cases skipped: \`${summary.totals.skipped}\``,
     `- Score: \`${score}\` criteria (\`${summary.totals.scorePercent}%\`)`,
+    `- Browser/system errors: \`${summary.infra.browserSystemErrorCount}\``,
+    `- Clean passes: \`${summary.infra.cleanPassCount}\``,
+    `- Anti-bot failures: \`${summary.infra.antiBotFailureCount}\``,
+    `- System failures: \`${summary.infra.systemFailureCount}\``,
     "",
     "Scoring is informational. Low scores do not fail the eval command; setup or runtime errors do.",
+    ...(summary.repeatCount > 1
+      ? [
+          "Suite-level totals, infra counts, duration, and metrics are averaged per repeat.",
+        ]
+      : []),
     "",
     "## Metrics",
     "",
@@ -773,14 +1028,15 @@ function buildSummaryMarkdown(summary: RunSummary): string {
     "",
     "## Cases",
     "",
-    "| Case | Status | Score | Duration | Cost | Tokens | Tool calls | Artifacts |",
-    "|---|---|---:|---:|---:|---:|---:|---|",
+    "| Case | Attempt | Status | Infra | Score | Duration | Cost | Tokens | Tool calls | Artifacts |",
+    "|---|---:|---|---|---:|---:|---:|---:|---:|---|",
   ];
 
   for (const result of summary.cases) {
     const caseScore = `${result.score.passed}/${result.score.total}`;
+    const attempt = `${result.repeatIndex}/${result.repeatCount}`;
     lines.push(
-      `| \`${result.name}\` | ${result.status} | \`${caseScore}\` | \`${formatDuration(result.durationMs)}\` | \`${formatUsd(result.combinedMetrics.totalCostUsd)}\` | \`${formatInteger(result.combinedMetrics.totalTokens)}\` | \`${result.combinedMetrics.totalToolCalls}\` | \`${result.artifacts.result}\` |`,
+      `| \`${result.name}\` | \`${attempt}\` | ${result.status} | \`${result.infraClassification}\` | \`${caseScore}\` | \`${formatDuration(result.durationMs)}\` | \`${formatUsd(result.combinedMetrics.totalCostUsd)}\` | \`${formatInteger(result.combinedMetrics.totalTokens)}\` | \`${result.combinedMetrics.totalToolCalls}\` | \`${result.artifacts.result}\` |`,
     );
   }
 
@@ -790,6 +1046,9 @@ function buildSummaryMarkdown(summary: RunSummary): string {
 async function runCase(
   evalCase: EvalCaseRecord,
   id: string,
+  baseId: string,
+  repeatIndex: number,
+  repeatCount: number,
   outputDir: string,
   model: string,
   provider: BrowserProviderName | null,
@@ -857,21 +1116,28 @@ async function runCase(
   const combinedError = [errorMessage, cleanupErrorMessage]
     .filter((message) => message && message.length > 0)
     .join("\n\n");
+  const recordingUrls = await recordingUrlsFromTranscript(artifactPaths.transcript);
+  const score = {
+    passed: scorePassed,
+    total: scoreTotal,
+    percent: scorePercent(scorePassed, scoreTotal),
+  };
   const result: CaseResult = {
     id,
+    baseId,
+    repeatIndex,
+    repeatCount,
     name: evalCase.name,
     file: evalCase.filePath ? relative(repoRoot, evalCase.filePath) : null,
     status,
     startedAt,
     finishedAt: new Date(finishedMs).toISOString(),
     durationMs: finishedMs - startedMs,
-    score: {
-      passed: scorePassed,
-      total: scoreTotal,
-      percent: scorePercent(scorePassed, scoreTotal),
-    },
+    score,
     agentMetrics,
     judgeMetrics,
+    recordingUrls,
+    infraClassification: classifyInfraResult(status, score, scores),
     artifacts,
     calls,
     scores,
@@ -903,6 +1169,23 @@ function artifactRecord(value: unknown, label: string): CaseResult["artifacts"] 
   };
 }
 
+function infraClassification(
+  value: unknown,
+  fallback: InfraClassification,
+  label: string,
+): InfraClassification {
+  if (value == null) return fallback;
+  if (
+    value === "clean-pass" ||
+    value === "anti-bot-failure" ||
+    value === "system-failure" ||
+    value === "ordinary-failure"
+  ) {
+    return value;
+  }
+  throw new Error(`${label} must be a valid infra classification.`);
+}
+
 function summaryCaseFromResult(
   value: unknown,
   label: string,
@@ -917,19 +1200,44 @@ function summaryCaseFromResult(
     result.judgeMetrics,
     `${label}.judgeMetrics`,
   );
+  const scoreRecord = {
+    passed: requireNonNegativeInteger(score.passed, `${label}.score.passed`),
+    total: requireNonNegativeInteger(score.total, `${label}.score.total`),
+    percent: requireFiniteNumber(score.percent, `${label}.score.percent`),
+  };
   return {
     id: requireString(result.id, `${label}.id`),
+    baseId:
+      typeof result.baseId === "string" && result.baseId.trim().length > 0
+        ? result.baseId
+        : requireString(result.id, `${label}.id`),
+    repeatIndex: optionalPositiveInteger(
+      result.repeatIndex,
+      1,
+      `${label}.repeatIndex`,
+    ),
+    repeatCount: optionalPositiveInteger(
+      result.repeatCount,
+      1,
+      `${label}.repeatCount`,
+    ),
     name: requireString(result.name, `${label}.name`),
     status: caseStatus(result.status, `${label}.status`),
     durationMs: requireFiniteNumber(result.durationMs, `${label}.durationMs`),
-    score: {
-      passed: requireNonNegativeInteger(score.passed, `${label}.score.passed`),
-      total: requireNonNegativeInteger(score.total, `${label}.score.total`),
-      percent: requireFiniteNumber(score.percent, `${label}.score.percent`),
-    },
+    score: scoreRecord,
     agentMetrics,
     judgeMetrics,
     combinedMetrics: aggregateMetrics([agentMetrics, judgeMetrics]),
+    recordingUrls: stringArray(result.recordingUrls, `${label}.recordingUrls`),
+    infraClassification: infraClassification(
+      result.infraClassification,
+      classifyInfraResult(
+        caseStatus(result.status, `${label}.status`),
+        scoreRecord,
+        [],
+      ),
+      `${label}.infraClassification`,
+    ),
     artifacts: artifactRecord(result.artifacts, `${label}.artifacts`),
     ...(typeof result.error === "string" ? { error: result.error } : {}),
     ...(typeof result.skipReason === "string"
@@ -956,7 +1264,30 @@ async function loadSummaryCases(
   );
   return cases
     .filter((result): result is RunSummary["cases"][number] => result !== null)
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) =>
+      a.baseId === b.baseId
+        ? a.repeatIndex - b.repeatIndex
+        : a.baseId.localeCompare(b.baseId),
+    );
+}
+
+function summarizeInfra(
+  cases: Array<{ infraClassification: InfraClassification }>,
+  repeatCount = 1,
+): RunSummary["infra"] {
+  const count = (classification: InfraClassification): number =>
+    averageValue(
+      cases.filter((result) => result.infraClassification === classification)
+        .length,
+      repeatCount,
+    );
+  return {
+    browserSystemErrorCount: count("system-failure"),
+    cleanPassCount: count("clean-pass"),
+    antiBotFailureCount: count("anti-bot-failure"),
+    systemFailureCount: count("system-failure"),
+    ordinaryFailureCount: count("ordinary-failure"),
+  };
 }
 
 async function readRunRecord(runDir: string): Promise<Record<string, unknown>> {
@@ -1008,24 +1339,59 @@ async function runSummary(options: SummaryCliOptions): Promise<number> {
   }
 
   const runRecord = await readRunRecord(runDir);
-  const scorePassed = cases.reduce(
-    (total, result) => total + result.score.passed,
-    0,
+  const repeatCount = optionalPositiveInteger(
+    runRecord.repeatCount,
+    cases[0]?.repeatCount ?? 1,
+    "run.json.repeatCount",
   );
-  const scoreTotal = cases.reduce(
-    (total, result) => total + result.score.total,
-    0,
+  const caseCount = new Set(cases.map((result) => result.baseId)).size;
+  const scorePassed = averageValue(
+    cases.reduce((total, result) => total + result.score.passed, 0),
+    repeatCount,
   );
-  const agentMetrics = aggregateMetrics(
-    cases.map((result) => result.agentMetrics),
+  const scoreTotal = averageValue(
+    cases.reduce((total, result) => total + result.score.total, 0),
+    repeatCount,
   );
-  const judgeMetrics = aggregateMetrics(
-    cases.map((result) => result.judgeMetrics),
+  const agentMetrics = averageMetrics(
+    aggregateMetrics(cases.map((result) => result.agentMetrics)),
+    repeatCount,
   );
-  const totalCaseDurationMs = cases.reduce(
-    (total, result) => total + result.durationMs,
-    0,
+  const judgeMetrics = averageMetrics(
+    aggregateMetrics(cases.map((result) => result.judgeMetrics)),
+    repeatCount,
   );
+  const totalCaseDurationMs = averageDuration(
+    cases.reduce((total, result) => total + result.durationMs, 0),
+    repeatCount,
+  );
+  const completedAttempts = completed.length;
+  const skippedAttempts = cases.filter(
+    (result) => result.status === "skipped",
+  ).length;
+  const erroredAttempts = cases.filter(
+    (result) => result.status === "error",
+  ).length;
+  const completedAverage = averageValue(completedAttempts, repeatCount);
+  const skippedAverage = averageValue(skippedAttempts, repeatCount);
+  const erroredAverage = averageValue(erroredAttempts, repeatCount);
+  const durationMs =
+    typeof runRecord.durationMs === "number" && Number.isFinite(runRecord.durationMs)
+      ? runRecord.durationMs
+      : typeof runRecord.wallDurationMs === "number" &&
+          Number.isFinite(runRecord.wallDurationMs)
+        ? averageDuration(runRecord.wallDurationMs, repeatCount)
+        : totalCaseDurationMs;
+  const averageCompletedDurationMs =
+    completedAttempts > 0
+      ? Math.round(
+          completed.reduce((total, result) => total + result.durationMs, 0) /
+            completedAttempts,
+        )
+      : null;
+  const combinedMetrics = aggregateMetrics([agentMetrics, judgeMetrics]);
+  const attempts = cases.length;
+  const selectedCaseCount = caseCount > 0 ? caseCount : attempts;
   const summary: RunSummary = {
     generatedAt: new Date().toISOString(),
     runId:
@@ -1036,18 +1402,10 @@ async function runSummary(options: SummaryCliOptions): Promise<number> {
       typeof runRecord.startedAt === "string" ? runRecord.startedAt : "",
     finishedAt:
       typeof runRecord.finishedAt === "string" ? runRecord.finishedAt : "",
-    durationMs:
-      typeof runRecord.durationMs === "number" && Number.isFinite(runRecord.durationMs)
-        ? runRecord.durationMs
-        : totalCaseDurationMs,
+    durationMs,
+    repeatCount,
     totalCaseDurationMs,
-    averageCompletedDurationMs:
-      completed.length > 0
-        ? Math.round(
-            completed.reduce((total, result) => total + result.durationMs, 0) /
-              completed.length,
-          )
-        : null,
+    averageCompletedDurationMs,
     selectedModel:
       typeof runRecord.selectedModel === "string" ? runRecord.selectedModel : "-",
     selectedProvider:
@@ -1055,18 +1413,20 @@ async function runSummary(options: SummaryCliOptions): Promise<number> {
         ? parseBrowserProviderName(runRecord.selectedProvider)
         : "local",
     totals: {
-      cases: cases.length,
-      completed: completed.length,
-      skipped: cases.filter((result) => result.status === "skipped").length,
-      errored: cases.filter((result) => result.status === "error").length,
+      cases: selectedCaseCount,
+      attempts,
+      completed: completedAverage,
+      skipped: skippedAverage,
+      errored: erroredAverage,
       scorePassed,
       scoreTotal,
       scorePercent: scorePercent(scorePassed, scoreTotal),
     },
+    infra: summarizeInfra(cases, repeatCount),
     metrics: {
       agent: agentMetrics,
       judge: judgeMetrics,
-      combined: aggregateMetrics([agentMetrics, judgeMetrics]),
+      combined: combinedMetrics,
     },
     cases,
   };
@@ -1082,35 +1442,50 @@ async function runSelectedCases(
   selectedCases: EvalCaseRecord[],
   ids: Map<EvalCaseRecord, string>,
   options: RunCliOptions,
+  repeatIndex: number,
+  maxParallelCases: number,
 ): Promise<CaseResult[]> {
-  return await Promise.all(
-    selectedCases.map(async (evalCase) => {
-      const id = ids.get(evalCase);
-      if (!id) {
+  return await mapWithConcurrency(
+    selectedCases,
+    maxParallelCases,
+    async (evalCase) => {
+      const baseId = ids.get(evalCase);
+      if (!baseId) {
         throw new Error(`Failed to allocate result ID for ${evalCase.name}`);
       }
+      const id =
+        options.repeatCount === 1
+          ? baseId
+          : `${baseId}-repeat-${repeatIndex}`;
+      const repeatLabel =
+        options.repeatCount === 1
+          ? ""
+          : ` (repeat ${repeatIndex}/${options.repeatCount})`;
 
-      process.stdout.write(`\n▶ ${evalCase.name}\n`);
+      process.stdout.write(`\n▶ ${evalCase.name}${repeatLabel}\n`);
       const result = await runCase(
         evalCase,
         id,
+        baseId,
+        repeatIndex,
+        options.repeatCount,
         options.outputDir,
         options.model,
         options.provider,
       );
       if (result.status === "completed") {
-        process.stdout.write(`✓ ${evalCase.name}\n`);
+        process.stdout.write(`✓ ${evalCase.name}${repeatLabel}\n`);
       } else if (result.status === "skipped") {
         process.stdout.write(
-          `- ${evalCase.name} skipped: ${result.skipReason ?? "No reason provided."}\n`,
+          `- ${evalCase.name}${repeatLabel} skipped: ${result.skipReason ?? "No reason provided."}\n`,
         );
       } else {
         process.stdout.write(
-          `✗ ${evalCase.name}\n${result.error ?? "Unknown error"}\n`,
+          `✗ ${evalCase.name}${repeatLabel}\n${result.error ?? "Unknown error"}\n`,
         );
       }
       return result;
-    }),
+    },
   );
 }
 
@@ -1150,67 +1525,133 @@ async function run(options: CliOptions): Promise<number> {
   ensureEvalModelCredentials(options.model);
 
   await mkdir(options.outputDir, { recursive: true });
-  process.stdout.write(`Running ${selectedCases.length} eval case(s)\n`);
-  process.stdout.write("Execution: parallel\n");
+  const selectedProvider = selectedProviderName(options.provider);
+  const { availableParallelism, maxParallelCases } =
+    detectedEvalConcurrency(selectedCases.length);
+  const attemptCount = selectedCases.length * options.repeatCount;
   process.stdout.write(
-    `Browser provider: ${selectedProviderName(options.provider)}\n`,
+    `Running ${selectedCases.length} eval case(s) x ${options.repeatCount} repeat(s) = ${attemptCount} attempt(s)\n`,
   );
+  process.stdout.write(
+    `Execution: up to ${maxParallelCases} parallel case(s), sequential repeats (detected ${availableParallelism} available CPU(s))\n`,
+  );
+  process.stdout.write(`Browser provider: ${selectedProvider}\n`);
+  if (selectedProvider === "kernel") {
+    process.stdout.write("Kernel stealth: true\n");
+    process.stdout.write("Kernel headful: true\n");
+  }
   process.stdout.write(`Output: ${options.outputDir}\n`);
 
   const ids = caseIds(selectedCases);
-  const results = await runSelectedCases(selectedCases, ids, options);
+  const previousKernelStealth = process.env.KERNEL_STEALTH;
+  const previousKernelHeadless = process.env.KERNEL_HEADLESS;
+  if (selectedProvider === "kernel") {
+    process.env.KERNEL_STEALTH = "true";
+    process.env.KERNEL_HEADLESS = "false";
+  }
 
-  const completed = results.filter(
+  let results: CaseResult[] = [];
+  try {
+    for (
+      let repeatIndex = 1;
+      repeatIndex <= options.repeatCount;
+      repeatIndex += 1
+    ) {
+      if (options.repeatCount > 1) {
+        process.stdout.write(
+          `\nRepeat ${repeatIndex}/${options.repeatCount}\n`,
+        );
+      }
+      results = results.concat(
+        await runSelectedCases(
+          selectedCases,
+          ids,
+          options,
+          repeatIndex,
+          maxParallelCases,
+        ),
+      );
+    }
+  } finally {
+    if (previousKernelStealth === undefined) {
+      delete process.env.KERNEL_STEALTH;
+    } else {
+      process.env.KERNEL_STEALTH = previousKernelStealth;
+    }
+    if (previousKernelHeadless === undefined) {
+      delete process.env.KERNEL_HEADLESS;
+    } else {
+      process.env.KERNEL_HEADLESS = previousKernelHeadless;
+    }
+  }
+
+  const completedAttempts = results.filter(
     (result) => result.status === "completed",
   ).length;
-  const skipped = results.filter((result) => result.status === "skipped").length;
-  const errored = results.filter((result) => result.status === "error").length;
-  const scorePassed = results.reduce(
+  const skippedAttempts = results.filter(
+    (result) => result.status === "skipped",
+  ).length;
+  const erroredAttempts = results.filter(
+    (result) => result.status === "error",
+  ).length;
+  const scorePassedAttempts = results.reduce(
     (total, result) => total + result.score.passed,
     0,
   );
-  const scoreTotal = results.reduce(
+  const scoreTotalAttempts = results.reduce(
     (total, result) => total + result.score.total,
     0,
   );
   const finishedAt = new Date().toISOString();
-  const durationMs = Date.now() - startedMs;
+  const wallDurationMs = Date.now() - startedMs;
+  const durationMs = averageDuration(wallDurationMs, options.repeatCount);
   const runId = relative(repoRoot, options.outputDir).startsWith("evals/runs/")
     ? toPosixPath(relative(join(repoRoot, "evals", "runs"), options.outputDir))
     : dirname(options.outputDir) === join(repoRoot, "evals", "runs")
       ? options.outputDir.split(sep).at(-1) ?? options.outputDir
       : options.outputDir.split(sep).at(-1) ?? options.outputDir;
-  const agentMetrics = aggregateMetrics(
-    results.map((result) => result.agentMetrics),
+  const agentMetrics = averageMetrics(
+    aggregateMetrics(results.map((result) => result.agentMetrics)),
+    options.repeatCount,
   );
-  const judgeMetrics = aggregateMetrics(
-    results.map((result) => result.judgeMetrics),
+  const judgeMetrics = averageMetrics(
+    aggregateMetrics(results.map((result) => result.judgeMetrics)),
+    options.repeatCount,
   );
   const combinedMetrics = aggregateMetrics([agentMetrics, judgeMetrics]);
-  const totalCaseDurationMs = results.reduce(
-    (total, result) => total + result.durationMs,
-    0,
+  const totalCaseDurationMs = averageDuration(
+    results.reduce((total, result) => total + result.durationMs, 0),
+    options.repeatCount,
   );
+  const completed = averageValue(completedAttempts, options.repeatCount);
+  const skipped = averageValue(skippedAttempts, options.repeatCount);
+  const errored = averageValue(erroredAttempts, options.repeatCount);
+  const scorePassed = averageValue(
+    scorePassedAttempts,
+    options.repeatCount,
+  );
+  const scoreTotal = averageValue(scoreTotalAttempts, options.repeatCount);
+  const completedAttemptDurationMs = results
+    .filter((result) => result.status === "completed")
+    .reduce((total, result) => total + result.durationMs, 0);
+  const averageCompletedDurationMs =
+    completedAttempts > 0
+      ? Math.round(completedAttemptDurationMs / completedAttempts)
+      : null;
   const summary: RunSummary = {
     generatedAt: finishedAt,
     runId,
     startedAt,
     finishedAt,
     durationMs,
+    repeatCount: options.repeatCount,
     totalCaseDurationMs,
-    averageCompletedDurationMs:
-      completed > 0
-        ? Math.round(
-            results
-              .filter((result) => result.status === "completed")
-              .reduce((total, result) => total + result.durationMs, 0) /
-              completed,
-          )
-        : null,
+    averageCompletedDurationMs,
     selectedModel: options.model,
-    selectedProvider: selectedProviderName(options.provider),
+    selectedProvider,
     totals: {
-      cases: results.length,
+      cases: selectedCases.length,
+      attempts: results.length,
       completed,
       skipped,
       errored,
@@ -1218,6 +1659,7 @@ async function run(options: CliOptions): Promise<number> {
       scoreTotal,
       scorePercent: scorePercent(scorePassed, scoreTotal),
     },
+    infra: summarizeInfra(results, options.repeatCount),
     metrics: {
       agent: agentMetrics,
       judge: judgeMetrics,
@@ -1225,6 +1667,9 @@ async function run(options: CliOptions): Promise<number> {
     },
     cases: results.map((result) => ({
       id: result.id,
+      baseId: result.baseId,
+      repeatIndex: result.repeatIndex,
+      repeatCount: result.repeatCount,
       name: result.name,
       status: result.status,
       durationMs: result.durationMs,
@@ -1235,6 +1680,8 @@ async function run(options: CliOptions): Promise<number> {
         result.agentMetrics,
         result.judgeMetrics,
       ]),
+      recordingUrls: result.recordingUrls,
+      infraClassification: result.infraClassification,
       artifacts: result.artifacts,
       ...(result.error ? { error: result.error } : {}),
       ...(result.skipReason ? { skipReason: result.skipReason } : {}),
@@ -1246,14 +1693,19 @@ async function run(options: CliOptions): Promise<number> {
     startedAt,
     finishedAt,
     durationMs,
+    wallDurationMs,
+    repeatCount: options.repeatCount,
     gitSha: gitSha(),
     outputDir: options.outputDir,
     fileFilters: options.fileFilters,
     testNamePattern: options.testNamePattern,
     selectedModel: options.model,
-    selectedProvider: selectedProviderName(options.provider),
+    selectedProvider,
     noAuth: options.noAuth,
+    availableParallelism,
+    maxParallelCases,
     totals: summary.totals,
+    infra: summary.infra,
     metrics: summary.metrics,
     cases: summary.cases,
   };
@@ -1267,9 +1719,9 @@ async function run(options: CliOptions): Promise<number> {
   );
 
   process.stdout.write(
-    `\nCompleted ${completed}/${results.length} eval case(s); score ${scorePassed}/${scoreTotal}; ${skipped} skipped; ${errored} error(s).\n`,
+    `\nCompleted ${completedAttempts}/${results.length} eval attempt(s); average score ${scorePassed}/${scoreTotal}; average skipped ${skipped}; average errors ${errored}.\n`,
   );
-  return errored > 0 ? 1 : 0;
+  return erroredAttempts > 0 ? 1 : 0;
 }
 
 async function profilesStatus(): Promise<number> {

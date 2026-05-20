@@ -7,6 +7,7 @@ export {
   parseSessionStateContent,
   serializeSessionState,
   type SessionAccessMode,
+  type ProviderState,
   type SessionStatus,
   type SessionState,
   type SessionStateFile,

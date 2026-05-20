@@ -81,6 +81,7 @@ type PiUsageSummary = {
 export type PiEvalHarnessOptions = {
   cwd: string;
   model?: string;
+  browserProvider?: string | null;
   stopOnFinalResult?: boolean;
 };
 
@@ -738,6 +739,7 @@ export class EvalResponse {
 export class PiEvalHarness {
   private readonly cwd: string;
   private readonly model: EvalModelSelector;
+  readonly browserProvider: string;
   private readonly stopOnFinalResult: boolean;
   private session: AgentSession | null = null;
 
@@ -746,6 +748,7 @@ export class PiEvalHarness {
     this.model = options.model
       ? parseModelSelector(options.model)
       : DEFAULT_EVAL_MODEL;
+    this.browserProvider = options.browserProvider ?? "local";
     this.stopOnFinalResult = options.stopOnFinalResult === true;
   }
 

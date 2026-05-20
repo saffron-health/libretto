@@ -568,10 +568,14 @@ export async function runOpenWithProvider(
     sessionId: providerSession.sessionId,
     cdpEndpoint: providerSession.cdpEndpoint,
     liveViewUrl: providerSession.liveViewUrl,
+    recordingUrl: providerSession.recordingUrl,
   });
 
   if (providerSession.liveViewUrl) {
     console.log(`View live session: ${providerSession.liveViewUrl}`);
+  }
+  if (providerSession.recordingUrl) {
+    console.log(`View recording: ${providerSession.recordingUrl}`);
   }
 
   writeSessionState(
@@ -587,6 +591,7 @@ export async function runOpenWithProvider(
       provider: {
         name: providerName,
         sessionId: providerSession.sessionId,
+        recordingUrl: providerSession.recordingUrl,
       },
     },
     logger,
@@ -867,7 +872,7 @@ async function waitForCloseAllTargets(
 
 async function closeProviderSessionDirectly(
   session: string,
-  providerState: { name: string; sessionId: string },
+  providerState: { name: string; sessionId: string; recordingUrl?: string },
   logger: LoggerApi,
 ): Promise<string | undefined> {
   try {
@@ -879,7 +884,7 @@ async function closeProviderSessionDirectly(
       sessionId: providerState.sessionId,
       replayUrl: result.replayUrl,
     });
-    return result.replayUrl;
+    return result.replayUrl ?? providerState.recordingUrl;
   } catch (error) {
     logger.warn("close-provider-direct-fallback-failed", {
       session,
