@@ -737,45 +737,6 @@ async function readJson(path: string): Promise<unknown> {
   }
 }
 
-function addRecordingUrlsFromValue(value: unknown, urls: Set<string>): void {
-  if (typeof value === "string") {
-    const urlPatterns = [
-      /View recording:\s*(https?:\/\/[^\s)"]+)/g,
-      /"recordingUrl"\s*:\s*"(https?:\/\/[^"]+)"/g,
-      /"replayUrl"\s*:\s*"(https?:\/\/[^"]+)"/g,
-      /"replayViewUrl"\s*:\s*"(https?:\/\/[^"]+)"/g,
-      /"replay_view_url"\s*:\s*"(https?:\/\/[^"]+)"/g,
-      /https?:\/\/\S*\/browser\/replays\?\S+/g,
-    ];
-    for (const pattern of urlPatterns) {
-      for (const match of value.matchAll(pattern)) {
-        urls.add(match[1] ?? match[0]);
-      }
-    }
-    return;
-  }
-
-  if (Array.isArray(value)) {
-    for (const item of value) addRecordingUrlsFromValue(item, urls);
-    return;
-  }
-
-  if (!isRecord(value)) return;
-
-  for (const [key, child] of Object.entries(value)) {
-    if (
-      typeof child === "string" &&
-      ["recordingUrl", "replayUrl", "replayViewUrl", "replay_view_url"].includes(
-        key,
-      ) &&
-      /^https?:\/\//.test(child)
-    ) {
-      urls.add(child);
-    }
-    addRecordingUrlsFromValue(child, urls);
-  }
-}
-
 async function recordingUrlsFromTranscript(path: string): Promise<string[]> {
   const urls = new Set<string>();
   let content: string;
@@ -793,15 +754,66 @@ async function recordingUrlsFromTranscript(path: string): Promise<string[]> {
   }
   for (const line of content.split("\n")) {
     if (line.trim().length === 0) continue;
-    let event: unknown;
+    let record: unknown;
     try {
-      event = JSON.parse(line);
-    } catch {
-      continue;
+      record = JSON.parse(line);
+    } catch (error) {
+      throw new Error(
+        `Failed to parse transcript JSON from ${path}: ${formatError(error)}`,
+      );
     }
-    addRecordingUrlsFromValue(event, urls);
+    for (const url of recordingUrlsFromTranscriptRecord(record)) urls.add(url);
   }
   return Array.from(urls);
+}
+
+function recordingUrlsFromTranscriptRecord(record: unknown): string[] {
+  if (!isRecord(record) || !isRecord(record.event)) return [];
+
+  const urls = new Set<string>();
+  addRecordingUrl(urls, recordingUrlField(record.event));
+  if (isRecord(record.event.result)) {
+    addRecordingUrl(urls, recordingUrlField(record.event.result));
+    for (const text of toolResultContentText(record.event.result)) {
+      addRecordingUrl(urls, recordingUrlFromCliOutput(text));
+    }
+  }
+  return Array.from(urls);
+}
+
+function recordingUrlField(record: Record<string, unknown>): string | null {
+  for (const key of ["recordingUrl", "replayUrl", "replayViewUrl", "replay_view_url"]) {
+    const value = record[key];
+    if (typeof value === "string" && isHttpUrl(value)) return value;
+  }
+  return null;
+}
+
+function toolResultContentText(result: Record<string, unknown>): string[] {
+  if (!Array.isArray(result.content)) return [];
+  return result.content.flatMap((item) => {
+    if (!isRecord(item) || typeof item.text !== "string") return [];
+    return [item.text];
+  });
+}
+
+function recordingUrlFromCliOutput(text: string): string | null {
+  for (const line of text.split("\n")) {
+    const prefix = "View recording:";
+    const trimmed = line.trim();
+    if (!trimmed.startsWith(prefix)) continue;
+    const url = trimmed.slice(prefix.length).trim();
+    return isHttpUrl(url) ? url : null;
+  }
+  return null;
+}
+
+function addRecordingUrl(urls: Set<string>, url: string | null): void {
+  if (url) urls.add(url);
+}
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\/\S+$/.test(value);
 }
 
 function classifyInfraResult(
