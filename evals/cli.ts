@@ -741,19 +741,60 @@ async function readJson(path: string): Promise<unknown> {
   }
 }
 
-function collectStrings(value: unknown): string[] {
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value)) return value.flatMap((item) => collectStrings(item));
-  if (isRecord(value)) {
-    return Object.values(value).flatMap((item) => collectStrings(item));
+function addRecordingUrlsFromValue(value: unknown, urls: Set<string>): void {
+  if (typeof value === "string") {
+    const urlPatterns = [
+      /View recording:\s*(https?:\/\/[^\s)"]+)/g,
+      /"recordingUrl"\s*:\s*"(https?:\/\/[^"]+)"/g,
+      /"replayUrl"\s*:\s*"(https?:\/\/[^"]+)"/g,
+      /"replayViewUrl"\s*:\s*"(https?:\/\/[^"]+)"/g,
+      /"replay_view_url"\s*:\s*"(https?:\/\/[^"]+)"/g,
+      /https?:\/\/\S*\/browser\/replays\?\S+/g,
+    ];
+    for (const pattern of urlPatterns) {
+      for (const match of value.matchAll(pattern)) {
+        urls.add(match[1] ?? match[0]);
+      }
+    }
+    return;
   }
-  return [];
+
+  if (Array.isArray(value)) {
+    for (const item of value) addRecordingUrlsFromValue(item, urls);
+    return;
+  }
+
+  if (!isRecord(value)) return;
+
+  for (const [key, child] of Object.entries(value)) {
+    if (
+      typeof child === "string" &&
+      ["recordingUrl", "replayUrl", "replayViewUrl", "replay_view_url"].includes(
+        key,
+      ) &&
+      /^https?:\/\//.test(child)
+    ) {
+      urls.add(child);
+    }
+    addRecordingUrlsFromValue(child, urls);
+  }
 }
 
 async function recordingUrlsFromTranscript(path: string): Promise<string[]> {
   const urls = new Set<string>();
-  const urlPattern = /https?:\/\/\S*\/browser\/replays\?\S+/g;
-  const content = await readFile(path, "utf8");
+  let content: string;
+  try {
+    content = await readFile(path, "utf8");
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
+      return [];
+    }
+    throw error;
+  }
   for (const line of content.split("\n")) {
     if (line.trim().length === 0) continue;
     let event: unknown;
@@ -762,12 +803,7 @@ async function recordingUrlsFromTranscript(path: string): Promise<string[]> {
     } catch {
       continue;
     }
-    for (const text of collectStrings(event)) {
-      const matches = text.matchAll(urlPattern);
-      for (const match of matches) {
-        urls.add(match[0]);
-      }
-    }
+    addRecordingUrlsFromValue(event, urls);
   }
   return Array.from(urls);
 }
