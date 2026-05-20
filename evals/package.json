@@ -7,6 +7,8 @@
     "lint": "lintcn lint --tsconfig tsconfig.json"
   },
   "dependencies": {
+    "@google-cloud/run": "^3.2.0",
+    "@google-cloud/storage": "^7.16.0",
     "@mariozechner/pi-coding-agent": "^0.70.6",
     "outdent": "^0.8.0",
     "tsx": "^4.21.0",

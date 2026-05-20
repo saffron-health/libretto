@@ -559,7 +559,7 @@ function parseJsonObject(text: string): unknown {
   return JSON.parse(candidate) as unknown;
 }
 
-async function scoreTranscript(opts: {
+export async function scoreTranscript(opts: {
   criteria: string[];
   cwd: string;
   model?: EvalModelSelector;

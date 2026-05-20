@@ -1,15 +1,17 @@
 import type { ProviderApi } from "./types.js";
 
-const KERNEL_API_ENDPOINT = "https://api.onkernel.com";
+const DEFAULT_KERNEL_API_ENDPOINT = "https://api.onkernel.com";
 
 export function createKernelProvider(): ProviderApi {
   const apiKey = process.env.KERNEL_API_KEY;
   if (!apiKey)
     throw new Error("KERNEL_API_KEY is required for Kernel provider.");
+  const endpoint =
+    process.env.KERNEL_API_ENDPOINT?.trim() || DEFAULT_KERNEL_API_ENDPOINT;
 
   return {
     async createSession() {
-      const resp = await fetch(`${KERNEL_API_ENDPOINT}/browsers`, {
+      const resp = await fetch(`${endpoint}/browsers`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -35,7 +37,7 @@ export function createKernelProvider(): ProviderApi {
       };
     },
     async closeSession(sessionId) {
-      const resp = await fetch(`${KERNEL_API_ENDPOINT}/browsers/${sessionId}`, {
+      const resp = await fetch(`${endpoint}/browsers/${sessionId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${apiKey}` },
       });
