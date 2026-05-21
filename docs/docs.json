@@ -115,7 +115,8 @@
               "libretto-cloud-hosting/authentication",
               "libretto-cloud-hosting/deployments",
               "libretto-cloud-hosting/observability-and-debugging",
-              "libretto-cloud-hosting/billing"
+              "libretto-cloud-hosting/billing",
+              "libretto-cloud-hosting/stealth"
             ]
           },
           {
