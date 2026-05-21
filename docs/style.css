@@ -1,0 +1,7 @@
+/* Libretto docs — heading overrides */
+:root {
+  --type-heading-1-size: 28px;
+  --type-heading-2-size: 20px;
+  --type-heading-3-size: 16px;
+  --weight-heading: 650;
+}

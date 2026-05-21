@@ -1,13 +1,18 @@
 packages:
   - "apps/*"
   - "benchmarks"
+  - "docs"
   - "evals"
   - "packages/*"
 
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
+  - "@holocron.so/*"
   - affordance
   - libretto
+  - safe-mdx
+  - spiceflow
+  - "@spiceflow/*"
 
 enablePrePostScripts: false
 
