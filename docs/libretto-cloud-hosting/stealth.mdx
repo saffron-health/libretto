@@ -1,0 +1,28 @@
+---
+title: Stealth
+sidebarTitle: Stealth
+---
+
+> Libretto's stealth browsers help hosted runs avoid bot detection.
+
+Every Libretto Cloud browser runs in stealth mode. Hosted runs use residential proxies and managed browser fingerprints, so sessions look more like normal user traffic than bare automation.
+
+Stealth also includes automatic CAPTCHA handling. Libretto Cloud cannot guarantee every challenge will clear, but common CAPTCHA and bot-check pages can resolve without a manual handoff.
+
+## Workflow behavior
+
+On Libretto Cloud, if a workflow reaches a CAPTCHA, Cloudflare check, or similar interstitial, wait up to 2 minutes before treating it as blocked. That gives the hosted browser time to finish the provider-side solve and continue to the page your workflow expects.
+
+After the wait, assert on the real page state with a URL or locator. This keeps failures clear when a challenge is not solved.
+
+```typescript theme={null}
+// Wait for hosted CAPTCHA solving; see https://libretto.sh/docs/libretto-cloud-hosting/stealth.
+await page.waitForTimeout(120_000);
+await page.getByRole("heading", { name: "Dashboard" }).waitFor();
+```
+
+## Local and self-hosted runs
+
+Stealth is included with Libretto Cloud and is also available through some other hosted browser providers. Local Chromium and self-hosted infrastructure do not include managed residential proxies or automatic CAPTCHA solving by default.
+
+For self-hosted runs, set up your own external proxy and CAPTCHA-solving services, or solve challenges manually in a visible browser and continue from that state.

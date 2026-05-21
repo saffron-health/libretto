@@ -24,7 +24,7 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 - Workflow guides: [one-shot generation](https://libretto.sh/docs/guides/one-shot-workflow-generation), [interactive building](https://libretto.sh/docs/guides/interactive-workflow-building), [debugging workflows](https://libretto.sh/docs/guides/debugging-workflows), [convert to network requests](https://libretto.sh/docs/guides/convert-to-network-requests)
 - CLI reference: [open and connect](https://libretto.sh/docs/reference/cli/open-and-connect), [sessions](https://libretto.sh/docs/reference/cli/sessions), [profiles](https://libretto.sh/docs/reference/cli/profiles), [snapshot](https://libretto.sh/docs/reference/cli/snapshot), [exec](https://libretto.sh/docs/reference/cli/exec), [run and resume](https://libretto.sh/docs/reference/cli/run-and-resume), [session logs](https://libretto.sh/docs/reference/cli/session-logs), [pages](https://libretto.sh/docs/reference/cli/pages)
 - Library API: [workflow](https://libretto.sh/docs/reference/runtime/workflow), [AI extraction](https://libretto.sh/docs/reference/runtime/ai-extraction), [network requests](https://libretto.sh/docs/reference/runtime/network-requests), [file downloads](https://libretto.sh/docs/reference/runtime/file-downloads)
-- Libretto Cloud Hosting: [overview](https://libretto.sh/docs/libretto-cloud-hosting/overview), [authentication](https://libretto.sh/docs/libretto-cloud-hosting/authentication), [deployments](https://libretto.sh/docs/libretto-cloud-hosting/deployments)
+- Libretto Cloud Hosting: [overview](https://libretto.sh/docs/libretto-cloud-hosting/overview), [authentication](https://libretto.sh/docs/libretto-cloud-hosting/authentication), [deployments](https://libretto.sh/docs/libretto-cloud-hosting/deployments), [stealth](https://libretto.sh/docs/libretto-cloud-hosting/stealth)
 - Alternative providers: [overview](https://libretto.sh/docs/alternative-providers/overview), [Kernel](https://libretto.sh/docs/alternative-providers/kernel), [Browserbase](https://libretto.sh/docs/alternative-providers/browserbase), [Steel](https://libretto.sh/docs/alternative-providers/steel), [GCP](https://libretto.sh/docs/alternative-providers/gcp), [AWS](https://libretto.sh/docs/alternative-providers/aws)
 
 ## Default Integration Approach
@@ -36,6 +36,12 @@ Full documentation is published at [libretto.sh](https://libretto.sh). Available
 Mix strategies freely across steps on a site.
 
 Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first navigation — deep URLs on a cold session are commonly blocked by edge bot protection.
+
+## CAPTCHA Handling
+
+- If a CAPTCHA, Cloudflare challenge, or similar bot check appears in a local Chromium session, try to solve it in the visible browser and continue from the solved state.
+- If the same challenge appears while the session is using a hosted browser provider, wait up to 2 minutes for automatic CAPTCHA handling before deciding the workflow is blocked.
+- When a CAPTCHA was observed during exploration, generated workflow code should include an explicit timeout wait at that point with a short comment linking to the hosted platform stealth docs. Follow `references/code-generation-rules.md` for the code shape.
 
 ## Setup
 
