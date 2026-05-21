@@ -38,7 +38,11 @@ function BlogShell({ children }: { children: React.ReactNode }) {
 function BlogPostPreview({ post }: { post: BlogPost }) {
   return (
     <article className="border-t border-rule py-8">
-      <AppLink href={`/blog/${post.slug}`} className="group block no-underline">
+      <AppLink
+        href={`/blog/${post.slug}`}
+        className="group block no-underline"
+        data-fathom-event="Blog post click"
+      >
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Text as="time" size="xs" className="text-muted/70">
             {formatPostDate(post.publishedAt)}
@@ -166,7 +170,7 @@ export function BlogPostPage({ slug }: { slug: string }) {
           >
             Post not found.
           </Text>
-          <Button href="/blog" variant="secondary">
+          <Button href="/blog" variant="secondary" data-fathom-event="Blog back click">
             Back to blog
           </Button>
         </section>
@@ -180,6 +184,7 @@ export function BlogPostPage({ slug }: { slug: string }) {
         <AppLink
           href="/blog"
           className="mb-10 inline-block text-sm text-muted/70 no-underline transition-colors hover:text-accent-bright"
+          data-fathom-event="Blog back click"
         >
           Back to blog
         </AppLink>

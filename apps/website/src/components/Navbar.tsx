@@ -69,10 +69,12 @@ function GlitchNavLink({
   href,
   children,
   external = true,
+  fathomEvent,
 }: {
   href: string;
   children: string;
   external?: boolean;
+  fathomEvent: string;
 }) {
   const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText(children);
 
@@ -82,6 +84,7 @@ function GlitchNavLink({
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
       className="no-underline"
+      data-fathom-event={fathomEvent}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
@@ -139,11 +142,15 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             </Text>
           </AppLink>
           <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
-            <GlitchNavLink href="/blog" external={false}>
+            <GlitchNavLink href="/blog" external={false} fathomEvent="Nav blog click">
               Blog
             </GlitchNavLink>
-            <GlitchNavLink href={DISCUSSIONS_URL}>Forum</GlitchNavLink>
-            <GlitchNavLink href={RELEASES_URL}>Changelog</GlitchNavLink>
+            <GlitchNavLink href={DISCUSSIONS_URL} fathomEvent="Nav forum click">
+              Forum
+            </GlitchNavLink>
+            <GlitchNavLink href={RELEASES_URL} fathomEvent="Nav changelog click">
+              Changelog
+            </GlitchNavLink>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -153,6 +160,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             rel="noopener noreferrer"
             aria-label="Libretto on npm"
             className="hidden text-ink/70 transition-colors hover:text-ink md:flex"
+            data-fathom-event="Nav npm click"
           >
             <NpmIcon width={36} height={14} />
           </a>
@@ -161,11 +169,12 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             target="_blank"
             rel="noopener noreferrer"
             className="hidden items-center gap-1.5 text-ink/70 transition-colors hover:text-ink md:flex"
+            data-fathom-event="Nav github click"
           >
             <GitHubStarIcon width={15} height={15} />
             {stars !== null && <span className="text-sm font-medium">{formatStars(stars)}</span>}
           </a>
-          <Button href="/docs/get-started/quickstart" size="sm">
+          <Button href="/docs/get-started/quickstart" size="sm" data-fathom-event="Nav docs click">
             Go to docs
           </Button>
           <div className="md:hidden">

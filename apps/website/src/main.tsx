@@ -1,10 +1,12 @@
 import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import { initializeFathomClickTracking } from "./analytics";
 import { App } from "./App";
 import { IcosahedronDebug } from "./IcosahedronDebug";
 
 const path = window.location.pathname;
+initializeFathomClickTracking();
 
 // Dev-only lazy imports — fully tree-shaken from production builds
 const DevAgentation = import.meta.env.DEV
