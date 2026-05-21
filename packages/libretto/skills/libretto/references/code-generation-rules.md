@@ -59,14 +59,10 @@ Before extracting data (for example text, rows, or field values), wait for the t
 
 ## CAPTCHA Waits
 
-If a CAPTCHA, Cloudflare challenge, or similar bot check appeared during exploration, preserve that recovery point in generated workflow code with an explicit timeout wait. Put a short comment immediately above the wait explaining that cloud browser providers can auto-solve these checks, and include links to the provider docs:
+If a CAPTCHA, Cloudflare challenge, or similar bot check appeared during exploration, preserve that recovery point in generated workflow code with an explicit 2 minute timeout wait. Put a short comment immediately above the wait linking to the hosted platform stealth docs:
 
 ```typescript
-// Cloud browser providers may auto-solve CAPTCHA or bot checks before the workflow can continue.
-// CAPTCHA solving on self-hosted infra is unsupported.
-// Libretto Cloud: https://libretto.sh/docs/libretto-cloud-hosting/overview
-// Kernel: https://www.kernel.sh/docs/browsers/bot-detection/stealth
-// Browserbase: https://docs.browserbase.com/platform/browser/core-features/overview
+// Wait for hosted CAPTCHA solving; see https://libretto.sh/docs/libretto-cloud-hosting/stealth.
 await page.waitForTimeout(120_000);
 ```
 
