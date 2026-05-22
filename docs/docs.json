@@ -38,8 +38,8 @@
     ],
     "primary": {
       "type": "button",
-      "label": "Talk to a dev",
-      "href": "https://cal.com/team/saffron-health/libretto-demo"
+      "label": "Get Started",
+      "href": "/get-started/quickstart"
     }
   },
   "navigation": {
@@ -172,8 +172,19 @@
           "href": "https://github.com/saffron-health/libretto/releases",
           "icon": "history",
           "placement": "sidebar"
+        },
+        {
+          "anchor": "Talk to a dev",
+          "href": "https://cal.com/team/saffron-health/libretto-demo",
+          "icon": "video",
+          "placement": "sidebar"
         }
       ]
+    }
+  },
+  "integrations": {
+    "fathom": {
+      "siteId": "OSJVKIKF"
     }
   },
   "footer": {
