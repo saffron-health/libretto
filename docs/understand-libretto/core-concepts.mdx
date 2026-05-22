@@ -9,7 +9,7 @@ title: Core concepts
 Libretto ships two interfaces:
 
 - **CLI** (`npx libretto <command>`): the primary interface for both agents and humans. Commands open browsers, take snapshots, execute Playwright code, run workflow files, and manage sessions. Every command accepts `--session <name>` to target a specific browser session.
-- **Library API** (`import { workflow } from "libretto"`): used inside workflow files you run with `npx libretto run`. The `workflow()` function wraps your automation handler and gives it typed access to `page` and `session`.
+- **Library API** (`import { workflow } from "libretto"`): used inside workflow files you run with `npx libretto run`. The `workflow()` function wraps your automation handler, validates input with a Zod schema, and gives the handler typed access to `page`, `session`, and parsed input.
 
 ### The `.libretto/` directory
 

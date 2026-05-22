@@ -39,12 +39,16 @@ npx libretto run <file> [flags]
 </ParamField>
 
 <ParamField path="--params" type="string">
-  Inline JSON input for the workflow, passed as a quoted string. Example: `--params '{"status":"open"}'`.
+  Inline JSON input for the workflow, passed as a quoted string. When the
+  workflow uses Zod schemas, Libretto validates this input against
+  `schemas.input` before the handler runs. Example:
+  `--params '{"status":"open"}'`.
 </ParamField>
 
 <ParamField path="--params-file" type="string">
   Path to a JSON file to use as workflow input. Cannot be used together with
-  `--params`.
+  `--params`. When the workflow uses Zod schemas, the file contents are
+  validated against `schemas.input`.
 </ParamField>
 
 <ParamField path="--auth-profile" type="string">
@@ -149,22 +153,32 @@ Insert `await pause(session)` calls in your workflow file to create interactive 
 
 ```typescript theme={null}
 import { workflow, pause } from "libretto";
+import { z } from "zod";
 
-export default workflow("myWorkflow", async (ctx, input) => {
-  const { session, page } = ctx;
+export default workflow(
+  "myWorkflow",
+  {
+    input: z.object({}),
+    output: z.object({
+      done: z.boolean(),
+    }),
+  },
+  async (ctx) => {
+    const { session, page } = ctx;
 
-  await page.goto("https://linkedin.com");
+    await page.goto("https://linkedin.com");
 
-  // Pause here for inspection
-  await pause(session);
+    // Pause here for inspection
+    await pause(session);
 
-  await page.locator("#submit").click();
+    await page.locator("#submit").click();
 
-  // Pause again before the final step
-  await pause(session);
+    // Pause again before the final step
+    await pause(session);
 
-  return { done: true };
-});
+    return { done: true };
+  },
+);
 ```
 
 <Note>
