@@ -1,28 +1,26 @@
-import { Button } from "./Button";
-import { SectionHeading } from "./SectionHeading";
-import { Text } from "./Text";
+import { Button } from "./Button.js";
+import { SectionIntro } from "./SectionIntro.js";
+import { SiteSection } from "./SiteSection.js";
 
 export function CTA() {
   return (
-    <section className="section-crt px-8 py-24">
-      <div className="mx-auto max-w-[1000px] text-center">
-        <SectionHeading className="mb-4">Ready to get started?</SectionHeading>
-        <Text
-          as="p"
-          size="md"
-          className="mx-auto mb-8 max-w-[580px] leading-relaxed text-muted [text-wrap:balance]"
-        >
-          Read the docs to set up Libretto and build your first integration in
-          minutes.
-        </Text>
-        <div className="flex flex-col items-center gap-3">
-          <Button href="/docs/get-started/quickstart">Go to docs</Button>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-faint">or</span>
-            <Button href="https://cal.com/team/saffron-health/libretto-demo" variant="secondary">book a demo</Button>
-          </div>
+    <SiteSection innerClassName="text-center">
+      <SectionIntro copyClassName="mb-8" title="Ready to get started?">
+        Read the docs to set up Libretto and build your first integration in
+        minutes.
+      </SectionIntro>
+      <div className="flex flex-col items-center gap-3">
+        <Button href="/docs/get-started/quickstart">Go to docs</Button>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-faint">or</span>
+          <Button
+            href="https://cal.com/team/saffron-health/libretto-demo"
+            variant="secondary"
+          >
+            book a demo
+          </Button>
         </div>
       </div>
-    </section>
+    </SiteSection>
   );
 }
