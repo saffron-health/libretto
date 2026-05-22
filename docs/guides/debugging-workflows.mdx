@@ -109,7 +109,7 @@ export default workflow(
     input: z.object({
       memberId: z.string(),
     }),
-    output: z.object({}),
+    output: z.void(),
   },
   async (ctx, input) => {
     const { session, page } = ctx;

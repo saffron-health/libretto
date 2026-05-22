@@ -36,12 +36,6 @@ type LibrettoWorkflowHandler<Input, Output> = (
 ) => Promise<Output>;
 ```
 
-Libretto validates `--params` and `--params-file` input against `schemas.input` before the workflow handler runs. The CLI passes the parsed input to the handler, so Zod transforms and defaults are reflected in `input`.
-
-`schemas.output` describes the returned value for TypeScript and hosted workflow metadata. Local `run()` does not validate the handler return value at runtime. Libretto Cloud serializes the output schema to JSON Schema during deploy and exposes it through `/v1/workflows/get`.
-
-The older `workflow(name, handler)` form is still supported for existing workflows, but new workflows should use the schema form.
-
 #### `LibrettoWorkflowContext`
 
 <ResponseField name="session" type="string">
