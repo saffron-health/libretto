@@ -16,10 +16,18 @@ export function CTA() {
           minutes.
         </Text>
         <div className="flex flex-col items-center gap-3">
-          <Button href="/docs/get-started/quickstart">Go to docs</Button>
+          <Button href="/docs/get-started/quickstart" data-fathom-event="CTA docs click">
+            Go to docs
+          </Button>
           <div className="flex items-center gap-2">
             <span className="text-sm text-faint">or</span>
-            <Button href="https://cal.com/team/saffron-health/libretto-demo" variant="secondary">book a demo</Button>
+            <Button
+              href="https://cal.com/team/saffron-health/libretto-demo"
+              variant="secondary"
+              data-fathom-event="CTA demo click"
+            >
+              book a demo
+            </Button>
           </div>
         </div>
       </div>

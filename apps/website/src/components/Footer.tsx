@@ -55,10 +55,14 @@ export function Footer() {
             © {new Date().getFullYear()} Saffron Health
           </Text>
           <div className="flex gap-6">
-            <a href="/blog" className={linkClass}>
+            <a href="/blog" className={linkClass} data-fathom-event="Footer blog click">
               Blog
             </a>
-            <a href="/docs/get-started/quickstart" className={linkClass}>
+            <a
+              href="/docs/get-started/quickstart"
+              className={linkClass}
+              data-fathom-event="Footer docs click"
+            >
               Docs
             </a>
             <a
@@ -66,10 +70,17 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className={linkClass}
+              data-fathom-event="Footer forum click"
             >
               Forum
             </a>
-            <a href={RELEASES_URL} target="_blank" rel="noopener noreferrer" className={linkClass}>
+            <a
+              href={RELEASES_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={linkClass}
+              data-fathom-event="Footer changelog click"
+            >
               Changelog
             </a>
           </div>
@@ -83,6 +94,7 @@ export function Footer() {
             rel="noopener noreferrer"
             aria-label="Libretto on npm"
             className="text-muted/50 transition-colors hover:text-muted"
+            data-fathom-event="Footer npm click"
           >
             <NpmIcon width={28} height={12} />
           </a>
@@ -92,6 +104,7 @@ export function Footer() {
             rel="noopener noreferrer"
             aria-label="Libretto on Discord"
             className="text-muted/50 transition-colors hover:text-muted"
+            data-fathom-event="Footer discord click"
           >
             <DiscordIcon width={14} height={14} />
           </a>
@@ -101,6 +114,7 @@ export function Footer() {
             rel="noopener noreferrer"
             aria-label="Libretto on GitHub"
             className="text-muted/50 transition-colors hover:text-muted"
+            data-fathom-event="Footer github click"
           >
             <GitHubIcon width={14} height={14} />
           </a>
