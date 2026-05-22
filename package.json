@@ -35,6 +35,7 @@
     "google-login": "gcloud auth login --update-adc && gcloud auth configure-docker us-central1-docker.pkg.dev --quiet",
     "cli": "pnpm -s --filter libretto cli",
     "create-tmp-workspace": "pnpm --filter @libretto/dev-tools create-tmp-workspace",
-    "website:dev": "pnpm --dir ./apps/website dev"
+    "website:dev": "pnpm --dir ./apps/website dev",
+    "website:brand-kit": "pnpm --dir ./apps/website brand-kit"
   }
 }
