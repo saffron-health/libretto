@@ -101,9 +101,16 @@ If you need the workflow to stop at a specific point (not at failure, but at a k
 
 ```typescript theme={null}
 import { workflow, pause } from "libretto";
+import { z } from "zod";
 
 export default workflow(
   "eligibilityCheck",
+  {
+    input: z.object({
+      memberId: z.string(),
+    }),
+    output: z.object({}),
+  },
   async (ctx, input) => {
     const { session, page } = ctx;
 

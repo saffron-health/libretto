@@ -62,15 +62,27 @@ If you already have a Node.js package that you plan to use for Libretto automati
 
     ```ts src/workflows/scrape-page.ts
     import { workflow } from "libretto";
+    import { z } from "zod";
 
-    export default workflow("scrape-page", async ({ page }) => {
-      await page.goto("https://example.com");
-      const title = await page.title();
-      console.log(`Page title: ${title}`);
-    });
+    export default workflow(
+      "scrape-page",
+      {
+        input: z.object({}),
+        output: z.object({
+          title: z.string(),
+        }),
+      },
+      async ({ page }) => {
+        await page.goto("https://example.com");
+        const title = await page.title();
+        console.log(`Page title: ${title}`);
+
+        return { title };
+      },
+    );
     ```
 
-    The `workflow()` function wraps your automation with browser lifecycle management, error handling, and session recording.
+    The `workflow()` function wraps your automation with browser lifecycle management, input validation, error handling, and session recording.
 
   </Step>
 

@@ -32,7 +32,7 @@ Prototyping against the live page is what separates Libretto from writing a Play
 
 ### 4. Code generation and validation
 
-Once the agent has validated all the interactions, it writes a TypeScript file that exports a `workflow()`. The workflow uses the same Playwright selectors the agent already tested, so the script is grounded in what actually worked on the live page.
+Once the agent has validated all the interactions, it writes a TypeScript file that exports a `workflow()` with Zod input and output schemas. The workflow uses the same Playwright selectors the agent already tested, so the script is grounded in what actually worked on the live page.
 
 The agent then runs the workflow headless to verify it works end-to-end without any manual intervention. If the run fails, the agent re-enters the snapshot-and-prototype loop (phases 2 and 3) to diagnose and fix the issue, then tries the headless run again.
 

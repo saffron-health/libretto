@@ -4,20 +4,30 @@ title: Workflow
 
 > Define and run reusable browser automation workflows.
 
-The `workflow()` factory is the entry point for every Libretto automation. You wrap your Playwright logic in a typed handler, export the result, and the CLI (or your own runner) takes care of launching a browser, wiring up context, and invoking your handler.
+The `workflow()` factory is the entry point for every Libretto automation. You wrap your Playwright logic in a typed handler, define Zod schemas for the workflow input and output, export the result, and the CLI (or your own runner) takes care of launching a browser, validating input, wiring up context, and invoking your handler.
 
 ### `workflow()`
 
-Creates a named `LibrettoWorkflow` from a handler function.
+Creates a named `LibrettoWorkflow` from input/output Zod schemas and a handler function.
 
 ```typescript theme={null}
-function workflow<Input = unknown, Output = unknown>(
+function workflow<
+  InputSchema extends z.ZodType,
+  OutputSchema extends z.ZodType,
+>(
   name: string,
-  handler: LibrettoWorkflowHandler<Input, Output>,
-): LibrettoWorkflow<Input, Output>;
+  schemas: {
+    input: InputSchema;
+    output: OutputSchema;
+  },
+  handler: LibrettoWorkflowHandler<
+    z.infer<InputSchema>,
+    z.infer<OutputSchema>
+  >,
+): LibrettoWorkflow<InputSchema, OutputSchema>;
 ```
 
-The handler receives a `LibrettoWorkflowContext` and typed `input`, and must return a `Promise<Output>`.
+The handler receives a `LibrettoWorkflowContext` and typed `input`, and must return a `Promise<Output>`. The input type is inferred from `schemas.input`; the output type is inferred from `schemas.output`.
 
 ```typescript theme={null}
 type LibrettoWorkflowHandler<Input, Output> = (
@@ -25,6 +35,12 @@ type LibrettoWorkflowHandler<Input, Output> = (
   input: Input,
 ) => Promise<Output>;
 ```
+
+Libretto validates `--params` and `--params-file` input against `schemas.input` before the workflow handler runs. The CLI passes the parsed input to the handler, so Zod transforms and defaults are reflected in `input`.
+
+`schemas.output` describes the returned value for TypeScript and hosted workflow metadata. Local `run()` does not validate the handler return value at runtime. Libretto Cloud serializes the output schema to JSON Schema during deploy and exposes it through `/v1/workflows/get`.
+
+The older `workflow(name, handler)` form is still supported for existing workflows, but new workflows should use the schema form.
 
 #### `LibrettoWorkflowContext`
 
@@ -41,9 +57,20 @@ type LibrettoWorkflowHandler<Input, Output> = (
 
 ```typescript theme={null}
 import { workflow, launchBrowser, pause } from "libretto";
+import { z } from "zod";
 
-export default workflow<{ query: string }, string[]>(
+const inputSchema = z.object({
+  query: z.string(),
+});
+
+const outputSchema = z.array(z.string());
+
+export default workflow(
   "main",
+  {
+    input: inputSchema,
+    output: outputSchema,
+  },
   async (ctx, input) => {
     const { page } = ctx;
 
@@ -184,9 +211,14 @@ npx libretto resume --session <session-name>
 
 ```typescript theme={null}
 import { workflow, pause } from "libretto";
+import { z } from "zod";
 
-export default workflow<{ id: string }, void>(
+export default workflow(
   "main",
+  {
+    input: z.object({ id: z.string() }),
+    output: z.void(),
+  },
   async (ctx, input) => {
     const { page, session } = ctx;
 
