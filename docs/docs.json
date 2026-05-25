@@ -4,7 +4,7 @@
   "description": "Toolkit for building, debugging, and maintaining browser automations.",
   "colors": {
     "primary": "#12ce41",
-    "light": "#2fdb4f",
+    "light": "#0a9e2f",
     "dark": "#12ce41"
   },
   "icons": { "library": "lucide" },
