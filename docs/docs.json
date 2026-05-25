@@ -4,8 +4,8 @@
   "description": "Toolkit for building, debugging, and maintaining browser automations.",
   "colors": {
     "primary": "#12ce41",
-    "light": "#0a9e2f",
-    "dark": "#12ce41"
+    "light": "#12ce41",
+    "dark": "#0a9e2f"
   },
   "icons": { "library": "lucide" },
   "favicon": "/favicon.svg",
