@@ -8,8 +8,13 @@ packages:
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - "@holocron.so/*"
+  - "@mintlify/*"
   - affordance
+  - framer-motion
   - libretto
+  - lodash
+  - mint
+  - motion
   - safe-mdx
   - spiceflow
   - "@spiceflow/*"
@@ -27,3 +32,4 @@ allowBuilds:
   protobufjs: true
   puppeteer: true
   sharp: true
+  workerd: true

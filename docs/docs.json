@@ -12,9 +12,11 @@
   "logo": {
     "light": "/favicon.svg",
     "dark": "/favicon.svg",
-    "href": "https://libretto.sh"
+    "href": "https://libretto.sh",
+    "text": "Libretto"
   },
   "fonts": {
+    "fontSize": 15,
     "heading": {
       "family": "Fraunces",
       "format": "woff2",
@@ -158,7 +160,7 @@
         {
           "anchor": "Discord",
           "href": "https://discord.gg/NYrG56hVDt",
-          "icon": "message-circle",
+          "icon": "fontawesome:brands:discord",
           "placement": "sidebar"
         },
         {
