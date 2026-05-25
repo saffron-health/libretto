@@ -10,7 +10,7 @@
     "@types/sharp": "^0.32.0",
     "fallow": "^2.55.0",
     "lintcn": "^0.9.0",
-    "mint": "4.2.525",
+
     "playwright": "^1.58.2",
     "sharp": "^0.34.5",
     "turbo": "^2.8.20"
@@ -18,9 +18,8 @@
   "scripts": {
     "build": "turbo run build",
     "lint": "turbo run lint --concurrency=1 && fallow --summary",
-    "docs:dev": "cd docs && mint dev --no-open",
-    "docs:validate": "cd docs && mint validate",
-    "docs:broken-links": "cd docs && mint broken-links --check-anchors",
+    "docs:dev": "pnpm --dir docs dev",
+    "docs:build": "pnpm --dir docs build",
     "website:build": "pnpm --dir ./apps/website build",
     "sync:mirrors": "node packages/dev-tools/scripts/sync-mirrors.mjs",
     "check:mirrors": "node packages/dev-tools/scripts/check-mirrors-sync.mjs",
