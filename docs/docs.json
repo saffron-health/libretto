@@ -37,12 +37,7 @@
         "type": "github",
         "href": "https://github.com/saffron-health/libretto"
       }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Get Started",
-      "href": "/get-started/quickstart"
-    }
+    ]
   },
   "navigation": {
     "tabs": [
