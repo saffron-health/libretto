@@ -1,6 +1,9 @@
 import classnames from "classnames";
 import { useState } from "react";
-import { Text } from "./Text";
+import { Text } from "./Text.js";
+import { Kicker } from "./Kicker.js";
+import { Panel } from "./Panel.js";
+import { SiteSection } from "./SiteSection.js";
 import {
   AWSLogo,
   KernelLogo,
@@ -30,7 +33,12 @@ function CommandBox({ command }: { command: string }) {
     setTimeout(() => setCopied(false), 1500);
   }
   return (
-    <div className="relative rounded-xl border border-accent/20 bg-panel px-5 py-4 pr-12 font-mono text-[13px] text-ink/80 shadow-sm">
+    <Panel
+      padding="none"
+      radius="xl"
+      tone="accent"
+      className="relative px-5 py-4 pr-12 font-mono text-[13px] text-ink/80 shadow-sm"
+    >
       <button
         type="button"
         onClick={handleCopy}
@@ -60,7 +68,7 @@ function CommandBox({ command }: { command: string }) {
         <span className="w-4 select-none text-ink/20">$</span>
         <span className="pl-2">{command}</span>
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -115,87 +123,83 @@ function ColumnHeading({ children }: { children: React.ReactNode }) {
 
 export function CloudProviders() {
   return (
-    <section className="section-crt px-8 py-24">
-      <div className="mx-auto max-w-[1100px]">
-        <div className="mb-10 text-center">
-          <span className="block font-mono text-base text-amber">
-            // DEPLOY --
-          </span>
+    <SiteSection width="lg">
+      <div className="mb-10 text-center">
+        <Kicker>// DEPLOY --</Kicker>
+      </div>
+
+      <div className="relative grid gap-12 md:grid-cols-2 md:gap-16">
+        <div className="absolute left-1/2 top-0 bottom-0 hidden -translate-x-1/2 md:flex md:flex-col md:items-center">
+          <div className="h-full w-px bg-amber/25" />
+          <OrBadge className="absolute top-1/2 size-10 -translate-y-1/2 rounded-full border border-amber/40 bg-bg" />
         </div>
 
-        <div className="relative grid gap-12 md:grid-cols-2 md:gap-16">
-          <div className="absolute left-1/2 top-0 bottom-0 hidden -translate-x-1/2 md:flex md:flex-col md:items-center">
-            <div className="h-full w-px bg-amber/25" />
-            <OrBadge className="absolute top-1/2 size-10 -translate-y-1/2 rounded-full border border-amber/40 bg-bg" />
-          </div>
+        <div className="md:pr-6">
+          <ColumnHeading>Deploy with one command</ColumnHeading>
+          <Text
+            as="p"
+            size="md"
+            className="mb-5 leading-relaxed text-muted [text-wrap:balance]"
+          >
+            Run your workflows on managed, headed browsers with residential
+            proxies. No infrastructure to set up.
+          </Text>
+          <ul className="mb-6 space-y-1.5 font-mono text-sm text-ink/55">
+            <li>→ Managed headed browsers, residential proxies included</li>
+            <li>
+              → Debugging agents that auto-fix scripts or email a full analysis
+              with video
+            </li>
+            <li>→ No browser pool to manage</li>
+          </ul>
+          <CommandBox command={DEPLOY_COMMAND} />
+          <a
+            href="/docs/libretto-cloud-hosting/overview"
+            className={`${linkClass} mt-4 inline-block font-mono text-xs`}
+            data-fathom-event="Cloud docs click"
+          >
+            cloud docs →
+          </a>
+        </div>
 
-          <div className="md:pr-6">
-            <ColumnHeading>Deploy with one command</ColumnHeading>
-            <Text
-              as="p"
-              size="md"
-              className="mb-5 leading-relaxed text-muted [text-wrap:balance]"
-            >
-              Run your workflows on managed, headed browsers with residential
-              proxies. No infrastructure to set up.
-            </Text>
-            <ul className="mb-6 space-y-1.5 font-mono text-sm text-ink/55">
-              <li>→ Managed headed browsers, residential proxies included</li>
-              <li>
-                → Debugging agents that auto-fix scripts or email a full
-                analysis with video
-              </li>
-              <li>→ No browser pool to manage</li>
-            </ul>
-            <CommandBox command={DEPLOY_COMMAND} />
-            <a
-              href="/docs/libretto-cloud-hosting/overview"
-              className={`${linkClass} mt-4 inline-block font-mono text-xs`}
-              data-fathom-event="Cloud docs click"
-            >
-              cloud docs →
-            </a>
-          </div>
+        <OrBadge className="-my-4 self-center md:hidden" />
 
-          <OrBadge className="-my-4 self-center md:hidden" />
-
-          <div className="md:pl-6">
-            <ColumnHeading>Alternative providers</ColumnHeading>
-            <Text
-              as="p"
-              size="md"
-              className="mb-5 leading-relaxed text-muted [text-wrap:balance]"
-            >
-              Run browsers with Kernel, Browserbase, or Steel, or run workflows
-              on infrastructure you control.
-            </Text>
-            <ul className="mb-6 space-y-1.5 font-mono text-sm text-ink/55">
-              <li>→ Connect Browserbase, Kernel, or Steel with your API key</li>
-              <li>
-                → Or run the workflow as a container with guides for Cloud Run
-                and ECS
-              </li>
-            </ul>
-            <div className="grid grid-cols-5 border border-ink/8">
-              {LOGOS.map((logo, i) => (
-                <LogoTile
-                  key={i}
-                  className={`h-16 ${i < LOGOS.length - 1 ? "border-r" : ""}`}
-                >
-                  {logo}
-                </LogoTile>
-              ))}
-            </div>
-            <a
-              href="/docs/alternative-providers/overview"
-              className={`${linkClass} mt-4 inline-block font-mono text-xs`}
-              data-fathom-event="Provider setup click"
-            >
-              provider setup →
-            </a>
+        <div className="md:pl-6">
+          <ColumnHeading>Alternative providers</ColumnHeading>
+          <Text
+            as="p"
+            size="md"
+            className="mb-5 leading-relaxed text-muted [text-wrap:balance]"
+          >
+            Run browsers with Kernel, Browserbase, or Steel, or run workflows on
+            infrastructure you control.
+          </Text>
+          <ul className="mb-6 space-y-1.5 font-mono text-sm text-ink/55">
+            <li>→ Connect Browserbase, Kernel, or Steel with your API key</li>
+            <li>
+              → Or run the workflow as a container with guides for Cloud Run and
+              ECS
+            </li>
+          </ul>
+          <div className="grid grid-cols-5 border border-ink/8">
+            {LOGOS.map((logo, i) => (
+              <LogoTile
+                key={i}
+                className={`h-16 ${i < LOGOS.length - 1 ? "border-r" : ""}`}
+              >
+                {logo}
+              </LogoTile>
+            ))}
           </div>
+          <a
+            href="/docs/alternative-providers/overview"
+            className={`${linkClass} mt-4 inline-block font-mono text-xs`}
+            data-fathom-event="Provider setup click"
+          >
+            provider setup →
+          </a>
         </div>
       </div>
-    </section>
+    </SiteSection>
   );
 }

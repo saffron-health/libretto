@@ -1,7 +1,8 @@
 import { type ReactNode, useState } from "react";
-import { SectionHeading } from "./SectionHeading";
-import { Text } from "./Text";
-import { CrossfadeIcon } from "./CrossfadeIcon";
+import { SectionIntro } from "./SectionIntro.js";
+import { Text } from "./Text.js";
+import { CrossfadeIcon } from "./CrossfadeIcon.js";
+import { SiteSection } from "./SiteSection.js";
 import { REPO_URL, DISCORD_URL } from "../site";
 
 const linkClass = "underline text-accent hover:text-accent-bright transition-colors";
@@ -161,20 +162,20 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
 
 export function FAQ() {
   return (
-    <section className="section-crt px-8 py-24">
-      <div className="mx-auto flex max-w-[1000px] flex-col gap-12 md:flex-row md:gap-16">
-        <div className="md:w-1/2 md:shrink-0 md:pt-5">
-          <span className="mb-3 block font-mono text-base text-amber">// FAQ --</span>
-          <SectionHeading>
-            Frequently asked questions
-          </SectionHeading>
-        </div>
-        <div className="md:w-1/2 border-t border-ink/10">
-          {faqs.map((faq) => (
-            <FAQAccordionItem key={faq.id} item={faq} />
-          ))}
-        </div>
+    <SiteSection innerClassName="flex flex-col gap-12 md:flex-row md:gap-16">
+      <div className="md:w-1/2 md:shrink-0 md:pt-5">
+        <SectionIntro
+          align="left"
+          headingClassName="mb-0"
+          kicker="// FAQ --"
+          title="Frequently asked questions"
+        />
       </div>
-    </section>
+      <div className="border-t border-ink/10 md:w-1/2">
+        {faqs.map((faq) => (
+          <FAQAccordionItem key={faq.id} item={faq} />
+        ))}
+      </div>
+    </SiteSection>
   );
 }
