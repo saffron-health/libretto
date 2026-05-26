@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type * as React from "react";
 import { AsciiLogo } from "../components/AsciiLogo.js";
 import { CanvasAsciihedron } from "../components/CanvasAsciihedron.js";
@@ -116,6 +116,18 @@ const logoMotionAssets: DownloadAsset[] = [
     href: "/brand-kit/animation/libretto-icosahedron-logo-loop.mp4",
     download: "libretto-icosahedron-logo-loop.mp4",
   },
+  {
+    label: "WebM",
+    detail: "Looping web video",
+    href: "/brand-kit/animation/libretto-icosahedron-logo-loop.webm",
+    download: "libretto-icosahedron-logo-loop.webm",
+  },
+  {
+    label: "WebP",
+    detail: "Animated web image",
+    href: "/brand-kit/animation/libretto-icosahedron-logo-loop.webp",
+    download: "libretto-icosahedron-logo-loop.webp",
+  },
 ];
 
 const asciihedronStillAssets: DownloadAsset[] = [
@@ -136,6 +148,27 @@ const asciihedronStillAssets: DownloadAsset[] = [
     detail: "Compressed web still",
     href: "/brand-kit/logos/libretto-asciihedron-still.webp",
     download: "libretto-asciihedron-still.webp",
+  },
+];
+
+const asciihedronMotionAssets: DownloadAsset[] = [
+  {
+    label: "MP4",
+    detail: "17.46s seamless loop",
+    href: "/brand-kit/animation/libretto-asciihedron-loop.mp4",
+    download: "libretto-asciihedron-loop.mp4",
+  },
+  {
+    label: "WebM",
+    detail: "17.46s seamless loop",
+    href: "/brand-kit/animation/libretto-asciihedron-loop.webm",
+    download: "libretto-asciihedron-loop.webm",
+  },
+  {
+    label: "WebP",
+    detail: "Animated web preview",
+    href: "/brand-kit/animation/libretto-asciihedron-loop.webp",
+    download: "libretto-asciihedron-loop.webp",
   },
 ];
 
@@ -360,82 +393,6 @@ function DownloadTile({ asset }: { asset: DownloadAsset }) {
   );
 }
 
-function RecordCanvasButton({
-  children,
-  extension,
-  mimeType,
-  targetRef,
-}: {
-  children: React.ReactNode;
-  extension: "mp4" | "webm";
-  mimeType: string;
-  targetRef: React.RefObject<HTMLDivElement | null>;
-}) {
-  const [status, setStatus] = useState<"idle" | "recording" | "unsupported">(
-    "idle",
-  );
-
-  async function handleRecord() {
-    const canvas = targetRef.current?.querySelector("canvas");
-    if (
-      !canvas ||
-      typeof MediaRecorder === "undefined" ||
-      !MediaRecorder.isTypeSupported(mimeType) ||
-      !("captureStream" in canvas)
-    ) {
-      setStatus("unsupported");
-      return;
-    }
-
-    setStatus("recording");
-    const stream = canvas.captureStream(30);
-    const chunks: BlobPart[] = [];
-    const recorder = new MediaRecorder(stream, { mimeType });
-    recorder.addEventListener("dataavailable", (event) => {
-      if (event.data.size > 0) {
-        chunks.push(event.data);
-      }
-    });
-    recorder.addEventListener(
-      "stop",
-      () => {
-        const blob = new Blob(chunks, { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `libretto-canvas-animation.${extension}`;
-        document.body.append(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        stream.getTracks().forEach((track) => track.stop());
-        setStatus("idle");
-      },
-      { once: true },
-    );
-    recorder.start();
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    recorder.stop();
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleRecord}
-      className="rounded-md border border-rule bg-panel-hi p-4 text-left transition-colors hover:border-accent/50 hover:bg-panel"
-    >
-      <span className="block font-mono text-sm font-semibold text-ink">
-        {status === "recording" ? "Recording..." : children}
-      </span>
-      <span className="mt-1 block text-xs leading-relaxed text-muted">
-        {status === "unsupported"
-          ? `${extension.toUpperCase()} recording is not supported in this browser.`
-          : "Records a 3-second loop from the live canvas."}
-      </span>
-    </button>
-  );
-}
-
 function PreviewShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex min-h-[560px] items-center justify-center overflow-hidden rounded-lg border border-rule bg-bg p-8">
@@ -446,7 +403,6 @@ function PreviewShell({ children }: { children: React.ReactNode }) {
 
 function LogosTab() {
   const [showStill, setShowStill] = useState(true);
-  const previewRef = useRef<HTMLDivElement>(null);
 
   return (
     <BrandTabPanel
@@ -468,7 +424,7 @@ function LogosTab() {
               }}
             />
           ) : (
-            <div ref={previewRef} className="relative flex items-center justify-center">
+            <div className="relative flex items-center justify-center">
               <div className="absolute h-[320px] w-[320px] rounded-full bg-amber/20 blur-2xl" />
               <SolidIcosahedron
                 autoRotate
@@ -487,16 +443,7 @@ function LogosTab() {
         showStill ? (
           <DownloadGrid assets={logoStillAssets} />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <DownloadGrid assets={logoMotionAssets} />
-            <RecordCanvasButton
-              extension="webm"
-              mimeType="video/webm;codecs=vp9"
-              targetRef={previewRef}
-            >
-              WebM
-            </RecordCanvasButton>
-          </div>
+          <DownloadGrid assets={logoMotionAssets} />
         )
       }
     />
@@ -505,7 +452,6 @@ function LogosTab() {
 
 function AsciihedronTab() {
   const [showStill, setShowStill] = useState(true);
-  const previewRef = useRef<HTMLDivElement>(null);
 
   return (
     <BrandTabPanel
@@ -525,7 +471,7 @@ function AsciihedronTab() {
               baseOpacity={0.11}
             />
           ) : (
-            <div ref={previewRef}>
+            <div>
               <CanvasAsciihedron
                 className="h-[1600px] w-[1600px] min-h-[1200px] min-w-[1200px] max-h-[180vw] max-w-[180vw] shrink-0 text-ink"
                 showAnnotations={false}
@@ -540,22 +486,7 @@ function AsciihedronTab() {
         showStill ? (
           <DownloadGrid assets={asciihedronStillAssets} />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <RecordCanvasButton
-              extension="mp4"
-              mimeType="video/mp4"
-              targetRef={previewRef}
-            >
-              MP4
-            </RecordCanvasButton>
-            <RecordCanvasButton
-              extension="webm"
-              mimeType="video/webm;codecs=vp9"
-              targetRef={previewRef}
-            >
-              WebM
-            </RecordCanvasButton>
-          </div>
+          <DownloadGrid assets={asciihedronMotionAssets} />
         )
       }
     />
