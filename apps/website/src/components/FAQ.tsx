@@ -23,7 +23,7 @@ const faqs: FAQItem[] = [
         gives your coding agent a live browser and a CLI to inspect pages,
         capture network traffic, record user actions, and turn them into
         deterministic automation scripts. Check out the{" "}
-        <a href="/docs/get-started/quickstart" className={linkClass}>
+        <a href="/docs/get-started/quickstart" className={linkClass} data-fathom-event="FAQ docs click">
           docs
         </a>{" "}
         to get started.
@@ -50,15 +50,15 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         The CLI has built-in support for{" "}
-        <a href="https://www.browserbase.com/" className={linkClass}>
+        <a href="https://www.browserbase.com/" className={linkClass} data-fathom-event="FAQ Browserbase click">
           Browserbase
         </a>{" "}
         and{" "}
-        <a href="https://www.kernel.computer/" className={linkClass}>
+        <a href="https://www.kernel.computer/" className={linkClass} data-fathom-event="FAQ Kernel click">
           Kernel
         </a>
         , and{" "}
-        <a href="https://steel.dev/" className={linkClass}>
+        <a href="https://steel.dev/" className={linkClass} data-fathom-event="FAQ Steel click">
           Steel
         </a>
         {" "}to spin up browser sessions directly. Libretto can also connect to any
@@ -74,7 +74,7 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         Yes, fully open source under the MIT license. You can find the code on{" "}
-        <a href={REPO_URL} className={linkClass}>
+        <a href={REPO_URL} className={linkClass} data-fathom-event="FAQ github click">
           GitHub
         </a>
         .
@@ -87,15 +87,15 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         Jump into our{" "}
-        <a href={DISCORD_URL} className={linkClass}>
+        <a href={DISCORD_URL} className={linkClass} data-fathom-event="FAQ discord click">
           Discord
         </a>{" "}
         for quick help, open an issue on{" "}
-        <a href={REPO_URL} className={linkClass}>
+        <a href={REPO_URL} className={linkClass} data-fathom-event="FAQ github click">
           GitHub
         </a>
         , or read through the{" "}
-        <a href="/docs/get-started/quickstart" className={linkClass}>
+        <a href="/docs/get-started/quickstart" className={linkClass} data-fathom-event="FAQ docs click">
           docs
         </a>
         .
@@ -138,6 +138,7 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
         className="flex w-full cursor-pointer items-center justify-between py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/30 rounded-sm"
         onClick={() => setIsExpanded(!isExpanded)}
         aria-expanded={isExpanded}
+        data-fathom-event="FAQ toggle click"
       >
         <Text size="md" className="font-medium text-ink">
           {item.question}

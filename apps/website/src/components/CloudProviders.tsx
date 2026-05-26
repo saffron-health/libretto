@@ -43,6 +43,7 @@ function CommandBox({ command }: { command: string }) {
         type="button"
         onClick={handleCopy}
         className="copy-icon-btn absolute right-2.5 top-2.5 size-7 flex items-center justify-center rounded-lg"
+        data-fathom-event="Cloud deploy command copy"
       >
         <div className="relative size-[18px] shrink-0">
           <div
@@ -155,6 +156,7 @@ export function CloudProviders() {
           <a
             href="/docs/libretto-cloud-hosting/overview"
             className={`${linkClass} mt-4 inline-block font-mono text-xs`}
+            data-fathom-event="Cloud docs click"
           >
             cloud docs →
           </a>
@@ -192,6 +194,7 @@ export function CloudProviders() {
           <a
             href="/docs/alternative-providers/overview"
             className={`${linkClass} mt-4 inline-block font-mono text-xs`}
+            data-fathom-event="Provider setup click"
           >
             provider setup →
           </a>

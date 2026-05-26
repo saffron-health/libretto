@@ -77,6 +77,7 @@ export function MobileMenu({ stars }: { stars: string | null }) {
       <AriaButton
         aria-label="Menu"
         className="relative flex size-9 items-center justify-center rounded-lg text-ink outline-none hover:bg-ink/[0.06] focus-visible:ring-2 focus-visible:ring-ink/20"
+        data-fathom-event="Mobile menu click"
       >
         <CrossfadeIcon
           activeKey={animation === "visible" ? "close" : "hamburger"}
@@ -107,7 +108,7 @@ export function MobileMenu({ stars }: { stars: string | null }) {
           className="min-w-[180px] origin-top-right rounded-xl border border-accent/20 bg-panel p-1.5 shadow-lg shadow-black/30"
         >
           <Menu className="outline-none">
-            <MenuItem href="/blog" className={itemClass}>
+            <MenuItem href="/blog" className={itemClass} data-fathom-event="Mobile nav blog click">
               Blog
             </MenuItem>
             <MenuItem
@@ -115,6 +116,7 @@ export function MobileMenu({ stars }: { stars: string | null }) {
               target="_blank"
               rel="noopener noreferrer"
               className={itemClass}
+              data-fathom-event="Mobile nav forum click"
             >
               Forum
             </MenuItem>
@@ -123,6 +125,7 @@ export function MobileMenu({ stars }: { stars: string | null }) {
               target="_blank"
               rel="noopener noreferrer"
               className={itemClass}
+              data-fathom-event="Mobile nav changelog click"
             >
               Changelog
             </MenuItem>
@@ -131,6 +134,7 @@ export function MobileMenu({ stars }: { stars: string | null }) {
               target="_blank"
               rel="noopener noreferrer"
               className={itemClass}
+              data-fathom-event="Mobile nav npm click"
             >
               <NpmIcon width={28} height={12} />
               npm
@@ -140,6 +144,7 @@ export function MobileMenu({ stars }: { stars: string | null }) {
               target="_blank"
               rel="noopener noreferrer"
               className={itemClass}
+              data-fathom-event="Mobile nav github click"
             >
               <GitHubStarIcon width={15} height={15} />
               GitHub{stars !== null && ` (${stars})`}
