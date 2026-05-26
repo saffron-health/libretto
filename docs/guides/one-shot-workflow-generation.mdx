@@ -10,7 +10,7 @@ One-shot generation is the fastest way to go from an idea to a working automatio
 
 <Steps>
   <Step title="Prompt your agent">
-    Describe the **site**, the **data or action** you want, and the **shape of the output**. The more specific you are, the better your results.
+    Describe the **site**, the **data or action** you want, and the **input/output shape** you want the workflow to expose as Zod schemas. The more specific you are, the better your results.
 
     ```text Example prompt
     Use the Libretto skill. Go on https://sfbay.craigslist.org and scrape the first 10 "free stuff" listings for title, location, and link.
@@ -48,18 +48,23 @@ One-shot generation is the fastest way to go from an idea to a working automatio
 
     ```typescript  theme={null}
     import { workflow } from "libretto";
+    import { z } from "zod";
 
-    type Output = {
-      listings: Array<{
-        title: string;
-        location: string;
-        link: string;
-      }>;
-    };
+    const outputSchema = z.object({
+      listings: z.array(z.object({
+        title: z.string(),
+        location: z.string(),
+        link: z.string().url(),
+      })),
+    });
 
-    export default workflow<{}, Output>(
+    export default workflow(
       "freeStuff",
-      async (ctx): Promise<Output> => {
+      {
+        input: z.object({}),
+        output: outputSchema,
+      },
+      async (ctx) => {
         const { page } = ctx;
 
         await page.goto("https://sfbay.craigslist.org/search/zip");
@@ -80,7 +85,7 @@ One-shot generation is the fastest way to go from an idea to a working automatio
     ```
 
     Things to check:
-    - **Output type** matches what you asked for
+    - **Input/output schemas** match what you asked for
     - **Selectors** look reasonable (class names, data attributes, or ARIA roles, not brittle positional selectors)
     - **Pagination** logic is present if you asked for more items than fit on one page
 

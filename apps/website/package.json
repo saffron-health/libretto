@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vp dev",
+    "brand-kit": "vp dev --host 0.0.0.0 --port 5174",
     "build": "tsc --noEmit && vp build",
     "type-check": "tsc --noEmit",
     "preview": "vp preview",

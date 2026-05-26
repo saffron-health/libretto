@@ -45,7 +45,7 @@ This scaffolds a package, installs dependencies, runs setup, and downloads Chrom
 From the existing package directory, add Libretto as a dependency and run setup:
 
 ```bash theme={null}
-npm install libretto
+npm install libretto zod
 npx libretto setup
 ```
 
@@ -58,14 +58,24 @@ Create `src/workflows/scrape-page.ts` in the package you set up:
 
 ```ts src/workflows/scrape-page.ts
 import { workflow } from "libretto";
+import { z } from "zod";
 
-export default workflow("scrape-page", async ({ page }) => {
-  await page.goto("https://example.com");
-  const title = await page.title();
-  console.log(`Page title: ${title}`);
+export default workflow(
+  "scrape-page",
+  {
+    input: z.object({}),
+    output: z.object({
+      title: z.string(),
+    }),
+  },
+  async ({ page }) => {
+    await page.goto("https://example.com");
+    const title = await page.title();
+    console.log(`Page title: ${title}`);
 
-  return { title };
-});
+    return { title };
+  },
+);
 ```
 
 Run it headless:

@@ -11,20 +11,25 @@ Most real automation targets sit behind a login. There are two patterns for gett
 
 ### Passing credentials into a workflow
 
-Workflows receive a typed `input` object. Credentials are just fields on that input, and your Playwright code fills them into the page the same way it fills any other form. If the site also requires a TOTP (Google Authenticator style) code, store the **shared secret** alongside the other credentials and derive a fresh code each run with a library like [`otplib`](https://www.npmjs.com/package/otplib):
+Workflows receive a typed `input` object inferred from the workflow's Zod input schema. Credentials are just fields on that input, and your Playwright code fills them into the page the same way it fills any other form. If the site also requires a TOTP (Google Authenticator style) code, store the **shared secret** alongside the other credentials and derive a fresh code each run with a library like [`otplib`](https://www.npmjs.com/package/otplib):
 
 ```typescript theme={null}
 import { authenticator } from "otplib";
 import { workflow } from "libretto";
+import { z } from "zod";
 
-type Input = {
-  username: string;
-  password: string;
-  totpSecret: string;
-};
-
-export const main = workflow<Input, { success: boolean }>(
+export const main = workflow(
   "portal-login",
+  {
+    input: z.object({
+      username: z.string(),
+      password: z.string(),
+      totpSecret: z.string(),
+    }),
+    output: z.object({
+      success: z.boolean(),
+    }),
+  },
   async (ctx, input) => {
     const { page } = ctx;
 
@@ -48,7 +53,7 @@ Invoke the workflow with credentials sourced from your environment:
 
 ```bash theme={null}
 npx libretto run ./portal-login.ts \
-  --input '{"username":"'"$PORTAL_USERNAME"'","password":"'"$PORTAL_PASSWORD"'","totpSecret":"'"$PORTAL_TOTP_SECRET"'"}'
+  --params '{"username":"'"$PORTAL_USERNAME"'","password":"'"$PORTAL_PASSWORD"'","totpSecret":"'"$PORTAL_TOTP_SECRET"'"}'
 ```
 
 <Warning>

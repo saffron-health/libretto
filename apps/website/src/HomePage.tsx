@@ -23,19 +23,7 @@ import { MaintainingFeatures } from "./components/MaintainingFeatures";
 import { CloudProviders } from "./components/CloudProviders";
 import { FAQ } from "./components/FAQ";
 import { CTA } from "./components/CTA";
-
-function SectionDivider() {
-  return (
-    <div
-      className="relative h-8 w-full border-y border-rule"
-      style={{
-        background:
-          "repeating-linear-gradient(315deg, color-mix(in oklch, var(--color-green-9) 8%, transparent) 0, color-mix(in oklch, var(--color-green-9) 8%, transparent) 1px, transparent 0, transparent 50%)",
-        backgroundSize: "10px 10px",
-      }}
-    />
-  );
-}
+import { SectionDivider } from "./components/SectionDivider.js";
 
 function Hero({
   paneUnlocked,
@@ -110,6 +98,7 @@ function Hero({
             <AppLink
               href="/docs/get-started/quickstart"
               className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
+              data-fathom-event="Hero docs click"
             >
               go to docs
             </AppLink>
