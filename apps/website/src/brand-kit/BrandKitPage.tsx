@@ -7,6 +7,7 @@ import { Panel } from "../components/Panel.js";
 import { SectionDivider } from "../components/SectionDivider.js";
 import { Text } from "../components/Text.js";
 import { SolidIcosahedron } from "./SolidIcosahedron.js";
+import { SOLID_ICOSAHEDRON_ROTATION } from "./solidIcosahedronGeometry.mjs";
 
 type BrandTab = "logos" | "asciihedron" | "wordmark";
 type ThemeMode = "dark" | "light";
@@ -403,7 +404,9 @@ function RecordCanvasButton({
         const link = document.createElement("a");
         link.href = url;
         link.download = `libretto-canvas-animation.${extension}`;
+        document.body.append(link);
         link.click();
+        link.remove();
         URL.revokeObjectURL(url);
         stream.getTracks().forEach((track) => track.stop());
         setStatus("idle");
@@ -449,7 +452,7 @@ function LogosTab() {
     <BrandTabPanel
       kicker="Primary mark"
       title="Solid gold icosahedron logo"
-      description="Use this as the identity anchor. The still exports are posed at x=0, y=144, z=18."
+      description={`Use this as the identity anchor. The still exports are posed at x=${SOLID_ICOSAHEDRON_ROTATION.x}, y=${SOLID_ICOSAHEDRON_ROTATION.y}, z=${SOLID_ICOSAHEDRON_ROTATION.z}.`}
       still={showStill}
       onStillChange={setShowStill}
       preview={
@@ -470,7 +473,7 @@ function LogosTab() {
               <SolidIcosahedron
                 autoRotate
                 className="relative z-10 h-[420px] w-[420px]"
-                rotation={{ x: 0, y: 144, z: 18 }}
+                rotation={SOLID_ICOSAHEDRON_ROTATION}
                 style={{
                   filter:
                     "drop-shadow(0 0 20px color-mix(in oklch, var(--color-amber-bright) 55%, transparent)) drop-shadow(0 0 64px color-mix(in oklch, var(--color-amber-bright) 24%, transparent))",

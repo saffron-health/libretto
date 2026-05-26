@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import {
+  buildIcosahedronMesh,
+  multiply4,
+  rotateXMatrix,
+  rotateYMatrix,
+  rotateZMatrix,
+  scaleMatrix,
+  SOLID_ICOSAHEDRON_LIGHTING,
+  SOLID_ICOSAHEDRON_SCALE,
+} from "./solidIcosahedronGeometry.mjs";
+import type { SolidIcosahedronRotation, Vec3 } from "./solidIcosahedronGeometry.mjs";
 
-type Vec3 = [number, number, number];
-type Face = [number, number, number];
+export type { SolidIcosahedronRotation } from "./solidIcosahedronGeometry.mjs";
 
-export interface SolidIcosahedronRotation {
-  x: number;
-  y: number;
-  z: number;
+function glslVector([x, y, z]: Vec3) {
+  return `vec3(${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)})`;
 }
-
-const RADIANS = Math.PI / 180;
 
 const vertexShaderSource = `
   attribute vec3 aPosition;
@@ -46,42 +52,17 @@ const fragmentShaderSource = `
     vec3 viewDirection = normalize(vec3(0.0, 0.0, 5.0) - vPosition);
     vec3 halfwayDirection = normalize(lightDirection + viewDirection);
     float diffuse = max(dot(normal, lightDirection), 0.0);
-    float fill = max(dot(normal, normalize(vec3(-0.75, -0.45, 0.72))), 0.0) * uFillLight;
-    float accent = max(dot(normal, normalize(vec3(-0.95, 0.65, 0.18))), 0.0) * uAccentLight;
+    float fill = max(dot(normal, normalize(${glslVector(SOLID_ICOSAHEDRON_LIGHTING.fillDirection)})), 0.0) * uFillLight;
+    float accent = max(dot(normal, normalize(${glslVector(SOLID_ICOSAHEDRON_LIGHTING.accentDirection)})), 0.0) * uAccentLight;
     vec2 lightPlane = normalize(lightDirection.xy + vec2(0.0001));
     float positionRamp = dot(vPosition.xy, lightPlane) * 0.5;
     float fragmentLight = clamp(diffuse + fill + accent + positionRamp * uFaceGradient, 0.0, 1.0);
     float specular = pow(max(dot(normal, halfwayDirection), 0.0), uShininess);
     float light = clamp(uAmbient + fragmentLight * uDiffuse, 0.0, 1.0);
-    vec3 color = uBaseColor * light + vec3(1.0, 0.93, 0.72) * specular * uSpecular;
+    vec3 color = uBaseColor * light + ${glslVector(SOLID_ICOSAHEDRON_LIGHTING.highlightColor)} * specular * uSpecular;
     gl_FragColor = vec4(color, 1.0);
   }
 `;
-
-function normalize([x, y, z]: Vec3): Vec3 {
-  const length = Math.hypot(x, y, z) || 1;
-  return [x / length, y / length, z / length];
-}
-
-function subtract(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-}
-
-function cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
-}
-
-function dot(a: Vec3, b: Vec3) {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-function negate([x, y, z]: Vec3): Vec3 {
-  return [-x, -y, -z];
-}
 
 function compileShader(
   gl: WebGLRenderingContext,
@@ -123,117 +104,6 @@ function createProgram(gl: WebGLRenderingContext) {
   return program;
 }
 
-function buildIcosahedronMesh() {
-  const a = 1 / Math.sqrt(5);
-  const r = Math.sqrt(1 - a * a);
-  const vertices: Vec3[] = [[0, 1, 0]];
-
-  for (let i = 0; i < 5; i += 1) {
-    const t = (90 + i * 72) * RADIANS;
-    vertices.push([r * Math.cos(t), a, r * Math.sin(t)]);
-  }
-
-  for (let i = 0; i < 5; i += 1) {
-    const t = (126 + i * 72) * RADIANS;
-    vertices.push([r * Math.cos(t), -a, r * Math.sin(t)]);
-  }
-
-  vertices.push([0, -1, 0]);
-
-  const faces: Face[] = [];
-  for (let i = 0; i < 5; i += 1) {
-    const top = 1 + i;
-    const nextTop = 1 + ((i + 1) % 5);
-    const bottom = 6 + i;
-    const prevBottom = 6 + ((i + 4) % 5);
-    const nextBottom = 6 + ((i + 1) % 5);
-    faces.push(
-      [0, top, nextTop],
-      [top, nextTop, bottom],
-      [top, bottom, prevBottom],
-      [11, nextBottom, bottom],
-    );
-  }
-
-  const positions: number[] = [];
-  const normals: number[] = [];
-  for (const face of faces) {
-    const tri = face.map((index) => vertices[index]) as [Vec3, Vec3, Vec3];
-    const centroid = normalize([
-      (tri[0][0] + tri[1][0] + tri[2][0]) / 3,
-      (tri[0][1] + tri[1][1] + tri[2][1]) / 3,
-      (tri[0][2] + tri[1][2] + tri[2][2]) / 3,
-    ]);
-    let normal = normalize(cross(subtract(tri[1], tri[0]), subtract(tri[2], tri[0])));
-    if (dot(normal, centroid) < 0) {
-      normal = negate(normal);
-    }
-
-    for (const vertex of tri) {
-      positions.push(...vertex);
-      normals.push(...normal);
-    }
-  }
-
-  return {
-    normals: new Float32Array(normals),
-    positions: new Float32Array(positions),
-    vertexCount: positions.length / 3,
-  };
-}
-
-function multiply4(a: Float32Array, b: Float32Array) {
-  const out = new Float32Array(16);
-  for (let row = 0; row < 4; row += 1) {
-    for (let col = 0; col < 4; col += 1) {
-      out[col * 4 + row] =
-        a[row] * b[col * 4] +
-        a[4 + row] * b[col * 4 + 1] +
-        a[8 + row] * b[col * 4 + 2] +
-        a[12 + row] * b[col * 4 + 3];
-    }
-  }
-  return out;
-}
-
-function scaleMatrix(value: number) {
-  return new Float32Array([
-    value,
-    0,
-    0,
-    0,
-    0,
-    value,
-    0,
-    0,
-    0,
-    0,
-    value,
-    0,
-    0,
-    0,
-    0,
-    1,
-  ]);
-}
-
-function rotateXMatrix(degrees: number) {
-  const c = Math.cos(degrees * RADIANS);
-  const s = Math.sin(degrees * RADIANS);
-  return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]);
-}
-
-function rotateYMatrix(degrees: number) {
-  const c = Math.cos(degrees * RADIANS);
-  const s = Math.sin(degrees * RADIANS);
-  return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
-}
-
-function rotateZMatrix(degrees: number) {
-  const c = Math.cos(degrees * RADIANS);
-  const s = Math.sin(degrees * RADIANS);
-  return new Float32Array([c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-}
 
 function ortho(
   left: number,
@@ -366,7 +236,10 @@ export function SolidIcosahedron({
           rotateZMatrix(currentRotation.z),
           multiply4(
             rotateYMatrix(yRotation),
-            multiply4(rotateXMatrix(currentRotation.x), scaleMatrix(0.98)),
+            multiply4(
+              rotateXMatrix(currentRotation.x),
+              scaleMatrix(SOLID_ICOSAHEDRON_SCALE),
+            ),
           ),
         );
 
@@ -401,15 +274,42 @@ export function SolidIcosahedron({
         );
         context.uniformMatrix4fv(locations.model, false, model);
         context.uniformMatrix4fv(locations.projection, false, projection);
-        context.uniform3f(locations.baseColor, 1.0, 0.79, 0.14);
-        context.uniform3f(locations.lightDirection, 0.82, 0.79, 0.46);
-        context.uniform1f(locations.fillLight, 0.25);
-        context.uniform1f(locations.accentLight, 0.2);
-        context.uniform1f(locations.ambient, 0.36);
-        context.uniform1f(locations.diffuse, 1.08);
-        context.uniform1f(locations.specular, 0.62);
-        context.uniform1f(locations.shininess, 23);
-        context.uniform1f(locations.faceGradient, 0.36);
+        context.uniform3f(
+          locations.baseColor,
+          ...SOLID_ICOSAHEDRON_LIGHTING.baseColor,
+        );
+        context.uniform3f(
+          locations.lightDirection,
+          ...SOLID_ICOSAHEDRON_LIGHTING.lightDirection,
+        );
+        context.uniform1f(
+          locations.fillLight,
+          SOLID_ICOSAHEDRON_LIGHTING.fillLight,
+        );
+        context.uniform1f(
+          locations.accentLight,
+          SOLID_ICOSAHEDRON_LIGHTING.accentLight,
+        );
+        context.uniform1f(
+          locations.ambient,
+          SOLID_ICOSAHEDRON_LIGHTING.ambient,
+        );
+        context.uniform1f(
+          locations.diffuse,
+          SOLID_ICOSAHEDRON_LIGHTING.diffuse,
+        );
+        context.uniform1f(
+          locations.specular,
+          SOLID_ICOSAHEDRON_LIGHTING.specular,
+        );
+        context.uniform1f(
+          locations.shininess,
+          SOLID_ICOSAHEDRON_LIGHTING.shininess,
+        );
+        context.uniform1f(
+          locations.faceGradient,
+          SOLID_ICOSAHEDRON_LIGHTING.faceGradient,
+        );
         context.drawArrays(context.TRIANGLES, 0, mesh.vertexCount);
 
         frameId = requestAnimationFrame(render);
