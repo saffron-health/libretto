@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="{{LIBRETTO_PATH_PREFIX}}assets/readme-banner.png" alt="Libretto" />
+</p>
+
 # Libretto
 
 [![npm version](https://img.shields.io/npm/v/libretto)](https://www.npmjs.com/package/libretto)
