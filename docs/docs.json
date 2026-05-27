@@ -8,10 +8,13 @@
     "dark": "#067a22"
   },
   "icons": { "library": "lucide" },
-  "favicon": "/favicon.svg",
+  "favicon": {
+    "light": "/brand-kit/logos/libretto-icosahedron-light.svg",
+    "dark": "/brand-kit/logos/libretto-icosahedron-dark.svg"
+  },
   "logo": {
-    "light": "/favicon.svg",
-    "dark": "/favicon.svg",
+    "light": "/brand-kit/logos/libretto-icosahedron-light.svg",
+    "dark": "/brand-kit/logos/libretto-icosahedron-dark.svg",
     "href": "https://libretto.sh",
     "text": "Libretto"
   },
