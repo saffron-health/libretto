@@ -2087,6 +2087,11 @@ async function run(options: CliOptions): Promise<number> {
   }
   preflightRequiredProfiles(selectedCases);
   validateCachedAgentSelection(options.agents);
+  if (options.gcp && options.repeatCount !== 1) {
+    throw new Error(
+      "--repeat-count is not supported with --gcp yet. Run separate Cloud Run evals instead.",
+    );
+  }
   if (!options.gcp) {
     ensureEvalModelCredentials(options.model);
   }
