@@ -16,3 +16,4 @@ tmp/
 .fallow/
 .worktrees/*
 !.worktrees/config.json
+.vercel
