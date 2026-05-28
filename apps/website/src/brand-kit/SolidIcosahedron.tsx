@@ -459,7 +459,7 @@ export function SolidIcosahedron({
   if (!hasWebGL) {
     return (
       <img
-        src="/brand-kit/logos/libretto-icosahedron-yellow.svg"
+        src="/logos/logo-dark.svg"
         alt="Solid gold icosahedron logo"
         className={className}
         style={style}

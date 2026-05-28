@@ -110,52 +110,16 @@ const rotationAxes: { id: RotationAxis; label: string }[] = [
 
 const logoStillAssets: DownloadAsset[] = [
   {
-    label: "SVG",
-    detail: "Vector, transparent",
-    href: "/brand-kit/logos/libretto-icosahedron-yellow.svg",
-    download: "libretto-icosahedron-yellow.svg",
+    label: "Light SVG",
+    detail: "Light mode vector",
+    href: "/logos/logo-light.svg",
+    download: "logo-light.svg",
   },
   {
-    label: "PNG 1024",
-    detail: "Primary raster",
-    href: "/brand-kit/logos/libretto-icosahedron-yellow-1024.png",
-    download: "libretto-icosahedron-yellow-1024.png",
-  },
-  {
-    label: "PNG 512",
-    detail: "App/site logo",
-    href: "/brand-kit/logos/libretto-icosahedron-yellow-512.png",
-    download: "libretto-icosahedron-yellow-512.png",
-  },
-  {
-    label: "PNG 256",
-    detail: "Profile/avatar",
-    href: "/brand-kit/logos/libretto-icosahedron-yellow-256.png",
-    download: "libretto-icosahedron-yellow-256.png",
-  },
-  {
-    label: "PNG 128",
-    detail: "Small UI mark",
-    href: "/brand-kit/logos/libretto-icosahedron-yellow-128.png",
-    download: "libretto-icosahedron-yellow-128.png",
-  },
-  {
-    label: "PNG 64",
-    detail: "Icon slot",
-    href: "/brand-kit/logos/libretto-icosahedron-yellow-64.png",
-    download: "libretto-icosahedron-yellow-64.png",
-  },
-  {
-    label: "PNG 32",
-    detail: "Favicon-sized",
-    href: "/brand-kit/logos/libretto-icosahedron-yellow-32.png",
-    download: "libretto-icosahedron-yellow-32.png",
-  },
-  {
-    label: "WebP",
-    detail: "Compressed web still",
-    href: "/brand-kit/logos/libretto-icosahedron-yellow-1024.webp",
-    download: "libretto-icosahedron-yellow-1024.webp",
+    label: "Dark SVG",
+    detail: "Dark mode vector",
+    href: "/logos/logo-dark.svg",
+    download: "logo-dark.svg",
   },
 ];
 
@@ -361,8 +325,7 @@ const ogImageAsset: ImageAsset = {
   height: 630,
 };
 
-const socialLogoHref = "/brand-kit/logos/libretto-icosahedron-yellow.svg";
-const socialAsciihedronHref = "/brand-kit/logos/libretto-asciihedron-still.png";
+const socialLogoHref = "/logos/logo-dark.svg";
 const socialHeadline = "DON'T MAKE BROWSER AGENTS DO A SCRIPT'S JOB";
 const socialHeadlineAscii = createCompactAscii(socialHeadline);
 const socialProfileLogoScale: Record<SocialPlatformId, number> = {
@@ -823,7 +786,6 @@ async function drawSocialBanner(
   context: CanvasRenderingContext2D,
   asset: SocialAsset,
 ) {
-  const asciihedron = await loadSocialImage(socialAsciihedronHref);
   const oneLine = asset.platformId === "reddit" || asset.platformId === "linkedin";
   const square = asset.width === asset.height;
   fillSocialBackground(
@@ -846,17 +808,13 @@ async function drawSocialBanner(
       : asset.width * 0.64;
   const asciihedronCenterY = asset.height / 2;
 
-  context.save();
-  context.globalAlpha = oneLine ? 0.28 : square ? 0.18 : 0.32;
-  context.filter = "brightness(1.35) contrast(1.08)";
-  context.drawImage(
-    asciihedron,
-    asciihedronCenterX - asciihedronSize / 2,
-    asciihedronCenterY - asciihedronSize / 2,
+  drawAsciihedronMotif(
+    context,
+    asciihedronCenterX,
+    asciihedronCenterY,
     asciihedronSize,
-    asciihedronSize,
+    oneLine ? 0.28 : square ? 0.18 : 0.32,
   );
-  context.restore();
 
   const lines = socialHeadlineAscii.split("\n");
   const maxWidth = oneLine ? asset.width * 0.94 : asset.width * (square ? 0.86 : 0.56);
@@ -877,6 +835,133 @@ async function drawSocialBanner(
     context.fillText(line, x, y + index * lineHeight);
   });
   context.restore();
+}
+
+function drawAsciihedronMotif(
+  context: CanvasRenderingContext2D,
+  centerX: number,
+  centerY: number,
+  size: number,
+  alpha: number,
+) {
+  const vertices = createProjectedIcosahedronVertices(size);
+  const edges = createIcosahedronEdges();
+  const shades = ".,-~:;=!*#$@";
+  const fontSize = Math.max(5, size * 0.019);
+
+  context.save();
+  context.translate(centerX, centerY);
+  context.globalAlpha = alpha;
+  context.fillStyle = "#f0cf5a";
+  context.font = `600 ${fontSize}px "Commit Mono", ui-monospace, monospace`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.shadowBlur = Math.max(8, fontSize * 1.7);
+  context.shadowColor = "rgba(240, 207, 90, 0.34)";
+
+  for (const [startIndex, endIndex] of edges) {
+    const start = vertices[startIndex];
+    const end = vertices[endIndex];
+    const distance = Math.hypot(end.x - start.x, end.y - start.y);
+    const steps = Math.max(4, Math.floor(distance / (fontSize * 0.9)));
+    for (let step = 0; step <= steps; step += 1) {
+      const amount = step / steps;
+      const x = start.x + (end.x - start.x) * amount;
+      const y = start.y + (end.y - start.y) * amount;
+      const shadeIndex = Math.min(
+        shades.length - 1,
+        Math.max(0, Math.round((start.depth + end.depth + 2) * 2.7 + step) % shades.length),
+      );
+      context.fillText(shades[shadeIndex], x, y);
+    }
+  }
+
+  for (const vertex of vertices) {
+    context.fillText("@", vertex.x, vertex.y);
+  }
+  context.restore();
+}
+
+function createProjectedIcosahedronVertices(size: number) {
+  const ringY = 1 / Math.sqrt(5);
+  const ringRadius = 2 / Math.sqrt(5);
+  const vertices: [number, number, number][] = [[0, 1, 0]];
+  for (let index = 0; index < 5; index += 1) {
+    const angle = (index * Math.PI * 2) / 5;
+    vertices.push([
+      ringRadius * Math.sin(angle),
+      ringY,
+      ringRadius * Math.cos(angle),
+    ]);
+  }
+  for (let index = 0; index < 5; index += 1) {
+    const angle = (index * Math.PI * 2) / 5 + Math.PI / 5;
+    vertices.push([
+      ringRadius * Math.sin(angle),
+      -ringY,
+      ringRadius * Math.cos(angle),
+    ]);
+  }
+  vertices.push([0, -1, 0]);
+
+  return vertices.map((vertex) => {
+    const [x, y, z] = rotateSocialPoint(
+      vertex,
+      SOLID_ICOSAHEDRON_ROTATION.x,
+      SOLID_ICOSAHEDRON_ROTATION.y,
+      SOLID_ICOSAHEDRON_ROTATION.z,
+    );
+    return {
+      depth: z,
+      x: x * size * 0.34,
+      y: -y * size * 0.34,
+    };
+  });
+}
+
+function createIcosahedronEdges() {
+  const edges = new Set<string>();
+  const faces = [
+    [0, 1, 2], [0, 2, 3], [0, 3, 4], [0, 4, 5], [0, 5, 1],
+    [1, 6, 2], [2, 6, 7], [2, 7, 3], [3, 7, 8], [3, 8, 4],
+    [4, 8, 9], [4, 9, 5], [5, 9, 10], [5, 10, 1], [1, 10, 6],
+    [11, 7, 6], [11, 8, 7], [11, 9, 8], [11, 10, 9], [11, 6, 10],
+  ];
+
+  for (const face of faces) {
+    for (let index = 0; index < face.length; index += 1) {
+      const start = face[index];
+      const end = face[(index + 1) % face.length];
+      edges.add(start < end ? `${start},${end}` : `${end},${start}`);
+    }
+  }
+  return Array.from(edges, (edge) => edge.split(",").map(Number) as [number, number]);
+}
+
+function rotateSocialPoint(
+  point: [number, number, number],
+  xDegrees: number,
+  yDegrees: number,
+  zDegrees: number,
+): [number, number, number] {
+  const xRadians = (xDegrees * Math.PI) / 180;
+  const yRadians = (yDegrees * Math.PI) / 180;
+  const zRadians = (zDegrees * Math.PI) / 180;
+  const afterX: [number, number, number] = [
+    point[0],
+    point[1] * Math.cos(xRadians) - point[2] * Math.sin(xRadians),
+    point[1] * Math.sin(xRadians) + point[2] * Math.cos(xRadians),
+  ];
+  const afterY: [number, number, number] = [
+    afterX[0] * Math.cos(yRadians) + afterX[2] * Math.sin(yRadians),
+    afterX[1],
+    -afterX[0] * Math.sin(yRadians) + afterX[2] * Math.cos(yRadians),
+  ];
+  return [
+    afterY[0] * Math.cos(zRadians) - afterY[1] * Math.sin(zRadians),
+    afterY[0] * Math.sin(zRadians) + afterY[1] * Math.cos(zRadians),
+    afterY[2],
+  ];
 }
 
 function fillSocialBackground(
@@ -1304,17 +1389,23 @@ function SocialBannerArt({
         ...style,
       }}
     >
-      <img
-        src={socialAsciihedronHref}
-        alt=""
-        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 object-contain brightness-125 contrast-110"
+      <div
+        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
         style={{
           height: asciihedronSize,
           left: asciihedronLeft,
           opacity: asciihedronOpacity,
           width: asciihedronSize,
         }}
-      />
+      >
+        <CanvasAsciihedron
+          showAnnotations={false}
+          objectScale={1.18}
+          spinSpeed={0}
+          baseOpacity={0.16}
+          className="h-full w-full text-[#f0cf5a] brightness-125 contrast-110"
+        />
+      </div>
       <pre
         aria-label={socialHeadline}
         className={`absolute m-0 whitespace-pre font-mono font-semibold leading-none text-[#f0cf5a] ${
