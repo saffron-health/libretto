@@ -2,6 +2,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  type RefObject,
   useRef,
   useState,
 } from "react";
@@ -14,6 +15,11 @@ import { ArrowRightIcon } from "../icons/ArrowRightIcon";
 
 type Vec3 = [number, number, number];
 type Face = [number, number, number];
+export type AsciihedronRotation = {
+  x: number;
+  y: number;
+  z: number;
+};
 type Edge = {
   a: number;
   b: number;
@@ -56,8 +62,10 @@ type CanvasAsciihedronProps = {
   showAnnotations?: boolean;
   objectScale?: number;
   spinSpeed?: number;
-  initialAngle?: number;
+  rotation?: AsciihedronRotation;
   baseOpacity?: number;
+  flatOpacity?: boolean;
+  canvasRef?: RefObject<HTMLCanvasElement | null>;
 };
 
 const COLS = 160;
@@ -76,11 +84,14 @@ const SHADE_CHARACTER_GROUPS = [
 const FULL_TURN = Math.PI * 2;
 const CAMERA_DISTANCE = 4.4;
 const ZOOM = 190;
-const TILT_X = 0;
-const TILT_Z = Math.PI / 9;
 const SPIN_SPEED = 0.00036;
 const LIGHT_DIRECTION = normalize([0, 0.85, 0.65]);
 const FACE_BORDER_BOOST = 1;
+const DEFAULT_ASCIIHEDRON_ROTATION: AsciihedronRotation = {
+  x: 10,
+  y: 144,
+  z: 25,
+};
 
 const POINTER_POSITION_LERP = 0.14;
 const POINTER_VELOCITY_LERP = 0.18;
@@ -93,8 +104,6 @@ const VERTICES = createVertices();
 const FACES = orientFaces(createFaces(), VERTICES);
 const EDGES = createEdges(FACES);
 const FACE_TEXTURE_GROUPS = assignFaceTextureGroups(FACES.length, EDGES);
-const SPIN_AXIS = normalize(applyFixedTilt([0, 1, 0]));
-const TILTED_VERTICES = VERTICES.map((vertex) => applyFixedTilt(vertex));
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -145,6 +154,13 @@ function rotateX([x, y, z]: Vec3, angle: number): Vec3 {
   return [x, y * cosine - z * sine, y * sine + z * cosine];
 }
 
+function rotateY([x, y, z]: Vec3, angle: number): Vec3 {
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+
+  return [x * cosine + z * sine, y, -x * sine + z * cosine];
+}
+
 function rotateZ([x, y, z]: Vec3, angle: number): Vec3 {
   const cosine = Math.cos(angle);
   const sine = Math.sin(angle);
@@ -172,8 +188,21 @@ function rotateAroundAxis(point: Vec3, axis: Vec3, angle: number): Vec3 {
   ];
 }
 
-function applyFixedTilt(vertex: Vec3): Vec3 {
-  return rotateZ(rotateX(vertex, TILT_X), TILT_Z);
+function degreesToRadians(degrees: number) {
+  return (degrees * Math.PI) / 180;
+}
+
+function applyRotation(
+  vertex: Vec3,
+  rotation: AsciihedronRotation,
+): Vec3 {
+  return rotateZ(
+    rotateY(
+      rotateX(vertex, degreesToRadians(rotation.x)),
+      degreesToRadians(rotation.y),
+    ),
+    degreesToRadians(rotation.z),
+  );
 }
 
 function edgeFunction(
@@ -660,11 +689,13 @@ export function KonamiOverlay({
 }
 
 export function CanvasAsciihedron({
+  canvasRef: canvasRefProp,
   className = "",
+  flatOpacity = false,
   showAnnotations = true,
   objectScale = 1,
   spinSpeed: spinSpeedProp,
-  initialAngle: initialAngleProp,
+  rotation: rotationProp,
   baseOpacity: baseOpacityProp,
   paneUnlocked = false,
   onClosePane,
@@ -673,11 +704,13 @@ export function CanvasAsciihedron({
   onClosePane?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const localCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = canvasRefProp ?? localCanvasRef;
 
   useEffect(() => {
     const container = containerRef.current;
     const canvas = canvasRef.current;
+    const rotation = rotationProp ?? DEFAULT_ASCIIHEDRON_ROTATION;
 
     if (!container || !canvas) {
       return;
@@ -710,13 +743,13 @@ export function CanvasAsciihedron({
     let devicePixelRatio = 1;
     let frameId = 0;
     let previousTime = 0;
-    let angle = initialAngleProp ?? Math.PI / 10;
+    let angle = 0;
     let lastPointerX = 0;
     let lastPointerY = 0;
     let lastPointerTime = 0;
     let hasPointerHistory = false;
     let lastWakeTime = 0;
-    let glyphColor = "rgb(0, 0, 0)";
+    let glyphColor = "";
     let glyphR = 0;
     let glyphG = 0;
     let glyphB = 0;
@@ -743,7 +776,10 @@ export function CanvasAsciihedron({
       wakeLifeRandom: 480,
       wakeSpawnInterval: 22,
       maxParticles: MAX_PARTICLES,
+      flatOpacity,
     };
+    const baseVertices = VERTICES.map((vertex) => applyRotation(vertex, rotation));
+    const spinAxis = normalize(applyRotation([0, 1, 0], rotation));
 
     let paneContainer: HTMLDivElement | null = null;
     if (paneUnlocked) {
@@ -882,6 +918,23 @@ export function CanvasAsciihedron({
       step: 1,
     });
 
+    const updateGlyphColor = () => {
+      const nextGlyphColor = getComputedStyle(container).color || "rgb(0, 0, 0)";
+      if (nextGlyphColor === glyphColor) {
+        return;
+      }
+
+      glyphColor = nextGlyphColor;
+      // Resolve to RGB for alpha blending
+      context.fillStyle = glyphColor;
+      context.fillRect(0, 0, 1, 1);
+      const pixel = context.getImageData(0, 0, 1, 1).data;
+      glyphR = pixel[0];
+      glyphG = pixel[1];
+      glyphB = pixel[2];
+      context.clearRect(0, 0, 1, 1);
+    };
+
     const resize = () => {
       const bounds = container.getBoundingClientRect();
       width = Math.max(1, bounds.width);
@@ -893,15 +946,8 @@ export function CanvasAsciihedron({
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      glyphColor = getComputedStyle(container).color || "rgb(0, 0, 0)";
-      // Resolve to RGB for alpha blending
-      context.fillStyle = glyphColor;
-      context.fillRect(0, 0, 1, 1);
-      const pixel = context.getImageData(0, 0, 1, 1).data;
-      glyphR = pixel[0];
-      glyphG = pixel[1];
-      glyphB = pixel[2];
-      context.clearRect(0, 0, 1, 1);
+      glyphColor = "";
+      updateGlyphColor();
     };
 
     const deactivatePointer = () => {
@@ -1013,6 +1059,7 @@ export function CanvasAsciihedron({
         }
       }
 
+      updateGlyphColor();
       context.clearRect(0, 0, width, height);
 
       zBuffer.fill(-Infinity);
@@ -1025,8 +1072,8 @@ export function CanvasAsciihedron({
       let projectedMinY = ROWS;
       let projectedMaxY = 0;
 
-      for (let index = 0; index < TILTED_VERTICES.length; index += 1) {
-        const spun = rotateAroundAxis(TILTED_VERTICES[index], SPIN_AXIS, angle);
+      for (let index = 0; index < baseVertices.length; index += 1) {
+        const spun = rotateAroundAxis(baseVertices[index], spinAxis, angle);
         const projected = projectVertex(
           spun,
           params.cameraDistance,
@@ -1239,7 +1286,9 @@ export function CanvasAsciihedron({
           const baseY = gridOffsetY + (row + 0.5) * cellHeight;
           // Closer (higher invDepth) → stronger, further → weaker
           const depthT = (zBuffer[index] - depthMin) / depthRange;
-          const depthAlpha = BASE_OPACITY * (params.depthMin + (params.depthMax - params.depthMin) * depthT);
+          const depthAlpha = params.flatOpacity
+            ? 1
+            : BASE_OPACITY * (params.depthMin + (params.depthMax - params.depthMin) * depthT);
           context.fillStyle = `rgba(${glyphR}, ${glyphG}, ${glyphB}, ${depthAlpha})`;
           const char = getShadeCharacter(shadeIndex, owner);
           context.fillText(char, baseX / glyphScaleX, baseY);
@@ -1274,7 +1323,9 @@ export function CanvasAsciihedron({
           } else {
             // Closer (higher invDepth) → darker/more opaque
             const depthT = (zBuffer[index] - depthMin) / depthRange;
-            const depthAlpha = BASE_OPACITY * (params.depthMin + (params.depthMax - params.depthMin) * depthT);
+            const depthAlpha = params.flatOpacity
+              ? 1
+              : BASE_OPACITY * (params.depthMin + (params.depthMax - params.depthMin) * depthT);
             context.fillStyle = `rgba(${glyphR}, ${glyphG}, ${glyphB}, ${depthAlpha})`;
             const char = getShadeCharacter(shadeIndex, owner);
             context.fillText(char, baseX / glyphScaleX, baseY);
@@ -1313,7 +1364,15 @@ export function CanvasAsciihedron({
       window.removeEventListener("mouseout", handleWindowMouseOut);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [objectScale, spinSpeedProp, initialAngleProp, baseOpacityProp, paneUnlocked, onClosePane]);
+  }, [
+    objectScale,
+    spinSpeedProp,
+    rotationProp,
+    baseOpacityProp,
+    flatOpacity,
+    paneUnlocked,
+    onClosePane,
+  ]);
 
   return (
     <div ref={containerRef} className={`relative overflow-hidden ${className}`}>

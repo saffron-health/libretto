@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <title>Libretto logo for dark mode</title>
+  <g>
+  <polygon points="287.37,455.50 657.28,327.11 583.50,711.26" fill="rgb(87 75 33)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="287.37,455.50 583.50,711.26 272.09,785.12" fill="rgb(86 75 32)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="657.28,327.11 870.61,577.38 583.50,711.26" fill="rgb(125 108 47)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 287.37,455.50 657.28,327.11" fill="rgb(123 106 46)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 583.50,711.26 272.09,785.12" fill="rgb(86 75 32)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 870.61,577.38 583.50,711.26" fill="rgb(86 75 32)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="153.39,446.62 287.37,455.50 272.09,785.12" fill="rgb(120 103 45)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="657.28,327.11 751.91,238.88 870.61,577.38" fill="rgb(240 207 90)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 153.39,446.62 287.37,455.50" fill="rgb(133 115 50)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 657.28,327.11 751.91,238.88" fill="rgb(240 207 90)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 272.09,785.12 366.72,696.89" fill="rgb(104 90 39)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 736.63,568.50 870.61,577.38" fill="rgb(172 148 64)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="153.39,446.62 272.09,785.12 366.72,696.89" fill="rgb(139 120 52)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="751.91,238.88 736.63,568.50 870.61,577.38" fill="rgb(240 207 90)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 440.50,312.74 153.39,446.62" fill="rgb(205 177 77)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 751.91,238.88 440.50,312.74" fill="rgb(240 207 90)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 366.72,696.89 736.63,568.50" fill="rgb(112 97 42)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="440.50,312.74 153.39,446.62 366.72,696.89" fill="rgb(164 142 62)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="751.91,238.88 440.50,312.74 736.63,568.50" fill="rgb(255 255 181)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="440.50,312.74 366.72,696.89 736.63,568.50" fill="rgb(226 195 85)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  </g>
+</svg>
