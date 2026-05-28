@@ -334,7 +334,6 @@ function OgArtwork({
           showAnnotations={false}
           objectScale={1.2}
           spinSpeed={0}
-          initialAngle={Math.PI * 0.85}
           baseOpacity={1}
         />
       </div>

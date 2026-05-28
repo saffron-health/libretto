@@ -1,25 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
   <title>Libretto solid gold icosahedron mark</title>
   <g>
-  <polygon points="274.34,414.11 646.74,293.11 563.46,670.39" fill="rgb(95 75 13)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="646.74,293.11 864.74,572.50 563.46,670.39" fill="rgb(138 109 19)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="274.34,414.11 563.46,670.39 262.19,768.28" fill="rgb(92 73 13)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="396.92,157.83 274.34,414.11 646.74,293.11" fill="rgb(160 127 22)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="627.08,866.17 864.74,572.50 563.46,670.39" fill="rgb(92 73 13)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="627.08,866.17 563.46,670.39 262.19,768.28" fill="rgb(92 73 13)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="646.74,293.11 761.81,255.72 864.74,572.50" fill="rgb(255 201 36)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="159.26,451.50 274.34,414.11 262.19,768.28" fill="rgb(132 104 18)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="396.92,157.83 646.74,293.11 761.81,255.72" fill="rgb(255 201 36)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="396.92,157.83 159.26,451.50 274.34,414.11" fill="rgb(149 118 21)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="627.08,866.17 749.66,609.89 864.74,572.50" fill="rgb(162 128 23)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="627.08,866.17 262.19,768.28 377.26,730.89" fill="rgb(106 84 15)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="761.81,255.72 749.66,609.89 864.74,572.50" fill="rgb(255 201 36)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="159.26,451.50 262.19,768.28 377.26,730.89" fill="rgb(146 115 20)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="396.92,157.83 761.81,255.72 460.54,353.61" fill="rgb(255 202 36)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="396.92,157.83 460.54,353.61 159.26,451.50" fill="rgb(231 183 32)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="627.08,866.17 377.26,730.89 749.66,609.89" fill="rgb(114 90 16)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="761.81,255.72 460.54,353.61 749.66,609.89" fill="rgb(255 255 126)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="460.54,353.61 159.26,451.50 377.26,730.89" fill="rgb(171 135 24)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
-  <polygon points="460.54,353.61 377.26,730.89 749.66,609.89" fill="rgb(215 170 30)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="287.37,455.50 657.28,327.11 583.50,711.26" fill="rgb(91 67 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="287.37,455.50 583.50,711.26 272.09,785.12" fill="rgb(90 66 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="657.28,327.11 870.61,577.38 583.50,711.26" fill="rgb(130 95 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 287.37,455.50 657.28,327.11" fill="rgb(128 94 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 583.50,711.26 272.09,785.12" fill="rgb(90 66 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 870.61,577.38 583.50,711.26" fill="rgb(90 66 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="153.39,446.62 287.37,455.50 272.09,785.12" fill="rgb(124 91 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="657.28,327.11 751.91,238.88 870.61,577.38" fill="rgb(249 183 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 153.39,446.62 287.37,455.50" fill="rgb(138 102 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 657.28,327.11 751.91,238.88" fill="rgb(249 183 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 272.09,785.12 366.72,696.89" fill="rgb(108 79 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 736.63,568.50 870.61,577.38" fill="rgb(178 131 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="153.39,446.62 272.09,785.12 366.72,696.89" fill="rgb(144 106 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="751.91,238.88 736.63,568.50 870.61,577.38" fill="rgb(249 183 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 440.50,312.74 153.39,446.62" fill="rgb(213 156 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="391.46,163.55 751.91,238.88 440.50,312.74" fill="rgb(249 183 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="632.54,860.45 366.72,696.89 736.63,568.50" fill="rgb(117 86 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="440.50,312.74 153.39,446.62 366.72,696.89" fill="rgb(171 125 0)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="751.91,238.88 440.50,312.74 736.63,568.50" fill="rgb(255 255 78)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
+  <polygon points="440.50,312.74 366.72,696.89 736.63,568.50" fill="rgb(234 172 1)" stroke="rgb(255 219 95)" stroke-opacity="0.08" stroke-width="1"/>
   </g>
 </svg>
