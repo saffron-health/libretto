@@ -1,5 +1,9 @@
 <!-- Generated from packages/libretto/README.template.md by `pnpm sync:mirrors`. Do not edit directly. -->
 
+<p align="center">
+  <img src="assets/readme-banner.png" alt="Libretto" />
+</p>
+
 # Libretto
 
 [![npm version](https://img.shields.io/npm/v/libretto)](https://www.npmjs.com/package/libretto)
