@@ -17,9 +17,16 @@ const EvalCloudTargetSchema = z.object({
   file: z.string(),
 });
 
+const EvalCloudExecutionNamesSchema = z.object({
+  workflowGeneration: z.string().optional(),
+  independent: z.string().optional(),
+  cached: z.string().optional(),
+});
+
 const EvalCloudManifestSchema = z.object({
   runId: z.string(),
   executionName: z.string(),
+  executionNames: EvalCloudExecutionNamesSchema.optional(),
   totalCases: z.number().int().nonnegative(),
   model: z.string(),
   browserProvider: z.string(),
@@ -62,6 +69,7 @@ const EvalCloudResultSchema = z.object({
 });
 
 export type EvalCloudTarget = z.infer<typeof EvalCloudTargetSchema>;
+export type EvalCloudExecutionNames = z.infer<typeof EvalCloudExecutionNamesSchema>;
 export type EvalCloudManifest = z.infer<typeof EvalCloudManifestSchema>;
 export type EvalCloudResult = z.infer<typeof EvalCloudResultSchema>;
 
@@ -152,6 +160,23 @@ export async function updateManifestExecutionName(
 ): Promise<void> {
   const manifest = await readManifest(bucket, runId);
   await writeManifest(bucket, runId, { ...manifest, executionName });
+}
+
+export async function updateManifestExecutionNames(
+  bucket: Bucket,
+  runId: string,
+  executionNames: Partial<EvalCloudExecutionNames>,
+  executionName: string,
+): Promise<void> {
+  const manifest = await readManifest(bucket, runId);
+  await writeManifest(bucket, runId, {
+    ...manifest,
+    executionName,
+    executionNames: {
+      ...manifest.executionNames,
+      ...executionNames,
+    },
+  });
 }
 
 export async function listRunIds(bucket: Bucket): Promise<string[]> {

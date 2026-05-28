@@ -40,6 +40,9 @@ type BrowserUseRunnerOutput = {
   task?: unknown;
   model?: unknown;
   error?: unknown;
+  use_vision?: unknown;
+  step_observations?: unknown;
+  conversation_files?: unknown;
   history?: {
     final_result?: unknown;
     is_done?: unknown;
@@ -53,6 +56,7 @@ type BrowserUseRunnerOutput = {
     extracted_content?: unknown;
     errors?: unknown;
     usage?: unknown;
+    full_history?: unknown;
   } | null;
   usage_summary?: unknown;
 };
@@ -138,6 +142,7 @@ function transcriptFromBrowserUseOutput(output: BrowserUseRunnerOutput): string 
   const history = output.history;
   return [
     `BROWSER_USE_MODEL: ${typeof output.model === "string" ? output.model : "-"}`,
+    `USE_VISION: ${String(output.use_vision ?? "")}`,
     `FINAL_RESULT: ${String(history?.final_result ?? "")}`,
     `IS_DONE: ${String(history?.is_done ?? "")}`,
     `IS_SUCCESSFUL: ${String(history?.is_successful ?? "")}`,
@@ -158,6 +163,15 @@ function transcriptFromBrowserUseOutput(output: BrowserUseRunnerOutput): string 
     "",
     "ERRORS:",
     compactJson(history?.errors ?? []),
+    "",
+    "FULL_HISTORY:",
+    compactJson(history?.full_history ?? []),
+    "",
+    "STEP_OBSERVATIONS:",
+    compactJson(output.step_observations ?? []),
+    "",
+    "CONVERSATION_FILES:",
+    compactJson(output.conversation_files ?? []),
     output.error ? `\nERROR: ${String(output.error)}` : "",
   ]
     .join("\n")

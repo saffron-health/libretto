@@ -27,10 +27,12 @@ async function main(): Promise<void> {
 
   const bucket = createEvalsBucket();
   const manifest = await readManifest(bucket, runId);
-  const target = manifest.targets[taskIndex];
+  const targetIndices = parseTargetIndices();
+  const targetIndex = targetIndices?.[taskIndex] ?? taskIndex;
+  const target = manifest.targets[targetIndex];
   if (!target) {
     throw new Error(
-      `CLOUD_RUN_TASK_INDEX ${taskIndex} is out of range for ${manifest.targets.length} eval target(s).`,
+      `CLOUD_RUN_TASK_INDEX ${taskIndex} resolved to target index ${String(targetIndex)}, which is out of range for ${manifest.targets.length} eval target(s).`,
     );
   }
 
@@ -38,6 +40,7 @@ async function main(): Promise<void> {
   await mkdir(localRunDir, { recursive: true });
 
   if (target.agent === "libretto-cached") {
+    ensureCachedTargetHasGenerator(manifest.targets, target);
     await downloadGeneratedWorkflow(bucket, runId, target, localRunDir);
   }
 
@@ -67,6 +70,19 @@ async function main(): Promise<void> {
   if (exitCode !== 0) {
     throw new Error(`Eval target exited with status ${exitCode}.`);
   }
+}
+
+function parseTargetIndices(): number[] | null {
+  const raw = process.env.EVAL_TARGET_INDICES?.trim();
+  if (!raw) return null;
+  const parsed = JSON.parse(raw) as unknown;
+  if (
+    !Array.isArray(parsed) ||
+    parsed.some((item) => !Number.isInteger(item) || item < 0)
+  ) {
+    throw new Error("EVAL_TARGET_INDICES must be a JSON array of non-negative integers.");
+  }
+  return parsed as number[];
 }
 
 async function runEvalTarget(opts: {
@@ -100,6 +116,7 @@ async function runEvalTarget(opts: {
     ...process.env,
     BROWSER_USE_EVAL_PYTHON:
       process.env.BROWSER_USE_EVAL_PYTHON || "/opt/browser-use-venv/bin/python",
+    EVAL_TARGET_BASE_ID: opts.target.baseId,
   };
 
   return await new Promise<number>((resolvePromise, reject) => {
@@ -142,6 +159,24 @@ async function downloadGeneratedWorkflow(
     "generated-workflow.ts",
   );
   await downloadObject(bucket, sourceObject, destination);
+}
+
+function ensureCachedTargetHasGenerator(
+  targets: EvalCloudTarget[],
+  target: EvalCloudTarget,
+): void {
+  const hasGenerator = targets.some(
+    (candidate) =>
+      candidate.baseId === target.baseId && candidate.agent === "libretto",
+  );
+  if (hasGenerator) return;
+
+  throw new Error(
+    [
+      `Cached eval target "${target.name}" is missing its corresponding libretto generator target in the Cloud Run manifest.`,
+      "libretto-cached targets require a generated-workflow.ts artifact produced by libretto in the same run.",
+    ].join("\n"),
+  );
 }
 
 function requireEnv(name: string): string {

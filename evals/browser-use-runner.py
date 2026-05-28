@@ -26,6 +26,61 @@ def to_jsonable(value: Any) -> Any:
     return str(value)
 
 
+def bool_from_env(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def maybe_call(value: Any, method_name: str) -> Any:
+    method = getattr(value, method_name, None)
+    if callable(method):
+        return method()
+    return None
+
+
+def browser_state_observation(browser_state_summary: Any, model_output: Any, step: int) -> dict[str, Any]:
+    dom_state = getattr(browser_state_summary, "dom_state", None)
+    llm_representation = maybe_call(dom_state, "llm_representation") if dom_state is not None else None
+    eval_representation = maybe_call(dom_state, "eval_representation") if dom_state is not None else None
+    return {
+        "step": step,
+        "url": to_jsonable(getattr(browser_state_summary, "url", None)),
+        "title": to_jsonable(getattr(browser_state_summary, "title", None)),
+        "tabs": to_jsonable(getattr(browser_state_summary, "tabs", None)),
+        "pixels_above": to_jsonable(getattr(browser_state_summary, "pixels_above", None)),
+        "pixels_below": to_jsonable(getattr(browser_state_summary, "pixels_below", None)),
+        "browser_errors": to_jsonable(getattr(browser_state_summary, "browser_errors", None)),
+        "recent_events": to_jsonable(getattr(browser_state_summary, "recent_events", None)),
+        "pending_network_requests": to_jsonable(
+            getattr(browser_state_summary, "pending_network_requests", None)
+        ),
+        "pagination_buttons": to_jsonable(getattr(browser_state_summary, "pagination_buttons", None)),
+        "closed_popup_messages": to_jsonable(
+            getattr(browser_state_summary, "closed_popup_messages", None)
+        ),
+        "page_info": to_jsonable(getattr(browser_state_summary, "page_info", None)),
+        "dom_llm_representation": to_jsonable(llm_representation),
+        "dom_eval_representation": to_jsonable(eval_representation),
+        "model_output": to_jsonable(model_output),
+    }
+
+
+def conversation_records(conversation_dir: Path) -> list[dict[str, str]]:
+    if not conversation_dir.exists():
+        return []
+    records = []
+    for path in sorted(conversation_dir.glob("conversation_*.txt")):
+        records.append(
+            {
+                "name": path.name,
+                "text": path.read_text(encoding="utf8"),
+            }
+        )
+    return records
+
+
 async def run() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-file", required=True)
@@ -38,7 +93,7 @@ async def run() -> None:
     task = Path(args.task_file).read_text(encoding="utf8")
 
     try:
-        from browser_use import Agent, Browser, ChatOpenAI
+        from browser_use import Agent, Browser, ChatOpenAI, Controller
     except Exception as error:
         message = (
             "Browser Use is not installed for this Python. Install it with "
@@ -77,11 +132,32 @@ async def run() -> None:
             args=["--no-sandbox"],
         )
     llm = ChatOpenAI(model=args.model)
+    step_observations: list[dict[str, Any]] = []
+    conversation_dir = cwd / "browser-use-conversations"
+    use_vision = bool_from_env("BROWSER_USE_EVAL_USE_VISION", False)
+    controller = Controller()
+
+    @controller.action(
+        "Wait up to 1 minute for the hosted browser provider to automatically solve a CAPTCHA, bot check, or anti-bot challenge. After this wait, inspect the page again before deciding whether the task is blocked."
+    )
+    async def solve_captcha() -> str:
+        await asyncio.sleep(60)
+        return "Waited 60 seconds for CAPTCHA auto-solving. Check the page again before deciding whether the task is blocked."
+
+    def record_step(browser_state_summary: Any, model_output: Any, step: int) -> None:
+        step_observations.append(
+            browser_state_observation(browser_state_summary, model_output, step)
+        )
+
     agent = Agent(
         task=task,
         llm=llm,
         browser=browser,
+        controller=controller,
         calculate_cost=True,
+        register_new_step_callback=record_step,
+        save_conversation_path=str(conversation_dir),
+        use_vision=use_vision,
     )
 
     history = None
@@ -127,7 +203,11 @@ async def run() -> None:
             "extracted_content": to_jsonable(history.extracted_content()),
             "errors": to_jsonable(history.errors()),
             "usage": to_jsonable(getattr(history, "usage", None)),
+            "full_history": to_jsonable(getattr(history, "history", None)),
         }
+    result["use_vision"] = use_vision
+    result["step_observations"] = step_observations
+    result["conversation_files"] = conversation_records(conversation_dir)
 
     Path(args.output).write_text(
         json.dumps(result, indent=2, ensure_ascii=False) + "\n",
