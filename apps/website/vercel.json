@@ -23,19 +23,19 @@
   "rewrites": [
     {
       "source": "/llms.txt",
-      "destination": "https://libretto-docs.vercel.app/llms.txt"
+      "destination": "https://libretto-docs.vercel.app/docs/llms.txt"
     },
     {
       "source": "/llms-full.txt",
-      "destination": "https://libretto-docs.vercel.app/llms-full.txt"
+      "destination": "https://libretto-docs.vercel.app/docs/llms-full.txt"
     },
     {
       "source": "/sitemap.xml",
-      "destination": "https://libretto-docs.vercel.app/sitemap.xml"
+      "destination": "https://libretto-docs.vercel.app/docs/sitemap.xml"
     },
     {
       "source": "/robots.txt",
-      "destination": "https://libretto-docs.vercel.app/robots.txt"
+      "destination": "https://libretto-docs.vercel.app/docs/robots.txt"
     },
     {
       "source": "/blog",
@@ -47,11 +47,11 @@
     },
     {
       "source": "/docs",
-      "destination": "https://libretto-docs.vercel.app"
+      "destination": "https://libretto-docs.vercel.app/docs"
     },
     {
       "source": "/docs/:path*",
-      "destination": "https://libretto-docs.vercel.app/:path*"
+      "destination": "https://libretto-docs.vercel.app/docs/:path*"
     }
   ]
 }

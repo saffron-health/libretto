@@ -9,12 +9,12 @@
   },
   "icons": { "library": "lucide" },
   "favicon": {
-    "light": "/brand-kit/logos/libretto-icosahedron-light.svg",
-    "dark": "/brand-kit/logos/libretto-icosahedron-dark.svg"
+    "light": "/docs/brand-kit/logos/libretto-icosahedron-light.svg",
+    "dark": "/docs/brand-kit/logos/libretto-icosahedron-dark.svg"
   },
   "logo": {
-    "light": "/brand-kit/logos/libretto-icosahedron-light.svg",
-    "dark": "/brand-kit/logos/libretto-icosahedron-dark.svg",
+    "light": "/docs/brand-kit/logos/libretto-icosahedron-light.svg",
+    "dark": "/docs/brand-kit/logos/libretto-icosahedron-dark.svg",
     "href": "https://libretto.sh",
     "text": "Libretto"
   },
