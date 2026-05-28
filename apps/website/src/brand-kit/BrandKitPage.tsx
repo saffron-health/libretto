@@ -13,6 +13,8 @@ import type { SolidIcosahedronRotation } from "./solidIcosahedronGeometry.mjs";
 type BrandTab = "logos" | "asciihedron" | "wordmark" | "socials";
 type ThemeMode = "dark" | "light";
 type RotationAxis = keyof SolidIcosahedronRotation;
+type SocialAssetKind = "banner" | "profile";
+type SocialPlatformId = "instagram" | "linkedin" | "reddit" | "x";
 
 type CSSVarStyle = React.CSSProperties & Record<`--${string}`, string>;
 
@@ -32,13 +34,23 @@ interface CanvasDownloadAsset {
   format: CanvasExportFormat;
 }
 
-interface SocialAsset extends DownloadAsset {
+interface ImageAsset extends DownloadAsset {
   width: number;
   height: number;
 }
 
+interface SocialAsset {
+  label: string;
+  detail: string;
+  download: string;
+  width: number;
+  height: number;
+  kind: SocialAssetKind;
+  platformId: SocialPlatformId;
+}
+
 interface SocialPlatform {
-  id: string;
+  id: SocialPlatformId;
   label: string;
   accountHref?: string;
   accountLabel?: string;
@@ -255,18 +267,20 @@ const socialPlatforms: SocialPlatform[] = [
     profile: {
       label: "X profile",
       detail: "400 x 400 PNG",
-      href: "/brand-kit/socials/x-profile.png",
       download: "libretto-x-profile.png",
       width: 400,
       height: 400,
+      kind: "profile",
+      platformId: "x",
     },
     banner: {
       label: "X banner",
       detail: "1500 x 500 PNG",
-      href: "/brand-kit/socials/x-banner.png",
       download: "libretto-x-banner.png",
       width: 1500,
       height: 500,
+      kind: "banner",
+      platformId: "x",
     },
   },
   {
@@ -275,18 +289,20 @@ const socialPlatforms: SocialPlatform[] = [
     profile: {
       label: "Reddit icon",
       detail: "256 x 256 PNG",
-      href: "/brand-kit/socials/reddit-profile.png",
       download: "libretto-reddit-icon.png",
       width: 256,
       height: 256,
+      kind: "profile",
+      platformId: "reddit",
     },
     banner: {
       label: "Reddit banner",
       detail: "1080 x 128 PNG",
-      href: "/brand-kit/socials/reddit-banner.png",
       download: "libretto-reddit-banner.png",
       width: 1080,
       height: 128,
+      kind: "banner",
+      platformId: "reddit",
     },
   },
   {
@@ -296,18 +312,20 @@ const socialPlatforms: SocialPlatform[] = [
     profile: {
       label: "Instagram profile",
       detail: "320 x 320 PNG",
-      href: "/brand-kit/socials/instagram-profile.png",
       download: "libretto-instagram-profile.png",
       width: 320,
       height: 320,
+      kind: "profile",
+      platformId: "instagram",
     },
     banner: {
       label: "Instagram tile",
       detail: "1080 x 1080 PNG",
-      href: "/brand-kit/socials/instagram-banner.png",
       download: "libretto-instagram-tile.png",
       width: 1080,
       height: 1080,
+      kind: "banner",
+      platformId: "instagram",
     },
   },
   {
@@ -316,23 +334,25 @@ const socialPlatforms: SocialPlatform[] = [
     profile: {
       label: "LinkedIn logo",
       detail: "400 x 400 PNG",
-      href: "/brand-kit/socials/linkedin-profile.png",
       download: "libretto-linkedin-logo.png",
       width: 400,
       height: 400,
+      kind: "profile",
+      platformId: "linkedin",
     },
     banner: {
       label: "LinkedIn cover",
       detail: "4200 x 700 PNG",
-      href: "/brand-kit/socials/linkedin-banner.png",
       download: "libretto-linkedin-cover.png",
       width: 4200,
       height: 700,
+      kind: "banner",
+      platformId: "linkedin",
     },
   },
 ];
 
-const ogImageAsset: SocialAsset = {
+const ogImageAsset: ImageAsset = {
   label: "OG image",
   detail: "1200 x 630 PNG",
   href: "/og-image.png",
@@ -340,6 +360,48 @@ const ogImageAsset: SocialAsset = {
   width: 1200,
   height: 630,
 };
+
+const socialLogoHref = "/brand-kit/logos/libretto-icosahedron-yellow.svg";
+const socialAsciihedronHref = "/brand-kit/logos/libretto-asciihedron-still.png";
+const socialHeadline = "DON'T MAKE BROWSER AGENTS DO A SCRIPT'S JOB";
+const socialHeadlineAscii = createCompactAscii(socialHeadline);
+const socialProfileLogoScale: Record<SocialPlatformId, number> = {
+  instagram: 0.34,
+  linkedin: 0.34,
+  reddit: 0.36,
+  x: 0.34,
+};
+
+function createCompactAscii(value: string) {
+  const glyphs: Record<string, string[]> = {
+    A: [" ██ ", "█  █", "████", "█  █", "█  █"],
+    B: ["███ ", "█  █", "███ ", "█  █", "███ "],
+    C: [" ███", "█   ", "█   ", "█   ", " ███"],
+    D: ["███ ", "█  █", "█  █", "█  █", "███ "],
+    E: ["████", "█   ", "███ ", "█   ", "████"],
+    G: [" ███", "█   ", "█ ██", "█  █", " ███"],
+    I: ["███", " █ ", " █ ", " █ ", "███"],
+    J: ["  ██", "   █", "   █", "█  █", " ██ "],
+    K: ["█  █", "█ █ ", "██  ", "█ █ ", "█  █"],
+    M: ["█   █", "██ ██", "█ █ █", "█   █", "█   █"],
+    N: ["█  █", "██ █", "█ ██", "█  █", "█  █"],
+    O: [" ██ ", "█  █", "█  █", "█  █", " ██ "],
+    P: ["███ ", "█  █", "███ ", "█   ", "█   "],
+    R: ["███ ", "█  █", "███ ", "█ █ ", "█  █"],
+    S: [" ███", "█   ", " ██ ", "   █", "███ "],
+    T: ["█████", "  █  ", "  █  ", "  █  ", "  █  "],
+    W: ["█   █", "█   █", "█ █ █", "██ ██", "█   █"],
+    "'": ["█", "█", " ", " ", " "],
+    " ": ["   ", "   ", "   ", "   ", "   "],
+  };
+  const characters = Array.from(value.toUpperCase());
+  return Array.from({ length: 5 }, (_, rowIndex) =>
+    characters
+      .map((character) => glyphs[character]?.[rowIndex] ?? character)
+      .join(" ")
+      .trimEnd(),
+  ).join("\n");
+}
 
 function ThemeButton({
   mode,
@@ -652,6 +714,223 @@ function CanvasDownloadTile({
   );
 }
 
+function SocialDownloadGrid({ assets }: { assets: SocialAsset[] }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {assets.map((asset) => (
+        <SocialDownloadTile key={asset.download} asset={asset} />
+      ))}
+    </div>
+  );
+}
+
+function SocialDownloadTile({ asset }: { asset: SocialAsset }) {
+  const [status, setStatus] = useState<"idle" | "downloading" | "failed">(
+    "idle",
+  );
+
+  async function handleDownload() {
+    setStatus("downloading");
+    try {
+      const blob = await renderSocialAssetBlob(asset);
+      downloadBlob(blob, asset.download);
+      setStatus("idle");
+    } catch {
+      setStatus("failed");
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      className="rounded-md border border-rule bg-panel-hi p-4 text-left transition-colors hover:border-accent/50 hover:bg-panel"
+    >
+      <span className="block font-mono text-sm font-semibold text-ink">
+        {status === "downloading" ? "Downloading..." : asset.label}
+      </span>
+      <span className="mt-1 block text-xs leading-relaxed text-muted">
+        {status === "failed" ? "Could not render social image." : asset.detail}
+      </span>
+    </button>
+  );
+}
+
+const socialImageCache = new Map<string, Promise<HTMLImageElement>>();
+
+function loadSocialImage(href: string) {
+  const source = new URL(href, window.location.href).href;
+  const cached = socialImageCache.get(source);
+  if (cached) {
+    return cached;
+  }
+
+  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`Unable to load ${href}.`));
+    image.src = source;
+  });
+  socialImageCache.set(source, imagePromise);
+  return imagePromise;
+}
+
+async function renderSocialAssetBlob(asset: SocialAsset) {
+  await document.fonts.load('600 24px "Commit Mono"');
+  const canvas = document.createElement("canvas");
+  canvas.width = asset.width;
+  canvas.height = asset.height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Unable to create social asset canvas.");
+  }
+
+  if (asset.kind === "profile") {
+    await drawSocialProfile(context, asset);
+  } else {
+    await drawSocialBanner(context, asset);
+  }
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/png");
+  });
+  if (!blob) {
+    throw new Error("Unable to export social image.");
+  }
+  return blob;
+}
+
+async function drawSocialProfile(
+  context: CanvasRenderingContext2D,
+  asset: SocialAsset,
+) {
+  const logo = await loadSocialImage(socialLogoHref);
+  fillSocialBackground(context, asset.width, asset.height, 0.5, 0.5);
+
+  const logoScale = socialProfileLogoScale[asset.platformId];
+  const logoSize = Math.round(Math.min(asset.width, asset.height) * logoScale);
+  const logoX = Math.round((asset.width - logoSize) / 2);
+  const logoY = Math.round((asset.height - logoSize) / 2);
+
+  context.save();
+  context.shadowBlur = Math.max(8, asset.width * 0.045);
+  context.shadowColor = "rgba(240, 207, 90, 0.52)";
+  context.drawImage(logo, logoX, logoY, logoSize, logoSize);
+  context.restore();
+}
+
+async function drawSocialBanner(
+  context: CanvasRenderingContext2D,
+  asset: SocialAsset,
+) {
+  const asciihedron = await loadSocialImage(socialAsciihedronHref);
+  const oneLine = asset.platformId === "reddit" || asset.platformId === "linkedin";
+  const square = asset.width === asset.height;
+  fillSocialBackground(
+    context,
+    asset.width,
+    asset.height,
+    oneLine ? 0.5 : square ? 0.64 : 0.76,
+    0.5,
+  );
+
+  const asciihedronSize = Math.round(
+    oneLine
+      ? asset.width * (asset.platformId === "reddit" ? 0.9 : 0.56)
+      : Math.max(asset.width, asset.height) * (square ? 1.28 : 0.72),
+  );
+  const asciihedronCenterX = oneLine
+    ? asset.width / 2
+    : asset.platformId === "x"
+      ? asset.width * 0.78
+      : asset.width * 0.64;
+  const asciihedronCenterY = asset.height / 2;
+
+  context.save();
+  context.globalAlpha = oneLine ? 0.28 : square ? 0.18 : 0.32;
+  context.filter = "brightness(1.35) contrast(1.08)";
+  context.drawImage(
+    asciihedron,
+    asciihedronCenterX - asciihedronSize / 2,
+    asciihedronCenterY - asciihedronSize / 2,
+    asciihedronSize,
+    asciihedronSize,
+  );
+  context.restore();
+
+  const lines = socialHeadlineAscii.split("\n");
+  const maxWidth = oneLine ? asset.width * 0.94 : asset.width * (square ? 0.86 : 0.56);
+  const maxHeight = asset.height * (oneLine ? 0.72 : square ? 0.42 : 0.62);
+  const fontSize = fitAsciiFontSize(context, lines, maxWidth, maxHeight);
+  const lineHeight = fontSize * 1.05;
+  const blockHeight = lineHeight * lines.length;
+  const blockWidth = measureAsciiBlockWidth(context, lines, fontSize);
+  const x = oneLine || square ? (asset.width - blockWidth) / 2 : asset.width * 0.08;
+  const y = (asset.height - blockHeight) / 2 + fontSize * 0.88;
+
+  context.save();
+  context.font = `600 ${fontSize}px "Commit Mono", ui-monospace, monospace`;
+  context.fillStyle = "#f0cf5a";
+  context.shadowBlur = Math.max(6, fontSize * 0.9);
+  context.shadowColor = "rgba(240, 207, 90, 0.38)";
+  lines.forEach((line, index) => {
+    context.fillText(line, x, y + index * lineHeight);
+  });
+  context.restore();
+}
+
+function fillSocialBackground(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  centerX: number,
+  centerY: number,
+) {
+  const gradient = context.createRadialGradient(
+    width * centerX,
+    height * centerY,
+    0,
+    width * centerX,
+    height * centerY,
+    Math.max(width, height) * 0.82,
+  );
+  gradient.addColorStop(0, "#202320");
+  gradient.addColorStop(0.48, "#171917");
+  gradient.addColorStop(1, "#111111");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, width, height);
+}
+
+function fitAsciiFontSize(
+  context: CanvasRenderingContext2D,
+  lines: string[],
+  maxWidth: number,
+  maxHeight: number,
+) {
+  let low = 4;
+  let high = maxHeight / Math.max(1, lines.length);
+  for (let index = 0; index < 14; index += 1) {
+    const fontSize = (low + high) / 2;
+    const blockWidth = measureAsciiBlockWidth(context, lines, fontSize);
+    const blockHeight = fontSize * 1.05 * lines.length;
+    if (blockWidth <= maxWidth && blockHeight <= maxHeight) {
+      low = fontSize;
+    } else {
+      high = fontSize;
+    }
+  }
+  return low;
+}
+
+function measureAsciiBlockWidth(
+  context: CanvasRenderingContext2D,
+  lines: string[],
+  fontSize: number,
+) {
+  context.font = `600 ${fontSize}px "Commit Mono", ui-monospace, monospace`;
+  return Math.max(...lines.map((line) => context.measureText(line).width));
+}
+
 function RotationControls({
   onChange,
   rotation,
@@ -906,7 +1185,7 @@ function SocialsTab() {
               <Text as="h3" size="md" className="mb-3 font-medium text-ink">
                 {platform.label}
               </Text>
-              <DownloadGrid assets={[platform.profile, platform.banner]} />
+              <SocialDownloadGrid assets={[platform.profile, platform.banner]} />
             </div>
           ))}
           <div>
@@ -968,6 +1247,94 @@ function SocialPreviewSurface({ platform }: { platform: SocialPlatform }) {
   return <LinkedInPreview platform={platform} />;
 }
 
+function SocialProfileArt({
+  asset,
+  className = "",
+}: {
+  asset: SocialAsset;
+  className?: string;
+}) {
+  const logoSize = `${socialProfileLogoScale[asset.platformId] * 100}%`;
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#111111] ${className}`}
+      style={{
+        background:
+          "radial-gradient(circle at 50% 50%, #202320 0%, #171917 62%, #111111 100%)",
+      }}
+    >
+      <img
+        src={socialLogoHref}
+        alt=""
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 object-contain"
+        style={{
+          filter:
+            "drop-shadow(0 0 12px rgba(240, 207, 90, 0.5)) drop-shadow(0 0 28px rgba(240, 207, 90, 0.22))",
+          height: logoSize,
+          width: logoSize,
+        }}
+      />
+    </div>
+  );
+}
+
+function SocialBannerArt({
+  asset,
+  className = "",
+  style,
+}: {
+  asset: SocialAsset;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const oneLine = asset.platformId === "reddit" || asset.platformId === "linkedin";
+  const square = asset.width === asset.height;
+  const asciihedronSize = oneLine
+    ? asset.platformId === "reddit" ? "90%" : "56%"
+    : square ? "128%" : "72%";
+  const asciihedronLeft = oneLine ? "50%" : asset.platformId === "x" ? "78%" : "64%";
+  const asciihedronOpacity = oneLine ? 0.28 : square ? 0.18 : 0.32;
+
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#111111] ${className}`}
+      style={{
+        aspectRatio: `${asset.width} / ${asset.height}`,
+        background: `radial-gradient(circle at ${oneLine ? "50%" : square ? "64%" : "76%"} 50%, #202320 0%, #171917 48%, #111111 100%)`,
+        ...style,
+      }}
+    >
+      <img
+        src={socialAsciihedronHref}
+        alt=""
+        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 object-contain brightness-125 contrast-110"
+        style={{
+          height: asciihedronSize,
+          left: asciihedronLeft,
+          opacity: asciihedronOpacity,
+          width: asciihedronSize,
+        }}
+      />
+      <pre
+        aria-label={socialHeadline}
+        className={`absolute m-0 whitespace-pre font-mono font-semibold leading-none text-[#f0cf5a] ${
+          oneLine || square
+            ? "left-1/2 top-1/2 text-[5px] lg:text-[7px]"
+            : "left-[8%] top-1/2 text-[6px] lg:text-[8px]"
+        }`}
+        style={{
+          filter:
+            "drop-shadow(0 0 8px rgba(240, 207, 90, 0.4)) drop-shadow(0 0 24px rgba(240, 207, 90, 0.22))",
+          transform: `${oneLine || square ? "translate(-50%, -50%)" : "translateY(-50%)"} scaleX(${oneLine ? 0.46 : square ? 0.58 : 0.52})`,
+          transformOrigin: oneLine || square ? "center" : "left center",
+        }}
+      >
+        {socialHeadlineAscii}
+      </pre>
+    </div>
+  );
+}
+
 function XPreview({ platform }: { platform: SocialPlatform }) {
   return (
     <div className="overflow-hidden rounded-md border border-[#eff3f4] bg-white text-[#0f1419]">
@@ -981,16 +1348,14 @@ function XPreview({ platform }: { platform: SocialPlatform }) {
         </div>
       </div>
       <div className="relative">
-        <img
-          src={platform.banner.href}
-          alt="X banner preview"
+        <SocialBannerArt
+          asset={platform.banner}
           className="h-auto w-full object-cover"
           style={{ aspectRatio: "3 / 1" }}
         />
-        <img
-          src={platform.profile.href}
-          alt="X profile preview"
-          className="absolute left-4 top-full size-24 -translate-y-1/2 rounded-full border-4 border-white object-cover"
+        <SocialProfileArt
+          asset={platform.profile}
+          className="absolute left-4 top-full size-24 -translate-y-1/2 rounded-full border-4 border-white"
         />
       </div>
       <div className="px-4 pb-4 pt-16">
@@ -1025,18 +1390,16 @@ function RedditPreview({ platform }: { platform: SocialPlatform }) {
           Join
         </span>
       </div>
-      <img
-        src={platform.banner.href}
-        alt="Reddit banner preview"
+      <SocialBannerArt
+        asset={platform.banner}
         className="h-auto w-full object-cover"
         style={{ aspectRatio: `${platform.banner.width} / ${platform.banner.height}` }}
       />
       <div className="px-4 pb-4">
         <div className="-mt-7 flex items-end gap-3">
-          <img
-            src={platform.profile.href}
-            alt="Reddit icon preview"
-            className="size-16 rounded-full border-4 border-white object-cover"
+          <SocialProfileArt
+            asset={platform.profile}
+            className="size-16 rounded-full border-4 border-white"
           />
           <div className="pb-1">
             <p className="text-lg font-bold">r/libretto</p>
@@ -1060,10 +1423,9 @@ function InstagramPreview({ platform }: { platform: SocialPlatform }) {
   return (
     <div className="overflow-hidden rounded-md border border-[#dbdbdb] bg-white p-5 text-[#262626]">
       <div className="flex items-start gap-5">
-        <img
-          src={platform.profile.href}
-          alt="Instagram profile preview"
-          className="size-24 rounded-full object-cover"
+        <SocialProfileArt
+          asset={platform.profile}
+          className="size-24 rounded-full"
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -1090,10 +1452,9 @@ function InstagramPreview({ platform }: { platform: SocialPlatform }) {
         ))}
       </div>
       <div className="mt-5 grid grid-cols-3 gap-1 border-t border-[#dbdbdb] pt-4">
-        <img
-          src={platform.banner.href}
-          alt="Instagram tile preview"
-          className="aspect-square object-cover"
+        <SocialBannerArt
+          asset={platform.banner}
+          className="aspect-square"
         />
         <div className="aspect-square bg-[#171917]" />
         <div className="aspect-square bg-[#202320]" />
@@ -1112,17 +1473,15 @@ function LinkedInPreview({ platform }: { platform: SocialPlatform }) {
         </span>
       </div>
       <div className="overflow-hidden rounded-md bg-white shadow-sm">
-        <img
-          src={platform.banner.href}
-          alt="LinkedIn cover preview"
+        <SocialBannerArt
+          asset={platform.banner}
           className="h-auto w-full object-cover"
           style={{ aspectRatio: "6 / 1" }}
         />
         <div className="px-6 pb-5">
-          <img
-            src={platform.profile.href}
-            alt="LinkedIn logo preview"
-            className="-mt-10 size-24 border-4 border-white bg-white object-cover shadow-md"
+          <SocialProfileArt
+            asset={platform.profile}
+            className="-mt-10 size-24 border-4 border-white bg-white shadow-md"
           />
           <p className="mt-3 text-2xl font-semibold leading-tight">Libretto</p>
           <p className="text-sm text-[#00000099]">Software Development · San Francisco, CA</p>
