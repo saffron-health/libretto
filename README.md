@@ -91,7 +91,7 @@ Run `npx libretto help` for the full list of commands.
 
 ## Configuration
 
-All Libretto state lives in a `.libretto/` directory at your project root. See the [configuration docs](https://libretto.sh/docs/configuration) for details on config files, sessions, and profiles.
+All Libretto state lives in a `.libretto/` directory at your project root. See the [configuration docs](https://libretto.sh/docs/understand-libretto/configuration) for details on config files, sessions, and profiles.
 
 ## Join the Community
 
