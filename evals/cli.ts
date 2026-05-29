@@ -7,6 +7,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
+import { ExecutionsClient } from "@google-cloud/run";
 import {
   getEvalCases,
   withEvalFileRegistration,
@@ -36,6 +37,20 @@ import {
   withEvalArtifactPaths,
   type EvalMetrics,
 } from "./artifacts.js";
+import {
+  parseEvalAgentName,
+  type EvalAgentName,
+} from "./agents.js";
+import { dispatchEvalGcpRun } from "./cloud-dispatch.js";
+import {
+  countCompletedCases,
+  createEvalsBucket,
+  downloadResults,
+  listRunIds,
+  readManifest,
+  type EvalCloudManifest,
+  type EvalCloudTarget,
+} from "./cloud-gcs.js";
 
 type RunCliOptions = {
   command: "run";
@@ -44,7 +59,11 @@ type RunCliOptions = {
   testNamePattern: string | null;
   model: string;
   provider: BrowserProviderName | null;
+  agents: EvalAgentName[];
+  concurrency: number | null;
   noAuth: boolean;
+  gcp: boolean;
+  gcpImage: string | null;
   repeatCount: number;
 };
 
@@ -63,11 +82,17 @@ type SummaryCliOptions = {
   allowEmpty: boolean;
 };
 
+type CloudQueryCliOptions = {
+  command: "list" | "status" | "results";
+  runId: string | null;
+};
+
 type CliOptions =
   | RunCliOptions
   | ProfilesStatusCliOptions
   | ProfilesLoginCliOptions
-  | SummaryCliOptions;
+  | SummaryCliOptions
+  | CloudQueryCliOptions;
 
 type CaseResult = {
   id: string;
@@ -75,6 +100,7 @@ type CaseResult = {
   repeatIndex: number;
   repeatCount: number;
   name: string;
+  agent: EvalAgentName;
   file: string | null;
   status: "completed" | "error" | "skipped";
   startedAt: string;
@@ -112,6 +138,7 @@ type RunSummary = {
   totalCaseDurationMs: number;
   averageCompletedDurationMs: number | null;
   selectedModel: string;
+  selectedAgents: EvalAgentName[];
   selectedProvider: BrowserProviderName;
   totals: {
     cases: number;
@@ -141,6 +168,7 @@ type RunSummary = {
     repeatIndex: number;
     repeatCount: number;
     name: string;
+    agent: EvalAgentName;
     status: CaseResult["status"];
     durationMs: number;
     score: CaseResult["score"];
@@ -344,8 +372,11 @@ function metricArtifactsForCase(
 function usage(): string {
   return [
     "Usage:",
-    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>] [--provider <browser-provider>] [--repeat-count <count>] [--no-auth]",
+    "  pnpm evals [run] [file-filter ...] [-t <pattern>] [--output <dir>] [--model <provider/model>] [--provider <browser-provider>] [--agent <agent>] [--agents <agents>] [--concurrency <n>] [--repeat-count <count>] [--no-auth] [--gcp] [--gcp-image <image>]",
     "  pnpm evals summary [run-dir] [--allow-empty]",
+    "  pnpm evals list",
+    "  pnpm evals status [--run <run-id>]",
+    "  pnpm evals results [--run <run-id>]",
     "  pnpm evals profiles status",
     "  pnpm evals profiles login <domain>",
     "",
@@ -353,7 +384,11 @@ function usage(): string {
     "  pnpm evals",
     "  pnpm evals --no-auth",
     "  pnpm evals run -t network --model openai/gpt-5.5 --provider kernel",
+    "  pnpm evals public-websites.eval.ts --agents libretto,browser-use --concurrency 4",
     "  pnpm evals public-websites.eval.ts --provider kernel --repeat-count 3",
+    "  pnpm evals public-websites.eval.ts --agents libretto,browser-use --provider kernel --concurrency 8 --gcp",
+    "  pnpm evals public-websites.eval.ts -t quotes --agents libretto,libretto-cached,browser-use --provider steel --concurrency 1 --gcp --gcp-image us-central1-docker.pkg.dev/saffron-health/libretto-benchmarks/evals:2026-05-20-a4fbe7",
+    "  pnpm evals status --run 2026-05-20-a1b2c3",
     "  pnpm evals basic.eval.ts --output temp/eval-run",
     "  pnpm evals summary",
     "  pnpm evals summary temp/eval-run",
@@ -388,6 +423,37 @@ function parseArgs(argv: string[]): CliOptions {
       runDir: args[0] ? resolve(repoRoot, args[0]) : null,
       allowEmpty,
     };
+  } else if (first === "list" || first === "status" || first === "results") {
+    args.shift();
+    if (args[0] === "--help" || args[0] === "-h") {
+      process.stdout.write(`${cloudUsage(first)}\n`);
+      process.exit(0);
+    }
+    let runId: string | null = null;
+    for (let index = 0; index < args.length; index += 1) {
+      const arg = args[index];
+      if (arg === "--run") {
+        const value = args[index + 1];
+        if (!value) throw new Error("--run requires a run ID.");
+        runId = value;
+        index += 1;
+        continue;
+      }
+      if (arg.startsWith("--run=")) {
+        const value = arg.slice("--run=".length);
+        if (!value) throw new Error("--run requires a run ID.");
+        runId = value;
+        continue;
+      }
+      throw new Error(`Unknown ${first} option: ${arg}`);
+    }
+    if (first === "list" && runId) {
+      throw new Error("list does not accept --run.");
+    }
+    return {
+      command: first,
+      runId,
+    };
   } else if (first === "profiles") {
     args.shift();
     const subcommand = args.shift();
@@ -414,7 +480,11 @@ function parseArgs(argv: string[]): CliOptions {
   let testNamePattern: string | null = null;
   let model = DEFAULT_EVAL_MODEL;
   let provider: BrowserProviderName | null = null;
+  const agents: EvalAgentName[] = ["libretto"];
+  let concurrency: number | null = null;
   let noAuth = false;
+  let gcp = false;
+  let gcpImage: string | null = null;
   let repeatCount = 1;
   const fileFilters: string[] = [];
 
@@ -423,6 +493,23 @@ function parseArgs(argv: string[]): CliOptions {
     if (arg === "--") continue;
     if (arg === "--no-auth") {
       noAuth = true;
+      continue;
+    }
+    if (arg === "--gcp") {
+      gcp = true;
+      continue;
+    }
+    if (arg === "--gcp-image") {
+      const value = args[index + 1];
+      if (!value) throw new Error("--gcp-image requires an image tag or digest.");
+      gcpImage = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--gcp-image=")) {
+      const value = arg.slice("--gcp-image=".length);
+      if (!value) throw new Error("--gcp-image requires an image tag or digest.");
+      gcpImage = value;
       continue;
     }
     if (arg === "--output") {
@@ -469,6 +556,53 @@ function parseArgs(argv: string[]): CliOptions {
       index += 1;
       continue;
     }
+    if (arg === "--agent") {
+      const value = args[index + 1];
+      if (!value) throw new Error("--agent requires an agent value.");
+      agents.splice(0, agents.length, parseEvalAgentName(value));
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--agent=")) {
+      const value = arg.slice("--agent=".length);
+      if (!value) throw new Error("--agent requires an agent value.");
+      agents.splice(0, agents.length, parseEvalAgentName(value));
+      continue;
+    }
+    if (arg === "--agents") {
+      const value = args[index + 1];
+      if (!value) throw new Error("--agents requires a comma-separated list.");
+      agents.splice(
+        0,
+        agents.length,
+        ...value.split(",").map(parseEvalAgentName),
+      );
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--agents=")) {
+      const value = arg.slice("--agents=".length);
+      if (!value) throw new Error("--agents requires a comma-separated list.");
+      agents.splice(
+        0,
+        agents.length,
+        ...value.split(",").map(parseEvalAgentName),
+      );
+      continue;
+    }
+    if (arg === "--concurrency") {
+      const value = args[index + 1];
+      if (!value) throw new Error("--concurrency requires a positive integer.");
+      concurrency = Number(value);
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--concurrency=")) {
+      const value = arg.slice("--concurrency=".length);
+      if (!value) throw new Error("--concurrency requires a positive integer.");
+      concurrency = Number(value);
+      continue;
+    }
     if (arg.startsWith("--provider=")) {
       const value = arg.slice("--provider=".length);
       if (!value) {
@@ -496,6 +630,13 @@ function parseArgs(argv: string[]): CliOptions {
     fileFilters.push(arg);
   }
 
+  if (
+    concurrency != null &&
+    (!Number.isInteger(concurrency) || concurrency <= 0)
+  ) {
+    throw new Error("--concurrency must be a positive integer.");
+  }
+
   return {
     command: "run",
     outputDir: resolve(
@@ -506,9 +647,32 @@ function parseArgs(argv: string[]): CliOptions {
     testNamePattern,
     model,
     provider,
+    agents: Array.from(new Set(agents)),
+    concurrency,
     noAuth,
+    gcp,
+    gcpImage,
     repeatCount,
   };
+}
+
+function cloudUsage(command: "list" | "status" | "results"): string {
+  if (command === "list") {
+    return [
+      "List GCS-backed eval runs.",
+      "",
+      "Usage: pnpm evals list",
+      "",
+      "Example: pnpm evals list",
+    ].join("\n");
+  }
+  return [
+    `${command === "status" ? "Show Cloud Run progress for" : "Show aggregated results for"} a GCS-backed eval run.`,
+    "",
+    `Usage: pnpm evals ${command} [--run <run-id>]`,
+    "",
+    `Example: pnpm evals ${command} --run 2026-05-20-a1b2c3`,
+  ].join("\n");
 }
 
 function createRunId(): string {
@@ -618,6 +782,36 @@ function caseIds(cases: EvalCaseRecord[]): Map<EvalCaseRecord, string> {
     ids.set(evalCase, count === 0 ? base : `${base}-${count + 1}`);
   }
   return ids;
+}
+
+function caseIdForAgent(baseId: string, agent: EvalAgentName): string {
+  return agent === "libretto" ? baseId : `${baseId}-${agent}`;
+}
+
+function isCachedAgent(agent: EvalAgentName): boolean {
+  return agent === "libretto-cached";
+}
+
+function isCloudRunTargetExecution(): boolean {
+  return (
+    process.env.EVAL_RUN_ID !== undefined &&
+    process.env.CLOUD_RUN_TASK_INDEX !== undefined
+  );
+}
+
+function validateCachedAgentSelection(agents: EvalAgentName[]): void {
+  if (
+    !isCloudRunTargetExecution() &&
+    agents.includes("libretto-cached") &&
+    !agents.includes("libretto")
+  ) {
+    throw new Error(
+      [
+        "libretto-cached requires libretto in the same run because it replays the workflow generated by the libretto agent.",
+        "Rerun with `--agents libretto,libretto-cached`.",
+      ].join("\n"),
+    );
+  }
 }
 
 function casesByRequiredProfile(
@@ -1026,17 +1220,39 @@ function buildSummaryMarkdown(summary: RunSummary): string {
     `- Cache write tokens: \`${formatInteger(summary.metrics.combined.cacheWriteTokens)}\``,
     `- Tool calls: \`${summary.metrics.combined.totalToolCalls}\``,
     "",
+    "## Agent Breakdown",
+    "",
+    "| Agent | Cases | Completed | Score | Agent duration | Agent cost | Agent tokens | Agent tool calls |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|",
+  ];
+
+  const agents = Array.from(new Set(summary.cases.map((result) => result.agent)));
+  for (const agent of agents) {
+    const cases = summary.cases.filter((result) => result.agent === agent);
+    const completed = cases.filter((result) => result.status === "completed");
+    const passed = cases.reduce((total, result) => total + result.score.passed, 0);
+    const total = cases.reduce((sum, result) => sum + result.score.total, 0);
+    const metrics = aggregateMetrics(
+      cases.map((result) => result.agentMetrics),
+    );
+    lines.push(
+      `| \`${agent}\` | \`${cases.length}\` | \`${completed.length}\` | \`${passed}/${total}\` | \`${formatDuration(metrics.durationMs)}\` | \`${formatUsd(metrics.totalCostUsd)}\` | \`${formatInteger(metrics.totalTokens)}\` | \`${metrics.totalToolCalls}\` |`,
+    );
+  }
+
+  lines.push(
+    "",
     "## Cases",
     "",
-    "| Case | Attempt | Status | Infra | Score | Duration | Cost | Tokens | Tool calls | Artifacts |",
-    "|---|---:|---|---|---:|---:|---:|---:|---:|---|",
-  ];
+    "| Case | Agent | Attempt | Status | Infra | Score | Duration | Cost | Tokens | Tool calls | Artifacts |",
+    "|---|---|---:|---|---|---:|---:|---:|---:|---:|---|",
+  );
 
   for (const result of summary.cases) {
     const caseScore = `${result.score.passed}/${result.score.total}`;
     const attempt = `${result.repeatIndex}/${result.repeatCount}`;
     lines.push(
-      `| \`${result.name}\` | \`${attempt}\` | ${result.status} | \`${result.infraClassification}\` | \`${caseScore}\` | \`${formatDuration(result.durationMs)}\` | \`${formatUsd(result.combinedMetrics.totalCostUsd)}\` | \`${formatInteger(result.combinedMetrics.totalTokens)}\` | \`${result.combinedMetrics.totalToolCalls}\` | \`${result.artifacts.result}\` |`,
+      `| \`${result.name}\` | \`${result.agent}\` | \`${attempt}\` | ${result.status} | \`${result.infraClassification}\` | \`${caseScore}\` | \`${formatDuration(result.durationMs)}\` | \`${formatUsd(result.combinedMetrics.totalCostUsd)}\` | \`${formatInteger(result.combinedMetrics.totalTokens)}\` | \`${result.combinedMetrics.totalToolCalls}\` | \`${result.artifacts.result}\` |`,
     );
   }
 
@@ -1045,6 +1261,7 @@ function buildSummaryMarkdown(summary: RunSummary): string {
 
 async function runCase(
   evalCase: EvalCaseRecord,
+  agent: EvalAgentName,
   id: string,
   baseId: string,
   repeatIndex: number,
@@ -1080,7 +1297,11 @@ async function runCase(
         takeRecordedEvalCalls();
 
         try {
-          context = await createEvalContext(evalCase, { model, provider });
+          context = await createEvalContext(evalCase, {
+            agentName: agent,
+            model,
+            provider,
+          });
           await evalCase.run(context);
         } catch (error) {
           status = "error";
@@ -1128,6 +1349,7 @@ async function runCase(
     repeatIndex,
     repeatCount,
     name: evalCase.name,
+    agent,
     file: evalCase.filePath ? relative(repoRoot, evalCase.filePath) : null,
     status,
     startedAt,
@@ -1222,6 +1444,10 @@ function summaryCaseFromResult(
       `${label}.repeatCount`,
     ),
     name: requireString(result.name, `${label}.name`),
+    agent:
+      typeof result.agent === "string"
+        ? parseEvalAgentName(result.agent)
+        : "libretto",
     status: caseStatus(result.status, `${label}.status`),
     durationMs: requireFiniteNumber(result.durationMs, `${label}.durationMs`),
     score: scoreRecord,
@@ -1408,6 +1634,11 @@ async function runSummary(options: SummaryCliOptions): Promise<number> {
     averageCompletedDurationMs,
     selectedModel:
       typeof runRecord.selectedModel === "string" ? runRecord.selectedModel : "-",
+    selectedAgents: Array.isArray(runRecord.selectedAgents)
+      ? runRecord.selectedAgents
+          .filter((agent): agent is string => typeof agent === "string")
+          .map(parseEvalAgentName)
+      : ["libretto"],
     selectedProvider:
       typeof runRecord.selectedProvider === "string"
         ? parseBrowserProviderName(runRecord.selectedProvider)
@@ -1438,6 +1669,317 @@ async function runSummary(options: SummaryCliOptions): Promise<number> {
   return 0;
 }
 
+type ExecutionProgress = {
+  taskCount: number;
+  runningCount: number;
+  succeededCount: number;
+  failedCount: number;
+  cancelledCount: number;
+  retriedCount: number;
+  pendingCount: number;
+  status: string;
+  logUri: string | null;
+};
+
+function renderTable(headers: string[], rows: string[][]): string {
+  const widths = headers.map((header, index) =>
+    Math.max(header.length, ...rows.map((row) => (row[index] ?? "").length)),
+  );
+  const renderRow = (row: string[]): string =>
+    row.map((cell, index) => (cell ?? "").padEnd(widths[index]!)).join("  ");
+  return [
+    renderRow(headers),
+    widths.map((width) => "-".repeat(width)).join("  "),
+    ...rows.map(renderRow),
+  ].join("\n");
+}
+
+function formatTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "Z");
+}
+
+function formatShortError(error: string | null | undefined): string {
+  if (!error) return "-";
+  const oneLine = error.replace(/\s+/g, " ").trim();
+  return oneLine.length <= 80 ? oneLine : `${oneLine.slice(0, 77)}...`;
+}
+
+function cloudExecutionEntries(
+  manifest: EvalCloudManifest,
+): Array<{ label: string; executionName: string }> {
+  const entries = [
+    {
+      label: "workflow-generation",
+      executionName: manifest.executionNames?.workflowGeneration,
+    },
+    { label: "independent", executionName: manifest.executionNames?.independent },
+    { label: "cached", executionName: manifest.executionNames?.cached },
+  ].filter(
+    (entry): entry is { label: string; executionName: string } =>
+      typeof entry.executionName === "string" && entry.executionName.length > 0,
+  );
+  if (entries.length > 0) return entries;
+  return manifest.executionName
+    ? [{ label: "default", executionName: manifest.executionName }]
+    : [];
+}
+
+function toCount(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value === "bigint") return Number(value);
+  if (
+    value &&
+    typeof value === "object" &&
+    "toNumber" in value &&
+    typeof value.toNumber === "function"
+  ) {
+    const parsed = value.toNumber();
+    return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+async function loadAllCloudManifests(
+  bucket: ReturnType<typeof createEvalsBucket>,
+): Promise<EvalCloudManifest[]> {
+  const runIds = await listRunIds(bucket);
+  const manifests = await mapWithConcurrency(runIds, 8, async (runId) => {
+    try {
+      return await readManifest(bucket, runId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(
+        `Warning: failed to read eval manifest for ${runId}: ${message}\n`,
+      );
+      return null;
+    }
+  });
+  return manifests
+    .filter((manifest): manifest is EvalCloudManifest => manifest !== null)
+    .sort(
+      (a, b) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+    );
+}
+
+async function resolveCloudManifest(
+  bucket: ReturnType<typeof createEvalsBucket>,
+  runId: string | null,
+): Promise<EvalCloudManifest> {
+  if (runId) return await readManifest(bucket, runId);
+  const manifests = await loadAllCloudManifests(bucket);
+  const latest = manifests[0];
+  if (!latest) throw new Error("No GCS-backed eval runs found.");
+  return latest;
+}
+
+async function readExecutionProgress(
+  executionName: string,
+): Promise<ExecutionProgress | null> {
+  if (!executionName || executionName === "unknown") return null;
+  const client = new ExecutionsClient();
+  const [execution] = await client.getExecution({ name: executionName });
+  const taskCount = toCount(execution.taskCount);
+  const runningCount = toCount(execution.runningCount);
+  const succeededCount = toCount(execution.succeededCount);
+  const failedCount = toCount(execution.failedCount);
+  const cancelledCount = toCount(execution.cancelledCount);
+  const retriedCount = toCount(execution.retriedCount);
+  const pendingCount = Math.max(
+    0,
+    taskCount - runningCount - succeededCount - failedCount - cancelledCount,
+  );
+  let status = "unknown";
+  if (runningCount > 0) status = "running";
+  else if (pendingCount > 0) status = "pending";
+  else if (failedCount > 0) status = "failed";
+  else if (cancelledCount > 0) status = "cancelled";
+  else if (taskCount > 0 && succeededCount >= taskCount) status = "succeeded";
+  else if (execution.completionTime) status = "completed";
+
+  return {
+    taskCount,
+    runningCount,
+    succeededCount,
+    failedCount,
+    cancelledCount,
+    retriedCount,
+    pendingCount,
+    status,
+    logUri: execution.logUri ?? null,
+  };
+}
+
+async function runCloudQuery(options: CloudQueryCliOptions): Promise<number> {
+  const bucket = createEvalsBucket();
+  if (options.command === "list") {
+    const manifests = await loadAllCloudManifests(bucket);
+    if (manifests.length === 0) {
+      process.stdout.write("No GCS-backed eval runs found.\n");
+      return 0;
+    }
+    const rows = await mapWithConcurrency(manifests, 8, async (manifest) => {
+      const summary = await countCompletedCases(bucket, manifest.runId);
+      return [
+        manifest.runId,
+        formatTimestamp(manifest.startedAt),
+        manifest.model,
+        manifest.browserProvider,
+        String(summary.total),
+        String(summary.completed),
+        String(summary.passed),
+        String(summary.errored),
+      ];
+    });
+    process.stdout.write(
+      `${renderTable(["RUN ID", "STARTED", "MODEL", "PROVIDER", "TOTAL", "DONE", "PASSED", "ERRORS"], rows)}\n`,
+    );
+    return 0;
+  }
+
+  const manifest = await resolveCloudManifest(bucket, options.runId);
+  const summary = await countCompletedCases(bucket, manifest.runId);
+  if (options.command === "status") {
+    const executionEntries = cloudExecutionEntries(manifest);
+    const progressRows = await mapWithConcurrency(
+      executionEntries,
+      4,
+      async ({ label, executionName }) => {
+        try {
+          const progress = await readExecutionProgress(executionName);
+          return { label, executionName, progress, error: null };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          process.stderr.write(
+            `Warning: failed to read Cloud Run execution ${executionName}: ${message}\n`,
+          );
+          return { label, executionName, progress: null, error: message };
+        }
+      },
+    );
+
+    const lines = [
+      `Run: ${manifest.runId}`,
+      `Started: ${formatTimestamp(manifest.startedAt)}`,
+      `Model: ${manifest.model}`,
+      `Browser provider: ${manifest.browserProvider}`,
+      `Execution: ${manifest.executionName || "-"}`,
+      progressRows.length === 1 && progressRows[0]?.progress?.logUri
+        ? `Logs: ${progressRows[0].progress.logUri}`
+        : null,
+      "",
+      "Uploaded results:",
+      `  completed: ${summary.completed}/${summary.total}`,
+      `  passed: ${summary.passed}`,
+      `  failed: ${summary.failed}`,
+      `  errored: ${summary.errored}`,
+      `  skipped: ${summary.skipped}`,
+      progressRows.length > 0 ? "" : "Cloud Run progress unavailable.",
+      progressRows.length > 0 ? "Cloud Run:" : null,
+      progressRows.length > 0
+        ? renderTable(
+            [
+              "LANE",
+              "STATUS",
+              "RUNNING",
+              "PENDING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELLED",
+              "RETRIED",
+              "EXECUTION",
+            ],
+            progressRows.map(({ label, executionName, progress, error }) => [
+              label,
+              progress?.status ?? "unknown",
+              progress ? String(progress.runningCount) : "-",
+              progress ? String(progress.pendingCount) : "-",
+              progress ? String(progress.succeededCount) : "-",
+              progress ? String(progress.failedCount) : "-",
+              progress ? String(progress.cancelledCount) : "-",
+              progress ? String(progress.retriedCount) : "-",
+              error ? `${executionName} (${error})` : executionName,
+            ]),
+          )
+        : null,
+    ].filter((line): line is string => line !== null);
+    process.stdout.write(`${lines.join("\n")}\n`);
+    return 0;
+  }
+
+  const downloadedResults = await downloadResults(bucket, manifest.runId);
+  const resultsByTarget = new Map(
+    downloadedResults.map(({ targetId, result }) => [targetId, result]),
+  );
+  const rows = manifest.targets.map((target) => {
+    const result = resultsByTarget.get(target.id);
+    return [
+      target.name,
+      target.agent,
+      result?.status ?? "pending",
+      result ? `${result.score.passed}/${result.score.total}` : "-",
+      result ? formatDuration(result.agentMetrics.durationMs ?? result.durationMs) : "-",
+      result?.agentMetrics.totalCostUsd == null
+        ? "-"
+        : formatUsd(result.agentMetrics.totalCostUsd),
+      result?.agentMetrics.totalTokens == null
+        ? "-"
+        : formatInteger(result.agentMetrics.totalTokens),
+      formatShortError(result?.error),
+    ];
+  });
+
+  process.stdout.write(
+    [
+      `Run: ${manifest.runId}`,
+      `Started: ${formatTimestamp(manifest.startedAt)}`,
+      `Completed: ${summary.completed}/${summary.total}`,
+      `Passed: ${summary.passed}`,
+      `Failed: ${summary.failed}`,
+      `Errored: ${summary.errored}`,
+      "",
+      renderTable(
+        ["CASE", "AGENT", "STATUS", "SCORE", "AGENT DURATION", "AGENT COST", "AGENT TOKENS", "ERROR"],
+        rows,
+      ),
+      "",
+    ].join("\n"),
+  );
+  return 0;
+}
+
+function cloudTargets(
+  selectedCases: EvalCaseRecord[],
+  ids: Map<EvalCaseRecord, string>,
+  agents: EvalAgentName[],
+): EvalCloudTarget[] {
+  const targets: EvalCloudTarget[] = [];
+  for (const evalCase of selectedCases) {
+    const baseId = ids.get(evalCase);
+    if (!baseId) throw new Error(`Failed to allocate result ID for ${evalCase.name}`);
+    if (!evalCase.filePath) {
+      throw new Error(`Eval case ${evalCase.name} is missing file metadata.`);
+    }
+    for (const agent of agents) {
+      targets.push({
+        index: targets.length,
+        id: caseIdForAgent(baseId, agent),
+        baseId,
+        name: evalCase.name,
+        agent,
+        file: toPosixPath(relative(repoRoot, evalCase.filePath)),
+      });
+    }
+  }
+  return targets;
+}
+
 async function runSelectedCases(
   selectedCases: EvalCaseRecord[],
   ids: Map<EvalCaseRecord, string>,
@@ -1445,26 +1987,30 @@ async function runSelectedCases(
   repeatIndex: number,
   maxParallelCases: number,
 ): Promise<CaseResult[]> {
-  return await mapWithConcurrency(
-    selectedCases,
-    maxParallelCases,
-    async (evalCase) => {
+  async function runTargets(
+    targets: Array<{ evalCase: EvalCaseRecord; agent: EvalAgentName }>,
+  ): Promise<CaseResult[]> {
+    const concurrency = options.concurrency ?? maxParallelCases;
+    return await mapWithConcurrency(targets, concurrency, async (target) => {
+      const { evalCase, agent } = target;
       const baseId = ids.get(evalCase);
       if (!baseId) {
         throw new Error(`Failed to allocate result ID for ${evalCase.name}`);
       }
+      const agentId = caseIdForAgent(baseId, agent);
       const id =
         options.repeatCount === 1
-          ? baseId
-          : `${baseId}-repeat-${repeatIndex}`;
+          ? agentId
+          : `${agentId}-repeat-${repeatIndex}`;
       const repeatLabel =
         options.repeatCount === 1
           ? ""
           : ` (repeat ${repeatIndex}/${options.repeatCount})`;
 
-      process.stdout.write(`\n▶ ${evalCase.name}${repeatLabel}\n`);
+      process.stdout.write(`\n▶ ${evalCase.name} [${agent}]${repeatLabel}\n`);
       const result = await runCase(
         evalCase,
+        agent,
         id,
         baseId,
         repeatIndex,
@@ -1474,24 +2020,42 @@ async function runSelectedCases(
         options.provider,
       );
       if (result.status === "completed") {
-        process.stdout.write(`✓ ${evalCase.name}${repeatLabel}\n`);
+        process.stdout.write(`✓ ${evalCase.name} [${agent}]${repeatLabel}\n`);
       } else if (result.status === "skipped") {
         process.stdout.write(
-          `- ${evalCase.name}${repeatLabel} skipped: ${result.skipReason ?? "No reason provided."}\n`,
+          `- ${evalCase.name} [${agent}]${repeatLabel} skipped: ${result.skipReason ?? "No reason provided."}\n`,
         );
       } else {
         process.stdout.write(
-          `✗ ${evalCase.name}${repeatLabel}\n${result.error ?? "Unknown error"}\n`,
+          `✗ ${evalCase.name} [${agent}]${repeatLabel}\n${result.error ?? "Unknown error"}\n`,
         );
       }
       return result;
-    },
+    });
+  }
+
+  const allTargets = selectedCases.flatMap((evalCase) =>
+    options.agents.map((agent) => ({ evalCase, agent })),
   );
+  const primaryTargets = allTargets.filter((target) => !isCachedAgent(target.agent));
+  const cachedTargets = allTargets.filter((target) => isCachedAgent(target.agent));
+
+  return [
+    ...(await runTargets(primaryTargets)),
+    ...(await runTargets(cachedTargets)),
+  ];
 }
 
 async function run(options: CliOptions): Promise<number> {
   if (options.command === "summary") {
     return await runSummary(options);
+  }
+  if (
+    options.command === "list" ||
+    options.command === "status" ||
+    options.command === "results"
+  ) {
+    return await runCloudQuery(options);
   }
   if (options.command === "profiles-status") {
     return await profilesStatus();
@@ -1522,19 +2086,72 @@ async function run(options: CliOptions): Promise<number> {
     );
   }
   preflightRequiredProfiles(selectedCases);
-  ensureEvalModelCredentials(options.model);
+  validateCachedAgentSelection(options.agents);
+  if (options.gcp && options.repeatCount !== 1) {
+    throw new Error(
+      "--repeat-count is not supported with --gcp yet. Run separate Cloud Run evals instead.",
+    );
+  }
+  if (!options.gcp) {
+    ensureEvalModelCredentials(options.model);
+  }
 
   await mkdir(options.outputDir, { recursive: true });
+  const ids = caseIds(selectedCases);
+  const targetBaseId = process.env.EVAL_TARGET_BASE_ID?.trim();
+  const casesForRun = targetBaseId
+    ? selectedCases.filter((evalCase) => ids.get(evalCase) === targetBaseId)
+    : selectedCases;
+  if (targetBaseId && casesForRun.length === 0) {
+    throw new Error(`No eval case matched EVAL_TARGET_BASE_ID=${targetBaseId}.`);
+  }
   const selectedProvider = selectedProviderName(options.provider);
-  const { availableParallelism, maxParallelCases } =
-    detectedEvalConcurrency(selectedCases.length);
-  const attemptCount = selectedCases.length * options.repeatCount;
+  const detectedConcurrency = detectedEvalConcurrency(
+    casesForRun.length * options.agents.length,
+  );
+  const availableParallelism = detectedConcurrency.availableParallelism;
+  const maxParallelCases = options.concurrency ?? detectedConcurrency.maxParallelCases;
+  const attemptCount =
+    casesForRun.length * options.agents.length * options.repeatCount;
+
+  if (options.gcp) {
+    const browserProvider = selectedProviderName(options.provider ?? selectedProvider);
+    const targets = cloudTargets(casesForRun, ids, options.agents);
+    process.stdout.write(
+      `Dispatching ${targets.length} eval target(s) to Cloud Run (${casesForRun.length} case(s), ${options.agents.length} agent(s), ${options.repeatCount} repeat(s)).\n`,
+    );
+    process.stdout.write(`Agents: ${options.agents.join(", ")}\n`);
+    process.stdout.write(`Browser provider: ${browserProvider}\n`);
+    const dispatch = await dispatchEvalGcpRun({
+      model: options.model,
+      browserProvider,
+      fileFilters: options.fileFilters,
+      testNamePattern: options.testNamePattern,
+      noAuth: options.noAuth,
+      agents: options.agents,
+      targets,
+      parallelism: options.concurrency,
+      image: options.gcpImage,
+    });
+    process.stdout.write(
+      [
+        `Dispatched eval run ${dispatch.runId} (${dispatch.totalCases} target(s), parallelism ${dispatch.parallelism}).`,
+        `Execution: ${dispatch.executionName}`,
+        `Check status: pnpm evals status --run ${dispatch.runId}`,
+        `Show results: pnpm evals results --run ${dispatch.runId}`,
+        "",
+      ].join("\n"),
+    );
+    return 0;
+  }
+
   process.stdout.write(
-    `Running ${selectedCases.length} eval case(s) x ${options.repeatCount} repeat(s) = ${attemptCount} attempt(s)\n`,
+    `Running ${casesForRun.length} eval case(s) x ${options.repeatCount} repeat(s) = ${attemptCount} attempt(s)\n`,
   );
   process.stdout.write(
     `Execution: up to ${maxParallelCases} parallel case(s), sequential repeats (detected ${availableParallelism} available CPU(s))\n`,
   );
+  process.stdout.write(`Agents: ${options.agents.join(", ")}\n`);
   process.stdout.write(`Browser provider: ${selectedProvider}\n`);
   if (selectedProvider === "kernel") {
     process.stdout.write("Kernel stealth: true\n");
@@ -1542,7 +2159,6 @@ async function run(options: CliOptions): Promise<number> {
   }
   process.stdout.write(`Output: ${options.outputDir}\n`);
 
-  const ids = caseIds(selectedCases);
   const previousKernelStealth = process.env.KERNEL_STEALTH;
   const previousKernelHeadless = process.env.KERNEL_HEADLESS;
   if (selectedProvider === "kernel") {
@@ -1564,7 +2180,7 @@ async function run(options: CliOptions): Promise<number> {
       }
       results = results.concat(
         await runSelectedCases(
-          selectedCases,
+          casesForRun,
           ids,
           options,
           repeatIndex,
@@ -1648,9 +2264,10 @@ async function run(options: CliOptions): Promise<number> {
     totalCaseDurationMs,
     averageCompletedDurationMs,
     selectedModel: options.model,
+    selectedAgents: options.agents,
     selectedProvider,
     totals: {
-      cases: selectedCases.length,
+      cases: casesForRun.length,
       attempts: results.length,
       completed,
       skipped,
@@ -1671,6 +2288,7 @@ async function run(options: CliOptions): Promise<number> {
       repeatIndex: result.repeatIndex,
       repeatCount: result.repeatCount,
       name: result.name,
+      agent: result.agent,
       status: result.status,
       durationMs: result.durationMs,
       score: result.score,
@@ -1700,7 +2318,9 @@ async function run(options: CliOptions): Promise<number> {
     fileFilters: options.fileFilters,
     testNamePattern: options.testNamePattern,
     selectedModel: options.model,
+    selectedAgents: options.agents,
     selectedProvider,
+    concurrency: options.concurrency,
     noAuth: options.noAuth,
     availableParallelism,
     maxParallelCases,
