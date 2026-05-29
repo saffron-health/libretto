@@ -6,13 +6,14 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   connect,
   disconnectBrowser,
-  getProfilePath,
-  hasProfile,
-  normalizeDomain,
-  normalizeUrl,
   runClose,
   resolveViewport,
 } from "../core/browser.js";
+import {
+  getProfilePath,
+  hasProfile,
+  normalizeProfileName,
+} from "../core/profiles.js";
 import { parseViewportArg } from "./browser.js";
 import {
   assertSessionAvailableForStart,
@@ -68,7 +69,7 @@ type RunIntegrationCommandRequest = {
   visualize: boolean;
   viewport?: { width: number; height: number };
   accessMode: SessionAccessMode;
-  authProfileDomain?: string;
+  authProfileName?: string;
   providerName?: string;
   stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
@@ -564,18 +565,18 @@ async function runIntegrationFromFile(
   const absoluteIntegrationPath = getAbsoluteIntegrationPath(
     args.integrationPath,
   );
-  if (args.authProfileDomain) {
-    const normalizedDomain = normalizeDomain(normalizeUrl(args.authProfileDomain));
-    if (!hasProfile(normalizedDomain)) {
-      const profilePath = getProfilePath(normalizedDomain);
+  if (args.authProfileName && args.providerName !== "libretto-cloud") {
+    const profileName = normalizeProfileName(args.authProfileName);
+    if (!hasProfile(profileName)) {
+      const profilePath = getProfilePath(profileName);
       throw new Error(
         [
-          `Local auth profile not found for domain "${normalizedDomain}".`,
+          `Local auth profile not found: "${profileName}".`,
           `Expected profile file: ${profilePath}`,
           "To create it:",
-          `  1. libretto open https://${normalizedDomain} --headed --session ${args.session}`,
+          `  1. libretto open <site-url> --headed --session ${args.session}`,
           "  2. Log in manually in the browser window.",
-          `  3. libretto save ${normalizedDomain} --session ${args.session}`,
+          `  3. libretto save ${profileName} --session ${args.session}`,
         ].join("\n"),
       );
     }
@@ -594,7 +595,11 @@ async function runIntegrationFromFile(
       session: args.session,
       experiments: args.experiments,
       browser: args.providerName
-        ? { kind: "provider", providerName: args.providerName }
+        ? {
+            kind: "provider",
+            providerName: args.providerName,
+            authProfileName: args.authProfileName,
+          }
         : {
             kind: "launch",
             headed: !args.headless,
@@ -606,7 +611,7 @@ async function runIntegrationFromFile(
         visualize: args.visualize,
         stayOpenOnSuccess: args.stayOpenOnSuccess,
         tsconfigPath: args.tsconfigPath,
-        authProfileDomain: args.authProfileDomain,
+        authProfileName: args.authProfileName,
       },
     },
     logger,
@@ -804,7 +809,7 @@ export const runInput = SimpleCLI.input({
     }),
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
-      help: "Domain for local auth profile (e.g. apps.example.com)",
+      help: "Named auth profile to use for the browser session",
     }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
@@ -896,7 +901,7 @@ export const runCommand = SimpleCLI.command({
         tsconfigPath: input.tsconfig,
         headless: daemonProviderName ? true : (headlessMode ?? false),
         visualize,
-        authProfileDomain: input.authProfile,
+        authProfileName: input.authProfile,
         viewport,
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
         providerName: daemonProviderName,

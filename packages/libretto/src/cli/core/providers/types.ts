@@ -5,6 +5,10 @@ export type ProviderSession = {
   // Only libretto-cloud surfaces this today; direct-SDK providers leave it
   // undefined.
   liveViewUrl?: string;
+  authProfileState?: {
+    cookies?: unknown[];
+    origins?: unknown[];
+  };
 };
 
 export type ProviderCloseResult = {
@@ -15,6 +19,6 @@ export type ProviderCloseResult = {
 };
 
 export type ProviderApi = {
-  createSession(): Promise<ProviderSession>;
+  createSession(options?: { authProfileName?: string }): Promise<ProviderSession>;
   closeSession(sessionId: string): Promise<ProviderCloseResult>;
 };

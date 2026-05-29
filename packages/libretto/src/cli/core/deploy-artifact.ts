@@ -845,9 +845,9 @@ function ensureBundleFile() {
 }
 
 function createWorkflowProxy(workflowName) {
-  return workflow(workflowName, async (ctx, input) => {
-    const impl = nativeRequire(ensureBundleFile());
-    const target = getWorkflowFromModuleExports(impl, workflowName);
+  const impl = nativeRequire(ensureBundleFile());
+  const target = getWorkflowFromModuleExports(impl, workflowName);
+  const proxy = workflow(workflowName, async (ctx, input) => {
     if (!target || typeof target.run !== "function") {
       throw new Error(
         \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
@@ -855,6 +855,13 @@ function createWorkflowProxy(workflowName) {
     }
     return await target.run(ctx, input);
   });
+  if (target && target.authProfileName) {
+    Object.defineProperty(proxy, "authProfileName", {
+      value: target.authProfileName,
+      enumerable: true,
+    });
+  }
+  return proxy;
 }
 
 ${exportLines}

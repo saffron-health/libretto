@@ -19,6 +19,7 @@ export type LibrettoWorkflowSchemas<
 > = {
   input: InputSchema;
   output: OutputSchema;
+  authProfile?: string | { name: string };
 };
 
 // Thrown when input fails Zod validation. The runner surfaces `.message`
@@ -89,6 +90,7 @@ export class LibrettoWorkflow<
   // this schema to JSON Schema at build time and exposes it via
   // /v1/workflows/get so API consumers know the workflow's output shape.
   public readonly outputSchema?: OutputSchema;
+  public readonly authProfileName?: string;
   private readonly handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
@@ -105,6 +107,7 @@ export class LibrettoWorkflow<
     this.name = name;
     this.inputSchema = schemas?.input;
     this.outputSchema = schemas?.output;
+    this.authProfileName = normalizeWorkflowAuthProfile(schemas?.authProfile);
     this.handler = handler;
   }
 
@@ -122,6 +125,7 @@ export type ExportedLibrettoWorkflow = {
   readonly name: string;
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;
+  readonly authProfileName?: string;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -249,4 +253,11 @@ export function workflow(
     );
   }
   return new LibrettoWorkflow(name, schemasOrHandler, maybeHandler);
+}
+
+function normalizeWorkflowAuthProfile(
+  value: LibrettoWorkflowSchemas<z.ZodType, z.ZodType>["authProfile"],
+): string | undefined {
+  if (!value) return undefined;
+  return typeof value === "string" ? value : value.name;
 }

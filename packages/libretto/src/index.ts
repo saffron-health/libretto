@@ -93,6 +93,10 @@ export {
 
 // Workflow helpers
 export {
+  librettoAuthenticate,
+  type LibrettoAuthenticateOptions,
+} from "./shared/workflow/authenticate.js";
+export {
   getDefaultWorkflowFromModuleExports,
   getWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,

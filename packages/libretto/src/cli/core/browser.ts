@@ -6,14 +6,13 @@ import {
   type Page,
 } from "playwright";
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { createServer } from "node:net";
 import { isWindowsNamedPipePath } from "../../shared/ipc/socket-transport.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import type { Experiments } from "./experiments.js";
-import { getSessionProviderClosePath, PROFILES_DIR } from "./context.js";
+import { getSessionProviderClosePath } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
 import {
   getCloudProviderApi,
@@ -30,6 +29,12 @@ import {
   writeSessionState,
 } from "./session.js";
 import { DaemonClient } from "./daemon/ipc.js";
+import {
+  getProfilePath,
+  hasProfile,
+  normalizeProfileName,
+  writeProfile,
+} from "./profiles.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const PROVIDER_CLOSE_WAIT_MS = 30_000;
@@ -109,14 +114,6 @@ export function normalizeUrl(url: string): URL {
 
 export function normalizeDomain(url: URL): string {
   return url.hostname.replace(/^www\./, "");
-}
-
-export function getProfilePath(domain: string): string {
-  return join(PROFILES_DIR, `${domain}.json`);
-}
-
-export function hasProfile(domain: string): boolean {
-  return existsSync(getProfilePath(domain));
 }
 
 async function tryConnectToCDP(
@@ -403,7 +400,7 @@ export async function runOpen(
   options: {
     viewport?: { width: number; height: number };
     accessMode?: SessionAccessMode;
-    authProfileDomain?: string;
+    authProfileName?: string;
     experiments: Experiments;
   },
 ): Promise<void> {
@@ -427,40 +424,43 @@ export async function runOpen(
 
   const browserMode = headed ? "headed" : "headless";
 
-  // When --auth-profile is provided, use that domain for profile lookup
-  // instead of deriving it from the URL.
-  const authDomain = options?.authProfileDomain
-    ? normalizeDomain(normalizeUrl(options.authProfileDomain))
+  // When --auth-profile is provided, use that named profile instead of
+  // deriving a legacy domain profile from the URL.
+  const authProfileName = options?.authProfileName
+    ? normalizeProfileName(options.authProfileName)
     : undefined;
-  if (authDomain) {
-    const authProfilePath = getProfilePath(authDomain);
+  if (authProfileName) {
+    const authProfilePath = getProfilePath(authProfileName);
     if (!existsSync(authProfilePath)) {
       throw new Error(
-        `No saved auth profile for "${authDomain}". ` +
-          `Save one first: libretto open https://${authDomain} --headed --session <name>, ` +
-          `log in, then run: libretto save ${authDomain} --session <name>`,
+        `No saved auth profile named "${authProfileName}". ` +
+          `Save one first: libretto open ${url} --headed --session <name>, ` +
+          `log in, then run: libretto save ${authProfileName} --session <name>`,
       );
     }
   }
 
   const supportsSavedProfile =
     parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
-  const domain = authDomain ?? (supportsSavedProfile ? normalizeDomain(parsedUrl) : undefined);
-  const profilePath = domain ? getProfilePath(domain) : undefined;
-  const useProfile = domain ? hasProfile(domain) : false;
+  const implicitProfileName = supportsSavedProfile
+    ? normalizeDomain(parsedUrl)
+    : undefined;
+  const profileName = authProfileName ?? implicitProfileName;
+  const profilePath = profileName ? getProfilePath(profileName) : undefined;
+  const useProfile = profileName ? hasProfile(profileName) : false;
 
   logger.info("open-launching", {
     url,
     mode: browserMode,
     session,
     port,
-    domain,
+    profileName,
     useProfile,
     profilePath: useProfile ? profilePath : undefined,
   });
 
   if (useProfile) {
-    console.log(`Loading saved profile for ${domain}`);
+    console.log(`Loading saved profile ${profileName}`);
   }
   console.log(`Launching ${browserMode} browser (session: ${session})...`);
 
@@ -523,6 +523,7 @@ export async function runOpenWithProvider(
   logger: LoggerApi,
   accessMode: SessionAccessMode,
   experiments: Experiments,
+  authProfileName?: string,
 ): Promise<void> {
   const parsedUrl = normalizeUrl(rawUrl);
   const url = parsedUrl.href;
@@ -548,6 +549,9 @@ export async function runOpenWithProvider(
         kind: "provider",
         providerName,
         initialUrl: url,
+        authProfileName: authProfileName
+          ? normalizeProfileName(authProfileName)
+          : undefined,
       },
     },
     logger,
@@ -602,18 +606,18 @@ export async function runOpenWithProvider(
 }
 
 export async function runSave(
-  urlOrDomain: string,
+  profileName: string,
   session: string,
   logger: LoggerApi,
+  options: { site?: string } = {},
 ): Promise<void> {
-  logger.info("save-start", { urlOrDomain, session });
+  logger.info("save-start", { profileName, session, site: options.site });
   const { browser, context, page } = await connect(session, logger);
 
   try {
     await new Promise((r) => setTimeout(r, 500));
 
-    const domain = normalizeDomain(normalizeUrl(urlOrDomain));
-    const profilePath = getProfilePath(domain);
+    const normalizedProfileName = normalizeProfileName(profileName);
 
     const cdpSession = await context.newCDPSession(page);
     const { cookies: rawCookies } = await cdpSession.send(
@@ -662,23 +666,94 @@ export async function runSave(
     }
 
     const state = { cookies, origins };
-    await mkdir(dirname(profilePath), { recursive: true });
-    await writeFile(profilePath, JSON.stringify(state, null, 2));
+    const profilePath = await writeProfile(normalizedProfileName, state);
 
     logger.info("save-success", {
-      domain,
+      profileName: normalizedProfileName,
       profilePath,
       cookieCount: cookies.length,
       originCount: origins.length,
     });
-    console.log(`Profile saved for ${domain}`);
+    console.log(`Profile saved: ${normalizedProfileName}`);
     console.log(`   Location: ${profilePath}`);
     console.log(`   Cookies: ${cookies.length}, Origins: ${origins.length}`);
   } catch (err) {
-    logger.error("save-error", { error: err, urlOrDomain, session });
+    logger.error("save-error", { error: err, profileName, session });
     throw err;
   } finally {
     disconnectBrowser(browser, logger, session);
+  }
+}
+
+export async function runFetchChromeProfile(
+  profileName: string,
+  cdpUrl: string,
+  logger: LoggerApi,
+): Promise<void> {
+  const normalizedProfileName = normalizeProfileName(profileName);
+  logger.info("fetch-chrome-profile-start", {
+    profileName: normalizedProfileName,
+    cdpUrl,
+  });
+  const browser = await chromium.connectOverCDP(cdpUrl);
+  try {
+    const context = browser.contexts()[0];
+    if (!context) {
+      throw new Error("Connected Chrome instance has no browser context.");
+    }
+    const pages = context.pages().filter(isOperationalPage);
+    const page = pages[0] ?? (await context.newPage());
+    const cdpSession = await context.newCDPSession(page);
+    const { cookies: rawCookies } = await cdpSession.send(
+      "Network.getAllCookies",
+    );
+    await cdpSession.detach();
+
+    const cookies = rawCookies.map((c: unknown) => {
+      const cookie = { ...(c as Record<string, unknown>) };
+      if (cookie.partitionKey && typeof cookie.partitionKey === "object") {
+        delete cookie.partitionKey;
+      }
+      return cookie;
+    });
+
+    const origins: Array<{
+      origin: string;
+      localStorage: Array<{ name: string; value: string }>;
+    }> = [];
+    for (const pg of pages) {
+      try {
+        const origin = new URL(pg.url()).origin;
+        const localStorage = await pg.evaluate(() => {
+          const items: Array<{ name: string; value: string }> = [];
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key) {
+              items.push({
+                name: key,
+                value: window.localStorage.getItem(key) || "",
+              });
+            }
+          }
+          return items;
+        });
+        if (localStorage.length > 0) {
+          origins.push({ origin, localStorage });
+        }
+      } catch {
+        // Skip pages that can't be inspected.
+      }
+    }
+
+    const profilePath = await writeProfile(normalizedProfileName, {
+      cookies,
+      origins,
+    });
+    console.log(`Profile fetched: ${normalizedProfileName}`);
+    console.log(`   Location: ${profilePath}`);
+    console.log(`   Cookies: ${cookies.length}, Origins: ${origins.length}`);
+  } finally {
+    disconnectBrowser(browser, logger);
   }
 }
 

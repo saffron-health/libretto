@@ -1,9 +1,12 @@
 import { authCommands } from "./commands/auth.js";
 import { billingCommands } from "./commands/billing.js";
 import { browserCommands } from "./commands/browser.js";
+import { credentialCommands } from "./commands/credentials.js";
 import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
 import { experimentsCommand } from "./commands/experiments.js";
+import { localProfileCommands } from "./commands/local-profiles.js";
+import { profileCommands } from "./commands/profiles.js";
 import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
 import { snapshotCommand } from "./commands/snapshot.js";
@@ -19,9 +22,12 @@ export const cliRoutes = {
       deploy: deployCommand,
       auth: authCommands,
       billing: billingCommands,
+      credentials: credentialCommands,
+      profiles: profileCommands,
     },
   }),
   experiments: experimentsCommand,
+  profiles: localProfileCommands,
   ...executionCommands,
   search: searchCommand,
   setup: setupCommand,

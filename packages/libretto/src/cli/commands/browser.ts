@@ -80,7 +80,7 @@ export const openInput = SimpleCLI.input({
     }),
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
-      help: "Override the domain used for auth profile lookup (e.g. use login.example.com's profile when opening app.example.com)",
+      help: "Named auth profile to load before opening the page",
     }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
@@ -119,7 +119,7 @@ export const openCommand = SimpleCLI.command({
           input.readOnly,
           input.writeAccess,
         ),
-        authProfileDomain: input.authProfile,
+        authProfileName: input.authProfile,
         experiments: ctx.experiments,
       });
     } else {
@@ -130,6 +130,7 @@ export const openCommand = SimpleCLI.command({
         ctx.logger,
         resolveRequestedSessionMode(input.readOnly, input.writeAccess),
         ctx.experiments,
+        input.authProfile,
       );
     }
   });
@@ -180,16 +181,19 @@ export const connectCommand = SimpleCLI.command({
 
 export const saveInput = SimpleCLI.input({
   positionals: [
-    SimpleCLI.positional("urlOrDomain", z.string().optional(), {
-      help: "URL or domain to save",
+    SimpleCLI.positional("profileName", z.string().optional(), {
+      help: "Profile name to save",
     }),
   ],
   named: {
     session: sessionOption(),
+    site: SimpleCLI.option(z.string().optional(), {
+      help: "Site or domain this profile is for",
+    }),
   },
 }).refine(
-  (input) => Boolean(input.urlOrDomain),
-  `Usage: libretto save <url|domain> --session <name>`,
+  (input) => Boolean(input.profileName),
+  `Usage: libretto save <profile-name> --session <name> [--site <url|domain>]`,
 );
 
 export const saveCommand = SimpleCLI.command({
@@ -198,7 +202,9 @@ export const saveCommand = SimpleCLI.command({
   .input(saveInput)
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
-    await runSave(input.urlOrDomain!, ctx.session, ctx.logger);
+    await runSave(input.profileName!, ctx.session, ctx.logger, {
+      site: input.site,
+    });
   });
 
 export const pagesInput = SimpleCLI.input({
