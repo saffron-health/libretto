@@ -87,76 +87,7 @@ Healthcare automation companies see the highest value from deterministic approac
 
 Financial services automation faces similar requirements. Tax preparation automation, insurance claim processing, and compliance reporting all demand reproducible workflows. Libretto's deterministic approach ensures these workflows behave predictably across regulatory audits and compliance reviews.
 
-Manufacturing and logistics companies increasingly adopt deterministic automation for supply chain integrations. These workflows often integrate with legacy systems that demand consistent interaction patterns and reliable data exchange protocols.
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Article",
-      "headline": "Deterministic Browser Automation: Why It Matters",
-      "description": "Deterministic browser automation ensures predictable, auditable workflows for regulated industries where non-deterministic agents create compliance risk.",
-      "author": {
-        "@type": "Person",
-        "name": "Tanishq Kancharla",
-        "jobTitle": "Founder",
-        "sameAs": ["https://www.linkedin.com/in/tanishq-k/"]
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "Libretto",
-        "url": "https://libretto.sh",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://libretto.sh/logos/logo-light.svg"
-        }
-      },
-      "datePublished": "2026-05-31",
-      "dateModified": "2026-05-31",
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": "https://libretto.sh/blog/deterministic-browser-automation-why-it-matters"
-      }
-    },
-    {
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "@id": "https://libretto.sh"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Blog",
-          "@id": "https://libretto.sh/blog"
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": "Deterministic Browser Automation: Why It Matters"
-        }
-      ]
-    },
-    {
-      "@type": "WebSite",
-      "name": "Libretto",
-      "url": "https://libretto.sh",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": {
-          "@type": "EntryPoint",
-          "urlTemplate": "https://libretto.sh/docs?q={search_term_string}"
-        },
-        "query-input": "required name=search_term_string"
-      }
-    }
-  ]
-}
-</script>`,
+Manufacturing and logistics companies increasingly adopt deterministic automation for supply chain integrations. These workflows often integrate with legacy systems that demand consistent interaction patterns and reliable data exchange protocols.`,
   }),
   createBlogPost({
     slug: "agent-friendly-debugging-browser-automation",
@@ -217,76 +148,7 @@ Libretto bridges traditional browser automation and agent-friendly debugging by 
 
 The system provides JSON-structured error responses, serialized page state, and programmatic retry suggestions. When automation fails, agents receive enough structured context to understand the failure and either retry with modifications or generate fix suggestions.
 
-This approach enables autonomous debugging workflows where agents can identify failures, understand root causes, and generate fixes without requiring human interpretation of traditional debugging output.
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Article",
-      "headline": "Agent-Friendly Debugging: Why Browser Automation Tools Need AI-Ready Output",
-      "description": "Standard debugging output isn't structured for AI consumption. Learn why QA teams need debugging tools designed for agent workflows and autonomous test development.",
-      "author": {
-        "@type": "Person",
-        "name": "Tanishq Kancharla",
-        "jobTitle": "Founder",
-        "sameAs": ["https://www.linkedin.com/in/tanishq-k/"]
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "Libretto",
-        "url": "https://libretto.sh",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://libretto.sh/logos/logo-light.svg"
-        }
-      },
-      "datePublished": "2026-05-30",
-      "dateModified": "2026-05-30",
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": "https://libretto.sh/blog/agent-friendly-debugging-browser-automation"
-      }
-    },
-    {
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "@id": "https://libretto.sh"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Blog",
-          "@id": "https://libretto.sh/blog"
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": "Agent-Friendly Debugging: Why Browser Automation Tools Need AI-Ready Output"
-        }
-      ]
-    },
-    {
-      "@type": "WebSite",
-      "name": "Libretto",
-      "url": "https://libretto.sh",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": {
-          "@type": "EntryPoint",
-          "urlTemplate": "https://libretto.sh/docs?q={search_term_string}"
-        },
-        "query-input": "required name=search_term_string"
-      }
-    }
-  ]
-}
-</script>`,
+This approach enables autonomous debugging workflows where agents can identify failures, understand root causes, and generate fixes without requiring human interpretation of traditional debugging output.`,
   }),
   createBlogPost({
     slug: "browser-automation-for-ai-agents",
@@ -356,76 +218,7 @@ Migration strategies depend on existing automation maturity and team structure. 
 
 Teams starting fresh should prioritize agent integration from the beginning. Building automation with agent consumption in mind creates better long-term maintainability than retrofitting human-focused tools for agent use.
 
-The migration process typically involves three phases: assessment of existing automation requirements, pilot projects with agent-ready tools, and gradual replacement of human-dependent workflows with autonomous alternatives.
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Article",
-      "headline": "Browser Automation for AI Agents: Building Reliable Autonomous Workflows",
-      "description": "AI agents need specialized browser automation tools for deterministic, repeatable execution. Compare approaches and learn what makes automation truly agent-ready.",
-      "author": {
-        "@type": "Person",
-        "name": "Tanishq Kancharla",
-        "jobTitle": "Founder",
-        "sameAs": ["https://www.linkedin.com/in/tanishq-k/"]
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "Libretto",
-        "url": "https://libretto.sh",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://libretto.sh/logos/logo-light.svg"
-        }
-      },
-      "datePublished": "2026-05-29",
-      "dateModified": "2026-05-29",
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": "https://libretto.sh/blog/browser-automation-for-ai-agents"
-      }
-    },
-    {
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "@id": "https://libretto.sh"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Blog",
-          "@id": "https://libretto.sh/blog"
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": "Browser Automation for AI Agents: Building Reliable Autonomous Workflows"
-        }
-      ]
-    },
-    {
-      "@type": "WebSite",
-      "name": "Libretto",
-      "url": "https://libretto.sh",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": {
-          "@type": "EntryPoint",
-          "urlTemplate": "https://libretto.sh/docs?q={search_term_string}"
-        },
-        "query-input": "required name=search_term_string"
-      }
-    }
-  ]
-}
-</script>`,
+The migration process typically involves three phases: assessment of existing automation requirements, pilot projects with agent-ready tools, and gradual replacement of human-dependent workflows with autonomous alternatives.`,
   }),
   createBlogPost({
     slug: "what-we-learned-building-healthcare-integrations",
