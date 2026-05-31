@@ -22,6 +22,412 @@ function createBlogPost(post: BlogPostInput): BlogPost {
 
 export const BLOG_POSTS = [
   createBlogPost({
+    slug: "deterministic-browser-automation-why-it-matters",
+    title: "Deterministic Browser Automation: Why It Matters",
+    description:
+      "Deterministic browser automation ensures predictable, auditable workflows for regulated industries where non-deterministic agents create compliance risk.",
+    publishedAt: "2026-05-31",
+    readingTime: "6 min read",
+    markdown: String.raw`# Deterministic Browser Automation: Why It Matters
+
+Deterministic browser automation ensures predictable, auditable workflows for regulated industries where non-deterministic agents create compliance risk. Unlike traditional automation tools that rely on unpredictable DOM parsing or runtime decision-making, deterministic approaches guarantee consistent behavior across executions. Healthcare and financial automation companies require this level of certainty because flaky automation creates liability and regulatory failures.
+
+**Quick Answer (40-60 words):** Deterministic browser automation guarantees identical behavior across script executions through predictable selectors, fixed wait strategies, and reproducible workflows. Essential for healthcare, finance, and compliance applications where audit trails and consistent outcomes matter more than adaptive flexibility.
+
+## What is deterministic browser automation?
+
+Deterministic browser automation refers to web automation scripts that produce identical results when run multiple times against the same target environment. Every action, selector, and timing decision follows predefined logic rather than runtime adaptation. The automation behaves predictably: same inputs produce same outputs, same page states trigger same responses.
+
+Traditional browser automation often incorporates non-deterministic elements. AI-driven tools like Browser Use make runtime decisions based on page analysis. These decisions can vary between executions even when facing identical page states. Deterministic automation eliminates this variability by pre-defining every interaction pattern and fallback strategy.
+
+## How do deterministic and non-deterministic approaches differ?
+
+Non-deterministic automation adapts to page changes through runtime intelligence. AI agents analyze DOM structures, make decisions about which elements to interact with, and adjust their behavior based on visual or structural cues. This flexibility helps handle dynamic websites but introduces unpredictability.
+
+Deterministic automation follows explicit scripts with predefined interaction patterns. Every selector, wait condition, and error handling strategy gets defined during development rather than discovered during execution.
+
+| Aspect | Deterministic | Non-deterministic |
+|--------|---------------|-------------------|
+| **Execution Consistency** | Identical behavior per run | Variable behavior per run |
+| **Error Handling** | Predefined fallback paths | Runtime decision-making |
+| **Debugging** | Reproducible failures | Context-dependent failures |
+| **Compliance** | Full audit trail | Partial audit trail |
+| **Development Time** | Higher upfront cost | Lower upfront cost |
+| **Runtime Performance** | Faster execution | Slower execution |
+
+According to [Browserbase](https://www.browserbase.com/blog/browser-agent-autonomy-levels), Playwright and Puppeteer represented the state of the art in 2022 as deterministic automation tools that "worked well until the web inevitably changed."
+
+## Why do regulated workflows demand determinism?
+
+Regulated industries require complete audit trails and predictable behavior patterns. Healthcare automation must demonstrate exactly which actions occurred during patient data processing. Financial automation needs reproducible workflows for compliance reporting and risk management.
+
+Non-deterministic agents introduce uncertainty into these processes. When an AI agent makes a runtime decision about which patient record to access or which form field to populate, that decision becomes difficult to audit or reproduce. Regulatory bodies require documentation showing exactly how automated systems behave under specific conditions.
+
+Deterministic automation provides this documentation through explicit script definitions. Every conditional branch, timing decision, and error response gets documented in code rather than discovered through runtime analysis. This creates the paper trail regulatory frameworks demand.
+
+## Where do Playwright and Puppeteer fit in modern automation?
+
+[Browserbase research](https://www.browserbase.com/blog/browser-agent-autonomy-levels) indicates Playwright and Puppeteer established deterministic automation as the foundation layer for web interactions. These tools provide reliable primitives: predictable selectors, consistent wait strategies, and reproducible page interactions.
+
+Modern agent frameworks often build on top of these deterministic foundations. [Browser Use success rates](https://www.firecrawl.dev/blog/best-browser-agents) increased from ~30% to ~80% when switching from fully autonomous to a plan-follower model with human oversight. This hybrid approach combines deterministic execution with bounded AI decision-making.
+
+Libretto extends this philosophy by providing deterministic browser automation specifically designed for agent consumption. Rather than replacing Playwright, Libretto builds agent-friendly debugging and workflow capture on top of proven deterministic foundations.
+
+## What performance and cost trade-offs should you expect?
+
+Deterministic automation typically offers better performance characteristics than runtime AI approaches. [Workflow Use reports](https://news.ycombinator.com/item?id=44007065) scripts run "reliably, 10x faster, and ~90% cheaper than Browser Use" when using predetermined interaction patterns instead of runtime decision-making.
+
+[Agent-browser performance data](https://agent-browser.dev) shows text output uses ~200-400 tokens compared to ~3000-5000 tokens for full DOM output. Deterministic automation achieves similar efficiency gains by avoiding repeated page analysis and decision-making overhead.
+
+The trade-off involves higher development-time investment. Deterministic scripts require explicit definition of interaction patterns, error handling paths, and edge case responses. Runtime AI approaches shift this complexity from development-time to execution-time, but at the cost of unpredictability and higher computational overhead.
+
+## Which industries benefit most from deterministic automation?
+
+Healthcare automation companies see the highest value from deterministic approaches. Electronic Health Record integrations require consistent data extraction patterns and reliable audit trails. Patient data processing cannot tolerate non-deterministic behavior that might access wrong records or misinterpret critical information.
+
+Financial services automation faces similar requirements. Tax preparation automation, insurance claim processing, and compliance reporting all demand reproducible workflows. Libretto's deterministic approach ensures these workflows behave predictably across regulatory audits and compliance reviews.
+
+Manufacturing and logistics companies increasingly adopt deterministic automation for supply chain integrations. These workflows often integrate with legacy systems that demand consistent interaction patterns and reliable data exchange protocols.
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Article",
+      "headline": "Deterministic Browser Automation: Why It Matters",
+      "description": "Deterministic browser automation ensures predictable, auditable workflows for regulated industries where non-deterministic agents create compliance risk.",
+      "author": {
+        "@type": "Person",
+        "name": "Tanishq Kancharla",
+        "jobTitle": "Founder",
+        "sameAs": ["https://www.linkedin.com/in/tanishq-k/"]
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Libretto",
+        "url": "https://libretto.sh",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://libretto.sh/logos/logo-light.svg"
+        }
+      },
+      "datePublished": "2026-05-31",
+      "dateModified": "2026-05-31",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://libretto.sh/blog/deterministic-browser-automation-why-it-matters"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "@id": "https://libretto.sh"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Blog",
+          "@id": "https://libretto.sh/blog"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Deterministic Browser Automation: Why It Matters"
+        }
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "name": "Libretto",
+      "url": "https://libretto.sh",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://libretto.sh/docs?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+  ]
+}
+</script>`,
+  }),
+  createBlogPost({
+    slug: "agent-friendly-debugging-browser-automation",
+    title: "Agent-Friendly Debugging: Why Browser Automation Tools Need AI-Ready Output",
+    description:
+      "Standard debugging output isn't structured for AI consumption. Learn why QA teams need debugging tools designed for agent workflows and autonomous test development.",
+    publishedAt: "2026-05-30",
+    readingTime: "5 min read",
+    markdown: String.raw`# Agent-Friendly Debugging: Why Browser Automation Tools Need AI-Ready Output
+
+Standard debugging output from traditional browser automation tools wasn't designed for AI consumption. Playwright logs, Chrome DevTools output, and conventional error messages require human interpretation. QA teams building autonomous test workflows need debugging information structured for agent consumption rather than manual review.
+
+**Quick Answer (40-60 words):** Agent-friendly debugging provides structured, machine-readable output that AI agents can interpret without human intervention. Essential for autonomous test development, workflow generation, and production debugging where agents need to understand failures and generate fixes independently.
+
+## What makes debugging output "agent-friendly"?
+
+Agent-friendly debugging output follows structured formats that AI systems can parse and act upon programmatically. Rather than human-readable error messages, these tools provide JSON payloads, structured logs, and machine-interpretable state descriptions.
+
+Traditional debugging tools optimize for human consumption. Playwright generates verbose console output with stack traces formatted for developer reading. Chrome DevTools presents visual information designed for manual analysis. These formats require human interpretation to understand what went wrong and how to fix it.
+
+Agent-friendly debugging transforms this information into structured data. Error states become JSON objects. Page state gets serialized into parseable formats. Network failures include programmatic retry instructions rather than human-readable descriptions.
+
+## How does traditional debugging fall short for AI agents?
+
+Traditional debugging assumes human developers will interpret output and make decisions about fixes. Error messages use natural language descriptions. Stack traces point to code lines developers can examine manually. Browser state gets presented visually through developer tools interfaces.
+
+AI agents cannot effectively consume this information. Natural language error messages require interpretation. Visual debugging interfaces cannot be parsed programmatically. Stack traces lack the structured context agents need to generate automated fixes.
+
+Consider a typical Playwright timeout error: "Timeout 30000ms exceeded. Locator: text=Submit". This tells a human developer that an element wasn't found, but provides minimal context for an agent to understand the page state, why the element wasn't available, or what alternative selectors might work.
+
+## What should agent-friendly debugging include?
+
+Effective agent-friendly debugging provides multiple layers of structured information. Page state snapshots capture DOM structure, element availability, and timing information in machine-readable formats. Error contexts include alternative selector suggestions and retry strategies.
+
+Network debugging becomes particularly important for agent workflows. Rather than showing HTTP status codes and response headers in human-readable formats, agent-friendly tools provide structured request/response data that agents can analyze to understand API failures and generate network-based alternatives to browser automation.
+
+Libretto's debugging architecture exemplifies this approach. When automation fails, the system captures structured page state, provides alternative interaction strategies, and formats errors as actionable JSON rather than human-readable messages.
+
+## Why do autonomous test workflows need structured debugging?
+
+Autonomous test development requires agents to understand failures and generate fixes without human intervention. Traditional debugging creates a dependency on human interpretation that breaks autonomous workflows.
+
+When an automated test fails in production, agent-friendly debugging enables the AI system to analyze the failure, understand the root cause, and either retry with different parameters or generate a fix for human review. This reduces the manual intervention required to maintain automation scripts.
+
+QA teams using autonomous agents for test generation see particular benefits. Rather than having agents generate tests that require manual debugging when they fail, agent-friendly debugging enables the AI to iterate on test logic autonomously until scripts achieve reliability.
+
+## Which debugging patterns work best for agents?
+
+Structured error responses perform better than natural language descriptions. JSON error objects with standardized fields enable agents to programmatically understand failure modes and generate appropriate responses.
+
+State snapshots prove more valuable than visual debugging interfaces. Serialized DOM state, element availability maps, and timing information provide the context agents need to understand page conditions and generate alternative strategies.
+
+Network debugging requires particular attention to format. Raw HTTP logs help agents reverse-engineer APIs and build network-based alternatives to UI automation. This debugging information should be structured for programmatic analysis rather than human review.
+
+## Where does Libretto fit in the agent debugging landscape?
+
+Libretto bridges traditional browser automation and agent-friendly debugging by providing structured output designed for AI consumption. Rather than replacing existing debugging tools, Libretto translates their output into formats agents can interpret and act upon.
+
+The system provides JSON-structured error responses, serialized page state, and programmatic retry suggestions. When automation fails, agents receive enough structured context to understand the failure and either retry with modifications or generate fix suggestions.
+
+This approach enables autonomous debugging workflows where agents can identify failures, understand root causes, and generate fixes without requiring human interpretation of traditional debugging output.
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Article",
+      "headline": "Agent-Friendly Debugging: Why Browser Automation Tools Need AI-Ready Output",
+      "description": "Standard debugging output isn't structured for AI consumption. Learn why QA teams need debugging tools designed for agent workflows and autonomous test development.",
+      "author": {
+        "@type": "Person",
+        "name": "Tanishq Kancharla",
+        "jobTitle": "Founder",
+        "sameAs": ["https://www.linkedin.com/in/tanishq-k/"]
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Libretto",
+        "url": "https://libretto.sh",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://libretto.sh/logos/logo-light.svg"
+        }
+      },
+      "datePublished": "2026-05-30",
+      "dateModified": "2026-05-30",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://libretto.sh/blog/agent-friendly-debugging-browser-automation"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "@id": "https://libretto.sh"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Blog",
+          "@id": "https://libretto.sh/blog"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Agent-Friendly Debugging: Why Browser Automation Tools Need AI-Ready Output"
+        }
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "name": "Libretto",
+      "url": "https://libretto.sh",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://libretto.sh/docs?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+  ]
+}
+</script>`,
+  }),
+  createBlogPost({
+    slug: "browser-automation-for-ai-agents",
+    title: "Browser Automation for AI Agents: Building Reliable Autonomous Workflows",
+    description:
+      "AI agents need specialized browser automation tools for deterministic, repeatable execution. Compare approaches and learn what makes automation truly agent-ready.",
+    publishedAt: "2026-05-29",
+    readingTime: "7 min read",
+    markdown: String.raw`# Browser Automation for AI Agents: Building Reliable Autonomous Workflows
+
+AI agents need specialized browser automation capabilities that traditional tools weren't designed to provide. Standard browser automation focuses on human-driven development workflows, while agent-ready automation must handle autonomous execution, structured debugging, and deterministic behavior across repeated runs.
+
+**Quick Answer (40-60 words):** Agent-ready browser automation provides deterministic execution, structured debugging output, and programmatic error handling that AI systems can interpret without human intervention. Essential for autonomous workflows where agents generate, execute, and maintain browser scripts independently.
+
+## What makes automation "AI-agent-ready"?
+
+Agent-ready automation differs from traditional browser automation in fundamental ways. Standard tools like Playwright assume human developers will write scripts, debug failures, and maintain automation over time. Agent-ready tools enable AI systems to perform these tasks autonomously.
+
+Deterministic execution becomes crucial for agent workflows. When an AI generates an automation script, that script must behave predictably across multiple executions. Non-deterministic elements like runtime decision-making or adaptive selectors create unpredictability that agents struggle to manage.
+
+Structured debugging output enables autonomous error handling. Rather than human-readable error messages, agent-ready tools provide JSON responses with programmatic retry instructions. This structured information allows agents to understand failures and generate fixes without human interpretation.
+
+## How do different automation approaches compare for agent use?
+
+Traditional browser automation tools optimize for human development workflows. Selenium WebDriver provides low-level browser control but requires extensive manual configuration. Playwright offers higher-level APIs but still assumes human developers will handle edge cases and debugging.
+
+Agent frameworks attempt to bridge this gap with varying approaches. Some tools add AI decision-making on top of existing automation frameworks. Others build agent-specific interfaces while maintaining deterministic execution underneath.
+
+| Tool Category | Deterministic Execution | Structured Debugging | Agent Integration | Best For |
+|---------------|------------------------|---------------------|-------------------|----------|
+| **Traditional (Playwright)** | Yes | No | Manual | Human-driven development |
+| **AI Agents (Browser Use)** | No | Partial | Native | Exploratory workflows |
+| **Hybrid (Libretto)** | Yes | Yes | Native | Production agent workflows |
+| **Headless Browsers** | Yes | No | Manual | API integration |
+
+Research from [Firecrawl](https://www.firecrawl.dev/blog/best-browser-agents) shows Browser Use success rates jumping "from ~30% to ~80% when switching from fully autonomous to a plan-follower model with human oversight." This improvement comes from combining deterministic execution with bounded AI decision-making.
+
+## Why do traditional tools fail with autonomous agents?
+
+Traditional automation tools create dependencies on human intervention that break autonomous workflows. When Playwright scripts fail, developers manually analyze error messages, inspect page state, and modify selectors or timing logic.
+
+Autonomous agents cannot replicate this debugging process with traditional tools. Natural language error messages require interpretation. Visual debugging interfaces cannot be parsed programmatically. Stack traces lack the structured context agents need to generate fixes.
+
+Performance characteristics also create problems for agent workflows. Traditional debugging assumes developers will manually optimize scripts for speed and reliability. Agents need automation that performs consistently without manual tuning or optimization.
+
+## What unique capabilities do agents need?
+
+Agents require programmatic access to page state and interaction alternatives. When an automation action fails, the agent needs structured information about page conditions, alternative selectors, and retry strategies.
+
+Network-level debugging becomes particularly valuable for agent workflows. Agents can often replace unreliable UI automation with direct API calls when they understand the underlying network requests. This requires debugging tools that capture and structure network traffic for programmatic analysis.
+
+Autonomous script generation demands different development patterns. Rather than writing scripts manually, agents need to observe workflows, capture interaction patterns, and generate automation code. This workflow requires tools designed for programmatic script generation rather than manual development.
+
+## Where do runtime AI and deterministic approaches fit?
+
+Runtime AI excels at exploratory workflows where flexibility matters more than predictability. Browser Use and similar tools handle dynamic websites effectively by making real-time decisions about page interactions.
+
+Deterministic approaches work better for production workflows where reliability and auditability matter. Healthcare automation, financial workflows, and compliance-heavy processes require predictable behavior and complete audit trails.
+
+The most effective agent automation combines both approaches strategically. [Workflow Use demonstrates](https://news.ycombinator.com/item?id=44007065) that deterministic scripts can run "reliably, 10x faster, and ~90% cheaper than Browser Use" when interaction patterns are well-defined.
+
+Libretto implements this hybrid approach by providing deterministic execution with agent-friendly debugging. Agents can generate reliable scripts while maintaining the ability to adapt when underlying websites change.
+
+## How should teams migrate to agent-ready automation?
+
+Migration strategies depend on existing automation maturity and team structure. Teams with extensive Playwright automation can often layer agent-friendly debugging on top of existing scripts without rewriting core automation logic.
+
+Teams starting fresh should prioritize agent integration from the beginning. Building automation with agent consumption in mind creates better long-term maintainability than retrofitting human-focused tools for agent use.
+
+The migration process typically involves three phases: assessment of existing automation requirements, pilot projects with agent-ready tools, and gradual replacement of human-dependent workflows with autonomous alternatives.
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Article",
+      "headline": "Browser Automation for AI Agents: Building Reliable Autonomous Workflows",
+      "description": "AI agents need specialized browser automation tools for deterministic, repeatable execution. Compare approaches and learn what makes automation truly agent-ready.",
+      "author": {
+        "@type": "Person",
+        "name": "Tanishq Kancharla",
+        "jobTitle": "Founder",
+        "sameAs": ["https://www.linkedin.com/in/tanishq-k/"]
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Libretto",
+        "url": "https://libretto.sh",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://libretto.sh/logos/logo-light.svg"
+        }
+      },
+      "datePublished": "2026-05-29",
+      "dateModified": "2026-05-29",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://libretto.sh/blog/browser-automation-for-ai-agents"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "@id": "https://libretto.sh"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Blog",
+          "@id": "https://libretto.sh/blog"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Browser Automation for AI Agents: Building Reliable Autonomous Workflows"
+        }
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "name": "Libretto",
+      "url": "https://libretto.sh",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://libretto.sh/docs?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+  ]
+}
+</script>`,
+  }),
+  createBlogPost({
     slug: "what-we-learned-building-healthcare-integrations",
     title: "What we learned building healthcare integrations for a year",
     description:
