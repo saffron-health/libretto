@@ -54,8 +54,18 @@
 
 .slot-sidebar-left .search-input {
   padding-top: 4px !important;
+  padding-right: 46px !important;
   padding-bottom: 4px !important;
+  padding-left: 30px !important;
   border-radius: var(--radius-md) !important;
+}
+
+.slot-sidebar-left div:has(> .search-input) > span:first-child {
+  left: 12px !important;
+}
+
+.slot-sidebar-left div:has(> .search-input) > span:last-child {
+  right: 26px !important;
 }
 
 .slot-sidebar-left div:has(> .search-input) kbd {
