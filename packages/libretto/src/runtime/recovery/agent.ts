@@ -29,9 +29,14 @@ export type RecoveryAgentStep = {
   action: BrowserAction;
 };
 
+export type RecoveryAgentStatus =
+  | "skipped"
+  | "no-action-needed"
+  | "action-taken"
+  | "incomplete";
+
 export type RecoveryAgentResult = {
-  actionTaken: boolean;
-  completed: boolean;
+  status: RecoveryAgentStatus;
   steps: RecoveryAgentStep[];
 };
 
@@ -319,6 +324,21 @@ function normalizeRecoveryAction(
   }
 }
 
+function getRecoveryStatus(steps: RecoveryAgentStep[]): RecoveryAgentStatus {
+  if (steps.length === 0) {
+    return "skipped";
+  }
+  const actionSteps = steps.filter((step) => step.action.type !== "done");
+  const completed = steps.at(-1)?.action.type === "done";
+  if (actionSteps.length === 0 && completed) {
+    return "no-action-needed";
+  }
+  if (completed) {
+    return "action-taken";
+  }
+  return "incomplete";
+}
+
 /**
  * Executes a vision-based recovery agent to recover from browser automation failures.
  * Takes a screenshot, sends it to the LLM with the instruction, and executes
@@ -331,7 +351,7 @@ export async function executeRecoveryAgent(
   model?: LanguageModel,
 ): Promise<RecoveryAgentResult> {
   if (!model) {
-    return { actionTaken: false, completed: false, steps: [] };
+    return { status: "skipped", steps: [] };
   }
   const log = logger ?? defaultLogger;
   log.info("Executing vision-based recovery agent", { instruction });
@@ -407,10 +427,8 @@ Analyze the screenshot and decide what action to take. If the task is complete o
   }
 
   log.info("Recovery agent execution completed");
-  const actionSteps = steps.filter((step) => step.action.type !== "done");
   return {
-    actionTaken: actionSteps.length > 0,
-    completed: steps.at(-1)?.action.type === "done",
+    status: getRecoveryStatus(steps),
     steps,
   };
 }

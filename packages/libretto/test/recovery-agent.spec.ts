@@ -80,8 +80,7 @@ describe("executeRecoveryAgent", () => {
       timeout: 10000,
     });
     expect(click).toHaveBeenCalledWith(500, 250, { button: "left" });
-    expect(result.actionTaken).toBe(true);
-    expect(result.completed).toBe(true);
+    expect(result.status).toBe("action-taken");
     expect(result.steps).toHaveLength(2);
   });
 });

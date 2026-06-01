@@ -17,7 +17,7 @@ describe("createFallbackPage", () => {
     const page = {
       locator: vi.fn(() => locator),
     } as unknown as Page;
-    const fallback = vi.fn(async () => ({ actionTaken: true }));
+    const fallback = vi.fn(async () => ({ status: "action-taken" }));
 
     const fallbackPage = createFallbackPage(page, {
       rules: [{ fallback }],
