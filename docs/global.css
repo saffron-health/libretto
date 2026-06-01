@@ -77,9 +77,9 @@
 }
 
 .slot-sidebar-left nav ul[class~='pl-3'] {
-  padding-left: 6px !important;
+  padding-left: 8px !important;
 }
 
 .slot-sidebar-left nav ul[class~='pl-3'] a {
-  padding-left: 6px;
+  padding-left: 4px;
 }
