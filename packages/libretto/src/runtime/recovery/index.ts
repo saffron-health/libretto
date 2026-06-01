@@ -13,13 +13,11 @@ export {
 export {
   createFallbackPage,
   popupClosingFallback,
-  type FallbackMethodGroup,
-  type FallbackMethodMatcher,
   type FallbackTargetType,
   type PageFallbackContext,
+  type PageFallback,
   type PageFallbackHandler,
   type PageFallbackOptions,
   type PageFallbackResult,
-  type PageFallbackRule,
   type PopupClosingFallbackOptions,
 } from "./page-fallbacks.js";

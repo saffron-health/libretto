@@ -20,7 +20,7 @@ describe("createFallbackPage", () => {
     const fallback = vi.fn(async () => ({ status: "action-taken" }));
 
     const fallbackPage = createFallbackPage(page, {
-      rules: [{ fallback }],
+      fallback,
     });
 
     await expect(fallbackPage.locator("#status").textContent()).resolves.toBe(
@@ -39,7 +39,7 @@ describe("createFallbackPage", () => {
     const fallback = vi.fn(async () => undefined);
 
     const fallbackPage = createFallbackPage(page, {
-      rules: [{ methods: "read", fallback }],
+      fallback,
     });
 
     await expect(fallbackPage.title()).resolves.toBe("Dashboard");
@@ -56,7 +56,7 @@ describe("createFallbackPage", () => {
     const fallback = vi.fn(async () => undefined);
 
     const fallbackPage = createFallbackPage(page, {
-      rules: [{ fallback }],
+      fallback,
     });
 
     expect(fallbackPage.url()).toBe("https://example.com/");
@@ -74,7 +74,7 @@ describe("createFallbackPage", () => {
     const fallback = vi.fn(async () => undefined);
 
     const fallbackPage = createFallbackPage(page, {
-      rules: [{ fallback }],
+      fallback,
     });
 
     await expect(fallbackPage.evaluate("1 + 1")).rejects.toBe(originalError);
@@ -94,7 +94,7 @@ describe("createFallbackPage", () => {
     const fallback = vi.fn(async () => undefined);
 
     const fallbackPage = createFallbackPage(page, {
-      rules: [{ methods: "ui", fallback }],
+      fallback,
     });
 
     await expect(fallbackPage.locator("#submit").click()).rejects.toBe(
@@ -102,6 +102,34 @@ describe("createFallbackPage", () => {
     );
     expect(click).toHaveBeenCalledTimes(2);
     expect(fallback).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows custom fallback logic to compose multiple recovery actions", async () => {
+    const originalError = new Error("stale page");
+    const click = vi.fn<() => Promise<void>>()
+      .mockRejectedValueOnce(originalError)
+      .mockResolvedValueOnce(undefined);
+    const locator = { click } as unknown as Locator;
+    const page = {
+      locator: vi.fn(() => locator),
+      reload: vi.fn(async () => undefined),
+    } as unknown as Page;
+    const closePopup = vi.fn(async (_page: Page) => undefined);
+    const fallback = vi.fn(async (context) => {
+      await closePopup(context.page);
+      await context.page.reload();
+    });
+
+    const fallbackPage = createFallbackPage(page, {
+      fallback,
+    });
+
+    await expect(fallbackPage.locator("#submit").click()).resolves.toBe(
+      undefined,
+    );
+    expect(closePopup).toHaveBeenCalledTimes(1);
+    expect(page.reload).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -119,7 +147,7 @@ describe("workflow page fallbacks", () => {
     const fallback = vi.fn(async () => undefined);
 
     const wf = workflow("fallback-workflow", {
-      pageFallbacks: [{ fallback }],
+      pageFallback: fallback,
       handler: async ({ page }) => {
         return await page.locator("#result").textContent();
       },
@@ -194,14 +222,11 @@ it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
       `);
 
       const fallbackPage = createFallbackPage(page, {
-        rules: [
-          popupClosingFallback({
-            methods: "all-supported",
-            provider,
-            apiKey,
-            model,
-          }),
-        ],
+        fallback: popupClosingFallback({
+          provider,
+          apiKey,
+          model,
+        }),
       });
       fallbackPage.setDefaultTimeout(500);
 

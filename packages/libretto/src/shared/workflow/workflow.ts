@@ -2,7 +2,7 @@ import type { Page } from "playwright";
 import { z } from "zod";
 import {
   createFallbackPage,
-  type PageFallbackRule,
+  type PageFallback,
 } from "../../runtime/recovery/page-fallbacks.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
@@ -32,7 +32,7 @@ export type LibrettoWorkflowOptions<
   OutputSchema extends z.ZodType = z.ZodType<Output>,
 > = {
   schemas?: LibrettoWorkflowSchemas<InputSchema, OutputSchema>;
-  pageFallbacks?: readonly PageFallbackRule[];
+  pageFallback?: PageFallback;
   handler: LibrettoWorkflowHandler<Input, Output>;
 };
 
@@ -104,7 +104,7 @@ export class LibrettoWorkflow<
   // this schema to JSON Schema at build time and exposes it via
   // /v1/workflows/get so API consumers know the workflow's output shape.
   public readonly outputSchema?: OutputSchema;
-  public readonly pageFallbacks: readonly PageFallbackRule[];
+  public readonly pageFallback?: PageFallback;
   private readonly handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
@@ -117,12 +117,12 @@ export class LibrettoWorkflow<
       z.infer<InputSchema>,
       z.infer<OutputSchema>
     >,
-    options?: { pageFallbacks?: readonly PageFallbackRule[] },
+    options?: { pageFallback?: PageFallback },
   ) {
     this.name = name;
     this.inputSchema = schemas?.input;
     this.outputSchema = schemas?.output;
-    this.pageFallbacks = options?.pageFallbacks ?? [];
+    this.pageFallback = options?.pageFallback;
     this.handler = handler;
   }
 
@@ -132,12 +132,12 @@ export class LibrettoWorkflow<
   ): Promise<z.infer<OutputSchema>> {
     const parsed = parseWorkflowInput(this.name, this.inputSchema, input);
     const workflowContext =
-      this.pageFallbacks.length === 0
+      !this.pageFallback
         ? ctx
         : {
             ...ctx,
             page: createFallbackPage(ctx.page, {
-              rules: this.pageFallbacks,
+              fallback: this.pageFallback,
             }),
           };
     return this.handler(workflowContext, parsed);
@@ -149,7 +149,7 @@ export type ExportedLibrettoWorkflow = {
   readonly name: string;
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;
-  readonly pageFallbacks?: readonly PageFallbackRule[];
+  readonly pageFallback?: PageFallback;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -297,7 +297,7 @@ export function workflow(
       name,
       schemasOrHandler.schemas,
       schemasOrHandler.handler,
-      { pageFallbacks: schemasOrHandler.pageFallbacks },
+      { pageFallback: schemasOrHandler.pageFallback },
     );
   }
   if (!maybeHandler) {

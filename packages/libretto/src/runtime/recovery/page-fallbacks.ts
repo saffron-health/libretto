@@ -18,29 +18,17 @@ export type PageFallbackHandler = (
   context: PageFallbackContext,
 ) => Promise<PageFallbackResult>;
 
-export type FallbackMethodGroup = "ui" | "read" | "all-supported";
-
-export type FallbackMethodMatcher =
-  | FallbackMethodGroup
-  | readonly string[]
-  | ((context: Omit<PageFallbackContext, "error">) => boolean);
-
-export type PageFallbackRule = {
-  methods?: FallbackMethodMatcher;
-  fallback: PageFallbackHandler;
-};
+export type PageFallback = PageFallbackHandler;
 
 export type PageFallbackOptions = {
-  rules: readonly PageFallbackRule[];
+  fallback: PageFallback;
 };
 
 export type PopupClosingFallbackOptions =
   | {
-      methods?: FallbackMethodMatcher;
       model: LanguageModel;
     }
   | {
-      methods?: FallbackMethodMatcher;
       provider: "openai" | "anthropic";
       apiKey: string;
       model: string;
@@ -184,35 +172,6 @@ function isSupportedMethod(
   return isUiMethod(targetType, method) || isReadMethod(targetType, method);
 }
 
-function matchesMethods(
-  matcher: FallbackMethodMatcher | undefined,
-  context: Omit<PageFallbackContext, "error">,
-): boolean {
-  const resolvedMatcher = matcher ?? "all-supported";
-  if (typeof resolvedMatcher === "function") {
-    return resolvedMatcher(context);
-  }
-  if (Array.isArray(resolvedMatcher)) {
-    return resolvedMatcher.includes(context.method);
-  }
-  switch (resolvedMatcher) {
-    case "ui":
-      return isUiMethod(context.targetType, context.method);
-    case "read":
-      return isReadMethod(context.targetType, context.method);
-    case "all-supported":
-      return isSupportedMethod(context.targetType, context.method);
-  }
-  return false;
-}
-
-function findMatchingRule(
-  rules: readonly PageFallbackRule[],
-  context: Omit<PageFallbackContext, "error">,
-): PageFallbackRule | null {
-  return rules.find((rule) => matchesMethods(rule.methods, context)) ?? null;
-}
-
 async function runWithFallback<T>(args: {
   page: Page;
   targetType: FallbackTargetType;
@@ -230,13 +189,12 @@ async function runWithFallback<T>(args: {
       method: args.method,
       args: args.methodArgs,
     } as const;
-    const rule = findMatchingRule(args.options.rules, baseContext);
-    if (!rule) {
+    if (!isSupportedMethod(baseContext.targetType, baseContext.method)) {
       throw originalError;
     }
 
     try {
-      await rule.fallback({
+      await args.options.fallback({
         ...baseContext,
         error: originalError,
       });
@@ -450,22 +408,19 @@ async function resolvePopupClosingModel(
 
 export function popupClosingFallback(
   options: PopupClosingFallbackOptions,
-): PageFallbackRule {
-  return {
-    methods: options.methods ?? "all-supported",
-    fallback: async ({ page }): Promise<RecoveryAgentResult> => {
-      const model = await resolvePopupClosingModel(options);
-      return executeRecoveryAgent(
-        page,
-        [
-          "Look at the page for any popup, modal, cookie banner, overlay, dialog, or interstitial that blocks interaction.",
-          "If any blocking popup is visible, close it before returning done.",
-          "Prefer obvious close, dismiss, continue, accept, or X buttons.",
-          "Do not return done while a blocking overlay or dialog is still visible.",
-        ].join(" "),
-        undefined,
-        model,
-      );
-    },
+): PageFallback {
+  return async ({ page }): Promise<RecoveryAgentResult> => {
+    const model = await resolvePopupClosingModel(options);
+    return executeRecoveryAgent(
+      page,
+      [
+        "Look at the page for any popup, modal, cookie banner, overlay, dialog, or interstitial that blocks interaction.",
+        "If any blocking popup is visible, close it before returning done.",
+        "Prefer obvious close, dismiss, continue, accept, or X buttons.",
+        "Do not return done while a blocking overlay or dialog is still visible.",
+      ].join(" "),
+      undefined,
+      model,
+    );
   };
 }
