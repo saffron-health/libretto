@@ -47,13 +47,39 @@
 }
 
 /* Align sidebar utility links with the search field inset. */
-.slot-sidebar-left nav > div:first-child > a {
-  min-height: 36px;
-  align-items: center;
+.slot-sidebar-left div:has(> .search-input) {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.slot-sidebar-left .search-input {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.slot-sidebar-left div:has(> .search-input) kbd {
+  border: 0 !important;
+  background: var(--accent);
+}
+
+.slot-sidebar-left nav a {
   border-radius: var(--radius-sm);
-  padding: 0 12px 0 8px;
+}
+
+.slot-sidebar-left nav > div:first-child > a {
+  align-items: center;
+  padding: 2px 12px 2px 8px;
 }
 
 .slot-sidebar-left nav > div:first-child > a > span:last-child {
   margin-right: 0;
+}
+
+.slot-sidebar-left nav ul[class~='pl-3'] {
+  padding-left: 6px !important;
+}
+
+.slot-sidebar-left nav ul[class~='pl-3'] a {
+  padding-left: 6px;
 }
