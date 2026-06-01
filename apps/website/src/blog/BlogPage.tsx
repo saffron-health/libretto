@@ -109,6 +109,18 @@ export function BlogIndexPage() {
 }
 
 const markdownComponents = {
+  h1({ children }: { children?: React.ReactNode }) {
+    return (
+      <Text
+        as="h1"
+        size="3xl"
+        style="serif"
+        className="mb-8 text-[2rem] font-[300] leading-tight text-ink"
+      >
+        {children}
+      </Text>
+    );
+  },
   h2({ children }: { children?: React.ReactNode }) {
     return (
       <Text
