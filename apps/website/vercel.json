@@ -23,19 +23,19 @@
   "rewrites": [
     {
       "source": "/llms.txt",
-      "destination": "https://libretto.sh/docs/llms.txt"
+      "destination": "https://libretto-docs.vercel.app/docs/llms.txt"
     },
     {
       "source": "/llms-full.txt",
-      "destination": "https://libretto.sh/docs/llms-full.txt"
+      "destination": "https://libretto-docs.vercel.app/docs/llms-full.txt"
     },
     {
       "source": "/sitemap.xml",
-      "destination": "https://libretto.sh/docs/sitemap.xml"
+      "destination": "https://libretto-docs.vercel.app/docs/sitemap.xml"
     },
     {
       "source": "/robots.txt",
-      "destination": "https://libretto.sh/docs/robots.txt"
+      "destination": "https://libretto-docs.vercel.app/docs/robots.txt"
     },
     {
       "source": "/blog",
@@ -47,11 +47,11 @@
     },
     {
       "source": "/docs",
-      "destination": "https://saffron-health-libretto-73.mintlify.dev/docs"
+      "destination": "https://libretto-docs.vercel.app/docs"
     },
     {
       "source": "/docs/:path*",
-      "destination": "https://saffron-health-libretto-73.mintlify.dev/docs/:path*"
+      "destination": "https://libretto-docs.vercel.app/docs/:path*"
     }
   ]
 }

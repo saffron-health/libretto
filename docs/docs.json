@@ -1,54 +1,52 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "$schema": "https://holocron.so/docs.json",
   "name": "Libretto",
   "description": "Toolkit for building, debugging, and maintaining browser automations.",
   "colors": {
     "primary": "#12ce41",
-    "light": "#2fdb4f",
-    "dark": "#12ce41"
+    "light": "#12ce41",
+    "dark": "#067a22"
   },
-  "favicon": "/favicon.svg",
+  "icons": { "library": "lucide" },
+  "favicon": {
+    "light": "/docs/brand-kit/logos/libretto-icosahedron-light.svg",
+    "dark": "/docs/brand-kit/logos/libretto-icosahedron-dark.svg"
+  },
   "logo": {
-    "light": "/favicon.svg",
-    "dark": "/favicon.svg",
-    "href": "https://libretto.sh"
+    "light": "/docs/brand-kit/logos/libretto-icosahedron-light.svg",
+    "dark": "/docs/brand-kit/logos/libretto-icosahedron-dark.svg",
+    "href": "https://libretto.sh",
+    "text": "Libretto"
   },
   "fonts": {
+    "fontSize": 15,
     "heading": {
       "family": "Fraunces",
       "format": "woff2",
       "weight": 300
-    },
-    "body": {
-      "family": "Commit Mono",
-      "source": "/fonts/CommitMono-VF.woff2",
-      "format": "woff2",
-      "weight": 400
     }
   },
   "appearance": {
-    "default": "dark",
-    "strict": true
+    "default": "system"
   },
   "background": {
     "color": {
-      "light": "#111111",
       "dark": "#111111"
     }
   },
-  "styling": {
-    "codeblocks": {
-      "theme": {
-        "light": "github-light",
-        "dark": "github-dark"
+  "navbar": {
+    "links": [
+      {
+        "type": "github",
+        "href": "https://github.com/saffron-health/libretto"
       }
-    }
+    ]
   },
   "navigation": {
     "tabs": [
       {
         "tab": "Docs",
+        "icon": "book-open",
         "groups": [
           {
             "group": "Get started",
@@ -81,6 +79,7 @@
       },
       {
         "tab": "Reference",
+        "icon": "terminal",
         "groups": [
           {
             "group": "CLI",
@@ -108,6 +107,7 @@
       },
       {
         "tab": "Hosting",
+        "icon": "cloud",
         "groups": [
           {
             "group": "Libretto Cloud Hosting",
@@ -153,39 +153,35 @@
         {
           "anchor": "GitHub",
           "href": "https://github.com/saffron-health/libretto",
-          "icon": "github"
-        },
-        {
-          "anchor": "npm",
-          "href": "https://www.npmjs.com/package/libretto",
-          "icon": "npm"
-        },
-        {
-          "anchor": "Changelog",
-          "href": "https://github.com/saffron-health/libretto/releases",
-          "icon": "clock-rotate-left"
+          "icon": "github",
+          "placement": "sidebar"
         },
         {
           "anchor": "Discord",
           "href": "https://discord.gg/NYrG56hVDt",
-          "icon": "discord"
+          "icon": "fontawesome:brands:discord",
+          "placement": "sidebar"
+        },
+        {
+          "anchor": "npm",
+          "href": "https://www.npmjs.com/package/libretto",
+          "icon": "package",
+          "placement": "sidebar"
+        },
+        {
+          "anchor": "Changelog",
+          "href": "https://github.com/saffron-health/libretto/releases",
+          "icon": "history",
+          "placement": "sidebar"
         },
         {
           "anchor": "Talk to a dev",
           "href": "https://cal.com/team/saffron-health/libretto-demo",
-          "icon": "video"
+          "icon": "video",
+          "placement": "sidebar"
         }
       ]
     }
-  },
-  "navbar": {},
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude"
-    ]
   },
   "footer": {
     "socials": {
