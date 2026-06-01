@@ -144,7 +144,7 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
         className="flex w-full cursor-pointer items-center justify-between py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/30 rounded-sm"
         onClick={() => setIsExpanded(!isExpanded)}
         aria-expanded={isExpanded}
-        data-fathom-event="FAQ toggle click"
+        data-fathom-event={`FAQ ${item.id} toggle click`}
       >
         <Text size="md" className="font-medium text-ink">
           {item.question}
