@@ -154,6 +154,7 @@ export class WorkflowController {
       const workflowContext: LibrettoWorkflowContext = {
         session: this.config.session,
         page: this.config.page,
+        logger: workflowLogger,
       };
 
       const uninstallPauseHandler = installPauseHandler((pauseArgs) =>

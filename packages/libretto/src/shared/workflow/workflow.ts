@@ -1,11 +1,17 @@
 import type { Page } from "playwright";
 import { z } from "zod";
+import type { MinimalLogger } from "../logger/logger.js";
+import {
+  createFallbackPage,
+  type PageFallbackRule,
+} from "../../runtime/recovery/page-fallbacks.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
 export type LibrettoWorkflowContext = {
   session: string;
   page: Page;
+  logger?: MinimalLogger;
 };
 
 export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
@@ -19,6 +25,17 @@ export type LibrettoWorkflowSchemas<
 > = {
   input: InputSchema;
   output: OutputSchema;
+};
+
+export type LibrettoWorkflowOptions<
+  Input = unknown,
+  Output = unknown,
+  InputSchema extends z.ZodType = z.ZodType<Input>,
+  OutputSchema extends z.ZodType = z.ZodType<Output>,
+> = {
+  schemas?: LibrettoWorkflowSchemas<InputSchema, OutputSchema>;
+  pageFallbacks?: readonly PageFallbackRule[];
+  handler: LibrettoWorkflowHandler<Input, Output>;
 };
 
 // Thrown when input fails Zod validation. The runner surfaces `.message`
@@ -89,6 +106,7 @@ export class LibrettoWorkflow<
   // this schema to JSON Schema at build time and exposes it via
   // /v1/workflows/get so API consumers know the workflow's output shape.
   public readonly outputSchema?: OutputSchema;
+  public readonly pageFallbacks: readonly PageFallbackRule[];
   private readonly handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
@@ -101,10 +119,12 @@ export class LibrettoWorkflow<
       z.infer<InputSchema>,
       z.infer<OutputSchema>
     >,
+    options?: { pageFallbacks?: readonly PageFallbackRule[] },
   ) {
     this.name = name;
     this.inputSchema = schemas?.input;
     this.outputSchema = schemas?.output;
+    this.pageFallbacks = options?.pageFallbacks ?? [];
     this.handler = handler;
   }
 
@@ -113,7 +133,17 @@ export class LibrettoWorkflow<
     input: unknown,
   ): Promise<z.infer<OutputSchema>> {
     const parsed = parseWorkflowInput(this.name, this.inputSchema, input);
-    return this.handler(ctx, parsed);
+    const workflowContext =
+      this.pageFallbacks.length === 0
+        ? ctx
+        : {
+            ...ctx,
+            page: createFallbackPage(ctx.page, {
+              rules: this.pageFallbacks,
+              logger: ctx.logger,
+            }),
+          };
+    return this.handler(workflowContext, parsed);
   }
 }
 
@@ -122,6 +152,7 @@ export type ExportedLibrettoWorkflow = {
   readonly name: string;
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;
+  readonly pageFallbacks?: readonly PageFallbackRule[];
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -226,6 +257,26 @@ export function workflow<
   >,
 ): LibrettoWorkflow<InputSchema, OutputSchema>;
 
+export function workflow<
+  InputSchema extends z.ZodType,
+  OutputSchema extends z.ZodType,
+>(
+  name: string,
+  options: LibrettoWorkflowOptions<
+    z.infer<InputSchema>,
+    z.infer<OutputSchema>,
+    InputSchema,
+    OutputSchema
+  > & {
+    schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema>;
+  },
+): LibrettoWorkflow<InputSchema, OutputSchema>;
+
+export function workflow<Input = unknown, Output = unknown>(
+  name: string,
+  options: LibrettoWorkflowOptions<Input, Output>,
+): LibrettoWorkflow<z.ZodType<Input>, z.ZodType<Output>>;
+
 // Legacy 2-arg form kept so deployments built before Zod schemas existed
 // continue to load. New code should always pass schemas.
 export function workflow<Input = unknown, Output = unknown>(
@@ -237,11 +288,20 @@ export function workflow(
   name: string,
   schemasOrHandler:
     | LibrettoWorkflowSchemas<z.ZodType, z.ZodType>
+    | LibrettoWorkflowOptions
     | LibrettoWorkflowHandler,
   maybeHandler?: LibrettoWorkflowHandler,
 ): LibrettoWorkflow {
   if (typeof schemasOrHandler === "function") {
     return new LibrettoWorkflow(name, undefined, schemasOrHandler);
+  }
+  if ("handler" in schemasOrHandler) {
+    return new LibrettoWorkflow(
+      name,
+      schemasOrHandler.schemas,
+      schemasOrHandler.handler,
+      { pageFallbacks: schemasOrHandler.pageFallbacks },
+    );
   }
   if (!maybeHandler) {
     throw new Error(

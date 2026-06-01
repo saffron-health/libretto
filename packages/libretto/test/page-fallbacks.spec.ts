@@ -1,0 +1,231 @@
+import { chromium, type Locator, type Page } from "playwright";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createFallbackPage,
+  popupClosingFallback,
+  type MinimalLogger,
+  workflow,
+} from "../src/index.js";
+
+function createTestLogger() {
+  const entries: {
+    level: "info" | "warn" | "error";
+    event: string;
+    data?: unknown;
+  }[] = [];
+  const logger: MinimalLogger = {
+    info: (event, data) => entries.push({ level: "info", event, data }),
+    warn: (event, data) => entries.push({ level: "warn", event, data }),
+    error: (event) => {
+      entries.push({ level: "error", event });
+      return new Error(event);
+    },
+  };
+  return { logger, entries };
+}
+
+describe("createFallbackPage", () => {
+  it("runs fallback for locator read methods and retries once", async () => {
+    const originalError = new Error("covered by popup");
+    const textContent = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(originalError)
+      .mockResolvedValueOnce("ready");
+    const locator = { textContent } as unknown as Locator;
+    const page = {
+      locator: vi.fn(() => locator),
+    } as unknown as Page;
+    const fallback = vi.fn(async () => ({ popupDetected: true }));
+
+    const fallbackPage = createFallbackPage(page, {
+      rules: [{ fallback }],
+    });
+
+    await expect(fallbackPage.locator("#status").textContent()).resolves.toBe(
+      "ready",
+    );
+    expect(textContent).toHaveBeenCalledTimes(2);
+    expect(fallback).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs fallback for page read methods", async () => {
+    const title = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error("blocked"))
+      .mockResolvedValueOnce("Dashboard");
+    const page = { title } as unknown as Page;
+    const fallback = vi.fn(async () => undefined);
+
+    const fallbackPage = createFallbackPage(page, {
+      rules: [{ methods: "read", fallback }],
+    });
+
+    await expect(fallbackPage.title()).resolves.toBe("Dashboard");
+    expect(title).toHaveBeenCalledTimes(2);
+    expect(fallback).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not wrap unsupported arbitrary execution methods", async () => {
+    const originalError = new Error("evaluate failed");
+    const evaluate = vi
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValue(originalError);
+    const page = { evaluate } as unknown as Page;
+    const fallback = vi.fn(async () => undefined);
+
+    const fallbackPage = createFallbackPage(page, {
+      rules: [{ fallback }],
+    });
+
+    await expect(fallbackPage.evaluate("1 + 1")).rejects.toBe(originalError);
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(fallback).not.toHaveBeenCalled();
+  });
+
+  it("preserves the original action error when retry fails", async () => {
+    const originalError = new Error("first failure");
+    const retryError = new Error("retry failure");
+    const click = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(originalError)
+      .mockRejectedValueOnce(retryError);
+    const locator = { click } as unknown as Locator;
+    const page = { locator: vi.fn(() => locator) } as unknown as Page;
+    const fallback = vi.fn(async () => undefined);
+
+    const fallbackPage = createFallbackPage(page, {
+      rules: [{ methods: "ui", fallback }],
+    });
+
+    await expect(fallbackPage.locator("#submit").click()).rejects.toBe(
+      originalError,
+    );
+    expect(click).toHaveBeenCalledTimes(2);
+    expect(fallback).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("workflow page fallbacks", () => {
+  it("injects a single fallback-enabled page into the workflow", async () => {
+    const originalError = new Error("popup");
+    const textContent = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(originalError)
+      .mockResolvedValueOnce("done");
+    const locator = { textContent } as unknown as Locator;
+    const rawPage = {
+      locator: vi.fn(() => locator),
+    } as unknown as Page;
+    const fallback = vi.fn(async () => undefined);
+
+    const wf = workflow("fallback-workflow", {
+      pageFallbacks: [{ fallback }],
+      handler: async ({ page }) => {
+        return await page.locator("#result").textContent();
+      },
+    });
+
+    await expect(wf.run({ session: "test", page: rawPage }, {})).resolves.toBe(
+      "done",
+    );
+    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(textContent).toHaveBeenCalledTimes(2);
+  });
+});
+
+it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
+  "closes a real popup with the configured model provider",
+  async () => {
+    const { logger, entries } = createTestLogger();
+    const provider = process.env.ANTHROPIC_API_KEY ? "anthropic" : "openai";
+    const apiKey =
+      provider === "anthropic"
+        ? process.env.ANTHROPIC_API_KEY
+        : process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "Set OPENAI_API_KEY or ANTHROPIC_API_KEY for the real popup fallback test.",
+      );
+    }
+
+    const model =
+      process.env.LIBRETTO_REAL_POPUP_FALLBACK_MODEL ??
+      (provider === "anthropic" ? "claude-sonnet-4-5" : "gpt-4.1-mini");
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    try {
+      await page.setContent(`
+        <style>
+          #modal {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.5);
+            display: grid;
+            place-items: center;
+          }
+          #dialog {
+            background: white;
+            color: black;
+            padding: 24px;
+            width: 320px;
+            font-family: sans-serif;
+          }
+          #close {
+            display: block;
+            width: 260px;
+            height: 96px;
+            margin: 20px auto 0;
+            font-size: 22px;
+          }
+        </style>
+        <button id="target">Read result</button>
+        <div id="modal">
+          <div id="dialog">
+            <h1>Cookie preferences</h1>
+            <p>This popup blocks the page. Close it to continue.</p>
+            <button id="close" onclick="document.querySelector('#modal').remove()">Close popup</button>
+          </div>
+        </div>
+        <script>
+          document.querySelector("#target").addEventListener("click", () => {
+            document.body.dataset.clicked = "true";
+          });
+        </script>
+      `);
+
+      const fallbackPage = createFallbackPage(page, {
+        logger,
+        rules: [
+          popupClosingFallback({
+            methods: "all-supported",
+            provider,
+            apiKey,
+            model,
+          }),
+        ],
+      });
+      fallbackPage.setDefaultTimeout(500);
+
+      try {
+        await fallbackPage.locator("#target").click();
+      } catch (error) {
+        throw new Error(
+          [
+            error instanceof Error ? error.message : String(error),
+            "Fallback logs:",
+            JSON.stringify(entries, null, 2),
+          ].join("\n"),
+        );
+      }
+
+      expect(await page.locator("#modal").count()).toBe(0);
+      expect(await page.locator("body").getAttribute("data-clicked")).toBe(
+        "true",
+      );
+    } finally {
+      await browser.close();
+    }
+  },
+  60_000,
+);

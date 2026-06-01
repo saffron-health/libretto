@@ -29,13 +29,31 @@ export {
 } from "./shared/state/index.js";
 
 // Recovery
-export { executeRecoveryAgent } from "./runtime/recovery/agent.js";
+export {
+  executeRecoveryAgent,
+  type BrowserAction,
+  type RecoveryAgentResult,
+  type RecoveryAgentStep,
+} from "./runtime/recovery/agent.js";
 export { attemptWithRecovery } from "./runtime/recovery/recovery.js";
 export {
   detectSubmissionError,
   type KnownSubmissionError,
   type DetectedSubmissionError,
 } from "./runtime/recovery/errors.js";
+export {
+  createFallbackPage,
+  popupClosingFallback,
+  type FallbackMethodGroup,
+  type FallbackMethodMatcher,
+  type FallbackTargetType,
+  type PageFallbackContext,
+  type PageFallbackHandler,
+  type PageFallbackOptions,
+  type PageFallbackResult,
+  type PageFallbackRule,
+  type PopupClosingFallbackOptions,
+} from "./runtime/recovery/page-fallbacks.js";
 
 // AI extraction
 export {
@@ -105,6 +123,7 @@ export {
   type ExportedLibrettoWorkflow,
   type LibrettoWorkflowContext,
   type LibrettoWorkflowHandler,
+  type LibrettoWorkflowOptions,
   type LibrettoWorkflowSchemas,
   type WorkflowInputValidator,
 } from "./shared/workflow/workflow.js";

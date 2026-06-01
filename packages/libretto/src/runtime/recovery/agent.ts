@@ -5,7 +5,7 @@ import {
 } from "../../shared/logger/logger.js";
 import { generateObject, type LanguageModel } from "ai";
 
-type BrowserAction =
+export type BrowserAction =
   | { type: "click"; x: number; y: number; button?: string }
   | { type: "double_click"; x: number; y: number }
   | {
@@ -22,6 +22,18 @@ type BrowserAction =
   | { type: "drag"; path: { x: number; y: number }[] }
   | { type: "move"; x: number; y: number }
   | { type: "done" };
+
+export type RecoveryAgentStep = {
+  step: number;
+  reasoning: string;
+  action: BrowserAction;
+};
+
+export type RecoveryAgentResult = {
+  popupDetected: boolean;
+  popupClosed: boolean;
+  steps: RecoveryAgentStep[];
+};
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -144,35 +156,55 @@ const recoveryActionSchema = z.object({
   reasoning: z
     .string()
     .describe("Your reasoning about what you see and what action to take"),
-  action: z.discriminatedUnion("type", [
-    z.object({
-      type: z.literal("click"),
-      x: z.number(),
-      y: z.number(),
-    }),
-    z.object({
-      type: z.literal("type"),
-      text: z.string(),
-    }),
-    z.object({
-      type: z.literal("keypress"),
-      keys: z.array(z.string()),
-    }),
-    z.object({
-      type: z.literal("scroll"),
-      x: z.number(),
-      y: z.number(),
-      scroll_x: z.number(),
-      scroll_y: z.number(),
-    }),
-    z.object({
-      type: z.literal("wait"),
-    }),
-    z.object({
-      type: z.literal("done"),
-    }),
-  ]),
+  action: z.object({
+    type: z
+      .enum(["click", "type", "keypress", "scroll", "wait", "done"])
+      .describe("The browser action to execute."),
+    x: z.number().nullable().describe("The x coordinate for click/scroll."),
+    y: z.number().nullable().describe("The y coordinate for click/scroll."),
+    text: z.string().nullable().describe("Text for type actions."),
+    keys: z
+      .array(z.string())
+      .nullable()
+      .describe("Keys for keypress actions."),
+    scroll_x: z.number().nullable().describe("Horizontal scroll delta."),
+    scroll_y: z.number().nullable().describe("Vertical scroll delta."),
+  }),
 });
+
+function numberOrThrow(value: number | null, field: string): number {
+  if (typeof value === "number") return value;
+  throw new Error(`Recovery action is missing ${field}.`);
+}
+
+function normalizeRecoveryAction(
+  action: z.infer<typeof recoveryActionSchema>["action"],
+): BrowserAction {
+  switch (action.type) {
+    case "click":
+      return {
+        type: "click",
+        x: numberOrThrow(action.x, "x"),
+        y: numberOrThrow(action.y, "y"),
+      };
+    case "type":
+      return { type: "type", text: action.text ?? "" };
+    case "keypress":
+      return { type: "keypress", keys: action.keys ?? [] };
+    case "scroll":
+      return {
+        type: "scroll",
+        x: numberOrThrow(action.x, "x"),
+        y: numberOrThrow(action.y, "y"),
+        scroll_x: numberOrThrow(action.scroll_x, "scroll_x"),
+        scroll_y: numberOrThrow(action.scroll_y, "scroll_y"),
+      };
+    case "wait":
+      return { type: "wait" };
+    case "done":
+      return { type: "done" };
+  }
+}
 
 /**
  * Executes a vision-based recovery agent to recover from browser automation failures.
@@ -184,9 +216,9 @@ export async function executeRecoveryAgent(
   instruction: string,
   logger?: MinimalLogger,
   model?: LanguageModel,
-): Promise<void> {
+): Promise<RecoveryAgentResult> {
   if (!model) {
-    return;
+    return { popupDetected: false, popupClosed: false, steps: [] };
   }
   const log = logger ?? defaultLogger;
   log.info("Executing vision-based recovery agent", { instruction });
@@ -196,11 +228,9 @@ export async function executeRecoveryAgent(
     throw new Error("Viewport size not found");
   }
 
-  let screenshot: string;
+  let screenshot: Buffer;
   try {
-    screenshot = (
-      await page.screenshot({ fullPage: false, timeout: 10000 })
-    ).toString("base64");
+    screenshot = await page.screenshot({ fullPage: false, timeout: 10000 });
   } catch (screenshotError) {
     log.warn("Failed to take screenshot for recovery agent, skipping", {
       screenshotError:
@@ -212,6 +242,7 @@ export async function executeRecoveryAgent(
   }
 
   const maxSteps = 3;
+  const steps: RecoveryAgentStep[] = [];
   for (let step = 1; step <= maxSteps; step++) {
     const { object: result } = await generateObject({
       model,
@@ -231,7 +262,7 @@ Analyze the screenshot and decide what action to take. If the task is complete o
             },
             {
               type: "image",
-              image: `data:image/png;base64,${screenshot}`,
+              image: screenshot,
             },
           ],
         },
@@ -239,24 +270,35 @@ Analyze the screenshot and decide what action to take. If the task is complete o
       temperature: 0,
     });
 
+    const action = normalizeRecoveryAction(result.action);
     log.info(`Recovery step ${step}/${maxSteps}`, {
       reasoning: result.reasoning,
-      action: result.action,
+      action,
+    });
+    steps.push({
+      step,
+      reasoning: result.reasoning,
+      action,
     });
 
-    if (result.action.type === "done") {
+    if (action.type === "done") {
       log.info("Recovery agent completed - no more actions needed");
       break;
     }
 
-    await executeBrowserAction(page, result.action, log);
+    await executeBrowserAction(page, action, log);
     await delay(2000);
 
     // Take new screenshot for next iteration
-    screenshot = (await page.screenshot({ fullPage: false })).toString(
-      "base64",
-    );
+    screenshot = await page.screenshot({ fullPage: false });
   }
 
   log.info("Recovery agent execution completed");
+  const actionSteps = steps.filter((step) => step.action.type !== "done");
+  return {
+    popupDetected: actionSteps.length > 0,
+    popupClosed:
+      actionSteps.length > 0 && steps.at(-1)?.action.type === "done",
+    steps,
+  };
 }
