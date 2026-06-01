@@ -1,7 +1,59 @@
-/* Libretto docs — heading overrides */
+/* Libretto docs — userland Holocron overrides */
 :root {
   --type-heading-1-size: 28px;
   --type-heading-2-size: 20px;
   --type-heading-3-size: 16px;
   --weight-heading: 650;
+  --sidebar-group-font-size: 11px;
+}
+
+/* Match the tighter sidebar section headers from the previous docs. */
+.slot-sidebar-left nav .cursor-default {
+  font-size: var(--sidebar-group-font-size) !important;
+}
+
+/* Keep prompt quotes distinct without the default heavy quote treatment. */
+.slot-main
+  :where(blockquote):not(:where([class~='not-prose'], [class~='not-prose'] *)),
+.prose
+  :where(blockquote):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+  padding-left: 16px;
+  border-left: 2px solid var(--border-subtle);
+  border-inline-start-width: 2px;
+  border-inline-start-color: var(--border-subtle);
+  font-style: italic;
+  font-weight: var(--weight-prose);
+}
+
+.slot-main
+  :where(blockquote p:first-of-type):not(
+    :where([class~='not-prose'], [class~='not-prose'] *)
+  )::before,
+.slot-main
+  :where(blockquote p:last-of-type):not(
+    :where([class~='not-prose'], [class~='not-prose'] *)
+  )::after,
+.prose
+  :where(blockquote p:first-of-type):not(
+    :where([class~='not-prose'], [class~='not-prose'] *)
+  )::before,
+.prose
+  :where(blockquote p:last-of-type):not(
+    :where([class~='not-prose'], [class~='not-prose'] *)
+  )::after {
+  content: none;
+}
+
+/* Align sidebar utility links with the search field inset. */
+.slot-sidebar-left nav > div:first-child > a {
+  min-height: 36px;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  padding: 0 12px 0 8px;
+}
+
+.slot-sidebar-left nav > div:first-child > a > span:last-child {
+  margin-right: 0;
 }
