@@ -10,6 +10,7 @@
 /* Match the tighter sidebar section headers from the previous docs. */
 .slot-sidebar-left nav .cursor-default {
   font-size: var(--sidebar-group-font-size) !important;
+  margin-top: 16px !important;
 }
 
 /* Keep prompt quotes distinct without the default heavy quote treatment. */
