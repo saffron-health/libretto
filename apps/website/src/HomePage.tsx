@@ -19,6 +19,7 @@ import { Footer } from "./components/Footer";
 import { VersionBadge } from "./components/VersionBadge";
 import { FeatureRows } from "./components/FeatureRows";
 import { BattleTestedBanner } from "./components/BattleTestedBanner";
+import { Benchmarks } from "./components/Benchmarks";
 import { MaintainingFeatures } from "./components/MaintainingFeatures";
 import { CloudProviders } from "./components/CloudProviders";
 import { FAQ } from "./components/FAQ";
@@ -126,6 +127,8 @@ export function HomePage() {
       <div className="section-rails relative mx-auto max-w-[1100px]">
         <SectionDivider />
         <FeatureRows />
+        <SectionDivider />
+        <Benchmarks />
         <SectionDivider />
         <BattleTestedBanner />
         <SectionDivider />

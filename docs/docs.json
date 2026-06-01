@@ -70,6 +70,7 @@
             "pages": [
               "understand-libretto/core-concepts",
               "understand-libretto/how-workflow-generation-works",
+              "understand-libretto/configuration",
               "understand-libretto/automation-and-bot-detection",
               "understand-libretto/website-authentication"
             ]

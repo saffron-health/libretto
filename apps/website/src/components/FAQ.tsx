@@ -31,6 +31,12 @@ const faqs: FAQItem[] = [
     ),
   },
   {
+    id: "who",
+    question: "Who is Libretto good for?",
+    answer:
+      "Libretto is best for teams that need reliable workflows against websites where the official API is missing, incomplete, read-only, too slow to access, or does not support the action they need.\n\nGood fits include teams that:\n\n- Integrate with customer portals, EHRs, payer sites, government systems, financial dashboards, CRMs, or legacy admin tools.\n- Need to automate workflows that exist in the web UI but are not exposed through an API.\n- Need repeatable scripts that are faster, cheaper, and easier to debug than runtime browser agents.\n- Already use Playwright or browser agents, but want agents to help build and repair automation instead of making decisions on every run.\n\nLibretto is probably not the right tool if the API already covers the full workflow cleanly, or if you only need a one-off scrape.",
+  },
+  {
     id: "diff",
     question:
       "How is it different from existing tools like Stagehand or Browser-Use?",
@@ -138,7 +144,7 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
         className="flex w-full cursor-pointer items-center justify-between py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/30 rounded-sm"
         onClick={() => setIsExpanded(!isExpanded)}
         aria-expanded={isExpanded}
-        data-fathom-event="FAQ toggle click"
+        data-fathom-event={`FAQ ${item.id} toggle click`}
       >
         <Text size="md" className="font-medium text-ink">
           {item.question}

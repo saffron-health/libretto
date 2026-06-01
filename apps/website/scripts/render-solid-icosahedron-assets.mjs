@@ -1,7 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import sharp from "sharp";
 import {
   add,
   buildIcosahedron,
@@ -14,19 +13,34 @@ import {
   rotateZMatrix,
   scale,
   scaleMatrix,
+  SOLID_ICOSAHEDRON_BASE_COLOR,
+  SOLID_ICOSAHEDRON_HIGHLIGHT_MIX,
   SOLID_ICOSAHEDRON_LIGHTING,
   SOLID_ICOSAHEDRON_ROTATION,
   SOLID_ICOSAHEDRON_SCALE,
+  mixColorWithWhite,
   subtract,
   transformPoint,
 } from "../src/brand-kit/solidIcosahedronGeometry.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const logosDir = join(root, "public", "brand-kit", "logos");
+const logosDir = join(root, "public", "logos");
 
 const SIZE = 1024;
 const CENTER = SIZE / 2;
 const VIEW_SCALE = 380;
+const LOGOS = [
+  {
+    baseColor: SOLID_ICOSAHEDRON_BASE_COLOR,
+    filename: "logo-light.svg",
+    title: "Libretto logo for light mode",
+  },
+  {
+    baseColor: [240 / 255, 207 / 255, 90 / 255],
+    filename: "logo-dark.svg",
+    title: "Libretto logo for dark mode",
+  },
+];
 
 mkdirSync(logosDir, { recursive: true });
 
@@ -34,7 +48,7 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function colorForFace(normal, position) {
+function colorForFace(normal, position, baseColor) {
   const lightDirection = normalize(SOLID_ICOSAHEDRON_LIGHTING.lightDirection);
   const viewDirection = normalize(subtract([0, 0, 5], position));
   const halfwayDirection = normalize(add(lightDirection, viewDirection));
@@ -62,8 +76,11 @@ function colorForFace(normal, position) {
     0,
     1,
   );
-  const base = SOLID_ICOSAHEDRON_LIGHTING.baseColor;
-  const highlight = SOLID_ICOSAHEDRON_LIGHTING.highlightColor;
+  const base = baseColor;
+  const highlight = mixColorWithWhite(
+    baseColor,
+    SOLID_ICOSAHEDRON_HIGHLIGHT_MIX,
+  );
   const color = base.map((value, index) =>
     clamp(
       value * light + highlight[index] * specular * SOLID_ICOSAHEDRON_LIGHTING.specular,
@@ -74,7 +91,7 @@ function colorForFace(normal, position) {
   return `rgb(${color.map((value) => Math.round(value * 255)).join(" ")})`;
 }
 
-function renderSvg() {
+function renderSvg({ baseColor, title }) {
   const { faces, vertices } = buildIcosahedron();
   const model = multiply4(
     rotateZMatrix(SOLID_ICOSAHEDRON_ROTATION.z),
@@ -101,7 +118,7 @@ function renderSvg() {
         .join(" ");
 
       return {
-        color: colorForFace(normal, centroid),
+        color: colorForFace(normal, centroid, baseColor),
         depth: centroid[2],
         points,
       };
@@ -114,7 +131,7 @@ function renderSvg() {
     .join("\n  ");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}" fill="none">
-  <title>Libretto solid gold icosahedron mark</title>
+  <title>${title}</title>
   <g>
   ${polygons}
   </g>
@@ -122,12 +139,8 @@ function renderSvg() {
 `;
 }
 
-const svg = renderSvg();
-const svgPath = join(logosDir, "libretto-icosahedron-yellow.svg");
-const pngPath = join(logosDir, "libretto-icosahedron-yellow-1024.png");
-
-writeFileSync(svgPath, svg);
-await sharp(Buffer.from(svg)).resize(SIZE, SIZE).png().toFile(pngPath);
-
-console.log(`Rendered ${svgPath}`);
-console.log(`Rendered ${pngPath}`);
+for (const logo of LOGOS) {
+  const svgPath = join(logosDir, logo.filename);
+  writeFileSync(svgPath, renderSvg(logo));
+  console.log(`Rendered ${svgPath}`);
+}

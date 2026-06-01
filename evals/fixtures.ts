@@ -7,8 +7,17 @@ import { PiEvalHarness } from "./harness.js";
 import { createTmpWorkspace } from "@libretto/dev-tools/tmp-workspace";
 import type { EvalCaseRecord } from "./eval-case.js";
 import { provisionAuthProfile } from "./auth-profiles.js";
+import {
+  BrowserUseEvalAgent,
+  LibrettoCachedEvalAgent,
+  LibrettoEvalAgent,
+  type EvalAgent,
+  type EvalAgentName,
+} from "./agents.js";
 
 export type EvalContext = {
+  agent: EvalAgent;
+  agentName: EvalAgentName;
   harness: PiEvalHarness;
   repoRoot: string;
   evalWorkspaceDir: string;
@@ -21,6 +30,7 @@ export type EvalContext = {
 };
 
 export type CreateEvalContextOptions = {
+  agentName?: EvalAgentName;
   model?: string;
   provider?: string | null;
 };
@@ -34,9 +44,12 @@ function stableHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
-function workspaceDirForCase(evalCase: EvalCaseRecord): string {
+function workspaceDirForCase(
+  evalCase: EvalCaseRecord,
+  agentName: EvalAgentName,
+): string {
   const stableId = stableHash(
-    `${evalCase.filePath ?? "unknown"}::${evalCase.name}`,
+    `${evalCase.filePath ?? "unknown"}::${evalCase.name}::${agentName}`,
   ).slice(0, 16);
   return join(DETERMINISTIC_WORKSPACE_ROOT, stableId);
 }
@@ -73,21 +86,27 @@ export async function createEvalContext(
   evalCase: EvalCaseRecord,
   options: CreateEvalContextOptions = {},
 ): Promise<EvalContext> {
-  const evalWorkspaceDir = workspaceDirForCase(evalCase);
+  const agentName = options.agentName ?? "libretto";
+  const evalWorkspaceDir = workspaceDirForCase(evalCase, agentName);
   const workspaceName = stableHash(
-    `${evalCase.filePath ?? "unknown"}::${evalCase.name}`,
+    `${evalCase.filePath ?? "unknown"}::${evalCase.name}::${agentName}`,
   ).slice(0, 16);
   await rm(evalWorkspaceDir, { recursive: true, force: true });
-  try {
-    await createTmpWorkspace({
-      name: workspaceName,
-      parentDir: DETERMINISTIC_WORKSPACE_ROOT,
-      skipBuild: true,
-      quiet: true,
-    });
-  } catch (error) {
-    await rm(evalWorkspaceDir, { recursive: true, force: true });
-    throw error;
+  if (agentName !== "browser-use") {
+    try {
+      await createTmpWorkspace({
+        name: workspaceName,
+        parentDir: DETERMINISTIC_WORKSPACE_ROOT,
+        skipBuild: true,
+        extraPackages: ["zod@^4.3.6"],
+        quiet: true,
+      });
+    } catch (error) {
+      await rm(evalWorkspaceDir, { recursive: true, force: true });
+      throw error;
+    }
+  } else {
+    await mkdir(evalWorkspaceDir, { recursive: true });
   }
 
   if (evalCase.authProfile) {
@@ -115,8 +134,21 @@ export async function createEvalContext(
     model: options.model,
     browserProvider: options.provider,
   });
+  const browserProvider = options.provider ?? "local";
+  const agent =
+    agentName === "libretto"
+      ? new LibrettoEvalAgent(harness, browserProvider)
+      : agentName === "libretto-cached"
+        ? new LibrettoCachedEvalAgent(browserProvider)
+        : new BrowserUseEvalAgent({
+            cwd: evalWorkspaceDir,
+            model: options.model ?? "openai/gpt-5.5",
+            browserProvider,
+          });
 
   return {
+    agent,
+    agentName,
     harness,
     repoRoot,
     evalWorkspaceDir,
@@ -144,7 +176,7 @@ export async function createEvalContext(
       return targetPath;
     },
     dispose: async () => {
-      harness.dispose();
+      agent.dispose();
       await rm(evalWorkspaceDir, { recursive: true, force: true });
     },
   };

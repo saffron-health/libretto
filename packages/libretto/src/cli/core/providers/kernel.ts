@@ -70,13 +70,21 @@ async function kernelFetchNoBody(
   }
 }
 
+function readEndpoint(): string {
+  return (
+    process.env.KERNEL_API_ENDPOINT?.trim() ||
+    process.env.KERNEL_ENDPOINT?.trim() ||
+    "https://api.onkernel.com"
+  );
+}
+
 export function createKernelProvider(
   options: KernelProviderOptions = {},
 ): ProviderApi {
   const apiKey = options.apiKey ?? process.env.KERNEL_API_KEY;
   if (!apiKey)
     throw new Error("KERNEL_API_KEY is required for Kernel provider.");
-  const endpoint = process.env.KERNEL_ENDPOINT ?? "https://api.onkernel.com";
+  const endpoint = readEndpoint();
   const headless = options.headless ?? process.env.KERNEL_HEADLESS !== "false";
   const stealth = options.stealth ?? readBooleanEnv("KERNEL_STEALTH", false);
   const timeoutSeconds = readTimeoutSeconds(options);
