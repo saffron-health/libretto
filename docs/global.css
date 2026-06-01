@@ -54,18 +54,18 @@
 
 .slot-sidebar-left .search-input {
   padding-top: 4px !important;
-  padding-right: 46px !important;
+  padding-right: 42px !important;
   padding-bottom: 4px !important;
-  padding-left: 30px !important;
+  padding-left: 28px !important;
   border-radius: var(--radius-md) !important;
 }
 
 .slot-sidebar-left div:has(> .search-input) > span:first-child {
-  left: 12px !important;
+  left: 10px !important;
 }
 
 .slot-sidebar-left div:has(> .search-input) > span:last-child {
-  right: 26px !important;
+  right: 24px !important;
 }
 
 .slot-sidebar-left div:has(> .search-input) kbd {
@@ -79,7 +79,7 @@
 
 .slot-sidebar-left nav > div:first-child > a {
   align-items: center;
-  padding: 2px 12px 2px 8px;
+  padding: 2px 10px 2px 6px;
 }
 
 .slot-sidebar-left nav > div:first-child > a > span:last-child {
