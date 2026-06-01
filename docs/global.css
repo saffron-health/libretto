@@ -54,7 +54,7 @@
 
 .slot-sidebar-left .search-input {
   padding-top: 4px !important;
-  padding-right: 42px !important;
+  padding-right: 32px !important;
   padding-bottom: 4px !important;
   padding-left: 28px !important;
   border-radius: var(--radius-md) !important;
@@ -62,10 +62,6 @@
 
 .slot-sidebar-left div:has(> .search-input) > span:first-child {
   left: 10px !important;
-}
-
-.slot-sidebar-left div:has(> .search-input) > span:last-child {
-  right: 24px !important;
 }
 
 .slot-sidebar-left div:has(> .search-input) kbd {
