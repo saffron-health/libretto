@@ -1,9 +1,5 @@
 import type { FrameLocator, Locator, Page } from "playwright";
 import type { LanguageModel } from "ai";
-import {
-  type MinimalLogger,
-  defaultLogger,
-} from "../../shared/logger/logger.js";
 import { executeRecoveryAgent, type RecoveryAgentResult } from "./agent.js";
 
 export type FallbackTargetType = "page" | "locator";
@@ -14,7 +10,6 @@ export type PageFallbackContext = {
   method: string;
   args: readonly unknown[];
   error: unknown;
-  logger: MinimalLogger;
 };
 
 export type PageFallbackResult = Record<string, unknown> | void;
@@ -28,7 +23,7 @@ export type FallbackMethodGroup = "ui" | "read" | "all-supported";
 export type FallbackMethodMatcher =
   | FallbackMethodGroup
   | readonly string[]
-  | ((context: Omit<PageFallbackContext, "error" | "logger">) => boolean);
+  | ((context: Omit<PageFallbackContext, "error">) => boolean);
 
 export type PageFallbackRule = {
   methods?: FallbackMethodMatcher;
@@ -37,7 +32,6 @@ export type PageFallbackRule = {
 
 export type PageFallbackOptions = {
   rules: readonly PageFallbackRule[];
-  logger?: MinimalLogger;
 };
 
 export type PopupClosingFallbackOptions =
@@ -74,11 +68,8 @@ const PAGE_UI_METHODS = new Set([
 ]);
 
 const PAGE_READ_METHODS = new Set([
-  "url",
   "title",
   "content",
-  "pageErrors",
-  "viewportSize",
   "screenshot",
   "waitForLoadState",
   "waitForRequest",
@@ -195,7 +186,7 @@ function isSupportedMethod(
 
 function matchesMethods(
   matcher: FallbackMethodMatcher | undefined,
-  context: Omit<PageFallbackContext, "error" | "logger">,
+  context: Omit<PageFallbackContext, "error">,
 ): boolean {
   const resolvedMatcher = matcher ?? "all-supported";
   if (typeof resolvedMatcher === "function") {
@@ -217,7 +208,7 @@ function matchesMethods(
 
 function findMatchingRule(
   rules: readonly PageFallbackRule[],
-  context: Omit<PageFallbackContext, "error" | "logger">,
+  context: Omit<PageFallbackContext, "error">,
 ): PageFallbackRule | null {
   return rules.find((rule) => matchesMethods(rule.methods, context)) ?? null;
 }
@@ -233,7 +224,6 @@ async function runWithFallback<T>(args: {
   try {
     return await args.invoke();
   } catch (originalError) {
-    const logger = args.options.logger ?? defaultLogger;
     const baseContext = {
       page: args.page,
       targetType: args.targetType,
@@ -245,40 +235,13 @@ async function runWithFallback<T>(args: {
       throw originalError;
     }
 
-    logger.info("page-fallback:attempt", {
-      targetType: args.targetType,
-      method: args.method,
-      error:
-        originalError instanceof Error
-          ? originalError.message
-          : String(originalError),
-    });
-
     try {
-      const result = await rule.fallback({
+      await rule.fallback({
         ...baseContext,
         error: originalError,
-        logger,
-      });
-      logger.info("page-fallback:completed", {
-        targetType: args.targetType,
-        method: args.method,
-        result,
       });
       return await args.invoke();
-    } catch (fallbackOrRetryError) {
-      logger.warn("page-fallback:failed", {
-        targetType: args.targetType,
-        method: args.method,
-        originalError:
-          originalError instanceof Error
-            ? originalError.message
-            : String(originalError),
-        fallbackOrRetryError:
-          fallbackOrRetryError instanceof Error
-            ? fallbackOrRetryError.message
-            : String(fallbackOrRetryError),
-      });
+    } catch {
       throw originalError;
     }
   }
@@ -473,11 +436,13 @@ async function resolvePopupClosingModel(
 ): Promise<LanguageModel> {
   if ("provider" in options) {
     if (options.provider === "openai") {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      return createOpenAI({ apiKey: options.apiKey })(options.model);
+      return import("@ai-sdk/openai").then(({ createOpenAI }) =>
+        createOpenAI({ apiKey: options.apiKey })(options.model),
+      );
     }
-    const { createAnthropic } = await import("@ai-sdk/anthropic");
-    return createAnthropic({ apiKey: options.apiKey })(options.model);
+    return import("@ai-sdk/anthropic").then(({ createAnthropic }) =>
+      createAnthropic({ apiKey: options.apiKey })(options.model),
+    );
   }
 
   return options.model;
@@ -488,9 +453,9 @@ export function popupClosingFallback(
 ): PageFallbackRule {
   return {
     methods: options.methods ?? "all-supported",
-    fallback: async ({ page, method, logger }): Promise<RecoveryAgentResult> => {
+    fallback: async ({ page }): Promise<RecoveryAgentResult> => {
       const model = await resolvePopupClosingModel(options);
-      const result = await executeRecoveryAgent(
+      return executeRecoveryAgent(
         page,
         [
           "Look at the page for any popup, modal, cookie banner, overlay, dialog, or interstitial that blocks interaction.",
@@ -498,18 +463,9 @@ export function popupClosingFallback(
           "Prefer obvious close, dismiss, continue, accept, or X buttons.",
           "Do not return done while a blocking overlay or dialog is still visible.",
         ].join(" "),
-        logger,
+        undefined,
         model,
       );
-
-      logger.info("popup-recovery:result", {
-        method,
-        popupDetected: result.popupDetected,
-        popupClosed: result.popupClosed,
-        steps: result.steps.length,
-      });
-
-      return result;
     },
   };
 }

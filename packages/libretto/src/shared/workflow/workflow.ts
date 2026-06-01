@@ -1,6 +1,5 @@
 import type { Page } from "playwright";
 import { z } from "zod";
-import type { MinimalLogger } from "../logger/logger.js";
 import {
   createFallbackPage,
   type PageFallbackRule,
@@ -11,7 +10,6 @@ export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 export type LibrettoWorkflowContext = {
   session: string;
   page: Page;
-  logger?: MinimalLogger;
 };
 
 export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
@@ -140,7 +138,6 @@ export class LibrettoWorkflow<
             ...ctx,
             page: createFallbackPage(ctx.page, {
               rules: this.pageFallbacks,
-              logger: ctx.logger,
             }),
           };
     return this.handler(workflowContext, parsed);

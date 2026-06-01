@@ -3,26 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createFallbackPage,
   popupClosingFallback,
-  type MinimalLogger,
   workflow,
 } from "../src/index.js";
-
-function createTestLogger() {
-  const entries: {
-    level: "info" | "warn" | "error";
-    event: string;
-    data?: unknown;
-  }[] = [];
-  const logger: MinimalLogger = {
-    info: (event, data) => entries.push({ level: "info", event, data }),
-    warn: (event, data) => entries.push({ level: "warn", event, data }),
-    error: (event) => {
-      entries.push({ level: "error", event });
-      return new Error(event);
-    },
-  };
-  return { logger, entries };
-}
 
 describe("createFallbackPage", () => {
   it("runs fallback for locator read methods and retries once", async () => {
@@ -35,7 +17,7 @@ describe("createFallbackPage", () => {
     const page = {
       locator: vi.fn(() => locator),
     } as unknown as Page;
-    const fallback = vi.fn(async () => ({ popupDetected: true }));
+    const fallback = vi.fn(async () => ({ actionTaken: true }));
 
     const fallbackPage = createFallbackPage(page, {
       rules: [{ fallback }],
@@ -63,6 +45,24 @@ describe("createFallbackPage", () => {
     await expect(fallbackPage.title()).resolves.toBe("Dashboard");
     expect(title).toHaveBeenCalledTimes(2);
     expect(fallback).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves synchronous page method return values", () => {
+    const page = {
+      url: vi.fn(() => "https://example.com/"),
+      viewportSize: vi.fn(() => ({ width: 1280, height: 720 })),
+      pageErrors: vi.fn(() => []),
+    } as unknown as Page;
+    const fallback = vi.fn(async () => undefined);
+
+    const fallbackPage = createFallbackPage(page, {
+      rules: [{ fallback }],
+    });
+
+    expect(fallbackPage.url()).toBe("https://example.com/");
+    expect(fallbackPage.viewportSize()).toEqual({ width: 1280, height: 720 });
+    expect(fallbackPage.pageErrors()).toEqual([]);
+    expect(fallback).not.toHaveBeenCalled();
   });
 
   it("does not wrap unsupported arbitrary execution methods", async () => {
@@ -136,7 +136,6 @@ describe("workflow page fallbacks", () => {
 it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
   "closes a real popup with the configured model provider",
   async () => {
-    const { logger, entries } = createTestLogger();
     const provider = process.env.ANTHROPIC_API_KEY ? "anthropic" : "openai";
     const apiKey =
       provider === "anthropic"
@@ -195,7 +194,6 @@ it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
       `);
 
       const fallbackPage = createFallbackPage(page, {
-        logger,
         rules: [
           popupClosingFallback({
             methods: "all-supported",
@@ -211,11 +209,7 @@ it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
         await fallbackPage.locator("#target").click();
       } catch (error) {
         throw new Error(
-          [
-            error instanceof Error ? error.message : String(error),
-            "Fallback logs:",
-            JSON.stringify(entries, null, 2),
-          ].join("\n"),
+          error instanceof Error ? error.message : String(error),
         );
       }
 
