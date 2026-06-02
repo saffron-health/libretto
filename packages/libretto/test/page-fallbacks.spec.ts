@@ -1,5 +1,6 @@
 import { chromium, type Locator, type Page } from "playwright";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import {
   createFallbackPage,
   popupRecoveryFallback,
@@ -152,6 +153,37 @@ describe("workflow page fallbacks", () => {
         return await page.locator("#result").textContent();
       },
     });
+
+    await expect(wf.run({ session: "test", page: rawPage }, {})).resolves.toBe(
+      "done",
+    );
+    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(textContent).toHaveBeenCalledTimes(2);
+  });
+
+  it("supports pageFallback in the schema definition argument", async () => {
+    const originalError = new Error("popup");
+    const textContent = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(originalError)
+      .mockResolvedValueOnce("done");
+    const locator = { textContent } as unknown as Locator;
+    const rawPage = {
+      locator: vi.fn(() => locator),
+    } as unknown as Page;
+    const fallback = vi.fn(async () => undefined);
+
+    const wf = workflow(
+      "fallback-schema-workflow",
+      {
+        input: z.object({}),
+        output: z.string(),
+        pageFallback: fallback,
+      },
+      async ({ page }) => {
+        return (await page.locator("#result").textContent()) ?? "";
+      },
+    );
 
     await expect(wf.run({ session: "test", page: rawPage }, {})).resolves.toBe(
       "done",

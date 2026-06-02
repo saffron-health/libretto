@@ -16,7 +16,8 @@ Add `pageFallback` to a workflow when you want Libretto to recover after a Page 
 
 ```typescript
 export default workflow("reviewOrder", {
-  schemas: { input, output },
+  input,
+  output,
   pageFallback: popupRecoveryFallback({
     provider: "openai",
     apiKey: process.env.OPENAI_API_KEY!,

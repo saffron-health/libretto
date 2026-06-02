@@ -25,15 +25,35 @@ export type LibrettoWorkflowSchemas<
   output: OutputSchema;
 };
 
+export type LibrettoWorkflowDefinition<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+> = {
+  input?: InputSchema;
+  output?: OutputSchema;
+  pageFallback?: PageFallback;
+};
+
 export type LibrettoWorkflowOptions<
-  Input = unknown,
-  Output = unknown,
-  InputSchema extends z.ZodType = z.ZodType<Input>,
-  OutputSchema extends z.ZodType = z.ZodType<Output>,
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+> = LibrettoWorkflowDefinition<InputSchema, OutputSchema> & {
+  handler: LibrettoWorkflowHandler<
+    z.infer<InputSchema>,
+    z.infer<OutputSchema>
+  >;
+};
+
+type LegacyLibrettoWorkflowOptions<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
 > = {
   schemas?: LibrettoWorkflowSchemas<InputSchema, OutputSchema>;
   pageFallback?: PageFallback;
-  handler: LibrettoWorkflowHandler<Input, Output>;
+  handler: LibrettoWorkflowHandler<
+    z.infer<InputSchema>,
+    z.infer<OutputSchema>
+  >;
 };
 
 // Thrown when input fails Zod validation. The runner surfaces `.message`
@@ -112,16 +132,21 @@ export class LibrettoWorkflow<
 
   constructor(
     name: string,
-    schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema> | undefined,
+    options:
+      | {
+          inputSchema?: InputSchema;
+          outputSchema?: OutputSchema;
+          pageFallback?: PageFallback;
+        }
+      | undefined,
     handler: LibrettoWorkflowHandler<
       z.infer<InputSchema>,
       z.infer<OutputSchema>
     >,
-    options?: { pageFallback?: PageFallback },
   ) {
     this.name = name;
-    this.inputSchema = schemas?.input;
-    this.outputSchema = schemas?.output;
+    this.inputSchema = options?.inputSchema;
+    this.outputSchema = options?.outputSchema;
     this.pageFallback = options?.pageFallback;
     this.handler = handler;
   }
@@ -240,14 +265,33 @@ export function getWorkflowFromModuleExports(
   return null;
 }
 
-// Recommended 3-arg form: pass Zod schemas so input is validated at run time
-// and the hosted platform can expose typed I/O metadata via /v1/workflows/get.
-export function workflow<
+function getWorkflowConstructorOptions<
   InputSchema extends z.ZodType,
   OutputSchema extends z.ZodType,
 >(
+  options:
+    | LibrettoWorkflowDefinition<InputSchema, OutputSchema>
+    | LibrettoWorkflowOptions<InputSchema, OutputSchema>
+    | LegacyLibrettoWorkflowOptions<InputSchema, OutputSchema>,
+): {
+  inputSchema?: InputSchema;
+  outputSchema?: OutputSchema;
+  pageFallback?: PageFallback;
+} {
+  const legacySchemas = "schemas" in options ? options.schemas : undefined;
+  return {
+    inputSchema: "input" in options ? options.input : legacySchemas?.input,
+    outputSchema: "output" in options ? options.output : legacySchemas?.output,
+    pageFallback: options.pageFallback,
+  };
+}
+
+export function workflow<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+>(
   name: string,
-  schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema>,
+  definition: LibrettoWorkflowDefinition<InputSchema, OutputSchema>,
   handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
@@ -255,27 +299,23 @@ export function workflow<
 ): LibrettoWorkflow<InputSchema, OutputSchema>;
 
 export function workflow<
-  InputSchema extends z.ZodType,
-  OutputSchema extends z.ZodType,
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
 >(
   name: string,
-  options: LibrettoWorkflowOptions<
-    z.infer<InputSchema>,
-    z.infer<OutputSchema>,
-    InputSchema,
-    OutputSchema
-  > & {
-    schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema>;
-  },
+  options: LibrettoWorkflowOptions<InputSchema, OutputSchema>,
 ): LibrettoWorkflow<InputSchema, OutputSchema>;
 
-export function workflow<Input = unknown, Output = unknown>(
+export function workflow<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+>(
   name: string,
-  options: LibrettoWorkflowOptions<Input, Output>,
-): LibrettoWorkflow<z.ZodType<Input>, z.ZodType<Output>>;
+  options: LegacyLibrettoWorkflowOptions<InputSchema, OutputSchema>,
+): LibrettoWorkflow<InputSchema, OutputSchema>;
 
 // Legacy 2-arg form kept so deployments built before Zod schemas existed
-// continue to load. New code should always pass schemas.
+// continue to load. New code should pass input/output schemas when possible.
 export function workflow<Input = unknown, Output = unknown>(
   name: string,
   handler: LibrettoWorkflowHandler<Input, Output>,
@@ -283,27 +323,31 @@ export function workflow<Input = unknown, Output = unknown>(
 
 export function workflow(
   name: string,
-  schemasOrHandler:
-    | LibrettoWorkflowSchemas<z.ZodType, z.ZodType>
+  definitionOrHandler:
+    | LibrettoWorkflowDefinition<z.ZodType, z.ZodType>
     | LibrettoWorkflowOptions
+    | LegacyLibrettoWorkflowOptions
     | LibrettoWorkflowHandler,
   maybeHandler?: LibrettoWorkflowHandler,
 ): LibrettoWorkflow {
-  if (typeof schemasOrHandler === "function") {
-    return new LibrettoWorkflow(name, undefined, schemasOrHandler);
+  if (typeof definitionOrHandler === "function") {
+    return new LibrettoWorkflow(name, undefined, definitionOrHandler);
   }
-  if ("handler" in schemasOrHandler) {
+  if ("handler" in definitionOrHandler) {
     return new LibrettoWorkflow(
       name,
-      schemasOrHandler.schemas,
-      schemasOrHandler.handler,
-      { pageFallback: schemasOrHandler.pageFallback },
+      getWorkflowConstructorOptions(definitionOrHandler),
+      definitionOrHandler.handler,
     );
   }
   if (!maybeHandler) {
     throw new Error(
-      `workflow("${name}") called with schemas but no handler. Pass the handler as the third argument.`,
+      `workflow("${name}") called without a handler. Pass the handler as the third argument or in the options object.`,
     );
   }
-  return new LibrettoWorkflow(name, schemasOrHandler, maybeHandler);
+  return new LibrettoWorkflow(
+    name,
+    getWorkflowConstructorOptions(definitionOrHandler),
+    maybeHandler,
+  );
 }

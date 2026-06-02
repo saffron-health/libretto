@@ -23,10 +23,10 @@ const outputSchema = z.object({
   results: z.array(z.object({ name: z.string(), value: z.string() })),
 });
 
-export default workflow(
-  "myWorkflow",
-  { input: inputSchema, output: outputSchema },
-  async (ctx: LibrettoWorkflowContext, input) => {
+export default workflow("myWorkflow", {
+  input: inputSchema,
+  output: outputSchema,
+  handler: async (ctx: LibrettoWorkflowContext, input) => {
     const { session, page } = ctx;
 
     console.log("workflow-start", { session, query: input.query });
@@ -35,12 +35,12 @@ export default workflow(
 
     return { results: [] };
   },
-);
+});
 ```
 
 Key points:
 
-- `workflow(name, { input, output }, handler)` takes a unique workflow name, a pair of Zod schemas describing input and output, and the async handler. If the workflow needs runtime error handling, use `workflow(name, { schemas: { input, output }, pageFallback, handler })` so Libretto can run `pageFallback` and retry the original Page or Locator action once. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
+- `workflow(name, { input, output, pageFallback, handler })` takes a unique workflow name, optional Zod input/output schemas, an optional page fallback, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
 - At run time, Libretto validates `input` against `inputSchema` before calling the handler. Invalid input throws a clear error listing each failing field; the workflow handler never sees malformed input.
 - `npx libretto run ./file.ts` executes the file's default-exported workflow, so always use `export default workflow(...)`.
 - `ctx` provides `session` and `page`. Use `console.log`/`console.warn`/`console.error` for logging — the runtime wraps these with structured metadata automatically.

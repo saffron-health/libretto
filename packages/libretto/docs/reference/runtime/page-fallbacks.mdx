@@ -6,7 +6,8 @@ Use it for unexpected UI that blocks the happy path, such as popups, cookie bann
 
 ```typescript
 export default workflow("reviewOrder", {
-  schemas: { input, output },
+  input,
+  output,
   pageFallback,
   handler: async ({ page }, params) => {
     await page.goto(params.url);
