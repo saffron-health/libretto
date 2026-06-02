@@ -1,18 +1,18 @@
 # Error recovery
 
-Libretto gives you two ways to handle failures: debug the workflow so the deterministic path is correct, or add a narrow runtime fallback for expected nondeterminism.
+Libretto helps your agent handle failures in two ways: inspect failed runs so it can fix the deterministic workflow, or add a narrow runtime fallback for expected nondeterminism.
 
 Most workflow failures should be fixed with better selectors, waits, or assertions. Runtime recovery is for cases where the workflow is on the right path but the site sometimes shows unexpected UI that blocks the next action.
 
 ## Debugging failed runs
 
-When a workflow fails, inspect the browser state before changing code. Run headed while developing, add `pause(ctx.session)` at useful checkpoints, and use `resume` after inspection.
+When a workflow fails, your agent can inspect the browser state before changing code. Run headed while developing, add `pause(ctx.session)` at useful checkpoints, and use `resume` after inspection.
 
-Libretto keeps session state, action logs, screenshots, and Playwright errors so you can tell whether a failure came from a selector, a timeout, navigation, or an element intercepting pointer events.
+Libretto keeps session state, action logs, screenshots, and Playwright errors so the agent can tell whether a failure came from a selector, a timeout, navigation, or an element intercepting pointer events.
 
 ## How pageFallback works
 
-Add `pageFallback` to a workflow when you want Libretto to recover from supported Page or Locator failures. When a wrapped method fails, Libretto calls the fallback and then retries the original method once.
+Add `pageFallback` to a workflow when you want Libretto to recover after a Page or Locator action fails. When the action fails, Libretto calls the fallback and then retries the original action once.
 
 ```typescript
 export default workflow("reviewOrder", {
@@ -39,6 +39,6 @@ It uses a viewport screenshot, asks the model for an action, scales the returned
 
 `popupRecoveryFallback()` is the built-in preset for closing popups and other blockers. Use `visionRecoveryFallback()` when you want to provide your own instruction.
 
-Do not add a vision fallback by default. Add one when exploration shows the site has blockers across sessions, accounts, or time. Do not use it to make business decisions that belong in the workflow handler.
+Simple sites without nondeterministic UI usually do not need a vision fallback. For complicated sites automated through the DOM, add one when exploration shows blockers across sessions, accounts, or time. Do not use it to make business decisions that belong in the workflow handler.
 
 Supported provider shortcut models are `gpt-5.5` and `claude-sonnet-4-6`.
