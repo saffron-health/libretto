@@ -24,17 +24,31 @@ export type PageFallbackOptions = {
   fallback: PageFallback;
 };
 
-export type VisionRecoveryFallbackOptions =
+type VisionRecoveryModelOptions =
   | {
-      instruction: string;
       model: LanguageModel;
     }
   | {
-      instruction: string;
       provider: "openai" | "anthropic";
       apiKey: string;
       model: string;
     };
+
+export type VisionRecoveryFallbackOptions = VisionRecoveryModelOptions & {
+  instruction: string;
+  maxSteps?: number;
+};
+
+export type PopupRecoveryFallbackOptions = VisionRecoveryModelOptions & {
+  maxSteps?: number;
+};
+
+export const POPUP_RECOVERY_INSTRUCTION = [
+  "Look at the page for any popup, modal, cookie banner, overlay, dialog, or interstitial that blocks interaction.",
+  "If any blocking popup is visible, close it before returning done.",
+  "Prefer obvious close, dismiss, continue, accept, or X buttons.",
+  "Do not return done while a blocking overlay or dialog is still visible.",
+].join(" ");
 
 const PAGE_UI_METHODS = new Set([
   "click",
@@ -413,6 +427,21 @@ export function visionRecoveryFallback(
 ): PageFallback {
   return async ({ page }): Promise<RecoveryAgentResult> => {
     const model = await resolveVisionRecoveryModel(options);
-    return executeRecoveryAgent(page, options.instruction, undefined, model);
+    return executeRecoveryAgent(
+      page,
+      options.instruction,
+      undefined,
+      model,
+      options.maxSteps,
+    );
   };
+}
+
+export function popupRecoveryFallback(
+  options: PopupRecoveryFallbackOptions,
+): PageFallback {
+  return visionRecoveryFallback({
+    ...options,
+    instruction: POPUP_RECOVERY_INSTRUCTION,
+  });
 }

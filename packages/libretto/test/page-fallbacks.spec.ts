@@ -2,7 +2,7 @@ import { chromium, type Locator, type Page } from "playwright";
 import { describe, expect, it, vi } from "vitest";
 import {
   createFallbackPage,
-  visionRecoveryFallback,
+  popupRecoveryFallback,
   workflow,
 } from "../src/index.js";
 
@@ -222,16 +222,11 @@ it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
       `);
 
       const fallbackPage = createFallbackPage(page, {
-        fallback: visionRecoveryFallback({
+        fallback: popupRecoveryFallback({
           provider,
           apiKey,
           model,
-          instruction: [
-            "Look at the page for any popup, modal, cookie banner, overlay, dialog, or interstitial that blocks interaction.",
-            "If any blocking popup is visible, close it before returning done.",
-            "Prefer obvious close, dismiss, continue, accept, or X buttons.",
-            "Do not return done while a blocking overlay or dialog is still visible.",
-          ].join(" "),
+          maxSteps: 3,
         }),
       });
       fallbackPage.setDefaultTimeout(500);

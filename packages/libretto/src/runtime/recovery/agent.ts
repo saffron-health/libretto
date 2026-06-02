@@ -349,6 +349,7 @@ export async function executeRecoveryAgent(
   instruction: string,
   logger?: MinimalLogger,
   model?: LanguageModel,
+  maxSteps = 3,
 ): Promise<RecoveryAgentResult> {
   if (!model) {
     return { status: "skipped", steps: [] };
@@ -369,7 +370,6 @@ export async function executeRecoveryAgent(
     throw new Error("Failed to take screenshot for recovery agent");
   }
 
-  const maxSteps = 3;
   const steps: RecoveryAgentStep[] = [];
   for (let step = 1; step <= maxSteps; step++) {
     const { screenshot, dimensions, scale } = screenshotState;

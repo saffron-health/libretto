@@ -42,7 +42,9 @@ export {
   type DetectedSubmissionError,
 } from "./runtime/recovery/errors.js";
 export {
+  POPUP_RECOVERY_INSTRUCTION,
   createFallbackPage,
+  popupRecoveryFallback,
   visionRecoveryFallback,
   type FallbackTargetType,
   type PageFallbackContext,
@@ -50,6 +52,7 @@ export {
   type PageFallbackHandler,
   type PageFallbackOptions,
   type PageFallbackResult,
+  type PopupRecoveryFallbackOptions,
   type VisionRecoveryFallbackOptions,
 } from "./runtime/recovery/page-fallbacks.js";
 

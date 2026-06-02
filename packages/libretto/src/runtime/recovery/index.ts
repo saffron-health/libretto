@@ -11,7 +11,9 @@ export {
   type DetectedSubmissionError,
 } from "./errors.js";
 export {
+  POPUP_RECOVERY_INSTRUCTION,
   createFallbackPage,
+  popupRecoveryFallback,
   visionRecoveryFallback,
   type FallbackTargetType,
   type PageFallbackContext,
@@ -19,5 +21,6 @@ export {
   type PageFallbackHandler,
   type PageFallbackOptions,
   type PageFallbackResult,
+  type PopupRecoveryFallbackOptions,
   type VisionRecoveryFallbackOptions,
 } from "./page-fallbacks.js";
