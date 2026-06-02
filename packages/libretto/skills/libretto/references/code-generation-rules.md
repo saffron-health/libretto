@@ -41,6 +41,7 @@ export default workflow(
 Key points:
 
 - `workflow(name, { input, output }, handler)` takes a unique workflow name, a pair of Zod schemas describing input and output, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
+- If the workflow needs runtime error handling, use `workflow(name, { schemas: { input, output }, pageFallback, handler })`. Libretto wraps the workflow `page` so supported Page and Locator failures can run `pageFallback` and then retry the original action once.
 - At run time, Libretto validates `input` against `inputSchema` before calling the handler. Invalid input throws a clear error listing each failing field; the workflow handler never sees malformed input.
 - `npx libretto run ./file.ts` executes the file's default-exported workflow, so always use `export default workflow(...)`.
 - `ctx` provides `session` and `page`. Use `console.log`/`console.warn`/`console.error` for logging — the runtime wraps these with structured metadata automatically.
@@ -48,6 +49,37 @@ Key points:
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.
 - After validation is complete and the workflow is confirmed working end to end, remove all `pause()` calls and pause-only workflow params unless the user explicitly says to keep them.
 - The browser is launched and closed automatically by the CLI. Do not launch or close it in the handler.
+
+## Workflow Error Handling
+
+Do not add fallback logic by default. Add a `pageFallback` only when exploration shows repeated nondeterminism, such as popups, cookie banners, modals, overlays, or similar blockers that may intercept otherwise correct actions.
+
+Use `popupRecoveryFallback()` for generic popup and modal dismissal. Use a custom `PageFallback` function when the site needs specific recovery steps before or after the popup recovery agent.
+
+```typescript
+import {
+  popupRecoveryFallback,
+  workflow,
+  type PageFallback,
+} from "libretto";
+
+const popupRecoveryAgent = popupRecoveryFallback({
+  provider: "openai",
+  apiKey: process.env.OPENAI_API_KEY!,
+  model: "gpt-5.5",
+  maxSteps: 3,
+});
+
+const pageFallback: PageFallback = async (context) => {
+  const result = await popupRecoveryAgent(context);
+  if (result.status === "action-taken") {
+    await context.page.waitForTimeout(250);
+  }
+  return result;
+};
+```
+
+Tell the user when you add a fallback measure and why. Keep primary workflow logic in the handler; fallback logic should only recover from unexpected blockers and let Libretto retry the failed action.
 
 ## Playwright DOM Interaction Rules
 

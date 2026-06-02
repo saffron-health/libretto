@@ -1,0 +1,131 @@
+# Page fallbacks
+
+Page fallbacks let a workflow recover from supported Playwright Page and Locator failures. When a wrapped method fails, Libretto calls the configured fallback and then retries the original method once.
+
+## Workflow usage
+
+```typescript
+import { popupRecoveryFallback, workflow } from "libretto";
+import { z } from "zod";
+
+const input = z.object({
+  url: z.string(),
+});
+
+const output = z.object({
+  complete: z.boolean(),
+});
+
+export default workflow("reviewOrder", {
+  schemas: { input, output },
+  pageFallback: popupRecoveryFallback({
+    provider: "openai",
+    apiKey: process.env.OPENAI_API_KEY!,
+    model: "gpt-5.5",
+    maxSteps: 3,
+  }),
+  handler: async ({ page }, params) => {
+    await page.goto(params.url);
+    await page.locator("#review").click();
+    return { complete: true };
+  },
+});
+```
+
+## Custom fallback functions
+
+Use a custom function when recovery needs site-specific logic around the built-in popup agent.
+
+```typescript
+import {
+  popupRecoveryFallback,
+  type PageFallback,
+} from "libretto";
+
+const popupRecoveryAgent = popupRecoveryFallback({
+  provider: "anthropic",
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: "claude-sonnet-4-6",
+  maxSteps: 3,
+});
+
+const pageFallback: PageFallback = async (context) => {
+  const result = await popupRecoveryAgent(context);
+  if (result.status === "action-taken") {
+    await context.page.waitForTimeout(250);
+  }
+  return result;
+};
+```
+
+## popupRecoveryFallback
+
+`popupRecoveryFallback(options)` creates a fallback for popups, cookie banners, modals, overlays, and other visible blockers. It uses Libretto's default popup recovery instruction.
+
+```typescript
+popupRecoveryFallback({
+  provider: "openai",
+  apiKey: process.env.OPENAI_API_KEY!,
+  model: "gpt-5.5",
+  maxSteps: 3,
+});
+```
+
+## visionRecoveryFallback
+
+`visionRecoveryFallback(options)` creates a generic vision recovery fallback with a custom instruction.
+
+```typescript
+visionRecoveryFallback({
+  provider: "anthropic",
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: "claude-sonnet-4-6",
+  instruction: "Close any visible blocker that prevents submitting the form.",
+  maxSteps: 3,
+});
+```
+
+The fallback takes viewport screenshots, asks the model for browser actions, scales screenshot coordinates to the Playwright viewport, and stops when the model returns `done` or `maxSteps` is reached.
+
+## Options
+
+Provider shortcut options:
+
+```typescript
+type VisionRecoveryProviderOptions =
+  | {
+      provider: "openai";
+      apiKey: string;
+      model?: "gpt-5.5";
+    }
+  | {
+      provider: "anthropic";
+      apiKey: string;
+      model?: "claude-sonnet-4-6";
+    };
+```
+
+Generic vision recovery also requires `instruction: string`. Both `popupRecoveryFallback` and `visionRecoveryFallback` accept `maxSteps?: number`.
+
+Advanced users can pass a preconfigured AI SDK `LanguageModel` instead of provider shortcut options:
+
+```typescript
+visionRecoveryFallback({
+  model: languageModel,
+  instruction: "Dismiss any visible blocking popup.",
+  maxSteps: 3,
+});
+```
+
+## Result
+
+Fallbacks return a recovery result:
+
+```typescript
+type RecoveryAgentResult = {
+  status: "skipped" | "no-action-needed" | "action-taken" | "incomplete";
+  steps: RecoveryAgentStep[];
+};
+```
+
+Libretto does not use the status to decide whether to retry. If the fallback returns without throwing, Libretto retries the original failed method once. Throw from a custom fallback when recovery should abort immediately.

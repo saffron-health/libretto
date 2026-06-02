@@ -1,0 +1,44 @@
+# Error handling and recovery
+
+Libretto workflows are deterministic TypeScript programs. Most failures should be handled with better selectors, waits, assertions, or network-level integration code. Runtime recovery is for bounded cases where the workflow is correct but the page may show unexpected UI that blocks an otherwise valid action.
+
+## Debugging workflow failures
+
+When a workflow fails, Libretto keeps enough browser state to inspect what happened. Run workflows headed while developing, add `pause(ctx.session)` at important checkpoints, and use `resume` after inspection. The session logs, action logs, screenshots, and Playwright error messages usually show whether the failure came from a selector, a timeout, navigation, or an element intercepting pointer events.
+
+Use recovery only after the underlying workflow is already clear. If a step is ambiguous or page structure changed, fix the workflow instead of asking runtime AI to decide the business logic.
+
+## Page fallbacks
+
+A workflow can define `pageFallback` in its `workflow()` options. Libretto wraps the workflow page so supported Page and Locator methods catch failures, call the fallback function, and retry the original method once.
+
+This is useful for transient blockers such as:
+
+- cookie banners
+- popups
+- modals
+- interstitials
+- overlays that intercept clicks
+
+It is not meant for primary workflow logic. The handler should still express the expected path through the site.
+
+## Vision recovery
+
+Vision recovery is a bounded fallback agent. It takes a viewport screenshot, asks a supported vision model what browser action to take, executes the action, and repeats up to `maxSteps`. The model returns screenshot pixel coordinates. Libretto scales those screenshot coordinates to Playwright viewport coordinates before clicking, scrolling, or moving the mouse.
+
+The built-in popup recovery fallback uses this mechanism with a popup-specific instruction. It looks for visible blockers and prefers obvious close, dismiss, continue, accept, or X buttons.
+
+## When to use it
+
+Use popup recovery when exploration shows that a site may display unpredictable blockers across sessions, accounts, locations, or time. Tell the user when you add it, because it introduces a runtime AI call and a retry path.
+
+Avoid it when the page is stable, the blocker has a deterministic selector, or the workflow needs a domain-specific decision. In those cases, write normal Playwright code or a custom `PageFallback` function with deterministic steps.
+
+## Model support
+
+Provider shortcut configuration is intentionally limited to the vision recovery models Libretto supports:
+
+- OpenAI: `gpt-5.5`
+- Anthropic: `claude-sonnet-4-6`
+
+Advanced users can pass a preconfigured `LanguageModel` directly when they need to own model construction themselves.
