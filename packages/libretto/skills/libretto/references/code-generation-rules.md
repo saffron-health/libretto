@@ -52,34 +52,9 @@ Key points:
 
 ## Workflow Error Handling
 
-Do not add fallback logic by default. Add a `pageFallback` only when exploration shows repeated nondeterminism, such as popups, cookie banners, modals, overlays, or similar blockers that may intercept otherwise correct actions.
+Do not add fallback logic by default. Add `pageFallback` only when exploration shows nondeterministic blockers such as popups, cookie banners, modals, or overlays.
 
-Use `popupRecoveryFallback()` for generic popup and modal dismissal. Use a custom `PageFallback` function when the site needs specific recovery steps before or after the popup recovery agent.
-
-```typescript
-import {
-  popupRecoveryFallback,
-  workflow,
-  type PageFallback,
-} from "libretto";
-
-const popupRecoveryAgent = popupRecoveryFallback({
-  provider: "openai",
-  apiKey: process.env.OPENAI_API_KEY!,
-  model: "gpt-5.5",
-  maxSteps: 3,
-});
-
-const pageFallback: PageFallback = async (context) => {
-  const result = await popupRecoveryAgent(context);
-  if (result.status === "action-taken") {
-    await context.page.waitForTimeout(250);
-  }
-  return result;
-};
-```
-
-Tell the user when you add a fallback measure and why. Keep primary workflow logic in the handler; fallback logic should only recover from unexpected blockers and let Libretto retry the failed action.
+Use `popupRecoveryFallback()` for generic popup and modal dismissal. Use a custom `PageFallback` function when the site needs specific recovery steps around the popup recovery agent. Tell the user when you add a fallback and keep primary workflow logic in the handler.
 
 ## Playwright DOM Interaction Rules
 
