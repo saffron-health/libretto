@@ -6,9 +6,9 @@ Most workflow failures should be fixed with better selectors, waits, or assertio
 
 ## Debugging failed runs
 
-When a workflow fails, your agent can inspect the browser state before changing code. Run headed while developing, add `pause(ctx.session)` at useful checkpoints, and use `resume` after inspection.
+When a workflow fails during development, Libretto helps your agent debug the code by preserving the browser session. The agent can run headed, add `pause(ctx.session)` at useful checkpoints, inspect the page state, and use `resume` to continue from the pause.
 
-Libretto keeps session state, action logs, screenshots, and Playwright errors so the agent can tell whether a failure came from a selector, a timeout, navigation, or an element intercepting pointer events.
+On the hosted platform, a failed run automatically starts an analysis agent. It reviews the error, logs, recording, screenshots, and browser state so it can explain what went wrong and suggest the code change.
 
 ## How pageFallback works
 
