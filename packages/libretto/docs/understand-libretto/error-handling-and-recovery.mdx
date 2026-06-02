@@ -1,8 +1,14 @@
-# Unexpected UI recovery
+# Error recovery
 
-Most workflow failures should be fixed with better selectors, waits, or assertions. Use runtime recovery when the workflow is on the right path but the site shows unexpected UI that blocks the next action.
+Libretto gives you two ways to handle failures: debug the workflow so the deterministic path is correct, or add a narrow runtime fallback for expected nondeterminism.
 
-Common examples are cookie banners, popups, modals, interstitials, and overlays that intercept clicks.
+Most workflow failures should be fixed with better selectors, waits, or assertions. Runtime recovery is for cases where the workflow is on the right path but the site sometimes shows unexpected UI that blocks the next action.
+
+## Debugging failed runs
+
+When a workflow fails, inspect the browser state before changing code. Run headed while developing, add `pause(ctx.session)` at useful checkpoints, and use `resume` after inspection.
+
+Libretto keeps session state, action logs, screenshots, and Playwright errors so you can tell whether a failure came from a selector, a timeout, navigation, or an element intercepting pointer events.
 
 ## How pageFallback works
 
@@ -27,12 +33,12 @@ export default workflow("reviewOrder", {
 
 ## Vision recovery
 
-The vision fallback agent looks at the current screen and takes one or more browser actions to get back to the expected path. It uses a viewport screenshot, asks the model for an action, scales the returned screenshot coordinates to Playwright coordinates, and executes the action.
+The vision fallback agent looks at the current screen and takes one or more browser actions to get back to the expected path. It is useful for nondeterministic blockers such as cookie banners, popups, modals, interstitials, and overlays that intercept clicks.
+
+It uses a viewport screenshot, asks the model for an action, scales the returned screenshot coordinates to Playwright coordinates, and executes the action.
 
 `popupRecoveryFallback()` is the built-in preset for closing popups and other blockers. Use `visionRecoveryFallback()` when you want to provide your own instruction.
 
-## When to use it
-
-Use a fallback when exploration shows the site has nondeterministic blockers across sessions, accounts, or time. Do not add one by default, and do not use it to make business decisions that belong in the workflow handler.
+Do not add a vision fallback by default. Add one when exploration shows the site has blockers across sessions, accounts, or time. Do not use it to make business decisions that belong in the workflow handler.
 
 Supported provider shortcut models are `gpt-5.5` and `claude-sonnet-4-6`.
