@@ -43,14 +43,14 @@ export {
 } from "./runtime/recovery/errors.js";
 export {
   createFallbackPage,
-  popupClosingFallback,
+  visionRecoveryFallback,
   type FallbackTargetType,
   type PageFallbackContext,
   type PageFallback,
   type PageFallbackHandler,
   type PageFallbackOptions,
   type PageFallbackResult,
-  type PopupClosingFallbackOptions,
+  type VisionRecoveryFallbackOptions,
 } from "./runtime/recovery/page-fallbacks.js";
 
 // AI extraction
