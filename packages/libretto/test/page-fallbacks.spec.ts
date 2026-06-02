@@ -2,13 +2,13 @@ import { chromium, type Locator, type Page } from "playwright";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
-  createFallbackPage,
-  popupRecoveryFallback,
+  createRecoveryPage,
+  popupRecoveryAction,
   workflow,
 } from "../src/index.js";
 
-describe("createFallbackPage", () => {
-  it("runs fallback for locator read methods and retries once", async () => {
+describe("createRecoveryPage", () => {
+  it("runs recovery action for locator read methods and retries once", async () => {
     const originalError = new Error("covered by popup");
     const textContent = vi
       .fn<() => Promise<string>>()
@@ -18,34 +18,34 @@ describe("createFallbackPage", () => {
     const page = {
       locator: vi.fn(() => locator),
     } as unknown as Page;
-    const fallback = vi.fn(async () => ({ status: "action-taken" }));
+    const recoveryAction = vi.fn(async () => ({ status: "action-taken" }));
 
-    const fallbackPage = createFallbackPage(page, {
-      fallback,
+    const recoveryPage = createRecoveryPage(page, {
+      recoveryAction,
     });
 
-    await expect(fallbackPage.locator("#status").textContent()).resolves.toBe(
+    await expect(recoveryPage.locator("#status").textContent()).resolves.toBe(
       "ready",
     );
     expect(textContent).toHaveBeenCalledTimes(2);
-    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(recoveryAction).toHaveBeenCalledTimes(1);
   });
 
-  it("runs fallback for page read methods", async () => {
+  it("runs recovery action for page read methods", async () => {
     const title = vi
       .fn<() => Promise<string>>()
       .mockRejectedValueOnce(new Error("blocked"))
       .mockResolvedValueOnce("Dashboard");
     const page = { title } as unknown as Page;
-    const fallback = vi.fn(async () => undefined);
+    const recoveryAction = vi.fn(async () => undefined);
 
-    const fallbackPage = createFallbackPage(page, {
-      fallback,
+    const recoveryPage = createRecoveryPage(page, {
+      recoveryAction,
     });
 
-    await expect(fallbackPage.title()).resolves.toBe("Dashboard");
+    await expect(recoveryPage.title()).resolves.toBe("Dashboard");
     expect(title).toHaveBeenCalledTimes(2);
-    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(recoveryAction).toHaveBeenCalledTimes(1);
   });
 
   it("preserves synchronous page method return values", () => {
@@ -54,16 +54,16 @@ describe("createFallbackPage", () => {
       viewportSize: vi.fn(() => ({ width: 1280, height: 720 })),
       pageErrors: vi.fn(() => []),
     } as unknown as Page;
-    const fallback = vi.fn(async () => undefined);
+    const recoveryAction = vi.fn(async () => undefined);
 
-    const fallbackPage = createFallbackPage(page, {
-      fallback,
+    const recoveryPage = createRecoveryPage(page, {
+      recoveryAction,
     });
 
-    expect(fallbackPage.url()).toBe("https://example.com/");
-    expect(fallbackPage.viewportSize()).toEqual({ width: 1280, height: 720 });
-    expect(fallbackPage.pageErrors()).toEqual([]);
-    expect(fallback).not.toHaveBeenCalled();
+    expect(recoveryPage.url()).toBe("https://example.com/");
+    expect(recoveryPage.viewportSize()).toEqual({ width: 1280, height: 720 });
+    expect(recoveryPage.pageErrors()).toEqual([]);
+    expect(recoveryAction).not.toHaveBeenCalled();
   });
 
   it("does not wrap unsupported arbitrary execution methods", async () => {
@@ -72,15 +72,15 @@ describe("createFallbackPage", () => {
       .fn<() => Promise<unknown>>()
       .mockRejectedValue(originalError);
     const page = { evaluate } as unknown as Page;
-    const fallback = vi.fn(async () => undefined);
+    const recoveryAction = vi.fn(async () => undefined);
 
-    const fallbackPage = createFallbackPage(page, {
-      fallback,
+    const recoveryPage = createRecoveryPage(page, {
+      recoveryAction,
     });
 
-    await expect(fallbackPage.evaluate("1 + 1")).rejects.toBe(originalError);
+    await expect(recoveryPage.evaluate("1 + 1")).rejects.toBe(originalError);
     expect(evaluate).toHaveBeenCalledTimes(1);
-    expect(fallback).not.toHaveBeenCalled();
+    expect(recoveryAction).not.toHaveBeenCalled();
   });
 
   it("preserves the original action error when retry fails", async () => {
@@ -92,20 +92,20 @@ describe("createFallbackPage", () => {
       .mockRejectedValueOnce(retryError);
     const locator = { click } as unknown as Locator;
     const page = { locator: vi.fn(() => locator) } as unknown as Page;
-    const fallback = vi.fn(async () => undefined);
+    const recoveryAction = vi.fn(async () => undefined);
 
-    const fallbackPage = createFallbackPage(page, {
-      fallback,
+    const recoveryPage = createRecoveryPage(page, {
+      recoveryAction,
     });
 
-    await expect(fallbackPage.locator("#submit").click()).rejects.toBe(
+    await expect(recoveryPage.locator("#submit").click()).rejects.toBe(
       originalError,
     );
     expect(click).toHaveBeenCalledTimes(2);
-    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(recoveryAction).toHaveBeenCalledTimes(1);
   });
 
-  it("allows custom fallback logic to compose multiple recovery actions", async () => {
+  it("allows custom recovery logic to compose multiple recovery actions", async () => {
     const originalError = new Error("stale page");
     const click = vi.fn<() => Promise<void>>()
       .mockRejectedValueOnce(originalError)
@@ -116,16 +116,16 @@ describe("createFallbackPage", () => {
       reload: vi.fn(async () => undefined),
     } as unknown as Page;
     const closePopup = vi.fn(async (_page: Page) => undefined);
-    const fallback = vi.fn(async (context) => {
+    const recoveryAction = vi.fn(async (context) => {
       await closePopup(context.page);
       await context.page.reload();
     });
 
-    const fallbackPage = createFallbackPage(page, {
-      fallback,
+    const recoveryPage = createRecoveryPage(page, {
+      recoveryAction,
     });
 
-    await expect(fallbackPage.locator("#submit").click()).resolves.toBe(
+    await expect(recoveryPage.locator("#submit").click()).resolves.toBe(
       undefined,
     );
     expect(closePopup).toHaveBeenCalledTimes(1);
@@ -134,8 +134,8 @@ describe("createFallbackPage", () => {
   });
 });
 
-describe("workflow page fallbacks", () => {
-  it("injects a single fallback-enabled page into the workflow", async () => {
+describe("workflow recovery actions", () => {
+  it("injects a single recovery-enabled page into the workflow", async () => {
     const originalError = new Error("popup");
     const textContent = vi
       .fn<() => Promise<string>>()
@@ -145,10 +145,10 @@ describe("workflow page fallbacks", () => {
     const rawPage = {
       locator: vi.fn(() => locator),
     } as unknown as Page;
-    const fallback = vi.fn(async () => undefined);
+    const recoveryAction = vi.fn(async () => undefined);
 
-    const wf = workflow("fallback-workflow", {
-      pageFallback: fallback,
+    const wf = workflow("recovery-workflow", {
+      recoveryAction,
       handler: async ({ page }) => {
         return await page.locator("#result").textContent();
       },
@@ -157,11 +157,11 @@ describe("workflow page fallbacks", () => {
     await expect(wf.run({ session: "test", page: rawPage }, {})).resolves.toBe(
       "done",
     );
-    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(recoveryAction).toHaveBeenCalledTimes(1);
     expect(textContent).toHaveBeenCalledTimes(2);
   });
 
-  it("supports pageFallback in the schema definition argument", async () => {
+  it("supports recoveryAction in the schema definition argument", async () => {
     const originalError = new Error("popup");
     const textContent = vi
       .fn<() => Promise<string>>()
@@ -171,14 +171,14 @@ describe("workflow page fallbacks", () => {
     const rawPage = {
       locator: vi.fn(() => locator),
     } as unknown as Page;
-    const fallback = vi.fn(async () => undefined);
+    const recoveryAction = vi.fn(async () => undefined);
 
     const wf = workflow(
-      "fallback-schema-workflow",
+      "recovery-schema-workflow",
       {
         input: z.object({}),
         output: z.string(),
-        pageFallback: fallback,
+        recoveryAction,
       },
       async ({ page }) => {
         return (await page.locator("#result").textContent()) ?? "";
@@ -188,21 +188,21 @@ describe("workflow page fallbacks", () => {
     await expect(wf.run({ session: "test", page: rawPage }, {})).resolves.toBe(
       "done",
     );
-    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(recoveryAction).toHaveBeenCalledTimes(1);
     expect(textContent).toHaveBeenCalledTimes(2);
   });
 });
 
-describe("vision recovery model options", () => {
+describe("computer use recovery model options", () => {
   it("rejects unsupported provider shortcut models", async () => {
-    const fallback = popupRecoveryFallback({
+    const recoveryAction = popupRecoveryAction({
       provider: "openai",
       apiKey: "test-key",
       model: "gpt-4o" as never,
     });
 
     await expect(
-      fallback({
+      recoveryAction({
         page: {} as Page,
         targetType: "page",
         method: "click",
@@ -210,7 +210,7 @@ describe("vision recovery model options", () => {
         error: new Error("blocked"),
       }),
     ).rejects.toThrow(
-      'Unsupported OpenAI vision recovery model "gpt-4o". Supported model: gpt-5.5.',
+      'Unsupported OpenAI computer use recovery model "gpt-4o". Supported model: gpt-5.5.',
     );
   });
 });
@@ -225,7 +225,7 @@ it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
         : process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error(
-        "Set OPENAI_API_KEY or ANTHROPIC_API_KEY for the real popup fallback test.",
+        "Set OPENAI_API_KEY or ANTHROPIC_API_KEY for the real popup recovery test.",
       );
     }
 
@@ -272,25 +272,25 @@ it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
         </script>
       `);
 
-      const fallback =
+      const recoveryAction =
         provider === "anthropic"
-          ? popupRecoveryFallback({
+          ? popupRecoveryAction({
               provider: "anthropic",
               apiKey,
               model: "claude-sonnet-4-6",
               maxSteps: 3,
             })
-          : popupRecoveryFallback({
+          : popupRecoveryAction({
               provider: "openai",
               apiKey,
               model: "gpt-5.5",
               maxSteps: 3,
             });
-      const fallbackPage = createFallbackPage(page, { fallback });
-      fallbackPage.setDefaultTimeout(500);
+      const recoveryPage = createRecoveryPage(page, { recoveryAction });
+      recoveryPage.setDefaultTimeout(500);
 
       try {
-        await fallbackPage.locator("#target").click();
+        await recoveryPage.locator("#target").click();
       } catch (error) {
         throw new Error(
           error instanceof Error ? error.message : String(error),

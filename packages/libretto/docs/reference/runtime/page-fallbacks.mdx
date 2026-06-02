@@ -1,14 +1,12 @@
-# Page fallbacks
+# Runtime recovery actions
 
-`pageFallback` lets a workflow recover from a supported Playwright Page or Locator failure, then retry the original action once.
-
-Use it for unexpected UI that blocks the happy path, such as popups, cookie banners, modals, or overlays.
+`recoveryAction` lets a workflow recover from a supported Playwright Page or Locator failure. When a supported action fails, Libretto runs the recovery action and retries the original action once.
 
 ```typescript
 export default workflow("reviewOrder", {
   input,
   output,
-  pageFallback,
+  recoveryAction,
   handler: async ({ page }, params) => {
     await page.goto(params.url);
     await page.locator("#review").click();
@@ -17,14 +15,16 @@ export default workflow("reviewOrder", {
 });
 ```
 
-## visionRecoveryFallback
+## computerUseRecoveryAction
 
-`visionRecoveryFallback()` runs a small vision agent with your instruction. It screenshots the viewport, asks the model for a browser action, executes it with Playwright coordinates, and stops when the model returns `done` or `maxSteps` is reached.
+`computerUseRecoveryAction()` runs a small vision agent with your instruction. It screenshots the viewport, asks the model for a browser action, executes it with Playwright coordinates, and stops when the model returns `done` or `maxSteps` is reached.
+
+One step is one screenshot, one model decision, and one browser action. The default `maxSteps` is `3`, which covers the common popup flow of close, confirm, then done.
 
 ```typescript
-import { visionRecoveryFallback } from "libretto";
+import { computerUseRecoveryAction } from "libretto";
 
-const pageFallback = visionRecoveryFallback({
+const recoveryAction = computerUseRecoveryAction({
   provider: "openai",
   apiKey: process.env.OPENAI_API_KEY!,
   model: "gpt-5.5",
@@ -40,16 +40,16 @@ Supported provider shortcuts:
 { provider: "anthropic", apiKey, model?: "claude-sonnet-4-6" }
 ```
 
-Advanced callers can pass a preconfigured AI SDK `LanguageModel` instead of provider shortcut options.
+Advanced callers can pass a preconfigured AI SDK `LanguageModel` with `languageModel`.
 
-## popupRecoveryFallback
+## popupRecoveryAction
 
-`popupRecoveryFallback()` is a preset for the common popup case. It uses Libretto's default instruction for closing popups, cookie banners, modals, overlays, and similar blockers.
+`popupRecoveryAction()` is a preset for the common popup case. It uses Libretto's default instruction for closing popups, cookie banners, modals, overlays, and similar blockers.
 
 ```typescript
-import { popupRecoveryFallback } from "libretto";
+import { popupRecoveryAction } from "libretto";
 
-const pageFallback = popupRecoveryFallback({
+const recoveryAction = popupRecoveryAction({
   provider: "anthropic",
   apiKey: process.env.ANTHROPIC_API_KEY!,
   model: "claude-sonnet-4-6",
@@ -57,29 +57,29 @@ const pageFallback = popupRecoveryFallback({
 });
 ```
 
-## Custom fallback logic
+## Custom recovery logic
 
-Use a custom `PageFallback` when the site needs extra recovery logic around the vision fallback.
+Use a custom `RecoveryAction` when the site needs deterministic recovery logic, or when it needs to combine `popupRecoveryAction()` with other steps such as reloading the page.
 
 ```typescript
 import {
-  popupRecoveryFallback,
-  type PageFallback,
+  popupRecoveryAction,
+  type RecoveryAction,
 } from "libretto";
 
-const popupRecoveryAgent = popupRecoveryFallback({
+const popupRecoveryAgent = popupRecoveryAction({
   provider: "openai",
   apiKey: process.env.OPENAI_API_KEY!,
   model: "gpt-5.5",
 });
 
-const pageFallback: PageFallback = async (context) => {
+const recoveryAction: RecoveryAction = async (context) => {
   const result = await popupRecoveryAgent(context);
-  if (result.status === "action-taken") {
-    await context.page.waitForTimeout(250);
+  if (result.status === "incomplete") {
+    await context.page.reload();
   }
   return result;
 };
 ```
 
-If the fallback returns without throwing, Libretto retries the original failed method once.
+If the recovery action returns without throwing, Libretto retries the original failed method once.

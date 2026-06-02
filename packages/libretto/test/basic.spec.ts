@@ -1463,6 +1463,59 @@ export default workflow("main", async () => {
     expect(result.stdout).not.toContain("Workflow paused.");
   }, 45_000);
 
+  test("run applies recoveryAction before retrying a failed browser action", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const integrationFilePath = await writeWorkflow(
+      "integration-recovery-action.mjs",
+      `
+const main = workflow("main", {
+  recoveryAction: async ({ page }) => {
+    console.log("RECOVERY_ACTION_RAN");
+    await page.locator("#modal").evaluate((node) => node.remove());
+  },
+  handler: async ({ page }) => {
+    await page.setContent(\`
+      <style>
+        #target {
+          margin: 80px;
+          width: 180px;
+          height: 64px;
+        }
+        #modal {
+          position: fixed;
+          inset: 0;
+          z-index: 10;
+          background: rgba(0, 0, 0, 0.3);
+        }
+      </style>
+      <button id="target">Click target</button>
+      <div id="modal"></div>
+      <script>
+        document.querySelector("#target").addEventListener("click", () => {
+          document.body.dataset.clicked = "true";
+        });
+      </script>
+    \`);
+    page.setDefaultTimeout(250);
+    await page.locator("#target").click();
+    console.log("RECOVERY_CLICKED=" + await page.locator("body").getAttribute("data-clicked"));
+  },
+});
+
+export default main;
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session recovery-action-test --headless`,
+    );
+    expect(result.stdout).toContain("RECOVERY_ACTION_RAN");
+    expect(result.stdout).toContain("RECOVERY_CLICKED=true");
+    expect(result.stdout).toContain("Integration completed.");
+  }, 45_000);
+
   test("run closes completed sessions by default", async ({
     librettoCli,
     writeWorkflow,

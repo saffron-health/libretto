@@ -2,31 +2,31 @@ import type { FrameLocator, Locator, Page } from "playwright";
 import type { LanguageModel } from "ai";
 import { executeRecoveryAgent, type RecoveryAgentResult } from "./agent.js";
 
-export type FallbackTargetType = "page" | "locator";
+export type RecoveryActionTargetType = "page" | "locator";
 
-export type PageFallbackContext = {
+export type RecoveryActionContext = {
   page: Page;
-  targetType: FallbackTargetType;
+  targetType: RecoveryActionTargetType;
   method: string;
   args: readonly unknown[];
   error: unknown;
 };
 
-export type PageFallbackResult = Record<string, unknown> | void;
+export type RecoveryActionResult = Record<string, unknown> | void;
 
-export type PageFallbackHandler = (
-  context: PageFallbackContext,
-) => Promise<PageFallbackResult>;
+export type RecoveryActionHandler = (
+  context: RecoveryActionContext,
+) => Promise<RecoveryActionResult>;
 
-export type PageFallback = PageFallbackHandler;
+export type RecoveryAction = RecoveryActionHandler;
 
-export type PageFallbackOptions = {
-  fallback: PageFallback;
+export type RecoveryActionOptions = {
+  recoveryAction: RecoveryAction;
 };
 
-type VisionRecoveryModelOptions =
+type ComputerUseRecoveryModelOptions =
   | {
-      model: LanguageModel;
+      languageModel: LanguageModel;
     }
   | {
       provider: "openai";
@@ -39,12 +39,12 @@ type VisionRecoveryModelOptions =
       model?: "claude-sonnet-4-6";
     };
 
-export type VisionRecoveryFallbackOptions = VisionRecoveryModelOptions & {
+export type ComputerUseRecoveryActionOptions = ComputerUseRecoveryModelOptions & {
   instruction: string;
   maxSteps?: number;
 };
 
-export type PopupRecoveryFallbackOptions = VisionRecoveryModelOptions & {
+export type PopupRecoveryActionOptions = ComputerUseRecoveryModelOptions & {
   maxSteps?: number;
 };
 
@@ -55,7 +55,7 @@ export const POPUP_RECOVERY_INSTRUCTION = [
   "Do not return done while a blocking overlay or dialog is still visible.",
 ].join(" ");
 
-export const VISION_RECOVERY_MODELS = {
+export const COMPUTER_USE_RECOVERY_MODELS = {
   anthropic: "claude-sonnet-4-6",
   openai: "gpt-5.5",
 } as const;
@@ -179,20 +179,26 @@ const FRAME_LOCATOR_FACTORY_METHODS = new Set([
   "frameLocator",
 ]);
 
-function isUiMethod(targetType: FallbackTargetType, method: string): boolean {
+function isUiMethod(
+  targetType: RecoveryActionTargetType,
+  method: string,
+): boolean {
   return targetType === "page"
     ? PAGE_UI_METHODS.has(method)
     : LOCATOR_UI_METHODS.has(method);
 }
 
-function isReadMethod(targetType: FallbackTargetType, method: string): boolean {
+function isReadMethod(
+  targetType: RecoveryActionTargetType,
+  method: string,
+): boolean {
   return targetType === "page"
     ? PAGE_READ_METHODS.has(method)
     : LOCATOR_READ_METHODS.has(method);
 }
 
 function isSupportedMethod(
-  targetType: FallbackTargetType,
+  targetType: RecoveryActionTargetType,
   method: string,
 ): boolean {
   return isUiMethod(targetType, method) || isReadMethod(targetType, method);
@@ -200,11 +206,11 @@ function isSupportedMethod(
 
 async function runWithFallback<T>(args: {
   page: Page;
-  targetType: FallbackTargetType;
+  targetType: RecoveryActionTargetType;
   method: string;
   methodArgs: readonly unknown[];
   invoke: () => T | Promise<T>;
-  options: PageFallbackOptions;
+  options: RecoveryActionOptions;
 }): Promise<T> {
   try {
     return await args.invoke();
@@ -220,7 +226,7 @@ async function runWithFallback<T>(args: {
     }
 
     try {
-      await args.options.fallback({
+      await args.options.recoveryAction({
         ...baseContext,
         error: originalError,
       });
@@ -241,7 +247,7 @@ function bindOrWrapLocatorMethod(
   rawPage: Page,
   method: string,
   value: unknown,
-  options: PageFallbackOptions,
+  options: RecoveryActionOptions,
   caches: ProxyCaches,
 ): unknown {
   if (typeof value !== "function") return value;
@@ -287,7 +293,7 @@ function bindOrWrapLocatorMethod(
 function createFallbackLocator(
   locator: Locator,
   rawPage: Page,
-  options: PageFallbackOptions,
+  options: RecoveryActionOptions,
   caches: ProxyCaches,
 ): Locator {
   const cached = caches.locators.get(locator);
@@ -316,7 +322,7 @@ function createFallbackLocator(
 function createFallbackFrameLocator(
   frameLocator: FrameLocator,
   rawPage: Page,
-  options: PageFallbackOptions,
+  options: RecoveryActionOptions,
   caches: ProxyCaches,
 ): FrameLocator {
   const cached = caches.frameLocators.get(frameLocator);
@@ -366,9 +372,9 @@ function createFallbackFrameLocator(
   return proxy;
 }
 
-export function createFallbackPage(
+export function createRecoveryPage(
   page: Page,
-  options: PageFallbackOptions,
+  options: RecoveryActionOptions,
 ): Page {
   const caches: ProxyCaches = {
     locators: new WeakMap(),
@@ -415,25 +421,26 @@ export function createFallbackPage(
   }) as Page;
 }
 
-async function resolveVisionRecoveryModel(
-  options: VisionRecoveryFallbackOptions,
+async function resolveComputerUseRecoveryModel(
+  options: ComputerUseRecoveryActionOptions,
 ): Promise<LanguageModel> {
   if ("provider" in options) {
     if (options.provider === "openai") {
-      const model: string = options.model ?? VISION_RECOVERY_MODELS.openai;
-      if (model !== VISION_RECOVERY_MODELS.openai) {
+      const model: string = options.model ?? COMPUTER_USE_RECOVERY_MODELS.openai;
+      if (model !== COMPUTER_USE_RECOVERY_MODELS.openai) {
         throw new Error(
-          `Unsupported OpenAI vision recovery model "${model}". Supported model: ${VISION_RECOVERY_MODELS.openai}.`,
+          `Unsupported OpenAI computer use recovery model "${model}". Supported model: ${COMPUTER_USE_RECOVERY_MODELS.openai}.`,
         );
       }
       return import("@ai-sdk/openai").then(({ createOpenAI }) =>
         createOpenAI({ apiKey: options.apiKey })(model),
       );
     }
-    const model: string = options.model ?? VISION_RECOVERY_MODELS.anthropic;
-    if (model !== VISION_RECOVERY_MODELS.anthropic) {
+    const model: string =
+      options.model ?? COMPUTER_USE_RECOVERY_MODELS.anthropic;
+    if (model !== COMPUTER_USE_RECOVERY_MODELS.anthropic) {
       throw new Error(
-        `Unsupported Anthropic vision recovery model "${model}". Supported model: ${VISION_RECOVERY_MODELS.anthropic}.`,
+        `Unsupported Anthropic computer use recovery model "${model}". Supported model: ${COMPUTER_USE_RECOVERY_MODELS.anthropic}.`,
       );
     }
     return import("@ai-sdk/anthropic").then(({ createAnthropic }) =>
@@ -441,14 +448,14 @@ async function resolveVisionRecoveryModel(
     );
   }
 
-  return options.model;
+  return options.languageModel;
 }
 
-export function visionRecoveryFallback(
-  options: VisionRecoveryFallbackOptions,
-): PageFallback {
+export function computerUseRecoveryAction(
+  options: ComputerUseRecoveryActionOptions,
+): RecoveryAction {
   return async ({ page }): Promise<RecoveryAgentResult> => {
-    const model = await resolveVisionRecoveryModel(options);
+    const model = await resolveComputerUseRecoveryModel(options);
     return executeRecoveryAgent(
       page,
       options.instruction,
@@ -459,10 +466,10 @@ export function visionRecoveryFallback(
   };
 }
 
-export function popupRecoveryFallback(
-  options: PopupRecoveryFallbackOptions,
-): PageFallback {
-  return visionRecoveryFallback({
+export function popupRecoveryAction(
+  options: PopupRecoveryActionOptions,
+): RecoveryAction {
+  return computerUseRecoveryAction({
     ...options,
     instruction: POPUP_RECOVERY_INSTRUCTION,
   });

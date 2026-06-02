@@ -42,19 +42,19 @@ export {
   type DetectedSubmissionError,
 } from "./runtime/recovery/errors.js";
 export {
+  COMPUTER_USE_RECOVERY_MODELS,
   POPUP_RECOVERY_INSTRUCTION,
-  VISION_RECOVERY_MODELS,
-  createFallbackPage,
-  popupRecoveryFallback,
-  visionRecoveryFallback,
-  type FallbackTargetType,
-  type PageFallbackContext,
-  type PageFallback,
-  type PageFallbackHandler,
-  type PageFallbackOptions,
-  type PageFallbackResult,
-  type PopupRecoveryFallbackOptions,
-  type VisionRecoveryFallbackOptions,
+  computerUseRecoveryAction,
+  createRecoveryPage,
+  popupRecoveryAction,
+  type ComputerUseRecoveryActionOptions,
+  type PopupRecoveryActionOptions,
+  type RecoveryActionContext,
+  type RecoveryAction,
+  type RecoveryActionHandler,
+  type RecoveryActionOptions,
+  type RecoveryActionResult,
+  type RecoveryActionTargetType,
 } from "./runtime/recovery/page-fallbacks.js";
 
 // AI extraction
@@ -126,7 +126,6 @@ export {
   type LibrettoWorkflowContext,
   type LibrettoWorkflowHandler,
   type LibrettoWorkflowOptions,
-  type LibrettoWorkflowSchemas,
   type WorkflowInputValidator,
 } from "./shared/workflow/workflow.js";
 const isDirectExecution = (): boolean => {

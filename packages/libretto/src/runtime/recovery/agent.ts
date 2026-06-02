@@ -339,6 +339,10 @@ function getRecoveryStatus(steps: RecoveryAgentStep[]): RecoveryAgentStatus {
   return "incomplete";
 }
 
+// A step is one screenshot -> model decision -> browser action cycle.
+// Three covers common popup flows like close/confirm/done while bounding cost.
+const DEFAULT_RECOVERY_MAX_STEPS = 3;
+
 /**
  * Executes a vision-based recovery agent to recover from browser automation failures.
  * Takes a screenshot, sends it to the LLM with the instruction, and executes
@@ -349,7 +353,7 @@ export async function executeRecoveryAgent(
   instruction: string,
   logger?: MinimalLogger,
   model?: LanguageModel,
-  maxSteps = 3,
+  maxSteps = DEFAULT_RECOVERY_MAX_STEPS,
 ): Promise<RecoveryAgentResult> {
   if (!model) {
     return { status: "skipped", steps: [] };
@@ -422,8 +426,9 @@ Analyze the screenshot and decide what action to take. If the task is complete o
     await executeBrowserAction(page, action, log);
     await delay(2000);
 
-    // Take new screenshot for next iteration
-    screenshotState = await takeViewportScreenshot(page);
+    if (step < maxSteps) {
+      screenshotState = await takeViewportScreenshot(page);
+    }
   }
 
   log.info("Recovery agent execution completed");

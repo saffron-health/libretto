@@ -40,7 +40,7 @@ export default workflow("myWorkflow", {
 
 Key points:
 
-- `workflow(name, { input, output, pageFallback, handler })` takes a unique workflow name, optional Zod input/output schemas, an optional page fallback, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
+- `workflow(name, { input, output, recoveryAction, handler })` takes a unique workflow name, optional Zod input/output schemas, an optional recovery action, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
 - At run time, Libretto validates `input` against `inputSchema` before calling the handler. Invalid input throws a clear error listing each failing field; the workflow handler never sees malformed input.
 - `npx libretto run ./file.ts` executes the file's default-exported workflow, so always use `export default workflow(...)`.
 - `ctx` provides `session` and `page`. Use `console.log`/`console.warn`/`console.error` for logging — the runtime wraps these with structured metadata automatically.
@@ -51,9 +51,9 @@ Key points:
 
 ## Workflow Error Handling
 
-Do not add fallback logic by default. Add `pageFallback` only when exploration shows nondeterministic blockers such as popups, cookie banners, modals, or overlays.
+Do not add runtime recovery by default. Add `recoveryAction` only when exploration shows nondeterministic blockers such as popups, cookie banners, modals, or overlays.
 
-Use `popupRecoveryFallback()` for generic popup and modal dismissal. Use a custom `PageFallback` function when the site needs specific recovery steps around the popup recovery agent. Tell the user when you add a fallback and keep primary workflow logic in the handler.
+Use `popupRecoveryAction()` for generic popup and modal dismissal. Use a custom `RecoveryAction` function when the site needs specific recovery steps around the popup recovery agent. Tell the user when you add runtime recovery and keep primary workflow logic in the handler.
 
 ## Playwright DOM Interaction Rules
 

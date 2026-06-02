@@ -1,8 +1,8 @@
 import type { Page } from "playwright";
 import { z } from "zod";
 import {
-  createFallbackPage,
-  type PageFallback,
+  createRecoveryPage,
+  type RecoveryAction,
 } from "../../runtime/recovery/page-fallbacks.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
@@ -17,39 +17,19 @@ export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
   input: Input,
 ) => Promise<Output>;
 
-export type LibrettoWorkflowSchemas<
-  InputSchema extends z.ZodType,
-  OutputSchema extends z.ZodType,
-> = {
-  input: InputSchema;
-  output: OutputSchema;
-};
-
 export type LibrettoWorkflowDefinition<
   InputSchema extends z.ZodType = z.ZodType<unknown>,
   OutputSchema extends z.ZodType = z.ZodType<unknown>,
 > = {
   input?: InputSchema;
   output?: OutputSchema;
-  pageFallback?: PageFallback;
+  recoveryAction?: RecoveryAction;
 };
 
 export type LibrettoWorkflowOptions<
   InputSchema extends z.ZodType = z.ZodType<unknown>,
   OutputSchema extends z.ZodType = z.ZodType<unknown>,
 > = LibrettoWorkflowDefinition<InputSchema, OutputSchema> & {
-  handler: LibrettoWorkflowHandler<
-    z.infer<InputSchema>,
-    z.infer<OutputSchema>
-  >;
-};
-
-type LegacyLibrettoWorkflowOptions<
-  InputSchema extends z.ZodType = z.ZodType<unknown>,
-  OutputSchema extends z.ZodType = z.ZodType<unknown>,
-> = {
-  schemas?: LibrettoWorkflowSchemas<InputSchema, OutputSchema>;
-  pageFallback?: PageFallback;
   handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
@@ -124,7 +104,7 @@ export class LibrettoWorkflow<
   // this schema to JSON Schema at build time and exposes it via
   // /v1/workflows/get so API consumers know the workflow's output shape.
   public readonly outputSchema?: OutputSchema;
-  public readonly pageFallback?: PageFallback;
+  public readonly recoveryAction?: RecoveryAction;
   private readonly handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
@@ -136,7 +116,7 @@ export class LibrettoWorkflow<
       | {
           inputSchema?: InputSchema;
           outputSchema?: OutputSchema;
-          pageFallback?: PageFallback;
+          recoveryAction?: RecoveryAction;
         }
       | undefined,
     handler: LibrettoWorkflowHandler<
@@ -147,7 +127,7 @@ export class LibrettoWorkflow<
     this.name = name;
     this.inputSchema = options?.inputSchema;
     this.outputSchema = options?.outputSchema;
-    this.pageFallback = options?.pageFallback;
+    this.recoveryAction = options?.recoveryAction;
     this.handler = handler;
   }
 
@@ -157,12 +137,12 @@ export class LibrettoWorkflow<
   ): Promise<z.infer<OutputSchema>> {
     const parsed = parseWorkflowInput(this.name, this.inputSchema, input);
     const workflowContext =
-      !this.pageFallback
+      !this.recoveryAction
         ? ctx
         : {
             ...ctx,
-            page: createFallbackPage(ctx.page, {
-              fallback: this.pageFallback,
+            page: createRecoveryPage(ctx.page, {
+              recoveryAction: this.recoveryAction,
             }),
           };
     return this.handler(workflowContext, parsed);
@@ -174,7 +154,7 @@ export type ExportedLibrettoWorkflow = {
   readonly name: string;
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;
-  readonly pageFallback?: PageFallback;
+  readonly recoveryAction?: RecoveryAction;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -271,18 +251,16 @@ function getWorkflowConstructorOptions<
 >(
   options:
     | LibrettoWorkflowDefinition<InputSchema, OutputSchema>
-    | LibrettoWorkflowOptions<InputSchema, OutputSchema>
-    | LegacyLibrettoWorkflowOptions<InputSchema, OutputSchema>,
+    | LibrettoWorkflowOptions<InputSchema, OutputSchema>,
 ): {
   inputSchema?: InputSchema;
   outputSchema?: OutputSchema;
-  pageFallback?: PageFallback;
+  recoveryAction?: RecoveryAction;
 } {
-  const legacySchemas = "schemas" in options ? options.schemas : undefined;
   return {
-    inputSchema: "input" in options ? options.input : legacySchemas?.input,
-    outputSchema: "output" in options ? options.output : legacySchemas?.output,
-    pageFallback: options.pageFallback,
+    inputSchema: options.input,
+    outputSchema: options.output,
+    recoveryAction: options.recoveryAction,
   };
 }
 
@@ -306,14 +284,6 @@ export function workflow<
   options: LibrettoWorkflowOptions<InputSchema, OutputSchema>,
 ): LibrettoWorkflow<InputSchema, OutputSchema>;
 
-export function workflow<
-  InputSchema extends z.ZodType = z.ZodType<unknown>,
-  OutputSchema extends z.ZodType = z.ZodType<unknown>,
->(
-  name: string,
-  options: LegacyLibrettoWorkflowOptions<InputSchema, OutputSchema>,
-): LibrettoWorkflow<InputSchema, OutputSchema>;
-
 // Legacy 2-arg form kept so deployments built before Zod schemas existed
 // continue to load. New code should pass input/output schemas when possible.
 export function workflow<Input = unknown, Output = unknown>(
@@ -326,7 +296,6 @@ export function workflow(
   definitionOrHandler:
     | LibrettoWorkflowDefinition<z.ZodType, z.ZodType>
     | LibrettoWorkflowOptions
-    | LegacyLibrettoWorkflowOptions
     | LibrettoWorkflowHandler,
   maybeHandler?: LibrettoWorkflowHandler,
 ): LibrettoWorkflow {
