@@ -43,6 +43,7 @@ export {
 } from "./runtime/recovery/errors.js";
 export {
   POPUP_RECOVERY_INSTRUCTION,
+  VISION_RECOVERY_MODELS,
   createFallbackPage,
   popupRecoveryFallback,
   visionRecoveryFallback,

@@ -29,9 +29,14 @@ type VisionRecoveryModelOptions =
       model: LanguageModel;
     }
   | {
-      provider: "openai" | "anthropic";
+      provider: "openai";
       apiKey: string;
-      model: string;
+      model?: "gpt-5.5";
+    }
+  | {
+      provider: "anthropic";
+      apiKey: string;
+      model?: "claude-sonnet-4-6";
     };
 
 export type VisionRecoveryFallbackOptions = VisionRecoveryModelOptions & {
@@ -49,6 +54,11 @@ export const POPUP_RECOVERY_INSTRUCTION = [
   "Prefer obvious close, dismiss, continue, accept, or X buttons.",
   "Do not return done while a blocking overlay or dialog is still visible.",
 ].join(" ");
+
+export const VISION_RECOVERY_MODELS = {
+  anthropic: "claude-sonnet-4-6",
+  openai: "gpt-5.5",
+} as const;
 
 const PAGE_UI_METHODS = new Set([
   "click",
@@ -410,12 +420,24 @@ async function resolveVisionRecoveryModel(
 ): Promise<LanguageModel> {
   if ("provider" in options) {
     if (options.provider === "openai") {
+      const model: string = options.model ?? VISION_RECOVERY_MODELS.openai;
+      if (model !== VISION_RECOVERY_MODELS.openai) {
+        throw new Error(
+          `Unsupported OpenAI vision recovery model "${model}". Supported model: ${VISION_RECOVERY_MODELS.openai}.`,
+        );
+      }
       return import("@ai-sdk/openai").then(({ createOpenAI }) =>
-        createOpenAI({ apiKey: options.apiKey })(options.model),
+        createOpenAI({ apiKey: options.apiKey })(model),
+      );
+    }
+    const model: string = options.model ?? VISION_RECOVERY_MODELS.anthropic;
+    if (model !== VISION_RECOVERY_MODELS.anthropic) {
+      throw new Error(
+        `Unsupported Anthropic vision recovery model "${model}". Supported model: ${VISION_RECOVERY_MODELS.anthropic}.`,
       );
     }
     return import("@ai-sdk/anthropic").then(({ createAnthropic }) =>
-      createAnthropic({ apiKey: options.apiKey })(options.model),
+      createAnthropic({ apiKey: options.apiKey })(model),
     );
   }
 

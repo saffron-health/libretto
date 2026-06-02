@@ -161,6 +161,28 @@ describe("workflow page fallbacks", () => {
   });
 });
 
+describe("vision recovery model options", () => {
+  it("rejects unsupported provider shortcut models", async () => {
+    const fallback = popupRecoveryFallback({
+      provider: "openai",
+      apiKey: "test-key",
+      model: "gpt-4o" as never,
+    });
+
+    await expect(
+      fallback({
+        page: {} as Page,
+        targetType: "page",
+        method: "click",
+        args: [],
+        error: new Error("blocked"),
+      }),
+    ).rejects.toThrow(
+      'Unsupported OpenAI vision recovery model "gpt-4o". Supported model: gpt-5.5.',
+    );
+  });
+});
+
 it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
   "closes a real popup with the configured model provider",
   async () => {
@@ -175,9 +197,6 @@ it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
       );
     }
 
-    const model =
-      process.env.LIBRETTO_REAL_POPUP_FALLBACK_MODEL ??
-      (provider === "anthropic" ? "claude-sonnet-4-5" : "gpt-4.1-mini");
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     try {
@@ -221,14 +240,21 @@ it.runIf(process.env.LIBRETTO_REAL_POPUP_FALLBACK_TEST === "1")(
         </script>
       `);
 
-      const fallbackPage = createFallbackPage(page, {
-        fallback: popupRecoveryFallback({
-          provider,
-          apiKey,
-          model,
-          maxSteps: 3,
-        }),
-      });
+      const fallback =
+        provider === "anthropic"
+          ? popupRecoveryFallback({
+              provider: "anthropic",
+              apiKey,
+              model: "claude-sonnet-4-6",
+              maxSteps: 3,
+            })
+          : popupRecoveryFallback({
+              provider: "openai",
+              apiKey,
+              model: "gpt-5.5",
+              maxSteps: 3,
+            });
+      const fallbackPage = createFallbackPage(page, { fallback });
       fallbackPage.setDefaultTimeout(500);
 
       try {
