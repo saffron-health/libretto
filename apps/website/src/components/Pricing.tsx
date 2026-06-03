@@ -14,7 +14,6 @@ const plans = [
     price: "$0",
     cadence: "per month",
     hours: "1",
-    browserHourRate: "$0.25 / browser hour",
     note: "Try a hosted browser session before connecting billing.",
   },
   {
@@ -22,7 +21,6 @@ const plans = [
     price: "$20",
     cadence: "per month",
     hours: "80",
-    browserHourRate: "$0.25 / browser hour",
     note: "For solo builders and small production workflows.",
     featured: true,
   },
@@ -31,14 +29,12 @@ const plans = [
     price: "$100",
     cadence: "per month",
     hours: "400",
-    browserHourRate: "$0.25 / browser hour",
     note: "Shared capacity for teams running regular cloud jobs. BAA included.",
   },
   {
     name: "Enterprise",
     price: "Custom",
-    cadence: "team@libretto.sh",
-    browserHourRate: "Custom browser-hour pricing",
+    cadence: "Contact team@libretto.sh",
     note: "BAA support, custom capacity, and deployment guidance.",
   },
 ];
@@ -85,15 +81,7 @@ function PlanCard({ plan }: { plan: (typeof plans)[number] }) {
               browser {plan.hours === "1" ? "hour" : "hours"} included
             </Text>
           </div>
-          <Text as="div" size="xs" className="mt-1 text-muted/75">
-            {plan.browserHourRate}
-          </Text>
         </div>
-      ) : null}
-      {!plan.hours ? (
-        <Text as="div" size="xs" className="mb-4 border-t border-ink/10 pt-4 text-muted/75">
-          {plan.browserHourRate}
-        </Text>
       ) : null}
       <Text as="p" size="sm" className="mt-auto leading-relaxed text-muted">
         {plan.note}
@@ -136,8 +124,9 @@ export function Pricing() {
         <div className="space-y-4">
           <CloudOnlyNote />
           <Text as="p" size="sm" className="leading-relaxed text-muted [text-wrap:pretty]">
-            Usage is measured by hosted browser session time. Manage plans,
-            invoices, and payment methods from the Libretto billing portal.
+            Usage is measured by hosted browser session time at $0.25 per
+            browser hour. Manage plans, invoices, and payment methods from the
+            Libretto billing portal.
           </Text>
         </div>
         <div className="flex flex-col items-center justify-center gap-3">
