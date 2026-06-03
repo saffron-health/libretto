@@ -76,11 +76,15 @@ agent-browser click @e2
 
 They are great for local coding work but not the right tool if you need browser automation to run in the cloud, or if you are trying to run the same workflow often.
 
+![Agent Browser homepage showing an ASCII browser snapshot](/blog/ai-browser-automation-tooling/agent-browser.png)
+
 ## Category 3: full browser agents
 
 A browser agent is basically an agent with access to a browser tool, with the sole purpose of performing some goal workflow on the browser and often running in the cloud.
 
 The difference from the previous category is who owns the loop. Tools like Playwright MCP give your local coding agent browser access while it is building or debugging, giving you full control. A full browser agent is often a paid managed service from a provider.
+
+![ChatGPT Atlas browser screenshot](/blog/ai-browser-automation-tooling/chatgpt-atlas.png)
 
 That makes browser agents useful for workflows where the path is not fixed, like if you are booking a tennis court for example, or for one-off workflows. The tradeoff is that every run is a little live. It's slower, more expensive, less predictable, and harder to audit than a script. If you're reserving a tennis court, it's fine, but you wouldn't want to ask a browser agent to send a bank transfer for example.
 

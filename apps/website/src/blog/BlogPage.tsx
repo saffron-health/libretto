@@ -132,7 +132,7 @@ const markdownComponents = {
   },
   pre({ children }: { children?: React.ReactNode }) {
     return (
-      <pre className="mb-8 overflow-x-auto rounded-md border border-rule bg-green-2/40 p-4 font-mono text-sm leading-relaxed text-ink">
+      <pre className="mb-8 overflow-x-auto rounded-md border border-amber/25 bg-[#17130d] p-4 font-mono text-sm leading-relaxed text-ink">
         {children}
       </pre>
     );
@@ -154,6 +154,23 @@ const markdownComponents = {
   },
   td({ children }: { children?: React.ReactNode }) {
     return <td className="border-b border-rule px-3 py-3 align-top">{children}</td>;
+  },
+  img({ src, alt }: React.ImgHTMLAttributes<HTMLImageElement>) {
+    if (!src) {
+      return null;
+    }
+
+    return (
+      <span className="mb-10 block">
+        <img
+          src={src}
+          alt={alt ?? ""}
+          loading="lazy"
+          className="w-full rounded-md border border-rule bg-[#17130d]"
+        />
+        {alt ? <span className="mt-3 block text-sm leading-relaxed text-muted/70">{alt}</span> : null}
+      </span>
+    );
   },
   strong({ children }: { children?: React.ReactNode }) {
     return <strong className="font-semibold text-ink">{children}</strong>;
