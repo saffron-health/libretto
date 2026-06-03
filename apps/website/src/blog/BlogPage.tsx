@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Footer } from "../components/Footer";
 import { Navbar } from "../components/Navbar";
 import { Text } from "../components/Text";
+import { buildBlogPostJsonLd, serializeJsonLd } from "./jsonLd";
 import { BLOG_POSTS, getBlogPost, type BlogPost } from "./posts";
 
 const BLOG_LOGO = String.raw`
@@ -67,6 +68,16 @@ function BlogPostPreview({ post }: { post: BlogPost }) {
   );
 }
 
+function BlogPostStructuredData({ post }: { post: BlogPost }) {
+  const jsonLd = serializeJsonLd(buildBlogPostJsonLd(post));
+
+  return (
+    <script type="application/ld+json">
+      {jsonLd}
+    </script>
+  );
+}
+
 export function BlogIndexPage() {
   return (
     <BlogShell>
@@ -98,6 +109,18 @@ export function BlogIndexPage() {
 }
 
 const markdownComponents = {
+  h1({ children }: { children?: React.ReactNode }) {
+    return (
+      <Text
+        as="h1"
+        size="3xl"
+        style="serif"
+        className="mb-8 text-[2rem] font-[300] leading-tight text-ink"
+      >
+        {children}
+      </Text>
+    );
+  },
   h2({ children }: { children?: React.ReactNode }) {
     return (
       <Text
@@ -222,6 +245,7 @@ export function BlogPostPage({ slug }: { slug: string }) {
 
   return (
     <BlogShell>
+      <BlogPostStructuredData post={post} />
       <article className="mx-auto max-w-[760px] pt-8 pb-20">
         <AppLink
           href="/blog"

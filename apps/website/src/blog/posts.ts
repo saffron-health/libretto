@@ -129,7 +129,7 @@ The direction feels clear: the browser is becoming a much more powerful surface 
       "Why we moved from runtime browser agents to development-time AI, Playwright scripts, and direct network calls.",
     publishedAt: "2026-05-14",
     readingTime: "3 min read",
-    markdown: String.raw`## What we learned building healthcare integrations for a year
+    markdown: String.raw`# What we learned building healthcare integrations for a year
 
 We spent the past year building and maintaining browser automations for EHR and payor portal integrations at our healthcare startup. The APIs we needed either didn't exist, were missing critical functionality, or were locked behind expensive and slow vendor processes. So, like every other healthcare startup, we leaned on browser automation. Building these automations and debugging failed ones was incredibly time-consuming, and most of what we believed going in turned out to be wrong.
 
