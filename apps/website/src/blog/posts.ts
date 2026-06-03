@@ -28,7 +28,7 @@ export const BLOG_POSTS = [
       "A practical map of browser automation frameworks, agent browser tools, browser agents, cloud infrastructure, and agent-assisted automation.",
     publishedAt: "2026-06-03",
     readingTime: "6 min read",
-    markdown: `## Understanding today's AI browser automation tooling
+    markdown: `# Understanding today's AI browser automation tooling
 
 ## Why browser automation got complicated
 
