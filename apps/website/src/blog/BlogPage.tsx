@@ -130,6 +130,31 @@ const markdownComponents = {
   li({ children }: { children?: React.ReactNode }) {
     return <li className="pl-2">{children}</li>;
   },
+  pre({ children }: { children?: React.ReactNode }) {
+    return (
+      <pre className="mb-8 overflow-x-auto rounded-md border border-rule bg-green-2/40 p-4 font-mono text-sm leading-relaxed text-ink">
+        {children}
+      </pre>
+    );
+  },
+  code({ children }: { children?: React.ReactNode }) {
+    return <code className="font-mono text-sm text-ink">{children}</code>;
+  },
+  table({ children }: { children?: React.ReactNode }) {
+    return (
+      <div className="mb-8 overflow-x-auto">
+        <table className="min-w-[720px] border-collapse text-left text-sm leading-relaxed text-muted">
+          {children}
+        </table>
+      </div>
+    );
+  },
+  th({ children }: { children?: React.ReactNode }) {
+    return <th className="border-b border-rule px-3 py-3 font-semibold text-ink">{children}</th>;
+  },
+  td({ children }: { children?: React.ReactNode }) {
+    return <td className="border-b border-rule px-3 py-3 align-top">{children}</td>;
+  },
   strong({ children }: { children?: React.ReactNode }) {
     return <strong className="font-semibold text-ink">{children}</strong>;
   },
