@@ -60,7 +60,7 @@ Its upside is also its downside. Once the code says "click the submit button," t
 
 ## Category 2: tools for agents to use browsers
 
-*Examples:* [Agent Browser](https://agent-browser.io/), [Playwright MCP](https://github.com/microsoft/playwright-mcp).
+*Examples:* [Agent Browser](https://agent-browser.dev/), [Playwright MCP](https://github.com/microsoft/playwright-mcp).
 
 The next category is tools that let your coding agent open and use a browser locally. E.g. skills, MCP servers, or CLIs that lets your agent open a browser and do some work on it. These are often available for free and open-source.
 
@@ -76,7 +76,7 @@ agent-browser click @e2
 
 They are great for local coding work but not the right tool if you need browser automation to run in the cloud, or if you are trying to run the same workflow often.
 
-![Agent Browser homepage showing an ASCII browser snapshot](/blog/ai-browser-automation-tooling/agent-browser.png)
+![agent-browser homepage showing installation commands and features](/blog/ai-browser-automation-tooling/agent-browser.png)
 
 ## Category 3: full browser agents
 
