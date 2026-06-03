@@ -112,6 +112,12 @@ npx libretto run src/workflows/craigslist-lost-found.ts --headless
 
 # When it is ready, deploy it:
 libretto cloud deploy
+
+# Then call it like an API:
+curl -X POST "https://api.libretto.sh/v1/jobs/create" \\
+  -H "x-api-key: $LIBRETTO_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"json":{"workflow":"craigslist-lost-found","timeout_seconds":300}}'
 \`\`\`
 
 With a browser agent, you pay for the model to reason through the task every time. With Libretto, you pay that cost once while the workflow is being authored. After that, the workflow can run in the cloud as normal automation, with no token cost on every run.
