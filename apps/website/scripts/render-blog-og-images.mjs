@@ -1,38 +1,27 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import sharp from "sharp";
+import { chromium } from "playwright";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const postsPath = join(root, "src", "blog", "posts.ts");
 const brandPath = join(root, "src", "brand.tsx");
 const outputRoot = join(root, "public", "blog");
 const brandSource = readFileSync(brandPath, "utf8");
-const paperAsciihedronPath = join(root, "public", "og", "paper-asciihedron.png");
+const paperAsciihedronImage = readFileSync(join(root, "public", "og", "paper-asciihedron.png"));
 const paperLogoImage = readFileSync(join(root, "public", "og", "paper-logo.png"));
-const serifFontPath = join(root, "public", "fonts", "Fraunces-Regular.ttf");
-const monoFontPath = join(root, "public", "fonts", "CommitMono-VF.woff2");
+const serifFont = readFileSync(join(root, "public", "fonts", "Fraunces-Regular.ttf"));
+const monoFont = readFileSync(join(root, "public", "fonts", "CommitMono-VF.woff2"));
 
 const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
-
-const PAPER_UNIT = 4;
-const PAPER_ASCIIHEDRON_SIZE = 345 * PAPER_UNIT;
-const PAPER_ASCIIHEDRON_X = 112.25 * PAPER_UNIT;
-const PAPER_ASCIIHEDRON_Y = -91 * PAPER_UNIT;
-const LOGO_SIZE = 13.25 * PAPER_UNIT;
-const LOGO_X = 14 * PAPER_UNIT;
-const LOGO_Y = 13.5 * PAPER_UNIT;
-const WORDMARK_X = 28.75 * PAPER_UNIT;
-const WORDMARK_Y = 16.75 * PAPER_UNIT;
-const TITLE_X = 14 * PAPER_UNIT;
-const TITLE_Y = 38 * PAPER_UNIT;
-const TITLE_MAX_WIDTH = 166 * PAPER_UNIT;
-const URL_X = 14 * PAPER_UNIT;
-const URL_Y = 130 * PAPER_UNIT;
 const SITE_URL = "https://libretto.sh";
 
 const brandName = readBrandStringConst("LIBRETTO_NAME");
+const asciihedronDataUri = `data:image/png;base64,${paperAsciihedronImage.toString("base64")}`;
+const logoDataUri = `data:image/png;base64,${paperLogoImage.toString("base64")}`;
+const serifFontDataUri = `data:font/truetype;base64,${serifFont.toString("base64")}`;
+const monoFontDataUri = `data:font/woff2;base64,${monoFont.toString("base64")}`;
 
 function readPosts() {
   const source = readFileSync(postsPath, "utf8");
@@ -51,118 +40,125 @@ function readPosts() {
   });
 }
 
-async function renderOgImage(post) {
-  const asciihedronLayer = getVisibleLayer({
-    height: PAPER_ASCIIHEDRON_SIZE,
-    left: PAPER_ASCIIHEDRON_X,
-    top: PAPER_ASCIIHEDRON_Y,
-    width: PAPER_ASCIIHEDRON_SIZE,
-  });
-  const asciihedron = await sharp(paperAsciihedronPath)
-    .resize(
-      Math.round(PAPER_ASCIIHEDRON_SIZE),
-      Math.round(PAPER_ASCIIHEDRON_SIZE),
-    )
-    .extract(asciihedronLayer.extract)
-    .tint("#6d6d6d")
-    .png()
-    .toBuffer();
-  const logo = await sharp(paperLogoImage)
-    .resize(LOGO_SIZE, LOGO_SIZE)
-    .png()
-    .toBuffer();
-  const wordmark = await renderTextLayer({
-    color: "#EBEEEB",
-    font: "Fraunces",
-    fontfile: serifFontPath,
-    fontSize: 48,
-    text: brandName,
-  });
-  const title = await renderTextLayer({
-    color: "#EBEEEB",
-    font: "Fraunces",
-    fontfile: serifFontPath,
-    fontSize: 72,
-    text: post.title,
-    width: TITLE_MAX_WIDTH,
-  });
-  const url = await renderTextLayer({
-    color: "#EBEEEB",
-    font: "Commit Mono",
-    fontfile: monoFontPath,
-    fontSize: 24,
-    text: SITE_URL,
-  });
+function renderOgHtml(post) {
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: "Fraunces";
+        font-style: normal;
+        font-weight: 400;
+        src: url("${serifFontDataUri}") format("truetype");
+      }
 
-  return sharp({
-    create: {
-      background: "#111111",
-      channels: 4,
-      height: OG_HEIGHT,
-      width: OG_WIDTH,
-    },
-  })
-    .composite([
-      {
-        input: asciihedron,
-        left: asciihedronLayer.left,
-        top: asciihedronLayer.top,
-      },
-      { input: logo, left: Math.round(LOGO_X), top: Math.round(LOGO_Y) },
-      { input: wordmark, left: Math.round(WORDMARK_X), top: Math.round(WORDMARK_Y) },
-      { input: title, left: Math.round(TITLE_X), top: Math.round(TITLE_Y) },
-      { input: url, left: Math.round(URL_X), top: Math.round(URL_Y) },
-    ])
-    .png()
-    .toBuffer();
-}
+      @font-face {
+        font-family: "CommitMono";
+        font-style: normal;
+        font-weight: 400;
+        src: url("${monoFontDataUri}") format("woff2");
+      }
 
-function getVisibleLayer({ height, left, top, width }) {
-  const visibleLeft = Math.max(0, Math.round(left));
-  const visibleTop = Math.max(0, Math.round(top));
-  const extractLeft = Math.max(0, Math.round(-left));
-  const extractTop = Math.max(0, Math.round(-top));
-  const visibleWidth = Math.min(
-    Math.round(width) - extractLeft,
-    OG_WIDTH - visibleLeft,
-  );
-  const visibleHeight = Math.min(
-    Math.round(height) - extractTop,
-    OG_HEIGHT - visibleTop,
-  );
+      * {
+        box-sizing: border-box;
+        font-synthesis: none;
+      }
 
-  return {
-    extract: {
-      height: visibleHeight,
-      left: extractLeft,
-      top: extractTop,
-      width: visibleWidth,
-    },
-    left: visibleLeft,
-    top: visibleTop,
-  };
-}
+      html,
+      body,
+      #root {
+        height: ${OG_HEIGHT}px;
+        margin: 0;
+        width: ${OG_WIDTH}px;
+      }
 
-async function renderTextLayer({
-  color,
-  font,
-  fontfile,
-  fontSize,
-  text,
-  width,
-}) {
-  return sharp({
-    text: {
-      dpi: 72,
-      font,
-      fontfile,
-      rgba: true,
-      text: `<span foreground="${color}" size="${fontSize * 1024}">${escapeXml(text)}</span>`,
-      width,
-    },
-  })
-    .png()
-    .toBuffer();
+      body {
+        background: #111111;
+        overflow: hidden;
+      }
+
+      .frame {
+        -webkit-font-smoothing: antialiased;
+        background: #111111;
+        height: ${OG_HEIGHT}px;
+        overflow: hidden;
+        position: relative;
+        width: ${OG_WIDTH}px;
+      }
+
+      .asciihedron {
+        background-image: url("${asciihedronDataUri}");
+        background-position: 50%;
+        background-size: cover;
+        height: 1380px;
+        left: 449px;
+        opacity: 0.24;
+        position: absolute;
+        top: -364px;
+        width: 1380px;
+      }
+
+      .logo {
+        background-image: url("${logoDataUri}");
+        background-position: 50%;
+        background-size: cover;
+        height: 42px;
+        left: 56px;
+        position: absolute;
+        top: 59px;
+        width: 42px;
+      }
+
+      .wordmark {
+        color: #ebeeeb;
+        font-family: "Fraunces", system-ui, sans-serif;
+        font-size: 38px;
+        font-weight: 400;
+        left: 103px;
+        line-height: 22px;
+        position: absolute;
+        top: 68px;
+        white-space: nowrap;
+      }
+
+      .title {
+        color: #ebeeeb;
+        font-family: "Fraunces", system-ui, sans-serif;
+        font-size: 72px;
+        font-weight: 400;
+        left: 56px;
+        line-height: 78px;
+        position: absolute;
+        top: 152px;
+        width: 664px;
+      }
+
+      .url {
+        color: #ebeeeb;
+        font-family: "CommitMono", ui-monospace, monospace;
+        font-size: 24px;
+        font-weight: 400;
+        left: 56px;
+        line-height: 24px;
+        position: absolute;
+        top: 520px;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="frame">
+        <div class="asciihedron"></div>
+        <div class="logo"></div>
+        <div class="wordmark">${escapeHtml(brandName)}</div>
+        <div class="title">${escapeHtml(post.title)}</div>
+        <div class="url">${SITE_URL}</div>
+      </div>
+    </div>
+  </body>
+</html>`;
 }
 
 function readBrandStringConst(name) {
@@ -183,10 +179,30 @@ function escapeXml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function escapeHtml(value) {
+  return escapeXml(value).replaceAll("'", "&#39;");
+}
+
+const browser = await chromium.launch();
+const page = await browser.newPage({
+  deviceScaleFactor: 1,
+  viewport: { height: OG_HEIGHT, width: OG_WIDTH },
+});
+
 for (const post of readPosts()) {
   const outputDir = join(outputRoot, post.slug);
   mkdirSync(outputDir, { recursive: true });
-  await sharp(await renderOgImage(post)).toFile(join(outputDir, "og-image.png"));
+  await page.setContent(renderOgHtml(post), { waitUntil: "load" });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+  await page.screenshot({
+    animations: "disabled",
+    path: join(outputDir, "og-image.png"),
+    type: "png",
+  });
 }
+
+await browser.close();
 
 console.log("Rendered blog OG images.");
