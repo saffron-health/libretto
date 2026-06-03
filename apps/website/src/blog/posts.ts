@@ -42,11 +42,13 @@ This post is my attempt to map the landscape. Not every category is clean. A few
 
 ## Category 1: browser automation frameworks
 
-*Examples:* [Playwright](https://playwright.dev/), [Selenium](https://www.selenium.dev/), [Puppeteer](https://pptr.dev/), [Stagehand](https://www.stagehand.dev/).
+*Examples:* [Playwright](https://playwright.dev/), [Selenium](https://www.selenium.dev/), [Puppeteer](https://pptr.dev/), [Stagehand](https://www.stagehand.dev/), [UiPath](https://www.uipath.com/), [Automation Anywhere](https://www.automationanywhere.com/), [Blue Prism](https://www.blueprism.com/), [Power Automate](https://www.microsoft.com/en-us/power-platform/products/power-automate/).
 
 The first category is browser automation frameworks. These are the tools people have conventionally used for web scraping, end-to-end testing, and workflow automation. You write code that opens a browser and tells it exactly what to do.
 
 They are useful because the workflow is explicit. The code says which page to open, what to click, what to wait for, and what data to pull out. That makes the automation easier to inspect than a black-box agent run. But these scripts are also notorious for being painful to write and maintain.
+
+Traditional RPA platforms like UiPath, Automation Anywhere, Blue Prism, and Power Automate live near this category too. They are broader enterprise automation suites rather than developer-first browser automation frameworks.
 
 Stagehand fits in this category, but it changes the feel of the code. You still write a program, but parts of that program can be natural-language actions or extraction steps. That can make authoring much faster when selectors are annoying or the page structure keeps changing.
 
