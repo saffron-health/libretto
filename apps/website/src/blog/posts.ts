@@ -84,7 +84,7 @@ A browser agent is basically an agent with access to a browser tool, with the so
 
 The difference from the previous category is who owns the loop. Tools like Playwright MCP give your local coding agent browser access while it is building or debugging, giving you full control. A full browser agent is often a paid managed service from a provider.
 
-![ChatGPT Atlas browser screenshot](/blog/ai-browser-automation-tooling/chatgpt-atlas.png)
+![Browser Use homepage showing a browser agent workflow](/blog/ai-browser-automation-tooling/browser-use.png)
 
 That makes browser agents useful for workflows where the path is not fixed, like if you are booking a tennis court for example, or for one-off workflows. The tradeoff is that every run is a little live. It's slower, more expensive, less predictable, and harder to audit than a script. If you're reserving a tennis court, it's fine, but you wouldn't want to ask a browser agent to send a bank transfer for example.
 
