@@ -7,20 +7,32 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const postsPath = join(root, "src", "blog", "posts.ts");
 const brandPath = join(root, "src", "brand.tsx");
 const outputRoot = join(root, "public", "blog");
-const mainOgImage = readFileSync(join(root, "public", "og-image.png"));
 const brandSource = readFileSync(brandPath, "utf8");
+const paperAsciihedronPath = join(root, "public", "og", "paper-asciihedron.png");
+const paperLogoImage = readFileSync(join(root, "public", "og", "paper-logo.png"));
+const serifFontPath = join(root, "public", "fonts", "Fraunces-Regular.ttf");
+const monoFontPath = join(root, "public", "fonts", "CommitMono-VF.woff2");
 
 const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
-const CONTENT_X = 58;
-const ASCIIHEDRON_REVEAL_X = 900;
-const TITLE_Y = 222;
-const TITLE_LINE_HEIGHT = 74;
 
-const logoSrc = readBrandStringConst("LIBRETTO_LOGO_DARK_SRC");
-const wordmarkSrc = readBrandStringConst("LIBRETTO_WORDMARK_SRC");
-const logoImage = readFileSync(join(root, "public", logoSrc.replace(/^\//, "")));
-const wordmarkImage = readFileSync(join(root, "public", wordmarkSrc.replace(/^\//, "")));
+const PAPER_UNIT = 4;
+const PAPER_ASCIIHEDRON_SIZE = 345 * PAPER_UNIT;
+const PAPER_ASCIIHEDRON_X = 112.25 * PAPER_UNIT;
+const PAPER_ASCIIHEDRON_Y = -91 * PAPER_UNIT;
+const LOGO_SIZE = 13.25 * PAPER_UNIT;
+const LOGO_X = 14 * PAPER_UNIT;
+const LOGO_Y = 13.5 * PAPER_UNIT;
+const WORDMARK_X = 28.75 * PAPER_UNIT;
+const WORDMARK_Y = 16.75 * PAPER_UNIT;
+const TITLE_X = 14 * PAPER_UNIT;
+const TITLE_Y = 38 * PAPER_UNIT;
+const TITLE_MAX_WIDTH = 166 * PAPER_UNIT;
+const URL_X = 14 * PAPER_UNIT;
+const URL_Y = 130 * PAPER_UNIT;
+const SITE_URL = "https://libretto.sh";
+
+const brandName = readBrandStringConst("LIBRETTO_NAME");
 
 function readPosts() {
   const source = readFileSync(postsPath, "utf8");
@@ -39,71 +51,118 @@ function readPosts() {
   });
 }
 
-function wrapText(text, maxLineLength) {
-  const words = text.split(/\s+/);
-  const lines = [];
-  let current = "";
-
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > maxLineLength && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = next;
-    }
-  }
-
-  if (current) {
-    lines.push(current);
-  }
-
-  return lines.slice(0, 4);
-}
-
-function renderTextLines(lines) {
-  return lines
-    .map(
-      (line, index) =>
-        `<text x="${CONTENT_X}" y="${TITLE_Y + index * TITLE_LINE_HEIGHT}" fill="#f3d36a" font-family="Fraunces, 'PP Editorial New', Georgia, serif" font-size="66" font-weight="500" letter-spacing="0">${escapeXml(line)}</text>`,
+async function renderOgImage(post) {
+  const asciihedronLayer = getVisibleLayer({
+    height: PAPER_ASCIIHEDRON_SIZE,
+    left: PAPER_ASCIIHEDRON_X,
+    top: PAPER_ASCIIHEDRON_Y,
+    width: PAPER_ASCIIHEDRON_SIZE,
+  });
+  const asciihedron = await sharp(paperAsciihedronPath)
+    .resize(
+      Math.round(PAPER_ASCIIHEDRON_SIZE),
+      Math.round(PAPER_ASCIIHEDRON_SIZE),
     )
-    .join("\n");
+    .extract(asciihedronLayer.extract)
+    .tint("#6d6d6d")
+    .png()
+    .toBuffer();
+  const logo = await sharp(paperLogoImage)
+    .resize(LOGO_SIZE, LOGO_SIZE)
+    .png()
+    .toBuffer();
+  const wordmark = await renderTextLayer({
+    color: "#EBEEEB",
+    font: "Fraunces",
+    fontfile: serifFontPath,
+    fontSize: 48,
+    text: brandName,
+  });
+  const title = await renderTextLayer({
+    color: "#EBEEEB",
+    font: "Fraunces",
+    fontfile: serifFontPath,
+    fontSize: 72,
+    text: post.title,
+    width: TITLE_MAX_WIDTH,
+  });
+  const url = await renderTextLayer({
+    color: "#EBEEEB",
+    font: "Commit Mono",
+    fontfile: monoFontPath,
+    fontSize: 24,
+    text: SITE_URL,
+  });
+
+  return sharp({
+    create: {
+      background: "#111111",
+      channels: 4,
+      height: OG_HEIGHT,
+      width: OG_WIDTH,
+    },
+  })
+    .composite([
+      {
+        input: asciihedron,
+        left: asciihedronLayer.left,
+        top: asciihedronLayer.top,
+      },
+      { input: logo, left: Math.round(LOGO_X), top: Math.round(LOGO_Y) },
+      { input: wordmark, left: Math.round(WORDMARK_X), top: Math.round(WORDMARK_Y) },
+      { input: title, left: Math.round(TITLE_X), top: Math.round(TITLE_Y) },
+      { input: url, left: Math.round(URL_X), top: Math.round(URL_Y) },
+    ])
+    .png()
+    .toBuffer();
 }
 
-function renderOgSvg(post) {
-  const titleLines = wrapText(post.title, 22);
-  const mainOgDataUri = `data:image/png;base64,${mainOgImage.toString("base64")}`;
-  const logoDataUri = `data:image/svg+xml;base64,${logoImage.toString("base64")}`;
-  const wordmarkDataUri = `data:image/svg+xml;base64,${wordmarkImage.toString("base64")}`;
-  const slugLine = `libretto.sh/blog/${post.slug}`;
+function getVisibleLayer({ height, left, top, width }) {
+  const visibleLeft = Math.max(0, Math.round(left));
+  const visibleTop = Math.max(0, Math.round(top));
+  const extractLeft = Math.max(0, Math.round(-left));
+  const extractTop = Math.max(0, Math.round(-top));
+  const visibleWidth = Math.min(
+    Math.round(width) - extractLeft,
+    OG_WIDTH - visibleLeft,
+  );
+  const visibleHeight = Math.min(
+    Math.round(height) - extractTop,
+    OG_HEIGHT - visibleTop,
+  );
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${OG_WIDTH}" height="${OG_HEIGHT}" viewBox="0 0 ${OG_WIDTH} ${OG_HEIGHT}">
-  <defs>
-    <filter id="amber-glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#f0b400" flood-opacity="0.25"/>
-      <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#f0b400" flood-opacity="0.16"/>
-    </filter>
-    <filter id="wordmark-glow" x="-20%" y="-40%" width="140%" height="180%">
-      <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#f0b400" flood-opacity="0.4"/>
-    </filter>
-    <linearGradient id="edge-fade" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#10100f" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#10100f" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-  <image href="${mainOgDataUri}" x="0" y="0" width="${OG_WIDTH}" height="${OG_HEIGHT}"/>
-  <rect x="0" y="0" width="${ASCIIHEDRON_REVEAL_X}" height="${OG_HEIGHT}" fill="#10100f"/>
-  <rect x="${ASCIIHEDRON_REVEAL_X}" y="0" width="120" height="${OG_HEIGHT}" fill="url(#edge-fade)"/>
-  <rect x="0" y="${OG_HEIGHT - 4}" width="${OG_WIDTH}" height="4" fill="#1e1e1c"/>
-  <g filter="url(#wordmark-glow)">
-    <image href="${logoDataUri}" x="${CONTENT_X}" y="48" width="58" height="58"/>
-    <image href="${wordmarkDataUri}" x="${CONTENT_X + 72}" y="45" width="380" height="73"/>
-  </g>
-  <g filter="url(#amber-glow)">
-  ${renderTextLines(titleLines)}
-  </g>
-  <text x="${CONTENT_X}" y="566" fill="#8a8472" font-family="Commit Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="24">${escapeXml(slugLine)}</text>
-</svg>`;
+  return {
+    extract: {
+      height: visibleHeight,
+      left: extractLeft,
+      top: extractTop,
+      width: visibleWidth,
+    },
+    left: visibleLeft,
+    top: visibleTop,
+  };
+}
+
+async function renderTextLayer({
+  color,
+  font,
+  fontfile,
+  fontSize,
+  text,
+  width,
+}) {
+  return sharp({
+    text: {
+      dpi: 72,
+      font,
+      fontfile,
+      rgba: true,
+      text: `<span foreground="${color}" size="${fontSize * 1024}">${escapeXml(text)}</span>`,
+      width,
+    },
+  })
+    .png()
+    .toBuffer();
 }
 
 function readBrandStringConst(name) {
@@ -127,9 +186,7 @@ function escapeXml(value) {
 for (const post of readPosts()) {
   const outputDir = join(outputRoot, post.slug);
   mkdirSync(outputDir, { recursive: true });
-  await sharp(Buffer.from(renderOgSvg(post)))
-    .png()
-    .toFile(join(outputDir, "og-image.png"));
+  await sharp(await renderOgImage(post)).toFile(join(outputDir, "og-image.png"));
 }
 
 console.log("Rendered blog OG images.");
