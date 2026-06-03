@@ -22,6 +22,7 @@ import { BattleTestedBanner } from "./components/BattleTestedBanner";
 import { Benchmarks } from "./components/Benchmarks";
 import { MaintainingFeatures } from "./components/MaintainingFeatures";
 import { CloudProviders } from "./components/CloudProviders";
+import { Pricing } from "./components/Pricing.js";
 import { FAQ } from "./components/FAQ";
 import { CTA } from "./components/CTA";
 import { SectionDivider } from "./components/SectionDivider.js";
@@ -135,6 +136,8 @@ export function HomePage() {
         <MaintainingFeatures />
         <SectionDivider />
         <CloudProviders />
+        <SectionDivider />
+        <Pricing />
         <SectionDivider />
         <FAQ />
         <SectionDivider />

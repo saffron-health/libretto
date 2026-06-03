@@ -10,6 +10,7 @@ const widthClasses: Record<SiteSectionWidth, string> = {
 
 interface SiteSectionProps {
   className?: string;
+  id?: string;
   innerClassName?: string;
   width?: SiteSectionWidth;
 }
@@ -17,6 +18,7 @@ interface SiteSectionProps {
 export function SiteSection({
   children,
   className = "",
+  id,
   innerClassName = "",
   width = "md",
 }: PropsWithChildren<SiteSectionProps>) {
@@ -25,7 +27,7 @@ export function SiteSection({
     .join(" ");
 
   return (
-    <section className={`section-crt px-8 py-24 ${className}`.trim()}>
+    <section id={id} className={`section-crt px-8 py-24 ${className}`.trim()}>
       <div className={innerClasses}>{children}</div>
     </section>
   );
