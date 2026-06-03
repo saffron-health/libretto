@@ -40,6 +40,17 @@ AI agents made this more confusing. There are now a lot more tools that involve 
 
 This post is my attempt to map the landscape. Not every category is clean. A few tools overlap. But the map is still helpful because it tells you what kind of problem each tool is actually trying to solve.
 
+## Quick map
+
+| Category | What it does | Best for | Main tradeoff |
+| --- | --- | --- | --- |
+| Browser automation frameworks | You write RPA code that controls the browser directly. | Known workflows where you want deterministic code. | Powerful, but painful to author and maintain. |
+| Browser tools for coding agents | Give coding agents browser context and browser controls. | Local development, debugging, and testing. | Great feedback loop, but not production automation by itself. |
+| Agentic browsers | Put an AI assistant inside the browser you use directly. | Reading, summarizing, and acting across pages while a person is present. | Useful for interactive work, but not a durable automation surface. |
+| Full browser agents | Let an agent decide browser actions at runtime. | One-off or changing workflows where flexibility matters. | Slow, expensive, and harder to audit than a script. |
+| Browser cloud infra providers | Host browser sessions and production browser infrastructure. | Scale, persistence, proxies, recordings, and managed sessions. | Often paid service - but worth it if this is for your business. |
+| Agent-assisted automation tools | Turn browser exploration into durable, maintainable automation. | Repeated workflows that need to be maintained over time. | More setup than a live agent, but faster, cheaper and easier to inspect. |
+
 ## Category 1: browser automation frameworks
 
 *Examples:* [Playwright](https://playwright.dev/), [Selenium](https://www.selenium.dev/), [Puppeteer](https://pptr.dev/), [Stagehand](https://www.stagehand.dev/), [UiPath](https://www.uipath.com/), [Automation Anywhere](https://www.automationanywhere.com/), [Blue Prism](https://www.blueprism.com/), [Power Automate](https://www.microsoft.com/en-us/power-platform/products/power-automate/).
@@ -144,17 +155,6 @@ curl -X POST "https://api.libretto.sh/v1/jobs/create" \\
 With a browser agent, you pay for the model to reason through the task every time. With Libretto, you pay that cost once while the workflow is being authored. After that, the workflow can run in the cloud as normal automation, with no token cost on every run.
 
 Libretto is best when the workflow is worth keeping around. If you only need to do something once, a browser agent is probably simpler. But if the same flow needs to run again, be debugged later, or become part of a product, it is better to have code and traces you can inspect instead of a fresh agent run and a prayer every time.
-
-## Comparison / map
-
-| Category | What it does | Best for | Main tradeoff |
-| --- | --- | --- | --- |
-| Browser automation frameworks | You write RPA code that controls the browser directly. | Known workflows where you want deterministic code. | Powerful, but painful to author and maintain. |
-| Browser tools for coding agents | Give coding agents browser context and browser controls. | Local development, debugging, and testing. | Great feedback loop, but not production automation by itself. |
-| Agentic browsers | Put an AI assistant inside the browser you use directly. | Reading, summarizing, and acting across pages while a person is present. | Useful for interactive work, but not a durable automation surface. |
-| Full browser agents | Let an agent decide browser actions at runtime. | One-off or changing workflows where flexibility matters. | Slow, expensive, and harder to audit than a script. |
-| Browser cloud infra providers | Host browser sessions and production browser infrastructure. | Scale, persistence, proxies, recordings, and managed sessions. | Often paid service - but worth it if this is for your business. |
-| Agent-assisted automation tools | Turn browser exploration into durable, maintainable automation. | Repeated workflows that need to be maintained over time. | More setup than a live agent, but faster, cheaper and easier to inspect. |
 
 ## Conclusion
 
