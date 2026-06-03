@@ -2,15 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Text } from "./Text";
 import { DiscordIcon, GitHubIcon, NpmIcon } from "../icons";
 import { DISCORD_URL, DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
-
-const LOGO = String.raw` ██╗     ██╗██████╗ ██████╗ ███████╗████████╗████████╗ ██████╗
- ██║     ██║██╔══██╗██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔═══██╗
- ██║     ██║██████╔╝██████╔╝█████╗     ██║      ██║   ██║   ██║
- ██║     ██║██╔══██╗██╔══██╗██╔══╝     ██║      ██║   ██║   ██║
- ███████╗██║██████╔╝██║  ██║███████╗   ██║      ██║   ╚██████╔╝
- ╚══════╝╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝   ╚═╝      ╚═╝    ╚═════╝`;
-
-const LOGO_COLS = 63; // widest line in the ASCII logo
+import { LIBRETTO_ASCII_NAME, LIBRETTO_ASCII_NAME_COLS } from "../brand.js";
 
 const linkClass = "text-muted/60 transition-colors hover:text-accent-bright text-xs no-underline";
 
@@ -29,7 +21,7 @@ function useLogoFontSize() {
     if (charWidth === 0) return;
     const ratio = charWidth; // width of one char at 16px
     const targetWidth = container.getBoundingClientRect().width;
-    const size = (targetWidth / (LOGO_COLS * ratio)) * 16;
+    const size = (targetWidth / (LIBRETTO_ASCII_NAME_COLS * ratio)) * 16;
     setFontSize(Math.max(6, size));
   }, []);
 
@@ -140,7 +132,7 @@ export function Footer() {
             className="footer-hollow-logo whitespace-pre font-mono leading-none tracking-[0] select-none"
             style={{ fontSize }}
           >
-            {LOGO}
+            {LIBRETTO_ASCII_NAME}
           </pre>
         </div>
       </div>

@@ -1,6 +1,13 @@
 import { useRef, useState } from "react";
 import type * as React from "react";
-import { AsciiLogo } from "../components/AsciiLogo.js";
+import {
+  BROWSER_AGENTS_SCRIPT_JOB_COMPACT_ASCII,
+  BROWSER_AGENTS_SCRIPT_JOB_TEXT,
+  LIBRETTO_LOGO_DARK_SRC,
+  LIBRETTO_LOGO_LIGHT_SRC,
+  LIBRETTO_WORDMARK_SRC,
+  LibrettoAsciiWordmark,
+} from "../brand.js";
 import { CanvasAsciihedron } from "../components/CanvasAsciihedron.js";
 import { Kicker } from "../components/Kicker.js";
 import { Panel } from "../components/Panel.js";
@@ -112,13 +119,13 @@ const logoStillAssets: DownloadAsset[] = [
   {
     label: "Light SVG",
     detail: "Light mode vector",
-    href: "/logos/logo-light.svg",
+    href: LIBRETTO_LOGO_LIGHT_SRC,
     download: "logo-light.svg",
   },
   {
     label: "Dark SVG",
     detail: "Dark mode vector",
-    href: "/logos/logo-dark.svg",
+    href: LIBRETTO_LOGO_DARK_SRC,
     download: "logo-dark.svg",
   },
 ];
@@ -190,7 +197,7 @@ const wordmarkAssets: DownloadAsset[] = [
   {
     label: "SVG",
     detail: "ASCII wordmark vector",
-    href: "/brand-kit/wordmark/libretto-ascii-wordmark.svg",
+    href: LIBRETTO_WORDMARK_SRC,
     download: "libretto-ascii-wordmark.svg",
   },
   {
@@ -325,46 +332,15 @@ const ogImageAsset: ImageAsset = {
   height: 630,
 };
 
-const socialLogoHref = "/logos/logo-dark.svg";
-const socialHeadline = "DON'T MAKE BROWSER AGENTS DO A SCRIPT'S JOB";
-const socialHeadlineAscii = createCompactAscii(socialHeadline);
+const socialLogoHref = LIBRETTO_LOGO_DARK_SRC;
+const socialHeadline = BROWSER_AGENTS_SCRIPT_JOB_TEXT;
+const socialHeadlineAscii = BROWSER_AGENTS_SCRIPT_JOB_COMPACT_ASCII;
 const socialProfileLogoScale: Record<SocialPlatformId, number> = {
   instagram: 0.34,
   linkedin: 0.34,
   reddit: 0.36,
   x: 0.34,
 };
-
-function createCompactAscii(value: string) {
-  const glyphs: Record<string, string[]> = {
-    A: [" ██ ", "█  █", "████", "█  █", "█  █"],
-    B: ["███ ", "█  █", "███ ", "█  █", "███ "],
-    C: [" ███", "█   ", "█   ", "█   ", " ███"],
-    D: ["███ ", "█  █", "█  █", "█  █", "███ "],
-    E: ["████", "█   ", "███ ", "█   ", "████"],
-    G: [" ███", "█   ", "█ ██", "█  █", " ███"],
-    I: ["███", " █ ", " █ ", " █ ", "███"],
-    J: ["  ██", "   █", "   █", "█  █", " ██ "],
-    K: ["█  █", "█ █ ", "██  ", "█ █ ", "█  █"],
-    M: ["█   █", "██ ██", "█ █ █", "█   █", "█   █"],
-    N: ["█  █", "██ █", "█ ██", "█  █", "█  █"],
-    O: [" ██ ", "█  █", "█  █", "█  █", " ██ "],
-    P: ["███ ", "█  █", "███ ", "█   ", "█   "],
-    R: ["███ ", "█  █", "███ ", "█ █ ", "█  █"],
-    S: [" ███", "█   ", " ██ ", "   █", "███ "],
-    T: ["█████", "  █  ", "  █  ", "  █  ", "  █  "],
-    W: ["█   █", "█   █", "█ █ █", "██ ██", "█   █"],
-    "'": ["█", "█", " ", " ", " "],
-    " ": ["   ", "   ", "   ", "   ", "   "],
-  };
-  const characters = Array.from(value.toUpperCase());
-  return Array.from({ length: 5 }, (_, rowIndex) =>
-    characters
-      .map((character) => glyphs[character]?.[rowIndex] ?? character)
-      .join(" ")
-      .trimEnd(),
-  ).join("\n");
-}
 
 function ThemeButton({
   mode,
@@ -1225,7 +1201,7 @@ function WordmarkTab() {
       preview={
         <PreviewShell>
           <div className="w-full overflow-hidden px-4">
-            <AsciiLogo className="text-[8px] lg:text-[12px]" />
+            <LibrettoAsciiWordmark className="text-[8px] lg:text-[12px]" />
           </div>
         </PreviewShell>
       }

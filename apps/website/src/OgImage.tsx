@@ -9,6 +9,10 @@ import {
 } from "react";
 import html2canvas from "html2canvas-pro";
 import { Pane } from "tweakpane";
+import {
+  BROWSER_AGENTS_SCRIPT_JOB_ASCII,
+  BROWSER_AGENTS_SCRIPT_JOB_TEXT,
+} from "./brand.js";
 import { CanvasAsciihedron } from "./components/CanvasAsciihedron";
 
 const OG_WIDTH = 1200;
@@ -37,34 +41,6 @@ const DEFAULT_LAYOUT: OgLayout = {
   polySize: 1370,
   polyOpacity: 0.18,
 };
-
-const TITLE_ASCII = String.raw`██████╗  ██████╗ ███╗   ██╗██╗████████╗  ███╗   ███╗ █████╗ ██╗  ██╗███████╗
-██╔══██╗██╔═══██╗████╗  ██║╚═╝╚══██╔══╝  ████╗ ████║██╔══██╗██║ ██╔╝██╔════╝
-██║  ██║██║   ██║██╔██╗ ██║      ██║     ██╔████╔██║███████║█████╔╝ █████╗
-██║  ██║██║   ██║██║╚██╗██║      ██║     ██║╚██╔╝██║██╔══██║██╔═██╗ ██╔══╝
-██████╔╝╚██████╔╝██║ ╚████║      ██║     ██║ ╚═╝ ██║██║  ██║██║  ██╗███████╗
-╚═════╝  ╚═════╝ ╚═╝  ╚═══╝      ╚═╝     ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
-
-██████╗ ██████╗  ██████╗ ██╗    ██╗███████╗███████╗██████╗    █████╗  ██████╗ ███████╗███╗   ██╗████████╗███████╗
-██╔══██╗██╔══██╗██╔═══██╗██║    ██║██╔════╝██╔════╝██╔══██╗  ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝██╔════╝
-██████╔╝██████╔╝██║   ██║██║ █╗ ██║███████╗█████╗  ██████╔╝  ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   ███████╗
-██╔══██╗██╔══██╗██║   ██║██║███╗██║╚════██║██╔══╝  ██╔══██╗  ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   ╚════██║
-██████╔╝██║  ██║╚██████╔╝╚███╔███╔╝███████║███████╗██║  ██║  ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   ███████║
-╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ╚══╝╚══╝ ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝
-
-██████╗  ██████╗    █████╗    ███████╗ ██████╗██████╗ ██╗██████╗ ████████╗██╗███████╗
-██╔══██╗██╔═══██╗  ██╔══██╗   ██╔════╝██╔════╝██╔══██╗██║██╔══██╗╚══██╔══╝╚═╝██╔════╝
-██║  ██║██║   ██║  ███████║   ███████╗██║     ██████╔╝██║██████╔╝   ██║      ███████╗
-██║  ██║██║   ██║  ██╔══██║   ╚════██║██║     ██╔══██╗██║██╔═══╝    ██║      ╚════██║
-██████╔╝╚██████╔╝  ██║  ██║   ███████║╚██████╗██║  ██║██║██║        ██║      ███████║
-╚═════╝  ╚═════╝   ╚═╝  ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝╚═╝        ╚═╝      ╚══════╝
-
-     ██╗ ██████╗ ██████╗
-     ██║██╔═══██╗██╔══██╗
-     ██║██║   ██║██████╔╝
-██   ██║██║   ██║██╔══██╗
-╚█████╔╝╚██████╔╝██████╔╝
- ╚════╝  ╚═════╝ ╚═════╝`;
 
 /**
  * Captures the offscreen container with html2canvas, then composites the
@@ -305,7 +281,7 @@ function OgArtwork({
         style={{ width: layout.textWidth, paddingLeft: layout.textLeft }}
       >
         <pre
-          aria-label="Don't make browser agents do a script's job"
+          aria-label={BROWSER_AGENTS_SCRIPT_JOB_TEXT}
           className="whitespace-pre font-mono font-semibold leading-none tracking-[-0.05em] text-amber"
           style={{
             fontSize: layout.textFontSize,
@@ -313,7 +289,7 @@ function OgArtwork({
               "0 0 8px color-mix(in oklch, var(--color-amber-bright) 50%, transparent), 0 0 24px color-mix(in oklch, var(--color-amber-bright) 25%, transparent)",
           }}
         >
-          {TITLE_ASCII}
+          {BROWSER_AGENTS_SCRIPT_JOB_ASCII}
         </pre>
       </div>
 
