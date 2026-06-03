@@ -1,4 +1,8 @@
+import { Children } from "react";
 import type * as React from "react";
+import Prism from "prismjs";
+import "prismjs/components/prism-bash.js";
+import "prismjs/components/prism-typescript.js";
 import { SafeMdxRenderer } from "safe-mdx";
 import { AppLink } from "../routing";
 import { Button } from "../components/Button";
@@ -75,6 +79,45 @@ function BlogPostStructuredData({ post }: { post: BlogPost }) {
     <script type="application/ld+json">
       {jsonLd}
     </script>
+  );
+}
+
+function getCodeLanguage(className: string | undefined): string | undefined {
+  return className?.match(/language-(\w+)/)?.[1];
+}
+
+function getCodeText(children: React.ReactNode): string {
+  return Children.toArray(children)
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number") {
+        return String(child);
+      }
+
+      return "";
+    })
+    .join("");
+}
+
+function Code({ children, className }: React.HTMLAttributes<HTMLElement>) {
+  const language = getCodeLanguage(className);
+  const code = getCodeText(children);
+  const grammar = language ? Prism.languages[language] : undefined;
+
+  if (!language || !grammar) {
+    return (
+      <code className="rounded border border-rule bg-[#17130d] px-1 py-0.5 font-mono text-[0.95em] text-ink">
+        {children}
+      </code>
+    );
+  }
+
+  return (
+    <code
+      className="font-mono text-sm text-[#e6edf3] [&_.token.boolean]:text-[#79c0ff] [&_.token.builtin]:text-[#ffa657] [&_.token.class-name]:text-[#ffa657] [&_.token.comment]:text-[#8b949e] [&_.token.function]:text-[#d2a8ff] [&_.token.keyword]:text-[#ff7b72] [&_.token.number]:text-[#79c0ff] [&_.token.operator]:text-[#ff7b72] [&_.token.property]:text-[#79c0ff] [&_.token.punctuation]:text-[#c9d1d9] [&_.token.string]:text-[#a5d6ff] [&_.token.variable]:text-[#ffa657]"
+      dangerouslySetInnerHTML={{
+        __html: Prism.highlight(code, grammar, language),
+      }}
+    />
   );
 }
 
@@ -160,13 +203,13 @@ const markdownComponents = {
       </pre>
     );
   },
-  code({ children }: { children?: React.ReactNode }) {
-    return <code className="font-mono text-sm text-ink">{children}</code>;
+  code({ children, className }: React.HTMLAttributes<HTMLElement>) {
+    return <Code className={className}>{children}</Code>;
   },
   table({ children }: { children?: React.ReactNode }) {
     return (
       <div className="mb-8 overflow-x-auto">
-        <table className="min-w-[720px] border-collapse text-left text-sm leading-relaxed text-muted">
+        <table className="min-w-[720px] border-collapse text-left text-sm leading-relaxed text-muted [&_thead_td]:text-white">
           {children}
         </table>
       </div>
