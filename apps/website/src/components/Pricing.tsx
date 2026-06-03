@@ -81,6 +81,9 @@ function PlanCard({ plan }: { plan: (typeof plans)[number] }) {
               browser {plan.hours === "1" ? "hour" : "hours"} included
             </Text>
           </div>
+          <Text as="div" size="xs" className="mt-1 text-ink">
+            $0.25 per browser-hour
+          </Text>
         </div>
       ) : null}
       {!plan.hours ? <div className="mb-4 border-t border-ink/10 pt-4" /> : null}
