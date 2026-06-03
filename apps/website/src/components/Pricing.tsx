@@ -14,6 +14,7 @@ const plans = [
     price: "$0",
     cadence: "per month",
     hours: "1",
+    browserHourRate: "$0.25 / browser hour",
     note: "Try a hosted browser session before connecting billing.",
   },
   {
@@ -21,6 +22,7 @@ const plans = [
     price: "$20",
     cadence: "per month",
     hours: "80",
+    browserHourRate: "$0.25 / browser hour",
     note: "For solo builders and small production workflows.",
     featured: true,
   },
@@ -29,12 +31,14 @@ const plans = [
     price: "$100",
     cadence: "per month",
     hours: "400",
-    note: "Shared capacity for teams running regular cloud jobs.",
+    browserHourRate: "$0.25 / browser hour",
+    note: "Shared capacity for teams running regular cloud jobs. BAA included.",
   },
   {
     name: "Enterprise",
     price: "Custom",
     cadence: "team@libretto.sh",
+    browserHourRate: "Custom browser-hour pricing",
     note: "BAA support, custom capacity, and deployment guidance.",
   },
 ];
@@ -72,14 +76,24 @@ function PlanCard({ plan }: { plan: (typeof plans)[number] }) {
         </Text>
       </div>
       {plan.hours ? (
-        <div className="mb-4 flex items-baseline gap-2 border-t border-ink/10 pt-4">
-          <Text as="span" size="2xl" className="font-medium text-accent-bright">
-            {plan.hours}
-          </Text>
-          <Text as="span" size="xs" className="text-muted">
-            browser {plan.hours === "1" ? "hour" : "hours"} included
+        <div className="mb-4 border-t border-ink/10 pt-4">
+          <div className="flex items-baseline gap-2">
+            <Text as="span" size="2xl" className="font-medium text-accent-bright">
+              {plan.hours}
+            </Text>
+            <Text as="span" size="xs" className="text-muted">
+              browser {plan.hours === "1" ? "hour" : "hours"} included
+            </Text>
+          </div>
+          <Text as="div" size="xs" className="mt-1 text-muted/75">
+            {plan.browserHourRate}
           </Text>
         </div>
+      ) : null}
+      {!plan.hours ? (
+        <Text as="div" size="xs" className="mb-4 border-t border-ink/10 pt-4 text-muted/75">
+          {plan.browserHourRate}
+        </Text>
       ) : null}
       <Text as="p" size="sm" className="mt-auto leading-relaxed text-muted">
         {plan.note}
