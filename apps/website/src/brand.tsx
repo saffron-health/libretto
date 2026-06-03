@@ -53,6 +53,9 @@ export const BROWSER_AGENTS_SCRIPT_JOB_COMPACT_ASCII = createCompactAscii(
 );
 
 type ImageProps = Omit<ComponentPropsWithoutRef<"img">, "src">;
+type LogoAndNameProps = ComponentPropsWithoutRef<"span"> & {
+  variant?: "dark" | "light";
+};
 type TextMarkProps = ComponentPropsWithoutRef<"span">;
 
 export function LibrettoLogoMark({
@@ -76,9 +79,22 @@ export function LibrettoWordmark({
   return (
     <span
       {...props}
-      className={`font-serif font-[400] leading-none tracking-[0] text-ink ${className}`.trim()}
+      className={`font-serif font-[300] leading-none tracking-[0] text-ink ${className}`.trim()}
     >
       {LIBRETTO_NAME}
+    </span>
+  );
+}
+
+export function LibrettoLogoAndName({
+  className = "",
+  variant = "dark",
+  ...props
+}: LogoAndNameProps) {
+  return (
+    <span {...props} className={`flex items-center gap-2 ${className}`.trim()}>
+      <LibrettoLogoMark variant={variant} className="size-[1.35rem] shrink-0" />
+      <LibrettoWordmark className="shrink-0 text-[1.35rem]" />
     </span>
   );
 }

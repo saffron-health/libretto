@@ -6,7 +6,7 @@ import { AnimationTarget } from "./AnimationOrchestration";
 import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
 import { AppLink } from "../routing";
 import { MobileMenu } from "./MobileMenu";
-import { LibrettoLogoMark, LibrettoWordmark } from "../brand.js";
+import { LibrettoLogoAndName } from "../brand.js";
 
 const GLITCH_CHARS = "@#$%&*+=<>{}[]|/\\~^!?";
 
@@ -137,9 +137,8 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
     <nav {...animateProps} className="px-8 pt-6">
       <div className="relative mx-auto flex max-w-[800px] items-center justify-between">
         <div className="flex items-center gap-10">
-          <AppLink href="/" className="flex items-center gap-2 no-underline">
-            <LibrettoLogoMark variant="dark" className="size-[1.35rem] shrink-0" />
-            <LibrettoWordmark className="shrink-0 text-[1.5rem]" />
+          <AppLink href="/" className="no-underline">
+            <LibrettoLogoAndName />
           </AppLink>
           <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
             <GlitchNavLink href="/blog" external={false} fathomEvent="Nav blog click">
