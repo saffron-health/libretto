@@ -99,14 +99,30 @@ function renderOgHtml(post) {
         width: 1380px;
       }
 
+      .content {
+        align-items: flex-start;
+        display: flex;
+        flex-direction: column;
+        height: 485px;
+        justify-content: space-between;
+        left: 56px;
+        position: absolute;
+        top: 59px;
+        width: 664px;
+      }
+
+      .brand {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+        height: 42px;
+      }
+
       .logo {
         background-image: url("${logoDataUri}");
         background-position: 50%;
         background-size: cover;
         height: 42px;
-        left: 56px;
-        position: absolute;
-        top: 59px;
         width: 42px;
       }
 
@@ -115,10 +131,7 @@ function renderOgHtml(post) {
         font-family: "Fraunces", system-ui, sans-serif;
         font-size: 38px;
         font-weight: 400;
-        left: 103px;
-        line-height: 22px;
-        position: absolute;
-        top: 68px;
+        line-height: 1;
         white-space: nowrap;
       }
 
@@ -127,10 +140,7 @@ function renderOgHtml(post) {
         font-family: "Fraunces", system-ui, sans-serif;
         font-size: 72px;
         font-weight: 400;
-        left: 56px;
         line-height: 78px;
-        position: absolute;
-        top: 152px;
         width: 664px;
       }
 
@@ -139,10 +149,7 @@ function renderOgHtml(post) {
         font-family: "CommitMono", ui-monospace, monospace;
         font-size: 24px;
         font-weight: 400;
-        left: 56px;
         line-height: 24px;
-        position: absolute;
-        top: 520px;
         white-space: nowrap;
       }
     </style>
@@ -151,10 +158,14 @@ function renderOgHtml(post) {
     <div id="root">
       <div class="frame">
         <div class="asciihedron"></div>
-        <div class="logo"></div>
-        <div class="wordmark">${escapeHtml(brandName)}</div>
-        <div class="title">${escapeHtml(post.title)}</div>
-        <div class="url">${SITE_URL}</div>
+        <div class="content">
+          <div class="brand">
+            <div class="logo"></div>
+            <div class="wordmark">${escapeHtml(brandName)}</div>
+          </div>
+          <div class="title">${escapeHtml(post.title)}</div>
+          <div class="url">${SITE_URL}</div>
+        </div>
       </div>
     </div>
   </body>
