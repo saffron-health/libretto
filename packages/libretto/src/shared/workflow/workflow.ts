@@ -1,5 +1,9 @@
 import type { Page } from "playwright";
 import { z } from "zod";
+import {
+  createRecoveryPage,
+  type RecoveryAction,
+} from "../../runtime/recovery/page-fallbacks.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
@@ -13,13 +17,24 @@ export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
   input: Input,
 ) => Promise<Output>;
 
-export type LibrettoWorkflowSchemas<
-  InputSchema extends z.ZodType,
-  OutputSchema extends z.ZodType,
+export type LibrettoWorkflowDefinition<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
 > = {
-  input: InputSchema;
-  output: OutputSchema;
+  input?: InputSchema;
+  output?: OutputSchema;
   authProfile?: string | { name: string };
+  recoveryAction?: RecoveryAction;
+};
+
+export type LibrettoWorkflowOptions<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+> = LibrettoWorkflowDefinition<InputSchema, OutputSchema> & {
+  handler: LibrettoWorkflowHandler<
+    z.infer<InputSchema>,
+    z.infer<OutputSchema>
+  >;
 };
 
 // Thrown when input fails Zod validation. The runner surfaces `.message`
@@ -91,6 +106,7 @@ export class LibrettoWorkflow<
   // /v1/workflows/get so API consumers know the workflow's output shape.
   public readonly outputSchema?: OutputSchema;
   public readonly authProfileName?: string;
+  public readonly recoveryAction?: RecoveryAction;
   private readonly handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
@@ -98,16 +114,24 @@ export class LibrettoWorkflow<
 
   constructor(
     name: string,
-    schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema> | undefined,
+    options:
+      | {
+          inputSchema?: InputSchema;
+          outputSchema?: OutputSchema;
+          authProfileName?: string;
+          recoveryAction?: RecoveryAction;
+        }
+      | undefined,
     handler: LibrettoWorkflowHandler<
       z.infer<InputSchema>,
       z.infer<OutputSchema>
     >,
   ) {
     this.name = name;
-    this.inputSchema = schemas?.input;
-    this.outputSchema = schemas?.output;
-    this.authProfileName = normalizeWorkflowAuthProfile(schemas?.authProfile);
+    this.inputSchema = options?.inputSchema;
+    this.outputSchema = options?.outputSchema;
+    this.authProfileName = options?.authProfileName;
+    this.recoveryAction = options?.recoveryAction;
     this.handler = handler;
   }
 
@@ -116,7 +140,16 @@ export class LibrettoWorkflow<
     input: unknown,
   ): Promise<z.infer<OutputSchema>> {
     const parsed = parseWorkflowInput(this.name, this.inputSchema, input);
-    return this.handler(ctx, parsed);
+    const workflowContext =
+      !this.recoveryAction
+        ? ctx
+        : {
+            ...ctx,
+            page: createRecoveryPage(ctx.page, {
+              recoveryAction: this.recoveryAction,
+            }),
+          };
+    return this.handler(workflowContext, parsed);
   }
 }
 
@@ -126,6 +159,7 @@ export type ExportedLibrettoWorkflow = {
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;
   readonly authProfileName?: string;
+  readonly recoveryAction?: RecoveryAction;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -216,22 +250,49 @@ export function getWorkflowFromModuleExports(
   return null;
 }
 
-// Recommended 3-arg form: pass Zod schemas so input is validated at run time
-// and the hosted platform can expose typed I/O metadata via /v1/workflows/get.
-export function workflow<
+function getWorkflowConstructorOptions<
   InputSchema extends z.ZodType,
   OutputSchema extends z.ZodType,
 >(
+  options:
+    | LibrettoWorkflowDefinition<InputSchema, OutputSchema>
+    | LibrettoWorkflowOptions<InputSchema, OutputSchema>,
+): {
+  inputSchema?: InputSchema;
+  outputSchema?: OutputSchema;
+  authProfileName?: string;
+  recoveryAction?: RecoveryAction;
+} {
+  return {
+    inputSchema: options.input,
+    outputSchema: options.output,
+    authProfileName: normalizeWorkflowAuthProfile(options.authProfile),
+    recoveryAction: options.recoveryAction,
+  };
+}
+
+export function workflow<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+>(
   name: string,
-  schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema>,
+  definition: LibrettoWorkflowDefinition<InputSchema, OutputSchema>,
   handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
   >,
 ): LibrettoWorkflow<InputSchema, OutputSchema>;
 
+export function workflow<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+>(
+  name: string,
+  options: LibrettoWorkflowOptions<InputSchema, OutputSchema>,
+): LibrettoWorkflow<InputSchema, OutputSchema>;
+
 // Legacy 2-arg form kept so deployments built before Zod schemas existed
-// continue to load. New code should always pass schemas.
+// continue to load. New code should pass input/output schemas when possible.
 export function workflow<Input = unknown, Output = unknown>(
   name: string,
   handler: LibrettoWorkflowHandler<Input, Output>,
@@ -239,24 +300,36 @@ export function workflow<Input = unknown, Output = unknown>(
 
 export function workflow(
   name: string,
-  schemasOrHandler:
-    | LibrettoWorkflowSchemas<z.ZodType, z.ZodType>
+  definitionOrHandler:
+    | LibrettoWorkflowDefinition<z.ZodType, z.ZodType>
+    | LibrettoWorkflowOptions
     | LibrettoWorkflowHandler,
   maybeHandler?: LibrettoWorkflowHandler,
 ): LibrettoWorkflow {
-  if (typeof schemasOrHandler === "function") {
-    return new LibrettoWorkflow(name, undefined, schemasOrHandler);
+  if (typeof definitionOrHandler === "function") {
+    return new LibrettoWorkflow(name, undefined, definitionOrHandler);
+  }
+  if ("handler" in definitionOrHandler) {
+    return new LibrettoWorkflow(
+      name,
+      getWorkflowConstructorOptions(definitionOrHandler),
+      definitionOrHandler.handler,
+    );
   }
   if (!maybeHandler) {
     throw new Error(
-      `workflow("${name}") called with schemas but no handler. Pass the handler as the third argument.`,
+      `workflow("${name}") called without a handler. Pass the handler as the third argument or in the options object.`,
     );
   }
-  return new LibrettoWorkflow(name, schemasOrHandler, maybeHandler);
+  return new LibrettoWorkflow(
+    name,
+    getWorkflowConstructorOptions(definitionOrHandler),
+    maybeHandler,
+  );
 }
 
 function normalizeWorkflowAuthProfile(
-  value: LibrettoWorkflowSchemas<z.ZodType, z.ZodType>["authProfile"],
+  value: LibrettoWorkflowDefinition<z.ZodType, z.ZodType>["authProfile"],
 ): string | undefined {
   if (!value) return undefined;
   return typeof value === "string" ? value : value.name;

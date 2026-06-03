@@ -236,6 +236,7 @@ class BrowserDaemon {
       provider: ProviderApi;
       name: string;
       sessionId: string;
+      recordingUrl?: string;
     },
   ) {
     this.logger = logger.withScope("child");
@@ -284,11 +285,13 @@ class BrowserDaemon {
       sessionId: string;
       cdpEndpoint: string;
       liveViewUrl?: string;
+      recordingUrl?: string;
     };
     providerSession?: {
       provider: ProviderApi;
       name: string;
       sessionId: string;
+      recordingUrl?: string;
     };
     beforeReady?: () => void;
   }): Promise<BrowserDaemon> {
@@ -578,11 +581,13 @@ class BrowserDaemon {
           sessionId: providerSession.sessionId,
           cdpEndpoint: providerSession.cdpEndpoint,
           liveViewUrl: providerSession.liveViewUrl,
+          recordingUrl: providerSession.recordingUrl,
         },
         providerSession: {
           provider,
           name: config.providerName,
           sessionId: providerSession.sessionId,
+          recordingUrl: providerSession.recordingUrl,
         },
         beforeReady: startupCleanup.dispose,
       });
@@ -655,13 +660,13 @@ class BrowserDaemon {
         const result = await this.providerSession.provider.closeSession(
           this.providerSession.sessionId,
         );
-        replayUrl = result.replayUrl;
-        if (result.replayUrl) {
+        replayUrl = result.replayUrl ?? this.providerSession.recordingUrl;
+        if (replayUrl) {
           this.logger.info("provider-recording", {
             session: this.session,
             provider: this.providerSession.name,
             sessionId: this.providerSession.sessionId,
-            replayUrl: result.replayUrl,
+            replayUrl,
           });
         }
         writeFileSync(
@@ -670,7 +675,7 @@ class BrowserDaemon {
             {
               provider: this.providerSession.name,
               sessionId: this.providerSession.sessionId,
-              replayUrl: result.replayUrl,
+              replayUrl,
             },
             null,
             2,

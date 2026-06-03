@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Footer } from "../components/Footer";
 import { Navbar } from "../components/Navbar";
 import { Text } from "../components/Text";
+import { buildBlogPostJsonLd, serializeJsonLd } from "./jsonLd";
 import { BLOG_POSTS, getBlogPost, type BlogPost } from "./posts";
 
 const BLOG_LOGO = String.raw`
@@ -38,7 +39,11 @@ function BlogShell({ children }: { children: React.ReactNode }) {
 function BlogPostPreview({ post }: { post: BlogPost }) {
   return (
     <article className="border-t border-rule py-8">
-      <AppLink href={`/blog/${post.slug}`} className="group block no-underline">
+      <AppLink
+        href={`/blog/${post.slug}`}
+        className="group block no-underline"
+        data-fathom-event="Blog post click"
+      >
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Text as="time" size="xs" className="text-muted/70">
             {formatPostDate(post.publishedAt)}
@@ -60,6 +65,16 @@ function BlogPostPreview({ post }: { post: BlogPost }) {
         </Text>
       </AppLink>
     </article>
+  );
+}
+
+function BlogPostStructuredData({ post }: { post: BlogPost }) {
+  const jsonLd = serializeJsonLd(buildBlogPostJsonLd(post));
+
+  return (
+    <script type="application/ld+json">
+      {jsonLd}
+    </script>
   );
 }
 
@@ -94,6 +109,18 @@ export function BlogIndexPage() {
 }
 
 const markdownComponents = {
+  h1({ children }: { children?: React.ReactNode }) {
+    return (
+      <Text
+        as="h1"
+        size="3xl"
+        style="serif"
+        className="mb-8 text-[2rem] font-[300] leading-tight text-ink"
+      >
+        {children}
+      </Text>
+    );
+  },
   h2({ children }: { children?: React.ReactNode }) {
     return (
       <Text
@@ -166,7 +193,7 @@ export function BlogPostPage({ slug }: { slug: string }) {
           >
             Post not found.
           </Text>
-          <Button href="/blog" variant="secondary">
+          <Button href="/blog" variant="secondary" data-fathom-event="Blog back click">
             Back to blog
           </Button>
         </section>
@@ -176,10 +203,12 @@ export function BlogPostPage({ slug }: { slug: string }) {
 
   return (
     <BlogShell>
+      <BlogPostStructuredData post={post} />
       <article className="mx-auto max-w-[760px] pt-8 pb-20">
         <AppLink
           href="/blog"
           className="mb-10 inline-block text-sm text-muted/70 no-underline transition-colors hover:text-accent-bright"
+          data-fathom-event="Blog back click"
         >
           Back to blog
         </AppLink>

@@ -19,7 +19,15 @@ pnpm evals
 pnpm evals run
 ```
 
-Cases run in parallel by default.
+Cases run in parallel by default, up to the CPU parallelism detected by Node.js.
+
+Repeat each selected case multiple times:
+
+```bash
+pnpm evals --repeat-count 3
+```
+
+Repeats run sequentially, with cases inside each repeat running up to the detected CPU parallelism. Run-level totals, infra counts, duration, and metrics are averaged per repeat so the aggregate fields stay comparable to a one-pass suite.
 
 Run only cases that do not declare an auth profile:
 
@@ -72,6 +80,53 @@ Override the default evaluated agent and judge model (`openai/gpt-5.5`):
 ```bash
 pnpm evals --model openai/gpt-5.5
 ```
+
+## Public website benchmarks
+
+The public website benchmark compares agents on the same set of live website
+tasks. The shared task registry lives in `evals/public-website-benchmark.ts`.
+`evals/public-websites.eval.ts` registers the full suite, while
+`evals/anti-bot-public-websites.eval.ts` registers the subset that previously
+did not show clear anti-bot failures.
+
+Run the full benchmark locally:
+
+```bash
+pnpm evals public-websites.eval.ts --agents libretto,libretto-cached,browser-use --provider steel --concurrency 10
+```
+
+Run the full benchmark on Cloud Run:
+
+```bash
+pnpm evals public-websites.eval.ts --agents libretto,libretto-cached,browser-use --provider steel --concurrency 20 --gcp
+```
+
+Run the anti-bot-clean subset on Cloud Run:
+
+```bash
+pnpm evals anti-bot-public-websites.eval.ts --agents libretto,libretto-cached,browser-use --provider steel --concurrency 10 --gcp
+```
+
+`libretto-cached` replays the workflow produced by the corresponding
+`libretto` target, so it must be selected with `libretto`. On Cloud Run the
+dispatcher runs the suite in two phases when cached targets are present:
+Libretto workflow generation runs first, independent agents such as
+`browser-use` run alongside that phase, and cached workflow replay starts after
+the generated workflow artifacts are uploaded.
+
+The latest public website benchmark run documented for this branch is
+`2026-05-27-95ee1a`. It covered 27 cases across three agents. The reported cost
+is the agent/model cost recorded by the harness; it does not add separate
+browser-session infrastructure cost.
+
+| Agent | Cases | Score | Avg agent time | Agent cost | Tokens |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `libretto` | 27 | 42/54 | 390.0s | $22.1506 | 18,855,003 |
+| `libretto-cached` | 27 | 46/54 | 38.5s | $0.0000 | 0 |
+| `browser-use` | 27 | 45/54 | 95.0s | $3.7419 | 1,020,823 |
+
+See `evals/references/public-website-benchmarks.md` for the benchmark design,
+Cloud Run setup, artifact layout, scoring model, and analysis notes.
 
 ## Auth profiles
 

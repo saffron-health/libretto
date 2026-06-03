@@ -10,6 +10,7 @@ import {
   type AgentSession,
   type AgentSessionEvent,
   type CreateAgentSessionOptions,
+  type ToolDefinition,
 } from "@mariozechner/pi-coding-agent";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -68,6 +69,41 @@ export type EvalScore = z.infer<typeof TranscriptScoreSchema> & {
 
 type PiMessage = AgentSession["messages"][number];
 type PiTool = NonNullable<CreateAgentSessionOptions["tools"]>[number];
+type PiCustomTool = NonNullable<CreateAgentSessionOptions["customTools"]>[number];
+
+const CAPTCHA_WAIT_MS = 60_000;
+const EMPTY_TOOL_PARAMETERS = {
+  type: "object",
+  properties: {},
+  additionalProperties: false,
+} as unknown as ToolDefinition["parameters"];
+
+const solveCaptchaTool: ToolDefinition = {
+  name: "solve_captcha",
+  label: "solve_captcha",
+  description:
+    "Wait up to 1 minute for the configured hosted browser provider to automatically solve a CAPTCHA, bot check, or anti-bot challenge.",
+  promptSnippet:
+    "solve_captcha: wait up to 1 minute for the hosted browser provider to automatically solve a CAPTCHA, bot check, or anti-bot challenge.",
+  promptGuidelines: [
+    "If a browser task hits a CAPTCHA, bot check, access-denied page, or similar anti-bot challenge, call solve_captcha once and then inspect the same page again.",
+  ],
+  parameters: EMPTY_TOOL_PARAMETERS,
+  async execute(_toolCallId, _params, signal) {
+    const startedMs = Date.now();
+    await sleep(CAPTCHA_WAIT_MS, signal);
+    const waitedMs = Date.now() - startedMs;
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Waited ${Math.round(waitedMs / 1000)} seconds for CAPTCHA auto-solving. Check the page again before deciding whether the task is blocked.`,
+        },
+      ],
+      details: { waitedMs },
+    };
+  },
+};
 
 type PiUsageSummary = {
   inputTokens: number;
@@ -81,6 +117,7 @@ type PiUsageSummary = {
 export type PiEvalHarnessOptions = {
   cwd: string;
   model?: string;
+  browserProvider?: string | null;
   stopOnFinalResult?: boolean;
 };
 
@@ -100,6 +137,21 @@ function compactText(text: string, maxChars: number): string {
   const compact = text.replace(/\s+/g, " ").trim();
   if (compact.length <= maxChars) return compact;
   return `${compact.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -307,6 +359,7 @@ async function createPiEvalSession(opts: {
   cwd: string;
   model?: EvalModelSelector;
   tools?: PiTool[];
+  customTools?: PiCustomTool[];
 }): Promise<AgentSession> {
   const authStorage = AuthStorage.create();
   const modelRegistry = ModelRegistry.create(authStorage);
@@ -332,9 +385,8 @@ async function createPiEvalSession(opts: {
     resourceLoader,
     settingsManager,
     sessionManager: SessionManager.inMemory(opts.cwd),
-    tools:
-      opts.tools ??
-      ["read", "write", "edit", "bash"],
+    tools: opts.tools ?? ["read", "write", "edit", "bash", "solve_captcha"],
+    customTools: opts.customTools ?? (opts.tools ? [] : [solveCaptchaTool]),
   });
   return session;
 }
@@ -559,7 +611,7 @@ function parseJsonObject(text: string): unknown {
   return JSON.parse(candidate) as unknown;
 }
 
-async function scoreTranscript(opts: {
+export async function scoreTranscript(opts: {
   criteria: string[];
   cwd: string;
   model?: EvalModelSelector;
@@ -738,6 +790,7 @@ export class EvalResponse {
 export class PiEvalHarness {
   private readonly cwd: string;
   private readonly model: EvalModelSelector;
+  readonly browserProvider: string;
   private readonly stopOnFinalResult: boolean;
   private session: AgentSession | null = null;
 
@@ -746,6 +799,7 @@ export class PiEvalHarness {
     this.model = options.model
       ? parseModelSelector(options.model)
       : DEFAULT_EVAL_MODEL;
+    this.browserProvider = options.browserProvider ?? "local";
     this.stopOnFinalResult = options.stopOnFinalResult === true;
   }
 

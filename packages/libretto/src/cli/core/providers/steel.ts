@@ -8,6 +8,16 @@ type SteelSessionResponse = {
   sessionViewerUrl?: string;
 };
 
+const STEEL_STEALTH_SESSION_OPTIONS = {
+  solveCaptcha: true,
+  useProxy: true,
+  stealthConfig: {
+    humanizeInteractions: true,
+    autoCaptchaSolving: true,
+    skipFingerprintInjection: false,
+  },
+};
+
 export type SteelProviderOptions = {
   apiKey?: string;
 };
@@ -30,7 +40,7 @@ export function createSteelProvider(
           "steel-api-key": apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify(STEEL_STEALTH_SESSION_OPTIONS),
       });
       if (!resp.ok) {
         const body = await resp.text();

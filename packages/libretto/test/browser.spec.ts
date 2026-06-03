@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { openInput } from "../src/cli/commands/browser.js";
 import { normalizeDomain, normalizeUrl } from "../src/cli/core/browser.js";
 import { resolveProviderName } from "../src/cli/core/providers/index.js";
+import { createKernelProvider } from "../src/cli/core/providers/kernel.js";
 import { createLibrettoCloudProvider } from "../src/cli/core/providers/libretto-cloud.js";
 import { createSteelProvider } from "../src/cli/core/providers/steel.js";
 import { test } from "./fixtures.js";
@@ -161,7 +162,15 @@ describe("Steel provider", () => {
           "steel-api-key": "test-key",
           "Content-Type": "application/json",
         },
-        body: "{}",
+        body: JSON.stringify({
+          solveCaptcha: true,
+          useProxy: true,
+          stealthConfig: {
+            humanizeInteractions: true,
+            autoCaptchaSolving: true,
+            skipFingerprintInjection: false,
+          },
+        }),
       }),
     );
   });
@@ -275,6 +284,113 @@ describe("provider session guards", () => {
     );
     expect(result.stderr).toContain("already open");
     expect(result.stderr).toContain("kernel");
+  });
+});
+
+describe("Kernel provider", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("uses constructor options before environment defaults", async () => {
+    vi.stubEnv("KERNEL_API_KEY", "env-key");
+    vi.stubEnv("KERNEL_HEADLESS", "false");
+    vi.stubEnv("KERNEL_STEALTH", "false");
+    vi.stubEnv("KERNEL_TIMEOUT_SECONDS", "111");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/browsers") {
+          return jsonResponse({
+            session_id: "kernel-session",
+            cdp_ws_url: "wss://kernel.example.test/cdp",
+            browser_live_view_url: "https://kernel.example.test/live",
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await createKernelProvider({
+      apiKey: "constructor-key",
+      headless: true,
+      stealth: true,
+      timeoutSeconds: 222,
+    }).createSession();
+
+    expect(session).toEqual({
+      sessionId: "kernel-session",
+      cdpEndpoint: "wss://kernel.example.test/cdp",
+      liveViewUrl: "https://kernel.example.test/live",
+      recordingUrl: undefined,
+    });
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
+      Authorization: "Bearer constructor-key",
+    });
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
+      headless: true,
+      stealth: true,
+      timeout_seconds: 222,
+    });
+  });
+
+  it("starts and stops replay recording when enabled", async () => {
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        const method = init?.method;
+        if (pathname === "/browsers" && method === "POST") {
+          return jsonResponse({
+            session_id: "kernel-recorded",
+            cdp_ws_url: "wss://kernel.example.test/recorded",
+            browser_live_view_url: "https://kernel.example.test/live",
+          });
+        }
+        if (pathname === "/browsers/kernel-recorded/replays") {
+          return jsonResponse({
+            replay_id: "replay-123",
+            replay_view_url: "https://kernel.example.test/replay",
+          });
+        }
+        if (
+          pathname === "/browsers/kernel-recorded/replays/replay-123/stop"
+        ) {
+          return new Response(null, { status: 200 });
+        }
+        if (pathname === "/browsers/kernel-recorded" && method === "DELETE") {
+          return new Response(null, { status: 200 });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const provider = createKernelProvider({
+      apiKey: "test-key",
+      enableRecording: true,
+    });
+
+    const session = await provider.createSession();
+    expect(session).toEqual({
+      sessionId: "kernel-recorded",
+      cdpEndpoint: "wss://kernel.example.test/recorded",
+      liveViewUrl: "https://kernel.example.test/live",
+      recordingUrl: "https://kernel.example.test/replay",
+    });
+
+    await expect(provider.closeSession("kernel-recorded")).resolves.toEqual({
+      replayUrl: "https://kernel.example.test/replay",
+    });
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname))
+      .toEqual([
+        "/browsers",
+        "/browsers/kernel-recorded/replays",
+        "/browsers/kernel-recorded/replays/replay-123/stop",
+        "/browsers/kernel-recorded",
+      ]);
   });
 });
 

@@ -57,7 +57,7 @@ This approach combines your knowledge of the application (you drive the browser 
   <Step title="Review the generated workflow file">
     The agent writes a TypeScript file that exports a `workflow()`. Things to check:
 
-    - **Output type** matches what you asked for
+    - **Input/output schemas** match what you asked for
     - **Selectors** look reasonable (class names, data attributes, or ARIA roles, not brittle positional selectors)
     - **Parameterization**: values you typed during the demo should be replaced with input parameters, not hardcoded
     - **Wait logic**: if you mentioned something takes time to load, make sure there's a `waitForSelector` or similar

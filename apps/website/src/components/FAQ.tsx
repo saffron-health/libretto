@@ -1,7 +1,8 @@
 import { type ReactNode, useState } from "react";
-import { SectionHeading } from "./SectionHeading";
-import { Text } from "./Text";
-import { CrossfadeIcon } from "./CrossfadeIcon";
+import { SectionIntro } from "./SectionIntro.js";
+import { Text } from "./Text.js";
+import { CrossfadeIcon } from "./CrossfadeIcon.js";
+import { SiteSection } from "./SiteSection.js";
 import { REPO_URL, DISCORD_URL } from "../site";
 
 const linkClass = "underline text-accent hover:text-accent-bright transition-colors";
@@ -22,12 +23,18 @@ const faqs: FAQItem[] = [
         gives your coding agent a live browser and a CLI to inspect pages,
         capture network traffic, record user actions, and turn them into
         deterministic automation scripts. Check out the{" "}
-        <a href="/docs/get-started/quickstart" className={linkClass}>
+        <a href="/docs/get-started/quickstart" className={linkClass} data-fathom-event="FAQ docs click">
           docs
         </a>{" "}
         to get started.
       </>
     ),
+  },
+  {
+    id: "who",
+    question: "Who is Libretto good for?",
+    answer:
+      "Libretto is best for teams that need reliable workflows against websites where the official API is missing, incomplete, read-only, too slow to access, or does not support the action they need.\n\nGood fits include teams that:\n\n- Integrate with customer portals, EHRs, payer sites, government systems, financial dashboards, CRMs, or legacy admin tools.\n- Need to automate workflows that exist in the web UI but are not exposed through an API.\n- Need repeatable scripts that are faster, cheaper, and easier to debug than runtime browser agents.\n- Already use Playwright or browser agents, but want agents to help build and repair automation instead of making decisions on every run.\n\nLibretto is probably not the right tool if the API already covers the full workflow cleanly, or if you only need a one-off scrape.",
   },
   {
     id: "diff",
@@ -49,15 +56,15 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         The CLI has built-in support for{" "}
-        <a href="https://www.browserbase.com/" className={linkClass}>
+        <a href="https://www.browserbase.com/" className={linkClass} data-fathom-event="FAQ Browserbase click">
           Browserbase
         </a>{" "}
         and{" "}
-        <a href="https://www.kernel.computer/" className={linkClass}>
+        <a href="https://www.kernel.computer/" className={linkClass} data-fathom-event="FAQ Kernel click">
           Kernel
         </a>
         , and{" "}
-        <a href="https://steel.dev/" className={linkClass}>
+        <a href="https://steel.dev/" className={linkClass} data-fathom-event="FAQ Steel click">
           Steel
         </a>
         {" "}to spin up browser sessions directly. Libretto can also connect to any
@@ -73,7 +80,7 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         Yes, fully open source under the MIT license. You can find the code on{" "}
-        <a href={REPO_URL} className={linkClass}>
+        <a href={REPO_URL} className={linkClass} data-fathom-event="FAQ github click">
           GitHub
         </a>
         .
@@ -86,15 +93,15 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         Jump into our{" "}
-        <a href={DISCORD_URL} className={linkClass}>
+        <a href={DISCORD_URL} className={linkClass} data-fathom-event="FAQ discord click">
           Discord
         </a>{" "}
         for quick help, open an issue on{" "}
-        <a href={REPO_URL} className={linkClass}>
+        <a href={REPO_URL} className={linkClass} data-fathom-event="FAQ github click">
           GitHub
         </a>
         , or read through the{" "}
-        <a href="/docs/get-started/quickstart" className={linkClass}>
+        <a href="/docs/get-started/quickstart" className={linkClass} data-fathom-event="FAQ docs click">
           docs
         </a>
         .
@@ -137,6 +144,7 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
         className="flex w-full cursor-pointer items-center justify-between py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/30 rounded-sm"
         onClick={() => setIsExpanded(!isExpanded)}
         aria-expanded={isExpanded}
+        data-fathom-event={`FAQ ${item.id} toggle click`}
       >
         <Text size="md" className="font-medium text-ink">
           {item.question}
@@ -160,20 +168,20 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
 
 export function FAQ() {
   return (
-    <section className="section-crt px-8 py-24">
-      <div className="mx-auto flex max-w-[1000px] flex-col gap-12 md:flex-row md:gap-16">
-        <div className="md:w-1/2 md:shrink-0 md:pt-5">
-          <span className="mb-3 block font-mono text-base text-amber">// FAQ --</span>
-          <SectionHeading>
-            Frequently asked questions
-          </SectionHeading>
-        </div>
-        <div className="md:w-1/2 border-t border-ink/10">
-          {faqs.map((faq) => (
-            <FAQAccordionItem key={faq.id} item={faq} />
-          ))}
-        </div>
+    <SiteSection innerClassName="flex flex-col gap-12 md:flex-row md:gap-16">
+      <div className="md:w-1/2 md:shrink-0 md:pt-5">
+        <SectionIntro
+          align="left"
+          headingClassName="mb-0"
+          kicker="// FAQ --"
+          title="Frequently asked questions"
+        />
       </div>
-    </section>
+      <div className="border-t border-ink/10 md:w-1/2">
+        {faqs.map((faq) => (
+          <FAQAccordionItem key={faq.id} item={faq} />
+        ))}
+      </div>
+    </SiteSection>
   );
 }

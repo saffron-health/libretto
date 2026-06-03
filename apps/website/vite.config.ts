@@ -8,7 +8,10 @@ export default defineConfig({
   server: { allowedHosts: ["codybot.exe.xyz"] },
   build: {
     rollupOptions: {
-      input: fileURLToPath(new URL("./index.html", import.meta.url)),
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        brandKit: fileURLToPath(new URL("./brand-kit.html", import.meta.url)),
+      },
     },
   },
   lint: { options: { typeAware: true, typeCheck: true } },

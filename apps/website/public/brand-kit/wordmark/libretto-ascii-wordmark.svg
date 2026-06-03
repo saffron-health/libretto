@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1360" height="260" viewBox="0 0 1360 260">
+  <title>Libretto ASCII wordmark</title>
+  <rect width="1360" height="260" fill="transparent"/>
+  <text x="40" y="58" fill="#F0CF5A" font-family="Commit Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="28" font-weight="800" xml:space="preserve"> ██╗     ██╗██████╗ ██████╗ ███████╗████████╗████████╗ ██████╗</text>
+  <text x="40" y="92" fill="#F0CF5A" font-family="Commit Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="28" font-weight="800" xml:space="preserve"> ██║     ██║██╔══██╗██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔═══██╗</text>
+  <text x="40" y="126" fill="#F0CF5A" font-family="Commit Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="28" font-weight="800" xml:space="preserve"> ██║     ██║██████╔╝██████╔╝█████╗     ██║      ██║   ██║   ██║</text>
+  <text x="40" y="160" fill="#F0CF5A" font-family="Commit Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="28" font-weight="800" xml:space="preserve"> ██║     ██║██╔══██╗██╔══██╗██╔══╝     ██║      ██║   ██║   ██║</text>
+  <text x="40" y="194" fill="#F0CF5A" font-family="Commit Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="28" font-weight="800" xml:space="preserve"> ███████╗██║██████╔╝██║  ██║███████╗   ██║      ██║   ╚██████╔╝</text>
+  <text x="40" y="228" fill="#F0CF5A" font-family="Commit Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="28" font-weight="800" xml:space="preserve"> ╚══════╝╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝   ╚═╝      ╚═╝    ╚═════╝</text>
+</svg>

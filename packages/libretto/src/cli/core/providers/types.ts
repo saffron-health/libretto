@@ -5,6 +5,9 @@ export type ProviderSession = {
   // Only libretto-cloud surfaces this today; direct-SDK providers leave it
   // undefined.
   liveViewUrl?: string;
+  // Provider-hosted URL for watching the recording for this session. It may be
+  // available as soon as recording starts, before the provider has finalized it.
+  recordingUrl?: string;
   authProfileState?: {
     cookies?: unknown[];
     origins?: unknown[];

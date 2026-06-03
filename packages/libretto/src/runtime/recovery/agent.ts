@@ -5,7 +5,7 @@ import {
 } from "../../shared/logger/logger.js";
 import { generateObject, type LanguageModel } from "ai";
 
-type BrowserAction =
+export type BrowserAction =
   | { type: "click"; x: number; y: number; button?: string }
   | { type: "double_click"; x: number; y: number }
   | {
@@ -22,6 +22,35 @@ type BrowserAction =
   | { type: "drag"; path: { x: number; y: number }[] }
   | { type: "move"; x: number; y: number }
   | { type: "done" };
+
+export type RecoveryAgentStep = {
+  step: number;
+  reasoning: string;
+  action: BrowserAction;
+};
+
+export type RecoveryAgentStatus =
+  | "skipped"
+  | "no-action-needed"
+  | "action-taken"
+  | "incomplete";
+
+export type RecoveryAgentResult = {
+  status: RecoveryAgentStatus;
+  steps: RecoveryAgentStep[];
+};
+
+type ImageDimensions = {
+  width: number;
+  height: number;
+};
+
+type CoordinateScale = {
+  scaleX: number;
+  scaleY: number;
+  viewportWidth: number;
+  viewportHeight: number;
+};
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,6 +84,101 @@ const KEY_MAPPINGS: Record<string, string> = {
 
 function mapKeyName(key: string): string {
   return KEY_MAPPINGS[key.toUpperCase()] ?? key;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function scalePoint(
+  x: number,
+  y: number,
+  scale: CoordinateScale,
+): { x: number; y: number } {
+  return {
+    x: clamp(x * scale.scaleX, 0, Math.max(scale.viewportWidth - 1, 0)),
+    y: clamp(y * scale.scaleY, 0, Math.max(scale.viewportHeight - 1, 0)),
+  };
+}
+
+function scaleBrowserAction(
+  action: BrowserAction,
+  scale: CoordinateScale,
+): BrowserAction {
+  switch (action.type) {
+    case "click": {
+      const point = scalePoint(action.x, action.y, scale);
+      return { ...action, ...point };
+    }
+    case "double_click": {
+      const point = scalePoint(action.x, action.y, scale);
+      return { ...action, ...point };
+    }
+    case "scroll": {
+      const point = scalePoint(action.x, action.y, scale);
+      return {
+        ...action,
+        ...point,
+        scroll_x: action.scroll_x * scale.scaleX,
+        scroll_y: action.scroll_y * scale.scaleY,
+      };
+    }
+    case "drag":
+      return {
+        ...action,
+        path: action.path.map((point) => scalePoint(point.x, point.y, scale)),
+      };
+    case "move": {
+      const point = scalePoint(action.x, action.y, scale);
+      return { ...action, ...point };
+    }
+    case "keypress":
+    case "type":
+    case "wait":
+    case "screenshot":
+    case "done":
+      return action;
+  }
+}
+
+function readPngDimensions(buffer: Buffer): ImageDimensions {
+  const pngSignature = "89504e470d0a1a0a";
+  if (buffer.subarray(0, 8).toString("hex") !== pngSignature) {
+    throw new Error("Recovery screenshot is not a PNG image.");
+  }
+
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
+}
+
+async function takeViewportScreenshot(page: Page): Promise<{
+  screenshot: Buffer;
+  dimensions: ImageDimensions;
+  scale: CoordinateScale;
+}> {
+  const viewport = page.viewportSize();
+  if (!viewport) {
+    throw new Error("Viewport size not found");
+  }
+
+  const screenshot = await page.screenshot({
+    fullPage: false,
+    scale: "css",
+    timeout: 10000,
+  });
+  const dimensions = readPngDimensions(screenshot);
+  return {
+    screenshot,
+    dimensions,
+    scale: {
+      scaleX: viewport.width / dimensions.width,
+      scaleY: viewport.height / dimensions.height,
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+    },
+  };
 }
 
 async function executeBrowserAction(
@@ -144,35 +268,80 @@ const recoveryActionSchema = z.object({
   reasoning: z
     .string()
     .describe("Your reasoning about what you see and what action to take"),
-  action: z.discriminatedUnion("type", [
-    z.object({
-      type: z.literal("click"),
-      x: z.number(),
-      y: z.number(),
-    }),
-    z.object({
-      type: z.literal("type"),
-      text: z.string(),
-    }),
-    z.object({
-      type: z.literal("keypress"),
-      keys: z.array(z.string()),
-    }),
-    z.object({
-      type: z.literal("scroll"),
-      x: z.number(),
-      y: z.number(),
-      scroll_x: z.number(),
-      scroll_y: z.number(),
-    }),
-    z.object({
-      type: z.literal("wait"),
-    }),
-    z.object({
-      type: z.literal("done"),
-    }),
-  ]),
+  action: z.object({
+    type: z
+      .enum(["click", "type", "keypress", "scroll", "wait", "done"])
+      .describe("The browser action to execute."),
+    x: z
+      .number()
+      .nullable()
+      .describe("The screenshot pixel x coordinate for click/scroll."),
+    y: z
+      .number()
+      .nullable()
+      .describe("The screenshot pixel y coordinate for click/scroll."),
+    text: z.string().nullable().describe("Text for type actions."),
+    keys: z
+      .array(z.string())
+      .nullable()
+      .describe("Keys for keypress actions."),
+    scroll_x: z.number().nullable().describe("Horizontal scroll delta."),
+    scroll_y: z.number().nullable().describe("Vertical scroll delta."),
+  }),
 });
+
+function numberOrThrow(value: number | null, field: string): number {
+  if (typeof value === "number") return value;
+  throw new Error(`Recovery action is missing ${field}.`);
+}
+
+function normalizeRecoveryAction(
+  action: z.infer<typeof recoveryActionSchema>["action"],
+): BrowserAction {
+  switch (action.type) {
+    case "click":
+      return {
+        type: "click",
+        x: numberOrThrow(action.x, "x"),
+        y: numberOrThrow(action.y, "y"),
+      };
+    case "type":
+      return { type: "type", text: action.text ?? "" };
+    case "keypress":
+      return { type: "keypress", keys: action.keys ?? [] };
+    case "scroll":
+      return {
+        type: "scroll",
+        x: numberOrThrow(action.x, "x"),
+        y: numberOrThrow(action.y, "y"),
+        scroll_x: numberOrThrow(action.scroll_x, "scroll_x"),
+        scroll_y: numberOrThrow(action.scroll_y, "scroll_y"),
+      };
+    case "wait":
+      return { type: "wait" };
+    case "done":
+      return { type: "done" };
+  }
+}
+
+function getRecoveryStatus(steps: RecoveryAgentStep[]): RecoveryAgentStatus {
+  if (steps.length === 0) {
+    return "skipped";
+  }
+  const actionSteps = steps.filter((step) => step.action.type !== "done");
+  const completed = steps.at(-1)?.action.type === "done";
+  if (actionSteps.length === 0 && completed) {
+    return "no-action-needed";
+  }
+  if (completed) {
+    return "action-taken";
+  }
+  return "incomplete";
+}
+
+// A step is one screenshot -> model decision -> browser action cycle.
+// Three covers common popup flows like close/confirm/done while bounding cost.
+const DEFAULT_RECOVERY_MAX_STEPS = 3;
 
 /**
  * Executes a vision-based recovery agent to recover from browser automation failures.
@@ -184,23 +353,17 @@ export async function executeRecoveryAgent(
   instruction: string,
   logger?: MinimalLogger,
   model?: LanguageModel,
-): Promise<void> {
+  maxSteps = DEFAULT_RECOVERY_MAX_STEPS,
+): Promise<RecoveryAgentResult> {
   if (!model) {
-    return;
+    return { status: "skipped", steps: [] };
   }
   const log = logger ?? defaultLogger;
   log.info("Executing vision-based recovery agent", { instruction });
 
-  const viewport = page.viewportSize();
-  if (!viewport) {
-    throw new Error("Viewport size not found");
-  }
-
-  let screenshot: string;
+  let screenshotState: Awaited<ReturnType<typeof takeViewportScreenshot>>;
   try {
-    screenshot = (
-      await page.screenshot({ fullPage: false, timeout: 10000 })
-    ).toString("base64");
+    screenshotState = await takeViewportScreenshot(page);
   } catch (screenshotError) {
     log.warn("Failed to take screenshot for recovery agent, skipping", {
       screenshotError:
@@ -211,8 +374,9 @@ export async function executeRecoveryAgent(
     throw new Error("Failed to take screenshot for recovery agent");
   }
 
-  const maxSteps = 3;
+  const steps: RecoveryAgentStep[] = [];
   for (let step = 1; step <= maxSteps; step++) {
+    const { screenshot, dimensions, scale } = screenshotState;
     const { object: result } = await generateObject({
       model,
       schema: recoveryActionSchema,
@@ -226,12 +390,12 @@ export async function executeRecoveryAgent(
 
 Your task: ${instruction}
 
-Viewport: ${viewport.width}x${viewport.height}px. Complete this in as few steps as possible.
+Screenshot: ${dimensions.width}x${dimensions.height}px. Coordinates must be screenshot pixel coordinates relative to the top-left corner of the screenshot. Complete this in as few steps as possible.
 Analyze the screenshot and decide what action to take. If the task is complete or no action is needed, use the "done" action type.`,
             },
             {
               type: "image",
-              image: `data:image/png;base64,${screenshot}`,
+              image: screenshot,
             },
           ],
         },
@@ -239,24 +403,37 @@ Analyze the screenshot and decide what action to take. If the task is complete o
       temperature: 0,
     });
 
+    const imageAction = normalizeRecoveryAction(result.action);
+    const action = scaleBrowserAction(imageAction, scale);
     log.info(`Recovery step ${step}/${maxSteps}`, {
       reasoning: result.reasoning,
-      action: result.action,
+      imageAction,
+      action,
+      screenshot: dimensions,
+      scale,
+    });
+    steps.push({
+      step,
+      reasoning: result.reasoning,
+      action,
     });
 
-    if (result.action.type === "done") {
+    if (action.type === "done") {
       log.info("Recovery agent completed - no more actions needed");
       break;
     }
 
-    await executeBrowserAction(page, result.action, log);
+    await executeBrowserAction(page, action, log);
     await delay(2000);
 
-    // Take new screenshot for next iteration
-    screenshot = (await page.screenshot({ fullPage: false })).toString(
-      "base64",
-    );
+    if (step < maxSteps) {
+      screenshotState = await takeViewportScreenshot(page);
+    }
   }
 
   log.info("Recovery agent execution completed");
+  return {
+    status: getRecoveryStatus(steps),
+    steps,
+  };
 }

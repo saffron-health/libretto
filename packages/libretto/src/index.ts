@@ -29,13 +29,33 @@ export {
 } from "./shared/state/index.js";
 
 // Recovery
-export { executeRecoveryAgent } from "./runtime/recovery/agent.js";
+export {
+  executeRecoveryAgent,
+  type BrowserAction,
+  type RecoveryAgentResult,
+  type RecoveryAgentStep,
+} from "./runtime/recovery/agent.js";
 export { attemptWithRecovery } from "./runtime/recovery/recovery.js";
 export {
   detectSubmissionError,
   type KnownSubmissionError,
   type DetectedSubmissionError,
 } from "./runtime/recovery/errors.js";
+export {
+  COMPUTER_USE_RECOVERY_MODELS,
+  POPUP_RECOVERY_INSTRUCTION,
+  computerUseRecoveryAction,
+  createRecoveryPage,
+  popupRecoveryAction,
+  type ComputerUseRecoveryActionOptions,
+  type PopupRecoveryActionOptions,
+  type RecoveryActionContext,
+  type RecoveryAction,
+  type RecoveryActionHandler,
+  type RecoveryActionOptions,
+  type RecoveryActionResult,
+  type RecoveryActionTargetType,
+} from "./runtime/recovery/page-fallbacks.js";
 
 // AI extraction
 export {
@@ -109,7 +129,7 @@ export {
   type ExportedLibrettoWorkflow,
   type LibrettoWorkflowContext,
   type LibrettoWorkflowHandler,
-  type LibrettoWorkflowSchemas,
+  type LibrettoWorkflowOptions,
   type WorkflowInputValidator,
 } from "./shared/workflow/workflow.js";
 const isDirectExecution = (): boolean => {

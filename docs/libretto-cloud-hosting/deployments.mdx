@@ -97,13 +97,18 @@ After the deployment finishes, call the hosted jobs endpoint with the workflow n
 ```ts theme={null}
 // src/workflows/check-eligibility.ts
 import { workflow } from "libretto";
+import { z } from "zod";
 
-type Input = {
-  memberId: string;
-};
-
-export default workflow<Input, { status: string }>(
+export default workflow(
   "check-eligibility",
+  {
+    input: z.object({
+      memberId: z.string(),
+    }),
+    output: z.object({
+      status: z.string(),
+    }),
+  },
   async ({ page }, input) => {
     await page.goto("https://example.com/eligibility");
 
@@ -114,7 +119,7 @@ export default workflow<Input, { status: string }>(
 );
 ```
 
-then hit the endpoint with `workflow: "check-eligibility"`:
+then hit the endpoint with `workflow: "check-eligibility"`. The `params` object must match the workflow input schema:
 
 ```bash theme={null}
 curl -X POST "https://api.libretto.sh/v1/jobs/create" \

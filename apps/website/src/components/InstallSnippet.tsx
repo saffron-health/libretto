@@ -22,6 +22,7 @@ export function InstallSnippet() {
         onClick={handleCopy}
         aria-label="Copy Libretto setup prompt"
         className="install-prompt__button"
+        data-fathom-event="Hero copy prompt click"
       >
         {copied ? "Copied" : "Copy prompt"}
       </Button>
