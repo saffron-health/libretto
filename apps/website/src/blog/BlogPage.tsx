@@ -1,4 +1,4 @@
-import { Children } from "react";
+import { Children, useEffect } from "react";
 import type * as React from "react";
 import Prism from "prismjs";
 import "prismjs/components/prism-bash.js";
@@ -9,7 +9,12 @@ import { Button } from "../components/Button";
 import { Footer } from "../components/Footer";
 import { Navbar } from "../components/Navbar";
 import { Text } from "../components/Text";
-import { buildBlogPostJsonLd, serializeJsonLd } from "./jsonLd";
+import {
+  buildBlogPostJsonLd,
+  getAbsoluteBlogPostImageUrl,
+  getAbsoluteBlogPostUrl,
+  serializeJsonLd,
+} from "./jsonLd";
 import { BLOG_POSTS, getBlogPost, type BlogPost } from "./posts";
 
 const BLOG_LOGO = String.raw`
@@ -80,6 +85,50 @@ function BlogPostStructuredData({ post }: { post: BlogPost }) {
       {jsonLd}
     </script>
   );
+}
+
+function setMetaContent(selector: string, content: string) {
+  let element = document.head.querySelector<HTMLMetaElement>(selector);
+  if (!element) {
+    element = document.createElement("meta");
+    const property = selector.match(/\[property="([^"]+)"\]/)?.[1];
+    const name = selector.match(/\[name="([^"]+)"\]/)?.[1];
+
+    if (property) {
+      element.setAttribute("property", property);
+    }
+    if (name) {
+      element.setAttribute("name", name);
+    }
+
+    document.head.append(element);
+  }
+
+  element.content = content;
+}
+
+function BlogPostMeta({ post }: { post: BlogPost }) {
+  useEffect(() => {
+    const title = `${post.title} | Libretto Blog`;
+    const url = getAbsoluteBlogPostUrl(post);
+    const imageUrl = getAbsoluteBlogPostImageUrl(post);
+
+    document.title = title;
+    setMetaContent('meta[name="description"]', post.description);
+    setMetaContent('meta[property="og:type"]', "article");
+    setMetaContent('meta[property="og:title"]', title);
+    setMetaContent('meta[property="og:description"]', post.description);
+    setMetaContent('meta[property="og:url"]', url);
+    setMetaContent('meta[property="og:image"]', imageUrl);
+    setMetaContent('meta[property="og:image:width"]', "1200");
+    setMetaContent('meta[property="og:image:height"]', "630");
+    setMetaContent('meta[name="twitter:card"]', "summary_large_image");
+    setMetaContent('meta[name="twitter:title"]', title);
+    setMetaContent('meta[name="twitter:description"]', post.description);
+    setMetaContent('meta[name="twitter:image"]', imageUrl);
+  }, [post]);
+
+  return null;
 }
 
 function getCodeLanguage(className: string | undefined): string | undefined {
@@ -288,6 +337,7 @@ export function BlogPostPage({ slug }: { slug: string }) {
 
   return (
     <BlogShell>
+      <BlogPostMeta post={post} />
       <BlogPostStructuredData post={post} />
       <article className="mx-auto max-w-[760px] pt-8 pb-20">
         <AppLink

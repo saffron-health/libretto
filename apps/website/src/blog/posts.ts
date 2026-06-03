@@ -10,12 +10,14 @@ type BlogPostInput = {
 };
 
 export type BlogPost = BlogPostInput & {
+  ogImage: string;
   mdast: ReturnType<typeof mdxParse>;
 };
 
 function createBlogPost(post: BlogPostInput): BlogPost {
   return {
     ...post,
+    ogImage: `/blog/${post.slug}/og-image.png`,
     mdast: mdxParse(post.markdown),
   };
 }

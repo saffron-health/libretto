@@ -11,7 +11,8 @@
     "preview": "vp preview",
     "lint": "vp lint && lintcn lint --tsconfig tsconfig.json",
     "check": "vp check",
-    "knip": "knip --cache --files --exports"
+    "knip": "knip --cache --files --exports",
+    "render-blog-og": "node scripts/render-blog-og-images.mjs"
   },
   "dependencies": {
     "@orama/orama": "^3.1.18",
