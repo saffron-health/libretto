@@ -126,7 +126,7 @@ export function Pricing() {
           <CloudOnlyNote />
           <Text as="p" size="sm" className="leading-relaxed text-muted [text-wrap:pretty]">
             Usage is measured by hosted browser session time at{" "}
-            <span className="text-ink">$0.25 per browser hour</span>. Manage
+            <span className="text-ink">$0.25 per browser-hour</span>. Manage
             plans, invoices, and payment methods from the Libretto billing
             portal.
           </Text>
