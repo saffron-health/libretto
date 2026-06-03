@@ -103,8 +103,10 @@ This brings us to Libretto, which is trying to solve a specific gap in the map: 
 Libretto is a skill and CLI for coding agents that helps them build and maintain browser automation code. You give your coding agent access to Libretto (just tell it to "fetch and follow [https://libretto.sh/start.md](https://libretto.sh/start.md)"), then ask it for a workflow, like "open Craigslist and tell me what the first 10 entries on the lost+found page are", or record the actions you want to automate. Your agent uses Libretto to turn that exploration into fast, cheap, deterministic automation code.
 
 \`\`\`bash
-codex exec \\
-  "Use the Libretto skill. Open Craigslist and return the first 10 entries on the lost+found page."
+codex exec - <<'PROMPT'
+Use the Libretto skill to open Craigslist.
+Return the first 10 entries on the lost+found page.
+PROMPT
 
 # Once the agent writes the workflow, run it like normal automation:
 npx libretto run src/workflows/craigslist-lost-found.ts --headless
