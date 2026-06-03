@@ -92,6 +92,8 @@ This category matters because it moves browser agents closer to everyday browsin
 
 The tradeoff is that these tools are usually optimized for a person sitting in front of the browser. They are not a clean way to ship a repeatable workflow, expose it as an API, or debug it later. They make the browser feel more capable, but they do not necessarily turn a messy browser task into maintainable automation.
 
+![ChatGPT Atlas showing agent mode in a browser with an Instacart page and ChatGPT sidebar](/blog/ai-browser-automation-tooling/chatgpt-atlas.webp)
+
 ## Category 4: full browser agents
 
 *Examples:* [Browser Use](https://www.browser-use.tech/), [OpenAI Operator](https://openai.com/index/introducing-operator/), [Claude computer use](https://www.anthropic.com/news/3-5-models-and-computer-use).
