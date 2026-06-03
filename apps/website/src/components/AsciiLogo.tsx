@@ -1,5 +1,5 @@
-import { LibrettoAsciiWordmark } from "../brand.js";
+import { AsciiLibretto } from "../brand.js";
 
 export function AsciiLogo({ className = "" }: { className?: string }) {
-  return <LibrettoAsciiWordmark className={className} />;
+  return <AsciiLibretto className={className} />;
 }

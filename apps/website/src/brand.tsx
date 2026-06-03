@@ -3,7 +3,7 @@ import type { ComponentPropsWithoutRef } from "react";
 export const LIBRETTO_NAME = "Libretto";
 export const LIBRETTO_LOGO_DARK_SRC = "/logos/logo-dark.svg";
 export const LIBRETTO_LOGO_LIGHT_SRC = "/logos/logo-light.svg";
-export const LIBRETTO_WORDMARK_SRC =
+export const ASCII_LIBRETTO_WORDMARK_SRC =
   "/brand-kit/wordmark/libretto-ascii-wordmark.svg";
 
 export const BROWSER_AGENTS_SCRIPT_JOB_TEXT =
@@ -53,6 +53,7 @@ export const BROWSER_AGENTS_SCRIPT_JOB_COMPACT_ASCII = createCompactAscii(
 );
 
 type ImageProps = Omit<ComponentPropsWithoutRef<"img">, "src">;
+type TextMarkProps = ComponentPropsWithoutRef<"span">;
 
 export function LibrettoLogoMark({
   alt = "",
@@ -69,13 +70,20 @@ export function LibrettoLogoMark({
 }
 
 export function LibrettoWordmark({
-  alt = LIBRETTO_NAME,
+  className = "",
   ...props
-}: ImageProps) {
-  return <img {...props} src={LIBRETTO_WORDMARK_SRC} alt={alt} />;
+}: TextMarkProps) {
+  return (
+    <span
+      {...props}
+      className={`font-serif font-[400] leading-none tracking-[0] text-ink ${className}`.trim()}
+    >
+      {LIBRETTO_NAME}
+    </span>
+  );
 }
 
-export function LibrettoAsciiWordmark({
+export function AsciiLibretto({
   className = "",
   decorative = false,
 }: {

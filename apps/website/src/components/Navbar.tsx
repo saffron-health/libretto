@@ -138,8 +138,8 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
       <div className="relative mx-auto flex max-w-[800px] items-center justify-between">
         <div className="flex items-center gap-10">
           <AppLink href="/" className="flex items-center gap-2 no-underline">
-            <LibrettoLogoMark variant="dark" className="size-6 shrink-0" />
-            <LibrettoWordmark className="h-7 w-auto shrink-0" />
+            <LibrettoLogoMark variant="dark" className="size-[1.35rem] shrink-0" />
+            <LibrettoWordmark className="shrink-0 text-[1.5rem]" />
           </AppLink>
           <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
             <GlitchNavLink href="/blog" external={false} fathomEvent="Nav blog click">
