@@ -170,6 +170,39 @@ function Code({ children, className }: React.HTMLAttributes<HTMLElement>) {
   );
 }
 
+function hasCodeMetaFlag(meta: string | null | undefined, flag: string): boolean {
+  return meta?.split(/\s+/).includes(flag) ?? false;
+}
+
+function CodeBlock({
+  code,
+  language,
+  wrap = false,
+}: {
+  code: string;
+  language?: string;
+  wrap?: boolean;
+}) {
+  const preClassName = [
+    "mb-8 rounded-md border border-amber/25 bg-[#17130d] p-4 font-mono text-sm leading-relaxed text-ink",
+    wrap ? "overflow-x-hidden whitespace-pre-wrap break-words" : "overflow-x-auto",
+  ].join(" ");
+
+  if (!language) {
+    return (
+      <pre className={preClassName}>
+        <code className="font-mono text-sm text-[#e6edf3]">{code}</code>
+      </pre>
+    );
+  }
+
+  return (
+    <pre className={preClassName}>
+      <Code className={`language-${language}`}>{code}</Code>
+    </pre>
+  );
+}
+
 export function BlogIndexPage() {
   return (
     <BlogShell>
@@ -360,6 +393,19 @@ export function BlogPostPage({ slug }: { slug: string }) {
             markdown={post.markdown}
             mdast={post.mdast}
             components={markdownComponents}
+            renderNode={(node) => {
+              if (node.type !== "code") {
+                return undefined;
+              }
+
+              return (
+                <CodeBlock
+                  code={node.value}
+                  language={node.lang ?? undefined}
+                  wrap={hasCodeMetaFlag(node.meta, "wrap")}
+                />
+              );
+            }}
           />
         </div>
       </article>
