@@ -82,6 +82,8 @@ They are great for local coding work but not the right tool if you need browser 
 
 ## Category 3: full browser agents
 
+*Examples:* [Browser Use](https://www.browser-use.tech/), [OpenAI Operator](https://openai.com/index/introducing-operator/), [Claude computer use](https://www.anthropic.com/news/3-5-models-and-computer-use).
+
 A browser agent is basically an agent with access to a browser tool, with the sole purpose of performing some goal workflow on the browser and often running in the cloud.
 
 The difference from the previous category is who owns the loop. Tools like Playwright MCP give your local coding agent browser access while it is building or debugging, giving you full control. A full browser agent is often a paid managed service from a provider.
@@ -92,11 +94,15 @@ That makes browser agents useful for workflows where the path is not fixed, like
 
 ## Category 4: browser cloud infra providers
 
+*Examples:* [Browserbase](https://www.browserbase.com/), [Kernel](https://www.kernel.sh/), [Steel](https://steel.dev/).
+
 Browser cloud providers are the infrastructure layer. They give you hosted browser sessions, plus the operational pieces that get annoying once a workflow leaves your laptop: persistence, logs, recordings, proxies, captcha-solving and auto-scaling.
 
 You can host simple browser automation scripts yourself via a Chromium docker container or similar, but adding in everything that makes production browser infra is worth outsourcing to a managed service.
 
 ## Category 5: agent-assisted automation tools
+
+*Examples:* [Libretto](https://libretto.sh/).
 
 This brings us to Libretto, which is trying to solve a specific gap in the map: how do you get the ease-of-use of an agent exploring a workflow, but end up with something closer to a fast, cheap, reliable automation script?
 
