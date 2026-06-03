@@ -102,6 +102,15 @@ This brings us to Libretto, which is trying to solve a specific gap in the map: 
 
 Libretto is a skill and CLI for coding agents that helps them build and maintain browser automation code. You give your coding agent access to Libretto (just tell it to "fetch and follow [https://libretto.sh/start.md](https://libretto.sh/start.md)"), then ask it for a workflow, like "open Craigslist and tell me what the first 10 entries on the lost+found page are", or record the actions you want to automate. Your agent uses Libretto to turn that exploration into fast, cheap, deterministic automation code.
 
+\`\`\`bash
+# In your coding agent:
+# "Use the Libretto skill. Open Craigslist and return the first 10
+# entries on the lost+found page."
+
+# Once the agent writes the workflow, run it like normal automation:
+npx libretto run src/workflows/craigslist-lost-found.ts --headless
+\`\`\`
+
 With a browser agent, you pay for the model to reason through the task every time. With Libretto, you pay that cost once while the workflow is being authored. After that, the workflow can run in the cloud as normal automation, with no token cost on every run.
 
 Libretto is best when the workflow is worth keeping around. If you only need to do something once, a browser agent is probably simpler. But if the same flow needs to run again, be debugged later, or become part of a product, it is better to have code and traces you can inspect instead of a fresh agent run and a prayer every time.
