@@ -111,7 +111,7 @@ export function MobileMenu({ stars }: { stars: string | null }) {
             <MenuItem href="/blog" className={itemClass} data-fathom-event="Mobile nav blog click">
               Blog
             </MenuItem>
-            <MenuItem href="#pricing" className={itemClass} data-fathom-event="Mobile nav pricing click">
+            <MenuItem href="/#pricing" className={itemClass} data-fathom-event="Mobile nav pricing click">
               Pricing
             </MenuItem>
             <MenuItem
