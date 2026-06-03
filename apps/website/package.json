@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vp dev",
     "brand-kit": "vp dev --host 0.0.0.0 --port 5174",
-    "build": "tsc --noEmit && vp build",
+    "build": "tsc --noEmit && vp build && node scripts/blog-og-metadata.mjs generate",
     "type-check": "tsc --noEmit",
     "preview": "vp preview",
-    "lint": "vp lint && lintcn lint --tsconfig tsconfig.json",
+    "lint": "vp lint && lintcn lint --tsconfig tsconfig.json && node scripts/blog-og-metadata.mjs check",
     "check": "vp check",
     "knip": "knip --cache --files --exports",
+    "check:blog-og": "node scripts/blog-og-metadata.mjs check",
+    "generate-blog-html": "node scripts/blog-og-metadata.mjs generate",
     "render-blog-og": "node scripts/render-blog-og-images.mjs"
   },
   "dependencies": {
