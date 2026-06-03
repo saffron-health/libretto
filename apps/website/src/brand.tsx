@@ -92,8 +92,8 @@ export function LibrettoLogoAndName({
   ...props
 }: LogoAndNameProps) {
   return (
-    <span {...props} className={`flex items-center gap-2 ${className}`.trim()}>
-      <LibrettoLogoMark variant={variant} className="size-[1.35rem] shrink-0" />
+    <span {...props} className={`flex items-center gap-1 ${className}`.trim()}>
+      <LibrettoLogoMark variant={variant} className="size-6 shrink-0" />
       <LibrettoWordmark className="shrink-0 text-[1.35rem]" />
     </span>
   );
