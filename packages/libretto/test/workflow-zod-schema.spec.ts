@@ -53,6 +53,26 @@ describe("workflow() with Zod schemas", () => {
     expect(result).toEqual({ pageTitle: "ok", finalUrl: "https://example.com" });
   });
 
+  it("accepts input and output schemas in the options object", async () => {
+    const wf = workflow("options-object", {
+      input: inputSchema,
+      output: outputSchema,
+      handler: async (_ctx, input) => ({
+        pageTitle: "ok",
+        finalUrl: input.url,
+      }),
+    });
+
+    expect(wf.inputSchema).toBe(inputSchema);
+    expect(wf.outputSchema).toBe(outputSchema);
+    await expect(
+      wf.run(fakeCtx, { url: "https://example.com" }),
+    ).resolves.toEqual({
+      pageTitle: "ok",
+      finalUrl: "https://example.com",
+    });
+  });
+
   it("throws LibrettoWorkflowInputError with a field-by-field message when input is invalid", async () => {
     let handlerCalled = false;
     const wf = workflow(
