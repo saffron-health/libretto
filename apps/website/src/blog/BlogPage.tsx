@@ -339,7 +339,7 @@ export function BlogPostPage({ slug }: { slug: string }) {
     <BlogShell>
       <BlogPostMeta post={post} />
       <BlogPostStructuredData post={post} />
-      <article className="mx-auto max-w-[760px] pt-8 pb-20">
+      <article className="mx-auto max-w-[800px] pt-8 pb-20">
         <AppLink
           href="/blog"
           className="mb-10 inline-block text-sm text-muted/70 no-underline transition-colors hover:text-accent-bright"
