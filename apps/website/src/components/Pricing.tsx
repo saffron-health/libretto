@@ -29,12 +29,12 @@ const plans = [
     price: "$100",
     cadence: "per month",
     hours: "400",
-    note: "Shared capacity for teams running regular cloud jobs.",
+    note: "Shared capacity for teams running regular cloud jobs. BAA included.",
   },
   {
     name: "Enterprise",
     price: "Custom",
-    cadence: "team@libretto.sh",
+    cadence: "Contact team@libretto.sh",
     note: "BAA support, custom capacity, and deployment guidance.",
   },
 ];
@@ -49,13 +49,9 @@ function PlanCard({ plan }: { plan: (typeof plans)[number] }) {
           : "border-ink/10 bg-panel",
       ].join(" ")}
     >
-      {plan.featured ? (
-        <div className="absolute right-5 top-5 font-mono text-[10px] uppercase text-accent-bright">
-          POPULAR
-        </div>
-      ) : null}
-      <Text as="h3" size="xl" className="mb-4 font-medium text-ink">
-        {plan.name}
+      <Text as="h3" size="lg" className="mb-4 flex items-center justify-between gap-3 text-ink">
+        <span>{plan.name}</span>
+        {plan.featured ? <span className="text-accent-bright">[Popular]</span> : null}
       </Text>
       <div className="mb-5">
         <Text
@@ -72,15 +68,21 @@ function PlanCard({ plan }: { plan: (typeof plans)[number] }) {
         </Text>
       </div>
       {plan.hours ? (
-        <div className="mb-4 flex items-baseline gap-2 border-t border-ink/10 pt-4">
-          <Text as="span" size="2xl" className="font-medium text-accent-bright">
-            {plan.hours}
-          </Text>
-          <Text as="span" size="xs" className="text-muted">
-            browser {plan.hours === "1" ? "hour" : "hours"} included
+        <div className="mb-4 border-t border-ink/10 pt-4">
+          <div className="flex items-baseline gap-2">
+            <Text as="span" size="2xl" className="font-medium text-accent-bright">
+              {plan.hours}
+            </Text>
+            <Text as="span" size="xs" className="text-muted">
+              browser {plan.hours === "1" ? "hour" : "hours"} included
+            </Text>
+          </div>
+          <Text as="div" size="xs" className="mt-1 text-ink">
+            $0.25 per browser-hour
           </Text>
         </div>
       ) : null}
+      {!plan.hours ? <div className="mb-4 border-t border-ink/10 pt-4" /> : null}
       <Text as="p" size="sm" className="mt-auto leading-relaxed text-muted">
         {plan.note}
       </Text>
@@ -122,8 +124,10 @@ export function Pricing() {
         <div className="space-y-4">
           <CloudOnlyNote />
           <Text as="p" size="sm" className="leading-relaxed text-muted [text-wrap:pretty]">
-            Usage is measured by hosted browser session time. Manage plans,
-            invoices, and payment methods from the Libretto billing portal.
+            Usage is measured by hosted browser session time at{" "}
+            <span className="text-ink">$0.25 per browser-hour</span>. Manage
+            plans, invoices, and payment methods from the Libretto billing
+            portal.
           </Text>
         </div>
         <div className="flex flex-col items-center justify-center gap-3">

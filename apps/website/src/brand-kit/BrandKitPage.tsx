@@ -1,6 +1,13 @@
 import { useRef, useState } from "react";
 import type * as React from "react";
-import { AsciiLogo } from "../components/AsciiLogo.js";
+import {
+  ASCII_LIBRETTO_WORDMARK_SRC,
+  AsciiLibretto,
+  BROWSER_AGENTS_SCRIPT_JOB_COMPACT_ASCII,
+  BROWSER_AGENTS_SCRIPT_JOB_TEXT,
+  LIBRETTO_LOGO_DARK_SRC,
+  LIBRETTO_LOGO_LIGHT_SRC,
+} from "../brand.js";
 import { CanvasAsciihedron } from "../components/CanvasAsciihedron.js";
 import { Kicker } from "../components/Kicker.js";
 import { Panel } from "../components/Panel.js";
@@ -10,7 +17,7 @@ import { SolidIcosahedron } from "./SolidIcosahedron.js";
 import { SOLID_ICOSAHEDRON_ROTATION } from "./solidIcosahedronGeometry.mjs";
 import type { SolidIcosahedronRotation } from "./solidIcosahedronGeometry.mjs";
 
-type BrandTab = "logos" | "asciihedron" | "wordmark" | "socials";
+type BrandTab = "logos" | "asciihedron" | "ascii-libretto" | "socials";
 type ThemeMode = "dark" | "light";
 type RotationAxis = keyof SolidIcosahedronRotation;
 type SocialAssetKind = "banner" | "profile";
@@ -98,7 +105,7 @@ const themeColors: Record<ThemeMode, CSSVarStyle> = {
 const tabs: { id: BrandTab; label: string }[] = [
   { id: "logos", label: "Logos" },
   { id: "asciihedron", label: "Asciihedron" },
-  { id: "wordmark", label: "Wordmark" },
+  { id: "ascii-libretto", label: "ASCII Libretto" },
   { id: "socials", label: "Socials" },
 ];
 
@@ -112,13 +119,13 @@ const logoStillAssets: DownloadAsset[] = [
   {
     label: "Light SVG",
     detail: "Light mode vector",
-    href: "/logos/logo-light.svg",
+    href: LIBRETTO_LOGO_LIGHT_SRC,
     download: "logo-light.svg",
   },
   {
     label: "Dark SVG",
     detail: "Dark mode vector",
-    href: "/logos/logo-dark.svg",
+    href: LIBRETTO_LOGO_DARK_SRC,
     download: "logo-dark.svg",
   },
 ];
@@ -186,11 +193,11 @@ const asciihedronMotionAssets: DownloadAsset[] = [
   },
 ];
 
-const wordmarkAssets: DownloadAsset[] = [
+const asciiLibrettoAssets: DownloadAsset[] = [
   {
     label: "SVG",
-    detail: "ASCII wordmark vector",
-    href: "/brand-kit/wordmark/libretto-ascii-wordmark.svg",
+    detail: "ASCII Libretto vector",
+    href: ASCII_LIBRETTO_WORDMARK_SRC,
     download: "libretto-ascii-wordmark.svg",
   },
   {
@@ -325,46 +332,15 @@ const ogImageAsset: ImageAsset = {
   height: 630,
 };
 
-const socialLogoHref = "/logos/logo-dark.svg";
-const socialHeadline = "DON'T MAKE BROWSER AGENTS DO A SCRIPT'S JOB";
-const socialHeadlineAscii = createCompactAscii(socialHeadline);
+const socialLogoHref = LIBRETTO_LOGO_DARK_SRC;
+const socialHeadline = BROWSER_AGENTS_SCRIPT_JOB_TEXT;
+const socialHeadlineAscii = BROWSER_AGENTS_SCRIPT_JOB_COMPACT_ASCII;
 const socialProfileLogoScale: Record<SocialPlatformId, number> = {
   instagram: 0.34,
   linkedin: 0.34,
   reddit: 0.36,
   x: 0.34,
 };
-
-function createCompactAscii(value: string) {
-  const glyphs: Record<string, string[]> = {
-    A: [" ██ ", "█  █", "████", "█  █", "█  █"],
-    B: ["███ ", "█  █", "███ ", "█  █", "███ "],
-    C: [" ███", "█   ", "█   ", "█   ", " ███"],
-    D: ["███ ", "█  █", "█  █", "█  █", "███ "],
-    E: ["████", "█   ", "███ ", "█   ", "████"],
-    G: [" ███", "█   ", "█ ██", "█  █", " ███"],
-    I: ["███", " █ ", " █ ", " █ ", "███"],
-    J: ["  ██", "   █", "   █", "█  █", " ██ "],
-    K: ["█  █", "█ █ ", "██  ", "█ █ ", "█  █"],
-    M: ["█   █", "██ ██", "█ █ █", "█   █", "█   █"],
-    N: ["█  █", "██ █", "█ ██", "█  █", "█  █"],
-    O: [" ██ ", "█  █", "█  █", "█  █", " ██ "],
-    P: ["███ ", "█  █", "███ ", "█   ", "█   "],
-    R: ["███ ", "█  █", "███ ", "█ █ ", "█  █"],
-    S: [" ███", "█   ", " ██ ", "   █", "███ "],
-    T: ["█████", "  █  ", "  █  ", "  █  ", "  █  "],
-    W: ["█   █", "█   █", "█ █ █", "██ ██", "█   █"],
-    "'": ["█", "█", " ", " ", " "],
-    " ": ["   ", "   ", "   ", "   ", "   "],
-  };
-  const characters = Array.from(value.toUpperCase());
-  return Array.from({ length: 5 }, (_, rowIndex) =>
-    characters
-      .map((character) => glyphs[character]?.[rowIndex] ?? character)
-      .join(" ")
-      .trimEnd(),
-  ).join("\n");
-}
 
 function ThemeButton({
   mode,
@@ -1216,16 +1192,16 @@ function AsciihedronTab({
   );
 }
 
-function WordmarkTab() {
+function AsciiLibrettoTab() {
   return (
     <BrandTabPanel
-      kicker="ASCII wordmark"
-      title="Libretto wordmark"
+      kicker="ASCII Libretto"
+      title="ASCII Libretto"
       description="Use the ASCII render for terminal-native moments, video title cards, and technical overlays."
       preview={
         <PreviewShell>
           <div className="w-full overflow-hidden px-4">
-            <AsciiLogo className="text-[8px] lg:text-[12px]" />
+            <AsciiLibretto className="text-[8px] lg:text-[12px]" />
           </div>
         </PreviewShell>
       }
@@ -1233,9 +1209,9 @@ function WordmarkTab() {
         <div className="grid gap-6">
           <div>
             <Text as="h3" size="md" className="mb-3 font-medium text-ink">
-              Wordmark exports
+              ASCII Libretto exports
             </Text>
-            <DownloadGrid assets={wordmarkAssets} />
+            <DownloadGrid assets={asciiLibrettoAssets} />
           </div>
           <div>
             <Text as="h3" size="md" className="mb-3 font-medium text-ink">
@@ -1756,7 +1732,7 @@ export function BrandKitPage() {
         {activeTab === "asciihedron" ? (
           <AsciihedronTab rotation={rotation} onRotationChange={setRotation} />
         ) : null}
-        {activeTab === "wordmark" ? <WordmarkTab /> : null}
+        {activeTab === "ascii-libretto" ? <AsciiLibrettoTab /> : null}
         {activeTab === "socials" ? <SocialsTab /> : null}
       </div>
     </main>

@@ -11,14 +11,23 @@ function getBlogPostUrl(post: Pick<BlogPost, "slug">): string {
   return `${BLOG_URL}/${post.slug}`;
 }
 
+export function getAbsoluteBlogPostUrl(post: Pick<BlogPost, "slug">): string {
+  return getBlogPostUrl(post);
+}
+
+export function getAbsoluteBlogPostImageUrl(post: Pick<BlogPost, "ogImage">): string {
+  return `${SITE_URL}${post.ogImage}`;
+}
+
 export function serializeJsonLd(value: JsonValue): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
 export function buildBlogPostJsonLd(
-  post: Pick<BlogPost, "description" | "publishedAt" | "slug" | "title">,
+  post: Pick<BlogPost, "description" | "ogImage" | "publishedAt" | "slug" | "title">,
 ): JsonValue {
   const postUrl = getBlogPostUrl(post);
+  const imageUrl = getAbsoluteBlogPostImageUrl(post);
 
   return {
     "@context": "https://schema.org",
@@ -44,6 +53,12 @@ export function buildBlogPostJsonLd(
         },
         datePublished: post.publishedAt,
         dateModified: post.publishedAt,
+        image: {
+          "@type": "ImageObject",
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+        },
         mainEntityOfPage: {
           "@type": "WebPage",
           "@id": postUrl,
