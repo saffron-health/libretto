@@ -34,10 +34,13 @@ export interface SolidIcosahedronLighting {
 }
 
 export const RADIANS: number;
+export const SOLID_ICOSAHEDRON_BASE_COLOR: Vec3;
+export const SOLID_ICOSAHEDRON_HIGHLIGHT_MIX: number;
 export const SOLID_ICOSAHEDRON_ROTATION: SolidIcosahedronRotation;
 export const SOLID_ICOSAHEDRON_SCALE: number;
 export const SOLID_ICOSAHEDRON_LIGHTING: SolidIcosahedronLighting;
 
+export function mixColorWithWhite(color: Vec3, amount: number): Vec3;
 export function normalize(vector: Vec3): Vec3;
 export function subtract(a: Vec3, b: Vec3): Vec3;
 export function cross(a: Vec3, b: Vec3): Vec3;

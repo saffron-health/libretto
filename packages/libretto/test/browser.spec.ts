@@ -162,7 +162,15 @@ describe("Steel provider", () => {
           "steel-api-key": "test-key",
           "Content-Type": "application/json",
         },
-        body: "{}",
+        body: JSON.stringify({
+          solveCaptcha: true,
+          useProxy: true,
+          stealthConfig: {
+            humanizeInteractions: true,
+            autoCaptchaSolving: true,
+            skipFingerprintInjection: false,
+          },
+        }),
       }),
     );
   });

@@ -1,23 +1,42 @@
 export const RADIANS = Math.PI / 180;
 
 export const SOLID_ICOSAHEDRON_ROTATION = Object.freeze({
-  x: 0,
+  x: 10,
   y: 144,
-  z: 18,
+  z: 25,
 });
 
 export const SOLID_ICOSAHEDRON_SCALE = 0.98;
+
+export const SOLID_ICOSAHEDRON_BASE_COLOR = Object.freeze([
+  249 / 255,
+  183 / 255,
+  0,
+]);
+
+export const SOLID_ICOSAHEDRON_HIGHLIGHT_MIX = 0.68;
+
+export function mixColorWithWhite([r, g, b], amount) {
+  return [
+    r + (1 - r) * amount,
+    g + (1 - g) * amount,
+    b + (1 - b) * amount,
+  ];
+}
 
 export const SOLID_ICOSAHEDRON_LIGHTING = Object.freeze({
   accentDirection: [-0.95, 0.65, 0.18],
   accentLight: 0.2,
   ambient: 0.36,
-  baseColor: [1, 0.79, 0.14],
+  baseColor: SOLID_ICOSAHEDRON_BASE_COLOR,
   diffuse: 1.08,
   faceGradient: 0.36,
   fillDirection: [-0.75, -0.45, 0.72],
   fillLight: 0.25,
-  highlightColor: [1, 0.93, 0.72],
+  highlightColor: mixColorWithWhite(
+    SOLID_ICOSAHEDRON_BASE_COLOR,
+    SOLID_ICOSAHEDRON_HIGHLIGHT_MIX,
+  ),
   lightDirection: [0.82, 0.79, 0.46],
   shininess: 23,
   specular: 0.62,

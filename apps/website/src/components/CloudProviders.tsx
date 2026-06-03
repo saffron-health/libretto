@@ -1,17 +1,13 @@
-import classnames from "classnames";
-import { useState } from "react";
 import { Text } from "./Text.js";
 import { Kicker } from "./Kicker.js";
-import { Panel } from "./Panel.js";
 import { SiteSection } from "./SiteSection.js";
+import { ShellCommand } from "./ShellCommand.js";
 import {
   AWSLogo,
   KernelLogo,
   BrowserbaseLogo,
   SteelLogo,
   GCPLogo,
-  CheckIcon,
-  CopyIcon,
 } from "../icons";
 
 const linkClass = "underline text-ink/70 transition-colors hover:text-ink";
@@ -24,53 +20,6 @@ const LOGOS = [
   <AWSLogo key="aws" className="h-9 w-auto text-ink/35" />,
   <GCPLogo key="gcp" className="h-8 w-auto text-ink/35" />,
 ];
-
-function CommandBox({ command }: { command: string }) {
-  const [copied, setCopied] = useState(false);
-  function handleCopy() {
-    void navigator.clipboard.writeText(command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-  return (
-    <Panel
-      padding="none"
-      radius="xl"
-      tone="accent"
-      className="relative px-5 py-4 pr-12 font-mono text-[13px] text-ink/80 shadow-sm"
-    >
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="copy-icon-btn absolute right-2.5 top-2.5 size-7 flex items-center justify-center rounded-lg"
-        data-fathom-event="Cloud deploy command copy"
-      >
-        <div className="relative size-[18px] shrink-0">
-          <div
-            className={classnames(
-              "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out",
-              copied ? "scale-100 opacity-100" : "scale-[0.25] opacity-0",
-            )}
-          >
-            <CheckIcon width={18} height={18} />
-          </div>
-          <div
-            className={classnames(
-              "absolute inset-0 flex items-center justify-center text-ink/50 transition-[opacity,filter,scale] duration-240 ease-in-out",
-              copied ? "scale-[0.25] opacity-0" : "scale-100 opacity-100",
-            )}
-          >
-            <CopyIcon width={18} height={18} className="translate-y-px" />
-          </div>
-        </div>
-      </button>
-      <div className="flex items-center">
-        <span className="w-4 select-none text-ink/20">$</span>
-        <span className="pl-2">{command}</span>
-      </div>
-    </Panel>
-  );
-}
 
 function LogoTile({
   children,
@@ -152,7 +101,11 @@ export function CloudProviders() {
             </li>
             <li>→ No browser pool to manage</li>
           </ul>
-          <CommandBox command={DEPLOY_COMMAND} />
+          <ShellCommand
+            ariaLabel="Copy cloud deploy command"
+            command={DEPLOY_COMMAND}
+            fathomEvent="Cloud deploy command copy"
+          />
           <a
             href="/docs/libretto-cloud-hosting/overview"
             className={`${linkClass} mt-4 inline-block font-mono text-xs`}

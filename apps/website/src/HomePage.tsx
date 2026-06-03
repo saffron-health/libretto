@@ -19,8 +19,10 @@ import { Footer } from "./components/Footer";
 import { VersionBadge } from "./components/VersionBadge";
 import { FeatureRows } from "./components/FeatureRows";
 import { BattleTestedBanner } from "./components/BattleTestedBanner";
+import { Benchmarks } from "./components/Benchmarks";
 import { MaintainingFeatures } from "./components/MaintainingFeatures";
 import { CloudProviders } from "./components/CloudProviders";
+import { Pricing } from "./components/Pricing.js";
 import { FAQ } from "./components/FAQ";
 import { CTA } from "./components/CTA";
 import { SectionDivider } from "./components/SectionDivider.js";
@@ -127,11 +129,15 @@ export function HomePage() {
         <SectionDivider />
         <FeatureRows />
         <SectionDivider />
+        <Benchmarks />
+        <SectionDivider />
         <BattleTestedBanner />
         <SectionDivider />
         <MaintainingFeatures />
         <SectionDivider />
         <CloudProviders />
+        <SectionDivider />
+        <Pricing />
         <SectionDivider />
         <FAQ />
         <SectionDivider />
