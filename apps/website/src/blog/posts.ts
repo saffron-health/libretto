@@ -42,14 +42,14 @@ This post is my attempt to map the landscape. Not every category is clean. A few
 
 ## Quick map
 
-| Category | What it does | Best for | Main tradeoff |
-| --- | --- | --- | --- |
-| Browser automation frameworks | You write RPA code that controls the browser directly. | Known workflows where you want deterministic code. | Powerful, but painful to author and maintain. |
-| Browser tools for coding agents | Give coding agents browser context and browser controls. | Local development, debugging, and testing. | Great feedback loop, but not production automation by itself. |
-| Agentic browsers | Put an AI assistant inside the browser you use directly. | Reading, summarizing, and acting across pages while a person is present. | Useful for interactive work, but not a durable automation surface. |
-| Full browser agents | Let an agent decide browser actions at runtime. | One-off or changing workflows where flexibility matters. | Slow, expensive, and harder to audit than a script. |
-| Browser cloud infra providers | Host browser sessions and production browser infrastructure. | Scale, persistence, proxies, recordings, and managed sessions. | Often paid service - but worth it if this is for your business. |
-| Agent-assisted automation tools | Turn browser exploration into durable, maintainable automation. | Repeated workflows that need to be maintained over time. | More setup than a live agent, but faster, cheaper and easier to inspect. |
+| Category | Examples | What it does | Best for | Main tradeoff |
+| --- | --- | --- | --- | --- |
+| Browser automation frameworks | Playwright, Selenium, Stagehand, UiPath | You write RPA code that controls the browser directly. | Known workflows where you want deterministic code. | Powerful, but painful to author and maintain. |
+| Browser tools for coding agents | Agent Browser, Playwright MCP | Give coding agents browser context and browser controls. | Local development, debugging, and testing. | Great feedback loop, but not production automation by itself. |
+| Agentic browsers | ChatGPT Atlas, Comet, Dia | Put an AI assistant inside the browser you use directly. | Reading, summarizing, and acting across pages while a person is present. | Useful for interactive work, but not a durable automation surface. |
+| Full browser agents | Browser Use, Operator, Claude computer use | Let an agent decide browser actions at runtime. | One-off or changing workflows where flexibility matters. | Slow, expensive, and harder to audit than a script. |
+| Browser cloud infra providers | Browserbase, Kernel, Steel | Host browser sessions and production browser infrastructure. | Scale, persistence, proxies, recordings, and managed sessions. | Often paid service - but worth it if this is for your business. |
+| Agent-assisted automation tools | Libretto | Turn browser exploration into durable, maintainable automation. | Repeated workflows that need to be maintained over time. | More setup than a live agent, but faster, cheaper and easier to inspect. |
 
 ## Category 1: browser automation frameworks
 
