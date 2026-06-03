@@ -49,13 +49,9 @@ function PlanCard({ plan }: { plan: (typeof plans)[number] }) {
           : "border-ink/10 bg-panel",
       ].join(" ")}
     >
-      {plan.featured ? (
-        <div className="absolute right-5 top-5 font-mono text-[10px] uppercase text-accent-bright">
-          POPULAR
-        </div>
-      ) : null}
-      <Text as="h3" size="xl" className="mb-4 font-medium text-ink">
-        {plan.name}
+      <Text as="h3" size="lg" className="mb-4 flex items-center justify-between gap-3 text-ink">
+        <span>{plan.name}</span>
+        {plan.featured ? <span className="text-accent-bright">[Popular]</span> : null}
       </Text>
       <div className="mb-5">
         <Text
