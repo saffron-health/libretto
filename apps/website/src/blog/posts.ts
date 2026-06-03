@@ -80,19 +80,29 @@ They are great for local coding work but not the right tool if you need browser 
 
 ![agent-browser homepage showing installation commands and features](/blog/ai-browser-automation-tooling/agent-browser.png)
 
-## Category 3: full browser agents
+## Category 3: agentic browsers
+
+*Examples:* [ChatGPT Atlas](https://openai.com/index/introducing-chatgpt-atlas/), [Perplexity Comet](https://www.perplexity.ai/comet), [Dia](https://www.diabrowser.com/).
+
+Agentic browsers are regular browsers with an AI assistant built into the browsing experience. Instead of asking an agent to open a separate browser somewhere else, you browse normally and the assistant can read the current page, summarize tabs, answer questions, or sometimes act on your behalf.
+
+This category matters because it moves browser agents closer to everyday browsing. If the task starts with "help me understand this page" or "help me work across these tabs," an agentic browser can feel much more natural than opening a separate automation tool.
+
+The tradeoff is that these tools are usually optimized for a person sitting in front of the browser. They are not a clean way to ship a repeatable workflow, expose it as an API, or debug it later. They make the browser feel more capable, but they do not necessarily turn a messy browser task into maintainable automation.
+
+## Category 4: full browser agents
 
 *Examples:* [Browser Use](https://www.browser-use.tech/), [OpenAI Operator](https://openai.com/index/introducing-operator/), [Claude computer use](https://www.anthropic.com/news/3-5-models-and-computer-use).
 
 A browser agent is basically an agent with access to a browser tool, with the sole purpose of performing some goal workflow on the browser and often running in the cloud.
 
-The difference from the previous category is who owns the loop. Tools like Playwright MCP give your local coding agent browser access while it is building or debugging, giving you full control. A full browser agent is often a paid managed service from a provider.
+The difference from tools for agents to use browsers is who owns the loop. Tools like Playwright MCP give your local coding agent browser access while it is building or debugging, giving you full control. A full browser agent is often a paid managed service from a provider.
 
 ![Browser Use homepage showing a browser agent workflow](/blog/ai-browser-automation-tooling/browser-use.png)
 
 That makes browser agents useful for workflows where the path is not fixed, like if you are booking a tennis court for example, or for one-off workflows. The tradeoff is that every run is a little live. It's slower, more expensive, less predictable, and harder to audit than a script. If you're reserving a tennis court, it's fine, but you wouldn't want to ask a browser agent to send a bank transfer for example.
 
-## Category 4: browser cloud infra providers
+## Category 5: browser cloud infra providers
 
 *Examples:* [Browserbase](https://www.browserbase.com/), [Kernel](https://www.kernel.sh/), [Steel](https://steel.dev/).
 
@@ -100,7 +110,7 @@ Browser cloud providers are the infrastructure layer. They give you hosted brows
 
 You can host simple browser automation scripts yourself via a Chromium docker container or similar, but adding in everything that makes production browser infra is worth outsourcing to a managed service.
 
-## Category 5: agent-assisted automation tools
+## Category 6: agent-assisted automation tools
 
 *Examples:* [Libretto](https://libretto.sh/).
 
@@ -137,6 +147,7 @@ Libretto is best when the workflow is worth keeping around. If you only need to 
 | --- | --- | --- | --- |
 | Browser automation frameworks | You write RPA code that controls the browser directly. | Known workflows where you want deterministic code. | Powerful, but painful to author and maintain. |
 | Tools for agents to use browsers | Give coding agents browser context and browser controls. | Local development, debugging, and testing. | Great feedback loop, but not production automation by itself. |
+| Agentic browsers | Put an AI assistant inside the browser you use directly. | Reading, summarizing, and acting across pages while a person is present. | Useful for interactive work, but not a durable automation surface. |
 | Full browser agents | Let an agent decide browser actions at runtime. | One-off or changing workflows where flexibility matters. | Slow, expensive, and harder to audit than a script. |
 | Browser cloud infra providers | Host browser sessions and production browser infrastructure. | Scale, persistence, proxies, recordings, and managed sessions. | Often paid service - but worth it if this is for your business. |
 | Agent-assisted automation tools | Turn browser exploration into durable, maintainable automation. | Repeated workflows that need to be maintained over time. | More setup than a live agent, but faster, cheaper and easier to inspect. |
