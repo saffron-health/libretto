@@ -1,4 +1,5 @@
 export { AWSLogo } from "./AWSLogo";
+export { ArrowRightIcon } from "./ArrowRightIcon";
 export { BrowserbaseLogo } from "./BrowserbaseLogo";
 export { GCPLogo } from "./GCPLogo";
 export { CheckIcon } from "./CheckIcon";

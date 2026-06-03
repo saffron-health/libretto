@@ -59,18 +59,15 @@ function shouldUseSpaNavigation({
       return false;
     }
 
+    if (url.hash) {
+      return false;
+    }
+
     if (!isAppOwnedPathname(url.pathname)) {
       return false;
     }
 
-    const currentPathname = normalizeAppPathname(window.location.pathname);
-    const nextPathname = normalizeAppPathname(url.pathname);
-    const isSameDocumentHashNavigation =
-      nextPathname === currentPathname &&
-      url.search === window.location.search &&
-      Boolean(url.hash);
-
-    return !isSameDocumentHashNavigation;
+    return true;
   } catch {
     return false;
   }
