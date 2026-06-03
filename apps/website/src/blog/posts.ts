@@ -109,6 +109,9 @@ Libretto is a skill and CLI for coding agents that helps them build and maintain
 
 # Once the agent writes the workflow, run it like normal automation:
 npx libretto run src/workflows/craigslist-lost-found.ts --headless
+
+# When it is ready, deploy it:
+libretto cloud deploy
 \`\`\`
 
 With a browser agent, you pay for the model to reason through the task every time. With Libretto, you pay that cost once while the workflow is being authored. After that, the workflow can run in the cloud as normal automation, with no token cost on every run.
