@@ -60,7 +60,7 @@ await stagehand.page.act("click the submit button");
 
 Its upside is also its downside. Once the code says "click the submit button," the code no longer fully explains what will happen at runtime. You get flexibility, but you give up some inspectability.
 
-## Category 2: tools for agents to use browsers
+## Category 2: browser tools for coding agents
 
 *Examples:* [Agent Browser](https://agent-browser.dev/), [Playwright MCP](https://github.com/microsoft/playwright-mcp).
 
@@ -96,7 +96,7 @@ The tradeoff is that these tools are usually optimized for a person sitting in f
 
 A browser agent is basically an agent with access to a browser tool, with the sole purpose of performing some goal workflow on the browser and often running in the cloud.
 
-The difference from tools for agents to use browsers is who owns the loop. Tools like Playwright MCP give your local coding agent browser access while it is building or debugging, giving you full control. A full browser agent is often a paid managed service from a provider.
+The difference from browser tools for coding agents is who owns the loop. Tools like Playwright MCP give your local coding agent browser access while it is building or debugging, giving you full control. A full browser agent is often a paid managed service from a provider.
 
 ![Browser Use homepage showing a browser agent workflow](/blog/ai-browser-automation-tooling/browser-use.png)
 
@@ -146,7 +146,7 @@ Libretto is best when the workflow is worth keeping around. If you only need to 
 | Category | What it does | Best for | Main tradeoff |
 | --- | --- | --- | --- |
 | Browser automation frameworks | You write RPA code that controls the browser directly. | Known workflows where you want deterministic code. | Powerful, but painful to author and maintain. |
-| Tools for agents to use browsers | Give coding agents browser context and browser controls. | Local development, debugging, and testing. | Great feedback loop, but not production automation by itself. |
+| Browser tools for coding agents | Give coding agents browser context and browser controls. | Local development, debugging, and testing. | Great feedback loop, but not production automation by itself. |
 | Agentic browsers | Put an AI assistant inside the browser you use directly. | Reading, summarizing, and acting across pages while a person is present. | Useful for interactive work, but not a durable automation surface. |
 | Full browser agents | Let an agent decide browser actions at runtime. | One-off or changing workflows where flexibility matters. | Slow, expensive, and harder to audit than a script. |
 | Browser cloud infra providers | Host browser sessions and production browser infrastructure. | Scale, persistence, proxies, recordings, and managed sessions. | Often paid service - but worth it if this is for your business. |
