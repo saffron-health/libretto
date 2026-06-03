@@ -83,6 +83,7 @@ function PlanCard({ plan }: { plan: (typeof plans)[number] }) {
           </div>
         </div>
       ) : null}
+      {!plan.hours ? <div className="mb-4 border-t border-ink/10 pt-4" /> : null}
       <Text as="p" size="sm" className="mt-auto leading-relaxed text-muted">
         {plan.note}
       </Text>
@@ -124,9 +125,10 @@ export function Pricing() {
         <div className="space-y-4">
           <CloudOnlyNote />
           <Text as="p" size="sm" className="leading-relaxed text-muted [text-wrap:pretty]">
-            Usage is measured by hosted browser session time at $0.25 per
-            browser hour. Manage plans, invoices, and payment methods from the
-            Libretto billing portal.
+            Usage is measured by hosted browser session time at{" "}
+            <span className="text-ink">$0.25 per browser hour</span>. Manage
+            plans, invoices, and payment methods from the Libretto billing
+            portal.
           </Text>
         </div>
         <div className="flex flex-col items-center justify-center gap-3">
