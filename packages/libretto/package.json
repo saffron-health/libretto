@@ -46,30 +46,20 @@
     "prepack": "pnpm run build"
   },
   "peerDependencies": {
-    "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/google": "^3.0.51",
-    "@ai-sdk/google-vertex": "^4.0.80",
-    "@ai-sdk/openai": "^3.0.41"
+    "@ai-sdk/google-vertex": "^4.0.80"
   },
   "peerDependenciesMeta": {
-    "@ai-sdk/anthropic": {
-      "optional": true
-    },
     "@ai-sdk/google": {
       "optional": true
     },
     "@ai-sdk/google-vertex": {
       "optional": true
-    },
-    "@ai-sdk/openai": {
-      "optional": true
     }
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.80",
-    "@ai-sdk/openai": "^3.0.41",
     "@anthropic-ai/claude-agent-sdk": "^0.2.75",
     "@mariozechner/pi-agent-core": "^0.62.0",
     "@mariozechner/pi-ai": "^0.62.0",
@@ -85,6 +75,8 @@
     "vitest": "^4.1.5"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.66",
+    "@ai-sdk/openai": "^3.0.66",
     "affordance": "workspace:^",
     "ai": "^6.0.116",
     "esbuild": "^0.27.0",

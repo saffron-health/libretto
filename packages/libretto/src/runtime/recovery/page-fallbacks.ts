@@ -1,6 +1,7 @@
 import type { FrameLocator, Locator, Page } from "playwright";
 import type { LanguageModel } from "ai";
 import { executeRecoveryAgent, type RecoveryAgentResult } from "./agent.js";
+import { defaultLogger } from "../../shared/logger/logger.js";
 
 export type RecoveryActionTargetType = "page" | "locator";
 
@@ -225,16 +226,66 @@ async function runWithFallback<T>(args: {
       throw originalError;
     }
 
+    defaultLogger.info("Action failed, attempting recovery", {
+      targetType: baseContext.targetType,
+      method: baseContext.method,
+      argsCount: baseContext.args.length,
+      error: formatErrorForLog(originalError),
+    });
+
+    let recoveryResult: RecoveryActionResult;
     try {
-      await args.options.recoveryAction({
+      recoveryResult = await args.options.recoveryAction({
         ...baseContext,
         error: originalError,
       });
-      return await args.invoke();
-    } catch {
+    } catch (recoveryError) {
+      defaultLogger.warn("Recovery action failed", {
+        targetType: baseContext.targetType,
+        method: baseContext.method,
+        originalError: formatErrorForLog(originalError),
+        recoveryError: formatErrorForLog(recoveryError),
+      });
+      throw new AggregateError(
+        [originalError, recoveryError],
+        "Recovery action failed after the original action failed.",
+      );
+    }
+
+    defaultLogger.info("Recovery action completed, retrying original action", {
+      targetType: baseContext.targetType,
+      method: baseContext.method,
+      recoveryResult,
+    });
+
+    try {
+      const result = await args.invoke();
+      defaultLogger.info("Recovered action retry succeeded", {
+        targetType: baseContext.targetType,
+        method: baseContext.method,
+      });
+      return result;
+    } catch (retryError) {
+      defaultLogger.warn("Recovered action retry failed", {
+        targetType: baseContext.targetType,
+        method: baseContext.method,
+        originalError: formatErrorForLog(originalError),
+        retryError: formatErrorForLog(retryError),
+      });
       throw originalError;
     }
   }
+}
+
+function formatErrorForLog(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+  return { value: String(error) };
 }
 
 type ProxyCaches = {

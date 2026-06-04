@@ -93,6 +93,7 @@ describe("createRecoveryPage", () => {
     const locator = { click } as unknown as Locator;
     const page = { locator: vi.fn(() => locator) } as unknown as Page;
     const recoveryAction = vi.fn(async () => undefined);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const recoveryPage = createRecoveryPage(page, {
       recoveryAction,
@@ -103,6 +104,95 @@ describe("createRecoveryPage", () => {
     );
     expect(click).toHaveBeenCalledTimes(2);
     expect(recoveryAction).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      "[WARN] Recovered action retry failed",
+      expect.objectContaining({
+        targetType: "locator",
+        method: "click",
+        retryError: expect.objectContaining({ message: "retry failure" }),
+      }),
+    );
+    warn.mockRestore();
+  });
+
+  it("surfaces the recovery error when recovery fails", async () => {
+    const originalError = new Error("first failure");
+    const recoveryError = new Error("recovery failure");
+    const click = vi.fn<() => Promise<void>>().mockRejectedValue(originalError);
+    const locator = { click } as unknown as Locator;
+    const page = { locator: vi.fn(() => locator) } as unknown as Page;
+    const recoveryAction = vi.fn(async () => {
+      throw recoveryError;
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const recoveryPage = createRecoveryPage(page, {
+      recoveryAction,
+    });
+
+    const result = recoveryPage.locator("#submit").click();
+
+    await expect(result).rejects.toThrow(
+      "Recovery action failed after the original action failed.",
+    );
+    await expect(result).rejects.toMatchObject({
+      errors: [originalError, recoveryError],
+    });
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(recoveryAction).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      "[WARN] Recovery action failed",
+      expect.objectContaining({
+        targetType: "locator",
+        method: "click",
+        recoveryError: expect.objectContaining({ message: "recovery failure" }),
+      }),
+    );
+    warn.mockRestore();
+  });
+
+  it("logs fallback recovery phases", async () => {
+    const originalError = new Error("covered by popup");
+    const click = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(originalError)
+      .mockResolvedValueOnce(undefined);
+    const locator = { click } as unknown as Locator;
+    const page = { locator: vi.fn(() => locator) } as unknown as Page;
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const recoveryAction = vi.fn(async () => ({ status: "action-taken" }));
+
+    const recoveryPage = createRecoveryPage(page, {
+      recoveryAction,
+    });
+
+    await expect(recoveryPage.locator("#submit").click()).resolves.toBe(
+      undefined,
+    );
+    expect(log).toHaveBeenCalledWith(
+      "[INFO] Action failed, attempting recovery",
+      expect.objectContaining({ targetType: "locator", method: "click" }),
+    );
+    expect(log).toHaveBeenCalledWith(
+      "[INFO] Recovery action completed, retrying original action",
+      expect.objectContaining({
+        targetType: "locator",
+        method: "click",
+        recoveryResult: { status: "action-taken" },
+      }),
+    );
+    expect(log).toHaveBeenCalledWith(
+      "[INFO] Recovered action retry succeeded",
+      expect.objectContaining({
+        targetType: "locator",
+        method: "click",
+      }),
+    );
+    expect(warn).not.toHaveBeenCalled();
+
+    log.mockRestore();
+    warn.mockRestore();
   });
 
   it("allows custom recovery logic to compose multiple recovery actions", async () => {
