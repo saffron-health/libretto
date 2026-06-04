@@ -88,7 +88,10 @@ export async function applyAuthProfileStorageState(
 }
 
 function normalizeHost(value: string): string {
-  return value.trim().toLowerCase().replace(/^\.+/, "").replace(/\.+$/, "");
+  let host = value.trim().toLowerCase();
+  while (host.startsWith(".")) host = host.slice(1);
+  while (host.endsWith(".")) host = host.slice(0, -1);
+  return host;
 }
 
 function cookieDomainMatchesSites(
