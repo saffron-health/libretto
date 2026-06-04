@@ -229,24 +229,28 @@ async function takeViewportScreenshot(page: Page): Promise<{
   }
 
   const cdpClient = await page.context().newCDPSession(page);
-  await cdpClient.send("Page.enable");
-  const metrics = (await cdpClient.send(
-    "Page.getLayoutMetrics",
-  )) as CdpLayoutMetrics;
-  const cdpViewport = getViewportFromLayoutMetrics(metrics);
-  if (!cdpViewport) {
-    throw new Error("Viewport size not found");
-  }
+  try {
+    await cdpClient.send("Page.enable");
+    const metrics = (await cdpClient.send(
+      "Page.getLayoutMetrics",
+    )) as CdpLayoutMetrics;
+    const cdpViewport = getViewportFromLayoutMetrics(metrics);
+    if (!cdpViewport) {
+      throw new Error("Viewport size not found");
+    }
 
-  const response = (await cdpClient.send("Page.captureScreenshot", {
-    format: "png",
-    captureBeyondViewport: false,
-  })) as CdpScreenshot;
-  if (!response.data) {
-    throw new Error("CDP screenshot response did not include image data");
-  }
+    const response = (await cdpClient.send("Page.captureScreenshot", {
+      format: "png",
+      captureBeyondViewport: false,
+    })) as CdpScreenshot;
+    if (!response.data) {
+      throw new Error("CDP screenshot response did not include image data");
+    }
 
-  return screenshotState(Buffer.from(response.data, "base64"), cdpViewport);
+    return screenshotState(Buffer.from(response.data, "base64"), cdpViewport);
+  } finally {
+    await cdpClient.detach().catch(() => {});
+  }
 }
 
 async function executeBrowserAction(

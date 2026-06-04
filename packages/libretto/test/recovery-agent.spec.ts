@@ -118,6 +118,7 @@ describe("executeRecoveryAgent", () => {
 
     const click = vi.fn(async () => undefined);
     const screenshot = vi.fn<() => Promise<Buffer>>();
+    const detach = vi.fn(async () => undefined);
     const send = vi.fn(async (method: string) => {
       if (method === "Page.getLayoutMetrics") {
         return {
@@ -138,7 +139,7 @@ describe("executeRecoveryAgent", () => {
       viewportSize: vi.fn(() => null),
       screenshot,
       context: vi.fn(() => ({
-        newCDPSession: vi.fn(async () => ({ send })),
+        newCDPSession: vi.fn(async () => ({ detach, send })),
       })),
       mouse: {
         click,
@@ -161,6 +162,7 @@ describe("executeRecoveryAgent", () => {
       format: "png",
       captureBeyondViewport: false,
     });
+    expect(detach).toHaveBeenCalled();
     expect(click).toHaveBeenCalledWith(500, 250, { button: "left" });
     expect(result.status).toBe("action-taken");
     expect(result.steps).toHaveLength(2);
