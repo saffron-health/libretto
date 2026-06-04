@@ -17,7 +17,7 @@ import { SolidIcosahedron } from "./SolidIcosahedron.js";
 import { SOLID_ICOSAHEDRON_ROTATION } from "./solidIcosahedronGeometry.mjs";
 import type { SolidIcosahedronRotation } from "./solidIcosahedronGeometry.mjs";
 
-type BrandTab = "logos" | "asciihedron" | "ascii-libretto" | "socials";
+type BrandTab = "logos" | "lockup" | "asciihedron" | "ascii-libretto" | "socials";
 type ThemeMode = "dark" | "light";
 type RotationAxis = keyof SolidIcosahedronRotation;
 type SocialAssetKind = "banner" | "profile";
@@ -104,6 +104,7 @@ const themeColors: Record<ThemeMode, CSSVarStyle> = {
 
 const tabs: { id: BrandTab; label: string }[] = [
   { id: "logos", label: "Logos" },
+  { id: "lockup", label: "Lockup" },
   { id: "asciihedron", label: "Asciihedron" },
   { id: "ascii-libretto", label: "ASCII Libretto" },
   { id: "socials", label: "Socials" },
@@ -148,6 +149,48 @@ const logoMotionAssets: DownloadAsset[] = [
     detail: "Animated web image",
     href: "/brand-kit/animation/libretto-icosahedron-logo-loop.webp",
     download: "libretto-icosahedron-logo-loop.webp",
+  },
+];
+
+const lockupDarkAssets: DownloadAsset[] = [
+  {
+    label: "SVG",
+    detail: "Dark background vector",
+    href: "/brand-kit/lockup/libretto-lockup-dark.svg",
+    download: "libretto-lockup-dark.svg",
+  },
+  {
+    label: "PNG",
+    detail: "Transparent raster",
+    href: "/brand-kit/lockup/libretto-lockup-dark.png",
+    download: "libretto-lockup-dark.png",
+  },
+  {
+    label: "WebP",
+    detail: "Dark background web image",
+    href: "/brand-kit/lockup/libretto-lockup-dark.webp",
+    download: "libretto-lockup-dark.webp",
+  },
+];
+
+const lockupLightAssets: DownloadAsset[] = [
+  {
+    label: "SVG",
+    detail: "Light background vector",
+    href: "/brand-kit/lockup/libretto-lockup-light.svg",
+    download: "libretto-lockup-light.svg",
+  },
+  {
+    label: "PNG",
+    detail: "Transparent raster",
+    href: "/brand-kit/lockup/libretto-lockup-light.png",
+    download: "libretto-lockup-light.png",
+  },
+  {
+    label: "WebP",
+    detail: "Light background web image",
+    href: "/brand-kit/lockup/libretto-lockup-light.webp",
+    download: "libretto-lockup-light.webp",
   },
 ];
 
@@ -1116,6 +1159,51 @@ function LogosTab({
   );
 }
 
+function LockupTab({ mode }: { mode: ThemeMode }) {
+  const activeAssets = mode === "dark" ? lockupDarkAssets : lockupLightAssets;
+  const activeLogoSrc =
+    mode === "dark" ? LIBRETTO_LOGO_DARK_SRC : LIBRETTO_LOGO_LIGHT_SRC;
+  const activeWordmarkColor = mode === "dark" ? "#EBEEEB" : "#201F18";
+
+  return (
+    <BrandTabPanel
+      kicker="Logo lockup"
+      title="Logo + wordmark"
+      description="Use the lockup when the solid gold mark and the Fraunces wordmark need to travel together."
+      preview={
+        <PreviewShell>
+          <div className="flex w-full items-center justify-center overflow-hidden">
+            <div className="flex min-h-[400px] w-full items-center justify-center overflow-clip">
+              <div
+                className="flex items-center justify-center gap-[6px]"
+                style={{
+                  fontSynthesis: "none",
+                  MozOsxFontSmoothing: "grayscale",
+                  WebkitFontSmoothing: "antialiased",
+                }}
+              >
+                <div
+                  className="h-[53px] w-[53px] shrink-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url("${activeLogoSrc}")` }}
+                />
+                <div
+                  className="font-serif text-[48px] leading-[28px]"
+                  style={{ color: activeWordmarkColor }}
+                >
+                  Libretto
+                </div>
+              </div>
+            </div>
+          </div>
+        </PreviewShell>
+      }
+      downloads={
+        <DownloadGrid assets={activeAssets} />
+      }
+    />
+  );
+}
+
 function AsciihedronTab({
   onRotationChange,
   rotation,
@@ -1200,7 +1288,7 @@ function AsciiLibrettoTab() {
       description="Use the ASCII render for terminal-native moments, video title cards, and technical overlays."
       preview={
         <PreviewShell>
-          <div className="w-full overflow-hidden px-4">
+          <div className="flex w-full justify-center overflow-hidden px-4">
             <AsciiLibretto className="text-[8px] lg:text-[12px]" />
           </div>
         </PreviewShell>
@@ -1729,6 +1817,7 @@ export function BrandKitPage() {
         {activeTab === "logos" ? (
           <LogosTab rotation={rotation} onRotationChange={setRotation} />
         ) : null}
+        {activeTab === "lockup" ? <LockupTab mode={mode} /> : null}
         {activeTab === "asciihedron" ? (
           <AsciihedronTab rotation={rotation} onRotationChange={setRotation} />
         ) : null}
