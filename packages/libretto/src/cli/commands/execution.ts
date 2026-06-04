@@ -33,7 +33,10 @@ import {
   getProviderStartupTimeoutMs,
   resolveProviderName,
 } from "../core/providers/index.js";
-import { getAbsoluteIntegrationPath } from "../core/workflow-runtime.js";
+import {
+  getAbsoluteIntegrationPath,
+  loadDefaultWorkflow,
+} from "../core/workflow-runtime.js";
 import {
   compileExecFunction,
   stripEmptyCatchHandlers,
@@ -565,8 +568,12 @@ async function runIntegrationFromFile(
   const absoluteIntegrationPath = getAbsoluteIntegrationPath(
     args.integrationPath,
   );
-  if (args.authProfileName && args.providerName !== "libretto-cloud") {
-    const profileName = normalizeProfileName(args.authProfileName);
+  const defaultWorkflow = await loadDefaultWorkflow(absoluteIntegrationPath);
+  const authProfileName = args.authProfileName ?? defaultWorkflow.authProfileName;
+  const authProfilePersist =
+    args.authProfileName !== undefined ? false : defaultWorkflow.authProfileRefresh === true;
+  if (authProfileName) {
+    const profileName = normalizeProfileName(authProfileName);
     if (!hasProfile(profileName)) {
       const profilePath = getProfilePath(profileName);
       throw new Error(
@@ -576,7 +583,7 @@ async function runIntegrationFromFile(
           "To create it:",
           `  1. libretto open <site-url> --headed --session ${args.session}`,
           "  2. Log in manually in the browser window.",
-          `  3. libretto save ${profileName} --session ${args.session}`,
+          `  3. libretto save ${profileName} --session ${args.session} --sites <site>`,
         ].join("\n"),
       );
     }
@@ -598,7 +605,8 @@ async function runIntegrationFromFile(
         ? {
             kind: "provider",
             providerName: args.providerName,
-            authProfileName: args.authProfileName,
+            authProfileName,
+            authProfilePersist,
           }
         : {
             kind: "launch",
@@ -611,7 +619,8 @@ async function runIntegrationFromFile(
         visualize: args.visualize,
         stayOpenOnSuccess: args.stayOpenOnSuccess,
         tsconfigPath: args.tsconfigPath,
-        authProfileName: args.authProfileName,
+        authProfileName,
+        authProfilePersist,
       },
     },
     logger,
@@ -816,7 +825,7 @@ export const runInput = SimpleCLI.input({
     }),
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
-      help: "Named auth profile to use for the browser session",
+      help: "Named auth profile to load before running the workflow",
     }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",

@@ -2,13 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { PROFILES_DIR } from "./context.js";
+import type { AuthProfileStorageState } from "../../shared/workflow/auth-profile-state.js";
 
 const PROFILE_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
-export type LocalAuthProfile = {
-  cookies?: unknown[];
-  origins?: unknown[];
-};
+export type LocalAuthProfile = AuthProfileStorageState;
 
 export function normalizeProfileName(name: string): string {
   const trimmed = name.trim();
@@ -41,7 +39,7 @@ export function hasProfile(profileName: string): boolean {
 export function readProfile(profileName: string): LocalAuthProfile {
   const profilePath = getProfilePath(profileName);
   const parsed = JSON.parse(readFileSync(profilePath, "utf8")) as unknown;
-  if (!parsed || typeof parsed !== "object") {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error(`Saved auth profile "${profileName}" is not a JSON object.`);
   }
   return parsed as LocalAuthProfile;

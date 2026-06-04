@@ -48,6 +48,14 @@ type HostedDeployPackage = {
   cleanup: () => void;
   entryPoint: string;
   outputDir: string;
+  workflows: WorkflowDeployMetadata[];
+};
+
+export type WorkflowDeployMetadata = {
+  name: string;
+  authProfileName?: string;
+  authProfileSites?: readonly string[];
+  authProfileRefresh?: boolean;
 };
 
 type BuildHostedDeployTarballArgs = {
@@ -696,11 +704,16 @@ function createExternalDiscoveryStub(): object {
   });
 }
 
-function createDiscoveryLibrettoModule(workflowNames: Set<string>): object {
+function createDiscoveryLibrettoModule(
+  workflowsByName: Map<string, WorkflowDeployMetadata>,
+): object {
   const moduleShape: Record<PropertyKey, unknown> = {
     LIBRETTO_WORKFLOW_BRAND,
-    workflow: (name: string) => {
-      workflowNames.add(name);
+    workflow: (name: string, definitionOrHandler?: unknown) => {
+      workflowsByName.set(name, {
+        name,
+        ...extractDiscoveryAuthProfileMetadata(definitionOrHandler),
+      });
       return {
         [LIBRETTO_WORKFLOW_BRAND]: true,
         name,
@@ -724,19 +737,57 @@ function createDiscoveryLibrettoModule(workflowNames: Set<string>): object {
   });
 }
 
-function discoverBundledWorkflowNames(args: {
+function extractDiscoveryAuthProfileMetadata(
+  definitionOrHandler: unknown,
+): Omit<WorkflowDeployMetadata, "name"> {
+  if (
+    !definitionOrHandler ||
+    typeof definitionOrHandler !== "object" ||
+    !("authProfile" in definitionOrHandler)
+  ) {
+    return {};
+  }
+  const authProfile = (definitionOrHandler as { authProfile?: unknown }).authProfile;
+  if (typeof authProfile === "string") return { authProfileName: authProfile };
+  if (!authProfile || typeof authProfile !== "object") return {};
+  const record = authProfile as {
+    name?: unknown;
+    sites?: unknown;
+    refresh?: unknown;
+  };
+  if (typeof record.name !== "string") return {};
+  const rawSites =
+    typeof record.sites === "string"
+      ? record.sites.split(",")
+      : Array.isArray(record.sites)
+        ? record.sites
+        : [];
+  const sites = rawSites
+    .filter((site): site is string => typeof site === "string")
+    .map((site) => site.trim())
+    .filter(Boolean);
+  return {
+    authProfileName: record.name,
+    ...(sites.length > 0 ? { authProfileSites: sites } : {}),
+    ...(typeof record.refresh === "boolean"
+      ? { authProfileRefresh: record.refresh }
+      : {}),
+  };
+}
+
+function discoverBundledWorkflows(args: {
   absEntryPoint: string;
   absSourceDir: string;
   bundleBuffer: Buffer;
   externalPackages: ReadonlySet<string>;
-}): string[] {
+}): WorkflowDeployMetadata[] {
   const discoveryPath = join(
     args.absSourceDir,
     `.libretto-deploy-discovery-${process.pid}-${Date.now()}.cjs`,
   );
   const originalRequire = Module.prototype.require;
-  const workflowNames = new Set<string>();
-  const discoveryLibrettoModule = createDiscoveryLibrettoModule(workflowNames);
+  const workflowsByName = new Map<string, WorkflowDeployMetadata>();
+  const discoveryLibrettoModule = createDiscoveryLibrettoModule(workflowsByName);
   let loadedModuleExports: Record<string, unknown> | null = null;
 
   try {
@@ -764,11 +815,11 @@ function discoverBundledWorkflowNames(args: {
     rmSync(discoveryPath, { force: true });
   }
 
-  const discoveredWorkflowNames = [...workflowNames].sort((left, right) =>
-    left.localeCompare(right),
+  const discoveredWorkflows = [...workflowsByName.values()].sort((left, right) =>
+    left.name.localeCompare(right.name),
   );
 
-  if (discoveredWorkflowNames.length === 0) {
+  if (discoveredWorkflows.length === 0) {
     throw new Error(
       `No workflows were found in ${args.absEntryPoint}. Import the workflow files you want to deploy from the entry point, or export a workflow directly from it.`,
     );
@@ -779,23 +830,23 @@ function discoverBundledWorkflowNames(args: {
       (workflow) => workflow.name,
     ),
   );
-  const nonExportedWorkflowNames = discoveredWorkflowNames.filter(
-    (name) => !exportedWorkflowNames.has(name),
+  const nonExportedWorkflowNames = discoveredWorkflows.filter(
+    (workflow) => !exportedWorkflowNames.has(workflow.name),
   );
 
   if (nonExportedWorkflowNames.length > 0) {
     throw new Error(
-      `Workflows discovered in ${args.absEntryPoint} must be exported from the deploy entry point. Re-export them from the entry point or export them through a \`workflows\` object. Non-exported workflows: ${nonExportedWorkflowNames.join(", ")}`,
+      `Workflows discovered in ${args.absEntryPoint} must be exported from the deploy entry point. Re-export them from the entry point or export them through a \`workflows\` object. Non-exported workflows: ${nonExportedWorkflowNames.map((workflow) => workflow.name).join(", ")}`,
     );
   }
 
-  return discoveredWorkflowNames;
+  return discoveredWorkflows;
 }
 
 function createBootstrapSource(args: {
   bundleBuffer: Buffer;
   deploymentName: string;
-  workflowNames: readonly string[];
+  workflows: readonly WorkflowDeployMetadata[];
 }): string {
   const bundleHash = createHash("sha256")
     .update(args.bundleBuffer)
@@ -805,10 +856,14 @@ function createBootstrapSource(args: {
     "base64",
   );
   const outputPrefix = `${normalizePackageName(args.deploymentName)}-`;
-  const exportLines = args.workflowNames
+  const exportLines = args.workflows
     .map(
-      (name, index) =>
-        `export const ${getGeneratedWorkflowExportName(index)} = createWorkflowProxy(${JSON.stringify(name)});`,
+      (workflow, index) =>
+        `export const ${getGeneratedWorkflowExportName(index)} = createWorkflowProxy(${JSON.stringify(workflow.name)}, ${JSON.stringify({
+          authProfileName: workflow.authProfileName,
+          authProfileSites: workflow.authProfileSites,
+          authProfileRefresh: workflow.authProfileRefresh,
+        })});`,
     )
     .join("\n");
 
@@ -844,24 +899,26 @@ function ensureBundleFile() {
   return BUNDLE_FILENAME;
 }
 
-function createWorkflowProxy(workflowName) {
-  const impl = nativeRequire(ensureBundleFile());
-  const target = getWorkflowFromModuleExports(impl, workflowName);
-  const proxy = workflow(workflowName, async (ctx, input) => {
-    if (!target || typeof target.run !== "function") {
-      throw new Error(
-        \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
-      );
-    }
-    return await target.run(ctx, input);
+function createWorkflowProxy(workflowName, metadata) {
+  return workflow(workflowName, {
+    ...(metadata?.authProfileName ? {
+      authProfile: {
+        name: metadata.authProfileName,
+        ...(metadata.authProfileSites ? { sites: metadata.authProfileSites } : {}),
+        ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),
+      },
+    } : {}),
+    async handler(ctx, input) {
+      const impl = nativeRequire(ensureBundleFile());
+      const target = getWorkflowFromModuleExports(impl, workflowName);
+      if (!target || typeof target.run !== "function") {
+        throw new Error(
+          \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
+        );
+      }
+      return await target.run(ctx, input);
+    },
   });
-  if (target && target.authProfileName) {
-    Object.defineProperty(proxy, "authProfileName", {
-      value: target.authProfileName,
-      enumerable: true,
-    });
-  }
-  return proxy;
 }
 
 ${exportLines}
@@ -875,7 +932,7 @@ async function writeBundledDeployEntrypoint(args: {
   externalPackages: ReadonlySet<string>;
   outputDir: string;
   workspacePackages: Map<string, WorkspacePackage>;
-}): Promise<void> {
+}): Promise<WorkflowDeployMetadata[]> {
   try {
     // The implementation bundle is CommonJS so the bootstrap can load it lazily
     // with createRequire() after workflow discovery, while external packages
@@ -905,7 +962,7 @@ async function writeBundledDeployEntrypoint(args: {
       );
     }
 
-    const workflowNames = discoverBundledWorkflowNames({
+    const workflows = discoverBundledWorkflows({
       absEntryPoint: args.absEntryPoint,
       absSourceDir: args.absSourceDir,
       bundleBuffer: Buffer.from(bundledImplementation.contents),
@@ -917,9 +974,10 @@ async function writeBundledDeployEntrypoint(args: {
       createBootstrapSource({
         bundleBuffer: Buffer.from(bundledImplementation.contents),
         deploymentName: args.deploymentName,
-        workflowNames,
+        workflows,
       }),
     );
+    return workflows;
   } catch (error) {
     throw new Error(
       `Failed to bundle deploy entry point ${args.absEntryPoint}.\n${formatBuildError(error)}`,
@@ -951,7 +1009,7 @@ export async function createHostedDeployPackage(
   let callerOwnsTempRoot = false;
 
   try {
-    await writeBundledDeployEntrypoint({
+    const workflows = await writeBundledDeployEntrypoint({
       absEntryPoint,
       absSourceDir,
       deploymentName: args.deploymentName,
@@ -978,13 +1036,14 @@ export async function createHostedDeployPackage(
     // Success transfers ownership of the temp directory to the caller, who is
     // responsible for invoking cleanup() after the tarball/upload step.
     callerOwnsTempRoot = true;
-    return {
-      cleanup: () => {
-        rmSync(tempRoot, { force: true, recursive: true });
-      },
-      entryPoint: "index.js",
-      outputDir,
-    };
+      return {
+        cleanup: () => {
+          rmSync(tempRoot, { force: true, recursive: true });
+        },
+        entryPoint: "index.js",
+        outputDir,
+        workflows,
+      };
   } finally {
     // On any failure before we return, this function still owns the temp dir
     // and must remove it to avoid leaking deploy workspaces in /tmp.
@@ -996,7 +1055,7 @@ export async function createHostedDeployPackage(
 
 export async function buildHostedDeployTarball(
   args: BuildHostedDeployTarballArgs,
-): Promise<{ entryPoint: string; source: string }> {
+): Promise<{ entryPoint: string; source: string; workflows: WorkflowDeployMetadata[] }> {
   const deployPackage = await createHostedDeployPackage(args);
 
   try {
@@ -1008,6 +1067,7 @@ export async function buildHostedDeployTarball(
     return {
       entryPoint: deployPackage.entryPoint,
       source: readFileSync(tarPath).toString("base64"),
+      workflows: deployPackage.workflows,
     };
   } finally {
     deployPackage.cleanup();

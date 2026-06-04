@@ -80,7 +80,7 @@ export const openInput = SimpleCLI.input({
     }),
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
-      help: "Named auth profile to load before opening the page",
+      help: "Named auth profile to load before opening the browser",
     }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
@@ -187,13 +187,13 @@ export const saveInput = SimpleCLI.input({
   ],
   named: {
     session: sessionOption(),
-    site: SimpleCLI.option(z.string().optional(), {
-      help: "Site or domain this profile is for",
+    sites: SimpleCLI.option(z.string().optional(), {
+      help: "Comma-separated sites whose auth state should be saved",
     }),
   },
 }).refine(
-  (input) => Boolean(input.profileName),
-  `Usage: libretto save <profile-name> --session <name> [--site <url|domain>]`,
+  (input) => Boolean(input.profileName && input.sites),
+  `Usage: libretto save <profile-name> --session <name> --sites <site[,site]>`,
 );
 
 export const saveCommand = SimpleCLI.command({
@@ -203,7 +203,7 @@ export const saveCommand = SimpleCLI.command({
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
     await runSave(input.profileName!, ctx.session, ctx.logger, {
-      site: input.site,
+      sites: input.sites!,
     });
   });
 

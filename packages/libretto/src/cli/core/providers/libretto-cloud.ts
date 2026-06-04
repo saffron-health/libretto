@@ -8,13 +8,6 @@ type CloudSessionResponse = {
   live_view_url: string | null;
 };
 
-type CloudBrowserProfileResponse = {
-  storage_state: {
-    cookies?: unknown[];
-    origins?: unknown[];
-  };
-};
-
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_BROWSER_SESSION_TIMEOUT_SECONDS = 3_600;
 const QUEUE_WAIT_TIMEOUT_MS = 10 * 60_000;
@@ -45,6 +38,7 @@ export function createLibrettoCloudProvider(): ProviderApi {
           json: {
             timeout_seconds: browserSessionTimeoutSeconds,
             profile_name: options?.authProfileName,
+            profile_persist: options?.authProfilePersist,
           },
         }),
       });
@@ -79,25 +73,10 @@ export function createLibrettoCloudProvider(): ProviderApi {
       } finally {
         startupCleanup.dispose();
       }
-      let authProfileState:
-        | CloudBrowserProfileResponse["storage_state"]
-        | undefined;
-      try {
-        authProfileState = options?.authProfileName
-          ? await getCloudBrowserProfile(endpoint, apiKey, options.authProfileName)
-          : undefined;
-      } catch (error) {
-        await closeCloudSession(endpoint, apiKey, readySession.session_id).catch(
-          () => {},
-        );
-        throw error;
-      }
-
       return {
         sessionId: readySession.session_id,
         cdpEndpoint: readySession.cdp_url,
         liveViewUrl: readySession.live_view_url ?? undefined,
-        authProfileState,
       };
     },
     async closeSession(sessionId) {
@@ -108,29 +87,6 @@ export function createLibrettoCloudProvider(): ProviderApi {
       return { replayUrl };
     },
   };
-}
-
-async function getCloudBrowserProfile(
-  endpoint: string,
-  apiKey: string,
-  profileName: string,
-): Promise<CloudBrowserProfileResponse["storage_state"]> {
-  const resp = await fetch(`${endpoint}/v1/browserProfiles/get`, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ json: { name: profileName } }),
-  });
-  if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(
-      `Libretto Cloud API error reading browser profile ${profileName} (${resp.status}): ${body}`,
-    );
-  }
-  const { json } = (await resp.json()) as { json: CloudBrowserProfileResponse };
-  return json.storage_state;
 }
 
 async function waitForCloudSessionReady(args: {

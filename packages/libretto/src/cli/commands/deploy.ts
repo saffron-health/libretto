@@ -4,7 +4,9 @@ import {
   orpcCall,
   resolveApiUrl,
 } from "../core/auth-fetch.js";
-import { buildHostedDeployTarball } from "../core/deploy-artifact.js";
+import {
+  buildHostedDeployTarball,
+} from "../core/deploy-artifact.js";
 import { readAuthState } from "../core/auth-storage.js";
 import { SimpleCLI } from "affordance";
 

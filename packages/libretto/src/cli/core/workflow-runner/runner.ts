@@ -1,10 +1,12 @@
 import type { BrowserContext, Page } from "playwright";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import { installPauseHandler } from "../../../shared/debug/pause-handler.js";
+import { captureAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
 import type {
   ExportedLibrettoWorkflow,
   LibrettoWorkflowContext,
 } from "../../../shared/workflow/workflow.js";
+import { readProfile, writeProfile } from "../profiles.js";
 import {
   getAbsoluteIntegrationPath,
   installHeadedWorkflowVisualization,
@@ -164,6 +166,7 @@ export class WorkflowController {
       );
       try {
         await workflow.run(workflowContext, workflowConfig.params ?? {});
+        await refreshLocalAuthProfileIfEnabled(workflow, this.config.page);
       } catch (error) {
         this.emitOutcome({
           state: "finished",
@@ -230,6 +233,25 @@ export class WorkflowController {
       stderr.write = originalStderrWrite;
     };
   }
+}
+
+async function refreshLocalAuthProfileIfEnabled(
+  workflow: ExportedLibrettoWorkflow,
+  page: Page,
+): Promise<void> {
+  if (!workflow.authProfileName || workflow.authProfileRefresh !== true) return;
+  const sites =
+    workflow.authProfileSites && workflow.authProfileSites.length > 0
+      ? workflow.authProfileSites
+      : readProfile(workflow.authProfileName).sites;
+  if (!sites || sites.length === 0) {
+    throw new Error(
+      `Auth profile "${workflow.authProfileName}" has refresh enabled but no sites are configured.`,
+    );
+  }
+  const state = await captureAuthProfileStorageState(page.context(), sites);
+  await writeProfile(workflow.authProfileName, state);
+  console.warn(`Auth profile refreshed: ${workflow.authProfileName}`);
 }
 
 function chunkToString(chunk: unknown): string {

@@ -132,6 +132,12 @@ export {
   type LibrettoWorkflowOptions,
   type WorkflowInputValidator,
 } from "./shared/workflow/workflow.js";
+export {
+  captureAuthProfileStorageState,
+  normalizeAuthProfileSite,
+  parseAuthProfileSites,
+  type AuthProfileStorageState,
+} from "./shared/workflow/auth-profile-state.js";
 const isDirectExecution = (): boolean => {
   const entryArg = process.argv[1];
   if (!entryArg) {

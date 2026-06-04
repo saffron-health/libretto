@@ -1220,12 +1220,13 @@ export default workflow("main", async () => {
       "run ./integration.ts --auth-profile app.example.com",
     );
     expect(result.stderr).toContain(
-      'Local auth profile not found for domain "app.example.com".',
+      'Local auth profile not found: "app.example.com".',
     );
+    expect(result.stderr).toContain("libretto open <site-url> --headed --session");
     expect(result.stderr).toContain(
-      "libretto open https://app.example.com --headed --session",
+      "libretto save app.example.com --session",
     );
-    expect(result.stderr).toContain("libretto save app.example.com --session");
+    expect(result.stderr).toContain("--sites <site>");
   });
 
   test("does not require local auth profile when auth metadata is absent", async ({

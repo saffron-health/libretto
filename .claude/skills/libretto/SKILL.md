@@ -183,7 +183,7 @@ npx libretto resume --session debug-example
 - Use `save` only when the user explicitly asks to save or reuse authenticated browser state.
 
 ```bash
-npx libretto save app.example.com
+npx libretto save example-app --session debug-example --sites app.example.com
 ```
 
 ### `close`

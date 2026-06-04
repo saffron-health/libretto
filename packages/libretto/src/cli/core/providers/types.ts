@@ -8,10 +8,6 @@ export type ProviderSession = {
   // Provider-hosted URL for watching the recording for this session. It may be
   // available as soon as recording starts, before the provider has finalized it.
   recordingUrl?: string;
-  authProfileState?: {
-    cookies?: unknown[];
-    origins?: unknown[];
-  };
 };
 
 export type ProviderCloseResult = {
@@ -22,6 +18,9 @@ export type ProviderCloseResult = {
 };
 
 export type ProviderApi = {
-  createSession(options?: { authProfileName?: string }): Promise<ProviderSession>;
+  createSession(options?: {
+    authProfileName?: string;
+    authProfilePersist?: boolean;
+  }): Promise<ProviderSession>;
   closeSession(sessionId: string): Promise<ProviderCloseResult>;
 };

@@ -5,28 +5,32 @@ Use this reference only when the user explicitly asks to save or reuse local aut
 ## When to Use This
 
 - The site requires manual login.
-- The user is running workflows locally or wants to push an explicit profile to Libretto Cloud.
+- The user is running workflows locally.
+- The workflow declares an auth profile for hosted runs.
 
 ## Workflow
 
 - Open the site in headed mode.
 - Ask the user to log in manually.
-- Save the current session as a named profile.
-- Reopen the site or run the workflow with that named profile.
-- Push the named profile separately when hosted runs need it.
+- Save the current session as a named, site-scoped profile.
+- Reopen the site or run the workflow with that profile.
 
 ## Commands
 
 ```bash
-npx libretto open https://app.example.com --headed
-npx libretto save app --session default --site app.example.com
-npx libretto run ./integration.ts --auth-profile app
-npx libretto cloud profiles push app --site app.example.com
+npx libretto open https://app.example.com --headed --session login
+npx libretto save example-app --session login --sites app.example.com,auth.example.com
+npx libretto run ./integration.ts --auth-profile example-app
+npx libretto profiles fetch chrome example-app --cdp-url http://127.0.0.1:9222 --sites app.example.com
+npx libretto cloud profiles list
 ```
 
 ## Notes
 
 - Profiles are local to the current machine.
-- Pushing a profile to Libretto Cloud overwrites a cloud profile with the same name.
-- Sessions can expire. If the profile stops working, repeat the login and save flow.
+- Saving a profile captures cookies and localStorage only for the comma-separated `--sites` list.
+- `libretto cloud deploy` creates a missing hosted auth profile from the local saved profile when a workflow declares `authProfile`.
+- `authProfile: { name: "example-app", sites: ["app.example.com"], refresh: true }` refreshes the saved profile after successful local and hosted runs.
+- `libretto cloud credentials push <name> --prefix LIBRETTO_<NAME>_` pushes matching env vars as hosted credentials. Prefixes must start with `LIBRETTO_` and end with `_`.
+- Sessions can expire. If refresh is disabled or cannot recover the profile, repeat the login and save flow.
 - Keep auth profiles as a brief operational detail in the main skill, not a full workflow pattern.

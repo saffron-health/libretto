@@ -5,15 +5,30 @@ import {
   type CDPSession,
   type Page,
 } from "playwright";
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import {
+  existsSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
+import { join } from "node:path";
 import { isWindowsNamedPipePath } from "../../shared/ipc/socket-transport.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import type { Experiments } from "./experiments.js";
 import { getSessionProviderClosePath } from "./context.js";
 import { readLibrettoConfig } from "./config.js";
+import {
+  captureAuthProfileStorageState,
+  parseAuthProfileSites,
+} from "../../shared/workflow/auth-profile-state.js";
+import {
+  getProfilePath,
+  hasProfile,
+  normalizeProfileName,
+  writeProfile,
+} from "./profiles.js";
 import {
   getCloudProviderApi,
   getProviderStartupTimeoutMs,
@@ -29,12 +44,6 @@ import {
   writeSessionState,
 } from "./session.js";
 import { DaemonClient } from "./daemon/ipc.js";
-import {
-  getProfilePath,
-  hasProfile,
-  normalizeProfileName,
-  writeProfile,
-} from "./profiles.js";
 
 const CLOSE_WAIT_MS = 1_500;
 const PROVIDER_CLOSE_WAIT_MS = 30_000;
@@ -431,21 +440,19 @@ export async function runOpen(
     : undefined;
   if (authProfileName) {
     const authProfilePath = getProfilePath(authProfileName);
-    if (!existsSync(authProfilePath)) {
+    if (!hasProfile(authProfileName)) {
       throw new Error(
         `No saved auth profile named "${authProfileName}". ` +
-          `Save one first: libretto open ${url} --headed --session <name>, ` +
-          `log in, then run: libretto save ${authProfileName} --session <name>`,
+          `Save one first: libretto open <site-url> --headed --session <name>, ` +
+          `log in, then run: libretto save ${authProfileName} --session <name> --sites <site>`,
       );
     }
   }
 
   const supportsSavedProfile =
     parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
-  const implicitProfileName = supportsSavedProfile
-    ? normalizeDomain(parsedUrl)
-    : undefined;
-  const profileName = authProfileName ?? implicitProfileName;
+  const profileName =
+    authProfileName ?? (supportsSavedProfile ? normalizeDomain(parsedUrl) : undefined);
   const profilePath = profileName ? getProfilePath(profileName) : undefined;
   const useProfile = profileName ? hasProfile(profileName) : false;
 
@@ -549,9 +556,7 @@ export async function runOpenWithProvider(
         kind: "provider",
         providerName,
         initialUrl: url,
-        authProfileName: authProfileName
-          ? normalizeProfileName(authProfileName)
-          : undefined,
+        authProfileName,
       },
     },
     logger,
@@ -614,76 +619,38 @@ export async function runSave(
   profileName: string,
   session: string,
   logger: LoggerApi,
-  options: { site?: string } = {},
+  options: { sites: string } = { sites: "" },
 ): Promise<void> {
-  logger.info("save-start", { profileName, session, site: options.site });
-  const { browser, context, page } = await connect(session, logger);
+  const normalizedProfileName = normalizeProfileName(profileName);
+  const sites = parseAuthProfileSites(options.sites);
+  if (sites.length === 0) {
+    throw new Error("Pass at least one site with --sites <site[,site]>.");
+  }
+
+  logger.info("save-start", { profileName: normalizedProfileName, session, sites });
+  const { browser, context } = await connect(session, logger);
 
   try {
     await new Promise((r) => setTimeout(r, 500));
 
-    const normalizedProfileName = normalizeProfileName(profileName);
-
-    const cdpSession = await context.newCDPSession(page);
-    const { cookies: rawCookies } = await cdpSession.send(
-      "Network.getAllCookies",
-    );
-
-    const cookies = rawCookies.map((c: any) => {
-      const cookie = { ...c };
-      if (cookie.partitionKey && typeof cookie.partitionKey === "object") {
-        delete cookie.partitionKey;
-      }
-      return cookie;
-    });
-
-    await cdpSession.detach();
-
-    const origins: Array<{
-      origin: string;
-      localStorage: Array<{ name: string; value: string }>;
-    }> = [];
-
-    for (const ctx of browser.contexts()) {
-      for (const pg of ctx.pages()) {
-        try {
-          const origin = new URL(pg.url()).origin;
-          const localStorage = await pg.evaluate(() => {
-            const items: Array<{ name: string; value: string }> = [];
-            for (let i = 0; i < window.localStorage.length; i++) {
-              const key = window.localStorage.key(i);
-              if (key) {
-                items.push({
-                  name: key,
-                  value: window.localStorage.getItem(key) || "",
-                });
-              }
-            }
-            return items;
-          });
-          if (localStorage.length > 0) {
-            origins.push({ origin, localStorage });
-          }
-        } catch {
-          // Skip pages that can't be accessed.
-        }
-      }
-    }
-
-    const state = { cookies, origins };
+    const state = await captureAuthProfileStorageState(context, sites);
     const profilePath = await writeProfile(normalizedProfileName, state);
 
     logger.info("save-success", {
       profileName: normalizedProfileName,
+      sites,
       profilePath,
-      cookieCount: cookies.length,
-      originCount: origins.length,
+      cookieCount: state.cookies?.length ?? 0,
+      originCount: state.origins?.length ?? 0,
     });
     console.log(`Profile saved: ${normalizedProfileName}`);
     console.log(`   Location: ${profilePath}`);
-    console.log(`   Cookies: ${cookies.length}, Origins: ${origins.length}`);
+    console.log(`   Sites: ${sites.join(", ")}`);
+    console.log(
+      `   Cookies: ${state.cookies?.length ?? 0}, Origins: ${state.origins?.length ?? 0}`,
+    );
   } catch (err) {
-    logger.error("save-error", { error: err, profileName, session });
+    logger.error("save-error", { error: err, profileName, session, sites });
     throw err;
   } finally {
     disconnectBrowser(browser, logger, session);
@@ -694,11 +661,18 @@ export async function runFetchChromeProfile(
   profileName: string,
   cdpUrl: string,
   logger: LoggerApi,
+  options: { sites: string },
 ): Promise<void> {
   const normalizedProfileName = normalizeProfileName(profileName);
+  const sites = parseAuthProfileSites(options.sites);
+  if (sites.length === 0) {
+    throw new Error("Pass at least one site with --sites <site[,site]>.");
+  }
+
   logger.info("fetch-chrome-profile-start", {
     profileName: normalizedProfileName,
     cdpUrl,
+    sites,
   });
   const browser = await chromium.connectOverCDP(cdpUrl);
   try {
@@ -706,57 +680,14 @@ export async function runFetchChromeProfile(
     if (!context) {
       throw new Error("Connected Chrome instance has no browser context.");
     }
-    const pages = context.pages().filter(isOperationalPage);
-    const page = pages[0] ?? (await context.newPage());
-    const cdpSession = await context.newCDPSession(page);
-    const { cookies: rawCookies } = await cdpSession.send(
-      "Network.getAllCookies",
-    );
-    await cdpSession.detach();
-
-    const cookies = rawCookies.map((c: unknown) => {
-      const cookie = { ...(c as Record<string, unknown>) };
-      if (cookie.partitionKey && typeof cookie.partitionKey === "object") {
-        delete cookie.partitionKey;
-      }
-      return cookie;
-    });
-
-    const origins: Array<{
-      origin: string;
-      localStorage: Array<{ name: string; value: string }>;
-    }> = [];
-    for (const pg of pages) {
-      try {
-        const origin = new URL(pg.url()).origin;
-        const localStorage = await pg.evaluate(() => {
-          const items: Array<{ name: string; value: string }> = [];
-          for (let i = 0; i < window.localStorage.length; i++) {
-            const key = window.localStorage.key(i);
-            if (key) {
-              items.push({
-                name: key,
-                value: window.localStorage.getItem(key) || "",
-              });
-            }
-          }
-          return items;
-        });
-        if (localStorage.length > 0) {
-          origins.push({ origin, localStorage });
-        }
-      } catch {
-        // Skip pages that can't be inspected.
-      }
-    }
-
-    const profilePath = await writeProfile(normalizedProfileName, {
-      cookies,
-      origins,
-    });
+    const state = await captureAuthProfileStorageState(context, sites);
+    const profilePath = await writeProfile(normalizedProfileName, state);
     console.log(`Profile fetched: ${normalizedProfileName}`);
     console.log(`   Location: ${profilePath}`);
-    console.log(`   Cookies: ${cookies.length}, Origins: ${origins.length}`);
+    console.log(`   Sites: ${sites.join(", ")}`);
+    console.log(
+      `   Cookies: ${state.cookies?.length ?? 0}, Origins: ${state.origins?.length ?? 0}`,
+    );
   } finally {
     disconnectBrowser(browser, logger);
   }

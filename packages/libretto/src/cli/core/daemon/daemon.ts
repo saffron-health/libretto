@@ -60,7 +60,6 @@ import {
   getProfilePath,
   hasProfile,
   normalizeProfileName,
-  readProfile,
 } from "../profiles.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
@@ -130,7 +129,7 @@ function getMissingLocalAuthProfileError(args: {
     "To create it:",
     `  1. libretto open <site-url> --headed --session ${args.session}`,
     "  2. Log in manually in the browser window.",
-    `  3. libretto save ${args.profileName} --session ${args.session}`,
+    `  3. libretto save ${args.profileName} --session ${args.session} --sites <site>`,
   ].join("\n");
 }
 
@@ -151,62 +150,6 @@ function resolveAuthProfileStorageStatePath(args: {
     );
   }
   return profilePath;
-}
-
-async function applyAuthProfileToContext(args: {
-  context: BrowserContext;
-  profileName?: string;
-  profileState?: { cookies?: unknown[]; origins?: unknown[] };
-  session: string;
-}): Promise<void> {
-  if (!args.profileName) return;
-  const profileName = normalizeProfileName(args.profileName);
-  if (!args.profileState && !hasProfile(profileName)) {
-    throw new UserFacingStartupError(
-      getMissingLocalAuthProfileError({
-        profileName,
-        profilePath: getProfilePath(profileName),
-        session: args.session,
-      }),
-    );
-  }
-  const profile = args.profileState ?? readProfile(profileName);
-  if (Array.isArray(profile.cookies) && profile.cookies.length > 0) {
-    await args.context.addCookies(
-      profile.cookies as Parameters<BrowserContext["addCookies"]>[0],
-    );
-  }
-  if (Array.isArray(profile.origins) && profile.origins.length > 0) {
-    const page = await args.context.newPage();
-    try {
-      for (const originEntry of profile.origins) {
-        if (
-          !originEntry ||
-          typeof originEntry !== "object" ||
-          !("origin" in originEntry) ||
-          typeof originEntry.origin !== "string" ||
-          !Array.isArray(
-            (originEntry as { localStorage?: unknown }).localStorage,
-          )
-        ) {
-          continue;
-        }
-        await page.goto(originEntry.origin, { waitUntil: "domcontentloaded" });
-        const localStorageItems = (
-          originEntry as unknown as {
-            localStorage: Array<{ name: string; value: string }>;
-          }
-        ).localStorage;
-        await page.evaluate((items) => {
-          for (const item of items) {
-            window.localStorage.setItem(item.name, item.value);
-          }
-        }, localStorageItems);
-      }
-    } finally {
-      await page.close().catch(() => {});
-    }
-  }
 }
 
 // ── BrowserDaemon ──────────────────────────────────────────────────────
@@ -547,6 +490,7 @@ class BrowserDaemon {
     try {
       providerSession = await provider.createSession({
         authProfileName: config.authProfileName,
+        authProfilePersist: config.authProfilePersist,
       });
       const browser = await chromium.connectOverCDP(
         providerSession.cdpEndpoint,
@@ -555,12 +499,6 @@ class BrowserDaemon {
       const contexts = browser.contexts();
       const context =
         contexts.length > 0 ? contexts[0] : await browser.newContext();
-      await applyAuthProfileToContext({
-        context,
-        profileName: config.authProfileName,
-        profileState: providerSession.authProfileState,
-        session,
-      });
       const operationalPages = context.pages().filter(isOperationalPage);
       const page =
         operationalPages.length > 0
@@ -1009,15 +947,6 @@ async function main(): Promise<void> {
       loadedWorkflow = await loadDefaultWorkflow(
         getAbsoluteIntegrationPath(config.workflow.integrationPath),
       );
-      config.workflow.authProfileName =
-        config.workflow.authProfileName ?? loadedWorkflow.authProfileName;
-      if (
-        config.browser.kind === "provider" &&
-        config.workflow.authProfileName &&
-        !config.browser.authProfileName
-      ) {
-        config.browser.authProfileName = config.workflow.authProfileName;
-      }
       validateWorkflowInput(loadedWorkflow, config.workflow.params ?? {});
     } catch (error) {
       throw new UserFacingStartupError(
