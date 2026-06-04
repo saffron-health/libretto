@@ -153,92 +153,27 @@ describe("executeRecoveryAgent", () => {
     expect(result.steps).toHaveLength(2);
   });
 
-  it("uses CDP screenshot metrics when page viewport metrics are unavailable", async () => {
+  it("fails when viewport metrics are unavailable", async () => {
     vi.useFakeTimers();
-    vi.mocked(generateObject)
-      .mockResolvedValueOnce({
-        object: {
-          reasoning: "Click the close button",
-          action: {
-            type: "click",
-            x: 250,
-            y: 125,
-            text: null,
-            keys: null,
-            scroll_x: null,
-            scroll_y: null,
-          },
-        },
-      } as never)
-      .mockResolvedValueOnce({
-        object: {
-          reasoning: "The popup is gone",
-          action: {
-            type: "done",
-            x: null,
-            y: null,
-            text: null,
-            keys: null,
-            scroll_x: null,
-            scroll_y: null,
-          },
-        },
-      } as never);
 
-    const click = vi.fn(async () => undefined);
     const screenshot = vi.fn<() => Promise<Buffer>>();
     const evaluate = vi.fn(async () => {
       throw new Error("execution context unavailable");
-    });
-    const detach = vi.fn(async () => undefined);
-    const send = vi.fn(async (method: string) => {
-      if (method === "Page.getLayoutMetrics") {
-        return {
-          cssVisualViewport: {
-            clientWidth: 1000,
-            clientHeight: 500,
-          },
-        };
-      }
-      if (method === "Page.captureScreenshot") {
-        return {
-          data: pngWithDimensions(500, 250).toString("base64"),
-        };
-      }
-      return {};
     });
     const page = {
       viewportSize: vi.fn(() => null),
       evaluate,
       screenshot,
-      context: vi.fn(() => ({
-        newCDPSession: vi.fn(async () => ({ detach, send })),
-      })),
       mouse: {
-        click,
+        click: vi.fn(async () => undefined),
       },
     } as unknown as Page;
 
-    const resultPromise = executeRecoveryAgent(
-      page,
-      "Close the popup",
-      undefined,
-      {} as never,
-    );
-    await vi.advanceTimersByTimeAsync(2000);
-    const result = await resultPromise;
+    await expect(
+      executeRecoveryAgent(page, "Close the popup", undefined, {} as never),
+    ).rejects.toThrow("Failed to take screenshot for recovery agent");
 
     expect(evaluate).toHaveBeenCalled();
     expect(screenshot).not.toHaveBeenCalled();
-    expect(send).toHaveBeenCalledWith("Page.enable");
-    expect(send).toHaveBeenCalledWith("Page.getLayoutMetrics");
-    expect(send).toHaveBeenCalledWith("Page.captureScreenshot", {
-      format: "png",
-      captureBeyondViewport: false,
-    });
-    expect(detach).toHaveBeenCalled();
-    expect(click).toHaveBeenCalledWith(500, 250, { button: "left" });
-    expect(result.status).toBe("action-taken");
-    expect(result.steps).toHaveLength(2);
   });
 });

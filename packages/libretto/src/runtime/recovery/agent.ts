@@ -52,22 +52,6 @@ type CoordinateScale = {
   viewportHeight: number;
 };
 
-type CdpViewportMetrics = {
-  clientWidth?: number;
-  clientHeight?: number;
-};
-
-type CdpLayoutMetrics = {
-  cssVisualViewport?: CdpViewportMetrics;
-  cssLayoutViewport?: CdpViewportMetrics;
-  visualViewport?: CdpViewportMetrics;
-  layoutViewport?: CdpViewportMetrics;
-};
-
-type CdpScreenshot = {
-  data?: string;
-};
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -175,23 +159,6 @@ function toPositiveNumber(value: unknown): number | undefined {
     : undefined;
 }
 
-function getViewportFromLayoutMetrics(
-  metrics: CdpLayoutMetrics,
-): ImageDimensions | null {
-  const width =
-    toPositiveNumber(metrics.cssVisualViewport?.clientWidth) ??
-    toPositiveNumber(metrics.cssLayoutViewport?.clientWidth) ??
-    toPositiveNumber(metrics.visualViewport?.clientWidth) ??
-    toPositiveNumber(metrics.layoutViewport?.clientWidth);
-  const height =
-    toPositiveNumber(metrics.cssVisualViewport?.clientHeight) ??
-    toPositiveNumber(metrics.cssLayoutViewport?.clientHeight) ??
-    toPositiveNumber(metrics.visualViewport?.clientHeight) ??
-    toPositiveNumber(metrics.layoutViewport?.clientHeight);
-
-  return width && height ? { width, height } : null;
-}
-
 async function getViewportFromPage(page: Page): Promise<ImageDimensions | null> {
   const metrics = await page.evaluate(() => ({
     visualViewportWidth: window.visualViewport?.width,
@@ -241,43 +208,16 @@ async function takeViewportScreenshot(page: Page): Promise<{
 }> {
   const viewport =
     page.viewportSize() ?? (await getViewportFromPage(page).catch(() => null));
-  if (viewport) {
-    try {
-      const screenshot = await page.screenshot({
-        fullPage: false,
-        scale: "css",
-        timeout: 10000,
-      });
-      return screenshotState(screenshot, viewport);
-    } catch {
-      // Fall through to CDP screenshot capture when the page is too unstable for
-      // Playwright's screenshot path.
-    }
+  if (!viewport) {
+    throw new Error("Viewport size not found");
   }
 
-  const cdpClient = await page.context().newCDPSession(page);
-  try {
-    await cdpClient.send("Page.enable");
-    const metrics = (await cdpClient.send(
-      "Page.getLayoutMetrics",
-    )) as CdpLayoutMetrics;
-    const cdpViewport = getViewportFromLayoutMetrics(metrics);
-    if (!cdpViewport) {
-      throw new Error("Viewport size not found");
-    }
-
-    const response = (await cdpClient.send("Page.captureScreenshot", {
-      format: "png",
-      captureBeyondViewport: false,
-    })) as CdpScreenshot;
-    if (!response.data) {
-      throw new Error("CDP screenshot response did not include image data");
-    }
-
-    return screenshotState(Buffer.from(response.data, "base64"), cdpViewport);
-  } finally {
-    await cdpClient.detach().catch(() => {});
-  }
+  const screenshot = await page.screenshot({
+    fullPage: false,
+    scale: "css",
+    timeout: 10000,
+  });
+  return screenshotState(screenshot, viewport);
 }
 
 async function executeBrowserAction(
