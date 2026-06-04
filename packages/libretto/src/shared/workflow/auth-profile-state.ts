@@ -57,6 +57,36 @@ export async function captureAuthProfileStorageState(
   };
 }
 
+export async function applyAuthProfileStorageState(
+  context: BrowserContext,
+  state: AuthProfileStorageState,
+): Promise<void> {
+  if (Array.isArray(state.cookies) && state.cookies.length > 0) {
+    await context.addCookies(
+      state.cookies as Parameters<BrowserContext["addCookies"]>[0],
+    );
+  }
+
+  if (!Array.isArray(state.origins) || state.origins.length === 0) {
+    return;
+  }
+
+  const page = await context.newPage();
+  try {
+    for (const origin of state.origins) {
+      if (!origin.origin || !Array.isArray(origin.localStorage)) continue;
+      await page.goto(origin.origin, { waitUntil: "domcontentloaded" });
+      await page.evaluate((items) => {
+        for (const item of items) {
+          window.localStorage.setItem(item.name, item.value);
+        }
+      }, origin.localStorage);
+    }
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
 function normalizeHost(value: string): string {
   return value.trim().toLowerCase().replace(/^\.+/, "").replace(/\.+$/, "");
 }

@@ -40,6 +40,7 @@ export type DaemonBrowserProviderConfig = {
   kind: "provider";
   providerName: string;
   initialUrl?: string;
+  localAuthProfileName?: string;
   authProfileName?: string;
   authProfilePersist?: boolean;
 };

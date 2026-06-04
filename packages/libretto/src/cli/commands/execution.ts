@@ -569,10 +569,15 @@ async function runIntegrationFromFile(
     args.integrationPath,
   );
   const defaultWorkflow = await loadDefaultWorkflow(absoluteIntegrationPath);
-  const authProfileName = args.authProfileName ?? defaultWorkflow.authProfileName;
+  const usesProviderBrowser = Boolean(args.providerName);
+  const authProfileName = usesProviderBrowser
+    ? defaultWorkflow.authProfileName
+    : args.authProfileName ?? defaultWorkflow.authProfileName;
   const authProfilePersist =
-    args.authProfileName !== undefined ? false : defaultWorkflow.authProfileRefresh === true;
-  if (authProfileName) {
+    !usesProviderBrowser && args.authProfileName !== undefined
+      ? false
+      : defaultWorkflow.authProfileRefresh === true;
+  if (authProfileName && !usesProviderBrowser) {
     const profileName = normalizeProfileName(authProfileName);
     if (!hasProfile(profileName)) {
       const profilePath = getProfilePath(profileName);
