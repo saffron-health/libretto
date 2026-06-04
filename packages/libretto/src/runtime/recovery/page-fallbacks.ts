@@ -246,7 +246,10 @@ async function runWithFallback<T>(args: {
         originalError: formatErrorForLog(originalError),
         recoveryError: formatErrorForLog(recoveryError),
       });
-      throw originalError;
+      throw new AggregateError(
+        [originalError, recoveryError],
+        "Recovery action failed after the original action failed.",
+      );
     }
 
     defaultLogger.info("Recovery action completed, retrying original action", {

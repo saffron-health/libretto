@@ -115,7 +115,7 @@ describe("createRecoveryPage", () => {
     warn.mockRestore();
   });
 
-  it("preserves the original action error when recovery fails", async () => {
+  it("surfaces the recovery error when recovery fails", async () => {
     const originalError = new Error("first failure");
     const recoveryError = new Error("recovery failure");
     const click = vi.fn<() => Promise<void>>().mockRejectedValue(originalError);
@@ -130,9 +130,14 @@ describe("createRecoveryPage", () => {
       recoveryAction,
     });
 
-    await expect(recoveryPage.locator("#submit").click()).rejects.toBe(
-      originalError,
+    const result = recoveryPage.locator("#submit").click();
+
+    await expect(result).rejects.toThrow(
+      "Recovery action failed after the original action failed.",
     );
+    await expect(result).rejects.toMatchObject({
+      errors: [originalError, recoveryError],
+    });
     expect(click).toHaveBeenCalledTimes(1);
     expect(recoveryAction).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(
