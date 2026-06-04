@@ -1,11 +1,20 @@
+import { Children, useEffect } from "react";
 import type * as React from "react";
+import Prism from "prismjs";
+import "prismjs/components/prism-bash.js";
+import "prismjs/components/prism-typescript.js";
 import { SafeMdxRenderer } from "safe-mdx";
 import { AppLink } from "../routing";
 import { Button } from "../components/Button";
 import { Footer } from "../components/Footer";
 import { Navbar } from "../components/Navbar";
 import { Text } from "../components/Text";
-import { buildBlogPostJsonLd, serializeJsonLd } from "./jsonLd";
+import {
+  buildBlogPostJsonLd,
+  getAbsoluteBlogPostImageUrl,
+  getAbsoluteBlogPostUrl,
+  serializeJsonLd,
+} from "./jsonLd";
 import { BLOG_POSTS, getBlogPost, type BlogPost } from "./posts";
 
 const BLOG_LOGO = String.raw`
@@ -75,6 +84,89 @@ function BlogPostStructuredData({ post }: { post: BlogPost }) {
     <script type="application/ld+json">
       {jsonLd}
     </script>
+  );
+}
+
+function setMetaContent(selector: string, content: string) {
+  let element = document.head.querySelector<HTMLMetaElement>(selector);
+  if (!element) {
+    element = document.createElement("meta");
+    const property = selector.match(/\[property="([^"]+)"\]/)?.[1];
+    const name = selector.match(/\[name="([^"]+)"\]/)?.[1];
+
+    if (property) {
+      element.setAttribute("property", property);
+    }
+    if (name) {
+      element.setAttribute("name", name);
+    }
+
+    document.head.append(element);
+  }
+
+  element.content = content;
+}
+
+function BlogPostMeta({ post }: { post: BlogPost }) {
+  useEffect(() => {
+    const title = `${post.title} | Libretto Blog`;
+    const url = getAbsoluteBlogPostUrl(post);
+    const imageUrl = getAbsoluteBlogPostImageUrl(post);
+
+    document.title = title;
+    setMetaContent('meta[name="description"]', post.description);
+    setMetaContent('meta[property="og:type"]', "article");
+    setMetaContent('meta[property="og:title"]', title);
+    setMetaContent('meta[property="og:description"]', post.description);
+    setMetaContent('meta[property="og:url"]', url);
+    setMetaContent('meta[property="og:image"]', imageUrl);
+    setMetaContent('meta[property="og:image:width"]', "1200");
+    setMetaContent('meta[property="og:image:height"]', "630");
+    setMetaContent('meta[name="twitter:card"]', "summary_large_image");
+    setMetaContent('meta[name="twitter:title"]', title);
+    setMetaContent('meta[name="twitter:description"]', post.description);
+    setMetaContent('meta[name="twitter:image"]', imageUrl);
+  }, [post]);
+
+  return null;
+}
+
+function getCodeLanguage(className: string | undefined): string | undefined {
+  return className?.match(/language-(\w+)/)?.[1];
+}
+
+function getCodeText(children: React.ReactNode): string {
+  return Children.toArray(children)
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number") {
+        return String(child);
+      }
+
+      return "";
+    })
+    .join("");
+}
+
+function Code({ children, className }: React.HTMLAttributes<HTMLElement>) {
+  const language = getCodeLanguage(className);
+  const code = getCodeText(children);
+  const grammar = language ? Prism.languages[language] : undefined;
+
+  if (!language || !grammar) {
+    return (
+      <code className="rounded border border-rule bg-[#17130d] px-1 py-0.5 font-mono text-[0.95em] text-ink">
+        {children}
+      </code>
+    );
+  }
+
+  return (
+    <code
+      className="font-mono text-sm text-[#e6edf3] [&_.token.boolean]:text-[#79c0ff] [&_.token.builtin]:text-[#ffa657] [&_.token.class-name]:text-[#ffa657] [&_.token.comment]:text-[#8b949e] [&_.token.function]:text-[#d2a8ff] [&_.token.keyword]:text-[#ff7b72] [&_.token.number]:text-[#79c0ff] [&_.token.operator]:text-[#ff7b72] [&_.token.property]:text-[#79c0ff] [&_.token.punctuation]:text-[#c9d1d9] [&_.token.string]:text-[#a5d6ff] [&_.token.variable]:text-[#ffa657]"
+      dangerouslySetInnerHTML={{
+        __html: Prism.highlight(code, grammar, language),
+      }}
+    />
   );
 }
 
@@ -153,6 +245,48 @@ const markdownComponents = {
   li({ children }: { children?: React.ReactNode }) {
     return <li className="pl-2">{children}</li>;
   },
+  pre({ children }: { children?: React.ReactNode }) {
+    return (
+      <pre className="mb-8 overflow-x-auto rounded-md border border-amber/25 bg-[#17130d] p-4 font-mono text-sm leading-relaxed text-ink">
+        {children}
+      </pre>
+    );
+  },
+  code({ children, className }: React.HTMLAttributes<HTMLElement>) {
+    return <Code className={className}>{children}</Code>;
+  },
+  table({ children }: { children?: React.ReactNode }) {
+    return (
+      <div className="mb-8 overflow-x-auto">
+        <table className="min-w-[720px] border-collapse text-left text-sm leading-relaxed text-muted [&_thead_td]:text-white">
+          {children}
+        </table>
+      </div>
+    );
+  },
+  th({ children }: { children?: React.ReactNode }) {
+    return <th className="border-b border-rule px-3 py-3 font-semibold text-ink">{children}</th>;
+  },
+  td({ children }: { children?: React.ReactNode }) {
+    return <td className="border-b border-rule px-3 py-3 align-top">{children}</td>;
+  },
+  img({ src, alt }: React.ImgHTMLAttributes<HTMLImageElement>) {
+    if (!src) {
+      return null;
+    }
+
+    return (
+      <span className="mb-10 block">
+        <img
+          src={src}
+          alt={alt ?? ""}
+          loading="lazy"
+          className="w-full rounded-md border border-rule bg-[#17130d]"
+        />
+        {alt ? <span className="mt-3 block text-sm leading-relaxed text-muted/70">{alt}</span> : null}
+      </span>
+    );
+  },
   strong({ children }: { children?: React.ReactNode }) {
     return <strong className="font-semibold text-ink">{children}</strong>;
   },
@@ -203,8 +337,9 @@ export function BlogPostPage({ slug }: { slug: string }) {
 
   return (
     <BlogShell>
+      <BlogPostMeta post={post} />
       <BlogPostStructuredData post={post} />
-      <article className="mx-auto max-w-[760px] pt-8 pb-20">
+      <article className="mx-auto max-w-[800px] pt-8 pb-20">
         <AppLink
           href="/blog"
           className="mb-10 inline-block text-sm text-muted/70 no-underline transition-colors hover:text-accent-bright"

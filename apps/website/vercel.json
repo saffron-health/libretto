@@ -42,8 +42,8 @@
       "destination": "/index.html"
     },
     {
-      "source": "/blog/:path*",
-      "destination": "/index.html"
+      "source": "/blog/:slug",
+      "destination": "/blog/:slug.html"
     },
     {
       "source": "/docs",

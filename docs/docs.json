@@ -74,7 +74,8 @@
               "understand-libretto/how-workflow-generation-works",
               "understand-libretto/configuration",
               "understand-libretto/automation-and-bot-detection",
-              "understand-libretto/website-authentication"
+              "understand-libretto/website-authentication",
+              "understand-libretto/error-handling-and-recovery"
             ]
           }
         ]
@@ -101,7 +102,8 @@
               "reference/runtime/workflow",
               "reference/runtime/ai-extraction",
               "reference/runtime/network-requests",
-              "reference/runtime/file-downloads"
+              "reference/runtime/file-downloads",
+              "reference/runtime/page-fallbacks"
             ]
           }
         ]

@@ -4,7 +4,7 @@ description: "Browser automation CLI for building, maintaining, and running brow
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.6.22"
+  version: "0.6.23"
 ---
 
 ## How Libretto Works
@@ -183,7 +183,7 @@ npx libretto resume --session debug-example
 - Use `save` only when the user explicitly asks to save or reuse authenticated browser state.
 
 ```bash
-npx libretto save example-app --session debug-example --sites app.example.com
+npx libretto save app.example.com
 ```
 
 ### `close`

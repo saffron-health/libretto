@@ -1,0 +1,47 @@
+---
+title: Error recovery
+---
+
+Libretto helps your agent handle failures in two ways: inspect failed runs so it can fix the deterministic workflow, or add a narrow runtime recovery action for expected nondeterminism.
+
+Most workflow failures should be fixed with better selectors, waits, or assertions. Runtime recovery is for cases where the workflow is on the right path but the site sometimes shows unexpected UI that blocks the next action.
+
+## Debugging failed runs
+
+When a workflow fails during development, the Libretto CLI helps your agent debug the code by preserving the browser session. The agent can run headed, add `pause(ctx.session)` at useful checkpoints, inspect the page state, iterate on code, and use `resume` to continue from the pause before redeploying.
+
+For deployed workflows on the hosted platform, a failed run automatically starts an analysis agent. It reviews the error, logs, recording, screenshots, and browser state so it can explain what went wrong and suggest the code change.
+
+## Runtime recovery actions
+
+Add `recoveryAction` to a workflow when you want Libretto to recover after a supported Page or Locator action fails. Libretto calls the recovery action, then retries the original action once.
+
+```typescript theme={null}
+export default workflow("reviewOrder", {
+  input,
+  output,
+  recoveryAction: popupRecoveryAction({
+    provider: "openai",
+    apiKey: process.env.OPENAI_API_KEY!,
+    model: "gpt-5.5",
+    maxSteps: 3,
+  }),
+  handler: async ({ page }, params) => {
+    await page.goto(params.url);
+    await page.locator("#review").click();
+    return { complete: true };
+  },
+});
+```
+
+## AI vision recovery
+
+The computer use recovery action looks at the current screen and takes one or more browser actions to get back to the expected path. It is useful for nondeterministic blockers such as cookie banners, popups, modals, interstitials, and overlays that intercept clicks.
+
+It uses a viewport screenshot, asks the model for an action, scales the returned screenshot coordinates to Playwright coordinates, and executes the action.
+
+`popupRecoveryAction()` is the built-in preset for closing popups and other blockers. Use `computerUseRecoveryAction()` when you want to provide your own instruction.
+
+Simple sites without nondeterministic UI usually do not need AI vision recovery. For complicated sites automated through the DOM, add it when exploration shows blockers across sessions, accounts, or time. Do not use it to make business decisions that belong in the workflow handler.
+
+Supported provider shortcut models are `gpt-5.5` and `claude-sonnet-4-6`.
