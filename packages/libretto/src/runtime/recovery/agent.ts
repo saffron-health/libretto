@@ -52,6 +52,22 @@ type CoordinateScale = {
   viewportHeight: number;
 };
 
+type CdpViewportMetrics = {
+  clientWidth?: number;
+  clientHeight?: number;
+};
+
+type CdpLayoutMetrics = {
+  cssVisualViewport?: CdpViewportMetrics;
+  cssLayoutViewport?: CdpViewportMetrics;
+  visualViewport?: CdpViewportMetrics;
+  layoutViewport?: CdpViewportMetrics;
+};
+
+type CdpScreenshot = {
+  data?: string;
+};
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -153,21 +169,37 @@ function readPngDimensions(buffer: Buffer): ImageDimensions {
   };
 }
 
-async function takeViewportScreenshot(page: Page): Promise<{
+function toPositiveNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
+}
+
+function getViewportFromLayoutMetrics(
+  metrics: CdpLayoutMetrics,
+): ImageDimensions | null {
+  const width =
+    toPositiveNumber(metrics.cssVisualViewport?.clientWidth) ??
+    toPositiveNumber(metrics.cssLayoutViewport?.clientWidth) ??
+    toPositiveNumber(metrics.visualViewport?.clientWidth) ??
+    toPositiveNumber(metrics.layoutViewport?.clientWidth);
+  const height =
+    toPositiveNumber(metrics.cssVisualViewport?.clientHeight) ??
+    toPositiveNumber(metrics.cssLayoutViewport?.clientHeight) ??
+    toPositiveNumber(metrics.visualViewport?.clientHeight) ??
+    toPositiveNumber(metrics.layoutViewport?.clientHeight);
+
+  return width && height ? { width, height } : null;
+}
+
+function screenshotState(
+  screenshot: Buffer,
+  viewport: ImageDimensions,
+): {
   screenshot: Buffer;
   dimensions: ImageDimensions;
   scale: CoordinateScale;
-}> {
-  const viewport = page.viewportSize();
-  if (!viewport) {
-    throw new Error("Viewport size not found");
-  }
-
-  const screenshot = await page.screenshot({
-    fullPage: false,
-    scale: "css",
-    timeout: 10000,
-  });
+} {
   const dimensions = readPngDimensions(screenshot);
   return {
     screenshot,
@@ -179,6 +211,42 @@ async function takeViewportScreenshot(page: Page): Promise<{
       viewportHeight: viewport.height,
     },
   };
+}
+
+async function takeViewportScreenshot(page: Page): Promise<{
+  screenshot: Buffer;
+  dimensions: ImageDimensions;
+  scale: CoordinateScale;
+}> {
+  const viewport = page.viewportSize();
+  if (viewport) {
+    const screenshot = await page.screenshot({
+      fullPage: false,
+      scale: "css",
+      timeout: 10000,
+    });
+    return screenshotState(screenshot, viewport);
+  }
+
+  const cdpClient = await page.context().newCDPSession(page);
+  await cdpClient.send("Page.enable");
+  const metrics = (await cdpClient.send(
+    "Page.getLayoutMetrics",
+  )) as CdpLayoutMetrics;
+  const cdpViewport = getViewportFromLayoutMetrics(metrics);
+  if (!cdpViewport) {
+    throw new Error("Viewport size not found");
+  }
+
+  const response = (await cdpClient.send("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: false,
+  })) as CdpScreenshot;
+  if (!response.data) {
+    throw new Error("CDP screenshot response did not include image data");
+  }
+
+  return screenshotState(Buffer.from(response.data, "base64"), cdpViewport);
 }
 
 async function executeBrowserAction(
