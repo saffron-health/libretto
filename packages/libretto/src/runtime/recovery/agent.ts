@@ -192,6 +192,27 @@ function getViewportFromLayoutMetrics(
   return width && height ? { width, height } : null;
 }
 
+async function getViewportFromPage(page: Page): Promise<ImageDimensions | null> {
+  const metrics = await page.evaluate(() => ({
+    visualViewportWidth: window.visualViewport?.width,
+    visualViewportHeight: window.visualViewport?.height,
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    documentElementClientWidth: document.documentElement?.clientWidth,
+    documentElementClientHeight: document.documentElement?.clientHeight,
+  }));
+  const width =
+    toPositiveNumber(metrics.visualViewportWidth) ??
+    toPositiveNumber(metrics.innerWidth) ??
+    toPositiveNumber(metrics.documentElementClientWidth);
+  const height =
+    toPositiveNumber(metrics.visualViewportHeight) ??
+    toPositiveNumber(metrics.innerHeight) ??
+    toPositiveNumber(metrics.documentElementClientHeight);
+
+  return width && height ? { width, height } : null;
+}
+
 function screenshotState(
   screenshot: Buffer,
   viewport: ImageDimensions,
@@ -218,14 +239,20 @@ async function takeViewportScreenshot(page: Page): Promise<{
   dimensions: ImageDimensions;
   scale: CoordinateScale;
 }> {
-  const viewport = page.viewportSize();
+  const viewport =
+    page.viewportSize() ?? (await getViewportFromPage(page).catch(() => null));
   if (viewport) {
-    const screenshot = await page.screenshot({
-      fullPage: false,
-      scale: "css",
-      timeout: 10000,
-    });
-    return screenshotState(screenshot, viewport);
+    try {
+      const screenshot = await page.screenshot({
+        fullPage: false,
+        scale: "css",
+        timeout: 10000,
+      });
+      return screenshotState(screenshot, viewport);
+    } catch {
+      // Fall through to CDP screenshot capture when the page is too unstable for
+      // Playwright's screenshot path.
+    }
   }
 
   const cdpClient = await page.context().newCDPSession(page);

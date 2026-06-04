@@ -84,7 +84,76 @@ describe("executeRecoveryAgent", () => {
     expect(result.steps).toHaveLength(2);
   });
 
-  it("uses CDP screenshot metrics when Playwright has no viewport", async () => {
+  it("uses page viewport metrics when Playwright has no viewport", async () => {
+    vi.useFakeTimers();
+    vi.mocked(generateObject)
+      .mockResolvedValueOnce({
+        object: {
+          reasoning: "Click the close button",
+          action: {
+            type: "click",
+            x: 250,
+            y: 125,
+            text: null,
+            keys: null,
+            scroll_x: null,
+            scroll_y: null,
+          },
+        },
+      } as never)
+      .mockResolvedValueOnce({
+        object: {
+          reasoning: "The popup is gone",
+          action: {
+            type: "done",
+            x: null,
+            y: null,
+            text: null,
+            keys: null,
+            scroll_x: null,
+            scroll_y: null,
+          },
+        },
+      } as never);
+
+    const click = vi.fn(async () => undefined);
+    const screenshot = vi
+      .fn<() => Promise<Buffer>>()
+      .mockResolvedValue(pngWithDimensions(500, 250));
+    const evaluate = vi.fn(async () => ({
+      visualViewportWidth: 1000,
+      visualViewportHeight: 500,
+    }));
+    const page = {
+      viewportSize: vi.fn(() => null),
+      evaluate,
+      screenshot,
+      mouse: {
+        click,
+      },
+    } as unknown as Page;
+
+    const resultPromise = executeRecoveryAgent(
+      page,
+      "Close the popup",
+      undefined,
+      {} as never,
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    const result = await resultPromise;
+
+    expect(evaluate).toHaveBeenCalled();
+    expect(screenshot).toHaveBeenCalledWith({
+      fullPage: false,
+      scale: "css",
+      timeout: 10000,
+    });
+    expect(click).toHaveBeenCalledWith(500, 250, { button: "left" });
+    expect(result.status).toBe("action-taken");
+    expect(result.steps).toHaveLength(2);
+  });
+
+  it("uses CDP screenshot metrics when page viewport metrics are unavailable", async () => {
     vi.useFakeTimers();
     vi.mocked(generateObject)
       .mockResolvedValueOnce({
@@ -118,6 +187,9 @@ describe("executeRecoveryAgent", () => {
 
     const click = vi.fn(async () => undefined);
     const screenshot = vi.fn<() => Promise<Buffer>>();
+    const evaluate = vi.fn(async () => {
+      throw new Error("execution context unavailable");
+    });
     const detach = vi.fn(async () => undefined);
     const send = vi.fn(async (method: string) => {
       if (method === "Page.getLayoutMetrics") {
@@ -137,6 +209,7 @@ describe("executeRecoveryAgent", () => {
     });
     const page = {
       viewportSize: vi.fn(() => null),
+      evaluate,
       screenshot,
       context: vi.fn(() => ({
         newCDPSession: vi.fn(async () => ({ detach, send })),
@@ -155,6 +228,7 @@ describe("executeRecoveryAgent", () => {
     await vi.advanceTimersByTimeAsync(2000);
     const result = await resultPromise;
 
+    expect(evaluate).toHaveBeenCalled();
     expect(screenshot).not.toHaveBeenCalled();
     expect(send).toHaveBeenCalledWith("Page.enable");
     expect(send).toHaveBeenCalledWith("Page.getLayoutMetrics");
