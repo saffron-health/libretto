@@ -100,7 +100,6 @@
             "group": "Runtime",
             "pages": [
               "reference/runtime/workflow",
-              "reference/runtime/ai-extraction",
               "reference/runtime/network-requests",
               "reference/runtime/file-downloads",
               "reference/runtime/page-fallbacks"

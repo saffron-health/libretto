@@ -119,7 +119,7 @@ pnpm test
 Source layout:
 
 - `packages/libretto/src/cli/` — CLI commands
-- `packages/libretto/src/runtime/` — browser runtime (network, recovery, downloads, extraction)
+- `packages/libretto/src/runtime/` — browser runtime (network, recovery, downloads)
 - `packages/libretto/src/shared/` — shared utilities (config, LLM client, logging, state)
 - `packages/libretto/test/` — test files (`*.spec.ts`)
 - `packages/libretto/README.template.md` — source of truth for the repo and package READMEs
