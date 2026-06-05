@@ -43,7 +43,7 @@ describe("workflow() with Zod schemas", () => {
       {
         input: inputSchema,
         output: outputSchema,
-        authProfile: { name: "twitter", persistAfterRun: true },
+        authProfile: { name: "twitter", refresh: true },
       },
       async (_ctx, input) => ({
         pageTitle: "x",
@@ -52,7 +52,7 @@ describe("workflow() with Zod schemas", () => {
     );
 
     expect(wf.authProfileName).toBe("twitter");
-    expect(wf.authProfilePersistAfterRun).toBe(true);
+    expect(wf.authProfileRefresh).toBe(true);
     expect("authProfileSites" in wf).toBe(false);
   });
 

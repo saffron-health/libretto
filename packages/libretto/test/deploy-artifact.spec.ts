@@ -310,7 +310,7 @@ describe("createHostedDeployPackage", () => {
     expect(implementation).toContain("lodash");
   });
 
-  it("preserves workflow auth profile name and persistence metadata without site metadata", async () => {
+  it("preserves workflow auth profile name and refresh metadata without site metadata", async () => {
     const workspaceRoot = createWorkspaceRoot();
     const sourceDir = join(workspaceRoot, "apps", "worker");
     const entryPoint = join(sourceDir, "src", "workflow.ts");
@@ -333,7 +333,7 @@ describe("createHostedDeployPackage", () => {
         "",
         "export const testWorkflow = workflow(",
         '  "testWorkflow",',
-        '  { authProfile: { name: "twitter", persistAfterRun: true } },',
+        '  { authProfile: { name: "twitter", refresh: true } },',
         "  async () => ({ ok: true }),",
         ");",
         "",
@@ -351,7 +351,7 @@ describe("createHostedDeployPackage", () => {
     expect(deployPackage.workflows).toEqual([
       {
         authProfileName: "twitter",
-        authProfilePersistAfterRun: true,
+        authProfileRefresh: true,
         name: "testWorkflow",
       },
     ]);
@@ -361,7 +361,7 @@ describe("createHostedDeployPackage", () => {
       "utf8",
     );
     expect(bundle).toContain(
-      'createWorkflowProxy("testWorkflow", {"authProfileName":"twitter","authProfilePersistAfterRun":true})',
+      'createWorkflowProxy("testWorkflow", {"authProfileName":"twitter","authProfileRefresh":true})',
     );
     expect(bundle).not.toContain("authProfileSites");
     expect(bundle).not.toContain("sites:");

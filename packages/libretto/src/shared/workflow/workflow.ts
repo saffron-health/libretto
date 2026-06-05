@@ -22,7 +22,7 @@ export type LibrettoWorkflowAuthProfile =
   | string
   | {
       name: string;
-      persistAfterRun?: boolean;
+      refresh?: boolean;
     };
 
 export type LibrettoWorkflowDefinition<
@@ -114,7 +114,7 @@ export class LibrettoWorkflow<
   // /v1/workflows/get so API consumers know the workflow's output shape.
   public readonly outputSchema?: OutputSchema;
   public readonly authProfileName?: string;
-  public readonly authProfilePersistAfterRun?: boolean;
+  public readonly authProfileRefresh?: boolean;
   public readonly recoveryAction?: RecoveryAction;
   private readonly handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
@@ -128,7 +128,7 @@ export class LibrettoWorkflow<
           inputSchema?: InputSchema;
           outputSchema?: OutputSchema;
           authProfileName?: string;
-          authProfilePersistAfterRun?: boolean;
+          authProfileRefresh?: boolean;
           recoveryAction?: RecoveryAction;
         }
       | undefined,
@@ -141,7 +141,7 @@ export class LibrettoWorkflow<
     this.inputSchema = options?.inputSchema;
     this.outputSchema = options?.outputSchema;
     this.authProfileName = options?.authProfileName;
-    this.authProfilePersistAfterRun = options?.authProfilePersistAfterRun;
+    this.authProfileRefresh = options?.authProfileRefresh;
     this.recoveryAction = options?.recoveryAction;
     this.handler = handler;
   }
@@ -170,7 +170,7 @@ export type ExportedLibrettoWorkflow = {
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;
   readonly authProfileName?: string;
-  readonly authProfilePersistAfterRun?: boolean;
+  readonly authProfileRefresh?: boolean;
   readonly recoveryAction?: RecoveryAction;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
@@ -273,7 +273,7 @@ function getWorkflowConstructorOptions<
   inputSchema?: InputSchema;
   outputSchema?: OutputSchema;
   authProfileName?: string;
-  authProfilePersistAfterRun?: boolean;
+  authProfileRefresh?: boolean;
   recoveryAction?: RecoveryAction;
 } {
   const authProfile = normalizeWorkflowAuthProfile(options.authProfile);
@@ -281,7 +281,7 @@ function getWorkflowConstructorOptions<
     inputSchema: options.input,
     outputSchema: options.output,
     authProfileName: authProfile?.name,
-    authProfilePersistAfterRun: authProfile?.persistAfterRun,
+    authProfileRefresh: authProfile?.refresh,
     recoveryAction: options.recoveryAction,
   };
 }
@@ -345,14 +345,14 @@ export function workflow(
 
 function normalizeWorkflowAuthProfile(
   value: LibrettoWorkflowAuthProfile | undefined,
-): { name: string; persistAfterRun?: boolean } | undefined {
+): { name: string; refresh?: boolean } | undefined {
   if (!value) return undefined;
   if (typeof value === "string") return { name: normalizeProfileName(value) };
   const name = normalizeProfileName(value.name);
   return {
     name,
-    ...(value.persistAfterRun === undefined
+    ...(value.refresh === undefined
       ? {}
-      : { persistAfterRun: value.persistAfterRun }),
+      : { refresh: value.refresh }),
   };
 }

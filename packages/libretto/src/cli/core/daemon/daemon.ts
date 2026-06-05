@@ -795,7 +795,7 @@ class BrowserDaemon {
       page: this.page,
       context: this.context,
       logger: this.logger,
-      persistLocalAuthProfiles: !this.externallyManaged,
+      refreshLocalAuthProfiles: !this.externallyManaged,
       onLog: (event) => {
         void this.broadcast("workflowOutput", event);
       },
@@ -938,7 +938,7 @@ async function main(): Promise<void> {
       validateWorkflowInput(loadedWorkflow, config.workflow.params ?? {});
       const authProfileName = loadedWorkflow.authProfileName;
       const authProfilePersist =
-        loadedWorkflow.authProfilePersistAfterRun === true;
+        loadedWorkflow.authProfileRefresh === true;
       workflowConfig = {
         ...config.workflow,
         authProfileName,

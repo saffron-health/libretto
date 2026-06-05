@@ -129,12 +129,12 @@ authProfile: "portal.example.com"
 
 authProfile: {
   name: "portal.example.com",
-  persistAfterRun: true,
+  refresh: true,
 }
 ```
 
 Use `--sites` only when saving or importing a local profile from an existing
-browser session. Set `persistAfterRun: true` when a successful local run should
+browser session. Set `refresh: true` when a successful local run should
 save updated browser state for sites visited by that workflow back to the
 profile.
 

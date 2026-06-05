@@ -54,7 +54,7 @@ type HostedDeployPackage = {
 export type WorkflowDeployMetadata = {
   name: string;
   authProfileName?: string;
-  authProfilePersistAfterRun?: boolean;
+  authProfileRefresh?: boolean;
 };
 
 type BuildHostedDeployTarballArgs = {
@@ -751,13 +751,13 @@ function extractDiscoveryAuthProfileMetadata(
   if (!authProfile || typeof authProfile !== "object") return {};
   const record = authProfile as {
     name?: unknown;
-    persistAfterRun?: unknown;
+    refresh?: unknown;
   };
   if (typeof record.name !== "string") return {};
   return {
     authProfileName: record.name,
-    ...(typeof record.persistAfterRun === "boolean"
-      ? { authProfilePersistAfterRun: record.persistAfterRun }
+    ...(typeof record.refresh === "boolean"
+      ? { authProfileRefresh: record.refresh }
       : {}),
   };
 }
@@ -848,7 +848,7 @@ function createBootstrapSource(args: {
       (workflow, index) =>
         `export const ${getGeneratedWorkflowExportName(index)} = createWorkflowProxy(${JSON.stringify(workflow.name)}, ${JSON.stringify({
           authProfileName: workflow.authProfileName,
-          authProfilePersistAfterRun: workflow.authProfilePersistAfterRun,
+          authProfileRefresh: workflow.authProfileRefresh,
         })});`,
     )
     .join("\n");
@@ -904,7 +904,7 @@ function createWorkflowProxy(workflowName, metadata) {
   return workflow(workflowName, {
     authProfile: {
       name: metadata.authProfileName,
-      ...(typeof metadata.authProfilePersistAfterRun === "boolean" ? { persistAfterRun: metadata.authProfilePersistAfterRun } : {}),
+      ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),
     },
     handler,
   });
