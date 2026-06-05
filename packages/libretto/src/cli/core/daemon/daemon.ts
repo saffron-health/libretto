@@ -809,6 +809,7 @@ class BrowserDaemon {
       page: this.page,
       context: this.context,
       logger: this.logger,
+      refreshLocalAuthProfiles: !this.externallyManaged,
       onLog: (event) => {
         void this.broadcast("workflowOutput", event);
       },

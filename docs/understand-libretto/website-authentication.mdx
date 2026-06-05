@@ -129,17 +129,17 @@ authProfile: "portal.example.com"
 
 authProfile: {
   name: "portal.example.com",
-  sites: ["portal.example.com", "auth.example.com"],
   refresh: true,
 }
 ```
 
-Use `sites` when the login spans multiple domains. Set `refresh: true` when a
-successful run should save the updated browser state back to the profile.
+Use `--sites` only when saving or importing a local profile from an existing
+browser session. Set `refresh: true` when a successful local run should save
+updated browser state for sites visited by that workflow back to the profile.
 
 For hosted runs, `libretto cloud deploy` registers workflow-declared profile
 names with Libretto Cloud. Hosted browser sessions then use the provider's native
-profile API; local profile files are not uploaded.
+profile API and persistence behavior; local profile files are not uploaded.
 
 <Warning>
   Sessions can expire. If a profile stops working, repeat the login-and-save flow to refresh it. For servers, rotate profiles on a schedule shorter than the site's session TTL.

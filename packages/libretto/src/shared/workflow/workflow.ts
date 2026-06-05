@@ -4,7 +4,6 @@ import {
   createRecoveryPage,
   type RecoveryAction,
 } from "../../runtime/recovery/page-fallbacks.js";
-import { normalizeAuthProfileSite } from "./auth-profile-state.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
@@ -22,7 +21,6 @@ export type LibrettoWorkflowAuthProfile =
   | string
   | {
       name: string;
-      sites?: string | readonly string[];
       refresh?: boolean;
     };
 
@@ -115,7 +113,6 @@ export class LibrettoWorkflow<
   // /v1/workflows/get so API consumers know the workflow's output shape.
   public readonly outputSchema?: OutputSchema;
   public readonly authProfileName?: string;
-  public readonly authProfileSites?: readonly string[];
   public readonly authProfileRefresh?: boolean;
   public readonly recoveryAction?: RecoveryAction;
   private readonly handler: LibrettoWorkflowHandler<
@@ -130,7 +127,6 @@ export class LibrettoWorkflow<
           inputSchema?: InputSchema;
           outputSchema?: OutputSchema;
           authProfileName?: string;
-          authProfileSites?: readonly string[];
           authProfileRefresh?: boolean;
           recoveryAction?: RecoveryAction;
         }
@@ -144,7 +140,6 @@ export class LibrettoWorkflow<
     this.inputSchema = options?.inputSchema;
     this.outputSchema = options?.outputSchema;
     this.authProfileName = options?.authProfileName;
-    this.authProfileSites = options?.authProfileSites;
     this.authProfileRefresh = options?.authProfileRefresh;
     this.recoveryAction = options?.recoveryAction;
     this.handler = handler;
@@ -174,7 +169,6 @@ export type ExportedLibrettoWorkflow = {
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;
   readonly authProfileName?: string;
-  readonly authProfileSites?: readonly string[];
   readonly authProfileRefresh?: boolean;
   readonly recoveryAction?: RecoveryAction;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
@@ -278,7 +272,6 @@ function getWorkflowConstructorOptions<
   inputSchema?: InputSchema;
   outputSchema?: OutputSchema;
   authProfileName?: string;
-  authProfileSites?: readonly string[];
   authProfileRefresh?: boolean;
   recoveryAction?: RecoveryAction;
 } {
@@ -287,7 +280,6 @@ function getWorkflowConstructorOptions<
     inputSchema: options.input,
     outputSchema: options.output,
     authProfileName: authProfile?.name,
-    authProfileSites: authProfile?.sites,
     authProfileRefresh: authProfile?.refresh,
     recoveryAction: options.recoveryAction,
   };
@@ -352,26 +344,12 @@ export function workflow(
 
 function normalizeWorkflowAuthProfile(
   value: LibrettoWorkflowAuthProfile | undefined,
-): { name: string; sites?: readonly string[]; refresh?: boolean } | undefined {
+): { name: string; refresh?: boolean } | undefined {
   if (!value) return undefined;
   if (typeof value === "string") return { name: value };
   const name = value.name.trim();
-  const sites = normalizeWorkflowAuthProfileSites(value.sites);
   return {
     name,
-    ...(sites.length > 0 ? { sites } : {}),
     ...(value.refresh === undefined ? {} : { refresh: value.refresh }),
   };
-}
-
-function normalizeWorkflowAuthProfileSites(
-  value: string | readonly string[] | undefined,
-): readonly string[] {
-  if (!value) return [];
-  const rawSites = typeof value === "string" ? value.split(",") : value;
-  return [...new Set(
-    rawSites
-      .map((site) => normalizeAuthProfileSite(site))
-      .filter((site): site is string => Boolean(site)),
-  )];
 }

@@ -309,6 +309,63 @@ describe("createHostedDeployPackage", () => {
     expect(implementation).toContain("lodash");
   });
 
+  it("preserves workflow auth profile name and refresh metadata without site metadata", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      type: "module",
+      dependencies: {
+        libretto: currentLibrettoVersion.version,
+      },
+    });
+
+    writeFileSync(
+      entryPoint,
+      [
+        'import { workflow } from "libretto";',
+        "",
+        "export const testWorkflow = workflow(",
+        '  "testWorkflow",',
+        '  { authProfile: { name: "twitter", refresh: true } },',
+        "  async () => ({ ok: true }),",
+        ");",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "auth-profile-worker",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+
+    expect(deployPackage.workflows).toEqual([
+      {
+        authProfileName: "twitter",
+        authProfileRefresh: true,
+        name: "testWorkflow",
+      },
+    ]);
+
+    const bundle = readFileSync(
+      join(deployPackage.outputDir, "index.js"),
+      "utf8",
+    );
+    expect(bundle).toContain(
+      'createWorkflowProxy("testWorkflow", {"authProfileName":"twitter","authProfileRefresh":true})',
+    );
+    expect(bundle).not.toContain("authProfileSites");
+    expect(bundle).not.toContain("sites:");
+  });
+
   it("vendors the current libretto package when the source manifest uses a local-only libretto spec", async () => {
     const workspaceRoot = createWorkspaceRoot();
     const sourceDir = join(workspaceRoot, "apps", "worker");

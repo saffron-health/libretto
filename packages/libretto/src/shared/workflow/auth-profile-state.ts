@@ -57,11 +57,67 @@ export async function captureAuthProfileStorageState(
   };
 }
 
+export function mergeAuthProfileStorageState(
+  existing: AuthProfileStorageState,
+  latest: AuthProfileStorageState,
+  sites: readonly string[],
+): AuthProfileStorageState {
+  const normalizedSites = [...new Set(
+    sites
+      .map((site) => normalizeAuthProfileSite(site))
+      .filter((site): site is string => Boolean(site)),
+  )];
+  if (normalizedSites.length === 0) {
+    return existing;
+  }
+
+  const existingCookies = existing.cookies ?? [];
+  const latestCookies = latest.cookies ?? [];
+  const existingOrigins = existing.origins ?? [];
+  const latestOrigins = latest.origins ?? [];
+
+  const mergedSites = [
+    ...new Set([
+      ...(existing.sites ?? []),
+      ...normalizedSites,
+    ]),
+  ];
+
+  return {
+    ...existing,
+    sites: mergedSites,
+    cookies: [
+      ...existingCookies.filter(
+        (cookie) => !cookieMatchesSites(cookie, normalizedSites),
+      ),
+      ...latestCookies.filter((cookie) =>
+        cookieMatchesSites(cookie, normalizedSites),
+      ),
+    ],
+    origins: [
+      ...existingOrigins.filter(
+        (origin) => !originMatchesSites(origin.origin, normalizedSites),
+      ),
+      ...latestOrigins.filter((origin) =>
+        originMatchesSites(origin.origin, normalizedSites),
+      ),
+    ],
+  };
+}
+
 function normalizeHost(value: string): string {
   let host = value.trim().toLowerCase();
   while (host.startsWith(".")) host = host.slice(1);
   while (host.endsWith(".")) host = host.slice(0, -1);
   return host;
+}
+
+function cookieMatchesSites(cookie: unknown, sites: readonly string[]): boolean {
+  if (!cookie || typeof cookie !== "object" || !("domain" in cookie)) {
+    return false;
+  }
+  const domain = (cookie as { domain?: unknown }).domain;
+  return typeof domain === "string" && cookieDomainMatchesSites(domain, sites);
 }
 
 function cookieDomainMatchesSites(

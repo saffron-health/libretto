@@ -1,7 +1,10 @@
-import type { BrowserContext, Page } from "playwright";
+import type { BrowserContext, Frame, Page } from "playwright";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import { installPauseHandler } from "../../../shared/debug/pause-handler.js";
-import { captureAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
+import {
+  mergeAuthProfileStorageState,
+  normalizeAuthProfileSite,
+} from "../../../shared/workflow/auth-profile-state.js";
 import type {
   ExportedLibrettoWorkflow,
   LibrettoWorkflowContext,
@@ -46,6 +49,7 @@ export type WorkflowControllerConfig = {
   page: Page;
   context: BrowserContext;
   logger: LoggerApi;
+  refreshLocalAuthProfiles?: boolean;
   onLog?: (event: WorkflowLogEvent) => void;
   onOutcome?: (outcome: WorkflowOutcome) => void;
 };
@@ -157,6 +161,7 @@ export class WorkflowController {
         session: this.config.session,
         page: this.config.page,
       };
+      const visitedSites = createVisitedSiteTracker(this.config.context);
 
       const uninstallPauseHandler = installPauseHandler((pauseArgs) =>
         this.pause({
@@ -166,7 +171,12 @@ export class WorkflowController {
       );
       try {
         await workflow.run(workflowContext, workflowConfig.params ?? {});
-        await refreshLocalAuthProfileIfEnabled(workflow, this.config.page);
+        await refreshLocalAuthProfileIfEnabled({
+          context: this.config.context,
+          enabled: this.config.refreshLocalAuthProfiles === true,
+          sites: visitedSites.sites(),
+          workflow,
+        });
       } catch (error) {
         this.emitOutcome({
           state: "finished",
@@ -177,6 +187,7 @@ export class WorkflowController {
         return;
       } finally {
         uninstallPauseHandler();
+        visitedSites.dispose();
       }
 
       this.emitOutcome({
@@ -236,22 +247,72 @@ export class WorkflowController {
 }
 
 async function refreshLocalAuthProfileIfEnabled(
-  workflow: ExportedLibrettoWorkflow,
-  page: Page,
+  args: {
+    context: BrowserContext;
+    enabled: boolean;
+    sites: readonly string[];
+    workflow: ExportedLibrettoWorkflow;
+  },
 ): Promise<void> {
+  const { context, enabled, sites, workflow } = args;
   if (!workflow.authProfileName || workflow.authProfileRefresh !== true) return;
-  const sites =
-    workflow.authProfileSites && workflow.authProfileSites.length > 0
-      ? workflow.authProfileSites
-      : readProfile(workflow.authProfileName).sites;
-  if (!sites || sites.length === 0) {
-    throw new Error(
-      `Auth profile "${workflow.authProfileName}" has refresh enabled but no sites are configured.`,
+  if (!enabled) return;
+  if (sites.length === 0) {
+    console.warn(
+      `Auth profile refresh skipped for "${workflow.authProfileName}": workflow did not visit any http(s) sites.`,
     );
+    return;
   }
-  const state = await captureAuthProfileStorageState(page.context(), sites);
+  const existing = readProfile(workflow.authProfileName);
+  const latest = await context.storageState({ indexedDB: true });
+  const state = mergeAuthProfileStorageState(existing, latest, sites);
   await writeProfile(workflow.authProfileName, state);
   console.warn(`Auth profile refreshed: ${workflow.authProfileName}`);
+}
+
+function createVisitedSiteTracker(context: BrowserContext): {
+  sites: () => string[];
+  dispose: () => void;
+} {
+  const sites = new Set<string>();
+  const pageListeners = new Map<Page, (frame: Frame) => void>();
+
+  const recordUrl = (url: string): void => {
+    if (!url.startsWith("http://") && !url.startsWith("https://")) return;
+    const site = normalizeAuthProfileSite(url);
+    if (site) sites.add(site);
+  };
+
+  const trackPage = (page: Page): void => {
+    if (pageListeners.has(page)) return;
+    recordUrl(page.url());
+
+    const onFrameNavigated = (frame: Frame): void => {
+      if (frame === page.mainFrame()) {
+        recordUrl(frame.url());
+      }
+    };
+
+    pageListeners.set(page, onFrameNavigated);
+    page.on("framenavigated", onFrameNavigated);
+  };
+
+  for (const page of context.pages()) {
+    trackPage(page);
+  }
+
+  context.on("page", trackPage);
+
+  return {
+    sites: () => [...sites],
+    dispose: () => {
+      context.off("page", trackPage);
+      for (const [page, listener] of pageListeners) {
+        page.off("framenavigated", listener);
+      }
+      pageListeners.clear();
+    },
+  };
 }
 
 function chunkToString(chunk: unknown): string {

@@ -54,7 +54,6 @@ type HostedDeployPackage = {
 export type WorkflowDeployMetadata = {
   name: string;
   authProfileName?: string;
-  authProfileSites?: readonly string[];
   authProfileRefresh?: boolean;
 };
 
@@ -752,23 +751,11 @@ function extractDiscoveryAuthProfileMetadata(
   if (!authProfile || typeof authProfile !== "object") return {};
   const record = authProfile as {
     name?: unknown;
-    sites?: unknown;
     refresh?: unknown;
   };
   if (typeof record.name !== "string") return {};
-  const rawSites =
-    typeof record.sites === "string"
-      ? record.sites.split(",")
-      : Array.isArray(record.sites)
-        ? record.sites
-        : [];
-  const sites = rawSites
-    .filter((site): site is string => typeof site === "string")
-    .map((site) => site.trim())
-    .filter(Boolean);
   return {
     authProfileName: record.name,
-    ...(sites.length > 0 ? { authProfileSites: sites } : {}),
     ...(typeof record.refresh === "boolean"
       ? { authProfileRefresh: record.refresh }
       : {}),
@@ -861,7 +848,6 @@ function createBootstrapSource(args: {
       (workflow, index) =>
         `export const ${getGeneratedWorkflowExportName(index)} = createWorkflowProxy(${JSON.stringify(workflow.name)}, ${JSON.stringify({
           authProfileName: workflow.authProfileName,
-          authProfileSites: workflow.authProfileSites,
           authProfileRefresh: workflow.authProfileRefresh,
         })});`,
     )
@@ -904,7 +890,6 @@ function createWorkflowProxy(workflowName, metadata) {
     ...(metadata?.authProfileName ? {
       authProfile: {
         name: metadata.authProfileName,
-        ...(metadata.authProfileSites ? { sites: metadata.authProfileSites } : {}),
         ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),
       },
     } : {}),
