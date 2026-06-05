@@ -66,4 +66,26 @@ describe("Aff v2 routes and direct invocation", () => {
       "Unknown command route: missing",
     );
   });
+
+  test("executes no-input commands by command-line path", async () => {
+    const app = Aff.cli("libretto").routes({
+      ai: Aff.group({ description: "AI commands" }).routes({
+        configure: Aff.command({ description: "Configure AI runtime" })
+          .handle(async ({ command, input, ctx }) => ({
+            routeKey: command.routeKey,
+            input,
+            ctx,
+          })),
+      }),
+      open: Aff.command({ description: "Open URL" })
+        .handle(async () => "opened"),
+    });
+
+    await expect(app.exec("ai configure")).resolves.toEqual({
+      routeKey: "ai.configure",
+      input: {},
+      ctx: {},
+    });
+    await expect(app.exec("open")).resolves.toBe("opened");
+  });
 });

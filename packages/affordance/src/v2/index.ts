@@ -15,6 +15,7 @@ interface AffCommandRoute {
 export interface AffApp {
   getCommands(): AffCommandMetadata[];
   invoke(routeKey: string, rawInput?: unknown, initialContext?: unknown): Promise<unknown>;
+  exec(commandLine: string): Promise<unknown>;
 }
 
 export interface AffCliBuilder {
@@ -41,6 +42,22 @@ function createCliBuilder(name: string): AffCliBuilder {
           return route.command.handler({
             input: rawInput,
             ctx: initialContext,
+            command: route.metadata,
+          });
+        },
+        async exec(commandLine) {
+          const tokens = commandLine.trim().split(/\s+/).filter(Boolean);
+          const route = commandRoutes.find(({ metadata }) => (
+            metadata.path.length === tokens.length
+              && metadata.path.every((segment, index) => segment === tokens[index])
+          ));
+          if (!route) {
+            throw new Error(`Unknown command: ${commandLine}`);
+          }
+
+          return route.command.handler({
+            input: {},
+            ctx: {},
             command: route.metadata,
           });
         },
