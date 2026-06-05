@@ -27,7 +27,7 @@ pnpm -s cli
 ```
 
 - Prefer `pnpm -s <script>` (or `pnpm --silent ...`) for routine scripted commands when you want less pnpm noise in logs.
-- Run `pnpm -s check` at the end of each coding turn. It uses Turborepo to run package-level check scripts, including type-check, tests, lint, and format checks.
+- Run `pnpm -s check` at the end of each coding turn. It uses Turborepo to run package-level check scripts, including type-check, tests, lint, and formatting.
 - Never override pnpm's minimum release age with `PNPM_CONFIG_MINIMUM_RELEASE_AGE=0` unless the human has given explicit permission for that command.
 
 - Do not pipe test commands through `grep`, `tail`, or other filters. The test reporter is minimal and token-efficient by default.

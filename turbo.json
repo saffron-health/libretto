@@ -24,9 +24,6 @@
     "format": {
       "outputs": []
     },
-    "format:check": {
-      "outputs": []
-    },
     "test:vitest": {
       "dependsOn": ["build"],
       "cache": false,

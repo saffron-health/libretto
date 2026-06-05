@@ -7,6 +7,7 @@ import {
 } from "./help.js";
 import { createCommandBuilder, type AffCommand } from "./command.js";
 import { createGroupBuilder, type AffGroup } from "./group.js";
+import { flag, option } from "./input.js";
 
 export type {
   AffCommand,
@@ -16,6 +17,15 @@ export type {
   AffCommandHandlerArgs,
 } from "./command.js";
 export type { AffGroup, AffGroupBuilder, AffGroupConfig } from "./group.js";
+export type {
+  AffArgumentDefinition,
+  AffArgumentsDefinition,
+  AffFlagDefinition,
+  AffInputRaw,
+  AffNamedInputDefinition,
+  AffOptionDefinition,
+  AffOptionsDefinition,
+} from "./input.js";
 
 export type AffRoute = AffGroup | AffCommand;
 export type AffRouteMap = Record<string, AffRoute>;
@@ -33,7 +43,12 @@ interface AffCommandRoute {
 
 export interface AffApp {
   getCommands(): AffCommandMetadata[];
-  invoke(routeKey: string, rawInput?: unknown, initialContext?: unknown): Promise<unknown>;
+  invoke(
+    routeKey: string,
+    args?: readonly unknown[],
+    options?: Readonly<Record<string, unknown>>,
+    initialContext?: unknown,
+  ): Promise<unknown>;
   exec(commandLine: string): Promise<unknown>;
 }
 
@@ -50,17 +65,17 @@ function createCliBuilder(name: string): AffCliBuilder {
         getCommands() {
           return commandRoutes.map(({ metadata }) => metadata);
         },
-        async invoke(routeKey, rawInput = {}, initialContext = {}) {
+        async invoke(routeKey, args = [], options = {}, initialContext = {}) {
           const route = commandRoutes.find(({ metadata }) => metadata.routeKey === routeKey);
           if (!route) {
             throw new Error(`Unknown command route: ${routeKey}`);
           }
 
-          return route.command.handler({
-            input: rawInput,
-            ctx: initialContext,
-            command: route.metadata,
-          });
+          return route.command.execute(
+            { arguments: args, options },
+            initialContext,
+            route.metadata,
+          );
         },
         async exec(commandLine) {
           const tokens = tokenizeCommandLine(commandLine);
@@ -83,11 +98,7 @@ function createCliBuilder(name: string): AffCliBuilder {
             throw new Error(renderUnknownCommandHelp(name, routes, tokens));
           }
 
-          return route.command.handler({
-            input: {},
-            ctx: {},
-            command: route.metadata,
-          });
+          return route.command.execute({ arguments: [], options: {} }, {}, route.metadata);
         },
       };
     },
@@ -128,4 +139,6 @@ export const Aff = {
   cli: createCliBuilder,
   group: createGroupBuilder,
   command: createCommandBuilder,
+  option,
+  flag,
 };

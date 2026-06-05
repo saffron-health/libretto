@@ -82,15 +82,15 @@ Builder rules:
 - `Aff.group(config).use(...).routes(...)` creates a group.
 - `Aff.command(config).arguments(...).options(...).use(...).handle(...)` creates a command with input.
 - Commands without input can omit `.arguments(...)` and `.options(...)`.
-- `.arguments(positionals)` declares positional arguments as an ordered array of `[name, schema]` tuples.
-- `.options(named)` declares named options as an object of option schemas.
-- Plain zod schemas are valid named options.
-- `Aff.option(schema)` wraps a valued named option when option-specific metadata or behavior is needed.
+- `.arguments(args)` declares positional arguments as an ordered array of `[name, schema]` tuples.
+- `.options(options)` declares named options as an object of option schemas.
+- Plain zod schemas are valid options.
+- `Aff.option(schema)` wraps a valued option when option-specific metadata or behavior is needed.
 - `Aff.flag(config?)` declares a boolean flag with a default of `false`.
 - `Aff.middleware(fn)` is a typed identity helper for inline middleware.
 - `Aff.middleware(config).handle(fn)` creates described middleware.
 - Apps expose `app.exec(commandLine)` for command-line execution, where `commandLine` is a single string such as `"open https://example.com --session debug"`.
-- Apps may expose `app.invoke(routeKey, rawInput, initialContext?)` for direct programmatic invocation in tests and internal integrations.
+- Apps may expose `app.invoke(routeKey, args?, options?, initialContext?)` for direct programmatic invocation in tests and internal integrations.
 - `.handle()` is terminal for commands and middleware.
 - Commands do not inherit group middleware at construction time.
 - Route resolution applies middleware in structural order: root, outer group, inner group, command.
@@ -117,7 +117,7 @@ Do not continue growing `packages/affordance/test/affordance.spec.ts`. Build v2 
 Use these files:
 
 - `packages/affordance/test/v2/routes-and-help.spec.ts` - route key/path derivation, groups, root/group/command help, unknown-command help recovery, and appended root help.
-- `packages/affordance/test/v2/input.spec.ts` - positional/named parsing, passthrough handling, aliases, global options, defaults, variadic positionals, and input validation errors.
+- `packages/affordance/test/v2/input.spec.ts` - argument/option parsing, passthrough handling, aliases, global options, defaults, variadic arguments, and input validation errors.
 - `packages/affordance/test/v2/middleware.spec.ts` - runtime middleware behavior: ordering, `next()`, short-circuiting, error propagation, root/group/command middleware nesting, and telemetry-facing command metadata.
 - `packages/affordance/test/v2/middleware-types.spec.ts` - type-level middleware contracts: context injection, downstream context availability, invalid context access via `@ts-expect-error`, and `$input` / `$context` builder contracts.
 
@@ -141,7 +141,7 @@ Create the v2 test folder and write the initial red tests. This phase is intenti
 
 Implement the smallest v2 runtime that can construct an app, derive command metadata, and invoke commands directly by route key. Do not implement help rendering, command-line parsing from `exec(commandLine)`, input parsing, or middleware in this phase unless the tests require a no-op placeholder.
 
-- [x] First trim or add tests so this phase covers only `Aff.cli(...).routes(...)`, groups, commands, `getCommands()`, and `invoke(routeKey, rawInput)` for no-input commands.
+- [x] First trim or add tests so this phase covers only `Aff.cli(...).routes(...)`, groups, commands, `getCommands()`, and `invoke(routeKey)` for no-input commands.
 - [x] Create `packages/affordance/src/v2/index.ts` exporting `Aff`.
 - [x] Implement `Aff.cli(name).routes(routes)`.
 - [x] Implement `Aff.group(config).routes(routes)`.
@@ -166,16 +166,16 @@ Add `exec(commandLine)` and help rendering independent of input parsing complexi
 
 Add input schemas and command argument parsing. Keep this phase focused on the parsing behavior v2 needs before middleware can rely on parsed input.
 
-- [ ] First add or adjust tests for positional parsing, named options, flags, defaults, validation errors, and parse-before-middleware behavior.
-- [ ] Implement command `.arguments(positionals)` with an ordered positional tuple array.
-- [ ] Implement command `.options(named)` with a named option schema object.
-- [ ] Implement plain zod schemas as valid option declarations.
-- [ ] Implement `Aff.option(schema)` for valued options.
-- [ ] Implement `Aff.flag(config?)` for boolean flags.
-- [ ] Implement raw `invoke(...)` input parsing using the existing zod-based behavior as a reference, not a blind copy.
+- [ ] First add or adjust tests for argument parsing, options, flags, defaults, validation errors, and parse-before-middleware behavior.
+- [x] Implement command `.arguments(args)` with an ordered argument tuple array.
+- [x] Implement command `.options(options)` with an option schema object.
+- [x] Implement plain zod schemas as valid option declarations.
+- [x] Implement `Aff.option(schema)` for valued options.
+- [x] Implement `Aff.flag(config?)` for boolean flags.
+- [x] Implement raw `invoke(...)` input parsing using the existing zod-based behavior as a reference, not a blind copy.
 - [ ] Implement command argument parsing in `exec(commandLine)` after the command-line string has been tokenized.
-- [ ] Implement required positional and named option errors.
-- [ ] Add additional option metadata, aliases, passthrough, global options, and variadic positionals only when tests for those behaviors are added.
+- [ ] Implement required argument and option errors.
+- [ ] Add additional option metadata, aliases, passthrough, global options, and variadic arguments only when tests for those behaviors are added.
 - [ ] Verify the Phase 4 input tests pass.
 
 ### Phase 5: Runtime middleware
@@ -217,7 +217,7 @@ Candidate features:
 - [ ] Named option aliases.
 - [ ] Passthrough arguments after `--`.
 - [ ] Global options.
-- [ ] Variadic positionals.
+- [ ] Variadic arguments.
 - [ ] `appendHelpText` or equivalent root help extension.
 - [ ] Refine and super-refine helpers on input declarations.
 - [ ] Duplicate route validation.

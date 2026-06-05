@@ -48,8 +48,8 @@ describe("Aff v2 routes and direct invocation", () => {
       routeKey: "ai.configure",
       path: ["ai", "configure"],
     });
-    await expect(app.invoke("open", { debug: true }, { session: "test" })).resolves.toEqual({
-      input: { debug: true },
+    await expect(app.invoke("open", [], {}, { session: "test" })).resolves.toEqual({
+      input: {},
       ctx: { session: "test" },
       routeKey: "open",
     });

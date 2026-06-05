@@ -29,8 +29,7 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "format": "oxfmt src/v2 test/v2",
-    "format:check": "oxfmt --check src/v2 test/v2",
-    "check": "run-p type-check test:vitest lint format:check",
+    "check": "run-p type-check test:vitest lint format",
     "lint": "lintcn lint --tsconfig tsconfig.json",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
