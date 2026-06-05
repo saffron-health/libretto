@@ -154,13 +154,13 @@ Implement the smallest v2 runtime that can construct an app, derive command meta
 
 Add `exec(commandLine)` and help rendering independent of input parsing complexity. This phase should preserve the v1 user-facing help behaviors that v2 intentionally keeps while changing the public execution interface to accept a single string.
 
-- [ ] First add or adjust tests for root help, group help, command help, exact group invocation rendering group help, and nearest-help unknown command errors.
-- [ ] Implement `app.exec(commandLine)` route matching for command paths and group paths.
-- [ ] Parse the command-line string into tokens for v2 execution. Keep the initial tokenizer small and driven by current tests.
-- [ ] Implement `help`, `--help`, and `-h` handling.
-- [ ] Implement root, group, and command help rendering.
-- [ ] Implement nearest-group help for unknown commands.
-- [ ] Verify the Phase 3 route/help tests pass.
+- [x] First add or adjust tests for root help, group help, command help, exact group invocation rendering group help, and nearest-help unknown command errors.
+- [x] Implement `app.exec(commandLine)` route matching for command paths and group paths.
+- [x] Parse the command-line string into tokens for v2 execution. Keep the initial tokenizer small and driven by current tests.
+- [x] Implement `help`, `--help`, and `-h` handling.
+- [x] Implement root, group, and command help rendering.
+- [x] Implement nearest-group help for unknown commands.
+- [x] Verify the Phase 3 route/help tests pass.
 
 ### Phase 4: Input declarations and parsing
 

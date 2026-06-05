@@ -5,11 +5,20 @@ export function getHelpPath(tokens: string[]): string[] | undefined {
     return tokens.slice(1);
   }
 
+  const helpFlagIndex = tokens.findIndex(isHelpFlag);
+  if (helpFlagIndex >= 0) {
+    return tokens.slice(0, helpFlagIndex);
+  }
+
   if (tokens.at(-1) === "help") {
     return tokens.slice(0, -1);
   }
 
   return undefined;
+}
+
+function isHelpFlag(token: string): boolean {
+  return token === "--help" || token === "-h";
 }
 
 export function renderHelp(
@@ -29,7 +38,20 @@ export function renderHelp(
     return renderCommandHelp(name, path, route);
   }
 
-  throw new Error(`Unknown command: ${path.join(" ")}`);
+  throw new Error(renderUnknownCommandHelp(name, routes, path));
+}
+
+export function renderUnknownCommandHelp(
+  name: string,
+  routes: AffRouteMap,
+  path: string[],
+): string {
+  const nearestGroup = findNearestGroupByPath(routes, path);
+  const nearestHelp = nearestGroup
+    ? renderGroupHelp(name, nearestGroup.path, nearestGroup.group)
+    : renderRootHelp(name, routes);
+
+  return [`Unknown command: ${path.join(" ")}`, "", nearestHelp].join("\n");
 }
 
 export function renderRootHelp(name: string, routes: AffRouteMap): string {
@@ -105,4 +127,31 @@ export function findRouteByPath(
   }
 
   return undefined;
+}
+
+interface NearestGroupMatch {
+  path: string[];
+  group: AffGroup;
+}
+
+function findNearestGroupByPath(
+  routes: AffRouteMap,
+  path: string[],
+): NearestGroupMatch | undefined {
+  let currentRoutes = routes;
+  let nearestGroup: NearestGroupMatch | undefined;
+  const visitedPath: string[] = [];
+
+  for (const pathSegment of path) {
+    const route = currentRoutes[pathSegment];
+    if (!route || route.type === "command") {
+      return nearestGroup;
+    }
+
+    visitedPath.push(pathSegment);
+    nearestGroup = { path: [...visitedPath], group: route };
+    currentRoutes = route.routes;
+  }
+
+  return nearestGroup;
 }

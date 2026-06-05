@@ -21,7 +21,7 @@ export interface AffCommand {
 }
 
 export interface AffCommandBuilder {
-  handle(handler: AffCommandHandler): AffCommand;
+  handle(handler?: AffCommandHandler): AffCommand;
 }
 
 export function createCommandBuilder(
@@ -32,8 +32,10 @@ export function createCommandBuilder(
       return {
         type: "command",
         config,
-        handler,
+        handler: handler ?? noopHandler,
       };
     },
   };
 }
+
+const noopHandler: AffCommandHandler = async () => undefined;

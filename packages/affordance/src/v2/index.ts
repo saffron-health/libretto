@@ -3,6 +3,7 @@ import {
   getHelpPath,
   renderGroupHelp,
   renderHelp,
+  renderUnknownCommandHelp,
 } from "./help.js";
 import { createCommandBuilder, type AffCommand } from "./command.js";
 import { createGroupBuilder, type AffGroup } from "./group.js";
@@ -64,7 +65,7 @@ function createCliBuilder(name: string): AffCliBuilder {
           });
         },
         async exec(commandLine) {
-          const tokens = commandLine.trim().split(/\s+/).filter(Boolean);
+          const tokens = tokenizeCommandLine(commandLine);
           const helpPath = getHelpPath(tokens);
           if (helpPath) {
             return renderHelp(name, routes, helpPath);
@@ -80,7 +81,7 @@ function createCliBuilder(name: string): AffCliBuilder {
               && metadata.path.every((segment, index) => segment === tokens[index])
           ));
           if (!route) {
-            throw new Error(`Unknown command: ${commandLine}`);
+            throw new Error(renderUnknownCommandHelp(name, routes, tokens));
           }
 
           return route.command.handler({
@@ -92,6 +93,10 @@ function createCliBuilder(name: string): AffCliBuilder {
       };
     },
   };
+}
+
+function tokenizeCommandLine(commandLine: string): string[] {
+  return commandLine.trim().split(/\s+/).filter(Boolean);
 }
 
 function flattenCommandRoutes(
