@@ -141,11 +141,11 @@ Create the v2 test folder and write the initial red tests. This phase is intenti
 
 Implement the smallest v2 runtime that can construct an app, derive command metadata, and invoke commands directly by route key. Do not implement help rendering, command-line parsing from `exec(commandLine)`, input parsing, or middleware in this phase unless the tests require a no-op placeholder.
 
-- [ ] First trim or add tests so this phase covers only `Aff.cli(...).routes(...)`, groups, commands, `getCommands()`, and `invoke(routeKey, rawInput)` for no-input commands.
-- [ ] Create `packages/affordance/src/v2/index.ts` exporting `Aff`.
-- [ ] Implement `Aff.cli(name).routes(routes)`.
-- [ ] Implement `Aff.group(config).routes(routes)`.
-- [ ] Implement `Aff.command(config).handle(handler)`.
+- [x] First trim or add tests so this phase covers only `Aff.cli(...).routes(...)`, groups, commands, `getCommands()`, and `invoke(routeKey, rawInput)` for no-input commands.
+- [x] Create `packages/affordance/src/v2/index.ts` exporting `Aff`.
+- [x] Implement `Aff.cli(name).routes(routes)`.
+- [x] Implement `Aff.group(config).routes(routes)`.
+- [x] Implement `Aff.command(config).handle(handler)`.
 - [ ] Derive `routeKey`, `path`, and `description` from the route tree.
 - [ ] Throw a clear error for unknown route keys in `invoke(...)`.
 - [ ] Verify the Phase 2 tests pass while later v2 tests may still fail.
