@@ -6,10 +6,10 @@ title: profiles
 
 ### save
 
-The `save` command saves the current browser session's cookies and localStorage as a named auth profile. Load the profile later with `--auth-profile` to skip manual login.
+The `save` command saves the current browser session's cookies, localStorage, and IndexedDB as a named local auth profile. Workflows load it by declaring `authProfile`.
 
 ```bash theme={null}
-npx libretto save linkedin --session app-login --site linkedin.com
+npx libretto save linkedin --session app-login --sites linkedin.com
 ```
 
 #### When to use `save`
@@ -29,7 +29,7 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
 
   <Step title="Save the session">
     ```bash  theme={null}
-    npx libretto save linkedin --session app-login --site linkedin.com
+    npx libretto save linkedin --session app-login --sites linkedin.com
     ```
 
     The profile is saved to `.libretto/profiles/linkedin.json`.
@@ -37,8 +37,10 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
   </Step>
 
   <Step title="Use the profile in future runs">
+    Declare `authProfile: "linkedin"` in the workflow, then run it normally:
+
     ```bash  theme={null}
-    npx libretto run ./integration.ts --auth-profile linkedin
+    npx libretto run ./integration.ts
     ```
   </Step>
 </Steps>
@@ -55,18 +57,18 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
   --session`.
 </ParamField>
 
-<ParamField path="--site" type="string">
-  Optional site or domain label for the profile. This is documentation metadata;
-  the saved profile is still referenced by `profileName`.
+<ParamField path="--sites" type="string" required>
+  Comma-separated site or domain list to capture, for example
+  `linkedin.com,auth.linkedin.com`.
 </ParamField>
 
 ### fetch chrome
 
-The `profiles fetch chrome` command imports cookies and localStorage from an
-existing Chrome DevTools Protocol session into a named local profile.
+The `profiles fetch chrome` command imports cookies, localStorage, and IndexedDB
+from an existing Chrome DevTools Protocol session into a named local profile.
 
 ```bash theme={null}
-npx libretto profiles fetch chrome twitter --cdp-url http://127.0.0.1:9222
+npx libretto profiles fetch chrome twitter --cdp-url http://127.0.0.1:9222 --sites x.com,twitter.com
 ```
 
 Start Chrome with remote debugging enabled, log in normally, then run the fetch
@@ -76,17 +78,25 @@ Recent Chrome versions reject remote debugging against the default user-data
 directory; if Chrome prints that error, copy the desired profile to a temporary
 user-data directory and launch Chrome from that copy.
 
-### cloud profiles push
+### cloud profiles list
 
-Push a local profile to Libretto Cloud explicitly:
+List hosted auth profile names known to Libretto Cloud:
 
 ```bash theme={null}
-npx libretto cloud profiles push twitter --site twitter.com
+npx libretto cloud profiles list
 ```
 
-Pushing a profile with the same name overwrites the existing cloud copy. Code
-deploys are separate from profile pushes, so you can redeploy workflow code
-without refreshing profile state.
+`libretto cloud deploy` automatically registers any `authProfile` names declared
+by deployed workflows. Hosted runs use the browser provider's native profile API;
+local profile files are not uploaded.
+
+### cloud profiles delete
+
+Delete a hosted auth profile name and its provider mappings:
+
+```bash theme={null}
+npx libretto cloud profiles delete twitter
+```
 
 ### cloud credentials push
 

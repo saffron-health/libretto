@@ -196,7 +196,7 @@ describe("createHostedDeployPackage", () => {
     expect(deployManifest.dependencies).toEqual({
       libretto: "0.5.4",
     });
-    expect(bundle).toContain('createWorkflowProxy("testWorkflow")');
+    expect(bundle).toContain('createWorkflowProxy("testWorkflow", {})');
     expect(implementation).toContain("bundled from workspace source");
     expect(implementation).not.toContain("@repo/config/message");
     expect(bundle).not.toContain("workspace:*");
@@ -305,7 +305,7 @@ describe("createHostedDeployPackage", () => {
       libretto: currentLibrettoVersion.version,
       lodash: "^4.17.21",
     });
-    expect(bundle).toContain('createWorkflowProxy("testWorkflow")');
+    expect(bundle).toContain('createWorkflowProxy("testWorkflow", {})');
     expect(implementation).toContain("lodash");
   });
 

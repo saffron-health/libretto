@@ -60,9 +60,7 @@ import {
   getProfilePath,
   hasProfile,
   normalizeProfileName,
-  readProfile,
 } from "../profiles.js";
-import { applyAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { DaemonExecRepl } from "./exec-repl.js";
@@ -501,12 +499,6 @@ class BrowserDaemon {
       const contexts = browser.contexts();
       const context =
         contexts.length > 0 ? contexts[0] : await browser.newContext();
-      if (config.localAuthProfileName) {
-        await applyAuthProfileStorageState(
-          context,
-          readProfile(config.localAuthProfileName),
-        );
-      }
       const operationalPages = context.pages().filter(isOperationalPage);
       const page =
         operationalPages.length > 0

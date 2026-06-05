@@ -120,6 +120,7 @@ function expectedRootHelp(): string {
       run  Run the default-exported Libretto workflow from a file
       resume  Resume a paused workflow for the current session
       search  Search the current page HTML snapshot
+      profiles <subcommand>  Manage local browser auth profiles
       setup  Set up libretto in the current project
       status  Show workspace status and open sessions
       snapshot  Capture a screenshot and compact accessibility snapshot
@@ -579,6 +580,8 @@ export default workflow("main", async (ctx) => {
         deploy  Deploy workflows to the hosted platform
         auth <subcommand>  Hosted-platform auth commands
         billing <subcommand>  Hosted-platform subscription + usage commands
+        credentials <subcommand>  Manage hosted credentials
+        profiles <subcommand>  Manage hosted browser auth profiles
     `}\n`);
     expect(result.stdout).toBe("");
   });
@@ -1210,15 +1213,16 @@ export const workflows = workflow("main", async () => {
     await writeWorkflow(
       "integration.ts",
       `
-export default workflow("main", async () => {
-  return "ok";
+export default workflow("main", {
+  authProfile: "app.example.com",
+  async handler() {
+    return "ok";
+  },
 });
 `,
     );
 
-    const result = await librettoCli(
-      "run ./integration.ts --auth-profile app.example.com",
-    );
+    const result = await librettoCli("run ./integration.ts");
     expect(result.stderr).toContain(
       'Local auth profile not found: "app.example.com".',
     );
@@ -1648,7 +1652,7 @@ export default workflow("main", async (ctx) => {
   }) => {
     const result = await librettoCli("save --session test");
     expect(result.stderr).toContain(
-      "libretto save <url|domain> --session <name>",
+      "libretto save <profile-name> --session <name> --sites <site[,site]>",
     );
   });
 

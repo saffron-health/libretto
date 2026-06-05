@@ -530,20 +530,9 @@ export async function runOpenWithProvider(
   logger: LoggerApi,
   accessMode: SessionAccessMode,
   experiments: Experiments,
-  authProfileName?: string,
 ): Promise<void> {
   const parsedUrl = normalizeUrl(rawUrl);
   const url = parsedUrl.href;
-  const normalizedAuthProfileName = authProfileName
-    ? normalizeProfileName(authProfileName)
-    : undefined;
-  if (normalizedAuthProfileName && !hasProfile(normalizedAuthProfileName)) {
-    throw new Error(
-      `No saved auth profile named "${normalizedAuthProfileName}". ` +
-        `Save one first: libretto open <site-url> --headed --session <name>, ` +
-        `log in, then run: libretto save ${normalizedAuthProfileName} --session <name> --sites <site>`,
-    );
-  }
   logger.info("open-provider-start", { url, provider: providerName, session });
 
   console.log(
@@ -566,7 +555,6 @@ export async function runOpenWithProvider(
         kind: "provider",
         providerName,
         initialUrl: url,
-        localAuthProfileName: normalizedAuthProfileName,
       },
     },
     logger,

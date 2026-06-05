@@ -6,6 +6,7 @@ import {
 } from "../core/auth-fetch.js";
 import {
   buildHostedDeployTarball,
+  type WorkflowDeployMetadata,
 } from "../core/deploy-artifact.js";
 import { readAuthState } from "../core/auth-storage.js";
 import { SimpleCLI } from "affordance";
@@ -19,6 +20,13 @@ type DeploymentResponse = {
     workflows?: string[] | null;
     build_error?: string | null;
   };
+};
+
+type EnsureProfileResponse = {
+  success: true;
+  profile_id: string;
+  name: string;
+  created: boolean;
 };
 
 function generateDeploymentName(): string {
@@ -113,6 +121,33 @@ async function pollDeployment(
   return deployment;
 }
 
+async function ensureWorkflowAuthProfiles(args: {
+  apiUrl: string;
+  credential: { source: "env-api-key"; apiKey: string };
+  workflows: readonly WorkflowDeployMetadata[];
+}): Promise<void> {
+  const profileNames = [
+    ...new Set(
+      args.workflows
+        .map((workflow) => workflow.authProfileName?.trim())
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ];
+  if (profileNames.length === 0) return;
+
+  console.log(
+    `Ensuring cloud auth ${profileNames.length === 1 ? "profile" : "profiles"}: ${profileNames.join(", ")}`,
+  );
+  for (const name of profileNames) {
+    await orpcCall<EnsureProfileResponse>({
+      apiUrl: args.apiUrl,
+      path: "/v1/browserProfiles/ensure",
+      input: { name },
+      credential: args.credential,
+    });
+  }
+}
+
 export const deployInput = SimpleCLI.input({
   positionals: [
     SimpleCLI.positional("sourceDir", z.string().default("."), {
@@ -161,12 +196,14 @@ export const deployCommand = SimpleCLI.command({
     // a minimal manifest. Bundled code is embedded in the generated files;
     // external packages are listed in the manifest for installation.
     console.log("Bundling hosted deployment artifact...");
-    const { entryPoint, source } = await buildHostedDeployTarball({
+    const { entryPoint, source, workflows } = await buildHostedDeployTarball({
       additionalExternals: input.external,
       deploymentName,
       entryPoint: input.entryPoint,
       sourceDir: input.sourceDir,
     });
+
+    await ensureWorkflowAuthProfiles({ apiUrl, credential, workflows });
 
     const createPayload: Record<string, unknown> = {
       source,

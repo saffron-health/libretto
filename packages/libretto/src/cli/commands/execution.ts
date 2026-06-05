@@ -72,7 +72,6 @@ type RunIntegrationCommandRequest = {
   visualize: boolean;
   viewport?: { width: number; height: number };
   accessMode: SessionAccessMode;
-  authProfileName?: string;
   providerName?: string;
   stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
@@ -570,13 +569,8 @@ async function runIntegrationFromFile(
   );
   const defaultWorkflow = await loadDefaultWorkflow(absoluteIntegrationPath);
   const usesProviderBrowser = Boolean(args.providerName);
-  const authProfileName = usesProviderBrowser
-    ? defaultWorkflow.authProfileName
-    : args.authProfileName ?? defaultWorkflow.authProfileName;
-  const authProfilePersist =
-    !usesProviderBrowser && args.authProfileName !== undefined
-      ? false
-      : defaultWorkflow.authProfileRefresh === true;
+  const authProfileName = defaultWorkflow.authProfileName;
+  const authProfilePersist = defaultWorkflow.authProfileRefresh === true;
   if (authProfileName && !usesProviderBrowser) {
     const profileName = normalizeProfileName(authProfileName);
     if (!hasProfile(profileName)) {
@@ -828,10 +822,6 @@ export const runInput = SimpleCLI.input({
       name: "stay-open-on-success",
       help: "Keep the browser session open after the workflow completes successfully",
     }),
-    authProfile: SimpleCLI.option(z.string().optional(), {
-      name: "auth-profile",
-      help: "Named auth profile to load before running the workflow",
-    }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
@@ -922,7 +912,6 @@ export const runCommand = SimpleCLI.command({
         tsconfigPath: input.tsconfig,
         headless: daemonProviderName ? true : (headlessMode ?? false),
         visualize,
-        authProfileName: input.authProfile,
         viewport,
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
         providerName: daemonProviderName,

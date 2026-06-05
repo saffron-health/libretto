@@ -51,10 +51,6 @@ npx libretto run <file> [flags]
   validated against `schemas.input`.
 </ParamField>
 
-<ParamField path="--auth-profile" type="string">
-  Domain of a saved auth profile to load for this run. Example: `--auth-profile linkedin.com`. Profiles are created with `npx libretto save <domain> --session <name>`.
-</ParamField>
-
 <ParamField path="--viewport" type="string">
   Viewport size in `WIDTHxHEIGHT` format, for example `1920x1080`. Falls back to
   `.libretto/config.json`, then `1366x768`.
@@ -124,8 +120,8 @@ npx libretto run ./integration.ts --headless --params '{"status":"open"}'
 # Run with a params file
 npx libretto run ./integration.ts --params-file ./params.json
 
-# Run with a saved auth profile
-npx libretto run ./integration.ts --auth-profile linkedin.com
+# Run a workflow that declares authProfile
+npx libretto run ./integration.ts
 
 # Run with explicit session name for post-failure inspection
 npx libretto run ./integration.ts --session debug-flow --headed

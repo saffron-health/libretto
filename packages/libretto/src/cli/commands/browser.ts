@@ -123,6 +123,11 @@ export const openCommand = SimpleCLI.command({
         experiments: ctx.experiments,
       });
     } else {
+      if (input.authProfile) {
+        throw new Error(
+          "--auth-profile is only supported for local browser sessions. Hosted provider sessions use workflow-declared authProfile settings.",
+        );
+      }
       await runOpenWithProvider(
         input.url,
         providerName,
@@ -130,7 +135,6 @@ export const openCommand = SimpleCLI.command({
         ctx.logger,
         resolveRequestedSessionMode(input.readOnly, input.writeAccess),
         ctx.experiments,
-        input.authProfile,
       );
     }
   });

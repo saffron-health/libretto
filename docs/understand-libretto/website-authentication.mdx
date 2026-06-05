@@ -7,7 +7,7 @@ title: Website authentication
 Most real automation targets sit behind a login. There are two patterns for getting past it, and they cover different kinds of login:
 
 1. **Pass credentials into the workflow as input** (username, password, TOTP secret). The workflow's Playwright code fills them into the login form and submits, just like any other form interaction. This works for any login you can script end-to-end, including ones with TOTP.
-2. **Save an authenticated profile** from a one-time manual login and reuse it with `--auth-profile`. Use this when the login can't be scripted (CAPTCHAs, SMS codes, device-approval prompts, magic links), so future runs start already signed in.
+2. **Save an authenticated profile** from a one-time manual login and declare it on the workflow with `authProfile`. Use this when the login can't be scripted (CAPTCHAs, SMS codes, device-approval prompts, magic links), so future runs start already signed in.
 
 ### Passing credentials into a workflow
 
@@ -62,7 +62,7 @@ npx libretto run ./portal-login.ts \
 
 ### Saving profiles locally
 
-When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magic links), the workaround is to log in **once** in a visible browser and snapshot the authenticated state. Libretto calls that snapshot a **profile**: cookies, `localStorage`, and other persistent storage saved to `.libretto/profiles/<domain>.json`. Future runs start already signed in by loading the profile.
+When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magic links), the workaround is to log in **once** in a visible browser and snapshot the authenticated state. Libretto calls that snapshot a **profile**: cookies, `localStorage`, and IndexedDB saved to `.libretto/profiles/<name>.json`. Future local runs start already signed in by loading the profile declared by the workflow.
 
 <Steps>
   <Step title="Open the site in headed mode">
@@ -79,20 +79,35 @@ When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magi
 
   <Step title="Save the session as a profile">
     ```bash  theme={null}
-    npx libretto save portal.example.com --session portal-login
+    npx libretto save portal.example.com --session portal-login --sites portal.example.com
     ```
 
     Libretto writes the authenticated state to `.libretto/profiles/portal.example.com.json`.
   </Step>
 
   <Step title="Reuse the profile in future runs">
+    Declare the profile on the workflow:
+
+    ```typescript theme={null}
+    export default workflow("report", {
+      authProfile: "portal.example.com",
+      async handler(ctx) {
+        await ctx.page.goto("https://portal.example.com");
+      },
+    });
+    ```
+
     ```bash  theme={null}
-    npx libretto run ./report.ts --auth-profile portal.example.com
+    npx libretto run ./report.ts
     ```
 
     The run starts already signed in. No login step required.
   </Step>
 </Steps>
+
+For hosted runs, `libretto cloud deploy` registers workflow-declared profile
+names with Libretto Cloud. Hosted browser sessions then use the provider's native
+profile API; local profile files are not uploaded.
 
 <Warning>
   Sessions can expire. If a profile stops working, repeat the login-and-save flow to refresh it. For servers, rotate profiles on a schedule shorter than the site's session TTL.
