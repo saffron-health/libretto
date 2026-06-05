@@ -23,6 +23,7 @@ The first implementation milestone should not try to match all v1 behavior. Star
 - Middleware can inject or refine downstream context through `next({ ctx })`.
 - `next()` rejects when downstream middleware or the handler throws, unless an intermediate middleware catches and handles the error.
 - Command handlers receive `{ input, ctx, command }`.
+- Input schemas can come from any validator that implements Standard Schema, while Zod remains valid because Zod v4 implements that interface.
 - Root middleware can be installed once on the CLI root builder and applies to every resolved command.
 - Tests are focused by behavior instead of growing one catch-all test file.
 
@@ -134,7 +135,7 @@ Create the v2 test folder and write the initial red tests. This phase is intenti
 - [x] Add `packages/affordance/test/v2/routes-and-help.spec.ts` with focused route builder and help expectations.
 - [x] Add `packages/affordance/test/v2/input.spec.ts` with minimum input expectations needed by route invocation.
 - [x] Add `packages/affordance/test/v2/middleware.spec.ts` with runtime `next()` expectations.
-- [ ] Add `packages/affordance/test/v2/middleware-types.spec.ts` with initial type-contract expectations, or defer it explicitly to Phase 6 if runtime behavior should land first.
+- [ ] Add `packages/affordance/test/v2/middleware-types.spec.ts` with initial type-contract expectations, or defer it explicitly to Phase 8 if runtime behavior should land first.
 - [x] Verify `pnpm -s --filter affordance test` fails because `../../src/v2/index.js` is missing.
 
 ### Phase 2: Minimal v2 app, route builders, and direct invocation
@@ -173,12 +174,41 @@ Add input schemas and command argument parsing. Keep this phase focused on the p
 - [x] Implement `Aff.option(schema)` for valued options.
 - [x] Implement `Aff.flag(config?)` for boolean flags.
 - [x] Implement raw `invoke(...)` input parsing using the existing zod-based behavior as a reference, not a blind copy.
-- [ ] Implement command argument parsing in `exec(commandLine)` after the command-line string has been tokenized.
-- [ ] Implement required argument and option errors.
+- [x] Implement command argument parsing in `exec(commandLine)` after the command-line string has been tokenized.
+- [x] Implement required argument and option errors.
 - [ ] Add additional option metadata, aliases, passthrough, global options, and variadic arguments only when tests for those behaviors are added.
 - [ ] Verify the Phase 4 input tests pass.
 
-### Phase 5: Runtime middleware
+### Phase 5: Teg parser-based command-line parsing
+
+Replace the handwritten command-line input parser with `teg-parser` before expanding CLI grammar features. Keep route resolution separate from input parsing: route matching should identify the command path, then the Teg-based parser should parse the remaining tokens into Aff raw input.
+
+The team owns `teg-parser`, so gaps in the parser API should be fixed upstream and published instead of worked around indefinitely in Affordance.
+
+- [ ] First add focused parser tests for quoted strings, `--option value`, `--option=value`, flags, missing option values, unknown options, and positional arguments.
+- [ ] Add `teg-parser` as an Affordance development/runtime dependency only after confirming its package metadata and dependency footprint are acceptable.
+- [ ] Move command-line input parsing out of `packages/affordance/src/v2/input.ts` if a dedicated parser module keeps `input.ts` focused on schema validation and input definitions.
+- [ ] Replace `parseCommandLineInput(...)` internals with Teg parser combinators while preserving the public Aff raw input shape `{ arguments, options }`.
+- [ ] Preserve current Phase 4 error messages unless a Teg parse failure gives a clearly better Aff-owned message.
+- [ ] Keep help detection and command route matching outside the Teg parser for now.
+- [ ] Verify existing Phase 4 exec parsing tests still pass.
+
+### Phase 6: Standard Schema input support
+
+Make Aff v2 schema-agnostic before middleware starts depending on parsed input. Zod should keep working, but the input layer should depend on the Standard Schema interface instead of Zod-specific parsing APIs.
+
+- [ ] First add tests that use at least one non-Zod Standard Schema implementation or a small in-test Standard Schema fixture for arguments and options.
+- [ ] First add type tests proving `AffInputFor` infers Standard Schema output types for arguments, plain options, and `Aff.option(schema)`.
+- [ ] Replace `ZodTypeAny` constraints in `packages/affordance/src/v2/input.ts` with a local Standard Schema-compatible type.
+- [ ] Replace `z.output<T>` inference with Standard Schema output inference.
+- [ ] Validate each argument and option independently through `schema["~standard"].validate(...)` instead of building a Zod object schema.
+- [ ] Make command input parsing async if needed, because Standard Schema validation may return a promise.
+- [ ] Keep required argument and option errors by validating `undefined`: if a schema accepts `undefined`, use the schema output; otherwise throw the Aff-specific missing input error.
+- [ ] Replace `z.prettifyError(...)` with an Aff-owned Standard Schema issue formatter.
+- [ ] Decide whether `Aff.flag()` continues to use Zod internally or uses a tiny Aff-owned boolean Standard Schema.
+- [ ] Verify existing Zod-based Phase 4 tests still pass.
+
+### Phase 7: Runtime middleware
 
 Add middleware builders and oRPC-style runtime composition. This phase should not attempt full type-level context propagation; it should prove runtime semantics first.
 
@@ -193,9 +223,9 @@ Add middleware builders and oRPC-style runtime composition. This phase should no
 - [ ] Compose middleware around handlers recursively or iteratively.
 - [ ] Implement `next({ ctx })` as shallow downstream context merging.
 - [ ] Preserve thrown errors when middleware does not catch them.
-- [ ] Verify the Phase 5 middleware tests pass.
+- [ ] Verify the Phase 7 middleware tests pass.
 
-### Phase 6: Type-level context and input contracts
+### Phase 8: Type-level context and input contracts
 
 Add the type system for context propagation after runtime semantics are stable. This phase should be allowed to change generic signatures without changing runtime behavior.
 
@@ -208,7 +238,7 @@ Add the type system for context propagation after runtime semantics are stable. 
 - [ ] Implement `$input<T>()` and `$context<T>()` on middleware builders if the tests choose that API.
 - [ ] Verify `pnpm -s --filter affordance type-check` passes.
 
-### Phase 7: Complete v2 parity decisions
+### Phase 9: Complete v2 parity decisions
 
 Decide which remaining v1 features are required before Libretto can migrate. Add focused tests and implementation for only those features.
 
@@ -223,7 +253,7 @@ Candidate features:
 - [ ] Duplicate route validation.
 - [ ] Missing handler validation.
 
-### Phase 8: Migrate Libretto CLI call sites
+### Phase 10: Migrate Libretto CLI call sites
 
 Migrate Libretto after Aff v2 is stable enough to support current command behavior. This phase should start with Libretto-facing regression tests.
 
@@ -236,7 +266,7 @@ Migrate Libretto after Aff v2 is stable enough to support current command behavi
 - [ ] Migrate representative command groups from `SimpleCLI` to `Aff`.
 - [ ] Run the smallest relevant Libretto CLI tests that cover session middleware behavior.
 
-### Phase 9: Update telemetry spec to consume Aff v2 middleware
+### Phase 11: Update telemetry spec to consume Aff v2 middleware
 
 Update the telemetry plan once v2 middleware can observe successful and failed command execution centrally.
 

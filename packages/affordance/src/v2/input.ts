@@ -83,20 +83,69 @@ export function parseInput<TOutput>(
 ): TOutput {
   const normalized = normalizeInput(definition, rawInput);
   const schema = z.object(buildInputShape(definition));
+  validateRequiredInput(definition, normalized);
+  const result = schema.safeParse(normalized);
 
-  try {
-    return schema.parse(normalized) as TOutput;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const messages = error.issues
-        .map((issue) => issue.message)
-        .filter((message) => message.length > 0);
-      if (messages.length > 0) {
-        throw new Error(messages.join("\n"));
-      }
-    }
-    throw error;
+  if (!result.success) {
+    throw new Error(z.prettifyError(result.error));
   }
+
+  return result.data as TOutput;
+}
+
+export function parseCommandLineInput(
+  definition: AffInputDefinition | undefined,
+  tokens: readonly string[],
+  commandName: string,
+): AffInputRaw {
+  if (!definition) {
+    if (tokens.length > 0) {
+      throw new Error(`Unexpected arguments for ${commandName}.`);
+    }
+
+    return {
+      arguments: [],
+      options: {},
+    };
+  }
+
+  const args: string[] = [];
+  const options: Record<string, unknown> = {};
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]!;
+
+    if (!token.startsWith("--") || token === "--") {
+      args.push(token);
+      continue;
+    }
+
+    const [name, inlineValue] = splitOptionToken(token.slice(2));
+    const optionDefinition = definition.options[name];
+    if (!optionDefinition) {
+      throw new Error(`Unknown option: --${name}`);
+    }
+
+    if (isFlagDefinition(optionDefinition)) {
+      options[name] = inlineValue === undefined ? true : parseFlagValue(name, inlineValue);
+      continue;
+    }
+
+    const value = inlineValue ?? tokens[index + 1];
+    if (value === undefined || isRecognizedOptionToken(definition, value)) {
+      throw new Error(`Missing value for --${name}.`);
+    }
+
+    options[name] = value;
+    if (inlineValue === undefined) {
+      index += 1;
+    }
+  }
+
+  return {
+    arguments: args,
+    options,
+  };
 }
 
 function normalizeInput(
@@ -131,6 +180,53 @@ function normalizeRawInput(rawInput: unknown): Required<AffInputRaw> {
   };
 }
 
+function validateRequiredInput(
+  definition: AffInputDefinition,
+  normalized: Record<string, unknown>,
+): void {
+  for (const [key, schema] of definition.arguments) {
+    if (normalized[key] === undefined && !schema.safeParse(undefined).success) {
+      throw new Error(`Missing required argument <${key}>.`);
+    }
+  }
+
+  for (const [key, optionDefinition] of Object.entries(definition.options)) {
+    const schema = getOptionSchema(optionDefinition);
+    if (normalized[key] === undefined && !schema.safeParse(undefined).success) {
+      throw new Error(`Missing required option --${key}.`);
+    }
+  }
+}
+
+function splitOptionToken(token: string): readonly [string, string | undefined] {
+  const separatorIndex = token.indexOf("=");
+  if (separatorIndex < 0) {
+    return [token, undefined];
+  }
+
+  return [token.slice(0, separatorIndex), token.slice(separatorIndex + 1)];
+}
+
+function parseFlagValue(name: string, value: string): boolean {
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+
+  throw new Error(`Invalid value for --${name}: expected true or false.`);
+}
+
+function isRecognizedOptionToken(definition: AffInputDefinition, token: string): boolean {
+  if (!token.startsWith("--") || token === "--") {
+    return false;
+  }
+
+  const [name] = splitOptionToken(token.slice(2));
+  return Object.hasOwn(definition.options, name);
+}
+
 function buildInputShape(definition: AffInputDefinition): Record<string, ZodTypeAny> {
   const shape: Record<string, ZodTypeAny> = {};
 
@@ -150,6 +246,10 @@ function getOptionSchema(optionDefinition: AffNamedInputDefinition): ZodTypeAny 
   }
 
   return optionDefinition;
+}
+
+function isFlagDefinition(value: AffNamedInputDefinition): value is AffFlagDefinition {
+  return isRecord(value) && value.type === "flag" && "schema" in value;
 }
 
 function isNamedInputDeclaration(

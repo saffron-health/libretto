@@ -57,5 +57,63 @@ describe("Aff v2 input", () => {
     expect(handlerCalls).toBe(0);
   });
 
-  test.todo("parses arguments and options from an exec string");
+  test("parses arguments and options from an exec string", async () => {
+    const app = Aff.cli("libretto").routes({
+      open: Aff.command({ description: "Open URL" })
+        .arguments([["url", z.url()]])
+        .options({
+          session: Aff.option(z.string().default("default")),
+          retries: z.coerce.number().int().default(0),
+          headless: Aff.flag(),
+        })
+        .handle(async ({ input }) => input),
+    });
+
+    await expect(
+      app.exec("open https://example.com --session debug --retries 2 --headless"),
+    ).resolves.toEqual({
+      url: "https://example.com",
+      session: "debug",
+      retries: 2,
+      headless: true,
+    });
+
+    await expect(app.exec("open https://example.com")).resolves.toEqual({
+      url: "https://example.com",
+      session: "default",
+      retries: 0,
+      headless: false,
+    });
+  });
+
+  test("surfaces command-line input errors before the handler runs", async () => {
+    let handlerCalls = 0;
+    const app = Aff.cli("libretto").routes({
+      open: Aff.command({ description: "Open URL" })
+        .arguments([["url", z.url()]])
+        .options({
+          session: Aff.option(z.string()),
+        })
+        .handle(async () => {
+          handlerCalls += 1;
+        }),
+      status: Aff.command({ description: "Show status" }).handle(async () => {
+        handlerCalls += 1;
+      }),
+    });
+
+    await expect(app.exec("open --session debug")).rejects.toThrow(
+      "Missing required argument <url>.",
+    );
+    await expect(app.exec("open https://example.com")).rejects.toThrow(
+      "Missing required option --session.",
+    );
+    await expect(app.exec("open https://example.com --unknown value")).rejects.toThrow(
+      "Unknown option: --unknown",
+    );
+    await expect(app.exec("status extra")).rejects.toThrow(
+      "Unexpected arguments for libretto status.",
+    );
+    expect(handlerCalls).toBe(0);
+  });
 });

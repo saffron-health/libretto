@@ -7,7 +7,7 @@ import {
 } from "./help.js";
 import { createCommandBuilder, type AffCommand } from "./command.js";
 import { createGroupBuilder, type AffGroup } from "./group.js";
-import { flag, option } from "./input.js";
+import { flag, option, parseCommandLineInput } from "./input.js";
 
 export type {
   AffCommand,
@@ -89,16 +89,20 @@ function createCliBuilder(name: string): AffCliBuilder {
             return renderGroupHelp(name, tokens, routeNode);
           }
 
-          const route = commandRoutes.find(
-            ({ metadata }) =>
-              metadata.path.length === tokens.length &&
-              metadata.path.every((segment, index) => segment === tokens[index]),
-          );
+          const route = findCommandRouteByTokens(commandRoutes, tokens);
           if (!route) {
             throw new Error(renderUnknownCommandHelp(name, routes, tokens));
           }
 
-          return route.command.execute({ arguments: [], options: {} }, {}, route.metadata);
+          return route.command.execute(
+            parseCommandLineInput(
+              route.command.input,
+              tokens.slice(route.metadata.path.length),
+              `${name} ${route.metadata.path.join(" ")}`,
+            ),
+            {},
+            route.metadata,
+          );
         },
       };
     },
@@ -133,6 +137,15 @@ function flattenCommandRoutes(routes: AffRouteMap, path: string[] = []): AffComm
   }
 
   return commandRoutes;
+}
+
+function findCommandRouteByTokens(
+  commandRoutes: readonly AffCommandRoute[],
+  tokens: readonly string[],
+): AffCommandRoute | undefined {
+  return commandRoutes
+    .filter(({ metadata }) => metadata.path.every((segment, index) => segment === tokens[index]))
+    .sort((left, right) => right.metadata.path.length - left.metadata.path.length)[0];
 }
 
 export const Aff = {
