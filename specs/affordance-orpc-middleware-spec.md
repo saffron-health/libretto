@@ -146,7 +146,7 @@ Implement the smallest v2 runtime that can construct an app, derive command meta
 - [x] Implement `Aff.cli(name).routes(routes)`.
 - [x] Implement `Aff.group(config).routes(routes)`.
 - [x] Implement `Aff.command(config).handle(handler)`.
-- [ ] Derive `routeKey`, `path`, and `description` from the route tree.
+- [x] Derive `routeKey`, `path`, and `description` from the route tree.
 - [ ] Throw a clear error for unknown route keys in `invoke(...)`.
 - [ ] Verify the Phase 2 tests pass while later v2 tests may still fail.
 

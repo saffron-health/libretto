@@ -1,7 +1,19 @@
-export type AffRouteMap = Record<string, unknown>;
+export type AffRoute = AffGroup | AffCommand;
+export type AffRouteMap = Record<string, AffRoute>;
+
+export interface AffCommandMetadata {
+  routeKey: string;
+  path: string[];
+  description?: string;
+}
+
+interface AffCommandRoute {
+  metadata: AffCommandMetadata;
+  command: AffCommand;
+}
 
 export interface AffApp {
-  getCommands(): [];
+  getCommands(): AffCommandMetadata[];
   invoke(routeKey: string): Promise<never>;
 }
 
@@ -11,10 +23,12 @@ export interface AffCliBuilder {
 
 function createCliBuilder(name: string): AffCliBuilder {
   return {
-    routes(_routes) {
+    routes(routes) {
+      const commandRoutes = flattenCommandRoutes(routes);
+
       return {
         getCommands() {
-          return [];
+          return commandRoutes.map(({ metadata }) => metadata);
         },
         async invoke(routeKey) {
           throw new Error(`Unknown command route: ${routeKey}`);
@@ -24,12 +38,41 @@ function createCliBuilder(name: string): AffCliBuilder {
   };
 }
 
+function flattenCommandRoutes(
+  routes: AffRouteMap,
+  path: string[] = [],
+): AffCommandRoute[] {
+  const commandRoutes: AffCommandRoute[] = [];
+
+  for (const [routeSegment, route] of Object.entries(routes)) {
+    const routePath = [...path, routeSegment];
+
+    if (route.type === "command") {
+      commandRoutes.push({
+        metadata: {
+          routeKey: routePath.join("."),
+          path: routePath,
+          description: route.config.description,
+        },
+        command: route,
+      });
+      continue;
+    }
+
+    if (route.type === "group") {
+      commandRoutes.push(...flattenCommandRoutes(route.routes, routePath));
+    }
+  }
+
+  return commandRoutes;
+}
+
 export interface AffGroupConfig {
   description?: string;
 }
 
 export interface AffGroup {
-  kind: "group";
+  type: "group";
   config: AffGroupConfig;
   routes: AffRouteMap;
 }
@@ -42,7 +85,7 @@ function createGroupBuilder(config: AffGroupConfig): AffGroupBuilder {
   return {
     routes(routes) {
       return {
-        kind: "group",
+        type: "group",
         config,
         routes,
       };
@@ -63,7 +106,7 @@ export interface AffCommandHandlerArgs {
 export type AffCommandHandler = (args: AffCommandHandlerArgs) => unknown | Promise<unknown>;
 
 export interface AffCommand {
-  kind: "command";
+  type: "command";
   config: AffCommandConfig;
   handler: AffCommandHandler;
 }
@@ -76,7 +119,7 @@ function createCommandBuilder(config: AffCommandConfig): AffCommandBuilder {
   return {
     handle(handler) {
       return {
-        kind: "command",
+        type: "command",
         config,
         handler,
       };
