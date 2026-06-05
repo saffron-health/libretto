@@ -6,11 +6,11 @@ describe("Aff v2 routes and direct invocation", () => {
   test("derives route keys and path tokens from route builders", () => {
     const app = Aff.cli("libretto").routes({
       ai: Aff.group({ description: "AI commands" }).routes({
-        configure: Aff.command({ description: "Configure AI runtime" })
-          .handle(),
+        configure: Aff.command({
+          description: "Configure AI runtime",
+        }).handle(),
       }),
-      open: Aff.command({ description: "Open URL" })
-        .handle(),
+      open: Aff.command({ description: "Open URL" }).handle(),
     });
 
     expect(app.getCommands()).toEqual([
@@ -30,27 +30,25 @@ describe("Aff v2 routes and direct invocation", () => {
   test("invokes no-input commands directly by route key", async () => {
     const app = Aff.cli("libretto").routes({
       ai: Aff.group({ description: "AI commands" }).routes({
-        configure: Aff.command({ description: "Configure AI runtime" })
-          .handle(async ({ command }) => ({
+        configure: Aff.command({ description: "Configure AI runtime" }).handle(
+          async ({ command }) => ({
             routeKey: command.routeKey,
             path: command.path,
-          })),
+          }),
+        ),
       }),
-      open: Aff.command({ description: "Open URL" })
-        .handle(async ({ input, ctx, command }) => ({
-          input,
-          ctx,
-          routeKey: command.routeKey,
-        })),
+      open: Aff.command({ description: "Open URL" }).handle(async ({ input, ctx, command }) => ({
+        input,
+        ctx,
+        routeKey: command.routeKey,
+      })),
     });
 
     await expect(app.invoke("ai.configure")).resolves.toEqual({
       routeKey: "ai.configure",
       path: ["ai", "configure"],
     });
-    await expect(
-      app.invoke("open", { debug: true }, { session: "test" }),
-    ).resolves.toEqual({
+    await expect(app.invoke("open", { debug: true }, { session: "test" })).resolves.toEqual({
       input: { debug: true },
       ctx: { session: "test" },
       routeKey: "open",
@@ -59,27 +57,24 @@ describe("Aff v2 routes and direct invocation", () => {
 
   test("throws a clear error for unknown route keys", async () => {
     const app = Aff.cli("libretto").routes({
-      open: Aff.command({ description: "Open URL" })
-        .handle(async () => "opened"),
+      open: Aff.command({ description: "Open URL" }).handle(async () => "opened"),
     });
 
-    await expect(app.invoke("missing")).rejects.toThrow(
-      "Unknown command route: missing",
-    );
+    await expect(app.invoke("missing")).rejects.toThrow("Unknown command route: missing");
   });
 
   test("executes no-input commands by command-line path", async () => {
     const app = Aff.cli("libretto").routes({
       ai: Aff.group({ description: "AI commands" }).routes({
-        configure: Aff.command({ description: "Configure AI runtime" })
-          .handle(async ({ command, input, ctx }) => ({
+        configure: Aff.command({ description: "Configure AI runtime" }).handle(
+          async ({ command, input, ctx }) => ({
             routeKey: command.routeKey,
             input,
             ctx,
-          })),
+          }),
+        ),
       }),
-      open: Aff.command({ description: "Open URL" })
-        .handle(async () => "opened"),
+      open: Aff.command({ description: "Open URL" }).handle(async () => "opened"),
     });
 
     await expect(app.exec("ai configure")).resolves.toEqual({
@@ -93,11 +88,11 @@ describe("Aff v2 routes and direct invocation", () => {
   test("renders root, group, and command help", async () => {
     const app = Aff.cli("libretto").routes({
       ai: Aff.group({ description: "AI commands" }).routes({
-        configure: Aff.command({ description: "Configure AI runtime" })
-          .handle(),
+        configure: Aff.command({
+          description: "Configure AI runtime",
+        }).handle(),
       }),
-      open: Aff.command({ description: "Open URL" })
-        .handle(),
+      open: Aff.command({ description: "Open URL" }).handle(),
     });
 
     await expect(app.exec("help")).resolves.toBe(
@@ -196,14 +191,17 @@ describe("Aff v2 routes and direct invocation", () => {
         deploy: Aff.command({
           description: "Deploy workflows to the hosted platform",
         }).handle(),
-        auth: Aff.group({ description: "Hosted-platform auth commands" }).routes({
+        auth: Aff.group({
+          description: "Hosted-platform auth commands",
+        }).routes({
           login: Aff.command({
             description: "Log in to the hosted platform",
           }).handle(),
         }),
       }),
-      open: Aff.command({ description: "Launch browser and open URL" })
-        .handle(),
+      open: Aff.command({
+        description: "Launch browser and open URL",
+      }).handle(),
     });
 
     await expect(app.exec("opne")).rejects.toThrow(

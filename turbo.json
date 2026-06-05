@@ -10,12 +10,21 @@
       "dependsOn": ["build"],
       "outputs": []
     },
+    "check": {
+      "cache": false
+    },
     "lint": {
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.lintcn/**/*.go",
         "$TURBO_ROOT$/.lintcn/**/*.json"
       ],
+      "outputs": []
+    },
+    "format": {
+      "outputs": []
+    },
+    "format:check": {
       "outputs": []
     },
     "test:vitest": {

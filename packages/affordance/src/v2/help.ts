@@ -21,11 +21,7 @@ function isHelpFlag(token: string): boolean {
   return token === "--help" || token === "-h";
 }
 
-export function renderHelp(
-  name: string,
-  routes: AffRouteMap,
-  path: string[],
-): string {
+export function renderHelp(name: string, routes: AffRouteMap, path: string[]): string {
   if (path.length === 0) {
     return renderRootHelp(name, routes);
   }
@@ -55,19 +51,10 @@ export function renderUnknownCommandHelp(
 }
 
 export function renderRootHelp(name: string, routes: AffRouteMap): string {
-  return [
-    `Usage: ${name} <command>`,
-    "",
-    "Commands:",
-    ...renderCommandList(routes),
-  ].join("\n");
+  return [`Usage: ${name} <command>`, "", "Commands:", ...renderCommandList(routes)].join("\n");
 }
 
-export function renderGroupHelp(
-  name: string,
-  path: string[],
-  group: AffGroup,
-): string {
+export function renderGroupHelp(name: string, path: string[], group: AffGroup): string {
   const help = [
     `Usage: ${name} ${path.join(" ")} <subcommand>`,
     "",
@@ -82,11 +69,7 @@ export function renderGroupHelp(
   return `${group.config.description}\n\n${help}`;
 }
 
-function renderCommandHelp(
-  name: string,
-  path: string[],
-  command: AffCommand,
-): string {
+function renderCommandHelp(name: string, path: string[], command: AffCommand): string {
   const usage = `Usage: ${name} ${path.join(" ")}`;
   if (!command.config.description) {
     return usage;
@@ -105,10 +88,7 @@ function renderCommandList(routes: AffRouteMap): string[] {
   });
 }
 
-export function findRouteByPath(
-  routes: AffRouteMap,
-  path: string[],
-): AffRoute | undefined {
+export function findRouteByPath(routes: AffRouteMap, path: string[]): AffRoute | undefined {
   let currentRoutes = routes;
 
   for (const [index, pathSegment] of path.entries()) {

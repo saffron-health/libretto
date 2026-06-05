@@ -10,9 +10,7 @@ export interface AffCommandHandlerArgs {
   command: AffCommandMetadata;
 }
 
-export type AffCommandHandler = (
-  args: AffCommandHandlerArgs,
-) => unknown | Promise<unknown>;
+export type AffCommandHandler = (args: AffCommandHandlerArgs) => unknown | Promise<unknown>;
 
 export interface AffCommand {
   type: "command";
@@ -24,9 +22,7 @@ export interface AffCommandBuilder {
   handle(handler?: AffCommandHandler): AffCommand;
 }
 
-export function createCommandBuilder(
-  config: AffCommandConfig,
-): AffCommandBuilder {
+export function createCommandBuilder(config: AffCommandConfig): AffCommandBuilder {
   return {
     handle(handler) {
       return {

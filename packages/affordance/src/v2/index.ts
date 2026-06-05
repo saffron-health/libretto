@@ -51,9 +51,7 @@ function createCliBuilder(name: string): AffCliBuilder {
           return commandRoutes.map(({ metadata }) => metadata);
         },
         async invoke(routeKey, rawInput = {}, initialContext = {}) {
-          const route = commandRoutes.find(
-            ({ metadata }) => metadata.routeKey === routeKey,
-          );
+          const route = commandRoutes.find(({ metadata }) => metadata.routeKey === routeKey);
           if (!route) {
             throw new Error(`Unknown command route: ${routeKey}`);
           }
@@ -76,10 +74,11 @@ function createCliBuilder(name: string): AffCliBuilder {
             return renderGroupHelp(name, tokens, routeNode);
           }
 
-          const route = commandRoutes.find(({ metadata }) => (
-            metadata.path.length === tokens.length
-              && metadata.path.every((segment, index) => segment === tokens[index])
-          ));
+          const route = commandRoutes.find(
+            ({ metadata }) =>
+              metadata.path.length === tokens.length &&
+              metadata.path.every((segment, index) => segment === tokens[index]),
+          );
           if (!route) {
             throw new Error(renderUnknownCommandHelp(name, routes, tokens));
           }
@@ -99,10 +98,7 @@ function tokenizeCommandLine(commandLine: string): string[] {
   return commandLine.trim().split(/\s+/).filter(Boolean);
 }
 
-function flattenCommandRoutes(
-  routes: AffRouteMap,
-  path: string[] = [],
-): AffCommandRoute[] {
+function flattenCommandRoutes(routes: AffRouteMap, path: string[] = []): AffCommandRoute[] {
   const commandRoutes: AffCommandRoute[] = [];
 
   for (const [routeSegment, route] of Object.entries(routes)) {
