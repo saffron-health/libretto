@@ -1,3 +1,21 @@
+import {
+  findRouteByPath,
+  getHelpPath,
+  renderGroupHelp,
+  renderHelp,
+} from "./help.js";
+import { createCommandBuilder, type AffCommand } from "./command.js";
+import { createGroupBuilder, type AffGroup } from "./group.js";
+
+export type {
+  AffCommand,
+  AffCommandBuilder,
+  AffCommandConfig,
+  AffCommandHandler,
+  AffCommandHandlerArgs,
+} from "./command.js";
+export type { AffGroup, AffGroupBuilder, AffGroupConfig } from "./group.js";
+
 export type AffRoute = AffGroup | AffCommand;
 export type AffRouteMap = Record<string, AffRoute>;
 
@@ -76,98 +94,6 @@ function createCliBuilder(name: string): AffCliBuilder {
   };
 }
 
-function getHelpPath(tokens: string[]): string[] | undefined {
-  if (tokens[0] === "help") {
-    return tokens.slice(1);
-  }
-
-  if (tokens.at(-1) === "help") {
-    return tokens.slice(0, -1);
-  }
-
-  return undefined;
-}
-
-function renderHelp(name: string, routes: AffRouteMap, path: string[]): string {
-  if (path.length === 0) {
-    return renderRootHelp(name, routes);
-  }
-
-  const route = findRouteByPath(routes, path);
-  if (route?.type === "group") {
-    return renderGroupHelp(name, path, route);
-  }
-  if (route?.type === "command") {
-    return renderCommandHelp(name, path, route);
-  }
-
-  throw new Error(`Unknown command: ${path.join(" ")}`);
-}
-
-function renderRootHelp(name: string, routes: AffRouteMap): string {
-  return [
-    `Usage: ${name} <command>`,
-    "",
-    "Commands:",
-    ...renderCommandList(routes),
-  ].join("\n");
-}
-
-function renderGroupHelp(name: string, path: string[], group: AffGroup): string {
-  const help = [
-    `Usage: ${name} ${path.join(" ")} <subcommand>`,
-    "",
-    "Commands:",
-    ...renderCommandList(group.routes),
-  ].join("\n");
-
-  if (!group.config.description) {
-    return help;
-  }
-
-  return `${group.config.description}\n\n${help}`;
-}
-
-function renderCommandHelp(name: string, path: string[], command: AffCommand): string {
-  const usage = `Usage: ${name} ${path.join(" ")}`;
-  if (!command.config.description) {
-    return usage;
-  }
-
-  return `${command.config.description}\n\n${usage}`;
-}
-
-function renderCommandList(routes: AffRouteMap): string[] {
-  return Object.entries(routes).map(([routeSegment, route]) => {
-    if (route.type === "group") {
-      return `  ${routeSegment} <subcommand>  ${route.config.description ?? ""}`;
-    }
-
-    return `  ${routeSegment}  ${route.config.description ?? ""}`;
-  });
-}
-
-function findRouteByPath(routes: AffRouteMap, path: string[]): AffRoute | undefined {
-  let currentRoutes = routes;
-
-  for (const [index, pathSegment] of path.entries()) {
-    const route = currentRoutes[pathSegment];
-    if (!route) {
-      return undefined;
-    }
-    if (index === path.length - 1) {
-      return route;
-    }
-    if (route.type === "command") {
-      return undefined;
-    }
-
-    currentRoutes = route.routes;
-  }
-
-  return undefined;
-}
-
 function flattenCommandRoutes(
   routes: AffRouteMap,
   path: string[] = [],
@@ -195,66 +121,6 @@ function flattenCommandRoutes(
   }
 
   return commandRoutes;
-}
-
-export interface AffGroupConfig {
-  description?: string;
-}
-
-export interface AffGroup {
-  type: "group";
-  config: AffGroupConfig;
-  routes: AffRouteMap;
-}
-
-export interface AffGroupBuilder {
-  routes(routes: AffRouteMap): AffGroup;
-}
-
-function createGroupBuilder(config: AffGroupConfig): AffGroupBuilder {
-  return {
-    routes(routes) {
-      return {
-        type: "group",
-        config,
-        routes,
-      };
-    },
-  };
-}
-
-export interface AffCommandConfig {
-  description?: string;
-}
-
-export interface AffCommandHandlerArgs {
-  input: unknown;
-  ctx: unknown;
-  command: AffCommandMetadata;
-}
-
-export type AffCommandHandler = (args: AffCommandHandlerArgs) => unknown | Promise<unknown>;
-
-export interface AffCommand {
-  type: "command";
-  config: AffCommandConfig;
-  handler: AffCommandHandler;
-}
-
-export interface AffCommandBuilder {
-  handle(handler: AffCommandHandler): AffCommand;
-}
-
-function createCommandBuilder(config: AffCommandConfig): AffCommandBuilder {
-  return {
-    handle(handler) {
-      return {
-        type: "command",
-        config,
-        handler,
-      };
-    },
-  };
 }
 
 export const Aff = {
