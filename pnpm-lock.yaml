@@ -191,6 +191,9 @@ importers:
       '@types/node':
         specifier: ^25.5.0
         version: 25.5.0
+      outdent:
+        specifier: ^0.8.0
+        version: 0.8.0
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)

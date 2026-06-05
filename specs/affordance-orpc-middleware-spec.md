@@ -1,188 +1,258 @@
 ## Problem overview
 
-Affordance middleware currently runs only as a pre-handler context builder: each middleware receives `{ input, ctx, command }`, returns a replacement context, and then the handler runs after all middleware completes. That model is enough for validation and context injection, but it cannot express cross-cutting behavior that needs to run both before and after handler execution, such as telemetry, timing, cleanup, tracing, or centralized error observation.
+Affordance v1 exposes CLI construction through `SimpleCLI`. Its middleware model is a pre-handler context builder: middleware receives `{ input, ctx, command }`, returns a replacement context, and then the handler runs after all middleware completes.
 
-The next telemetry work needs middleware to behave like oRPC middleware: a middleware runs code before `next()`, calls `next()` to continue downstream execution, then runs code after `next()` resolves or rejects.
+That model cannot express cross-cutting behavior that needs to wrap command execution, such as telemetry, timing, cleanup, tracing, or centralized error observation. Adding those semantics directly to `SimpleCLI` also keeps us tied to a builder shape that already has confusing inheritance behavior, such as deduplicating middleware when a scoped builder is reused.
 
 ## Solution overview
 
-Change SimpleCLI `.use(...)` middleware semantics to an oRPC-style chain. Middleware receives `next`, may call `await next({ ctx: ... })` to continue with merged context, and can run logic before and after that call. If downstream middleware or the command handler throws, `next()` rejects with that error; middleware can catch it for observation or transformation, and uncaught errors continue propagating to the CLI bootstrap.
+Build Aff v2 from scratch under `packages/affordance/src/v2/`. Do not retrofit `SimpleCLI` v1 during the v2 build. The v2 API is named `Aff`, uses bottom-up route builders, and composes middleware structurally through CLI, group, and command builders.
 
-Keep the existing SimpleCLI handler argument names (`ctx`, `input`, `command`) instead of renaming to oRPC's `context`, because Libretto command handlers already use `ctx` throughout the codebase. The execution model should mirror oRPC; the local naming does not need to.
+Tests live under `packages/affordance/test/v2/`. Rebuild the test suite from scratch, copying only v1 behavior that v2 intentionally preserves. Each phase should start by adding or adjusting red tests for that phase, then implement the smallest code needed to pass them.
+
+The first implementation milestone should not try to match all v1 behavior. Start with route construction and invocation, then add help rendering, input parsing, runtime middleware, type contracts, and Libretto migration in separate phases.
 
 ## Goals
 
-- Middleware can run code before and after downstream command execution.
+- Aff v2 exists separately from `SimpleCLI` v1.
+- V2 APIs are exposed as `Aff`, not `SimpleCLI`.
+- V2 uses bottom-up builders: middleware, commands, and groups are standalone values that are layered together structurally.
+- Route resolution applies parent middleware structurally; commands do not pre-carry inherited group middleware.
+- Middleware wraps downstream execution with `next()` and can run before and after the handler.
 - Middleware can observe command success and failure without modifying every command handler.
-- Middleware can still inject or refine context for downstream middleware and handlers.
+- Middleware can inject or refine downstream context through `next({ ctx })`.
 - `next()` rejects when downstream middleware or the handler throws, unless an intermediate middleware catches and handles the error.
-- Existing command handlers continue receiving `{ input, ctx, command }`.
-- Existing Libretto session/experiment middleware is migrated to the new `next({ ctx })` style.
-- Root-level middleware can be installed once on `SimpleCLI.define(...)` and applies to every resolved command.
-- Tests clearly specify ordering, short-circuiting, context merging, and error propagation.
+- Command handlers receive `{ input, ctx, command }`.
+- Root middleware can be installed once on the CLI root builder and applies to every resolved command.
+- Tests are focused by behavior instead of growing one catch-all test file.
 
 ## Non-goals
 
-- No migrations or backfills.
-- No public plugin system or third-party middleware registry.
-- No input mapping API like oRPC's `.mapInput(...)` in v1.
-- No middleware concatenation helper in v1.
-- No built-in lifecycle middleware helpers such as `onStart`, `onSuccess`, `onError`, or `onFinish` in v1.
-- No handler output envelope; command handlers can still return any value.
+- No changes to `packages/affordance/src/index.ts` during the v2 build phases.
+- No migration of existing Libretto command handlers until the v2 API is stable.
+- No replacement of the package root export until a later migration phase.
+- No backwards compatibility for old v1 middleware semantics inside v2.
+- No middleware inheritance deduplication helper like `mergeInheritedMiddlewares`; v2 should not need it.
+- No public plugin registry.
+- No input mapping API like oRPC's `.mapInput(...)` in the initial v2 build.
+- No built-in lifecycle helpers such as `onStart`, `onSuccess`, `onError`, or `onFinish` in the initial v2 build.
+- No handler output envelope; command handlers can return any value.
 - No rename from `ctx` to `context` across Libretto command handlers.
 
-## Semantics
+## V2 API shape
 
-SimpleCLI middleware should follow these rules:
+Use bottom-up builders. Middleware, commands, and groups are standalone values; behavior such as telemetry is layered onto a CLI root.
+
+```ts
+const telemetry = Aff.middleware({ description: "telemetry" }).handle(
+  async ({ command, next }) => {
+    try {
+      const result = await next();
+      record(command, false);
+      return result;
+    } catch (error) {
+      record(command, true);
+      throw error;
+    }
+  },
+);
+
+const app = Aff.cli("libretto")
+  .use(telemetry)
+  .routes({
+    cloud: Aff.group({ description: "Cloud commands" })
+      .use(cloudMiddleware)
+      .routes({
+        login: Aff.command({ description: "Log in" })
+          .arguments([])
+          .options({
+            session: z.string().optional(),
+          })
+          .use(commandMiddleware)
+          .handle(async ({ ctx, input, command }) => {
+            return "ok";
+          }),
+      }),
+  });
+```
+
+Builder rules:
+
+- `Aff.cli(name).use(...).routes(...)` creates an app.
+- `Aff.group(config).use(...).routes(...)` creates a group.
+- `Aff.command(config).arguments(...).options(...).use(...).handle(...)` creates a command with input.
+- Commands without input can omit `.arguments(...)` and `.options(...)`.
+- `.arguments(positionals)` declares positional arguments as an ordered array of `[name, schema]` tuples.
+- `.options(named)` declares named options as an object of option schemas.
+- Plain zod schemas are valid named options.
+- `Aff.option(schema)` wraps a valued named option when option-specific metadata or behavior is needed.
+- `Aff.flag(config?)` declares a boolean flag with a default of `false`.
+- `Aff.middleware(fn)` is a typed identity helper for inline middleware.
+- `Aff.middleware(config).handle(fn)` creates described middleware.
+- Apps expose `app.exec(commandLine)` for command-line execution, where `commandLine` is a single string such as `"open https://example.com --session debug"`.
+- Apps may expose `app.invoke(routeKey, rawInput, initialContext?)` for direct programmatic invocation in tests and internal integrations.
+- `.handle()` is terminal for commands and middleware.
+- Commands do not inherit group middleware at construction time.
+- Route resolution applies middleware in structural order: root, outer group, inner group, command.
+
+## Runtime middleware semantics
+
+Aff v2 middleware follows these rules:
 
 - Middleware signature is `async ({ input, ctx, command, next }) => { ... }`.
 - Calling `await next()` continues to the next middleware, or the command handler if there is no later middleware.
-- Calling `await next({ ctx: patch })` merges `patch` into the current context for downstream execution.
-- Root-level middleware from `SimpleCLI.define(..., { middlewares: [...] })` runs after route matching and input parsing, before group and command middleware.
-- Root-level middleware does not run for help output, version output handled outside SimpleCLI, exact group help, unknown commands, parse errors before command resolution, or input validation failures.
+- Calling `await next({ ctx: patch })` shallow-merges `patch` into the current context for downstream execution.
+- Root middleware runs after route matching and input parsing, before group and command middleware.
+- Root middleware does not run for help output, version output handled outside Aff, exact group help, unknown commands, parse errors before command resolution, or input validation failures.
 - The context visible after `await next(...)` is not automatically mutated for the current middleware; middleware that needs a local value should keep a local variable.
-- If a middleware returns without calling `next()`, it short-circuits downstream execution and its return value becomes the command result.
+- If middleware returns without calling `next()`, it short-circuits downstream execution and its return value becomes the command result.
 - If downstream execution throws, `next()` rejects with the same error object.
 - If middleware catches the error and rethrows it, the CLI sees the original failure.
 - If middleware catches the error and returns a value, the command is considered handled successfully from the caller's perspective.
 
-## Important files/docs/websites for implementation
+## Test organization
 
-- `packages/affordance/src/index.ts` - SimpleCLI types, command builder, group builder, route resolution, and `SimpleCLIApp.invoke(...)` middleware execution.
-- `packages/affordance/test/affordance.spec.ts` - framework tests for route derivation, middleware ordering, context typing, and error behavior.
-- `packages/libretto/src/cli/commands/shared.ts` - Libretto's reusable `withRequiredSession`, `withAutoSession`, and `withExperiments` middleware that must be migrated to `next({ ctx })`.
-- `packages/libretto/src/cli/commands/browser.ts` - representative command group using chained middleware.
-- `packages/libretto/src/cli/commands/execution.ts` - representative command group using chained middleware and session context.
-- `packages/libretto/src/cli/router.ts` - later telemetry work will install a root-level middleware here.
-- `specs/telemetry.md` - downstream spec that depends on this middleware model before anonymous CLI telemetry can be centralized.
-- `https://orpc.dev/docs/middleware` - reference model: oRPC middleware receives `next`, can run logic before and after it, can inject context through `next({ context: ... })`, and lets downstream errors propagate unless caught.
+Do not continue growing `packages/affordance/test/affordance.spec.ts`. Build v2 tests under `packages/affordance/test/v2/`.
 
-## Implementation
+Use these files:
 
-Use a test-first flow for every phase. Add the behavioral or type-level tests before changing implementation code, even when those tests do not compile or fail immediately. The red tests are the contract for the phase; implementation follows only after the expected behavior is captured.
+- `packages/affordance/test/v2/routes-and-help.spec.ts` - route key/path derivation, groups, root/group/command help, unknown-command help recovery, and appended root help.
+- `packages/affordance/test/v2/input.spec.ts` - positional/named parsing, passthrough handling, aliases, global options, defaults, variadic positionals, and input validation errors.
+- `packages/affordance/test/v2/middleware.spec.ts` - runtime middleware behavior: ordering, `next()`, short-circuiting, error propagation, root/group/command middleware nesting, and telemetry-facing command metadata.
+- `packages/affordance/test/v2/middleware-types.spec.ts` - type-level middleware contracts: context injection, downstream context availability, invalid context access via `@ts-expect-error`, and `$input` / `$context` builder contracts.
 
-### Phase 1: Replace pre-handler middleware execution with an oRPC-style chain
+Copy v1 tests only when the behavior is an explicit v2 goal. Prefer fewer, clearer tests over a one-for-one port of the old suite.
 
-Start by rewriting the runtime middleware tests to describe `next()`-based execution. The first test-only change is expected to fail because `next` does not exist yet; then update SimpleCLI internals until those tests pass.
+## Implementation plan
 
-```ts
-// packages/affordance/test/affordance.spec.ts
-test("middleware wraps handler execution through next", async () => {
-  const order: string[] = [];
-  const noInput = SimpleCLI.input({ positionals: [], named: {} });
+Use TDD for every phase. Each phase should first add or update tests that fail for the expected reason, then implement only the smallest code needed for that phase. Do not implement later-phase behavior early unless it is required to make the current phase coherent.
 
-  const app = SimpleCLI.define("libretto", {
-    run: SimpleCLI.command({ description: "run" })
-      .input(noInput)
-      .use(async ({ next }) => {
-        order.push("before");
-        const result = await next();
-        order.push("after");
-        return result;
-      })
-      .handle(async () => {
-        order.push("handler");
-        return "ok";
-      }),
-  });
+### Phase 1: Establish the v2 test contract
 
-  await expect(app.invoke("run", { positionals: [], named: {} })).resolves.toBe("ok");
-  expect(order).toEqual(["before", "handler", "after"]);
-});
-```
+Create the v2 test folder and write the initial red tests. This phase is intentionally test-only. It should fail because `packages/affordance/src/v2/index.ts` does not exist yet.
 
-- [ ] First add failing tests in `packages/affordance/test/affordance.spec.ts` for before/after ordering around `await next()`.
-- [ ] First add failing tests for `next()` rejecting with the original downstream handler error.
-- [ ] First add failing tests for middleware short-circuiting when it returns without calling `next()`.
-- [ ] First add failing tests for root middleware order: root middleware, then group middleware from outermost to innermost, then command middleware, then handler.
-- [ ] First add failing tests proving root middleware does not run for help output, exact group help, unknown commands, or input validation failures.
-- [ ] Then update `SimpleCLIMiddleware` so middleware receives `next`.
-- [ ] Then add `middlewares?: readonly SimpleCLIMiddleware[]` to `SimpleCLI.define(...)` config for root-level command middleware.
-- [ ] Then update `SimpleCLIApp.invoke(...)` to compose middleware recursively or iteratively around the handler.
-- [ ] Then implement `next({ ctx })` as a shallow merge with the current context for downstream execution.
-- [ ] Then preserve thrown errors when middleware does not catch them.
-- [ ] Verify `pnpm -s --filter affordance test` passes.
+- [x] Add `packages/affordance/test/v2/routes-and-help.spec.ts` with focused route builder and help expectations.
+- [x] Add `packages/affordance/test/v2/input.spec.ts` with minimum input expectations needed by route invocation.
+- [x] Add `packages/affordance/test/v2/middleware.spec.ts` with runtime `next()` expectations.
+- [ ] Add `packages/affordance/test/v2/middleware-types.spec.ts` with initial type-contract expectations, or defer it explicitly to Phase 6 if runtime behavior should land first.
+- [x] Verify `pnpm -s --filter affordance test` fails because `../../src/v2/index.js` is missing.
 
-### Phase 2: Preserve typed context propagation under the new continuation model
+### Phase 2: Minimal v2 app, route builders, and direct invocation
 
-Start by changing the existing type-level tests to the new `next({ ctx })` contract. This test-only change may fail to type-check at first; that is expected until the generic middleware signature is updated.
+Implement the smallest v2 runtime that can construct an app, derive command metadata, and invoke commands directly by route key. Do not implement help rendering, command-line parsing from `exec(commandLine)`, input parsing, or middleware in this phase unless the tests require a no-op placeholder.
 
-```ts
-// packages/affordance/test/affordance.spec.ts
-const validateSession: SimpleCLIMiddleware<
-  { session?: string },
-  {},
-  { sessionState: { id: string } }
-> = async ({ next }) => {
-  return next({ ctx: { sessionState: { id: "default" } } });
-};
+- [ ] First trim or add tests so this phase covers only `Aff.cli(...).routes(...)`, groups, commands, `getCommands()`, and `invoke(routeKey, rawInput)` for no-input commands.
+- [ ] Create `packages/affordance/src/v2/index.ts` exporting `Aff`.
+- [ ] Implement `Aff.cli(name).routes(routes)`.
+- [ ] Implement `Aff.group(config).routes(routes)`.
+- [ ] Implement `Aff.command(config).handle(handler)`.
+- [ ] Derive `routeKey`, `path`, and `description` from the route tree.
+- [ ] Throw a clear error for unknown route keys in `invoke(...)`.
+- [ ] Verify the Phase 2 tests pass while later v2 tests may still fail.
 
-const app = SimpleCLI.define("libretto", {
-  open: SimpleCLI.command({ description: "open" })
-    .input(openInput)
-    .use(validateSession)
-    .handle(async ({ ctx }) => {
-      const id: string = ctx.sessionState.id;
-    }),
-});
-```
+### Phase 3: Help and command-line route resolution
 
-- [ ] First update or replace the current typed middleware context test to use `next({ ctx })`.
-- [ ] First add a type-level test that a second middleware sees context injected by the first middleware.
-- [ ] First add a type-level test that a handler sees context injected by all prior middleware.
-- [ ] First add a type-level test that an unprovided context key is still rejected with `@ts-expect-error`.
-- [ ] Then keep the existing `.use(...)` generic chain so downstream handler `ctx` includes middleware-provided fields.
-- [ ] Then make `next({ ctx })` type-check when the patch satisfies the middleware's declared output context.
-- [ ] Verify `pnpm -s --filter affordance type-check` passes if the package exposes that script; otherwise verify root `pnpm -s type-check`.
+Add `exec(commandLine)` and help rendering independent of input parsing complexity. This phase should preserve the v1 user-facing help behaviors that v2 intentionally keeps while changing the public execution interface to accept a single string.
 
-### Phase 3: Migrate Libretto CLI middleware call sites
+- [ ] First add or adjust tests for root help, group help, command help, exact group invocation rendering group help, and nearest-help unknown command errors.
+- [ ] Implement `app.exec(commandLine)` route matching for command paths and group paths.
+- [ ] Parse the command-line string into tokens for v2 execution. Keep the initial tokenizer small and driven by current tests.
+- [ ] Implement `help`, `--help`, and `-h` handling.
+- [ ] Implement root, group, and command help rendering.
+- [ ] Implement nearest-group help for unknown commands.
+- [ ] Verify the Phase 3 route/help tests pass.
 
-Start by adding Libretto-facing regression tests that exercise the shared middleware through real command definitions. These tests should fail until `withExperiments`, `withRequiredSession`, and `withAutoSession` call `next({ ctx })` instead of returning context.
+### Phase 4: Input declarations and parsing
 
-```ts
-// packages/libretto/test/multi-session.spec.ts
-test("exec still rejects missing session through required-session middleware", async ({
-  librettoCli,
-}) => {
-  const result = await librettoCli(`exec "return 1"`);
-  expect(result.stderr).toContain("Missing required option --session.");
-});
-```
+Add input schemas and command argument parsing. Keep this phase focused on the parsing behavior v2 needs before middleware can rely on parsed input.
 
-- [ ] First add or update Libretto CLI tests proving shared middleware-injected context reaches handlers under the new `next({ ctx })` model.
-- [ ] First add or update Libretto CLI tests proving a session middleware failure still prevents the handler from running.
-- [ ] First add or update Libretto CLI tests proving existing command handlers do not need to manually call middleware continuation.
-- [ ] Then update `withExperiments()` to call `next({ ctx: { ...ctx, experiments } })`.
-- [ ] Then update `withRequiredSession()` to call `next({ ctx: { ...ctx, session, logger, sessionState } })`.
-- [ ] Then update `withAutoSession()` to call `next({ ctx: { ...ctx, session, logger } })`.
-- [ ] Then confirm existing command handlers in `browser.ts`, `execution.ts`, `search.ts`, and `snapshot.ts` need no handler-level changes.
+- [ ] First add or adjust tests for positional parsing, named options, flags, defaults, validation errors, and parse-before-middleware behavior.
+- [ ] Implement command `.arguments(positionals)` with an ordered positional tuple array.
+- [ ] Implement command `.options(named)` with a named option schema object.
+- [ ] Implement plain zod schemas as valid option declarations.
+- [ ] Implement `Aff.option(schema)` for valued options.
+- [ ] Implement `Aff.flag(config?)` for boolean flags.
+- [ ] Implement raw `invoke(...)` input parsing using the existing zod-based behavior as a reference, not a blind copy.
+- [ ] Implement command argument parsing in `exec(commandLine)` after the command-line string has been tokenized.
+- [ ] Implement required positional and named option errors.
+- [ ] Add additional option metadata, aliases, passthrough, global options, and variadic positionals only when tests for those behaviors are added.
+- [ ] Verify the Phase 4 input tests pass.
+
+### Phase 5: Runtime middleware
+
+Add middleware builders and oRPC-style runtime composition. This phase should not attempt full type-level context propagation; it should prove runtime semantics first.
+
+- [ ] First add or adjust tests for before/after ordering around `await next()`.
+- [ ] First add tests for `next()` rejecting with the original downstream handler error.
+- [ ] First add tests for short-circuiting when middleware returns without calling `next()`.
+- [ ] First add tests for root, group, and command middleware structural order.
+- [ ] First add tests proving root middleware does not run for help output, exact group help, unknown commands, or input validation failures.
+- [ ] Implement `.use(...)` on CLI, group, and command builders.
+- [ ] Implement `Aff.middleware(fn)` as an identity helper.
+- [ ] Implement `Aff.middleware(config).handle(fn)`.
+- [ ] Compose middleware around handlers recursively or iteratively.
+- [ ] Implement `next({ ctx })` as shallow downstream context merging.
+- [ ] Preserve thrown errors when middleware does not catch them.
+- [ ] Verify the Phase 5 middleware tests pass.
+
+### Phase 6: Type-level context and input contracts
+
+Add the type system for context propagation after runtime semantics are stable. This phase should be allowed to change generic signatures without changing runtime behavior.
+
+- [ ] First add type-level tests that a second middleware sees context injected by the first middleware.
+- [ ] First add type-level tests that a handler sees context injected by all prior middleware.
+- [ ] First add type-level tests that unprovided context keys are rejected with `@ts-expect-error`.
+- [ ] First add type-level tests for `$input<T>()` and `$context<T>()` contracts.
+- [ ] Implement the generic `.use(...)` chain so downstream `ctx` includes middleware-provided fields.
+- [ ] Implement typed `next({ ctx })` patches.
+- [ ] Implement `$input<T>()` and `$context<T>()` on middleware builders if the tests choose that API.
+- [ ] Verify `pnpm -s --filter affordance type-check` passes.
+
+### Phase 7: Complete v2 parity decisions
+
+Decide which remaining v1 features are required before Libretto can migrate. Add focused tests and implementation for only those features.
+
+Candidate features:
+
+- [ ] Named option aliases.
+- [ ] Passthrough arguments after `--`.
+- [ ] Global options.
+- [ ] Variadic positionals.
+- [ ] `appendHelpText` or equivalent root help extension.
+- [ ] Refine and super-refine helpers on input declarations.
+- [ ] Duplicate route validation.
+- [ ] Missing handler validation.
+
+### Phase 8: Migrate Libretto CLI call sites
+
+Migrate Libretto after Aff v2 is stable enough to support current command behavior. This phase should start with Libretto-facing regression tests.
+
+- [ ] First add or update Libretto CLI tests proving shared middleware-injected context reaches handlers under `next({ ctx })`.
+- [ ] First add or update Libretto CLI tests proving a session middleware failure prevents the handler from running.
+- [ ] First add or update Libretto CLI tests proving command handlers do not manually call middleware continuation.
+- [ ] Update `withExperiments()` to call `next({ ctx: { ...ctx, experiments } })`.
+- [ ] Update `withRequiredSession()` to call `next({ ctx: { ...ctx, session, logger, sessionState } })`.
+- [ ] Update `withAutoSession()` to call `next({ ctx: { ...ctx, session, logger } })`.
+- [ ] Migrate representative command groups from `SimpleCLI` to `Aff`.
 - [ ] Run the smallest relevant Libretto CLI tests that cover session middleware behavior.
 
-### Phase 4: Update telemetry spec to consume the new middleware model
+### Phase 9: Update telemetry spec to consume Aff v2 middleware
 
-Start by adding the telemetry-facing affordance tests that telemetry will rely on: root middleware sees the resolved command metadata, observes success after `next()` resolves, and observes failure when `next()` rejects. These are affordance tests, not telemetry implementation tests.
+Update the telemetry plan once v2 middleware can observe successful and failed command execution centrally.
 
-```ts
-// packages/affordance/test/affordance.spec.ts
-test("root middleware observes success and failure through next", async () => {
-  const events: Array<{ command: string; error: boolean }> = [];
-  const observe: SimpleCLIMiddleware = async ({ command, next }) => {
-    try {
-      const result = await next();
-      events.push({ command: command.path.join(" "), error: false });
-      return result;
-    } catch (error) {
-      events.push({ command: command.path.join(" "), error: true });
-      throw error;
-    }
-  };
-  ...
-});
-```
+- [ ] First add v2 tests for root middleware observing successful command completion through `await next()`.
+- [ ] First add v2 tests for root middleware observing failed command completion through `next()` rejection.
+- [ ] First add v2 tests proving root middleware receives resolved `command.path` and `command.routeKey`.
+- [ ] Update `specs/telemetry.md` to reference Aff v2 and this spec.
+- [ ] Ensure telemetry's success/failure behavior depends on `next()` resolving or rejecting.
 
-- [ ] First add failing affordance tests for root middleware observing successful command completion through `await next()`.
-- [ ] First add failing affordance tests for root middleware observing failed command completion through `next()` rejection.
-- [ ] First add failing affordance tests proving root middleware receives resolved `command.path` and `command.routeKey`.
-- [ ] Then update `specs/telemetry.md` to reference `specs/affordance-orpc-middleware-spec.md`.
-- [ ] Then replace the telemetry spec's separate around-middleware phase with a dependency on SimpleCLI oRPC-style middleware.
-- [ ] Then ensure telemetry's success/failure behavior depends on `next()` resolving or rejecting.
+## Important files/docs/websites for implementation
+
+- `packages/affordance/src/v2/index.ts` - new Aff v2 implementation.
+- `packages/affordance/test/v2/*.spec.ts` - new v2 tests.
+- `packages/affordance/src/index.ts` - existing `SimpleCLI` v1 implementation; leave unchanged during v2 build phases.
+- `packages/affordance/test/affordance.spec.ts` - existing v1 tests; copy only behavior that is an explicit v2 goal.
+- `packages/libretto/src/cli/commands/shared.ts` - Libretto's reusable `withRequiredSession`, `withAutoSession`, and `withExperiments` middleware for the later migration phase.
+- `packages/libretto/src/cli/router.ts` - later telemetry work will install root-level middleware here.
+- `specs/telemetry.md` - downstream spec that depends on this middleware model before anonymous CLI telemetry can be centralized.
+- `https://orpc.dev/docs/middleware` - reference model: oRPC middleware receives `next`, can run logic before and after it, can inject context through `next({ context: ... })`, and lets downstream errors propagate unless caught.
