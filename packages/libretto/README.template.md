@@ -117,7 +117,7 @@ pnpm test
 Source layout:
 
 - `{{LIBRETTO_PATH_PREFIX}}src/cli/` — CLI commands
-- `{{LIBRETTO_PATH_PREFIX}}src/runtime/` — browser runtime (network, recovery, downloads, extraction)
+- `{{LIBRETTO_PATH_PREFIX}}src/runtime/` — browser runtime (network, recovery, downloads)
 - `{{LIBRETTO_PATH_PREFIX}}src/shared/` — shared utilities (config, LLM client, logging, state)
 - `{{LIBRETTO_PATH_PREFIX}}test/` — test files (`*.spec.ts`)
 - `{{LIBRETTO_PATH_PREFIX}}README.template.md` — source of truth for the repo and package READMEs

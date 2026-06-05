@@ -62,7 +62,7 @@ Libretto captures all network traffic and page state during a session, which let
     * Works with any site regardless of how data is rendered (server-side, client-side, or hybrid)
     * Data extraction is visual/DOM-based, which maps naturally to what a user sees
     * Easy to debug with `headless: false` and Playwright's trace viewer
-    * Integrates directly with Libretto's step-based workflow, recovery, and extraction features
+    * Integrates directly with Libretto's step-based workflow and recovery features
 
     **Cons:**
 
@@ -213,7 +213,7 @@ Libretto captures all network traffic and page state during a session, which let
 
 * The data you need is visible in the DOM and straightforward to extract with selectors
 * The site doesn't have aggressive bot protection, or you're using stealth plugins
-* You want the simplest implementation that integrates with Libretto's recovery and extraction features
+* You want the simplest implementation that integrates with Libretto's recovery features
 * The data is rendered server-side and doesn't come from a separate API call
 
 **Use passive interception (`page.on('response')`) when:**

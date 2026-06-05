@@ -119,7 +119,7 @@ pnpm test
 Source layout:
 
 - `src/cli/` — CLI commands
-- `src/runtime/` — browser runtime (network, recovery, downloads, extraction)
+- `src/runtime/` — browser runtime (network, recovery, downloads)
 - `src/shared/` — shared utilities (config, LLM client, logging, state)
 - `test/` — test files (`*.spec.ts`)
 - `README.template.md` — source of truth for the repo and package READMEs

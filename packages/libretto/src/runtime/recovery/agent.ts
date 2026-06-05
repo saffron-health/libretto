@@ -153,21 +153,41 @@ function readPngDimensions(buffer: Buffer): ImageDimensions {
   };
 }
 
-async function takeViewportScreenshot(page: Page): Promise<{
+function toPositiveNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
+}
+
+async function getViewportFromPage(page: Page): Promise<ImageDimensions | null> {
+  const metrics = await page.evaluate(() => ({
+    visualViewportWidth: window.visualViewport?.width,
+    visualViewportHeight: window.visualViewport?.height,
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    documentElementClientWidth: document.documentElement?.clientWidth,
+    documentElementClientHeight: document.documentElement?.clientHeight,
+  }));
+  const width =
+    toPositiveNumber(metrics.visualViewportWidth) ??
+    toPositiveNumber(metrics.innerWidth) ??
+    toPositiveNumber(metrics.documentElementClientWidth);
+  const height =
+    toPositiveNumber(metrics.visualViewportHeight) ??
+    toPositiveNumber(metrics.innerHeight) ??
+    toPositiveNumber(metrics.documentElementClientHeight);
+
+  return width && height ? { width, height } : null;
+}
+
+function screenshotState(
+  screenshot: Buffer,
+  viewport: ImageDimensions,
+): {
   screenshot: Buffer;
   dimensions: ImageDimensions;
   scale: CoordinateScale;
-}> {
-  const viewport = page.viewportSize();
-  if (!viewport) {
-    throw new Error("Viewport size not found");
-  }
-
-  const screenshot = await page.screenshot({
-    fullPage: false,
-    scale: "css",
-    timeout: 10000,
-  });
+} {
   const dimensions = readPngDimensions(screenshot);
   return {
     screenshot,
@@ -179,6 +199,25 @@ async function takeViewportScreenshot(page: Page): Promise<{
       viewportHeight: viewport.height,
     },
   };
+}
+
+async function takeViewportScreenshot(page: Page): Promise<{
+  screenshot: Buffer;
+  dimensions: ImageDimensions;
+  scale: CoordinateScale;
+}> {
+  const viewport =
+    page.viewportSize() ?? (await getViewportFromPage(page).catch(() => null));
+  if (!viewport) {
+    throw new Error("Viewport size not found");
+  }
+
+  const screenshot = await page.screenshot({
+    fullPage: false,
+    scale: "css",
+    timeout: 10000,
+  });
+  return screenshotState(screenshot, viewport);
 }
 
 async function executeBrowserAction(
