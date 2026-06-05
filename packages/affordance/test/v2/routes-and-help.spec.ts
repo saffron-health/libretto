@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import outdent from "outdent";
 import { Aff } from "../../src/v2/index.js";
 
 describe("Aff v2 routes and direct invocation", () => {
@@ -87,5 +88,70 @@ describe("Aff v2 routes and direct invocation", () => {
       ctx: {},
     });
     await expect(app.exec("open")).resolves.toBe("opened");
+  });
+
+  test("renders root, group, and command help", async () => {
+    const app = Aff.cli("libretto").routes({
+      ai: Aff.group({ description: "AI commands" }).routes({
+        configure: Aff.command({ description: "Configure AI runtime" })
+          .handle(async () => {}),
+      }),
+      open: Aff.command({ description: "Open URL" })
+        .handle(async () => {}),
+    });
+
+    await expect(app.exec("help")).resolves.toBe(
+      outdent`
+        Usage: libretto <command>
+
+        Commands:
+          ai <subcommand>  AI commands
+          open  Open URL
+      `,
+    );
+    await expect(app.exec("help ai")).resolves.toBe(
+      outdent`
+        AI commands
+
+        Usage: libretto ai <subcommand>
+
+        Commands:
+          configure  Configure AI runtime
+      `,
+    );
+    await expect(app.exec("ai help")).resolves.toBe(
+      outdent`
+        AI commands
+
+        Usage: libretto ai <subcommand>
+
+        Commands:
+          configure  Configure AI runtime
+      `,
+    );
+    await expect(app.exec("ai")).resolves.toBe(
+      outdent`
+        AI commands
+
+        Usage: libretto ai <subcommand>
+
+        Commands:
+          configure  Configure AI runtime
+      `,
+    );
+    await expect(app.exec("help ai configure")).resolves.toBe(
+      outdent`
+        Configure AI runtime
+
+        Usage: libretto ai configure
+      `,
+    );
+    await expect(app.exec("ai configure help")).resolves.toBe(
+      outdent`
+        Configure AI runtime
+
+        Usage: libretto ai configure
+      `,
+    );
   });
 });
