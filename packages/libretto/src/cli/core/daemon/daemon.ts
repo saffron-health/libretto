@@ -376,6 +376,12 @@ class BrowserDaemon {
     workflow?: DaemonWorkflowConfig;
   }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
+    const storageStatePath =
+      config.storageStatePath ??
+      resolveAuthProfileStorageStatePath({
+        authProfileName: args.workflow?.authProfileName,
+        session,
+      });
     const windowPositionArg = config.windowPosition
       ? `--window-position=${config.windowPosition.x},${config.windowPosition.y}`
       : undefined;
@@ -392,13 +398,6 @@ class BrowserDaemon {
         ...(windowPositionArg ? [windowPositionArg] : []),
       ],
     });
-
-    const storageStatePath =
-      config.storageStatePath ??
-      resolveAuthProfileStorageStatePath({
-        authProfileName: args.workflow?.authProfileName,
-        session,
-      });
 
     const context = await browser.newContext({
       ...(storageStatePath ? { storageState: storageStatePath } : {}),
@@ -942,12 +941,28 @@ async function main(): Promise<void> {
     config.browser.kind === "launch" ? config.browser.headed : false;
 
   let loadedWorkflow: ExportedLibrettoWorkflow | undefined;
+  let workflowConfig = config.workflow;
+  let browserConfig = config.browser;
   if (config.workflow) {
     try {
       loadedWorkflow = await loadDefaultWorkflow(
         getAbsoluteIntegrationPath(config.workflow.integrationPath),
       );
       validateWorkflowInput(loadedWorkflow, config.workflow.params ?? {});
+      const authProfileName = loadedWorkflow.authProfileName;
+      const authProfilePersist = loadedWorkflow.authProfileRefresh === true;
+      workflowConfig = {
+        ...config.workflow,
+        authProfileName,
+        authProfilePersist,
+      };
+      if (config.browser.kind === "provider") {
+        browserConfig = {
+          ...config.browser,
+          authProfileName,
+          authProfilePersist,
+        };
+      }
     } catch (error) {
       throw new UserFacingStartupError(
         error instanceof Error ? error.message : String(error),
@@ -956,30 +971,30 @@ async function main(): Promise<void> {
   }
 
   const daemon =
-    config.browser.kind === "provider"
+    browserConfig.kind === "provider"
       ? await BrowserDaemon.connectToProvider({
           session: config.session,
           experiments: config.experiments,
-          browser: config.browser,
+          browser: browserConfig,
         })
-      : config.browser.kind === "connect"
+      : browserConfig.kind === "connect"
         ? await BrowserDaemon.connectToEndpoint({
             session: config.session,
             experiments: config.experiments,
-            browser: config.browser,
+            browser: browserConfig,
           })
         : await BrowserDaemon.launchBrowser({
             session: config.session,
             experiments: config.experiments,
-            browser: config.browser,
-            workflow: config.workflow,
+            browser: browserConfig,
+            workflow: workflowConfig,
           });
 
-  if (config.workflow) {
+  if (workflowConfig) {
     void waitForSessionState(config.session)
       .then(() =>
         daemon.startWorkflow({
-          workflow: config.workflow!,
+          workflow: workflowConfig,
           headed,
           loadedWorkflow,
         }),

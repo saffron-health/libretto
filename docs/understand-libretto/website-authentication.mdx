@@ -60,6 +60,22 @@ npx libretto run ./portal-login.ts \
   Credentials passed on the command line land in your shell history and the session log. For production, inject them from a secret manager (GCP Secret Manager, AWS Secrets Manager, Vault) and read them inside the dispatcher that invokes the workflow.
 </Warning>
 
+### Hosted credentials
+
+For hosted workflows, push credential environment variables to Libretto Cloud
+instead of passing secrets on the command line:
+
+```bash theme={null}
+export LIBRETTO_PORTAL_USERNAME="alice@example.com"
+export LIBRETTO_PORTAL_PASSWORD="secret"
+npx libretto cloud credentials push portal --prefix LIBRETTO_PORTAL_
+```
+
+The command stores a hosted credential named `portal`. Matching environment
+variables become lowercase fields with the prefix removed, so
+`LIBRETTO_PORTAL_USERNAME` becomes `username` and
+`LIBRETTO_PORTAL_PASSWORD` becomes `password`.
+
 ### Saving profiles locally
 
 When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magic links), the workaround is to log in **once** in a visible browser and snapshot the authenticated state. Libretto calls that snapshot a **profile**: cookies, `localStorage`, and IndexedDB saved to `.libretto/profiles/<name>.json`. Future local runs start already signed in by loading the profile declared by the workflow.
@@ -86,7 +102,8 @@ When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magi
   </Step>
 
   <Step title="Reuse the profile in future runs">
-    Declare the profile on the workflow:
+    Declare the profile on the workflow. The profile name should match the
+    local file name under `.libretto/profiles/`.
 
     ```typescript theme={null}
     export default workflow("report", {
@@ -104,6 +121,21 @@ When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magi
     The run starts already signed in. No login step required.
   </Step>
 </Steps>
+
+The `authProfile` option can be a string name or an object:
+
+```typescript theme={null}
+authProfile: "portal.example.com"
+
+authProfile: {
+  name: "portal.example.com",
+  sites: ["portal.example.com", "auth.example.com"],
+  refresh: true,
+}
+```
+
+Use `sites` when the login spans multiple domains. Set `refresh: true` when a
+successful run should save the updated browser state back to the profile.
 
 For hosted runs, `libretto cloud deploy` registers workflow-declared profile
 names with Libretto Cloud. Hosted browser sessions then use the provider's native

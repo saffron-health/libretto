@@ -98,18 +98,6 @@ Delete a hosted auth profile name and its provider mappings:
 npx libretto cloud profiles delete twitter
 ```
 
-### cloud credentials push
-
-Push related `.env` credentials to Libretto Cloud by prefix:
-
-```bash theme={null}
-npx libretto cloud credentials push twitter --prefix LIBRETTO_TWITTER_
-```
-
-For example, `LIBRETTO_TWITTER_USERNAME` becomes `username` and
-`LIBRETTO_TWITTER_PASSWORD` becomes `password` in the hosted credential object.
-Pushing with the same credential name overwrites the cloud copy.
-
 ---
 
 ### Profile storage

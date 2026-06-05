@@ -9,11 +9,6 @@ import {
   runClose,
   resolveViewport,
 } from "../core/browser.js";
-import {
-  getProfilePath,
-  hasProfile,
-  normalizeProfileName,
-} from "../core/profiles.js";
 import { parseViewportArg } from "./browser.js";
 import {
   assertSessionAvailableForStart,
@@ -35,7 +30,6 @@ import {
 } from "../core/providers/index.js";
 import {
   getAbsoluteIntegrationPath,
-  loadDefaultWorkflow,
 } from "../core/workflow-runtime.js";
 import {
   compileExecFunction,
@@ -567,26 +561,6 @@ async function runIntegrationFromFile(
   const absoluteIntegrationPath = getAbsoluteIntegrationPath(
     args.integrationPath,
   );
-  const defaultWorkflow = await loadDefaultWorkflow(absoluteIntegrationPath);
-  const usesProviderBrowser = Boolean(args.providerName);
-  const authProfileName = defaultWorkflow.authProfileName;
-  const authProfilePersist = defaultWorkflow.authProfileRefresh === true;
-  if (authProfileName && !usesProviderBrowser) {
-    const profileName = normalizeProfileName(authProfileName);
-    if (!hasProfile(profileName)) {
-      const profilePath = getProfilePath(profileName);
-      throw new Error(
-        [
-          `Local auth profile not found: "${profileName}".`,
-          `Expected profile file: ${profilePath}`,
-          "To create it:",
-          `  1. libretto open <site-url> --headed --session ${args.session}`,
-          "  2. Log in manually in the browser window.",
-          `  3. libretto save ${profileName} --session ${args.session} --sites <site>`,
-        ].join("\n"),
-      );
-    }
-  }
 
   const runLogPath = logFileForSession(args.session);
   const workflowOutcome = createDeferred<WorkflowOutcome>();
@@ -604,8 +578,6 @@ async function runIntegrationFromFile(
         ? {
             kind: "provider",
             providerName: args.providerName,
-            authProfileName,
-            authProfilePersist,
           }
         : {
             kind: "launch",
@@ -618,8 +590,6 @@ async function runIntegrationFromFile(
         visualize: args.visualize,
         stayOpenOnSuccess: args.stayOpenOnSuccess,
         tsconfigPath: args.tsconfigPath,
-        authProfileName,
-        authProfilePersist,
       },
     },
     logger,
