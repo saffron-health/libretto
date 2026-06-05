@@ -142,6 +142,10 @@ export function parseCommandLineInput(
     }
   }
 
+  if (args.length > definition.arguments.length) {
+    throw new Error(`Unexpected arguments for ${commandName}.`);
+  }
+
   return {
     arguments: args,
     options,

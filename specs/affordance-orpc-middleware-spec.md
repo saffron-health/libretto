@@ -167,7 +167,7 @@ Add `exec(commandLine)` and help rendering independent of input parsing complexi
 
 Add input schemas and command argument parsing. Keep this phase focused on the parsing behavior v2 needs before middleware can rely on parsed input.
 
-- [ ] First add or adjust tests for argument parsing, options, flags, defaults, validation errors, and parse-before-middleware behavior.
+- [x] First add or adjust tests for argument parsing, options, flags, defaults, validation errors, and command-line parse errors before handler execution. Parse-before-middleware behavior is covered in Phase 7 once middleware exists.
 - [x] Implement command `.arguments(args)` with an ordered argument tuple array.
 - [x] Implement command `.options(options)` with an option schema object.
 - [x] Implement plain zod schemas as valid option declarations.
@@ -176,8 +176,8 @@ Add input schemas and command argument parsing. Keep this phase focused on the p
 - [x] Implement raw `invoke(...)` input parsing using the existing zod-based behavior as a reference, not a blind copy.
 - [x] Implement command argument parsing in `exec(commandLine)` after the command-line string has been tokenized.
 - [x] Implement required argument and option errors.
-- [ ] Add additional option metadata, aliases, passthrough, global options, and variadic arguments only when tests for those behaviors are added.
-- [ ] Verify the Phase 4 input tests pass.
+- [x] Keep additional option metadata, aliases, passthrough, global options, and variadic arguments deferred until tests for those behaviors are added.
+- [x] Verify the Phase 4 input tests pass.
 
 ### Phase 5: Teg parser-based command-line parsing
 

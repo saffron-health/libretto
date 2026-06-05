@@ -86,6 +86,26 @@ describe("Aff v2 input", () => {
     });
   });
 
+  test("parses inline option values and explicit flag values from an exec string", async () => {
+    const app = Aff.cli("libretto").routes({
+      open: Aff.command({ description: "Open URL" })
+        .arguments([["url", z.url()]])
+        .options({
+          session: Aff.option(z.string()),
+          headless: Aff.flag(),
+        })
+        .handle(async ({ input }) => input),
+    });
+
+    await expect(
+      app.exec("open https://example.com --session=debug --headless=false"),
+    ).resolves.toEqual({
+      url: "https://example.com",
+      session: "debug",
+      headless: false,
+    });
+  });
+
   test("surfaces command-line input errors before the handler runs", async () => {
     let handlerCalls = 0;
     const app = Aff.cli("libretto").routes({
@@ -110,6 +130,12 @@ describe("Aff v2 input", () => {
     );
     await expect(app.exec("open https://example.com --unknown value")).rejects.toThrow(
       "Unknown option: --unknown",
+    );
+    await expect(app.exec("open https://example.com --session")).rejects.toThrow(
+      "Missing value for --session.",
+    );
+    await expect(app.exec("open https://example.com extra --session debug")).rejects.toThrow(
+      "Unexpected arguments for libretto open.",
     );
     await expect(app.exec("status extra")).rejects.toThrow(
       "Unexpected arguments for libretto status.",
