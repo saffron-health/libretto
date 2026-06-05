@@ -49,7 +49,7 @@ export type WorkflowControllerConfig = {
   page: Page;
   context: BrowserContext;
   logger: LoggerApi;
-  refreshLocalAuthProfiles?: boolean;
+  persistLocalAuthProfiles?: boolean;
   onLog?: (event: WorkflowLogEvent) => void;
   onOutcome?: (outcome: WorkflowOutcome) => void;
 };
@@ -171,9 +171,9 @@ export class WorkflowController {
       );
       try {
         await workflow.run(workflowContext, workflowConfig.params ?? {});
-        await refreshLocalAuthProfileIfEnabled({
+        await persistLocalAuthProfileIfEnabled({
           context: this.config.context,
-          enabled: this.config.refreshLocalAuthProfiles === true,
+          enabled: this.config.persistLocalAuthProfiles === true,
           sites: visitedSites.sites(),
           workflow,
         });
@@ -246,7 +246,7 @@ export class WorkflowController {
   }
 }
 
-async function refreshLocalAuthProfileIfEnabled(
+async function persistLocalAuthProfileIfEnabled(
   args: {
     context: BrowserContext;
     enabled: boolean;
@@ -255,11 +255,13 @@ async function refreshLocalAuthProfileIfEnabled(
   },
 ): Promise<void> {
   const { context, enabled, sites, workflow } = args;
-  if (!workflow.authProfileName || workflow.authProfileRefresh !== true) return;
+  if (!workflow.authProfileName || workflow.authProfilePersistAfterRun !== true) {
+    return;
+  }
   if (!enabled) return;
   if (sites.length === 0) {
     console.warn(
-      `Auth profile refresh skipped for "${workflow.authProfileName}": workflow did not visit any http(s) sites.`,
+      `Auth profile persistence skipped for "${workflow.authProfileName}": workflow did not visit any http(s) sites.`,
     );
     return;
   }
@@ -267,7 +269,7 @@ async function refreshLocalAuthProfileIfEnabled(
   const latest = await context.storageState({ indexedDB: true });
   const state = mergeAuthProfileStorageState(existing, latest, sites);
   await writeProfile(workflow.authProfileName, state);
-  console.warn(`Auth profile refreshed: ${workflow.authProfileName}`);
+  console.warn(`Auth profile persisted: ${workflow.authProfileName}`);
 }
 
 function createVisitedSiteTracker(context: BrowserContext): {

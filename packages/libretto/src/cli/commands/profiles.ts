@@ -59,17 +59,14 @@ export const deleteProfileCommand = SimpleCLI.command({
 })
   .input(SimpleCLI.input({
     positionals: [
-      SimpleCLI.positional("profileName", z.string().optional(), {
+      SimpleCLI.positional("profileName", z.string(), {
         help: "Cloud profile name to delete",
       }),
     ],
     named: {},
-  }).refine(
-    (input) => Boolean(input.profileName),
-    "Usage: libretto cloud profiles delete <profile-name>",
-  ))
+  }))
   .handle(async ({ input }) => {
-    const profileName = normalizeProfileName(input.profileName!);
+    const profileName = normalizeProfileName(input.profileName);
     const { apiUrl, credential } = requireApiKeyCredential();
     const response = await orpcCall<DeleteProfileResponse>({
       apiUrl,

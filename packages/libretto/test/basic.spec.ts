@@ -115,12 +115,12 @@ function expectedRootHelp(): string {
       close  Close the browser
       cloud <subcommand>  Deploy workflows and manage hosted Libretto
       experiments  List or update Libretto experiment flags
+      import-chrome-profiles  Fetch scoped auth state from a Chrome CDP session into a local profile
       exec  Execute Playwright TypeScript code
       readonly-exec  Execute read-only Playwright inspection code
       run  Run the default-exported Libretto workflow from a file
       resume  Resume a paused workflow for the current session
       search  Search the current page HTML snapshot
-      profiles <subcommand>  Manage local browser auth profiles
       setup  Set up libretto in the current project
       status  Show workspace status and open sessions
       snapshot  Capture a screenshot and compact accessibility snapshot
@@ -1651,9 +1651,7 @@ export default workflow("main", async (ctx) => {
     librettoCli,
   }) => {
     const result = await librettoCli("save --session test");
-    expect(result.stderr).toContain(
-      "libretto save <profile-name> --session <name> --sites <site[,site]>",
-    );
+    expect(result.stderr).toContain("Missing required argument <profileName>.");
   });
 
   test("fails when --session value is missing", async ({ librettoCli }) => {

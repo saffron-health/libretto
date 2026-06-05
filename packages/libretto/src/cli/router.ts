@@ -5,7 +5,7 @@ import { cloudCredentialCommands } from "./commands/cloud-credentials.js";
 import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
 import { experimentsCommand } from "./commands/experiments.js";
-import { localProfileCommands } from "./commands/local-profiles.js";
+import { importChromeProfilesCommand } from "./commands/import-chrome-profiles.js";
 import { profileCommands } from "./commands/profiles.js";
 import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
@@ -27,9 +27,9 @@ export const cliRoutes = {
     },
   }),
   experiments: experimentsCommand,
+  "import-chrome-profiles": importChromeProfilesCommand,
   ...executionCommands,
   search: searchCommand,
-  profiles: localProfileCommands,
   setup: setupCommand,
   status: statusCommand,
   snapshot: snapshotCommand,

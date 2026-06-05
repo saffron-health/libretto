@@ -2,6 +2,8 @@ import { z } from "zod";
 import { SimpleCLI } from "affordance";
 import { orpcCall, resolveApiUrl } from "../core/auth-fetch.js";
 
+const CLOUD_CREDENTIAL_ENV_PREFIX = "LIBRETTO_CLOUD_";
+
 type UpsertCredentialResponse = {
   success: true;
   credential_id: string;
@@ -34,38 +36,29 @@ function parseEnvCredentials(prefix: string): Record<string, string> {
 }
 
 export const pushCredentialCommand = SimpleCLI.command({
-  description: "Push LIBRETTO-prefixed env credentials to Libretto Cloud",
+  description: "Push LIBRETTO_CLOUD-prefixed env credentials to Libretto Cloud",
 })
   .input(SimpleCLI.input({
     positionals: [
-      SimpleCLI.positional("name", z.string().optional(), {
+      SimpleCLI.positional("name", z.string(), {
         help: "Credential name to create or overwrite",
       }),
     ],
-    named: {
-      prefix: SimpleCLI.option(z.string().optional(), {
-        help: "Environment variable prefix to push, e.g. LIBRETTO_TWITTER_",
-      }),
-    },
-  }).refine(
-    (input) => Boolean(input.name),
-    "Usage: libretto cloud credentials push <name> --prefix LIBRETTO_<NAME>_",
-  ))
+    named: {},
+  }))
   .handle(async ({ input }) => {
-    const prefix = input.prefix ?? `LIBRETTO_${input.name!.toUpperCase()}_`;
-    if (!prefix.startsWith("LIBRETTO_") || !prefix.endsWith("_")) {
-      throw new Error("Credential env prefix must start with LIBRETTO_ and end with _.");
-    }
-    const credentials = parseEnvCredentials(prefix);
+    const credentials = parseEnvCredentials(CLOUD_CREDENTIAL_ENV_PREFIX);
     if (Object.keys(credentials).length === 0) {
-      throw new Error(`No env vars found with prefix ${prefix}.`);
+      throw new Error(
+        `No env vars found with prefix ${CLOUD_CREDENTIAL_ENV_PREFIX}.`,
+      );
     }
     const { apiUrl, credential } = requireApiKeyCredential();
     const response = await orpcCall<UpsertCredentialResponse>({
       apiUrl,
       path: "/v1/credentials/upsert",
       input: {
-        name: input.name!,
+        name: input.name,
         credentials,
       },
       credential,

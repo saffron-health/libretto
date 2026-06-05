@@ -57,6 +57,7 @@ import {
 } from "./ipc.js";
 import { wrapPageForActionLogging } from "../telemetry.js";
 import {
+  formatMissingLocalAuthProfileMessage,
   getProfilePath,
   hasProfile,
   normalizeProfileName,
@@ -118,21 +119,6 @@ class UserFacingStartupError extends Error {
   }
 }
 
-function getMissingLocalAuthProfileError(args: {
-  profileName: string;
-  profilePath: string;
-  session: string;
-}): string {
-  return [
-    `Local auth profile not found: "${args.profileName}".`,
-    `Expected profile file: ${args.profilePath}`,
-    "To create it:",
-    `  1. libretto open <site-url> --headed --session ${args.session}`,
-    "  2. Log in manually in the browser window.",
-    `  3. libretto save ${args.profileName} --session ${args.session} --sites <site>`,
-  ].join("\n");
-}
-
 function resolveAuthProfileStorageStatePath(args: {
   authProfileName?: string;
   session: string;
@@ -142,7 +128,7 @@ function resolveAuthProfileStorageStatePath(args: {
   const profilePath = getProfilePath(profileName);
   if (!hasProfile(profileName)) {
     throw new UserFacingStartupError(
-      getMissingLocalAuthProfileError({
+      formatMissingLocalAuthProfileMessage({
         profileName,
         profilePath,
         session: args.session,
@@ -809,7 +795,7 @@ class BrowserDaemon {
       page: this.page,
       context: this.context,
       logger: this.logger,
-      refreshLocalAuthProfiles: !this.externallyManaged,
+      persistLocalAuthProfiles: !this.externallyManaged,
       onLog: (event) => {
         void this.broadcast("workflowOutput", event);
       },
@@ -951,7 +937,8 @@ async function main(): Promise<void> {
       );
       validateWorkflowInput(loadedWorkflow, config.workflow.params ?? {});
       const authProfileName = loadedWorkflow.authProfileName;
-      const authProfilePersist = loadedWorkflow.authProfileRefresh === true;
+      const authProfilePersist =
+        loadedWorkflow.authProfilePersistAfterRun === true;
       workflowConfig = {
         ...config.workflow,
         authProfileName,

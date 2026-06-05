@@ -24,6 +24,7 @@ import {
   parseAuthProfileSites,
 } from "../../shared/workflow/auth-profile-state.js";
 import {
+  formatMissingLocalAuthProfileMessage,
   getProfilePath,
   hasProfile,
   normalizeProfileName,
@@ -442,9 +443,11 @@ export async function runOpen(
     const authProfilePath = getProfilePath(authProfileName);
     if (!hasProfile(authProfileName)) {
       throw new Error(
-        `No saved auth profile named "${authProfileName}". ` +
-          `Save one first: libretto open <site-url> --headed --session <name>, ` +
-          `log in, then run: libretto save ${authProfileName} --session <name> --sites <site>`,
+        formatMissingLocalAuthProfileMessage({
+          profileName: authProfileName,
+          profilePath: authProfilePath,
+          session,
+        }),
       );
     }
   }
@@ -629,8 +632,6 @@ export async function runSave(
   const { browser, context } = await connect(session, logger);
 
   try {
-    await new Promise((r) => setTimeout(r, 500));
-
     const state = await captureAuthProfileStorageState(context, sites);
     const profilePath = await writeProfile(normalizedProfileName, state);
 

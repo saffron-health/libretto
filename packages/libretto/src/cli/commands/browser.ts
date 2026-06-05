@@ -185,20 +185,17 @@ export const connectCommand = SimpleCLI.command({
 
 export const saveInput = SimpleCLI.input({
   positionals: [
-    SimpleCLI.positional("profileName", z.string().optional(), {
+    SimpleCLI.positional("profileName", z.string(), {
       help: "Profile name to save",
     }),
   ],
   named: {
     session: sessionOption(),
-    sites: SimpleCLI.option(z.string().optional(), {
+    sites: SimpleCLI.option(z.string(), {
       help: "Comma-separated sites whose auth state should be saved",
     }),
   },
-}).refine(
-  (input) => Boolean(input.profileName && input.sites),
-  `Usage: libretto save <profile-name> --session <name> --sites <site[,site]>`,
-);
+});
 
 export const saveCommand = SimpleCLI.command({
   description: "Save current browser session",
@@ -206,8 +203,8 @@ export const saveCommand = SimpleCLI.command({
   .input(saveInput)
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
-    await runSave(input.profileName!, ctx.session, ctx.logger, {
-      sites: input.sites!,
+    await runSave(input.profileName, ctx.session, ctx.logger, {
+      sites: input.sites,
     });
   });
 

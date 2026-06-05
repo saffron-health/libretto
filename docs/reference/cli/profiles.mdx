@@ -62,17 +62,27 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
   `linkedin.com,auth.linkedin.com`.
 </ParamField>
 
-### fetch chrome
+Subdomains do not need to be listed separately when the parent domain is enough
+for the login. For example, `linkedin.com` captures cookies for
+`www.linkedin.com` and `auth.linkedin.com`. Add multiple sites when the login
+uses separate parent domains, such as `example.com,example-login.com`.
 
-The `profiles fetch chrome` command imports cookies, localStorage, and IndexedDB
+### import-chrome-profiles
+
+The `import-chrome-profiles` command imports cookies, localStorage, and IndexedDB
 from an existing Chrome DevTools Protocol session into a named local profile.
+The profile name is the local Libretto profile you want to create. The `--sites`
+list decides which signed-in sites are copied from Chrome.
 
 ```bash theme={null}
-npx libretto profiles fetch chrome twitter --cdp-url http://127.0.0.1:9222 --sites x.com,twitter.com
+npx libretto import-chrome-profiles twitter --cdp-url http://127.0.0.1:9222 --sites x.com,twitter.com
 ```
 
 Start Chrome with remote debugging enabled, log in normally, then run the fetch
-command. The profile is saved under `.libretto/profiles/<profileName>.json`.
+command. The CDP URL comes from the Chrome process you launched with
+`--remote-debugging-port`; for example, port `9222` gives
+`http://127.0.0.1:9222`. The profile is saved under
+`.libretto/profiles/<profileName>.json`.
 
 Recent Chrome versions reject remote debugging against the default user-data
 directory; if Chrome prints that error, copy the desired profile to a temporary
@@ -89,6 +99,12 @@ npx libretto cloud profiles list
 `libretto cloud deploy` automatically registers any `authProfile` names declared
 by deployed workflows. Hosted runs use the browser provider's native profile API;
 local profile files are not uploaded.
+
+Local profiles and cloud profiles are intentionally separate. There is no command
+to copy a local profile file into a cloud profile, or to download a cloud profile
+into `.libretto/profiles/`. Local profiles are Playwright storage-state JSON for
+local runs; cloud profiles are provider-native browser profiles managed by the
+hosted browser provider.
 
 ### cloud profiles delete
 

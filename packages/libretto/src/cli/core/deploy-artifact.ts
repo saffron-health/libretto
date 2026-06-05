@@ -54,7 +54,7 @@ type HostedDeployPackage = {
 export type WorkflowDeployMetadata = {
   name: string;
   authProfileName?: string;
-  authProfileRefresh?: boolean;
+  authProfilePersistAfterRun?: boolean;
 };
 
 type BuildHostedDeployTarballArgs = {
@@ -751,13 +751,13 @@ function extractDiscoveryAuthProfileMetadata(
   if (!authProfile || typeof authProfile !== "object") return {};
   const record = authProfile as {
     name?: unknown;
-    refresh?: unknown;
+    persistAfterRun?: unknown;
   };
   if (typeof record.name !== "string") return {};
   return {
     authProfileName: record.name,
-    ...(typeof record.refresh === "boolean"
-      ? { authProfileRefresh: record.refresh }
+    ...(typeof record.persistAfterRun === "boolean"
+      ? { authProfilePersistAfterRun: record.persistAfterRun }
       : {}),
   };
 }
@@ -848,7 +848,7 @@ function createBootstrapSource(args: {
       (workflow, index) =>
         `export const ${getGeneratedWorkflowExportName(index)} = createWorkflowProxy(${JSON.stringify(workflow.name)}, ${JSON.stringify({
           authProfileName: workflow.authProfileName,
-          authProfileRefresh: workflow.authProfileRefresh,
+          authProfilePersistAfterRun: workflow.authProfilePersistAfterRun,
         })});`,
     )
     .join("\n");
@@ -886,23 +886,27 @@ function ensureBundleFile() {
 }
 
 function createWorkflowProxy(workflowName, metadata) {
+  const handler = async (ctx, input) => {
+    const impl = nativeRequire(ensureBundleFile());
+    const target = getWorkflowFromModuleExports(impl, workflowName);
+    if (!target || typeof target.run !== "function") {
+      throw new Error(
+        \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
+      );
+    }
+    return await target.run(ctx, input);
+  };
+
+  if (!metadata?.authProfileName) {
+    return workflow(workflowName, handler);
+  }
+
   return workflow(workflowName, {
-    ...(metadata?.authProfileName ? {
-      authProfile: {
-        name: metadata.authProfileName,
-        ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),
-      },
-    } : {}),
-    async handler(ctx, input) {
-      const impl = nativeRequire(ensureBundleFile());
-      const target = getWorkflowFromModuleExports(impl, workflowName);
-      if (!target || typeof target.run !== "function") {
-        throw new Error(
-          \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
-        );
-      }
-      return await target.run(ctx, input);
+    authProfile: {
+      name: metadata.authProfileName,
+      ...(typeof metadata.authProfilePersistAfterRun === "boolean" ? { persistAfterRun: metadata.authProfilePersistAfterRun } : {}),
     },
+    handler,
   });
 }
 

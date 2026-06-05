@@ -31,11 +31,11 @@ Recent Chrome versions do not allow `--remote-debugging-port` against the
 default user-data directory. If Chrome prints `DevTools remote debugging
 requires a non-default data directory`, copy the desired profile to a temporary
 user-data directory and launch Chrome from that copy before running
-`profiles fetch chrome`; disable extensions if the copied profile opens and
+`import-chrome-profiles`; disable extensions if the copied profile opens and
 exits.
 
 ```bash
-npx libretto profiles fetch chrome example-app --cdp-url http://127.0.0.1:9222 --sites app.example.com
+npx libretto import-chrome-profiles example-app --cdp-url http://127.0.0.1:9222 --sites app.example.com
 ```
 
 ## Notes
@@ -44,6 +44,6 @@ npx libretto profiles fetch chrome example-app --cdp-url http://127.0.0.1:9222 -
 - Saving a profile captures cookies, localStorage, and IndexedDB only for the comma-separated `--sites` list.
 - `run` uses the workflow-declared `authProfile`; do not pass `--auth-profile` to `run`.
 - `libretto cloud deploy` registers missing hosted auth profile names when a workflow declares `authProfile`; it does not upload local profile files.
-- `authProfile: { name: "example-app", refresh: true }` refreshes local profile data for sites visited by successful local runs; hosted runs use provider-native profile persistence.
-- Sessions can expire. If refresh is disabled or cannot recover the profile, repeat the login and save flow.
+- `authProfile: { name: "example-app", persistAfterRun: true }` persists local profile data for sites visited by successful local runs; hosted runs use provider-native profile persistence.
+- Sessions can expire. If persistence is disabled or cannot recover the profile, repeat the login and save flow.
 - Keep auth profiles as a brief operational detail in the main skill, not a full workflow pattern.

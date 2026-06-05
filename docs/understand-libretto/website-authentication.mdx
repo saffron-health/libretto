@@ -66,15 +66,15 @@ For hosted workflows, push credential environment variables to Libretto Cloud
 instead of passing secrets on the command line:
 
 ```bash theme={null}
-export LIBRETTO_PORTAL_USERNAME="alice@example.com"
-export LIBRETTO_PORTAL_PASSWORD="secret"
-npx libretto cloud credentials push portal --prefix LIBRETTO_PORTAL_
+export LIBRETTO_CLOUD_USERNAME="alice@example.com"
+export LIBRETTO_CLOUD_PASSWORD="secret"
+npx libretto cloud credentials push portal
 ```
 
-The command stores a hosted credential named `portal`. Matching environment
-variables become lowercase fields with the prefix removed, so
-`LIBRETTO_PORTAL_USERNAME` becomes `username` and
-`LIBRETTO_PORTAL_PASSWORD` becomes `password`.
+The command stores a hosted credential named `portal`. Environment variables
+with the `LIBRETTO_CLOUD_` prefix become lowercase fields with the prefix
+removed, so `LIBRETTO_CLOUD_USERNAME` becomes `username` and
+`LIBRETTO_CLOUD_PASSWORD` becomes `password`.
 
 ### Saving profiles locally
 
@@ -129,13 +129,14 @@ authProfile: "portal.example.com"
 
 authProfile: {
   name: "portal.example.com",
-  refresh: true,
+  persistAfterRun: true,
 }
 ```
 
 Use `--sites` only when saving or importing a local profile from an existing
-browser session. Set `refresh: true` when a successful local run should save
-updated browser state for sites visited by that workflow back to the profile.
+browser session. Set `persistAfterRun: true` when a successful local run should
+save updated browser state for sites visited by that workflow back to the
+profile.
 
 For hosted runs, `libretto cloud deploy` registers workflow-declared profile
 names with Libretto Cloud. Hosted browser sessions then use the provider's native
