@@ -190,6 +190,10 @@ importers:
         version: link:../packages/libretto
 
   packages/affordance:
+    dependencies:
+      teg-parser:
+        specifier: 0.15.0
+        version: 0.15.0
     devDependencies:
       '@types/node':
         specifier: ^25.5.0
@@ -7653,6 +7657,9 @@ packages:
 
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
+
+  teg-parser@0.15.0:
+    resolution: {integrity: sha512-SJjmzMLP5ibhYGtLlX19jAcvqEDnsSXYDEyeqVT9Jg7ZgyNe4Al0vJhqQ+f6Zfw7HlheuKoiIpP+Kg/ne82+bg==}
 
   text-decoder@1.2.7:
     resolution: {integrity: sha512-vlLytXkeP4xvEq2otHeJfSQIRyWxo/oZGEbXrtEEF9Hnmrdly59sUbzZ/QgyWuLYHctCHxFF4tRQZNQ9k60ExQ==}
@@ -17926,6 +17933,10 @@ snapshots:
     transitivePeerDependencies:
       - bare-abort-controller
       - react-native-b4a
+
+  teg-parser@0.15.0:
+    dependencies:
+      lodash: 4.18.1
 
   text-decoder@1.2.7:
     dependencies:

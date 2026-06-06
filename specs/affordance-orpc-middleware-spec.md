@@ -185,13 +185,13 @@ Replace the handwritten command-line input parser with `teg-parser` before expan
 
 The team owns `teg-parser`, so gaps in the parser API should be fixed upstream and published instead of worked around indefinitely in Affordance.
 
-- [ ] First add focused parser tests for quoted strings, `--option value`, `--option=value`, flags, missing option values, unknown options, and positional arguments.
-- [ ] Add `teg-parser` as an Affordance development/runtime dependency only after confirming its package metadata and dependency footprint are acceptable.
-- [ ] Move command-line input parsing out of `packages/affordance/src/v2/input.ts` if a dedicated parser module keeps `input.ts` focused on schema validation and input definitions.
-- [ ] Replace `parseCommandLineInput(...)` internals with Teg parser combinators while preserving the public Aff raw input shape `{ arguments, options }`.
-- [ ] Preserve current Phase 4 error messages unless a Teg parse failure gives a clearly better Aff-owned message.
-- [ ] Keep help detection and command route matching outside the Teg parser for now.
-- [ ] Verify existing Phase 4 exec parsing tests still pass.
+- [x] First add focused parser tests for quoted strings, `--option value`, `--option=value`, flags, missing option values, unknown options, and positional arguments.
+- [x] Add `teg-parser` as an Affordance runtime dependency after confirming its package metadata and dependency footprint are acceptable.
+- [x] Move command-line input parsing out of `packages/affordance/src/v2/input.ts` so `input.ts` stays focused on schema validation and input definitions.
+- [x] Replace command-line tokenization with a Teg-backed parser while preserving the public Aff raw input shape `{ arguments, options }`.
+- [x] Preserve current Phase 4 error messages unless a Teg parse failure gives a clearly better Aff-owned message.
+- [x] Keep help detection and command route matching outside the Teg parser for now.
+- [x] Verify existing Phase 4 exec parsing tests still pass.
 
 ### Phase 6: Standard Schema input support
 

@@ -106,6 +106,28 @@ describe("Aff v2 input", () => {
     });
   });
 
+  test("parses quoted command-line arguments and option values", async () => {
+    const app = Aff.cli("libretto").routes({
+      run: Aff.command({ description: "Run workflow" })
+        .arguments([["workflow", z.string()]])
+        .options({
+          label: Aff.option(z.string()),
+          params: Aff.option(z.string()),
+        })
+        .handle(async ({ input }) => input),
+    });
+
+    await expect(
+      app.exec(
+        'run "workflows/my flow.ts" --label "smoke test" --params=\'{"url":"https://example.com"}\'',
+      ),
+    ).resolves.toEqual({
+      workflow: "workflows/my flow.ts",
+      label: "smoke test",
+      params: '{"url":"https://example.com"}',
+    });
+  });
+
   test("surfaces command-line input errors before the handler runs", async () => {
     let handlerCalls = 0;
     const app = Aff.cli("libretto").routes({

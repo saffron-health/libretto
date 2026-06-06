@@ -6,7 +6,7 @@ import {
   type AffInputDefinition,
   type AffInputFor,
   type AffOptionsDefinition,
-} from "./input.js";
+} from "./input/input.js";
 
 export interface AffCommandConfig {
   description?: string;
@@ -52,7 +52,7 @@ function createConfiguredCommandBuilder<TInput>(
   args: AffArgumentsDefinition,
   options: AffOptionsDefinition,
   hasInput: boolean,
-  parseRawInput: (rawInput: unknown) => TInput,
+  parseRawInput: (rawInput: unknown, commandName?: string) => TInput,
 ): AffCommandBuilder<TInput> {
   return {
     arguments<const TArguments extends AffArgumentsDefinition>(nextArgs: TArguments) {
@@ -62,7 +62,7 @@ function createConfiguredCommandBuilder<TInput>(
         nextArgs,
         options,
         true,
-        (rawInput) => parseInput(input, rawInput),
+        (rawInput, commandName) => parseInput(input, rawInput, commandName),
       );
     },
     options<const TOptions extends AffOptionsDefinition>(nextOptions: TOptions) {
@@ -72,7 +72,7 @@ function createConfiguredCommandBuilder<TInput>(
         args,
         nextOptions,
         true,
-        (rawInput) => parseInput(input, rawInput),
+        (rawInput, commandName) => parseInput(input, rawInput, commandName),
       );
     },
     handle(handler) {
@@ -83,7 +83,7 @@ function createConfiguredCommandBuilder<TInput>(
         input,
         execute(rawInput, initialContext, command) {
           return handler?.({
-            input: parseRawInput(rawInput),
+            input: parseRawInput(rawInput, command.path.join(" ")),
             ctx: initialContext,
             command,
           });

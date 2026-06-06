@@ -1,24 +1,27 @@
 import type { AffCommand, AffGroup, AffRoute, AffRouteMap } from "./index.js";
+import type { CommandLineInputToken } from "./input/parser.js";
 
-export function getHelpPath(tokens: string[]): string[] | undefined {
-  if (tokens[0] === "help") {
-    return tokens.slice(1);
+export function getHelpPath(tokens: readonly CommandLineInputToken[]): string[] | undefined {
+  const firstToken = tokens[0];
+  if (firstToken?.type === "argument" && firstToken.value === "help") {
+    return pathFromTokens(tokens.slice(1));
   }
 
   const helpFlagIndex = tokens.findIndex(isHelpFlag);
   if (helpFlagIndex >= 0) {
-    return tokens.slice(0, helpFlagIndex);
+    return pathFromTokens(tokens.slice(0, helpFlagIndex));
   }
 
-  if (tokens.at(-1) === "help") {
-    return tokens.slice(0, -1);
+  const lastToken = tokens.at(-1);
+  if (lastToken?.type === "argument" && lastToken.value === "help") {
+    return pathFromTokens(tokens.slice(0, -1));
   }
 
   return undefined;
 }
 
-function isHelpFlag(token: string): boolean {
-  return token === "--help" || token === "-h";
+function isHelpFlag(token: CommandLineInputToken): boolean {
+  return token.type === "option" && (token.key === "help" || token.key === "h");
 }
 
 export function renderHelp(name: string, routes: AffRouteMap, path: string[]): string {
@@ -88,7 +91,10 @@ function renderCommandList(routes: AffRouteMap): string[] {
   });
 }
 
-export function findRouteByPath(routes: AffRouteMap, path: string[]): AffRoute | undefined {
+export function findRouteByPath(
+  routes: AffRouteMap,
+  path: readonly string[],
+): AffRoute | undefined {
   let currentRoutes = routes;
 
   for (const [index, pathSegment] of path.entries()) {
@@ -107,6 +113,10 @@ export function findRouteByPath(routes: AffRouteMap, path: string[]): AffRoute |
   }
 
   return undefined;
+}
+
+export function pathFromTokens(tokens: readonly CommandLineInputToken[]): string[] {
+  return tokens.filter((token) => token.type === "argument").map((token) => token.value);
 }
 
 interface NearestGroupMatch {
