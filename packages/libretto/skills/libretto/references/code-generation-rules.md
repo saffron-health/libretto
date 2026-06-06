@@ -40,7 +40,7 @@ export default workflow("myWorkflow", {
 
 Key points:
 
-- `workflow(name, { input, output, recoveryAction, handler })` takes a unique workflow name, optional Zod input/output schemas, an optional recovery action, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
+- `workflow(name, { input, output, credentials, authProfile, recoveryAction, handler })` takes a unique workflow name, optional Zod input/output schemas, optional declared credential names, an optional auth profile, an optional recovery action, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
 - At run time, Libretto validates `input` against `inputSchema` before calling the handler. Invalid input throws a clear error listing each failing field; the workflow handler never sees malformed input.
 - `npx libretto run ./file.ts` executes the file's default-exported workflow, so always use `export default workflow(...)`.
 - `ctx` provides `session` and `page`. Use `console.log`/`console.warn`/`console.error` for logging — the runtime wraps these with structured metadata automatically.
@@ -48,6 +48,33 @@ Key points:
 - Use `await pause(ctx.session)` (or `await pause(session)`) to pause the workflow for debugging. It is a no-op in production.
 - After validation is complete and the workflow is confirmed working end to end, remove all `pause()` calls and pause-only workflow params unless the user explicitly says to keep them.
 - The browser is launched and closed automatically by the CLI. Do not launch or close it in the handler.
+
+## Workflow Credentials And Auth Profiles
+
+Use `credentials` only when the workflow needs secrets such as API keys, usernames, passwords, or TOTP shared secrets. Do not put secrets in the Zod input schema and do not tell users to pass secrets with `--params`.
+
+Declared credentials are injected into `input.credentials`. Local runs resolve matching `LIBRETTO_CLOUD_` environment variables from `.env`; hosted runs resolve matching Libretto Cloud credential records and do not read credential values from the executor environment. Only declared names are injected.
+
+```typescript
+export default workflow("sentimentWorkflow", {
+  credentials: ["openai_api_key"],
+  input: z.object({
+    pageUrl: z.string().url(),
+  }),
+  output: z.object({
+    sentiment: z.string(),
+  }),
+  async handler(ctx, input) {
+    const apiKey = input.credentials.openai_api_key;
+    // Use apiKey for server-side API calls.
+    return { sentiment: "neutral" };
+  },
+});
+```
+
+Credential names use the normalized form after removing `LIBRETTO_CLOUD_` and lowercasing the rest. For example, `LIBRETTO_CLOUD_OPENAI_API_KEY` becomes `openai_api_key`.
+
+When a workflow needs a logged-in website session, generate it with an `authProfile` by default and include `librettoAuthenticate` fallback login logic using declared credentials. Follow `references/auth-profiles.md` for profile naming, refresh behavior, hosted profile behavior, and the fallback-login pattern.
 
 ## Workflow Error Handling
 

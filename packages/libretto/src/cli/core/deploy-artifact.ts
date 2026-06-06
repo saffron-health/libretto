@@ -21,6 +21,7 @@ import {
   getWorkflowsFromModuleExports,
   LIBRETTO_WORKFLOW_BRAND,
 } from "../../shared/workflow/workflow.js";
+import { normalizeCredentialNames } from "../../shared/workflow/credentials.js";
 
 type PackageManifest = {
   name?: string;
@@ -53,6 +54,7 @@ type HostedDeployPackage = {
 
 export type WorkflowDeployMetadata = {
   name: string;
+  credentialNames: string[];
   authProfileName?: string;
   authProfileRefresh?: boolean;
 };
@@ -711,6 +713,7 @@ function createDiscoveryLibrettoModule(
     workflow: (name: string, definitionOrHandler?: unknown) => {
       workflowsByName.set(name, {
         name,
+        ...extractDiscoveryCredentialMetadata(definitionOrHandler),
         ...extractDiscoveryAuthProfileMetadata(definitionOrHandler),
       });
       return {
@@ -736,9 +739,28 @@ function createDiscoveryLibrettoModule(
   });
 }
 
+function extractDiscoveryCredentialMetadata(
+  definitionOrHandler: unknown,
+): Pick<WorkflowDeployMetadata, "credentialNames"> {
+  if (
+    !definitionOrHandler ||
+    typeof definitionOrHandler !== "object" ||
+    !("credentials" in definitionOrHandler)
+  ) {
+    return { credentialNames: [] };
+  }
+  const rawCredentials = (definitionOrHandler as { credentials?: unknown })
+    .credentials;
+  return {
+    credentialNames: Array.isArray(rawCredentials)
+      ? normalizeCredentialNames(rawCredentials)
+      : [],
+  };
+}
+
 function extractDiscoveryAuthProfileMetadata(
   definitionOrHandler: unknown,
-): Omit<WorkflowDeployMetadata, "name"> {
+): Omit<WorkflowDeployMetadata, "name" | "credentialNames"> {
   if (
     !definitionOrHandler ||
     typeof definitionOrHandler !== "object" ||
@@ -847,6 +869,7 @@ function createBootstrapSource(args: {
     .map(
       (workflow, index) =>
         `export const ${getGeneratedWorkflowExportName(index)} = createWorkflowProxy(${JSON.stringify(workflow.name)}, ${JSON.stringify({
+          credentialNames: workflow.credentialNames,
           authProfileName: workflow.authProfileName,
           authProfileRefresh: workflow.authProfileRefresh,
         })});`,
@@ -898,10 +921,18 @@ function createWorkflowProxy(workflowName, metadata) {
   };
 
   if (!metadata?.authProfileName) {
-    return workflow(workflowName, handler);
+    return workflow(workflowName, {
+      credentials: Array.isArray(metadata?.credentialNames)
+        ? metadata.credentialNames
+        : [],
+      handler,
+    });
   }
 
   return workflow(workflowName, {
+    credentials: Array.isArray(metadata.credentialNames)
+      ? metadata.credentialNames
+      : [],
     authProfile: {
       name: metadata.authProfileName,
       ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),

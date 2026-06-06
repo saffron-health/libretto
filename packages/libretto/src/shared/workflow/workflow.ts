@@ -5,6 +5,10 @@ import {
   type RecoveryAction,
 } from "../../runtime/recovery/page-fallbacks.js";
 import { normalizeProfileName } from "./auth-profile-name.js";
+import {
+  mergeCredentialsIntoInput,
+  normalizeCredentialNames,
+} from "./credentials.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
@@ -31,6 +35,7 @@ export type LibrettoWorkflowDefinition<
 > = {
   input?: InputSchema;
   output?: OutputSchema;
+  credentials?: readonly string[];
   authProfile?: LibrettoWorkflowAuthProfile;
   recoveryAction?: RecoveryAction;
 };
@@ -81,10 +86,44 @@ function parseWorkflowInput<InputSchema extends z.ZodType>(
   if (!inputSchema) return input as z.infer<InputSchema>;
 
   const result = inputSchema.safeParse(input);
-  if (!result.success) {
-    throw new LibrettoWorkflowInputError(workflowName, result.error);
+  if (result.success) {
+    return reattachCredentialInput(result.data, input) as z.infer<InputSchema>;
   }
-  return result.data;
+
+  const stripped = stripCredentialInput(input);
+  if (stripped !== input) {
+    const strippedResult = inputSchema.safeParse(stripped);
+    if (strippedResult.success) {
+      return reattachCredentialInput(strippedResult.data, input) as z.infer<InputSchema>;
+    }
+  }
+
+  throw new LibrettoWorkflowInputError(workflowName, result.error);
+}
+
+function stripCredentialInput(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const { credentials: _credentials, ...rest } = input as Record<string, unknown>;
+  if (!("credentials" in (input as Record<string, unknown>))) return input;
+  return rest;
+}
+
+function reattachCredentialInput(parsed: unknown, raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return parsed;
+  const rawRecord = raw as Record<string, unknown>;
+  const rawCredentials =
+    rawRecord.credentials && typeof rawRecord.credentials === "object"
+      ? rawRecord.credentials
+      : undefined;
+  if (!rawCredentials) return parsed;
+  const parsedRecord =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? { ...(parsed as Record<string, unknown>) }
+      : {};
+  return {
+    ...parsedRecord,
+    credentials: rawCredentials,
+  };
 }
 
 export type WorkflowInputValidator = {
@@ -113,6 +152,7 @@ export class LibrettoWorkflow<
   // this schema to JSON Schema at build time and exposes it via
   // /v1/workflows/get so API consumers know the workflow's output shape.
   public readonly outputSchema?: OutputSchema;
+  public readonly credentialNames: readonly string[];
   public readonly authProfileName?: string;
   public readonly authProfileRefresh?: boolean;
   public readonly recoveryAction?: RecoveryAction;
@@ -127,6 +167,7 @@ export class LibrettoWorkflow<
       | {
           inputSchema?: InputSchema;
           outputSchema?: OutputSchema;
+          credentialNames?: readonly string[];
           authProfileName?: string;
           authProfileRefresh?: boolean;
           recoveryAction?: RecoveryAction;
@@ -140,6 +181,7 @@ export class LibrettoWorkflow<
     this.name = name;
     this.inputSchema = options?.inputSchema;
     this.outputSchema = options?.outputSchema;
+    this.credentialNames = options?.credentialNames ?? [];
     this.authProfileName = options?.authProfileName;
     this.authProfileRefresh = options?.authProfileRefresh;
     this.recoveryAction = options?.recoveryAction;
@@ -150,7 +192,11 @@ export class LibrettoWorkflow<
     ctx: LibrettoWorkflowContext,
     input: unknown,
   ): Promise<z.infer<OutputSchema>> {
-    const parsed = parseWorkflowInput(this.name, this.inputSchema, input);
+    const parsed = parseWorkflowInput(
+      this.name,
+      this.inputSchema,
+      mergeCredentialsIntoInput(input, this.credentialNames),
+    );
     const workflowContext =
       !this.recoveryAction
         ? ctx
@@ -169,6 +215,7 @@ export type ExportedLibrettoWorkflow = {
   readonly name: string;
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;
+  readonly credentialNames: readonly string[];
   readonly authProfileName?: string;
   readonly authProfileRefresh?: boolean;
   readonly recoveryAction?: RecoveryAction;
@@ -272,6 +319,7 @@ function getWorkflowConstructorOptions<
 ): {
   inputSchema?: InputSchema;
   outputSchema?: OutputSchema;
+  credentialNames: readonly string[];
   authProfileName?: string;
   authProfileRefresh?: boolean;
   recoveryAction?: RecoveryAction;
@@ -280,6 +328,7 @@ function getWorkflowConstructorOptions<
   return {
     inputSchema: options.input,
     outputSchema: options.output,
+    credentialNames: normalizeCredentialNames(options.credentials),
     authProfileName: authProfile?.name,
     authProfileRefresh: authProfile?.refresh,
     recoveryAction: options.recoveryAction,

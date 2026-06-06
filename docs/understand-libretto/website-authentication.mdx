@@ -2,79 +2,88 @@
 title: Website authentication
 ---
 
-> Pass credentials into a workflow, and reuse authenticated browser state across runs when the login can't be scripted.
+> Use declared credentials for scripted logins, and reuse authenticated browser state when the login can't be scripted.
 
 Most real automation targets sit behind a login. There are two patterns for getting past it, and they cover different kinds of login:
 
-1. **Pass credentials into the workflow as input** (username, password, TOTP secret). The workflow's Playwright code fills them into the login form and submits, just like any other form interaction. This works for any login you can script end-to-end, including ones with TOTP.
+1. **Declare credential names on the workflow** (username, password, TOTP secret). Local non-production runs resolve them from `.env`; hosted runs resolve them from Libretto Cloud's encrypted credential store. The workflow's Playwright code fills them into the login form and submits, just like any other form interaction.
 2. **Save an authenticated profile** from a one-time manual login and declare it on the workflow with `authProfile`. Use this when the login can't be scripted (CAPTCHAs, SMS codes, device-approval prompts, magic links), so future runs start already signed in.
 
-### Passing credentials into a workflow
+### Declaring credentials
 
-Workflows receive a typed `input` object inferred from the workflow's Zod input schema. Credentials are just fields on that input, and your Playwright code fills them into the page the same way it fills any other form. If the site also requires a TOTP (Google Authenticator style) code, store the **shared secret** alongside the other credentials and derive a fresh code each run with a library like [`otplib`](https://www.npmjs.com/package/otplib):
+Credentials are separate from normal workflow input. Declare the credential
+names the workflow needs with `credentials`, then read the resolved values from
+`input.credentials`. Undeclared credentials are not injected.
+
+For local runs, put matching `LIBRETTO_CLOUD_` variables in `.env`:
+
+```dotenv theme={null}
+LIBRETTO_CLOUD_USERNAME=alice@example.com
+LIBRETTO_CLOUD_PASSWORD=secret
+LIBRETTO_CLOUD_TOTP_SECRET=JBSWY3DPEHPK3PXP
+LIBRETTO_CLOUD_OPENAI_API_KEY=sk-...
+```
+
+For hosted runs, push those same variables to Libretto Cloud:
+
+```bash theme={null}
+npx libretto cloud credentials push
+```
+
+The command stores each non-empty `LIBRETTO_CLOUD_` variable as its own
+tenant-scoped credential. The prefix is removed and the key is lowercased, so
+`LIBRETTO_CLOUD_OPENAI_API_KEY` becomes `openai_api_key`.
+Hosted production runs do not read `LIBRETTO_CLOUD_` variables from the
+executor environment; they use only credentials injected by Libretto Cloud.
+
+If the site requires a TOTP (Google Authenticator style) code, store the
+**shared secret** as a credential and derive a fresh code each run with a library
+like [`otplib`](https://www.npmjs.com/package/otplib):
 
 ```typescript theme={null}
 import { authenticator } from "otplib";
 import { workflow } from "libretto";
 import { z } from "zod";
 
-export const main = workflow(
-  "portal-login",
-  {
-    input: z.object({
-      username: z.string(),
-      password: z.string(),
-      totpSecret: z.string(),
-    }),
-    output: z.object({
-      success: z.boolean(),
-    }),
-  },
-  async (ctx, input) => {
+export const main = workflow("portal-login", {
+  credentials: ["username", "password", "totp_secret"],
+  input: z.object({
+    accountId: z.string(),
+  }),
+  output: z.object({
+    success: z.boolean(),
+  }),
+  async handler(ctx, input) {
     const { page } = ctx;
+    const { username, password, totp_secret } = input.credentials;
 
     await page.goto("https://portal.example.com/login");
-    await page.fill('[name="username"]', input.username);
-    await page.fill('[name="password"]', input.password);
+    await page.fill('[name="username"]', username);
+    await page.fill('[name="password"]', password);
     await page.click('button[type="submit"]');
 
     // The site prompts for a TOTP code
     await page.waitForSelector('[name="otp"]');
-    await page.fill('[name="otp"]', authenticator.generate(input.totpSecret));
+    await page.fill('[name="otp"]', authenticator.generate(totp_secret));
     await page.click('button[type="submit"]');
 
     await page.waitForURL(/\/dashboard/);
     return { success: true };
   },
-);
+});
 ```
 
-Invoke the workflow with credentials sourced from your environment:
+Run locally with normal params only; credentials come from `.env`:
 
 ```bash theme={null}
-npx libretto run ./portal-login.ts \
-  --params '{"username":"'"$PORTAL_USERNAME"'","password":"'"$PORTAL_PASSWORD"'","totpSecret":"'"$PORTAL_TOTP_SECRET"'"}'
+npx libretto run ./portal-login.ts --params '{"accountId":"acct_123"}'
 ```
 
 <Warning>
-  Credentials passed on the command line land in your shell history and the session log. For production, inject them from a secret manager (GCP Secret Manager, AWS Secrets Manager, Vault) and read them inside the dispatcher that invokes the workflow.
+  Do not pass secrets in `--params`. Command-line params can land in shell
+  history and logs. Use declared credentials backed by `.env` locally and
+  Libretto Cloud credentials in hosted runs.
 </Warning>
-
-### Hosted credentials
-
-For hosted workflows, push credential environment variables to Libretto Cloud
-instead of passing secrets on the command line:
-
-```bash theme={null}
-export LIBRETTO_CLOUD_USERNAME="alice@example.com"
-export LIBRETTO_CLOUD_PASSWORD="secret"
-npx libretto cloud credentials push portal
-```
-
-The command stores a hosted credential named `portal`. Environment variables
-with the `LIBRETTO_CLOUD_` prefix become lowercase fields with the prefix
-removed, so `LIBRETTO_CLOUD_USERNAME` becomes `username` and
-`LIBRETTO_CLOUD_PASSWORD` becomes `password`.
 
 ### Saving profiles locally
 

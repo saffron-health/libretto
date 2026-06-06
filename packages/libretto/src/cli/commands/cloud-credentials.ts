@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { SimpleCLI } from "affordance";
 import { orpcCall, resolveApiUrl } from "../core/auth-fetch.js";
 
@@ -24,51 +23,55 @@ function requireApiKeyCredential() {
   };
 }
 
-function parseEnvCredentials(prefix: string): Record<string, string> {
+function parseEnvCredentials(prefix: string): Array<{ name: string; value: string }> {
   const credentials: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (!key.startsWith(prefix) || value === undefined) continue;
+    if (value.trim().length === 0) continue;
     const fieldName = key.slice(prefix.length).toLowerCase();
     if (!fieldName || fieldName === "api_key") continue;
     credentials[fieldName] = value;
   }
-  return credentials;
+  return Object.entries(credentials)
+    .map(([name, value]) => ({ name, value }))
+    .sort((left, right) => left.name.localeCompare(right.name));
 }
 
 export const pushCredentialCommand = SimpleCLI.command({
   description: "Push LIBRETTO_CLOUD-prefixed env credentials to Libretto Cloud",
 })
   .input(SimpleCLI.input({
-    positionals: [
-      SimpleCLI.positional("name", z.string(), {
-        help: "Credential name to create or overwrite",
-      }),
-    ],
+    positionals: [],
     named: {},
   }))
-  .handle(async ({ input }) => {
+  .handle(async () => {
     const credentials = parseEnvCredentials(CLOUD_CREDENTIAL_ENV_PREFIX);
-    if (Object.keys(credentials).length === 0) {
+    if (credentials.length === 0) {
       throw new Error(
-        `No env vars found with prefix ${CLOUD_CREDENTIAL_ENV_PREFIX}.`,
+        `No non-empty env vars found with prefix ${CLOUD_CREDENTIAL_ENV_PREFIX}.`,
       );
     }
     const { apiUrl, credential } = requireApiKeyCredential();
-    const response = await orpcCall<UpsertCredentialResponse>({
-      apiUrl,
-      path: "/v1/credentials/upsert",
-      input: {
-        name: input.name,
-        credentials,
-      },
-      credential,
-    });
+    let created = 0;
+    let updated = 0;
+    for (const item of credentials) {
+      const response = await orpcCall<UpsertCredentialResponse>({
+        apiUrl,
+        path: "/v1/credentials/upsert",
+        input: item,
+        credential,
+      });
+      if (response.overwritten) {
+        updated += 1;
+        console.log(`Updated cloud credential: ${item.name}`);
+      } else {
+        created += 1;
+        console.log(`Created cloud credential: ${item.name}`);
+      }
+    }
     console.log(
-      response.overwritten
-        ? `Updated cloud credential: ${input.name}`
-        : `Created cloud credential: ${input.name}`,
+      `Pushed ${credentials.length} cloud ${credentials.length === 1 ? "credential" : "credentials"} (${created} created, ${updated} updated).`,
     );
-    console.log(`Credential ID: ${response.credential_id}`);
   });
 
 export const cloudCredentialCommands = SimpleCLI.group({
