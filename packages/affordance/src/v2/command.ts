@@ -5,6 +5,7 @@ import {
   type AffArgumentsDefinition,
   type AffInputDefinition,
   type AffInputFor,
+  type AffInputRaw,
   type AffOptionsDefinition,
 } from "./input/input.js";
 
@@ -27,9 +28,10 @@ export interface AffCommand {
   config: AffCommandConfig;
   input?: AffInputDefinition;
   execute(
-    rawInput: unknown,
+    rawInput: AffInputRaw,
     initialContext: unknown,
     command: AffCommandMetadata,
+    commandName?: string,
   ): unknown | Promise<unknown>;
 }
 
@@ -52,7 +54,7 @@ function createConfiguredCommandBuilder<TInput>(
   args: AffArgumentsDefinition,
   options: AffOptionsDefinition,
   hasInput: boolean,
-  parseRawInput: (rawInput: unknown, commandName?: string) => TInput,
+  parseRawInput: (rawInput: AffInputRaw, commandName?: string) => TInput,
 ): AffCommandBuilder<TInput> {
   return {
     arguments<const TArguments extends AffArgumentsDefinition>(nextArgs: TArguments) {
@@ -81,9 +83,9 @@ function createConfiguredCommandBuilder<TInput>(
         type: "command",
         config,
         input,
-        execute(rawInput, initialContext, command) {
+        execute(rawInput, initialContext, command, commandName) {
           return handler?.({
-            input: parseRawInput(rawInput, command.path.join(" ")),
+            input: parseRawInput(rawInput, commandName ?? command.path.join(" ")),
             ctx: initialContext,
             command,
           });

@@ -68,9 +68,7 @@ function createCliBuilder(name: string): AffCliBuilder {
           return commandRoutes.map(({ metadata }) => metadata);
         },
         async invoke(routeKey, args = [], options = {}, initialContext = {}) {
-          const route = commandRoutes.find(
-            ({ metadata }) => metadata.routeKey === routeKey,
-          );
+          const route = commandRoutes.find(({ metadata }) => metadata.routeKey === routeKey);
           if (!route) {
             throw new Error(`Unknown command route: ${routeKey}`);
           }
@@ -79,6 +77,7 @@ function createCliBuilder(name: string): AffCliBuilder {
             { arguments: args, options },
             initialContext,
             route.metadata,
+            `${name} ${route.metadata.path.join(" ")}`,
           );
         },
         async exec(commandLine) {
@@ -99,51 +98,40 @@ function createCliBuilder(name: string): AffCliBuilder {
             throw new Error(renderUnknownCommandHelp(name, routes, inputPath));
           }
 
-          const rawInput = inputTokens
-            .slice(route.metadata.path.length)
-            .reduce<{
-              arguments: string[];
-              options: Record<string, unknown>;
-            }>(
-              (input, token) => {
-                if (token.type === "argument") {
-                  input.arguments.push(token.value);
-                } else {
-                  input.options[token.key] = token.value;
-                }
-                return input;
-              },
-              { arguments: [], options: {} },
-            );
+          const rawInput = inputTokens.slice(route.metadata.path.length).reduce<{
+            arguments: string[];
+            options: Record<string, unknown>;
+          }>(
+            (input, token) => {
+              if (token.type === "argument") {
+                input.arguments.push(token.value);
+              } else {
+                input.options[token.key] = token.value;
+              }
+              return input;
+            },
+            { arguments: [], options: {} },
+          );
           if (
             !route.command.input &&
-            (rawInput.arguments.length > 0 ||
-              Object.keys(rawInput.options).length > 0)
+            (rawInput.arguments.length > 0 || Object.keys(rawInput.options).length > 0)
           ) {
-            throw new Error(
-              `Unexpected arguments for ${name} ${route.metadata.path.join(" ")}.`,
-            );
-          }
-          if (
-            route.command.input &&
-            rawInput.arguments.length > route.command.input.arguments.length
-          ) {
-            throw new Error(
-              `Unexpected arguments for ${name} ${route.metadata.path.join(" ")}.`,
-            );
+            throw new Error(`Unexpected arguments for ${name} ${route.metadata.path.join(" ")}.`);
           }
 
-          return route.command.execute(rawInput, {}, route.metadata);
+          return route.command.execute(
+            rawInput,
+            {},
+            route.metadata,
+            `${name} ${route.metadata.path.join(" ")}`,
+          );
         },
       };
     },
   };
 }
 
-function flattenCommandRoutes(
-  routes: AffRouteMap,
-  path: string[] = [],
-): AffCommandRoute[] {
+function flattenCommandRoutes(routes: AffRouteMap, path: string[] = []): AffCommandRoute[] {
   const commandRoutes: AffCommandRoute[] = [];
 
   for (const [routeSegment, route] of Object.entries(routes)) {
@@ -174,12 +162,8 @@ function findCommandRouteByPath(
   path: readonly string[],
 ): AffCommandRoute | undefined {
   return commandRoutes
-    .filter(({ metadata }) =>
-      metadata.path.every((segment, index) => segment === path[index]),
-    )
-    .sort(
-      (left, right) => right.metadata.path.length - left.metadata.path.length,
-    )[0];
+    .filter(({ metadata }) => metadata.path.every((segment, index) => segment === path[index]))
+    .sort((left, right) => right.metadata.path.length - left.metadata.path.length)[0];
 }
 
 export const Aff = {

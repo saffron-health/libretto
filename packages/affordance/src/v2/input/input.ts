@@ -1,13 +1,8 @@
 import { z, type ZodTypeAny } from "zod";
 
 export interface AffInputRaw {
-  arguments?: readonly unknown[];
-  options?: Readonly<Record<string, unknown>>;
-}
-
-interface NormalizedRawInput {
   arguments: readonly unknown[];
-  options: Record<string, unknown>;
+  options: Readonly<Record<string, unknown>>;
 }
 
 export type AffArgumentDefinition<
@@ -84,93 +79,87 @@ export function flag(): AffFlagDefinition {
 
 export function parseInput<TOutput>(
   definition: AffInputDefinition<TOutput>,
-  rawInput: unknown,
+  rawInput: AffInputRaw,
   commandName?: string,
 ): TOutput {
-  const raw = normalizeRawInput(rawInput);
-  validateRawInput(definition, raw, commandName);
-  const normalized = normalizeInput(definition, raw);
+  const input = buildSchemaInput(definition, rawInput, commandName);
+  return parseSchemaInput(definition, input);
+}
+
+function buildSchemaInput(
+  definition: AffInputDefinition,
+  rawInput: AffInputRaw,
+  commandName: string | undefined,
+): Record<string, unknown> {
+  if (rawInput.arguments.length > definition.arguments.length) {
+    throw new Error(
+      commandName ? `Unexpected arguments for ${commandName}.` : "Unexpected arguments.",
+    );
+  }
+
+  const input: Record<string, unknown> = {};
+
+  definition.arguments.forEach(([key], index) => {
+    input[key] = rawInput.arguments[index];
+  });
+
+  for (const key of Object.keys(definition.options)) {
+    input[key] = undefined;
+  }
+
+  for (const [key, value] of Object.entries(rawInput.options)) {
+    const optionDefinition = definition.options[key];
+    if (!optionDefinition) {
+      throw new Error(`Unknown option: --${key}`);
+    }
+
+    input[key] = normalizeOptionValue(key, optionDefinition, value);
+  }
+
+  return input;
+}
+
+function normalizeOptionValue(
+  key: string,
+  optionDefinition: AffNamedInputDefinition,
+  value: unknown,
+): unknown {
+  if (isFlagDefinition(optionDefinition)) {
+    if (value === undefined) {
+      return true;
+    }
+
+    if (typeof value === "boolean") {
+      return value;
+    }
+
+    if (value === "true" || value === "false") {
+      return value === "true";
+    }
+
+    throw new Error(`Invalid value for --${key}: expected true or false.`);
+  }
+
+  if (value === undefined) {
+    throw new Error(`Missing value for --${key}.`);
+  }
+
+  return value;
+}
+
+function parseSchemaInput<TOutput>(
+  definition: AffInputDefinition<TOutput>,
+  input: Record<string, unknown>,
+): TOutput {
   const schema = z.object(buildInputShape(definition));
-  validateRequiredInput(definition, normalized);
-  const result = schema.safeParse(normalized);
+  validateRequiredInput(definition, input);
+  const result = schema.safeParse(input);
 
   if (!result.success) {
     throw new Error(z.prettifyError(result.error));
   }
 
   return result.data as TOutput;
-}
-
-function normalizeInput(
-  definition: AffInputDefinition,
-  raw: NormalizedRawInput,
-): Record<string, unknown> {
-  const output: Record<string, unknown> = {};
-
-  definition.arguments.forEach(([key], index) => {
-    output[key] = raw.arguments[index];
-  });
-
-  for (const key of Object.keys(definition.options)) {
-    output[key] = raw.options[key];
-  }
-
-  return output;
-}
-
-function validateRawInput(
-  definition: AffInputDefinition,
-  raw: NormalizedRawInput,
-  commandName: string | undefined,
-): void {
-  if (raw.arguments.length > definition.arguments.length) {
-    throw new Error(
-      commandName ? `Unexpected arguments for ${commandName}.` : "Unexpected arguments.",
-    );
-  }
-
-  for (const [key, value] of Object.entries(raw.options)) {
-    const optionDefinition = definition.options[key];
-    if (!optionDefinition) {
-      throw new Error(`Unknown option: --${key}`);
-    }
-
-    if (isFlagDefinition(optionDefinition)) {
-      if (value === undefined) {
-        raw.options[key] = true;
-        continue;
-      }
-
-      if (typeof value === "boolean") {
-        continue;
-      }
-
-      if (value === "true" || value === "false") {
-        raw.options[key] = value === "true";
-        continue;
-      }
-
-      throw new Error(`Invalid value for --${key}: expected true or false.`);
-    }
-
-    if (value === undefined) {
-      throw new Error(`Missing value for --${key}.`);
-    }
-  }
-}
-
-function normalizeRawInput(rawInput: unknown): NormalizedRawInput {
-  if (!isRecord(rawInput)) {
-    return {
-      arguments: [],
-      options: {},
-    };
-  }
-
-  return {
-    arguments: Array.isArray(rawInput.arguments) ? rawInput.arguments : [],
-    options: isRecord(rawInput.options) ? { ...rawInput.options } : {},
-  };
 }
 
 function validateRequiredInput(
