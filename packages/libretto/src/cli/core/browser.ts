@@ -629,30 +629,36 @@ export async function runSave(
   }
 
   logger.info("save-start", { profileName: normalizedProfileName, session, sites });
-  const { browser, context } = await connect(session, logger);
+  const state = readSessionStateOrThrow(session);
+  if (!state.daemonSocketPath) {
+    throw new Error(
+      `Session "${session}" has no daemon socket. Close and reopen the session, then run libretto save again.`,
+    );
+  }
+  const client = await DaemonClient.connect(state.daemonSocketPath);
 
   try {
-    const state = await captureAuthProfileStorageState(context, sites);
-    const profilePath = await writeProfile(normalizedProfileName, state);
+    const storageState = await client.captureAuthProfileStorageState({ sites });
+    const profilePath = await writeProfile(normalizedProfileName, storageState);
 
     logger.info("save-success", {
       profileName: normalizedProfileName,
       sites,
       profilePath,
-      cookieCount: state.cookies?.length ?? 0,
-      originCount: state.origins?.length ?? 0,
+      cookieCount: storageState.cookies?.length ?? 0,
+      originCount: storageState.origins?.length ?? 0,
     });
     console.log(`Profile saved: ${normalizedProfileName}`);
     console.log(`   Location: ${profilePath}`);
     console.log(`   Sites: ${sites.join(", ")}`);
     console.log(
-      `   Cookies: ${state.cookies?.length ?? 0}, Origins: ${state.origins?.length ?? 0}`,
+      `   Cookies: ${storageState.cookies?.length ?? 0}, Origins: ${storageState.origins?.length ?? 0}`,
     );
   } catch (err) {
     logger.error("save-error", { error: err, profileName, session, sites });
     throw err;
   } finally {
-    disconnectBrowser(browser, logger, session);
+    client.destroy();
   }
 }
 

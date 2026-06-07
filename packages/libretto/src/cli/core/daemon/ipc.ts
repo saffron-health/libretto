@@ -10,6 +10,7 @@ import { connectToIpcSocket } from "../../../shared/ipc/socket-transport.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import type { SnapshotDiff } from "../../../shared/snapshot/diff-snapshots.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
+import type { AuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
 import { REPO_ROOT } from "../context.js";
 import type { WorkflowStatus } from "../workflow-runner/runner.js";
 import type { DaemonConfig } from "./config.js";
@@ -43,6 +44,10 @@ export type DaemonSnapshotResult = {
   snapshot: Snapshot;
 };
 
+export type DaemonCaptureAuthProfileStorageStateArgs = {
+  sites: string[];
+};
+
 export type DaemonCloseResult = { replayUrl?: string };
 
 export type DaemonCommandResult<T> =
@@ -56,6 +61,9 @@ export type CliToDaemonApi = {
   pages(): DaemonPageSummary[];
   exec(args: DaemonExecArgs): DaemonExecResult;
   readonlyExec(args: DaemonReadonlyExecArgs): DaemonExecResult;
+  captureAuthProfileStorageState(
+    args: DaemonCaptureAuthProfileStorageStateArgs,
+  ): AuthProfileStorageState;
   snapshot(args: DaemonSnapshotArgs): DaemonSnapshotResult;
   getWorkflowStatus(): WorkflowStatus;
   resumeWorkflow(): void;
@@ -207,6 +215,7 @@ export type DaemonResultMap = {
   pages: DaemonPageSummary[];
   exec: DaemonExecSuccess;
   "readonly-exec": DaemonExecSuccess;
+  captureAuthProfileStorageState: AuthProfileStorageState;
   snapshot: DaemonSnapshotResult;
 };
 
@@ -443,6 +452,12 @@ export class DaemonClient {
 
   async readonlyExec(args: DaemonReadonlyExecArgs): Promise<DaemonExecResult> {
     return this.ipc.call.readonlyExec(args);
+  }
+
+  async captureAuthProfileStorageState(
+    args: DaemonCaptureAuthProfileStorageStateArgs,
+  ): Promise<AuthProfileStorageState> {
+    return this.ipc.call.captureAuthProfileStorageState(args);
   }
 
   async snapshot(

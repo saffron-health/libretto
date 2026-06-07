@@ -51,9 +51,7 @@ Key points:
 
 ## Workflow Credentials And Auth Profiles
 
-Use `credentials` only when the workflow needs secrets such as API keys, usernames, passwords, or TOTP shared secrets. Do not put secrets in the Zod input schema and do not tell users to pass secrets with `--params`.
-
-Declared credentials are injected into `input.credentials`. Local runs resolve matching `LIBRETTO_CLOUD_` environment variables from `.env`; hosted runs resolve matching Libretto Cloud credential records and do not read credential values from the executor environment. Only declared names are injected.
+Declare `credentials` for runtime secrets instead of putting them in the Zod input schema or `--params`. Only declared names are injected into `input.credentials`; local runs read matching `LIBRETTO_CLOUD_` variables from `.env`, and hosted runs read matching Libretto Cloud credentials. For example, `LIBRETTO_CLOUD_OPENAI_API_KEY` becomes `input.credentials.openai_api_key`.
 
 ```typescript
 export default workflow("sentimentWorkflow", {
@@ -72,9 +70,14 @@ export default workflow("sentimentWorkflow", {
 });
 ```
 
-Credential names use the normalized form after removing `LIBRETTO_CLOUD_` and lowercasing the rest. For example, `LIBRETTO_CLOUD_OPENAI_API_KEY` becomes `openai_api_key`.
+For logged-in website workflows, unless the user says otherwise, generate both:
 
-When a workflow needs a logged-in website session, generate it with an `authProfile` by default and include `librettoAuthenticate` fallback login logic using declared credentials. Follow `references/auth-profiles.md` for profile naming, refresh behavior, hosted profile behavior, and the fallback-login pattern.
+- `authProfile: { name, refresh: true }`
+- `librettoAuthenticate(...)` fallback login logic using declared credentials such as `credentials: ["username", "password"]`
+
+After generating or validating a credentialed workflow, include the local `.env` variable names the user must set, and never print secret values.
+
+The fallback should validate the signed-in state, log in when validation fails, and validate again before continuing. Follow `references/auth-profiles.md` for profile naming, refresh behavior, hosted profile behavior, and the fallback-login pattern.
 
 ## Workflow Error Handling
 

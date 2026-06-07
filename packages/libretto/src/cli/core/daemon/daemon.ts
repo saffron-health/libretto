@@ -90,6 +90,7 @@ import {
 } from "../workflow-runtime.js";
 import { WorkflowController } from "../workflow-runner/runner.js";
 import { validateWorkflowInput } from "../../../shared/workflow/workflow.js";
+import { captureAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -650,6 +651,10 @@ class BrowserDaemon {
         this.withRequestTimeout(() => handlePages(this.pageById, this.page)),
       exec: (args) => this.runExec(args),
       readonlyExec: (args) => this.runReadonlyExec(args),
+      captureAuthProfileStorageState: (args) =>
+        this.withRequestTimeout(() =>
+          captureAuthProfileStorageState(this.context, args.sites),
+        ),
       snapshot: (args) => this.runSnapshot(args),
       getWorkflowStatus: () => this.getWorkflowStatus(),
       resumeWorkflow: () => this.resumeWorkflow(),
