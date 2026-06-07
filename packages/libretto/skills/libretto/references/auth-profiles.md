@@ -4,8 +4,7 @@ Use this reference when generating or maintaining workflows that need a logged-i
 
 ## When to Use This
 
-- The site requires login.
-- The workflow should reuse browser login state across runs.
+- The user wants to persist authentication across runs.
 - The workflow should recover when saved login state is stale.
 
 ## Workflow
@@ -18,9 +17,10 @@ Use this reference when generating or maintaining workflows that need a logged-i
 ## Commands
 
 ```bash
-npx libretto open https://app.example.com --headed --session login
+# Save scoped auth state from the current Libretto session.
 npx libretto save example-app --session login --sites app.example.com,auth.example.com
-npx libretto run ./integration.ts
+
+# List or delete hosted auth profile names.
 npx libretto cloud profiles list
 npx libretto cloud profiles delete example-app
 ```
@@ -72,12 +72,8 @@ export default workflow("accountWorkflow", {
 ## Notes
 
 - Saving a profile captures cookies, localStorage, and IndexedDB only for the comma-separated `--sites` list.
-- Prefer signing in through a headed Libretto session and saving that session.
 - If the user explicitly wants to import from Chrome, ask which Chrome/profile
   to launch or attach to and get consent before attaching because disconnecting
   can close or relaunch that Chrome window. Chrome may require copying the
   selected profile to a temporary user-data directory before running
   `npx libretto import-chrome-profiles example-app --cdp-url http://127.0.0.1:9222 --sites app.example.com`.
-- `run` uses the workflow-declared `authProfile`; do not pass `--auth-profile` to `run`.
-- Sessions can expire. If refresh is disabled or cannot recover the profile, repeat the login and save flow.
-- Keep auth profiles as a brief operational detail in the main skill, not a full workflow pattern.
