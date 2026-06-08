@@ -89,43 +89,6 @@ Healthcare prior authorizations represent the ideal use case: high volume (thous
 Tax preparation at scale justifies automation investment because the labor cost of manual form filling grows linearly with client volume, while automation costs grow logarithmically. Legal document filing and regulatory compliance workflows offer similar economics.
 
 The decision matrix should weigh automation development cost against ongoing manual processing cost, factoring in the compliance value of having auditable, deterministic processes. When manual processes cost $50-200 per transaction and volumes exceed 1000 transactions monthly, deterministic automation typically delivers positive ROI within 6-12 months.
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "Article",
-  "headline": "AI Agent Browser Automation: Enterprise Reliability Redefined",
-  "description": "Deterministic AI agents outperform vision-based automation in production workflows where compliance and audit trails matter.",
-  "author": {
-    "@type": "Person",
-    "name": "Tanishq Kancharla",
-    "jobTitle": "Founder",
-    "sameAs": ["https://www.linkedin.com/in/tanishq-k/"]
-  },
-  "publisher": {
-    "@type": "Organization",
-    "name": "Libretto",
-    "url": "https://libretto.sh",
-    "logo": {
-      "@type": "ImageObject",
-      "url": "https://libretto.sh/logos/logo-light.svg"
-    }
-  },
-  "datePublished": "2026-06-08",
-  "dateModified": "2026-06-08",
-  "image": {
-    "@type": "ImageObject",
-    "url": "https://libretto.sh/blog/ai-agent-browser-automation-enterprise-reliability/og-image.png",
-    "width": 1200,
-    "height": 630
-  },
-  "mainEntityOfPage": {
-    "@type": "WebPage",
-    "@id": "https://libretto.sh/blog/ai-agent-browser-automation-enterprise-reliability"
-  },
-  "url": "https://libretto.sh/blog/ai-agent-browser-automation-enterprise-reliability"
-}
-</script>
 `,
   }),
   createBlogPost({
