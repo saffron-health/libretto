@@ -214,12 +214,12 @@ export function createCLIApp() {
 }
 ```
 
-- [ ] Install the telemetry middleware in `createCLIApp()`.
-- [ ] Ensure `libretto help`, root help, `--version`, and unknown-command parse failures do not create an event unless a command route resolves.
-- [ ] Add CLI-level tests for a successful command event and a failing command event using a mocked telemetry transport.
-- [ ] Verify command failures still print the original error and exit non-zero.
-- [ ] Verify telemetry transport failures do not change command output.
-- [ ] Run the smallest relevant Libretto CLI test target, then `pnpm -s type-check` if the affordance API changes require broader type validation.
+- [x] Install the telemetry middleware in `createCLIApp()`.
+- [x] Ensure `libretto help`, root help, `--version`, and unknown-command parse failures do not create an event unless a command route resolves.
+- [x] Add CLI-level tests for a successful command event and a failing command event using a mocked telemetry transport.
+- [x] Verify command failures still print the original error and exit non-zero.
+- [x] Verify telemetry transport failures do not change command output.
+- [x] Run the smallest relevant Libretto CLI test target, then `pnpm -s type-check` if the affordance API changes require broader type validation.
 
 ### Phase 5: Disclose telemetry in README and sync mirrors
 
