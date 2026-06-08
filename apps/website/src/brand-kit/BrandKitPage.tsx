@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type * as React from "react";
+import html2canvas from "html2canvas-pro";
 import {
   ASCII_LIBRETTO_WORDMARK_SRC,
   AsciiLibretto,
@@ -707,14 +708,21 @@ function SocialDownloadGrid({ assets }: { assets: SocialAsset[] }) {
 }
 
 function SocialDownloadTile({ asset }: { asset: SocialAsset }) {
+  const exportRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"idle" | "downloading" | "failed">(
     "idle",
   );
 
   async function handleDownload() {
+    const exportNode = exportRef.current;
+    if (!exportNode) {
+      setStatus("failed");
+      return;
+    }
+
     setStatus("downloading");
     try {
-      const blob = await renderSocialAssetBlob(asset);
+      const blob = await renderSocialAssetBlob(exportNode, asset);
       downloadBlob(blob, asset.download);
       setStatus("idle");
     } catch {
@@ -723,42 +731,72 @@ function SocialDownloadTile({ asset }: { asset: SocialAsset }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleDownload}
-      className="rounded-md border border-rule bg-panel-hi p-4 text-left transition-colors hover:border-accent/50 hover:bg-panel"
-    >
-      <span className="block font-mono text-sm font-semibold text-ink">
-        {status === "downloading" ? "Downloading..." : asset.label}
-      </span>
-      <span className="mt-1 block text-xs leading-relaxed text-muted">
-        {status === "failed" ? "Could not render social image." : asset.detail}
-      </span>
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleDownload}
+        className="rounded-md border border-rule bg-panel-hi p-4 text-left transition-colors hover:border-accent/50 hover:bg-panel"
+      >
+        <span className="block font-mono text-sm font-semibold text-ink">
+          {status === "downloading" ? "Downloading..." : asset.label}
+        </span>
+        <span className="mt-1 block text-xs leading-relaxed text-muted">
+          {status === "failed" ? "Could not render social image." : asset.detail}
+        </span>
+      </button>
+      <SocialAssetExportTarget asset={asset} exportRef={exportRef} />
+    </>
   );
 }
 
-const socialImageCache = new Map<string, Promise<HTMLImageElement>>();
-
-function loadSocialImage(href: string) {
-  const source = new URL(href, window.location.href).href;
-  const cached = socialImageCache.get(source);
-  if (cached) {
-    return cached;
-  }
-
-  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`Unable to load ${href}.`));
-    image.src = source;
-  });
-  socialImageCache.set(source, imagePromise);
-  return imagePromise;
+function SocialAssetExportTarget({
+  asset,
+  exportRef,
+}: {
+  asset: SocialAsset;
+  exportRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed left-[-100000px] top-0 overflow-hidden"
+      style={{
+        height: asset.height,
+        width: asset.width,
+      }}
+    >
+      <div
+        ref={exportRef}
+        style={{
+          height: asset.height,
+          width: asset.width,
+        }}
+      >
+        {asset.kind === "profile" ? (
+          <SocialProfileArt asset={asset} className="h-full w-full" />
+        ) : (
+          <SocialBannerArt asset={asset} className="h-full w-full" />
+        )}
+      </div>
+    </div>
+  );
 }
 
-async function renderSocialAssetBlob(asset: SocialAsset) {
+async function renderSocialAssetBlob(
+  exportNode: HTMLDivElement,
+  asset: SocialAsset,
+) {
   await document.fonts.load('600 24px "Commit Mono"');
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  const htmlLayer = await html2canvas(exportNode, {
+    backgroundColor: null,
+    height: asset.height,
+    scale: 1,
+    useCORS: true,
+    width: asset.width,
+  });
   const canvas = document.createElement("canvas");
   canvas.width = asset.width;
   canvas.height = asset.height;
@@ -767,11 +805,8 @@ async function renderSocialAssetBlob(asset: SocialAsset) {
     throw new Error("Unable to create social asset canvas.");
   }
 
-  if (asset.kind === "profile") {
-    await drawSocialProfile(context, asset);
-  } else {
-    await drawSocialBanner(context, asset);
-  }
+  context.drawImage(htmlLayer, 0, 0);
+  compositeSkippedCanvases(context, exportNode);
 
   const blob = await new Promise<Blob | null>((resolve) => {
     canvas.toBlob(resolve, "image/png");
@@ -782,257 +817,39 @@ async function renderSocialAssetBlob(asset: SocialAsset) {
   return blob;
 }
 
-async function drawSocialProfile(
+function compositeSkippedCanvases(
   context: CanvasRenderingContext2D,
-  asset: SocialAsset,
+  exportNode: HTMLElement,
 ) {
-  const logo = await loadSocialImage(socialLogoHref);
-  fillSocialBackground(context, asset.width, asset.height, 0.5, 0.5);
-
-  const logoScale = socialProfileLogoScale[asset.platformId];
-  const logoSize = Math.round(Math.min(asset.width, asset.height) * logoScale);
-  const logoX = Math.round((asset.width - logoSize) / 2);
-  const logoY = Math.round((asset.height - logoSize) / 2);
-
-  context.save();
-  context.shadowBlur = Math.max(8, asset.width * 0.045);
-  context.shadowColor = "rgba(240, 207, 90, 0.52)";
-  context.drawImage(logo, logoX, logoY, logoSize, logoSize);
-  context.restore();
-}
-
-async function drawSocialBanner(
-  context: CanvasRenderingContext2D,
-  asset: SocialAsset,
-) {
-  const oneLine = asset.platformId === "reddit" || asset.platformId === "linkedin";
-  const square = asset.width === asset.height;
-  fillSocialBackground(
-    context,
-    asset.width,
-    asset.height,
-    oneLine ? 0.5 : square ? 0.64 : 0.76,
-    0.5,
-  );
-
-  const asciihedronSize = Math.round(
-    oneLine
-      ? asset.width * (asset.platformId === "reddit" ? 0.9 : 0.56)
-      : Math.max(asset.width, asset.height) * (square ? 1.28 : 0.72),
-  );
-  const asciihedronCenterX = oneLine
-    ? asset.width / 2
-    : asset.platformId === "x"
-      ? asset.width * 0.78
-      : asset.width * 0.64;
-  const asciihedronCenterY = asset.height / 2;
-
-  drawAsciihedronMotif(
-    context,
-    asciihedronCenterX,
-    asciihedronCenterY,
-    asciihedronSize,
-    oneLine ? 0.28 : square ? 0.18 : 0.32,
-  );
-
-  const lines = socialHeadlineAscii.split("\n");
-  const maxWidth = oneLine ? asset.width * 0.94 : asset.width * (square ? 0.86 : 0.56);
-  const maxHeight = asset.height * (oneLine ? 0.72 : square ? 0.42 : 0.62);
-  const fontSize = fitAsciiFontSize(context, lines, maxWidth, maxHeight);
-  const lineHeight = fontSize * 1.05;
-  const blockHeight = lineHeight * lines.length;
-  const blockWidth = measureAsciiBlockWidth(context, lines, fontSize);
-  const x = oneLine || square ? (asset.width - blockWidth) / 2 : asset.width * 0.08;
-  const y = (asset.height - blockHeight) / 2 + fontSize * 0.88;
-
-  context.save();
-  context.font = `600 ${fontSize}px "Commit Mono", ui-monospace, monospace`;
-  context.fillStyle = "#f0cf5a";
-  context.shadowBlur = Math.max(6, fontSize * 0.9);
-  context.shadowColor = "rgba(240, 207, 90, 0.38)";
-  lines.forEach((line, index) => {
-    context.fillText(line, x, y + index * lineHeight);
-  });
-  context.restore();
-}
-
-function drawAsciihedronMotif(
-  context: CanvasRenderingContext2D,
-  centerX: number,
-  centerY: number,
-  size: number,
-  alpha: number,
-) {
-  const vertices = createProjectedIcosahedronVertices(size);
-  const edges = createIcosahedronEdges();
-  const shades = ".,-~:;=!*#$@";
-  const fontSize = Math.max(5, size * 0.019);
-
-  context.save();
-  context.translate(centerX, centerY);
-  context.globalAlpha = alpha;
-  context.fillStyle = "#f0cf5a";
-  context.font = `600 ${fontSize}px "Commit Mono", ui-monospace, monospace`;
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.shadowBlur = Math.max(8, fontSize * 1.7);
-  context.shadowColor = "rgba(240, 207, 90, 0.34)";
-
-  for (const [startIndex, endIndex] of edges) {
-    const start = vertices[startIndex];
-    const end = vertices[endIndex];
-    const distance = Math.hypot(end.x - start.x, end.y - start.y);
-    const steps = Math.max(4, Math.floor(distance / (fontSize * 0.9)));
-    for (let step = 0; step <= steps; step += 1) {
-      const amount = step / steps;
-      const x = start.x + (end.x - start.x) * amount;
-      const y = start.y + (end.y - start.y) * amount;
-      const shadeIndex = Math.min(
-        shades.length - 1,
-        Math.max(0, Math.round((start.depth + end.depth + 2) * 2.7 + step) % shades.length),
-      );
-      context.fillText(shades[shadeIndex], x, y);
-    }
-  }
-
-  for (const vertex of vertices) {
-    context.fillText("@", vertex.x, vertex.y);
-  }
-  context.restore();
-}
-
-function createProjectedIcosahedronVertices(size: number) {
-  const ringY = 1 / Math.sqrt(5);
-  const ringRadius = 2 / Math.sqrt(5);
-  const vertices: [number, number, number][] = [[0, 1, 0]];
-  for (let index = 0; index < 5; index += 1) {
-    const angle = (index * Math.PI * 2) / 5;
-    vertices.push([
-      ringRadius * Math.sin(angle),
-      ringY,
-      ringRadius * Math.cos(angle),
-    ]);
-  }
-  for (let index = 0; index < 5; index += 1) {
-    const angle = (index * Math.PI * 2) / 5 + Math.PI / 5;
-    vertices.push([
-      ringRadius * Math.sin(angle),
-      -ringY,
-      ringRadius * Math.cos(angle),
-    ]);
-  }
-  vertices.push([0, -1, 0]);
-
-  return vertices.map((vertex) => {
-    const [x, y, z] = rotateSocialPoint(
-      vertex,
-      SOLID_ICOSAHEDRON_ROTATION.x,
-      SOLID_ICOSAHEDRON_ROTATION.y,
-      SOLID_ICOSAHEDRON_ROTATION.z,
+  const exportRect = exportNode.getBoundingClientRect();
+  for (const skippedCanvas of exportNode.querySelectorAll("canvas")) {
+    const canvasRect = skippedCanvas.getBoundingClientRect();
+    const style = getComputedStyle(skippedCanvas);
+    context.save();
+    context.globalAlpha = opacityBetween(exportNode, skippedCanvas);
+    context.filter = style.filter === "none" ? "none" : style.filter;
+    context.drawImage(
+      skippedCanvas,
+      canvasRect.left - exportRect.left,
+      canvasRect.top - exportRect.top,
+      canvasRect.width,
+      canvasRect.height,
     );
-    return {
-      depth: z,
-      x: x * size * 0.34,
-      y: -y * size * 0.34,
-    };
-  });
-}
-
-function createIcosahedronEdges() {
-  const edges = new Set<string>();
-  const faces = [
-    [0, 1, 2], [0, 2, 3], [0, 3, 4], [0, 4, 5], [0, 5, 1],
-    [1, 6, 2], [2, 6, 7], [2, 7, 3], [3, 7, 8], [3, 8, 4],
-    [4, 8, 9], [4, 9, 5], [5, 9, 10], [5, 10, 1], [1, 10, 6],
-    [11, 7, 6], [11, 8, 7], [11, 9, 8], [11, 10, 9], [11, 6, 10],
-  ];
-
-  for (const face of faces) {
-    for (let index = 0; index < face.length; index += 1) {
-      const start = face[index];
-      const end = face[(index + 1) % face.length];
-      edges.add(start < end ? `${start},${end}` : `${end},${start}`);
-    }
+    context.restore();
   }
-  return Array.from(edges, (edge) => edge.split(",").map(Number) as [number, number]);
 }
 
-function rotateSocialPoint(
-  point: [number, number, number],
-  xDegrees: number,
-  yDegrees: number,
-  zDegrees: number,
-): [number, number, number] {
-  const xRadians = (xDegrees * Math.PI) / 180;
-  const yRadians = (yDegrees * Math.PI) / 180;
-  const zRadians = (zDegrees * Math.PI) / 180;
-  const afterX: [number, number, number] = [
-    point[0],
-    point[1] * Math.cos(xRadians) - point[2] * Math.sin(xRadians),
-    point[1] * Math.sin(xRadians) + point[2] * Math.cos(xRadians),
-  ];
-  const afterY: [number, number, number] = [
-    afterX[0] * Math.cos(yRadians) + afterX[2] * Math.sin(yRadians),
-    afterX[1],
-    -afterX[0] * Math.sin(yRadians) + afterX[2] * Math.cos(yRadians),
-  ];
-  return [
-    afterY[0] * Math.cos(zRadians) - afterY[1] * Math.sin(zRadians),
-    afterY[0] * Math.sin(zRadians) + afterY[1] * Math.cos(zRadians),
-    afterY[2],
-  ];
-}
-
-function fillSocialBackground(
-  context: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  centerX: number,
-  centerY: number,
-) {
-  const gradient = context.createRadialGradient(
-    width * centerX,
-    height * centerY,
-    0,
-    width * centerX,
-    height * centerY,
-    Math.max(width, height) * 0.82,
-  );
-  gradient.addColorStop(0, "#202320");
-  gradient.addColorStop(0.48, "#171917");
-  gradient.addColorStop(1, "#111111");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, width, height);
-}
-
-function fitAsciiFontSize(
-  context: CanvasRenderingContext2D,
-  lines: string[],
-  maxWidth: number,
-  maxHeight: number,
-) {
-  let low = 4;
-  let high = maxHeight / Math.max(1, lines.length);
-  for (let index = 0; index < 14; index += 1) {
-    const fontSize = (low + high) / 2;
-    const blockWidth = measureAsciiBlockWidth(context, lines, fontSize);
-    const blockHeight = fontSize * 1.05 * lines.length;
-    if (blockWidth <= maxWidth && blockHeight <= maxHeight) {
-      low = fontSize;
-    } else {
-      high = fontSize;
+function opacityBetween(root: HTMLElement, element: HTMLElement) {
+  let opacity = 1;
+  let current: HTMLElement | null = element;
+  while (current && current !== root.parentElement) {
+    const value = Number.parseFloat(getComputedStyle(current).opacity);
+    if (Number.isFinite(value)) {
+      opacity *= value;
     }
+    current = current.parentElement;
   }
-  return low;
-}
-
-function measureAsciiBlockWidth(
-  context: CanvasRenderingContext2D,
-  lines: string[],
-  fontSize: number,
-) {
-  context.font = `600 ${fontSize}px "Commit Mono", ui-monospace, monospace`;
-  return Math.max(...lines.map((line) => context.measureText(line).width));
+  return opacity;
 }
 
 function RotationControls({
