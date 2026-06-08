@@ -92,6 +92,39 @@ export function buildBlogPostJsonLd(
         "@type": "WebSite",
         name: "Libretto",
         url: SITE_URL,
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: "Libretto",
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Windows, macOS, Linux",
+        url: SITE_URL,
+        downloadUrl: "https://www.npmjs.com/package/libretto",
+        author: {
+          "@type": "Person",
+          name: "Tanishq Kancharla",
+          jobTitle: "Founder",
+        },
+        publisher: {
+          "@type": "Organization",
+          name: "Libretto",
+          url: SITE_URL,
+        },
+        description: "Deterministic browser automation + agent-friendly debugging for AI workflows",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+          availability: "https://schema.org/InStock",
+        },
       },
     ],
   };
