@@ -2,161 +2,123 @@
 title: Website authentication
 ---
 
-> Use declared credentials for scripted logins, and reuse authenticated browser state when the login can't be scripted.
+> Use credentials for scripted login, auth profiles for saved browser state, and `librettoAuthenticate` to recover when a saved session is missing or expired.
 
-Most real automation targets sit behind a login. There are two patterns for getting past it, and they cover different kinds of login:
+Libretto supports two website authentication tools:
 
-1. **Declare credential names on the workflow** (username, password, TOTP secret). Local non-production runs resolve them from `.env`; hosted runs resolve them from Libretto Cloud's encrypted credential store. The workflow's Playwright code fills them into the login form and submits, just like any other form interaction.
-2. **Save an authenticated profile** from a one-time manual login and declare it on the workflow with `authProfile`. Use this when the login can't be scripted (CAPTCHAs, SMS codes, device-approval prompts, magic links), so future runs start already signed in.
+- `credentials` are secrets such as usernames, passwords, API keys, and TOTP shared secrets. Use them when the workflow can log in with Playwright.
+- `authProfile` is named browser state for a signed-in session. Use it when a workflow should start from an existing login or preserve login state across runs.
 
-### Declaring credentials
+By default, Libretto-generated login workflows combine both: the workflow starts with the named auth profile, validates that it is signed in, and falls back to a credential-based login when the profile is missing, expired, or logged out.
 
-Credentials are separate from normal workflow input. Declare the credential
-names the workflow needs with `credentials`, then read the resolved values from
-`input.credentials`. Undeclared credentials are not injected.
+```typescript theme={null}
+import { librettoAuthenticate, workflow } from "libretto";
+import { z } from "zod";
 
-For local runs, put matching `LIBRETTO_CLOUD_` variables in `.env`:
+export default workflow("portalReport", {
+  credentials: ["username", "password"],
+  authProfile: {
+    name: "portal",
+    refresh: true,
+  },
+  input: z.object({
+    reportId: z.string(),
+  }),
+  output: z.object({
+    title: z.string(),
+  }),
+  async handler(ctx, input) {
+    const { page } = ctx;
+
+    await page.goto("https://portal.example.com");
+
+    await librettoAuthenticate(ctx, {
+      credentials: input.credentials,
+      validate: async ({ page }) =>
+        await page
+          .getByRole("button", { name: /account|sign out/i })
+          .isVisible()
+          .catch(() => false),
+      fallback: async ({ page }, credentials) => {
+        await page.goto("https://portal.example.com/login");
+        await page.getByLabel("Email").fill(credentials.username);
+        await page.getByLabel("Password").fill(credentials.password);
+        await page.getByRole("button", { name: /log in/i }).click();
+      },
+    });
+
+    await page.goto(`https://portal.example.com/reports/${input.reportId}`);
+    const title = await page.locator("h1").innerText();
+    return { title };
+  },
+});
+```
+
+In this pattern, the auth profile handles the common case where the browser is already signed in. The fallback handles the recovery case where the profile is missing, expired, or logged out. If the fallback succeeds and `refresh: true` is set, the run saves the updated browser state back to the profile for future runs.
+
+### Credentials
+
+Credentials are separate from normal workflow input. Declare the names the workflow needs, then read the resolved values from `input.credentials`. Do not pass secrets through `--params`.
+
+For local runs, store matching variables in `.env`:
 
 ```dotenv theme={null}
 LIBRETTO_CLOUD_USERNAME=alice@example.com
 LIBRETTO_CLOUD_PASSWORD=secret
 LIBRETTO_CLOUD_TOTP_SECRET=JBSWY3DPEHPK3PXP
-LIBRETTO_CLOUD_OPENAI_API_KEY=sk-...
 ```
 
-For hosted runs, push those same variables to Libretto Cloud:
+Libretto removes the `LIBRETTO_CLOUD_` prefix and lowercases the rest, so `LIBRETTO_CLOUD_USERNAME` becomes `input.credentials.username`.
 
-```bash theme={null}
-npx libretto cloud credentials push
-```
-
-The command stores each non-empty `LIBRETTO_CLOUD_` variable as its own
-tenant-scoped credential. The prefix is removed and the key is lowercased, so
-`LIBRETTO_CLOUD_OPENAI_API_KEY` becomes `openai_api_key`.
-Hosted production runs do not read `LIBRETTO_CLOUD_` variables from the
-executor environment; they use only credentials injected by Libretto Cloud.
-
-If the site requires a TOTP (Google Authenticator style) code, store the
-**shared secret** as a credential and derive a fresh code each run with a library
-like [`otplib`](https://www.npmjs.com/package/otplib):
-
-```typescript theme={null}
-import { authenticator } from "otplib";
-import { workflow } from "libretto";
-import { z } from "zod";
-
-export const main = workflow("portal-login", {
-  credentials: ["username", "password", "totp_secret"],
-  input: z.object({
-    accountId: z.string(),
-  }),
-  output: z.object({
-    success: z.boolean(),
-  }),
-  async handler(ctx, input) {
-    const { page } = ctx;
-    const { username, password, totp_secret } = input.credentials;
-
-    await page.goto("https://portal.example.com/login");
-    await page.fill('[name="username"]', username);
-    await page.fill('[name="password"]', password);
-    await page.click('button[type="submit"]');
-
-    // The site prompts for a TOTP code
-    await page.waitForSelector('[name="otp"]');
-    await page.fill('[name="otp"]', authenticator.generate(totp_secret));
-    await page.click('button[type="submit"]');
-
-    await page.waitForURL(/\/dashboard/);
-    return { success: true };
-  },
-});
-```
-
-Run locally with normal params only; credentials come from `.env`:
-
-```bash theme={null}
-npx libretto run ./portal-login.ts --params '{"accountId":"acct_123"}'
-```
+For hosted runs, store the same credential names in Libretto Cloud. See [Libretto Cloud credentials](/libretto-cloud-api/credentials).
 
 <Warning>
-  Do not pass secrets in `--params`. Command-line params can land in shell
-  history and logs. Use declared credentials backed by `.env` locally and
-  Libretto Cloud credentials in hosted runs.
+  Never put secrets in workflow params, logs, or source code. Use declared credentials backed by `.env` locally and Libretto Cloud credentials in hosted runs.
 </Warning>
 
-### Saving profiles locally
+### Auth profiles
 
-When a site's login can't be scripted (CAPTCHAs, SMS codes, device prompts, magic links), the workaround is to log in **once** in a visible browser and snapshot the authenticated state. Libretto calls that snapshot a **profile**: cookies, `localStorage`, and IndexedDB saved to `.libretto/profiles/<name>.json`. Future local runs start already signed in by loading the profile declared by the workflow.
+An auth profile is named browser state for a login session. Local profiles live in `.libretto/profiles/<name>.json`; hosted profiles are provider-native browser profiles managed by Libretto Cloud and the active browser provider.
 
-<Steps>
-  <Step title="Open the site in headed mode">
-    ```bash  theme={null}
-    npx libretto open https://portal.example.com --headed --session portal-login
-    ```
-
-    A visible Chromium window launches, pinned to the session `portal-login`.
-  </Step>
-
-  <Step title="Complete the login in the browser">
-    Enter credentials, solve CAPTCHAs, approve device prompts, or whatever else the site requires.
-  </Step>
-
-  <Step title="Save the session as a profile">
-    ```bash  theme={null}
-    npx libretto save portal.example.com --session portal-login --sites portal.example.com
-    ```
-
-    Libretto writes the authenticated state to `.libretto/profiles/portal.example.com.json`.
-  </Step>
-
-  <Step title="Reuse the profile in future runs">
-    Declare the profile on the workflow. The profile name should match the
-    local file name under `.libretto/profiles/`.
-
-    ```typescript theme={null}
-    export default workflow("report", {
-      authProfile: "portal.example.com",
-      async handler(ctx) {
-        await ctx.page.goto("https://portal.example.com");
-      },
-    });
-    ```
-
-    ```bash  theme={null}
-    npx libretto run ./report.ts
-    ```
-
-    The run starts already signed in. No login step required.
-  </Step>
-</Steps>
-
-The `authProfile` option can be a string name or an object:
+Use the workflow-level `authProfile` option:
 
 ```typescript theme={null}
-authProfile: "portal.example.com"
+authProfile: "portal"
 
 authProfile: {
-  name: "portal.example.com",
+  name: "portal",
   refresh: true,
 }
 ```
 
-Use `--sites` only when saving or importing a local profile from an existing
-browser session. Set `refresh: true` when a successful local run should
-save updated browser state for sites visited by that workflow back to the
-profile.
+Use `{ name, refresh: true }` when successful runs should persist updated browser state back to the profile. On local runs, this updates the local `.libretto/profiles/<name>.json` file. On hosted runs, it asks the browser provider to persist changes to the provider-native profile.
 
-For hosted runs, `libretto cloud deploy` registers workflow-declared profile
-names with Libretto Cloud. Hosted browser sessions then use the provider's native
-profile API and persistence behavior; local profile files are not uploaded.
+The preferred way to create a local profile is to sign in through a headed Libretto session and save it:
 
-<Warning>
-  Sessions can expire. If a profile stops working, repeat the login-and-save flow to refresh it. For servers, rotate profiles on a schedule shorter than the site's session TTL.
-</Warning>
+```bash theme={null}
+npx libretto open https://portal.example.com --headed --session portal-login
+# Log in manually in the browser window.
+npx libretto save portal --session portal-login --sites portal.example.com
+```
 
-Profiles are:
+Use this when the login cannot be scripted with Playwright, such as CAPTCHAs, SMS codes, device approvals, or magic links. Once saved, the workflow can use `authProfile: "portal"` or `authProfile: { name: "portal", refresh: true }` without repeating the manual login every run.
 
-- **Machine-local.** They live in `.libretto/profiles/` and are not shared across environments or team members.
-- **Git-ignored by default.** The `.libretto/.gitignore` created during setup excludes them.
-- **Effectively credentials.** Treat them like a password. Never commit, never share, and rotate them if leaked.
+If you already have a signed-in Chrome profile and explicitly want to copy from it, start that Chrome profile with remote debugging enabled and import only the sites you need:
+
+```bash theme={null}
+npx libretto import-chrome-profiles portal --cdp-url http://127.0.0.1:9222 --sites portal.example.com
+```
+
+Chrome often needs to be closed and relaunched with a temporary user-data directory before remote debugging can attach. Importing from Chrome can close or relaunch that browser window, so confirm with the user before doing it.
+
+Use `--sites` only when saving or importing a local profile. It controls which site storage is copied into the local profile. See [CLI profiles](/reference/cli/profiles).
+
+### Hosted website authentication
+
+Hosted runs do not upload local `.libretto/profiles/<name>.json` files. They use provider-native profiles with the workflow's `authProfile.name`. `libretto cloud deploy` registers missing profile names, and hosted runs populate or refresh the provider profile when fallback login succeeds.
+
+For the hosted model, provider behavior, and profile persistence details, see [Website authentication in Libretto Cloud](/libretto-cloud-hosting/website-authentication).
+
+### Runtime helper
+
+Use [`librettoAuthenticate`](/reference/runtime/authentication) when a workflow has an auth profile and credential fallback. The helper runs your validation function, calls your fallback login function if needed, and validates again before the workflow continues.
