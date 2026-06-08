@@ -254,7 +254,7 @@ Decide which remaining v1 features are required before Libretto can migrate. Add
 
 Candidate features:
 
-- [ ] Named option aliases.
+- [x] Named option aliases.
 - [ ] Passthrough arguments after `--`.
 - [ ] Global options.
 - [ ] Variadic arguments.

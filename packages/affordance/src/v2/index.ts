@@ -38,9 +38,12 @@ export type {
 export type {
   AffArgumentDefinition,
   AffArgumentsDefinition,
+  AffFlagConfig,
   AffFlagDefinition,
   AffInputRaw,
   AffNamedInputDefinition,
+  AffNamedInputConfig,
+  AffOptionConfig,
   AffOptionDefinition,
   AffOptionsDefinition,
 } from "./input/input.js";

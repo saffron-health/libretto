@@ -51,9 +51,11 @@ const longOptionParser = sequence([
   optionKeyParser,
   maybe(oneOf([inlineOptionValueParser, separatedOptionValueParser])),
 ]).map(([, key, value]): CommandLineInputToken => ({ type: "option", key, value }));
-const shortOptionParser = sequence([text("-"), optionKeyParser]).map(
-  ([, key]): CommandLineInputToken => ({ type: "option", key }),
-);
+const shortOptionParser = sequence([
+  text("-"),
+  optionKeyParser,
+  maybe(oneOf([inlineOptionValueParser, separatedOptionValueParser])),
+]).map(([, key, value]): CommandLineInputToken => ({ type: "option", key, value }));
 const optionParser = oneOf([longOptionParser, shortOptionParser]);
 const argumentParser = valueParser.map(
   (value): CommandLineInputToken => ({ type: "argument", value }),

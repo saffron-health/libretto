@@ -19,6 +19,15 @@ describe("Aff v2 command-line parser", () => {
     ]);
   });
 
+  test("parses short options with separated values and flags", () => {
+    expect(parseCommandLine("open https://example.com -s debug -H")).toEqual([
+      { type: "argument", value: "open" },
+      { type: "argument", value: "https://example.com" },
+      { type: "option", key: "s", value: "debug" },
+      { type: "option", key: "H", value: undefined },
+    ]);
+  });
+
   test("parses quoted values and preserves whitespace inside quotes", () => {
     expect(
       parseCommandLine(

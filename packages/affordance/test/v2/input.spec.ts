@@ -188,6 +188,41 @@ describe("Aff v2 input", () => {
     });
   });
 
+  test("parses named option aliases from exec and invoke input", async () => {
+    const app = Aff.cli("libretto").routes({
+      open: Aff.command({ description: "Open URL" })
+        .arguments([["url", z.url()]])
+        .options({
+          session: Aff.option(z.string().default("default"), { aliases: ["s"] }),
+          headless: Aff.flag({ aliases: ["H"] }),
+        })
+        .handle(async ({ input }) => input),
+    });
+
+    await expect(app.exec("open https://example.com -s debug -H")).resolves.toEqual({
+      url: "https://example.com",
+      session: "debug",
+      headless: true,
+    });
+
+    await expect(app.invoke("open", ["https://example.com"], { s: "debug" })).resolves.toEqual({
+      url: "https://example.com",
+      session: "debug",
+      headless: false,
+    });
+  });
+
+  test("rejects duplicate named option aliases", async () => {
+    expect(() =>
+      Aff.command({ description: "Open URL" })
+        .arguments([["url", z.url()]])
+        .options({
+          session: Aff.option(z.string(), { aliases: ["s"] }),
+          scope: Aff.option(z.string(), { aliases: ["s"] }),
+        }),
+    ).toThrow("Duplicate option alias --s for --session and --scope.");
+  });
+
   test("parses quoted command-line arguments and option values", async () => {
     const app = Aff.cli("libretto").routes({
       run: Aff.command({ description: "Run workflow" })
