@@ -10,6 +10,7 @@ import { parseCommandLine } from "./input/parser.js";
 import { createCommandBuilder, type AffCommand } from "./command.js";
 import { createGroupBuilder, type AffGroup } from "./group.js";
 import { flag, option } from "./input/input.js";
+import { createMiddleware, runMiddlewares, type AffMiddleware } from "./middleware.js";
 
 export type {
   AffCommand,
@@ -19,6 +20,14 @@ export type {
   AffCommandHandlerArgs,
 } from "./command.js";
 export type { AffGroup, AffGroupBuilder, AffGroupConfig } from "./group.js";
+export type {
+  AffMiddleware,
+  AffMiddlewareArgs,
+  AffMiddlewareBuilder,
+  AffMiddlewareConfig,
+  AffMiddlewareHandler,
+  AffMiddlewareNextOptions,
+} from "./middleware.js";
 export type {
   AffArgumentDefinition,
   AffArgumentsDefinition,
@@ -41,6 +50,7 @@ export interface AffCommandMetadata {
 interface AffCommandRoute {
   metadata: AffCommandMetadata;
   command: AffCommand;
+  middlewares: readonly AffMiddleware[];
 }
 
 export interface AffApp {
@@ -55,13 +65,24 @@ export interface AffApp {
 }
 
 export interface AffCliBuilder {
+  use(middleware: AffMiddleware): AffCliBuilder;
   routes(routes: AffRouteMap): AffApp;
 }
 
 function createCliBuilder(name: string): AffCliBuilder {
+  return createConfiguredCliBuilder(name, []);
+}
+
+function createConfiguredCliBuilder(
+  name: string,
+  middlewares: readonly AffMiddleware[],
+): AffCliBuilder {
   return {
+    use(middleware) {
+      return createConfiguredCliBuilder(name, [...middlewares, middleware]);
+    },
     routes(routes) {
-      const commandRoutes = flattenCommandRoutes(routes);
+      const commandRoutes = flattenCommandRoutes(routes, [], middlewares);
 
       return {
         getCommands() {
@@ -73,11 +94,20 @@ function createCliBuilder(name: string): AffCliBuilder {
             throw new Error(`Unknown command route: ${routeKey}`);
           }
 
-          return route.command.execute(
-            { arguments: args, options },
-            initialContext,
-            route.metadata,
-            `${name} ${route.metadata.path.join(" ")}`,
+          const commandName = `${name} ${route.metadata.path.join(" ")}`;
+          const rawInput = { arguments: args, options };
+          if (
+            !route.command.input &&
+            (rawInput.arguments.length > 0 || Object.keys(rawInput.options).length > 0)
+          ) {
+            throw new Error(`Unexpected arguments for ${commandName}.`);
+          }
+
+          const input = await route.command.parse(rawInput, commandName);
+          return runMiddlewares(
+            route.middlewares,
+            { input, ctx: initialContext, command: route.metadata },
+            (ctx) => route.command.run(input, ctx, route.metadata),
           );
         },
         async exec(commandLine) {
@@ -119,11 +149,12 @@ function createCliBuilder(name: string): AffCliBuilder {
             throw new Error(`Unexpected arguments for ${name} ${route.metadata.path.join(" ")}.`);
           }
 
-          return route.command.execute(
-            rawInput,
-            {},
-            route.metadata,
-            `${name} ${route.metadata.path.join(" ")}`,
+          const commandName = `${name} ${route.metadata.path.join(" ")}`;
+          const input = await route.command.parse(rawInput, commandName);
+          return runMiddlewares(
+            route.middlewares,
+            { input, ctx: {}, command: route.metadata },
+            (ctx) => route.command.run(input, ctx, route.metadata),
           );
         },
       };
@@ -131,7 +162,11 @@ function createCliBuilder(name: string): AffCliBuilder {
   };
 }
 
-function flattenCommandRoutes(routes: AffRouteMap, path: string[] = []): AffCommandRoute[] {
+function flattenCommandRoutes(
+  routes: AffRouteMap,
+  path: string[] = [],
+  middlewares: readonly AffMiddleware[] = [],
+): AffCommandRoute[] {
   const commandRoutes: AffCommandRoute[] = [];
 
   for (const [routeSegment, route] of Object.entries(routes)) {
@@ -145,12 +180,15 @@ function flattenCommandRoutes(routes: AffRouteMap, path: string[] = []): AffComm
           description: route.config.description,
         },
         command: route,
+        middlewares: [...middlewares, ...route.middlewares],
       });
       continue;
     }
 
     if (route.type === "group") {
-      commandRoutes.push(...flattenCommandRoutes(route.routes, routePath));
+      commandRoutes.push(
+        ...flattenCommandRoutes(route.routes, routePath, [...middlewares, ...route.middlewares]),
+      );
     }
   }
 
@@ -170,6 +208,7 @@ export const Aff = {
   cli: createCliBuilder,
   group: createGroupBuilder,
   command: createCommandBuilder,
+  middleware: createMiddleware,
   option,
   flag,
 };

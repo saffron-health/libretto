@@ -212,18 +212,18 @@ Make Aff v2 schema-agnostic before middleware starts depending on parsed input. 
 
 Add middleware builders and oRPC-style runtime composition. This phase should not attempt full type-level context propagation; it should prove runtime semantics first.
 
-- [ ] First add or adjust tests for before/after ordering around `await next()`.
-- [ ] First add tests for `next()` rejecting with the original downstream handler error.
-- [ ] First add tests for short-circuiting when middleware returns without calling `next()`.
-- [ ] First add tests for root, group, and command middleware structural order.
-- [ ] First add tests proving root middleware does not run for help output, exact group help, unknown commands, or input validation failures.
-- [ ] Implement `.use(...)` on CLI, group, and command builders.
-- [ ] Implement `Aff.middleware(fn)` as an identity helper.
-- [ ] Implement `Aff.middleware(config).handle(fn)`.
-- [ ] Compose middleware around handlers recursively or iteratively.
-- [ ] Implement `next({ ctx })` as shallow downstream context merging.
-- [ ] Preserve thrown errors when middleware does not catch them.
-- [ ] Verify the Phase 7 middleware tests pass.
+- [x] First add or adjust tests for before/after ordering around `await next()`.
+- [x] First add tests for `next()` rejecting with the original downstream handler error.
+- [x] First add tests for short-circuiting when middleware returns without calling `next()`.
+- [x] First add tests for root, group, and command middleware structural order.
+- [x] First add tests proving root middleware does not run for help output, exact group help, unknown commands, or input validation failures.
+- [x] Implement `.use(...)` on CLI, group, and command builders.
+- [x] Implement `Aff.middleware(fn)` as an identity helper.
+- [x] Implement `Aff.middleware(config).handle(fn)`.
+- [x] Compose middleware around handlers recursively or iteratively.
+- [x] Implement `next({ ctx })` as shallow downstream context merging.
+- [x] Preserve thrown errors when middleware does not catch them.
+- [x] Verify the Phase 7 middleware tests pass.
 
 ### Phase 8: Type-level context and input contracts
 

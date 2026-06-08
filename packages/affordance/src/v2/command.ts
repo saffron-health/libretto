@@ -1,4 +1,5 @@
 import type { AffCommandMetadata } from "./index.js";
+import type { AffMiddleware } from "./middleware.js";
 import {
   createInputDefinition,
   parseInput,
@@ -27,12 +28,9 @@ export interface AffCommand {
   type: "command";
   config: AffCommandConfig;
   input?: AffInputDefinition;
-  execute(
-    rawInput: AffInputRaw,
-    initialContext: unknown,
-    command: AffCommandMetadata,
-    commandName?: string,
-  ): unknown | Promise<unknown>;
+  middlewares: readonly AffMiddleware[];
+  parse(rawInput: AffInputRaw, commandName?: string): unknown | Promise<unknown>;
+  run(input: unknown, ctx: unknown, command: AffCommandMetadata): unknown | Promise<unknown>;
 }
 
 export interface AffCommandBuilder<TInput = unknown> {
@@ -42,11 +40,12 @@ export interface AffCommandBuilder<TInput = unknown> {
   options<const TOptions extends AffOptionsDefinition>(
     options: TOptions,
   ): AffCommandBuilder<TInput & AffInputFor<[], TOptions>>;
+  use(middleware: AffMiddleware): AffCommandBuilder<TInput>;
   handle(handler?: AffCommandHandler<TInput>): AffCommand;
 }
 
 export function createCommandBuilder(config: AffCommandConfig): AffCommandBuilder<{}> {
-  return createConfiguredCommandBuilder(config, [], {}, false, () => ({}));
+  return createConfiguredCommandBuilder(config, [], {}, false, [], () => ({}));
 }
 
 function createConfiguredCommandBuilder<TInput>(
@@ -54,6 +53,7 @@ function createConfiguredCommandBuilder<TInput>(
   args: AffArgumentsDefinition,
   options: AffOptionsDefinition,
   hasInput: boolean,
+  middlewares: readonly AffMiddleware[],
   parseRawInput: (rawInput: AffInputRaw, commandName?: string) => TInput | Promise<TInput>,
 ): AffCommandBuilder<TInput> {
   return {
@@ -64,6 +64,7 @@ function createConfiguredCommandBuilder<TInput>(
         nextArgs,
         options,
         true,
+        middlewares,
         (rawInput, commandName) => parseInput(input, rawInput, commandName),
       );
     },
@@ -74,7 +75,18 @@ function createConfiguredCommandBuilder<TInput>(
         args,
         nextOptions,
         true,
+        middlewares,
         (rawInput, commandName) => parseInput(input, rawInput, commandName),
+      );
+    },
+    use(middleware) {
+      return createConfiguredCommandBuilder(
+        config,
+        args,
+        options,
+        hasInput,
+        [...middlewares, middleware],
+        parseRawInput,
       );
     },
     handle(handler) {
@@ -83,10 +95,14 @@ function createConfiguredCommandBuilder<TInput>(
         type: "command",
         config,
         input,
-        async execute(rawInput, initialContext, command, commandName) {
+        middlewares,
+        parse(rawInput, commandName) {
+          return parseRawInput(rawInput, commandName);
+        },
+        async run(parsedInput, ctx, command) {
           return handler?.({
-            input: await parseRawInput(rawInput, commandName ?? command.path.join(" ")),
-            ctx: initialContext,
+            input: parsedInput as TInput,
+            ctx,
             command,
           });
         },
