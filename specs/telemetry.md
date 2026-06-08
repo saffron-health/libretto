@@ -225,10 +225,10 @@ export function createCLIApp() {
 
 Document the anonymous telemetry behavior near the README configuration or CLI usage section. Keep the disclosure short and specific.
 
-- [ ] Update `packages/libretto/README.template.md` with:
-  - [ ] the exact collected fields: install id, timestamp, command event, error boolean,
-  - [ ] examples of excluded data: command args, URLs, project paths, auth state, API keys, user identity,
-  - [ ] the install id location: `~/.libretto/telemetry.json`,
-  - [ ] the opt-out: `LIBRETTO_TELEMETRY_DISABLED=1`.
-- [ ] Run `pnpm sync:mirrors` so generated READMEs stay in sync.
-- [ ] Verify `pnpm check:mirrors` passes.
+- [x] Update `packages/libretto/README.template.md` with:
+  - [x] the exact collected fields: install id, timestamp, command event, error boolean,
+  - [x] examples of excluded data: command args, URLs, project paths, auth state, API keys, user identity,
+  - [x] the install id location: `~/.libretto/telemetry.json`,
+  - [x] the opt-out: `LIBRETTO_TELEMETRY_DISABLED=1`.
+- [x] Run `pnpm sync:mirrors` so generated READMEs stay in sync.
+- [x] Verify `pnpm check:mirrors` passes.
