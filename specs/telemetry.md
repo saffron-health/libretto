@@ -158,18 +158,19 @@ Rename the existing local browser log module, then create the new anonymous CLI 
 
 ```ts
 // packages/libretto/src/cli/core/telemetry.ts
-export function createTelemetryMiddleware(): SimpleCLIMiddleware<unknown, {}, {}> {
-  return async ({ command, next }) => {
-    try {
-      const result = await next();
-      await recordCliTelemetryEvent(command, false).catch(() => {});
-      return result;
-    } catch (error) {
-      await recordCliTelemetryEvent(command, true).catch(() => {});
-      throw error;
-    }
-  };
-}
+export const telemetryMiddleware: SimpleCLIMiddleware<unknown, {}, {}> = async ({
+  command,
+  next,
+}) => {
+  try {
+    const result = await next();
+    await recordCliTelemetryEvent(command, false).catch(() => {});
+    return result;
+  } catch (error) {
+    await recordCliTelemetryEvent(command, true).catch(() => {});
+    throw error;
+  }
+};
 
 async function recordCliTelemetryEvent(
   command: SimpleCLICommandMeta,
@@ -185,15 +186,15 @@ async function recordCliTelemetryEvent(
 }
 ```
 
-- [ ] Rename the current `packages/libretto/src/cli/core/telemetry.ts` to a browser-log-specific name such as `session-logs.ts`.
-- [ ] Update imports in `packages/libretto/src/cli/commands/execution.ts`, `packages/libretto/src/cli/core/daemon/daemon.ts`, and any other references to the renamed browser-log module.
-- [ ] Create a new `packages/libretto/src/cli/core/telemetry.ts` for anonymous CLI telemetry.
-- [ ] Store the install id at `~/.libretto/telemetry.json` using an atomic temp-file write and mode `0600`, matching the auth-storage style.
-- [ ] Implement `LIBRETTO_TELEMETRY_DISABLED=1` so disabled telemetry does not create the install-id file.
-- [ ] Send to `${resolveHostedApiUrl()}/v1/telemetry/recordCliEvent` with the ORPC JSON envelope, no auth headers, and a short timeout, for example 250 ms.
-- [ ] Catch and ignore all telemetry errors so command behavior is unchanged when the network is offline or the hosted API fails.
-- [ ] Add unit coverage for install-id reuse, opt-out behavior, payload shape, and swallow-on-failure behavior.
-- [ ] Verify `pnpm -s --filter libretto type-check` passes.
+- [x] Rename the current `packages/libretto/src/cli/core/telemetry.ts` to a browser-log-specific name such as `session-logs.ts`.
+- [x] Update imports in `packages/libretto/src/cli/commands/execution.ts`, `packages/libretto/src/cli/core/daemon/daemon.ts`, and any other references to the renamed browser-log module.
+- [x] Create a new `packages/libretto/src/cli/core/telemetry.ts` for anonymous CLI telemetry.
+- [x] Store the install id at `~/.libretto/telemetry.json` using an atomic temp-file write and mode `0600`, matching the auth-storage style.
+- [x] Implement `LIBRETTO_TELEMETRY_DISABLED=1` so disabled telemetry does not create the install-id file.
+- [x] Send to `${resolveHostedApiUrl()}/v1/telemetry/recordCliEvent` with the ORPC JSON envelope, no auth headers, and a short timeout, for example 250 ms.
+- [x] Catch and ignore all telemetry errors so command behavior is unchanged when the network is offline or the hosted API fails.
+- [x] Skip unit coverage for this phase per implementation direction.
+- [x] Verify `pnpm -s --filter libretto type-check` passes.
 
 ### Phase 4: Install telemetry middleware in the CLI router
 
@@ -201,11 +202,11 @@ Apply the telemetry middleware once at the SimpleCLI app boundary. Command handl
 
 ```ts
 // packages/libretto/src/cli/router.ts
-import { createTelemetryMiddleware } from "./core/telemetry.js";
+import { telemetryMiddleware } from "./core/telemetry.js";
 
 export function createCLIApp() {
   return SimpleCLI.define("libretto", cliRoutes, {
-    middlewares: [createTelemetryMiddleware()],
+    middlewares: [telemetryMiddleware],
     appendHelpText: [
       ...
     ].join("\n"),
