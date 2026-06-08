@@ -144,13 +144,13 @@ export const recordCliTelemetryEventRoute = pub
   });
 ```
 
-- [ ] Add `cliTelemetryEvents` to `../browser-automations/packages/db/src/schema/appSchema.ts` with columns `id`, `installId`, `occurredAt`, `event`, `error`, and `createdAt`.
-- [ ] Generate and review a Drizzle migration for the new table.
-- [ ] Add `api/src/routes/telemetry/recordCliEvent.ts` using the unauthenticated `pub` builder.
-- [ ] Register the route under `telemetry.recordCliEvent` in `api/src/routes/router.ts`.
-- [ ] Add a rate limiter for `/v1/telemetry/*` in `api/src/app.ts` before the ORPC catch-all.
-- [ ] Add focused API tests that valid payloads insert exactly those four client fields plus server timestamps, and invalid payloads are rejected before insert.
-- [ ] Verify the hosted API package tests covering the new route pass.
+- [x] Add `cliTelemetryEvents` to `../browser-automations/packages/db/src/schema/appSchema.ts` with columns `id`, `installId`, `occurredAt`, `event`, `error`, and `createdAt`.
+- [x] Generate and review a Drizzle migration for the new table.
+- [x] Add `api/src/routes/telemetry/recordCliEvent.ts` using the unauthenticated `pub` builder.
+- [x] Register the route under `telemetry.recordCliEvent` in `api/src/routes/router.ts`.
+- [x] Add a rate limiter for `/v1/telemetry/*` in `api/src/app.ts` before the ORPC catch-all.
+- [x] Add focused API tests that valid payloads insert exactly those four client fields plus server timestamps, and invalid payloads are rejected before insert.
+- [x] Verify the hosted API package tests covering the new route pass.
 
 ### Phase 3: Centralize Libretto CLI telemetry in `core/telemetry.ts`
 
