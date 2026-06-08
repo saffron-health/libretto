@@ -75,6 +75,7 @@ const DEFAULT_RUNTIME_EXTERNALS = [
   "chromium-bidi",
 ] as const;
 const BUILT_IN_MANIFEST_DEPENDENCIES = ["libretto"] as const;
+const DEPLOY_METADATA_FILENAME = ".libretto-workflows.json";
 const SOURCE_FILE_EXTENSIONS = [
   "",
   ".ts",
@@ -607,6 +608,16 @@ function writeDeployManifest(args: {
   );
 }
 
+function writeDeployMetadata(args: {
+  outputDir: string;
+  workflows: readonly WorkflowDeployMetadata[];
+}): void {
+  writeFileSync(
+    join(args.outputDir, DEPLOY_METADATA_FILENAME),
+    JSON.stringify({ workflows: args.workflows }, null, 2) + "\n",
+  );
+}
+
 function shouldVendorCurrentLibretto(versionSpec: string): boolean {
   return (
     versionSpec.startsWith("file:") ||
@@ -1052,6 +1063,7 @@ export async function createHostedDeployPackage(
       outputDir,
       sourceDir: absSourceDir,
     });
+    writeDeployMetadata({ outputDir, workflows });
 
     // Success transfers ownership of the temp directory to the caller, who is
     // responsible for invoking cleanup() after the tarball/upload step.
