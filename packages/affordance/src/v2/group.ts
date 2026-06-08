@@ -1,5 +1,5 @@
 import type { AffRouteMap } from "./index.js";
-import type { AffMiddleware } from "./middleware.js";
+import type { AffContext, AffEmptyContext, AffMergeContext, AffMiddleware } from "./middleware.js";
 
 export interface AffGroupConfig {
   description?: string;
@@ -12,8 +12,12 @@ export interface AffGroup {
   routes: AffRouteMap;
 }
 
-export interface AffGroupBuilder {
-  use(middleware: AffMiddleware): AffGroupBuilder;
+export interface AffGroupBuilder<TContext extends AffContext = AffEmptyContext> {
+  use<TMiddlewareContext extends AffContext, TNextContext extends AffContext>(
+    middleware: TContext extends TMiddlewareContext
+      ? AffMiddleware<unknown, TMiddlewareContext, TNextContext>
+      : never,
+  ): AffGroupBuilder<AffMergeContext<TContext, TNextContext>>;
   routes(routes: AffRouteMap): AffGroup;
 }
 
@@ -21,13 +25,20 @@ export function createGroupBuilder(config: AffGroupConfig): AffGroupBuilder {
   return createConfiguredGroupBuilder(config, []);
 }
 
-function createConfiguredGroupBuilder(
+function createConfiguredGroupBuilder<TContext extends AffContext = AffEmptyContext>(
   config: AffGroupConfig,
   middlewares: readonly AffMiddleware[],
-): AffGroupBuilder {
+): AffGroupBuilder<TContext> {
   return {
-    use(middleware) {
-      return createConfiguredGroupBuilder(config, [...middlewares, middleware]);
+    use<TMiddlewareContext extends AffContext, TNextContext extends AffContext>(
+      middleware: TContext extends TMiddlewareContext
+        ? AffMiddleware<unknown, TMiddlewareContext, TNextContext>
+        : never,
+    ) {
+      return createConfiguredGroupBuilder<AffMergeContext<TContext, TNextContext>>(config, [
+        ...middlewares,
+        middleware as unknown as AffMiddleware,
+      ]);
     },
     routes(routes) {
       return {

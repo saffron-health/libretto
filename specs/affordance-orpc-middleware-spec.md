@@ -135,7 +135,7 @@ Create the v2 test folder and write the initial red tests. This phase is intenti
 - [x] Add `packages/affordance/test/v2/routes-and-help.spec.ts` with focused route builder and help expectations.
 - [x] Add `packages/affordance/test/v2/input.spec.ts` with minimum input expectations needed by route invocation.
 - [x] Add `packages/affordance/test/v2/middleware.spec.ts` with runtime `next()` expectations.
-- [ ] Add `packages/affordance/test/v2/middleware-types.spec.ts` with initial type-contract expectations, or defer it explicitly to Phase 8 if runtime behavior should land first.
+- [x] Add `packages/affordance/test/v2/middleware-types.spec.ts` with initial type-contract expectations, or defer it explicitly to Phase 8 if runtime behavior should land first.
 - [x] Verify `pnpm -s --filter affordance test` fails because `../../src/v2/index.js` is missing.
 
 ### Phase 2: Minimal v2 app, route builders, and direct invocation
@@ -229,16 +229,26 @@ Add middleware builders and oRPC-style runtime composition. This phase should no
 
 Add the type system for context propagation after runtime semantics are stable. This phase should be allowed to change generic signatures without changing runtime behavior.
 
-- [ ] First add type-level tests that a second middleware sees context injected by the first middleware.
-- [ ] First add type-level tests that a handler sees context injected by all prior middleware.
-- [ ] First add type-level tests that unprovided context keys are rejected with `@ts-expect-error`.
-- [ ] First add type-level tests for `$input<T>()` and `$context<T>()` contracts.
-- [ ] Implement the generic `.use(...)` chain so downstream `ctx` includes middleware-provided fields.
-- [ ] Implement typed `next({ ctx })` patches.
-- [ ] Implement `$input<T>()` and `$context<T>()` on middleware builders if the tests choose that API.
-- [ ] Verify `pnpm -s --filter affordance type-check` passes.
+- [x] First add type-level tests that a second middleware sees context injected by the first middleware.
+- [x] First add type-level tests that a handler sees context injected by all prior middleware.
+- [x] First add type-level tests that unprovided context keys are rejected with `@ts-expect-error`.
+- [x] First add type-level tests for `$input<T>()` and `$context<T>()` contracts.
+- [x] Implement the generic `.use(...)` chain so downstream `ctx` includes middleware-provided fields.
+- [x] Implement typed `next({ ctx })` patches.
+- [x] Implement `$input<T>()` and `$context<T>()` on middleware builders if the tests choose that API.
+- [x] Verify `pnpm -s --filter affordance type-check` passes.
 
-### Phase 9: Complete v2 parity decisions
+### Phase 9: Document public v2 exports with JSDoc
+
+Add concise JSDoc comments for every Aff v2 library export so generated declarations and editor hover text explain the API without requiring readers to inspect implementation files.
+
+- [ ] First identify every public export from `packages/affordance/src/v2/index.ts`, including exported types and values reachable through `Aff`.
+- [ ] Add JSDoc comments to exported builders, route types, middleware types, input declaration helpers, app interfaces, metadata types, and config objects.
+- [ ] Document type-only contract helpers such as `$input<T>()` and `$context<T>()` with examples of when to use them.
+- [ ] Keep comments concise and user-facing; describe behavior and constraints, not implementation details.
+- [ ] Verify generated declaration comments by running `pnpm -s --filter affordance type-check` and inspecting representative hover/declaration output if needed.
+
+### Phase 10: Complete v2 parity decisions
 
 Decide which remaining v1 features are required before Libretto can migrate. Add focused tests and implementation for only those features.
 
@@ -253,7 +263,7 @@ Candidate features:
 - [ ] Duplicate route validation.
 - [ ] Missing handler validation.
 
-### Phase 10: Migrate Libretto CLI call sites
+### Phase 11: Migrate Libretto CLI call sites
 
 Migrate Libretto after Aff v2 is stable enough to support current command behavior. This phase should start with Libretto-facing regression tests.
 
@@ -266,7 +276,7 @@ Migrate Libretto after Aff v2 is stable enough to support current command behavi
 - [ ] Migrate representative command groups from `SimpleCLI` to `Aff`.
 - [ ] Run the smallest relevant Libretto CLI tests that cover session middleware behavior.
 
-### Phase 11: Update telemetry spec to consume Aff v2 middleware
+### Phase 12: Update telemetry spec to consume Aff v2 middleware
 
 Update the telemetry plan once v2 middleware can observe successful and failed command execution centrally.
 

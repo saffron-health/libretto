@@ -10,7 +10,14 @@ import { parseCommandLine } from "./input/parser.js";
 import { createCommandBuilder, type AffCommand } from "./command.js";
 import { createGroupBuilder, type AffGroup } from "./group.js";
 import { flag, option } from "./input/input.js";
-import { createMiddleware, runMiddlewares, type AffMiddleware } from "./middleware.js";
+import {
+  createMiddleware,
+  runMiddlewares,
+  type AffContext,
+  type AffEmptyContext,
+  type AffMergeContext,
+  type AffMiddleware,
+} from "./middleware.js";
 
 export type {
   AffCommand,
@@ -64,8 +71,12 @@ export interface AffApp {
   exec(commandLine: string): Promise<unknown>;
 }
 
-export interface AffCliBuilder {
-  use(middleware: AffMiddleware): AffCliBuilder;
+export interface AffCliBuilder<TContext extends AffContext = AffEmptyContext> {
+  use<TMiddlewareContext extends AffContext, TNextContext extends AffContext>(
+    middleware: TContext extends TMiddlewareContext
+      ? AffMiddleware<unknown, TMiddlewareContext, TNextContext>
+      : never,
+  ): AffCliBuilder<AffMergeContext<TContext, TNextContext>>;
   routes(routes: AffRouteMap): AffApp;
 }
 
@@ -73,13 +84,20 @@ function createCliBuilder(name: string): AffCliBuilder {
   return createConfiguredCliBuilder(name, []);
 }
 
-function createConfiguredCliBuilder(
+function createConfiguredCliBuilder<TContext extends AffContext = AffEmptyContext>(
   name: string,
   middlewares: readonly AffMiddleware[],
-): AffCliBuilder {
+): AffCliBuilder<TContext> {
   return {
-    use(middleware) {
-      return createConfiguredCliBuilder(name, [...middlewares, middleware]);
+    use<TMiddlewareContext extends AffContext, TNextContext extends AffContext>(
+      middleware: TContext extends TMiddlewareContext
+        ? AffMiddleware<unknown, TMiddlewareContext, TNextContext>
+        : never,
+    ) {
+      return createConfiguredCliBuilder<AffMergeContext<TContext, TNextContext>>(name, [
+        ...middlewares,
+        middleware as unknown as AffMiddleware,
+      ]);
     },
     routes(routes) {
       const commandRoutes = flattenCommandRoutes(routes, [], middlewares);
