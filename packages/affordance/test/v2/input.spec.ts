@@ -252,6 +252,7 @@ describe("Aff v2 input", () => {
         .arguments([["url", z.url()]])
         .options({
           session: Aff.option(z.string()),
+          headless: Aff.flag({ aliases: ["H"] }),
         })
         .handle(async () => {
           handlerCalls += 1;
@@ -274,6 +275,9 @@ describe("Aff v2 input", () => {
       "Unknown option: --toString",
     );
     await expect(app.exec("open https://example.com --session")).rejects.toThrow(
+      "Missing value for --session.",
+    );
+    await expect(app.exec("open https://example.com --session -H")).rejects.toThrow(
       "Missing value for --session.",
     );
     await expect(app.exec("open https://example.com extra --session debug")).rejects.toThrow(

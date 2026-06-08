@@ -43,7 +43,7 @@ const optionKeyParser = oneOrMore(not(oneOf([text("="), whitespaceCharParser])))
 const inlineOptionValueParser = sequence([text("="), valueParser]).map(([, value]) => value);
 const separatedOptionValueParser = sequence([
   oneOrMore(whitespaceCharParser),
-  lookahead(not(text("--"))),
+  lookahead(not(text("-"))),
   valueParser,
 ]).map(([, , value]) => value);
 const longOptionParser = sequence([
