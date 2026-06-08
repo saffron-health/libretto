@@ -48,7 +48,7 @@ import {
   readActionLog,
   readNetworkLog,
   wrapPageForActionLogging,
-} from "../core/telemetry.js";
+} from "../core/session-logs.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import type { Experiments } from "../core/experiments.js";
 import { SimpleCLI } from "affordance";
