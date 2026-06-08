@@ -23,7 +23,7 @@ export function createLibrettoCloudProvider(): ProviderApi {
   // The Libretto Cloud API is an oRPC RPCHandler, not plain REST, so inputs
   // must be wrapped as { json: ... } and outputs arrive the same way.
   return {
-    async createSession() {
+    async createSession(options) {
       const browserSessionTimeoutSeconds = readPositiveNumberEnv(
         "LIBRETTO_TIMEOUT_SECONDS",
         DEFAULT_BROWSER_SESSION_TIMEOUT_SECONDS,
@@ -35,7 +35,11 @@ export function createLibrettoCloudProvider(): ProviderApi {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          json: { timeout_seconds: browserSessionTimeoutSeconds },
+          json: {
+            timeout_seconds: browserSessionTimeoutSeconds,
+            profile_name: options?.authProfileName,
+            profile_persist: options?.authProfilePersist,
+          },
         }),
       });
       if (!resp.ok) {

@@ -37,6 +37,42 @@ describe("workflow() with Zod schemas", () => {
     expect(wf.outputSchema).toBe(outputSchema);
   });
 
+  it("exposes auth profile metadata for local runs and hosted workflow discovery", () => {
+    const wf = workflow(
+      "profiled",
+      {
+        input: inputSchema,
+        output: outputSchema,
+        authProfile: { name: "twitter", refresh: true },
+      },
+      async (_ctx, input) => ({
+        pageTitle: "x",
+        finalUrl: input.url,
+      }),
+    );
+
+    expect(wf.authProfileName).toBe("twitter");
+    expect(wf.authProfileRefresh).toBe(true);
+    expect("authProfileSites" in wf).toBe(false);
+  });
+
+  it("rejects invalid workflow auth profile names", () => {
+    expect(() =>
+      workflow(
+        "invalid-profile",
+        { input: inputSchema, authProfile: { name: " " } },
+        async () => ({ pageTitle: "x", finalUrl: "https://example.com" }),
+      ),
+    ).toThrow("Profile name is required");
+    expect(() =>
+      workflow(
+        "path-profile",
+        { input: inputSchema, authProfile: "../twitter" },
+        async () => ({ pageTitle: "x", finalUrl: "https://example.com" }),
+      ),
+    ).toThrow("Invalid profile name");
+  });
+
   it("passes parsed input through to the handler when input is valid", async () => {
     const wf = workflow(
       "valid",

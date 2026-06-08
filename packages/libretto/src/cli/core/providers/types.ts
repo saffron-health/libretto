@@ -18,6 +18,9 @@ export type ProviderCloseResult = {
 };
 
 export type ProviderApi = {
-  createSession(): Promise<ProviderSession>;
+  createSession(options?: {
+    authProfileName?: string;
+    authProfilePersist?: boolean;
+  }): Promise<ProviderSession>;
   closeSession(sessionId: string): Promise<ProviderCloseResult>;
 };

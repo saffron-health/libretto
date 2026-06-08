@@ -115,6 +115,7 @@ function expectedRootHelp(): string {
       close  Close the browser
       cloud <subcommand>  Deploy workflows and manage hosted Libretto
       experiments  List or update Libretto experiment flags
+      import-chrome-profiles  Fetch scoped auth state from a Chrome CDP session into a local profile
       exec  Execute Playwright TypeScript code
       readonly-exec  Execute read-only Playwright inspection code
       run  Run the default-exported Libretto workflow from a file
@@ -579,6 +580,8 @@ export default workflow("main", async (ctx) => {
         deploy  Deploy workflows to the hosted platform
         auth <subcommand>  Hosted-platform auth commands
         billing <subcommand>  Hosted-platform subscription + usage commands
+        credentials <subcommand>  Manage hosted credentials
+        profiles <subcommand>  Manage hosted browser auth profiles
     `}\n`);
     expect(result.stdout).toBe("");
   });
@@ -1210,22 +1213,24 @@ export const workflows = workflow("main", async () => {
     await writeWorkflow(
       "integration.ts",
       `
-export default workflow("main", async () => {
-  return "ok";
+export default workflow("main", {
+  authProfile: "app.example.com",
+  async handler() {
+    return "ok";
+  },
 });
 `,
     );
 
-    const result = await librettoCli(
-      "run ./integration.ts --auth-profile app.example.com",
-    );
+    const result = await librettoCli("run ./integration.ts");
     expect(result.stderr).toContain(
-      'Local auth profile not found for domain "app.example.com".',
+      'Local auth profile not found: "app.example.com".',
     );
+    expect(result.stderr).toContain("libretto open <site-url> --headed --session");
     expect(result.stderr).toContain(
-      "libretto open https://app.example.com --headed --session",
+      "libretto save app.example.com --session",
     );
-    expect(result.stderr).toContain("libretto save app.example.com --session");
+    expect(result.stderr).toContain("--sites <site>");
   });
 
   test("does not require local auth profile when auth metadata is absent", async ({
@@ -1646,9 +1651,7 @@ export default workflow("main", async (ctx) => {
     librettoCli,
   }) => {
     const result = await librettoCli("save --session test");
-    expect(result.stderr).toContain(
-      "libretto save <url|domain> --session <name>",
-    );
+    expect(result.stderr).toContain("Missing required argument <profileName>.");
   });
 
   test("fails when --session value is missing", async ({ librettoCli }) => {

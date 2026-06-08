@@ -40,6 +40,8 @@ export type DaemonBrowserProviderConfig = {
   kind: "provider";
   providerName: string;
   initialUrl?: string;
+  authProfileName?: string;
+  authProfilePersist?: boolean;
 };
 
 export type DaemonWorkflowConfig = {
@@ -48,7 +50,8 @@ export type DaemonWorkflowConfig = {
   visualize?: boolean;
   stayOpenOnSuccess?: boolean;
   tsconfigPath?: string;
-  authProfileDomain?: string;
+  authProfileName?: string;
+  authProfilePersist?: boolean;
 };
 
 export type DaemonConfig = {

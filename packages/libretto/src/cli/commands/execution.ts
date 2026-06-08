@@ -6,10 +6,6 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   connect,
   disconnectBrowser,
-  getProfilePath,
-  hasProfile,
-  normalizeDomain,
-  normalizeUrl,
   runClose,
   resolveViewport,
 } from "../core/browser.js";
@@ -32,7 +28,9 @@ import {
   getProviderStartupTimeoutMs,
   resolveProviderName,
 } from "../core/providers/index.js";
-import { getAbsoluteIntegrationPath } from "../core/workflow-runtime.js";
+import {
+  getAbsoluteIntegrationPath,
+} from "../core/workflow-runtime.js";
 import {
   compileExecFunction,
   stripEmptyCatchHandlers,
@@ -68,7 +66,6 @@ type RunIntegrationCommandRequest = {
   visualize: boolean;
   viewport?: { width: number; height: number };
   accessMode: SessionAccessMode;
-  authProfileDomain?: string;
   providerName?: string;
   stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
@@ -564,22 +561,6 @@ async function runIntegrationFromFile(
   const absoluteIntegrationPath = getAbsoluteIntegrationPath(
     args.integrationPath,
   );
-  if (args.authProfileDomain) {
-    const normalizedDomain = normalizeDomain(normalizeUrl(args.authProfileDomain));
-    if (!hasProfile(normalizedDomain)) {
-      const profilePath = getProfilePath(normalizedDomain);
-      throw new Error(
-        [
-          `Local auth profile not found for domain "${normalizedDomain}".`,
-          `Expected profile file: ${profilePath}`,
-          "To create it:",
-          `  1. libretto open https://${normalizedDomain} --headed --session ${args.session}`,
-          "  2. Log in manually in the browser window.",
-          `  3. libretto save ${normalizedDomain} --session ${args.session}`,
-        ].join("\n"),
-      );
-    }
-  }
 
   const runLogPath = logFileForSession(args.session);
   const workflowOutcome = createDeferred<WorkflowOutcome>();
@@ -594,7 +575,10 @@ async function runIntegrationFromFile(
       session: args.session,
       experiments: args.experiments,
       browser: args.providerName
-        ? { kind: "provider", providerName: args.providerName }
+        ? {
+            kind: "provider",
+            providerName: args.providerName,
+          }
         : {
             kind: "launch",
             headed: !args.headless,
@@ -606,7 +590,6 @@ async function runIntegrationFromFile(
         visualize: args.visualize,
         stayOpenOnSuccess: args.stayOpenOnSuccess,
         tsconfigPath: args.tsconfigPath,
-        authProfileDomain: args.authProfileDomain,
       },
     },
     logger,
@@ -809,10 +792,6 @@ export const runInput = SimpleCLI.input({
       name: "stay-open-on-success",
       help: "Keep the browser session open after the workflow completes successfully",
     }),
-    authProfile: SimpleCLI.option(z.string().optional(), {
-      name: "auth-profile",
-      help: "Domain for local auth profile (e.g. apps.example.com)",
-    }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
@@ -903,7 +882,6 @@ export const runCommand = SimpleCLI.command({
         tsconfigPath: input.tsconfig,
         headless: daemonProviderName ? true : (headlessMode ?? false),
         visualize,
-        authProfileDomain: input.authProfile,
         viewport,
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
         providerName: daemonProviderName,

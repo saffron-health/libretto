@@ -61,7 +61,7 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 - Defer repo/code review until you begin generating code, unless the user explicitly asks for it earlier.
 - Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code.
 - Validation requires a successful clean `run` with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
-- After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--headed`, `--headless`, or `--auth-profile` flags the workflow needs.
+- After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--headed`, or `--headless` flags the workflow needs.
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
@@ -164,7 +164,6 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 npx libretto run ./integration.ts --params '{"status":"open"}'
 npx libretto run ./integration.ts --read-only
 npx libretto run ./integration.ts --stay-open-on-success
-npx libretto run ./integration.ts --auth-profile app.example.com
 ```
 
 ### `resume`

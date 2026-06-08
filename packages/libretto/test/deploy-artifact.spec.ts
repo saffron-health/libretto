@@ -196,7 +196,8 @@ describe("createHostedDeployPackage", () => {
     expect(deployManifest.dependencies).toEqual({
       libretto: "0.5.4",
     });
-    expect(bundle).toContain('createWorkflowProxy("testWorkflow")');
+    expect(bundle).toContain('createWorkflowProxy("testWorkflow", {"credentialNames":[]})');
+    expect(bundle).toContain("return workflow(workflowName, {");
     expect(implementation).toContain("bundled from workspace source");
     expect(implementation).not.toContain("@repo/config/message");
     expect(bundle).not.toContain("workspace:*");
@@ -305,8 +306,66 @@ describe("createHostedDeployPackage", () => {
       libretto: currentLibrettoVersion.version,
       lodash: "^4.17.21",
     });
-    expect(bundle).toContain('createWorkflowProxy("testWorkflow")');
+    expect(bundle).toContain('createWorkflowProxy("testWorkflow", {"credentialNames":[]})');
     expect(implementation).toContain("lodash");
+  });
+
+  it("preserves workflow auth profile name and refresh metadata without site metadata", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      type: "module",
+      dependencies: {
+        libretto: currentLibrettoVersion.version,
+      },
+    });
+
+    writeFileSync(
+      entryPoint,
+      [
+        'import { workflow } from "libretto";',
+        "",
+        "export const testWorkflow = workflow(",
+        '  "testWorkflow",',
+        '  { credentials: ["openai_api_key"], authProfile: { name: "twitter", refresh: true } },',
+        "  async () => ({ ok: true }),",
+        ");",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "auth-profile-worker",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+
+    expect(deployPackage.workflows).toEqual([
+      {
+        authProfileName: "twitter",
+        authProfileRefresh: true,
+        credentialNames: ["openai_api_key"],
+        name: "testWorkflow",
+      },
+    ]);
+
+    const bundle = readFileSync(
+      join(deployPackage.outputDir, "index.js"),
+      "utf8",
+    );
+    expect(bundle).toContain(
+      'createWorkflowProxy("testWorkflow", {"credentialNames":["openai_api_key"],"authProfileName":"twitter","authProfileRefresh":true})',
+    );
+    expect(bundle).not.toContain("authProfileSites");
+    expect(bundle).not.toContain("sites:");
   });
 
   it("vendors the current libretto package when the source manifest uses a local-only libretto spec", async () => {
