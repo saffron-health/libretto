@@ -45,12 +45,19 @@ export type {
   AffOptionsDefinition,
 } from "./input/input.js";
 
+/** A command or command group that can appear in an Aff route tree. */
 export type AffRoute = AffGroup | AffCommand;
+
+/** Named child routes passed to `Aff.cli(...).routes(...)` or `Aff.group(...).routes(...)`. */
 export type AffRouteMap = Record<string, AffRoute>;
 
+/** Resolved command metadata exposed to handlers, middleware, and command listings. */
 export interface AffCommandMetadata {
+  /** Dot-separated route key, such as `cloud.login`. */
   routeKey: string;
+  /** Command path segments as typed on the command line, such as `["cloud", "login"]`. */
   path: string[];
+  /** Optional user-facing description from the command config. */
   description?: string;
 }
 
@@ -60,23 +67,34 @@ interface AffCommandRoute {
   middlewares: readonly AffMiddleware[];
 }
 
+/** A constructed Aff CLI application. */
 export interface AffApp {
+  /** Return metadata for every command reachable from the app root. */
   getCommands(): AffCommandMetadata[];
+  /**
+   * Invoke a command by route key using already-tokenized argument and option values.
+   *
+   * Useful for tests and programmatic integrations that do not need command-line parsing.
+   */
   invoke(
     routeKey: string,
     args?: readonly unknown[],
     options?: Readonly<Record<string, unknown>>,
     initialContext?: unknown,
   ): Promise<unknown>;
+  /** Execute a command-line string, including route resolution, input parsing, and middleware. */
   exec(commandLine: string): Promise<unknown>;
 }
 
+/** Root CLI builder returned by `Aff.cli(name)`. */
 export interface AffCliBuilder<TContext extends AffContext = AffEmptyContext> {
+  /** Add root middleware that runs for every resolved command. */
   use<TMiddlewareContext extends AffContext, TNextContext extends AffContext>(
     middleware: TContext extends TMiddlewareContext
       ? AffMiddleware<unknown, TMiddlewareContext, TNextContext>
       : never,
   ): AffCliBuilder<AffMergeContext<TContext, TNextContext>>;
+  /** Attach the root route tree and construct an executable app. */
   routes(routes: AffRouteMap): AffApp;
 }
 
@@ -222,7 +240,30 @@ function findCommandRouteByPath(
     .sort((left, right) => right.metadata.path.length - left.metadata.path.length)[0];
 }
 
-export const Aff = {
+/** Entry point for building Aff v2 command-line applications. */
+export const Aff: {
+  /** Create a root CLI builder with the given executable name. */
+  cli: typeof createCliBuilder;
+  /** Create a command group builder for nested routes. */
+  group: typeof createGroupBuilder;
+  /** Create a command builder for a leaf command. */
+  command: typeof createCommandBuilder;
+  /**
+   * Create middleware, either as an inline typed identity helper or as a described builder.
+   *
+   * @example
+   * ```ts
+   * const telemetry = Aff.middleware({ description: "telemetry" }).handle(async ({ next }) => {
+   *   return next();
+   * });
+   * ```
+   */
+  middleware: typeof createMiddleware;
+  /** Wrap a valued option schema when option-specific Aff metadata is needed. */
+  option: typeof option;
+  /** Declare a boolean flag option that defaults to `false` when omitted. */
+  flag: typeof flag;
+} = {
   cli: createCliBuilder,
   group: createGroupBuilder,
   command: createCommandBuilder,

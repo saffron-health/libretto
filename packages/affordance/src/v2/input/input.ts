@@ -6,9 +6,11 @@ type AffNamedInputDeclaration<TType extends "option" | "flag", TSchema extends S
   schema: TSchema;
 };
 
+/** Valued named option backed by a Standard Schema validator. */
 export type AffOptionDefinition<TSchema extends StandardSchemaV1 = StandardSchemaV1> =
   AffNamedInputDeclaration<"option", TSchema>;
 
+/** Wrap a Standard Schema validator as a valued named option declaration. */
 export function option<TSchema extends StandardSchemaV1>(
   schema: TSchema,
 ): AffOptionDefinition<TSchema> {
@@ -18,11 +20,13 @@ export function option<TSchema extends StandardSchemaV1>(
   };
 }
 
+/** Boolean named option that defaults to `false` when omitted. */
 export type AffFlagDefinition = AffNamedInputDeclaration<
   "flag",
   StandardSchemaV1<unknown, boolean>
 >;
 
+/** Create a boolean flag declaration for `.options(...)`. */
 export function flag(): AffFlagDefinition {
   return {
     type: "flag",
@@ -30,22 +34,30 @@ export function flag(): AffFlagDefinition {
   };
 }
 
+/** Positional argument declaration as a `[name, schema]` tuple. */
 export type AffArgumentDefinition<
   TKey extends string = string,
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
 > = readonly [TKey, TSchema];
 
+/** Ordered positional argument declarations for `.arguments(...)`. */
 export type AffArgumentsDefinition = readonly AffArgumentDefinition[];
 
+/** Named input declaration accepted by `.options(...)`. */
 export type AffNamedInputDefinition = AffOptionDefinition | AffFlagDefinition | StandardSchemaV1;
 
+/** Named option declarations keyed by their command-line option name. */
 export type AffOptionsDefinition = Record<string, AffNamedInputDefinition>;
 
+/** Parsed input definition owned by a command. */
 export type AffInputDefinition<TOutput = unknown> = {
+  /** Ordered positional argument declarations. */
   arguments: AffArgumentsDefinition;
+  /** Named option declarations. */
   options: AffOptionsDefinition;
 };
 
+/** Create an input definition from positional arguments and named options. */
 export function createInputDefinition<TOutput = unknown>(
   args: AffArgumentsDefinition,
   options: AffOptionsDefinition,
@@ -73,16 +85,21 @@ type InferOptions<TOptions extends AffOptionsDefinition> = {
   [K in keyof TOptions]: InferSchemaOutput<SchemaForOption<TOptions[K]>>;
 };
 
+/** Parsed input object inferred from argument and option declarations. */
 export type AffInputFor<
   TArguments extends AffArgumentsDefinition,
   TOptions extends AffOptionsDefinition,
 > = InferArguments<TArguments> & InferOptions<TOptions>;
 
+/** Raw invocation input before Aff validates arguments and options. */
 export type AffInputRaw = {
+  /** Positional argument values in declaration order. */
   arguments: readonly unknown[];
+  /** Named option values keyed by option name. */
   options: Readonly<Record<string, unknown>>;
 };
 
+/** Validate raw invocation input against an Aff input definition. */
 export async function parseInput<TOutput>(
   definition: AffInputDefinition<TOutput>,
   rawInput: AffInputRaw,

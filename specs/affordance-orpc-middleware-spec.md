@@ -242,11 +242,11 @@ Add the type system for context propagation after runtime semantics are stable. 
 
 Add concise JSDoc comments for every Aff v2 library export so generated declarations and editor hover text explain the API without requiring readers to inspect implementation files.
 
-- [ ] First identify every public export from `packages/affordance/src/v2/index.ts`, including exported types and values reachable through `Aff`.
-- [ ] Add JSDoc comments to exported builders, route types, middleware types, input declaration helpers, app interfaces, metadata types, and config objects.
-- [ ] Document type-only contract helpers such as `$input<T>()` and `$context<T>()` with examples of when to use them.
-- [ ] Keep comments concise and user-facing; describe behavior and constraints, not implementation details.
-- [ ] Verify generated declaration comments by running `pnpm -s --filter affordance type-check` and inspecting representative hover/declaration output if needed.
+- [x] First identify every public export from `packages/affordance/src/v2/index.ts`, including exported types and values reachable through `Aff`.
+- [x] Add JSDoc comments to exported builders, route types, middleware types, input declaration helpers, app interfaces, metadata types, and config objects.
+- [x] Document type-only contract helpers such as `$input<T>()` and `$context<T>()` with examples of when to use them.
+- [x] Keep comments concise and user-facing; describe behavior and constraints, not implementation details.
+- [x] Verify generated declaration comments by running `pnpm -s --filter affordance type-check` and inspecting representative hover/declaration output if needed.
 
 ### Phase 10: Complete v2 parity decisions
 
