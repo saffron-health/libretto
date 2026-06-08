@@ -10,7 +10,7 @@ Add a small anonymous telemetry pipeline that spans Libretto and the hosted plat
 
 - In Libretto, create one CLI telemetry module at `packages/libretto/src/cli/core/telemetry.ts`.
 - Store a random install id in `~/.libretto/telemetry.json`; do not read auth state, API keys, git remotes, usernames, project paths, command args, or environment details.
-- Send one best-effort event per successfully resolved CLI command through oRPC-style affordance middleware so handlers do not call telemetry directly.
+- Send one best-effort event per successfully resolved CLI command through a small SimpleCLI middleware change so handlers do not call telemetry directly.
 - In the hosted platform (`../browser-automations`), add a public, rate-limited ingestion route that validates and stores the anonymous event.
 - Disclose the behavior in `packages/libretto/README.template.md`, then sync mirrors.
 
@@ -20,7 +20,7 @@ Because `packages/libretto/src/cli/core/telemetry.ts` already exists for local b
 
 - A Libretto CLI user gets one random, device-local install id stored outside project state.
 - Libretto records anonymous CLI command events with only `{ installId, timestamp, event, error }`.
-- CLI telemetry is emitted centrally through oRPC-style affordance middleware, not scattered across command handlers.
+- CLI telemetry is emitted centrally through SimpleCLI middleware, not scattered across command handlers.
 - Telemetry failure never changes command output, command exit code, or command latency beyond a small timeout budget.
 - The hosted platform accepts anonymous telemetry without requiring a Libretto Cloud account or API key.
 - The README clearly discloses what is collected, what is not collected, and how to opt out.
@@ -52,16 +52,15 @@ Rules:
 - `installId` is generated with `crypto.randomUUID()` and persisted in `~/.libretto/telemetry.json` with user-only permissions.
 - `timestamp` is the client-side event time in ISO-8601 format.
 - `event` is derived only from the resolved command path, such as `libretto run` or `libretto cloud auth login`.
-- `error` is `true` when the command handler throws after route resolution and `false` otherwise.
+- `error` is `true` when resolved-command middleware or the command handler throws and `false` otherwise.
 - Help/version/root-help invocations and unknown-command parse failures do not need telemetry in v1 because they do not resolve to a command handler.
 - `LIBRETTO_TELEMETRY_DISABLED=1` disables install-id creation and event sending.
 - The hosted API must not store auth headers, IP addresses, user agents, request paths beyond the route, or raw request bodies for this endpoint. Normal Cloud Run access logs may still exist outside this application table.
 
 ## Important files/docs/websites for implementation
 
-- `packages/affordance/src/index.ts` - SimpleCLI middleware execution currently runs only before handlers; telemetry needs `next()`-based middleware that can observe success and failure centrally.
+- `packages/affordance/src/index.ts` - SimpleCLI middleware execution currently runs only before handlers; telemetry needs the minimal `next()` support required to observe success and failure centrally, plus app-level middleware registration.
 - `packages/affordance/test/affordance.spec.ts` - focused tests for middleware ordering and error propagation.
-- `specs/affordance-orpc-middleware-spec.md` - prerequisite spec that changes SimpleCLI middleware to `next()`-based execution so telemetry can observe success and failure.
 - `packages/libretto/src/cli/router.ts` - creates the Libretto CLI app and is the natural place to install root-level telemetry middleware.
 - `packages/libretto/src/cli/cli.ts` - CLI bootstrap, help/version bypasses, and exit-code handling.
 - `packages/libretto/src/cli/core/telemetry.ts` - currently browser action/network logging; rename this to avoid colliding with anonymous CLI telemetry.
@@ -80,9 +79,14 @@ Rules:
 
 ## Implementation
 
-### Phase 1: Land oRPC-style affordance middleware
+### Phase 1: Add only the SimpleCLI middleware behavior telemetry needs
 
-Implement `specs/affordance-orpc-middleware-spec.md` before adding CLI telemetry. Telemetry should be ordinary `.use(...)` middleware that awaits `next()`, not a separate around-middleware API.
+Do not implement the broader affordance v2 middleware redesign in this branch. Make the smallest SimpleCLI changes that let telemetry wrap a resolved command centrally while preserving existing context-return middleware such as `withRequiredSession()` and `withAutoSession()`.
+
+Telemetry needs two affordance capabilities:
+
+- Middleware can call `await next()` and run code before and after downstream middleware and the handler.
+- `SimpleCLI.define()` can accept app-level middlewares that run once for every resolved command before inherited group and command middleware.
 
 ```ts
 // packages/affordance/src/index.ts
@@ -91,13 +95,20 @@ export type SimpleCLIMiddleware<TInput, TContextIn, TContextOut> = (
     next: (options?: { ctx?: Partial<TContextOut> }) => Promise<unknown>;
   },
 ) => Promise<unknown> | unknown;
+
+type SimpleCLIAppConfig = {
+  globalNamed?: SimpleCLINamedDefinition;
+  appendHelpText?: string;
+  middlewares?: AnySimpleCLIMiddleware[];
+};
 ```
 
-- [ ] Complete `specs/affordance-orpc-middleware-spec.md`.
-- [ ] Ensure middleware can run before and after `await next()`.
+- [ ] Add a `next()` function to middleware args and compose middleware so a caller can run before and after `await next()`.
 - [ ] Ensure `next()` rejects with downstream handler errors unless an intermediate middleware catches them.
-- [ ] Ensure middleware can still inject downstream context with `next({ ctx })`.
-- [ ] Ensure middleware can short-circuit by returning without calling `next()`.
+- [ ] Ensure middleware can inject downstream context with `next({ ctx })`.
+- [ ] Preserve existing legacy middleware behavior where returning a context object without calling `next()` merges that context and continues to the next middleware or handler.
+- [ ] Add `middlewares` to `SimpleCLI.define()` config and run those app-level middlewares only after a command route resolves, before route-tree middleware.
+- [ ] Do not add unrelated affordance v2 features, new routing APIs, or a separate around-middleware API.
 - [ ] Verify `pnpm -s --filter affordance test` passes.
 
 ### Phase 2: Add hosted anonymous telemetry ingestion
@@ -146,10 +157,10 @@ export function createTelemetryMiddleware(): SimpleCLIMiddleware<unknown, {}, {}
   return async ({ command, next }) => {
     try {
       const result = await next();
-      await recordCliTelemetryEvent(command, false);
+      await recordCliTelemetryEvent(command, false).catch(() => {});
       return result;
     } catch (error) {
-      await recordCliTelemetryEvent(command, true);
+      await recordCliTelemetryEvent(command, true).catch(() => {});
       throw error;
     }
   };
@@ -174,7 +185,7 @@ async function recordCliTelemetryEvent(
 - [ ] Create a new `packages/libretto/src/cli/core/telemetry.ts` for anonymous CLI telemetry.
 - [ ] Store the install id at `~/.libretto/telemetry.json` using an atomic temp-file write and mode `0600`, matching the auth-storage style.
 - [ ] Implement `LIBRETTO_TELEMETRY_DISABLED=1` so disabled telemetry does not create the install-id file.
-- [ ] Send to `${resolveHostedApiUrl()}/v1/telemetry/recordCliEvent` with no auth headers and a short timeout, for example 250 ms.
+- [ ] Send to `${resolveHostedApiUrl()}/v1/telemetry/recordCliEvent` with the ORPC JSON envelope, no auth headers, and a short timeout, for example 250 ms.
 - [ ] Catch and ignore all telemetry errors so command behavior is unchanged when the network is offline or the hosted API fails.
 - [ ] Add unit coverage for install-id reuse, opt-out behavior, payload shape, and swallow-on-failure behavior.
 - [ ] Verify `pnpm -s --filter libretto type-check` passes.
