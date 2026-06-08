@@ -38,14 +38,14 @@ export interface AffCommand {
 export interface AffCommandBuilder<TInput = unknown> {
   arguments<const TArguments extends AffArgumentsDefinition>(
     args: TArguments,
-  ): AffCommandBuilder<AffInputFor<TArguments, {}>>;
+  ): AffCommandBuilder<TInput & AffInputFor<TArguments, {}>>;
   options<const TOptions extends AffOptionsDefinition>(
     options: TOptions,
   ): AffCommandBuilder<TInput & AffInputFor<[], TOptions>>;
   handle(handler?: AffCommandHandler<TInput>): AffCommand;
 }
 
-export function createCommandBuilder(config: AffCommandConfig): AffCommandBuilder<unknown> {
+export function createCommandBuilder(config: AffCommandConfig): AffCommandBuilder<{}> {
   return createConfiguredCommandBuilder(config, [], {}, false, () => ({}));
 }
 
@@ -54,12 +54,12 @@ function createConfiguredCommandBuilder<TInput>(
   args: AffArgumentsDefinition,
   options: AffOptionsDefinition,
   hasInput: boolean,
-  parseRawInput: (rawInput: AffInputRaw, commandName?: string) => TInput,
+  parseRawInput: (rawInput: AffInputRaw, commandName?: string) => TInput | Promise<TInput>,
 ): AffCommandBuilder<TInput> {
   return {
     arguments<const TArguments extends AffArgumentsDefinition>(nextArgs: TArguments) {
-      const input = createInputDefinition<AffInputFor<TArguments, {}>>(nextArgs, options);
-      return createConfiguredCommandBuilder<AffInputFor<TArguments, {}>>(
+      const input = createInputDefinition<TInput & AffInputFor<TArguments, {}>>(nextArgs, options);
+      return createConfiguredCommandBuilder<TInput & AffInputFor<TArguments, {}>>(
         config,
         nextArgs,
         options,
@@ -83,9 +83,9 @@ function createConfiguredCommandBuilder<TInput>(
         type: "command",
         config,
         input,
-        execute(rawInput, initialContext, command, commandName) {
+        async execute(rawInput, initialContext, command, commandName) {
           return handler?.({
-            input: parseRawInput(rawInput, commandName ?? command.path.join(" ")),
+            input: await parseRawInput(rawInput, commandName ?? command.path.join(" ")),
             ctx: initialContext,
             command,
           });

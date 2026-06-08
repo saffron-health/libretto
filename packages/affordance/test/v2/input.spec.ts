@@ -1,6 +1,21 @@
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
 import { Aff } from "../../src/v2/index.js";
+
+function testStandardSchema<TInput, TOutput>(
+  validate: (
+    value: unknown,
+  ) => StandardSchemaV1.Result<TOutput> | Promise<StandardSchemaV1.Result<TOutput>>,
+): StandardSchemaV1<TInput, TOutput> {
+  return {
+    "~standard": {
+      version: 1,
+      vendor: "affordance-test",
+      validate,
+    },
+  };
+}
 
 describe("Aff v2 input", () => {
   test("parses arguments and options from invoke input", async () => {
@@ -55,6 +70,73 @@ describe("Aff v2 input", () => {
       }),
     ).rejects.toThrow("Invalid URL");
     expect(handlerCalls).toBe(0);
+  });
+
+  test("parses arguments and options declared with non-Zod Standard Schema validators", async () => {
+    const pathSchema = testStandardSchema<string, { path: string }>((value) => {
+      if (typeof value === "string" && value.length > 0) {
+        return { value: { path: value } };
+      }
+
+      return { issues: [{ message: "Expected a non-empty path" }] };
+    });
+    const countSchema = testStandardSchema<string, number>((value) => {
+      if (typeof value === "string" && /^\d+$/.test(value)) {
+        return { value: Number(value) };
+      }
+
+      return { issues: [{ message: "Expected a numeric count" }] };
+    });
+    const labelSchema = testStandardSchema<string | undefined, string>((value) => {
+      if (typeof value === "string" && value.length > 0) {
+        return { value };
+      }
+
+      if (value === undefined) {
+        return { value: "default" };
+      }
+
+      return { issues: [{ message: "Expected a label" }] };
+    });
+
+    const app = Aff.cli("libretto").routes({
+      run: Aff.command({ description: "Run workflow" })
+        .arguments([["workflow", pathSchema]])
+        .options({
+          count: countSchema,
+          label: Aff.option(labelSchema),
+        })
+        .handle(async ({ input }) => input),
+    });
+
+    await expect(app.exec("run workflows/smoke.ts --count 3")).resolves.toEqual({
+      workflow: { path: "workflows/smoke.ts" },
+      count: 3,
+      label: "default",
+    });
+  });
+
+  test("awaits asynchronous Standard Schema validation", async () => {
+    const tokenSchema = testStandardSchema<string, { token: string }>(async (value) => {
+      if (value === "valid-token") {
+        return { value: { token: "valid-token" } };
+      }
+
+      return { issues: [{ message: "Expected a valid token" }] };
+    });
+
+    const app = Aff.cli("libretto").routes({
+      auth: Aff.command({ description: "Authenticate" })
+        .options({
+          token: Aff.option(tokenSchema),
+        })
+        .handle(async ({ input }) => input),
+    });
+
+    await expect(app.exec("auth --token valid-token")).resolves.toEqual({
+      token: { token: "valid-token" },
+    });
+    await expect(app.exec("auth --token invalid-token")).rejects.toThrow("Expected a valid token");
   });
 
   test("parses arguments and options from an exec string", async () => {
@@ -152,6 +234,9 @@ describe("Aff v2 input", () => {
     );
     await expect(app.exec("open https://example.com --unknown value")).rejects.toThrow(
       "Unknown option: --unknown",
+    );
+    await expect(app.exec("open https://example.com --toString value")).rejects.toThrow(
+      "Unknown option: --toString",
     );
     await expect(app.exec("open https://example.com --session")).rejects.toThrow(
       "Missing value for --session.",

@@ -48,6 +48,7 @@
     "zod": "^4.3.6"
   },
   "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
     "teg-parser": "0.15.0"
   }
 }

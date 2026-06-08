@@ -197,16 +197,16 @@ The team owns `teg-parser`, so gaps in the parser API should be fixed upstream a
 
 Make Aff v2 schema-agnostic before middleware starts depending on parsed input. Zod should keep working, but the input layer should depend on the Standard Schema interface instead of Zod-specific parsing APIs.
 
-- [ ] First add tests that use at least one non-Zod Standard Schema implementation or a small in-test Standard Schema fixture for arguments and options.
-- [ ] First add type tests proving `AffInputFor` infers Standard Schema output types for arguments, plain options, and `Aff.option(schema)`.
-- [ ] Replace `ZodTypeAny` constraints in `packages/affordance/src/v2/input.ts` with a local Standard Schema-compatible type.
-- [ ] Replace `z.output<T>` inference with Standard Schema output inference.
-- [ ] Validate each argument and option independently through `schema["~standard"].validate(...)` instead of building a Zod object schema.
-- [ ] Make command input parsing async if needed, because Standard Schema validation may return a promise.
-- [ ] Keep required argument and option errors by validating `undefined`: if a schema accepts `undefined`, use the schema output; otherwise throw the Aff-specific missing input error.
-- [ ] Replace `z.prettifyError(...)` with an Aff-owned Standard Schema issue formatter.
-- [ ] Decide whether `Aff.flag()` continues to use Zod internally or uses a tiny Aff-owned boolean Standard Schema.
-- [ ] Verify existing Zod-based Phase 4 tests still pass.
+- [x] First add tests that use at least one non-Zod Standard Schema implementation or a small in-test Standard Schema fixture for arguments and options.
+- [x] First add type tests proving command handlers infer Standard Schema output types for arguments, plain options, and `Aff.option(schema)`.
+- [x] Replace `ZodTypeAny` constraints in `packages/affordance/src/v2/input/input.ts` with a local Standard Schema-compatible type.
+- [x] Replace `z.output<T>` inference with Standard Schema output inference.
+- [x] Validate each argument and option independently through `schema["~standard"].validate(...)` instead of building a Zod object schema.
+- [x] Make command input parsing async because Standard Schema validation may return a promise.
+- [x] Keep required argument and option errors by validating `undefined`: if a schema accepts `undefined`, use the schema output; otherwise throw the Aff-specific missing input error.
+- [x] Replace `z.prettifyError(...)` with an Aff-owned Standard Schema issue formatter.
+- [x] Keep `Aff.flag()` backed by Zod internally for now; it still exposes only Aff-owned flag behavior.
+- [x] Verify existing Zod-based Phase 4 tests still pass.
 
 ### Phase 7: Runtime middleware
 

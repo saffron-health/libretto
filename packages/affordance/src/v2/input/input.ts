@@ -1,57 +1,50 @@
-import { z, type ZodTypeAny } from "zod";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
+import { z } from "zod";
 
-export interface AffInputRaw {
-  arguments: readonly unknown[];
-  options: Readonly<Record<string, unknown>>;
+type AffNamedInputDeclaration<TType extends "option" | "flag", TSchema extends StandardSchemaV1> = {
+  type: TType;
+  schema: TSchema;
+};
+
+export type AffOptionDefinition<TSchema extends StandardSchemaV1 = StandardSchemaV1> =
+  AffNamedInputDeclaration<"option", TSchema>;
+
+export function option<TSchema extends StandardSchemaV1>(
+  schema: TSchema,
+): AffOptionDefinition<TSchema> {
+  return {
+    type: "option",
+    schema,
+  };
+}
+
+export type AffFlagDefinition = AffNamedInputDeclaration<
+  "flag",
+  StandardSchemaV1<unknown, boolean>
+>;
+
+export function flag(): AffFlagDefinition {
+  return {
+    type: "flag",
+    schema: z.boolean().default(false),
+  };
 }
 
 export type AffArgumentDefinition<
   TKey extends string = string,
-  TSchema extends ZodTypeAny = ZodTypeAny,
+  TSchema extends StandardSchemaV1 = StandardSchemaV1,
 > = readonly [TKey, TSchema];
 
 export type AffArgumentsDefinition = readonly AffArgumentDefinition[];
 
-interface AffNamedInputDeclaration<TType extends "option" | "flag", TSchema extends ZodTypeAny> {
-  type: TType;
-  schema: TSchema;
-}
-
-export type AffOptionDefinition<TSchema extends ZodTypeAny = ZodTypeAny> = AffNamedInputDeclaration<
-  "option",
-  TSchema
->;
-
-export type AffFlagDefinition = AffNamedInputDeclaration<"flag", z.ZodDefault<z.ZodBoolean>>;
-
-export type AffNamedInputDefinition = AffOptionDefinition | AffFlagDefinition | ZodTypeAny;
+export type AffNamedInputDefinition = AffOptionDefinition | AffFlagDefinition | StandardSchemaV1;
 
 export type AffOptionsDefinition = Record<string, AffNamedInputDefinition>;
 
-export interface AffInputDefinition<TOutput = unknown> {
+export type AffInputDefinition<TOutput = unknown> = {
   arguments: AffArgumentsDefinition;
   options: AffOptionsDefinition;
-}
-
-type InferArguments<TArguments extends AffArgumentsDefinition> = {
-  [TArgument in TArguments[number] as TArgument[0]]: z.output<TArgument[1]>;
 };
-
-type SchemaForOption<TOption> =
-  TOption extends AffNamedInputDeclaration<"option" | "flag", infer TSchema>
-    ? TSchema
-    : TOption extends ZodTypeAny
-      ? TOption
-      : never;
-
-type InferOptions<TOptions extends AffOptionsDefinition> = {
-  [K in keyof TOptions]: z.output<SchemaForOption<TOptions[K]>>;
-};
-
-export type AffInputFor<
-  TArguments extends AffArgumentsDefinition,
-  TOptions extends AffOptionsDefinition,
-> = InferArguments<TArguments> & InferOptions<TOptions>;
 
 export function createInputDefinition<TOutput = unknown>(
   args: AffArgumentsDefinition,
@@ -63,34 +56,38 @@ export function createInputDefinition<TOutput = unknown>(
   };
 }
 
-export function option<TSchema extends ZodTypeAny>(schema: TSchema): AffOptionDefinition<TSchema> {
-  return {
-    type: "option",
-    schema,
-  };
-}
+type InferSchemaOutput<TSchema extends StandardSchemaV1> = StandardSchemaV1.InferOutput<TSchema>;
 
-export function flag(): AffFlagDefinition {
-  return {
-    type: "flag",
-    schema: z.boolean().default(false),
-  };
-}
+type InferArguments<TArguments extends AffArgumentsDefinition> = {
+  [TArgument in TArguments[number] as TArgument[0]]: InferSchemaOutput<TArgument[1]>;
+};
 
-export function parseInput<TOutput>(
+type SchemaForOption<TOption> =
+  TOption extends AffNamedInputDeclaration<"option" | "flag", infer TSchema>
+    ? TSchema
+    : TOption extends StandardSchemaV1
+      ? TOption
+      : never;
+
+type InferOptions<TOptions extends AffOptionsDefinition> = {
+  [K in keyof TOptions]: InferSchemaOutput<SchemaForOption<TOptions[K]>>;
+};
+
+export type AffInputFor<
+  TArguments extends AffArgumentsDefinition,
+  TOptions extends AffOptionsDefinition,
+> = InferArguments<TArguments> & InferOptions<TOptions>;
+
+export type AffInputRaw = {
+  arguments: readonly unknown[];
+  options: Readonly<Record<string, unknown>>;
+};
+
+export async function parseInput<TOutput>(
   definition: AffInputDefinition<TOutput>,
   rawInput: AffInputRaw,
   commandName?: string,
-): TOutput {
-  const input = buildSchemaInput(definition, rawInput, commandName);
-  return parseSchemaInput(definition, input);
-}
-
-function buildSchemaInput(
-  definition: AffInputDefinition,
-  rawInput: AffInputRaw,
-  commandName: string | undefined,
-): Record<string, unknown> {
+): Promise<TOutput> {
   if (rawInput.arguments.length > definition.arguments.length) {
     throw new Error(
       commandName ? `Unexpected arguments for ${commandName}.` : "Unexpected arguments.",
@@ -99,32 +96,64 @@ function buildSchemaInput(
 
   const input: Record<string, unknown> = {};
 
-  definition.arguments.forEach(([key], index) => {
-    input[key] = rawInput.arguments[index];
-  });
-
-  for (const key of Object.keys(definition.options)) {
-    input[key] = undefined;
+  for (const [index, [key, schema]] of definition.arguments.entries()) {
+    const value = rawInput.arguments[index];
+    input[key] = await validateInputValue(schema, value, `Missing required argument <${key}>.`);
   }
 
-  for (const [key, value] of Object.entries(rawInput.options)) {
-    const optionDefinition = definition.options[key];
-    if (!optionDefinition) {
+  for (const key of Object.keys(rawInput.options)) {
+    if (!Object.hasOwn(definition.options, key)) {
       throw new Error(`Unknown option: --${key}`);
     }
-
-    input[key] = normalizeOptionValue(key, optionDefinition, value);
   }
 
-  return input;
+  for (const [key, optionDefinition] of Object.entries(definition.options)) {
+    const optionWasProvided = Object.hasOwn(rawInput.options, key);
+    const value = resolveNamedInputValue(
+      key,
+      optionDefinition,
+      rawInput.options[key],
+      optionWasProvided,
+    );
+    input[key] = await validateInputValue(
+      getOptionSchema(optionDefinition),
+      value,
+      `Missing required option --${key}.`,
+    );
+  }
+
+  return input as TOutput;
 }
 
-function normalizeOptionValue(
+async function validateInputValue(
+  schema: StandardSchemaV1,
+  value: unknown,
+  missingError: string,
+): Promise<unknown> {
+  const result = await schema["~standard"].validate(value);
+
+  if ("value" in result) {
+    return result.value;
+  }
+
+  if (value === undefined) {
+    throw new Error(missingError);
+  }
+
+  throw new Error(result.issues.map((issue) => issue.message).join("\n"));
+}
+
+function resolveNamedInputValue(
   key: string,
   optionDefinition: AffNamedInputDefinition,
   value: unknown,
+  optionWasProvided: boolean,
 ): unknown {
-  if (isFlagDefinition(optionDefinition)) {
+  if ("type" in optionDefinition && optionDefinition.type === "flag") {
+    if (!optionWasProvided) {
+      return undefined;
+    }
+
     if (value === undefined) {
       return true;
     }
@@ -138,79 +167,21 @@ function normalizeOptionValue(
     }
 
     throw new Error(`Invalid value for --${key}: expected true or false.`);
-  }
-
-  if (value === undefined) {
+  } else if (optionWasProvided && value === undefined) {
     throw new Error(`Missing value for --${key}.`);
-  }
-
-  return value;
-}
-
-function parseSchemaInput<TOutput>(
-  definition: AffInputDefinition<TOutput>,
-  input: Record<string, unknown>,
-): TOutput {
-  const schema = z.object(buildInputShape(definition));
-  validateRequiredInput(definition, input);
-  const result = schema.safeParse(input);
-
-  if (!result.success) {
-    throw new Error(z.prettifyError(result.error));
-  }
-
-  return result.data as TOutput;
-}
-
-function validateRequiredInput(
-  definition: AffInputDefinition,
-  normalized: Record<string, unknown>,
-): void {
-  for (const [key, schema] of definition.arguments) {
-    if (normalized[key] === undefined && !schema.safeParse(undefined).success) {
-      throw new Error(`Missing required argument <${key}>.`);
-    }
-  }
-
-  for (const [key, optionDefinition] of Object.entries(definition.options)) {
-    const schema = getOptionSchema(optionDefinition);
-    if (normalized[key] === undefined && !schema.safeParse(undefined).success) {
-      throw new Error(`Missing required option --${key}.`);
-    }
+  } else {
+    return value;
   }
 }
 
-function buildInputShape(definition: AffInputDefinition): Record<string, ZodTypeAny> {
-  const shape: Record<string, ZodTypeAny> = {};
-
-  for (const [key, schema] of definition.arguments) {
-    shape[key] = schema;
-  }
-  for (const [key, optionDefinition] of Object.entries(definition.options)) {
-    shape[key] = getOptionSchema(optionDefinition);
-  }
-
-  return shape;
-}
-
-function getOptionSchema(optionDefinition: AffNamedInputDefinition): ZodTypeAny {
-  if (isNamedInputDeclaration(optionDefinition)) {
+function getOptionSchema(optionDefinition: AffNamedInputDefinition): StandardSchemaV1 {
+  if (
+    "type" in optionDefinition &&
+    (optionDefinition.type === "option" || optionDefinition.type === "flag") &&
+    "schema" in optionDefinition
+  ) {
     return optionDefinition.schema;
   }
 
   return optionDefinition;
-}
-
-function isFlagDefinition(value: AffNamedInputDefinition): value is AffFlagDefinition {
-  return isRecord(value) && value.type === "flag" && "schema" in value;
-}
-
-function isNamedInputDeclaration(
-  value: AffNamedInputDefinition,
-): value is AffOptionDefinition | AffFlagDefinition {
-  return isRecord(value) && (value.type === "option" || value.type === "flag") && "schema" in value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
