@@ -10,7 +10,8 @@ const TELEMETRY_ENDPOINT_PATH = "/v1/telemetry/recordCliEvent";
 const TELEMETRY_TIMEOUT_MS = 250;
 
 type StoredTelemetryState = {
-  installId: string;
+  installId?: string;
+  enabled?: boolean;
 };
 
 type CliTelemetryPayload = {
@@ -29,23 +30,45 @@ function telemetryPath(): string {
 }
 
 function isTelemetryDisabled(): boolean {
-  return process.env.LIBRETTO_TELEMETRY_DISABLED === "1";
+  return (
+    process.env.LIBRETTO_TELEMETRY_DISABLED === "1" ||
+    process.env.DO_NOT_TRACK === "1" ||
+    process.env.CI === "1"
+  );
 }
 
-async function readOrCreateInstallId(): Promise<string> {
+async function readTelemetryState(): Promise<StoredTelemetryState | null> {
   try {
     const raw = await fs.readFile(telemetryPath(), "utf8");
-    const parsed = JSON.parse(raw) as Partial<StoredTelemetryState>;
-    if (typeof parsed.installId === "string" && parsed.installId.length > 0) {
-      return parsed.installId;
-    }
+    return JSON.parse(raw) as Partial<StoredTelemetryState>;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return null;
+  }
+}
+
+async function readOrCreateInstallId(): Promise<string | null> {
+  const state = await readTelemetryState();
+  if (state?.enabled === false) return null;
+
+  if (typeof state?.installId === "string" && state.installId.length > 0) {
+    return state.installId;
   }
 
   const installId = randomUUID();
-  await writeTelemetryState({ installId });
+  writeTelemetryNotice();
+  await writeTelemetryState({ installId, enabled: true });
   return installId;
+}
+
+function writeTelemetryNotice(): void {
+  if (!process.stderr.isTTY) return;
+  process.stderr.write(
+    [
+      "Libretto collects anonymous CLI telemetry: install id, timestamp, command event, and error status only.",
+      "Set LIBRETTO_TELEMETRY_DISABLED=1 or DO_NOT_TRACK=1 to disable it, or set enabled:false in ~/.libretto/telemetry.json.",
+    ].join(" ") + "\n",
+  );
 }
 
 async function writeTelemetryState(state: StoredTelemetryState): Promise<void> {
@@ -61,9 +84,11 @@ async function recordCliTelemetryEvent(
   error: boolean,
 ): Promise<void> {
   if (isTelemetryDisabled()) return;
+  const installId = await readOrCreateInstallId();
+  if (!installId) return;
 
   await sendWithTimeout({
-    installId: await readOrCreateInstallId(),
+    installId,
     timestamp: new Date().toISOString(),
     event: `libretto ${command.path.join(" ")}`,
     error,

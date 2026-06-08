@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test as base } from "./fixtures.js";
 
@@ -47,6 +49,9 @@ describe("CLI telemetry", () => {
     const result = await librettoCli("status", {
       HOME: workspacePath("home"),
       LIBRETTO_API_URL: telemetryServer.url,
+      LIBRETTO_TELEMETRY_DISABLED: undefined,
+      DO_NOT_TRACK: undefined,
+      CI: undefined,
     });
 
     expect(result.stdout).toContain("No open sessions.");
@@ -71,6 +76,9 @@ describe("CLI telemetry", () => {
     const result = await librettoCli("pages --session missing", {
       HOME: workspacePath("home"),
       LIBRETTO_API_URL: telemetryServer.url,
+      LIBRETTO_TELEMETRY_DISABLED: undefined,
+      DO_NOT_TRACK: undefined,
+      CI: undefined,
     });
 
     expect(result.stderr).toContain('No session "missing" found.');
@@ -95,6 +103,9 @@ describe("CLI telemetry", () => {
     const env = {
       HOME: workspacePath("home"),
       LIBRETTO_API_URL: telemetryServer.url,
+      LIBRETTO_TELEMETRY_DISABLED: undefined,
+      DO_NOT_TRACK: undefined,
+      CI: undefined,
     };
 
     await librettoCli("", env);
@@ -112,10 +123,64 @@ describe("CLI telemetry", () => {
     const result = await librettoCli("status", {
       HOME: workspacePath("home"),
       LIBRETTO_API_URL: await closedServerUrl(),
+      LIBRETTO_TELEMETRY_DISABLED: undefined,
+      DO_NOT_TRACK: undefined,
+      CI: undefined,
     });
 
     expect(result.stdout).toContain("No open sessions.");
     expect(result.stderr).toBe("");
+  });
+
+  test("respects environment opt-out controls", async ({
+    librettoCli,
+    telemetryServer,
+    workspacePath,
+  }) => {
+    const optOuts: Record<string, Record<string, string>> = {
+      libretto: { LIBRETTO_TELEMETRY_DISABLED: "1" },
+      doNotTrack: { DO_NOT_TRACK: "1" },
+      ci: { CI: "1" },
+    };
+
+    for (const [name, optOut] of Object.entries(optOuts)) {
+      const result = await librettoCli("status", {
+        HOME: workspacePath(`home-${name}`),
+        LIBRETTO_API_URL: telemetryServer.url,
+        LIBRETTO_TELEMETRY_DISABLED: undefined,
+        DO_NOT_TRACK: undefined,
+        CI: undefined,
+        ...optOut,
+      });
+      expect(result.stdout).toContain("No open sessions.");
+    }
+
+    expect(telemetryServer.requests).toHaveLength(0);
+  });
+
+  test("respects persistent opt-out in telemetry state", async ({
+    librettoCli,
+    telemetryServer,
+    workspacePath,
+  }) => {
+    const home = workspacePath("home-persistent-disabled");
+    const stateDir = join(home, ".libretto");
+    await mkdir(stateDir, { recursive: true });
+    await writeFile(
+      join(stateDir, "telemetry.json"),
+      JSON.stringify({ enabled: false }, null, 2),
+    );
+
+    const result = await librettoCli("status", {
+      HOME: home,
+      LIBRETTO_API_URL: telemetryServer.url,
+      LIBRETTO_TELEMETRY_DISABLED: undefined,
+      DO_NOT_TRACK: undefined,
+      CI: undefined,
+    });
+
+    expect(result.stdout).toContain("No open sessions.");
+    expect(telemetryServer.requests).toHaveLength(0);
   });
 });
 

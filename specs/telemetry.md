@@ -54,7 +54,8 @@ Rules:
 - `event` is derived only from the resolved command path, such as `libretto run` or `libretto cloud auth login`.
 - `error` is `true` when resolved-command middleware or the command handler throws and `false` otherwise.
 - Help/version/root-help invocations and unknown-command parse failures do not need telemetry in v1 because they do not resolve to a command handler.
-- `LIBRETTO_TELEMETRY_DISABLED=1` disables install-id creation and event sending.
+- `LIBRETTO_TELEMETRY_DISABLED=1`, `DO_NOT_TRACK=1`, `CI=1`, and `~/.libretto/telemetry.json` with `"enabled": false` disable install-id creation and event sending.
+- Libretto prints a one-time notice in interactive terminals when it creates the first install id.
 - The hosted API must not store auth headers, IP addresses, user agents, request paths beyond the route, or raw request bodies for this endpoint. Normal Cloud Run access logs may still exist outside this application table.
 
 ## Important files/docs/websites for implementation
@@ -190,7 +191,8 @@ async function recordCliTelemetryEvent(
 - [x] Update imports in `packages/libretto/src/cli/commands/execution.ts`, `packages/libretto/src/cli/core/daemon/daemon.ts`, and any other references to the renamed browser-log module.
 - [x] Create a new `packages/libretto/src/cli/core/telemetry.ts` for anonymous CLI telemetry.
 - [x] Store the install id at `~/.libretto/telemetry.json` using an atomic temp-file write and mode `0600`, matching the auth-storage style.
-- [x] Implement `LIBRETTO_TELEMETRY_DISABLED=1` so disabled telemetry does not create the install-id file.
+- [x] Implement `LIBRETTO_TELEMETRY_DISABLED=1`, `DO_NOT_TRACK=1`, `CI=1`, and persistent `"enabled": false` opt-outs so disabled telemetry does not create the install-id file.
+- [x] Print a one-time interactive notice when Libretto creates the first install id.
 - [x] Send to `${resolveHostedApiUrl()}/v1/telemetry/recordCliEvent` with the ORPC JSON envelope, no auth headers, and a short timeout, for example 250 ms.
 - [x] Catch and ignore all telemetry errors so command behavior is unchanged when the network is offline or the hosted API fails.
 - [x] Skip unit coverage for this phase per implementation direction.
@@ -229,6 +231,6 @@ Document the anonymous telemetry behavior near the README configuration or CLI u
   - [x] the exact collected fields: install id, timestamp, command event, error boolean,
   - [x] examples of excluded data: command args, URLs, project paths, auth state, API keys, user identity,
   - [x] the install id location: `~/.libretto/telemetry.json`,
-  - [x] the opt-out: `LIBRETTO_TELEMETRY_DISABLED=1`.
+  - [x] the opt-outs: `LIBRETTO_TELEMETRY_DISABLED=1`, `DO_NOT_TRACK=1`, `CI=1`, and `"enabled": false` in `~/.libretto/telemetry.json`.
 - [x] Run `pnpm sync:mirrors` so generated READMEs stay in sync.
 - [x] Verify `pnpm check:mirrors` passes.
