@@ -90,11 +90,16 @@ Telemetry needs two affordance capabilities:
 
 ```ts
 // packages/affordance/src/index.ts
-export type SimpleCLIMiddleware<TInput, TContextIn, TContextOut> = (
+export type SimpleCLIMiddleware<
+  TInput,
+  TContextIn,
+  TContextOut,
+  TResult = void | TContextOut,
+> = (
   args: SimpleCLIMiddlewareArgs<TInput, TContextIn> & {
     next: (options?: { ctx?: Partial<TContextOut> }) => Promise<unknown>;
   },
-) => Promise<unknown> | unknown;
+) => TResult | Promise<TResult>;
 
 type SimpleCLIAppConfig = {
   globalNamed?: SimpleCLINamedDefinition;
@@ -103,13 +108,13 @@ type SimpleCLIAppConfig = {
 };
 ```
 
-- [ ] Add a `next()` function to middleware args and compose middleware so a caller can run before and after `await next()`.
-- [ ] Ensure `next()` rejects with downstream handler errors unless an intermediate middleware catches them.
-- [ ] Ensure middleware can inject downstream context with `next({ ctx })`.
-- [ ] Preserve existing legacy middleware behavior where returning a context object without calling `next()` merges that context and continues to the next middleware or handler.
-- [ ] Add `middlewares` to `SimpleCLI.define()` config and run those app-level middlewares only after a command route resolves, before route-tree middleware.
-- [ ] Do not add unrelated affordance v2 features, new routing APIs, or a separate around-middleware API.
-- [ ] Verify `pnpm -s --filter affordance test` passes.
+- [x] Add a `next()` function to middleware args and compose middleware so a caller can run before and after `await next()`.
+- [x] Ensure `next()` rejects with downstream handler errors unless an intermediate middleware catches them.
+- [x] Ensure middleware can inject downstream context with `next({ ctx })`.
+- [x] Preserve existing legacy middleware behavior where returning a context object without calling `next()` merges that context and continues to the next middleware or handler.
+- [x] Add `middlewares` to `SimpleCLI.define()` config and run those app-level middlewares only after a command route resolves, before route-tree middleware.
+- [x] Do not add unrelated affordance v2 features, new routing APIs, or a separate around-middleware API.
+- [x] Verify `pnpm -s --filter affordance test` passes.
 
 ### Phase 2: Add hosted anonymous telemetry ingestion
 

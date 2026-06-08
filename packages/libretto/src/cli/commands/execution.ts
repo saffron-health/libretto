@@ -54,6 +54,7 @@ import type { Experiments } from "../core/experiments.js";
 import { SimpleCLI } from "affordance";
 import {
   pageOption,
+  type SessionContext,
   sessionOption,
   withAutoSession,
   withExperiments,
@@ -865,7 +866,7 @@ export const runCommand = SimpleCLI.command({
 })
   .input(runInput)
   .use(withAutoSession())
-  .use(withExperiments())
+  .use(withExperiments<SessionContext>())
   .handle(async ({ input, ctx }) => {
     warnIfLibrettoVersionsDiffer();
     await stopExistingFailedRunSession(ctx.session, ctx.logger);
