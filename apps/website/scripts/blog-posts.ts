@@ -12,17 +12,38 @@ const REQUIRED_FRONTMATTER_FIELDS = [
   "readingTime",
 ];
 
-function parseFrontmatterValue(rawValue) {
+export type BlogPostInput = {
+  slug: string;
+  title: string;
+  description: string;
+  publishedAt: string;
+  readingTime: string;
+  markdown: string;
+  ogImage: string;
+};
+
+export type BlogPost = BlogPostInput & {
+  mdast: ReturnType<typeof mdxParse>;
+};
+
+function parseFrontmatterValue(rawValue: string): string {
   const value = rawValue.trim();
 
   if (value.startsWith('"')) {
-    return JSON.parse(value);
+    const parsedValue: unknown = JSON.parse(value);
+    if (typeof parsedValue !== "string") {
+      throw new Error(`Expected frontmatter value to parse as a string`);
+    }
+    return parsedValue;
   }
 
   return value;
 }
 
-function parseFrontmatter(filePath, source) {
+function parseFrontmatter(
+  filePath: string,
+  source: string,
+): { frontmatter: Record<string, string>; markdown: string } {
   const normalizedSource = source.replace(/\r\n/g, "\n");
 
   if (!normalizedSource.startsWith("---\n")) {
@@ -36,7 +57,7 @@ function parseFrontmatter(filePath, source) {
     );
   }
 
-  const frontmatter = {};
+  const frontmatter: Record<string, string> = {};
   const frontmatterSource = normalizedSource.slice(4, frontmatterEnd);
   for (const line of frontmatterSource.split("\n")) {
     if (line.trim() === "") {
@@ -69,7 +90,7 @@ function parseFrontmatter(filePath, source) {
   };
 }
 
-function readBlogPost(fileName, source) {
+function readBlogPost(fileName: string, source: string): BlogPostInput {
   const slug = basename(fileName, extname(fileName));
   const { frontmatter, markdown } = parseFrontmatter(fileName, source);
 
@@ -84,7 +105,7 @@ function readBlogPost(fileName, source) {
   };
 }
 
-export async function loadBlogPostInputs() {
+export async function loadBlogPostInputs(): Promise<BlogPostInput[]> {
   const fileNames = (await readdir(POSTS_DIR)).filter((fileName) =>
     fileName.endsWith(".md"),
   );
@@ -104,7 +125,7 @@ export async function loadBlogPostInputs() {
   return posts;
 }
 
-export async function loadBlogPosts() {
+export async function loadBlogPosts(): Promise<BlogPost[]> {
   const posts = await loadBlogPostInputs();
 
   return posts.map((post) => ({

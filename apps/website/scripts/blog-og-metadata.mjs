@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadBlogPostInputs } from "./blog-posts.mjs";
+import { loadBlogPostInputs } from "./blog-posts.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const WEBSITE_DIR = resolve(SCRIPT_DIR, "..");

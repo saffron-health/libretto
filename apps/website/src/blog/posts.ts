@@ -1,6 +1,6 @@
 import { comptime } from "comptime.ts" with { type: "comptime" };
-import { loadBlogPosts } from "../../scripts/blog-posts.mjs" with { type: "comptime" };
-import type { BlogPost } from "../../scripts/blog-posts.mjs";
+import { loadBlogPosts } from "../../scripts/blog-posts.ts" with { type: "comptime" };
+import type { BlogPost } from "../../scripts/blog-posts.ts";
 
 export const BLOG_POSTS = comptime(loadBlogPosts()) satisfies BlogPost[];
 

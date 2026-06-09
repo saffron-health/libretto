@@ -16,7 +16,7 @@ import {
   serializeJsonLd,
 } from "./jsonLd";
 import { BLOG_POSTS, getBlogPost } from "./posts";
-import type { BlogPost } from "../../scripts/blog-posts.mjs";
+import type { BlogPost } from "../../scripts/blog-posts.ts";
 
 const BLOG_LOGO = String.raw`
  ██████╗ ██╗      ██████╗  ██████╗
