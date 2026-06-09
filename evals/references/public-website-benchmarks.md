@@ -91,7 +91,7 @@ pnpm exec libretto run generated-workflow.ts --headless
 
 ## Scoring
 
-Each public website case has two scoring criteria:
+Each public website case has two baseline scoring criteria:
 
 - Live page evidence: the agent reached the requested website or task area,
   performed the requested search or lookup, and returned a plausible answer
@@ -100,13 +100,19 @@ Each public website case has two scoring criteria:
   access-denied pages, 403 pages, unusual traffic pages, or similar anti-bot
   states after waiting and checking the intended site again.
 
+Libretto agent runs have one additional scoring criterion:
+
+- Workflow creation and validation: the assistant created the requested
+  reusable Libretto workflow file at the exact path from the prompt and
+  attempted the requested headless validation command for that workflow.
+
 The score is informational. Failed criteria are recorded in artifacts and
 summaries. The eval command fails only when setup, execution, or result
 collection fails.
 
 The infrastructure classification is derived from the score:
 
-- `clean-pass` means both criteria passed.
+- `clean-pass` means all criteria for that run passed.
 - `anti-bot-failure` means the anti-bot criterion failed.
 - `ordinary-failure` means another scoring criterion failed.
 

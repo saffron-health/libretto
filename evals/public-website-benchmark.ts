@@ -124,24 +124,6 @@ export const WEBSITE_EVALS: WebsiteEval[] = [
   },
 ];
 
-export const ANTI_BOT_CLEAN_WEBSITE_EVAL_NAMES = new Set([
-  "airbnb austin next weekend search",
-  "amazon wireless mouse search",
-  "apple newest iphone lookup",
-  "best buy headphones search",
-  "craigslist used bikes search",
-  "github playwright repo stats",
-  "hacker news browser automation search",
-  "linkedin public job search",
-  "mdn array map lookup",
-  "pypi requests package lookup",
-  "quotes to scrape einstein quote",
-  "target coffee maker search",
-  "uber eats sf sushi search",
-  "wikipedia olympics medal table lookup",
-  "youtube playwright tutorial search",
-]);
-
 const LIVE_PAGE_EVIDENCE_CRITERION =
   "The agent used the selected browser automation agent to reach the requested website or task area, perform the requested search or lookup, and return a plausible answer grounded in live page evidence. Be lenient about ambiguous result choice, sorting, availability, prices, or dynamic website content. Mark false if the run used the wrong website or task area, could not access the relevant page due to browser/provider issues, or returned an answer without evidence from the live page.";
 const ANTI_BOT_CRITERION =
