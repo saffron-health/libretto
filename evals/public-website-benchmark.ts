@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { appendFile, cp, mkdir, writeFile } from "node:fs/promises";
+import { appendFile, access, cp, mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { evalCase } from "./eval-case.js";
 import type { EvalAgentName } from "./agents.js";
@@ -146,6 +146,15 @@ const LIVE_PAGE_EVIDENCE_CRITERION =
   "The agent used the selected browser automation agent to reach the requested website or task area, perform the requested search or lookup, and return a plausible answer grounded in live page evidence. Be lenient about ambiguous result choice, sorting, availability, prices, or dynamic website content. Mark false if the run used the wrong website or task area, could not access the relevant page due to browser/provider issues, or returned an answer without evidence from the live page.";
 const ANTI_BOT_CRITERION =
   "Mark false if the run encountered or reported an anti-bot block, including CAPTCHA, challenge, human verification, bot check, Access Denied, permission denied, blocked, 403/Forbidden, unusual traffic, or bot-detection pages, and the block was still present after the agent waited up to 3 minutes and checked the same intended site again. Mark false if the agent worked around an anti-bot block by opening another page, session, search result, mirror, API, cached copy, or fallback source. Mark true for a challenge if the configured browser provider visibly solved it automatically within the 3-minute wait and the agent continued directly on the intended site from that solved page.";
+const LIBRETTO_WORKFLOW_CRITERION =
+  "For Libretto agent runs, the assistant created the requested reusable Libretto workflow file at the exact path from the prompt and attempted the requested headless validation command for that workflow.";
+
+function criteriaForAgent(agentName: EvalAgentName): string[] {
+  const criteria = [LIVE_PAGE_EVIDENCE_CRITERION, ANTI_BOT_CRITERION];
+  return agentName === "libretto"
+    ? [...criteria, LIBRETTO_WORKFLOW_CRITERION]
+    : criteria;
+}
 
 function infraClassificationForScore(
   score: EvalScore,
@@ -206,6 +215,37 @@ async function copyGeneratedWorkflow(workflowPath: string): Promise<void> {
   if (!paths) return;
   const targetPath = join(dirname(paths.transcript), "generated-workflow.ts");
   await cp(workflowPath, targetPath, { force: true });
+}
+
+async function copyGeneratedWorkflowIfPresent(workflowPath: string): Promise<void> {
+  try {
+    await access(workflowPath);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      const paths = getEvalArtifactPaths();
+      const timestamp = new Date().toISOString();
+      await appendArtifact(
+        paths?.transcript,
+        `${JSON.stringify({
+          timestamp,
+          source: "harness",
+          event: { type: "missing_generated_workflow", workflowPath },
+        })}\n`,
+      );
+      await appendArtifact(
+        paths?.transcriptMarkdown,
+        [
+          "## Missing generated workflow",
+          "",
+          `Expected workflow file was not found: ${workflowPath}`,
+          "",
+        ].join("\n"),
+      );
+      return;
+    }
+    throw error;
+  }
+  await copyGeneratedWorkflow(workflowPath);
 }
 
 function generatedWorkflowForCachedRun(): string {
@@ -372,7 +412,7 @@ export function registerWebsiteEvalCases(websiteEvals: WebsiteEval[]): void {
   for (const websiteEval of websiteEvals) {
     evalCase({ name: websiteEval.name }, async (context) => {
       const { agent } = context;
-      const criteria = [LIVE_PAGE_EVIDENCE_CRITERION, ANTI_BOT_CRITERION];
+      const criteria = criteriaForAgent(agent.name);
 
       if (agent.name === "libretto-cached") {
         const sourceWorkflowPath = generatedWorkflowForCachedRun();
@@ -409,7 +449,7 @@ export function registerWebsiteEvalCases(websiteEvals: WebsiteEval[]): void {
       );
 
       if (agent.name === "libretto") {
-        await copyGeneratedWorkflow(workflowPath);
+        await copyGeneratedWorkflowIfPresent(workflowPath);
       }
 
       const score = await response.score(criteria);

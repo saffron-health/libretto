@@ -31,10 +31,6 @@ but it measures the cached automation path that Libretto is designed to enable.
 - `evals/public-website-benchmark.ts` contains the shared task list, scoring
   criteria, agent prompts, cached workflow replay, and registration helper.
 - `evals/public-websites.eval.ts` registers all public website tasks.
-- `evals/anti-bot-public-websites.eval.ts` registers the subset that previously
-  did not show clear anti-bot failures.
-- `evals/captcha-public-websites-smoke.eval.ts` registers a small smoke subset
-  that previously encountered CAPTCHA or anti-bot pages.
 - `evals/agents.ts` implements the `libretto`, `libretto-cached`, and
   `browser-use` agent adapters.
 - `evals/browser-use-runner.py` runs Browser Use and writes normalized JSON
@@ -204,12 +200,6 @@ Run the full suite on Cloud Run:
 
 ```bash
 pnpm evals public-websites.eval.ts --agents libretto,libretto-cached,browser-use --provider steel --concurrency 20 --gcp
-```
-
-Run the anti-bot-clean subset:
-
-```bash
-pnpm evals anti-bot-public-websites.eval.ts --agents libretto,libretto-cached,browser-use --provider steel --concurrency 10 --gcp
 ```
 
 Reuse an existing image instead of building a new image:
