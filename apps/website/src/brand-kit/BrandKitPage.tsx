@@ -824,10 +824,9 @@ function compositeSkippedCanvases(
   const exportRect = exportNode.getBoundingClientRect();
   for (const skippedCanvas of exportNode.querySelectorAll("canvas")) {
     const canvasRect = skippedCanvas.getBoundingClientRect();
-    const style = getComputedStyle(skippedCanvas);
     context.save();
     context.globalAlpha = opacityBetween(exportNode, skippedCanvas);
-    context.filter = style.filter === "none" ? "none" : style.filter;
+    context.filter = filterBetween(exportNode, skippedCanvas);
     context.drawImage(
       skippedCanvas,
       canvasRect.left - exportRect.left,
@@ -837,6 +836,19 @@ function compositeSkippedCanvases(
     );
     context.restore();
   }
+}
+
+function filterBetween(root: HTMLElement, element: HTMLElement) {
+  const filters: string[] = [];
+  let current: HTMLElement | null = element;
+  while (current && current !== root.parentElement) {
+    const filter = getComputedStyle(current).filter;
+    if (filter !== "none") {
+      filters.push(filter);
+    }
+    current = current.parentElement;
+  }
+  return filters.length > 0 ? filters.join(" ") : "none";
 }
 
 function opacityBetween(root: HTMLElement, element: HTMLElement) {
