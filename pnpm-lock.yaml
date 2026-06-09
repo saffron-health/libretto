@@ -93,6 +93,9 @@ importers:
       '@types/mdast':
         specifier: ^4.0.4
         version: 4.0.4
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
       '@types/prismjs':
         specifier: ^1.26.6
         version: 1.26.6

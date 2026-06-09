@@ -36,6 +36,7 @@
     "@ai-sdk/google-vertex": "^4.0.95",
     "@tweakpane/core": "^2.0.5",
     "@types/mdast": "^4.0.4",
+    "@types/node": "^25.5.0",
     "@types/prismjs": "^1.26.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
