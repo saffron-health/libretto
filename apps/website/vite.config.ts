@@ -1,10 +1,14 @@
 import { defineConfig } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { comptime } from "comptime.ts/vite";
 import { fileURLToPath } from "node:url";
 
+const comptimePlugin = await comptime();
+
 export default defineConfig({
-  plugins: [tailwindcss(), react()],
+  plugins: [comptimePlugin, tailwindcss(), react()],
+  optimizeDeps: { exclude: ["comptime.ts"] },
   server: { allowedHosts: ["codybot.exe.xyz", "cody.tail14d4f7.ts.net"] },
   build: {
     rollupOptions: {

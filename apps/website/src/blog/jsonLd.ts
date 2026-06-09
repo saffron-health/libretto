@@ -1,4 +1,4 @@
-import type { BlogPost } from "./posts";
+import type { BlogPost } from "../../scripts/blog-posts.ts";
 
 type JsonPrimitive = string | number | boolean | null;
 type JsonObject = { [key: string]: JsonValue | undefined };
