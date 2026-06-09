@@ -5,8 +5,8 @@ import { stdin as input, stdout as output } from "node:process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createLoggerForSession } from "../packages/libretto/src/cli/core/context.js";
+import { getProfilePath } from "../packages/libretto/src/cli/core/profiles.js";
 import {
-  getProfilePath,
   normalizeDomain,
   normalizeUrl,
   runClose,
