@@ -2,9 +2,9 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { loadBlogPostInputs } from "./blog-posts.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const postsPath = join(root, "src", "blog", "posts.ts");
 const brandPath = join(root, "src", "brand.tsx");
 const outputRoot = join(root, "public", "blog");
 const brandSource = readFileSync(brandPath, "utf8");
@@ -22,23 +22,6 @@ const asciihedronDataUri = `data:image/png;base64,${paperAsciihedronImage.toStri
 const logoDataUri = `data:image/png;base64,${paperLogoImage.toString("base64")}`;
 const serifFontDataUri = `data:font/truetype;base64,${serifFont.toString("base64")}`;
 const monoFontDataUri = `data:font/woff2;base64,${monoFont.toString("base64")}`;
-
-function readPosts() {
-  const source = readFileSync(postsPath, "utf8");
-  const blocks = source.matchAll(/createBlogPost\(\{([\s\S]*?)\n  \}\),/g);
-
-  return [...blocks].map((match) => {
-    const block = match[1];
-    const slug = block.match(/slug:\s*"([^"]+)"/)?.[1];
-    const title = block.match(/title:\s*"([^"]+)"/)?.[1];
-
-    if (!slug || !title) {
-      throw new Error("Unable to parse blog post slug/title for OG image generation.");
-    }
-
-    return { slug, title };
-  });
-}
 
 function renderOgHtml(post) {
   return `<!doctype html>
@@ -200,7 +183,7 @@ const page = await browser.newPage({
   viewport: { height: OG_HEIGHT, width: OG_WIDTH },
 });
 
-for (const post of readPosts()) {
+for (const post of await loadBlogPostInputs()) {
   const outputDir = join(outputRoot, post.slug);
   mkdirSync(outputDir, { recursive: true });
   await page.setContent(renderOgHtml(post), { waitUntil: "load" });

@@ -21,6 +21,7 @@
     "@orama/orama": "^3.1.18",
     "@tailwindcss/vite": "^4.2.2",
     "classnames": "^2.5.1",
+    "comptime.ts": "^0.8.1",
     "motion": "^12.38.0",
     "prismjs": "^1.30.0",
     "react": "^19.2.4",

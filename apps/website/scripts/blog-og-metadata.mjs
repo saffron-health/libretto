@@ -1,68 +1,19 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import { loadBlogPostInputs } from "./blog-posts.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const WEBSITE_DIR = resolve(SCRIPT_DIR, "..");
-const POSTS_PATH = join(WEBSITE_DIR, "src/blog/posts.ts");
 const PUBLIC_DIR = join(WEBSITE_DIR, "public");
 const DIST_DIR = join(WEBSITE_DIR, "dist");
 const SITE_URL = "https://libretto.sh";
 
-function readStringProperty(objectLiteral, name) {
-  const property = objectLiteral.properties.find((candidate) => {
-    return (
-      ts.isPropertyAssignment(candidate) &&
-      ts.isIdentifier(candidate.name) &&
-      candidate.name.text === name
-    );
-  });
-
-  if (!property || !ts.isPropertyAssignment(property)) {
-    throw new Error(`Missing ${name} property in blog post`);
-  }
-
-  const initializer = property.initializer;
-  if (ts.isStringLiteral(initializer) || ts.isNoSubstitutionTemplateLiteral(initializer)) {
-    return initializer.text;
-  }
-
-  throw new Error(`Expected ${name} to be a string literal`);
-}
-
-function readBlogPosts() {
-  const sourceText = readFileSync(POSTS_PATH, "utf8");
-  const sourceFile = ts.createSourceFile(POSTS_PATH, sourceText, ts.ScriptTarget.Latest, true);
-  const posts = [];
-
-  function visit(node) {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === "createBlogPost"
-    ) {
-      const [argument] = node.arguments;
-      if (!argument || !ts.isObjectLiteralExpression(argument)) {
-        throw new Error("createBlogPost must be called with an object literal");
-      }
-
-      const slug = readStringProperty(argument, "slug");
-      posts.push({
-        slug,
-        title: readStringProperty(argument, "title"),
-        description: readStringProperty(argument, "description"),
-        ogImage: `/blog/${slug}/og-image.png`,
-      });
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
+async function readBlogPosts() {
+  const posts = await loadBlogPostInputs();
 
   if (posts.length === 0) {
-    throw new Error(`No blog posts found in ${POSTS_PATH}`);
+    throw new Error(`No blog posts found in ${join(WEBSITE_DIR, "posts")}`);
   }
 
   return posts;
@@ -86,7 +37,9 @@ function getPostImageUrl(post) {
 
 function upsertMeta(html, attribute, key, content) {
   const escapedContent = escapeHtml(content);
-  const pattern = new RegExp(`<meta\\s+${attribute}="${key}"\\s+content="[^"]*"\\s*/?>`);
+  const pattern = new RegExp(
+    `<meta\\s+${attribute}="${key}"\\s+content="[^"]*"\\s*/?>`,
+  );
   const replacement = `<meta ${attribute}="${key}" content="${escapedContent}" />`;
 
   if (pattern.test(html)) {
@@ -97,7 +50,10 @@ function upsertMeta(html, attribute, key, content) {
 }
 
 function upsertTitle(html, title) {
-  return html.replace(/<title>.*?<\/title>/, `<title>${escapeHtml(title)}</title>`);
+  return html.replace(
+    /<title>.*?<\/title>/,
+    `<title>${escapeHtml(title)}</title>`,
+  );
 }
 
 function getBlogPostHtml(baseHtml, post) {
@@ -128,14 +84,18 @@ function assertBlogOgImages(posts) {
     .filter((imagePath) => !existsSync(imagePath));
 
   if (missing.length > 0) {
-    throw new Error(`Missing blog OG image(s):\n${missing.map((path) => `- ${path}`).join("\n")}`);
+    throw new Error(
+      `Missing blog OG image(s):\n${missing.map((path) => `- ${path}`).join("\n")}`,
+    );
   }
 }
 
 function generateBlogHtml(posts) {
   const baseHtmlPath = join(DIST_DIR, "index.html");
   if (!existsSync(baseHtmlPath)) {
-    throw new Error(`Build output not found at ${baseHtmlPath}. Run vp build first.`);
+    throw new Error(
+      `Build output not found at ${baseHtmlPath}. Run vp build first.`,
+    );
   }
 
   const baseHtml = readFileSync(baseHtmlPath, "utf8");
@@ -183,7 +143,9 @@ function assertGeneratedBlogHtml(posts) {
   if (missing.length > 0 || mismatched.length > 0) {
     const messages = [];
     if (missing.length > 0) {
-      messages.push(`Missing generated blog HTML:\n${missing.map((path) => `- ${path}`).join("\n")}`);
+      messages.push(
+        `Missing generated blog HTML:\n${missing.map((path) => `- ${path}`).join("\n")}`,
+      );
     }
     if (mismatched.length > 0) {
       messages.push(
@@ -196,9 +158,9 @@ function assertGeneratedBlogHtml(posts) {
   }
 }
 
-function main() {
+async function main() {
   const mode = process.argv[2];
-  const posts = readBlogPosts();
+  const posts = await readBlogPosts();
 
   if (mode === "generate") {
     assertBlogOgImages(posts);
@@ -217,4 +179,4 @@ function main() {
   throw new Error("Usage: node scripts/blog-og-metadata.mjs <generate|check>");
 }
 
-main();
+await main();
