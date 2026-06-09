@@ -790,13 +790,19 @@ async function renderSocialAssetBlob(
   await new Promise((resolve) => requestAnimationFrame(resolve));
   await new Promise((resolve) => requestAnimationFrame(resolve));
 
-  const htmlLayer = await html2canvas(exportNode, {
-    backgroundColor: null,
-    height: asset.height,
-    scale: 1,
-    useCORS: true,
-    width: asset.width,
-  });
+  const restoreCanvasVisibility = hideDescendantCanvases(exportNode);
+  let htmlLayer: HTMLCanvasElement;
+  try {
+    htmlLayer = await html2canvas(exportNode, {
+      backgroundColor: null,
+      height: asset.height,
+      scale: 1,
+      useCORS: true,
+      width: asset.width,
+    });
+  } finally {
+    restoreCanvasVisibility();
+  }
   const canvas = document.createElement("canvas");
   canvas.width = asset.width;
   canvas.height = asset.height;
@@ -815,6 +821,20 @@ async function renderSocialAssetBlob(
     throw new Error("Unable to export social image.");
   }
   return blob;
+}
+
+function hideDescendantCanvases(root: HTMLElement) {
+  const previousVisibility = Array.from(root.querySelectorAll("canvas")).map(
+    (canvas) => [canvas, canvas.style.visibility] as const,
+  );
+  for (const [canvas] of previousVisibility) {
+    canvas.style.visibility = "hidden";
+  }
+  return () => {
+    for (const [canvas, visibility] of previousVisibility) {
+      canvas.style.visibility = visibility;
+    }
+  };
 }
 
 function compositeSkippedCanvases(
