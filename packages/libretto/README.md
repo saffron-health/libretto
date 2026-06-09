@@ -93,6 +93,14 @@ Run `npx libretto help` for the full list of commands.
 
 All Libretto state lives in a `.libretto/` directory at your project root. See the [configuration docs](https://libretto.sh/docs/understand-libretto/configuration) for details on config files, sessions, and profiles.
 
+## Telemetry
+
+Libretto records anonymous CLI telemetry to help understand CLI usage and help us prioritize improvements. Each resolved command can send only an install id, timestamp, command event name such as `libretto run`, and an error boolean. Libretto does not send command arguments, URLs, project paths, auth state, API keys, error messages or details, or user identity.
+
+The install id is stored in the telemetry file at `~/.libretto/telemetry.json`. The implementation lives in [`src/cli/core/telemetry.ts`](src/cli/core/telemetry.ts).
+
+To disable telemetry, set `LIBRETTO_TELEMETRY_DISABLED=1`, set `DO_NOT_TRACK=1`, run with `CI=1`, or edit `~/.libretto/telemetry.json` and set `"enabled": false`.
+
 ## Join the Community
 
 Join our Discord to connect with other developers, get help, and share what you've built:

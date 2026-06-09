@@ -21,6 +21,7 @@ import {
 import { warnIfLibrettoVersionsDiffer } from "../core/skill-version.js";
 import { SimpleCLI } from "affordance";
 import {
+  type SessionContext,
   sessionOption,
   withAutoSession,
   withExperiments,
@@ -105,7 +106,7 @@ export const openCommand = SimpleCLI.command({
 })
   .input(openInput)
   .use(withAutoSession())
-  .use(withExperiments())
+  .use(withExperiments<SessionContext>())
   .handle(async ({ input, ctx }) => {
     warnIfLibrettoVersionsDiffer();
     assertSessionAvailableForStart(ctx.session, ctx.logger);
@@ -171,7 +172,7 @@ export const connectCommand = SimpleCLI.command({
 })
   .input(connectInput)
   .use(withAutoSession())
-  .use(withExperiments())
+  .use(withExperiments<SessionContext>())
   .handle(async ({ input, ctx }) => {
     warnIfLibrettoVersionsDiffer();
     await runConnectWithLogger(

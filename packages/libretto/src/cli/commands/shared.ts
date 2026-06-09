@@ -11,7 +11,6 @@ import {
 } from "../core/session.js";
 import {
   SimpleCLI,
-  type SimpleCLIMiddlewareArgs,
   type SimpleCLIContext,
   type SimpleCLIMiddleware,
 } from "affordance";
@@ -41,13 +40,10 @@ export type ExperimentsContext = {
   experiments: Experiments;
 };
 
-export function withExperiments() {
-  return async <TInput, TContext extends SimpleCLIContext>({
-    ctx,
-  }: SimpleCLIMiddlewareArgs<
-    TInput,
-    TContext
-  >): Promise<TContext & ExperimentsContext> => ({
+export function withExperiments<
+  TContext extends SimpleCLIContext,
+>(): SimpleCLIMiddleware<unknown, TContext, TContext & ExperimentsContext> {
+  return async ({ ctx }) => ({
     ...ctx,
     experiments: resolveExperiments(),
   });

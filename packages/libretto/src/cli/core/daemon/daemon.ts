@@ -55,7 +55,7 @@ import {
   type DaemonExecResult,
   type DaemonToCliApi,
 } from "./ipc.js";
-import { wrapPageForActionLogging } from "../telemetry.js";
+import { wrapPageForActionLogging } from "../session-logs.js";
 import {
   formatMissingLocalAuthProfileMessage,
   getProfilePath,
