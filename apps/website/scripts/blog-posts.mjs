@@ -15,7 +15,7 @@ const REQUIRED_FRONTMATTER_FIELDS = [
 function parseFrontmatterValue(rawValue) {
   const value = rawValue.trim();
 
-  if (value.startsWith('"') || value.startsWith("'")) {
+  if (value.startsWith('"')) {
     return JSON.parse(value);
   }
 
