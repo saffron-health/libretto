@@ -21,7 +21,13 @@ export type BlogPostInput = {
   publishedAt: string;
   readingTime: string;
   markdown: string;
+  faqs: BlogPostFaq[];
   ogImage: string;
+};
+
+export type BlogPostFaq = {
+  question: string;
+  answer: string;
 };
 
 export type BlogPost = BlogPostInput & {
@@ -92,6 +98,57 @@ function parseFrontmatter(
   };
 }
 
+function stripMarkdownFormatting(value: string): string {
+  return value
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractBlogPostFaqs(markdown: string): BlogPostFaq[] {
+  const lines = markdown.split("\n");
+  const faqStart = lines.findIndex(
+    (line) => line.trim() === "## Frequently Asked Questions",
+  );
+
+  if (faqStart === -1) {
+    return [];
+  }
+
+  const faqs: BlogPostFaq[] = [];
+  let question: string | undefined;
+  let answerLines: string[] = [];
+
+  function flushFaq() {
+    const answer = stripMarkdownFormatting(answerLines.join(" "));
+    if (question && answer) {
+      faqs.push({ question, answer });
+    }
+    question = undefined;
+    answerLines = [];
+  }
+
+  for (const line of lines.slice(faqStart + 1)) {
+    if (line.startsWith("## ")) {
+      break;
+    }
+
+    if (line.startsWith("### ")) {
+      flushFaq();
+      question = stripMarkdownFormatting(line.slice("### ".length));
+      continue;
+    }
+
+    if (question && line.trim() !== "") {
+      answerLines.push(line.trim());
+    }
+  }
+
+  flushFaq();
+  return faqs;
+}
+
 function readBlogPost(fileName: string, source: string): BlogPostInput {
   const slug = basename(fileName, extname(fileName));
   const { frontmatter, markdown } = parseFrontmatter(fileName, source);
@@ -103,13 +160,14 @@ function readBlogPost(fileName: string, source: string): BlogPostInput {
     publishedAt: frontmatter.publishedAt,
     readingTime: frontmatter.readingTime,
     markdown,
+    faqs: extractBlogPostFaqs(markdown),
     ogImage: `/blog/${slug}/og-image.png`,
   };
 }
 
 export async function loadBlogPostInputs(): Promise<BlogPostInput[]> {
   const fileNames = (await readdir(POSTS_DIR)).filter((fileName) =>
-    fileName.endsWith(".md"),
+    fileName.endsWith(".md") && fileName !== "AGENTS.md",
   );
 
   const posts = await Promise.all(

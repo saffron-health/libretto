@@ -115,7 +115,7 @@ Automation is not a one-time project. It's an ongoing practice.
 
 ### How long does it take to automate a typical workflow?
 
-Initial automation development typically requires 2-4 times longer than manual workflow execution, depending on complexity and tool choice. However, automation pays back this investment quickly for workflows executed more than 10-15 times, especially when considering reduced error rates and 24/7 execution capability.
+Initial automation development typically takes longer than a single manual workflow run, depending on complexity and tool choice. However, automation pays back this investment quickly for workflows that repeat often, especially when considering reduced error rates and unattended execution capability.
 
 ### What percentage of workflows can be fully automated?
 
@@ -132,94 +132,3 @@ File handling automation requires specific techniques for each browser and autom
 ### How do you test automation workflows before production deployment?
 
 Automation testing follows similar patterns to software testing: unit tests for individual workflow steps, integration tests for complete workflows, and staging environment validation with production-like data. Automated testing of automation workflows reduces the risk of deploying unreliable scripts.
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "BlogPosting",
-      "headline": "How to Automate Browser Workflows: Step-by-Step Guide for Developers",
-      "description": "Learn to automate complex browser workflows with deterministic outcomes. Covers tool selection, implementation strategies, debugging approaches, and maintenance best practices.",
-      "image": "https://libretto.sh/og-image.png",
-      "datePublished": "2026-06-09",
-      "dateModified": "2026-06-09",
-      "author": {
-        "@type": "Organization",
-        "name": "Libretto",
-        "url": "https://libretto.sh"
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "Libretto",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://libretto.sh/logos/logo-dark.svg"
-        }
-      }
-    },
-    {
-      "@type": "Organization",
-      "@id": "#organization",
-      "name": "Libretto",
-      "url": "https://libretto.sh",
-      "logo": "https://libretto.sh/logos/logo-dark.svg"
-    },
-    {
-      "@type": "WebSite",
-      "name": "Libretto",
-      "url": "https://libretto.sh",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://libretto.sh/docs?q={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
-    },
-    {
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "How long does it take to automate a typical workflow?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Initial automation development typically requires 2-4 times longer than manual workflow execution, depending on complexity and tool choice. However, automation pays back this investment quickly for workflows executed more than 10-15 times, especially when considering reduced error rates and 24/7 execution capability."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What percentage of workflows can be fully automated?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Most business workflows can achieve substantial automation coverage, with remaining steps requiring human judgment for edge cases, approvals, or complex decision-making. The key is identifying which workflow components provide the highest value when automated rather than pursuing complete automation."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How do you handle workflows that span multiple websites or applications?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Cross-application workflows require session management, authentication coordination, and data passing between systems. Modern automation frameworks can maintain multiple browser contexts simultaneously and coordinate actions across different domains while preserving security boundaries."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What's the best approach for automating workflows with file uploads or downloads?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "File handling automation requires specific techniques for each browser and automation framework. Most tools provide programmatic file selection methods that bypass browser file dialogs, while download automation often involves monitoring filesystem changes or intercepting network responses."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How do you test automation workflows before production deployment?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Automation testing follows similar patterns to software testing: unit tests for individual workflow steps, integration tests for complete workflows, and staging environment validation with production-like data. Automated testing of automation workflows reduces the risk of deploying unreliable scripts."
-          }
-        }
-      ]
-    }
-  ]
-}
-</script>
