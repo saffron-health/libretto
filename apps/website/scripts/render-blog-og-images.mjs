@@ -124,6 +124,7 @@ function renderOgHtml(post) {
         font-size: 72px;
         font-weight: 400;
         line-height: 78px;
+        text-wrap: pretty;
         width: 664px;
       }
 

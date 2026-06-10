@@ -108,6 +108,17 @@ function setMetaContent(selector: string, content: string) {
   element.content = content;
 }
 
+function setCanonicalHref(href: string) {
+  let element = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (!element) {
+    element = document.createElement("link");
+    element.rel = "canonical";
+    document.head.append(element);
+  }
+
+  element.href = href;
+}
+
 function BlogPostMeta({ post }: { post: BlogPost }) {
   useEffect(() => {
     const title = `${post.title} | Libretto Blog`;
@@ -115,6 +126,7 @@ function BlogPostMeta({ post }: { post: BlogPost }) {
     const imageUrl = getAbsoluteBlogPostImageUrl(post);
 
     document.title = title;
+    setCanonicalHref(url);
     setMetaContent('meta[name="description"]', post.description);
     setMetaContent('meta[property="og:type"]', "article");
     setMetaContent('meta[property="og:title"]', title);
