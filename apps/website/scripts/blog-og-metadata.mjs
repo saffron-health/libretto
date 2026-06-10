@@ -49,6 +49,18 @@ function upsertMeta(html, attribute, key, content) {
   return html.replace("</head>", `    ${replacement}\n  </head>`);
 }
 
+function upsertCanonical(html, href) {
+  const escapedHref = escapeHtml(href);
+  const pattern = /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/;
+  const replacement = `<link rel="canonical" href="${escapedHref}" />`;
+
+  if (pattern.test(html)) {
+    return html.replace(pattern, replacement);
+  }
+
+  return html.replace("</head>", `    ${replacement}\n  </head>`);
+}
+
 function upsertTitle(html, title) {
   return html.replace(
     /<title>.*?<\/title>/,
@@ -62,6 +74,7 @@ function getBlogPostHtml(baseHtml, post) {
   const imageUrl = getPostImageUrl(post);
 
   let html = upsertTitle(baseHtml, title);
+  html = upsertCanonical(html, postUrl);
   html = upsertMeta(html, "name", "description", post.description);
   html = upsertMeta(html, "property", "og:type", "article");
   html = upsertMeta(html, "property", "og:title", title);
