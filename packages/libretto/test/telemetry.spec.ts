@@ -63,6 +63,8 @@ describe("CLI telemetry", () => {
         json: {
           event: "libretto status",
           error: false,
+          packageVersion: expect.stringMatching(/^\d+\.\d+\.\d+/),
+          buildChannel: "source",
         },
       },
     });

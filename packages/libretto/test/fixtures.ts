@@ -124,6 +124,7 @@ async function execProcess(
   stdinText?: string,
 ): Promise<SpawnResult> {
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
+  childEnv.LIBRETTO_TELEMETRY_DISABLED = "1";
   for (const [key, value] of Object.entries(env ?? {})) {
     if (value === undefined) {
       delete childEnv[key];
