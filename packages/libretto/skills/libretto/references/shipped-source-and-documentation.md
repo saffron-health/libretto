@@ -1,6 +1,6 @@
 # Shipped Source & Documentation
 
-The npm package includes `src/` (full TypeScript source) and `docs/` for deeper understanding of internals and design decisions. Read these when you need implementation context beyond what the main skill file covers. Resolve paths from the package root, such as `node_modules/libretto/`.
+The npm package includes `src/` (full TypeScript source) and `docs/` for deeper understanding of internals and design decisions. Resolve paths from the package root, such as `node_modules/libretto/`.
 
 Full documentation is published at [libretto.sh](https://libretto.sh). Available pages:
 
