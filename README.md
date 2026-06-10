@@ -95,7 +95,7 @@ All Libretto state lives in a `.libretto/` directory at your project root. See t
 
 ## Telemetry
 
-Libretto records anonymous CLI telemetry to help understand CLI usage and help us prioritize improvements. Each resolved command can send only an install id, timestamp, command event name such as `libretto run`, and an error boolean. Libretto does not send command arguments, URLs, project paths, auth state, API keys, error messages or details, or user identity.
+Libretto records anonymous CLI telemetry to help understand CLI usage and help us prioritize improvements. Each resolved command can send only an install id, timestamp, command event name such as `libretto run`, error boolean, package version, and build channel (`node_modules`, `source`, or `unknown`). Libretto does not send command arguments, URLs, project paths, auth state, API keys, error messages or details, or user identity.
 
 The install id is stored in the telemetry file at `~/.libretto/telemetry.json`. The implementation lives in [`packages/libretto/src/cli/core/telemetry.ts`](packages/libretto/src/cli/core/telemetry.ts).
 
