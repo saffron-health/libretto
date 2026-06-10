@@ -15,7 +15,7 @@ metadata:
 
 ## Shipped Source & Documentation
 
-For shipped source details and published documentation links, read `references/shipped-source-and-documentation.md`.
+Read `references/shipped-source-and-documentation.md` for shipped source details, published documentation links, and implementation context beyond what this skill file covers.
 
 ## Default Integration Approach
 
