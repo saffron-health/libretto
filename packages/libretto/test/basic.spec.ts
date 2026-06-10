@@ -603,6 +603,8 @@ export default workflow("main", async (ctx) => {
         billing <subcommand>  Hosted-platform subscription + usage commands
         credentials <subcommand>  Manage hosted credentials
         profiles <subcommand>  Manage hosted browser auth profiles
+        share  Share one hosted workflow's code publicly
+        sharing <subcommand>  Manage tenant workflow code sharing
     `}\n`);
     expect(result.stdout).toBe("");
   });

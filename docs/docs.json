@@ -93,7 +93,8 @@
               "reference/cli/exec",
               "reference/cli/run-and-resume",
               "reference/cli/session-logs",
-              "reference/cli/pages"
+              "reference/cli/pages",
+              "reference/cli/share"
             ]
           },
           {

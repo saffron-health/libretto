@@ -1,0 +1,111 @@
+---
+title: share
+---
+
+> Make hosted workflow source code public through Libretto Cloud.
+
+The `cloud share` command creates a public code share for a workflow that is already deployed to Libretto Cloud. Use it when you want anyone with the generated URL to fork your automation code and use it as the starting point for their own automation.
+
+<Info>
+  Workflow sharing requires a Libretto Cloud account, API key, and tenant-level
+  code sharing. Code sharing is disabled by default for new tenants. If you have
+  not set up Libretto Cloud yet, start with [Libretto Cloud
+  Hosting](/libretto-cloud-hosting/overview).
+</Info>
+
+### cloud share
+
+```bash theme={null}
+npx libretto cloud share check-eligibility
+```
+
+#### Syntax
+
+```bash theme={null}
+npx libretto cloud share <workflow> [flags]
+```
+
+<ParamField path="workflow" type="string" required>
+  The hosted workflow name to share. This is the workflow name declared in code
+  and deployed with `npx libretto cloud deploy`.
+</ParamField>
+
+<ParamField path="--refresh" type="boolean">
+  Refresh an existing share from the workflow's current deployment.
+</ParamField>
+
+#### Prerequisites
+
+<Steps>
+  <Step title="Create a Libretto Cloud account">
+    Sign up for Libretto Cloud before sharing workflows:
+
+    ```bash theme={null}
+    npx libretto cloud auth signup
+    ```
+
+    See [Libretto Cloud Hosting](/libretto-cloud-hosting/overview) for the full
+    hosted setup flow.
+  </Step>
+
+  <Step title="Issue an API key">
+    Create an API key and expose it as `LIBRETTO_API_KEY`:
+
+    ```bash theme={null}
+    npx libretto cloud auth api-key issue --label laptop-dev
+    export LIBRETTO_API_KEY=<issued-key>
+    ```
+  </Step>
+
+  <Step title="Enable code sharing">
+    Code sharing is disabled by default for each tenant. Enable it before
+    creating public workflow links:
+
+    ```bash theme={null}
+    npx libretto cloud sharing enable
+    ```
+  </Step>
+
+  <Step title="Deploy the workflow">
+    Share works on hosted workflows. Deploy the package that contains the
+    workflow before sharing it:
+
+    ```bash theme={null}
+    npx libretto cloud deploy .
+    ```
+  </Step>
+</Steps>
+
+#### Output
+
+When sharing succeeds, Libretto prints the public marketplace URL and code URL:
+
+```bash theme={null}
+Shared workflow: check-eligibility
+Marketplace URL: https://libretto.sh/...
+Code URL: https://libretto.sh/...
+```
+
+If the workflow is already shared, rerun the command with `--refresh` to update the shared code from the current deployment:
+
+```bash theme={null}
+npx libretto cloud share check-eligibility --refresh
+```
+
+### cloud sharing
+
+Use the `cloud sharing` commands to inspect or change whether public workflow code sharing is enabled for the current Libretto Cloud tenant. New tenants start with code sharing disabled.
+
+```bash theme={null}
+npx libretto cloud sharing status
+npx libretto cloud sharing enable
+npx libretto cloud sharing disable
+```
+
+All `cloud sharing` commands require `LIBRETTO_API_KEY`.
+
+<Warning>
+  Shared workflow code is public. Review the deployed source before sharing, and
+  keep credentials in Libretto Cloud credentials or environment configuration
+  instead of hard-coding them in workflow files.
+</Warning>
