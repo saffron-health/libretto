@@ -161,14 +161,24 @@ describe("createHostedDeployPackage", () => {
       'export const workspaceMessage = "bundled from workspace source";\n',
     );
     writeFileSync(
+      join(sourceDir, "src", "format.ts"),
+      [
+        "export function formatMessage(value: string): string {",
+        '  return `formatted ${value}`;',
+        "}",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
       entryPoint,
       [
         'import { workflow } from "libretto";',
         'import { workspaceMessage } from "@repo/config/message";',
+        'import { formatMessage } from "./format";',
         "",
         "export const testWorkflow = workflow(",
         '  "testWorkflow",',
-        "  async () => workspaceMessage,",
+        "  async () => formatMessage(workspaceMessage),",
         ");",
         "",
       ].join("\n"),
@@ -187,6 +197,11 @@ describe("createHostedDeployPackage", () => {
     ) as {
       dependencies?: Record<string, string>;
     };
+    const deployMetadata = JSON.parse(
+      readFileSync(join(deployPackage.outputDir, ".libretto-workflows.json"), "utf8"),
+    ) as {
+      workflows: Array<{ name: string; sourceFile?: string; sourceFiles?: string[] }>;
+    };
     const bundle = readFileSync(
       join(deployPackage.outputDir, "index.js"),
       "utf8",
@@ -196,9 +211,30 @@ describe("createHostedDeployPackage", () => {
     expect(deployManifest.dependencies).toEqual({
       libretto: "0.5.4",
     });
+    expect(deployMetadata.workflows).toEqual([
+      {
+        name: "testWorkflow",
+        credentialNames: [],
+        sourceFile: "src/workflow.ts",
+        sourceFiles: ["src/format.ts", "src/workflow.ts"],
+      },
+    ]);
+    expect(
+      readFileSync(
+        join(deployPackage.outputDir, ".libretto-share", "source", "src", "workflow.ts"),
+        "utf8",
+      ),
+    ).toContain("testWorkflow");
+    expect(
+      readFileSync(
+        join(deployPackage.outputDir, ".libretto-share", "source", "src", "format.ts"),
+        "utf8",
+      ),
+    ).toContain("formatMessage");
     expect(bundle).toContain('createWorkflowProxy("testWorkflow", {"credentialNames":[]})');
     expect(bundle).toContain("return workflow(workflowName, {");
     expect(implementation).toContain("bundled from workspace source");
+    expect(implementation).toContain("formatted");
     expect(implementation).not.toContain("@repo/config/message");
     expect(bundle).not.toContain("workspace:*");
     expect(
@@ -354,6 +390,8 @@ describe("createHostedDeployPackage", () => {
         authProfileRefresh: true,
         credentialNames: ["openai_api_key"],
         name: "testWorkflow",
+        sourceFile: "src/workflow.ts",
+        sourceFiles: ["src/workflow.ts"],
       },
     ]);
 

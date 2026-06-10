@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { createRequire, Module } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
@@ -57,6 +57,8 @@ export type WorkflowDeployMetadata = {
   credentialNames: string[];
   authProfileName?: string;
   authProfileRefresh?: boolean;
+  sourceFile?: string;
+  sourceFiles?: string[];
 };
 
 type BuildHostedDeployTarballArgs = {
@@ -473,13 +475,17 @@ function resolveWorkspaceSourcePath(
 function workspaceSourcePlugin(
   workspacePackages: Map<string, WorkspacePackage>,
   externalPackages: ReadonlySet<string>,
+  unresolvedWorkspaceImports?: Map<string, string>,
 ) {
   return {
     name: "workspace-source-resolver",
     setup(buildApi: {
       onResolve: (
         options: { filter: RegExp },
-        callback: (args: { path: string }) => { path: string } | null,
+        callback: (args: { path: string }) =>
+          | { path: string }
+          | { path: string; external: true }
+          | null,
       ) => void;
     }) {
       // Workspace imports are treated as bundle input, so their code is
@@ -503,9 +509,8 @@ function workspaceSourcePlugin(
           match.subpath,
         );
         if (!resolvedPath) {
-          throw new Error(
-            `Unable to resolve workspace import "${args.path}" from ${match.info.dir}.`,
-          );
+          unresolvedWorkspaceImports?.set(args.path, match.info.dir);
+          return { path: args.path, external: true };
         }
 
         return { path: resolvedPath };
@@ -616,6 +621,40 @@ function writeDeployMetadata(args: {
     join(args.outputDir, DEPLOY_METADATA_FILENAME),
     JSON.stringify({ workflows: args.workflows }, null, 2) + "\n",
   );
+}
+
+function toPortableRelativePath(args: {
+  absSourceDir: string;
+  absPath: string;
+}): string {
+  const relPath = relative(args.absSourceDir, args.absPath).replaceAll("\\", "/");
+  if (relPath.startsWith("../") || relPath === ".." || relPath.startsWith("/")) {
+    throw new Error(
+      `Deploy entry point must be inside the source directory to support cloud code sharing: ${args.absPath}`,
+    );
+  }
+  return relPath;
+}
+
+function writeShareableSourceFiles(args: {
+  absSourceDir: string;
+  absSourcePaths: readonly string[];
+  outputDir: string;
+}): string[] {
+  const relPaths = [...new Set(args.absSourcePaths.map((absPath) =>
+    toPortableRelativePath({
+      absPath,
+      absSourceDir: args.absSourceDir,
+    }),
+  ))].sort();
+
+  for (const relPath of relPaths) {
+    const targetPath = join(args.outputDir, ".libretto-share", "source", relPath);
+    mkdirSync(dirname(targetPath), { recursive: true });
+    cpSync(resolve(args.absSourceDir, relPath), targetPath);
+  }
+
+  return relPaths;
 }
 
 function shouldVendorCurrentLibretto(versionSpec: string): boolean {
@@ -963,8 +1002,12 @@ async function writeBundledDeployEntrypoint(args: {
   externalPackages: ReadonlySet<string>;
   outputDir: string;
   workspacePackages: Map<string, WorkspacePackage>;
-}): Promise<WorkflowDeployMetadata[]> {
+}): Promise<{
+  shareableSourceFiles: string[];
+  workflows: WorkflowDeployMetadata[];
+}> {
   try {
+    const unresolvedWorkspaceImports = new Map<string, string>();
     // The implementation bundle is CommonJS so the bootstrap can load it lazily
     // with createRequire() after workflow discovery, while external packages
     // continue to load through normal Node module resolution.
@@ -976,13 +1019,25 @@ async function writeBundledDeployEntrypoint(args: {
       format: "cjs",
       outfile: "prebundled.cjs",
       platform: "node",
+      metafile: true,
       plugins: [
-        workspaceSourcePlugin(args.workspacePackages, args.externalPackages),
+        workspaceSourcePlugin(
+          args.workspacePackages,
+          args.externalPackages,
+          unresolvedWorkspaceImports,
+        ),
       ],
       splitting: false,
       target: "node20",
       write: false,
     });
+    const [unresolvedImport] = unresolvedWorkspaceImports;
+    if (unresolvedImport) {
+      const [importPath, packageDir] = unresolvedImport;
+      throw new Error(
+        `Unable to resolve workspace import "${importPath}" from ${packageDir}.`,
+      );
+    }
 
     const bundledImplementation = implementationBuild.outputFiles?.find(
       (file) => file.path.endsWith("prebundled.cjs"),
@@ -1008,7 +1063,22 @@ async function writeBundledDeployEntrypoint(args: {
         workflows,
       }),
     );
-    return workflows;
+    const shareableSourceFiles = Object.keys(implementationBuild.metafile?.inputs ?? {})
+      .map((inputPath) =>
+        isAbsolute(inputPath)
+          ? resolve(inputPath)
+          : resolve(args.absSourceDir, inputPath),
+      )
+      .filter((absPath) => {
+        const relPath = relative(args.absSourceDir, absPath);
+        return (
+          relPath !== "" &&
+          !relPath.startsWith("../") &&
+          relPath !== ".." &&
+          !isAbsolute(relPath)
+        );
+      });
+    return { shareableSourceFiles, workflows };
   } catch (error) {
     throw new Error(
       `Failed to bundle deploy entry point ${args.absEntryPoint}.\n${formatBuildError(error)}`,
@@ -1040,7 +1110,7 @@ export async function createHostedDeployPackage(
   let callerOwnsTempRoot = false;
 
   try {
-    const workflows = await writeBundledDeployEntrypoint({
+    const { shareableSourceFiles, workflows } = await writeBundledDeployEntrypoint({
       absEntryPoint,
       absSourceDir,
       deploymentName: args.deploymentName,
@@ -1048,6 +1118,20 @@ export async function createHostedDeployPackage(
       outputDir,
       workspacePackages,
     });
+    const sourceFiles = writeShareableSourceFiles({
+      absSourceDir,
+      absSourcePaths: [...shareableSourceFiles, absEntryPoint],
+      outputDir,
+    });
+    const sourceFile = toPortableRelativePath({
+      absPath: absEntryPoint,
+      absSourceDir,
+    });
+    const workflowsWithShareableSource = workflows.map((workflow) => ({
+      ...workflow,
+      sourceFile,
+      sourceFiles,
+    }));
 
     if (librettoDependency === "file:./libretto") {
       copyCurrentLibrettoPackage(outputDir);
@@ -1063,7 +1147,7 @@ export async function createHostedDeployPackage(
       outputDir,
       sourceDir: absSourceDir,
     });
-    writeDeployMetadata({ outputDir, workflows });
+    writeDeployMetadata({ outputDir, workflows: workflowsWithShareableSource });
 
     // Success transfers ownership of the temp directory to the caller, who is
     // responsible for invoking cleanup() after the tarball/upload step.
@@ -1074,7 +1158,7 @@ export async function createHostedDeployPackage(
         },
         entryPoint: "index.js",
         outputDir,
-        workflows,
+        workflows: workflowsWithShareableSource,
       };
   } finally {
     // On any failure before we return, this function still owns the temp dir

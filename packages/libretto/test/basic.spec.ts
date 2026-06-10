@@ -361,7 +361,28 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("deploy");
     expect(result.stdout).toContain("auth");
     expect(result.stdout).toContain("billing");
+    expect(result.stdout).toContain("share");
+    expect(result.stdout).toContain("sharing");
     expect(result.stderr).toBe("");
+  });
+
+  test("prints cloud share help", async ({ librettoCli }) => {
+    const result = await librettoCli("help cloud share");
+    expect(result.stdout).toContain("Share one hosted workflow's code publicly");
+    expect(result.stdout).toContain("libretto cloud share <workflow>");
+    expect(result.stdout).toContain("--refresh");
+    expect(result.stderr).toBe("");
+  });
+
+  test("cloud share requires an API key", async ({ librettoCli }) => {
+    const result = await librettoCli("cloud share testWorkflow", {
+      LIBRETTO_API_KEY: undefined,
+    });
+
+    expect(result.stderr).toContain(
+      "LIBRETTO_API_KEY is required to share Libretto Cloud workflow code.",
+    );
+    expect(result.stderr).toContain("libretto cloud auth api-key issue");
   });
 
   test("prints deploy help with auto repair flag", async ({ librettoCli }) => {
@@ -582,6 +603,8 @@ export default workflow("main", async (ctx) => {
         billing <subcommand>  Hosted-platform subscription + usage commands
         credentials <subcommand>  Manage hosted credentials
         profiles <subcommand>  Manage hosted browser auth profiles
+        share  Share one hosted workflow's code publicly
+        sharing <subcommand>  Manage tenant workflow code sharing
     `}\n`);
     expect(result.stdout).toBe("");
   });
