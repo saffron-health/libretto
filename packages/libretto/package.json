@@ -8,6 +8,9 @@
     "type": "git",
     "url": "https://github.com/saffron-health/libretto"
   },
+  "bugs": {
+    "url": "https://github.com/saffron-health/libretto/issues"
+  },
   "type": "module",
   "publishConfig": {
     "access": "public"
