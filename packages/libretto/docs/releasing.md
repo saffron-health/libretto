@@ -66,10 +66,13 @@ The root `scripts/prepare-release.sh` script does the following:
 1. Checks that the working tree is clean.
 2. Updates local `main` from `origin/main`.
 3. Runs `pnpm install --frozen-lockfile`, `pnpm --filter libretto type-check`, and `pnpm --filter libretto test`.
-4. Bumps the version in `packages/libretto/package.json`.
-5. Creates a release branch.
-6. Commits the version bump.
-7. Pushes the branch and opens a PR to `main` with the `release` label.
+4. Checks whether `packages/affordance` changed since the current Libretto release tag. If it changed, the script runs Affordance type-check/tests and bumps `packages/affordance/package.json` by one patch version when the current Affordance version is already published to npm.
+5. Bumps the version in `packages/libretto/package.json`.
+6. Creates a release branch.
+7. Commits the version bump.
+8. Pushes the branch and opens a PR to `main` with the `release` label.
+
+Affordance is published before Libretto in `.github/workflows/release.yml`. Keeping this automatic patch bump in the release PR prevents Libretto from depending on unpublished Affordance APIs while still avoiding unnecessary Affordance releases when its package contents did not change.
 
 Release PRs also run the eval workflow. That workflow records score, duration, token, cost, and tool-call metrics for review. Scores are informational: low scores do not fail the workflow, but setup/runtime failures and zero completed records do.
 
