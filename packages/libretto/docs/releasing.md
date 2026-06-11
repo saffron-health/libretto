@@ -83,12 +83,12 @@ After the release PR merges, `.github/workflows/release.yml` runs on `main`.
 The workflow:
 
 1. Reads the version from `packages/libretto/package.json`.
-2. Checks whether that version already exists on npm and in GitHub Releases.
+2. Checks whether that version already exists on npm and in GitHub Releases. It also checks whether the current `packages/affordance/package.json` version and matching `create-libretto` version already exist on npm.
 3. Runs install, type-check, and tests for the `libretto` package in a verification job.
 4. Publishes `affordance` first, then `libretto@X.Y.Z`, then `create-libretto@X.Y.Z` with trusted publishing.
 5. Creates GitHub release `vX.Y.Z` with generated release notes if it does not already exist.
 
-This makes the workflow safe to re-run after partial failures. For example, if npm publish succeeds but GitHub release creation fails, a re-run will skip npm and only create the missing release.
+This makes the workflow safe to re-run after partial failures. For example, if npm publish succeeds but GitHub release creation fails, a re-run will skip npm and only create the missing release. It also means Affordance can still be published if its version is missing even when the Libretto npm package and GitHub release for the current Libretto version already exist.
 
 ## Eval gating on release PRs
 
