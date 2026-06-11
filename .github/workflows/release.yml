@@ -33,8 +33,12 @@ jobs:
           set -euo pipefail
           package_name="$(node -p "require('./packages/libretto/package.json').name")"
           version="$(node -p "require('./packages/libretto/package.json').version")"
+          affordance_version="$(node -p "require('./packages/affordance/package.json').version")"
+          create_libretto_package_name="$(node -p "require('./packages/create-libretto/package.json').name")"
           echo "package_name=${package_name}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "affordance_version=${affordance_version}" >> "$GITHUB_OUTPUT"
+          echo "create_libretto_package_name=${create_libretto_package_name}" >> "$GITHUB_OUTPUT"
           echo "tag=v${version}" >> "$GITHUB_OUTPUT"
 
       - name: Check release state
@@ -46,6 +50,9 @@ jobs:
 
           release_exists=false
           npm_exists=false
+          affordance_npm_exists=false
+          create_libretto_npm_exists=false
+          publish_needed=false
 
           if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
             release_exists=true
@@ -55,16 +62,31 @@ jobs:
             npm_exists=true
           fi
 
+          if npm view "affordance@${{ steps.version.outputs.affordance_version }}" version >/dev/null 2>&1; then
+            affordance_npm_exists=true
+          fi
+
+          if npm view "${{ steps.version.outputs.create_libretto_package_name }}@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
+            create_libretto_npm_exists=true
+          fi
+
+          if [ "$release_exists" != true ] || [ "$npm_exists" != true ] || [ "$affordance_npm_exists" != true ] || [ "$create_libretto_npm_exists" != true ]; then
+            publish_needed=true
+          fi
+
           echo "release_exists=${release_exists}" >> "$GITHUB_OUTPUT"
           echo "npm_exists=${npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "affordance_npm_exists=${affordance_npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "create_libretto_npm_exists=${create_libretto_npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "publish_needed=${publish_needed}" >> "$GITHUB_OUTPUT"
 
       - name: Skip already published version
-        if: steps.state.outputs.release_exists == 'true' && steps.state.outputs.npm_exists == 'true'
+        if: steps.state.outputs.publish_needed != 'true'
         run: |
-          echo "Version ${{ steps.version.outputs.version }} is already published to npm and GitHub."
+          echo "Version ${{ steps.version.outputs.version }} and affordance@${{ steps.version.outputs.affordance_version }} are already published to npm and GitHub."
 
       - name: Configure gcloud secret access for evaluator
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -105,7 +127,7 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       - name: Restore evaluator cache
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         uses: actions/cache@v4
         with:
           path: temp/libretto-cli-evaluate-cache
@@ -114,15 +136,15 @@ jobs:
             libretto-evaluate-cache-${{ runner.os }}-
 
       - name: Install dependencies
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         run: npx playwright install chromium
 
       - name: Verify release build
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         run: |
           pnpm check:mirrors
           pnpm --filter libretto... build
@@ -133,10 +155,13 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       release_exists: ${{ steps.state.outputs.release_exists }}
       npm_exists: ${{ steps.state.outputs.npm_exists }}
+      affordance_npm_exists: ${{ steps.state.outputs.affordance_npm_exists }}
+      create_libretto_npm_exists: ${{ steps.state.outputs.create_libretto_npm_exists }}
+      publish_needed: ${{ steps.state.outputs.publish_needed }}
 
   release:
     needs: verify
-    if: needs.verify.outputs.release_exists != 'true' || needs.verify.outputs.npm_exists != 'true'
+    if: needs.verify.outputs.publish_needed == 'true'
     runs-on: ubuntu-latest
     environment:
       name: release
@@ -163,6 +188,7 @@ jobs:
         run: pnpm --filter libretto... build
 
       - name: Publish affordance to npm
+        if: needs.verify.outputs.affordance_npm_exists != 'true'
         working-directory: packages/affordance
         run: |
           affordance_version="$(node -p "require('./package.json').version")"
@@ -178,6 +204,7 @@ jobs:
         run: pnpm publish --access public --no-git-checks
 
       - name: Publish create-libretto to npm
+        if: needs.verify.outputs.create_libretto_npm_exists != 'true'
         working-directory: packages/create-libretto
         run: |
           if ! npm view "create-libretto@${{ needs.verify.outputs.version }}" version >/dev/null 2>&1; then
