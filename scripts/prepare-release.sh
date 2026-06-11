@@ -75,7 +75,9 @@ affordance_current_version="$(node -p "require('./${affordance_package_json_path
 affordance_next_version=""
 
 if git rev-parse --verify --quiet "v${current_version}" >/dev/null; then
-  if ! git diff --quiet "v${current_version}..HEAD" -- "$affordance_dir"; then
+  if ! git diff --quiet "v${current_version}..HEAD" -- \
+    "$affordance_dir" \
+    ":(exclude)$affordance_package_json_path"; then
     affordance_changed=true
   fi
 else

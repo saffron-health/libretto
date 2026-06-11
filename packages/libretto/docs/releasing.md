@@ -66,7 +66,7 @@ The root `scripts/prepare-release.sh` script does the following:
 1. Checks that the working tree is clean.
 2. Updates local `main` from `origin/main`.
 3. Runs `pnpm install --frozen-lockfile`, `pnpm --filter libretto type-check`, and `pnpm --filter libretto test`.
-4. Checks whether `packages/affordance` changed since the current Libretto release tag. If it changed, the script runs Affordance type-check/tests and bumps `packages/affordance/package.json` by one patch version when the current Affordance version is already published to npm.
+4. Checks whether `packages/affordance` changed since the current Libretto release tag, excluding `packages/affordance/package.json` version-only changes. If source/package contents changed, the script runs Affordance type-check/tests and bumps `packages/affordance/package.json` by one patch version when the current Affordance version is already published to npm.
 5. Bumps the version in `packages/libretto/package.json`.
 6. Creates a release branch.
 7. Commits the version bump.
