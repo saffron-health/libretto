@@ -144,9 +144,6 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             <GlitchNavLink href="/blog" external={false} fathomEvent="Nav blog click">
               Blog
             </GlitchNavLink>
-            <GlitchNavLink href="/#pricing" external={false} fathomEvent="Nav pricing click">
-              Pricing
-            </GlitchNavLink>
             <GlitchNavLink href={DISCUSSIONS_URL} fathomEvent="Nav forum click">
               Forum
             </GlitchNavLink>

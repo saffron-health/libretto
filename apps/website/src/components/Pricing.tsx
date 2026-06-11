@@ -102,7 +102,7 @@ function CloudOnlyNote() {
   );
 }
 
-export function Pricing() {
+export function _Pricing() {
   return (
     <SiteSection id="pricing" width="lg">
       <SectionIntro
