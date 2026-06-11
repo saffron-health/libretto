@@ -115,7 +115,7 @@ export function CloudProviders() {
               cloud docs →
             </a>
             <a
-              href="/docs/libretto-cloud-hosting/billing"
+              href="/docs/libretto-cloud-hosting/billing#plans-and-pricing"
               className={linkClass}
               data-fathom-event="Cloud pricing click"
             >
