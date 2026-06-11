@@ -79,6 +79,29 @@ if git rev-parse --verify --quiet "v${current_version}" >/dev/null; then
     "$affordance_dir" \
     ":(exclude)$affordance_package_json_path"; then
     affordance_changed=true
+  else
+    previous_affordance_package_json="$(mktemp)"
+    git show "v${current_version}:${affordance_package_json_path}" > "$previous_affordance_package_json"
+    if ! node - "$previous_affordance_package_json" "$affordance_package_json_path" <<'NODE'
+const fs = require("node:fs");
+const [previousPath, currentPath] = process.argv.slice(2);
+
+function comparablePackageJson(path) {
+  const packageJson = JSON.parse(fs.readFileSync(path, "utf8"));
+  delete packageJson.version;
+  return JSON.stringify(packageJson);
+}
+
+process.exit(
+  comparablePackageJson(previousPath) === comparablePackageJson(currentPath)
+    ? 0
+    : 1,
+);
+NODE
+    then
+      affordance_changed=true
+    fi
+    rm "$previous_affordance_package_json"
   fi
 else
   echo "Warning: v${current_version} tag not found; skipping automatic affordance change detection." >&2
