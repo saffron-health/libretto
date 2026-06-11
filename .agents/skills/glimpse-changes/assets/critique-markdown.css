@@ -1,0 +1,589 @@
+:root {
+  --diff-unified-width: 80ch;
+  --diff-split-pane-width: 70ch;
+  --diff-shell-max-height: 60vh;
+  --diff-split-shell-width: calc((var(--diff-split-pane-width) * 2) + 8ch);
+}
+
+.review-shell {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    "JetBrains Mono Nerd", "JetBrains Mono", "Fira Code", Monaco, Menlo,
+    "Ubuntu Mono", Consolas, monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.review-footer {
+  width: min(70ch, 100%);
+  margin: 2.55em 0 0;
+}
+
+.review-source {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.review-toc {
+  display: none;
+}
+
+.toc-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  background: var(--panel);
+}
+
+.toc-item:hover {
+  color: var(--text);
+  border-color: var(--border-active);
+}
+
+.markdown-body {
+  width: min(70ch, 100%);
+  max-width: 70ch;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin-top: 0;
+  color: var(--text);
+  line-height: 1.7;
+  font-weight: 600;
+}
+
+.markdown-body h1 {
+  font-size: 1em;
+}
+
+.markdown-body h2 {
+  padding-bottom: 0;
+  border-bottom: 0;
+  font-size: 1em;
+  margin-top: 1.25em;
+}
+
+.markdown-body h3 {
+  font-size: 1em;
+  margin-top: 1.25em;
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body blockquote,
+.markdown-body .code-shell,
+.markdown-body .diff-shell,
+.markdown-body hr {
+  margin-top: 0;
+  margin-bottom: 1.7em;
+}
+
+.markdown-body p,
+.markdown-body li,
+.markdown-body blockquote {
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 3ch;
+  list-style-position: outside;
+}
+
+.markdown-body li::marker {
+  color: var(--accent);
+  font-size: 0.8em;
+}
+
+.markdown-body a {
+  color: var(--link);
+}
+
+.markdown-body code {
+  font-family:
+    "JetBrains Mono Nerd", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
+  color: inherit;
+}
+
+.markdown-body p > code,
+.markdown-body li > code,
+.markdown-body blockquote > code,
+.markdown-body h1 > code,
+.markdown-body h2 > code,
+.markdown-body h3 > code,
+.markdown-body h4 > code,
+.markdown-body h5 > code,
+.markdown-body h6 > code {
+  padding: 0 0.28em;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.35em;
+  background: var(--panel);
+  color: var(--text);
+  display: inline;
+  width: auto;
+  max-width: none;
+  vertical-align: baseline;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  white-space: normal;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  margin-top: 0;
+  margin-bottom: 1.7em;
+  overflow-x: auto;
+  display: table;
+}
+
+.markdown-body thead {
+  border-bottom: 2px solid var(--border);
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 0.4em 1.2ch;
+  border: 1px solid var(--border-subtle);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.markdown-body th {
+  font-weight: 600;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.markdown-body td {
+  background: var(--bg);
+}
+
+.markdown-body tbody tr:nth-child(even) td {
+  background: var(--panel);
+}
+
+.markdown-body blockquote {
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 0 0 2ch;
+  border-left: 0;
+  color: var(--muted);
+}
+
+.markdown-body hr {
+  border-top-width: 0;
+  border-top-color: var(--rule);
+}
+
+.code-shell {
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  width: 100%;
+  max-width: 100%;
+}
+
+.markdown-body .diff-shell,
+.markdown-body .changes-shell {
+  max-width: calc(100cqw - 32px);
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 3.4em;
+  margin-bottom: 3.4em;
+}
+
+body[data-diff-style="split"] .diff-shell,
+body[data-diff-style="split"] .changes-shell {
+  width: min(var(--diff-split-shell-width), calc(100cqw - 32px));
+}
+
+body[data-diff-style="unified"] .diff-shell {
+  width: min(var(--diff-unified-width), calc(100cqw - 32px));
+  max-width: min(var(--diff-unified-width), calc(100cqw - 32px));
+  left: auto;
+  transform: none;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.diff-workbench {
+  width: 100%;
+  margin: 0 0 3.4em;
+}
+
+.diff-mount {
+  display: grid;
+  gap: 1.7em;
+}
+
+/* Hide hunk separators in inline diff blocks (non-expandable) */
+.diff-shell [data-separator],
+.diff-shell [data-separator-wrapper],
+.diff-shell [data-separator-content],
+.diff-shell [data-unmodified-lines] {
+  display: none !important;
+}
+
+.diff-file-block {
+  display: grid;
+  gap: 0.85em;
+}
+
+.diff-header-row {
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+}
+
+.diff-path-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--muted);
+  line-height: 1.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diff-stat {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-family: "JetBrains Mono Nerd", "JetBrains Mono", "Fira Code", monospace;
+  line-height: 1;
+}
+
+.diff-stat-add {
+  color: var(--diff-add);
+}
+
+.diff-stat-remove {
+  color: var(--diff-remove);
+}
+
+.diff-header-spinner {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+.diff-header-spinner .glimpse-spinner {
+  width: 14px;
+  height: 14px;
+}
+
+[data-render-state="ready"] .diff-header-spinner,
+[data-render-state="error"] .diff-header-spinner,
+[data-render-state="empty"] .diff-header-spinner {
+  display: none;
+}
+
+.diff-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.diff-toggle:hover {
+  color: var(--text);
+  background: var(--element);
+}
+
+.diff-toggle svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.diff-file-block.collapsed .diff-toggle svg {
+  transform: rotate(-90deg);
+}
+
+.diff-file-block.collapsed .diff-scroll {
+  display: none;
+}
+
+.diff-scroll {
+  max-height: var(--diff-shell-max-height);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.diffs-host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  --diffs-font-family:
+    "JetBrains Mono Nerd", "JetBrains Mono", "Fira Code", Monaco, Menlo,
+    "Ubuntu Mono", Consolas, monospace;
+  --diffs-header-font-family:
+    "JetBrains Mono Nerd", "JetBrains Mono", "Fira Code", Monaco, Menlo,
+    "Ubuntu Mono", Consolas, monospace;
+  --diffs-bg: var(--bg);
+  --diffs-fg: var(--text);
+  --diffs-fg-number: var(--muted);
+  --diffs-bg-context: var(--bg);
+  --diffs-bg-separator: var(--panel);
+  --diffs-bg-addition: var(--diff-add-bg);
+  --diffs-bg-deletion: var(--diff-remove-bg);
+  --diffs-bg-addition-number: var(--diff-add-bg);
+  --diffs-bg-deletion-number: var(--diff-remove-bg);
+  --diffs-bg-addition-emphasis: color-mix(
+    in srgb,
+    var(--diff-add-bg) 68%,
+    var(--diff-add) 32%
+  );
+  --diffs-bg-deletion-emphasis: color-mix(
+    in srgb,
+    var(--diff-remove-bg) 68%,
+    var(--diff-remove) 32%
+  );
+  --diffs-addition-base: var(--diff-add);
+  --diffs-deletion-base: var(--diff-remove);
+  --diffs-modified-base: var(--diff-hunk);
+  --diffs-font-size: 13px;
+  --diffs-line-height: 1.7;
+  --diffs-gap-inline: 8px;
+  --diffs-gap-block: 8px;
+  --diffs-min-number-column-width: var(--diffs-min-number-column-width-default);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Changes blocks (expandable file diffs) */
+
+.changes-shell {
+  display: grid;
+  gap: 1.7em;
+}
+
+.changes-file {
+  display: grid;
+  gap: 0.85em;
+}
+
+.changes-file-header {
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.changes-file-header .changes-file-path {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.changes-file-header .diff-stat {
+  flex: 0 0 auto;
+}
+
+.changes-file-header .diff-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.changes-file.collapsed .changes-mount {
+  display: none;
+}
+
+.changes-mount {
+  max-height: var(--diff-shell-max-height);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.changes-mount .diffs-host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  --diffs-font-family:
+    "JetBrains Mono Nerd", "JetBrains Mono", "Fira Code", Monaco, Menlo,
+    "Ubuntu Mono", Consolas, monospace;
+  --diffs-header-font-family:
+    "JetBrains Mono Nerd", "JetBrains Mono", "Fira Code", Monaco, Menlo,
+    "Ubuntu Mono", Consolas, monospace;
+  --diffs-bg: var(--bg);
+  --diffs-fg: var(--text);
+  --diffs-fg-number: var(--muted);
+  --diffs-bg-context: var(--bg);
+  --diffs-bg-separator: var(--panel);
+  --diffs-bg-addition: var(--diff-add-bg);
+  --diffs-bg-deletion: var(--diff-remove-bg);
+  --diffs-bg-addition-number: var(--diff-add-bg);
+  --diffs-bg-deletion-number: var(--diff-remove-bg);
+  --diffs-bg-addition-emphasis: color-mix(
+    in srgb,
+    var(--diff-add-bg) 68%,
+    var(--diff-add) 32%
+  );
+  --diffs-bg-deletion-emphasis: color-mix(
+    in srgb,
+    var(--diff-remove-bg) 68%,
+    var(--diff-remove) 32%
+  );
+  --diffs-addition-base: var(--diff-add);
+  --diffs-deletion-base: var(--diff-remove);
+  --diffs-modified-base: var(--diff-hunk);
+  --diffs-font-size: 13px;
+  --diffs-line-height: 1.7;
+  --diffs-gap-inline: 8px;
+  --diffs-gap-block: 8px;
+  --diffs-min-number-column-width: var(--diffs-min-number-column-width-default);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.changes-file-error {
+  padding: 8px 12px;
+  color: var(--diff-remove);
+  background: var(--diff-remove-bg);
+  border-radius: 6px;
+}
+
+.code-file-block {
+  width: 100%;
+  max-width: 100%;
+}
+
+.code-scroll {
+  max-height: var(--diff-shell-max-height);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.code-shell .diffs-host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.code-label {
+  display: none;
+}
+
+.code-block {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  background: transparent;
+  color: var(--text);
+  width: 100%;
+  min-width: 0;
+}
+
+.code-block code {
+  display: block;
+  padding: 0;
+}
+
+.code-line {
+  display: block;
+  padding: 0 1ch;
+  white-space: pre;
+  font-family:
+    "JetBrains Mono Nerd", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
+  line-height: 1.7;
+}
+
+.code-line.add {
+  color: var(--diff-add);
+  background: var(--diff-add-bg);
+}
+
+.code-line.remove {
+  color: var(--diff-remove);
+  background: var(--diff-remove-bg);
+}
+
+.code-line.hunk {
+  color: var(--diff-hunk);
+  background: var(--panel);
+}
+
+.code-line.ctx {
+  color: var(--diff-context);
+  background: var(--diff-context-bg);
+}
+
+@media (max-width: 720px) {
+  #content {
+    width: 100%;
+    padding: 8px;
+  }
+
+  .markdown-body > h1,
+  .markdown-body > h2,
+  .markdown-body > h3,
+  .markdown-body > h4,
+  .markdown-body > h5,
+  .markdown-body > h6,
+  .markdown-body > p,
+  .markdown-body > ul,
+  .markdown-body > ol,
+  .markdown-body > blockquote,
+  .markdown-body > hr,
+  .code-shell,
+  .diff-shell,
+  .changes-shell,
+  .code-block {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .diff-header-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .diff-style-toggle {
+    margin-left: auto;
+  }
+
+  .diff-shell,
+  .changes-shell {
+    left: 0;
+    transform: none;
+  }
+
+  .diffs-host {
+    width: 100%;
+  }
+}

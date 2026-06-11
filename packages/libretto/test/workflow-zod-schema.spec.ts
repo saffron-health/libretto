@@ -15,7 +15,7 @@ const fakeCtx = { session: "test-session", page: fakePage };
 
 describe("workflow() with Zod schemas", () => {
   const inputSchema = z.object({
-    url: z.string().url(),
+    url: z.url(),
     shouldFail: z.boolean().optional(),
   });
   const outputSchema = z.object({

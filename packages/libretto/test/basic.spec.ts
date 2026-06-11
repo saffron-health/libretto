@@ -937,7 +937,7 @@ export default workflow("main", async (ctx) => {
         export default workflow(
           "main",
           {
-            input: z.object({ url: z.string().url() }),
+            input: z.object({ url: z.url() }),
             output: z.unknown(),
           },
           async () => "ok",

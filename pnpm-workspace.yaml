@@ -5,6 +5,8 @@ packages:
   - "packages/*"
 
 minimumReleaseAge: 10080
+minimumReleaseAgeStrict: false
+preferFullMetadata: true
 minimumReleaseAgeExclude:
   - affordance
   - libretto
