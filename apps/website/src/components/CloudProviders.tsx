@@ -106,13 +106,22 @@ export function CloudProviders() {
             command={DEPLOY_COMMAND}
             fathomEvent="Cloud deploy command copy"
           />
-          <a
-            href="/docs/libretto-cloud-hosting/overview"
-            className={`${linkClass} mt-4 inline-block font-mono text-xs`}
-            data-fathom-event="Cloud docs click"
-          >
-            cloud docs →
-          </a>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 font-mono text-xs">
+            <a
+              href="/docs/libretto-cloud-hosting/overview"
+              className={linkClass}
+              data-fathom-event="Cloud docs click"
+            >
+              cloud docs →
+            </a>
+            <a
+              href="/docs/libretto-cloud-hosting/billing#plans-and-pricing"
+              className={linkClass}
+              data-fathom-event="Cloud pricing click"
+            >
+              pricing →
+            </a>
+          </div>
         </div>
 
         <OrBadge className="-my-4 self-center md:hidden" />
