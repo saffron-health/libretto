@@ -6,7 +6,9 @@ usage() {
 Usage: scripts/prepare-release.sh [patch|minor|major]
 
 Creates a release PR branch from main, bumps packages/libretto/package.json,
-pushes the branch, and opens a pull request targeting main.
+bumps packages/affordance/package.json when affordance changed since the last
+Libretto release and its current version is already published, pushes the
+branch, and opens a pull request targeting main.
 EOF
 }
 
@@ -14,6 +16,8 @@ bump="${1:-patch}"
 package_json_path="packages/libretto/package.json"
 package_dir="packages/libretto"
 skill_path="packages/libretto/skills/libretto/SKILL.md"
+affordance_package_json_path="packages/affordance/package.json"
+affordance_dir="packages/affordance"
 
 case "$bump" in
   patch|minor|major)
@@ -66,6 +70,32 @@ process.stdout.write(next.join("."))
 ' "$current_version" "$bump")"
 branch_name="release-v${next_version}"
 
+affordance_changed=false
+affordance_current_version="$(node -p "require('./${affordance_package_json_path}').version")"
+affordance_next_version=""
+
+if git rev-parse --verify --quiet "v${current_version}" >/dev/null; then
+  if ! git diff --quiet "v${current_version}..HEAD" -- "$affordance_dir"; then
+    affordance_changed=true
+  fi
+else
+  echo "Warning: v${current_version} tag not found; skipping automatic affordance change detection." >&2
+fi
+
+if [ "$affordance_changed" = true ]; then
+  pnpm --filter affordance type-check
+  pnpm --filter affordance test
+
+  if npm view "affordance@${affordance_current_version}" version >/dev/null 2>&1; then
+    affordance_next_version="$(node -e '
+const [major, minor, patch] = process.argv[1].split(".").map(Number)
+process.stdout.write([major, minor, patch + 1].join("."))
+' "$affordance_current_version")"
+  else
+    echo "Affordance changed, but affordance@${affordance_current_version} is not published; keeping current affordance version."
+  fi
+fi
+
 if git show-ref --verify --quiet "refs/heads/${branch_name}"; then
   echo "Local branch ${branch_name} already exists." >&2
   exit 1
@@ -83,6 +113,13 @@ git checkout -b "$branch_name"
   npm version "$next_version" --no-git-tag-version >/dev/null
 )
 
+if [ -n "$affordance_next_version" ]; then
+  (
+    cd "$affordance_dir"
+    npm version "$affordance_next_version" --no-git-tag-version >/dev/null
+  )
+fi
+
 node packages/dev-tools/scripts/set-libretto-skill-version.mjs "$next_version"
 
 pnpm sync:mirrors
@@ -90,6 +127,7 @@ pnpm check:mirrors
 
 git add \
   "$package_json_path" \
+  "$affordance_package_json_path" \
   packages/libretto/skills/libretto/SKILL.md \
   packages/libretto/skills/libretto-readonly/SKILL.md \
   .agents/skills/libretto \
@@ -111,10 +149,12 @@ gh pr create \
 ## Summary
 
 - release libretto v${next_version}
+$(if [ -n "$affordance_next_version" ]; then echo "- release affordance v${affordance_next_version}"; elif [ "$affordance_changed" = true ]; then echo "- include affordance changes already versioned at v${affordance_current_version}"; fi)
 
 ## Verification
 
 - pnpm --filter libretto type-check
 - pnpm --filter libretto test
+$(if [ "$affordance_changed" = true ]; then echo "- pnpm --filter affordance type-check"; echo "- pnpm --filter affordance test"; fi)
 EOF
 )"
