@@ -38,6 +38,7 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 - Use the package manager convention for the target project. The examples use `npx libretto`; pnpm, yarn, and bun projects should use their equivalent package-manager execution form.
 - Use `npx libretto setup` for first-time workspace onboarding. It installs Chromium and syncs skills.
 - Use `npx libretto status` to inspect open sessions without triggering setup.
+- Use `npx libretto update` to upgrade the project-local Libretto package. Use `npx libretto update --dry-run` to preview the package-manager command first.
 
 ## Experiments
 
