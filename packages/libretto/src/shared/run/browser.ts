@@ -13,6 +13,10 @@ import {
   SessionStateFileSchema,
 } from "../state/session-state.js";
 import { readLibrettoConfig } from "../../cli/core/config.js";
+import {
+  applyWindowPosition,
+  type WindowPosition,
+} from "./window-position.js";
 
 async function pickFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
@@ -49,51 +53,8 @@ export type BrowserSession = {
   close: () => Promise<void>;
 };
 
-function resolveWindowPosition(): { x: number; y: number } | undefined {
+function resolveWindowPosition(): WindowPosition | undefined {
   return readLibrettoConfig().windowPosition;
-}
-
-async function applyWindowPosition(
-  browser: Browser,
-  context: BrowserContext,
-  page: Page,
-  windowPosition: { x: number; y: number } | undefined,
-): Promise<void> {
-  if (!windowPosition) {
-    return;
-  }
-
-  const requestedBounds = {
-    left: windowPosition.x,
-    top: windowPosition.y,
-    windowState: "normal" as const,
-  };
-
-  const pageCdp = await context.newCDPSession(page);
-  let browserCdp:
-    | Awaited<ReturnType<Browser["newBrowserCDPSession"]>>
-    | undefined;
-  try {
-    const targetInfo = await pageCdp.send("Target.getTargetInfo");
-    const targetId = (
-      targetInfo as { targetInfo?: { targetId?: string } }
-    ).targetInfo?.targetId;
-    browserCdp = await browser.newBrowserCDPSession();
-    const windowResult = await browserCdp.send(
-      "Browser.getWindowForTarget",
-      targetId ? { targetId } : {},
-    );
-    await browserCdp.send("Browser.setWindowBounds", {
-      windowId: windowResult.windowId,
-      bounds: requestedBounds,
-    });
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  } catch {
-    // Best-effort: window positioning should not prevent browser launch.
-  } finally {
-    await pageCdp.detach().catch(() => {});
-    await browserCdp?.detach().catch(() => {});
-  }
 }
 
 export async function launchBrowser({
