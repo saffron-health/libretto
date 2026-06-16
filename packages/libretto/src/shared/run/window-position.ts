@@ -18,11 +18,14 @@ export async function applyWindowPosition(
     windowState: "normal" as const,
   };
 
-  const pageCdp = await context.newCDPSession(page);
+  let pageCdp:
+    | Awaited<ReturnType<BrowserContext["newCDPSession"]>>
+    | undefined;
   let browserCdp:
     | Awaited<ReturnType<Browser["newBrowserCDPSession"]>>
     | undefined;
   try {
+    pageCdp = await context.newCDPSession(page);
     const targetInfo = await pageCdp.send("Target.getTargetInfo");
     const targetId = (
       targetInfo as { targetInfo?: { targetId?: string } }
@@ -40,7 +43,7 @@ export async function applyWindowPosition(
   } catch {
     // Best-effort: window positioning should not prevent browser launch.
   } finally {
-    await pageCdp.detach().catch(() => {});
+    await pageCdp?.detach().catch(() => {});
     await browserCdp?.detach().catch(() => {});
   }
 }

@@ -85,4 +85,21 @@ describe("applyWindowPosition", () => {
     ).resolves.toBeUndefined();
     expect(pageCdp.detach).toHaveBeenCalled();
   });
+
+  it("does not throw when creating the page CDP session fails", async () => {
+    const context = {
+      newCDPSession: vi.fn(async () => {
+        throw new Error("cdp session failed");
+      }),
+    };
+
+    await expect(
+      applyWindowPosition(
+        { newBrowserCDPSession: vi.fn() } as never,
+        context as never,
+        {} as never,
+        { x: 10, y: 20 },
+      ),
+    ).resolves.toBeUndefined();
+  });
 });
