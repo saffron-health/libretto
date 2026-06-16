@@ -19,7 +19,7 @@ export function CTA() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-faint">or</span>
           <Button
-            href="https://cal.com/team/saffron-health/libretto-demo"
+            href="https://cal.com/team/libretto/demo"
             variant="secondary"
             data-fathom-event="CTA demo click"
           >
