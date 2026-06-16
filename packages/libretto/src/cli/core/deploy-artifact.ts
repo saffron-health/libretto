@@ -71,7 +71,6 @@ type BuildHostedDeployTarballArgs = {
 type CreateHostedDeployPackageArgs = BuildHostedDeployTarballArgs;
 
 const DEFAULT_RUNTIME_EXTERNALS = [
-  "libretto",
   "playwright",
   "playwright-core",
   "chromium-bidi",
@@ -580,22 +579,79 @@ function resolveDependencyVersion(
   );
 }
 
+function resolveLibrettoDependencyVersion(
+  sourceDir: string,
+  packageName: string,
+): string | null {
+  try {
+    const librettoManifestPath = require.resolve("libretto/package.json", {
+      paths: [sourceDir],
+    });
+    const version = readDependencyVersionFromManifest(
+      readPackageManifest(librettoManifestPath),
+      packageName,
+    );
+    if (version) {
+      return version;
+    }
+  } catch {
+    // Fall through to the current CLI install. Source installs are optional in
+    // tests that only exercise manifest construction.
+  }
+
+  const version = readDependencyVersionFromManifest(
+    readPackageManifest(join(CURRENT_LIBRETTO_PACKAGE_DIR, "package.json")),
+    packageName,
+  );
+  if (version) {
+    return version;
+  }
+
+  try {
+    const manifestPath = require.resolve(`${packageName}/package.json`, {
+      paths: [CURRENT_LIBRETTO_PACKAGE_DIR],
+    });
+    return readPackageManifest(manifestPath).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function writeDeployManifest(args: {
   additionalExternals: readonly string[];
   deploymentName: string;
   librettoDependency: string;
   outputDir: string;
+  runtimeExternals: readonly string[];
   sourceDir: string;
 }): void {
+  const dependencyPackages = [
+    ...new Set([
+      ...BUILT_IN_MANIFEST_DEPENDENCIES,
+      ...args.runtimeExternals.filter((packageName) =>
+        resolveLibrettoDependencyVersion(args.sourceDir, packageName),
+      ),
+      ...args.additionalExternals,
+    ]),
+  ];
   const dependencies = Object.fromEntries(
-    [...BUILT_IN_MANIFEST_DEPENDENCIES, ...args.additionalExternals].map(
-      (packageName) => [
+    dependencyPackages.map((packageName) => {
+      const fallbackVersion =
+        packageName === "libretto"
+          ? args.librettoDependency
+          : (resolveLibrettoDependencyVersion(args.sourceDir, packageName) ??
+            undefined);
+      return [
         packageName,
         packageName === "libretto"
           ? args.librettoDependency
-          : resolveDependencyVersion(args.sourceDir, packageName),
-      ],
-    ),
+          : resolveDependencyVersion(
+              args.sourceDir,
+              packageName,
+              fallbackVersion,
+            ),
+      ];
+    }),
   );
 
   writeFileSync(
@@ -930,7 +986,7 @@ function createBootstrapSource(args: {
   // to discover workflow exports. The implementation bundle stays embedded in
   // the file, while external packages are resolved from node_modules when the
   // deployed code loads them.
-  return `import { createRequire } from "node:module";
+  return `import { createRequire, Module } from "node:module";
 import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -946,6 +1002,45 @@ const BUNDLE_FILENAME = join(
 const nativeRequire = createRequire(
   join(tmpdir(), ${JSON.stringify("libretto-deploy-bootstrap.cjs")}),
 );
+const packageRequire = createRequire(import.meta.url || __filename);
+
+function isBarePackageSpecifier(specifier) {
+  return (
+    !specifier.startsWith(".") &&
+    !specifier.startsWith("/") &&
+    !specifier.startsWith("node:") &&
+    !/^[A-Za-z]:[\\\\/]/.test(specifier)
+  );
+}
+
+function loadImplementation() {
+  const originalRequire = Module.prototype.require;
+  function patchedRequire(specifier) {
+    try {
+      return originalRequire.call(this, specifier);
+    } catch (error) {
+      if (
+        error?.code === "MODULE_NOT_FOUND" &&
+        isBarePackageSpecifier(specifier)
+      ) {
+        Module.prototype.require = originalRequire;
+        try {
+          return packageRequire(specifier);
+        } finally {
+          Module.prototype.require = patchedRequire;
+        }
+      }
+      throw error;
+    }
+  }
+  Module.prototype.require = patchedRequire;
+
+  try {
+    return nativeRequire(ensureBundleFile());
+  } finally {
+    Module.prototype.require = originalRequire;
+  }
+}
 
 function ensureBundleFile() {
   if (!existsSync(BUNDLE_FILENAME)) {
@@ -960,7 +1055,7 @@ function ensureBundleFile() {
 
 function createWorkflowProxy(workflowName, metadata) {
   const handler = async (ctx, input) => {
-    const impl = nativeRequire(ensureBundleFile());
+    const impl = loadImplementation();
     const target = getWorkflowFromModuleExports(impl, workflowName);
     if (!target || typeof target.run !== "function") {
       throw new Error(
@@ -1008,6 +1103,11 @@ async function writeBundledDeployEntrypoint(args: {
 }> {
   try {
     const unresolvedWorkspaceImports = new Map<string, string>();
+    const discoveryExternalPackages = new Set<string>([
+      ...args.externalPackages,
+      "libretto",
+    ]);
+    const unresolvedDiscoveryWorkspaceImports = new Map<string, string>();
     // The implementation bundle is CommonJS so the bootstrap can load it lazily
     // with createRequire() after workflow discovery, while external packages
     // continue to load through normal Node module resolution.
@@ -1031,9 +1131,37 @@ async function writeBundledDeployEntrypoint(args: {
       target: "node20",
       write: false,
     });
+    // Discovery intentionally keeps libretto external so the local discovery
+    // shim can observe workflow(...) calls without executing the full library.
+    const discoveryBuild = await build({
+      absWorkingDir: args.absSourceDir,
+      bundle: true,
+      entryPoints: [args.absEntryPoint],
+      external: [...discoveryExternalPackages],
+      format: "cjs",
+      outfile: "prebundled-discovery.cjs",
+      platform: "node",
+      plugins: [
+        workspaceSourcePlugin(
+          args.workspacePackages,
+          discoveryExternalPackages,
+          unresolvedDiscoveryWorkspaceImports,
+        ),
+      ],
+      splitting: false,
+      target: "node20",
+      write: false,
+    });
     const [unresolvedImport] = unresolvedWorkspaceImports;
     if (unresolvedImport) {
       const [importPath, packageDir] = unresolvedImport;
+      throw new Error(
+        `Unable to resolve workspace import "${importPath}" from ${packageDir}.`,
+      );
+    }
+    const [unresolvedDiscoveryImport] = unresolvedDiscoveryWorkspaceImports;
+    if (unresolvedDiscoveryImport) {
+      const [importPath, packageDir] = unresolvedDiscoveryImport;
       throw new Error(
         `Unable to resolve workspace import "${importPath}" from ${packageDir}.`,
       );
@@ -1047,12 +1175,18 @@ async function writeBundledDeployEntrypoint(args: {
         "Bundler did not produce a deployment implementation file.",
       );
     }
+    const bundledDiscovery = discoveryBuild.outputFiles?.find((file) =>
+      file.path.endsWith("prebundled-discovery.cjs"),
+    );
+    if (!bundledDiscovery) {
+      throw new Error("Bundler did not produce a deployment discovery file.");
+    }
 
     const workflows = discoverBundledWorkflows({
       absEntryPoint: args.absEntryPoint,
       absSourceDir: args.absSourceDir,
-      bundleBuffer: Buffer.from(bundledImplementation.contents),
-      externalPackages: args.externalPackages,
+      bundleBuffer: Buffer.from(bundledDiscovery.contents),
+      externalPackages: discoveryExternalPackages,
     });
 
     writeFileSync(
@@ -1145,6 +1279,7 @@ export async function createHostedDeployPackage(
       deploymentName: args.deploymentName,
       librettoDependency,
       outputDir,
+      runtimeExternals: [...DEFAULT_RUNTIME_EXTERNALS],
       sourceDir: absSourceDir,
     });
     writeDeployMetadata({ outputDir, workflows: workflowsWithShareableSource });
