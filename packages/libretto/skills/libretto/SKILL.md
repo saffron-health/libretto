@@ -51,8 +51,8 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 - Do not treat visibility as interactivity. If an element will not act, inspect blockers before retrying.
 - Defer repo/code review until you begin generating code, unless the user explicitly asks for it earlier.
 - Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code.
-- For logged-in workflows, build and verify working sign-in logic first (signed out, with no auth profile present); the sign-in code takes priority and an auth profile is added only after it is verified. See `references/website-authentication.md`.
-- Validation requires a successful clean `run` with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
+- For workflows that require authentication, read and follow the guidelines in `references/website-authentication.md`.
+- Validation requires a successful clean `run` on a fresh session with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
 - After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--headed`, or `--headless` flags the workflow needs.
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
