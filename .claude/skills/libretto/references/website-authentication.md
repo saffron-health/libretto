@@ -8,12 +8,13 @@ Build and verify working sign-in logic first. The sign-in code takes priority; a
 
 Workflows that need a logged-in session must contain working sign-in logic. Follow these steps whenever you build a workflow that has to sign in to a website.
 
-If the user asks you to wait while they log in during exploration, treat that manual login as discovery only; still build `librettoAuthenticate` sign-in code unless the user explicitly requests a manual-login workflow.
-
 1. Open the site in headed mode and have the user log in manually so the selectors they use to sign in are recorded in the action logs.
-2. Build the sign-in logic with `librettoAuthenticate`, driven by declared credentials such as `portal_username`, `portal_password`, and `portal_totp_secret`.
-3. Tell the user to add those credential values to `.env`. You are blocked from validating until they do, because you cannot sign in without them.
-4. Validate from a clean, signed-out browser with no auth profile present, so the `librettoAuthenticate` sign-in step actually runs. Validation that passes against an already-signed-in session or a warm profile does not prove the sign-in logic works; it is a false positive.
+2. Read `.libretto/sessions/<session>/actions.jsonl` to determine what secrets (credentials) are needed to be input by the user
+3. Create a set of blank `LIBRETTO_CLOUD_<secret_name>` values in the .env and tell the user to fill them in. Examples are username, password, totp_secret
+4. Before you open a new browser to perform validation, use the .env libretto credentials that were created along with the `librettoAuthenticate` function to add sign in functionality to the script.
+5. Then when you do your workflow validatation, it must be from a clean, signed-out browser with no auth profile present, so the `librettoAuthenticate` sign-in step actually runs. Validation that passes against an already-signed-in session or a warm profile does not prove the sign-in logic works; it is a false positive.
+
+If the user asks you to wait while they log in during exploration, treat that manual login as discovery only; still build `librettoAuthenticate` sign-in code unless the user explicitly requests a manual-login workflow.
 
 ```typescript
 import { librettoAuthenticate, workflow } from "libretto";
