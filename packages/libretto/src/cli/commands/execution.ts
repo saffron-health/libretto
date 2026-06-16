@@ -7,6 +7,7 @@ import {
   connect,
   disconnectBrowser,
   runClose,
+  resolveWindowPosition,
   resolveViewport,
 } from "../core/browser.js";
 import { parseViewportArg } from "./browser.js";
@@ -22,7 +23,10 @@ import {
   type SessionState,
 } from "../core/session.js";
 import { warnIfLibrettoVersionsDiffer } from "../core/skill-version.js";
-import { readLibrettoConfig } from "../core/config.js";
+import {
+  readLibrettoConfig,
+  type WindowPositionConfig,
+} from "../core/config.js";
 import { renderSnapshotDiff } from "../../shared/snapshot/diff-snapshots.js";
 import {
   getProviderStartupTimeoutMs,
@@ -41,6 +45,7 @@ import {
   type DaemonExecResult,
   type DaemonToCliApi,
 } from "../core/daemon/ipc.js";
+import type { DaemonConfig } from "../core/daemon/config.js";
 import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
 import {
   readActionLog,
@@ -66,6 +71,7 @@ type RunIntegrationCommandRequest = {
   headless: boolean;
   visualize: boolean;
   viewport?: { width: number; height: number };
+  windowPosition?: WindowPositionConfig;
   accessMode: SessionAccessMode;
   providerName?: string;
   stayOpenOnSuccess: boolean;
@@ -75,6 +81,29 @@ type RunIntegrationCommandRequest = {
 type ExecMode = "exec" | "readonly-exec";
 
 const require = moduleBuiltin.createRequire(import.meta.url);
+
+export function createRunBrowserConfig(args: {
+  providerName?: string;
+  headless: boolean;
+  viewport?: { width: number; height: number };
+  windowPosition?: WindowPositionConfig;
+}): DaemonConfig["browser"] {
+  if (args.providerName) {
+    return {
+      kind: "provider",
+      providerName: args.providerName,
+    };
+  }
+
+  return {
+    kind: "launch",
+    headed: !args.headless,
+    viewport: args.viewport ?? { width: 1366, height: 768 },
+    ...(!args.headless && args.windowPosition
+      ? { windowPosition: args.windowPosition }
+      : {}),
+  };
+}
 
 function writeDaemonExecOutput(output?: { stdout: string; stderr: string }) {
   if (output?.stdout) {
@@ -575,16 +604,7 @@ async function runIntegrationFromFile(
     config: {
       session: args.session,
       experiments: args.experiments,
-      browser: args.providerName
-        ? {
-            kind: "provider",
-            providerName: args.providerName,
-          }
-        : {
-            kind: "launch",
-            headed: !args.headless,
-            viewport: args.viewport ?? { width: 1366, height: 768 },
-      },
+      browser: createRunBrowserConfig(args),
       workflow: {
         integrationPath: absoluteIntegrationPath,
         params: args.params,
@@ -875,15 +895,21 @@ export const runCommand = SimpleCLI.command({
       console.log(`Connecting to ${providerName} browser...`);
     }
 
+    const headless = daemonProviderName ? true : (headlessMode ?? false);
+    const windowPosition = headless
+      ? undefined
+      : resolveWindowPosition(ctx.logger);
+
     await runIntegrationFromFile(
       {
         integrationPath: input.integrationFile!,
         session: ctx.session,
         params,
         tsconfigPath: input.tsconfig,
-        headless: daemonProviderName ? true : (headlessMode ?? false),
+        headless,
         visualize,
         viewport,
+        windowPosition,
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
         providerName: daemonProviderName,
         stayOpenOnSuccess: input.stayOpenOnSuccess,

@@ -49,7 +49,7 @@ Key points:
 - After validation is complete and the workflow is confirmed working end to end, remove all `pause()` calls and pause-only workflow params unless the user explicitly says to keep them.
 - The browser is launched and closed automatically by the CLI. Do not launch or close it in the handler.
 
-## Workflow Credentials And Auth Profiles
+## Workflow Credentials And Authentication
 
 Declare `credentials` for runtime secrets instead of putting them in the Zod input schema or `--params`. Only declared names are injected into `input.credentials`; local runs read matching `LIBRETTO_CLOUD_` variables from `.env`, and hosted runs read matching Libretto Cloud credentials. For example, `LIBRETTO_CLOUD_OPENAI_API_KEY` becomes `input.credentials.openai_api_key`.
 
@@ -70,14 +70,7 @@ export default workflow("sentimentWorkflow", {
 });
 ```
 
-For logged-in website workflows, unless the user says otherwise, generate both:
-
-- `authProfile: { name, refresh: true }`
-- `librettoAuthenticate(...)` fallback login logic using declared credentials such as `credentials: ["username", "password"]`
-
-After generating or validating a credentialed workflow, include the local `.env` variable names the user must set, and never print secret values.
-
-The fallback should validate the signed-in state, log in when validation fails, and validate again before continuing. Follow `references/auth-profiles.md` for profile naming, refresh behavior, hosted profile behavior, and the fallback-login pattern.
+For website workflows that require signing in, build working sign-in logic with `librettoAuthenticate` and verify it from a clean signed-out browser before adding an auth profile. Follow `references/website-authentication.md`.
 
 ## Workflow Error Handling
 

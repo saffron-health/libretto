@@ -51,6 +51,7 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 - Do not treat visibility as interactivity. If an element will not act, inspect blockers before retrying.
 - Defer repo/code review until you begin generating code, unless the user explicitly asks for it earlier.
 - Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code.
+- For logged-in workflows, build and verify working sign-in logic first (signed out, with no auth profile present); the sign-in code takes priority and an auth profile is added only after it is verified. See `references/website-authentication.md`.
 - Validation requires a successful clean `run` with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
 - After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--headed`, or `--headless` flags the workflow needs.
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
@@ -270,7 +271,7 @@ To run it again, use: npx libretto run ./integration.ts
 - Read `references/configuration-file-reference.md` when you need to inspect or change `.libretto/config.json` for viewport or session defaults.
 - Read `references/site-security-review.md` before reviewing the site's security posture and deciding whether to lead with network requests, passive interception, or Playwright DOM automation on a new site.
 - Read `references/code-generation-rules.md` before writing or editing production workflow files.
-- Read `references/auth-profiles.md` when auth-profile behavior is relevant.
+- Read `references/website-authentication.md` when website sign-in or auth-profile behavior is relevant.
 - Read `references/pages-and-page-targeting.md` when a session has multiple open pages or you need `--page`.
 - Read `references/action-logs.md` for full action log field descriptions and user-vs-agent event semantics.
 - If the workflow code is deployed to the Libretto Cloud platform and you need to reference its API docs, fetch [https://libretto.sh/docs/llms.txt](https://libretto.sh/docs/llms.txt) and follow the relevant page links.

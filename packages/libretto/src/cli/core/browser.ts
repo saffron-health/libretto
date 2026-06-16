@@ -388,7 +388,7 @@ export function resolveViewport(
   return DEFAULT_VIEWPORT;
 }
 
-function resolveWindowPosition(
+export function resolveWindowPosition(
   logger: LoggerApi,
 ): { x: number; y: number } | undefined {
   const config = readLibrettoConfig();

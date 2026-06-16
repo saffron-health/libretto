@@ -1,8 +1,8 @@
 import type { LibrettoWorkflowContext } from "./workflow.js";
 
 export type LibrettoAuthenticateOptions = {
-  validate: (ctx: LibrettoWorkflowContext) => Promise<boolean> | boolean;
-  fallback: (
+  isSignedIn: (ctx: LibrettoWorkflowContext) => Promise<boolean> | boolean;
+  signIn: (
     ctx: LibrettoWorkflowContext,
     credentials: Record<string, string>,
   ) => Promise<void> | void;
@@ -14,17 +14,17 @@ export async function librettoAuthenticate(
   ctx: LibrettoWorkflowContext,
   options: LibrettoAuthenticateOptions,
 ): Promise<{ usedProfile: boolean }> {
-  if (await options.validate(ctx)) {
+  if (await options.isSignedIn(ctx)) {
     return { usedProfile: true };
   }
 
   const credentials = normalizeCredentials(
     options.credentials ?? readCredentialsFromEnv(options.envPrefix),
   );
-  await options.fallback(ctx, credentials);
+  await options.signIn(ctx, credentials);
 
-  if (!(await options.validate(ctx))) {
-    throw new Error("Authentication fallback completed, but validation still failed.");
+  if (!(await options.isSignedIn(ctx))) {
+    throw new Error("Sign-in completed, but the session is still not signed in.");
   }
 
   return { usedProfile: false };
