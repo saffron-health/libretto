@@ -1,20 +1,12 @@
 # Website Authentication
 
-Use this reference for workflows that need a logged-in website session: how to build and verify sign-in logic with `librettoAuthenticate`, and how auth profiles save signed-in state for later runs.
+Use this reference when a workflow needs a logged-in website session. The Working Rules in `../SKILL.md` define the required auth workflow; this file explains how to implement sign-in logic with `librettoAuthenticate`, and how auth profiles save signed-in state for later runs.
 
 Build and verify working sign-in logic first. The sign-in code takes priority; an auth profile is added only after the sign-in logic is verified, never as a substitute for it.
 
-## Generating Sign-In Logic
+## Sign-In Logic
 
-Workflows that need a logged-in session must contain working sign-in logic. Follow these steps whenever you build a workflow that has to sign in to a website.
-
-1. Open the site in headed mode and have the user log in manually so the selectors they use to sign in are recorded in the action logs.
-2. Read `.libretto/sessions/<session>/actions.jsonl` to determine what secrets (credentials) are needed to be input by the user.
-3. Create a set of blank `LIBRETTO_CLOUD_<secret_name>` values in `.env` and tell the user to fill them in. Examples are username, password, totp_secret.
-4. Before you open a new browser to perform validation, use the .env libretto credentials that were created along with the `librettoAuthenticate` function to add sign in functionality to the script.
-5. Then when you do your workflow validation, it must be from a clean, signed-out browser with no auth profile present, so the `librettoAuthenticate` sign-in step actually runs. Validation that passes against an already-signed-in session or a warm profile does not prove the sign-in logic works; it is a false positive.
-
-If the user asks you to wait while they log in during exploration, treat that manual login as discovery only; still build `librettoAuthenticate` sign-in code unless the user explicitly requests a manual-login workflow.
+Use `librettoAuthenticate` so the workflow can sign in from a fresh browser. Declare each required secret in the workflow credentials array and use those credentials inside `signIn`.
 
 ```typescript
 import { librettoAuthenticate, workflow } from "libretto";
@@ -47,10 +39,6 @@ export default workflow("accountWorkflow", {
   },
 });
 ```
-
-### TOTP two-factor codes
-
-Libretto has no special TOTP mode. For sites with TOTP-based two-factor auth, declare a TOTP secret credential such as `portal_totp_secret`, have the user put it in `.env` (for example `LIBRETTO_CLOUD_PORTAL_TOTP_SECRET=...`), and generate the current code from that secret inside `signIn` with an `otplib`/`otpauth` helper before submitting it. Text and email verification codes are not supported.
 
 ## Auth Profiles
 

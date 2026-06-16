@@ -51,8 +51,11 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 - Do not treat visibility as interactivity. If an element will not act, inspect blockers before retrying.
 - Defer repo/code review until you begin generating code, unless the user explicitly asks for it earlier.
 - Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code.
-- For workflows that require authentication, read and follow the guidelines in `references/website-authentication.md`.
-- Validation requires a successful clean `run` on a fresh session with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
+- For authenticated workflows, manual login is discovery only. After the user logs in, read only the sign-in action logs and identify the required credentials; if credentials are unclear, ask before writing code.
+- Add missing blank `LIBRETTO_CLOUD_<secret_name>=` entries without overwriting populated values. If any required credential is blank, stop and ask the user to fill it; until then, do not inspect logged-in pages, read authenticated network bodies, write workflow code, open validation sessions, or continue discovery.
+- Authenticated workflows must implement `librettoAuthenticate` with declared credentials before validation. Use a reusable `*_totp_secret` credential for authenticator-app MFA, not a one-time `otp_code`; text and email verification codes are not supported for fully automated sign-in.
+- Read `references/website-authentication.md` when you need `librettoAuthenticate` examples or auth-profile details.
+- Validation requires a successful clean `run` on a fresh, unauthenticated session with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
 - After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--headed`, or `--headless` flags the workflow needs.
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
@@ -233,13 +236,15 @@ Key fields: `id` (incrementing request id), `ts` (ISO timestamp), `pageId` (page
 [Context: The user wants to build a new browser workflow and does not yet know the page structure]
 Assistant: I'll inspect the real site first if needed, but before I finish I'll create `target-workflow.ts` so the task produces reusable automation code.
 Assistant: [Runs `npx libretto open https://target.example.com --headed`]
+Assistant: [If sign-in is required, follows the authenticated workflow rules before continuing]
 Assistant: [Reads `references/site-security-review.md` before choosing between passive network inspection, direct browser fetch calls, and Playwright-first automation]
 Assistant: [Runs `npx libretto snapshot --session <session>`]
 Assistant: [Uses `snapshot` and `exec` as needed to understand the site and decide the implementation path]
 Assistant: [Reads `references/code-generation-rules.md` before writing production workflow code]
 Assistant: I found the working path. I'll now create the workflow file and verify it.
 Assistant: [Creates or edits `target-workflow.ts` following `references/code-generation-rules.md`]
-Assistant: [Runs `npx libretto run ./target-workflow.ts --params '{"status":"open"}'` to validate]
+Assistant: [Runs `npx libretto run ./target-workflow.ts --params '{"status":"open"}'` on a fresh, unauthenticated session to verify both sign-in and workflow behavior]
+Assistant: [If sign-in validation passes and a reusable session is useful, adds an auth profile and reruns validation]
 Assistant: Validation passed. Here are the results:
 [Shows the output/results from the validation run]
 To run it again, use: npx libretto run ./target-workflow.ts --params '{"status":"open"}'
@@ -271,7 +276,7 @@ To run it again, use: npx libretto run ./integration.ts
 - Read `references/configuration-file-reference.md` when you need to inspect or change `.libretto/config.json` for viewport or session defaults.
 - Read `references/site-security-review.md` before reviewing the site's security posture and deciding whether to lead with network requests, passive interception, or Playwright DOM automation on a new site.
 - Read `references/code-generation-rules.md` before writing or editing production workflow files.
-- Read `references/website-authentication.md` when website sign-in or auth-profile behavior is relevant.
+- Read `references/website-authentication.md` when website sign-in implementation or auth-profile behavior is relevant.
 - Read `references/pages-and-page-targeting.md` when a session has multiple open pages or you need `--page`.
 - Read `references/action-logs.md` for full action log field descriptions and user-vs-agent event semantics.
 - If the workflow code is deployed to the Libretto Cloud platform and you need to reference its API docs, fetch [https://libretto.sh/docs/llms.txt](https://libretto.sh/docs/llms.txt) and follow the relevant page links.
