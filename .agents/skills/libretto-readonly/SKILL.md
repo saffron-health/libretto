@@ -23,6 +23,7 @@ metadata:
 - Prefer `snapshot` first when the visible page state is unclear.
 - Use `readonly-exec` for focused inspection: titles, HTML, locator text, counts, visibility checks, and GET requests.
 - Keep snippets small and purpose-built. Do not run multiple `readonly-exec` commands at the same time.
+- Close disposable sessions before your final response once inspection is complete. Open browsers keep consuming local or hosted resources.
 - End with diagnosis and handoff guidance, not an attempted in-browser repair.
 
 ## Commands
@@ -81,7 +82,7 @@ libretto readonly-exec "await scrollBy(0, 500)" --session failed-job-debug
 
 ### `close`
 
-- Use `close` when the inspection session is no longer needed.
+- Use `close` when the inspection session is no longer needed, unless the user explicitly asks to keep the browser open.
 
 ```bash
 libretto close --session failed-job-debug
