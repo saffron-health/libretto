@@ -1,4 +1,5 @@
 import { cpSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,10 +12,24 @@ import { SimpleCLI } from "affordance";
 
 function installBrowsers(): void {
   console.log("Installing Playwright Chromium...");
-  const result = spawnSync("npx", ["playwright", "install", "chromium"], {
-    stdio: "inherit",
-    shell: true,
-  });
+  const require = createRequire(import.meta.url);
+  let playwrightCLI: string;
+  try {
+    playwrightCLI = join(
+      dirname(require.resolve("playwright/package.json")),
+      "cli.js",
+    );
+  } catch {
+    console.error(
+      "Could not resolve playwright. Run manually: npx playwright install chromium",
+    );
+    return;
+  }
+  const result = spawnSync(
+    process.execPath,
+    [playwrightCLI, "install", "chromium"],
+    { stdio: "inherit" },
+  );
   if (result.status === 0) {
     console.log("✓ Playwright Chromium installed");
   } else {
