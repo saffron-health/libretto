@@ -9,7 +9,7 @@ Libretto supports two website authentication tools:
 - `credentials` are secrets such as usernames, passwords, API keys, and TOTP shared secrets. Use them when the workflow can log in with Playwright.
 - `authProfile` is named browser state for a signed-in session. Use it when a workflow should start from an existing login or preserve login state across runs.
 
-By default, Libretto-generated login workflows combine both: the workflow starts with the named auth profile, validates that it is signed in, and falls back to a credential-based login when the profile is missing, expired, or logged out.
+By default, Libretto-generated login workflows combine both: the workflow starts with the named auth profile, checks whether it is signed in, and signs in with credentials when the profile is missing, expired, or logged out.
 
 ```typescript theme={null}
 import { librettoAuthenticate, workflow } from "libretto";
@@ -34,12 +34,12 @@ export default workflow("portalReport", {
 
     await librettoAuthenticate(ctx, {
       credentials: input.credentials,
-      validate: async ({ page }) =>
+      isSignedIn: async ({ page }) =>
         await page
           .getByRole("button", { name: /account|sign out/i })
           .isVisible()
           .catch(() => false),
-      fallback: async ({ page }, credentials) => {
+      signIn: async ({ page }, credentials) => {
         await page.goto("https://portal.example.com/login");
         await page.getByLabel("Email").fill(credentials.username);
         await page.getByLabel("Password").fill(credentials.password);
@@ -54,7 +54,7 @@ export default workflow("portalReport", {
 });
 ```
 
-In this pattern, the auth profile handles the common case where the browser is already signed in. The fallback handles the recovery case where the profile is missing, expired, or logged out. If the fallback succeeds and `refresh: true` is set, the run saves the updated browser state back to the profile for future runs.
+In this pattern, the auth profile handles the common case where the browser is already signed in. The `signIn` step handles the recovery case where the profile is missing, expired, or logged out. If sign-in succeeds and `refresh: true` is set, the run saves the updated browser state back to the profile for future runs.
 
 ### Credentials
 
@@ -115,10 +115,10 @@ Use `--sites` only when saving or importing a local profile. It controls which s
 
 ### Hosted website authentication
 
-Hosted runs do not upload local `.libretto/profiles/<name>.json` files. They use provider-native profiles with the workflow's `authProfile.name`. `libretto cloud deploy` registers missing profile names, and hosted runs populate or refresh the provider profile when fallback login succeeds.
+Hosted runs do not upload local `.libretto/profiles/<name>.json` files. They use provider-native profiles with the workflow's `authProfile.name`. `libretto cloud deploy` registers missing profile names, and hosted runs populate or refresh the provider profile when sign-in succeeds.
 
 For the hosted model, provider behavior, and profile persistence details, see [Website authentication in Libretto Cloud](/libretto-cloud-hosting/website-authentication).
 
 ### Runtime helper
 
-Use [`librettoAuthenticate`](/reference/runtime/authentication) when a workflow has an auth profile and credential fallback. The helper runs your validation function, calls your fallback login function if needed, and validates again before the workflow continues.
+Use [`librettoAuthenticate`](/reference/runtime/authentication) when a workflow has an auth profile and scripted sign-in. The helper runs your `isSignedIn` check, calls your `signIn` function if needed, and checks again before the workflow continues.

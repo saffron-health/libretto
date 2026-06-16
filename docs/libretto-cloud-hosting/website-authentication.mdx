@@ -10,7 +10,7 @@ Hosted website authentication uses the same workflow code as local runs:
 
 - `credentials` declares which secrets the workflow can use for login.
 - `authProfile` declares the provider-native browser profile to reuse.
-- `librettoAuthenticate` validates the profile and runs fallback login if needed.
+- `librettoAuthenticate` checks whether the profile is signed in and runs sign-in if needed.
 
 ```typescript theme={null}
 import { librettoAuthenticate, workflow } from "libretto";
@@ -26,12 +26,12 @@ export default workflow("portalReport", {
 
     await librettoAuthenticate(ctx, {
       credentials: input.credentials,
-      validate: async ({ page }) =>
+      isSignedIn: async ({ page }) =>
         await page
           .getByRole("button", { name: /account|sign out/i })
           .isVisible()
           .catch(() => false),
-      fallback: async ({ page }, credentials) => {
+      signIn: async ({ page }, credentials) => {
         await page.goto("https://portal.example.com/login");
         await page.getByLabel("Email").fill(credentials.username);
         await page.getByLabel("Password").fill(credentials.password);
@@ -67,7 +67,7 @@ Hosted profiles are provider-native browser profiles. They are not local `.libre
 
 When you deploy a workflow that declares `authProfile`, Libretto Cloud registers the profile name if it does not already exist. When a hosted run starts, Libretto Cloud passes that profile name to the active browser provider.
 
-If `refresh: true` is set, the hosted provider should persist browser state changes made during the run back to that profile. This lets a successful fallback login repair an expired profile for future runs.
+If `refresh: true` is set, the hosted provider should persist browser state changes made during the run back to that profile. This lets a successful sign-in repair an expired profile for future runs.
 
 ### Local profiles versus hosted profiles
 
@@ -75,4 +75,4 @@ Local profiles are Playwright storage-state JSON files under `.libretto/profiles
 
 Hosted profiles are managed by the browser provider selected by Libretto Cloud. They are useful for deployed jobs and local CLI runs that use `--provider libretto-cloud`.
 
-The two are intentionally separate. To seed a hosted profile, run the workflow with Libretto Cloud and let fallback login create or refresh the provider-native profile.
+The two are intentionally separate. To seed a hosted profile, run the workflow with Libretto Cloud and let sign-in create or refresh the provider-native profile.

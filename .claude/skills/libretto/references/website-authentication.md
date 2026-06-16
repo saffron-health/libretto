@@ -1,0 +1,73 @@
+# Website Authentication
+
+Use this reference when a workflow needs a logged-in website session. The Working Rules in `../SKILL.md` define the required auth workflow; this file explains how to implement sign-in logic with `librettoAuthenticate`, and how auth profiles save signed-in state for later runs.
+
+Build and verify working sign-in logic first. The sign-in code takes priority; an auth profile is added only after the sign-in logic is verified, never as a substitute for it.
+
+## Sign-In Logic
+
+Use `librettoAuthenticate` so the workflow can sign in from a fresh browser. Declare each required secret in the workflow credentials array and use those credentials inside `signIn`.
+
+```typescript
+import { librettoAuthenticate, workflow } from "libretto";
+
+export default workflow("accountWorkflow", {
+  credentials: ["portal_username", "portal_password"],
+  async handler(ctx, input) {
+    const { page } = ctx;
+
+    await page.goto("https://app.example.com/dashboard");
+
+    // Sign in when the session is not already authenticated.
+    await librettoAuthenticate(ctx, {
+      credentials: input.credentials,
+      isSignedIn: async () =>
+        await page
+          .getByRole("heading", { name: "Dashboard" })
+          .isVisible()
+          .catch(() => false),
+      signIn: async (_ctx, credentials) => {
+        await page.goto("https://app.example.com/login");
+        await page.getByLabel("Email").fill(credentials.portal_username);
+        await page.getByLabel("Password").fill(credentials.portal_password);
+        await page.getByRole("button", { name: "Sign in" }).click();
+        await page.getByRole("heading", { name: "Dashboard" }).waitFor();
+      },
+    });
+
+    // Continue with the signed-in workflow steps.
+  },
+});
+```
+
+## Auth Profiles
+
+Auth profiles save the signed-in browser state (cookies, localStorage, IndexedDB) so later runs can reuse a logged-in session instead of signing in from scratch. The sign-in logic still takes priority: do not add a profile until the `librettoAuthenticate` sign-in step has been verified from a signed-out browser with no profile present. If you add a profile first, validation passes on the saved session while the untested sign-in logic fails the first time that session expires.
+
+A profile only holds whatever a signed-in session wrote into it, so it does nothing until a run has signed in at least once. With `refresh: true`, a successful run writes updated browser state back to the profile, so a fresh sign-in repairs an expired one. Local runs load `.libretto/profiles/<name>.json`; hosted runs use the provider-native profile with the same name.
+
+Add the profile to the workflow you already verified:
+
+```typescript
+export default workflow("accountWorkflow", {
+  // Added only after the signIn step above is verified standalone.
+  authProfile: { name: "example-account", refresh: true },
+  credentials: ["portal_username", "portal_password"],
+  // ...same handler and librettoAuthenticate call as above.
+});
+```
+
+## Commands
+
+```bash
+# Save the current signed-in session as a named, site-scoped profile.
+npx libretto save example-app --session login --sites app.example.com,auth.example.com
+
+# List or delete hosted auth profile names.
+npx libretto cloud profiles list
+npx libretto cloud profiles delete example-app
+```
+
+`save` captures cookies, localStorage, and IndexedDB only for the comma-separated `--sites` list.
+
+To reuse an existing signed-in Chrome profile instead of signing in, use `npx libretto import-chrome-profiles`. Get the user's consent first, since attaching can close or relaunch their Chrome window.
