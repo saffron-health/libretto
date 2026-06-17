@@ -58,6 +58,7 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 - Validation requires a successful clean `run` on a fresh, unauthenticated session with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
 - After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--headed`, or `--headless` flags the workflow needs.
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
+- Close disposable sessions before your final response once exploration, debugging, or validation is complete. Open browsers keep consuming local or hosted resources.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
 - If the browser must remain read-only, switch to the `libretto-readonly` skill and use `readonly-exec` instead of `exec`.
@@ -183,6 +184,7 @@ npx libretto save app.example.com
 ### `close`
 
 - Use `close` when the user is done with the session or an exploration session is no longer helping progress (unless the user asked to keep watching that browser).
+- Prefer closing sessions promptly after successful validation or diagnosis so unused browsers do not keep consuming resources.
 - `close --all` is available for workspace cleanup.
 
 ```bash
