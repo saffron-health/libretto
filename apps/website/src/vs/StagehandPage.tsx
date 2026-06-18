@@ -347,8 +347,14 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
 function CodeComparison() {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <CodeBlock code={stagehandExample} label="Stagehand: runtime AI primitive" />
-      <CodeBlock code={librettoExample} label="Libretto: generated workflow code" />
+      <CodeBlock
+        code={stagehandExample}
+        label="Stagehand: runtime AI primitive"
+      />
+      <CodeBlock
+        code={librettoExample}
+        label="Libretto: generated workflow code"
+      />
     </div>
   );
 }
