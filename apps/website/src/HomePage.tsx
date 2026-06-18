@@ -7,7 +7,6 @@ import {
 import { Text } from "./components/Text";
 import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
-import { AppLink } from "./routing";
 import {
   OrchestrationContainer,
   AnimationTarget,
@@ -96,13 +95,13 @@ function Hero({
           <InstallSnippet />
           <div className="text-xs text-muted">
             or{" "}
-            <AppLink
+            <a
               href="/docs/get-started/quickstart"
               className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
               data-fathom-event="Hero docs click"
             >
               go to docs
-            </AppLink>
+            </a>
           </div>
         </div>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>

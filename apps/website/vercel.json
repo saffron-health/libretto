@@ -46,6 +46,10 @@
       "destination": "/blog/:slug.html"
     },
     {
+      "source": "/vs/browser-use",
+      "destination": "/index.html"
+    },
+    {
       "source": "/docs",
       "destination": "https://saffron-health-libretto-73.mintlify.dev/docs"
     },
