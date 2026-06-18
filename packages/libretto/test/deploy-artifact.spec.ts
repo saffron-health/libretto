@@ -281,6 +281,100 @@ describe("createHostedDeployPackage", () => {
     ).toEqual(["index.js"]);
   });
 
+  it("excludes bundled node_modules inputs from shareable source metadata", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "browser-agent");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+    const dependencyDir = join(sourceDir, "node_modules", "bundled-helper");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+    mkdirSync(dependencyDir, { recursive: true });
+
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/browser-agent",
+      private: true,
+      type: "module",
+      dependencies: {
+        "bundled-helper": "1.0.0",
+        libretto: "0.5.4",
+      },
+    });
+    writeJson(join(dependencyDir, "package.json"), {
+      name: "bundled-helper",
+      version: "1.0.0",
+      type: "module",
+      main: "./index.js",
+    });
+    writeFileSync(
+      join(dependencyDir, "index.js"),
+      'export const dependencyMessage = "bundled dependency";\n',
+    );
+    writeFileSync(
+      join(sourceDir, "src", "format.ts"),
+      [
+        'import { dependencyMessage } from "bundled-helper";',
+        "",
+        "export function formatMessage(value: string): string {",
+        '  return `${dependencyMessage}: ${value}`;',
+        "}",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      entryPoint,
+      [
+        'import { workflow } from "libretto";',
+        'import { formatMessage } from "./format";',
+        "",
+        "export const testWorkflow = workflow(",
+        '  "testWorkflow",',
+        '  async () => formatMessage("direct helper"),',
+        ");",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "ecw-pull-open-referrals",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+
+    const deployMetadata = JSON.parse(
+      readFileSync(join(deployPackage.outputDir, ".libretto-workflows.json"), "utf8"),
+    ) as {
+      workflows: Array<{ name: string; sourceFile?: string; sourceFiles?: string[] }>;
+    };
+    const bundle = readFileSync(
+      join(deployPackage.outputDir, "index.js"),
+      "utf8",
+    );
+    const implementation = extractBundledImplementation(bundle);
+
+    expect(deployMetadata.workflows).toEqual([
+      {
+        name: "testWorkflow",
+        credentialNames: [],
+        sourceFile: "src/workflow.ts",
+        sourceFiles: ["src/format.ts", "src/workflow.ts"],
+      },
+    ]);
+    expect(
+      existsSync(
+        join(
+          deployPackage.outputDir,
+          ".libretto-share",
+          "source",
+          "node_modules",
+        ),
+      ),
+    ).toBe(false);
+    expect(implementation).toContain("bundled dependency");
+    expect(implementation).toContain("direct helper");
+  });
+
   it("rejects workflows that are only imported for side effects by the deploy entry point", async () => {
     const workspaceRoot = createWorkspaceRoot();
     const sourceDir = join(workspaceRoot, "apps", "browser-agent");

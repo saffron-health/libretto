@@ -692,6 +692,10 @@ function toPortableRelativePath(args: {
   return relPath;
 }
 
+function isShareableSourceRelPath(relPath: string): boolean {
+  return !relPath.split("/").includes("node_modules");
+}
+
 function writeShareableSourceFiles(args: {
   absSourceDir: string;
   absSourcePaths: readonly string[];
@@ -702,7 +706,7 @@ function writeShareableSourceFiles(args: {
       absPath,
       absSourceDir: args.absSourceDir,
     }),
-  ))].sort();
+  ))].filter(isShareableSourceRelPath).sort();
 
   for (const relPath of relPaths) {
     const targetPath = join(args.outputDir, ".libretto-share", "source", relPath);
@@ -1209,7 +1213,8 @@ async function writeBundledDeployEntrypoint(args: {
           relPath !== "" &&
           !relPath.startsWith("../") &&
           relPath !== ".." &&
-          !isAbsolute(relPath)
+          !isAbsolute(relPath) &&
+          isShareableSourceRelPath(relPath.replaceAll("\\", "/"))
         );
       });
     return { shareableSourceFiles, workflows };
