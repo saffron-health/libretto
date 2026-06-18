@@ -1,0 +1,6 @@
+User-agent: *
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
+Disallow: /cdn-cgi/
+Allow: /_next/image
+Disallow: /_next/
+Sitemap: https://libretto.sh/sitemap.xml

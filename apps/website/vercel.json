@@ -30,14 +30,6 @@
       "destination": "https://libretto.sh/docs/llms-full.txt"
     },
     {
-      "source": "/sitemap.xml",
-      "destination": "https://libretto.sh/docs/sitemap.xml"
-    },
-    {
-      "source": "/robots.txt",
-      "destination": "https://libretto.sh/docs/robots.txt"
-    },
-    {
       "source": "/blog",
       "destination": "/index.html"
     },
