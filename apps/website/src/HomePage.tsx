@@ -24,67 +24,6 @@ import { CloudProviders } from "./components/CloudProviders";
 import { FAQ } from "./components/FAQ";
 import { CTA } from "./components/CTA";
 import { SectionDivider } from "./components/SectionDivider.js";
-import { SiteSection } from "./components/SiteSection.js";
-import { SectionIntro } from "./components/SectionIntro.js";
-import { Panel } from "./components/Panel.js";
-import { Button } from "./components/Button.js";
-
-const comparisonPages = [
-  {
-    href: "/vs/browser-use",
-    title: "Libretto vs Browser Use",
-    description:
-      "Compare deterministic scripts with a runtime browser agent for production browser automation.",
-  },
-  {
-    href: "/vs/stagehand",
-    title: "Libretto vs Stagehand",
-    description:
-      "Compare generated workflows with act(), observe(), caching, and runtime inference trade-offs.",
-  },
-  {
-    href: "/vs/playwright-codegen",
-    title: "Libretto vs Playwright codegen",
-    description:
-      "Compare simple action recording with agent-built workflows, validation loops, and network shortcuts.",
-  },
-];
-
-function Comparisons() {
-  return (
-    <SiteSection id="comparisons">
-      <SectionIntro
-        kicker="// Comparisons --"
-        title="Compare browser automation tools"
-      >
-        See when Libretto is a better fit than runtime agents, AI action APIs,
-        or browser recorders.
-      </SectionIntro>
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
-        {comparisonPages.map((page) => (
-          <Panel key={page.href} className="flex h-full flex-col gap-5" padding="lg">
-            <div className="flex flex-1 flex-col gap-3">
-              <Text as="h3" size="lg" className="font-medium text-ink">
-                {page.title}
-              </Text>
-              <Text as="p" size="sm" className="leading-relaxed text-muted">
-                {page.description}
-              </Text>
-            </div>
-            <Button
-              href={page.href}
-              variant="secondary"
-              size="sm"
-              data-fathom-event={`${page.title} homepage comparison click`}
-            >
-              Read comparison
-            </Button>
-          </Panel>
-        ))}
-      </div>
-    </SiteSection>
-  );
-}
 
 function Hero({
   paneUnlocked,
@@ -195,8 +134,6 @@ export function HomePage() {
         <MaintainingFeatures />
         <SectionDivider />
         <CloudProviders />
-        <SectionDivider />
-        <Comparisons />
         <SectionDivider />
         <FAQ />
         <SectionDivider />
