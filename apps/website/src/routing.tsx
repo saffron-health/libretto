@@ -52,7 +52,11 @@ function shouldUseSpaNavigation({
 }
 
 function isDocumentPath(pathname: string): boolean {
-  return pathname === "/docs" || pathname.startsWith("/docs/");
+  return (
+    pathname === "/docs" ||
+    pathname.startsWith("/docs/") ||
+    /\.[^/]+$/.test(pathname)
+  );
 }
 
 export function AppLink({ href, target, download, ...props }: AppLinkProps) {
