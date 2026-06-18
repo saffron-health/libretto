@@ -46,7 +46,7 @@
       "destination": "/blog/:slug.html"
     },
     {
-      "source": "/vs/browser-use",
+      "source": "/vs/:slug",
       "destination": "/index.html"
     },
     {
