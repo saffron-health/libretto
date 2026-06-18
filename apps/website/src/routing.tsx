@@ -5,24 +5,6 @@ type AppLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
   href: string;
 };
 
-export function normalizeAppPathname(pathname: string): string {
-  if (pathname === "/") {
-    return pathname;
-  }
-
-  return pathname.replace(/\/+$/, "");
-}
-
-export function isAppOwnedPathname(pathname: string): boolean {
-  const normalizedPathname = normalizeAppPathname(pathname);
-
-  return (
-    normalizedPathname === "/" ||
-    normalizedPathname === "/blog" ||
-    normalizedPathname.startsWith("/blog/")
-  );
-}
-
 function shouldUseSpaNavigation({
   href,
   target,
@@ -59,11 +41,7 @@ function shouldUseSpaNavigation({
       return false;
     }
 
-    if (url.hash) {
-      return false;
-    }
-
-    if (!isAppOwnedPathname(url.pathname)) {
+    if (url.hash || isDocumentPath(url.pathname)) {
       return false;
     }
 
@@ -71,6 +49,14 @@ function shouldUseSpaNavigation({
   } catch {
     return false;
   }
+}
+
+function isDocumentPath(pathname: string): boolean {
+  return (
+    pathname === "/docs" ||
+    pathname.startsWith("/docs/") ||
+    /\.[^/]+$/.test(pathname)
+  );
 }
 
 export function AppLink({ href, target, download, ...props }: AppLinkProps) {
