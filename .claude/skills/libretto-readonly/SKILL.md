@@ -4,7 +4,7 @@ description: "Read-only Libretto workflow for diagnosing live browser state with
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.6.30"
+  version: "0.6.31"
 ---
 
 ## How Libretto Read-Only Works
