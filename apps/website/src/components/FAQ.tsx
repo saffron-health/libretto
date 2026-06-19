@@ -1,7 +1,6 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode } from "react";
 import { SectionIntro } from "./SectionIntro.js";
 import { Text } from "./Text.js";
-import { CrossfadeIcon } from "./CrossfadeIcon.js";
 import { SiteSection } from "./SiteSection.js";
 import { REPO_URL, DISCORD_URL } from "../site";
 
@@ -11,7 +10,6 @@ interface FAQItem {
   id: string;
   question: string;
   answer: ReactNode;
-  defaultExpanded?: boolean;
 }
 
 const faqs: FAQItem[] = [
@@ -63,7 +61,6 @@ const faqs: FAQItem[] = [
         .
       </>
     ),
-    defaultExpanded: true,
   },
   {
     id: "providers",
@@ -152,32 +149,30 @@ function MinusIcon() {
 }
 
 function FAQAccordionItem({ item }: { item: FAQItem }) {
-  const [isExpanded, setIsExpanded] = useState(item.defaultExpanded ?? false);
   return (
-    <div className="border-b border-ink/10">
-      <button
-        className="flex w-full cursor-pointer items-center justify-between py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/30 rounded-sm"
-        onClick={() => setIsExpanded(!isExpanded)}
-        aria-expanded={isExpanded}
+    <details className="group border-b border-ink/10 [&_summary::-webkit-details-marker]:hidden">
+      <summary
+        className="flex w-full cursor-pointer list-none items-center justify-between py-5 text-left outline-none rounded-sm focus-visible:ring-2 focus-visible:ring-accent/30"
         data-fathom-event={`FAQ ${item.id} toggle click`}
       >
         <Text size="md" className="font-medium text-ink">
           {item.question}
         </Text>
         <span className="ml-4 shrink-0 text-muted">
-          <CrossfadeIcon activeKey={isExpanded ? "minus" : "plus"}>
-            {isExpanded ? <MinusIcon /> : <PlusIcon />}
-          </CrossfadeIcon>
+          <span className="group-open:hidden">
+            <PlusIcon />
+          </span>
+          <span className="hidden group-open:block">
+            <MinusIcon />
+          </span>
         </span>
-      </button>
-      {isExpanded && (
-        <div className="overflow-hidden">
-          <Text as="p" size="sm" className="pb-5 leading-relaxed text-muted whitespace-pre-line">
-            {item.answer}
-          </Text>
-        </div>
-      )}
-    </div>
+      </summary>
+      <div className="overflow-hidden">
+        <Text as="p" size="sm" className="pb-5 leading-relaxed text-muted whitespace-pre-line">
+          {item.answer}
+        </Text>
+      </div>
+    </details>
   );
 }
 
