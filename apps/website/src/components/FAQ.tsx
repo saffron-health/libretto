@@ -162,7 +162,7 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
           <span className="group-open:hidden">
             <PlusIcon />
           </span>
-          <span className="hidden group-open:block">
+          <span className="hidden text-accent group-open:block">
             <MinusIcon />
           </span>
         </span>
