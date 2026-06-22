@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { openSync, closeSync } from "node:fs";
-import { createRequire } from "node:module";
 import { homedir, userInfo } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createIpcPeer, type IpcPeer } from "../../../shared/ipc/ipc.js";
@@ -246,8 +245,7 @@ export class DaemonClient {
     const daemonEntryPath = fileURLToPath(
       new URL("./daemon.js", import.meta.url),
     );
-    const require = createRequire(import.meta.url);
-    const tsxCliPath = require.resolve("tsx/cli");
+    const tsxCliPath = fileURLToPath(import.meta.resolve("tsx/cli"));
 
     const childStderrFd = openSync(logPath, "a");
     const child = spawn(
