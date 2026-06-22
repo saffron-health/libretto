@@ -1,0 +1,62 @@
+name: Verify issue 408 on Windows
+
+on:
+  push:
+    branches:
+      - verify-408-windows-node24
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+
+      - name: Show environment
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
+          systeminfo | Select-String -Pattern '^OS Name|^OS Version'
+
+      - name: Reproduce libretto 0.6.28 daemon startup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          New-Item -ItemType Directory -Force repro | Out-Null
+          Set-Location repro
+          npm init -y
+          npm install libretto@0.6.28
+          New-Item -ItemType Directory -Force src/workflows | Out-Null
+          @'
+          import { workflow } from "libretto";
+
+          export default workflow("smoke", async ({ page }) => {
+            await page.goto("data:text/html,<title>ok</title>");
+            return { ok: true };
+          });
+          '@ | Set-Content -Encoding UTF8 src/workflows/smoke.ts
+
+          Write-Host "Running Libretto smoke workflow:"
+          npx libretto run src/workflows/smoke.ts --headless
+          $exitCode = $LASTEXITCODE
+          Write-Host "libretto exit code: $exitCode"
+
+          Write-Host "Session logs:"
+          if (Test-Path .libretto) {
+            Get-ChildItem -Recurse .libretto | Select-Object FullName,Length,LastWriteTime | Format-Table -AutoSize
+            Get-ChildItem -Recurse .libretto -Filter *.jsonl | ForEach-Object {
+              Write-Host "--- $($_.FullName) ---"
+              Get-Content $_.FullName
+            }
+          } else {
+            Write-Host "No .libretto directory found"
+          }
+
+          exit $exitCode
