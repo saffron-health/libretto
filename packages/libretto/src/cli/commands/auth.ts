@@ -18,6 +18,8 @@
  */
 
 import { z } from "zod";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { SimpleCLI } from "affordance";
 import {
   ApiCallError,
@@ -62,6 +64,18 @@ type SignupResponse = {
 
 type Session = {
   user: { id: string; email: string; emailVerified: boolean; name?: string };
+  session: { id: string; expiresAt: string };
+};
+
+type CliOAuthSessionResponse = {
+  status: "complete";
+  setCookie: string[];
+  user: {
+    id: string;
+    email: string;
+    emailVerified: boolean;
+    hasOrganization: boolean;
+  };
   session: { id: string; expiresAt: string };
 };
 
@@ -144,6 +158,178 @@ async function persistSignupSession(
   };
   await writeAuthState(next);
   return next;
+}
+
+async function persistSessionFromSetCookie(input: {
+  apiUrl: string;
+  setCookie: string[];
+  user: { id: string; email: string };
+  expiresAt: string | null;
+}): Promise<AuthState> {
+  const cookie = setCookieToCookieHeader(input.setCookie);
+  if (!cookie) {
+    throw new Error("Authentication did not return a session cookie.");
+  }
+  const next: AuthState = {
+    apiUrl: input.apiUrl,
+    session: {
+      cookie,
+      userId: input.user.id,
+      email: input.user.email,
+      expiresAt: input.expiresAt,
+    },
+  };
+  await writeAuthState(next);
+  return next;
+}
+
+function tryOpenBrowser(url: string): void {
+  if (process.env.LIBRETTO_AUTH_NO_BROWSER) return;
+  const platform = process.platform;
+  const command =
+    platform === "darwin" ? "open" : platform === "win32" ? "cmd" : "xdg-open";
+  const args = platform === "win32" ? ["/c", "start", "", url] : [url];
+  const child = spawn(command, args, {
+    detached: true,
+    stdio: "ignore",
+  });
+  child.on("error", () => undefined);
+  child.unref();
+}
+
+async function startGoogleOAuth(apiUrl: string): Promise<{
+  code: string;
+  url: string;
+}> {
+  const code = randomUUID();
+  const { data } = await betterAuthCall<{ url?: string; redirect?: boolean }>({
+    apiUrl,
+    path: "/api/auth/sign-in/social",
+    input: {
+      provider: "google",
+      callbackURL: `${apiUrl}/auth/cli/complete?code=${encodeURIComponent(code)}`,
+      errorCallbackURL: `${apiUrl}/auth/cli/complete?code=${encodeURIComponent(code)}`,
+    },
+    unauthenticated: true,
+  });
+  if (!data.url) {
+    throw new Error("Google sign-in did not return an authorization URL.");
+  }
+  return { code, url: data.url };
+}
+
+async function pollForCliOAuthSession(
+  apiUrl: string,
+  code: string,
+  pollIntervalMs = 2000,
+  maxWaitMs = 5 * 60 * 1000,
+): Promise<CliOAuthSessionResponse> {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    const response = await fetch(
+      `${apiUrl}/auth/cli/session?code=${encodeURIComponent(code)}`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+    );
+    const data = (await response.json().catch(() => null)) as
+      | Partial<CliOAuthSessionResponse>
+      | { status?: string }
+      | null;
+    if (response.status === 202 || data?.status === "pending") {
+      process.stdout.write(".");
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+      continue;
+    }
+    if (response.ok && data?.status === "complete") {
+      console.log();
+      return data as CliOAuthSessionResponse;
+    }
+    throw new Error(
+      `Google sign-in did not complete (${response.status}). Re-run the command and try again.`,
+    );
+  }
+  console.log();
+  throw new Error("Timed out waiting for Google sign-in.");
+}
+
+async function createOrganizationForCurrentUser(
+  apiUrl: string,
+  cookie: string,
+  email: string,
+): Promise<void> {
+  console.log();
+  console.log("No organization is attached to this account yet.");
+  const orgName = await prompt("Organization name:");
+  const defaultSlug = slugify(orgName);
+  let orgSlug = (await prompt("Organization slug:", { defaultValue: defaultSlug })).toLowerCase();
+  const debugNotificationEmail = await prompt(
+    "Alert email (for hosted workflow failures):",
+    { defaultValue: email },
+  );
+
+  while (true) {
+    try {
+      await orpcCall({
+        apiUrl,
+        path: "/v1/auth/createOrgForCurrentUser",
+        input: {
+          organizationName: orgName,
+          organizationSlug: orgSlug,
+          debugNotificationEmail,
+        },
+        credential: { source: "cookie", cookie },
+      });
+      return;
+    } catch (e) {
+      if (
+        e instanceof ApiCallError &&
+        e.code === "CONFLICT" &&
+        isSlugTakenData(e.data)
+      ) {
+        console.log();
+        console.log(e.message);
+        orgSlug = (await prompt("Organization slug:")).toLowerCase();
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+async function loginWithGoogle(apiUrl: string): Promise<void> {
+  const { code, url } = await startGoogleOAuth(apiUrl);
+
+  console.log("Open this URL to sign in with Google:");
+  console.log(url);
+  tryOpenBrowser(url);
+  console.log();
+  console.log("Waiting for Google sign-in");
+
+  const result = await pollForCliOAuthSession(apiUrl, code);
+  const state = await persistSessionFromSetCookie({
+    apiUrl,
+    setCookie: result.setCookie,
+    user: result.user,
+    expiresAt: result.session.expiresAt,
+  });
+
+  if (!result.user.hasOrganization && state.session?.cookie) {
+    await createOrganizationForCurrentUser(
+      apiUrl,
+      state.session.cookie,
+      result.user.email,
+    );
+  }
+
+  console.log(`Logged in as ${result.user.email}.`);
+  console.log(`Session saved to ${authStatePath()}`);
+  if (!result.user.emailVerified) {
+    console.log(
+      "Heads up: your email isn't verified yet. Verify it before issuing API keys.",
+    );
+  }
 }
 
 /**
@@ -308,6 +494,23 @@ export const loginCommand = SimpleCLI.command({
   .input(SimpleCLI.input({ positionals: [], named: {} }))
   .handle(async () => {
     const apiUrl = resolveHostedApiUrl();
+
+    console.log("Sign in to Libretto Cloud");
+    console.log("  1. Email and password");
+    console.log("  2. Google");
+    const choice = await prompt("Choose sign-in method:", {
+      defaultValue: "1",
+    });
+
+    const normalized = choice.trim().toLowerCase();
+    if (
+      normalized === "2" ||
+      normalized === "g" ||
+      normalized === "google"
+    ) {
+      await loginWithGoogle(apiUrl);
+      return;
+    }
 
     const email = await prompt("Email:");
     const password = await promptPassword("Password:");
