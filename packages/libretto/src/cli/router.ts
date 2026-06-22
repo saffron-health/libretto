@@ -2,6 +2,7 @@ import { authCommands } from "./commands/auth.js";
 import { billingCommands } from "./commands/billing.js";
 import { browserCommands } from "./commands/browser.js";
 import { cloudCredentialCommands } from "./commands/cloud-credentials.js";
+import { settingsCommands } from "./commands/cloud-settings.js";
 import { codeSharingCommands, shareWorkflowCommand } from "./commands/cloud-sharing.js";
 import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
@@ -26,6 +27,7 @@ export const cliRoutes = {
       billing: billingCommands,
       credentials: cloudCredentialCommands,
       profiles: profileCommands,
+      settings: settingsCommands,
       share: shareWorkflowCommand,
       sharing: codeSharingCommands,
     },
