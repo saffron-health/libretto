@@ -43,6 +43,21 @@ jobs:
           });
           '@ | Set-Content -Encoding UTF8 src/workflows/smoke.ts
 
+          Write-Host "Directly importing the packaged daemon entry path:"
+          @'
+          const specifier = process.argv[2];
+          try {
+            const load = new Function("specifier", "return im" + "port(specifier)");
+            await load(specifier);
+          } catch (error) {
+            console.error(error.code);
+            console.error(error.message);
+          }
+          '@ | Set-Content -Encoding UTF8 daemon-wrapper.mjs
+          $daemonPath = (Resolve-Path node_modules/libretto/dist/cli/core/daemon/daemon.js).Path
+          Write-Host $daemonPath
+          node daemon-wrapper.mjs $daemonPath
+
           Write-Host "Running Libretto smoke workflow:"
           npx libretto run src/workflows/smoke.ts --headless
           $exitCode = $LASTEXITCODE
