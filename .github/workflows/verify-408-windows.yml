@@ -32,7 +32,7 @@ jobs:
           New-Item -ItemType Directory -Force repro | Out-Null
           Set-Location repro
           npm init -y
-          npm install libretto@0.6.28
+          npm install libretto@0.6.31
           New-Item -ItemType Directory -Force src/workflows | Out-Null
           @'
           import { workflow } from "libretto";
