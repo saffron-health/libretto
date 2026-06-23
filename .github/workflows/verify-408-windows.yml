@@ -37,6 +37,7 @@ jobs:
         shell: pwsh
         run: |
           pnpm install --frozen-lockfile
+          pnpm --filter affordance build
           pnpm --filter libretto build
           pnpm exec playwright install chromium
 
