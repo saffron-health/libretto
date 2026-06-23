@@ -6,7 +6,7 @@ import { loadBlogPostInputs } from "./blog-posts.ts";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const WEBSITE_DIR = resolve(SCRIPT_DIR, "..");
 const PUBLIC_DIR = join(WEBSITE_DIR, "public");
-const DIST_DIR = join(WEBSITE_DIR, "dist");
+const DIST_DIR = join(WEBSITE_DIR, "dist", "client");
 const SITE_URL = "https://libretto.sh";
 
 async function readBlogPosts() {
@@ -107,19 +107,29 @@ function generateBlogHtml(posts) {
   const baseHtmlPath = join(DIST_DIR, "index.html");
   if (!existsSync(baseHtmlPath)) {
     throw new Error(
-      `Build output not found at ${baseHtmlPath}. Run vp build first.`,
+      `Build output not found at ${baseHtmlPath}. Run vite build first.`,
     );
   }
 
   const baseHtml = readFileSync(baseHtmlPath, "utf8");
   for (const post of posts) {
-    const html = getBlogPostHtml(baseHtml, post);
     const outputPaths = [
       join(DIST_DIR, "blog", `${post.slug}.html`),
       join(DIST_DIR, "blog", post.slug, "index.html"),
     ];
+    const existingPostHtmlPath = outputPaths.find((outputPath) =>
+      existsSync(outputPath),
+    );
+    const fallbackPostHtml = existingPostHtmlPath
+      ? readFileSync(existingPostHtmlPath, "utf8")
+      : baseHtml;
 
     for (const outputPath of outputPaths) {
+      const sourceHtml = existsSync(outputPath)
+        ? readFileSync(outputPath, "utf8")
+        : fallbackPostHtml;
+      const html = getBlogPostHtml(sourceHtml, post);
+
       mkdirSync(dirname(outputPath), { recursive: true });
       writeFileSync(outputPath, html);
     }
