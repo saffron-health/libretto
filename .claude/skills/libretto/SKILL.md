@@ -4,7 +4,7 @@ description: "Browser automation CLI for building, maintaining, and running brow
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.6.31"
+  version: "0.6.32"
 ---
 
 ## How Libretto Works
