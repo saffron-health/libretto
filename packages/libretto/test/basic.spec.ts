@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import outdent from "outdent";
@@ -983,8 +984,16 @@ export default workflow("main", async (ctx) => {
   test("validates workflow params before starting a browser session", async ({
     librettoCli,
     librettoRuntimePath,
+    workspacePath,
     writeWorkflowScript,
   }) => {
+    // Link zod into the temp workspace so the script can resolve it
+    const require_ = createRequire(import.meta.url);
+    const zodDir = join(require_.resolve("zod"), "..");
+    const nodeModules = workspacePath("node_modules");
+    await mkdir(nodeModules, { recursive: true });
+    await symlink(zodDir, join(nodeModules, "zod"), "dir");
+
     await writeWorkflowScript(
       "integration.ts",
       outdent`
