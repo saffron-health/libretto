@@ -51,8 +51,8 @@ importers:
         specifier: ^4.2.2
         version: 4.2.2(vite@8.0.16(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))
       '@tanstack/react-router':
-        specifier: 1.168.25
-        version: 1.168.25(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: 1.170.15
+        version: 1.170.15(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@tanstack/react-start':
         specifier: 1.168.25
         version: 1.168.25(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@8.0.16(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))
@@ -3696,20 +3696,9 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
 
-  '@tanstack/history@1.161.6':
-    resolution: {integrity: sha512-NaOGLRrddszbQj9upGat6HG/4TKvXLvu+osAIgfxPYA+eIvYKv8GKDJOrY2D3/U9MRnKfMWD7bU4jeD4xmqyIg==}
-    engines: {node: '>=20.19'}
-
   '@tanstack/history@1.162.0':
     resolution: {integrity: sha512-79pf/RkhteYZTRgcR4F9kbk84P2N8rugQJswxfIqovlbRiT3yI7eBE+5QorIrZaOKktsgzRlXh1l/du/xpl4iA==}
     engines: {node: '>=20.19'}
-
-  '@tanstack/react-router@1.168.25':
-    resolution: {integrity: sha512-4U/E76dc+fYuLixjV1RLNfqrkQoexSL8MqGNpIHOodtvY3fMPGaALrvDVtBDQYBEU4z5r5fHaV6+kclWAVFP9A==}
-    engines: {node: '>=20.19'}
-    peerDependencies:
-      react: '>=18.0.0 || >=19.0.0'
-      react-dom: '>=18.0.0 || >=19.0.0'
 
   '@tanstack/react-router@1.170.15':
     resolution: {integrity: sha512-GawYz7HEjj8rTUUDoT/SemDEVm63pZUO+2mOcXHY9Jl3EwMS5gFBnPu/2UvcrwRm1jN1k79fokc0d4aFmrLatg==}
@@ -3771,11 +3760,6 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
-  '@tanstack/router-core@1.168.17':
-    resolution: {integrity: sha512-VDq7HCqRK3sdpxoETwYoTXTaYi+OVQC197g1fdzaiZBUmhntfjn+PQc15OzTqNNhf8Menk6r6ftmuphybMKdig==}
-    engines: {node: '>=20.19'}
-    hasBin: true
 
   '@tanstack/router-core@1.171.13':
     resolution: {integrity: sha512-+NOwEj1kO/6IGmpHRIZHasYxYWpyBQGNIZAST9aNrk9Q3YlU9SgqVnl1pbLa9qAKfeNdXQIRve0RQb/0kyDeDA==}
@@ -13000,18 +12984,7 @@ snapshots:
       tailwindcss: 4.2.2
       vite: 8.0.16(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
-  '@tanstack/history@1.161.6': {}
-
   '@tanstack/history@1.162.0': {}
-
-  '@tanstack/react-router@1.168.25(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      '@tanstack/history': 1.161.6
-      '@tanstack/react-store': 0.9.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@tanstack/router-core': 1.168.17
-      isbot: 5.1.44
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
 
   '@tanstack/react-router@1.170.15(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
@@ -13090,13 +13063,6 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
       use-sync-external-store: 1.6.0(react@19.2.4)
-
-  '@tanstack/router-core@1.168.17':
-    dependencies:
-      '@tanstack/history': 1.161.6
-      cookie-es: 3.1.1
-      seroval: 1.5.4
-      seroval-plugins: 1.5.4(seroval@1.5.4)
 
   '@tanstack/router-core@1.171.13':
     dependencies:
