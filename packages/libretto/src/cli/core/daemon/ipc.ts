@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { openSync, closeSync } from "node:fs";
-import { createRequire } from "node:module";
+import * as moduleBuiltin from "node:module";
 import { homedir, userInfo } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createIpcPeer, type IpcPeer } from "../../../shared/ipc/ipc.js";
@@ -246,25 +246,34 @@ export class DaemonClient {
     const daemonEntryPath = fileURLToPath(
       new URL("./daemon.js", import.meta.url),
     );
-    const require = createRequire(import.meta.url);
-    const tsxCliPath = require.resolve("tsx/cli");
+    const childArgs = [daemonEntryPath, JSON.stringify(config)];
+    const childEnv: NodeJS.ProcessEnv = { ...process.env };
+
+    if (config.workflow) {
+      const tsxPreflightPath = fileURLToPath(
+        import.meta.resolve("tsx/preflight"),
+      );
+      const tsxLoaderFlag =
+        typeof moduleBuiltin.register === "function" ? "--import" : "--loader";
+
+      childArgs.unshift(
+        "--require",
+        tsxPreflightPath,
+        tsxLoaderFlag,
+        import.meta.resolve("tsx"),
+      );
+
+      if (config.workflow.tsconfigPath) {
+        childEnv.TSX_TSCONFIG_PATH = config.workflow.tsconfigPath;
+      }
+    }
 
     const childStderrFd = openSync(logPath, "a");
-    const child = spawn(
-      process.execPath,
-      [
-        tsxCliPath,
-        ...(config.workflow?.tsconfigPath
-          ? ["--tsconfig", config.workflow.tsconfigPath]
-          : []),
-        daemonEntryPath,
-        JSON.stringify(config),
-      ],
-      {
-        detached: true,
-        stdio: ["ignore", "ignore", childStderrFd, "ipc"],
-      },
-    );
+    const child = spawn(process.execPath, childArgs, {
+      detached: true,
+      stdio: ["ignore", "ignore", childStderrFd, "ipc"],
+      env: childEnv,
+    });
     closeSync(childStderrFd);
 
     const pid = child.pid!;

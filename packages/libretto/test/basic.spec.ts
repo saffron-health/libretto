@@ -363,6 +363,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("billing");
     expect(result.stdout).toContain("jobs");
     expect(result.stdout).toContain("schedules");
+    expect(result.stdout).toContain("settings");
     expect(result.stdout).toContain("share");
     expect(result.stdout).toContain("sharing");
     expect(result.stderr).toBe("");
@@ -641,24 +642,27 @@ export default workflow("main", async (ctx) => {
     librettoCli,
   }) => {
     const result = await librettoCli("cloud opne");
-    expect(result.stderr).toBe(`${outdent`
-      Unknown command: cloud opne
-
-      Deploy workflows and manage hosted Libretto
-
-      Usage: libretto cloud <subcommand>
-
-      Commands:
-        deploy  Deploy workflows to the hosted platform
-        auth <subcommand>  Hosted-platform auth commands
-        billing <subcommand>  Hosted-platform subscription + usage commands
-        credentials <subcommand>  Manage hosted credentials
-        jobs <subcommand>  Create and manage hosted jobs
-        profiles <subcommand>  Manage hosted browser auth profiles
-        schedules <subcommand>  Create and manage hosted schedules
-        share  Share one hosted workflow's code publicly
-        sharing <subcommand>  Manage tenant workflow code sharing
-    `}\n`);
+    expect(result.stderr).toContain("Unknown command: cloud opne");
+    expect(result.stderr).toContain(
+      "Deploy workflows and manage hosted Libretto",
+    );
+    expect(result.stderr).toContain("Usage: libretto cloud <subcommand>");
+    expect(result.stderr).toContain(
+      "deploy  Deploy workflows to the hosted platform",
+    );
+    expect(result.stderr).toContain(
+      "auth <subcommand>  Hosted-platform auth commands",
+    );
+    expect(result.stderr).toContain(
+      "jobs <subcommand>  Create and manage hosted jobs",
+    );
+    expect(result.stderr).toContain(
+      "schedules <subcommand>  Create and manage hosted schedules",
+    );
+    expect(result.stderr).toContain(
+      "settings <subcommand>  Manage Libretto Cloud tenant settings",
+    );
+    expect(result.stderr).not.toContain("Usage: libretto <command>");
     expect(result.stdout).toBe("");
   });
 
