@@ -13,53 +13,50 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
           node-version: 24.14.1
+          cache: pnpm
 
       - name: Show environment
         shell: pwsh
         run: |
           node --version
           npm --version
+          pnpm --version
           systeminfo | Select-String -Pattern '^OS Name|^OS Version'
 
-      - name: Reproduce libretto 0.6.28 daemon startup
+      - name: Build local Libretto
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter libretto build
+          pnpm exec playwright install chromium
+
+      - name: Run local Libretto smoke workflow
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          New-Item -ItemType Directory -Force repro | Out-Null
-          Set-Location repro
-          npm init -y
-          npm install libretto@0.6.31
-          New-Item -ItemType Directory -Force src/workflows | Out-Null
+          Set-Location packages/libretto
+          New-Item -ItemType Directory -Force tmp-workflows | Out-Null
           @'
-          import { workflow } from "libretto";
+          import { workflow } from "../dist/index.js";
 
           export default workflow("smoke", async ({ page }) => {
             await page.goto("data:text/html,<title>ok</title>");
             return { ok: true };
           });
-          '@ | Set-Content -Encoding UTF8 src/workflows/smoke.ts
-
-          Write-Host "Directly importing the packaged daemon entry path:"
-          @'
-          const specifier = process.argv[2];
-          try {
-            const load = new Function("specifier", "return im" + "port(specifier)");
-            await load(specifier);
-          } catch (error) {
-            console.error(error.code);
-            console.error(error.message);
-          }
-          '@ | Set-Content -Encoding UTF8 daemon-wrapper.mjs
-          $daemonPath = (Resolve-Path node_modules/libretto/dist/cli/core/daemon/daemon.js).Path
-          Write-Host $daemonPath
-          node daemon-wrapper.mjs $daemonPath
+          '@ | Set-Content -Encoding UTF8 tmp-workflows/smoke.ts
 
           Write-Host "Running Libretto smoke workflow:"
-          npx libretto run src/workflows/smoke.ts --headless
+          node dist/index.js run tmp-workflows/smoke.ts --headless
           $exitCode = $LASTEXITCODE
           Write-Host "libretto exit code: $exitCode"
 
