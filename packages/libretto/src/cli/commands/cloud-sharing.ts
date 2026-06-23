@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SimpleCLI } from "affordance";
-import { orpcCall, resolveApiUrl } from "../core/auth-fetch.js";
+import { orpcCall } from "../core/auth-fetch.js";
+import { withCloudApiKey, type CloudApiKeyContext } from "./shared.js";
 
 type CodeSharingStatusResponse = {
   enabled: boolean;
@@ -13,19 +14,6 @@ type ShareWorkflowResponse = {
   marketplace_url: string;
   code_url: string;
 };
-
-function requireCloudApiKey() {
-  const apiKey = process.env.LIBRETTO_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error(
-      "LIBRETTO_API_KEY is required to share Libretto Cloud workflow code. Issue one with `libretto cloud auth api-key issue --label <label>`.",
-    );
-  }
-  return {
-    apiUrl: resolveApiUrl(null),
-    credential: { source: "env-api-key" as const, apiKey },
-  };
-}
 
 export const shareWorkflowCommand = SimpleCLI.command({
   description: "Share one hosted workflow's code publicly",
@@ -42,13 +30,13 @@ export const shareWorkflowCommand = SimpleCLI.command({
       }),
     },
   }))
-  .handle(async ({ input }) => {
-    const { apiUrl, credential } = requireCloudApiKey();
+  .use(withCloudApiKey("share Libretto Cloud workflow code"))
+  .handle(async ({ input, ctx }) => {
     const response = await orpcCall<ShareWorkflowResponse>({
-      apiUrl,
+      apiUrl: ctx.apiUrl,
       path: "/v1/workflows/share",
       input: { workflow: input.workflow, refresh: input.refresh },
-      credential,
+      credential: ctx.credential,
     });
 
     if (response.status === "existing") {
@@ -68,25 +56,27 @@ export const codeSharingStatusCommand = SimpleCLI.command({
   description: "Show whether tenant code sharing is enabled",
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
-  .handle(async () => {
-    const { apiUrl, credential } = requireCloudApiKey();
+  .use(withCloudApiKey("manage tenant workflow code sharing"))
+  .handle(async ({ ctx }) => {
     const response = await orpcCall<CodeSharingStatusResponse>({
-      apiUrl,
+      apiUrl: ctx.apiUrl,
       path: "/v1/tenant/codeSharing",
       input: {},
-      credential,
+      credential: ctx.credential,
     });
     console.log(`Code sharing: ${response.enabled ? "enabled" : "disabled"}`);
     return response.enabled;
   });
 
-async function updateCodeSharing(enabled: boolean): Promise<boolean> {
-  const { apiUrl, credential } = requireCloudApiKey();
+async function updateCodeSharing(
+  enabled: boolean,
+  ctx: CloudApiKeyContext,
+): Promise<boolean> {
   const response = await orpcCall<CodeSharingStatusResponse>({
-    apiUrl,
+    apiUrl: ctx.apiUrl,
     path: "/v1/tenant/updateCodeSharing",
     input: { enabled },
-    credential,
+    credential: ctx.credential,
   });
   console.log(`Code sharing: ${response.enabled ? "enabled" : "disabled"}`);
   return response.enabled;
@@ -96,13 +86,15 @@ export const enableCodeSharingCommand = SimpleCLI.command({
   description: "Enable public workflow code sharing for this tenant",
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
-  .handle(async () => updateCodeSharing(true));
+  .use(withCloudApiKey("manage tenant workflow code sharing"))
+  .handle(async ({ ctx }) => updateCodeSharing(true, ctx));
 
 export const disableCodeSharingCommand = SimpleCLI.command({
   description: "Disable public workflow code sharing for this tenant",
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
-  .handle(async () => updateCodeSharing(false));
+  .use(withCloudApiKey("manage tenant workflow code sharing"))
+  .handle(async ({ ctx }) => updateCodeSharing(false, ctx));
 
 export const codeSharingCommands = SimpleCLI.group({
   description: "Manage tenant workflow code sharing",

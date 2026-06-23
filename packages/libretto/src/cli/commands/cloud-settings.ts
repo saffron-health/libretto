@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SimpleCLI } from "affordance";
-import { orpcCall, resolveApiUrl } from "../core/auth-fetch.js";
+import { orpcCall } from "../core/auth-fetch.js";
+import { withCloudApiKey, type CloudApiKeyContext } from "./shared.js";
 
 type TenantSettingsResponse = {
   code_sharing_enabled: boolean;
@@ -14,19 +15,6 @@ type TenantSettingsInput = {
 };
 
 const settingState = z.enum(["enabled", "disabled"]);
-
-function requireCloudApiKey() {
-  const apiKey = process.env.LIBRETTO_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error(
-      "LIBRETTO_API_KEY is required to manage Libretto Cloud settings. Issue one with `libretto cloud auth api-key issue --label <label>`.",
-    );
-  }
-  return {
-    apiUrl: resolveApiUrl(null),
-    credential: { source: "env-api-key" as const, apiKey },
-  };
-}
 
 function toBoolean(state: "enabled" | "disabled"): boolean {
   return state === "enabled";
@@ -49,14 +37,14 @@ function printTenantSettings(
 }
 
 async function tenantSettings(
+  ctx: CloudApiKeyContext,
   input: TenantSettingsInput = {},
 ): Promise<TenantSettingsResponse> {
-  const { apiUrl, credential } = requireCloudApiKey();
   return orpcCall<TenantSettingsResponse>({
-    apiUrl,
+    apiUrl: ctx.apiUrl,
     path: "/v1/tenant/settings",
     input,
-    credential,
+    credential: ctx.credential,
   });
 }
 
@@ -64,7 +52,8 @@ export const settingsStatusCommand = SimpleCLI.command({
   description: "Show Libretto Cloud tenant settings",
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
-  .handle(async () => printTenantSettings(await tenantSettings()));
+  .use(withCloudApiKey("manage Libretto Cloud settings"))
+  .handle(async ({ ctx }) => printTenantSettings(await tenantSettings(ctx)));
 
 export const setSettingsCommand = SimpleCLI.command({
   description: "Update one or more Libretto Cloud tenant settings",
@@ -82,7 +71,8 @@ export const setSettingsCommand = SimpleCLI.command({
       },
     }),
   )
-  .handle(async ({ input }) => {
+  .use(withCloudApiKey("manage Libretto Cloud settings"))
+  .handle(async ({ input, ctx }) => {
     const updates: TenantSettingsInput = {};
     if (input.codeSharing !== undefined) {
       updates.code_sharing_enabled = toBoolean(input.codeSharing);
@@ -99,7 +89,7 @@ export const setSettingsCommand = SimpleCLI.command({
       );
     }
 
-    return printTenantSettings(await tenantSettings(updates));
+    return printTenantSettings(await tenantSettings(ctx, updates));
   });
 
 export const settingsCommands = SimpleCLI.group({

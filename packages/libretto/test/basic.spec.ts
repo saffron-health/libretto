@@ -361,9 +361,61 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("deploy");
     expect(result.stdout).toContain("auth");
     expect(result.stdout).toContain("billing");
+    expect(result.stdout).toContain("jobs");
+    expect(result.stdout).toContain("schedules");
+    expect(result.stdout).toContain("settings");
     expect(result.stdout).toContain("share");
     expect(result.stdout).toContain("sharing");
     expect(result.stderr).toBe("");
+  });
+
+  test("prints cloud jobs create help", async ({ librettoCli }) => {
+    const result = await librettoCli("help cloud jobs create");
+    expect(result.stdout).toContain(
+      "Create a Libretto Cloud job for a deployed workflow",
+    );
+    expect(result.stdout).toContain("libretto cloud jobs create [workflow]");
+    expect(result.stdout).toContain("--params-file");
+    expect(result.stdout).toContain("--timeout-seconds");
+    expect(result.stderr).toBe("");
+  });
+
+  test("cloud jobs create requires an API key", async ({ librettoCli }) => {
+    const result = await librettoCli("cloud jobs create testWorkflow", {
+      LIBRETTO_API_KEY: undefined,
+    });
+
+    expect(result.stderr).toContain(
+      "LIBRETTO_API_KEY is required to create Libretto Cloud jobs.",
+    );
+    expect(result.stderr).toContain("libretto cloud auth api-key issue");
+  });
+
+  test("prints cloud schedules create help", async ({ librettoCli }) => {
+    const result = await librettoCli("help cloud schedules create");
+    expect(result.stdout).toContain(
+      "Create a recurring schedule for a deployed workflow",
+    );
+    expect(result.stdout).toContain(
+      "libretto cloud schedules create [workflow]",
+    );
+    expect(result.stdout).toContain("--cron");
+    expect(result.stdout).toContain("--timezone");
+    expect(result.stderr).toBe("");
+  });
+
+  test("cloud schedules create requires an API key", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli(
+      'cloud schedules create testWorkflow --cron "0 * * * *"',
+      { LIBRETTO_API_KEY: undefined },
+    );
+
+    expect(result.stderr).toContain(
+      "LIBRETTO_API_KEY is required to create Libretto Cloud schedules.",
+    );
+    expect(result.stderr).toContain("libretto cloud auth api-key issue");
   });
 
   test("prints cloud share help", async ({ librettoCli }) => {
@@ -600,6 +652,15 @@ export default workflow("main", async (ctx) => {
     );
     expect(result.stderr).toContain(
       "auth <subcommand>  Hosted-platform auth commands",
+    );
+    expect(result.stderr).toContain(
+      "jobs <subcommand>  Create and manage hosted jobs",
+    );
+    expect(result.stderr).toContain(
+      "schedules <subcommand>  Create and manage hosted schedules",
+    );
+    expect(result.stderr).toContain(
+      "settings <subcommand>  Manage Libretto Cloud tenant settings",
     );
     expect(result.stderr).not.toContain("Usage: libretto <command>");
     expect(result.stdout).toBe("");

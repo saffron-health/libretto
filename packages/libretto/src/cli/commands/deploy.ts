@@ -1,15 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import {
-  orpcCall,
-  resolveApiUrl,
-} from "../core/auth-fetch.js";
+import { orpcCall } from "../core/auth-fetch.js";
 import {
   buildHostedDeployTarball,
   type WorkflowDeployMetadata,
 } from "../core/deploy-artifact.js";
 import { readAuthState } from "../core/auth-storage.js";
 import { SimpleCLI } from "affordance";
+import { withCloudApiKey } from "./shared.js";
 
 type DeploymentStatus = "building" | "ready" | "failed";
 
@@ -51,19 +49,6 @@ function deployApiKeyRequiredMessage(hasStoredSession: boolean): string {
     "  • Generate a key: run `libretto cloud auth api-key issue --label <label>`.",
     "  • Add it to your project .env file: `LIBRETTO_API_KEY=<issued-key>`.",
   ].join("\n");
-}
-
-async function requireDeployApiKey() {
-  const apiKey = process.env.LIBRETTO_API_KEY?.trim();
-
-  if (!apiKey) {
-    throw new Error(deployApiKeyRequiredMessage(await hasStoredCloudSession()));
-  }
-
-  return {
-    apiUrl: resolveApiUrl(null),
-    credential: { source: "env-api-key" as const, apiKey },
-  };
 }
 
 async function hasStoredCloudSession(): Promise<boolean> {
@@ -188,8 +173,12 @@ export const deployCommand = SimpleCLI.command({
   description: "Deploy workflows to the hosted platform",
 })
   .input(deployInput)
-  .handle(async ({ input }) => {
-    const { apiUrl, credential } = await requireDeployApiKey();
+  .use(withCloudApiKey(
+    "deploy to Libretto Cloud",
+    async () => deployApiKeyRequiredMessage(await hasStoredCloudSession()),
+  ))
+  .handle(async ({ input, ctx }) => {
+    const { apiUrl, credential } = ctx;
     const deploymentName = generateDeploymentName();
 
     // Hosted deploy uploads a generated artifact with a deploy entrypoint and
