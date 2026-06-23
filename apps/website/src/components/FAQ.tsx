@@ -72,7 +72,7 @@ const faqs: FAQItem[] = [
           Browserbase
         </a>{" "}
         and{" "}
-        <a href="https://www.kernel.computer/" className={linkClass} data-fathom-event="FAQ Kernel click">
+        <a href="https://www.kernel.sh/" className={linkClass} data-fathom-event="FAQ Kernel click">
           Kernel
         </a>
         , and{" "}
