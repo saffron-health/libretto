@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { SimpleCLI } from "affordance";
-import { orpcCall, resolveApiUrl } from "../core/auth-fetch.js";
+import { orpcCall } from "../core/auth-fetch.js";
 import { normalizeProfileName } from "../core/profiles.js";
+import { withCloudApiKey } from "./shared.js";
 
 type ListProfilesResponse = {
   profiles: Array<{
@@ -17,30 +18,17 @@ type DeleteProfileResponse = {
   deleted_count: number;
 };
 
-function requireApiKeyCredential() {
-  const apiKey = process.env.LIBRETTO_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error(
-      "LIBRETTO_API_KEY is required to manage Libretto Cloud profiles. Issue one with `libretto cloud auth api-key issue --label <label>`.",
-    );
-  }
-  return {
-    apiUrl: resolveApiUrl(null),
-    credential: { source: "env-api-key" as const, apiKey },
-  };
-}
-
 export const listProfilesCommand = SimpleCLI.command({
   description: "List Libretto Cloud auth profiles",
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
-  .handle(async () => {
-    const { apiUrl, credential } = requireApiKeyCredential();
+  .use(withCloudApiKey("manage Libretto Cloud profiles"))
+  .handle(async ({ ctx }) => {
     const response = await orpcCall<ListProfilesResponse>({
-      apiUrl,
+      apiUrl: ctx.apiUrl,
       path: "/v1/browserProfiles/list",
       input: {},
-      credential,
+      credential: ctx.credential,
     });
     if (response.profiles.length === 0) {
       console.log("No cloud profiles found.");
@@ -65,14 +53,14 @@ export const deleteProfileCommand = SimpleCLI.command({
     ],
     named: {},
   }))
-  .handle(async ({ input }) => {
+  .use(withCloudApiKey("manage Libretto Cloud profiles"))
+  .handle(async ({ input, ctx }) => {
     const profileName = normalizeProfileName(input.profileName);
-    const { apiUrl, credential } = requireApiKeyCredential();
     const response = await orpcCall<DeleteProfileResponse>({
-      apiUrl,
+      apiUrl: ctx.apiUrl,
       path: "/v1/browserProfiles/delete",
       input: { name: profileName },
-      credential,
+      credential: ctx.credential,
     });
     if (!response.success || response.deleted_count === 0) {
       console.log(`No cloud profile found for ${profileName}.`);
