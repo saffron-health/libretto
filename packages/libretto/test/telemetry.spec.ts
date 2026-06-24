@@ -70,6 +70,49 @@ describe("CLI telemetry", () => {
     });
   });
 
+  test("includes configured cloud user id when signed in", async ({
+    librettoCli,
+    telemetryServer,
+    workspacePath,
+  }) => {
+    const home = workspacePath("home-cloud-account");
+    await mkdir(join(home, ".libretto"), { recursive: true });
+    await writeFile(
+      join(home, ".libretto", "auth.json"),
+      JSON.stringify(
+        {
+          apiUrl: telemetryServer.url,
+          session: {
+            cookie: "better-auth.session_token=test-session",
+            userId: "cloud-account-123",
+            email: "person@example.test",
+            expiresAt: null,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const result = await librettoCli("status", {
+      HOME: home,
+      LIBRETTO_API_URL: telemetryServer.url,
+      LIBRETTO_TELEMETRY_DISABLED: undefined,
+      DO_NOT_TRACK: undefined,
+      CI: undefined,
+    });
+
+    expect(result.stdout).toContain("No open sessions.");
+    expect(telemetryServer.requests).toHaveLength(1);
+    expect(telemetryServer.requests[0]).toMatchObject({
+      body: {
+        json: {
+          cloudUserId: "cloud-account-123",
+        },
+      },
+    });
+  });
+
   test("records failing resolved command events without changing the error", async ({
     librettoCli,
     telemetryServer,
