@@ -6,6 +6,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { SimpleCLICommandMeta, SimpleCLIMiddleware } from "affordance";
 import { resolveHostedApiUrl } from "./auth-fetch.js";
+import { readAuthState } from "./auth-storage.js";
 
 const TELEMETRY_FILE_NAME = "telemetry.json";
 const TELEMETRY_ENDPOINT_PATH = "/v1/telemetry/recordCliEvent";
@@ -25,6 +26,7 @@ type CliTelemetryPayload = {
   error: boolean;
   packageVersion: string;
   buildChannel: BuildChannel;
+  cloudUserId?: string;
 };
 
 type PackageJson = {
@@ -109,7 +111,7 @@ function writeTelemetryNotice(): void {
   if (!process.stderr.isTTY) return;
   process.stderr.write(
     [
-      "Libretto collects anonymous CLI telemetry: install id, timestamp, command event, error status, package version, and build channel only.",
+      "Libretto collects CLI telemetry: install id, timestamp, command event, error status, package version, build channel, and signed-in cloud user id only.",
       "Set LIBRETTO_TELEMETRY_DISABLED=1 or DO_NOT_TRACK=1 to disable it, or set enabled:false in ~/.libretto/telemetry.json.",
     ].join(" ") + "\n",
   );
@@ -130,6 +132,7 @@ async function recordCliTelemetryEvent(
   if (isTelemetryDisabled()) return;
   const installId = await readOrCreateInstallId();
   if (!installId) return;
+  const cloudUserId = await readConfiguredCloudUserId();
 
   await sendWithTimeout({
     installId,
@@ -138,7 +141,18 @@ async function recordCliTelemetryEvent(
     error,
     packageVersion,
     buildChannel,
+    ...(cloudUserId ? { cloudUserId } : {}),
   });
+}
+
+async function readConfiguredCloudUserId(): Promise<string | null> {
+  try {
+    const state = await readAuthState();
+    const cloudUserId = state?.session?.userId;
+    return cloudUserId && cloudUserId.length > 0 ? cloudUserId : null;
+  } catch {
+    return null;
+  }
 }
 
 async function sendWithTimeout(payload: CliTelemetryPayload): Promise<void> {
