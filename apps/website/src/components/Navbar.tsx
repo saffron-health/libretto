@@ -3,7 +3,7 @@ import { Text } from "./Text";
 import { Button } from "./Button";
 import { GitHubStarIcon, NpmIcon } from "../icons";
 import { AnimationTarget } from "./AnimationOrchestration";
-import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
+import { NPM_URL, RELEASES_URL, REPO_URL } from "../site";
 import { MobileMenu } from "./MobileMenu";
 import { LibrettoLogoAndName } from "../brand.js";
 
@@ -142,9 +142,6 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
           <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
             <GlitchNavLink href="/blog" external={false} fathomEvent="Nav blog click">
               Blog
-            </GlitchNavLink>
-            <GlitchNavLink href={DISCUSSIONS_URL} fathomEvent="Nav forum click">
-              Forum
             </GlitchNavLink>
             <GlitchNavLink href={RELEASES_URL} fathomEvent="Nav changelog click">
               Changelog
