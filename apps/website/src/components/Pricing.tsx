@@ -1,5 +1,4 @@
 import { ArrowRightIcon } from "../icons/index.js";
-import { AppLink } from "../routing.js";
 import { SectionIntro } from "./SectionIntro.js";
 import { ShellCommand } from "./ShellCommand.js";
 import { SiteSection } from "./SiteSection.js";
@@ -136,14 +135,14 @@ export function _Pricing() {
             command={BILLING_COMMAND}
             fathomEvent="Pricing billing command copy"
           />
-          <AppLink
+          <a
             href={BILLING_DOCS_URL}
             className="inline-flex items-center gap-1.5 font-mono text-xs text-accent underline decoration-accent/60 underline-offset-4 transition-colors hover:text-accent-bright"
             data-fathom-event="Pricing billing docs click"
           >
             Billing docs
             <ArrowRightIcon width={15} height={15} />
-          </AppLink>
+          </a>
         </div>
       </div>
     </SiteSection>

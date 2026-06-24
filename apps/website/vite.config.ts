@@ -16,7 +16,6 @@ const prerenderPaths = [
   "/vs/stagehand",
   ...blogPosts.map((post) => `/blog/${post.slug}`),
 ];
-const prerenderPathSet = new Set(prerenderPaths);
 
 export default defineConfig({
   plugins: [
@@ -25,9 +24,7 @@ export default defineConfig({
     tanstackStart({
       prerender: {
         enabled: true,
-        crawlLinks: true,
-        failOnError: true,
-        filter: ({ path }) => prerenderPathSet.has(path),
+        crawlLinks: false,
       },
       pages: prerenderPaths.map((path) => ({
         path,

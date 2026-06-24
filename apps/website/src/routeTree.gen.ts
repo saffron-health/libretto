@@ -9,8 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as OgImageRouteImport } from './routes/og-image'
-import { Route as IcosahedronRouteImport } from './routes/icosahedron'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as IndexRouteImport } from './routes/index'
@@ -20,16 +18,6 @@ import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs.playwright-
 import { Route as VsBrowserUseRouteImport } from './routes/vs.browser-use'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 
-const OgImageRoute = OgImageRouteImport.update({
-  id: '/og-image',
-  path: '/og-image',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IcosahedronRoute = IcosahedronRouteImport.update({
-  id: '/icosahedron',
-  path: '/icosahedron',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const BrandKitRoute = BrandKitRouteImport.update({
   id: '/brand-kit',
   path: '/brand-kit',
@@ -75,8 +63,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
-  '/icosahedron': typeof IcosahedronRoute
-  '/og-image': typeof OgImageRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
@@ -86,8 +72,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/brand-kit': typeof BrandKitRoute
-  '/icosahedron': typeof IcosahedronRoute
-  '/og-image': typeof OgImageRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
@@ -99,8 +83,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
-  '/icosahedron': typeof IcosahedronRoute
-  '/og-image': typeof OgImageRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
@@ -113,8 +95,6 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
-    | '/icosahedron'
-    | '/og-image'
     | '/blog/$slug'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
@@ -124,8 +104,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/brand-kit'
-    | '/icosahedron'
-    | '/og-image'
     | '/blog/$slug'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
@@ -136,8 +114,6 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
-    | '/icosahedron'
-    | '/og-image'
     | '/blog/$slug'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
@@ -149,8 +125,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BlogRoute: typeof BlogRouteWithChildren
   BrandKitRoute: typeof BrandKitRoute
-  IcosahedronRoute: typeof IcosahedronRoute
-  OgImageRoute: typeof OgImageRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
@@ -158,20 +132,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/og-image': {
-      id: '/og-image'
-      path: '/og-image'
-      fullPath: '/og-image'
-      preLoaderRoute: typeof OgImageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/icosahedron': {
-      id: '/icosahedron'
-      path: '/icosahedron'
-      fullPath: '/icosahedron'
-      preLoaderRoute: typeof IcosahedronRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/brand-kit': {
       id: '/brand-kit'
       path: '/brand-kit'
@@ -247,8 +207,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BlogRoute: BlogRouteWithChildren,
   BrandKitRoute: BrandKitRoute,
-  IcosahedronRoute: IcosahedronRoute,
-  OgImageRoute: OgImageRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,

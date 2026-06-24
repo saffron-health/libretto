@@ -45,7 +45,6 @@ export const Route = createRootRoute({
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&display=swap",
       },
-      { rel: "canonical", href: "https://libretto.sh/" },
     ],
     scripts: [
       {

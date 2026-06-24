@@ -1,7 +1,6 @@
 import { Children, useEffect } from "react";
 import type * as React from "react";
 import { SafeMdxRenderer } from "safe-mdx";
-import { AppLink } from "../routing";
 import { Button } from "../components/Button";
 import { Footer } from "../components/Footer";
 import { Navbar } from "../components/Navbar";
@@ -47,7 +46,7 @@ function BlogShell({ children }: { children: React.ReactNode }) {
 function BlogPostPreview({ post }: { post: BlogPost }) {
   return (
     <article className="border-t border-rule py-8">
-      <AppLink
+      <a
         href={`/blog/${post.slug}`}
         className="group block no-underline"
         data-fathom-event="Blog post click"
@@ -71,7 +70,7 @@ function BlogPostPreview({ post }: { post: BlogPost }) {
         <Text as="p" size="md" className="max-w-[660px] leading-relaxed text-muted">
           {post.description}
         </Text>
-      </AppLink>
+      </a>
     </article>
   );
 }
@@ -308,14 +307,14 @@ const markdownComponents = {
     const isExternal = typeof href === "string" && /^https?:\/\//.test(href);
 
     return (
-      <AppLink
+      <a
         href={href ?? "#"}
         target={isExternal ? "_blank" : undefined}
         rel={isExternal ? "noopener noreferrer" : undefined}
         className="text-accent-bright underline decoration-accent/40 underline-offset-4 transition-colors hover:text-ink"
       >
         {children}
-      </AppLink>
+      </a>
     );
   },
 };
@@ -351,13 +350,13 @@ export function BlogPostPage({ slug }: { slug: string }) {
       <BlogPostMeta post={post} />
       <BlogPostStructuredData post={post} />
       <article className="mx-auto max-w-[800px] pt-8 pb-20">
-        <AppLink
+        <a
           href="/blog"
           className="mb-10 inline-block text-sm text-muted/70 no-underline transition-colors hover:text-accent-bright"
           data-fathom-event="Blog back click"
         >
           Back to blog
-        </AppLink>
+        </a>
         <div className="mb-10 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Text as="time" size="xs" className="text-muted/70">
             {formatPostDate(post.publishedAt)}

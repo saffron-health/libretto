@@ -1,6 +1,4 @@
-import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { AppLink } from "../routing";
 import { AsciiLibretto } from "../brand";
 import { Button } from "../components/Button";
 import { Footer } from "../components/Footer";
@@ -181,62 +179,6 @@ export default workflow("readAuthorizationStatus", {
   },
 });`;
 
-function setMetaContent(selector: string, content: string) {
-  let element = document.head.querySelector<HTMLMetaElement>(selector);
-  if (!element) {
-    element = document.createElement("meta");
-    const property = selector.match(/\[property="([^"]+)"\]/)?.[1];
-    const name = selector.match(/\[name="([^"]+)"\]/)?.[1];
-
-    if (property) {
-      element.setAttribute("property", property);
-    }
-    if (name) {
-      element.setAttribute("name", name);
-    }
-
-    document.head.append(element);
-  }
-
-  element.content = content;
-}
-
-function setCanonicalHref(href: string) {
-  let element = document.head.querySelector<HTMLLinkElement>(
-    'link[rel="canonical"]',
-  );
-  if (!element) {
-    element = document.createElement("link");
-    element.rel = "canonical";
-    document.head.append(element);
-  }
-
-  element.href = href;
-}
-
-function StagehandPageMeta() {
-  useEffect(() => {
-    const title =
-      "Libretto vs Stagehand: compiled scripts vs runtime AI primitives";
-    const description =
-      "A developer-focused comparison of Libretto and Browserbase Stagehand for AI browser automation: act(), observe(), caching, deterministic scripts, and runtime inference trade-offs.";
-    const url = "https://libretto.sh/vs/stagehand";
-
-    document.title = title;
-    setCanonicalHref(url);
-    setMetaContent('meta[name="description"]', description);
-    setMetaContent('meta[property="og:type"]', "article");
-    setMetaContent('meta[property="og:title"]', title);
-    setMetaContent('meta[property="og:description"]', description);
-    setMetaContent('meta[property="og:url"]', url);
-    setMetaContent('meta[name="twitter:card"]', "summary");
-    setMetaContent('meta[name="twitter:title"]', title);
-    setMetaContent('meta[name="twitter:description"]', description);
-  }, []);
-
-  return null;
-}
-
 function ArticleSection({
   children,
   kicker,
@@ -387,7 +329,6 @@ function FAQList() {
 export function StagehandPage() {
   return (
     <div className="crt-page flex min-h-screen flex-col bg-bg text-ink">
-      <StagehandPageMeta />
       <Navbar />
       <main className="section-rails relative mx-auto mt-16 w-full max-w-[1100px] flex-1 px-8">
         <article className="mx-auto max-w-[820px] pb-20">
@@ -611,13 +552,13 @@ export function StagehandPage() {
               >
                 Go to docs
               </Button>
-              <AppLink
+              <a
                 href="https://libretto.sh"
                 className="text-sm text-muted underline decoration-muted underline-offset-4 transition-colors hover:text-accent-bright"
                 data-fathom-event="Stagehand comparison homepage click"
               >
                 libretto.sh
-              </AppLink>
+              </a>
             </div>
           </section>
         </article>
