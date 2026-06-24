@@ -1,18 +1,5 @@
-import { Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
-import { BlogIndexPage } from "../blog/BlogPage";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/blog")({
-  component: BlogRoute,
+  component: Outlet,
 });
-
-function BlogRoute() {
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  });
-
-  if (pathname === "/blog" || pathname === "/blog/") {
-    return <BlogIndexPage />;
-  }
-
-  return <Outlet />;
-}

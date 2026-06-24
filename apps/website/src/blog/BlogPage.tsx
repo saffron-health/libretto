@@ -1,8 +1,5 @@
 import { Children, useEffect } from "react";
 import type * as React from "react";
-import Prism from "prismjs";
-import "prismjs/components/prism-bash.js";
-import "prismjs/components/prism-typescript.js";
 import { SafeMdxRenderer } from "safe-mdx";
 import { AppLink } from "../routing";
 import { Button } from "../components/Button";
@@ -15,6 +12,7 @@ import {
   getAbsoluteBlogPostUrl,
   serializeJsonLd,
 } from "./jsonLd";
+import { Prism } from "../prism";
 import { BLOG_POSTS, getBlogPost } from "./posts";
 import type { BlogPost } from "../../scripts/blog-posts.ts";
 

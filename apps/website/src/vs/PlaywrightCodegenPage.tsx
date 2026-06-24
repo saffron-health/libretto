@@ -1,7 +1,5 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import Prism from "prismjs";
-import "prismjs/components/prism-typescript.js";
 import { AppLink } from "../routing";
 import { AsciiLibretto } from "../brand";
 import { Button } from "../components/Button";
@@ -11,6 +9,7 @@ import { Navbar } from "../components/Navbar";
 import { Panel } from "../components/Panel";
 import { SectionHeading } from "../components/SectionHeading";
 import { Text } from "../components/Text";
+import { Prism } from "../prism";
 
 interface ComparisonRow {
   label: string;

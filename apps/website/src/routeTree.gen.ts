@@ -14,6 +14,7 @@ import { Route as IcosahedronRouteImport } from './routes/icosahedron'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as VsStagehandRouteImport } from './routes/vs.stagehand'
 import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs.playwright-codegen'
 import { Route as VsBrowserUseRouteImport } from './routes/vs.browser-use'
@@ -43,6 +44,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const BlogIndexRoute = BlogIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => BlogRoute,
 } as any)
 const VsStagehandRoute = VsStagehandRouteImport.update({
   id: '/vs/stagehand',
@@ -75,10 +81,10 @@ export interface FileRoutesByFullPath {
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
+  '/blog/': typeof BlogIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/blog': typeof BlogRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
   '/icosahedron': typeof IcosahedronRoute
   '/og-image': typeof OgImageRoute
@@ -86,6 +92,7 @@ export interface FileRoutesByTo {
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
+  '/blog': typeof BlogIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +105,7 @@ export interface FileRoutesById {
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
+  '/blog/': typeof BlogIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,10 +119,10 @@ export interface FileRouteTypes {
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
+    | '/blog/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/blog'
     | '/brand-kit'
     | '/icosahedron'
     | '/og-image'
@@ -122,6 +130,7 @@ export interface FileRouteTypes {
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
+    | '/blog'
   id:
     | '__root__'
     | '/'
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
+    | '/blog/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -183,6 +193,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blog/': {
+      id: '/blog/'
+      path: '/'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof BlogIndexRouteImport
+      parentRoute: typeof BlogRoute
+    }
     '/vs/stagehand': {
       id: '/vs/stagehand'
       path: '/vs/stagehand'
@@ -216,10 +233,12 @@ declare module '@tanstack/react-router' {
 
 interface BlogRouteChildren {
   BlogSlugRoute: typeof BlogSlugRoute
+  BlogIndexRoute: typeof BlogIndexRoute
 }
 
 const BlogRouteChildren: BlogRouteChildren = {
   BlogSlugRoute: BlogSlugRoute,
+  BlogIndexRoute: BlogIndexRoute,
 }
 
 const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren)
