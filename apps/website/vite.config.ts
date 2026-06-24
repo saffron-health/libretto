@@ -7,15 +7,7 @@ import { loadBlogPostInputs } from "./scripts/blog-posts.ts";
 
 const comptimePlugin = await comptime();
 const blogPosts = await loadBlogPostInputs();
-const prerenderPaths = [
-  "/",
-  "/blog",
-  "/brand-kit",
-  "/vs/browser-use",
-  "/vs/playwright-codegen",
-  "/vs/stagehand",
-  ...blogPosts.map((post) => `/blog/${post.slug}`),
-];
+const blogPostPaths = blogPosts.map((post) => `/blog/${post.slug}`);
 
 export default defineConfig({
   plugins: [
@@ -26,7 +18,7 @@ export default defineConfig({
         enabled: true,
         crawlLinks: false,
       },
-      pages: prerenderPaths.map((path) => ({
+      pages: blogPostPaths.map((path) => ({
         path,
         prerender: { enabled: true },
       })),

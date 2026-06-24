@@ -1,4 +1,4 @@
-import { Children, useEffect } from "react";
+import { Children } from "react";
 import type * as React from "react";
 import { SafeMdxRenderer } from "safe-mdx";
 import { Button } from "../components/Button";
@@ -7,8 +7,6 @@ import { Navbar } from "../components/Navbar";
 import { Text } from "../components/Text";
 import {
   buildBlogPostJsonLd,
-  getAbsoluteBlogPostImageUrl,
-  getAbsoluteBlogPostUrl,
   serializeJsonLd,
 } from "./jsonLd";
 import { Prism } from "../prism";
@@ -83,62 +81,6 @@ function BlogPostStructuredData({ post }: { post: BlogPost }) {
       {jsonLd}
     </script>
   );
-}
-
-function setMetaContent(selector: string, content: string) {
-  let element = document.head.querySelector<HTMLMetaElement>(selector);
-  if (!element) {
-    element = document.createElement("meta");
-    const property = selector.match(/\[property="([^"]+)"\]/)?.[1];
-    const name = selector.match(/\[name="([^"]+)"\]/)?.[1];
-
-    if (property) {
-      element.setAttribute("property", property);
-    }
-    if (name) {
-      element.setAttribute("name", name);
-    }
-
-    document.head.append(element);
-  }
-
-  element.content = content;
-}
-
-function setCanonicalHref(href: string) {
-  let element = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-  if (!element) {
-    element = document.createElement("link");
-    element.rel = "canonical";
-    document.head.append(element);
-  }
-
-  element.href = href;
-}
-
-function BlogPostMeta({ post }: { post: BlogPost }) {
-  useEffect(() => {
-    const title = `${post.title} | Libretto Blog`;
-    const url = getAbsoluteBlogPostUrl(post);
-    const imageUrl = getAbsoluteBlogPostImageUrl(post);
-
-    document.title = title;
-    setCanonicalHref(url);
-    setMetaContent('meta[name="description"]', post.description);
-    setMetaContent('meta[property="og:type"]', "article");
-    setMetaContent('meta[property="og:title"]', title);
-    setMetaContent('meta[property="og:description"]', post.description);
-    setMetaContent('meta[property="og:url"]', url);
-    setMetaContent('meta[property="og:image"]', imageUrl);
-    setMetaContent('meta[property="og:image:width"]', "1200");
-    setMetaContent('meta[property="og:image:height"]', "630");
-    setMetaContent('meta[name="twitter:card"]', "summary_large_image");
-    setMetaContent('meta[name="twitter:title"]', title);
-    setMetaContent('meta[name="twitter:description"]', post.description);
-    setMetaContent('meta[name="twitter:image"]', imageUrl);
-  }, [post]);
-
-  return null;
 }
 
 function getCodeLanguage(className: string | undefined): string | undefined {
@@ -347,7 +289,6 @@ export function BlogPostPage({ slug }: { slug: string }) {
 
   return (
     <BlogShell>
-      <BlogPostMeta post={post} />
       <BlogPostStructuredData post={post} />
       <article className="mx-auto max-w-[800px] pt-8 pb-20">
         <a

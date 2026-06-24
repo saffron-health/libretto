@@ -10,20 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
-import { Route as BlogRouteImport } from './routes/blog'
+import { Route as BlogRouteRouteImport } from './routes/blog/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as BlogIndexRouteImport } from './routes/blog.index'
-import { Route as VsStagehandRouteImport } from './routes/vs.stagehand'
-import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs.playwright-codegen'
-import { Route as VsBrowserUseRouteImport } from './routes/vs.browser-use'
-import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
+import { Route as BlogIndexRouteImport } from './routes/blog/index'
+import { Route as VsStagehandRouteImport } from './routes/vs/stagehand'
+import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs/playwright-codegen'
+import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
+import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 
 const BrandKitRoute = BrandKitRouteImport.update({
   id: '/brand-kit',
   path: '/brand-kit',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BlogRoute = BlogRouteImport.update({
+const BlogRouteRoute = BlogRouteRouteImport.update({
   id: '/blog',
   path: '/blog',
   getParentRoute: () => rootRouteImport,
@@ -36,7 +36,7 @@ const IndexRoute = IndexRouteImport.update({
 const BlogIndexRoute = BlogIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => BlogRoute,
+  getParentRoute: () => BlogRouteRoute,
 } as any)
 const VsStagehandRoute = VsStagehandRouteImport.update({
   id: '/vs/stagehand',
@@ -56,12 +56,12 @@ const VsBrowserUseRoute = VsBrowserUseRouteImport.update({
 const BlogSlugRoute = BlogSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
-  getParentRoute: () => BlogRoute,
+  getParentRoute: () => BlogRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/blog': typeof BlogRouteWithChildren
+  '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
@@ -81,7 +81,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/blog': typeof BlogRouteWithChildren
+  '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
@@ -123,7 +123,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  BlogRoute: typeof BlogRouteWithChildren
+  BlogRouteRoute: typeof BlogRouteRouteWithChildren
   BrandKitRoute: typeof BrandKitRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
@@ -143,7 +143,7 @@ declare module '@tanstack/react-router' {
       id: '/blog'
       path: '/blog'
       fullPath: '/blog'
-      preLoaderRoute: typeof BlogRouteImport
+      preLoaderRoute: typeof BlogRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -158,7 +158,7 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/blog/'
       preLoaderRoute: typeof BlogIndexRouteImport
-      parentRoute: typeof BlogRoute
+      parentRoute: typeof BlogRouteRoute
     }
     '/vs/stagehand': {
       id: '/vs/stagehand'
@@ -186,26 +186,28 @@ declare module '@tanstack/react-router' {
       path: '/$slug'
       fullPath: '/blog/$slug'
       preLoaderRoute: typeof BlogSlugRouteImport
-      parentRoute: typeof BlogRoute
+      parentRoute: typeof BlogRouteRoute
     }
   }
 }
 
-interface BlogRouteChildren {
+interface BlogRouteRouteChildren {
   BlogSlugRoute: typeof BlogSlugRoute
   BlogIndexRoute: typeof BlogIndexRoute
 }
 
-const BlogRouteChildren: BlogRouteChildren = {
+const BlogRouteRouteChildren: BlogRouteRouteChildren = {
   BlogSlugRoute: BlogSlugRoute,
   BlogIndexRoute: BlogIndexRoute,
 }
 
-const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren)
+const BlogRouteRouteWithChildren = BlogRouteRoute._addFileChildren(
+  BlogRouteRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  BlogRoute: BlogRouteWithChildren,
+  BlogRouteRoute: BlogRouteRouteWithChildren,
   BrandKitRoute: BrandKitRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,

@@ -6,15 +6,12 @@
   "scripts": {
     "dev": "vite dev",
     "brand-kit": "vite dev --host 0.0.0.0 --port 5174",
-    "clean": "node scripts/clean-dist.mjs",
-    "build": "pnpm -s clean && tsc --noEmit && vite build && node scripts/blog-og-metadata.mjs generate",
+    "build": "tsc --noEmit && vite build",
     "type-check": "tsc --noEmit",
     "preview": "vite preview",
-    "lint": "lintcn lint --tsconfig tsconfig.json && node scripts/blog-og-metadata.mjs check",
+    "lint": "lintcn lint --tsconfig tsconfig.json",
     "check": "pnpm -s type-check && pnpm -s lint",
     "knip": "knip --cache --files --exports",
-    "check:blog-og": "node scripts/blog-og-metadata.mjs check",
-    "generate-blog-html": "node scripts/blog-og-metadata.mjs generate",
     "render-blog-og": "node scripts/render-blog-og-images.mjs",
     "render-brand-kit": "node scripts/render-brand-kit-assets.mjs"
   },

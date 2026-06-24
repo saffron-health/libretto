@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { StagehandPage } from "../vs/StagehandPage";
+import { PlaywrightCodegenPage } from "../../vs/PlaywrightCodegenPage";
 
-const title = "Libretto vs Stagehand: compiled scripts vs runtime AI primitives";
+const title = "Libretto vs Playwright codegen: workflow compiler vs browser recorder";
 const description =
-  "A developer-focused comparison of Libretto and Browserbase Stagehand for AI browser automation: act(), observe(), caching, deterministic scripts, and runtime inference trade-offs.";
-const url = "https://libretto.sh/vs/stagehand";
+  "A developer-focused comparison of Libretto and Playwright codegen for deterministic browser automation, generated code, network shortcuts, debugging, and maintenance.";
+const url = "https://libretto.sh/vs/playwright-codegen";
 
-export const Route = createFileRoute("/vs/stagehand")({
+export const Route = createFileRoute("/vs/playwright-codegen")({
   head: () => ({
     meta: [
       { title },
@@ -21,5 +21,5 @@ export const Route = createFileRoute("/vs/stagehand")({
     ],
     links: [{ rel: "canonical", href: url }],
   }),
-  component: StagehandPage,
+  component: PlaywrightCodegenPage,
 });

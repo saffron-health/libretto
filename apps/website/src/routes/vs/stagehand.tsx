@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BrowserUsePage } from "../vs/BrowserUsePage";
+import { StagehandPage } from "../../vs/StagehandPage";
 
-const title = "Libretto vs Browser Use: deterministic scripts vs a runtime agent";
+const title = "Libretto vs Stagehand: compiled scripts vs runtime AI primitives";
 const description =
-  "A developer-focused comparison of Libretto and Browser Use for AI browser automation: runtime agents, deterministic scripts, speed, debuggability, and production trade-offs.";
-const url = "https://libretto.sh/vs/browser-use";
+  "A developer-focused comparison of Libretto and Browserbase Stagehand for AI browser automation: act(), observe(), caching, deterministic scripts, and runtime inference trade-offs.";
+const url = "https://libretto.sh/vs/stagehand";
 
-export const Route = createFileRoute("/vs/browser-use")({
+export const Route = createFileRoute("/vs/stagehand")({
   head: () => ({
     meta: [
       { title },
@@ -21,5 +21,5 @@ export const Route = createFileRoute("/vs/browser-use")({
     ],
     links: [{ rel: "canonical", href: url }],
   }),
-  component: BrowserUsePage,
+  component: StagehandPage,
 });
