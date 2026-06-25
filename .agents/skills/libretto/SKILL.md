@@ -46,9 +46,9 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 
 ## Run Modes
 
-Using `npx libretto ... --provider <name>` runs workflow code locally while the browser runs on that provider. Use it to debug anti-bot, CAPTCHA, or provider-specific browser behavior.
+Without `--provider`, `open` and `run` use `LIBRETTO_PROVIDER`, then `.libretto/config.json`, then local Chromium. Using `npx libretto ... --provider <name>` runs workflow code locally while the browser runs on that provider. Use it to debug anti-bot, CAPTCHA, or provider-specific browser behavior.
 
-Deployed workflows are different: Libretto Cloud packages and runs the workflow as an API-backed workflow. When the user says "cloud" or "provider," clarify which they mean. For debugging browser behavior, default to a hosted browser run.
+Usually, test workflow code locally, then test on a remote browser provider like `libretto-cloud`, then deploy the workflow. If the user's intent is unclear, clarify whether they mean a hosted browser run or a deployed API-backed workflow.
 
 If the user prefers a provider for all local CLI runs in a workspace, update `.libretto/config.json` with `provider` instead of repeating `--provider`. Read `references/configuration-file-reference.md` first.
 
@@ -64,7 +64,7 @@ If the user prefers a provider for all local CLI runs in a workspace, update `.l
 - Authenticated workflows must implement `librettoAuthenticate` with declared credentials before validation. Use a reusable `*_totp_secret` credential for authenticator-app MFA, not a one-time `otp_code`; text and email verification codes are not supported for fully automated sign-in.
 - Read `references/website-authentication.md` when you need `librettoAuthenticate` examples or auth-profile details.
 - Validation requires a successful clean `run` on a fresh, unauthenticated session with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
-- After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--auth-profile`, `--provider`, `--headed`, or `--headless` flags the workflow needs.
+- After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--provider`, `--headed`, or `--headless` flags the workflow needs. Do not add `--auth-profile` to `run`; workflow `authProfile` metadata controls profile use.
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
 - Never run multiple `exec` commands at the same time.
