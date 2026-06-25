@@ -429,6 +429,37 @@ describe("Libretto Cloud provider", () => {
     });
   });
 
+  it("passes requested headless mode to cloud browser sessions", async () => {
+    vi.stubEnv("LIBRETTO_API_KEY", "test-key");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/v1/sessions/create") {
+          return jsonResponse({
+            json: {
+              session_id: "session-headless",
+              status: "open",
+              cdp_url: "wss://cloud.example.test/devtools/session-headless",
+              live_view_url: null,
+            },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await createLibrettoCloudProvider().createSession({
+      headless: true,
+    });
+
+    expect(session.sessionId).toBe("session-headless");
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
+      json: { timeout_seconds: 3600, headless: true },
+    });
+  });
+
   it("waits for queued sessions to receive a CDP URL", async () => {
     vi.stubEnv("LIBRETTO_API_KEY", "test-key");
     vi.stubEnv("LIBRETTO_TIMEOUT_SECONDS", "123");

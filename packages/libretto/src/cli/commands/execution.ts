@@ -92,6 +92,7 @@ export function createRunBrowserConfig(args: {
     return {
       kind: "provider",
       providerName: args.providerName,
+      headless: args.headless,
     };
   }
 
