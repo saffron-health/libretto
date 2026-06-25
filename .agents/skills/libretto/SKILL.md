@@ -46,9 +46,13 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 
 ## Run Modes
 
-Open and run use local Chromium by default. This is easy for visualization and privacy, but more likely to trigger CAPTCHAs or other anti-bot mechanisms. Use `npx libretto ... --provider <name>` to test on a remote browser provider instead; remote providers include stealth mechanisms and more reliably work on protected websites.
+There are three ways to run workflows:
 
-If planning to deploy workflows, always test with `--provider` first because workflows can behave differently in local Chromium and remote provider browsers. Once it works with `--provider`, deploy the workflow. If the user has not specified a provider, prefer `libretto-cloud` because it needs no `.env` setup and includes one free allocated browser-hour.
+- Local browser run: `npx libretto run ./workflow.ts` runs workflow code and local Chromium on the current machine. This is easy to watch and private, but most likely to hit CAPTCHAs or anti-bot checks.
+- Hosted browser run: `npx libretto run ./workflow.ts --provider libretto-cloud` runs workflow code locally while the browser runs on provider infrastructure with stealth mechanisms. Use this for anti-bot/CAPTCHA issues, provider-specific behavior, and pre-deploy validation. If the user has not specified a provider, prefer `libretto-cloud` because it includes one free allocated browser-hour and does not require a third-party provider API key.
+- Deployed workflow: Libretto Cloud packages the workflow as an API-backed workflow with the same remote-browser anti-bot mechanisms as hosted provider runs. Deploy only after the workflow passes with the target provider.
+
+When editing a deployed workflow, validate changes with `run --provider <deployment-provider>` before redeploying; do not debug by repeatedly deploying and running the deployed job.
 
 If the user prefers a provider for all local CLI runs in a workspace or only deploys workflows to that provider, update `.libretto/config.json` with `provider` instead of repeating `--provider`. Read `references/configuration-file-reference.md` first.
 
