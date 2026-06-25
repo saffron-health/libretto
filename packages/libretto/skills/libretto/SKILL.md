@@ -44,6 +44,18 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 
 - Use `npx libretto experiments` to list internal feature flags and `npx libretto experiments describe <name>` for usage notes when an experiment is enabled.
 
+## Run Modes
+
+There are three ways to run workflows:
+
+- Local browser run: `npx libretto run ./workflow.ts` runs workflow code and local Chromium on the current machine. This is easy to watch and private, but most likely to hit CAPTCHAs or anti-bot checks.
+- Hosted browser run: `npx libretto run ./workflow.ts --provider libretto-cloud` runs workflow code locally while the browser runs on provider infrastructure with stealth mechanisms. Use this for anti-bot/CAPTCHA issues, provider-specific behavior, and pre-deploy validation. If the user has not specified a provider, prefer `libretto-cloud` because it includes one free allocated browser-hour and does not require a third-party provider API key.
+- Deployed workflow: Libretto Cloud packages the workflow as an API-backed workflow with the same remote-browser anti-bot mechanisms as hosted provider runs. Deploy only after the workflow passes with the target provider.
+
+When editing a deployed workflow, validate changes with `run --provider <deployment-provider>` before redeploying; do not debug by repeatedly deploying and running the deployed job.
+
+If the user prefers a provider for all local CLI runs in a workspace or only deploys workflows to that provider, update `.libretto/config.json` with `provider` instead of repeating `--provider`. Read `references/configuration-file-reference.md` first.
+
 ## Working Rules
 
 - Announce which session you are using and what page you are on.
@@ -56,7 +68,7 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 - Authenticated workflows must implement `librettoAuthenticate` with declared credentials before validation. Use a reusable `*_totp_secret` credential for authenticator-app MFA, not a one-time `otp_code`; text and email verification codes are not supported for fully automated sign-in.
 - Read `references/website-authentication.md` when you need `librettoAuthenticate` examples or auth-profile details.
 - Validation requires a successful clean `run` on a fresh, unauthenticated session with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
-- After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--headed`, or `--headless` flags the workflow needs.
+- After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--provider`, `--headed`, or `--headless` flags the workflow needs. Do not add `--auth-profile` to `run`; workflow `authProfile` metadata controls profile use.
 - Treat exploration sessions as disposable unless the user explicitly wants one kept open.
 - Close disposable sessions before your final response once exploration, debugging, or validation is complete. Open browsers keep consuming local or hosted resources.
 - Get explicit user confirmation before mutating actions or replaying network requests that may have side effects.
@@ -74,6 +86,7 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 
 ```bash
 npx libretto open https://example.com
+npx libretto open https://example.com --provider libretto-cloud --session provider-debug
 npx libretto open https://example.com --read-only --session readonly-example
 npx libretto open https://example.com --session debug-example
 ```
@@ -150,6 +163,7 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 - Use `run` to verify a workflow file after creating it or editing it. Use the same headed or headless mode for validation that the workflow run is already using. Plain `run` defaults to headed mode.
 - Workflows define their input shape with a Zod schema (see `references/code-generation-rules.md`). `run` validates `--params` against that schema before calling the handler and prints a clear field-by-field error if the input doesn't match.
 - Successful runs close the browser by default. Pass `--stay-open-on-success` when you need to inspect the completed state with `pages`, `snapshot`, or `exec`.
+- Use `--provider <name>` when validating behavior in that provider's browser runtime.
 - Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.
 - If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
 - Insert `await pause(session)` statements in the workflow file when you need to stop at specific states for interactive debugging, like breakpoints in the browser flow.
@@ -158,6 +172,7 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 
 ```bash
 npx libretto run ./integration.ts --params '{"status":"open"}'
+npx libretto run ./integration.ts --provider libretto-cloud
 npx libretto run ./integration.ts --read-only
 npx libretto run ./integration.ts --stay-open-on-success
 ```
