@@ -49,8 +49,8 @@ A profile only holds whatever a signed-in session wrote into it, so it does noth
 Auth profiles are browser-runtime-specific:
 
 - Local runs load `.libretto/profiles/<name>.json`.
-- Hosted browser runs and deployed workflows use provider-backed profile state; a local profile file is not available to provider browsers.
-- Provider-backed profiles are created or refreshed by workflow-declared `authProfile` metadata. For manual login, run the hosted workflow with a pause/wait, ask the human to sign in through the live URL, then let the workflow finish so the provider can persist the profile.
+- `libretto-cloud` and providers that explicitly support auth profiles use provider-backed profile state; a local profile file is not available to provider browsers.
+- Provider-backed profiles are created or refreshed by workflow-declared `authProfile` metadata. For manual login on a remote provider, run the hosted workflow with a pause/wait, ask the human to sign in through the live URL, use the observed login flow to implement `librettoAuthenticate`, then let the workflow finish so the provider can persist the profile.
 - A plain `open --provider` session does not have workflow auth profile metadata. `libretto save` writes a local profile from an open session; it does not persist provider-backed workflow auth profile state.
 - Revalidate login when switching providers, even if the profile name is the same.
 

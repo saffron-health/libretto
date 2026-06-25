@@ -46,11 +46,11 @@ Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first 
 
 ## Run Modes
 
-Without `--provider`, `open` and `run` use `LIBRETTO_PROVIDER`, then `.libretto/config.json`, then local Chromium. Using `npx libretto ... --provider <name>` runs workflow code locally while the browser runs on that provider. Use it to debug anti-bot, CAPTCHA, or provider-specific browser behavior.
+Open and run use local Chromium by default. This is easy for visualization and privacy, but more likely to trigger CAPTCHAs or other anti-bot mechanisms. Use `npx libretto ... --provider <name>` to test on a remote browser provider instead; remote providers include stealth mechanisms and more reliably work on protected websites.
 
-Usually, test workflow code locally, then test on a remote browser provider like `libretto-cloud`, then deploy the workflow. If the user's intent is unclear, clarify whether they mean a hosted browser run or a deployed API-backed workflow.
+If planning to deploy workflows, always test with `--provider` first because workflows can behave differently in local Chromium and remote provider browsers. Once it works with `--provider`, deploy the workflow. If the user has not specified a provider, prefer `libretto-cloud` because it needs no `.env` setup and includes one free allocated browser-hour.
 
-If the user prefers a provider for all local CLI runs in a workspace, update `.libretto/config.json` with `provider` instead of repeating `--provider`. Read `references/configuration-file-reference.md` first.
+If the user prefers a provider for all local CLI runs in a workspace or only deploys workflows to that provider, update `.libretto/config.json` with `provider` instead of repeating `--provider`. Read `references/configuration-file-reference.md` first.
 
 ## Working Rules
 
