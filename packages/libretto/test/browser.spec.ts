@@ -337,6 +337,34 @@ describe("Kernel provider", () => {
     });
   });
 
+  it("uses per-session headless mode before provider defaults", async () => {
+    vi.stubEnv("KERNEL_API_KEY", "env-key");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/browsers") {
+          return jsonResponse({
+            session_id: "kernel-session",
+            cdp_ws_url: "wss://kernel.example.test/cdp",
+            browser_live_view_url: null,
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createKernelProvider({
+      apiKey: "constructor-key",
+      headless: false,
+    }).createSession({ headless: true });
+
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toMatchObject({
+      headless: true,
+    });
+  });
+
   it("starts and stops replay recording when enabled", async () => {
     const fetchMock = vi.fn(
       async (url: string | URL | Request, init?: RequestInit) => {

@@ -99,7 +99,8 @@ export function createKernelProvider(
   >();
 
   return {
-    async createSession() {
+    async createSession(sessionOptions) {
+      const sessionHeadless = sessionOptions?.headless ?? headless;
       const json = await kernelFetchJson<KernelBrowserResponse>(
         endpoint,
         apiKey,
@@ -107,7 +108,7 @@ export function createKernelProvider(
         {
           method: "POST",
           body: JSON.stringify({
-            headless,
+            headless: sessionHeadless,
             stealth,
             timeout_seconds: timeoutSeconds,
           }),
