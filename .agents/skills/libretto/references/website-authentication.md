@@ -2,7 +2,7 @@
 
 Use this reference when a workflow needs a logged-in website session. The Working Rules in `../SKILL.md` define the required auth workflow; this file explains how to implement sign-in logic with `librettoAuthenticate`, and how auth profiles save signed-in state for later runs.
 
-For local-only repeat runs, a saved auth profile can be enough if the user is comfortable refreshing it manually when it expires. For deployed workflows, build and verify working sign-in logic first; an auth profile is added only after `librettoAuthenticate` is verified, never as a substitute for it.
+Build and verify working sign-in logic first. Authenticated workflows must use `librettoAuthenticate`; an auth profile is added only after the sign-in logic is verified, never as a substitute for it.
 
 ## Sign-In Logic
 
@@ -42,7 +42,7 @@ export default workflow("accountWorkflow", {
 
 ## Auth Profiles
 
-Auth profiles save the signed-in browser state (cookies, localStorage, IndexedDB) so later runs can reuse a logged-in session instead of signing in from scratch. For deployed workflows, the sign-in logic still takes priority: do not add a profile until the `librettoAuthenticate` sign-in step has been verified from a signed-out browser with no profile present. If you add a profile first, validation passes on the saved session while the untested sign-in logic fails the first time that session expires.
+Auth profiles save the signed-in browser state (cookies, localStorage, IndexedDB) so later runs can reuse a logged-in session instead of signing in from scratch. The sign-in logic still takes priority: do not add a profile until the `librettoAuthenticate` sign-in step has been verified from a signed-out browser with no profile present. If you add a profile first, validation passes on the saved session while the untested sign-in logic fails the first time that session expires.
 
 A profile only holds whatever a signed-in session wrote into it, so it does nothing until a run has signed in at least once. With `refresh: true`, a successful run writes updated browser state back to the profile, so a fresh sign-in repairs an expired one.
 
