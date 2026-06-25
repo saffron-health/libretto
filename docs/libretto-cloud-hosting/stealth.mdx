@@ -9,6 +9,41 @@ Every Libretto Cloud browser runs in stealth mode. Hosted runs use residential p
 
 Stealth also includes automatic CAPTCHA handling. Libretto Cloud cannot guarantee every challenge will clear, but common CAPTCHA and bot-check pages can resolve without a manual handoff.
 
+## Residential proxy locations
+
+By default, Libretto Cloud uses a managed US residential proxy for each hosted browser. If the target site is location-sensitive, pass `residential_proxy` when you create a job, browser session, or schedule.
+
+`country` is required and must be a two-letter ISO country code. You can refine US locations with `state` or `zip`, target a city with `city`, or target an ISP/network with `asn`.
+
+```bash theme={null}
+curl -X POST "https://api.libretto.sh/v1/jobs/create" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "workflow": "check-eligibility",
+      "params": {
+        "memberId": "12345"
+      },
+      "residential_proxy": {
+        "country": "US",
+        "state": "CA",
+        "city": "san-francisco"
+      }
+    }
+  }'
+```
+
+Supported fields:
+
+- `country`: two-letter country code, such as `US`.
+- `state`: two-letter US state code. Only supported with `country: "US"`.
+- `city`: city slug without spaces.
+- `zip`: five-digit US ZIP code. Only supported with `country: "US"`; cannot be combined with `city` or `state`.
+- `asn`: network identifier such as `AS7922`; cannot be combined with `city` or `state`.
+
+For recurring workflows, pass the same object to `residential_proxy` on `/v1/schedules/create` or `/v1/schedules/update`. To clear a schedule's configured proxy location, set `residential_proxy` to `null` on `/v1/schedules/update`.
+
 ## Workflow behavior
 
 On Libretto Cloud, if a workflow reaches a CAPTCHA, Cloudflare check, or similar interstitial, wait up to 2 minutes before treating it as blocked. That gives the hosted browser time to finish the provider-side solve and continue to the page your workflow expects.

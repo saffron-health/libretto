@@ -112,6 +112,13 @@ export function MobileMenu({ stars }: { stars: string | null }) {
               Blog
             </MenuItem>
             <MenuItem
+              href="/#comparisons"
+              className={itemClass}
+              data-fathom-event="Mobile nav comparisons click"
+            >
+              Comparisons
+            </MenuItem>
+            <MenuItem
               href={DISCUSSIONS_URL}
               target="_blank"
               rel="noopener noreferrer"

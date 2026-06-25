@@ -10,8 +10,8 @@
   },
   "favicon": "/favicon.svg",
   "logo": {
-    "light": "/favicon.svg",
-    "dark": "/favicon.svg",
+    "light": "/logos/logo-light.svg",
+    "dark": "/logos/logo-dark.svg",
     "href": "https://libretto.sh"
   },
   "fonts": {

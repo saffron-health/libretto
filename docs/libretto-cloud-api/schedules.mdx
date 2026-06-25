@@ -26,9 +26,12 @@ Request fields:
 - `callback_url`: optional
 - `callback_secret`: optional
 - `skip_callbacks`: optional, default `false`
+- `residential_proxy`: optional residential proxy location object
 - `enabled`: optional, default `true`
 
 If you set `callback_url`, you must also set `callback_secret`.
+
+Use `residential_proxy` for recurring workflows that need traffic to originate from a specific residential proxy country, US state, city, ZIP code, or ASN. See [Residential proxy locations](/libretto-cloud-hosting/stealth#residential-proxy-locations) for the supported fields and combination rules.
 
 Response fields:
 
@@ -75,9 +78,11 @@ Request fields:
 - `callback_url`: optional string or `null`
 - `callback_secret`: optional string or `null`
 - `skip_callbacks`: optional
+- `residential_proxy`: optional object or `null`
 - `enabled`: optional
 
 To clear the callback, set both `callback_url` and `callback_secret` to `null`.
+To clear the configured residential proxy location, set `residential_proxy` to `null`.
 
 Response fields:
 
@@ -106,6 +111,7 @@ The `schedule` object returned by the schedules endpoints includes:
 - `cron_expr`
 - `timezone`
 - `timeout_seconds`
+- `residential_proxy`
 - `callback_url`
 - `skip_callbacks`
 - `enabled`

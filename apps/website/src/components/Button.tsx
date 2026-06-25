@@ -1,5 +1,4 @@
 import type * as React from "react";
-import { AppLink } from "../routing";
 
 type ButtonSize = "default" | "sm";
 type ButtonVariant = "primary" | "secondary";
@@ -42,7 +41,7 @@ export function Button({
 
   if (typeof props.href === "string") {
     const anchorProps = props as ButtonAsAnchorProps;
-    return <AppLink className={classes} {...anchorProps} />;
+    return <a className={classes} {...anchorProps} />;
   }
 
   const buttonProps = props as ButtonAsButtonProps;
