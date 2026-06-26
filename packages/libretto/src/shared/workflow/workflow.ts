@@ -4,6 +4,7 @@ import {
   createRecoveryPage,
   type RecoveryAction,
 } from "../../runtime/recovery/page-fallbacks.js";
+import type { ViewportConfig } from "../../cli/core/config.js";
 import { normalizeProfileName } from "./auth-profile-name.js";
 import {
   mergeCredentialsIntoInput,
@@ -37,6 +38,9 @@ export type LibrettoWorkflowDefinition<
   output?: OutputSchema;
   credentials?: readonly string[];
   authProfile?: LibrettoWorkflowAuthProfile;
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: ViewportConfig;
   recoveryAction?: RecoveryAction;
 };
 
@@ -155,6 +159,9 @@ export class LibrettoWorkflow<
   public readonly credentialNames: readonly string[];
   public readonly authProfileName?: string;
   public readonly authProfileRefresh?: boolean;
+  public readonly startUrl?: string;
+  public readonly gpu?: boolean;
+  public readonly viewport?: ViewportConfig;
   public readonly recoveryAction?: RecoveryAction;
   private readonly handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
@@ -170,6 +177,9 @@ export class LibrettoWorkflow<
           credentialNames?: readonly string[];
           authProfileName?: string;
           authProfileRefresh?: boolean;
+          startUrl?: string;
+          gpu?: boolean;
+          viewport?: ViewportConfig;
           recoveryAction?: RecoveryAction;
         }
       | undefined,
@@ -184,6 +194,9 @@ export class LibrettoWorkflow<
     this.credentialNames = options?.credentialNames ?? [];
     this.authProfileName = options?.authProfileName;
     this.authProfileRefresh = options?.authProfileRefresh;
+    this.startUrl = options?.startUrl;
+    this.gpu = options?.gpu;
+    this.viewport = options?.viewport;
     this.recoveryAction = options?.recoveryAction;
     this.handler = handler;
   }
@@ -218,6 +231,9 @@ export type ExportedLibrettoWorkflow = {
   readonly credentialNames: readonly string[];
   readonly authProfileName?: string;
   readonly authProfileRefresh?: boolean;
+  readonly startUrl?: string;
+  readonly gpu?: boolean;
+  readonly viewport?: ViewportConfig;
   readonly recoveryAction?: RecoveryAction;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
@@ -322,6 +338,9 @@ function getWorkflowConstructorOptions<
   credentialNames: readonly string[];
   authProfileName?: string;
   authProfileRefresh?: boolean;
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: ViewportConfig;
   recoveryAction?: RecoveryAction;
 } {
   const authProfile = normalizeWorkflowAuthProfile(options.authProfile);
@@ -331,6 +350,9 @@ function getWorkflowConstructorOptions<
     credentialNames: normalizeCredentialNames(options.credentials),
     authProfileName: authProfile?.name,
     authProfileRefresh: authProfile?.refresh,
+    startUrl: options.startUrl,
+    gpu: options.gpu,
+    viewport: options.viewport,
     recoveryAction: options.recoveryAction,
   };
 }

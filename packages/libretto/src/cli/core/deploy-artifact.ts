@@ -22,6 +22,10 @@ import {
   LIBRETTO_WORKFLOW_BRAND,
 } from "../../shared/workflow/workflow.js";
 import { normalizeCredentialNames } from "../../shared/workflow/credentials.js";
+import {
+  ViewportConfigSchema,
+  type ViewportConfig,
+} from "./config.js";
 
 type PackageManifest = {
   name?: string;
@@ -57,6 +61,9 @@ export type WorkflowDeployMetadata = {
   credentialNames: string[];
   authProfileName?: string;
   authProfileRefresh?: boolean;
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: ViewportConfig;
   sourceFile?: string;
   sourceFiles?: string[];
 };
@@ -825,6 +832,7 @@ function createDiscoveryLibrettoModule(
         name,
         ...extractDiscoveryCredentialMetadata(definitionOrHandler),
         ...extractDiscoveryAuthProfileMetadata(definitionOrHandler),
+        ...extractDiscoveryLaunchMetadata(definitionOrHandler),
       });
       return {
         [LIBRETTO_WORKFLOW_BRAND]: true,
@@ -847,6 +855,46 @@ function createDiscoveryLibrettoModule(
       return createExternalDiscoveryStub();
     },
   });
+}
+
+function extractDiscoveryLaunchMetadata(
+  definitionOrHandler: unknown,
+): Omit<
+  WorkflowDeployMetadata,
+  "name" | "credentialNames" | "authProfileName" | "authProfileRefresh"
+> {
+  if (!definitionOrHandler || typeof definitionOrHandler !== "object") {
+    return {};
+  }
+
+  const record = definitionOrHandler as {
+    startUrl?: unknown;
+    gpu?: unknown;
+    viewport?: unknown;
+  };
+  const metadata: Omit<
+    WorkflowDeployMetadata,
+    "name" | "credentialNames" | "authProfileName" | "authProfileRefresh"
+  > = {};
+
+  if (typeof record.startUrl === "string") {
+    metadata.startUrl = record.startUrl;
+  }
+  if (typeof record.gpu === "boolean") {
+    metadata.gpu = record.gpu;
+  }
+  if (
+    record.viewport &&
+    typeof record.viewport === "object" &&
+    !Array.isArray(record.viewport)
+  ) {
+    const viewport = ViewportConfigSchema.safeParse(record.viewport);
+    if (viewport.success) {
+      metadata.viewport = viewport.data;
+    }
+  }
+
+  return metadata;
 }
 
 function extractDiscoveryCredentialMetadata(
@@ -982,6 +1030,9 @@ function createBootstrapSource(args: {
           credentialNames: workflow.credentialNames,
           authProfileName: workflow.authProfileName,
           authProfileRefresh: workflow.authProfileRefresh,
+          startUrl: workflow.startUrl,
+          gpu: workflow.gpu,
+          viewport: workflow.viewport,
         })});`,
     )
     .join("\n");
@@ -1069,23 +1120,21 @@ function createWorkflowProxy(workflowName, metadata) {
     return await target.run(ctx, input);
   };
 
-  if (!metadata?.authProfileName) {
-    return workflow(workflowName, {
-      credentials: Array.isArray(metadata?.credentialNames)
-        ? metadata.credentialNames
-        : [],
-      handler,
-    });
-  }
-
   return workflow(workflowName, {
-    credentials: Array.isArray(metadata.credentialNames)
+    credentials: Array.isArray(metadata?.credentialNames)
       ? metadata.credentialNames
       : [],
-    authProfile: {
-      name: metadata.authProfileName,
-      ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),
-    },
+    ...(metadata?.authProfileName
+      ? {
+          authProfile: {
+            name: metadata.authProfileName,
+            ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),
+          },
+        }
+      : {}),
+    ...(typeof metadata?.startUrl === "string" ? { startUrl: metadata.startUrl } : {}),
+    ...(typeof metadata?.gpu === "boolean" ? { gpu: metadata.gpu } : {}),
+    ...(metadata?.viewport ? { viewport: metadata.viewport } : {}),
     handler,
   });
 }
