@@ -67,6 +67,22 @@
       "destination": "/index.html"
     },
     {
+      "source": "/signin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/invite",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/onboarding",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/index.html"
+    },
+    {
       "source": "/docs",
       "destination": "https://saffron-health-libretto-73.mintlify.dev/docs"
     },

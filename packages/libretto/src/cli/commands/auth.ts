@@ -5,7 +5,7 @@
  *   libretto cloud auth login
  *   libretto cloud auth forgot-password
  *   libretto cloud auth logout
- *   libretto cloud auth invite <email> [--role member|admin|owner]
+ *   libretto cloud auth invite <email> [--role member|owner]
  *   libretto cloud auth accept-invite <tenantSlug> <invitationId>
  *   libretto cloud auth api-key issue [--label <label>]
  *   libretto cloud auth api-key list
@@ -20,7 +20,6 @@
 import { z } from "zod";
 import { SimpleCLI } from "affordance";
 import {
-  ApiCallError,
   betterAuthCall,
   NOT_AUTHENTICATED_MESSAGE,
   orpcCall,
@@ -36,19 +35,11 @@ import {
   writeAuthState,
   type AuthState,
 } from "../core/auth-storage.js";
-import { prompt, promptPassword, slugify } from "../core/prompt.js";
+import { prompt, promptPassword } from "../core/prompt.js";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-function isSlugTakenData(data: unknown): boolean {
-  return (
-    !!data &&
-    typeof data === "object" &&
-    (data as { reason?: unknown }).reason === "slug_taken"
-  );
-}
 
 type SignupResponse = {
   userId: string;
@@ -82,6 +73,10 @@ type ApiKeyListItem = {
   createdAt: string;
   lastRequest?: string | null;
 };
+
+function resolveHostedWebsiteUrl(): string {
+  return process.env.LIBRETTO_WEBSITE_URL?.trim() || "https://libretto.sh";
+}
 
 async function getCurrentSession(
   apiUrl: string,
@@ -198,104 +193,19 @@ async function issueApiKey(
 // ---------------------------------------------------------------------------
 
 export const signupCommand = SimpleCLI.command({
-  description: "Create a new hosted-platform account and organization",
+  description: "Open the hosted-platform sign-up page",
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
   .handle(async () => {
-    const apiUrl = resolveHostedApiUrl();
-    console.log("Sign up for libretto cloud");
+    const signupUrl = new URL("/signin", resolveHostedWebsiteUrl());
+    signupUrl.searchParams.set("mode", "signup");
+
+    console.log("Sign up for Libretto Cloud in your browser:");
+    console.log(`  ${signupUrl.toString()}`);
     console.log();
-    console.log("Heads up: a libretto user can only belong to one organization.");
-    console.log(
-      "If your team already has a libretto org, ask a teammate for an invite instead — switching orgs later isn't supported.",
-    );
-    console.log("Type 'q' at the name prompt to quit if that applies to you.");
-    console.log();
-
-    const name = await prompt("Your name:");
-    if (name.toLowerCase() === "q" || name.length === 0) {
-      console.log(
-        "OK — ask an existing teammate to run `libretto cloud auth invite <your-email>` and then run `libretto cloud auth accept-invite <slug> <invitation-id>` from this machine.",
-      );
-      return;
-    }
-
-    const email = await prompt("Your email:");
-    const password = await promptPassword("Choose a password (8+ chars):");
-
-    const orgName = await prompt("Organization name:");
-    const defaultSlug = slugify(orgName);
-    let orgSlug = (await prompt("Organization slug:", { defaultValue: defaultSlug })).toLowerCase();
-    const debugNotificationEmail = await prompt(
-      "Alert email (for hosted workflow failures):",
-      { defaultValue: email },
-    );
-
-    console.log();
-    console.log("Creating account...");
-
-    // Retry loop: if the server reports slug-taken (data.reason === "slug_taken"),
-    // re-prompt for just the slug and try again — keeping the entered name,
-    // email, and password. Other errors propagate.
-    //
-    // The server's slug pre-check (added to /v1/auth/signupAndCreateOrg)
-    // catches the conflict before any user is created, so retrying doesn't
-    // leave dangling user rows behind. The transaction-level unique-violation
-    // catch carries the same `data.reason` so a race-loser is also handled.
-    let result: SignupResponse;
-    while (true) {
-      try {
-        result = await orpcCall<SignupResponse>({
-          apiUrl,
-          path: "/v1/auth/signupAndCreateOrg",
-          input: {
-            name,
-            email,
-            password,
-            organizationName: orgName,
-            organizationSlug: orgSlug,
-            debugNotificationEmail,
-          },
-          unauthenticated: true,
-        });
-        break;
-      } catch (e) {
-        if (
-          e instanceof ApiCallError &&
-          e.code === "CONFLICT" &&
-          isSlugTakenData(e.data)
-        ) {
-          console.log();
-          console.log(e.message);
-          orgSlug = (await prompt("Organization slug:")).toLowerCase();
-          continue;
-        }
-        throw e;
-      }
-    }
-
-    await persistSignupSession(apiUrl, result);
-
-    console.log(`Account created. Verification email sent to ${result.email}.`);
-    console.log("Click the link in the email to verify, then return here.");
-    console.log("Waiting for verification");
-
-    const verified = await pollForVerification(apiUrl);
-    if (!verified) {
-      console.log();
-      console.log(
-        "Timed out waiting for email verification. Click the link in the email when you're ready — your CLI session is already saved, no need to re-run signup.",
-      );
-      return;
-    }
-
-    console.log();
-    console.log("Email verified. You're logged in.");
-    console.log(`Session saved to ${authStatePath()}`);
-    console.log();
-    console.log("To generate an API key, run:");
+    console.log("After creating your workspace, return here and run:");
+    console.log("  libretto cloud auth login");
     console.log("  libretto cloud auth api-key issue --label <label>");
-    console.log("Then add LIBRETTO_API_KEY=<key> to your project's .env file.");
   });
 
 // ---------------------------------------------------------------------------
@@ -429,7 +339,7 @@ export const inviteCommand = SimpleCLI.command({
       named: {
         role: SimpleCLI.option(
           z
-            .enum(["member", "admin", "owner"])
+            .enum(["member", "owner"])
             .default("member"),
           { help: "Role to assign (default: member)." },
         ),
