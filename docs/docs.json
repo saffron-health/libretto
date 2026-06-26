@@ -139,7 +139,6 @@
             "group": "Libretto Cloud API",
             "pages": [
               "libretto-cloud-api/overview",
-              "libretto-cloud-api/authentication",
               "libretto-cloud-api/sessions",
               "libretto-cloud-api/recordings",
               "libretto-cloud-api/deployments-and-workflows",
