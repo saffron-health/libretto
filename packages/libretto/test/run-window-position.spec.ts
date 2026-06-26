@@ -40,6 +40,7 @@ describe("createRunBrowserConfig", () => {
     ).toEqual({
       kind: "provider",
       providerName: "kernel",
+      headless: true,
     });
   });
 });

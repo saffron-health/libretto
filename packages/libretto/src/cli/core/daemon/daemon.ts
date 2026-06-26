@@ -479,6 +479,7 @@ class BrowserDaemon {
       providerSession = await provider.createSession({
         authProfileName: config.authProfileName,
         authProfilePersist: config.authProfilePersist,
+        headless: config.headless,
       });
       const browser = await chromium.connectOverCDP(
         providerSession.cdpEndpoint,
