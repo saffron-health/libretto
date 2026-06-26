@@ -478,7 +478,7 @@ describe("createHostedDeployPackage", () => {
     expect(implementation).toContain("lodash");
   });
 
-  it("preserves workflow auth profile name and refresh metadata without site metadata", async () => {
+  it("preserves workflow auth profile and browser launch metadata without site metadata", async () => {
     const workspaceRoot = createWorkspaceRoot();
     const sourceDir = join(workspaceRoot, "apps", "worker");
     const entryPoint = join(sourceDir, "src", "workflow.ts");
@@ -501,7 +501,13 @@ describe("createHostedDeployPackage", () => {
         "",
         "export const testWorkflow = workflow(",
         '  "testWorkflow",',
-        '  { credentials: ["openai_api_key"], authProfile: { name: "twitter", refresh: true } },',
+        "  {",
+        '    credentials: ["openai_api_key"],',
+        '    authProfile: { name: "twitter", refresh: true },',
+        '    startUrl: "https://example.com/start",',
+        "    gpu: true,",
+        "    viewport: { width: 1440, height: 900 },",
+        "  },",
         "  async () => ({ ok: true }),",
         ");",
         "",
@@ -521,9 +527,12 @@ describe("createHostedDeployPackage", () => {
         authProfileName: "twitter",
         authProfileRefresh: true,
         credentialNames: ["openai_api_key"],
+        gpu: true,
         name: "testWorkflow",
         sourceFile: "src/workflow.ts",
         sourceFiles: ["src/workflow.ts"],
+        startUrl: "https://example.com/start",
+        viewport: { width: 1440, height: 900 },
       },
     ]);
 
@@ -532,7 +541,7 @@ describe("createHostedDeployPackage", () => {
       "utf8",
     );
     expect(bundle).toContain(
-      'createWorkflowProxy("testWorkflow", {"credentialNames":["openai_api_key"],"authProfileName":"twitter","authProfileRefresh":true})',
+      'createWorkflowProxy("testWorkflow", {"credentialNames":["openai_api_key"],"authProfileName":"twitter","authProfileRefresh":true,"startUrl":"https://example.com/start","gpu":true,"viewport":{"width":1440,"height":900}})',
     );
     expect(bundle).not.toContain("authProfileSites");
     expect(bundle).not.toContain("sites:");

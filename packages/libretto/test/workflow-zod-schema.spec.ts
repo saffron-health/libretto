@@ -56,6 +56,27 @@ describe("workflow() with Zod schemas", () => {
     expect("authProfileSites" in wf).toBe(false);
   });
 
+  it("exposes browser launch metadata for hosted workflow discovery", () => {
+    const wf = workflow(
+      "launch-configured",
+      {
+        input: inputSchema,
+        output: outputSchema,
+        startUrl: "https://example.com/start",
+        gpu: true,
+        viewport: { width: 1440, height: 900 },
+      },
+      async (_ctx, input) => ({
+        pageTitle: "x",
+        finalUrl: input.url,
+      }),
+    );
+
+    expect(wf.startUrl).toBe("https://example.com/start");
+    expect(wf.gpu).toBe(true);
+    expect(wf.viewport).toEqual({ width: 1440, height: 900 });
+  });
+
   it("rejects invalid workflow auth profile names", () => {
     expect(() =>
       workflow(
