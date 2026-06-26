@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navbar } from "./components/Navbar";
 import { getAuthStatus, orpcCall } from "./cloudApi";
+import { redirectAfterVerifiedEmail } from "./verifyEmailFlow";
 
 type CliLoginParams = {
   requestId: string;
@@ -13,10 +14,6 @@ function getCliLoginParams(): CliLoginParams | null {
   const secret = params.get("cliLoginSecret")?.trim();
   if (!requestId || !secret) return null;
   return { requestId, secret };
-}
-
-function targetAfterVerification(hasTenant: boolean): string {
-  return hasTenant ? "/dashboard" : "/onboarding";
 }
 
 function getSafeReturnTo(): string | null {
@@ -47,6 +44,7 @@ async function approveCliLoginIfPresent(): Promise<boolean> {
 export function VerifyEmailPage() {
   const [email, setEmail] = useState("");
   const [checking, setChecking] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,13 +55,26 @@ export function VerifyEmailPage() {
         const status = await getAuthStatus();
         if (cancelled) return;
         if (status.emailVerified) {
-          approveCliLoginIfPresent().catch(() => {});
-          window.location.assign(
-            getSafeReturnTo() ?? targetAfterVerification(status.hasTenant),
-          );
+          const redirectTo = await redirectAfterVerifiedEmail({
+            hasTenant: status.hasTenant,
+            returnTo: getSafeReturnTo(),
+            hasCliLoginParams: Boolean(getCliLoginParams()),
+            approveCliLogin: approveCliLoginIfPresent,
+          });
+          if (cancelled) return;
+          if (!redirectTo) {
+            setEmail(status.email);
+            setChecking(false);
+            setError(
+              "Email verified, but CLI login approval failed. Keep this page open and run `libretto cloud auth login` again.",
+            );
+            return;
+          }
+          window.location.assign(redirectTo);
           return;
         }
         setEmail(status.email);
+        setError(null);
         setChecking(false);
       } catch {
         if (cancelled) return;
@@ -71,7 +82,7 @@ export function VerifyEmailPage() {
       }
     }
 
-    checkVerification();
+    void checkVerification();
     intervalId = window.setInterval(checkVerification, 3000);
     return () => {
       cancelled = true;
@@ -103,20 +114,27 @@ export function VerifyEmailPage() {
                 Checking verification...
               </div>
             ) : (
-              <div className="rounded-md border border-rule bg-bg/70 p-5 text-sm leading-6 text-muted">
-                <p>
-                  We sent a verification link to{" "}
-                  <span className="font-mono text-ink">{email}</span>.
-                </p>
-                <p className="mt-3">
-                  Click the link in your inbox to continue. This page will
-                  update automatically once your email is verified.
-                </p>
-                <p className="mt-3">
-                  Open the verification link in this same browser so Libretto
-                  can finish signing you in.
-                </p>
-              </div>
+              <>
+                <div className="rounded-md border border-rule bg-bg/70 p-5 text-sm leading-6 text-muted">
+                  <p>
+                    We sent a verification link to{" "}
+                    <span className="font-mono text-ink">{email}</span>.
+                  </p>
+                  <p className="mt-3">
+                    Click the link in your inbox to continue. This page will
+                    update automatically once your email is verified.
+                  </p>
+                  <p className="mt-3">
+                    Open the verification link in this same browser so Libretto
+                    can finish signing you in.
+                  </p>
+                </div>
+                {error && (
+                  <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-5 text-red-200">
+                    {error}
+                  </p>
+                )}
+              </>
             )}
           </div>
         </section>

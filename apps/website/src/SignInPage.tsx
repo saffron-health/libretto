@@ -11,7 +11,7 @@ type AuthResponse = {
 type AuthMode = "signin" | "signup";
 
 type PasswordResetResponse = {
-  status: "sent" | "not_found";
+  status: "sent";
 };
 
 type CliLoginParams = {
@@ -254,11 +254,11 @@ export function SignInPage() {
         "/v1/auth/requestPasswordReset",
         { email: normalizedEmail },
       );
-      if (result.status === "not_found") {
-        setError(`No Libretto account exists for ${normalizedEmail}.`);
-        return;
+      if (result.status === "sent") {
+        setNotice(
+          `If a Libretto account exists for ${normalizedEmail}, a password reset email has been sent.`,
+        );
       }
-      setNotice(`Password reset email sent to ${normalizedEmail}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Password reset failed.");
     } finally {
