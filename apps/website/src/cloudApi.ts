@@ -29,12 +29,17 @@ export type AuthStatus = {
   tenantId: string | null;
 };
 
-export const cloudApiUrl =
-  import.meta.env.VITE_LIBRETTO_CLOUD_API_URL?.trim() ||
-  (window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
+function resolveCloudApiUrl(): string {
+  const configured = import.meta.env.VITE_LIBRETTO_CLOUD_API_URL?.trim();
+  if (configured) return configured;
+  if (typeof window === "undefined") return "https://api.libretto.sh";
+  return window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
     ? "http://localhost:8080"
-    : "https://api.libretto.sh");
+    : "https://api.libretto.sh";
+}
+
+export const cloudApiUrl = resolveCloudApiUrl();
 
 async function parseJson(response: Response): Promise<unknown> {
   const text = await response.text();

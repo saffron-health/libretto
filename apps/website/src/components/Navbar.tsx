@@ -4,7 +4,6 @@ import { Button } from "./Button";
 import { GitHubStarIcon } from "../icons";
 import { AnimationTarget } from "./AnimationOrchestration";
 import { RELEASES_URL, REPO_URL } from "../site";
-import { AppLink } from "../routing";
 import { MobileMenu } from "./MobileMenu";
 import { LibrettoLogoAndName } from "../brand.js";
 import { getCloudSession, type CloudSession } from "../cloudApi";
@@ -27,13 +26,12 @@ function useGlitchText(text: string) {
     if (!hovered) return;
 
     const chars = text.split("");
-    // Each character gets a random settle time (in ms)
     const settleTimes = chars.map(() => 150 + Math.random() * 350);
     const start = performance.now();
     let settled = false;
 
     let lastUpdate = 0;
-    const INTERVAL = 60; // ms between character changes
+    const INTERVAL = 60;
 
     function tick(now: number) {
       const elapsed = now - start;
@@ -67,6 +65,25 @@ function useGlitchText(text: string) {
   return { display, isScrambling, hovered, onEnter, onLeave };
 }
 
+function ExternalIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M6 4H4.5A1.5 1.5 0 0 0 3 5.5v6A1.5 1.5 0 0 0 4.5 13h6A1.5 1.5 0 0 0 12 11.5V10" />
+      <path d="M9 3h4v4" />
+      <path d="m8 8 5-5" />
+    </svg>
+  );
+}
+
 function GlitchNavLink({
   href,
   children,
@@ -83,7 +100,7 @@ function GlitchNavLink({
   const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText(children);
 
   return (
-    <AppLink
+    <a
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
@@ -105,24 +122,9 @@ function GlitchNavLink({
         >
           {display}
         </Text>
-        {trailingIcon && (
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            className="size-3.5 shrink-0"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.7"
-          >
-            <path d="M6 4H4.5A1.5 1.5 0 0 0 3 5.5v6A1.5 1.5 0 0 0 4.5 13h6A1.5 1.5 0 0 0 12 11.5V10" />
-            <path d="M9 3h4v4" />
-            <path d="m8 8 5-5" />
-          </svg>
-        )}
+        {trailingIcon && <ExternalIcon />}
       </span>
-    </AppLink>
+    </a>
   );
 }
 
@@ -169,7 +171,7 @@ function CloudAccountLink({ session }: { session: CloudSession | null }) {
   }
 
   return (
-    <AppLink
+    <a
       href="/dashboard"
       className="inline-flex h-10 items-center gap-2 rounded-lg border border-rule bg-panel px-3 text-sm text-ink no-underline transition-colors hover:border-accent/45 hover:bg-panel-hi"
       data-fathom-event="Nav dashboard click"
@@ -179,7 +181,7 @@ function CloudAccountLink({ session }: { session: CloudSession | null }) {
         {userInitial(session)}
       </span>
       <span className="hidden sm:block">Cloud dashboard</span>
-    </AppLink>
+    </a>
   );
 }
 
@@ -209,9 +211,12 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
     <nav {...animateProps} className="px-4 pt-6 md:px-8">
       <div className="relative mx-auto flex max-w-[980px] items-center justify-between">
         <div className="flex items-center gap-6">
-          <AppLink href="/" className="flex h-[1.9375rem] -translate-y-px items-center no-underline lg:-translate-y-[2.5px]">
+          <a
+            href="/"
+            className="flex h-[1.9375rem] -translate-y-px items-center no-underline lg:-translate-y-[2.5px]"
+          >
             <LibrettoLogoAndName />
-          </AppLink>
+          </a>
           <div className="hidden items-center gap-6 lg:flex">
             <GlitchNavLink
               href="/docs/get-started/quickstart"

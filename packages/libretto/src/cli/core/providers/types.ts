@@ -21,6 +21,7 @@ export type ProviderApi = {
   createSession(options?: {
     authProfileName?: string;
     authProfilePersist?: boolean;
+    headless?: boolean;
   }): Promise<ProviderSession>;
   closeSession(sessionId: string): Promise<ProviderCloseResult>;
 };

@@ -68,7 +68,7 @@ async function waitForServer(url) {
 
 const server = spawn(
   "pnpm",
-  ["-s", "exec", "vp", "dev", "--host", host, "--port", String(port)],
+  ["-s", "exec", "vite", "dev", "--host", host, "--port", String(port)],
   {
     cwd: root,
     detached: true,
@@ -77,7 +77,7 @@ const server = spawn(
 );
 
 try {
-  await waitForServer(`http://${host}:${port}/brand-kit.html`);
+  await waitForServer(`http://${host}:${port}/brand-kit`);
 
   const browser = await chromium.launch();
   const page = await browser.newPage({
@@ -111,7 +111,7 @@ try {
     };
   });
 
-  await page.goto(`http://${host}:${port}/brand-kit.html`, {
+  await page.goto(`http://${host}:${port}/brand-kit`, {
     waitUntil: "networkidle",
   });
 

@@ -39,6 +39,7 @@ export type DaemonBrowserConnectConfig = {
 export type DaemonBrowserProviderConfig = {
   kind: "provider";
   providerName: string;
+  headless?: boolean;
   initialUrl?: string;
   authProfileName?: string;
   authProfilePersist?: boolean;

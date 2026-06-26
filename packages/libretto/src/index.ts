@@ -128,6 +128,7 @@ export {
   workflow,
   type ExportedLibrettoWorkflow,
   type LibrettoWorkflowContext,
+  type LibrettoWorkflowDefinition,
   type LibrettoWorkflowHandler,
   type LibrettoWorkflowOptions,
   type WorkflowInputValidator,

@@ -529,6 +529,7 @@ export async function runOpen(
 export async function runOpenWithProvider(
   rawUrl: string,
   providerName: string,
+  headless: boolean,
   session: string,
   logger: LoggerApi,
   accessMode: SessionAccessMode,
@@ -557,6 +558,7 @@ export async function runOpenWithProvider(
       browser: {
         kind: "provider",
         providerName,
+        headless,
         initialUrl: url,
       },
     },

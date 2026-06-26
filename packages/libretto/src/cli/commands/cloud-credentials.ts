@@ -1,5 +1,6 @@
 import { SimpleCLI } from "affordance";
-import { orpcCall, resolveApiUrl } from "../core/auth-fetch.js";
+import { orpcCall } from "../core/auth-fetch.js";
+import { withCloudApiKey } from "./shared.js";
 
 const CLOUD_CREDENTIAL_ENV_PREFIX = "LIBRETTO_CLOUD_";
 
@@ -9,19 +10,6 @@ type UpsertCredentialResponse = {
   overwritten: boolean;
   message: string;
 };
-
-function requireApiKeyCredential() {
-  const apiKey = process.env.LIBRETTO_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error(
-      "LIBRETTO_API_KEY is required to manage Libretto Cloud credentials. Issue one with `libretto cloud auth api-key issue --label <label>`.",
-    );
-  }
-  return {
-    apiUrl: resolveApiUrl(null),
-    credential: { source: "env-api-key" as const, apiKey },
-  };
-}
 
 function parseEnvCredentials(prefix: string): Array<{ name: string; value: string }> {
   const credentials: Record<string, string> = {};
@@ -44,22 +32,22 @@ export const pushCredentialCommand = SimpleCLI.command({
     positionals: [],
     named: {},
   }))
-  .handle(async () => {
+  .use(withCloudApiKey("manage Libretto Cloud credentials"))
+  .handle(async ({ ctx }) => {
     const credentials = parseEnvCredentials(CLOUD_CREDENTIAL_ENV_PREFIX);
     if (credentials.length === 0) {
       throw new Error(
         `No non-empty env vars found with prefix ${CLOUD_CREDENTIAL_ENV_PREFIX}.`,
       );
     }
-    const { apiUrl, credential } = requireApiKeyCredential();
     let created = 0;
     let updated = 0;
     for (const item of credentials) {
       const response = await orpcCall<UpsertCredentialResponse>({
-        apiUrl,
+        apiUrl: ctx.apiUrl,
         path: "/v1/credentials/upsert",
         input: item,
-        credential,
+        credential: ctx.credential,
       });
       if (response.overwritten) {
         updated += 1;

@@ -25,6 +25,7 @@ type CliLoginApproveResponse = {
 };
 
 function getCliLoginParams(): CliLoginParams | null {
+  if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
   const requestId = params.get("cliLoginId")?.trim();
   const secret = params.get("cliLoginSecret")?.trim();
@@ -33,6 +34,7 @@ function getCliLoginParams(): CliLoginParams | null {
 }
 
 function withoutCliLoginParams(): string {
+  if (typeof window === "undefined") return "/signin";
   const url = new URL(window.location.href);
   url.searchParams.delete("cliLoginId");
   url.searchParams.delete("cliLoginSecret");
@@ -40,7 +42,9 @@ function withoutCliLoginParams(): string {
 }
 
 function currentSigninCallbackUrl(): string {
-  const url = new URL("/verify-email", window.location.origin);
+  const origin =
+    typeof window === "undefined" ? "https://libretto.sh" : window.location.origin;
+  const url = new URL("/verify-email", origin);
   const cliLogin = getCliLoginParams();
   if (cliLogin) {
     url.searchParams.set("cliLoginId", cliLogin.requestId);
@@ -92,6 +96,7 @@ function EyeIcon() {
 
 export function SignInPage() {
   const [mode, setMode] = useState<AuthMode>(() =>
+    typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("mode") === "signup"
       ? "signup"
       : "signin",

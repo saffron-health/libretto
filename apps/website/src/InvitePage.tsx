@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Link } from "wouter";
 import { Navbar } from "./components/Navbar";
 import {
   authPost,
@@ -53,6 +52,9 @@ function GoogleLogo() {
 }
 
 function getInviteParams() {
+  if (typeof window === "undefined") {
+    return { invitationId: "", tenantSlug: "", shouldAccept: false };
+  }
   const params = new URLSearchParams(window.location.search);
   return {
     invitationId: params.get("invitationId")?.trim() ?? "",
@@ -63,7 +65,9 @@ function getInviteParams() {
 
 function inviteCallbackUrl(): string {
   const { invitationId, tenantSlug } = getInviteParams();
-  const url = new URL("/invite", window.location.origin);
+  const origin =
+    typeof window === "undefined" ? "https://libretto.sh" : window.location.origin;
+  const url = new URL("/invite", origin);
   url.searchParams.set("tenantSlug", tenantSlug);
   url.searchParams.set("invitationId", invitationId);
   url.searchParams.set("accept", "1");
@@ -71,7 +75,9 @@ function inviteCallbackUrl(): string {
 }
 
 function inviteVerificationUrl(): string {
-  const url = new URL("/verify-email", window.location.origin);
+  const origin =
+    typeof window === "undefined" ? "https://libretto.sh" : window.location.origin;
+  const url = new URL("/verify-email", origin);
   url.searchParams.set("returnTo", inviteCallbackUrl());
   return url.toString();
 }
@@ -218,12 +224,12 @@ export function InvitePage() {
                 <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-5 text-red-200">
                   This invite link is missing its invitation details.
                 </p>
-                <Link
+                <a
                   className="libretto-button libretto-button--default h-10 w-full"
                   href="/"
                 >
                   Go home
-                </Link>
+                </a>
               </div>
             ) : checking ? (
               <div className="rounded-md border border-rule bg-bg/70 px-4 py-8 text-center text-sm text-muted">
