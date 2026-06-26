@@ -43,4 +43,18 @@ describe("createRunBrowserConfig", () => {
       headless: true,
     });
   });
+
+  it("passes headed mode to provider workflow runs", () => {
+    expect(
+      createRunBrowserConfig({
+        providerName: "kernel",
+        headless: false,
+        windowPosition: { x: 536, y: 33 },
+      }),
+    ).toEqual({
+      kind: "provider",
+      providerName: "kernel",
+      headless: false,
+    });
+  });
 });
