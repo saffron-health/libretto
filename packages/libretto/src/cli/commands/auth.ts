@@ -3,10 +3,8 @@
  *
  *   libretto cloud auth signup
  *   libretto cloud auth login
- *   libretto cloud auth forgot-password
  *   libretto cloud auth logout
  *   libretto cloud auth invite <email> [--role member|owner]
- *   libretto cloud auth accept-invite <tenantSlug> <invitationId>
  *   libretto cloud auth api-key issue [--label <label>]
  *   libretto cloud auth api-key list
  *   libretto cloud auth api-key revoke <id>
@@ -17,6 +15,7 @@
  * available, with LIBRETTO_API_KEY winning when set.
  */
 
+import { spawn } from "node:child_process";
 import { z } from "zod";
 import { SimpleCLI } from "affordance";
 import {
@@ -31,25 +30,13 @@ import {
   authStatePath,
   clearAuthState,
   readAuthState,
-  setCookieToCookieHeader,
   writeAuthState,
   type AuthState,
 } from "../core/auth-storage.js";
-import { prompt, promptPassword } from "../core/prompt.js";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-type SignupResponse = {
-  userId: string;
-  email: string;
-  organizationId: string;
-  organizationSlug: string | null;
-  sessionToken: string | null;
-  setCookie: string[];
-  emailVerified: boolean;
-};
 
 type Session = {
   user: { id: string; email: string; emailVerified: boolean; name?: string };
@@ -74,8 +61,55 @@ type ApiKeyListItem = {
   lastRequest?: string | null;
 };
 
+type CliLoginCreateResponse = {
+  requestId: string;
+  secret: string;
+  expiresAt: string;
+};
+
+type CliLoginPollResponse =
+  | { status: "pending" }
+  | { status: "expired" }
+  | {
+      status: "approved";
+      cookieHeader: string;
+      userId: string;
+      email: string;
+      emailVerified: boolean;
+      sessionExpiresAt: string | null;
+    };
+
 function resolveHostedWebsiteUrl(): string {
   return process.env.LIBRETTO_WEBSITE_URL?.trim() || "https://libretto.sh";
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function openBrowser(url: string): boolean {
+  const command =
+    process.platform === "darwin"
+      ? "open"
+      : process.platform === "win32"
+        ? "cmd"
+        : "xdg-open";
+  const args =
+    process.platform === "win32"
+      ? ["/c", "start", "", url]
+      : [url];
+
+  try {
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.on("error", () => {});
+    child.unref();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function getCurrentSession(
@@ -101,44 +135,106 @@ async function getCurrentSession(
   }
 }
 
-async function pollForVerification(
-  apiUrl: string,
-  pollIntervalMs = 4000,
-  maxWaitMs = 10 * 60 * 1000,
-): Promise<boolean> {
-  // The signup flow writes the cookie to disk before this poll starts, so
-  // the default credential pick in `betterAuthCall` (env key > stored
-  // cookie) reads the right one.
-  const start = Date.now();
-  while (Date.now() - start < maxWaitMs) {
-    const session = await getCurrentSession(apiUrl);
-    if (session?.user.emailVerified) return true;
-    process.stdout.write(".");
-    await new Promise((r) => setTimeout(r, pollIntervalMs));
-  }
-  console.log();
-  return false;
-}
+async function runBrowserAuthFlow(options: {
+  mode: "login" | "signup";
+  apiUrl: string;
+  websiteUrl: string;
+}): Promise<void> {
+  const login = await orpcCall<CliLoginCreateResponse>({
+    apiUrl: options.apiUrl,
+    path: "/v1/auth/cliLoginCreate",
+    unauthenticated: true,
+  });
 
-async function persistSignupSession(
-  apiUrl: string,
-  result: SignupResponse,
-): Promise<AuthState> {
-  const cookie = setCookieToCookieHeader(result.setCookie);
-  if (!cookie) {
-    throw new Error("Sign-up did not return a session cookie. Check the server.");
+  const loginUrl = new URL("/signin", options.websiteUrl);
+  loginUrl.searchParams.set("cliLoginId", login.requestId);
+  loginUrl.searchParams.set("cliLoginSecret", login.secret);
+  if (options.mode === "signup") {
+    loginUrl.searchParams.set("mode", "signup");
   }
-  const next: AuthState = {
-    apiUrl,
-    session: {
-      cookie,
-      userId: result.userId,
-      email: result.email,
-      expiresAt: null,
-    },
-  };
-  await writeAuthState(next);
-  return next;
+
+  console.log(
+    options.mode === "signup"
+      ? "Sign up for Libretto Cloud in your browser:"
+      : "Sign in to Libretto Cloud in your browser:",
+  );
+  console.log(`  ${loginUrl.toString()}`);
+  console.log();
+  if (openBrowser(loginUrl.toString())) {
+    console.log("Opened the page in your default browser.");
+    console.log("If it didn't open, copy the link above into your browser.");
+    console.log();
+  } else {
+    console.log("Copy the link above into your browser.");
+    console.log();
+  }
+  console.log(
+    options.mode === "signup"
+      ? "Waiting for browser sign-up"
+      : "Waiting for browser sign-in",
+  );
+
+  const expiresAt = new Date(login.expiresAt).getTime();
+  let verificationHintShown = false;
+  while (Date.now() < expiresAt) {
+    const result = await orpcCall<CliLoginPollResponse>({
+      apiUrl: options.apiUrl,
+      path: "/v1/auth/cliLoginPoll",
+      input: {
+        requestId: login.requestId,
+        secret: login.secret,
+      },
+      unauthenticated: true,
+    });
+
+    if (result.status === "expired") {
+      throw new Error(
+        `Auth request expired. Run \`libretto cloud auth ${options.mode}\` again.`,
+      );
+    }
+
+    if (result.status === "approved") {
+      const session = await getCurrentSession(options.apiUrl, result.cookieHeader);
+      if (!session?.user?.id) {
+        throw new Error(
+          "Browser auth succeeded, but the returned session could not be verified.",
+        );
+      }
+
+      const next: AuthState = {
+        apiUrl: options.apiUrl,
+        session: {
+          cookie: result.cookieHeader,
+          userId: result.userId,
+          email: result.email,
+          expiresAt: session.session.expiresAt ?? result.sessionExpiresAt,
+        },
+      };
+      await writeAuthState(next);
+
+      console.log();
+      console.log(`Logged in as ${result.email}.`);
+      if (!result.emailVerified) {
+        console.log(
+          "Heads up: your email isn't verified yet. Click the verification link in your inbox to finish setup.",
+        );
+      }
+      return;
+    }
+
+    if (options.mode === "signup" && !verificationHintShown) {
+      console.log();
+      console.log("After signing up with email/password, verify your email to finish CLI auth.");
+      verificationHintShown = true;
+    }
+    process.stdout.write(".");
+    await sleep(2000);
+  }
+
+  console.log();
+  throw new Error(
+    `Auth request expired. Run \`libretto cloud auth ${options.mode}\` again.`,
+  );
 }
 
 /**
@@ -197,15 +293,11 @@ export const signupCommand = SimpleCLI.command({
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
   .handle(async () => {
-    const signupUrl = new URL("/signin", resolveHostedWebsiteUrl());
-    signupUrl.searchParams.set("mode", "signup");
-
-    console.log("Sign up for Libretto Cloud in your browser:");
-    console.log(`  ${signupUrl.toString()}`);
-    console.log();
-    console.log("After creating your workspace, return here and run:");
-    console.log("  libretto cloud auth login");
-    console.log("  libretto cloud auth api-key issue --label <label>");
+    await runBrowserAuthFlow({
+      mode: "signup",
+      apiUrl: resolveHostedApiUrl(),
+      websiteUrl: resolveHostedWebsiteUrl(),
+    });
   });
 
 // ---------------------------------------------------------------------------
@@ -213,94 +305,16 @@ export const signupCommand = SimpleCLI.command({
 // ---------------------------------------------------------------------------
 
 export const loginCommand = SimpleCLI.command({
-  description: "Sign in to an existing hosted-platform account",
+  description: "Open the hosted-platform sign-in page",
 })
   .input(SimpleCLI.input({ positionals: [], named: {} }))
   .handle(async () => {
-    const apiUrl = resolveHostedApiUrl();
-
-    const email = await prompt("Email:");
-    const password = await promptPassword("Password:");
-
-    const { data, setCookie } = await betterAuthCall<{
-      token: string;
-      user: { id: string; email: string; emailVerified: boolean };
-    }>({
-      apiUrl,
-      path: "/api/auth/sign-in/email",
-      input: { email, password },
-      unauthenticated: true,
+    await runBrowserAuthFlow({
+      mode: "login",
+      apiUrl: resolveHostedApiUrl(),
+      websiteUrl: resolveHostedWebsiteUrl(),
     });
-
-    const cookie = setCookieToCookieHeader(setCookie);
-    if (!cookie) {
-      throw new Error("Login response did not include a session cookie.");
-    }
-
-    // Pass the just-issued cookie explicitly — at this point we haven't
-    // persisted it yet, so a default credential pick would read the stale
-    // (or missing) cookie from disk.
-    const session = await getCurrentSession(apiUrl, cookie);
-
-    const next: AuthState = {
-      apiUrl,
-      session: {
-        cookie,
-        userId: data.user.id,
-        email: data.user.email,
-        expiresAt: session?.session.expiresAt ?? null,
-      },
-    };
-    await writeAuthState(next);
-
-    console.log(`Logged in as ${data.user.email}.`);
-    if (!data.user.emailVerified) {
-      console.log(
-        "Heads up: your email isn't verified yet. Re-sending the verification link to your inbox — click it to finish setup.",
-      );
-      try {
-        await betterAuthCall({
-          apiUrl,
-          path: "/api/auth/send-verification-email",
-          input: {
-            email: data.user.email,
-            callbackURL: `${apiUrl}/auth/verified`,
-          },
-          unauthenticated: true,
-        });
-        console.log(`Verification email sent to ${data.user.email}.`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
-        console.log(
-          `Couldn't resend the verification email (${message}). Try again, or hit /api/auth/send-verification-email directly.`,
-        );
-      }
-    }
   });
-
-export const forgotPasswordCommand = SimpleCLI.command({
-  description: "Send a password reset email",
-})
-  .input(SimpleCLI.input({ positionals: [], named: {} }))
-  .handle(async () => {
-    const apiUrl = resolveHostedApiUrl();
-    const email = await prompt("Email:");
-    const result = await orpcCall<{ status: "sent" | "not_found" }>({
-      apiUrl,
-      path: "/v1/auth/requestPasswordReset",
-      input: { email },
-      unauthenticated: true,
-    });
-    if (result.status === "not_found") {
-      console.log(`No Libretto account exists for ${email}.`);
-      return;
-    }
-    console.log(`Password reset link sent to ${email}.`);
-  });
-
-// ---------------------------------------------------------------------------
-// logout
-// ---------------------------------------------------------------------------
 
 export const logoutCommand = SimpleCLI.command({
   description: "Clear local libretto credentials",
@@ -379,10 +393,8 @@ export const inviteCommand = SimpleCLI.command({
       credential,
     });
 
-    // Fetch the inviter's org so we can print the slug. The accept
-    // command requires the recipient to type the slug as confirmation
-    // (slug is uniquely indexed; name is not), so showing it here helps
-    // the inviter share the right command.
+    // Fetch the inviter's org so we can print the website invite link for
+    // manual testing and support cases where the email is unavailable.
     const { data: orgs } = await betterAuthCall<
       Array<{ id: string; name: string; slug: string | null }>
     >({
@@ -394,151 +406,18 @@ export const inviteCommand = SimpleCLI.command({
     const org = orgs?.find((o) => o.id === data.organizationId);
     const orgName = org?.name ?? "<your-org-name>";
     const orgSlug = org?.slug ?? "<your-org-slug>";
+    const inviteUrl = new URL("/invite", resolveHostedWebsiteUrl());
+    inviteUrl.searchParams.set("tenantSlug", orgSlug);
+    inviteUrl.searchParams.set("invitationId", data.id);
+    inviteUrl.searchParams.set("accept", "1");
 
     console.log(`Invitation sent to ${data.email}.`);
     console.log(`Invitation id: ${data.id}`);
     console.log(`Organization:  ${orgName} (${orgSlug})`);
     console.log(`Expires at:    ${data.expiresAt}`);
     console.log();
-    console.log("Tell them to run:");
-    console.log(
-      `  libretto cloud auth accept-invite ${orgSlug} ${data.id}`,
-    );
-  });
-
-// ---------------------------------------------------------------------------
-// accept-invite
-// ---------------------------------------------------------------------------
-
-export const acceptInviteCommand = SimpleCLI.command({
-  description: "Accept an organization invitation",
-})
-  .input(
-    SimpleCLI.input({
-      positionals: [
-        SimpleCLI.positional(
-          "tenantSlug",
-          z
-            .string()
-            .min(2)
-            .max(60)
-            .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/, {
-              message:
-                "Slug must be lowercase letters, numbers, and hyphens (no leading/trailing hyphen).",
-            }),
-          {
-            help:
-              "Slug of the organization you're joining. Must match the org slug in the invitation email — acts as a confirmation step.",
-          },
-        ),
-        SimpleCLI.positional("invitationId", z.string().min(1), {
-          help: "Invitation id from the invite email.",
-        }),
-      ],
-      named: {},
-    }),
-  )
-  .handle(async ({ input }) => {
-    const stored = await readAuthState();
-    const apiUrl = resolveHostedApiUrl();
-    const credential = pickCredential(stored);
-    const expectedTenantSlug = input.tenantSlug;
-
-    if (credential.source !== "none") {
-      // Path A — already signed in. Better Auth will try to insert a row
-      // into `members` for the new org, but `members.userId` is UNIQUE
-      // (one libretto user = one organization). Pre-check the user's
-      // existing memberships and refuse with a clear message rather than
-      // letting it 500 with a Postgres constraint error.
-      const { data: existingOrgs } = await betterAuthCall<Array<{ id: string }>>({
-        apiUrl,
-        path: "/api/auth/organization/list",
-        method: "GET",
-        credential,
-      });
-      if (Array.isArray(existingOrgs) && existingOrgs.length > 0) {
-        throw new Error(
-          [
-            "You're already a member of an organization.",
-            "A libretto user can only belong to one organization at a time.",
-            "To accept this invite: log out, delete the existing account, and re-run `libretto cloud auth accept-invite` with a new account (or a fresh email).",
-          ].join("\n"),
-        );
-      }
-
-      // Confirmation step: fetch the invitation and require the user to
-      // have typed the matching organization slug. Same lightweight
-      // second-factor check that the public ORPC route enforces for
-      // Path B. Slug is the right field here because `tenants.slug` is
-      // uniquely indexed; `tenants.name` is not, so a name-based check
-      // could be bypassed by a colliding lowercase name.
-      const { data: invitation } = await betterAuthCall<{
-        organizationName: string;
-        organizationSlug: string | null;
-        organizationId: string;
-      }>({
-        apiUrl,
-        path: `/api/auth/organization/get-invitation?id=${encodeURIComponent(input.invitationId)}`,
-        method: "GET",
-        credential,
-      });
-      if (
-        !invitation?.organizationSlug ||
-        invitation.organizationSlug !== expectedTenantSlug
-      ) {
-        throw new Error(
-          "Organization slug doesn't match this invitation. Double-check the slug shown in the invitation email.",
-        );
-      }
-
-      await betterAuthCall<{ member: { organizationId: string } }>({
-        apiUrl,
-        path: "/api/auth/organization/accept-invitation",
-        input: { invitationId: input.invitationId },
-        credential,
-      });
-      console.log(`Invitation accepted. You're now a member of ${invitation.organizationName}.`);
-      return;
-    }
-
-    // Not signed in: collect a name + password and call the public ORPC route.
-    // The server validates tenantSlug against the invitation server-side too.
-    console.log("Accepting invite — let's create your account.");
-    const name = await prompt("Your name:");
-    const password = await promptPassword("Choose a password (8+ chars):");
-
-    const result = await orpcCall<SignupResponse>({
-      apiUrl,
-      path: "/v1/auth/acceptInviteAndSignup",
-      input: {
-        invitationId: input.invitationId,
-        tenantSlug: input.tenantSlug,
-        name,
-        password,
-      },
-      unauthenticated: true,
-    });
-
-    await persistSignupSession(apiUrl, result);
-
-    console.log(`Account created. Verification email sent to ${result.email}.`);
-    console.log("Click the link in the email and return here.");
-    console.log("Waiting for verification");
-
-    const verified = await pollForVerification(apiUrl);
-    if (!verified) {
-      console.log();
-      console.log(
-        "Timed out waiting for email verification. Click the link in the email when ready — your CLI session is already saved.",
-      );
-      return;
-    }
-
-    console.log();
-    console.log("Email verified. You're logged in and a member of the organization.");
-    console.log("To generate an API key, run:");
-    console.log("  libretto cloud auth api-key issue --label <label>");
-    console.log("Then add LIBRETTO_API_KEY=<key> to your project's .env file.");
+    console.log("Invite link:");
+    console.log(`  ${inviteUrl.toString()}`);
   });
 
 // ---------------------------------------------------------------------------
@@ -693,10 +572,8 @@ export const authCommands = SimpleCLI.group({
   routes: {
     signup: signupCommand,
     login: loginCommand,
-    "forgot-password": forgotPasswordCommand,
     logout: logoutCommand,
     invite: inviteCommand,
-    "accept-invite": acceptInviteCommand,
     whoami: whoamiCommand,
     "api-key": SimpleCLI.group({
       description: "Manage API keys",

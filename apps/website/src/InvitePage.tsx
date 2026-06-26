@@ -70,6 +70,12 @@ function inviteCallbackUrl(): string {
   return url.toString();
 }
 
+function inviteVerificationUrl(): string {
+  const url = new URL("/verify-email", window.location.origin);
+  url.searchParams.set("returnTo", inviteCallbackUrl());
+  return url.toString();
+}
+
 function formatExpiration(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -98,6 +104,10 @@ export function InvitePage() {
     setLoading("accept");
     setError(null);
     try {
+      if (session && !session.user.emailVerified) {
+        window.location.assign(inviteVerificationUrl());
+        return;
+      }
       await orpcCall<AcceptResponse>("/v1/auth/acceptInviteForCurrentUser", {
         invitationId,
         tenantSlug,
@@ -156,9 +166,9 @@ export function InvitePage() {
         name,
         email: details.email,
         password,
-        callbackURL: inviteCallbackUrl(),
+        callbackURL: inviteVerificationUrl(),
       });
-      await acceptInvite();
+      window.location.assign(inviteVerificationUrl());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-up failed.");
       setLoading(null);

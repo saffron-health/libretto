@@ -8,6 +8,7 @@ import { SignInPage } from "./SignInPage";
 import { DashboardPage } from "./DashboardPage";
 import { OnboardingPage } from "./OnboardingPage";
 import { InvitePage } from "./InvitePage";
+import { VerifyEmailPage } from "./VerifyEmailPage";
 
 function VsRoutes() {
   return (
@@ -29,6 +30,7 @@ export function App() {
       </Route>
       <Route path="/vs" nest component={VsRoutes} />
       <Route path="/signin" component={SignInPage} />
+      <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/invite" component={InvitePage} />
       <Route path="/onboarding" component={OnboardingPage} />
       <Route path="/dashboard" component={DashboardPage} />

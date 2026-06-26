@@ -691,7 +691,8 @@ export function DashboardPage() {
                         <button
                           type="button"
                           onClick={() => setShowDeleteAccountDialog(true)}
-                          className="h-8 rounded-md border border-red-400/25 px-2.5 text-xs text-red-200 transition-colors hover:border-red-300/45 hover:bg-red-500/10"
+                          aria-label="Delete account"
+                          className="h-6 rounded border border-red-400/20 px-1.5 text-[10px] uppercase text-red-200/80 transition-colors hover:border-red-300/40 hover:bg-red-500/10 hover:text-red-100"
                         >
                           Delete account
                         </button>

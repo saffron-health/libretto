@@ -31,6 +31,10 @@ export function OnboardingPage() {
   useEffect(() => {
     getAuthStatus()
       .then((status) => {
+        if (!status.emailVerified) {
+          window.location.assign("/verify-email");
+          return;
+        }
         if (status.hasTenant) {
           window.location.assign("/dashboard");
           return;

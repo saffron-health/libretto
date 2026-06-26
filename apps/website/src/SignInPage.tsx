@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Navbar } from "./components/Navbar";
-import { authPost, getAuthStatus, getCloudSession } from "./cloudApi";
+import { authPost, getAuthStatus, getCloudSession, orpcCall } from "./cloudApi";
 
 type AuthResponse = {
   redirect?: boolean;
@@ -9,6 +9,45 @@ type AuthResponse = {
 };
 
 type AuthMode = "signin" | "signup";
+
+type PasswordResetResponse = {
+  status: "sent" | "not_found";
+};
+
+type CliLoginParams = {
+  requestId: string;
+  secret: string;
+};
+
+type CliLoginApproveResponse = {
+  status: "approved" | "pending_verification";
+  email: string;
+};
+
+function getCliLoginParams(): CliLoginParams | null {
+  const params = new URLSearchParams(window.location.search);
+  const requestId = params.get("cliLoginId")?.trim();
+  const secret = params.get("cliLoginSecret")?.trim();
+  if (!requestId || !secret) return null;
+  return { requestId, secret };
+}
+
+function withoutCliLoginParams(): string {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("cliLoginId");
+  url.searchParams.delete("cliLoginSecret");
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function currentSigninCallbackUrl(): string {
+  const url = new URL("/verify-email", window.location.origin);
+  const cliLogin = getCliLoginParams();
+  if (cliLogin) {
+    url.searchParams.set("cliLoginId", cliLogin.requestId);
+    url.searchParams.set("cliLoginSecret", cliLogin.secret);
+  }
+  return url.toString();
+}
 
 function GoogleLogo() {
   return (
@@ -33,6 +72,24 @@ function GoogleLogo() {
   );
 }
 
+function EyeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="size-[17px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 export function SignInPage() {
   const [mode, setMode] = useState<AuthMode>(() =>
     new URLSearchParams(window.location.search).get("mode") === "signup"
@@ -42,15 +99,61 @@ export function SignInPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState<"google" | "email" | "signup" | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState<"google" | "email" | "signup" | "reset" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function approveCliLogin(): Promise<boolean> {
+    const cliLogin = getCliLoginParams();
+    if (!cliLogin) return false;
+
+    const statusBeforeApproval = await getAuthStatus();
+    if (!statusBeforeApproval.emailVerified) {
+      window.history.replaceState(null, "", currentSigninCallbackUrl());
+      window.location.assign(currentSigninCallbackUrl());
+      return true;
+    }
+
+    const result = await orpcCall<CliLoginApproveResponse>(
+      "/v1/auth/cliLoginApprove",
+      {
+        requestId: cliLogin.requestId,
+        secret: cliLogin.secret,
+      },
+    );
+    if (result.status === "pending_verification") {
+      window.history.replaceState(null, "", currentSigninCallbackUrl());
+      window.location.assign(currentSigninCallbackUrl());
+      return true;
+    }
+    window.history.replaceState(null, "", withoutCliLoginParams());
+    try {
+      window.location.assign(
+        statusBeforeApproval.hasTenant ? "/dashboard" : "/onboarding",
+      );
+    } catch {
+      window.location.assign("/onboarding");
+    }
+    return true;
+  }
 
   useEffect(() => {
     getCloudSession()
       .then((session) => {
         if (!session) return;
+        if (getCliLoginParams()) {
+          approveCliLogin().catch((err) => {
+            setError(err instanceof Error ? err.message : "CLI login approval failed.");
+          });
+          return;
+        }
         getAuthStatus()
           .then((status) => {
+            if (!status.emailVerified) {
+              window.location.assign("/verify-email");
+              return;
+            }
             window.location.assign(status.hasTenant ? "/dashboard" : "/onboarding");
           })
           .catch(() => {
@@ -64,16 +167,20 @@ export function SignInPage() {
     event.preventDefault();
     setLoading("email");
     setError(null);
+    setNotice(null);
     try {
       const result = await authPost<AuthResponse>("/api/auth/sign-in/email", {
         email,
         password,
-        callbackURL: `${window.location.origin}/dashboard`,
+        callbackURL: getCliLoginParams()
+          ? currentSigninCallbackUrl()
+          : `${window.location.origin}/dashboard`,
       });
       if (result.url) {
         window.location.assign(result.url);
         return;
       }
+      if (await approveCliLogin()) return;
       window.location.assign("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email sign-in failed.");
@@ -85,14 +192,18 @@ export function SignInPage() {
     event.preventDefault();
     setLoading("signup");
     setError(null);
+    setNotice(null);
     try {
       await authPost<AuthResponse>("/api/auth/sign-up/email", {
         name,
         email,
         password,
-        callbackURL: `${window.location.origin}/onboarding`,
+        callbackURL: getCliLoginParams()
+          ? currentSigninCallbackUrl()
+          : `${window.location.origin}/verify-email`,
       });
-      window.location.assign("/onboarding");
+      if (await approveCliLogin()) return;
+      window.location.assign("/verify-email");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-up failed.");
       setLoading(null);
@@ -102,18 +213,50 @@ export function SignInPage() {
   async function continueWithGoogle() {
     setLoading("google");
     setError(null);
+    setNotice(null);
     try {
       const result = await authPost<AuthResponse>("/api/auth/sign-in/social", {
         provider: "google",
-        callbackURL: `${window.location.origin}/${mode === "signup" ? "onboarding" : "dashboard"}`,
+        callbackURL: getCliLoginParams()
+          ? currentSigninCallbackUrl()
+          : `${window.location.origin}/${mode === "signup" ? "onboarding" : "dashboard"}`,
       });
       if (result.url) {
         window.location.assign(result.url);
         return;
       }
+      if (await approveCliLogin()) return;
       window.location.assign(mode === "signup" ? "/onboarding" : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google authentication failed.");
+      setLoading(null);
+    }
+  }
+
+  async function requestPasswordReset() {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setError("Enter your email address to reset your password.");
+      setNotice(null);
+      return;
+    }
+
+    setLoading("reset");
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await orpcCall<PasswordResetResponse>(
+        "/v1/auth/requestPasswordReset",
+        { email: normalizedEmail },
+      );
+      if (result.status === "not_found") {
+        setError(`No Libretto account exists for ${normalizedEmail}.`);
+        return;
+      }
+      setNotice(`Password reset email sent to ${normalizedEmail}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Password reset failed.");
+    } finally {
       setLoading(null);
     }
   }
@@ -145,6 +288,7 @@ export function SignInPage() {
                   onClick={() => {
                     setMode(option);
                     setError(null);
+                    setNotice(null);
                   }}
                   className="h-9 rounded-md text-xs font-medium uppercase text-muted transition-colors hover:text-ink aria-pressed:bg-panel-hi aria-pressed:text-accent-bright"
                   aria-pressed={mode === option}
@@ -207,18 +351,38 @@ export function SignInPage() {
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-xs uppercase text-muted">
-                  Password
+                <span className="mb-2 flex items-center justify-between gap-3 text-xs uppercase text-muted">
+                  <span>Password</span>
+                  {mode === "signin" && (
+                    <button
+                      type="button"
+                      onClick={requestPasswordReset}
+                      disabled={loading !== null}
+                      className="text-[11px] text-accent transition-colors hover:text-accent-bright disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {loading === "reset" ? "Sending..." : "Forgot password?"}
+                    </button>
+                  )}
                 </span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                  minLength={mode === "signup" ? 8 : undefined}
-                  required
-                  className="h-10 w-full rounded-md border border-rule bg-bg px-3 text-sm text-ink outline-none transition-colors placeholder:text-muted/45 focus:border-accent"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                    minLength={mode === "signup" ? 8 : undefined}
+                    required
+                    className="h-10 w-full rounded-md border border-rule bg-bg px-3 pr-12 text-sm text-ink outline-none transition-colors placeholder:text-muted/45 focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-1 top-1 grid size-8 place-items-center rounded-md text-muted transition-colors hover:bg-panel-hi hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25"
+                  >
+                    <EyeIcon />
+                  </button>
+                </div>
               </label>
               <button
                 type="submit"
@@ -234,6 +398,11 @@ export function SignInPage() {
             {error && (
               <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-5 text-red-200">
                 {error}
+              </p>
+            )}
+            {notice && (
+              <p className="mt-4 rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-sm leading-5 text-accent-bright">
+                {notice}
               </p>
             )}
           </div>

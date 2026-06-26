@@ -2,13 +2,15 @@
 title: Authentication
 ---
 
-> Use the public auth endpoints to create a new account or accept an invite when you do not already have a Libretto account.
+> Use the public auth endpoints for non-interactive account setup flows. Most users should sign up, log in, and accept invites through the Libretto Cloud website or CLI browser handoff.
 
 These endpoints use the same ORPC request envelope as the rest of the Libretto Cloud API, but they do not require `x-api-key`.
 
 ### POST `/v1/auth/signupAndCreateOrg`
 
-Create a new user account, create a new organization, send the verification email, and return the session cookie material that the CLI stores locally.
+Create a new user account and organization in one API call, send the verification email, and return session cookie material for callers that need to store the resulting session themselves.
+
+The interactive website and CLI signup flow usually signs the user in first, verifies email when needed, and then creates the organization from the onboarding page.
 
 Request fields:
 
@@ -48,12 +50,14 @@ curl -X POST "https://api.libretto.sh/v1/auth/signupAndCreateOrg" \
 
 ### POST `/v1/auth/acceptInviteAndSignup`
 
-Create a user account for an invited email address and accept the invitation in one call.
+Create a user account for an invited email address and accept the invitation in one API call.
+
+The interactive website invite flow usually signs the user up or in first, verifies email when needed, and then accepts the invitation from the invite page.
 
 Request fields:
 
-- `invitationId`: invitation id from the invite email
-- `tenantSlug`: organization slug from the invite email
+- `invitationId`: invitation id from the invite link
+- `tenantSlug`: organization slug from the invite link
 - `name`: user display name
 - `password`: password, 8 to 128 characters
 
@@ -84,7 +88,7 @@ curl -X POST "https://api.libretto.sh/v1/auth/acceptInviteAndSignup" \
 
 ### Interactive auth flows
 
-Interactive login, logout, invites, API-key issuance, and member management are handled through the Libretto Cloud CLI auth flow rather than separate public `/v1/*` endpoints here. Use [Libretto Cloud authentication](/libretto-cloud-hosting/authentication) for that workflow.
+Interactive signup, login, password reset, invite acceptance, API-key issuance, and member management are handled through the Libretto Cloud website and CLI auth flows rather than separate public `/v1/*` endpoints here. Use [Libretto Cloud authentication](/libretto-cloud-hosting/authentication) for that workflow.
 
 <CardGroup cols={3}>
   <Card title="Libretto Cloud API overview" icon="book-open" href="/libretto-cloud-api/overview">
