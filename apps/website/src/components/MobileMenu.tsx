@@ -2,7 +2,7 @@ import { useState } from "react";
 import { MenuTrigger, Menu, MenuItem, Popover, Button as AriaButton } from "react-aria-components";
 import { motion } from "motion/react";
 import { GitHubStarIcon, NpmIcon } from "../icons";
-import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
+import { NPM_URL, RELEASES_URL, REPO_URL } from "../site";
 import { CrossfadeIcon } from "./CrossfadeIcon";
 
 type AnimationState = "unmounted" | "hidden" | "visible";
@@ -110,22 +110,6 @@ export function MobileMenu({ stars }: { stars: string | null }) {
           <Menu className="outline-none">
             <MenuItem href="/blog" className={itemClass} data-fathom-event="Mobile nav blog click">
               Blog
-            </MenuItem>
-            <MenuItem
-              href="/#comparisons"
-              className={itemClass}
-              data-fathom-event="Mobile nav comparisons click"
-            >
-              Comparisons
-            </MenuItem>
-            <MenuItem
-              href={DISCUSSIONS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={itemClass}
-              data-fathom-event="Mobile nav forum click"
-            >
-              Forum
             </MenuItem>
             <MenuItem
               href={RELEASES_URL}

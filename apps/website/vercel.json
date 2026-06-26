@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "dist/client",
   "headers": [
     {
       "source": "/((?!docs(?:/|$)).*)",
@@ -53,18 +54,6 @@
     {
       "source": "/llms-full.txt",
       "destination": "https://libretto.sh/docs/llms-full.txt"
-    },
-    {
-      "source": "/blog",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/blog/:slug",
-      "destination": "/blog/:slug.html"
-    },
-    {
-      "source": "/vs/:slug",
-      "destination": "/index.html"
     },
     {
       "source": "/docs",

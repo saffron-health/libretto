@@ -3,8 +3,7 @@ import { Text } from "./Text";
 import { Button } from "./Button";
 import { GitHubStarIcon, NpmIcon } from "../icons";
 import { AnimationTarget } from "./AnimationOrchestration";
-import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
-import { AppLink } from "../routing";
+import { NPM_URL, RELEASES_URL, REPO_URL } from "../site";
 import { MobileMenu } from "./MobileMenu";
 import { LibrettoLogoAndName } from "../brand.js";
 
@@ -80,7 +79,7 @@ function GlitchNavLink({
   const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText(children);
 
   return (
-    <AppLink
+    <a
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
@@ -97,7 +96,7 @@ function GlitchNavLink({
       >
         {display}
       </Text>
-    </AppLink>
+    </a>
   );
 }
 
@@ -137,18 +136,12 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
     <nav {...animateProps} className="px-8 pt-6">
       <div className="relative mx-auto flex max-w-[800px] items-center justify-between">
         <div className="flex items-center gap-10">
-          <AppLink href="/" className="no-underline">
+          <a href="/" className="no-underline">
             <LibrettoLogoAndName />
-          </AppLink>
+          </a>
           <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
             <GlitchNavLink href="/blog" external={false} fathomEvent="Nav blog click">
               Blog
-            </GlitchNavLink>
-            <GlitchNavLink href="/#comparisons" external={false} fathomEvent="Nav comparisons click">
-              Comparisons
-            </GlitchNavLink>
-            <GlitchNavLink href={DISCUSSIONS_URL} fathomEvent="Nav forum click">
-              Forum
             </GlitchNavLink>
             <GlitchNavLink href={RELEASES_URL} fathomEvent="Nav changelog click">
               Changelog
