@@ -131,7 +131,6 @@ export {
   type LibrettoWorkflowDefinition,
   type LibrettoWorkflowHandler,
   type LibrettoWorkflowOptions,
-  type LibrettoWorkflowViewport,
   type WorkflowInputValidator,
 } from "./shared/workflow/workflow.js";
 export {

@@ -30,8 +30,6 @@ export type LibrettoWorkflowAuthProfile =
       refresh?: boolean;
     };
 
-export type LibrettoWorkflowViewport = ViewportConfig;
-
 export type LibrettoWorkflowDefinition<
   InputSchema extends z.ZodType = z.ZodType<unknown>,
   OutputSchema extends z.ZodType = z.ZodType<unknown>,
@@ -42,7 +40,7 @@ export type LibrettoWorkflowDefinition<
   authProfile?: LibrettoWorkflowAuthProfile;
   startUrl?: string;
   gpu?: boolean;
-  viewport?: LibrettoWorkflowViewport;
+  viewport?: ViewportConfig;
   recoveryAction?: RecoveryAction;
 };
 
@@ -163,7 +161,7 @@ export class LibrettoWorkflow<
   public readonly authProfileRefresh?: boolean;
   public readonly startUrl?: string;
   public readonly gpu?: boolean;
-  public readonly viewport?: LibrettoWorkflowViewport;
+  public readonly viewport?: ViewportConfig;
   public readonly recoveryAction?: RecoveryAction;
   private readonly handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
@@ -181,7 +179,7 @@ export class LibrettoWorkflow<
           authProfileRefresh?: boolean;
           startUrl?: string;
           gpu?: boolean;
-          viewport?: LibrettoWorkflowViewport;
+          viewport?: ViewportConfig;
           recoveryAction?: RecoveryAction;
         }
       | undefined,
@@ -235,7 +233,7 @@ export type ExportedLibrettoWorkflow = {
   readonly authProfileRefresh?: boolean;
   readonly startUrl?: string;
   readonly gpu?: boolean;
-  readonly viewport?: LibrettoWorkflowViewport;
+  readonly viewport?: ViewportConfig;
   readonly recoveryAction?: RecoveryAction;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
@@ -342,7 +340,7 @@ function getWorkflowConstructorOptions<
   authProfileRefresh?: boolean;
   startUrl?: string;
   gpu?: boolean;
-  viewport?: LibrettoWorkflowViewport;
+  viewport?: ViewportConfig;
   recoveryAction?: RecoveryAction;
 } {
   const authProfile = normalizeWorkflowAuthProfile(options.authProfile);
