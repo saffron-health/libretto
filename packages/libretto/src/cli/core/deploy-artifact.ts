@@ -22,6 +22,10 @@ import {
   LIBRETTO_WORKFLOW_BRAND,
 } from "../../shared/workflow/workflow.js";
 import { normalizeCredentialNames } from "../../shared/workflow/credentials.js";
+import {
+  ViewportConfigSchema,
+  type ViewportConfig,
+} from "./config.js";
 
 type PackageManifest = {
   name?: string;
@@ -59,10 +63,7 @@ export type WorkflowDeployMetadata = {
   authProfileRefresh?: boolean;
   startUrl?: string;
   gpu?: boolean;
-  viewport?: {
-    width: number;
-    height: number;
-  };
+  viewport?: ViewportConfig;
   sourceFile?: string;
   sourceFiles?: string[];
 };
@@ -887,12 +888,9 @@ function extractDiscoveryLaunchMetadata(
     typeof record.viewport === "object" &&
     !Array.isArray(record.viewport)
   ) {
-    const viewport = record.viewport as { width?: unknown; height?: unknown };
-    if (typeof viewport.width === "number" && typeof viewport.height === "number") {
-      metadata.viewport = {
-        width: viewport.width,
-        height: viewport.height,
-      };
+    const viewport = ViewportConfigSchema.safeParse(record.viewport);
+    if (viewport.success) {
+      metadata.viewport = viewport.data;
     }
   }
 

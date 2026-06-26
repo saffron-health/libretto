@@ -4,6 +4,7 @@ import {
   createRecoveryPage,
   type RecoveryAction,
 } from "../../runtime/recovery/page-fallbacks.js";
+import type { ViewportConfig } from "../../cli/core/config.js";
 import { normalizeProfileName } from "./auth-profile-name.js";
 import {
   mergeCredentialsIntoInput,
@@ -29,10 +30,7 @@ export type LibrettoWorkflowAuthProfile =
       refresh?: boolean;
     };
 
-export type LibrettoWorkflowViewport = {
-  width: number;
-  height: number;
-};
+export type LibrettoWorkflowViewport = ViewportConfig;
 
 export type LibrettoWorkflowDefinition<
   InputSchema extends z.ZodType = z.ZodType<unknown>,
