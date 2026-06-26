@@ -896,7 +896,7 @@ export const runCommand = SimpleCLI.command({
       console.log(`Connecting to ${providerName} browser...`);
     }
 
-    const headless = daemonProviderName ? true : (headlessMode ?? false);
+    const headless = headlessMode ?? false;
     const windowPosition = headless
       ? undefined
       : resolveWindowPosition(ctx.logger);
