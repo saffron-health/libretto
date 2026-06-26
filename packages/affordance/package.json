@@ -28,6 +28,8 @@
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",
+    "format": "oxfmt src/v2 test/v2",
+    "check": "run-p type-check test:vitest lint format",
     "lint": "lintcn lint --tsconfig tsconfig.json",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
@@ -39,9 +41,14 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "outdent": "^0.8.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.5",
     "zod": "^4.3.6"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
+    "teg-parser": "0.15.0"
   }
 }

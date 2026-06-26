@@ -39,6 +39,7 @@
     "sync-skills": "pnpm run sync:mirrors",
     "check:skills": "pnpm run check:mirrors",
     "build": "tsup --config tsup.config.ts",
+    "check": "run-p type-check test:vitest lint",
     "lint": "lintcn lint --tsconfig tsconfig.json",
     "type-check": "tsc --noEmit",
     "test": "turbo run test:vitest --filter=libretto --log-order=grouped",
