@@ -68,6 +68,8 @@ export const createCloudJobInput = SimpleCLI.input({
       name: "timeout-seconds",
       help: "Job timeout in seconds",
     }),
+    headed: SimpleCLI.flag({ help: "Run browser in headed mode" }),
+    headless: SimpleCLI.flag({ help: "Run browser in headless mode" }),
     callbackUrl: SimpleCLI.option(z.string().optional(), {
       name: "callback-url",
       help: "Per-job callback URL",
@@ -90,6 +92,10 @@ export const createCloudJobInput = SimpleCLI.input({
   .refine(
     (input) => !(input.params && input.paramsFile),
     "Pass either --params or --params-file, not both.",
+  )
+  .refine(
+    (input) => !(input.headed && input.headless),
+    "Cannot pass both --headed and --headless.",
   )
   .refine(
     (input) =>
@@ -121,6 +127,8 @@ export const createCloudJobCommand = SimpleCLI.command({
     if (input.timeoutSeconds !== undefined) {
       payload.timeout_seconds = input.timeoutSeconds;
     }
+    if (input.headed) payload.headless = false;
+    if (input.headless) payload.headless = true;
     if (input.callbackUrl) payload.callback_url = input.callbackUrl;
     if (input.callbackSecret) payload.callback_secret = input.callbackSecret;
     if (input.skipCallbacks) payload.skip_callbacks = true;

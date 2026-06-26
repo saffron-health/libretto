@@ -378,6 +378,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("libretto cloud jobs create [workflow]");
     expect(result.stdout).toContain("--params-file");
     expect(result.stdout).toContain("--timeout-seconds");
+    expect(result.stdout).toContain("--headless");
     expect(result.stderr).toBe("");
   });
 
