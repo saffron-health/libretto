@@ -88,19 +88,19 @@ function Hero({
           htmlStyle={{ opacity: 0 }}
           className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:balance]"
         >
-          Libretto is an open-source CLI that lets agents turn website
-          workflows into fast, reusable scripts you can deploy
+          Libretto is an open-source CLI that turns website workflows into fast,
+          reusable scripts in your codebase
         </Text>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-col items-center justify-center gap-3">
           <InstallSnippet />
           <div className="text-xs text-muted">
             or{" "}
             <a
-              href="/docs/get-started/quickstart"
+              href="https://cal.com/team/libretto/demo"
               className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
-              data-fathom-event="Hero docs click"
+              data-fathom-event="Hero demo click"
             >
-              go to docs
+              BOOK A DEMO
             </a>
           </div>
         </div>

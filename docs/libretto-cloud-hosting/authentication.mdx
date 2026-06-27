@@ -18,13 +18,13 @@ Use `auth signup` when you are creating a brand new Libretto Cloud organization:
 npx libretto cloud auth signup
 ```
 
-The CLI prompts for your name, email, password, organization name, organization slug, and the alert email that Libretto Cloud should use for workflow failure notifications. After the account is created, it waits for email verification and stores the session locally in `~/.libretto/auth.json`.
+The CLI opens the signup page in your browser and waits while you create the account. You can sign up with Google or with email and password. If you use email and password, open the verification link in the same browser so the website can finish setup. After the website approves the signup, the CLI stores the Libretto Cloud session in `~/.libretto/auth.json`.
 
 <Note>
   A Libretto user can only belong to one organization at a time. If your team already has an organization, use an invite instead of creating a second account.
 </Note>
 
-If the organization slug is already taken, the CLI re-prompts for just the slug and keeps the rest of your signup input.
+If the organization slug is already taken, choose a different slug in the website signup form.
 
 ### Log in to an existing account
 
@@ -34,17 +34,11 @@ Use `auth login` when the account already exists:
 npx libretto cloud auth login
 ```
 
-This stores a new Libretto Cloud session in `~/.libretto/auth.json`. If the account is not verified yet, the CLI re-sends the verification email.
+The CLI opens the login page in your browser and waits while you sign in with Google or email and password. After the website approves the login, the CLI stores the Libretto Cloud session in `~/.libretto/auth.json`.
 
 ### Reset a forgotten password
 
-Use `auth forgot-password` to request a password reset email:
-
-```bash theme={null}
-npx libretto cloud auth forgot-password
-```
-
-After you choose a new password from the reset link, run `auth login` again to save a fresh local session.
+Open the Libretto Cloud login page and use the forgot-password action to request a password reset email. After you choose a new password from the reset link, run `auth login` again to save a fresh local session.
 
 To clear local credentials:
 
@@ -70,19 +64,13 @@ Use `auth invite` from an account that can manage members in the active organiza
 npx libretto cloud auth invite teammate@example.com --role member
 ```
 
-The command sends an invitation email to the teammate and prints the invitation id and organization slug that they need for `auth accept-invite`.
+The command sends an invitation email to the teammate and prints the invite link for manual testing or support.
 
 ### Accept an invite
 
-Use `auth accept-invite` when you are joining an existing organization:
+Open the invitation link from the email. The website guides you through signing in or creating the invited account, then accepts the invitation. If you create the invited account with email and password, verify email from the same browser; after verification, the website returns to the invite and accepts it.
 
-```bash theme={null}
-npx libretto cloud auth accept-invite <tenant-slug> <invitation-id>
-```
-
-If you are not logged in yet, the CLI creates the account first, waits for email verification, and then saves the hosted session locally.
-
-If you are already logged in, `auth accept-invite` only works when that account is not already a member of another organization.
+If you are already signed in, invite acceptance only works when that account is not already a member of another organization.
 
 ### Issue an API key
 

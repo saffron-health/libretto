@@ -9,6 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as SigninRouteImport } from './routes/signin'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as InviteRouteImport } from './routes/invite'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
 import { Route as BlogRouteRouteImport } from './routes/blog/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -18,6 +23,31 @@ import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs/playwright-
 import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SigninRoute = SigninRouteImport.update({
+  id: '/signin',
+  path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteRoute = InviteRouteImport.update({
+  id: '/invite',
+  path: '/invite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BrandKitRoute = BrandKitRouteImport.update({
   id: '/brand-kit',
   path: '/brand-kit',
@@ -63,6 +93,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/dashboard': typeof DashboardRoute
+  '/invite': typeof InviteRoute
+  '/onboarding': typeof OnboardingRoute
+  '/signin': typeof SigninRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
@@ -72,6 +107,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/brand-kit': typeof BrandKitRoute
+  '/dashboard': typeof DashboardRoute
+  '/invite': typeof InviteRoute
+  '/onboarding': typeof OnboardingRoute
+  '/signin': typeof SigninRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
@@ -83,6 +123,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/dashboard': typeof DashboardRoute
+  '/invite': typeof InviteRoute
+  '/onboarding': typeof OnboardingRoute
+  '/signin': typeof SigninRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
@@ -95,6 +140,11 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/dashboard'
+    | '/invite'
+    | '/onboarding'
+    | '/signin'
+    | '/verify-email'
     | '/blog/$slug'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
@@ -104,6 +154,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/brand-kit'
+    | '/dashboard'
+    | '/invite'
+    | '/onboarding'
+    | '/signin'
+    | '/verify-email'
     | '/blog/$slug'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
@@ -114,6 +169,11 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/dashboard'
+    | '/invite'
+    | '/onboarding'
+    | '/signin'
+    | '/verify-email'
     | '/blog/$slug'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
@@ -125,6 +185,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BlogRouteRoute: typeof BlogRouteRouteWithChildren
   BrandKitRoute: typeof BrandKitRoute
+  DashboardRoute: typeof DashboardRoute
+  InviteRoute: typeof InviteRoute
+  OnboardingRoute: typeof OnboardingRoute
+  SigninRoute: typeof SigninRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
@@ -132,6 +197,41 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signin': {
+      id: '/signin'
+      path: '/signin'
+      fullPath: '/signin'
+      preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite': {
+      id: '/invite'
+      path: '/invite'
+      fullPath: '/invite'
+      preLoaderRoute: typeof InviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/brand-kit': {
       id: '/brand-kit'
       path: '/brand-kit'
@@ -209,6 +309,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BlogRouteRoute: BlogRouteRouteWithChildren,
   BrandKitRoute: BrandKitRoute,
+  DashboardRoute: DashboardRoute,
+  InviteRoute: InviteRoute,
+  OnboardingRoute: OnboardingRoute,
+  SigninRoute: SigninRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,
