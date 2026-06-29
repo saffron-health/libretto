@@ -19,14 +19,14 @@ export const SessionViewportSchema = z.object({
 export const ProviderStateSchema = z.object({
   name: z.string(),
   sessionId: z.string(),
-  recordingUrl: z.string().url().optional(),
+  recordingUrl: z.url().optional(),
 });
 
 export const SessionStateFileSchema = z.object({
   version: z.literal(SESSION_STATE_VERSION),
   port: z.number().int().min(0).max(65535),
   pid: z.number().int().optional(),
-  cdpEndpoint: z.string().url().optional(),
+  cdpEndpoint: z.url().optional(),
   session: z.string().min(1),
   startedAt: z.string().datetime({ offset: true }),
   status: SessionStatusSchema.optional(),

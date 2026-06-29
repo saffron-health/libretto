@@ -10,51 +10,223 @@ metadata:
 
 Render a Markdown document in a native Glimpse window with syntax-highlighted code and rich diff rendering.
 
+## Setup
+
+cd ./  && npm install
+
+## Default change-doc format
+
+When creating a change-doc for Glimpse, use this structure by default:
+
+1. A short, specific title.
+2. A `## Summary` section with a concise bulleted list of the main changes.
+3. One section per logical change, each with:
+   - a clear section title
+   - a short explanation of what changed and why
+   - a `changes` block referencing the relevant files
+
+Prefer grouping by logical concern instead of by file whenever possible.
+Lead with rationale, then show the diff that supports it.
+
+Template:
+
+````md
+# <Title>
+
+## Summary
+
+- Change 1
+- Change 2
+- Change 3
+
+## <Section title>
+
+What changed and why it matters.
+
+```changes
+path/to/file
+```
+
+## <Another section title>
+
+More rationale for this group of changes.
+
+```changes
+path/to/other-file
+path/to/related-file
+```
+````
+
+Example:
+
+````bash
+cat <<'EOF' | node ./bin/glimpse-changes.js -
+# Improve review flow messaging
+
+## Summary
+- clarify the default blocking review flow
+- document when to use background mode
+- add stronger guidance for user-driven review sessions
+
+## Clarify the default review flow
+Explain that agents should usually open the review, ask the user to inspect it,
+and wait until the user says they are done.
+
+```changes
+packages/glimpse-changes/skills/glimpse-changes/SKILL.md
+````
+
+EOF
+
+`````
+
+Example with an ad-hoc fenced diff block:
+
+````bash
+cat <<'EOF' | node ./bin/glimpse-changes.js -
+# New utility module
+
+## Summary
+- Added a helper for computing hashes
+
+## Hash helper
+
+```diff
++++ src/utils/hash.ts
++import { createHash } from "node:crypto";
++
++export function shortHash(input: string): string {
++  return createHash("sha256")
++    .update("example:" + input)
++    .digest("hex")
++    .slice(0, 12);
++}
+`````
+
+EOF
+
+````
+
 ## Usage
 
-Pipe markdown or pass it as an argument:
+Prefer piping markdown over stdin. This avoids shell-quoting issues.
 
 ```bash
-cat report.md | npx glimpse-changes
-npx glimpse-changes "# Title\n\nContent"
+cat report.md | node ./bin/glimpse-changes.js
+cat report.md | node ./bin/glimpse-changes.js -
+
+cat <<'EOF' | node ./bin/glimpse-changes.js -
+# Title
+
+Content
+EOF
 ```
 
-Use `-` to force reading from stdin:
+**Important: Do NOT escape backticks or dollar signs inside `<<'EOF'` heredocs.**
+The single-quoted delimiter already prevents all shell expansion. Escaping
+backticks (e.g. writing `\`` instead of `` ` ``) will break fence detection and
+produce garbled output instead of rendered diffs.
+
+You can still pass a single inline markdown argument for simple content:
 
 ```bash
-npx glimpse-changes -
+node ./bin/glimpse-changes.js "# Title\n\nContent"
 ```
 
-### Options
+The CLI opens a Glimpse window and blocks until closed.
 
-- `--dry-run` — Render to file only, don't open Glimpse. Prints `{ dryRun: true, htmlPath, title }` as JSON.
-- `--background` — Open the window in the background, print the output file path, and exit immediately. The output file contains `__PENDING__` until the user closes the window, then it contains the review output.
+## Review workflow
 
-By default the CLI blocks until the window is closed and prints review output to stdout.
+This skill is not just for rendering a nice diff view — it can also collect
+user review feedback.
 
-## Diff blocks
+- Use the default blocking mode when you only need to show the content and wait.
+- In an interactive agent session, prefer a user-driven workflow: open the
+  review, ask the user to review it, and wait for them to tell you when they
+  are done.
+- Use `--background` only when you specifically want an asynchronous workflow.
+- In background mode, the CLI prints a review file path.
+- That file contains `__PENDING__` until the window is closed.
+- Once the user is done, the file contains either their review text or a
+  no-review completion message.
 
-**Command diffs** — executed at render time, must start with `git diff`:
+Default interactive agent flow:
 
+1. Render the report for the user.
+2. Tell the user to review it in Glimpse.
+3. Wait for the user to say they are finished.
+4. Then continue the task.
+
+Asynchronous/background flow (only when explicitly useful):
+
+1. Render the report with `node ./bin/glimpse-changes.js --background -`.
+2. Capture the printed review file path.
+3. Poll that file until it is no longer `__PENDING__`.
+4. Read the review text and continue the task.
+
+### Background mode
+
+Use `--background` to open the window without blocking:
+
+```bash
+node ./bin/glimpse-changes.js --background "# Title\n\nContent"
+# prints: Glimpse window opened. Read /tmp/glimpse-review-<id>.txt for user feedback.
 ```
-!`git diff -- path/to/file`
-```
 
-**Full unified diffs** — paste standard `git diff` output in a `diff` fenced block:
+The output file contains `__PENDING__` until the user closes the window, then it contains the review text. Poll by reading the file and checking whether it still says `__PENDING__`. If the user closes the window without adding review comments, the file will contain a no-review completion message.
+
+## Changes blocks
+
+Use `changes` fenced code blocks to show file diffs. List file paths (relative
+to the working directory) and the renderer resolves old/new contents from git
+automatically. Diffs are expandable — users can click to reveal collapsed
+context between hunks.
+
+**Show full file diffs:**
 
 ````
-```diff
-diff --git a/foo.txt b/foo.txt
---- a/foo.txt
-+++ b/foo.txt
-@@ -1,3 +1,3 @@
- context
--old
-+new
-```
-````
 
-**Inline diffs** — bare `+`/`-`/` ` prefixed lines in a `diff` fenced block:
+```changes
+src/db/queries.ts
+src/db/schema.ts
+```
+
+```
+
+**Focus on a line range** (still expandable, but scrolled to the range):
+
+```
+
+```changes
+src/config.ts:42-50
+```
+
+`````
+
+**Group related files** in one block for a stacked view, or **separate them**
+with prose for a guided walkthrough:
+
+````md
+The query layer now batches reads:
+
+```changes
+src/db/queries.ts
+```
+
+I also updated the schema to match:
+
+```changes
+src/db/schema.ts
+```
+`````
+
+The renderer handles new files (untracked), deleted files, and modified files.
+If a file cannot be resolved, it shows an error inline.
+
+## Inline diffs
+
+For ad-hoc illustrations not tied to real files, use `diff` fenced blocks with
+literal `+`/`-`/` ` prefixed lines:
 
 ````
 ```diff
@@ -64,22 +236,7 @@ diff --git a/foo.txt b/foo.txt
 ```
 ````
 
-Every non-empty line must start with `+`, `-`, or a space. Invalid lines cause an error.
-
-For added-file snippets, you can start with `+++ path/to/file.ext` and keep the remaining lines prefixed with `+`. The renderer will synthesize a proper new-file diff so the filename and syntax highlighting are preserved.
-
-## Changes blocks
-
-Use a `changes` fenced block to show expandable file-level diffs with full syntax highlighting. Each line is a file path, optionally with a line range to focus on:
-
-````
-```changes
-src/cli/run.ts
-src/utils/parse.ts:10-50
-```
-````
-
-The renderer reads the file from the working tree and compares it against `HEAD` via `git show`, producing a rich interactive diff with collapsible hunks, add/remove stats, and syntax highlighting inferred from the file extension.
+Every non-empty line must start with `+`, `-`, or a space.
 
 ## Code blocks
 
@@ -90,39 +247,3 @@ Fenced code blocks with a language tag get syntax highlighting via `@pierre/diff
 const x = 1;
 ```
 ````
-
-## Markdown support
-
-Beyond code and diff blocks, the renderer supports:
-
-- Headings (`# H1` through `###### H6`) — H1–H3 appear in a table of contents
-- Bold (`**text**`), italic (`*text*`), inline code (`` `code` ``), links (`[label](url)`)
-- Blockquotes (`> text`)
-- Unordered lists (`- item`)
-- Ordered lists (`1. item`)
-- Tables (GFM pipe syntax with alignment)
-- Horizontal rules (`---`)
-- Bare URLs are auto-linked
-
-## Annotations (user review)
-
-When the window is open, the user can select text and leave inline comments. On close, the CLI outputs all annotations in a structured format:
-
-```
-User review:
-
-> selected text (file:line)
-
-User's comment here
-```
-
-If the user closes without annotating, the output is:
-`Window closed. User marked done without review.`
-
-## Typical workflow
-
-1. Inspect changes with `git diff`, `git status`, etc.
-2. Write a markdown explanation of the changes.
-3. Pipe it to `npx glimpse-changes`.
-
-Prefer command diffs (`` !`git diff ...` ``) over pasting raw diff content — they always reflect the current working tree. Use `changes` blocks for interactive file-level diffs with expand/collapse.
