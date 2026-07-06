@@ -158,9 +158,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("Usage: libretto <command>");
   });
 
-  test("setup completes without AI configuration", async ({
-    librettoCli,
-  }) => {
+  test("setup completes without AI configuration", async ({ librettoCli }) => {
     const result = await librettoCli("setup --skip-browsers", {
       LIBRETTO_DISABLE_DOTENV: "1",
       OPENAI_API_KEY: "",
@@ -356,9 +354,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain(
       "Deploy workflows and manage hosted Libretto",
     );
-    expect(result.stdout).toContain(
-      "libretto cloud <subcommand>",
-    );
+    expect(result.stdout).toContain("libretto cloud <subcommand>");
     expect(result.stdout).toContain("deploy");
     expect(result.stdout).toContain("auth");
     expect(result.stdout).toContain("billing");
@@ -422,7 +418,9 @@ describe("basic CLI subprocess behavior", () => {
 
   test("prints cloud share help", async ({ librettoCli }) => {
     const result = await librettoCli("help cloud share");
-    expect(result.stdout).toContain("Share one hosted workflow's code publicly");
+    expect(result.stdout).toContain(
+      "Share one hosted workflow's code publicly",
+    );
     expect(result.stdout).toContain("libretto cloud share <workflow>");
     expect(result.stdout).toContain("--refresh");
     expect(result.stderr).toBe("");
@@ -444,9 +442,7 @@ describe("basic CLI subprocess behavior", () => {
       npm_command: undefined,
       npm_config_user_agent: undefined,
     });
-    expect(result.stdout).toContain(
-      "Deploy workflows to the hosted platform",
-    );
+    expect(result.stdout).toContain("Deploy workflows to the hosted platform");
     expect(result.stdout).toContain("libretto cloud deploy [sourceDir]");
     expect(result.stdout).toContain("--auto-repair");
     expect(result.stdout).toContain(
@@ -535,9 +531,7 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain(
       "Run the default-exported Libretto workflow from a file",
     );
-    expect(result.stdout).toContain(
-      "libretto run [integrationFile] [options]",
-    );
+    expect(result.stdout).toContain("libretto run [integrationFile] [options]");
     expect(result.stdout).toContain("--read-only");
     expect(result.stdout).toContain("--no-visualize");
     expect(result.stdout).toContain("--stay-open-on-success");
@@ -550,9 +544,7 @@ describe("basic CLI subprocess behavior", () => {
   test("prints session-mode help", async ({ librettoCli }) => {
     const result = await librettoCli("help session-mode");
     expect(result.stdout).toContain("View or set the session access mode");
-    expect(result.stdout).toContain(
-      "libretto session-mode [mode] [options]",
-    );
+    expect(result.stdout).toContain("libretto session-mode [mode] [options]");
     expect(result.stderr).toBe("");
   });
 
@@ -594,11 +586,11 @@ describe("basic CLI subprocess behavior", () => {
     const missing = await librettoCli("experiments enable");
     expect(missing.stderr).toContain("Missing experiment name for enable.");
     expect(missing.stderr).toContain("libretto experiments");
-    expect(missing.stderr).toContain("libretto experiments enable <experiment>");
-
-    const unknownAction = await librettoCli(
-      "experiments toggle oldExperiment",
+    expect(missing.stderr).toContain(
+      "libretto experiments enable <experiment>",
     );
+
+    const unknownAction = await librettoCli("experiments toggle oldExperiment");
     expect(unknownAction.stderr).toContain(
       'Unknown experiments action "toggle".',
     );
@@ -610,7 +602,9 @@ describe("basic CLI subprocess behavior", () => {
     const unknown = await librettoCli("experiments enable nopeExperiment");
     expect(unknown.stderr).toContain('Unknown experiment "nopeExperiment".');
     expect(unknown.stderr).toContain("libretto experiments");
-    expect(unknown.stderr).toContain("libretto experiments enable <experiment>");
+    expect(unknown.stderr).toContain(
+      "libretto experiments enable <experiment>",
+    );
   });
 
   test("run does not expose experiments to workflow context", async ({
@@ -681,9 +675,7 @@ export default workflow("main", async (ctx) => {
     const session = "session-mode-cli";
     await seedSessionState({ session, mode: "write-access" });
 
-    const currentMode = await librettoCli(
-      `session-mode --session ${session}`,
-    );
+    const currentMode = await librettoCli(`session-mode --session ${session}`);
     expect(currentMode.stdout).toContain(
       `Session "${session}" mode: write-access`,
     );
@@ -695,9 +687,7 @@ export default workflow("main", async (ctx) => {
       `Session "${session}" mode set to read-only.`,
     );
 
-    const updatedMode = await librettoCli(
-      `session-mode --session ${session}`,
-    );
+    const updatedMode = await librettoCli(`session-mode --session ${session}`);
     expect(updatedMode.stdout).toContain(
       `Session "${session}" mode: read-only`,
     );
@@ -978,7 +968,9 @@ export default workflow("main", async (ctx) => {
   });
 
   test("fails run with invalid JSON in --params", async ({ librettoCli }) => {
-    const result = await librettoCli('run ./integration.ts --params "{not-json}"');
+    const result = await librettoCli(
+      'run ./integration.ts --params "{not-json}"',
+    );
     expect(result.stderr).toContain("Invalid JSON in --params:");
   });
 
@@ -1019,7 +1011,9 @@ export default workflow("main", async (ctx) => {
     expect(result.stderr).not.toContain("Browser is still open");
     expect(result.stdout).not.toContain("Running workflow");
 
-    const pagesResult = await librettoCli("pages --session validation-preflight");
+    const pagesResult = await librettoCli(
+      "pages --session validation-preflight",
+    );
     expectMissingSessionError(pagesResult.stderr, "validation-preflight");
   });
 
@@ -1316,10 +1310,10 @@ export default workflow("main", {
     expect(result.stderr).toContain(
       'Local auth profile not found: "app.example.com".',
     );
-    expect(result.stderr).toContain("libretto open <site-url> --headed --session");
     expect(result.stderr).toContain(
-      "libretto save app.example.com --session",
+      "libretto open <site-url> --headed --session",
     );
+    expect(result.stderr).toContain("libretto save app.example.com --session");
     expect(result.stderr).toContain("--sites <site>");
   });
 
@@ -1399,7 +1393,9 @@ export default workflow("main", async (ctx) => {
     expect(paused.stdout).toContain("Workflow paused.");
 
     const resumed = await librettoCli(`resume --session ${session}`);
-    expect(resumed.stdout).toContain(`Resume requested for session "${session}".`);
+    expect(resumed.stdout).toContain(
+      `Resume requested for session "${session}".`,
+    );
     expect(resumed.stdout).toContain("WORKFLOW_AFTER_RESUME");
     expect(resumed.stdout).toContain("Integration completed.");
     expect(resumed.stdout).toContain("Browser closed");
