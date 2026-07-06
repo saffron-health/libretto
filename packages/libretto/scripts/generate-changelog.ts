@@ -365,6 +365,11 @@ function getTextContent(value: unknown): string {
 function getInspectedDiffPullRequests(): number[] {
   const inspected = new Set<number>();
   for (const toolCall of toolCalls.values()) {
+    if (toolCall.isError !== false) {
+      // Only count tool calls that completed successfully.
+      continue;
+    }
+
     const args = getObjectProperty(toolCall.args, "args");
     if (typeof args !== "string") {
       continue;
@@ -461,7 +466,14 @@ agent.subscribe((event: AgentEvent) => {
   }
 });
 
-await agent.prompt("Generate the release notes now.");
+try {
+  await agent.prompt("Generate the release notes now.");
+} catch (error) {
+  console.error("Changelog generation failed: agent prompt threw an error.");
+  console.error(error);
+  writeAuditFile();
+  process.exit(1);
+}
 
 if (!finalText) {
   console.error("Changelog generation failed: no text output from agent.");
