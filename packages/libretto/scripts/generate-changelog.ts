@@ -280,6 +280,12 @@ const ghTool: AgentTool = {
           `PR #${number ?? "(missing)"} is outside the ${releaseContext.previousTag}...${releaseContext.currentRef} release range.`,
         );
       }
+
+      // Diff inspection enforcement counts successful 'pr diff NUMBER' calls,
+      // so reject flags like --name-only that would return less than the full diff.
+      if (action === "diff" && parts.length > 3) {
+        throw new Error("'pr diff' accepts only a PR number. Run 'pr diff NUMBER' with no extra arguments.");
+      }
     }
     try {
       const output = runGh(parts);
