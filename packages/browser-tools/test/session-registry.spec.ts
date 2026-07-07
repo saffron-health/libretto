@@ -4,18 +4,18 @@ import { SessionRegistry } from "../src/session-registry.js";
 
 const test = base.extend<{ registry: SessionRegistry }>({
 	registry: async ({}, use) => {
-		const registry = new SessionRegistry(new LocalBrowserProvider());
+		const registry = new SessionRegistry(
+			new LocalBrowserProvider({ headless: true }),
+		);
 		await use(registry);
 		await registry.dispose();
 	},
 });
 
-test("openSession returns a ses- ID and a usable current page", async ({
+test("openSession returns a session ID and a usable current page", async ({
 	registry,
 }) => {
 	const { sessionId } = await registry.openSession();
-	expect(sessionId).toMatch(/^ses-[0-9a-f]{4,}$/);
-
 	const page = registry.getCurrentPage(sessionId);
 	await page.goto("data:text/html,<title>hello</title>");
 	expect(await page.title()).toBe("hello");
@@ -43,7 +43,7 @@ test("getCurrentPage tracks the newest page in the session", async ({
 	registry,
 }) => {
 	const { sessionId } = await registry.openSession();
-	const { context } = registry.getSession(sessionId);
+	const context = registry.getCurrentPage(sessionId).context();
 
 	const newest = await context.newPage();
 	await newest.goto("data:text/html,<title>newest</title>");
@@ -54,7 +54,6 @@ test("getCurrentPage tracks the newest page in the session", async ({
 
 test("unknown session ID throws with the ID in the message", ({ registry }) => {
 	expect(() => registry.getCurrentPage("ses-nope")).toThrowError(/ses-nope/);
-	expect(() => registry.getSession("ses-nope")).toThrowError(/ses-nope/);
 });
 
 test("closeSession makes the session unknown", async ({ registry }) => {

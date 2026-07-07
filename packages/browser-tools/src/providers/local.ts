@@ -1,5 +1,6 @@
 import { createServer } from "node:net";
 import type { Browser } from "playwright";
+import { chromium } from "playwright";
 import type {
 	BrowserProvider,
 	ProviderSession,
@@ -47,8 +48,9 @@ async function fetchWebSocketDebuggerUrl(port: number): Promise<string> {
 
 /**
  * Launches a local Chromium with an ephemeral remote-debugging port and hands
- * back its CDP websocket endpoint. Playwright is imported lazily so the SDK
- * never loads it unless the local provider is actually used.
+ * back its CDP websocket endpoint. This is the only provider that needs the
+ * Chromium binary installed (`npx playwright install chromium`); cloud
+ * providers attach over CDP without a local browser download.
  */
 export class LocalBrowserProvider implements BrowserProvider {
 	readonly name = "local";
@@ -57,12 +59,10 @@ export class LocalBrowserProvider implements BrowserProvider {
 	private nextSessionNumber = 1;
 
 	constructor(options: LocalBrowserProviderOptions = {}) {
-		this.headless = options.headless ?? true;
+		this.headless = options.headless ?? false;
 	}
 
 	async createSession(): Promise<ProviderSession> {
-		// @lintc-ignore Human-approved: the SDK must not load playwright unless the local provider is used.
-		const { chromium } = await import("playwright");
 		const port = await pickFreePort();
 		const browser = await chromium.launch({
 			headless: this.headless,

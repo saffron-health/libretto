@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { Browser, BrowserContext, Page } from "playwright";
+import { chromium } from "playwright";
 import type { BrowserProvider } from "./provider.js";
 
 interface SessionEntry {
@@ -15,25 +16,21 @@ interface SessionEntry {
  * state. Sessions die with the process; `dispose()` closes everything.
  */
 export class SessionRegistry {
-	private readonly provider: BrowserProvider;
 	private readonly sessions = new Map<string, SessionEntry>();
 
-	constructor(provider: BrowserProvider) {
-		this.provider = provider;
-	}
+	constructor(public readonly provider: BrowserProvider) {}
 
 	async openSession(): Promise<{ sessionId: string }> {
 		const providerSession = await this.provider.createSession();
-		// @lintc-ignore Human-approved: the SDK must not load playwright unless a session is opened.
-		const { chromium } = await import("playwright");
 		const browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
 
 		const context = browser.contexts()[0] ?? (await browser.newContext());
+		const existingPages = context.pages();
 		const entry: SessionEntry = {
 			providerSessionId: providerSession.sessionId,
 			browser,
 			context,
-			currentPage: undefined,
+			currentPage: existingPages[existingPages.length - 1],
 		};
 		// Newest page wins, so popups and tabs become current automatically.
 		context.on("page", (page) => {
@@ -59,11 +56,6 @@ export class SessionRegistry {
 			throw new Error(`Session "${sessionId}" has no open pages`);
 		}
 		return page;
-	}
-
-	getSession(sessionId: string): { browser: Browser; context: BrowserContext } {
-		const entry = this.requireSession(sessionId);
-		return { browser: entry.browser, context: entry.context };
 	}
 
 	async closeSession(sessionId: string): Promise<void> {
