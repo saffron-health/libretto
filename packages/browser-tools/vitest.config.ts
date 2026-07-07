@@ -5,6 +5,8 @@ export default defineConfig({
     name: "browser-tools",
     environment: "node",
     include: ["test/**/*.spec.ts", "src/**/*.spec.ts"],
+    // No tests yet — the first suites land with the session registry PR.
+    passWithNoTests: true,
     testTimeout: 30_000,
     pool: "forks",
     isolate: true,
