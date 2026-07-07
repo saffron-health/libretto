@@ -11,12 +11,14 @@ export interface BrowserTool<Input = unknown, Output = unknown> {
 	name: string;
 	description: string;
 	inputSchema: StandardSchemaV1<Input>;
-	execute(input: Input): Promise<Output>;
+	execute(input: Input): Promise<ToolResult<Output>>;
 }
 
 /**
- * Model-fixable failures come back as data, not throws. Throws are reserved
- * for host-level misconfiguration (missing credentials, no provider).
+ * Every tool returns the same envelope: `{ ok: true, ...payload }` on
+ * success, `{ ok: false, error }` for model-fixable failures (bad session ID,
+ * blocked navigation, agent code that throws). Throws are reserved for
+ * host-level misconfiguration (missing credentials, no provider).
  */
 export interface ToolErrorResult {
 	ok: false;
