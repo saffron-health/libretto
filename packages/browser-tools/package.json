@@ -23,6 +23,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./ai-sdk": {
+      "types": "./dist/ai-sdk.d.ts",
+      "import": "./dist/ai-sdk.js",
+      "default": "./dist/ai-sdk.js"
     }
   },
   "scripts": {
@@ -35,10 +40,21 @@
   },
   "dependencies": {
     "@standard-schema/spec": "^1.0.0",
+    "playwright": "^1.58.2",
+    "sucrase": "^3.35.0",
     "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "ai": "^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "ai": "^6.0.116",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.5"

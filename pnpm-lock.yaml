@@ -212,6 +212,12 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.1.0
+      playwright:
+        specifier: ^1.58.2
+        version: 1.58.2
+      sucrase:
+        specifier: ^3.35.0
+        version: 3.35.1
       zod:
         specifier: ^4.3.6
         version: 4.4.3
@@ -219,6 +225,9 @@ importers:
       '@types/node':
         specifier: ^25.5.0
         version: 25.5.0
+      ai:
+        specifier: ^6.0.116
+        version: 6.0.140(zod@4.4.3)
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)
@@ -8201,6 +8210,13 @@ snapshots:
       '@vercel/oidc': 3.1.0
       zod: 4.3.6
 
+  '@ai-sdk/gateway@3.0.82(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.8
+      '@ai-sdk/provider-utils': 4.0.21(zod@4.4.3)
+      '@vercel/oidc': 3.1.0
+      zod: 4.4.3
+
   '@ai-sdk/google-vertex@4.0.95(zod@4.3.6)':
     dependencies:
       '@ai-sdk/anthropic': 3.0.64(zod@4.3.6)
@@ -13425,6 +13441,14 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       zod: 4.3.6
 
+  ai@6.0.140(zod@4.4.3):
+    dependencies:
+      '@ai-sdk/gateway': 3.0.82(zod@4.4.3)
+      '@ai-sdk/provider': 3.0.8
+      '@ai-sdk/provider-utils': 4.0.21(zod@4.4.3)
+      '@opentelemetry/api': 1.9.0
+      zod: 4.4.3
+
   ajv-draft-04@1.0.0(ajv@8.18.0):
     optionalDependencies:
       ajv: 8.18.0
@@ -17830,7 +17854,7 @@ snapshots:
       lines-and-columns: 1.2.4
       mz: 2.7.0
       pirates: 4.0.7
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.17
       ts-interface-checker: 0.1.13
 
   supports-color@7.2.0:
