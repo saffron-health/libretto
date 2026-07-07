@@ -42,7 +42,7 @@ describe("runExecCode", () => {
 		);
 		expect(result).toMatchObject({
 			ok: false,
-			error: "Error: boom",
+			error: "boom",
 			stdout: "before",
 		});
 	});

@@ -74,7 +74,7 @@ Session "ses-4f2a" is no longer connected to a browser. Call browser_close if yo
 
 Reserve throws for host-level misconfiguration (missing API keys, provider down) that the agent cannot fix by changing its tool calls.
 
-In `packages/browser-tools`, format caught errors with `errorMessage()` / `errorMessageWithName()` from `src/errors.ts` — do not duplicate ad-hoc `describeError` helpers.
+In `packages/browser-tools`, format caught errors with `errorMessage()` from `src/errors.ts` — do not duplicate ad-hoc helpers.
 
 ## **FORBIDDEN** Actions
 
