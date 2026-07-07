@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { errorMessage } from "../errors.js";
 import type { ExecResult, ExecScope } from "../exec/exec-engine.js";
 import { runExecCode } from "../exec/exec-engine.js";
 import type { SessionRegistry } from "../session-registry.js";
@@ -33,10 +34,6 @@ export interface ExecTool extends BrowserTool<ExecToolInput, ExecToolOutput> {
 	inputSchema: typeof execInputSchema;
 }
 
-function describeError(err: unknown): string {
-	return err instanceof Error ? err.message : String(err);
-}
-
 export function createExecTool(registry: SessionRegistry): ExecTool {
 	return {
 		name: "browser_exec",
@@ -59,14 +56,19 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 				if (!browser) {
 					return {
 						ok: false,
-						error: `Session "${sessionId}" has no connected browser.`,
+						error:
+							`Session "${sessionId}" is no longer connected to a browser. ` +
+							"Call browser_close if you still have this session ID, then browser_open " +
+							"to start a fresh session.",
 					};
 				}
 				scope = { page, context, browser };
 			} catch (err) {
 				return {
 					ok: false,
-					error: `${describeError(err)}. Call browser_open first to get a session ID.`,
+					error:
+						`${errorMessage(err)}. Call browser_open to get a session ID, ` +
+						"then pass it to browser_exec.",
 				};
 			}
 			return runExecCode(code, scope);

@@ -1,6 +1,7 @@
+import { transform } from "sucrase";
 import type { Browser, BrowserContext, Page } from "playwright";
+import { errorMessageWithName } from "../errors.js";
 import type { ToolResult } from "../tool.js";
-import { stripTypeScript } from "./strip-types.js";
 
 export interface ExecScope {
 	page: Page;
@@ -32,11 +33,6 @@ function formatConsoleArg(value: unknown): string {
 	} catch {
 		return String(value);
 	}
-}
-
-function describeError(err: unknown): string {
-	if (err instanceof Error) return `${err.name}: ${err.message}`;
-	return String(err);
 }
 
 function toJsonSafe(result: unknown): unknown {
@@ -75,9 +71,13 @@ export async function runExecCode(
 
 	let stripped: string;
 	try {
-		stripped = stripTypeScript(code);
+		stripped = transform(code, {
+			transforms: ["typescript"],
+			disableESTransforms: true,
+			keepUnusedImports: true,
+		}).code;
 	} catch (err) {
-		return { ok: false, error: describeError(err), stdout: "", stderr: "" };
+		return { ok: false, error: errorMessageWithName(err), stdout: "", stderr: "" };
 	}
 
 	try {
@@ -98,7 +98,7 @@ export async function runExecCode(
 	} catch (err) {
 		return {
 			ok: false,
-			error: describeError(err),
+			error: errorMessageWithName(err),
 			stdout: stdoutLines.join("\n"),
 			stderr: stderrLines.join("\n"),
 		};

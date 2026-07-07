@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { errorMessage } from "../errors.js";
 import type { SessionRegistry } from "../session-registry.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
 
@@ -24,10 +25,6 @@ export interface OpenTool extends BrowserTool<OpenToolInput, OpenToolOutput> {
 	inputSchema: typeof openInputSchema;
 }
 
-function describeError(err: unknown): string {
-	return err instanceof Error ? err.message : String(err);
-}
-
 export function createOpenTool(registry: SessionRegistry): OpenTool {
 	return {
 		name: "browser_open",
@@ -44,7 +41,10 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 					await registry.closeSession(sessionId);
 					return {
 						ok: false,
-						error: `Failed to navigate to ${url}: ${describeError(err)}`,
+						error:
+							`Could not navigate to ${url} (${errorMessage(err)}). ` +
+							"The session was closed. Call browser_open again — use a full https:// URL, " +
+							"or omit url and navigate with browser_exec via `await page.goto(...)`.",
 					};
 				}
 			}
