@@ -5,11 +5,11 @@ Browser tools for AI agents. Gives any agent framework a set of tools to open re
 ```typescript
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
-import { createBrowserTools } from "@libretto/browser-tools/ai-sdk";
+import { createAiSdkBrowserTools } from "@libretto/browser-tools/ai-sdk";
 import { LocalBrowserProvider } from "@libretto/browser-tools";
 
 // Cloud providers (Libretto Cloud, Browserbase, Kernel, ...) are on the way.
-const { tools, dispose } = createBrowserTools(new LocalBrowserProvider());
+const { tools, dispose } = createAiSdkBrowserTools(new LocalBrowserProvider());
 // The agent can now call browser_open and browser_exec.
 // Coming next: browser_snapshot, browser_status, browser_close, browser_connect.
 
