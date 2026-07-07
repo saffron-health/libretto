@@ -8,10 +8,10 @@ import { generateText } from "ai";
 import { createBrowserTools } from "@libretto/browser-tools/ai-sdk";
 import { LocalBrowserProvider } from "@libretto/browser-tools";
 
-// Supports Libretto Cloud, Browserbase, Kernel, etc.
+// Cloud providers (Libretto Cloud, Browserbase, Kernel, ...) are on the way.
 const { tools, dispose } = createBrowserTools(new LocalBrowserProvider());
-// The agent can now call browser_open, browser_connect, browser_exec,
-// browser_snapshot, browser_status, and browser_close.
+// The agent can now call browser_open and browser_exec.
+// Coming next: browser_snapshot, browser_status, browser_close, browser_connect.
 
 const result = await generateText({
   model: anthropic("claude-sonnet-4-5"),
