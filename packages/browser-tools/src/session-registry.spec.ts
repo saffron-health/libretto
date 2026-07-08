@@ -96,7 +96,7 @@ test("beforeExit disposes leftover sessions as a backstop", async ({
 	await vi.waitFor(() => expect(registry.listSessions()).toHaveLength(0));
 });
 
-test("dispose removes the exit hooks it installed", async ({ registry }) => {
+test("dispose removes the beforeExit hook it installed", async ({ registry }) => {
 	const before = process.listenerCount("beforeExit");
 	await registry.openSession();
 	expect(process.listenerCount("beforeExit")).toBeGreaterThan(before);
