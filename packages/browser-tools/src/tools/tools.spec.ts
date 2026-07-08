@@ -46,11 +46,12 @@ test("browser_exec runs Playwright code against an open session", async ({
 		sessionId: opened.sessionId,
 		code: "return page.title()",
 	});
-	expect(result).toEqual({
+	expect(result).toMatchObject({
 		ok: true,
 		result: "hello",
 		stdout: "",
 		stderr: "",
+		snapshotDiff: "",
 	});
 });
 
@@ -71,22 +72,24 @@ test("browser_exec carries browser state across calls and supports TypeScript", 
 			"console.log('mutated to', label); " +
 			"return label",
 	});
-	expect(mutate).toEqual({
+	expect(mutate).toMatchObject({
 		ok: true,
 		result: "updated",
 		stdout: "mutated to updated",
 		stderr: "",
 	});
+	expect(mutate.ok && mutate.snapshotDiff.length).toBeGreaterThan(0);
 
 	const read = await execTool.execute({
 		sessionId: opened.sessionId,
 		code: "return await page.locator('#t').textContent()",
 	});
-	expect(read).toEqual({
+	expect(read).toMatchObject({
 		ok: true,
 		result: "updated",
 		stdout: "",
 		stderr: "",
+		snapshotDiff: "",
 	});
 });
 
