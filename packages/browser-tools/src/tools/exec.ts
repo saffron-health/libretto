@@ -6,6 +6,7 @@ import {
 	diffSnapshots,
 	renderSnapshotDiff,
 } from "../snapshot/diff-snapshots.js";
+import { waitForPageStable } from "../snapshot/wait-for-page-stable.js";
 import type { SessionRegistry } from "../session-registry.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
 
@@ -86,6 +87,7 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 
 			let snapshotDiff = "";
 			try {
+				await waitForPageStable(scope.page);
 				const after = await registry.captureSnapshotAfterExec(sessionId);
 				snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
 			} catch {
