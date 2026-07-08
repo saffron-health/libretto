@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { withReturnTo } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
 import { getAuthStatus, getCloudSession, orpcCall } from "./cloudApi";
-import { GitHubIcon } from "./icons";
 
 type GitHubRepository = {
   id: string;
@@ -21,9 +20,6 @@ type InstallationRepositoriesResponse = {
   };
   repositories: GitHubRepository[];
 };
-
-const GITHUB_APP_INSTALL_URL =
-  "https://github.com/apps/libretto-agent/installations/new";
 
 function currentReturnTo(): string {
   const url = new URL(window.location.href);
@@ -46,7 +42,6 @@ export function GitHubSetupPage() {
     [],
   );
   const installationId = params.get("installation_id")?.trim();
-  const setupAction = params.get("setup_action")?.trim();
 
   useEffect(() => {
     async function loadGitHubSetup() {
@@ -122,8 +117,8 @@ export function GitHubSetupPage() {
             </h1>
             <p className="mt-6 max-w-[520px] text-sm leading-6 text-muted">
               Sign in to Libretto Cloud, install the public GitHub App, then
-              link a repository to your workspace so Libretto can open scoped PRs
-              when scripts break.
+                  link a repository to your workspace so Libretto can open scoped PRs
+                  when scripts break.
             </p>
           </div>
 
@@ -135,12 +130,6 @@ export function GitHubSetupPage() {
             ) : (
               ready && (
                 <div className="space-y-5">
-                  {setupAction === "request" && (
-                    <p className="rounded-md border border-amber/30 bg-amber/10 px-3 py-2 text-sm leading-5 text-amber-bright">
-                      Installation was requested from a GitHub organization
-                      admin. Return here after the request is approved.
-                    </p>
-                  )}
                   {installationId && installation && (
                     <p className="rounded-md border border-rule bg-bg/70 px-3 py-2 font-mono text-xs text-muted">
                       {installation.account_login} installation {installation.id}{" "}
@@ -149,15 +138,18 @@ export function GitHubSetupPage() {
                   )}
 
                   {!installationId ? (
-                    <a
-                      href={GITHUB_APP_INSTALL_URL}
-                      className="flex h-11 w-full items-center justify-center gap-3 rounded-md border border-rule bg-bg/70 px-4 text-sm font-medium text-ink shadow-sm shadow-black/20 transition-colors hover:border-accent/45 hover:bg-panel-hi focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25"
-                    >
-                      <span className="grid size-6 place-items-center rounded-full bg-ink text-bg">
-                        <GitHubIcon className="size-4" />
-                      </span>
-                      Install Libretto Agent
-                    </a>
+                    <div className="space-y-3 rounded-md border border-rule bg-bg/70 px-4 py-5 text-sm text-muted">
+                      <p>
+                        No GitHub installation callback was found. Start from
+                        setup to connect GitHub.
+                      </p>
+                      <a
+                        href="/setup"
+                        className="inline-flex text-xs text-accent-bright underline decoration-accent/60 underline-offset-4 transition-colors hover:text-ink hover:decoration-accent"
+                      >
+                        Return to setup
+                      </a>
+                    </div>
                   ) : !installation ? (
                     <div className="rounded-md border border-rule bg-bg/70 px-4 py-8 text-center text-sm text-muted">
                       Connecting GitHub...
