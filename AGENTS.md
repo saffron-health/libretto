@@ -52,6 +52,30 @@ pnpm -s cli
 - Prefer small, focused functions over large ones.
 - Name things for what they do, not how they're implemented.
 
+## Agent-facing error messages
+
+Errors returned to agents (tool `{ ok: false, error }` results, MCP `isError` content, CLI output an agent reads) must tell the agent what to do next — not just what went wrong.
+
+**Bad** — dead ends:
+
+```
+Unknown session ID: ses-4f2a
+Failed to navigate to https://example.com: net::ERR_NAME_NOT_RESOLVED
+Session "ses-4f2a" has no connected browser.
+```
+
+**Good** — diagnosis plus next step:
+
+```
+Unknown session ID: ses-4f2a. Call browser_open to get a session ID, then pass it to browser_exec.
+Could not navigate to https://example.com (net::ERR_NAME_NOT_RESOLVED). The session was closed. Call browser_open again — use a full https:// URL, or omit url and navigate with browser_exec via `await page.goto(...)`.
+Session "ses-4f2a" is no longer connected to a browser. Call browser_close if you still have this session ID, then browser_open to start a fresh session.
+```
+
+Reserve throws for host-level misconfiguration (missing API keys, provider down) that the agent cannot fix by changing its tool calls.
+
+In `packages/browser-tools`, format caught errors with `errorMessage()` from `src/errors.ts` — do not duplicate ad-hoc helpers.
+
 ## **FORBIDDEN** Actions
 
 - For stable releases on `main`: NEVER manually edit the `version` field in `packages/libretto/package.json`. Use `pnpm prepare-release` — that script opens a release PR, and CI publishes to npm under the `latest` dist-tag on merge.
