@@ -1,0 +1,109 @@
+---
+title: Playwright debug autofix
+description: Open GitHub autofix pull requests when a Playwright automation fails.
+---
+
+`@libretto/playwright-debug` lets an existing Playwright script keep its current
+browser provider, retries, logging, and fallback logic while adding one debugger
+call in the failure path.
+
+```typescript
+import { createLibrettoDebugger } from "@libretto/playwright-debug";
+
+const librettoDebugger = createLibrettoDebugger({
+  github: {
+    owner: "acme",
+    repo: "automations",
+    baseBranch: "main",
+    installationId: process.env.LIBRETTO_GITHUB_INSTALLATION_ID,
+  },
+  agent: {
+    model: "openai/gpt-5.4",
+  },
+  mode: "open_pr",
+});
+```
+
+The `agent.model` value uses Libretto's `provider/model-id` convention. For
+example, `openai/gpt-5.4` resolves to provider `openai` and model id `gpt-5.4`.
+The first version supports `openai/...` and `anthropic/...`.
+
+```typescript
+try {
+  await runAutomation(page);
+} catch (error) {
+  await librettoDebugger.debugPlaywrightFailure(error, page);
+
+  await sendToExistingFallbackService(error);
+  throw error;
+}
+```
+
+## What It Captures
+
+`debugPlaywrightFailure()` captures the error message, stack trace, page URL,
+page title, screenshot, and DOM snapshot. It uses stack frames and optional
+`includeFiles` to read source files from GitHub, asks the configured model for
+full-file replacements, writes the files to a new branch with the GitHub Git
+API, and opens a pull request.
+
+```typescript
+await librettoDebugger.debugPlaywrightFailure(error, page, {
+  includeFiles: ["src/workflows/acme.ts"],
+  branchName: "libretto-debug/acme-login",
+});
+```
+
+## Model Keys
+
+Set the provider API key in the environment where the Playwright script runs:
+
+```bash
+export OPENAI_API_KEY=...
+# or
+export ANTHROPIC_API_KEY=...
+```
+
+You can also pass `agent.apiKey` directly when the key is provided by your
+secrets manager.
+
+## GitHub Authentication
+
+The debugger can use Libretto's public GitHub App, token auth, or self-hosted
+GitHub App auth.
+
+For the hosted public app path, install the Libretto GitHub App on the target
+repository and provide:
+
+```bash
+export LIBRETTO_API_KEY=...
+export LIBRETTO_GITHUB_INSTALLATION_ID=...
+```
+
+With that setup, the debugger asks Libretto Cloud for a short-lived GitHub
+installation token scoped to the configured `owner/repo` and only the
+permissions needed to read/write contents and open pull requests.
+
+For token auth, pass `github.token` or set `LIBRETTO_GITHUB_TOKEN` /
+`GITHUB_TOKEN`. The token needs permission to read contents, write contents, and
+open pull requests on the target repository.
+
+For self-hosted GitHub App auth, `installationId` is not enough by itself. The
+debugger also needs the App ID and private key so it can mint an installation
+access token locally:
+
+```bash
+export LIBRETTO_GITHUB_APP_ID=...
+export LIBRETTO_GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+export LIBRETTO_GITHUB_INSTALLATION_ID=...
+```
+
+The GitHub App should request these repository permissions:
+
+- Contents: read and write
+- Pull requests: read and write
+- Metadata: read
+
+The hosted public Libretto app should be installable by any account. It does not
+need webhooks, callback URLs, device flow, or user OAuth authorization for this
+PR-opening flow.

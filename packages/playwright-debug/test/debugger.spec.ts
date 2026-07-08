@@ -1,0 +1,376 @@
+import type { Page } from "playwright";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createLibrettoDebugger,
+  parseAgentModel,
+  type DebugAgentRunner,
+} from "../src/index.js";
+
+function jsonResponse(body: unknown, init?: ResponseInit): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+}
+
+function createPage(): Page {
+  return {
+    url: vi.fn(() => "https://example.test/dashboard"),
+    title: vi.fn(async () => "Dashboard"),
+    screenshot: vi.fn(async () => Buffer.from("png")),
+    content: vi.fn(async () => "<html><main>Missing submit button</main></html>"),
+  } as unknown as Page;
+}
+
+function createError(): Error {
+  const error = new Error("locator.click: Timeout 5000ms exceeded");
+  error.stack = [
+    "Error: locator.click: Timeout 5000ms exceeded",
+    "    at runAutomation (/repo/src/workflow.ts:12:7)",
+  ].join("\n");
+  return error;
+}
+
+describe("parseAgentModel", () => {
+  it("parses provider/model-id strings", () => {
+    expect(parseAgentModel("openai/gpt-5.4")).toEqual({
+      provider: "openai",
+      modelId: "gpt-5.4",
+    });
+    expect(parseAgentModel("anthropic/claude-sonnet-4-6")).toEqual({
+      provider: "anthropic",
+      modelId: "claude-sonnet-4-6",
+    });
+  });
+
+  it("rejects unsupported provider strings", () => {
+    expect(() => parseAgentModel("google/gemini-3-flash")).toThrow(
+      "Unsupported agent model provider",
+    );
+    expect(() => parseAgentModel("gpt-5.4")).toThrow(
+      'Expected "provider/model-id"',
+    );
+  });
+});
+
+describe("createLibrettoDebugger", () => {
+  it("captures failure context and returns no_changes when the agent has no fix", async () => {
+    const requests: Array<{ method: string; url: string }> = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const requestUrl = url.toString();
+      const method = init?.method ?? "GET";
+      requests.push({ method, url: requestUrl });
+      if (requestUrl.endsWith("/git/ref/heads/main")) {
+        return jsonResponse({ object: { sha: "base-commit" } });
+      }
+      if (requestUrl.endsWith("/git/commits/base-commit")) {
+        return jsonResponse({ sha: "base-commit", tree: { sha: "base-tree" } });
+      }
+      if (requestUrl.includes("/contents/src/workflow.ts?ref=main")) {
+        return jsonResponse({
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from("export async function runAutomation() {}").toString(
+            "base64",
+          ),
+        });
+      }
+      return jsonResponse({ message: "not found" }, { status: 404 });
+    }) as unknown as typeof fetch;
+    const runner = vi.fn<DebugAgentRunner>(async (context) => {
+      expect(context.model).toEqual({ provider: "openai", modelId: "gpt-5.4" });
+      expect(context.failure.message).toContain("Timeout");
+      expect(context.failure.url).toBe("https://example.test/dashboard");
+      expect(context.failure.title).toBe("Dashboard");
+      expect(context.failure.screenshot?.base64).toBe("cG5n");
+      expect(context.failure.domSnapshot).toContain("Missing submit button");
+      expect(context.sourceFiles).toEqual([
+        {
+          path: "src/workflow.ts",
+          content: "export async function runAutomation() {}",
+        },
+      ]);
+      return {
+        summary: "No safe fix found",
+        rationale: "The failure needs more context.",
+        changes: [],
+      };
+    });
+
+    const debuggerInstance = createLibrettoDebugger({
+      github: {
+        owner: "acme",
+        repo: "automations",
+        baseBranch: "main",
+        token: "ghs_test",
+        repositoryRoot: "/repo",
+      },
+      agent: {
+        model: "openai/gpt-5.4",
+      },
+      fetch: fetchImpl,
+      modelRunner: runner,
+    });
+
+    const result = await debuggerInstance.debugPlaywrightFailure(
+      createError(),
+      createPage(),
+    );
+
+    expect(result.status).toBe("no_changes");
+    expect(runner).toHaveBeenCalledOnce();
+    expect(requests.map((request) => request.method)).toEqual([
+      "GET",
+      "GET",
+      "GET",
+    ]);
+  });
+
+  it("writes model changes through the GitHub Git API and opens a pull request", async () => {
+    const calls: Array<{ method: string; url: string; body?: unknown }> = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const requestUrl = url.toString();
+      const method = init?.method ?? "GET";
+      const body =
+        typeof init?.body === "string" ? (JSON.parse(init.body) as unknown) : undefined;
+      calls.push({ method, url: requestUrl, body });
+      if (requestUrl.endsWith("/git/ref/heads/main")) {
+        return jsonResponse({ object: { sha: "base-commit" } });
+      }
+      if (requestUrl.endsWith("/git/commits/base-commit")) {
+        return jsonResponse({ sha: "base-commit", tree: { sha: "base-tree" } });
+      }
+      if (requestUrl.includes("/contents/src/workflow.ts?ref=main")) {
+        return jsonResponse({
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from("await page.locator('#old').click();").toString(
+            "base64",
+          ),
+        });
+      }
+      if (method === "POST" && requestUrl.endsWith("/git/refs")) {
+        return jsonResponse({ ref: "refs/heads/libretto-debug/test" });
+      }
+      if (method === "POST" && requestUrl.endsWith("/git/blobs")) {
+        return jsonResponse({ sha: "blob-sha" });
+      }
+      if (method === "POST" && requestUrl.endsWith("/git/trees")) {
+        return jsonResponse({ sha: "tree-sha" });
+      }
+      if (method === "POST" && requestUrl.endsWith("/git/commits")) {
+        return jsonResponse({ sha: "new-commit", tree: { sha: "tree-sha" } });
+      }
+      if (method === "PATCH" && requestUrl.endsWith("/git/refs/heads/libretto-debug%2Ftest")) {
+        return jsonResponse({});
+      }
+      if (method === "POST" && requestUrl.endsWith("/pulls")) {
+        return jsonResponse({
+          html_url: "https://github.com/acme/automations/pull/123",
+        });
+      }
+      return jsonResponse({ message: "not found" }, { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const debuggerInstance = createLibrettoDebugger({
+      github: {
+        owner: "acme",
+        repo: "automations",
+        baseBranch: "main",
+        token: "ghs_test",
+        repositoryRoot: "/repo",
+      },
+      agent: {
+        model: "anthropic/claude-sonnet-4-6",
+      },
+      fetch: fetchImpl,
+      modelRunner: async () => ({
+        summary: "Use the new submit selector",
+        rationale: "The DOM shows the old selector no longer exists.",
+        changes: [
+          {
+            path: "src/workflow.ts",
+            content: "await page.getByRole('button', { name: 'Submit' }).click();",
+          },
+        ],
+      }),
+    });
+
+    const result = await debuggerInstance.debugPlaywrightFailure(
+      createError(),
+      createPage(),
+      { branchName: "libretto-debug/test" },
+    );
+
+    expect(result).toMatchObject({
+      status: "pull_request_opened",
+      branchName: "libretto-debug/test",
+      pullRequestUrl: "https://github.com/acme/automations/pull/123",
+      changedFiles: ["src/workflow.ts"],
+    });
+    expect(calls.map((call) => call.method)).toEqual([
+      "GET",
+      "GET",
+      "GET",
+      "POST",
+      "POST",
+      "POST",
+      "POST",
+      "PATCH",
+      "POST",
+    ]);
+    expect(calls.find((call) => call.url.endsWith("/git/blobs"))?.body).toEqual({
+      content: "await page.getByRole('button', { name: 'Submit' }).click();",
+      encoding: "utf-8",
+    });
+    expect(calls.find((call) => call.url.endsWith("/pulls"))?.body).toMatchObject({
+      title: "Libretto autofix for Playwright failure",
+      head: "libretto-debug/test",
+      base: "main",
+    });
+  });
+
+  it("uses Libretto Cloud to broker the GitHub installation token", async () => {
+    const calls: Array<{ method: string; url: string; body?: unknown; auth?: string }> = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const requestUrl = url.toString();
+      const method = init?.method ?? "GET";
+      const body =
+        typeof init?.body === "string" ? (JSON.parse(init.body) as unknown) : undefined;
+      const headers = new Headers(init?.headers);
+      calls.push({
+        method,
+        url: requestUrl,
+        body,
+        auth: headers.get("authorization") ?? headers.get("x-api-key") ?? undefined,
+      });
+      if (requestUrl === "https://api.libretto.test/v1/github/createInstallationToken") {
+        return jsonResponse({
+          json: {
+            token: "brokered-installation-token",
+            expires_at: "2026-07-08T00:00:00Z",
+          },
+        });
+      }
+      if (requestUrl.endsWith("/git/ref/heads/main")) {
+        return jsonResponse({ object: { sha: "base-commit" } });
+      }
+      if (requestUrl.endsWith("/git/commits/base-commit")) {
+        return jsonResponse({ sha: "base-commit", tree: { sha: "base-tree" } });
+      }
+      if (requestUrl.includes("/contents/src/workflow.ts?ref=main")) {
+        return jsonResponse({
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from("old").toString("base64"),
+        });
+      }
+      return jsonResponse({ message: "not found" }, { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const debuggerInstance = createLibrettoDebugger({
+      github: {
+        owner: "acme",
+        repo: "automations",
+        baseBranch: "main",
+        installationId: "12345",
+        librettoApiKey: "libretto-key",
+        librettoApiUrl: "https://api.libretto.test",
+        repositoryRoot: "/repo",
+      },
+      agent: {
+        model: "openai/gpt-5.4",
+      },
+      fetch: fetchImpl,
+      modelRunner: async () => ({
+        summary: "No fix",
+        rationale: "No fix",
+        changes: [],
+      }),
+    });
+
+    await debuggerInstance.debugPlaywrightFailure(createError(), createPage());
+
+    expect(calls[0]).toMatchObject({
+      method: "POST",
+      url: "https://api.libretto.test/v1/github/createInstallationToken",
+      auth: "libretto-key",
+      body: {
+        json: {
+          installation_id: "12345",
+          owner: "acme",
+          repo: "automations",
+        },
+      },
+    });
+    expect(calls[1]?.auth).toBe("Bearer brokered-installation-token");
+  });
+
+  it("requires complete GitHub App credentials when token auth is absent", async () => {
+    const debuggerInstance = createLibrettoDebugger({
+      github: {
+        owner: "acme",
+        repo: "automations",
+        baseBranch: "main",
+        installationId: "123",
+      },
+      agent: {
+        model: "openai/gpt-5.4",
+      },
+      fetch: vi.fn() as unknown as typeof fetch,
+      modelRunner: async () => ({
+        summary: "unused",
+        rationale: "unused",
+        changes: [],
+      }),
+    });
+
+    await expect(
+      debuggerInstance.debugPlaywrightFailure(createError(), createPage()),
+    ).rejects.toThrow("GitHub App auth requires installationId, appId, and privateKey");
+  });
+
+  it("rejects unsafe paths returned by the agent", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const requestUrl = url.toString();
+      if (requestUrl.endsWith("/git/ref/heads/main")) {
+        return jsonResponse({ object: { sha: "base-commit" } });
+      }
+      if (requestUrl.endsWith("/git/commits/base-commit")) {
+        return jsonResponse({ sha: "base-commit", tree: { sha: "base-tree" } });
+      }
+      if (requestUrl.includes("/contents/src/workflow.ts?ref=main")) {
+        return jsonResponse({
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from("old").toString("base64"),
+        });
+      }
+      return jsonResponse({ message: "not found" }, { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const debuggerInstance = createLibrettoDebugger({
+      github: {
+        owner: "acme",
+        repo: "automations",
+        baseBranch: "main",
+        token: "ghs_test",
+        repositoryRoot: "/repo",
+      },
+      agent: {
+        model: "openai/gpt-5.4",
+      },
+      fetch: fetchImpl,
+      modelRunner: async () => ({
+        summary: "Unsafe",
+        rationale: "Unsafe",
+        changes: [{ path: "../secret.ts", content: "" }],
+      }),
+    });
+
+    await expect(
+      debuggerInstance.debugPlaywrightFailure(createError(), createPage()),
+    ).rejects.toThrow("Unsafe repository path");
+  });
+});

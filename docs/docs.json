@@ -104,7 +104,8 @@
               "reference/runtime/authentication",
               "reference/runtime/network-requests",
               "reference/runtime/file-downloads",
-              "reference/runtime/page-fallbacks"
+              "reference/runtime/page-fallbacks",
+              "reference/runtime/playwright-debug"
             ]
           }
         ]
