@@ -4,7 +4,8 @@
     "glimpse-changes": {
       "source": "tanishqkancharla/glimpse-changes",
       "sourceType": "github",
-      "computedHash": "40e0a6fda116923f63e498de86440e0501569650a47e0b024e70dc6c7e8ca2a8"
+      "skillPath": "skills/glimpse-changes/SKILL.md",
+      "computedHash": "e2a7632fdfd6075fa38fb85b5dbd79522e1b777bda9caf95b5b0aea5983fdd01"
     }
   }
 }

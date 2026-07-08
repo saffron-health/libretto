@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "glimpse-changes": {
+      "source": "tanishqkancharla/glimpse-changes",
+      "sourceType": "github",
+      "skillPath": "skills/glimpse-changes/SKILL.md",
+      "computedHash": "e2a7632fdfd6075fa38fb85b5dbd79522e1b777bda9caf95b5b0aea5983fdd01"
+    },
     "improve-codebase-architecture": {
       "source": "mattpocock/skills",
       "sourceType": "github",
