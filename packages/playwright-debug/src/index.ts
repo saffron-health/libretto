@@ -1,5 +1,5 @@
 import { createSign } from "node:crypto";
-import { relative } from "node:path";
+import { relative, win32 } from "node:path";
 import { z } from "zod";
 import { generateObject, type LanguageModel } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -394,9 +394,7 @@ function collectCandidateFiles(args: {
 
   if (args.stack) {
     for (const rawPath of collectStackFilePaths(args.stack)) {
-      const repoPath = rawPath.startsWith("/")
-        ? relative(args.repositoryRoot, rawPath)
-        : rawPath;
+      const repoPath = relativeToRepositoryRoot(rawPath, args.repositoryRoot);
       if (!repoPath.startsWith("..")) {
         files.add(normalizeRepoPath(repoPath));
       }
@@ -404,6 +402,17 @@ function collectCandidateFiles(args: {
   }
 
   return [...files].filter(isSafeRepoPath);
+}
+
+function relativeToRepositoryRoot(path: string, repositoryRoot: string): string {
+  if (isWindowsAbsolutePath(path) || isWindowsAbsolutePath(repositoryRoot)) {
+    return win32.relative(repositoryRoot, path);
+  }
+  return path.startsWith("/") ? relative(repositoryRoot, path) : path;
+}
+
+function isWindowsAbsolutePath(path: string): boolean {
+  return /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("\\\\");
 }
 
 function collectStackFilePaths(stack: string): string[] {

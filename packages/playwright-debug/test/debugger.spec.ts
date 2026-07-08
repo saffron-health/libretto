@@ -162,6 +162,65 @@ describe("createLibrettoDebugger", () => {
     ]);
   });
 
+  it("relativizes Windows absolute stack paths against the repository root", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const requestUrl = url.toString();
+      if (requestUrl.endsWith("/git/ref/heads/main")) {
+        return jsonResponse({ object: { sha: "base-commit" } });
+      }
+      if (requestUrl.endsWith("/git/commits/base-commit")) {
+        return jsonResponse({ sha: "base-commit", tree: { sha: "base-tree" } });
+      }
+      if (requestUrl.includes("/contents/src/workflow.ts?ref=main")) {
+        return jsonResponse({
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from("export async function runAutomation() {}").toString(
+            "base64",
+          ),
+        });
+      }
+      return jsonResponse({ message: "not found" }, { status: 404 });
+    }) as unknown as typeof fetch;
+    const runner = vi.fn<DebugAgentRunner>(async (context) => {
+      expect(context.sourceFiles).toEqual([
+        {
+          path: "src/workflow.ts",
+          content: "export async function runAutomation() {}",
+        },
+      ]);
+      return {
+        summary: "No safe fix found",
+        rationale: "The failure needs more context.",
+        changes: [],
+      };
+    });
+    const error = new Error("locator.click: Timeout 5000ms exceeded");
+    error.stack = [
+      "Error: locator.click: Timeout 5000ms exceeded",
+      "    at runAutomation (C:\\repo\\src\\workflow.ts:12:7)",
+    ].join("\n");
+
+    const debuggerInstance = createLibrettoDebugger({
+      github: {
+        owner: "acme",
+        repo: "automations",
+        baseBranch: "main",
+        token: "ghs_test",
+        repositoryRoot: "C:\\repo",
+      },
+      agent: {
+        model: "openai/gpt-5.4",
+      },
+      fetch: fetchImpl,
+      modelRunner: runner,
+    });
+
+    await debuggerInstance.debugPlaywrightFailure(error, createPage());
+
+    expect(runner).toHaveBeenCalledOnce();
+  });
+
   it("writes model changes through the GitHub Git API and opens a pull request", async () => {
     const calls: Array<{ method: string; url: string; body?: unknown }> = [];
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {

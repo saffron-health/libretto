@@ -1,4 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import {
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  Popover,
+  Button as AriaButton,
+} from "react-aria-components";
 import { Text } from "./Text";
 import { Button } from "./Button";
 import { GitHubStarIcon } from "../icons";
@@ -157,6 +165,81 @@ function userInitial(session: CloudSession): string {
   return session.user.email.slice(0, 1).toUpperCase();
 }
 
+function PullRequestIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <circle cx="4" cy="4" r="1.6" />
+      <circle cx="4" cy="12" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <path d="M4 5.6v4.8" />
+      <path d="M12 10.4V7.8A3.8 3.8 0 0 0 8.2 4H7" />
+      <path d="m8.2 2.4-1.6 1.6 1.6 1.6" />
+    </svg>
+  );
+}
+
+function CloudBrowserIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M5 11.5H4.2A3.2 3.2 0 0 1 4.1 5.1 4.4 4.4 0 0 1 12.5 7a2.3 2.3 0 0 1-.3 4.5H11" />
+      <path d="M6 9.5h4v3H6z" />
+      <path d="M7.2 12.5h1.6" />
+    </svg>
+  );
+}
+
+function DashboardMenuItem({
+  href,
+  icon,
+  title,
+  description,
+  fathomEvent,
+}: {
+  href: string;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  fathomEvent: string;
+}) {
+  return (
+    <MenuItem
+      href={href}
+      className="grid cursor-pointer grid-cols-[28px_1fr] gap-2 rounded-md px-2 py-2 text-ink outline-none transition-colors data-[focused]:bg-ink/[0.07] data-[pressed]:bg-ink/[0.1]"
+      data-fathom-event={fathomEvent}
+    >
+      <span className="grid size-7 place-items-center rounded-md border border-rule bg-bg/70 text-accent-bright">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium leading-5">
+          {title}
+        </span>
+        <span className="block truncate text-xs leading-4 text-muted">
+          {description}
+        </span>
+      </span>
+    </MenuItem>
+  );
+}
+
 function CloudAccountLink({ session }: { session: CloudSession | null }) {
   if (!session) {
     return (
@@ -165,23 +248,54 @@ function CloudAccountLink({ session }: { session: CloudSession | null }) {
         size="sm"
         data-fathom-event="Nav cloud sign up click"
       >
-        Cloud sign in/up
+        Sign in/up
       </Button>
     );
   }
 
   return (
-    <a
-      href="/dashboard"
-      className="inline-flex h-10 items-center gap-2 rounded-lg border border-rule bg-panel px-3 text-sm text-ink no-underline transition-colors hover:border-accent/45 hover:bg-panel-hi"
-      data-fathom-event="Nav dashboard click"
-      aria-label={`Open dashboard for ${session.user.email}`}
-    >
-      <span className="grid size-6 shrink-0 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
-        {userInitial(session)}
-      </span>
-      <span className="hidden sm:block">Cloud dashboard</span>
-    </a>
+    <MenuTrigger>
+      <AriaButton
+        className="inline-flex h-10 items-center gap-2 rounded-lg border border-rule bg-panel px-3 text-sm text-ink outline-none transition-colors hover:border-accent/45 hover:bg-panel-hi focus-visible:ring-2 focus-visible:ring-accent/40"
+        data-fathom-event="Nav dashboard menu click"
+        aria-label={`Open dashboard menu for ${session.user.email}`}
+      >
+        <span className="grid size-6 shrink-0 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
+          {userInitial(session)}
+        </span>
+        <span className="hidden sm:block">Dashboard</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          className="hidden size-3.5 text-muted sm:block"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        >
+          <path d="m4 6 4 4 4-4" />
+        </svg>
+      </AriaButton>
+      <Popover placement="bottom end" offset={6} className="z-50 outline-none">
+        <Menu className="w-[260px] rounded-lg border border-rule bg-panel p-1 shadow-lg shadow-black/35 outline-none">
+          <DashboardMenuItem
+            href="/dashboard"
+            icon={<PullRequestIcon />}
+            title="Libretto PR Agents"
+            description="Free repo PR automation"
+            fathomEvent="Nav PR agents dashboard click"
+          />
+          <DashboardMenuItem
+            href="/dashboard/cloud-browsers"
+            icon={<CloudBrowserIcon />}
+            title="Cloud Browsers"
+            description="Hosted browser runs"
+            fathomEvent="Nav cloud browsers dashboard click"
+          />
+        </Menu>
+      </Popover>
+    </MenuTrigger>
   );
 }
 

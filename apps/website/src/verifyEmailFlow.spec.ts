@@ -66,4 +66,15 @@ describe("redirectAfterVerifiedEmail", () => {
       }),
     ).resolves.toBe("/onboarding");
   });
+
+  it("drops dashboard return targets before tenant setup exists", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: false,
+        returnTo: "/dashboard",
+        hasCliLoginParams: false,
+        approveCliLogin: async () => true,
+      }),
+    ).resolves.toBe("/onboarding");
+  });
 });

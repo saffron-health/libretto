@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { getSafeReturnTo, postAuthRedirect, sanitizeReturnToForAuthState } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
 import { getAuthStatus, orpcCall } from "./cloudApi";
 
@@ -36,7 +37,13 @@ export function OnboardingPage() {
           return;
         }
         if (status.hasTenant) {
-          window.location.assign("/dashboard");
+          window.location.assign(
+            postAuthRedirect({
+              emailVerified: status.emailVerified,
+              hasTenant: status.hasTenant,
+              returnTo: getSafeReturnTo(),
+            }),
+          );
           return;
         }
         setEmail(status.email);
@@ -66,7 +73,9 @@ export function OnboardingPage() {
         organizationSlug: normalizedSlug,
         debugNotificationEmail: debugNotificationEmail || email,
       });
-      window.location.assign("/dashboard");
+      window.location.assign(
+        sanitizeReturnToForAuthState(getSafeReturnTo(), false) ?? "/setup",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Organization setup failed.");
       setLoading(false);

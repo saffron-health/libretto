@@ -29,6 +29,13 @@ export type AuthStatus = {
   tenantId: string | null;
 };
 
+export type SetupStatus = {
+  local_agent_setup_complete: boolean;
+  github_repository_linked: boolean;
+  linked_repository_count: number;
+  setup_complete: boolean;
+};
+
 function resolveCloudApiUrl(): string {
   const configured = import.meta.env.VITE_LIBRETTO_CLOUD_API_URL?.trim();
   if (configured) return configured;
@@ -114,4 +121,14 @@ export async function getCloudSession(): Promise<CloudSession | null> {
 
 export async function getAuthStatus(): Promise<AuthStatus> {
   return orpcCall<AuthStatus>("/v1/auth/status");
+}
+
+export async function getSetupStatus(): Promise<SetupStatus> {
+  return orpcCall<SetupStatus>("/v1/tenant/setupStatus");
+}
+
+export async function updateSetupStatus(
+  input: Partial<Pick<SetupStatus, "local_agent_setup_complete">>,
+): Promise<SetupStatus> {
+  return orpcCall<SetupStatus>("/v1/tenant/setupStatus", input);
 }
