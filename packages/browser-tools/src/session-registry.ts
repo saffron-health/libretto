@@ -14,8 +14,8 @@ interface SessionEntry {
 	context: BrowserContext;
 	currentPage: Page | undefined;
 	pageById: Map<string, Page>;
-	/** Post-exec snapshot baseline per page ID for snapshot diffs. */
-	latestSnapshotByPageId: Map<string, Snapshot>;
+	/** Post-exec snapshot baseline per page for snapshot diffs. */
+	latestSnapshotByPage: Map<Page, Snapshot>;
 }
 
 export interface SessionPageSummary {
@@ -159,10 +159,10 @@ export class SessionRegistry {
 		pageId?: string,
 	): Promise<Snapshot> {
 		const entry = this.requireSession(sessionId);
-		const cacheKey = this.snapshotPageId(entry, sessionId, pageId);
-		const cached = entry.latestSnapshotByPageId.get(cacheKey);
+		const page = this.getCurrentPage(sessionId, pageId);
+		const cached = entry.latestSnapshotByPage.get(page);
 		if (cached) return cached;
-		return captureSnapshot(this.getCurrentPage(sessionId, pageId));
+		return captureSnapshot(page);
 	}
 
 	/** Capture after exec and cache for the next call's baseline. */
@@ -171,15 +171,15 @@ export class SessionRegistry {
 		pageId?: string,
 	): Promise<Snapshot> {
 		const entry = this.requireSession(sessionId);
-		const cacheKey = this.snapshotPageId(entry, sessionId, pageId);
-		const after = await captureSnapshot(this.getCurrentPage(sessionId, pageId));
-		entry.latestSnapshotByPageId.set(cacheKey, after);
+		const page = this.getCurrentPage(sessionId, pageId);
+		const after = await captureSnapshot(page);
+		entry.latestSnapshotByPage.set(page, after);
 		return after;
 	}
 
 	clearSnapshotCache(sessionId: string): void {
 		const entry = this.sessions.get(sessionId);
-		if (entry) entry.latestSnapshotByPageId.clear();
+		if (entry) entry.latestSnapshotByPage.clear();
 	}
 
 	async dispose(): Promise<void> {
@@ -245,7 +245,7 @@ export class SessionRegistry {
 			context: args.context,
 			currentPage: undefined,
 			pageById: new Map(),
-			latestSnapshotByPageId: new Map(),
+			latestSnapshotByPage: new Map(),
 		};
 		// Newest page wins, so popups and tabs become current automatically.
 		args.context.on("page", (page) => {
@@ -265,7 +265,7 @@ export class SessionRegistry {
 		entry.pageById.set(pageId, page);
 		page.on("close", () => {
 			entry.pageById.delete(pageId);
-			entry.latestSnapshotByPageId.delete(pageId);
+			entry.latestSnapshotByPage.delete(page);
 			if (entry.currentPage === page) {
 				entry.currentPage = undefined;
 			}
@@ -279,32 +279,6 @@ export class SessionRegistry {
 			if (trackedPage === page) return pageId;
 		}
 		return undefined;
-	}
-
-	private snapshotPageId(
-		entry: SessionEntry,
-		sessionId: string,
-		pageId?: string,
-	): string {
-		if (pageId) {
-			const page = entry.pageById.get(pageId);
-			if (!page || page.isClosed()) {
-				throw new Error(
-					`Unknown page ID "${pageId}" in session "${sessionId}". ` +
-						"Call browser_status to list open pages.",
-				);
-			}
-			return pageId;
-		}
-
-		const page = this.getCurrentPage(sessionId);
-		const resolvedPageId = this.findPageId(entry, page);
-		if (!resolvedPageId) {
-			throw new Error(
-				`Session "${sessionId}" has no tracked page for the current tab.`,
-			);
-		}
-		return resolvedPageId;
 	}
 
 	private listPagesForEntry(entry: SessionEntry): SessionPageSummary[] {
