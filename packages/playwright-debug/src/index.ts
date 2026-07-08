@@ -340,11 +340,7 @@ function collectCandidateFiles(args: {
   }
 
   if (args.stack) {
-    const filePattern =
-      /(?:file:\/\/)?((?:[A-Za-z]:)?[^()\s]+?\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)):\d+:\d+/g;
-    for (const match of args.stack.matchAll(filePattern)) {
-      const rawPath = match[1];
-      if (!rawPath) continue;
+    for (const rawPath of collectStackFilePaths(args.stack)) {
       const repoPath = rawPath.startsWith("/")
         ? relative(args.repositoryRoot, rawPath)
         : rawPath;
@@ -355,6 +351,78 @@ function collectCandidateFiles(args: {
   }
 
   return [...files].filter(isSafeRepoPath);
+}
+
+function collectStackFilePaths(stack: string): string[] {
+  const paths = new Set<string>();
+  for (const line of stack.split("\n")) {
+    for (const token of splitStackLine(line)) {
+      const path = parseStackLocation(token);
+      if (path) {
+        paths.add(path);
+      }
+    }
+  }
+  return [...paths];
+}
+
+function splitStackLine(line: string): string[] {
+  const tokens: string[] = [];
+  let token = "";
+  for (const char of line) {
+    if (char === " " || char === "\t" || char === "(" || char === ")") {
+      if (token) {
+        tokens.push(token);
+        token = "";
+      }
+    } else {
+      token += char;
+    }
+  }
+  if (token) {
+    tokens.push(token);
+  }
+  return tokens;
+}
+
+function parseStackLocation(token: string): string | null {
+  const normalized = trimStackTokenPrefixAndSuffix(token);
+  const columnColonIndex = normalized.lastIndexOf(":");
+  if (columnColonIndex === -1) return null;
+
+  const lineColonIndex = normalized.lastIndexOf(":", columnColonIndex - 1);
+  if (lineColonIndex === -1) return null;
+
+  const line = normalized.slice(lineColonIndex + 1, columnColonIndex);
+  const column = normalized.slice(columnColonIndex + 1);
+  if (!isDigits(line) || !isDigits(column)) return null;
+
+  const path = normalized.slice(0, lineColonIndex);
+  if (!hasSupportedSourceExtension(path)) return null;
+
+  return path;
+}
+
+function trimStackTokenPrefixAndSuffix(token: string): string {
+  let value = token.startsWith("file://") ? token.slice("file://".length) : token;
+  while (value.endsWith(",") || value.endsWith(";")) {
+    value = value.slice(0, -1);
+  }
+  return value;
+}
+
+function isDigits(value: string): boolean {
+  if (!value) return false;
+  for (const char of value) {
+    if (char < "0" || char > "9") return false;
+  }
+  return true;
+}
+
+function hasSupportedSourceExtension(path: string): boolean {
+  return [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"].some(
+    (extension) => path.endsWith(extension),
+  );
 }
 
 function normalizeChanges(changes: AgentFileChange[]): AgentFileChange[] {
