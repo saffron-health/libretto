@@ -43,8 +43,12 @@ export interface PageStatus {
  * Playwright connections. Owned by a factory instance — no module-level
  * state. Sessions die with the process; `dispose()` closes everything.
  */
+/** Signals we attempt best-effort cleanup on, when no host handler owns them. */
+const EXIT_SIGNALS: readonly NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+
 export class SessionRegistry {
 	private readonly sessions = new Map<string, SessionEntry>();
+	private exitHooksInstalled = false;
 
 	constructor(public readonly provider: BrowserProvider) {}
 
@@ -68,6 +72,7 @@ export class SessionRegistry {
 
 		const sessionId = this.generateSessionId();
 		this.sessions.set(sessionId, entry);
+		this.installExitHooks();
 		return { sessionId };
 	}
 
@@ -87,6 +92,7 @@ export class SessionRegistry {
 
 		const sessionId = this.generateSessionId();
 		this.sessions.set(sessionId, entry);
+		this.installExitHooks();
 		return { sessionId };
 	}
 
@@ -173,11 +179,52 @@ export class SessionRegistry {
 	}
 
 	async dispose(): Promise<void> {
+		this.removeExitHooks();
 		const sessionIds = [...this.sessions.keys()];
 		for (const sessionId of sessionIds) {
 			await this.closeSession(sessionId);
 		}
 	}
+
+	/**
+	 * Best-effort backstop so provider-owned (cloud) sessions get released even
+	 * when a consumer forgets to call {@link dispose}. `beforeExit` covers a
+	 * script that finishes naturally; signals are only claimed when no host
+	 * handler already owns them, so we stay out of a host's own shutdown.
+	 */
+	private installExitHooks(): void {
+		if (this.exitHooksInstalled) return;
+		this.exitHooksInstalled = true;
+		process.once("beforeExit", this.handleBeforeExit);
+		for (const signal of EXIT_SIGNALS) {
+			if (process.listenerCount(signal) === 0) {
+				process.on(signal, this.handleSignal);
+			}
+		}
+	}
+
+	private removeExitHooks(): void {
+		if (!this.exitHooksInstalled) return;
+		this.exitHooksInstalled = false;
+		process.removeListener("beforeExit", this.handleBeforeExit);
+		for (const signal of EXIT_SIGNALS) {
+			process.removeListener(signal, this.handleSignal);
+		}
+	}
+
+	private readonly handleBeforeExit = (): void => {
+		void this.dispose();
+	};
+
+	private readonly handleSignal = (signal: NodeJS.Signals): void => {
+		// Adding a signal listener suppresses Node's default termination, so the
+		// process stays alive while dispose() runs; re-raise afterward to restore
+		// the default disposition (or defer to a handler the host added since).
+		void this.dispose().finally(() => {
+			process.removeListener(signal, this.handleSignal);
+			process.kill(process.pid, signal);
+		});
+	};
 
 	private createSessionEntry(args: {
 		providerSessionId: string | undefined;
