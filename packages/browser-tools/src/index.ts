@@ -11,3 +11,9 @@ export { LocalBrowserProvider } from "./providers/local.js";
 export type { LocalBrowserProviderOptions } from "./providers/local.js";
 export type { OpenTool, OpenToolInput, OpenToolOutput } from "./tools/open.js";
 export type { ExecTool, ExecToolInput, ExecToolOutput } from "./tools/exec.js";
+export type {
+	SnapshotTool,
+	SnapshotToolInput,
+	SnapshotToolOutput,
+	SnapshotScreenshot,
+} from "./tools/snapshot.js";
