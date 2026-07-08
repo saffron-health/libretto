@@ -3,7 +3,7 @@ name: glimpse-changes
 description: Create a visual explanation of the current session diff as a single HTML page and show it in a native Glimpse window. Use when the user wants a visual walkthrough of local code changes instead of a plain text diff.
 metadata:
   author: tanishqkancharla
-  version: "1.9.3"
+  version: "1.9.5"
 ---
 
 # Glimpse Changes
@@ -13,7 +13,7 @@ Render a Markdown walkthrough in a native Glimpse window with syntax-highlighted
 ## Setup
 
 ```bash
-cd ./ && npm install
+npx glimpse-changes@1.9.5 --help
 ```
 
 ## How to write a useful walkthrough
@@ -76,7 +76,7 @@ path/to/test-file.test.ts:50-100
 Example:
 
 ````bash
-cat <<'EOF' | node ./bin/glimpse-changes.js -
+cat <<'EOF' | npx glimpse-changes@1.9.5 -
 # Improve review flow messaging
 
 ## Summary
@@ -98,7 +98,7 @@ EOF
 Example with an ad-hoc fenced diff block:
 
 ````bash
-cat <<'EOF' | node ./bin/glimpse-changes.js -
+cat <<'EOF' | npx glimpse-changes@1.9.5 -
 # New utility module
 
 ## Summary
@@ -126,10 +126,10 @@ EOF
 Prefer piping markdown over stdin. This avoids shell-quoting issues.
 
 ```bash
-cat report.md | node ./bin/glimpse-changes.js
-cat report.md | node ./bin/glimpse-changes.js -
+cat report.md | npx glimpse-changes@1.9.5
+cat report.md | npx glimpse-changes@1.9.5 -
 
-cat <<'EOF' | node ./bin/glimpse-changes.js -
+cat <<'EOF' | npx glimpse-changes@1.9.5 -
 # Title
 
 Content
@@ -143,7 +143,7 @@ will break fence detection and produce garbled output instead of rendered diffs.
 You can still pass a single inline markdown argument for simple content:
 
 ```bash
-node ./bin/glimpse-changes.js "# Title\n\nContent"
+npx glimpse-changes@1.9.5 "# Title\n\nContent"
 ```
 
 The CLI opens a Glimpse window and blocks until closed.
@@ -165,7 +165,7 @@ the window is closed, then contains either the user's review text or a no-review
 completion message.
 
 ```bash
-node ./bin/glimpse-changes.js --background "# Title\n\nContent"
+npx glimpse-changes@1.9.5 --background "# Title\n\nContent"
 # prints: Glimpse window opened. Read /tmp/glimpse-review-<id>.txt for user feedback.
 ```
 
