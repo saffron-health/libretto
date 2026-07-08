@@ -228,6 +228,9 @@ importers:
       ai:
         specifier: ^6.0.116
         version: 6.0.140(zod@4.4.3)
+      outdent:
+        specifier: ^0.8.0
+        version: 0.8.0
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)

@@ -1,10 +1,10 @@
 import { scopeSnapshotToRef } from "./capture-snapshot.js";
 import type {
-  Snapshot,
-  SnapshotFrame,
-  SnapshotNode,
-  SnapshotPrimitive,
-} from "./types.js";
+	Snapshot,
+	SnapshotFrame,
+	SnapshotNode,
+	SnapshotPrimitive,
+} from "./capture-snapshot.js";
 
 const MAX_CHILDREN_PER_PARENT = 4;
 const MAX_LABEL_CHARS = 140;
