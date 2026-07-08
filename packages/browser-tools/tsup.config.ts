@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
-// Per-file output (bundle: false) so framework subpath entries
-// (./ai-sdk, ./flue, ...) can be added as plain source files later.
+// Per-file output (bundle: false) so framework adapters under src/adapters/
+// can be added as index.ts entry points with matching package.json exports.
 export default defineConfig({
   entry: ["src/**/*.ts", "!src/**/*.spec.ts"],
   format: ["esm"],

@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { chromium } from "playwright";
+import type { Snapshot } from "./snapshot/capture-snapshot.js";
+import { snapshot as captureSnapshot } from "./snapshot/capture-snapshot.js";
 import type { BrowserProvider } from "./provider.js";
 
 interface SessionEntry {
@@ -8,6 +10,7 @@ interface SessionEntry {
 	browser: Browser;
 	context: BrowserContext;
 	currentPage: Page | undefined;
+	latestSnapshot?: Snapshot;
 }
 
 /**
@@ -63,6 +66,26 @@ export class SessionRegistry {
 		this.sessions.delete(sessionId);
 		await entry.browser.close();
 		await this.provider.closeSession(entry.providerSessionId);
+	}
+
+	/** Baseline for the next exec diff — cached post-exec snapshot or a fresh capture. */
+	async readSnapshotBaseline(sessionId: string): Promise<Snapshot> {
+		const entry = this.requireSession(sessionId);
+		if (entry.latestSnapshot) return entry.latestSnapshot;
+		return captureSnapshot(this.getCurrentPage(sessionId));
+	}
+
+	/** Capture after exec and cache for the next call's baseline. */
+	async captureSnapshotAfterExec(sessionId: string): Promise<Snapshot> {
+		const entry = this.requireSession(sessionId);
+		const after = await captureSnapshot(this.getCurrentPage(sessionId));
+		entry.latestSnapshot = after;
+		return after;
+	}
+
+	clearSnapshotCache(sessionId: string): void {
+		const entry = this.sessions.get(sessionId);
+		if (entry) delete entry.latestSnapshot;
 	}
 
 	async dispose(): Promise<void> {

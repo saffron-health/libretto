@@ -1,9 +1,14 @@
 import { z } from "zod";
 import { errorMessage } from "../errors.js";
-import type { ExecResult, ExecScope } from "../exec/exec-engine.js";
+import type { ExecScope } from "../exec/exec-engine.js";
 import { runExecCode } from "../exec/exec-engine.js";
+import {
+	diffSnapshots,
+	renderSnapshotDiff,
+} from "../snapshot/diff-snapshots.js";
+import { waitForPageStable } from "../snapshot/wait-for-page-stable.js";
 import type { SessionRegistry } from "../session-registry.js";
-import type { BrowserTool } from "../tool.js";
+import type { BrowserTool, ToolResult } from "../tool.js";
 
 const execInputSchema = z.object({
 	sessionId: z
@@ -23,6 +28,8 @@ export interface ExecToolOutput {
 	result: unknown;
 	stdout: string;
 	stderr: string;
+	/** Rendered a11y-tree diff since the previous exec on this session; empty when unchanged. */
+	snapshotDiff: string;
 }
 
 /**
@@ -44,10 +51,12 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			"itself is the only state. In scope: `page` (the current playwright " +
 			"Page), `context` (BrowserContext), `browser` (Browser). TypeScript is " +
 			"fine. `console.log`/`console.error` output is captured and returned as " +
-			"stdout/stderr. Failures come back as `{ ok: false, error }` — read the " +
-			"error, fix the code, and try again.",
+			"stdout/stderr. Successful execs also return `snapshotDiff` — a compact " +
+			"text diff of accessibility-tree changes since the previous exec (empty when " +
+			"unchanged). Failures come back as `{ ok: false, error }` — read the error, " +
+			"fix the code, and try again.",
 		inputSchema: execInputSchema,
-		async execute({ sessionId, code }): Promise<ExecResult> {
+		async execute({ sessionId, code }): Promise<ToolResult<ExecToolOutput>> {
 			let scope: ExecScope;
 			try {
 				const page = registry.getCurrentPage(sessionId);
@@ -71,7 +80,21 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 						"then pass it to browser_exec.",
 				};
 			}
-			return runExecCode(code, scope);
+
+			const before = await registry.readSnapshotBaseline(sessionId);
+			const execResult = await runExecCode(code, scope);
+			if (!execResult.ok) return execResult;
+
+			let snapshotDiff = "";
+			try {
+				await waitForPageStable(scope.page);
+				const after = await registry.captureSnapshotAfterExec(sessionId);
+				snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
+			} catch {
+				registry.clearSnapshotCache(sessionId);
+			}
+
+			return { ...execResult, snapshotDiff };
 		},
 	};
 }

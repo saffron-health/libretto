@@ -25,9 +25,9 @@
       "default": "./dist/index.js"
     },
     "./ai-sdk": {
-      "types": "./dist/ai-sdk.d.ts",
-      "import": "./dist/ai-sdk.js",
-      "default": "./dist/ai-sdk.js"
+      "types": "./dist/adapters/ai-sdk/index.d.ts",
+      "import": "./dist/adapters/ai-sdk/index.js",
+      "default": "./dist/adapters/ai-sdk/index.js"
     }
   },
   "scripts": {
@@ -55,6 +55,7 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "ai": "^6.0.116",
+    "outdent": "^0.8.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.5"

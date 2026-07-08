@@ -4,11 +4,14 @@ import type { ExecTool } from "./tools/exec.js";
 import { createExecTool } from "./tools/exec.js";
 import type { OpenTool } from "./tools/open.js";
 import { createOpenTool } from "./tools/open.js";
+import type { SnapshotTool } from "./tools/snapshot.js";
+import { createSnapshotTool } from "./tools/snapshot.js";
 
 export interface BrowserToolkit {
 	tools: {
 		browser_open: OpenTool;
 		browser_exec: ExecTool;
+		browser_snapshot: SnapshotTool;
 	};
 	/** Closes every session opened through this toolkit. */
 	dispose(): Promise<void>;
@@ -16,7 +19,7 @@ export interface BrowserToolkit {
 
 /**
  * Framework-agnostic factory — returns base {@link BrowserTool} objects.
- * Framework entry points wrap this: `createAiSdkBrowserTools`, `createFlueBrowserTools`, …
+ * Framework entry points live under src/adapters/ (e.g. adapters/ai-sdk).
  */
 export function createBrowserTools(provider: BrowserProvider): BrowserToolkit {
 	const registry = new SessionRegistry(provider);
@@ -24,6 +27,7 @@ export function createBrowserTools(provider: BrowserProvider): BrowserToolkit {
 		tools: {
 			browser_open: createOpenTool(registry),
 			browser_exec: createExecTool(registry),
+			browser_snapshot: createSnapshotTool(registry),
 		},
 		dispose: () => registry.dispose(),
 	};

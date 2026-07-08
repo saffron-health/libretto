@@ -1,8 +1,8 @@
 import { expect, test as base } from "vitest";
-import { LocalBrowserProvider } from "../src/providers/local.js";
-import { SessionRegistry } from "../src/session-registry.js";
-import { createExecTool } from "../src/tools/exec.js";
-import { createOpenTool } from "../src/tools/open.js";
+import { LocalBrowserProvider } from "../providers/local.js";
+import { SessionRegistry } from "../session-registry.js";
+import { createExecTool } from "./exec.js";
+import { createOpenTool } from "./open.js";
 
 const test = base.extend<{
 	registry: SessionRegistry;
@@ -46,11 +46,12 @@ test("browser_exec runs Playwright code against an open session", async ({
 		sessionId: opened.sessionId,
 		code: "return page.title()",
 	});
-	expect(result).toEqual({
+	expect(result).toMatchObject({
 		ok: true,
 		result: "hello",
 		stdout: "",
 		stderr: "",
+		snapshotDiff: "",
 	});
 });
 
@@ -71,22 +72,24 @@ test("browser_exec carries browser state across calls and supports TypeScript", 
 			"console.log('mutated to', label); " +
 			"return label",
 	});
-	expect(mutate).toEqual({
+	expect(mutate).toMatchObject({
 		ok: true,
 		result: "updated",
 		stdout: "mutated to updated",
 		stderr: "",
 	});
+	expect(mutate.ok && mutate.snapshotDiff.length).toBeGreaterThan(0);
 
 	const read = await execTool.execute({
 		sessionId: opened.sessionId,
 		code: "return await page.locator('#t').textContent()",
 	});
-	expect(read).toEqual({
+	expect(read).toMatchObject({
 		ok: true,
 		result: "updated",
 		stdout: "",
 		stderr: "",
+		snapshotDiff: "",
 	});
 });
 

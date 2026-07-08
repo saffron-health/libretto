@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     name: "browser-tools",
     environment: "node",
-    include: ["test/**/*.spec.ts", "src/**/*.spec.ts"],
+    include: ["src/**/*.spec.ts"],
     testTimeout: 30_000,
     pool: "forks",
     isolate: true,
