@@ -50,6 +50,12 @@ test("getCurrentPage tracks the newest page in the session", async ({
 
 	expect(registry.getCurrentPage(sessionId)).toBe(newest);
 	expect(await registry.getCurrentPage(sessionId).title()).toBe("newest");
+
+	const pages = registry.listSessionPages(sessionId);
+	expect(pages).toHaveLength(2);
+	expect(pages.filter((page) => page.active)).toEqual([
+		expect.objectContaining({ url: expect.stringContaining("newest") }),
+	]);
 });
 
 test("unknown session ID throws with the ID in the message", ({ registry }) => {

@@ -14,6 +14,12 @@ const snapshotInputSchema = z.object({
 		.boolean()
 		.optional()
 		.describe("When true, also return a PNG screenshot as base64 bytes."),
+	pageId: z
+		.string()
+		.optional()
+		.describe(
+			'Optional page ID from browser_status. Defaults to the most recently opened tab.',
+		),
 });
 
 export type SnapshotToolInput = z.infer<typeof snapshotInputSchema>;
@@ -45,10 +51,11 @@ export function createSnapshotTool(registry: SessionRegistry): SnapshotTool {
 		async execute({
 			sessionId,
 			screenshot,
+			pageId,
 		}): Promise<ToolResult<SnapshotToolOutput>> {
 			let page;
 			try {
-				page = registry.getCurrentPage(sessionId);
+				page = registry.resolvePage(sessionId, pageId);
 			} catch (err) {
 				return {
 					ok: false,

@@ -13,7 +13,14 @@ export function createAiSdkBrowserTools(provider: BrowserProvider): {
 	dispose(): Promise<void>;
 } {
 	const base = createBrowserTools(provider);
-	const { browser_open, browser_exec, browser_snapshot } = base.tools;
+	const {
+		browser_open,
+		browser_exec,
+		browser_snapshot,
+		browser_status,
+		browser_close,
+		browser_connect,
+	} = base.tools;
 	return {
 		tools: {
 			browser_open: tool({
@@ -31,6 +38,21 @@ export function createAiSdkBrowserTools(provider: BrowserProvider): {
 				inputSchema: browser_snapshot.inputSchema,
 				execute: (input) => browser_snapshot.execute(input),
 				toModelOutput: snapshotToModelOutput,
+			}),
+			browser_status: tool({
+				description: browser_status.description,
+				inputSchema: browser_status.inputSchema,
+				execute: (input) => browser_status.execute(input),
+			}),
+			browser_close: tool({
+				description: browser_close.description,
+				inputSchema: browser_close.inputSchema,
+				execute: (input) => browser_close.execute(input),
+			}),
+			browser_connect: tool({
+				description: browser_connect.description,
+				inputSchema: browser_connect.inputSchema,
+				execute: (input) => browser_connect.execute(input),
 			}),
 		},
 		dispose: base.dispose,
