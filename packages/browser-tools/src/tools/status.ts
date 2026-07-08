@@ -61,19 +61,18 @@ export function createStatusTool(registry: SessionRegistry): StatusTool {
 			}
 
 			if (pageId === undefined) {
-				try {
-					return {
-						ok: true,
-						pages: registry.listSessionPages(sessionId),
-					};
-				} catch (err) {
+				const session = registry
+					.listSessions()
+					.find((entry) => entry.sessionId === sessionId);
+				if (!session) {
 					return {
 						ok: false,
 						error:
-							`${errorMessage(err)}. Call browser_open to get a session ID, ` +
-							"or browser_status with no args to list open sessions.",
+							`Unknown session ID: ${sessionId}. Call browser_open to get a ` +
+							"session ID, or browser_status with no args to list open sessions.",
 					};
 				}
+				return { ok: true, pages: session.pages };
 			}
 
 			try {

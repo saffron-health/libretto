@@ -65,7 +65,7 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 		async execute({ sessionId, code, pageId }): Promise<ToolResult<ExecToolOutput>> {
 			let scope: ExecScope;
 			try {
-				const page = registry.resolvePage(sessionId, pageId);
+				const page = registry.getCurrentPage(sessionId, pageId);
 				const context = page.context();
 				const browser = context.browser();
 				if (!browser) {

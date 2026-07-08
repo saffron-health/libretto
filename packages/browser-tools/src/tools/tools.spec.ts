@@ -136,21 +136,22 @@ test("browser_status lists sessions and pages at three zoom levels", async ({
 			},
 		],
 	});
+	if (!all.ok || !("sessions" in all)) throw new Error("expected sessions");
+	const pageId = all.sessions[0].pages[0].pageId;
 
 	const sessionOnly = await statusTool.execute({ sessionId: opened.sessionId });
-	expect(sessionOnly).toMatchObject({
-		ok: true,
-		pages: [{ pageId: expect.any(String), url: expect.any(String), active: true }],
-	});
 	if (!sessionOnly.ok || !("pages" in sessionOnly)) throw new Error("expected pages");
+	expect(sessionOnly.pages).toEqual([
+		{ pageId, url: expect.any(String), active: true },
+	]);
 
 	const pageOnly = await statusTool.execute({
 		sessionId: opened.sessionId,
-		pageId: sessionOnly.pages[0].pageId,
+		pageId,
 	});
 	expect(pageOnly).toMatchObject({
 		ok: true,
-		pageId: sessionOnly.pages[0].pageId,
+		pageId,
 		title: "status-page",
 		active: true,
 		readyState: expect.any(String),

@@ -11,10 +11,7 @@ const closeInputSchema = z.object({
 
 export type CloseToolInput = z.infer<typeof closeInputSchema>;
 
-export interface CloseToolOutput {
-	/** Empty success payload — session is closed. */
-	closed?: true;
-}
+export type CloseToolOutput = {};
 
 export interface CloseTool extends BrowserTool<CloseToolInput, CloseToolOutput> {
 	inputSchema: typeof closeInputSchema;

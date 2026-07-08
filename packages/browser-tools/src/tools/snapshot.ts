@@ -55,7 +55,7 @@ export function createSnapshotTool(registry: SessionRegistry): SnapshotTool {
 		}): Promise<ToolResult<SnapshotToolOutput>> {
 			let page;
 			try {
-				page = registry.resolvePage(sessionId, pageId);
+				page = registry.getCurrentPage(sessionId, pageId);
 			} catch (err) {
 				return {
 					ok: false,

@@ -90,11 +90,7 @@ export class SessionRegistry {
 		return { sessionId };
 	}
 
-	getCurrentPage(sessionId: string): Page {
-		return this.resolvePage(sessionId);
-	}
-
-	resolvePage(sessionId: string, pageId?: string): Page {
+	getCurrentPage(sessionId: string, pageId?: string): Page {
 		const entry = this.requireSession(sessionId);
 		if (pageId) {
 			const page = entry.pageById.get(pageId);
@@ -121,24 +117,16 @@ export class SessionRegistry {
 	}
 
 	listSessions(): SessionSummary[] {
-		const summaries: SessionSummary[] = [];
-		for (const [sessionId, entry] of this.sessions) {
-			summaries.push({
-				sessionId,
-				provider: entry.providerName,
-				pages: this.listPagesForEntry(entry),
-			});
-		}
-		return summaries;
-	}
-
-	listSessionPages(sessionId: string): SessionPageSummary[] {
-		return this.listPagesForEntry(this.requireSession(sessionId));
+		return [...this.sessions].map(([sessionId, entry]) => ({
+			sessionId,
+			provider: entry.providerName,
+			pages: this.listPagesForEntry(entry),
+		}));
 	}
 
 	async getPageStatus(sessionId: string, pageId: string): Promise<PageStatus> {
-		const page = this.resolvePage(sessionId, pageId);
-		const activePage = this.resolvePage(sessionId);
+		const page = this.getCurrentPage(sessionId, pageId);
+		const activePage = this.getCurrentPage(sessionId);
 		return {
 			pageId,
 			url: page.url(),
@@ -165,7 +153,7 @@ export class SessionRegistry {
 	): Promise<Snapshot> {
 		const entry = this.requireSession(sessionId);
 		if (!pageId && entry.latestSnapshot) return entry.latestSnapshot;
-		return captureSnapshot(this.resolvePage(sessionId, pageId));
+		return captureSnapshot(this.getCurrentPage(sessionId, pageId));
 	}
 
 	/** Capture after exec and cache for the next call's baseline. */
@@ -174,7 +162,7 @@ export class SessionRegistry {
 		pageId?: string,
 	): Promise<Snapshot> {
 		const entry = this.requireSession(sessionId);
-		const after = await captureSnapshot(this.resolvePage(sessionId, pageId));
+		const after = await captureSnapshot(this.getCurrentPage(sessionId, pageId));
 		if (!pageId) entry.latestSnapshot = after;
 		return after;
 	}
