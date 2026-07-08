@@ -1,17 +1,59 @@
+import { createServer } from "node:net";
+import type { Browser } from "playwright";
+import { chromium } from "playwright";
 import { expect, test as base } from "vitest";
 import { LocalBrowserProvider } from "../providers/local.js";
 import { SessionRegistry } from "../session-registry.js";
 import { createCloseTool } from "./close.js";
+import { createConnectTool } from "./connect.js";
 import { createExecTool } from "./exec.js";
 import { createOpenTool } from "./open.js";
+import { createSnapshotTool } from "./snapshot.js";
 import { createStatusTool } from "./status.js";
+
+async function pickFreePort(): Promise<number> {
+	return await new Promise((resolve, reject) => {
+		const server = createServer();
+		server.unref();
+		server.on("error", reject);
+		server.listen(0, "127.0.0.1", () => {
+			const addr = server.address();
+			if (addr && typeof addr === "object") {
+				server.close(() => resolve(addr.port));
+				return;
+			}
+			server.close(() => reject(new Error("Failed to resolve debug port")));
+		});
+	});
+}
+
+async function fetchWebSocketDebuggerUrl(port: number): Promise<string> {
+	const versionUrl = `http://127.0.0.1:${port}/json/version`;
+	const deadline = Date.now() + 10_000;
+	while (Date.now() < deadline) {
+		try {
+			const response = await fetch(versionUrl);
+			const info = (await response.json()) as {
+				webSocketDebuggerUrl?: string;
+			};
+			if (info.webSocketDebuggerUrl) return info.webSocketDebuggerUrl;
+		} catch {
+			// Not listening yet; retry below.
+		}
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	throw new Error(`Could not read webSocketDebuggerUrl from ${versionUrl}`);
+}
 
 const test = base.extend<{
 	registry: SessionRegistry;
 	openTool: ReturnType<typeof createOpenTool>;
 	execTool: ReturnType<typeof createExecTool>;
+	snapshotTool: ReturnType<typeof createSnapshotTool>;
 	statusTool: ReturnType<typeof createStatusTool>;
 	closeTool: ReturnType<typeof createCloseTool>;
+	connectTool: ReturnType<typeof createConnectTool>;
+	externalBrowser: { browser: Browser; cdpUrl: string };
 }>({
 	registry: async ({}, use) => {
 		const registry = new SessionRegistry(
@@ -31,6 +73,22 @@ const test = base.extend<{
 	},
 	closeTool: async ({ registry }, use) => {
 		await use(createCloseTool(registry));
+	},
+	connectTool: async ({ registry }, use) => {
+		await use(createConnectTool(registry));
+	},
+	snapshotTool: async ({ registry }, use) => {
+		await use(createSnapshotTool(registry));
+	},
+	externalBrowser: async ({}, use) => {
+		const port = await pickFreePort();
+		const browser = await chromium.launch({
+			headless: true,
+			args: [`--remote-debugging-port=${port}`],
+		});
+		const cdpUrl = await fetchWebSocketDebuggerUrl(port);
+		await use({ browser, cdpUrl });
+		await browser.close();
 	},
 });
 
@@ -173,4 +231,85 @@ test("browser_close removes a session from browser_status", async ({
 
 	const all = await statusTool.execute({});
 	expect(all).toMatchObject({ ok: true, sessions: [] });
+});
+
+test("browser_connect attaches to an external browser and close detaches without killing it", async ({
+	connectTool,
+	closeTool,
+	execTool,
+	statusTool,
+	externalBrowser,
+}) => {
+	const context =
+		externalBrowser.browser.contexts()[0] ??
+		(await externalBrowser.browser.newContext());
+	const page = context.pages()[0] ?? (await context.newPage());
+	await page.goto("data:text/html,<title>connected</title>");
+
+	const connected = await connectTool.execute({ cdpUrl: externalBrowser.cdpUrl });
+	if (!connected.ok) throw new Error(connected.error);
+
+	const status = await statusTool.execute({});
+	expect(status).toMatchObject({
+		ok: true,
+		sessions: [
+			{
+				sessionId: connected.sessionId,
+				provider: "attached",
+				pages: [{ pageId: expect.any(String), url: expect.any(String), active: true }],
+			},
+		],
+	});
+
+	const execResult = await execTool.execute({
+		sessionId: connected.sessionId,
+		code: "return page.url()",
+	});
+	expect(execResult).toMatchObject({ ok: true, result: expect.any(String) });
+
+	const closed = await closeTool.execute({ sessionId: connected.sessionId });
+	expect(closed).toEqual({ ok: true });
+	expect(externalBrowser.browser.isConnected()).toBe(true);
+
+	const all = await statusTool.execute({});
+	expect(all).toMatchObject({ ok: true, sessions: [] });
+});
+
+test("browser_exec returns ok false for a stale page ID", async ({
+	openTool,
+	execTool,
+}) => {
+	const opened = await openTool.execute({
+		url: "data:text/html,<title>stale-page</title>",
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const result = await execTool.execute({
+		sessionId: opened.sessionId,
+		pageId: "page-nope",
+		code: "return page.title()",
+	});
+	expect(result.ok).toBe(false);
+	if (result.ok) return;
+	expect(result.error).toMatch(/page-nope/);
+	expect(result.error).toMatch(/browser_status/);
+});
+
+test("browser_snapshot returns ok false for a stale page ID", async ({
+	openTool,
+	snapshotTool,
+}) => {
+	const opened = await openTool.execute({
+		url: "data:text/html,<title>stale-page</title>",
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const result = await snapshotTool.execute({
+		sessionId: opened.sessionId,
+		pageId: "page-nope",
+	});
+	expect(result.ok).toBe(false);
+	if (result.ok) return;
+	expect(result.error).toMatch(/page-nope/);
+	expect(result.error).toMatch(/browser_status/);
 });
