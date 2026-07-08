@@ -74,7 +74,7 @@ export function OnboardingPage() {
         debugNotificationEmail: debugNotificationEmail || email,
       });
       window.location.assign(
-        sanitizeReturnToForAuthState(getSafeReturnTo(), false) ?? "/setup",
+        sanitizeReturnToForAuthState(getSafeReturnTo(), true) ?? "/setup",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Organization setup failed.");

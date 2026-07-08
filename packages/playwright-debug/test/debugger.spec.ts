@@ -399,13 +399,12 @@ describe("createLibrettoDebugger", () => {
     expect(calls[1]?.auth).toBe("Bearer brokered-installation-token");
   });
 
-  it("requires complete GitHub App credentials when token auth is absent", async () => {
+  it("requires GitHub token auth or a Libretto Cloud API key", async () => {
     const debuggerInstance = createLibrettoDebugger({
       github: {
         owner: "acme",
         repo: "automations",
         baseBranch: "main",
-        installationId: "123",
       },
       agent: {
         model: "openai/gpt-5.4",
@@ -420,7 +419,7 @@ describe("createLibrettoDebugger", () => {
 
     await expect(
       debuggerInstance.debugPlaywrightFailure(createError(), createPage()),
-    ).rejects.toThrow("GitHub App auth requires installationId, appId, and privateKey");
+    ).rejects.toThrow("GitHub authentication is missing");
   });
 
   it("rejects unsafe paths returned by the agent", async () => {

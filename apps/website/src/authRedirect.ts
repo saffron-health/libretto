@@ -36,8 +36,7 @@ export function sanitizeReturnToForAuthState(
   if (
     !hasTenant &&
     (pathname === "/dashboard" ||
-      pathname === "/setup" ||
-      pathname === "/github/setup")
+      pathname === "/setup")
   ) {
     return null;
   }

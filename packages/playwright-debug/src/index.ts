@@ -1,4 +1,3 @@
-import { createSign } from "node:crypto";
 import { relative, win32 } from "node:path";
 import { z } from "zod";
 import { generateObject, type LanguageModel } from "ai";
@@ -14,10 +13,7 @@ export type GitHubDebuggerConfig = {
   owner: string;
   repo: string;
   baseBranch: string;
-  installationId?: string | number;
   token?: string;
-  appId?: string | number;
-  privateKey?: string;
   librettoApiKey?: string;
   librettoApiUrl?: string;
   apiBaseUrl?: string;
@@ -147,10 +143,6 @@ type GitHubContentResponse = {
   type: string;
   encoding?: string;
   content?: string;
-};
-
-type InstallationTokenResponse = {
-  token: string;
 };
 
 type BrokeredInstallationTokenResponse = {
@@ -651,15 +643,10 @@ class GitHubClient {
       (await createBrokeredInstallationToken({
         config: args.config,
         fetchImpl: args.fetchImpl,
-      })) ??
-      (await createInstallationToken({
-        config: args.config,
-        apiBaseUrl,
-        fetchImpl: args.fetchImpl,
       }));
     if (!token) {
       throw new Error(
-        "GitHub authentication is missing. Provide github.token, LIBRETTO_GITHUB_TOKEN, GITHUB_TOKEN, LIBRETTO_API_KEY for a repository linked to Libretto Cloud, or self-hosted GitHub App credentials.",
+        "GitHub authentication is missing. Provide github.token, LIBRETTO_GITHUB_TOKEN, GITHUB_TOKEN, or LIBRETTO_API_KEY for a repository linked to Libretto Cloud.",
       );
     }
     return new GitHubClient({
@@ -855,10 +842,6 @@ async function createBrokeredInstallationToken(args: {
   config: GitHubDebuggerConfig;
   fetchImpl: typeof fetch;
 }): Promise<string | null> {
-  const installationId =
-    args.config.installationId?.toString().trim() ??
-    process.env.LIBRETTO_GITHUB_INSTALLATION_ID?.trim();
-
   const apiKey =
     args.config.librettoApiKey?.trim() ?? process.env.LIBRETTO_API_KEY?.trim();
   if (!apiKey) return null;
@@ -878,7 +861,6 @@ async function createBrokeredInstallationToken(args: {
       },
       body: JSON.stringify({
         json: {
-          ...(installationId ? { installation_id: installationId } : {}),
           owner: args.config.owner,
           repo: args.config.repo,
         },
@@ -900,87 +882,6 @@ async function createBrokeredInstallationToken(args: {
     );
   }
   return body.json.token;
-}
-
-async function createInstallationToken(args: {
-  config: GitHubDebuggerConfig;
-  apiBaseUrl: string;
-  fetchImpl: typeof fetch;
-}): Promise<string | null> {
-  const installationId =
-    args.config.installationId?.toString().trim() ??
-    process.env.LIBRETTO_GITHUB_INSTALLATION_ID?.trim();
-  const appId =
-    args.config.appId?.toString().trim() ??
-    process.env.LIBRETTO_GITHUB_APP_ID?.trim();
-  const privateKey = normalizePrivateKey(
-    args.config.privateKey ?? process.env.LIBRETTO_GITHUB_PRIVATE_KEY,
-  );
-  if (!installationId && !appId && !privateKey) return null;
-  if (!installationId || !appId || !privateKey) {
-    throw new Error(
-      "GitHub App auth requires installationId, appId, and privateKey. Set LIBRETTO_GITHUB_INSTALLATION_ID, LIBRETTO_GITHUB_APP_ID, and LIBRETTO_GITHUB_PRIVATE_KEY or pass them in github config.",
-    );
-  }
-
-  const jwt = createGitHubAppJwt({ appId, privateKey });
-  const response = await args.fetchImpl(
-    `${args.apiBaseUrl}/app/installations/${encodeURIComponent(installationId)}/access_tokens`,
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${jwt}`,
-        "Content-Type": "application/json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-      body: JSON.stringify({
-        repositories: [args.config.repo],
-        permissions: {
-          contents: "write",
-          pull_requests: "write",
-          metadata: "read",
-        },
-      }),
-    },
-  );
-  if (!response.ok) {
-    throw new GitHubRequestError(
-      response.status,
-      `GitHub App installation token request failed: ${await response.text()}`,
-    );
-  }
-  const body = (await response.json()) as InstallationTokenResponse;
-  return body.token;
-}
-
-function createGitHubAppJwt(args: {
-  appId: string;
-  privateKey: string;
-}): string {
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  const header = base64UrlJson({ alg: "RS256", typ: "JWT" });
-  const payload = base64UrlJson({
-    iat: nowSeconds - 60,
-    exp: nowSeconds + 9 * 60,
-    iss: args.appId,
-  });
-  const signingInput = `${header}.${payload}`;
-  const signature = createSign("RSA-SHA256")
-    .update(signingInput)
-    .sign(args.privateKey)
-    .toString("base64url");
-  return `${signingInput}.${signature}`;
-}
-
-function base64UrlJson(value: unknown): string {
-  return Buffer.from(JSON.stringify(value)).toString("base64url");
-}
-
-function normalizePrivateKey(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed) return undefined;
-  return trimmed.replace(/\\n/g, "\n");
 }
 
 function trimTrailingSlash(value: string): string {

@@ -43,17 +43,11 @@ For model calls, use the provider's normal API key environment variable:
 - `OPENAI_API_KEY` for `openai/...`
 - `ANTHROPIC_API_KEY` for `anthropic/...`
 
-For GitHub, pass `github.token`, set `LIBRETTO_GITHUB_TOKEN`, or configure a
-Libretto Cloud API key after linking the repository to the public Libretto
-GitHub App:
+For GitHub, link the repository to the public Libretto GitHub App and configure
+a Libretto Cloud API key:
 
 - `LIBRETTO_API_KEY`
 
-For self-hosted deployments, configure your own GitHub App with:
-
-- `LIBRETTO_GITHUB_APP_ID`
-- `LIBRETTO_GITHUB_PRIVATE_KEY`
-- `LIBRETTO_GITHUB_INSTALLATION_ID`
-
-The GitHub App needs read/write Contents permission, read/write Pull requests
-permission, and read Metadata permission for the target repository.
+Libretto Cloud mints the short-lived GitHub installation token needed to read
+contents, write contents, and open pull requests. For local development, you can
+also pass `github.token`, set `LIBRETTO_GITHUB_TOKEN`, or set `GITHUB_TOKEN`.

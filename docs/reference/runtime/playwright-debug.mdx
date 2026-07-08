@@ -78,12 +78,11 @@ secrets manager.
 
 ## GitHub Authentication
 
-The debugger can use Libretto's public GitHub App, token auth, or self-hosted
-GitHub App auth.
+The debugger uses Libretto's public GitHub App through Libretto Cloud.
 
-For the hosted public app path, first connect the repository to Libretto Cloud.
-The connect flow verifies the GitHub user can access the installed Libretto
-GitHub App and stores the tenant/repository link. Then provide:
+First connect the repository to Libretto Cloud. The connect flow verifies the
+GitHub user can access the installed Libretto GitHub App and stores the
+tenant/repository link. Then provide:
 
 ```bash
 export LIBRETTO_API_KEY=...
@@ -93,19 +92,9 @@ With that setup, the debugger asks Libretto Cloud for a short-lived GitHub
 installation token scoped to the configured `owner/repo` and only the
 permissions needed to read/write contents and open pull requests.
 
-For token auth, pass `github.token` or set `LIBRETTO_GITHUB_TOKEN` /
-`GITHUB_TOKEN`. The token needs permission to read contents, write contents, and
-open pull requests on the target repository.
-
-For self-hosted GitHub App auth, `installationId` is not enough by itself. The
-debugger also needs the App ID and private key so it can mint an installation
-access token locally:
-
-```bash
-export LIBRETTO_GITHUB_APP_ID=...
-export LIBRETTO_GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
-export LIBRETTO_GITHUB_INSTALLATION_ID=...
-```
+For local development, you can pass `github.token` or set
+`LIBRETTO_GITHUB_TOKEN` / `GITHUB_TOKEN`. The token needs permission to read
+contents, write contents, and open pull requests on the target repository.
 
 The GitHub App should request these repository permissions:
 
