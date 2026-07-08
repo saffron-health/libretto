@@ -275,6 +275,48 @@ test("browser_connect attaches to an external browser and close detaches without
 	expect(all).toMatchObject({ ok: true, sessions: [] });
 });
 
+test("browser_exec snapshot diff uses per-page cache across mixed pageId calls", async ({
+	openTool,
+	execTool,
+	statusTool,
+}) => {
+	const opened = await openTool.execute({
+		url: "data:text/html,<h1 id='t'>start</h1>",
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const status = await statusTool.execute({ sessionId: opened.sessionId });
+	if (!status.ok || !("pages" in status)) throw new Error("expected pages");
+	const pageId = status.pages[0].pageId;
+
+	const first = await execTool.execute({
+		sessionId: opened.sessionId,
+		code:
+			"await page.locator('#t').evaluate((el: HTMLElement) => { el.textContent = 'first'; });",
+	});
+	expect(first).toMatchObject({ ok: true });
+	expect(first.ok && first.snapshotDiff.length).toBeGreaterThan(0);
+
+	const second = await execTool.execute({
+		sessionId: opened.sessionId,
+		pageId,
+		code:
+			"await page.locator('#t').evaluate((el: HTMLElement) => { el.textContent = 'second'; });",
+	});
+	expect(second).toMatchObject({ ok: true });
+	expect(second.ok && second.snapshotDiff.length).toBeGreaterThan(0);
+
+	const third = await execTool.execute({
+		sessionId: opened.sessionId,
+		code: "return await page.locator('#t').textContent()",
+	});
+	expect(third).toMatchObject({
+		ok: true,
+		result: "second",
+		snapshotDiff: "",
+	});
+});
+
 test("browser_exec returns ok false for a stale page ID", async ({
 	openTool,
 	execTool,
