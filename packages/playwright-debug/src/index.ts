@@ -80,6 +80,14 @@ export type LibrettoDebuggerOptions = {
   now?: () => Date;
 };
 
+export type CreateGitHubConnectUrlOptions = {
+  owner: string;
+  repo: string;
+  librettoApiKey?: string;
+  librettoApiUrl?: string;
+  fetch?: typeof fetch;
+};
+
 export type DebugPlaywrightFailureOptions = {
   branchName?: string;
   includeFiles?: string[];
@@ -258,6 +266,51 @@ export function createLibrettoDebugger(
       };
     },
   };
+}
+
+export async function createLibrettoGitHubConnectUrl(
+  options: CreateGitHubConnectUrlOptions,
+): Promise<string> {
+  const apiKey =
+    options.librettoApiKey?.trim() ?? process.env.LIBRETTO_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error(
+      "Creating a GitHub connect URL requires LIBRETTO_API_KEY or librettoApiKey.",
+    );
+  }
+
+  const apiUrl = trimTrailingSlash(
+    options.librettoApiUrl?.trim() ??
+      process.env.LIBRETTO_API_URL?.trim() ??
+      DEFAULT_LIBRETTO_API_URL,
+  );
+  const response = await (options.fetch ?? globalThis.fetch)(
+    `${apiUrl}/v1/github/createConnectUrl`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        json: {
+          owner: options.owner,
+          repo: options.repo,
+        },
+      }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Libretto GitHub connect URL request failed (${response.status}): ${await response.text()}`,
+    );
+  }
+
+  const body = (await response.json()) as { json?: { url?: string } };
+  if (!body.json?.url) {
+    throw new Error("Libretto GitHub connect URL response did not include a URL.");
+  }
+  return body.json.url;
 }
 
 export function parseAgentModel(model: string): {
@@ -597,7 +650,7 @@ class GitHubClient {
       }));
     if (!token) {
       throw new Error(
-        "GitHub authentication is missing. Provide github.token, LIBRETTO_GITHUB_TOKEN, GITHUB_TOKEN, LIBRETTO_API_KEY with installationId, or self-hosted GitHub App credentials.",
+        "GitHub authentication is missing. Provide github.token, LIBRETTO_GITHUB_TOKEN, GITHUB_TOKEN, LIBRETTO_API_KEY for a repository linked to Libretto Cloud, or self-hosted GitHub App credentials.",
       );
     }
     return new GitHubClient({
@@ -796,7 +849,6 @@ async function createBrokeredInstallationToken(args: {
   const installationId =
     args.config.installationId?.toString().trim() ??
     process.env.LIBRETTO_GITHUB_INSTALLATION_ID?.trim();
-  if (!installationId) return null;
 
   const apiKey =
     args.config.librettoApiKey?.trim() ?? process.env.LIBRETTO_API_KEY?.trim();
@@ -817,7 +869,7 @@ async function createBrokeredInstallationToken(args: {
       },
       body: JSON.stringify({
         json: {
-          installation_id: installationId,
+          ...(installationId ? { installation_id: installationId } : {}),
           owner: args.config.owner,
           repo: args.config.repo,
         },

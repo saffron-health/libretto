@@ -8,14 +8,23 @@ browser provider, retries, logging, and fallback logic while adding one debugger
 call in the failure path.
 
 ```typescript
-import { createLibrettoDebugger } from "@libretto/playwright-debug";
+import {
+  createLibrettoDebugger,
+  createLibrettoGitHubConnectUrl,
+} from "@libretto/playwright-debug";
+
+console.log(
+  await createLibrettoGitHubConnectUrl({
+    owner: "acme",
+    repo: "automations",
+  }),
+);
 
 const librettoDebugger = createLibrettoDebugger({
   github: {
     owner: "acme",
     repo: "automations",
     baseBranch: "main",
-    installationId: process.env.LIBRETTO_GITHUB_INSTALLATION_ID,
   },
   agent: {
     model: "openai/gpt-5.4",
@@ -72,12 +81,12 @@ secrets manager.
 The debugger can use Libretto's public GitHub App, token auth, or self-hosted
 GitHub App auth.
 
-For the hosted public app path, install the Libretto GitHub App on the target
-repository and provide:
+For the hosted public app path, first connect the repository to Libretto Cloud.
+The connect flow verifies the GitHub user can access the installed Libretto
+GitHub App and stores the tenant/repository link. Then provide:
 
 ```bash
 export LIBRETTO_API_KEY=...
-export LIBRETTO_GITHUB_INSTALLATION_ID=...
 ```
 
 With that setup, the debugger asks Libretto Cloud for a short-lived GitHub
@@ -105,5 +114,6 @@ The GitHub App should request these repository permissions:
 - Metadata: read
 
 The hosted public Libretto app should be installable by any account. It does not
-need webhooks, callback URLs, device flow, or user OAuth authorization for this
-PR-opening flow.
+need webhooks or device flow. It does need a callback URL and GitHub App user
+authorization so Libretto Cloud can verify and store the tenant/repository link
+before minting installation tokens.

@@ -4,14 +4,23 @@
 Playwright runs.
 
 ```ts
-import { createLibrettoDebugger } from "@libretto/playwright-debug";
+import {
+  createLibrettoDebugger,
+  createLibrettoGitHubConnectUrl,
+} from "@libretto/playwright-debug";
+
+console.log(
+  await createLibrettoGitHubConnectUrl({
+    owner: "acme",
+    repo: "automations",
+  }),
+);
 
 const librettoDebugger = createLibrettoDebugger({
   github: {
     owner: "acme",
     repo: "automations",
     baseBranch: "main",
-    installationId: process.env.LIBRETTO_GITHUB_INSTALLATION_ID,
   },
   agent: {
     model: "openai/gpt-5.4",
@@ -35,11 +44,10 @@ For model calls, use the provider's normal API key environment variable:
 - `ANTHROPIC_API_KEY` for `anthropic/...`
 
 For GitHub, pass `github.token`, set `LIBRETTO_GITHUB_TOKEN`, or configure a
-Libretto Cloud API key so Libretto can broker a token from the public GitHub
-App:
+Libretto Cloud API key after linking the repository to the public Libretto
+GitHub App:
 
 - `LIBRETTO_API_KEY`
-- `LIBRETTO_GITHUB_INSTALLATION_ID`
 
 For self-hosted deployments, configure your own GitHub App with:
 

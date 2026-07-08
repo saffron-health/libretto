@@ -2,6 +2,7 @@ import type { Page } from "playwright";
 import { describe, expect, it, vi } from "vitest";
 import {
   createLibrettoDebugger,
+  createLibrettoGitHubConnectUrl,
   parseAgentModel,
   type DebugAgentRunner,
 } from "../src/index.js";
@@ -50,6 +51,40 @@ describe("parseAgentModel", () => {
     );
     expect(() => parseAgentModel("gpt-5.4")).toThrow(
       'Expected "provider/model-id"',
+    );
+  });
+});
+
+describe("createLibrettoGitHubConnectUrl", () => {
+  it("requests a GitHub connect URL from Libretto Cloud", async () => {
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      expect(init?.method).toBe("POST");
+      expect(new Headers(init?.headers).get("x-api-key")).toBe("libretto-key");
+      expect(JSON.parse(init?.body as string)).toEqual({
+        json: {
+          owner: "acme",
+          repo: "automations",
+        },
+      });
+      return jsonResponse({
+        json: {
+          url: "https://github.com/login/oauth/authorize?state=signed",
+        },
+      });
+    }) as unknown as typeof fetch;
+
+    await expect(
+      createLibrettoGitHubConnectUrl({
+        owner: "acme",
+        repo: "automations",
+        librettoApiKey: "libretto-key",
+        librettoApiUrl: "https://api.libretto.test",
+        fetch: fetchImpl,
+      }),
+    ).resolves.toBe("https://github.com/login/oauth/authorize?state=signed");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.libretto.test/v1/github/createConnectUrl",
+      expect.objectContaining({ method: "POST" }),
     );
   });
 });
@@ -274,7 +309,6 @@ describe("createLibrettoDebugger", () => {
         owner: "acme",
         repo: "automations",
         baseBranch: "main",
-        installationId: "12345",
         librettoApiKey: "libretto-key",
         librettoApiUrl: "https://api.libretto.test",
         repositoryRoot: "/repo",
@@ -298,7 +332,6 @@ describe("createLibrettoDebugger", () => {
       auth: "libretto-key",
       body: {
         json: {
-          installation_id: "12345",
           owner: "acme",
           repo: "automations",
         },
