@@ -45,6 +45,7 @@ test("createAiSdkBrowserTools exposes browser_open, browser_exec, and browser_sn
 		"browser_open",
 		"browser_snapshot",
 	]);
+	expect(toolkit.tools.browser_snapshot?.toModelOutput).toBeDefined();
 });
 
 test("browser_open with a data: URL returns a session ID", async ({

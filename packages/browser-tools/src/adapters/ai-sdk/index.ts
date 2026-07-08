@@ -1,6 +1,7 @@
 import { tool, type ToolSet } from "ai";
 import { createBrowserTools } from "../../create-browser-tools.js";
 import type { BrowserProvider } from "../../provider.js";
+import { snapshotToModelOutput } from "./snapshot-to-model-output.js";
 
 /**
  * AI SDK adapter: wraps the base tools into `ai` package tools for use
@@ -29,6 +30,7 @@ export function createAiSdkBrowserTools(provider: BrowserProvider): {
 				description: browser_snapshot.description,
 				inputSchema: browser_snapshot.inputSchema,
 				execute: (input) => browser_snapshot.execute(input),
+				toModelOutput: snapshotToModelOutput,
 			}),
 		},
 		dispose: base.dispose,
