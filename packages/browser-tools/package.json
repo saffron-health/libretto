@@ -36,6 +36,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:vitest": "vitest run",
+    "evals": "vitest run --config vitest.evals.config.ts",
     "prepack": "pnpm run build"
   },
   "dependencies": {
