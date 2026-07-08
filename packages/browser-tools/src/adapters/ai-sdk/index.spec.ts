@@ -1,7 +1,7 @@
 import type { ToolSet } from "ai";
 import { expect, test as base } from "vitest";
-import { createAiSdkBrowserTools } from "../src/ai-sdk.js";
-import { LocalBrowserProvider } from "../src/providers/local.js";
+import { LocalBrowserProvider } from "../../providers/local.js";
+import { createAiSdkBrowserTools } from "./index.js";
 
 interface Toolkit {
 	tools: ToolSet;

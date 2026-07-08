@@ -1,9 +1,9 @@
 import { tool, type ToolSet } from "ai";
-import { createBrowserTools } from "./create-browser-tools.js";
-import type { BrowserProvider } from "./provider.js";
+import { createBrowserTools } from "../../create-browser-tools.js";
+import type { BrowserProvider } from "../../provider.js";
 
 /**
- * AI SDK entry point: adapts the base tools into `ai` package tools for use
+ * AI SDK adapter: wraps the base tools into `ai` package tools for use
  * with `generateText` / `streamText`. The base tools expose concrete zod
  * schemas, which the AI SDK accepts directly as `inputSchema`.
  */

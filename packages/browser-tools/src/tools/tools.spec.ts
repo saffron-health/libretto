@@ -1,8 +1,8 @@
 import { expect, test as base } from "vitest";
-import { LocalBrowserProvider } from "../src/providers/local.js";
-import { SessionRegistry } from "../src/session-registry.js";
-import { createExecTool } from "../src/tools/exec.js";
-import { createOpenTool } from "../src/tools/open.js";
+import { LocalBrowserProvider } from "../providers/local.js";
+import { SessionRegistry } from "../session-registry.js";
+import { createExecTool } from "./exec.js";
+import { createOpenTool } from "./open.js";
 
 const test = base.extend<{
 	registry: SessionRegistry;

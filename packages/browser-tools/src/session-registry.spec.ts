@@ -1,6 +1,6 @@
 import { expect, test as base } from "vitest";
-import { LocalBrowserProvider } from "../src/providers/local.js";
-import { SessionRegistry } from "../src/session-registry.js";
+import { LocalBrowserProvider } from "./providers/local.js";
+import { SessionRegistry } from "./session-registry.js";
 
 const test = base.extend<{ registry: SessionRegistry }>({
 	registry: async ({}, use) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runExecCode, type ExecScope } from "../src/exec/exec-engine.js";
+import { runExecCode, type ExecScope } from "./exec-engine.js";
 
 const stubPage = { url: () => "https://example.com" };
 const scope = {

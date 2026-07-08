@@ -25,9 +25,9 @@
       "default": "./dist/index.js"
     },
     "./ai-sdk": {
-      "types": "./dist/ai-sdk.d.ts",
-      "import": "./dist/ai-sdk.js",
-      "default": "./dist/ai-sdk.js"
+      "types": "./dist/adapters/ai-sdk/index.d.ts",
+      "import": "./dist/adapters/ai-sdk/index.js",
+      "default": "./dist/adapters/ai-sdk/index.js"
     }
   },
   "scripts": {

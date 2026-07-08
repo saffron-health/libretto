@@ -16,7 +16,7 @@ export interface BrowserToolkit {
 
 /**
  * Framework-agnostic factory — returns base {@link BrowserTool} objects.
- * Framework entry points wrap this: `createAiSdkBrowserTools`, `createFlueBrowserTools`, …
+ * Framework entry points live under src/adapters/ (e.g. adapters/ai-sdk).
  */
 export function createBrowserTools(provider: BrowserProvider): BrowserToolkit {
 	const registry = new SessionRegistry(provider);
