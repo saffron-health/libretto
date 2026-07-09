@@ -2,6 +2,7 @@ import { createServer } from "node:net";
 import type { Browser } from "playwright";
 import { chromium } from "playwright";
 import { expect, test as base } from "vitest";
+import { DomainPolicyRestricted } from "../domain-policy.js";
 import { LocalBrowserProvider } from "../providers/local.js";
 import { SessionRegistry } from "../session-registry.js";
 import { createCloseTool } from "./close.js";
@@ -99,6 +100,46 @@ test("browser_open navigates to a url and returns a session ID", async ({
 		url: "data:text/html,<title>hello</title>",
 	});
 	expect(result).toEqual({ ok: true, sessionId: expect.any(String) });
+});
+
+test("browser_open reports a blocked top-level navigation as a domain policy error", async () => {
+	const registry = new SessionRegistry(
+		new LocalBrowserProvider({ headless: true }),
+		{ blockedDomains: ["example.com"] },
+	);
+	await expect(
+		createOpenTool(registry).execute({
+			url: "https://example.com/",
+		}),
+	).rejects.toMatchObject({
+		name: "DomainPolicyRestricted",
+		domainPolicy: { blockedDomains: ["example.com"] },
+		attemptedNavigationUrl: "https://example.com/",
+	});
+	await registry.dispose();
+});
+
+test("domain policy silently aborts blocked subresources", async () => {
+	const registry = new SessionRegistry(
+		new LocalBrowserProvider({ headless: true }),
+		{ blockedDomains: ["example.com"] },
+	);
+	const opened = await createOpenTool(registry).execute({
+		url:
+			'data:text/html,<title>allowed</title><img id="blocked" ' +
+			'src="https://example.com/image.png">',
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const result = await createExecTool(registry).execute({
+		sessionId: opened.sessionId,
+		code:
+			"return await page.locator('#blocked').evaluate(" +
+			"(image: HTMLImageElement) => image.naturalWidth)",
+	});
+
+	expect(result).toMatchObject({ ok: true, result: 0 });
+	await registry.dispose();
 });
 
 test("browser_exec runs Playwright code against an open session", async ({
@@ -273,6 +314,27 @@ test("browser_connect attaches to an external browser and close detaches without
 
 	const all = await statusTool.execute({});
 	expect(all).toMatchObject({ ok: true, sessions: [] });
+});
+
+test("domain policy applies to browser_connect sessions and browser_exec navigations", async ({
+	externalBrowser,
+}) => {
+	const registry = new SessionRegistry(
+		new LocalBrowserProvider({ headless: true }),
+		{ blockedDomains: ["example.com"] },
+	);
+	const connected = await createConnectTool(registry).execute({
+		cdpUrl: externalBrowser.cdpUrl,
+	});
+	if (!connected.ok) throw new Error(connected.error);
+
+	await expect(
+		createExecTool(registry).execute({
+			sessionId: connected.sessionId,
+			code: "await page.goto('https://example.com/')",
+		}),
+	).rejects.toBeInstanceOf(DomainPolicyRestricted);
+	await registry.dispose();
 });
 
 test("browser_exec snapshot diff uses per-page cache across mixed pageId calls", async ({

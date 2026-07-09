@@ -1,6 +1,11 @@
 import { randomBytes } from "node:crypto";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { chromium } from "playwright";
+import type { DomainPolicyOptions } from "./domain-policy.js";
+import {
+	DomainPolicyRestricted,
+	isUrlAllowed,
+} from "./domain-policy.js";
 import type { Snapshot } from "./snapshot/capture-snapshot.js";
 import { snapshot as captureSnapshot } from "./snapshot/capture-snapshot.js";
 import type { BrowserProvider } from "./provider.js";
@@ -46,14 +51,22 @@ export interface PageStatus {
  */
 export class SessionRegistry {
 	private readonly sessions = new Map<string, SessionEntry>();
+	private readonly blockedNavigationByContext = new WeakMap<
+		BrowserContext,
+		DomainPolicyRestricted
+	>();
 	private beforeExitHookInstalled = false;
 
-	constructor(public readonly provider: BrowserProvider) {}
+	constructor(
+		public readonly provider: BrowserProvider,
+		private readonly domainPolicy: DomainPolicyOptions = {},
+	) {}
 
 	async openSession(): Promise<{ sessionId: string }> {
 		const providerSession = await this.provider.createSession();
 		const browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
 		const context = browser.contexts()[0] ?? (await browser.newContext());
+		await this.applyDomainPolicy(context);
 		const entry = this.createSessionEntry({
 			providerSessionId: providerSession.sessionId,
 			providerName: this.provider.name,
@@ -77,6 +90,7 @@ export class SessionRegistry {
 	async connectSession(cdpEndpoint: string): Promise<{ sessionId: string }> {
 		const browser = await chromium.connectOverCDP(cdpEndpoint);
 		const context = browser.contexts()[0] ?? (await browser.newContext());
+		await this.applyDomainPolicy(context);
 		const entry = this.createSessionEntry({
 			providerSessionId: undefined,
 			providerName: "attached",
@@ -179,6 +193,19 @@ export class SessionRegistry {
 		if (entry) entry.latestSnapshotByPage.clear();
 	}
 
+	clearBlockedNavigationError(page: Page): void {
+		this.blockedNavigationByContext.delete(page.context());
+	}
+
+	consumeBlockedNavigationError(
+		page: Page,
+	): DomainPolicyRestricted | undefined {
+		const context = page.context();
+		const error = this.blockedNavigationByContext.get(context);
+		this.blockedNavigationByContext.delete(context);
+		return error;
+	}
+
 	async dispose(): Promise<void> {
 		this.removeBeforeExitHook();
 		const sessionIds = [...this.sessions.keys()];
@@ -207,6 +234,34 @@ export class SessionRegistry {
 	private readonly handleBeforeExit = (): void => {
 		void this.dispose();
 	};
+
+	private async applyDomainPolicy(context: BrowserContext): Promise<void> {
+		if (
+			this.domainPolicy.allowedDomains === undefined &&
+			!this.domainPolicy.blockedDomains?.length
+		) {
+			return;
+		}
+
+		await context.route("**/*", async (route, request) => {
+			const url = request.url();
+			if (isUrlAllowed(url, this.domainPolicy)) {
+				await route.continue();
+				return;
+			}
+
+			if (request.isNavigationRequest()) {
+				const frame = request.frame();
+				if (frame === frame.page().mainFrame()) {
+					this.blockedNavigationByContext.set(
+						context,
+						new DomainPolicyRestricted(this.domainPolicy, url),
+					);
+				}
+			}
+			await route.abort("blockedbyclient");
+		});
+	}
 
 	private createSessionEntry(args: {
 		providerSessionId: string | undefined;

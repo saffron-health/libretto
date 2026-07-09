@@ -31,7 +31,9 @@ interface KernelReplay {
 function readBooleanEnv(name: string, defaultValue: boolean): boolean {
 	const value = process.env[name]?.trim().toLowerCase();
 	if (!value) return defaultValue;
-	return value === "1" || value === "true" || value === "yes";
+	if (value === "1" || value === "true" || value === "yes") return true;
+	if (value === "0" || value === "false" || value === "no") return false;
+	return defaultValue;
 }
 
 function readEndpoint(): string {
@@ -93,7 +95,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 	private readonly replays = new Map<string, KernelReplay>();
 
 	constructor(options: KernelBrowserProviderOptions = {}) {
-		const apiKey = options.apiKey ?? process.env.KERNEL_API_KEY;
+		const apiKey = (options.apiKey ?? process.env.KERNEL_API_KEY)?.trim();
 		if (!apiKey) {
 			throw new Error(
 				"KernelBrowserProvider: missing API key. " +
@@ -103,7 +105,8 @@ export class KernelBrowserProvider implements BrowserProvider {
 
 		this.apiKey = apiKey;
 		this.endpoint = readEndpoint();
-		this.headless = options.headless ?? process.env.KERNEL_HEADLESS !== "false";
+		this.headless =
+			options.headless ?? readBooleanEnv("KERNEL_HEADLESS", true);
 		this.stealth = options.stealth ?? readBooleanEnv("KERNEL_STEALTH", false);
 		this.timeoutSeconds =
 			options.timeoutSeconds ??
