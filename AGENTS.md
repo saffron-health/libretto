@@ -89,3 +89,11 @@ In `packages/browser-tools`, format caught errors with `errorMessage()` from `sr
 - Edit `packages/libretto/README.template.md` directly for README changes, then run `pnpm sync:mirrors`.
 - Edit `packages/libretto/skills/libretto/SKILL.md` directly.
 - `packages/libretto/skills/libretto` is the source of truth for Libretto skill files.
+
+## Cursor Cloud specific instructions
+
+The primary deliverable is the `libretto` CLI/library in `packages/libretto`; there is no long-running backend to stand up. Standard commands live in `## Important Commands` above (`pnpm -s type-check | test | lint | cli`); the startup update script already runs `pnpm install` and installs Playwright Chromium. Notes below are the non-obvious gotchas.
+
+- **`pnpm -s lint` needs Go 1.26** because `lintcn` compiles a custom `tsgolint` binary. The system Go is 1.22 and `GOTOOLCHAIN=auto` fails to resolve the bare `go 1.26` directive (`toolchain not available`). Fix is a persistent config write: `go env -w GOTOOLCHAIN=go1.26.0` (already set during setup). Turbo strips `GOTOOLCHAIN` passed as a shell env var, so it must be in Go's env file, not `export`ed. If lint suddenly fails to download `go1.26`, re-run that `go env -w` command. First lint run compiles the Go binary (~1-2 min); later runs reuse the cache in `~/.cache/lintcn/`.
+- **Browser runs are headless here** (no display). Pass `--headless` to `libretto open`/`run`, or they default to headed and hang. Exercise the CLI end to end with: `pnpm -s cli open <url> --headless --session <name>` → `snapshot` → `exec "<expression>"` (REPL expression, not a `return` statement) → `close --session <name>`.
+- **Optional marketing site**: `pnpm website:dev` serves Vite on `http://localhost:5173`. `pnpm docs:dev` (Mintlify) and `pnpm evals` / `pnpm benchmarks` need external LLM/Google Cloud credentials and are not required for core CLI development.
