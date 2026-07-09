@@ -1,4 +1,4 @@
-import { expect, test as base } from "vitest";
+import { expect, test as base, vi } from "vitest";
 import { LocalBrowserProvider } from "./providers/local.js";
 import { SessionRegistry } from "./session-registry.js";
 
@@ -50,6 +50,12 @@ test("getCurrentPage tracks the newest page in the session", async ({
 
 	expect(registry.getCurrentPage(sessionId)).toBe(newest);
 	expect(await registry.getCurrentPage(sessionId).title()).toBe("newest");
+
+	const [session] = registry.listSessions();
+	expect(session.pages).toHaveLength(2);
+	expect(session.pages.filter((page) => page.active)).toEqual([
+		expect.objectContaining({ url: expect.stringContaining("newest") }),
+	]);
 });
 
 test("unknown session ID throws with the ID in the message", ({ registry }) => {
@@ -77,4 +83,24 @@ test("dispose closes all sessions and is idempotent", async ({ registry }) => {
 	);
 
 	await registry.dispose();
+});
+
+test("beforeExit disposes leftover sessions as a backstop", async ({
+	registry,
+}) => {
+	await registry.openSession();
+	expect(registry.listSessions()).toHaveLength(1);
+
+	process.emit("beforeExit", 0);
+
+	await vi.waitFor(() => expect(registry.listSessions()).toHaveLength(0));
+});
+
+test("dispose removes the beforeExit hook it installed", async ({ registry }) => {
+	const before = process.listenerCount("beforeExit");
+	await registry.openSession();
+	expect(process.listenerCount("beforeExit")).toBeGreaterThan(before);
+
+	await registry.dispose();
+	expect(process.listenerCount("beforeExit")).toBe(before);
 });

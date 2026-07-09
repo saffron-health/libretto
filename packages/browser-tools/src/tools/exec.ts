@@ -20,6 +20,12 @@ const execInputSchema = z.object({
 			"Playwright code to run against the session. Runs as the body of an " +
 				"async function — use `return` to produce a result.",
 		),
+	pageId: z
+		.string()
+		.optional()
+		.describe(
+			'Optional page ID from browser_status. Defaults to the most recently opened tab.',
+		),
 });
 
 export type ExecToolInput = z.infer<typeof execInputSchema>;
@@ -56,10 +62,10 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			"unchanged). Failures come back as `{ ok: false, error }` — read the error, " +
 			"fix the code, and try again.",
 		inputSchema: execInputSchema,
-		async execute({ sessionId, code }): Promise<ToolResult<ExecToolOutput>> {
+		async execute({ sessionId, code, pageId }): Promise<ToolResult<ExecToolOutput>> {
 			let scope: ExecScope;
 			try {
-				const page = registry.getCurrentPage(sessionId);
+				const page = registry.getCurrentPage(sessionId, pageId);
 				const context = page.context();
 				const browser = context.browser();
 				if (!browser) {
@@ -81,14 +87,14 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 				};
 			}
 
-			const before = await registry.readSnapshotBaseline(sessionId);
+			const before = await registry.readSnapshotBaseline(sessionId, pageId);
 			const execResult = await runExecCode(code, scope);
 			if (!execResult.ok) return execResult;
 
 			let snapshotDiff = "";
 			try {
 				await waitForPageStable(scope.page);
-				const after = await registry.captureSnapshotAfterExec(sessionId);
+				const after = await registry.captureSnapshotAfterExec(sessionId, pageId);
 				snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
 			} catch {
 				registry.clearSnapshotCache(sessionId);

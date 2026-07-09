@@ -37,13 +37,16 @@ const test = base.extend<{ toolkit: Toolkit }>({
 	},
 });
 
-test("createAiSdkBrowserTools exposes browser_open, browser_exec, and browser_snapshot", ({
+test("createAiSdkBrowserTools exposes all six browser tools", ({
 	toolkit,
 }) => {
 	expect(Object.keys(toolkit.tools).sort()).toEqual([
+		"browser_close",
+		"browser_connect",
 		"browser_exec",
 		"browser_open",
 		"browser_snapshot",
+		"browser_status",
 	]);
 });
 
