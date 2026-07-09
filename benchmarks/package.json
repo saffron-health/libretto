@@ -13,7 +13,7 @@
     "zod": "^4.3.6"
   },
   "scripts": {
-    "lint": "lintcn lint --tsconfig tsconfig.json",
+    "lint": "eslint .",
     "benchmarks": "tsx cli.ts"
   },
   "devDependencies": {

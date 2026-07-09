@@ -17,7 +17,7 @@
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "lint": "lintcn lint --tsconfig tsconfig.json",
+    "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "create-tmp-workspace": "node dist/create-tmp-workspace.js",
     "sync:mirrors": "node scripts/sync-mirrors.mjs",

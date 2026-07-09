@@ -13,8 +13,7 @@
     "lint": {
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/.lintcn/**/*.go",
-        "$TURBO_ROOT$/.lintcn/**/*.json"
+        "$TURBO_ROOT$/eslint.config.mjs"
       ],
       "outputs": []
     },

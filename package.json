@@ -7,13 +7,15 @@
     "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai": "^3.0.41",
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
     "@types/sharp": "^0.32.0",
+    "eslint": "^10.6.0",
     "fallow": "^2.55.0",
-    "lintcn": "^0.9.0",
     "mint": "4.2.525",
     "playwright": "^1.58.2",
     "sharp": "^0.34.5",
-    "turbo": "^2.8.20"
+    "turbo": "^2.8.20",
+    "typescript-eslint": "^8.62.1"
   },
   "scripts": {
     "build": "turbo run build",
