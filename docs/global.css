@@ -46,6 +46,27 @@
   content: none;
 }
 
+/* Give code blocks a clear surface and keep copy controls aligned within it. */
+.slot-main figure[class~='group/code'] {
+  padding: 12px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--muted);
+}
+
+.slot-main figure[class~='group/code'] button[aria-label='Copy code'] {
+  top: 8px;
+  right: 8px;
+  margin-top: 0;
+  background: var(--background);
+}
+
+.slot-main
+  figure[class~='group/code']:hover
+  button[aria-label='Copy code'] {
+  opacity: 1;
+}
+
 /* Align sidebar utility links with the search field inset. */
 .slot-sidebar-left div:has(> .search-input) {
   padding-left: 0 !important;
