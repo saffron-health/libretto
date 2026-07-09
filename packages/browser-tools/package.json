@@ -1,0 +1,64 @@
+{
+  "name": "@libretto/browser-tools",
+  "version": "0.1.0",
+  "description": "Browser tools for AI agents — open, inspect, and drive real browsers from any agent framework",
+  "license": "MIT",
+  "homepage": "https://libretto.sh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saffron-health/libretto.git",
+    "directory": "packages/browser-tools"
+  },
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./ai-sdk": {
+      "types": "./dist/adapters/ai-sdk/index.d.ts",
+      "import": "./dist/adapters/ai-sdk/index.js",
+      "default": "./dist/adapters/ai-sdk/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "lint": "lintcn lint --tsconfig tsconfig.json",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:vitest": "vitest run",
+    "evals": "vitest run --config vitest.evals.config.ts",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "^1.0.0",
+    "playwright": "^1.58.2",
+    "sucrase": "^3.35.0",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "ai": "^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "ai": "^6.0.116",
+    "outdent": "^0.8.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.5"
+  }
+}
