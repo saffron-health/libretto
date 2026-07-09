@@ -12,8 +12,14 @@ const noAwaitImport = {
   },
   create(context) {
     return {
-      "AwaitExpression > ImportExpression"(node) {
-        context.report({ node, messageId: "awaitImport" });
+      AwaitExpression(node) {
+        let expression = node.argument;
+        while (expression.type === "ParenthesizedExpression") {
+          expression = expression.expression;
+        }
+        if (expression.type === "ImportExpression") {
+          context.report({ node: expression, messageId: "awaitImport" });
+        }
       },
     };
   },
