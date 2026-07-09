@@ -165,6 +165,21 @@ function userInitial(session: CloudSession): string {
   return session.user.email.slice(0, 1).toUpperCase();
 }
 
+function getCurrentPageLabel(): string {
+  if (typeof window === "undefined") return "Dashboard";
+  const pathname = window.location.pathname;
+  if (pathname === "/dashboard/cloud-browsers") return "Cloud Browsers";
+  if (pathname === "/dashboard") return "Libretto PR Agents";
+  if (
+    pathname === "/setup" ||
+    pathname === "/github/setup" ||
+    pathname === "/onboarding"
+  ) {
+    return "Setup";
+  }
+  return "Dashboard";
+}
+
 function PullRequestIcon() {
   return (
     <svg
@@ -241,6 +256,12 @@ function DashboardMenuItem({
 }
 
 function CloudAccountLink({ session }: { session: CloudSession | null }) {
+  const [pageLabel, setPageLabel] = useState("Dashboard");
+
+  useEffect(() => {
+    setPageLabel(getCurrentPageLabel());
+  }, []);
+
   if (!session) {
     return (
       <Button
@@ -263,7 +284,9 @@ function CloudAccountLink({ session }: { session: CloudSession | null }) {
         <span className="grid size-6 shrink-0 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
           {userInitial(session)}
         </span>
-        <span className="hidden sm:block">Dashboard</span>
+        <span className="hidden max-w-[180px] truncate sm:block">
+          {pageLabel}
+        </span>
         <svg
           aria-hidden="true"
           viewBox="0 0 16 16"

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { withReturnTo } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
 import { getAuthStatus, getCloudSession, orpcCall } from "./cloudApi";
+import { GitHubIcon } from "./icons";
 
 type GitHubRepository = {
   id: string;
@@ -29,9 +30,6 @@ function currentReturnTo(): string {
 export function GitHubSetupPage() {
   const [checking, setChecking] = useState(true);
   const [ready, setReady] = useState(false);
-  const [installation, setInstallation] =
-    useState<InstallationRepositoriesResponse["installation"] | null>(null);
-  const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const params = useMemo(
@@ -80,12 +78,10 @@ export function GitHubSetupPage() {
 
         if (installationId) {
           try {
-            const result = await orpcCall<InstallationRepositoriesResponse>(
+            await orpcCall<InstallationRepositoriesResponse>(
               "/v1/github/syncInstallation",
               { installation_id: installationId },
             );
-            setInstallation(result.installation);
-            setRepositories(result.repositories);
             window.location.assign("/dashboard");
           } catch (err) {
             setError(
@@ -106,97 +102,70 @@ export function GitHubSetupPage() {
   return (
     <div className="crt-page min-h-screen bg-bg text-ink">
       <Navbar />
-      <main className="mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-[980px] items-center px-6 py-10">
-        <section className="grid w-full gap-10 md:grid-cols-[1fr_430px] md:items-center">
-          <div>
-            <p className="mb-4 font-mono text-xs uppercase text-accent">
-              Libretto Agent
-            </p>
-            <h1 className="crt-glow max-w-[600px] font-serif text-[44px] font-[300] leading-[1.02] text-ink md:text-[58px]">
-              Connect GitHub PRs.
-            </h1>
-            <p className="mt-6 max-w-[520px] text-sm leading-6 text-muted">
-              Sign in to Libretto Cloud, install the public GitHub App, then
-                  link a repository to your workspace so Libretto can open scoped PRs
-                  when scripts break.
-            </p>
+      <main className="mx-auto w-full max-w-[980px] px-4 py-8 md:px-8">
+        <div className="mb-7 border-b border-rule pb-6">
+          <p className="mb-2 font-mono text-xs uppercase text-accent">
+            Libretto setup
+          </p>
+          <h1 className="font-serif text-[34px] font-[300] leading-tight md:text-[46px]">
+            Finish setup
+          </h1>
+        </div>
+
+        {checking ? (
+          <div className="rounded-lg border border-dashed border-rule bg-panel/45 px-4 py-10 text-center text-sm text-muted">
+            Checking account...
           </div>
-
-          <div className="rounded-lg border border-rule bg-panel/85 p-5 shadow-2xl shadow-black/25">
-            {checking ? (
-              <div className="rounded-md border border-rule bg-bg/70 px-4 py-8 text-center text-sm text-muted">
-                Checking account...
-              </div>
-            ) : (
-              ready && (
-                <div className="space-y-5">
-                  {installationId && installation && (
-                    <p className="rounded-md border border-rule bg-bg/70 px-3 py-2 font-mono text-xs text-muted">
-                      {installation.account_login} installation {installation.id}{" "}
-                      connected. Returning to dashboard...
-                    </p>
-                  )}
-
-                  {!installationId ? (
-                    <div className="space-y-3 rounded-md border border-rule bg-bg/70 px-4 py-5 text-sm text-muted">
-                      <p>
-                        No GitHub installation callback was found. Start from
-                        setup to connect GitHub.
-                      </p>
-                      <a
-                        href="/setup"
-                        className="inline-flex text-xs text-accent-bright underline decoration-accent/60 underline-offset-4 transition-colors hover:text-ink hover:decoration-accent"
-                      >
-                        Return to setup
-                      </a>
-                    </div>
-                  ) : !installation ? (
-                    <div className="rounded-md border border-rule bg-bg/70 px-4 py-8 text-center text-sm text-muted">
+        ) : (
+          ready && (
+            <section className="rounded-lg border border-accent/25 bg-green-9/10 p-4 md:p-5">
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div className="min-w-0">
+                  <p className="mb-2 font-mono text-xs uppercase text-accent">
+                    Step 2 of 2
+                  </p>
+                  <h2 className="flex items-center gap-3 text-lg font-semibold text-ink">
+                    <GitHubIcon className="size-5 shrink-0 text-accent-bright" />
+                    Connect a GitHub repository
+                  </h2>
+                  <p className="mt-2 max-w-[620px] text-sm text-muted">
+                    Let Libretto open PRs when scripts break.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 md:items-end">
+                  {installationId ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="libretto-button libretto-button--sm inline-flex h-9 min-w-[168px] cursor-wait items-center justify-center whitespace-nowrap px-4 opacity-80"
+                    >
                       Connecting GitHub...
-                    </div>
-                  ) : repositories.length === 0 && !error ? (
-                    <div className="rounded-md border border-rule bg-bg/70 px-4 py-8 text-center text-sm text-muted">
-                      GitHub connected. No repositories are currently selected for
-                      this installation.
-                    </div>
+                    </button>
                   ) : (
-                    <div className="space-y-3">
-                      <p className="text-xs uppercase text-muted">
-                        Repositories from GitHub
-                      </p>
-                      {repositories.map((repository) => {
-                        return (
-                          <div
-                            key={repository.id}
-                            className="flex flex-col gap-3 rounded-md border border-rule bg-bg/70 p-3 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm text-ink">
-                                {repository.full_name}
-                              </p>
-                              <p className="text-xs text-muted">
-                                {repository.private ? "Private" : "Public"}
-                              </p>
-                            </div>
-                            <span className="rounded-full border border-accent/30 px-3 py-1 text-xs text-accent-bright">
-                              Linked
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <a
+                      href="/setup"
+                      className="libretto-button libretto-button--sm inline-flex h-9 min-w-[148px] items-center justify-center whitespace-nowrap px-4"
+                    >
+                      Return to setup
+                    </a>
                   )}
                 </div>
-              )
-            )}
+              </div>
 
-            {error && (
-              <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-5 text-red-200">
-                {error}
-              </p>
-            )}
-          </div>
-        </section>
+              {!installationId && (
+                <p className="mt-4 rounded-md border border-amber/30 bg-amber/10 px-3 py-2 text-sm leading-5 text-amber-bright">
+                  No GitHub installation callback was found. Start from setup to
+                  connect GitHub.
+                </p>
+              )}
+              {error && (
+                <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-5 text-red-200">
+                  {error}
+                </p>
+              )}
+            </section>
+          )
+        )}
       </main>
     </div>
   );
