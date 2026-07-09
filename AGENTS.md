@@ -89,3 +89,11 @@ In `packages/browser-tools`, format caught errors with `errorMessage()` from `sr
 - Edit `packages/libretto/README.template.md` directly for README changes, then run `pnpm sync:mirrors`.
 - Edit `packages/libretto/skills/libretto/SKILL.md` directly.
 - `packages/libretto/skills/libretto` is the source of truth for Libretto skill files.
+
+## Cursor Cloud specific instructions
+
+The primary deliverable is the `libretto` CLI/library in `packages/libretto`; there is no long-running backend to stand up. Standard commands are in `## Important Commands` above; the startup update script runs `pnpm install` and installs Playwright Chromium. Notes below are the non-obvious gotchas.
+
+- **Browser runs are headless here** (no display). Pass `--headless` to `libretto open`/`run`, or they default to headed and hang. A quick end-to-end smoke test: `pnpm -s cli open <url> --headless --session <name>` then `snapshot`, then `exec "<expression>"` (the REPL wants an expression, not a `return` statement), then `close --session <name>`.
+- **Lint is a single root command**, not per-package: `pnpm -s lint` runs `oxlint --type-aware` over the whole repo (~2s) plus `fallow`. The two custom rules (`libretto/no-await-import`, `libretto/require-disable-description`) live in the local **alpha** oxlint JS plugin `oxlint-plugin-libretto.mjs`; the type-aware rules run via `oxlint-tsgolint` (installed by `pnpm install`). oxlint's `ignorePatterns` are cwd-relative, so always run lint from the repo root.
+- **Optional marketing site**: `pnpm website:dev` serves Vite on `http://localhost:5173`. `pnpm docs:dev` (Mintlify) and `pnpm evals` / `pnpm benchmarks` need external LLM/Google Cloud credentials and are not required for core CLI development.
