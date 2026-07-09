@@ -19,13 +19,7 @@ interface KernelBrowserResponse {
 }
 
 interface KernelReplayResponse {
-	replay_id: string;
 	replay_view_url?: string | null;
-}
-
-interface KernelReplay {
-	replayId: string;
-	replayViewUrl?: string;
 }
 
 function readBooleanEnv(name: string, defaultValue: boolean): boolean {
@@ -42,6 +36,18 @@ function readEndpoint(): string {
 		process.env.KERNEL_ENDPOINT?.trim() ||
 		"https://api.onkernel.com"
 	);
+}
+
+function readTimeoutSeconds(option: number | undefined): number {
+	const timeoutSeconds =
+		option ?? Number(process.env.KERNEL_TIMEOUT_SECONDS ?? 300);
+	if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
+		throw new Error(
+			"KernelBrowserProvider: timeout must be a positive number of seconds. " +
+				"Pass { timeoutSeconds } or set KERNEL_TIMEOUT_SECONDS.",
+		);
+	}
+	return timeoutSeconds;
 }
 
 async function kernelFetchJson<T>(
@@ -92,7 +98,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 	private readonly stealth: boolean;
 	private readonly timeoutSeconds: number;
 	private readonly enableRecording: boolean;
-	private readonly replays = new Map<string, KernelReplay>();
+	private readonly replayUrlBySession = new Map<string, string>();
 
 	constructor(options: KernelBrowserProviderOptions = {}) {
 		const apiKey = (options.apiKey ?? process.env.KERNEL_API_KEY)?.trim();
@@ -108,12 +114,16 @@ export class KernelBrowserProvider implements BrowserProvider {
 		this.headless =
 			options.headless ?? readBooleanEnv("KERNEL_HEADLESS", true);
 		this.stealth = options.stealth ?? readBooleanEnv("KERNEL_STEALTH", false);
-		this.timeoutSeconds =
-			options.timeoutSeconds ??
-			Number(process.env.KERNEL_TIMEOUT_SECONDS ?? 300);
+		this.timeoutSeconds = readTimeoutSeconds(options.timeoutSeconds);
 		this.enableRecording =
 			options.enableRecording ??
 			readBooleanEnv("KERNEL_ENABLE_RECORDING", false);
+		if (this.enableRecording && this.headless) {
+			throw new Error(
+				"KernelBrowserProvider: replays require a headed browser. " +
+					"Pass { headless: false } or set KERNEL_HEADLESS=false.",
+			);
+		}
 	}
 
 	async createSession(): Promise<ProviderSession> {
@@ -140,10 +150,12 @@ export class KernelBrowserProvider implements BrowserProvider {
 					`/browsers/${browser.session_id}/replays`,
 					{ method: "POST", body: JSON.stringify({}) },
 				);
-				this.replays.set(browser.session_id, {
-					replayId: replay.replay_id,
-					replayViewUrl: replay.replay_view_url ?? undefined,
-				});
+				if (replay.replay_view_url) {
+					this.replayUrlBySession.set(
+						browser.session_id,
+						replay.replay_view_url,
+					);
+				}
 			} catch (error) {
 				await kernelFetchNoBody(
 					this.endpoint,
@@ -164,20 +176,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 	}
 
 	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
-		const replay = this.replays.get(sessionId);
-		let replayStopError: unknown;
-		if (replay) {
-			try {
-				await kernelFetchNoBody(
-					this.endpoint,
-					this.apiKey,
-					`/browsers/${sessionId}/replays/${replay.replayId}/stop`,
-					{ method: "POST" },
-				);
-			} catch (error) {
-				replayStopError = error;
-			}
-		}
+		const replayUrl = this.replayUrlBySession.get(sessionId);
 
 		await kernelFetchNoBody(
 			this.endpoint,
@@ -185,9 +184,8 @@ export class KernelBrowserProvider implements BrowserProvider {
 			`/browsers/${sessionId}`,
 			{ method: "DELETE" },
 		);
-		this.replays.delete(sessionId);
+		this.replayUrlBySession.delete(sessionId);
 
-		if (replayStopError) throw replayStopError;
-		return { replayUrl: replay?.replayViewUrl };
+		return { replayUrl };
 	}
 }
