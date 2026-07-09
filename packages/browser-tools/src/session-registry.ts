@@ -91,6 +91,12 @@ export class SessionRegistry {
 		const browser = await chromium.connectOverCDP(cdpEndpoint);
 		const context = browser.contexts()[0] ?? (await browser.newContext());
 		await this.applyDomainPolicy(context);
+		try {
+			this.assertCurrentPagesAllowed(context);
+		} catch (error) {
+			await browser.close().catch(() => {});
+			throw error;
+		}
 		const entry = this.createSessionEntry({
 			providerSessionId: undefined,
 			providerName: "attached",
@@ -261,6 +267,15 @@ export class SessionRegistry {
 			}
 			await route.abort("blockedbyclient");
 		});
+	}
+
+	private assertCurrentPagesAllowed(context: BrowserContext): void {
+		for (const page of context.pages()) {
+			const url = page.url();
+			if (!isUrlAllowed(url, this.domainPolicy)) {
+				throw new DomainPolicyRestricted(this.domainPolicy, url);
+			}
+		}
 	}
 
 	private createSessionEntry(args: {

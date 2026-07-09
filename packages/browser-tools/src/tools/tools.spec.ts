@@ -319,6 +319,11 @@ test("browser_connect attaches to an external browser and close detaches without
 test("domain policy applies to browser_connect sessions and browser_exec navigations", async ({
 	externalBrowser,
 }) => {
+	const context =
+		externalBrowser.browser.contexts()[0] ??
+		(await externalBrowser.browser.newContext());
+	await context.newPage();
+
 	const registry = new SessionRegistry(
 		new LocalBrowserProvider({ headless: true }),
 		{ blockedDomains: ["example.com"] },
@@ -331,9 +336,40 @@ test("domain policy applies to browser_connect sessions and browser_exec navigat
 	await expect(
 		createExecTool(registry).execute({
 			sessionId: connected.sessionId,
-			code: "await page.goto('https://example.com/')",
+			code:
+				"await page.goto('https://example.com/').catch(() => undefined); " +
+				"return 'caught'",
 		}),
 	).rejects.toBeInstanceOf(DomainPolicyRestricted);
+	await registry.dispose();
+});
+
+test("domain policy rejects a connected browser already showing a blocked page", async ({
+	externalBrowser,
+}) => {
+	const context =
+		externalBrowser.browser.contexts()[0] ??
+		(await externalBrowser.browser.newContext());
+	const page = context.pages()[0] ?? (await context.newPage());
+	const blockedUrl = new URL(externalBrowser.cdpUrl);
+	blockedUrl.protocol = "http:";
+	blockedUrl.pathname = "/json/version";
+	blockedUrl.search = "";
+	blockedUrl.hash = "";
+	await page.goto(blockedUrl.href);
+
+	const registry = new SessionRegistry(
+		new LocalBrowserProvider({ headless: true }),
+		{ blockedDomains: ["127.0.0.1"] },
+	);
+
+	await expect(
+		createConnectTool(registry).execute({ cdpUrl: externalBrowser.cdpUrl }),
+	).rejects.toMatchObject({
+		name: "DomainPolicyRestricted",
+		attemptedNavigationUrl: blockedUrl.href,
+	});
+	expect(externalBrowser.browser.isConnected()).toBe(true);
 	await registry.dispose();
 });
 

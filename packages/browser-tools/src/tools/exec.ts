@@ -90,12 +90,9 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			registry.clearBlockedNavigationError(scope.page);
 			const before = await registry.readSnapshotBaseline(sessionId, pageId);
 			const execResult = await runExecCode(code, scope);
-			if (!execResult.ok) {
-				const policyError = registry.consumeBlockedNavigationError(scope.page);
-				if (policyError) throw policyError;
-				return execResult;
-			}
-			registry.clearBlockedNavigationError(scope.page);
+			const policyError = registry.consumeBlockedNavigationError(scope.page);
+			if (policyError) throw policyError;
+			if (!execResult.ok) return execResult;
 
 			let snapshotDiff = "";
 			try {
