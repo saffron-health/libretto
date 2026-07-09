@@ -28,7 +28,6 @@
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "lint": "lintcn lint --tsconfig tsconfig.json",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:vitest": "vitest run",

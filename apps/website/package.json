@@ -9,8 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "type-check": "tsc --noEmit",
     "preview": "vite preview",
-    "lint": "lintcn lint --tsconfig tsconfig.json",
-    "check": "pnpm -s type-check && pnpm -s lint",
+    "check": "pnpm -s type-check",
     "knip": "knip --cache --files --exports",
     "render-blog-og": "node scripts/render-blog-og-images.mjs",
     "render-brand-kit": "node scripts/render-brand-kit-assets.mjs"

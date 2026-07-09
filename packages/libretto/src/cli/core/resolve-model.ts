@@ -105,7 +105,7 @@ async function getProviderModel(
       if (!apiKey) {
         throw new Error(missingProviderCredentialsMessage(provider));
       }
-      // @lintc-ignore Human-approved: we don't want to import unless the user is using that subagent.
+      // oxlint-disable-next-line libretto/no-await-import -- Human-approved: we don't want to import unless the user is using that subagent.
       const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
       const google = createGoogleGenerativeAI({ apiKey });
       return google(modelId);
@@ -115,7 +115,7 @@ async function getProviderModel(
       if (!project) {
         throw new Error(missingProviderCredentialsMessage(provider));
       }
-      // @lintc-ignore Human-approved: we don't want to import unless the user is using that subagent.
+      // oxlint-disable-next-line libretto/no-await-import -- Human-approved: we don't want to import unless the user is using that subagent.
       const { createVertex } = await import("@ai-sdk/google-vertex");
       const vertex = createVertex({
         project,
@@ -128,7 +128,7 @@ async function getProviderModel(
       if (!apiKey) {
         throw new Error(missingProviderCredentialsMessage(provider));
       }
-      // @lintc-ignore Human-approved: we don't want to import unless the user is using that subagent.
+      // oxlint-disable-next-line libretto/no-await-import -- Human-approved: we don't want to import unless the user is using that subagent.
       const { createAnthropic } = await import("@ai-sdk/anthropic");
       const anthropic = createAnthropic({ apiKey });
       return anthropic(modelId);
@@ -138,7 +138,7 @@ async function getProviderModel(
       if (!apiKey) {
         throw new Error(missingProviderCredentialsMessage(provider));
       }
-      // @lintc-ignore Human-approved: we don't want to import unless the user is using that subagent.
+      // oxlint-disable-next-line libretto/no-await-import -- Human-approved: we don't want to import unless the user is using that subagent.
       const { createOpenAI } = await import("@ai-sdk/openai");
       const openai = createOpenAI({ apiKey });
       return openai(modelId);
@@ -148,7 +148,7 @@ async function getProviderModel(
       if (!apiKey) {
         throw new Error(missingProviderCredentialsMessage(provider));
       }
-      // @lintc-ignore Human-approved: we don't want to import unless the user is using that subagent.
+      // oxlint-disable-next-line libretto/no-await-import -- Human-approved: we don't want to import unless the user is using that subagent.
       const { createOpenAI } = await import("@ai-sdk/openai");
       const openrouter = createOpenAI({
         apiKey,

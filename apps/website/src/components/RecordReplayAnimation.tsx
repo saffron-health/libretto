@@ -497,7 +497,7 @@ export function RecordReplayAnimation() {
     return () => {
       cancelRef.current = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run-once mount effect; dependencies intentionally omitted
   }, []);
 
   return (
