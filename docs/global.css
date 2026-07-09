@@ -4,12 +4,11 @@
   --type-heading-2-size: 20px;
   --type-heading-3-size: 16px;
   --weight-heading: 650;
-  --sidebar-group-font-size: 11px;
+  --type-nav-group-size: 13px;
 }
 
 /* Match the tighter sidebar section headers from the previous docs. */
 .slot-sidebar-left nav .cursor-default {
-  font-size: var(--sidebar-group-font-size) !important;
   margin-top: 16px !important;
 }
 

@@ -7,7 +7,7 @@
     "light": "#12ce41",
     "dark": "#067a22"
   },
-  "icons": { "library": "lucide" },
+  "icons": { "library": "fontawesome" },
   "favicon": {
     "light": "/docs/brand-kit/logos/libretto-icosahedron-light.svg",
     "dark": "/docs/brand-kit/logos/libretto-icosahedron-dark.svg"
@@ -165,13 +165,13 @@
         {
           "anchor": "npm",
           "href": "https://www.npmjs.com/package/libretto",
-          "icon": "package",
+          "icon": "lucide:package",
           "placement": "sidebar"
         },
         {
           "anchor": "Changelog",
           "href": "https://github.com/saffron-health/libretto/releases",
-          "icon": "history",
+          "icon": "lucide:history",
           "placement": "sidebar"
         },
         {
