@@ -85,28 +85,39 @@ export function OnboardingPage() {
   return (
     <div className="crt-page min-h-screen bg-bg text-ink">
       <Navbar />
-      <main className="mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-[980px] items-center px-6 py-10">
-        <section className="grid w-full gap-10 md:grid-cols-[1fr_420px] md:items-center">
-          <div>
-            <p className="mb-4 font-mono text-xs uppercase text-accent">
-              Libretto Cloud
-            </p>
-            <h1 className="crt-glow max-w-[560px] font-serif text-[44px] font-[300] leading-[1.02] text-ink md:text-[58px]">
-              Set up your workspace.
-            </h1>
-            <p className="mt-6 max-w-[500px] text-sm leading-6 text-muted">
-              Create the organization that will own hosted jobs, users, billing,
-              credentials, and deployments.
-            </p>
-          </div>
+      <main className="mx-auto w-full max-w-[980px] px-4 py-8 md:px-8">
+        <div className="mb-7 border-b border-rule pb-6">
+          <p className="mb-2 font-mono text-xs uppercase text-accent">
+            Libretto setup
+          </p>
+          <h1 className="font-serif text-[34px] font-[300] leading-tight md:text-[46px]">
+            Set up your workspace
+          </h1>
+        </div>
 
-          <div className="rounded-lg border border-rule bg-panel/85 p-5 shadow-2xl shadow-black/25">
-            {checking ? (
-              <div className="rounded-md border border-rule bg-bg/70 px-4 py-8 text-center text-sm text-muted">
-                Checking account...
+        {checking ? (
+          <div className="rounded-lg border border-dashed border-rule bg-panel/45 px-4 py-10 text-center text-sm text-muted">
+            Checking account...
+          </div>
+        ) : (
+          <section className="rounded-lg border border-accent/25 bg-green-9/10 p-4 md:p-5">
+            <form
+              className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] md:items-start"
+              onSubmit={createOrganization}
+            >
+              <div className="min-w-0">
+                <p className="mb-2 font-mono text-xs uppercase text-accent">
+                  Workspace
+                </p>
+                <h2 className="text-lg font-semibold text-ink">
+                  Create your organization
+                </h2>
+                <p className="mt-2 max-w-[520px] text-sm leading-6 text-muted">
+                  This workspace owns users, repositories, and PR agent settings.
+                </p>
               </div>
-            ) : (
-              <form className="space-y-4" onSubmit={createOrganization}>
+
+              <div className="space-y-4 rounded-md border border-rule bg-bg/70 p-4">
                 <label className="block">
                   <span className="mb-2 block text-xs uppercase text-muted">
                     Organization
@@ -163,16 +174,16 @@ export function OnboardingPage() {
                 >
                   {loading ? "Creating workspace..." : "Create workspace"}
                 </button>
-              </form>
-            )}
+              </div>
+            </form>
 
             {error && (
               <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-5 text-red-200">
                 {error}
               </p>
             )}
-          </div>
-        </section>
+          </section>
+        )}
       </main>
     </div>
   );
