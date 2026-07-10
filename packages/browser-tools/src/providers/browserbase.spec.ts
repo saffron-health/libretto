@@ -1,11 +1,14 @@
 import { chromium } from "playwright";
 import { expect, test } from "vitest";
-import { KernelBrowserProvider } from "./kernel.js";
+import { BrowserbaseBrowserProvider } from "./browserbase.js";
 
-test.skipIf(!process.env.KERNEL_API_KEY?.trim())(
-	"creates, connects to, and closes a Kernel browser",
+test.skipIf(
+	!process.env.BROWSERBASE_API_KEY?.trim() ||
+		!process.env.BROWSERBASE_PROJECT_ID?.trim(),
+)(
+	"creates, connects to, and closes a Browserbase browser",
 	async () => {
-		const provider = new KernelBrowserProvider();
+		const provider = new BrowserbaseBrowserProvider();
 		const session = await provider.createSession();
 		const browser = await chromium.connectOverCDP(session.cdpEndpoint);
 

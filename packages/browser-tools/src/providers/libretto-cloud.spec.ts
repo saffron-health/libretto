@@ -1,11 +1,11 @@
 import { chromium } from "playwright";
 import { expect, test } from "vitest";
-import { KernelBrowserProvider } from "./kernel.js";
+import { LibrettoCloudBrowserProvider } from "./libretto-cloud.js";
 
-test.skipIf(!process.env.KERNEL_API_KEY?.trim())(
-	"creates, connects to, and closes a Kernel browser",
+test.skipIf(!process.env.LIBRETTO_API_KEY?.trim())(
+	"creates, connects to, and closes a Libretto Cloud browser",
 	async () => {
-		const provider = new KernelBrowserProvider();
+		const provider = new LibrettoCloudBrowserProvider();
 		const session = await provider.createSession();
 		const browser = await chromium.connectOverCDP(session.cdpEndpoint);
 

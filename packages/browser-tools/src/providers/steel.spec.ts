@@ -1,11 +1,11 @@
 import { chromium } from "playwright";
 import { expect, test } from "vitest";
-import { KernelBrowserProvider } from "./kernel.js";
+import { SteelBrowserProvider } from "./steel.js";
 
-test.skipIf(!process.env.KERNEL_API_KEY?.trim())(
-	"creates, connects to, and closes a Kernel browser",
+test.skipIf(!process.env.STEEL_API_KEY?.trim())(
+	"creates, connects to, and closes a Steel browser",
 	async () => {
-		const provider = new KernelBrowserProvider();
+		const provider = new SteelBrowserProvider();
 		const session = await provider.createSession();
 		const browser = await chromium.connectOverCDP(session.cdpEndpoint);
 
