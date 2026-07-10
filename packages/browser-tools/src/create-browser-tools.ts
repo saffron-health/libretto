@@ -1,3 +1,4 @@
+import type { DomainPolicyOptions } from "./domain-policy.js";
 import type { BrowserProvider } from "./provider.js";
 import { SessionRegistry } from "./session-registry.js";
 import type { CloseTool } from "./tools/close.js";
@@ -26,12 +27,17 @@ export interface BrowserToolkit {
 	dispose(): Promise<void>;
 }
 
+export type BrowserToolkitOptions = DomainPolicyOptions;
+
 /**
  * Framework-agnostic factory — returns base {@link BrowserTool} objects.
  * Framework entry points live under src/adapters/ (e.g. adapters/ai-sdk).
  */
-export function createBrowserTools(provider: BrowserProvider): BrowserToolkit {
-	const registry = new SessionRegistry(provider);
+export function createBrowserTools(
+	provider: BrowserProvider,
+	options: BrowserToolkitOptions = {},
+): BrowserToolkit {
+	const registry = new SessionRegistry(provider, options);
 	return {
 		tools: {
 			browser_open: createOpenTool(registry),

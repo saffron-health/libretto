@@ -35,10 +35,13 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 		async execute({ url }): Promise<ToolResult<OpenToolOutput>> {
 			const { sessionId } = await registry.openSession();
 			if (url !== undefined) {
+				const page = registry.getCurrentPage(sessionId);
 				try {
-					await registry.getCurrentPage(sessionId).goto(url);
+					await page.goto(url);
 				} catch (err) {
+					const policyError = registry.consumeBlockedNavigationError(page);
 					await registry.closeSession(sessionId);
+					if (policyError) throw policyError;
 					return {
 						ok: false,
 						error:

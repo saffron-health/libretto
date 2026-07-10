@@ -28,12 +28,18 @@
       "types": "./dist/adapters/ai-sdk/index.d.ts",
       "import": "./dist/adapters/ai-sdk/index.js",
       "default": "./dist/adapters/ai-sdk/index.js"
+    },
+    "./kernel": {
+      "types": "./dist/providers/kernel.d.ts",
+      "import": "./dist/providers/kernel.js",
+      "default": "./dist/providers/kernel.js"
     }
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "test:kernel": "KERNEL_API_KEY=\"$(gcloud secrets versions access latest --secret=browser-tools-kernel-api-key --project=769071280674)\" && export KERNEL_API_KEY && test -n \"$KERNEL_API_KEY\" && vitest run src/providers/kernel.spec.ts",
     "test:vitest": "vitest run",
     "evals": "vitest run --config vitest.evals.config.ts",
     "prepack": "pnpm run build"

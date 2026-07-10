@@ -17,8 +17,9 @@ export interface BrowserTool<Input = unknown, Output = unknown> {
 /**
  * Every tool returns the same envelope: `{ ok: true, ...payload }` on
  * success, `{ ok: false, error }` for model-fixable failures (bad session ID,
- * blocked navigation, agent code that throws). Throws are reserved for
- * host-level misconfiguration (missing credentials, no provider).
+ * agent code that throws). Host-level failures throw. Domain policy violations
+ * throw {@link DomainPolicyRestricted} so clients can inspect and render the
+ * configured policy and attempted URL.
  */
 export interface ToolErrorResult {
 	ok: false;

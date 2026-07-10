@@ -1,4 +1,6 @@
 // Public entry for the framework-agnostic base format.
+export { DomainPolicyRestricted } from "./domain-policy.js";
+export type { DomainPolicyOptions } from "./domain-policy.js";
 export type { BrowserTool, ToolErrorResult, ToolResult } from "./tool.js";
 export type {
 	BrowserProvider,
@@ -6,7 +8,10 @@ export type {
 	ProviderSessionClosed,
 } from "./provider.js";
 export { createBrowserTools } from "./create-browser-tools.js";
-export type { BrowserToolkit } from "./create-browser-tools.js";
+export type {
+	BrowserToolkit,
+	BrowserToolkitOptions,
+} from "./create-browser-tools.js";
 export { LocalBrowserProvider } from "./providers/local.js";
 export type { LocalBrowserProviderOptions } from "./providers/local.js";
 export type { OpenTool, OpenToolInput, OpenToolOutput } from "./tools/open.js";

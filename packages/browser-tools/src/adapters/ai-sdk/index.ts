@@ -1,5 +1,6 @@
 import { tool, type ToolSet } from "ai";
 import { createBrowserTools } from "../../create-browser-tools.js";
+import type { BrowserToolkitOptions } from "../../create-browser-tools.js";
 import type { BrowserProvider } from "../../provider.js";
 import { snapshotToModelOutput } from "./snapshot-to-model-output.js";
 
@@ -8,11 +9,14 @@ import { snapshotToModelOutput } from "./snapshot-to-model-output.js";
  * with `generateText` / `streamText`. The base tools expose concrete zod
  * schemas, which the AI SDK accepts directly as `inputSchema`.
  */
-export function createAiSdkBrowserTools(provider: BrowserProvider): {
+export function createAiSdkBrowserTools(
+	provider: BrowserProvider,
+	options: BrowserToolkitOptions = {},
+): {
 	tools: ToolSet;
 	dispose(): Promise<void>;
 } {
-	const base = createBrowserTools(provider);
+	const base = createBrowserTools(provider, options);
 	const {
 		browser_open,
 		browser_exec,

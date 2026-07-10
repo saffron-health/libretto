@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DomainPolicyRestricted } from "../domain-policy.js";
 import { errorMessage } from "../errors.js";
 import type { SessionRegistry } from "../session-registry.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
@@ -36,6 +37,7 @@ export function createConnectTool(registry: SessionRegistry): ConnectTool {
 				const { sessionId } = await registry.connectSession(cdpUrl);
 				return { ok: true, sessionId };
 			} catch (err) {
+				if (err instanceof DomainPolicyRestricted) throw err;
 				return {
 					ok: false,
 					error:
