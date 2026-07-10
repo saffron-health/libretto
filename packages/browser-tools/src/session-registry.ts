@@ -69,6 +69,7 @@ export class SessionRegistry {
 			browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
 			const context = browser.contexts()[0] ?? (await browser.newContext());
 			await this.applyDomainPolicy(context);
+			this.assertCurrentPagesAllowed(context);
 			const entry = this.createSessionEntry({
 				providerSessionId: providerSession.sessionId,
 				providerName: this.provider.name,

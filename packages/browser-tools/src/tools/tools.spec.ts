@@ -140,6 +140,47 @@ test("browser_open closes provider sessions when browser setup fails", async () 
 	await registry.dispose();
 });
 
+test("browser_open rejects a provider browser already showing a blocked page", async ({
+	externalBrowser,
+}) => {
+	const context =
+		externalBrowser.browser.contexts()[0] ??
+		(await externalBrowser.browser.newContext());
+	const page = context.pages()[0] ?? (await context.newPage());
+	const blockedUrl = new URL(externalBrowser.cdpUrl);
+	blockedUrl.protocol = "http:";
+	blockedUrl.pathname = "/json/version";
+	blockedUrl.search = "";
+	blockedUrl.hash = "";
+	await page.goto(blockedUrl.href);
+
+	let closedSessionId: string | undefined;
+	const registry = new SessionRegistry(
+		{
+			name: "preloaded",
+			async createSession() {
+				return {
+					sessionId: "provider-session",
+					cdpEndpoint: externalBrowser.cdpUrl,
+				};
+			},
+			async closeSession(sessionId) {
+				closedSessionId = sessionId;
+				return {};
+			},
+		},
+		{ blockedDomains: ["127.0.0.1"] },
+	);
+
+	await expect(createOpenTool(registry).execute({})).rejects.toMatchObject({
+		name: "DomainPolicyRestricted",
+		attemptedNavigationUrl: blockedUrl.href,
+	});
+	expect(closedSessionId).toBe("provider-session");
+	expect(externalBrowser.browser.isConnected()).toBe(true);
+	await registry.dispose();
+});
+
 test("domain policy silently aborts blocked subresources", async () => {
 	const registry = new SessionRegistry(
 		new LocalBrowserProvider({ headless: true }),
