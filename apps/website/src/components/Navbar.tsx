@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text } from "./Text";
 import { Button } from "./Button";
-import { GitHubStarIcon, NpmIcon } from "../icons";
+import { GitHubStarIcon } from "../icons";
 import { AnimationTarget } from "./AnimationOrchestration";
-import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
-import { AppLink } from "../routing";
+import { RELEASES_URL, REPO_URL } from "../site";
 import { MobileMenu } from "./MobileMenu";
 import { LibrettoLogoAndName } from "../brand.js";
+import { getCloudSession, type CloudSession } from "../cloudApi";
 
 const GLITCH_CHARS = "@#$%&*+=<>{}[]|/\\~^!?";
 
@@ -26,13 +26,12 @@ function useGlitchText(text: string) {
     if (!hovered) return;
 
     const chars = text.split("");
-    // Each character gets a random settle time (in ms)
     const settleTimes = chars.map(() => 150 + Math.random() * 350);
     const start = performance.now();
     let settled = false;
 
     let lastUpdate = 0;
-    const INTERVAL = 60; // ms between character changes
+    const INTERVAL = 60;
 
     function tick(now: number) {
       const elapsed = now - start;
@@ -66,38 +65,66 @@ function useGlitchText(text: string) {
   return { display, isScrambling, hovered, onEnter, onLeave };
 }
 
+function ExternalIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M6 4H4.5A1.5 1.5 0 0 0 3 5.5v6A1.5 1.5 0 0 0 4.5 13h6A1.5 1.5 0 0 0 12 11.5V10" />
+      <path d="M9 3h4v4" />
+      <path d="m8 8 5-5" />
+    </svg>
+  );
+}
+
 function GlitchNavLink({
   href,
   children,
   external = true,
+  trailingIcon = false,
   fathomEvent,
 }: {
   href: string;
   children: string;
   external?: boolean;
+  trailingIcon?: boolean;
   fathomEvent: string;
 }) {
   const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText(children);
 
   return (
-    <AppLink
+    <a
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
-      className="no-underline"
+      className="flex h-[1.9375rem] items-center no-underline"
       data-fathom-event={fathomEvent}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
-      <Text
-        size="sm"
-        className={`font-medium transition-colors duration-75 ${
-          isScrambling ? "text-amber font-mono" : hovered ? "text-accent-bright" : "text-ink"
+      <span
+        className={`inline-flex items-center gap-1.5 transition-colors duration-75 ${
+          isScrambling ? "text-amber" : hovered ? "text-accent-bright" : "text-ink"
         }`}
       >
-        {display}
-      </Text>
-    </AppLink>
+        <Text
+          size="sm"
+          className={`font-medium leading-none ${
+            isScrambling ? "font-mono" : ""
+          }`}
+        >
+          {display}
+        </Text>
+        {trailingIcon && <ExternalIcon />}
+      </span>
+    </a>
   );
 }
 
@@ -126,58 +153,106 @@ function formatStars(count: number): string {
   return String(count);
 }
 
+function userInitial(session: CloudSession): string {
+  return session.user.email.slice(0, 1).toUpperCase();
+}
+
+function CloudAccountLink({ session }: { session: CloudSession | null }) {
+  if (!session) {
+    return (
+      <Button
+        href="/signin?mode=signup"
+        size="sm"
+        data-fathom-event="Nav cloud sign up click"
+      >
+        Cloud sign in/up
+      </Button>
+    );
+  }
+
+  return (
+    <a
+      href="/dashboard"
+      className="inline-flex h-10 items-center gap-2 rounded-lg border border-rule bg-panel px-3 text-sm text-ink no-underline transition-colors hover:border-accent/45 hover:bg-panel-hi"
+      data-fathom-event="Nav dashboard click"
+      aria-label={`Open dashboard for ${session.user.email}`}
+    >
+      <span className="grid size-6 shrink-0 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
+        {userInitial(session)}
+      </span>
+      <span className="hidden sm:block">Cloud dashboard</span>
+    </a>
+  );
+}
+
 export function Navbar({ animate = false }: { animate?: boolean }) {
   const stars = useGitHubStars("saffron-health/libretto");
+  const [session, setSession] = useState<CloudSession | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCloudSession()
+      .then((result) => {
+        if (!cancelled) setSession(result);
+      })
+      .catch(() => {
+        if (!cancelled) setSession(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const animateProps = animate
     ? { "data-animate": AnimationTarget.Navbar, style: { opacity: 0 } as const }
     : {};
 
   return (
-    <nav {...animateProps} className="px-8 pt-6">
-      <div className="relative mx-auto flex max-w-[800px] items-center justify-between">
-        <div className="flex items-center gap-10">
-          <AppLink href="/" className="no-underline">
+    <nav {...animateProps} className="px-4 pt-6 md:px-8">
+      <div className="relative mx-auto flex max-w-[980px] items-center justify-between">
+        <div className="flex items-center gap-6">
+          <a
+            href="/"
+            className="flex h-[1.9375rem] -translate-y-px items-center no-underline lg:-translate-y-[2.5px]"
+          >
             <LibrettoLogoAndName />
-          </AppLink>
-          <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
+          </a>
+          <div className="hidden items-center gap-6 lg:flex">
+            <GlitchNavLink
+              href="/docs/get-started/quickstart"
+              external={false}
+              trailingIcon
+              fathomEvent="Nav docs click"
+            >
+              Docs
+            </GlitchNavLink>
             <GlitchNavLink href="/blog" external={false} fathomEvent="Nav blog click">
               Blog
-            </GlitchNavLink>
-            <GlitchNavLink href={DISCUSSIONS_URL} fathomEvent="Nav forum click">
-              Forum
             </GlitchNavLink>
             <GlitchNavLink href={RELEASES_URL} fathomEvent="Nav changelog click">
               Changelog
             </GlitchNavLink>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <a
-            href={NPM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Libretto on npm"
-            className="hidden text-ink/70 transition-colors hover:text-ink md:flex"
-            data-fathom-event="Nav npm click"
-          >
-            <NpmIcon width={36} height={14} />
-          </a>
+        <div className="flex items-center gap-3 md:gap-4">
           <a
             href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden items-center gap-1.5 text-ink/70 transition-colors hover:text-ink md:flex"
+            className="hidden h-[1.9375rem] items-center gap-1.5 text-ink/70 transition-colors hover:text-ink lg:flex"
             data-fathom-event="Nav github click"
           >
             <GitHubStarIcon width={15} height={15} />
             {stars !== null && <span className="text-sm font-medium">{formatStars(stars)}</span>}
           </a>
-          <Button href="/docs/get-started/quickstart" size="sm" data-fathom-event="Nav docs click">
-            Go to docs
-          </Button>
-          <div className="md:hidden">
-            <MobileMenu stars={stars !== null ? formatStars(stars) : null} />
+          <div className="hidden sm:block">
+            <CloudAccountLink session={session} />
+          </div>
+          <div className="lg:hidden">
+            <MobileMenu
+              stars={stars !== null ? formatStars(stars) : null}
+              session={session}
+            />
           </div>
         </div>
       </div>

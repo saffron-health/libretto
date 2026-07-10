@@ -4,7 +4,11 @@ import { Button } from "./Button";
 const PROMPT =
   "Fetch and follow https://libretto.sh/start.md to set up Libretto and create a new browser automation.";
 
-export function InstallSnippet() {
+export function InstallSnippet({
+  fathomEvent = "Hero copy prompt click",
+}: {
+  fathomEvent?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
@@ -22,7 +26,7 @@ export function InstallSnippet() {
         onClick={handleCopy}
         aria-label="Copy Libretto setup prompt"
         className="install-prompt__button"
-        data-fathom-event="Hero copy prompt click"
+        data-fathom-event={fathomEvent}
       >
         {copied ? "Copied" : "Copy prompt"}
       </Button>

@@ -10,14 +10,6 @@
       "dependsOn": ["build"],
       "outputs": []
     },
-    "lint": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/.lintcn/**/*.go",
-        "$TURBO_ROOT$/.lintcn/**/*.json"
-      ],
-      "outputs": []
-    },
     "test:vitest": {
       "dependsOn": ["build"],
       "cache": false,

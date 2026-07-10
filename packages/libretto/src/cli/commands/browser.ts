@@ -132,6 +132,7 @@ export const openCommand = SimpleCLI.command({
       await runOpenWithProvider(
         input.url,
         providerName,
+        input.headless,
         ctx.session,
         ctx.logger,
         resolveRequestedSessionMode(input.readOnly, input.writeAccess),

@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { loadBlogPostInputs } from "./blog-posts.ts";
+import { loadBlogPostInputs } from "./blog-posts.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const brandPath = join(root, "src", "brand.tsx");

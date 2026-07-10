@@ -91,6 +91,7 @@ import {
 import { WorkflowController } from "../workflow-runner/runner.js";
 import { validateWorkflowInput } from "../../../shared/workflow/workflow.js";
 import { captureAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
+import { applyWindowPosition } from "../../../shared/run/window-position.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -397,6 +398,7 @@ class BrowserDaemon {
     });
 
     const page = await context.newPage();
+    await applyWindowPosition(browser, context, page, config.windowPosition);
     page.setDefaultTimeout(30000);
     page.setDefaultNavigationTimeout(45000);
 
@@ -477,6 +479,7 @@ class BrowserDaemon {
       providerSession = await provider.createSession({
         authProfileName: config.authProfileName,
         authProfilePersist: config.authProfilePersist,
+        headless: config.headless,
       });
       const browser = await chromium.connectOverCDP(
         providerSession.cdpEndpoint,

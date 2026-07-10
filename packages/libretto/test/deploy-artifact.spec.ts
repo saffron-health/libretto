@@ -32,11 +32,32 @@ function extractBundledImplementation(indexSource: string): string {
 
 const require = createRequire(import.meta.url);
 const currentLibrettoPackageDir = fileURLToPath(new URL("..", import.meta.url));
-const currentLibrettoVersion = JSON.parse(
+const currentLibrettoManifest = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ) as {
+  dependencies?: Record<string, string>;
   version: string;
 };
+const expectedRuntimeExternalDependencies = Object.fromEntries(
+  ["playwright", "playwright-core", "chromium-bidi"].flatMap((packageName) => {
+    let version = currentLibrettoManifest.dependencies?.[packageName];
+    if (!version) {
+      try {
+        const packageJsonPath = require.resolve(`${packageName}/package.json`, {
+          paths: [currentLibrettoPackageDir],
+        });
+        version = (
+          JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+            version?: string;
+          }
+        ).version;
+      } catch {
+        version = undefined;
+      }
+    }
+    return version ? [[packageName, version]] : [];
+  }),
+);
 
 describe("createHostedDeployPackage", () => {
   const cleanups: Array<() => void> = [];
@@ -57,6 +78,19 @@ describe("createHostedDeployPackage", () => {
 
   function createWorkspaceRoot(): string {
     const workspaceRoot = mkdtempSync(join(tmpdir(), "libretto-deploy-test-"));
+    const nodeModulesDir = join(workspaceRoot, "node_modules");
+    mkdirSync(nodeModulesDir, { recursive: true });
+    symlinkSync(
+      currentLibrettoPackageDir,
+      join(nodeModulesDir, "libretto"),
+      "dir",
+    );
+    for (const packageName of Object.keys(expectedRuntimeExternalDependencies)) {
+      const packageJsonPath = require.resolve(`${packageName}/package.json`, {
+        paths: [currentLibrettoPackageDir],
+      });
+      symlinkSync(dirname(packageJsonPath), join(nodeModulesDir, packageName), "dir");
+    }
     registerCleanup(() => {
       rmSync(workspaceRoot, { force: true, recursive: true });
     });
@@ -93,7 +127,9 @@ describe("createHostedDeployPackage", () => {
     const nodeModulesDir = join(dirname(args.outfile), "node_modules");
     mkdirSync(nodeModulesDir, { recursive: true });
     const linkedPackageDir = join(nodeModulesDir, "libretto");
-    symlinkSync(currentLibrettoPackageDir, linkedPackageDir, "dir");
+    if (!existsSync(linkedPackageDir)) {
+      symlinkSync(currentLibrettoPackageDir, linkedPackageDir, "dir");
+    }
 
     await build({
       bundle: true,
@@ -210,6 +246,7 @@ describe("createHostedDeployPackage", () => {
 
     expect(deployManifest.dependencies).toEqual({
       libretto: "0.5.4",
+      ...expectedRuntimeExternalDependencies,
     });
     expect(deployMetadata.workflows).toEqual([
       {
@@ -244,6 +281,100 @@ describe("createHostedDeployPackage", () => {
     ).toEqual(["index.js"]);
   });
 
+  it("excludes bundled node_modules inputs from shareable source metadata", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "browser-agent");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+    const dependencyDir = join(sourceDir, "node_modules", "bundled-helper");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+    mkdirSync(dependencyDir, { recursive: true });
+
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/browser-agent",
+      private: true,
+      type: "module",
+      dependencies: {
+        "bundled-helper": "1.0.0",
+        libretto: "0.5.4",
+      },
+    });
+    writeJson(join(dependencyDir, "package.json"), {
+      name: "bundled-helper",
+      version: "1.0.0",
+      type: "module",
+      main: "./index.js",
+    });
+    writeFileSync(
+      join(dependencyDir, "index.js"),
+      'export const dependencyMessage = "bundled dependency";\n',
+    );
+    writeFileSync(
+      join(sourceDir, "src", "format.ts"),
+      [
+        'import { dependencyMessage } from "bundled-helper";',
+        "",
+        "export function formatMessage(value: string): string {",
+        '  return `${dependencyMessage}: ${value}`;',
+        "}",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      entryPoint,
+      [
+        'import { workflow } from "libretto";',
+        'import { formatMessage } from "./format";',
+        "",
+        "export const testWorkflow = workflow(",
+        '  "testWorkflow",',
+        '  async () => formatMessage("direct helper"),',
+        ");",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "ecw-pull-open-referrals",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+
+    const deployMetadata = JSON.parse(
+      readFileSync(join(deployPackage.outputDir, ".libretto-workflows.json"), "utf8"),
+    ) as {
+      workflows: Array<{ name: string; sourceFile?: string; sourceFiles?: string[] }>;
+    };
+    const bundle = readFileSync(
+      join(deployPackage.outputDir, "index.js"),
+      "utf8",
+    );
+    const implementation = extractBundledImplementation(bundle);
+
+    expect(deployMetadata.workflows).toEqual([
+      {
+        name: "testWorkflow",
+        credentialNames: [],
+        sourceFile: "src/workflow.ts",
+        sourceFiles: ["src/format.ts", "src/workflow.ts"],
+      },
+    ]);
+    expect(
+      existsSync(
+        join(
+          deployPackage.outputDir,
+          ".libretto-share",
+          "source",
+          "node_modules",
+        ),
+      ),
+    ).toBe(false);
+    expect(implementation).toContain("bundled dependency");
+    expect(implementation).toContain("direct helper");
+  });
+
   it("rejects workflows that are only imported for side effects by the deploy entry point", async () => {
     const workspaceRoot = createWorkspaceRoot();
     const sourceDir = join(workspaceRoot, "apps", "browser-agent");
@@ -256,7 +387,7 @@ describe("createHostedDeployPackage", () => {
       private: true,
       type: "module",
       dependencies: {
-        libretto: currentLibrettoVersion.version,
+        libretto: currentLibrettoManifest.version,
       },
     });
 
@@ -339,14 +470,15 @@ describe("createHostedDeployPackage", () => {
     const implementation = extractBundledImplementation(bundle);
 
     expect(deployManifest.dependencies).toEqual({
-      libretto: currentLibrettoVersion.version,
+      libretto: currentLibrettoManifest.version,
+      ...expectedRuntimeExternalDependencies,
       lodash: "^4.17.21",
     });
     expect(bundle).toContain('createWorkflowProxy("testWorkflow", {"credentialNames":[]})');
     expect(implementation).toContain("lodash");
   });
 
-  it("preserves workflow auth profile name and refresh metadata without site metadata", async () => {
+  it("preserves workflow auth profile and browser launch metadata without site metadata", async () => {
     const workspaceRoot = createWorkspaceRoot();
     const sourceDir = join(workspaceRoot, "apps", "worker");
     const entryPoint = join(sourceDir, "src", "workflow.ts");
@@ -358,7 +490,7 @@ describe("createHostedDeployPackage", () => {
       private: true,
       type: "module",
       dependencies: {
-        libretto: currentLibrettoVersion.version,
+        libretto: currentLibrettoManifest.version,
       },
     });
 
@@ -369,7 +501,13 @@ describe("createHostedDeployPackage", () => {
         "",
         "export const testWorkflow = workflow(",
         '  "testWorkflow",',
-        '  { credentials: ["openai_api_key"], authProfile: { name: "twitter", refresh: true } },',
+        "  {",
+        '    credentials: ["openai_api_key"],',
+        '    authProfile: { name: "twitter", refresh: true },',
+        '    startUrl: "https://example.com/start",',
+        "    gpu: true,",
+        "    viewport: { width: 1440, height: 900 },",
+        "  },",
         "  async () => ({ ok: true }),",
         ");",
         "",
@@ -389,9 +527,12 @@ describe("createHostedDeployPackage", () => {
         authProfileName: "twitter",
         authProfileRefresh: true,
         credentialNames: ["openai_api_key"],
+        gpu: true,
         name: "testWorkflow",
         sourceFile: "src/workflow.ts",
         sourceFiles: ["src/workflow.ts"],
+        startUrl: "https://example.com/start",
+        viewport: { width: 1440, height: 900 },
       },
     ]);
 
@@ -400,7 +541,7 @@ describe("createHostedDeployPackage", () => {
       "utf8",
     );
     expect(bundle).toContain(
-      'createWorkflowProxy("testWorkflow", {"credentialNames":["openai_api_key"],"authProfileName":"twitter","authProfileRefresh":true})',
+      'createWorkflowProxy("testWorkflow", {"credentialNames":["openai_api_key"],"authProfileName":"twitter","authProfileRefresh":true,"startUrl":"https://example.com/start","gpu":true,"viewport":{"width":1440,"height":900}})',
     );
     expect(bundle).not.toContain("authProfileSites");
     expect(bundle).not.toContain("sites:");
@@ -452,6 +593,7 @@ describe("createHostedDeployPackage", () => {
 
     expect(deployManifest.dependencies).toEqual({
       libretto: "file:./libretto",
+      ...expectedRuntimeExternalDependencies,
     });
     expect(
       existsSync(join(deployPackage.outputDir, "libretto", "package.json")),
@@ -531,6 +673,52 @@ describe("createHostedDeployPackage", () => {
         {},
       ),
     ).resolves.toEqual({ ok: true });
+  });
+
+  it("bundles workflow libretto imports into the embedded implementation", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "index.ts");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      type: "module",
+      dependencies: {
+        libretto: currentLibrettoManifest.version,
+      },
+    });
+    writeFileSync(
+      entryPoint,
+      [
+        'import { librettoAuthenticate, workflow } from "libretto";',
+        "",
+        "export const testWorkflow = workflow(",
+        '  "testWorkflow",',
+        "  async () => ({ hasAuthenticate: typeof librettoAuthenticate === \"function\" }),",
+        ");",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "embedded-libretto-worker",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+
+    const bundle = readFileSync(
+      join(deployPackage.outputDir, "index.js"),
+      "utf8",
+    );
+    const implementation = extractBundledImplementation(bundle);
+
+    expect(implementation).toContain("librettoAuthenticate");
+    expect(implementation).not.toContain('require("libretto")');
   });
 
   it("does not resolve bare workspace imports through subpath-only exports", async () => {

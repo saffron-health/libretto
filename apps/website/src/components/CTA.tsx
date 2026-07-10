@@ -1,4 +1,5 @@
 import { Button } from "./Button.js";
+import { InstallSnippet } from "./InstallSnippet.js";
 import { SectionIntro } from "./SectionIntro.js";
 import { SiteSection } from "./SiteSection.js";
 
@@ -10,12 +11,7 @@ export function CTA() {
         minutes.
       </SectionIntro>
       <div className="flex flex-col items-center gap-3">
-        <Button
-          href="/docs/get-started/quickstart"
-          data-fathom-event="CTA docs click"
-        >
-          Go to docs
-        </Button>
+        <InstallSnippet fathomEvent="CTA copy prompt click" />
         <div className="flex items-center gap-2">
           <span className="text-sm text-faint">or</span>
           <Button

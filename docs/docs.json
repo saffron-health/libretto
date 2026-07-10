@@ -10,8 +10,8 @@
   },
   "favicon": "/favicon.svg",
   "logo": {
-    "light": "/favicon.svg",
-    "dark": "/favicon.svg",
+    "light": "/logos/logo-light.svg",
+    "dark": "/logos/logo-dark.svg",
     "href": "https://libretto.sh"
   },
   "fonts": {
@@ -139,7 +139,6 @@
             "group": "Libretto Cloud API",
             "pages": [
               "libretto-cloud-api/overview",
-              "libretto-cloud-api/authentication",
               "libretto-cloud-api/sessions",
               "libretto-cloud-api/recordings",
               "libretto-cloud-api/deployments-and-workflows",

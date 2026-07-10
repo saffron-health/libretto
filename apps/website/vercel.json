@@ -1,6 +1,32 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "dist/client",
   "headers": [
+    {
+      "source": "/((?!docs(?:/|$)).*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://cdn.usefathom.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.libretto.sh https://api.github.com https://cdn.usefathom.com https://api.usefathom.com; form-action 'self'; upgrade-insecure-requests"
+        }
+      ]
+    },
     {
       "source": "/llms.txt",
       "headers": [
@@ -28,22 +54,6 @@
     {
       "source": "/llms-full.txt",
       "destination": "https://libretto.sh/docs/llms-full.txt"
-    },
-    {
-      "source": "/sitemap.xml",
-      "destination": "https://libretto.sh/docs/sitemap.xml"
-    },
-    {
-      "source": "/robots.txt",
-      "destination": "https://libretto.sh/docs/robots.txt"
-    },
-    {
-      "source": "/blog",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/blog/:slug",
-      "destination": "/blog/:slug.html"
     },
     {
       "source": "/docs",

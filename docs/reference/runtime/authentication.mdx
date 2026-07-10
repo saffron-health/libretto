@@ -2,11 +2,11 @@
 title: Authentication
 ---
 
-> Validate an authenticated session and run a credential fallback when the profile is not signed in.
+> Check whether a session is signed in and run scripted sign-in logic when it is not.
 
 ### `librettoAuthenticate()`
 
-`librettoAuthenticate` is the runtime helper for workflows that combine an auth profile with a scripted login fallback.
+`librettoAuthenticate` is the runtime helper for workflows that combine an auth profile with scripted sign-in logic.
 
 ```typescript theme={null}
 async function librettoAuthenticate(
@@ -17,17 +17,17 @@ async function librettoAuthenticate(
 
 #### Options
 
-<ParamField path="validate" type="(ctx: LibrettoWorkflowContext) => Promise<boolean> | boolean" required>
-  Checks whether the current browser page is signed in. Return `true` only when
-  the workflow can safely continue.
+<ParamField path="isSignedIn" type="(ctx: LibrettoWorkflowContext) => Promise<boolean> | boolean" required>
+  Checks whether the current browser page is already signed in. Return `true`
+  only when the workflow can safely continue.
 </ParamField>
 
-<ParamField path="fallback" type="(ctx: LibrettoWorkflowContext, credentials: Record<string, string>) => Promise<void> | void" required>
-  Performs the login flow when `validate` returns `false`.
+<ParamField path="signIn" type="(ctx: LibrettoWorkflowContext, credentials: Record<string, string>) => Promise<void> | void" required>
+  Performs the sign-in flow when `isSignedIn` returns `false`.
 </ParamField>
 
 <ParamField path="credentials" type="Record<string, unknown>">
-  Credential values to pass to the fallback. In workflows, pass
+  Credential values to pass to `signIn`. In workflows, pass
   `input.credentials` from declared workflow credentials.
 </ParamField>
 
@@ -39,8 +39,8 @@ async function librettoAuthenticate(
 #### Return value
 
 <ResponseField name="usedProfile" type="boolean">
-  `true` when the initial validation passed, meaning the saved profile was
-  already signed in. `false` when Libretto ran the fallback login.
+  `true` when the initial `isSignedIn` check passed, meaning the saved profile
+  was already signed in. `false` when Libretto ran the `signIn` step.
 </ResponseField>
 
 #### Example
@@ -61,12 +61,12 @@ export default workflow("portalReport", {
 
     await librettoAuthenticate(ctx, {
       credentials: input.credentials,
-      validate: async ({ page }) =>
+      isSignedIn: async ({ page }) =>
         await page
           .getByRole("button", { name: /account|sign out/i })
           .isVisible()
           .catch(() => false),
-      fallback: async ({ page }, credentials) => {
+      signIn: async ({ page }, credentials) => {
         await page.goto("https://portal.example.com/login");
         await page.getByLabel("Email").fill(credentials.username);
         await page.getByLabel("Password").fill(credentials.password);
@@ -79,9 +79,9 @@ export default workflow("portalReport", {
 });
 ```
 
-After `fallback` runs, `librettoAuthenticate` calls `validate` again. If validation still fails, it throws an error instead of letting the workflow continue in a logged-out state.
+After `signIn` runs, `librettoAuthenticate` calls `isSignedIn` again. If the session is still not signed in, it throws an error instead of letting the workflow continue in a logged-out state.
 
 <Note>
   Pair `librettoAuthenticate` with `authProfile: { name, refresh: true }` when
-  successful fallback login should update the profile for future runs.
+  a successful sign-in should update the profile for future runs.
 </Note>

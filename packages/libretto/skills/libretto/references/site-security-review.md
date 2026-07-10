@@ -43,7 +43,7 @@ General guidance: determine whether the site has bot protection and roughly how 
 
 ### Probe 2: Fetch and XHR Interception
 
-Check whether the site has monkey-patched `window.fetch` or `XMLHttpRequest`. If it has, making your own fetch calls from `page.evaluate()` is risky because the site can inspect call stacks and detect calls that do not originate from its own code.
+Check whether the site has monkey-patched `window.fetch` or `XMLHttpRequest`. Patching is a caution signal, not an automatic blocker. Browser-context network requests are usually fine when the target endpoint is already called by the site with fetch/XHR and there is no strong bot-protection evidence.
 
 ```js
 window.fetch.toString()
@@ -52,7 +52,7 @@ Object.getOwnPropertyDescriptor(window, 'fetch')
 window.fetch.hasOwnProperty('prototype')
 ```
 
-Important: some sites use `Proxy` to wrap fetch, which makes `toString()` still return `"[native code]"`. The prototype check is a heuristic, not definitive. If you see any sign of fetch interception, treat it as patched.
+Important: ordinary app instrumentation and Libretto's own page-stability tracking can also wrap fetch/XHR. Treat browser fetch as risky only when the wrapper appears security-related, obfuscated, tied to bot-protection scripts, or likely to inspect call stacks. Some `Proxy` wrappers still stringify as `"[native code]"`, so these checks are only heuristics.
 
 ## Choosing a Data Capture Strategy
 
@@ -66,7 +66,7 @@ When to prioritize this:
 
 - The target endpoint is normally called by the site with fetch/XHR
 - No enterprise bot protection is detected
-- `fetch` is not monkey-patched
+- No security-related fetch/XHR interception is detected, or the observed wrapper appears to be ordinary app instrumentation
 - The API responses are parseable and useful
 - You need data that requires many API calls (deep pagination, bulk queries) where driving the UI would be slow
 
@@ -83,7 +83,7 @@ Listen to network responses that the browser naturally makes as you navigate. Yo
 When to prioritize this:
 
 - Enterprise bot protection is detected
-- `fetch` is monkey-patched
+- Security-related fetch/XHR interception is detected
 - The site's normal UI flow triggers API calls that return the data you need
 - You want to minimize detection risk as much as possible
 
@@ -112,8 +112,9 @@ Trade-off: it is slower, more fragile against DOM changes, and you only get data
 
 | Site Profile | Primary Strategy | Supplement With |
 | --- | --- | --- |
-| No bot protection, fetch/XHR endpoint, fetch not patched | A (`page.evaluate(fetch)`) | Playwright for navigation/auth |
-| No bot protection, fetch is patched or endpoint is not fetch/XHR | B (`page.on('response', ...)`) | Playwright for navigation; DOM extraction as fallback |
+| No bot protection, fetch/XHR endpoint, no security-related interception | A (`page.evaluate(fetch)`) | Playwright for navigation/auth |
+| No bot protection, harmless app instrumentation, fetch/XHR endpoint | A (`page.evaluate(fetch)`) | B (`page.on('response', ...)`) if requests fail |
+| No bot protection, security-related interception or endpoint is not fetch/XHR | B (`page.on('response', ...)`) | Playwright for navigation; DOM extraction as fallback |
 | Bot protection detected | B (`page.on('response', ...)`) | Playwright for navigation; cautious use of `page.evaluate(fetch)` only if needed |
 | Server-rendered content (no API calls) | C (DOM extraction) | Playwright for all interaction |
 

@@ -219,7 +219,19 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ github.token }}
         working-directory: packages/libretto
-        run: pnpm generate-changelog "${{ needs.verify.outputs.tag }}" > "$RUNNER_TEMP/changelog.md"
+        run: |
+          CHANGELOG_AUDIT_FILE="$RUNNER_TEMP/changelog-audit.json" \
+            pnpm generate-changelog "${{ needs.verify.outputs.tag }}" > "$RUNNER_TEMP/changelog.md"
+
+      - name: Upload changelog audit
+        if: always() && needs.verify.outputs.release_exists != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-audit-${{ needs.verify.outputs.tag }}
+          path: |
+            ${{ runner.temp }}/changelog.md
+            ${{ runner.temp }}/changelog-audit.json
+          if-no-files-found: warn
 
       - name: Create GitHub release
         if: needs.verify.outputs.release_exists != 'true'

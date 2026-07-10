@@ -1,7 +1,6 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode } from "react";
 import { SectionIntro } from "./SectionIntro.js";
 import { Text } from "./Text.js";
-import { CrossfadeIcon } from "./CrossfadeIcon.js";
 import { SiteSection } from "./SiteSection.js";
 import { REPO_URL, DISCORD_URL } from "../site";
 
@@ -39,16 +38,29 @@ const faqs: FAQItem[] = [
   {
     id: "diff",
     question:
-      "How is it different from existing tools like Stagehand or Browser-Use?",
-    answer:
-      "Tools like Stagehand and Browser-Use use AI at runtime to handle edge cases without human involvement. They also rely entirely on UI interactions, which makes them slow, expensive, and nondeterministic.\n\nLibretto generates deterministic scripts that can use both UI automation and direct network requests. When a script breaks, you use Libretto to diagnose and fix it. You can still add AI runtime logic since it's all just TypeScript, but it's not the default.",
-  },
-  {
-    id: "diff-playwright",
-    question:
-      "How is it different from tools like playwright-cli, agent-browser, and dev-browser?",
-    answer:
-      "Libretto is both a runtime and a CLI, built specifically for writing reusable automation scripts.\n\nIt comes out of the box with a script validation loop that checks scripts run end-to-end when you generate them or make edits, pause statements agents can drop into your code for step-through debugging, and a workflow recorder that captures actions in a real browser and turns them into scripts.\n\nWhen you're happy with a script, you deploy it to the cloud and run it as a type-safe API with one command.",
+      "How is Libretto different from Browser Use, Stagehand, and Playwright codegen?",
+    answer: (
+      <>
+        Libretto generates deterministic TypeScript workflows that can use UI
+        automation and direct network requests. Browser Use is a runtime agent,
+        Stagehand adds AI actions on top of Playwright, and Playwright codegen is
+        a recorder for simple browser tests.
+        {"\n\n"}
+        Read the detailed comparisons: {" "}
+        <a href="/vs/browser-use" className={linkClass} data-fathom-event="FAQ Browser Use comparison click">
+          Libretto vs Browser Use
+        </a>
+        , {" "}
+        <a href="/vs/stagehand" className={linkClass} data-fathom-event="FAQ Stagehand comparison click">
+          Libretto vs Stagehand
+        </a>
+        , and {" "}
+        <a href="/vs/playwright-codegen" className={linkClass} data-fathom-event="FAQ Playwright codegen comparison click">
+          Libretto vs Playwright codegen
+        </a>
+        .
+      </>
+    ),
   },
   {
     id: "providers",
@@ -60,7 +72,7 @@ const faqs: FAQItem[] = [
           Browserbase
         </a>{" "}
         and{" "}
-        <a href="https://www.kernel.computer/" className={linkClass} data-fathom-event="FAQ Kernel click">
+        <a href="https://www.kernel.sh/" className={linkClass} data-fathom-event="FAQ Kernel click">
           Kernel
         </a>
         , and{" "}
@@ -137,38 +149,36 @@ function MinusIcon() {
 }
 
 function FAQAccordionItem({ item }: { item: FAQItem }) {
-  const [isExpanded, setIsExpanded] = useState(false);
   return (
-    <div className="border-b border-ink/10">
-      <button
-        className="flex w-full cursor-pointer items-center justify-between py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/30 rounded-sm"
-        onClick={() => setIsExpanded(!isExpanded)}
-        aria-expanded={isExpanded}
+    <details className="group border-b border-ink/10 [&_summary::-webkit-details-marker]:hidden">
+      <summary
+        className="flex w-full cursor-pointer list-none items-center justify-between py-5 text-left outline-none rounded-sm focus-visible:ring-2 focus-visible:ring-accent/30"
         data-fathom-event={`FAQ ${item.id} toggle click`}
       >
         <Text size="md" className="font-medium text-ink">
           {item.question}
         </Text>
         <span className="ml-4 shrink-0 text-muted">
-          <CrossfadeIcon activeKey={isExpanded ? "minus" : "plus"}>
-            {isExpanded ? <MinusIcon /> : <PlusIcon />}
-          </CrossfadeIcon>
+          <span className="group-open:hidden">
+            <PlusIcon />
+          </span>
+          <span className="hidden text-accent group-open:block">
+            <MinusIcon />
+          </span>
         </span>
-      </button>
-      {isExpanded && (
-        <div className="overflow-hidden">
-          <Text as="p" size="sm" className="pb-5 leading-relaxed text-muted whitespace-pre-line">
-            {item.answer}
-          </Text>
-        </div>
-      )}
-    </div>
+      </summary>
+      <div className="overflow-hidden">
+        <Text as="p" size="sm" className="pb-5 leading-relaxed text-muted whitespace-pre-line">
+          {item.answer}
+        </Text>
+      </div>
+    </details>
   );
 }
 
 export function FAQ() {
   return (
-    <SiteSection innerClassName="flex flex-col gap-12 md:flex-row md:gap-16">
+    <SiteSection id="comparisons" innerClassName="flex flex-col gap-12 md:flex-row md:gap-16">
       <div className="md:w-1/2 md:shrink-0 md:pt-5">
         <SectionIntro
           align="left"

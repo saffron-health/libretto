@@ -39,6 +39,7 @@ export function createLibrettoCloudProvider(): ProviderApi {
             timeout_seconds: browserSessionTimeoutSeconds,
             profile_name: options?.authProfileName,
             profile_persist: options?.authProfilePersist,
+            headless: options?.headless,
           },
         }),
       });
