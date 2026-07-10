@@ -64,54 +64,61 @@ export class SessionRegistry {
 
 	async openSession(): Promise<{ sessionId: string }> {
 		const providerSession = await this.provider.createSession();
-		const browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
-		const context = browser.contexts()[0] ?? (await browser.newContext());
-		await this.applyDomainPolicy(context);
-		const entry = this.createSessionEntry({
-			providerSessionId: providerSession.sessionId,
-			providerName: this.provider.name,
-			attached: false,
-			browser,
-			context,
-		});
-		if (context.pages().length === 0) {
-			await context.newPage();
-		}
-		for (const page of context.pages()) {
-			this.trackPage(entry, page);
-		}
+		let browser: Browser | undefined;
+		try {
+			browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
+			const context = browser.contexts()[0] ?? (await browser.newContext());
+			await this.applyDomainPolicy(context);
+			const entry = this.createSessionEntry({
+				providerSessionId: providerSession.sessionId,
+				providerName: this.provider.name,
+				attached: false,
+				browser,
+				context,
+			});
+			if (context.pages().length === 0) {
+				await context.newPage();
+			}
+			for (const page of context.pages()) {
+				this.trackPage(entry, page);
+			}
 
-		const sessionId = this.generateSessionId();
-		this.sessions.set(sessionId, entry);
-		this.installBeforeExitHook();
-		return { sessionId };
+			const sessionId = this.generateSessionId();
+			this.sessions.set(sessionId, entry);
+			this.installBeforeExitHook();
+			return { sessionId };
+		} catch (error) {
+			await browser?.close().catch(() => {});
+			await this.provider.closeSession(providerSession.sessionId).catch(() => {});
+			throw error;
+		}
 	}
 
 	async connectSession(cdpEndpoint: string): Promise<{ sessionId: string }> {
 		const browser = await chromium.connectOverCDP(cdpEndpoint);
-		const context = browser.contexts()[0] ?? (await browser.newContext());
-		await this.applyDomainPolicy(context);
 		try {
+			const context = browser.contexts()[0] ?? (await browser.newContext());
+			await this.applyDomainPolicy(context);
 			this.assertCurrentPagesAllowed(context);
+			const entry = this.createSessionEntry({
+				providerSessionId: undefined,
+				providerName: "attached",
+				attached: true,
+				browser,
+				context,
+			});
+			for (const page of context.pages()) {
+				this.trackPage(entry, page);
+			}
+
+			const sessionId = this.generateSessionId();
+			this.sessions.set(sessionId, entry);
+			this.installBeforeExitHook();
+			return { sessionId };
 		} catch (error) {
 			await browser.close().catch(() => {});
 			throw error;
 		}
-		const entry = this.createSessionEntry({
-			providerSessionId: undefined,
-			providerName: "attached",
-			attached: true,
-			browser,
-			context,
-		});
-		for (const page of context.pages()) {
-			this.trackPage(entry, page);
-		}
-
-		const sessionId = this.generateSessionId();
-		this.sessions.set(sessionId, entry);
-		this.installBeforeExitHook();
-		return { sessionId };
 	}
 
 	getCurrentPage(sessionId: string, pageId?: string): Page {
@@ -197,10 +204,6 @@ export class SessionRegistry {
 	clearSnapshotCache(sessionId: string): void {
 		const entry = this.sessions.get(sessionId);
 		if (entry) entry.latestSnapshotByPage.clear();
-	}
-
-	clearBlockedNavigationError(page: Page): void {
-		this.blockedNavigationByContext.delete(page.context());
 	}
 
 	consumeBlockedNavigationError(

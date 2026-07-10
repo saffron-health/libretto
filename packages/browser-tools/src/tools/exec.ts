@@ -87,11 +87,12 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 				};
 			}
 
-			registry.clearBlockedNavigationError(scope.page);
 			const before = await registry.readSnapshotBaseline(sessionId, pageId);
 			const execResult = await runExecCode(code, scope);
-			const policyError = registry.consumeBlockedNavigationError(scope.page);
-			if (policyError) throw policyError;
+			const executionPolicyError = registry.consumeBlockedNavigationError(
+				scope.page,
+			);
+			if (executionPolicyError) throw executionPolicyError;
 			if (!execResult.ok) return execResult;
 
 			let snapshotDiff = "";
@@ -102,6 +103,9 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			} catch {
 				registry.clearSnapshotCache(sessionId);
 			}
+			const stabilizationPolicyError =
+				registry.consumeBlockedNavigationError(scope.page);
+			if (stabilizationPolicyError) throw stabilizationPolicyError;
 
 			return { ...execResult, snapshotDiff };
 		},

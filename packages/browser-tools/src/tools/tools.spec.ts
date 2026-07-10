@@ -119,6 +119,27 @@ test("browser_open reports a blocked top-level navigation as a domain policy err
 	await registry.dispose();
 });
 
+test("browser_open closes provider sessions when browser setup fails", async () => {
+	let closedSessionId: string | undefined;
+	const registry = new SessionRegistry({
+		name: "unreachable",
+		async createSession() {
+			return {
+				sessionId: "provider-session",
+				cdpEndpoint: "ws://127.0.0.1:1",
+			};
+		},
+		async closeSession(sessionId) {
+			closedSessionId = sessionId;
+			return {};
+		},
+	});
+
+	await expect(createOpenTool(registry).execute({})).rejects.toThrow();
+	expect(closedSessionId).toBe("provider-session");
+	await registry.dispose();
+});
+
 test("domain policy silently aborts blocked subresources", async () => {
 	const registry = new SessionRegistry(
 		new LocalBrowserProvider({ headless: true }),
@@ -339,6 +360,34 @@ test("domain policy applies to browser_connect sessions and browser_exec navigat
 			code:
 				"await page.goto('https://example.com/').catch(() => undefined); " +
 				"return 'caught'",
+		}),
+	).rejects.toBeInstanceOf(DomainPolicyRestricted);
+	await registry.dispose();
+});
+
+test("domain policy reports unawaited browser_exec navigations after stabilization", async ({
+	externalBrowser,
+}) => {
+	const context =
+		externalBrowser.browser.contexts()[0] ??
+		(await externalBrowser.browser.newContext());
+	await context.newPage();
+
+	const registry = new SessionRegistry(
+		new LocalBrowserProvider({ headless: true }),
+		{ blockedDomains: ["example.com"] },
+	);
+	const connected = await createConnectTool(registry).execute({
+		cdpUrl: externalBrowser.cdpUrl,
+	});
+	if (!connected.ok) throw new Error(connected.error);
+
+	await expect(
+		createExecTool(registry).execute({
+			sessionId: connected.sessionId,
+			code:
+				"void page.goto('https://example.com/').catch(() => undefined); " +
+				"return 'started'",
 		}),
 	).rejects.toBeInstanceOf(DomainPolicyRestricted);
 	await registry.dispose();

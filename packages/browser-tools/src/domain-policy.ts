@@ -1,3 +1,7 @@
+/**
+ * Controls requests in the browser context managed by the toolkit.
+ * This is not a sandbox for `browser_exec` or caller-created contexts.
+ */
 export interface DomainPolicyOptions {
 	allowedDomains?: readonly string[];
 	blockedDomains?: readonly string[];
