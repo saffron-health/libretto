@@ -62,8 +62,8 @@
     0 3px 3px -1.5px rgba(0, 0, 0, 0.08);
   --docs-shadow-minimal: 0 1px 1px -0.5px rgba(0, 0, 0, 0.08);
   --docs-focus:
-    0 0 0 2px rgba(6, 122, 34, 0.85),
-    0 0 8px 1px rgba(6, 122, 34, 0.18);
+    0 0 0 1px rgba(6, 122, 34, 0.65),
+    0 0 8px 1px rgba(6, 122, 34, 0.1);
 }
 
 .dark {
@@ -101,8 +101,8 @@
     0 3px 3px -1.5px rgba(0, 0, 0, 0.12);
   --docs-shadow-minimal: 0 1px 1px -0.5px rgba(0, 0, 0, 0.12);
   --docs-focus:
-    0 0 0 2px rgba(18, 206, 65, 0.75),
-    0 0 8px 1px rgba(18, 206, 65, 0.18);
+    0 0 0 1px rgba(18, 206, 65, 0.65),
+    0 0 8px 1px rgba(18, 206, 65, 0.1);
 
   --prism-fg: #eeeeee;
   --prism-keyword: #7ee79a;
@@ -260,10 +260,15 @@
 /* Neutral framed surfaces for code, cards, and tables. */
 .slot-main figure[class~='group/code'] {
   padding: 12px;
-  border: 1px solid var(--docs-outline);
+  border: 0;
   border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dark .slot-main figure[class~='group/code'] {
+  border: 1px solid var(--docs-outline);
   background: var(--card);
-  box-shadow: var(--docs-shadow);
 }
 
 .slot-main figure[class~='group/code'] button[aria-label='Copy code'] {
@@ -284,7 +289,7 @@
 .slot-main [class~='group/card'] {
   gap: 9px;
   padding: 12px !important;
-  border-color: var(--docs-outline);
+  border-color: transparent;
   border-radius: 6px;
   background: var(--card);
   box-shadow: var(--docs-shadow-minimal);
@@ -294,8 +299,11 @@
 }
 
 .slot-main :where(a):hover > [class~='group/card'] {
-  border-color: var(--ring);
+  border-color: transparent;
   background: var(--docs-hover);
+  box-shadow:
+    0 0 0 1px var(--ring),
+    var(--docs-shadow-minimal);
 }
 
 .slot-main
@@ -309,7 +317,7 @@
 .slot-main table {
   border-color: var(--border-subtle);
   border-radius: 6px;
-  box-shadow: var(--docs-shadow);
+  box-shadow: none;
 }
 
 .slot-main :where(input, button, a):focus-visible {
