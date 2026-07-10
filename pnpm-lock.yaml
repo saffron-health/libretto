@@ -147,6 +147,9 @@ importers:
       '@sinclair/typebox':
         specifier: ^0.34.41
         version: 0.34.48
+      affordance:
+        specifier: workspace:*
+        version: link:../packages/affordance
       google-auth-library:
         specifier: ^10.6.1
         version: 10.6.2
