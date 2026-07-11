@@ -82,7 +82,9 @@ export function GitHubSetupPage() {
               "/v1/github/syncInstallation",
               { installation_id: installationId },
             );
-            window.location.assign("/dashboard");
+            // Return to the setup wizard at the connected-repositories step so
+            // the remaining steps (generate API key, add debugger) continue.
+            window.location.assign("/setup?step=github-repositories");
           } catch (err) {
             setError(
               err instanceof Error
@@ -122,7 +124,7 @@ export function GitHubSetupPage() {
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                 <div className="min-w-0">
                   <p className="mb-2 font-mono text-xs uppercase text-accent">
-                    Step 2 of 2
+                    Step 2 of 4
                   </p>
                   <h2 className="flex items-center gap-3 text-lg font-semibold text-ink">
                     <GitHubIcon className="size-5 shrink-0 text-accent-bright" />

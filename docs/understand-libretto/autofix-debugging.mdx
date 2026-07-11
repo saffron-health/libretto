@@ -1,0 +1,57 @@
+---
+title: Autofix debugging
+---
+
+When a Playwright automation fails, Libretto's autofix debugger diagnoses the
+failure against the live website and opens a pull request with a fix on your
+connected repository. It turns a broken run into a reviewable change instead of
+a pager alert.
+
+You add one call in your script's failure path; Libretto does the rest. For the
+API and configuration, see the
+[Playwright debug autofix reference](/docs/reference/runtime/playwright-debug).
+
+## Why it inspects the live page
+
+A stack trace and a static DOM snapshot are rarely enough to fix a browser
+automation. A selector like `input[name="username"]` might have failed because
+the real field is `name="login"`, because the page redirected, or because an
+element loads late — and the source code alone cannot tell you which.
+
+So the debugger does not guess. It runs an agent loop on the
+[`@libretto/browser-tools`](/docs/reference/runtime/playwright-debug) SDK and
+drives a real browser to confirm the cause before it proposes anything. Fixes
+are grounded in what the agent actually observed on the page.
+
+## The flow
+
+1. **Capture.** On failure, the debugger records the error, stack, URL, title,
+   screenshot, and DOM snapshot, and reads the relevant source files from your
+   repo at the base branch.
+2. **Investigate.** The agent opens the failing URL, snapshots the live
+   accessibility tree, and runs Playwright code against the page (for example,
+   checking whether a selector resolves) until it is confident about the root
+   cause.
+3. **Fix.** It produces a minimal, full-file change for the files that must
+   change — or, if the evidence is insufficient, it proposes nothing.
+4. **Open a PR.** The change is committed to a new branch and opened as a pull
+   request whose description cites the failure and the evidence behind the fix.
+
+## What you need
+
+- **A connected GitHub repository.** Install the Libretto GitHub App and link
+  the repo so Libretto can open PRs on it.
+- **A `LIBRETTO_API_KEY`.** The debugger exchanges it for a short-lived,
+  repo-scoped GitHub token — you never manage a raw GitHub token in production.
+- **The debugger call in your script.** Add `debugPlaywrightFailure(error, page)`
+  in your automation's `catch` block.
+
+The [setup flow](/setup) walks through connecting GitHub, minting the API key,
+and adding the debugger to an existing script.
+
+## Relationship to error recovery
+
+Autofix debugging fixes the deterministic workflow *after* a failure by opening
+a PR. For expected nondeterminism that should be handled *during* a run, use a
+narrow runtime recovery action instead — see
+[Error recovery](/docs/understand-libretto/error-handling-and-recovery).

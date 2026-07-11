@@ -3,8 +3,10 @@ import type { ReactNode } from "react";
 import {
   Menu,
   MenuItem,
+  MenuSection,
   MenuTrigger,
   Popover,
+  Separator,
   Button as AriaButton,
 } from "react-aria-components";
 import { Text } from "./Text";
@@ -14,7 +16,12 @@ import { AnimationTarget } from "./AnimationOrchestration";
 import { RELEASES_URL, REPO_URL } from "../site";
 import { MobileMenu } from "./MobileMenu";
 import { LibrettoLogoAndName } from "../brand.js";
-import { getCloudSession, type CloudSession } from "../cloudApi";
+import {
+  authPost,
+  getCloudSession,
+  getSetupStatus,
+  type CloudSession,
+} from "../cloudApi";
 
 const GLITCH_CHARS = "@#$%&*+=<>{}[]|/\\~^!?";
 
@@ -202,6 +209,25 @@ function PullRequestIcon() {
   );
 }
 
+function SignOutIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M6 14H3.5A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2H6" />
+      <path d="M10.5 11 14 8l-3.5-3" />
+      <path d="M14 8H6" />
+    </svg>
+  );
+}
+
 function CloudBrowserIcon() {
   return (
     <svg
@@ -221,23 +247,47 @@ function CloudBrowserIcon() {
   );
 }
 
+function SetupIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M3 4.5h10" />
+      <path d="M3 8h10" />
+      <path d="M3 11.5h5" />
+      <path d="m10.5 11.2 1.2 1.2 2-2.4" />
+    </svg>
+  );
+}
+
 function DashboardMenuItem({
   href,
   icon,
   title,
   description,
   fathomEvent,
+  current = false,
 }: {
   href: string;
   icon: ReactNode;
   title: string;
   description: string;
   fathomEvent: string;
+  current?: boolean;
 }) {
   return (
     <MenuItem
       href={href}
-      className="grid cursor-pointer grid-cols-[28px_1fr] gap-2 rounded-md px-2 py-2 text-ink outline-none transition-colors data-[focused]:bg-ink/[0.07] data-[pressed]:bg-ink/[0.1]"
+      className={`grid cursor-pointer grid-cols-[28px_1fr] gap-2 rounded-md px-2 py-2 text-ink outline-none transition-colors data-[focused]:bg-ink/[0.07] data-[pressed]:bg-ink/[0.1] ${
+        current ? "bg-green-9/15" : ""
+      }`}
       data-fathom-event={fathomEvent}
     >
       <span className="grid size-7 place-items-center rounded-md border border-rule bg-bg/70 text-accent-bright">
@@ -257,10 +307,43 @@ function DashboardMenuItem({
 
 function CloudAccountLink({ session }: { session: CloudSession | null }) {
   const [pageLabel, setPageLabel] = useState("Dashboard");
+  const [signingOut, setSigningOut] = useState(false);
+  const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
 
   useEffect(() => {
     setPageLabel(getCurrentPageLabel());
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setSetupComplete(null);
+      return;
+    }
+
+    let cancelled = false;
+    setSetupComplete(null);
+    getSetupStatus()
+      .then((status) => {
+        if (!cancelled) setSetupComplete(status.setup_complete);
+      })
+      .catch(() => {
+        if (!cancelled) setSetupComplete(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await authPost("/api/auth/sign-out", {});
+      window.location.assign("/");
+    } catch {
+      setSigningOut(false);
+    }
+  }
 
   if (!session) {
     return (
@@ -279,7 +362,7 @@ function CloudAccountLink({ session }: { session: CloudSession | null }) {
       <AriaButton
         className="inline-flex h-10 items-center gap-2 rounded-lg border border-rule bg-panel px-3 text-sm text-ink outline-none transition-colors hover:border-accent/45 hover:bg-panel-hi focus-visible:ring-2 focus-visible:ring-accent/40"
         data-fathom-event="Nav dashboard menu click"
-        aria-label={`Open dashboard menu for ${session.user.email}`}
+        aria-label={`Open account menu for ${session.user.email}`}
       >
         <span className="grid size-6 shrink-0 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
           {userInitial(session)}
@@ -301,21 +384,66 @@ function CloudAccountLink({ session }: { session: CloudSession | null }) {
         </svg>
       </AriaButton>
       <Popover placement="bottom end" offset={6} className="z-50 outline-none">
-        <Menu className="w-[260px] rounded-lg border border-rule bg-panel p-1 shadow-lg shadow-black/35 outline-none">
+        <Menu className="w-[300px] rounded-lg border border-rule bg-panel p-1 shadow-lg shadow-black/35 outline-none">
           <DashboardMenuItem
             href="/dashboard"
             icon={<PullRequestIcon />}
             title="Libretto PR Agents"
-            description="Free repo PR automation"
+            description="Auto-fix failing workflows"
             fathomEvent="Nav PR agents dashboard click"
+            current={pageLabel === "Libretto PR Agents"}
           />
           <DashboardMenuItem
             href="/dashboard/cloud-browsers"
             icon={<CloudBrowserIcon />}
             title="Cloud Browsers"
-            description="Hosted browser runs"
+            description="Run automations on managed browsers"
             fathomEvent="Nav cloud browsers dashboard click"
+            current={pageLabel === "Cloud Browsers"}
           />
+          {setupComplete === false && (
+            <DashboardMenuItem
+              href="/setup"
+              icon={<SetupIcon />}
+              title="Setup"
+              description="Finish workspace setup"
+              fathomEvent="Nav setup click"
+              current={pageLabel === "Setup"}
+            />
+          )}
+          <Separator className="mx-2 my-1 h-px bg-rule" />
+          <MenuSection className="rounded-md bg-ink/[0.04] p-1">
+            <MenuItem
+              id="account-email"
+              isDisabled
+              className="grid cursor-default grid-cols-[28px_1fr] items-center gap-2 rounded-md px-2 py-1.5 outline-none data-[disabled]:opacity-100"
+              textValue={session.user.email}
+            >
+              <span className="grid size-7 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
+                {userInitial(session)}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Signed in as
+                </span>
+                <span className="block truncate text-xs text-ink">
+                  {session.user.email}
+                </span>
+              </span>
+            </MenuItem>
+            <MenuItem
+              id="signout"
+              onAction={signOut}
+              isDisabled={signingOut}
+              className="grid cursor-pointer grid-cols-[28px_1fr] items-center gap-2 rounded-md px-2 py-2 text-sm text-muted outline-none transition-colors data-[disabled]:cursor-default data-[disabled]:opacity-60 data-[focused]:bg-ink/[0.07] data-[focused]:text-ink data-[pressed]:bg-ink/[0.1]"
+              data-fathom-event="Nav sign out click"
+            >
+              <span className="grid size-7 place-items-center">
+                <SignOutIcon />
+              </span>
+              <span>{signingOut ? "Signing out..." : "Sign out"}</span>
+            </MenuItem>
+          </MenuSection>
         </Menu>
       </Popover>
     </MenuTrigger>
@@ -345,7 +473,10 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
     : {};
 
   return (
-    <nav {...animateProps} className="px-4 pt-6 md:px-8">
+    <nav
+      {...animateProps}
+      className="sticky top-0 z-50 px-4 py-4 backdrop-blur-md md:px-8"
+    >
       <div className="relative mx-auto flex max-w-[980px] items-center justify-between">
         <div className="flex items-center gap-6">
           <a

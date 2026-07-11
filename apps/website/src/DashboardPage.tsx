@@ -3,7 +3,6 @@ import type { FormEvent } from "react";
 import { Navbar } from "./components/Navbar";
 import { InstallSnippet } from "./components/InstallSnippet";
 import {
-  authPost,
   getAuthStatus,
   getCloudSession,
   getSetupStatus,
@@ -188,11 +187,6 @@ export function DashboardPage() {
     );
   }, []);
 
-  const userInitial = useMemo(
-    () => session?.user.email.slice(0, 1).toUpperCase() ?? "L",
-    [session],
-  );
-
   const currentDashboardUser = useMemo(
     () => users?.users.find((user) => user.id === session?.user.id) ?? null,
     [session?.user.id, users],
@@ -306,15 +300,6 @@ export function DashboardPage() {
     }
   }
 
-  async function signOut() {
-    setBusy("signout");
-    try {
-      await authPost("/api/auth/sign-out", {});
-    } finally {
-      window.location.assign("/");
-    }
-  }
-
   async function deleteAccount() {
     setBusy("delete-account");
     setError(null);
@@ -377,9 +362,6 @@ export function DashboardPage() {
 
         <div className="mb-7 flex flex-col gap-4 border-b border-rule pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 font-mono text-xs uppercase text-accent">
-              Libretto Cloud
-            </p>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="font-serif text-[34px] font-[300] leading-tight md:text-[46px]">
                 Libretto PR Agents
@@ -393,23 +375,6 @@ export function DashboardPage() {
               when scripts break.
             </p>
           </div>
-          {session && (
-            <div className="flex items-center gap-3">
-              <div className="grid size-9 shrink-0 place-items-center rounded-full border border-rule bg-panel-hi text-sm text-accent-bright">
-                {userInitial}
-              </div>
-              <div className="min-w-0 text-right">
-                <p className="truncate text-sm text-ink">{session.user.email}</p>
-                <button
-                  type="button"
-                  onClick={signOut}
-                  className="text-xs text-muted transition-colors hover:text-accent-bright"
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="mb-6 flex w-full overflow-x-auto rounded-lg border border-rule bg-panel p-1 md:w-fit">

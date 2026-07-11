@@ -3,7 +3,6 @@ import type { FormEvent } from "react";
 import { Navbar } from "./components/Navbar";
 import { InstallSnippet } from "./components/InstallSnippet";
 import {
-  authPost,
   getAuthStatus,
   getCloudSession,
   orpcCall,
@@ -290,11 +289,6 @@ export function CloudBrowsersDashboardPage() {
     }
   }, [activeTab, billing, jobs, session, sessions, users]);
 
-  const userInitial = useMemo(
-    () => session?.user.email.slice(0, 1).toUpperCase() ?? "L",
-    [session],
-  );
-
   const currentDashboardUser = useMemo(
     () => users?.users.find((user) => user.id === session?.user.id) ?? null,
     [session?.user.id, users],
@@ -423,15 +417,6 @@ export function CloudBrowsersDashboardPage() {
     }
   }
 
-  async function signOut() {
-    setBusy("signout");
-    try {
-      await authPost("/api/auth/sign-out", {});
-    } finally {
-      window.location.assign("/");
-    }
-  }
-
   async function deleteAccount() {
     setBusy("delete-account");
     setError(null);
@@ -456,30 +441,10 @@ export function CloudBrowsersDashboardPage() {
       <main className="mx-auto w-full max-w-[1120px] px-4 py-8 md:px-8">
         <div className="mb-7 flex flex-col gap-4 border-b border-rule pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 font-mono text-xs uppercase text-accent">
-              Libretto Cloud
-            </p>
             <h1 className="font-serif text-[34px] font-[300] leading-tight md:text-[46px]">
               Cloud Browsers
             </h1>
           </div>
-          {session && (
-            <div className="flex items-center gap-3">
-              <div className="grid size-9 shrink-0 place-items-center rounded-full border border-rule bg-panel-hi text-sm text-accent-bright">
-                {userInitial}
-              </div>
-              <div className="min-w-0 text-right">
-                <p className="truncate text-sm text-ink">{session.user.email}</p>
-                <button
-                  type="button"
-                  onClick={signOut}
-                  className="text-xs text-muted transition-colors hover:text-accent-bright"
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {showCloudSetupPrompt && (

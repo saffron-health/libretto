@@ -33,7 +33,16 @@ export type SetupStatus = {
   local_agent_setup_complete: boolean;
   github_repository_linked: boolean;
   linked_repository_count: number;
+  api_key_created: boolean;
+  debugger_added: boolean;
   setup_complete: boolean;
+};
+
+export type ApiKeyCreateResponse = {
+  id: string;
+  name?: string | null;
+  prefix?: string | null;
+  key: string;
 };
 
 function resolveCloudApiUrl(): string {
@@ -127,8 +136,41 @@ export async function getSetupStatus(): Promise<SetupStatus> {
   return orpcCall<SetupStatus>("/v1/tenant/setupStatus");
 }
 
+export type LinkedRepository = {
+  id: string;
+  owner: string;
+  name: string;
+  full_name: string;
+  private: boolean;
+  linked_at: string;
+  installation_id: string;
+  account_login: string;
+};
+
+export async function listLinkedRepositories(): Promise<{
+  repositories: LinkedRepository[];
+}> {
+  return orpcCall<{ repositories: LinkedRepository[] }>(
+    "/v1/github/listLinkedRepositories",
+  );
+}
+
 export async function updateSetupStatus(
-  input: Partial<Pick<SetupStatus, "local_agent_setup_complete">>,
+  input: Partial<
+    Pick<
+      SetupStatus,
+      "local_agent_setup_complete" | "api_key_created" | "debugger_added"
+    >
+  >,
 ): Promise<SetupStatus> {
   return orpcCall<SetupStatus>("/v1/tenant/setupStatus", input);
+}
+
+// Mints a Libretto API key for the signed-in user's tenant. The server injects
+// the correct metadata.tenantId, so we only pass an optional label. The raw key
+// is returned exactly once.
+export async function createApiKey(name?: string): Promise<ApiKeyCreateResponse> {
+  return authPost<ApiKeyCreateResponse>("/api/auth/api-key/create", {
+    ...(name ? { name } : {}),
+  });
 }

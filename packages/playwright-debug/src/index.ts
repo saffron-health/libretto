@@ -1,8 +1,17 @@
 import { relative, win32 } from "node:path";
 import { z } from "zod";
-import { generateObject, type LanguageModel } from "ai";
+import {
+  generateText,
+  hasToolCall,
+  stepCountIs,
+  tool,
+  type LanguageModel,
+  type ModelMessage,
+} from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import { LocalBrowserProvider } from "@libretto/browser-tools";
+import { createAiSdkBrowserTools } from "@libretto/browser-tools/ai-sdk";
 import type { Page } from "playwright";
 
 export type SupportedAgentProvider = "anthropic" | "openai";
@@ -201,7 +210,7 @@ export function createLibrettoDebugger(
       const runner =
         options.modelRunner ??
         ((context: DebugAgentContext) =>
-          runDefaultDebugAgent(context, options.agent.apiKey));
+          runBrowserToolsDebugAgent(context, options.agent.apiKey));
       const fix = agentFixSchema.parse(
         await runner({
           model,
@@ -551,17 +560,93 @@ function createPullRequestBody(args: {
   return lines.join("\n");
 }
 
-async function runDefaultDebugAgent(
+const DEFAULT_MAX_AGENT_STEPS = 24;
+
+const BROWSER_TOOLS_SYSTEM_PROMPT = [
+  "You are Libretto's autofix debugger. A Playwright browser automation just failed.",
+  "Your job is to find the ROOT CAUSE by investigating the LIVE website with the browser_* tools, then submit a minimal, correct fix.",
+  "",
+  "Method:",
+  "1. Read the failure (error message, stack, and source files) provided below.",
+  "2. Actively investigate the real page instead of guessing. Use `browser_open` to load the URL where it failed, `browser_snapshot` to read the live accessibility tree / DOM, and `browser_exec` to probe the page (for example run `return await page.locator('input[name=\"login\"]').count()` to confirm whether a selector actually resolves).",
+  "3. Only once the live page confirms the real cause, call `submit_fix` with full-file replacements for the files that must change.",
+  "",
+  "Rules:",
+  "- Base the fix on what you actually observed in the browser, never on assumptions.",
+  "- Return COMPLETE file contents for each changed file, not diffs.",
+  "- Change as little as possible and do not touch unrelated code.",
+  "- Prefer selectors that you verified exist on the live page.",
+  "- If the evidence is insufficient for a safe fix, call `submit_fix` with an empty `changes` array.",
+].join("\n");
+
+async function runBrowserToolsDebugAgent(
   context: DebugAgentContext,
   apiKeyOverride?: string,
 ): Promise<AgentFix> {
   const model = await resolveLanguageModel(context.model, apiKeyOverride);
-  const result = await generateObject({
-    model,
-    schema: agentFixSchema,
-    prompt: createAgentPrompt(context),
+  const browser = createAiSdkBrowserTools(
+    new LocalBrowserProvider({ headless: true }),
+  );
+
+  let submitted: AgentFix | null = null;
+  const submitFix = tool({
+    description:
+      "Submit the final fix after investigating the live page. Provide full-file " +
+      "replacements for every file that must change, or an empty changes array when " +
+      "there is not enough evidence for a safe fix.",
+    inputSchema: agentFixSchema,
+    execute: async (fix: AgentFix) => {
+      submitted = fix;
+      return { ok: true as const };
+    },
   });
-  return result.object;
+
+  // The debugger runs inside a failed automation's catch path, so an
+  // agent-side error should degrade to "no changes" rather than replace the
+  // caller's original failure.
+  let agentError: unknown = null;
+  try {
+    await generateText({
+      model,
+      tools: { ...browser.tools, submit_fix: submitFix },
+      stopWhen: [
+        stepCountIs(DEFAULT_MAX_AGENT_STEPS),
+        hasToolCall("submit_fix"),
+      ],
+      system: BROWSER_TOOLS_SYSTEM_PROMPT,
+      messages: buildAgentMessages(context),
+    });
+  } catch (error) {
+    agentError = error;
+  } finally {
+    await browser.dispose();
+  }
+
+  if (submitted) return submitted;
+  return {
+    summary: "No fix submitted",
+    rationale: agentError
+      ? `The debug agent errored before submitting a fix: ${
+          agentError instanceof Error ? agentError.message : String(agentError)
+        }`
+      : "The debug agent did not reach a confident fix within its investigation budget.",
+    changes: [],
+  };
+}
+
+function buildAgentMessages(context: DebugAgentContext): ModelMessage[] {
+  const content: Array<
+    | { type: "text"; text: string }
+    | { type: "image"; image: string; mediaType: string }
+  > = [{ type: "text", text: createAgentPrompt(context) }];
+  if (context.failure.screenshot) {
+    content.push({
+      type: "image",
+      image: context.failure.screenshot.base64,
+      mediaType: context.failure.screenshot.mimeType,
+    });
+  }
+  return [{ role: "user", content }];
 }
 
 async function resolveLanguageModel(
@@ -593,9 +678,7 @@ function createAgentPrompt(context: DebugAgentContext): string {
     )
     .join("\n\n");
   return [
-    "You are fixing a failed Playwright browser automation.",
-    "Return full-file replacements only for files that must change.",
-    "Do not edit unrelated code. If there is not enough evidence, return an empty changes array.",
+    "A Playwright browser automation failed. Investigate the live page and fix it.",
     "",
     "Failure:",
     `Message: ${context.failure.message}`,

@@ -51,10 +51,9 @@ try {
 ## What It Captures
 
 `debugPlaywrightFailure()` captures the error message, stack trace, page URL,
-page title, screenshot, and DOM snapshot. It uses stack frames and optional
-`includeFiles` to read source files from GitHub, asks the configured model for
-full-file replacements, writes the files to a new branch with the GitHub Git
-API, and opens a pull request.
+page title, screenshot, and DOM snapshot from the failed page. It uses the stack
+frames — plus any paths you pass in `includeFiles` — to read the relevant source
+files from GitHub at `baseBranch`.
 
 ```typescript
 await librettoDebugger.debugPlaywrightFailure(error, page, {
@@ -62,6 +61,33 @@ await librettoDebugger.debugPlaywrightFailure(error, page, {
   branchName: "libretto-debug/acme-login",
 });
 ```
+
+`includeFiles` is optional. When the error stack references files inside the
+repository, the debugger discovers them automatically; pass `includeFiles` when
+the stack does not cover the file that needs the fix (for example bundled or
+minified stacks, or a cross-file change).
+
+## How It Investigates
+
+The debugger does not guess a fix from a static snapshot. It runs an agent loop
+built on the [`@libretto/browser-tools`](https://www.npmjs.com/package/@libretto/browser-tools)
+SDK: the model is given the failure context and source files, then drives a real
+browser to confirm the root cause before proposing a change. It can:
+
+- `browser_open` the URL where the automation failed,
+- `browser_snapshot` the live accessibility tree (and a screenshot), and
+- `browser_exec` Playwright code against the page — for example counting a
+  selector's matches to check whether it actually resolves.
+
+Only once the live page confirms the cause does the agent submit full-file
+replacements. The debugger writes those files to a new branch with the GitHub
+Git API and opens a pull request whose body cites the observed evidence. If the
+evidence is insufficient for a safe fix, it opens no PR and returns
+`status: "no_changes"`.
+
+Because it launches a local browser to investigate, the environment running the
+debugger needs Playwright's Chromium available (the same requirement as your
+automation).
 
 ## Model Keys
 
