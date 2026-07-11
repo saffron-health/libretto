@@ -272,9 +272,6 @@
 }
 
 .slot-main figure[class~='group/code'] button[aria-label='Copy code'] {
-  top: 8px;
-  right: 8px;
-  margin-top: 0;
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   background: var(--popover);
