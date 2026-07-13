@@ -11,6 +11,7 @@ export default defineConfig({
 		isolate: true,
 		fileParallelism: false,
 		maxWorkers: 1,
+		maxConcurrency: 5,
 		reporters: ["minimal"],
 	},
 });
