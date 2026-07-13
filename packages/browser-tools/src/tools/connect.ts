@@ -15,14 +15,13 @@ const connectInputSchema = z.object({
 
 export type ConnectToolInput = z.infer<typeof connectInputSchema>;
 
-export interface ConnectToolOutput {
+export type ConnectToolOutput = {
 	sessionId: string;
 }
 
-export interface ConnectTool
-	extends BrowserTool<ConnectToolInput, ConnectToolOutput> {
+export type ConnectTool = {
 	inputSchema: typeof connectInputSchema;
-}
+} & BrowserTool<ConnectToolInput, ConnectToolOutput>
 
 export function createConnectTool(registry: SessionRegistry): ConnectTool {
 	return {

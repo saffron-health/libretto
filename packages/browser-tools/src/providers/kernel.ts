@@ -4,7 +4,7 @@ import type {
 	ProviderSessionClosed,
 } from "../provider.js";
 
-export interface KernelBrowserProviderOptions {
+export type KernelBrowserProviderOptions = {
 	apiKey?: string;
 	headless?: boolean;
 	stealth?: boolean;
@@ -12,13 +12,13 @@ export interface KernelBrowserProviderOptions {
 	enableRecording?: boolean;
 }
 
-interface KernelBrowserResponse {
+type KernelBrowserResponse = {
 	session_id: string;
 	cdp_ws_url: string;
 	browser_live_view_url?: string | null;
 }
 
-interface KernelReplayResponse {
+type KernelReplayResponse = {
 	replay_view_url?: string | null;
 }
 

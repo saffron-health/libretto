@@ -4,13 +4,13 @@ import type {
 	ProviderSessionClosed,
 } from "../provider.js";
 
-export interface BrowserbaseBrowserProviderOptions {
+export type BrowserbaseBrowserProviderOptions = {
 	apiKey?: string;
 	projectId?: string;
 	endpoint?: string;
 }
 
-interface BrowserbaseSessionResponse {
+type BrowserbaseSessionResponse = {
 	id: string;
 	connectUrl: string;
 }

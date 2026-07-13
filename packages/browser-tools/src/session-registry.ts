@@ -10,7 +10,7 @@ import type { Snapshot } from "./snapshot/capture-snapshot.js";
 import { snapshot as captureSnapshot } from "./snapshot/capture-snapshot.js";
 import type { BrowserProvider } from "./provider.js";
 
-interface SessionEntry {
+type SessionEntry = {
 	providerSessionId: string | undefined;
 	providerName: string;
 	/** True for browser_connect sessions — close detaches without killing the browser. */
@@ -23,19 +23,19 @@ interface SessionEntry {
 	latestSnapshotByPage: Map<Page, Snapshot>;
 }
 
-export interface SessionPageSummary {
+export type SessionPageSummary = {
 	pageId: string;
 	url: string;
 	active: boolean;
 }
 
-export interface SessionSummary {
+export type SessionSummary = {
 	sessionId: string;
 	provider: string;
 	pages: SessionPageSummary[];
 }
 
-export interface PageStatus {
+export type PageStatus = {
 	pageId: string;
 	url: string;
 	title: string;

@@ -4,7 +4,7 @@ import { DomainPolicyRestricted } from "../../domain-policy.js";
 import { LocalBrowserProvider } from "../../providers/local.js";
 import { createAiSdkBrowserTools } from "./index.js";
 
-interface Toolkit {
+type Toolkit = {
 	tools: ToolSet;
 	dispose(): Promise<void>;
 }

@@ -7,13 +7,13 @@ import type {
 const DEFAULT_STEEL_API_ENDPOINT = "https://api.steel.dev";
 const DEFAULT_STEEL_CONNECT_ENDPOINT = "wss://connect.steel.dev";
 
-export interface SteelBrowserProviderOptions {
+export type SteelBrowserProviderOptions = {
 	apiKey?: string;
 	endpoint?: string;
 	connectEndpoint?: string;
 }
 
-interface SteelSessionResponse {
+type SteelSessionResponse = {
 	id: string;
 	sessionViewerUrl?: string;
 }
