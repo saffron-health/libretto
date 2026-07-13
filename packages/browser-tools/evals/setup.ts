@@ -27,16 +27,6 @@ export function requireOpenAiApiKey(): string {
 	return apiKey;
 }
 
-export function requireLibrettoApiKey(): string {
-	const apiKey = process.env.LIBRETTO_API_KEY?.trim();
-	if (!apiKey) {
-		throw new Error(
-			"LIBRETTO_API_KEY is not loaded. Add it to repo-root .env before running Libretto Cloud evals.",
-		);
-	}
-	return apiKey;
-}
-
 export function requireKernelApiKey(): string {
 	const apiKey = process.env.KERNEL_API_KEY?.trim();
 	if (!apiKey) {
