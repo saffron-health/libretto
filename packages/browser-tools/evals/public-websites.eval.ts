@@ -1,12 +1,12 @@
-import { openai } from "@ai-sdk/openai";
-import { stepCountIs, ToolLoopAgent } from "ai";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test } from "vitest";
-import { createAiSdkBrowserTools } from "../src/adapters/ai-sdk/index.js";
-import { LibrettoCloudBrowserProvider } from "../src/providers/libretto-cloud.js";
 import {
-	requireLibrettoApiKey,
-	requireOpenAiApiKey,
-} from "./setup.js";
+	judgePiBrowserTask,
+	runPiBrowserTask,
+} from "./pi-harness.js";
+import { requireKernelApiKey } from "./setup.js";
 
 type PublicWebsiteEval = {
 	name: string;
@@ -39,43 +39,38 @@ const PUBLIC_WEBSITE_EVALS: PublicWebsiteEval[] = [
 
 test.concurrent.each(PUBLIC_WEBSITE_EVALS)(
 	"$name",
-	async ({ task }) => {
-		requireOpenAiApiKey();
-		requireLibrettoApiKey();
-
-		const { tools, dispose } = createAiSdkBrowserTools(
-			new LibrettoCloudBrowserProvider(),
+	async ({ name, task }) => {
+		requireKernelApiKey();
+		const workspace = await mkdtemp(
+			join(tmpdir(), "browser-tools-public-eval-"),
 		);
 
 		try {
-			const agent = new ToolLoopAgent({
-				model: openai("gpt-5.5"),
-				tools,
-				stopWhen: stepCountIs(100),
-				providerOptions: {
-					openai: {
-						store: false,
-					},
-				},
-			});
-
-			const result = await agent.generate({ prompt: task });
-			const toolCalls = result.steps.flatMap((step) => step.toolCalls);
-
-			expect(result.text.trim().length).toBeGreaterThan(0);
-			expect(toolCalls.some((call) => call.toolName === "browser_open")).toBe(
-				true,
-			);
+			const run = await runPiBrowserTask({ task, workspace });
+			expect(run.answer.trim().length).toBeGreaterThan(0);
+			expect(run.toolNames).toContain("browser_open");
 			expect(
-				toolCalls.some(
-					(call) =>
-						call.toolName === "browser_snapshot" ||
-						call.toolName === "browser_exec",
+				run.toolNames.some(
+					(toolName) =>
+						toolName === "browser_snapshot" || toolName === "browser_exec",
 				),
 			).toBe(true);
+
+			const judgment = await judgePiBrowserTask({
+				task,
+				run,
+				workspace,
+			});
+			console.log(
+				JSON.stringify({
+					eval: name,
+					score: judgment.completed ? "1/1" : "0/1",
+					judgment,
+				}),
+			);
 		} finally {
-			await dispose();
+			await rm(workspace, { recursive: true, force: true });
 		}
 	},
-	300_000,
+	600_000,
 );

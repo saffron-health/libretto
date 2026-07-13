@@ -11,10 +11,10 @@ import type { BrowserProvider } from "../../provider.js";
 import type { BrowserTool, ToolResult } from "../../tool.js";
 import type { SnapshotToolOutput } from "../../tools/snapshot.js";
 
-export interface PiBrowserToolkit {
+export type PiBrowserToolkit = {
 	tools: ToolDefinition[];
 	dispose(): Promise<void>;
-}
+};
 
 type PiToolContent =
 	| { type: "text"; text: string }

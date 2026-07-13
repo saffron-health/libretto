@@ -37,4 +37,14 @@ export function requireLibrettoApiKey(): string {
 	return apiKey;
 }
 
+export function requireKernelApiKey(): string {
+	const apiKey = process.env.KERNEL_API_KEY?.trim();
+	if (!apiKey) {
+		throw new Error(
+			"KERNEL_API_KEY is not loaded. Add it to repo-root .env before running Kernel evals.",
+		);
+	}
+	return apiKey;
+}
+
 requireOpenAiApiKey();
