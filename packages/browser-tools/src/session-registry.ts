@@ -13,12 +13,13 @@ import type { BrowserProvider } from "./provider.js";
 type SessionEntry = {
 	providerSessionId: string | undefined;
 	providerName: string;
-	/** True for browser_connect sessions — close detaches without killing the browser. */
-	attached: boolean;
+	ownership: "provider" | "connection" | "borrowed";
 	browser: Browser;
 	context: BrowserContext;
 	currentPage: Page | undefined;
 	pageById: Map<string, Page>;
+	contextPageListener: (page: Page) => void;
+	pageCloseListenerByPage: Map<Page, () => void>;
 	/** Post-exec snapshot baseline per page for snapshot diffs. */
 	latestSnapshotByPage: Map<Page, Snapshot>;
 }
@@ -47,7 +48,7 @@ export type PageStatus = {
 /**
  * In-process registry mapping public session IDs (`ses-4f2a`) to live
  * Playwright connections. Owned by a factory instance — no module-level
- * state. Sessions die with the process; `dispose()` closes everything.
+ * state. `dispose()` closes owned sessions and detaches borrowed pages.
  */
 export class SessionRegistry {
 	private readonly sessions = new Map<string, SessionEntry>();
@@ -58,12 +59,16 @@ export class SessionRegistry {
 	private beforeExitHookInstalled = false;
 
 	constructor(
-		public readonly provider: BrowserProvider,
+		public readonly provider: BrowserProvider | undefined,
 		private readonly domainPolicy: DomainPolicyOptions = {},
 	) {}
 
 	async openSession(): Promise<{ sessionId: string }> {
-		const providerSession = await this.provider.createSession();
+		const provider = this.provider;
+		if (!provider) {
+			throw new Error("This browser toolkit only operates on its attached page.");
+		}
+		const providerSession = await provider.createSession();
 		let browser: Browser | undefined;
 		try {
 			browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
@@ -72,8 +77,8 @@ export class SessionRegistry {
 			this.assertCurrentPagesAllowed(context);
 			const entry = this.createSessionEntry({
 				providerSessionId: providerSession.sessionId,
-				providerName: this.provider.name,
-				attached: false,
+				providerName: provider.name,
+				ownership: "provider",
 				browser,
 				context,
 			});
@@ -90,7 +95,7 @@ export class SessionRegistry {
 			return { sessionId };
 		} catch (error) {
 			await browser?.close().catch(() => {});
-			await this.provider.closeSession(providerSession.sessionId).catch(() => {});
+			await provider.closeSession(providerSession.sessionId).catch(() => {});
 			throw error;
 		}
 	}
@@ -104,7 +109,7 @@ export class SessionRegistry {
 			const entry = this.createSessionEntry({
 				providerSessionId: undefined,
 				providerName: "attached",
-				attached: true,
+				ownership: "connection",
 				browser,
 				context,
 			});
@@ -120,6 +125,30 @@ export class SessionRegistry {
 			await browser.close().catch(() => {});
 			throw error;
 		}
+	}
+
+	attachPage(page: Page): { sessionId: string } {
+		const context = page.context();
+		const browser = context.browser();
+		if (!browser) {
+			throw new Error("The supplied page is not connected to a Playwright browser.");
+		}
+		const entry = this.createSessionEntry({
+			providerSessionId: undefined,
+			providerName: "borrowed-page",
+			ownership: "borrowed",
+			browser,
+			context,
+		});
+		for (const contextPage of context.pages()) {
+			this.trackPage(entry, contextPage);
+		}
+		this.trackPage(entry, page);
+
+		const sessionId = this.generateSessionId();
+		this.sessions.set(sessionId, entry);
+		this.installBeforeExitHook();
+		return { sessionId };
 	}
 
 	getCurrentPage(sessionId: string, pageId?: string): Page {
@@ -172,9 +201,11 @@ export class SessionRegistry {
 	async closeSession(sessionId: string): Promise<void> {
 		const entry = this.requireSession(sessionId);
 		this.sessions.delete(sessionId);
+		this.releaseSessionEntry(entry);
+		if (entry.ownership === "borrowed") return;
 		await entry.browser.close();
-		if (!entry.attached && entry.providerSessionId) {
-			await this.provider.closeSession(entry.providerSessionId);
+		if (entry.ownership === "provider" && entry.providerSessionId) {
+			await this.provider?.closeSession(entry.providerSessionId);
 		}
 	}
 
@@ -285,24 +316,27 @@ export class SessionRegistry {
 	private createSessionEntry(args: {
 		providerSessionId: string | undefined;
 		providerName: string;
-		attached: boolean;
+		ownership: SessionEntry["ownership"];
 		browser: Browser;
 		context: BrowserContext;
 	}): SessionEntry {
 		const entry: SessionEntry = {
 			providerSessionId: args.providerSessionId,
 			providerName: args.providerName,
-			attached: args.attached,
+			ownership: args.ownership,
 			browser: args.browser,
 			context: args.context,
 			currentPage: undefined,
 			pageById: new Map(),
+			contextPageListener: () => {},
+			pageCloseListenerByPage: new Map(),
 			latestSnapshotByPage: new Map(),
 		};
 		// Newest page wins, so popups and tabs become current automatically.
-		args.context.on("page", (page) => {
+		entry.contextPageListener = (page) => {
 			this.trackPage(entry, page);
-		});
+		};
+		args.context.on("page", entry.contextPageListener);
 		return entry;
 	}
 
@@ -315,15 +349,29 @@ export class SessionRegistry {
 
 		const pageId = this.generatePageId(entry.pageById);
 		entry.pageById.set(pageId, page);
-		page.on("close", () => {
+		const closeListener = () => {
 			entry.pageById.delete(pageId);
+			entry.pageCloseListenerByPage.delete(page);
 			entry.latestSnapshotByPage.delete(page);
 			if (entry.currentPage === page) {
 				entry.currentPage = undefined;
 			}
-		});
+		};
+		entry.pageCloseListenerByPage.set(page, closeListener);
+		page.on("close", closeListener);
 		entry.currentPage = page;
 		return pageId;
+	}
+
+	private releaseSessionEntry(entry: SessionEntry): void {
+		entry.context.off("page", entry.contextPageListener);
+		for (const [page, listener] of entry.pageCloseListenerByPage) {
+			page.off("close", listener);
+		}
+		entry.pageCloseListenerByPage.clear();
+		entry.pageById.clear();
+		entry.latestSnapshotByPage.clear();
+		entry.currentPage = undefined;
 	}
 
 	private findPageId(entry: SessionEntry, page: Page): string | undefined {

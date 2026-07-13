@@ -19,7 +19,7 @@ const GITHUB_APP_INSTALL_URL =
 const DEBUGGER_DOCS_URL = "/docs/reference/runtime/playwright-debug";
 const DEBUGGER_CONCEPT_URL = "/docs/understand-libretto/autofix-debugging";
 const DEBUGGER_PROMPT =
-  "Add the Libretto autofix debugger to my existing Playwright automation. " +
+  "Add the Libretto Playwright debugging agent to my existing automation. " +
   "Install @libretto/playwright-debug, then in my script's failure path call " +
   "debugPlaywrightFailure(error, page). Follow " +
   "https://libretto.sh/docs/reference/runtime/playwright-debug to configure " +
@@ -585,7 +585,7 @@ export function SetupPage() {
                     href={DEBUGGER_CONCEPT_URL}
                     className="text-accent-bright underline decoration-accent/40 underline-offset-4 hover:decoration-accent"
                   >
-                    how autofix debugging works
+                    Playwright debugging agent
                   </a>
                 </p>
                 <StepFooter

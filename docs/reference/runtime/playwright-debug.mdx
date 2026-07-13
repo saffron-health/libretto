@@ -1,24 +1,17 @@
 ---
-title: Playwright debug autofix
-description: Open GitHub autofix pull requests when a Playwright automation fails.
+title: Playwright debugging agent
+description: Investigate failures and automatically open pull requests to fix Playwright scripts as they break.
 ---
 
+The Playwright debugging agent investigates failed browser automations and
+automatically opens pull requests that fix broken scripts.
+
 `@libretto/playwright-debug` lets an existing Playwright script keep its current
-browser provider, retries, logging, and fallback logic while adding one debugger
+browser provider, retries, logging, and fallback logic while adding one agent
 call in the failure path.
 
 ```typescript
-import {
-  createLibrettoDebugger,
-  createLibrettoGitHubConnectUrl,
-} from "@libretto/playwright-debug";
-
-console.log(
-  await createLibrettoGitHubConnectUrl({
-    owner: "acme",
-    repo: "automations",
-  }),
-);
+import { createLibrettoDebugger } from "@libretto/playwright-debug";
 
 const librettoDebugger = createLibrettoDebugger({
   github: {
@@ -29,7 +22,6 @@ const librettoDebugger = createLibrettoDebugger({
   agent: {
     model: "openai/gpt-5.4",
   },
-  mode: "open_pr",
 });
 ```
 
@@ -58,7 +50,6 @@ files from GitHub at `baseBranch`.
 ```typescript
 await librettoDebugger.debugPlaywrightFailure(error, page, {
   includeFiles: ["src/workflows/acme.ts"],
-  branchName: "libretto-debug/acme-login",
 });
 ```
 
@@ -72,9 +63,11 @@ minified stacks, or a cross-file change).
 The debugger does not guess a fix from a static snapshot. It runs an agent loop
 built on the [`@libretto/browser-tools`](https://www.npmjs.com/package/@libretto/browser-tools)
 SDK: the model is given the failure context and source files, then drives a real
-browser to confirm the root cause before proposing a change. It can:
+browser to confirm the root cause before proposing a change. It stays attached
+to the supplied failed `Page`, preserving its authentication, storage, routes,
+open tabs, and in-memory state. It can:
 
-- `browser_open` the URL where the automation failed,
+- `browser_status` the existing pages in the failed browser context,
 - `browser_snapshot` the live accessibility tree (and a screenshot), and
 - `browser_exec` Playwright code against the page — for example counting a
   selector's matches to check whether it actually resolves.
@@ -85,9 +78,9 @@ Git API and opens a pull request whose body cites the observed evidence. If the
 evidence is insufficient for a safe fix, it opens no PR and returns
 `status: "no_changes"`.
 
-Because it launches a local browser to investigate, the environment running the
-debugger needs Playwright's Chromium available (the same requirement as your
-automation).
+The debugger does not launch or close a second browser. Debugger infrastructure
+failures resolve with `status: "debugger_failed"` so the caller's existing
+fallback and original error handling can continue.
 
 ## Model Keys
 
@@ -106,9 +99,9 @@ secrets manager.
 
 The debugger uses Libretto's public GitHub App through Libretto Cloud.
 
-First connect the repository to Libretto Cloud. The connect flow verifies the
-GitHub user can access the installed Libretto GitHub App and stores the
-tenant/repository link. Then provide:
+First use the [Libretto setup flow](https://libretto.sh/setup) to connect the
+repository. The flow verifies the GitHub user can access the installed Libretto
+GitHub App and stores the tenant/repository link. Then provide:
 
 ```bash
 export LIBRETTO_API_KEY=...

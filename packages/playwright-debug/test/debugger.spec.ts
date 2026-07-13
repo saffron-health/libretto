@@ -2,7 +2,6 @@ import type { Page } from "playwright";
 import { describe, expect, it, vi } from "vitest";
 import {
   createLibrettoDebugger,
-  createLibrettoGitHubConnectUrl,
   parseAgentModel,
   type DebugAgentRunner,
 } from "../src/index.js";
@@ -55,40 +54,6 @@ describe("parseAgentModel", () => {
   });
 });
 
-describe("createLibrettoGitHubConnectUrl", () => {
-  it("requests a GitHub connect URL from Libretto Cloud", async () => {
-    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      expect(init?.method).toBe("POST");
-      expect(new Headers(init?.headers).get("x-api-key")).toBe("libretto-key");
-      expect(JSON.parse(init?.body as string)).toEqual({
-        json: {
-          owner: "acme",
-          repo: "automations",
-        },
-      });
-      return jsonResponse({
-        json: {
-          url: "https://github.com/login/oauth/authorize?state=signed",
-        },
-      });
-    }) as unknown as typeof fetch;
-
-    await expect(
-      createLibrettoGitHubConnectUrl({
-        owner: "acme",
-        repo: "automations",
-        librettoApiKey: "libretto-key",
-        librettoApiUrl: "https://api.libretto.test",
-        fetch: fetchImpl,
-      }),
-    ).resolves.toBe("https://github.com/login/oauth/authorize?state=signed");
-    expect(fetchImpl).toHaveBeenCalledWith(
-      "https://api.libretto.test/v1/github/createConnectUrl",
-      expect.objectContaining({ method: "POST" }),
-    );
-  });
-});
-
 describe("createLibrettoDebugger", () => {
   it("captures failure context and returns no_changes when the agent has no fix", async () => {
     const requests: Array<{ method: string; url: string }> = [];
@@ -127,6 +92,7 @@ describe("createLibrettoDebugger", () => {
         },
       ]);
       return {
+        title: "Investigate submit timeout",
         summary: "No safe fix found",
         rationale: "The failure needs more context.",
         changes: [],
@@ -190,6 +156,7 @@ describe("createLibrettoDebugger", () => {
         },
       ]);
       return {
+        title: "Investigate submit timeout",
         summary: "No safe fix found",
         rationale: "The failure needs more context.",
         changes: [],
@@ -256,7 +223,12 @@ describe("createLibrettoDebugger", () => {
       if (method === "POST" && requestUrl.endsWith("/git/commits")) {
         return jsonResponse({ sha: "new-commit", tree: { sha: "tree-sha" } });
       }
-      if (method === "PATCH" && requestUrl.endsWith("/git/refs/heads/libretto-debug%2Ftest")) {
+      if (
+        method === "PATCH" &&
+        requestUrl.includes(
+          "/git/refs/heads/libretto-debug%2Facme-automations-20260713T220000000Z-",
+        )
+      ) {
         return jsonResponse({});
       }
       if (method === "POST" && requestUrl.endsWith("/pulls")) {
@@ -279,7 +251,9 @@ describe("createLibrettoDebugger", () => {
         model: "anthropic/claude-sonnet-4-6",
       },
       fetch: fetchImpl,
+      now: () => new Date("2026-07-13T22:00:00.000Z"),
       modelRunner: async () => ({
+        title: "Use the new submit selector",
         summary: "Use the new submit selector",
         rationale: "The DOM shows the old selector no longer exists.",
         changes: [
@@ -294,12 +268,13 @@ describe("createLibrettoDebugger", () => {
     const result = await debuggerInstance.debugPlaywrightFailure(
       createError(),
       createPage(),
-      { branchName: "libretto-debug/test" },
     );
 
     expect(result).toMatchObject({
       status: "pull_request_opened",
-      branchName: "libretto-debug/test",
+      branchName: expect.stringMatching(
+        /^libretto-debug\/acme-automations-20260713T220000000Z-[0-9a-f]{8}$/,
+      ),
       pullRequestUrl: "https://github.com/acme/automations/pull/123",
       changedFiles: ["src/workflow.ts"],
     });
@@ -319,10 +294,25 @@ describe("createLibrettoDebugger", () => {
       encoding: "utf-8",
     });
     expect(calls.find((call) => call.url.endsWith("/pulls"))?.body).toMatchObject({
-      title: "Libretto autofix for Playwright failure",
-      head: "libretto-debug/test",
+      title: "[Libretto Agent]: Use the new submit selector",
+      head: expect.stringMatching(
+        /^libretto-debug\/acme-automations-20260713T220000000Z-[0-9a-f]{8}$/,
+      ),
       base: "main",
     });
+
+    const secondResult = await debuggerInstance.debugPlaywrightFailure(
+      createError(),
+      createPage(),
+    );
+    expect(secondResult).toMatchObject({ status: "pull_request_opened" });
+    if (
+      result.status !== "pull_request_opened" ||
+      secondResult.status !== "pull_request_opened"
+    ) {
+      throw new Error("Expected both debugger runs to open pull requests");
+    }
+    expect(secondResult.branchName).not.toBe(result.branchName);
   });
 
   it("uses Libretto Cloud to broker the GitHub installation token", async () => {
@@ -377,6 +367,7 @@ describe("createLibrettoDebugger", () => {
       },
       fetch: fetchImpl,
       modelRunner: async () => ({
+        title: "No fix",
         summary: "No fix",
         rationale: "No fix",
         changes: [],
@@ -411,6 +402,7 @@ describe("createLibrettoDebugger", () => {
       },
       fetch: vi.fn() as unknown as typeof fetch,
       modelRunner: async () => ({
+        title: "Unused",
         summary: "unused",
         rationale: "unused",
         changes: [],
@@ -419,7 +411,49 @@ describe("createLibrettoDebugger", () => {
 
     await expect(
       debuggerInstance.debugPlaywrightFailure(createError(), createPage()),
-    ).rejects.toThrow("GitHub authentication is missing");
+    ).resolves.toMatchObject({
+      status: "debugger_failed",
+      error: expect.stringContaining("GitHub authentication is missing"),
+    });
+  });
+
+  it("does not replace the original automation error or prevent fallback logic", async () => {
+    const debuggerInstance = createLibrettoDebugger({
+      github: {
+        owner: "acme",
+        repo: "automations",
+        baseBranch: "main",
+        token: "ghs_test",
+      },
+      agent: { model: "openai/gpt-5.4" },
+      fetch: (async () =>
+        jsonResponse({ message: "GitHub unavailable" }, { status: 503 })) as typeof fetch,
+      modelRunner: async () => ({
+        title: "Unused",
+        summary: "unused",
+        rationale: "unused",
+        changes: [],
+      }),
+    });
+    const originalError = createError();
+    let fallbackCalled = false;
+
+    const runFailurePath = async () => {
+      try {
+        throw originalError;
+      } catch (error) {
+        const debugResult = await debuggerInstance.debugPlaywrightFailure(
+          error,
+          createPage(),
+        );
+        expect(debugResult.status).toBe("debugger_failed");
+        fallbackCalled = true;
+        throw error;
+      }
+    };
+
+    await expect(runFailurePath()).rejects.toBe(originalError);
+    expect(fallbackCalled).toBe(true);
   });
 
   it("rejects unsafe paths returned by the agent", async () => {
@@ -454,6 +488,7 @@ describe("createLibrettoDebugger", () => {
       },
       fetch: fetchImpl,
       modelRunner: async () => ({
+        title: "Unsafe",
         summary: "Unsafe",
         rationale: "Unsafe",
         changes: [{ path: "../secret.ts", content: "" }],
@@ -462,6 +497,9 @@ describe("createLibrettoDebugger", () => {
 
     await expect(
       debuggerInstance.debugPlaywrightFailure(createError(), createPage()),
-    ).rejects.toThrow("Unsafe repository path");
+    ).resolves.toMatchObject({
+      status: "debugger_failed",
+      error: expect.stringContaining("Unsafe repository path"),
+    });
   });
 });

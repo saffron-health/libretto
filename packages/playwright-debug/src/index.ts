@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { relative, win32 } from "node:path";
 import { z } from "zod";
 import {
@@ -10,13 +11,10 @@ import {
 } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
-import { LocalBrowserProvider } from "@libretto/browser-tools";
-import { createAiSdkBrowserTools } from "@libretto/browser-tools/ai-sdk";
+import { createAiSdkBrowserToolsForPage } from "@libretto/browser-tools/ai-sdk";
 import type { Page } from "playwright";
 
 export type SupportedAgentProvider = "anthropic" | "openai";
-
-export type LibrettoDebuggerMode = "open_pr";
 
 export type GitHubDebuggerConfig = {
   owner: string;
@@ -58,6 +56,7 @@ export type AgentFileChange = {
 };
 
 export type AgentFix = {
+  title: string;
   summary: string;
   rationale: string;
   changes: AgentFileChange[];
@@ -79,26 +78,20 @@ export type DebugAgentRunner = (
 export type LibrettoDebuggerOptions = {
   github: GitHubDebuggerConfig;
   agent: AgentModelConfig;
-  mode?: LibrettoDebuggerMode;
   modelRunner?: DebugAgentRunner;
   fetch?: typeof fetch;
   now?: () => Date;
 };
 
-export type CreateGitHubConnectUrlOptions = {
-  owner: string;
-  repo: string;
-  librettoApiKey?: string;
-  librettoApiUrl?: string;
-  fetch?: typeof fetch;
-};
-
 export type DebugPlaywrightFailureOptions = {
-  branchName?: string;
   includeFiles?: string[];
 };
 
 export type DebugPlaywrightFailureResult =
+  | {
+      status: "debugger_failed";
+      error: string;
+    }
   | {
       status: "no_changes";
       summary: string;
@@ -164,6 +157,7 @@ const DEFAULT_MAX_DOM_CHARS = 120_000;
 const DEFAULT_LIBRETTO_API_URL = "https://api.libretto.sh";
 
 const agentFixSchema = z.object({
+  title: z.string().trim().min(1).max(120),
   summary: z.string().min(1),
   rationale: z.string().min(1),
   changes: z.array(
@@ -177,18 +171,16 @@ const agentFixSchema = z.object({
 export function createLibrettoDebugger(
   options: LibrettoDebuggerOptions,
 ): LibrettoDebugger {
-  const mode = options.mode ?? "open_pr";
-  if (mode !== "open_pr") {
-    throw new Error(`Unsupported debugger mode "${mode}". Supported mode: open_pr.`);
-  }
-
   const model = parseAgentModel(options.agent.model);
   const maxSourceFileBytes =
     options.agent.maxSourceFileBytes ?? DEFAULT_MAX_SOURCE_FILE_BYTES;
   const now = options.now ?? (() => new Date());
 
-  return {
-    async debugPlaywrightFailure(error, page, failureOptions = {}) {
+  const runDebugPlaywrightFailure = async (
+    error: unknown,
+    page: Page,
+    failureOptions: DebugPlaywrightFailureOptions,
+  ): Promise<DebugPlaywrightFailureResult> => {
       const failure = await captureFailureContext(error, page);
       const github = await GitHubClient.create({
         config: options.github,
@@ -210,7 +202,7 @@ export function createLibrettoDebugger(
       const runner =
         options.modelRunner ??
         ((context: DebugAgentContext) =>
-          runBrowserToolsDebugAgent(context, options.agent.apiKey));
+          runBrowserToolsDebugAgent(context, page, options.agent.apiKey));
       const fix = agentFixSchema.parse(
         await runner({
           model,
@@ -228,13 +220,11 @@ export function createLibrettoDebugger(
         };
       }
 
-      const branchName =
-        failureOptions.branchName ??
-        createBranchName({
-          owner: options.github.owner,
-          repo: options.github.repo,
-          date: now(),
-        });
+      const branchName = createBranchName({
+        owner: options.github.owner,
+        repo: options.github.repo,
+        date: now(),
+      });
       await github.createBranch(branchName, base.commitSha);
       const commitSha = await github.commitFileChanges({
         branchName,
@@ -247,7 +237,7 @@ export function createLibrettoDebugger(
       const pullRequestUrl = await github.openPullRequest({
         branchName,
         baseBranch: options.github.baseBranch,
-        title: "Libretto autofix for Playwright failure",
+        title: `[Libretto Agent]: ${fix.title}`,
         body: createPullRequestBody({
           fix,
           failure,
@@ -265,53 +255,24 @@ export function createLibrettoDebugger(
         changedFiles: changes.map((change) => change.path),
         sourceFiles,
       };
+  };
+
+  return {
+    async debugPlaywrightFailure(error, page, failureOptions = {}) {
+      try {
+        return await runDebugPlaywrightFailure(error, page, failureOptions);
+      } catch (debuggerError) {
+        return {
+          status: "debugger_failed",
+          error: `Libretto debugger failed: ${formatError(debuggerError)}`,
+        };
+      }
     },
   };
 }
 
-export async function createLibrettoGitHubConnectUrl(
-  options: CreateGitHubConnectUrlOptions,
-): Promise<string> {
-  const apiKey =
-    options.librettoApiKey?.trim() ?? process.env.LIBRETTO_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error(
-      "Creating a GitHub connect URL requires LIBRETTO_API_KEY or librettoApiKey.",
-    );
-  }
-
-  const apiUrl = trimTrailingSlash(
-    options.librettoApiUrl?.trim() ??
-      process.env.LIBRETTO_API_URL?.trim() ??
-      DEFAULT_LIBRETTO_API_URL,
-  );
-  const response = await (options.fetch ?? globalThis.fetch)(
-    `${apiUrl}/v1/github/createConnectUrl`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        json: {
-          owner: options.owner,
-          repo: options.repo,
-        },
-      }),
-    },
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Libretto GitHub connect URL request failed (${response.status}): ${await response.text()}`,
-    );
-  }
-
-  const body = (await response.json()) as { json?: { url?: string } };
-  if (!body.json?.url) {
-    throw new Error("Libretto GitHub connect URL response did not include a URL.");
-  }
-  return body.json.url;
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function parseAgentModel(model: string): {
@@ -519,8 +480,9 @@ function createBranchName(args: {
   repo: string;
   date: Date;
 }): string {
-  const iso = args.date.toISOString().replace(/[-:]/g, "").replace(/\..+$/, "");
-  return `libretto-debug/${slugify(args.owner)}-${slugify(args.repo)}-${iso}`;
+  const iso = args.date.toISOString().replace(/[-:.]/g, "");
+  const suffix = randomBytes(4).toString("hex");
+  return `libretto-debug/${slugify(args.owner)}-${slugify(args.repo)}-${iso}-${suffix}`;
 }
 
 function slugify(value: string): string {
@@ -568,30 +530,31 @@ const BROWSER_TOOLS_SYSTEM_PROMPT = [
   "",
   "Method:",
   "1. Read the failure (error message, stack, and source files) provided below.",
-  "2. Actively investigate the real page instead of guessing. Use `browser_open` to load the URL where it failed, `browser_snapshot` to read the live accessibility tree / DOM, and `browser_exec` to probe the page (for example run `return await page.locator('input[name=\"login\"]').count()` to confirm whether a selector actually resolves).",
+  "2. Actively investigate the attached failed page instead of guessing. Use the provided session ID with `browser_snapshot` to read the live accessibility tree / DOM and `browser_exec` to probe the page (for example run `return await page.locator('input[name=\"login\"]').count()` to confirm whether a selector actually resolves).",
   "3. Only once the live page confirms the real cause, call `submit_fix` with full-file replacements for the files that must change.",
   "",
   "Rules:",
+  "- Provide a concise PR title that describes the fix. Do not include the `[Libretto Agent]` prefix; the library adds it.",
   "- Base the fix on what you actually observed in the browser, never on assumptions.",
   "- Return COMPLETE file contents for each changed file, not diffs.",
   "- Change as little as possible and do not touch unrelated code.",
+  "- Do not close the page, browser context, or browser.",
   "- Prefer selectors that you verified exist on the live page.",
   "- If the evidence is insufficient for a safe fix, call `submit_fix` with an empty `changes` array.",
 ].join("\n");
 
 async function runBrowserToolsDebugAgent(
   context: DebugAgentContext,
+  page: Page,
   apiKeyOverride?: string,
 ): Promise<AgentFix> {
   const model = await resolveLanguageModel(context.model, apiKeyOverride);
-  const browser = createAiSdkBrowserTools(
-    new LocalBrowserProvider({ headless: true }),
-  );
+  const browser = createAiSdkBrowserToolsForPage(page);
 
   let submitted: AgentFix | null = null;
   const submitFix = tool({
     description:
-      "Submit the final fix after investigating the live page. Provide full-file " +
+      "Submit the final fix and a concise PR title after investigating the live page. Provide full-file " +
       "replacements for every file that must change, or an empty changes array when " +
       "there is not enough evidence for a safe fix.",
     inputSchema: agentFixSchema,
@@ -601,10 +564,6 @@ async function runBrowserToolsDebugAgent(
     },
   });
 
-  // The debugger runs inside a failed automation's catch path, so an
-  // agent-side error should degrade to "no changes" rather than replace the
-  // caller's original failure.
-  let agentError: unknown = null;
   try {
     await generateText({
       model,
@@ -614,31 +573,30 @@ async function runBrowserToolsDebugAgent(
         hasToolCall("submit_fix"),
       ],
       system: BROWSER_TOOLS_SYSTEM_PROMPT,
-      messages: buildAgentMessages(context),
+      messages: buildAgentMessages(context, browser.sessionId),
     });
-  } catch (error) {
-    agentError = error;
   } finally {
     await browser.dispose();
   }
 
   if (submitted) return submitted;
   return {
+    title: "No fix submitted",
     summary: "No fix submitted",
-    rationale: agentError
-      ? `The debug agent errored before submitting a fix: ${
-          agentError instanceof Error ? agentError.message : String(agentError)
-        }`
-      : "The debug agent did not reach a confident fix within its investigation budget.",
+    rationale:
+      "The debug agent did not reach a confident fix within its investigation budget.",
     changes: [],
   };
 }
 
-function buildAgentMessages(context: DebugAgentContext): ModelMessage[] {
+function buildAgentMessages(
+  context: DebugAgentContext,
+  sessionId: string,
+): ModelMessage[] {
   const content: Array<
     | { type: "text"; text: string }
     | { type: "image"; image: string; mediaType: string }
-  > = [{ type: "text", text: createAgentPrompt(context) }];
+  > = [{ type: "text", text: createAgentPrompt(context, sessionId) }];
   if (context.failure.screenshot) {
     content.push({
       type: "image",
@@ -670,7 +628,10 @@ async function resolveLanguageModel(
   return createAnthropic({ apiKey })(model.modelId);
 }
 
-function createAgentPrompt(context: DebugAgentContext): string {
+function createAgentPrompt(
+  context: DebugAgentContext,
+  sessionId: string,
+): string {
   const files = context.sourceFiles
     .map(
       (file) =>
@@ -679,6 +640,7 @@ function createAgentPrompt(context: DebugAgentContext): string {
     .join("\n\n");
   return [
     "A Playwright browser automation failed. Investigate the live page and fix it.",
+    `The failed page is already attached as browser session ${sessionId}.`,
     "",
     "Failure:",
     `Message: ${context.failure.message}`,

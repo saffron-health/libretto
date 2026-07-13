@@ -358,9 +358,6 @@ importers:
       '@types/node':
         specifier: ^25.5.0
         version: 25.5.0
-      lintcn:
-        specifier: ^0.9.0
-        version: 0.9.0
       playwright:
         specifier: ^1.58.2
         version: 1.58.2

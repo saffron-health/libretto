@@ -1,20 +1,13 @@
 # @libretto/playwright-debug
 
-`@libretto/playwright-debug` opens GitHub autofix pull requests from failed
-Playwright runs.
+`@libretto/playwright-debug` adds a Playwright debugging agent that investigates
+failed runs on the supplied live page and automatically opens pull requests to
+fix broken scripts. It preserves the page's browser context and treats debugger
+infrastructure failures as best-effort results instead of replacing the original
+automation error.
 
 ```ts
-import {
-  createLibrettoDebugger,
-  createLibrettoGitHubConnectUrl,
-} from "@libretto/playwright-debug";
-
-console.log(
-  await createLibrettoGitHubConnectUrl({
-    owner: "acme",
-    repo: "automations",
-  }),
-);
+import { createLibrettoDebugger } from "@libretto/playwright-debug";
 
 const librettoDebugger = createLibrettoDebugger({
   github: {
@@ -25,7 +18,6 @@ const librettoDebugger = createLibrettoDebugger({
   agent: {
     model: "openai/gpt-5.4",
   },
-  mode: "open_pr",
 });
 
 try {
@@ -43,8 +35,8 @@ For model calls, use the provider's normal API key environment variable:
 - `OPENAI_API_KEY` for `openai/...`
 - `ANTHROPIC_API_KEY` for `anthropic/...`
 
-For GitHub, link the repository to the public Libretto GitHub App and configure
-a Libretto Cloud API key:
+For GitHub, use the [Libretto setup flow](https://libretto.sh/setup) to connect
+the repository, then configure the generated Libretto Cloud API key:
 
 - `LIBRETTO_API_KEY`
 

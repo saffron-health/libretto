@@ -7,8 +7,12 @@ export type {
 	ProviderSession,
 	ProviderSessionClosed,
 } from "./provider.js";
-export { createBrowserTools } from "./create-browser-tools.js";
+export {
+	createBrowserTools,
+	createBrowserToolsForPage,
+} from "./create-browser-tools.js";
 export type {
+	BorrowedPageBrowserToolkit,
 	BrowserToolkit,
 	BrowserToolkitOptions,
 } from "./create-browser-tools.js";

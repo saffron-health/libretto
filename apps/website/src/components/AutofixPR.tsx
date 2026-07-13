@@ -101,7 +101,7 @@ export function AutofixPR() {
           className="text-sm text-accent-bright underline decoration-accent/40 underline-offset-4 transition-colors hover:decoration-accent"
           data-fathom-event="Autofix section docs click"
         >
-          How the autofix PR agent works →
+          Playwright debugging agent →
         </a>
       </div>
     </SiteSection>
