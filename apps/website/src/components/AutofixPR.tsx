@@ -18,7 +18,7 @@ const STEPS: FlowStep[] = [
   {
     n: "2",
     title: "The agent investigates",
-    body: "Libretto reopens the live page with browser tools, inspects the real DOM, and confirms the root cause instead of guessing.",
+    body: "The Playwright debugging agent inspects the failed page with browser tools, reads its live DOM and browser state, and confirms the root cause instead of guessing.",
   },
   {
     n: "3",
