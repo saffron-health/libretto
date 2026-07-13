@@ -166,6 +166,9 @@ importers:
       libretto:
         specifier: workspace:*
         version: link:../packages/libretto
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   evals:
     dependencies:
