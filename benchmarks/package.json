@@ -4,19 +4,22 @@
   "type": "module",
   "dependencies": {
     "@google-cloud/run": "^3.2.0",
-    "@onkernel/sdk": "^0.44.0",
     "@google-cloud/storage": "^7.16.0",
     "@mariozechner/pi-coding-agent": "^0.62.0",
+    "@onkernel/sdk": "^0.44.0",
     "@sinclair/typebox": "^0.34.41",
+    "affordance": "workspace:*",
     "google-auth-library": "^10.6.1",
     "tsx": "^4.21.0",
     "zod": "^4.3.6"
   },
   "scripts": {
+    "type-check": "tsc --noEmit",
     "benchmarks": "tsx cli.ts"
   },
   "devDependencies": {
     "@libretto/dev-tools": "workspace:*",
-    "libretto": "workspace:*"
+    "libretto": "workspace:*",
+    "typescript": "^5.9.3"
   }
 }

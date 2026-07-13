@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ExecutionsClient } from "@google-cloud/run";
-import { SimpleCLI } from "../libretto-internals.js";
+import { SimpleCLI } from "affordance";
 import { dispatchGcpRun } from "./cloud-dispatch.js";
 import {
   countCompletedCases,
