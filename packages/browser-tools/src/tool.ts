@@ -6,7 +6,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
  * Standard Schema so the public contract names no validator; schemas are
  * authored in zod internally.
  */
-export interface BrowserTool<Input = unknown, Output = unknown> {
+export type BrowserTool<Input = unknown, Output = unknown> = {
 	/** Prefixed name as exposed to the agent, e.g. `browser_open`. */
 	name: string;
 	description: string;
@@ -21,7 +21,7 @@ export interface BrowserTool<Input = unknown, Output = unknown> {
  * throw {@link DomainPolicyRestricted} so clients can inspect and render the
  * configured policy and attempted URL.
  */
-export interface ToolErrorResult {
+export type ToolErrorResult = {
 	ok: false;
 	error: string;
 	stdout?: string;

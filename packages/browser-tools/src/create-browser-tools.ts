@@ -14,7 +14,7 @@ import { createSnapshotTool } from "./tools/snapshot.js";
 import type { StatusTool } from "./tools/status.js";
 import { createStatusTool } from "./tools/status.js";
 
-export interface BrowserToolkit {
+export type BrowserToolkit = {
 	tools: {
 		browser_open: OpenTool;
 		browser_exec: ExecTool;

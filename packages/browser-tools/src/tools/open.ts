@@ -12,7 +12,7 @@ const openInputSchema = z.object({
 
 export type OpenToolInput = z.infer<typeof openInputSchema>;
 
-export interface OpenToolOutput {
+export type OpenToolOutput = {
 	sessionId: string;
 }
 
@@ -21,9 +21,9 @@ export interface OpenToolOutput {
  * StandardSchemaV1) so framework adapters like ai-sdk can pass it straight
  * through as their own schema input.
  */
-export interface OpenTool extends BrowserTool<OpenToolInput, OpenToolOutput> {
+export type OpenTool = {
 	inputSchema: typeof openInputSchema;
-}
+} & BrowserTool<OpenToolInput, OpenToolOutput>
 
 export function createOpenTool(registry: SessionRegistry): OpenTool {
 	return {

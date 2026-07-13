@@ -20,6 +20,14 @@
     "libretto/no-await-import": "error",
     "libretto/require-disable-description": "error"
   },
+  "overrides": [
+    {
+      "files": ["packages/browser-tools/**/*.ts"],
+      "rules": {
+        "typescript/consistent-type-definitions": ["error", "type"]
+      }
+    }
+  ],
   "ignorePatterns": [
     "**/dist/**",
     "docs/**",
