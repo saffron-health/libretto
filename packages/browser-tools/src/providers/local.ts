@@ -7,7 +7,7 @@ import type {
 	ProviderSessionClosed,
 } from "../provider.js";
 
-export interface LocalBrowserProviderOptions {
+export type LocalBrowserProviderOptions = {
 	headless?: boolean;
 }
 
