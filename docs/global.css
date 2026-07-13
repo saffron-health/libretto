@@ -177,7 +177,7 @@
 }
 
 .dark .slot-sidebar-left nav .cursor-default {
-  color: var(--text-tertiary);
+  color: var(--text-tertiary) !important;
 }
 
 .slot-sidebar-left nav a,
