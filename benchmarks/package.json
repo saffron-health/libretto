@@ -14,7 +14,7 @@
     "zod": "^4.3.6"
   },
   "scripts": {
-    "type-check": "turbo run build --filter=@libretto/benchmarks... && tsc --noEmit",
+    "type-check": "tsc --noEmit",
     "benchmarks": "tsx cli.ts"
   },
   "devDependencies": {
