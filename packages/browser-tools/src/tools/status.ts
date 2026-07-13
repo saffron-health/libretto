@@ -17,11 +17,11 @@ const statusInputSchema = z.object({
 
 export type StatusToolInput = z.infer<typeof statusInputSchema>;
 
-export interface StatusAllOutput {
+export type StatusAllOutput = {
 	sessions: SessionSummary[];
 }
 
-export interface StatusSessionOutput {
+export type StatusSessionOutput = {
 	pages: SessionPageSummary[];
 }
 
@@ -30,9 +30,9 @@ export type StatusToolOutput =
 	| StatusSessionOutput
 	| PageStatus;
 
-export interface StatusTool extends BrowserTool<StatusToolInput, StatusToolOutput> {
+export type StatusTool = {
 	inputSchema: typeof statusInputSchema;
-}
+} & BrowserTool<StatusToolInput, StatusToolOutput>
 
 export function createStatusTool(registry: SessionRegistry): StatusTool {
 	return {

@@ -24,20 +24,19 @@ const snapshotInputSchema = z.object({
 
 export type SnapshotToolInput = z.infer<typeof snapshotInputSchema>;
 
-export interface SnapshotScreenshot {
+export type SnapshotScreenshot = {
 	base64: string;
 	mimeType: "image/png";
 }
 
-export interface SnapshotToolOutput {
+export type SnapshotToolOutput = {
 	tree: string;
 	screenshot?: SnapshotScreenshot;
 }
 
-export interface SnapshotTool
-	extends BrowserTool<SnapshotToolInput, SnapshotToolOutput> {
+export type SnapshotTool = {
 	inputSchema: typeof snapshotInputSchema;
-}
+} & BrowserTool<SnapshotToolInput, SnapshotToolOutput>
 
 export function createSnapshotTool(registry: SessionRegistry): SnapshotTool {
 	return {

@@ -9,7 +9,7 @@ const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_BROWSER_SESSION_TIMEOUT_SECONDS = 3_600;
 const QUEUE_WAIT_TIMEOUT_MS = 10 * 60_000;
 
-export interface LibrettoCloudBrowserProviderOptions {
+export type LibrettoCloudBrowserProviderOptions = {
 	apiKey?: string;
 	apiUrl?: string;
 	/** Browser session TTL requested at create time. */
@@ -17,7 +17,7 @@ export interface LibrettoCloudBrowserProviderOptions {
 	headless?: boolean;
 }
 
-interface CloudSessionResponse {
+type CloudSessionResponse = {
 	session_id: string;
 	status: string;
 	cdp_url: string | null;
