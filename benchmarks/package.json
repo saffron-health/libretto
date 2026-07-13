@@ -20,6 +20,6 @@
   "devDependencies": {
     "@libretto/dev-tools": "workspace:*",
     "libretto": "workspace:*",
-    "typescript": "^6.0.3"
+    "typescript": "^5.9.3"
   }
 }
