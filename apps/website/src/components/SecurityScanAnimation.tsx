@@ -221,7 +221,7 @@ export function SecurityScanAnimation() {
     cancelledRef.current = false;
 
     async function run() {
-      // eslint-disable-next-line no-constant-condition
+      // eslint-disable-next-line no-constant-condition -- animation loop runs until cancelledRef is set
       while (true) {
         if (cancelledRef.current) return;
 

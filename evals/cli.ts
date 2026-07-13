@@ -733,7 +733,7 @@ async function discoverEvalFiles(fileFilters: string[]): Promise<string[]> {
 async function importEvalFiles(files: string[]): Promise<EvalCaseRecord[]> {
   for (const file of files) {
     await withEvalFileRegistration(file, async () => {
-      // @lintc-ignore Human-approved: eval files are intentionally discovered and loaded dynamically by the eval CLI.
+      // oxlint-disable-next-line libretto/no-await-import -- Human-approved: eval files are intentionally discovered and loaded dynamically by the eval CLI.
       await import(pathToFileURL(file).href);
     });
   }

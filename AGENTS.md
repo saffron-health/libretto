@@ -89,3 +89,7 @@ In `packages/browser-tools`, format caught errors with `errorMessage()` from `sr
 - Edit `packages/libretto/README.template.md` directly for README changes, then run `pnpm sync:mirrors`.
 - Edit `packages/libretto/skills/libretto/SKILL.md` directly.
 - `packages/libretto/skills/libretto` is the source of truth for Libretto skill files.
+
+## Cursor Cloud specific instructions
+
+- **Browser runs are headless here** (no display). Pass `--headless` to `libretto open`/`run`, or they default to headed and hang.

@@ -28,11 +28,30 @@
       "types": "./dist/adapters/ai-sdk/index.d.ts",
       "import": "./dist/adapters/ai-sdk/index.js",
       "default": "./dist/adapters/ai-sdk/index.js"
+    },
+    "./kernel": {
+      "types": "./dist/providers/kernel.d.ts",
+      "import": "./dist/providers/kernel.js",
+      "default": "./dist/providers/kernel.js"
+    },
+    "./browserbase": {
+      "types": "./dist/providers/browserbase.d.ts",
+      "import": "./dist/providers/browserbase.js",
+      "default": "./dist/providers/browserbase.js"
+    },
+    "./steel": {
+      "types": "./dist/providers/steel.d.ts",
+      "import": "./dist/providers/steel.js",
+      "default": "./dist/providers/steel.js"
+    },
+    "./libretto-cloud": {
+      "types": "./dist/providers/libretto-cloud.d.ts",
+      "import": "./dist/providers/libretto-cloud.js",
+      "default": "./dist/providers/libretto-cloud.js"
     }
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "lint": "lintcn lint --tsconfig tsconfig.json",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:vitest": "vitest run",

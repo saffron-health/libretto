@@ -1,11 +1,16 @@
 import { randomBytes } from "node:crypto";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { chromium } from "playwright";
+import type { DomainPolicyOptions } from "./domain-policy.js";
+import {
+	DomainPolicyRestricted,
+	isUrlAllowed,
+} from "./domain-policy.js";
 import type { Snapshot } from "./snapshot/capture-snapshot.js";
 import { snapshot as captureSnapshot } from "./snapshot/capture-snapshot.js";
 import type { BrowserProvider } from "./provider.js";
 
-interface SessionEntry {
+type SessionEntry = {
 	providerSessionId: string | undefined;
 	providerName: string;
 	/** True for browser_connect sessions — close detaches without killing the browser. */
@@ -18,19 +23,19 @@ interface SessionEntry {
 	latestSnapshotByPage: Map<Page, Snapshot>;
 }
 
-export interface SessionPageSummary {
+export type SessionPageSummary = {
 	pageId: string;
 	url: string;
 	active: boolean;
 }
 
-export interface SessionSummary {
+export type SessionSummary = {
 	sessionId: string;
 	provider: string;
 	pages: SessionPageSummary[];
 }
 
-export interface PageStatus {
+export type PageStatus = {
 	pageId: string;
 	url: string;
 	title: string;
@@ -46,52 +51,75 @@ export interface PageStatus {
  */
 export class SessionRegistry {
 	private readonly sessions = new Map<string, SessionEntry>();
+	private readonly blockedNavigationByContext = new WeakMap<
+		BrowserContext,
+		DomainPolicyRestricted
+	>();
 	private beforeExitHookInstalled = false;
 
-	constructor(public readonly provider: BrowserProvider) {}
+	constructor(
+		public readonly provider: BrowserProvider,
+		private readonly domainPolicy: DomainPolicyOptions = {},
+	) {}
 
 	async openSession(): Promise<{ sessionId: string }> {
 		const providerSession = await this.provider.createSession();
-		const browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
-		const context = browser.contexts()[0] ?? (await browser.newContext());
-		const entry = this.createSessionEntry({
-			providerSessionId: providerSession.sessionId,
-			providerName: this.provider.name,
-			attached: false,
-			browser,
-			context,
-		});
-		if (context.pages().length === 0) {
-			await context.newPage();
-		}
-		for (const page of context.pages()) {
-			this.trackPage(entry, page);
-		}
+		let browser: Browser | undefined;
+		try {
+			browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
+			const context = browser.contexts()[0] ?? (await browser.newContext());
+			await this.applyDomainPolicy(context);
+			this.assertCurrentPagesAllowed(context);
+			const entry = this.createSessionEntry({
+				providerSessionId: providerSession.sessionId,
+				providerName: this.provider.name,
+				attached: false,
+				browser,
+				context,
+			});
+			if (context.pages().length === 0) {
+				await context.newPage();
+			}
+			for (const page of context.pages()) {
+				this.trackPage(entry, page);
+			}
 
-		const sessionId = this.generateSessionId();
-		this.sessions.set(sessionId, entry);
-		this.installBeforeExitHook();
-		return { sessionId };
+			const sessionId = this.generateSessionId();
+			this.sessions.set(sessionId, entry);
+			this.installBeforeExitHook();
+			return { sessionId };
+		} catch (error) {
+			await browser?.close().catch(() => {});
+			await this.provider.closeSession(providerSession.sessionId).catch(() => {});
+			throw error;
+		}
 	}
 
 	async connectSession(cdpEndpoint: string): Promise<{ sessionId: string }> {
 		const browser = await chromium.connectOverCDP(cdpEndpoint);
-		const context = browser.contexts()[0] ?? (await browser.newContext());
-		const entry = this.createSessionEntry({
-			providerSessionId: undefined,
-			providerName: "attached",
-			attached: true,
-			browser,
-			context,
-		});
-		for (const page of context.pages()) {
-			this.trackPage(entry, page);
-		}
+		try {
+			const context = browser.contexts()[0] ?? (await browser.newContext());
+			await this.applyDomainPolicy(context);
+			this.assertCurrentPagesAllowed(context);
+			const entry = this.createSessionEntry({
+				providerSessionId: undefined,
+				providerName: "attached",
+				attached: true,
+				browser,
+				context,
+			});
+			for (const page of context.pages()) {
+				this.trackPage(entry, page);
+			}
 
-		const sessionId = this.generateSessionId();
-		this.sessions.set(sessionId, entry);
-		this.installBeforeExitHook();
-		return { sessionId };
+			const sessionId = this.generateSessionId();
+			this.sessions.set(sessionId, entry);
+			this.installBeforeExitHook();
+			return { sessionId };
+		} catch (error) {
+			await browser.close().catch(() => {});
+			throw error;
+		}
 	}
 
 	getCurrentPage(sessionId: string, pageId?: string): Page {
@@ -179,6 +207,15 @@ export class SessionRegistry {
 		if (entry) entry.latestSnapshotByPage.clear();
 	}
 
+	consumeBlockedNavigationError(
+		page: Page,
+	): DomainPolicyRestricted | undefined {
+		const context = page.context();
+		const error = this.blockedNavigationByContext.get(context);
+		this.blockedNavigationByContext.delete(context);
+		return error;
+	}
+
 	async dispose(): Promise<void> {
 		this.removeBeforeExitHook();
 		const sessionIds = [...this.sessions.keys()];
@@ -207,6 +244,43 @@ export class SessionRegistry {
 	private readonly handleBeforeExit = (): void => {
 		void this.dispose();
 	};
+
+	private async applyDomainPolicy(context: BrowserContext): Promise<void> {
+		if (
+			this.domainPolicy.allowedDomains === undefined &&
+			!this.domainPolicy.blockedDomains?.length
+		) {
+			return;
+		}
+
+		await context.route("**/*", async (route, request) => {
+			const url = request.url();
+			if (isUrlAllowed(url, this.domainPolicy)) {
+				await route.continue();
+				return;
+			}
+
+			if (request.isNavigationRequest()) {
+				const frame = request.frame();
+				if (frame === frame.page().mainFrame()) {
+					this.blockedNavigationByContext.set(
+						context,
+						new DomainPolicyRestricted(this.domainPolicy, url),
+					);
+				}
+			}
+			await route.abort("blockedbyclient");
+		});
+	}
+
+	private assertCurrentPagesAllowed(context: BrowserContext): void {
+		for (const page of context.pages()) {
+			const url = page.url();
+			if (!isUrlAllowed(url, this.domainPolicy)) {
+				throw new DomainPolicyRestricted(this.domainPolicy, url);
+			}
+		}
+	}
 
 	private createSessionEntry(args: {
 		providerSessionId: string | undefined;

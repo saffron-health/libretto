@@ -12,7 +12,7 @@ const openInputSchema = z.object({
 
 export type OpenToolInput = z.infer<typeof openInputSchema>;
 
-export interface OpenToolOutput {
+export type OpenToolOutput = {
 	sessionId: string;
 }
 
@@ -21,9 +21,9 @@ export interface OpenToolOutput {
  * StandardSchemaV1) so framework adapters like ai-sdk can pass it straight
  * through as their own schema input.
  */
-export interface OpenTool extends BrowserTool<OpenToolInput, OpenToolOutput> {
+export type OpenTool = {
 	inputSchema: typeof openInputSchema;
-}
+} & BrowserTool<OpenToolInput, OpenToolOutput>
 
 export function createOpenTool(registry: SessionRegistry): OpenTool {
 	return {
@@ -35,10 +35,13 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 		async execute({ url }): Promise<ToolResult<OpenToolOutput>> {
 			const { sessionId } = await registry.openSession();
 			if (url !== undefined) {
+				const page = registry.getCurrentPage(sessionId);
 				try {
-					await registry.getCurrentPage(sessionId).goto(url);
+					await page.goto(url);
 				} catch (err) {
+					const policyError = registry.consumeBlockedNavigationError(page);
 					await registry.closeSession(sessionId);
+					if (policyError) throw policyError;
 					return {
 						ok: false,
 						error:

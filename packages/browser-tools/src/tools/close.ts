@@ -13,9 +13,9 @@ export type CloseToolInput = z.infer<typeof closeInputSchema>;
 
 export type CloseToolOutput = {};
 
-export interface CloseTool extends BrowserTool<CloseToolInput, CloseToolOutput> {
+export type CloseTool = {
 	inputSchema: typeof closeInputSchema;
-}
+} & BrowserTool<CloseToolInput, CloseToolOutput>
 
 export function createCloseTool(registry: SessionRegistry): CloseTool {
 	return {

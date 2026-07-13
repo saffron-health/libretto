@@ -1,9 +1,10 @@
 import type { ToolSet } from "ai";
 import { expect, test as base } from "vitest";
+import { DomainPolicyRestricted } from "../../domain-policy.js";
 import { LocalBrowserProvider } from "../../providers/local.js";
 import { createAiSdkBrowserTools } from "./index.js";
 
-interface Toolkit {
+type Toolkit = {
 	tools: ToolSet;
 	dispose(): Promise<void>;
 }
@@ -57,6 +58,20 @@ test("browser_open with a data: URL returns a session ID", async ({
 		url: "data:text/html,<title>hello</title>",
 	});
 	expect(result).toMatchObject({ ok: true, sessionId: expect.any(String) });
+});
+
+test("createAiSdkBrowserTools forwards domain policy options", async () => {
+	const toolkit = createAiSdkBrowserTools(
+		new LocalBrowserProvider({ headless: true }),
+		{ blockedDomains: ["example.com"] },
+	);
+
+	await expect(
+		callTool(toolkit.tools, "browser_open", {
+			url: "https://example.com/",
+		}),
+	).rejects.toBeInstanceOf(DomainPolicyRestricted);
+	await toolkit.dispose();
 });
 
 test("browser_exec runs Playwright code against the opened page", async ({

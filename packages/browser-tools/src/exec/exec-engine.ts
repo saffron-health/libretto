@@ -3,7 +3,7 @@ import type { Browser, BrowserContext, Page } from "playwright";
 import { errorMessage } from "../errors.js";
 import type { ToolResult } from "../tool.js";
 
-export interface ExecScope {
+export type ExecScope = {
 	page: Page;
 	context: BrowserContext;
 	browser: Browser;

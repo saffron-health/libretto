@@ -30,7 +30,7 @@ const execInputSchema = z.object({
 
 export type ExecToolInput = z.infer<typeof execInputSchema>;
 
-export interface ExecToolOutput {
+export type ExecToolOutput = {
 	result: unknown;
 	stdout: string;
 	stderr: string;
@@ -43,9 +43,9 @@ export interface ExecToolOutput {
  * StandardSchemaV1) so framework adapters like ai-sdk can pass it straight
  * through as their own schema input.
  */
-export interface ExecTool extends BrowserTool<ExecToolInput, ExecToolOutput> {
+export type ExecTool = {
 	inputSchema: typeof execInputSchema;
-}
+} & BrowserTool<ExecToolInput, ExecToolOutput>
 
 export function createExecTool(registry: SessionRegistry): ExecTool {
 	return {
@@ -89,6 +89,10 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 
 			const before = await registry.readSnapshotBaseline(sessionId, pageId);
 			const execResult = await runExecCode(code, scope);
+			const executionPolicyError = registry.consumeBlockedNavigationError(
+				scope.page,
+			);
+			if (executionPolicyError) throw executionPolicyError;
 			if (!execResult.ok) return execResult;
 
 			let snapshotDiff = "";
@@ -99,6 +103,9 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			} catch {
 				registry.clearSnapshotCache(sessionId);
 			}
+			const stabilizationPolicyError =
+				registry.consumeBlockedNavigationError(scope.page);
+			if (stabilizationPolicyError) throw stabilizationPolicyError;
 
 			return { ...execResult, snapshotDiff };
 		},
