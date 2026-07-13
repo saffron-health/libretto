@@ -272,9 +272,13 @@
 }
 
 .slot-main figure[class~='group/code'] button[aria-label='Copy code'] {
-  border: 1px solid var(--border-subtle);
+  border: 0;
   border-radius: 4px;
-  background: var(--popover);
+  background: transparent;
+}
+
+.slot-main figure[class~='group/code'] button[aria-label='Copy code']:hover {
+  background: var(--docs-hover);
 }
 
 .slot-main
