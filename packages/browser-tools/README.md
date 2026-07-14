@@ -21,5 +21,3 @@ const result = await generateText({
 
 await dispose(); // close any sessions the agent left open
 ```
-
-Under active development — not yet published.
