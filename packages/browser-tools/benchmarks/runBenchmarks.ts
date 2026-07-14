@@ -152,6 +152,13 @@ type CliOptions = {
 	repeatCount: number;
 }
 
+const CliOptionsSchema = z.object({
+	casePattern: z.string().optional(),
+	concurrency: z.number().int().positive(),
+	outputDir: z.string().optional(),
+	repeatCount: z.number().int().positive(),
+});
+
 type UsageMetrics = {
 	durationMs: number;
 	inputTokens: number;
@@ -206,28 +213,36 @@ class SessionRunError extends Error {
 	}
 }
 
+type AffordanceSchema = Parameters<typeof SimpleCLI.option>[0];
+
+function forAffordance(schema: z.ZodType): AffordanceSchema {
+	return schema as unknown as AffordanceSchema;
+}
+
 const benchmarkInput = SimpleCLI.input({
 	positionals: [],
 	named: {
-		casePattern: SimpleCLI.option(z.string().optional(), {
+		casePattern: SimpleCLI.option(forAffordance(z.string().optional()), {
 			name: "case",
 			aliases: ["t"],
 			help: "Run cases whose names contain this text",
 		}),
 		concurrency: SimpleCLI.option(
-			z.coerce.number().int().positive().default(DEFAULT_CONCURRENCY),
+			forAffordance(
+				z.coerce.number().int().positive().default(DEFAULT_CONCURRENCY),
+			),
 			{
 				help: `Parallel attempts (default: ${DEFAULT_CONCURRENCY})`,
 			},
 		),
 		repeatCount: SimpleCLI.option(
-			z.coerce.number().int().positive().default(1),
+			forAffordance(z.coerce.number().int().positive().default(1)),
 			{
 				name: "repeat-count",
 				help: "Runs per selected case (default: 1)",
 			},
 		),
-		outputDir: SimpleCLI.option(z.string().optional(), {
+		outputDir: SimpleCLI.option(forAffordance(z.string().optional()), {
 			name: "output",
 			help: "Artifact directory",
 		}),
@@ -783,7 +798,7 @@ const app = SimpleCLI.define(
 		})
 			.input(benchmarkInput)
 			.handle(async ({ input }) => {
-				await runBenchmarks(input);
+				await runBenchmarks(CliOptionsSchema.parse(input));
 			}),
 	},
 	{
