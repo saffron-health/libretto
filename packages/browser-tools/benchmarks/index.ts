@@ -305,6 +305,13 @@ function totalMetric(
 	return results.reduce((total, result) => total + result.agentMetrics[key], 0);
 }
 
+function maxContextTokens(results: AttemptResult[]): number {
+	return results.reduce(
+		(max, result) => Math.max(max, result.agentMetrics.maxRequestContextTokens),
+		0,
+	);
+}
+
 function summaryMarkdown(options: {
 	runId: string;
 	results: AttemptResult[];
@@ -329,14 +336,15 @@ function summaryMarkdown(options: {
 		`- Completed: \`${completed}\``,
 		`- Passed: \`${passed}\``,
 		`- Agent duration: \`${(totalMetric(options.results, "durationMs") / 1000).toFixed(1)}s\``,
+		`- Maximum request context: \`${maxContextTokens(options.results)}\``,
 		`- Agent tokens: \`${totalMetric(options.results, "totalTokens")}\``,
 		`- Agent cost: \`$${totalMetric(options.results, "costUsd").toFixed(4)}\``,
 		`- Browser tool calls: \`${totalMetric(options.results, "totalToolCalls")}\``,
 		"",
 		"## Harnesses",
 		"",
-		"| Harness | Attempts | Completed | Passed | Duration | Tokens | Cost | Tool calls |",
-		"|---|---:|---:|---:|---:|---:|---:|---:|",
+		"| Harness | Attempts | Completed | Passed | Avg duration | Max context | Tokens | Cost | Tool calls |",
+		"|---|---:|---:|---:|---:|---:|---:|---:|---:|",
 	];
 	for (const harness of HARNESS_NAMES) {
 		const harnessResults = options.results.filter(
@@ -344,19 +352,19 @@ function summaryMarkdown(options: {
 		);
 		if (harnessResults.length === 0) continue;
 		lines.push(
-			`| ${harness} | ${harnessResults.length} | ${harnessResults.filter((result) => result.status === "completed").length} | ${harnessResults.filter((result) => result.judgment?.completed === true).length} | ${(totalMetric(harnessResults, "durationMs") / 1000).toFixed(1)}s | ${totalMetric(harnessResults, "totalTokens")} | $${totalMetric(harnessResults, "costUsd").toFixed(4)} | ${totalMetric(harnessResults, "totalToolCalls")} |`,
+			`| ${harness} | ${harnessResults.length} | ${harnessResults.filter((result) => result.status === "completed").length} | ${harnessResults.filter((result) => result.judgment?.completed === true).length} | ${(totalMetric(harnessResults, "durationMs") / harnessResults.length / 1000).toFixed(1)}s | ${maxContextTokens(harnessResults)} | ${totalMetric(harnessResults, "totalTokens")} | $${totalMetric(harnessResults, "costUsd").toFixed(4)} | ${totalMetric(harnessResults, "totalToolCalls")} |`,
 		);
 	}
 	lines.push(
 		"",
 		"## Cases",
 		"",
-		"| Case | Harness | Repeat | Status | Score | Duration | Tokens | Cost |",
-		"|---|---|---:|---|---|---:|---:|---:|",
+		"| Case | Harness | Repeat | Status | Score | Duration | Max context | Tokens | Cost |",
+		"|---|---|---:|---|---|---:|---:|---:|---:|",
 	);
 	for (const result of options.results) {
 		lines.push(
-			`| ${result.caseName} | ${result.harness} | ${result.repeat} | ${result.status} | ${result.judgment?.completed === true ? "pass" : "fail"} | ${(result.agentMetrics.durationMs / 1000).toFixed(1)}s | ${result.agentMetrics.totalTokens} | $${result.agentMetrics.costUsd.toFixed(4)} |`,
+			`| ${result.caseName} | ${result.harness} | ${result.repeat} | ${result.status} | ${result.judgment?.completed === true ? "pass" : "fail"} | ${(result.agentMetrics.durationMs / 1000).toFixed(1)}s | ${result.agentMetrics.maxRequestContextTokens} | ${result.agentMetrics.totalTokens} | $${result.agentMetrics.costUsd.toFixed(4)} |`,
 		);
 	}
 	return `${lines.join("\n")}\n`;
@@ -438,6 +446,7 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 		passed: results.filter((result) => result.judgment?.completed === true)
 			.length,
 		agentDurationMs: totalMetric(results, "durationMs"),
+		maxRequestContextTokens: maxContextTokens(results),
 		agentTokens: totalMetric(results, "totalTokens"),
 		agentCostUsd: totalMetric(results, "costUsd"),
 		agentToolCalls: totalMetric(results, "totalToolCalls"),

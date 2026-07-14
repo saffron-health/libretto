@@ -26,6 +26,7 @@ export type UsageMetrics = {
 	cacheReadTokens: number;
 	cacheWriteTokens: number;
 	totalTokens: number;
+	maxRequestContextTokens: number;
 	costUsd: number;
 	turns: number;
 	toolCalls: Record<string, number>;
@@ -51,7 +52,8 @@ export class SessionRunError extends Error {
 export async function createPiSession(options: {
 	workspace: string;
 	systemPrompt: string;
-	customTools: ToolDefinition[];
+	customTools?: ToolDefinition[];
+	tools?: string[];
 }): Promise<AgentSession> {
 	const apiKey = process.env.OPENAI_API_KEY?.trim();
 	if (!apiKey) {
@@ -95,8 +97,9 @@ export async function createPiSession(options: {
 		resourceLoader,
 		settingsManager,
 		sessionManager: SessionManager.inMemory(options.workspace),
-		noTools: "builtin",
-		customTools: options.customTools,
+		noTools: options.tools ? undefined : "builtin",
+		tools: options.tools,
+		customTools: options.customTools ?? [],
 	});
 	return session;
 }
@@ -161,6 +164,7 @@ export function usageMetrics(run: SessionRun): UsageMetrics {
 		cacheReadTokens: stats.tokens.cacheRead,
 		cacheWriteTokens: stats.tokens.cacheWrite,
 		totalTokens: stats.tokens.total,
+		maxRequestContextTokens: maxRequestContextTokens(run.events),
 		costUsd: stats.cost,
 		turns: stats.assistantMessages,
 		toolCalls,
@@ -179,11 +183,40 @@ export function emptyMetrics(): UsageMetrics {
 		cacheReadTokens: 0,
 		cacheWriteTokens: 0,
 		totalTokens: 0,
+		maxRequestContextTokens: 0,
 		costUsd: 0,
 		turns: 0,
 		toolCalls: {},
 		totalToolCalls: 0,
 	};
+}
+
+function maxRequestContextTokens(events: AgentSessionEvent[]): number {
+	let maxTokens = 0;
+	for (const event of events) {
+		if (event.type !== "message_end") continue;
+		const message = event.message as {
+			role?: unknown;
+			usage?: {
+				input?: unknown;
+				cacheRead?: unknown;
+				cacheWrite?: unknown;
+			};
+		};
+		if (message.role !== "assistant") continue;
+		const input =
+			typeof message.usage?.input === "number" ? message.usage.input : 0;
+		const cacheRead =
+			typeof message.usage?.cacheRead === "number"
+				? message.usage.cacheRead
+				: 0;
+		const cacheWrite =
+			typeof message.usage?.cacheWrite === "number"
+				? message.usage.cacheWrite
+				: 0;
+		maxTokens = Math.max(maxTokens, input + cacheRead + cacheWrite);
+	}
+	return maxTokens;
 }
 
 function eventReplacer(key: string, value: unknown): unknown {

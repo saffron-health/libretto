@@ -1,6 +1,3 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
 import { KernelBrowserProvider } from "../../src/providers/kernel.js";
 import {
 	createPiSession,
@@ -10,126 +7,13 @@ import {
 	type SessionRun,
 } from "../agent.js";
 
-const CLI_TIMEOUT_MS = 2 * 60_000;
-
-export type CliCommandResult = {
-	command: string;
-	args: string[];
-	stdout: string;
-	stderr: string;
-	exitCode: number | null;
-	timedOut: boolean;
-}
-
-export type CliHarnessTool = {
-	tool: ToolDefinition;
-	dispose(): Promise<void>;
-}
-
-export async function runCliCommand(options: {
-	command: string;
-	args: string[];
-	cwd: string;
-	env?: NodeJS.ProcessEnv;
-	stdin?: string;
-}): Promise<CliCommandResult> {
-	return await new Promise((resolve, reject) => {
-		const child = spawn(options.command, options.args, {
-			cwd: options.cwd,
-			detached: process.platform !== "win32",
-			env: { ...process.env, ...options.env },
-			stdio: ["pipe", "pipe", "pipe"],
-		});
-		let stdout = "";
-		let stderr = "";
-		let timedOut = false;
-		let forceKill: NodeJS.Timeout | undefined;
-		const timeout = setTimeout(() => {
-			timedOut = true;
-			killProcessGroup(child.pid, "SIGTERM");
-			forceKill = setTimeout(() => {
-				killProcessGroup(child.pid, "SIGKILL");
-			}, 5_000);
-		}, CLI_TIMEOUT_MS);
-		child.stdout.setEncoding("utf8");
-		child.stderr.setEncoding("utf8");
-		child.stdout.on("data", (chunk: string) => {
-			stdout += chunk;
-		});
-		child.stderr.on("data", (chunk: string) => {
-			stderr += chunk;
-		});
-		child.on("error", (error) => {
-			clearTimeout(timeout);
-			if (forceKill) clearTimeout(forceKill);
-			reject(error);
-		});
-		child.on("close", (exitCode) => {
-			clearTimeout(timeout);
-			if (forceKill) clearTimeout(forceKill);
-			resolve({
-				command: options.command,
-				args: options.args,
-				stdout,
-				stderr,
-				exitCode,
-				timedOut,
-			});
-		});
-		if (options.stdin === undefined) {
-			child.stdin.end();
-		} else {
-			child.stdin.end(options.stdin);
-		}
-	});
-}
-
-function killProcessGroup(
-	pid: number | undefined,
-	signal: NodeJS.Signals,
-): void {
-	if (pid === undefined) return;
-	try {
-		if (process.platform === "win32") {
-			const killer = spawn(
-				"taskkill",
-				["/PID", String(pid), "/T", "/F"],
-				{ stdio: "ignore", windowsHide: true },
-			);
-			killer.unref();
-		} else {
-			process.kill(-pid, signal);
-		}
-	} catch (error) {
-		if (error instanceof Error && "code" in error && error.code === "ESRCH") return;
-		process.stderr.write(
-			`Failed to stop timed-out CLI process ${pid}: ${error instanceof Error ? error.message : String(error)}\n`,
-		);
-	}
-}
-
-export function cliResultText(result: CliCommandResult): string {
-	return JSON.stringify(
-		{
-			exitCode: result.exitCode,
-			timedOut: result.timedOut,
-			stdout: result.stdout,
-			stderr: result.stderr,
-		},
-		null,
-		2,
-	);
-}
-
-export async function runCliHarness(options: {
+export async function runBashHarness(options: {
 	task: string;
 	workspace: string;
-	systemPrompt: string;
-	createTool: (options: {
+	buildSystemPrompt: (connection: {
 		cdpEndpoint: string;
 		sessionName: string;
-		workspace: string;
-	}) => CliHarnessTool;
+	}) => string;
 }): Promise<SessionRun> {
 	const provider = new KernelBrowserProvider({
 		headless: false,
@@ -137,51 +21,31 @@ export async function runCliHarness(options: {
 		timeoutSeconds: Math.ceil(DEFAULT_TIMEOUT_MS / 1000),
 	});
 	const providerSession = await provider.createSession();
-	const sessionName = `benchmark-${randomBytes(6).toString("hex")}`;
-	let cliTool: CliHarnessTool | null = null;
-	let session: Awaited<ReturnType<typeof createPiSession>> | null = null;
+	const sessionName = `benchmark-${providerSession.sessionId}`;
+	let session: Awaited<ReturnType<typeof createPiSession>>;
 	try {
-		cliTool = options.createTool({
-			cdpEndpoint: providerSession.cdpEndpoint,
-			sessionName,
-			workspace: options.workspace,
-		});
 		session = await createPiSession({
 			workspace: options.workspace,
-			systemPrompt: options.systemPrompt,
-			customTools: [cliTool.tool],
+			systemPrompt: options.buildSystemPrompt({
+				cdpEndpoint: providerSession.cdpEndpoint,
+				sessionName,
+			}),
+			tools: ["bash"],
 		});
 	} catch (error) {
-		session?.dispose();
-		try {
-			await disposeCliHarness(cliTool, provider, providerSession.sessionId);
-		} catch (cleanupError) {
-			const message =
-				cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
-			process.stderr.write(`CLI setup cleanup also failed: ${message}\n`);
-		}
+		await closeProviderAfterFailure(provider, providerSession.sessionId);
 		throw error;
-	}
-	if (!cliTool || !session) {
-		await disposeCliHarness(cliTool, provider, providerSession.sessionId);
-		throw new Error("CLI harness setup completed without a tool or Pi session.");
 	}
 
 	let run: SessionRun;
 	try {
 		run = await runPrompt(session, options.task);
 	} catch (error) {
-		try {
-			await disposeCliHarness(cliTool, provider, providerSession.sessionId);
-		} catch (cleanupError) {
-			const message =
-				cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
-			process.stderr.write(`CLI browser cleanup also failed: ${message}\n`);
-		}
+		await closeProviderAfterFailure(provider, providerSession.sessionId);
 		throw error;
 	}
 	try {
-		await disposeCliHarness(cliTool, provider, providerSession.sessionId);
+		await provider.closeSession(providerSession.sessionId);
 	} catch (error) {
 		throw new SessionRunError(
 			new Error(
@@ -193,35 +57,18 @@ export async function runCliHarness(options: {
 	return run;
 }
 
-async function disposeCliHarness(
-	cliTool: CliHarnessTool | null,
+async function closeProviderAfterFailure(
 	provider: KernelBrowserProvider,
-	providerSessionId: string,
+	sessionId: string,
 ): Promise<void> {
-	let toolError: unknown;
 	try {
-		await cliTool?.dispose();
+		await provider.closeSession(sessionId);
 	} catch (error) {
-		toolError = error;
+		const message = error instanceof Error ? error.message : String(error);
+		process.stderr.write(`CLI browser cleanup also failed: ${message}\n`);
 	}
-	let providerError: unknown;
-	try {
-		await provider.closeSession(providerSessionId);
-	} catch (error) {
-		providerError = error;
-	}
-	if (toolError || providerError) {
-		throw new Error(
-			[
-				toolError
-					? `tool cleanup: ${toolError instanceof Error ? toolError.message : String(toolError)}`
-					: null,
-				providerError
-					? `provider cleanup: ${providerError instanceof Error ? providerError.message : String(providerError)}`
-					: null,
-			]
-				.filter(Boolean)
-				.join("; "),
-		);
-	}
+}
+
+export function shellQuote(value: string): string {
+	return `'${value.replaceAll("'", `'\\''`)}'`;
 }
