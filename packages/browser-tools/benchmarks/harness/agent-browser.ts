@@ -11,10 +11,33 @@ import {
 } from "./cli.js";
 import type { SessionRun } from "../agent.js";
 
+const AGENT_BROWSER_COMMANDS = new Set([
+	"open",
+	"snapshot",
+	"click",
+	"dblclick",
+	"fill",
+	"type",
+	"press",
+	"hover",
+	"select",
+	"check",
+	"uncheck",
+	"scroll",
+	"wait",
+	"get",
+	"eval",
+	"tab",
+	"screenshot",
+]);
+
 const AgentBrowserInput = z.object({
 	args: z
 		.array(z.string())
 		.min(1)
+		.refine((args) => AGENT_BROWSER_COMMANDS.has(args[0]), {
+			message: `Command must be one of: ${[...AGENT_BROWSER_COMMANDS].join(", ")}`,
+		})
 		.describe(
 			"agent-browser arguments, beginning with a command such as open, snapshot, click, fill, eval, or wait",
 		),

@@ -36,15 +36,20 @@ export async function runCliCommand(options: {
 	return await new Promise((resolve, reject) => {
 		const child = spawn(options.command, options.args, {
 			cwd: options.cwd,
+			detached: process.platform !== "win32",
 			env: { ...process.env, ...options.env },
 			stdio: ["pipe", "pipe", "pipe"],
 		});
 		let stdout = "";
 		let stderr = "";
 		let timedOut = false;
+		let forceKill: NodeJS.Timeout | undefined;
 		const timeout = setTimeout(() => {
 			timedOut = true;
-			child.kill("SIGTERM");
+			killProcessGroup(child.pid, "SIGTERM");
+			forceKill = setTimeout(() => {
+				killProcessGroup(child.pid, "SIGKILL");
+			}, 5_000);
 		}, CLI_TIMEOUT_MS);
 		child.stdout.setEncoding("utf8");
 		child.stderr.setEncoding("utf8");
@@ -56,10 +61,12 @@ export async function runCliCommand(options: {
 		});
 		child.on("error", (error) => {
 			clearTimeout(timeout);
+			if (forceKill) clearTimeout(forceKill);
 			reject(error);
 		});
 		child.on("close", (exitCode) => {
 			clearTimeout(timeout);
+			if (forceKill) clearTimeout(forceKill);
 			resolve({
 				command: options.command,
 				args: options.args,
@@ -75,6 +82,25 @@ export async function runCliCommand(options: {
 			child.stdin.end(options.stdin);
 		}
 	});
+}
+
+function killProcessGroup(
+	pid: number | undefined,
+	signal: NodeJS.Signals,
+): void {
+	if (pid === undefined) return;
+	try {
+		if (process.platform === "win32") {
+			process.kill(pid, signal);
+		} else {
+			process.kill(-pid, signal);
+		}
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ESRCH") return;
+		process.stderr.write(
+			`Failed to stop timed-out CLI process ${pid}: ${error instanceof Error ? error.message : String(error)}\n`,
+		);
+	}
 }
 
 export function cliResultText(result: CliCommandResult): string {
@@ -107,16 +133,34 @@ export async function runCliHarness(options: {
 	});
 	const providerSession = await provider.createSession();
 	const sessionName = `benchmark-${randomBytes(6).toString("hex")}`;
-	const cliTool = options.createTool({
-		cdpEndpoint: providerSession.cdpEndpoint,
-		sessionName,
-		workspace: options.workspace,
-	});
-	const session = await createPiSession({
-		workspace: options.workspace,
-		systemPrompt: options.systemPrompt,
-		customTools: [cliTool.tool],
-	});
+	let cliTool: CliHarnessTool | null = null;
+	let session: Awaited<ReturnType<typeof createPiSession>> | null = null;
+	try {
+		cliTool = options.createTool({
+			cdpEndpoint: providerSession.cdpEndpoint,
+			sessionName,
+			workspace: options.workspace,
+		});
+		session = await createPiSession({
+			workspace: options.workspace,
+			systemPrompt: options.systemPrompt,
+			customTools: [cliTool.tool],
+		});
+	} catch (error) {
+		session?.dispose();
+		try {
+			await disposeCliHarness(cliTool, provider, providerSession.sessionId);
+		} catch (cleanupError) {
+			const message =
+				cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+			process.stderr.write(`CLI setup cleanup also failed: ${message}\n`);
+		}
+		throw error;
+	}
+	if (!cliTool || !session) {
+		await disposeCliHarness(cliTool, provider, providerSession.sessionId);
+		throw new Error("CLI harness setup completed without a tool or Pi session.");
+	}
 
 	let run: SessionRun;
 	try {
@@ -145,13 +189,13 @@ export async function runCliHarness(options: {
 }
 
 async function disposeCliHarness(
-	cliTool: CliHarnessTool,
+	cliTool: CliHarnessTool | null,
 	provider: KernelBrowserProvider,
 	providerSessionId: string,
 ): Promise<void> {
 	let toolError: unknown;
 	try {
-		await cliTool.dispose();
+		await cliTool?.dispose();
 	} catch (error) {
 		toolError = error;
 	}

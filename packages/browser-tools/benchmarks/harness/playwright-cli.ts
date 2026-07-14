@@ -12,10 +12,49 @@ import {
 } from "./cli.js";
 import type { SessionRun } from "../agent.js";
 
+const PLAYWRIGHT_CLI_COMMANDS = new Set([
+	"goto",
+	"type",
+	"click",
+	"dblclick",
+	"fill",
+	"drag",
+	"drop",
+	"hover",
+	"select",
+	"check",
+	"uncheck",
+	"snapshot",
+	"find",
+	"eval",
+	"run-code",
+	"dialog-accept",
+	"dialog-dismiss",
+	"resize",
+	"go-back",
+	"go-forward",
+	"reload",
+	"press",
+	"keydown",
+	"keyup",
+	"mousemove",
+	"mousedown",
+	"mouseup",
+	"mousewheel",
+	"screenshot",
+	"tab-list",
+	"tab-new",
+	"tab-close",
+	"tab-select",
+]);
+
 const PlaywrightCliInput = z.object({
 	args: z
 		.array(z.string())
 		.min(1)
+		.refine((args) => PLAYWRIGHT_CLI_COMMANDS.has(args[0]), {
+			message: `Command must be one of: ${[...PLAYWRIGHT_CLI_COMMANDS].join(", ")}`,
+		})
 		.describe(
 			"playwright-cli arguments, beginning with a command such as goto, snapshot, find, click, fill, eval, or run-code",
 		),
