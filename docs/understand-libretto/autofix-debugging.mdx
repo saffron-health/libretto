@@ -20,7 +20,7 @@ the real field is `name="login"`, because the page redirected, or because an
 element loads late — and the source code alone cannot tell you which.
 
 The debugging agent does not guess. It runs an agent loop on the
-[`@libretto/browser-tools`](../reference/runtime/playwright-debug) SDK and
+[`libretto-browser-tools`](../reference/runtime/playwright-debug) SDK and
 drives the supplied failed page in its existing browser context. Authentication,
 storage, open tabs, network routes, and in-memory state remain available while
 the agent confirms the cause. Fixes are grounded in what the agent actually

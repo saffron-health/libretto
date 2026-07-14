@@ -1,13 +1,13 @@
-# @libretto/playwright-debug
+# libretto-playwright-debug
 
-`@libretto/playwright-debug` adds a Playwright debugging agent that investigates
+`libretto-playwright-debug` adds a Playwright debugging agent that investigates
 failed runs on the supplied live page and automatically opens pull requests to
 fix broken scripts. It preserves the page's browser context and treats debugger
 infrastructure failures as best-effort results instead of replacing the original
 automation error.
 
 ```ts
-import { createLibrettoDebugger } from "@libretto/playwright-debug";
+import { createLibrettoDebugger } from "libretto-playwright-debug";
 
 const librettoDebugger = createLibrettoDebugger({
   github: {
