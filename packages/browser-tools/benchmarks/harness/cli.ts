@@ -91,7 +91,12 @@ function killProcessGroup(
 	if (pid === undefined) return;
 	try {
 		if (process.platform === "win32") {
-			process.kill(pid, signal);
+			const killer = spawn(
+				"taskkill",
+				["/PID", String(pid), "/T", "/F"],
+				{ stdio: "ignore", windowsHide: true },
+			);
+			killer.unref();
 		} else {
 			process.kill(-pid, signal);
 		}
