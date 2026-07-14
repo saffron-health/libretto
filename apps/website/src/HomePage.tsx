@@ -20,6 +20,7 @@ import { FeatureRows } from "./components/FeatureRows";
 import { BattleTestedBanner } from "./components/BattleTestedBanner";
 import { Benchmarks } from "./components/Benchmarks";
 import { MaintainingFeatures } from "./components/MaintainingFeatures";
+import { AutofixPR } from "./components/AutofixPR";
 import { CloudProviders } from "./components/CloudProviders";
 import { FAQ } from "./components/FAQ";
 import { CTA } from "./components/CTA";
@@ -132,6 +133,8 @@ export function HomePage() {
         <BattleTestedBanner />
         <SectionDivider />
         <MaintainingFeatures />
+        <SectionDivider />
+        <AutofixPR />
         <SectionDivider />
         <CloudProviders />
         <SectionDivider />

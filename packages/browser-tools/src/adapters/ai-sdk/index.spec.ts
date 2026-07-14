@@ -1,8 +1,15 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import type { ToolSet } from "ai";
+import type { Browser, Page } from "playwright";
+import { chromium } from "playwright";
 import { expect, test as base } from "vitest";
 import { DomainPolicyRestricted } from "../../domain-policy.js";
 import { LocalBrowserProvider } from "../../providers/local.js";
-import { createAiSdkBrowserTools } from "./index.js";
+import {
+	createAiSdkBrowserTools,
+	createAiSdkBrowserToolsForPage,
+} from "./index.js";
 
 type Toolkit = {
 	tools: ToolSet;
@@ -38,6 +45,48 @@ const test = base.extend<{ toolkit: Toolkit }>({
 	},
 });
 
+const borrowedPageTest = base.extend<{
+	browser: Browser;
+	page: Page;
+	protectedServer: { origin: string; requestCount(): number };
+}>({
+	browser: async ({}, use) => {
+		const browser = await chromium.launch({ headless: true });
+		await use(browser);
+		await browser.close();
+	},
+	page: async ({ browser }, use) => {
+		const context = await browser.newContext();
+		const page = await context.newPage();
+		await use(page);
+		await context.close();
+	},
+	protectedServer: async ({}, use) => {
+		let requests = 0;
+		const server = createServer((request, response) => {
+			requests += 1;
+			const authenticated = request.headers.cookie?.includes("session=valid");
+			response.writeHead(authenticated ? 200 : 401, {
+				"content-type": "text/html",
+			});
+			response.end(
+				authenticated
+					? "<main><h1>Protected dashboard</h1></main>"
+					: "<main><h1>Sign in required</h1></main>",
+			);
+		});
+		await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+		const address = server.address() as AddressInfo;
+		await use({
+			origin: `http://127.0.0.1:${address.port}`,
+			requestCount: () => requests,
+		});
+		await new Promise<void>((resolve, reject) => {
+			server.close((error) => (error ? reject(error) : resolve()));
+		});
+	},
+});
+
 test("createAiSdkBrowserTools exposes all six browser tools", ({
 	toolkit,
 }) => {
@@ -50,6 +99,84 @@ test("createAiSdkBrowserTools exposes all six browser tools", ({
 		"browser_status",
 	]);
 });
+
+borrowedPageTest(
+	"borrowed tools operate on the exact supplied page with its in-memory state",
+	async ({ page }) => {
+		await page.setContent(
+			'<input id="draft" value="unsaved"><script>window.debugMarker = "failed-page";</script>',
+		);
+		const otherPage = await page.context().newPage();
+		await otherPage.setContent("<title>newer unrelated tab</title>");
+
+		const toolkit = createAiSdkBrowserToolsForPage(page);
+		expect(Object.keys(toolkit.tools).sort()).toEqual([
+			"browser_exec",
+			"browser_snapshot",
+			"browser_status",
+		]);
+		const result = await callTool(toolkit.tools, "browser_exec", {
+			sessionId: toolkit.sessionId,
+			code:
+				"return await page.evaluate(() => ({ marker: window.debugMarker, " +
+				"draft: document.querySelector('#draft')?.value }));",
+		});
+
+		expect(result).toMatchObject({
+			ok: true,
+			result: { marker: "failed-page", draft: "unsaved" },
+		});
+		await toolkit.dispose();
+	},
+);
+
+borrowedPageTest(
+	"borrowed tools retain authenticated state and do not close caller-owned Playwright objects",
+	async ({ browser, page, protectedServer }) => {
+		await page.context().addCookies([
+			{
+				name: "session",
+				value: "valid",
+				url: protectedServer.origin,
+				httpOnly: true,
+			},
+		]);
+		await page.goto(protectedServer.origin);
+		await page.evaluate(() => localStorage.setItem("draft", "stateful-value"));
+
+		const toolkit = createAiSdkBrowserToolsForPage(page);
+		const snapshot = await callTool(toolkit.tools, "browser_snapshot", {
+			sessionId: toolkit.sessionId,
+		});
+		expect(snapshot).toMatchObject({ ok: true });
+		expect(String(snapshot.tree)).toContain("Protected dashboard");
+
+		const state = await callTool(toolkit.tools, "browser_exec", {
+			sessionId: toolkit.sessionId,
+			code:
+				"return { cookies: await context.cookies(), " +
+				"draft: await page.evaluate(() => localStorage.getItem('draft')) };",
+		});
+		expect(state).toMatchObject({
+			ok: true,
+			result: {
+				cookies: expect.arrayContaining([
+					expect.objectContaining({ name: "session", value: "valid" }),
+				]),
+				draft: "stateful-value",
+			},
+		});
+		expect(protectedServer.requestCount()).toBe(1);
+
+		await toolkit.dispose();
+		expect(page.isClosed()).toBe(false);
+		expect(browser.isConnected()).toBe(true);
+		await page.locator("h1").evaluate((heading) => {
+			heading.textContent = "Still usable";
+		});
+		expect(await page.locator("h1").textContent()).toBe("Still usable");
+	},
+);
 
 test("browser_open with a data: URL returns a session ID", async ({
 	toolkit,

@@ -75,7 +75,8 @@
               "understand-libretto/configuration",
               "understand-libretto/automation-and-bot-detection",
               "understand-libretto/website-authentication",
-              "understand-libretto/error-handling-and-recovery"
+              "understand-libretto/error-handling-and-recovery",
+              "understand-libretto/autofix-debugging"
             ]
           }
         ]
@@ -104,7 +105,8 @@
               "reference/runtime/authentication",
               "reference/runtime/network-requests",
               "reference/runtime/file-downloads",
-              "reference/runtime/page-fallbacks"
+              "reference/runtime/page-fallbacks",
+              "reference/runtime/playwright-debug"
             ]
           }
         ]

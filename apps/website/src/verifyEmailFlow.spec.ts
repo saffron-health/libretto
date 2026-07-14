@@ -66,4 +66,28 @@ describe("redirectAfterVerifiedEmail", () => {
       }),
     ).resolves.toBe("/onboarding");
   });
+
+  it("drops dashboard return targets before tenant setup exists", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: false,
+        returnTo: "/dashboard",
+        hasCliLoginParams: false,
+        approveCliLogin: async () => true,
+      }),
+    ).resolves.toBe("/onboarding");
+  });
+
+  it("preserves GitHub setup return targets through tenant setup", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: false,
+        returnTo: "/github/setup?installation_id=123&setup_action=install",
+        hasCliLoginParams: false,
+        approveCliLogin: async () => true,
+      }),
+    ).resolves.toBe(
+      "/onboarding?returnTo=%2Fgithub%2Fsetup%3Finstallation_id%3D123%26setup_action%3Dinstall",
+    );
+  });
 });

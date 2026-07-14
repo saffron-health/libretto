@@ -1,5 +1,6 @@
 import type { DomainPolicyOptions } from "./domain-policy.js";
 import type { BrowserProvider } from "./provider.js";
+import type { Page } from "playwright";
 import { SessionRegistry } from "./session-registry.js";
 import type { CloseTool } from "./tools/close.js";
 import { createCloseTool } from "./tools/close.js";
@@ -29,6 +30,17 @@ export type BrowserToolkit = {
 
 export type BrowserToolkitOptions = DomainPolicyOptions;
 
+export type BorrowedPageBrowserToolkit = {
+	sessionId: string;
+	tools: {
+		browser_exec: ExecTool;
+		browser_snapshot: SnapshotTool;
+		browser_status: StatusTool;
+	};
+	/** Detaches tools without closing the caller-owned page, context, or browser. */
+	dispose(): Promise<void>;
+}
+
 /**
  * Framework-agnostic factory — returns base {@link BrowserTool} objects.
  * Framework entry points live under src/adapters/ (e.g. adapters/ai-sdk).
@@ -46,6 +58,20 @@ export function createBrowserTools(
 			browser_status: createStatusTool(registry),
 			browser_close: createCloseTool(registry),
 			browser_connect: createConnectTool(registry),
+		},
+		dispose: () => registry.dispose(),
+	};
+}
+
+export function createBrowserToolsForPage(page: Page): BorrowedPageBrowserToolkit {
+	const registry = new SessionRegistry(undefined);
+	const { sessionId } = registry.attachPage(page);
+	return {
+		sessionId,
+		tools: {
+			browser_exec: createExecTool(registry),
+			browser_snapshot: createSnapshotTool(registry),
+			browser_status: createStatusTool(registry),
 		},
 		dispose: () => registry.dispose(),
 	};

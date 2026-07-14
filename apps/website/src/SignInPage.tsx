@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import {
+  getSafeReturnTo,
+  postAuthRedirect,
+  sanitizeReturnToForAuthState,
+  withReturnTo,
+} from "./authRedirect";
 import { Navbar } from "./components/Navbar";
 import { authPost, getAuthStatus, getCloudSession, orpcCall } from "./cloudApi";
+import { GitHubIcon } from "./icons";
 
 type AuthResponse = {
   redirect?: boolean;
@@ -95,17 +102,14 @@ function EyeIcon() {
 }
 
 export function SignInPage() {
-  const [mode, setMode] = useState<AuthMode>(() =>
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("mode") === "signup"
-      ? "signup"
-      : "signin",
-  );
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState<"google" | "email" | "signup" | "reset" | null>(null);
+  const [loading, setLoading] = useState<
+    "google" | "github" | "email" | "signup" | "reset" | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -144,6 +148,10 @@ export function SignInPage() {
   }
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("mode") === "signup") {
+      setMode("signup");
+    }
+
     getCloudSession()
       .then((session) => {
         if (!session) return;
@@ -155,14 +163,16 @@ export function SignInPage() {
         }
         getAuthStatus()
           .then((status) => {
-            if (!status.emailVerified) {
-              window.location.assign("/verify-email");
-              return;
-            }
-            window.location.assign(status.hasTenant ? "/dashboard" : "/onboarding");
+            window.location.assign(
+              postAuthRedirect({
+                emailVerified: status.emailVerified,
+                hasTenant: status.hasTenant,
+                returnTo: getSafeReturnTo(),
+              }),
+            );
           })
           .catch(() => {
-            window.location.assign("/onboarding");
+            setError("Could not load account status. Refresh once the API is ready.");
           });
       })
       .catch(() => {});
@@ -179,7 +189,9 @@ export function SignInPage() {
         password,
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
-          : `${window.location.origin}/dashboard`,
+          : `${window.location.origin}${
+              sanitizeReturnToForAuthState(getSafeReturnTo(), true) ?? "/dashboard"
+            }`,
       });
       if (result.url) {
         window.location.assign(result.url);
@@ -199,41 +211,60 @@ export function SignInPage() {
     setError(null);
     setNotice(null);
     try {
+      const returnTo = getSafeReturnTo();
+      const callbackReturnTo = sanitizeReturnToForAuthState(returnTo, false);
       await authPost<AuthResponse>("/api/auth/sign-up/email", {
         name,
         email,
         password,
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
-          : `${window.location.origin}/verify-email`,
+          : `${window.location.origin}${withReturnTo("/verify-email", callbackReturnTo)}`,
       });
       if (await approveCliLogin()) return;
-      window.location.assign("/verify-email");
+      window.location.assign(withReturnTo("/verify-email", callbackReturnTo));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-up failed.");
       setLoading(null);
     }
   }
 
-  async function continueWithGoogle() {
-    setLoading("google");
+  async function continueWithSocial(provider: "google" | "github") {
+    setLoading(provider);
     setError(null);
     setNotice(null);
     try {
+      const returnTo = getSafeReturnTo();
+      const callbackReturnTo = sanitizeReturnToForAuthState(
+        returnTo,
+        mode === "signin",
+      );
       const result = await authPost<AuthResponse>("/api/auth/sign-in/social", {
-        provider: "google",
+        provider,
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
-          : `${window.location.origin}/${mode === "signup" ? "onboarding" : "dashboard"}`,
+          : `${window.location.origin}${
+              mode === "signup"
+                ? withReturnTo("/onboarding", callbackReturnTo)
+                : callbackReturnTo ?? "/dashboard"
+            }`,
       });
       if (result.url) {
         window.location.assign(result.url);
         return;
       }
       if (await approveCliLogin()) return;
-      window.location.assign(mode === "signup" ? "/onboarding" : "/dashboard");
+      window.location.assign(
+        mode === "signup"
+          ? withReturnTo("/onboarding", callbackReturnTo)
+          : callbackReturnTo ?? "/dashboard",
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Google authentication failed.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : `${provider === "google" ? "Google" : "GitHub"} authentication failed.`,
+      );
       setLoading(null);
     }
   }
@@ -305,7 +336,7 @@ export function SignInPage() {
 
             <button
               type="button"
-              onClick={continueWithGoogle}
+              onClick={() => void continueWithSocial("google")}
               disabled={loading !== null}
               className="flex h-11 w-full items-center justify-center gap-3 rounded-md border border-rule bg-bg/70 px-4 text-sm font-medium text-ink shadow-sm shadow-black/20 transition-colors hover:border-accent/45 hover:bg-panel-hi focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -315,6 +346,20 @@ export function SignInPage() {
               {loading === "google"
                 ? "Opening Google..."
                 : mode === "signin" ? "Continue with Google" : "Sign up with Google"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void continueWithSocial("github")}
+              disabled={loading !== null}
+              className="mt-3 flex h-11 w-full items-center justify-center gap-3 rounded-md border border-rule bg-bg/70 px-4 text-sm font-medium text-ink shadow-sm shadow-black/20 transition-colors hover:border-accent/45 hover:bg-panel-hi focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="grid size-6 place-items-center rounded-full bg-ink text-bg">
+                <GitHubIcon className="size-4" />
+              </span>
+              {loading === "github"
+                ? "Opening GitHub..."
+                : mode === "signin" ? "Continue with GitHub" : "Sign up with GitHub"}
             </button>
 
             <div className="my-5 flex items-center gap-3">
