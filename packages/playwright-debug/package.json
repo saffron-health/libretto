@@ -1,5 +1,5 @@
 {
-  "name": "@libretto/playwright-debug",
+  "name": "libretto-playwright-debug",
   "version": "0.1.0",
   "description": "Open GitHub autofix pull requests from failed Playwright runs",
   "license": "MIT",
@@ -39,7 +39,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.81",
     "@ai-sdk/openai": "3.0.66",
-    "@libretto/browser-tools": "workspace:*",
+    "libretto-browser-tools": "workspace:*",
     "ai": "6.0.140",
     "zod": "4.3.6"
   },

@@ -11,7 +11,7 @@ import {
 } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
-import { createAiSdkBrowserToolsForPage } from "@libretto/browser-tools/ai-sdk";
+import { createAiSdkBrowserToolsForPage } from "libretto-browser-tools/ai-sdk";
 import type { Page } from "playwright";
 
 export type SupportedAgentProvider = "anthropic" | "openai";

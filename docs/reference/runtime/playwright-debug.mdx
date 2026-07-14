@@ -6,12 +6,12 @@ description: Investigate failures and automatically open pull requests to fix Pl
 The Playwright debugging agent investigates failed browser automations and
 automatically opens pull requests that fix broken scripts.
 
-`@libretto/playwright-debug` lets an existing Playwright script keep its current
+`libretto-playwright-debug` lets an existing Playwright script keep its current
 browser provider, retries, logging, and fallback logic while adding one agent
 call in the failure path.
 
 ```typescript
-import { createLibrettoDebugger } from "@libretto/playwright-debug";
+import { createLibrettoDebugger } from "libretto-playwright-debug";
 
 const librettoDebugger = createLibrettoDebugger({
   github: {
@@ -61,7 +61,7 @@ minified stacks, or a cross-file change).
 ## How It Investigates
 
 The debugger does not guess a fix from a static snapshot. It runs an agent loop
-built on the [`@libretto/browser-tools`](https://www.npmjs.com/package/@libretto/browser-tools)
+built on the [`libretto-browser-tools`](https://www.npmjs.com/package/libretto-browser-tools)
 SDK: the model is given the failure context and source files, then drives a real
 browser to confirm the root cause before proposing a change. It stays attached
 to the supplied failed `Page`, preserving its authentication, storage, routes,

@@ -20,7 +20,7 @@ const DEBUGGER_DOCS_URL = "/docs/reference/runtime/playwright-debug";
 const DEBUGGER_CONCEPT_URL = "/docs/understand-libretto/autofix-debugging";
 const DEBUGGER_PROMPT =
   "Add the Libretto Playwright debugging agent to my existing automation. " +
-  "Install @libretto/playwright-debug, then in my script's failure path call " +
+  "Install libretto-playwright-debug, then in my script's failure path call " +
   "debugPlaywrightFailure(error, page). Follow " +
   "https://libretto.sh/docs/reference/runtime/playwright-debug to configure " +
   "createLibrettoDebugger with my repo (owner, repo, baseBranch) and " +
