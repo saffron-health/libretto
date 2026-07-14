@@ -506,7 +506,7 @@ async function judgeBrowserRun(options: {
 		},
 	});
 	const session = await createPiSession({
-		workspace,
+		workspace: options.workspace,
 		systemPrompt: [
 			"You strictly judge browser-agent transcripts.",
 			"Mark completed only when the transcript shows live-page evidence from the intended website and the final answer satisfies the task.",
