@@ -84,9 +84,12 @@
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.6",
+    "@playwright/cli": "^0.1.17",
     "@types/node": "^25.5.0",
     "affordance": "workspace:*",
+    "agent-browser": "^0.31.2",
     "ai": "^6.0.116",
+    "dev-browser": "^0.2.8",
     "outdent": "^0.8.0",
     "tsup": "^8.5.1",
     "tsx": "^4.23.0",

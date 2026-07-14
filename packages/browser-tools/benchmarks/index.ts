@@ -15,30 +15,69 @@ import {
 	type UsageMetrics,
 } from "./agent.js";
 import { WEBSITE_CASES, type WebsiteCase } from "./cases.js";
+import { runAgentBrowserHarness } from "./harness/agent-browser.js";
 import { runBrowserToolsHarness } from "./harness/browser-tools.js";
+import { runDevBrowserHarness } from "./harness/dev-browser.js";
+import { runPlaywrightCliHarness } from "./harness/playwright-cli.js";
 import { judgeBrowserRun, type Judgment } from "./judge.js";
 
 const DEFAULT_CONCURRENCY = 5;
+const HARNESS_NAMES = [
+	"browser-tools",
+	"agent-browser",
+	"playwright-cli",
+	"dev-browser",
+] as const;
+type HarnessName = (typeof HARNESS_NAMES)[number];
+const HarnessNameSchema = z.enum(HARNESS_NAMES);
+const HARNESS_RUNNERS: Record<
+	HarnessName,
+	(task: string, workspace: string) => Promise<SessionRun>
+> = {
+	"browser-tools": runBrowserToolsHarness,
+	"agent-browser": runAgentBrowserHarness,
+	"playwright-cli": runPlaywrightCliHarness,
+	"dev-browser": runDevBrowserHarness,
+};
 const packageRoot = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageRoot, "../..");
 
 type CliOptions = {
 	casePattern?: string;
 	concurrency: number;
+	harnesses: HarnessName[];
 	outputDir?: string;
 	repeatCount: number;
 }
 
-const CliOptionsSchema = z.object({
-	casePattern: z.string().optional(),
-	concurrency: z.number().int().positive(),
-	outputDir: z.string().optional(),
-	repeatCount: z.number().int().positive(),
-});
+const CliOptionsSchema = z
+	.object({
+		casePattern: z.string().optional(),
+		concurrency: z.number().int().positive(),
+		harnesses: z.string().trim().min(1),
+		outputDir: z.string().optional(),
+		repeatCount: z.number().int().positive(),
+	})
+	.transform((input): CliOptions => {
+		const harnesses = input.harnesses.split(",").map((name) => {
+			const parsed = HarnessNameSchema.safeParse(name.trim());
+			if (!parsed.success) {
+				throw new Error(
+					`Unknown harness "${name}". Valid harnesses: ${HARNESS_NAMES.join(", ")}.`,
+				);
+			}
+			return parsed.data;
+		});
+		return {
+			...input,
+			harnesses: [...new Set(harnesses)],
+		};
+	});
 
 type AttemptResult = {
 	id: string;
 	caseName: string;
+	harness: HarnessName;
 	task: string;
 	repeat: number;
 	status: "completed" | "error";
@@ -76,6 +115,12 @@ const benchmarkInput = SimpleCLI.input({
 			),
 			{
 				help: `Parallel attempts (default: ${DEFAULT_CONCURRENCY})`,
+			},
+		),
+		harnesses: SimpleCLI.option(
+			forAffordance(z.string().default(HARNESS_NAMES.join(","))),
+			{
+				help: `Comma-separated harnesses (default: ${HARNESS_NAMES.join(",")})`,
 			},
 		),
 		repeatCount: SimpleCLI.option(
@@ -141,10 +186,11 @@ async function writeAgentArtifacts(
 
 async function runAttempt(options: {
 	websiteCase: WebsiteCase;
+	harness: HarnessName;
 	repeat: number;
 	runDir: string;
 }): Promise<AttemptResult> {
-	const id = `${slug(options.websiteCase.name)}-run-${options.repeat}`;
+	const id = `${slug(options.websiteCase.name)}-${options.harness}-run-${options.repeat}`;
 	const caseDir = join(options.runDir, "cases", id);
 	const transcriptPath = join(caseDir, "transcript.md");
 	const eventsPath = join(caseDir, "events.jsonl");
@@ -161,7 +207,7 @@ async function runAttempt(options: {
 
 	try {
 		try {
-			agentRun = await runBrowserToolsHarness(
+			agentRun = await HARNESS_RUNNERS[options.harness](
 				options.websiteCase.task,
 				caseDir,
 			);
@@ -204,6 +250,7 @@ async function runAttempt(options: {
 	const result: AttemptResult = {
 		id,
 		caseName: options.websiteCase.name,
+		harness: options.harness,
 		task: options.websiteCase.task,
 		repeat: options.repeat,
 		status: errorMessage ? "error" : "completed",
@@ -271,11 +318,10 @@ function summaryMarkdown(options: {
 		(result) => result.judgment?.completed === true,
 	).length;
 	const lines = [
-		"# Browser Tools Benchmark",
+		"# Browser Harness Benchmark",
 		"",
 		`- Run: \`${options.runId}\``,
 		`- Model: \`${MODEL_SELECTOR}\``,
-		"- Agent: `browser-tools`",
 		"- Browser provider: `kernel`",
 		`- Started: \`${options.startedAt}\``,
 		`- Finished: \`${options.finishedAt}\``,
@@ -287,12 +333,30 @@ function summaryMarkdown(options: {
 		`- Agent cost: \`$${totalMetric(options.results, "costUsd").toFixed(4)}\``,
 		`- Browser tool calls: \`${totalMetric(options.results, "totalToolCalls")}\``,
 		"",
-		"| Case | Repeat | Status | Score | Duration | Tokens | Cost |",
-		"|---|---:|---|---|---:|---:|---:|",
+		"## Harnesses",
+		"",
+		"| Harness | Attempts | Completed | Passed | Duration | Tokens | Cost | Tool calls |",
+		"|---|---:|---:|---:|---:|---:|---:|---:|",
 	];
+	for (const harness of HARNESS_NAMES) {
+		const harnessResults = options.results.filter(
+			(result) => result.harness === harness,
+		);
+		if (harnessResults.length === 0) continue;
+		lines.push(
+			`| ${harness} | ${harnessResults.length} | ${harnessResults.filter((result) => result.status === "completed").length} | ${harnessResults.filter((result) => result.judgment?.completed === true).length} | ${(totalMetric(harnessResults, "durationMs") / 1000).toFixed(1)}s | ${totalMetric(harnessResults, "totalTokens")} | $${totalMetric(harnessResults, "costUsd").toFixed(4)} | ${totalMetric(harnessResults, "totalToolCalls")} |`,
+		);
+	}
+	lines.push(
+		"",
+		"## Cases",
+		"",
+		"| Case | Harness | Repeat | Status | Score | Duration | Tokens | Cost |",
+		"|---|---|---:|---|---|---:|---:|---:|",
+	);
 	for (const result of options.results) {
 		lines.push(
-			`| ${result.caseName} | ${result.repeat} | ${result.status} | ${result.judgment?.completed === true ? "pass" : "fail"} | ${(result.agentMetrics.durationMs / 1000).toFixed(1)}s | ${result.agentMetrics.totalTokens} | $${result.agentMetrics.costUsd.toFixed(4)} |`,
+			`| ${result.caseName} | ${result.harness} | ${result.repeat} | ${result.status} | ${result.judgment?.completed === true ? "pass" : "fail"} | ${(result.agentMetrics.durationMs / 1000).toFixed(1)}s | ${result.agentMetrics.totalTokens} | $${result.agentMetrics.costUsd.toFixed(4)} |`,
 		);
 	}
 	return `${lines.join("\n")}\n`;
@@ -321,10 +385,13 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 	const attempts = Array.from(
 		{ length: options.repeatCount },
 		(_unused, repeatIndex) =>
-			selectedCases.map((websiteCase) => ({
-				websiteCase,
-				repeat: repeatIndex + 1,
-			})),
+			selectedCases.flatMap((websiteCase) =>
+				options.harnesses.map((harness) => ({
+					websiteCase,
+					harness,
+					repeat: repeatIndex + 1,
+				})),
+			),
 	).flat();
 	const startedAt = new Date().toISOString();
 	await writeFile(
@@ -333,7 +400,7 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 			{
 				runId,
 				model: MODEL_SELECTOR,
-				agent: "browser-tools",
+				harnesses: options.harnesses,
 				browserProvider: "kernel",
 				concurrency: options.concurrency,
 				repeatCount: options.repeatCount,
@@ -346,7 +413,7 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 		"utf8",
 	);
 	process.stdout.write(
-		`Running ${attempts.length} browser-tools attempt(s) with ${MODEL_SELECTOR} and Kernel (concurrency ${options.concurrency}).\n`,
+		`Running ${attempts.length} attempt(s) across ${options.harnesses.join(", ")} with ${MODEL_SELECTOR} and Kernel (concurrency ${options.concurrency}).\n`,
 	);
 	process.stdout.write(`Output: ${runDir}\n`);
 	const results = await mapWithConcurrency(
@@ -362,7 +429,7 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 	const summary = {
 		runId,
 		model: MODEL_SELECTOR,
-		agent: "browser-tools",
+		harnesses: options.harnesses,
 		browserProvider: "kernel",
 		startedAt,
 		finishedAt,
@@ -396,7 +463,7 @@ const app = SimpleCLI.define(
 	"browser-tools-benchmarks",
 	{
 		run: SimpleCLI.command({
-			description: "Run the 27-site browser-tools benchmark with Pi and Kernel",
+			description: "Compare browser harnesses on 27 public websites with Pi and Kernel",
 		})
 			.input(benchmarkInput)
 			.handle(async ({ input }) => {
