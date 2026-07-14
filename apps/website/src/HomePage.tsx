@@ -16,15 +16,6 @@ import { AsciiLogo } from "./components/AsciiLogo";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 import { VersionBadge } from "./components/VersionBadge";
-import { FeatureRows } from "./components/FeatureRows";
-import { BattleTestedBanner } from "./components/BattleTestedBanner";
-import { Benchmarks } from "./components/Benchmarks";
-import { MaintainingFeatures } from "./components/MaintainingFeatures";
-import { AutofixPR } from "./components/AutofixPR";
-import { CloudProviders } from "./components/CloudProviders";
-import { FAQ } from "./components/FAQ";
-import { CTA } from "./components/CTA";
-import { SectionDivider } from "./components/SectionDivider.js";
 
 function Hero({
   paneUnlocked,
@@ -125,22 +116,6 @@ export function HomePage() {
       <Navbar animate />
       <Hero paneUnlocked={paneUnlocked} onClosePane={closePane} />
       <div className="section-rails relative mx-auto max-w-[1100px]">
-        <SectionDivider />
-        <FeatureRows />
-        <SectionDivider />
-        <Benchmarks />
-        <SectionDivider />
-        <BattleTestedBanner />
-        <SectionDivider />
-        <MaintainingFeatures />
-        <SectionDivider />
-        <AutofixPR />
-        <SectionDivider />
-        <CloudProviders />
-        <SectionDivider />
-        <FAQ />
-        <SectionDivider />
-        <CTA />
         <Footer />
       </div>
     </OrchestrationContainer>

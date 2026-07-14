@@ -305,6 +305,78 @@ function DashboardMenuItem({
   );
 }
 
+function CliIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M3 4.5 6.5 8 3 11.5" />
+      <path d="M8 11.5h5" />
+    </svg>
+  );
+}
+
+function ProductsNavMenu() {
+  const { display, isScrambling, hovered, onEnter, onLeave } =
+    useGlitchText("Products");
+
+  return (
+    <MenuTrigger>
+      <AriaButton
+        className="flex h-[1.9375rem] items-center gap-1 outline-none"
+        data-fathom-event="Nav products click"
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+      >
+        <span
+          className={`inline-flex items-center gap-1 transition-colors duration-75 ${
+            isScrambling ? "text-amber" : hovered ? "text-accent-bright" : "text-ink"
+          }`}
+        >
+          <Text
+            size="sm"
+            className={`font-medium leading-none ${
+              isScrambling ? "font-mono" : ""
+            }`}
+          >
+            {display}
+          </Text>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            className="size-3.5 text-muted"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.8"
+          >
+            <path d="m4 6 4 4 4-4" />
+          </svg>
+        </span>
+      </AriaButton>
+      <Popover placement="bottom start" offset={6} className="z-50 outline-none">
+        <Menu className="w-[300px] rounded-lg border border-rule bg-panel p-1 shadow-lg shadow-black/35 outline-none">
+          <DashboardMenuItem
+            href="/cli"
+            icon={<CliIcon />}
+            title="Libretto CLI"
+            description="Turn website workflows into reliable APIs"
+            fathomEvent="Nav products cli click"
+          />
+        </Menu>
+      </Popover>
+    </MenuTrigger>
+  );
+}
+
 function CloudAccountLink({ session }: { session: CloudSession | null }) {
   const [pageLabel, setPageLabel] = useState("Dashboard");
   const [signingOut, setSigningOut] = useState(false);
@@ -486,6 +558,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             <LibrettoLogoAndName />
           </a>
           <div className="hidden items-center gap-6 lg:flex">
+            <ProductsNavMenu />
             <GlitchNavLink
               href="/docs/get-started/quickstart"
               external={false}

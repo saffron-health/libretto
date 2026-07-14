@@ -134,6 +134,13 @@ export function MobileMenu({
               </MenuItem>
             )}
             <MenuItem
+              href="/cli"
+              className={itemClass}
+              data-fathom-event="Mobile nav products cli click"
+            >
+              Libretto CLI
+            </MenuItem>
+            <MenuItem
               href="/docs/get-started/quickstart"
               className={itemClass}
               data-fathom-event="Mobile nav docs click"

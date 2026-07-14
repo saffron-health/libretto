@@ -15,6 +15,7 @@ import { Route as SetupRouteImport } from './routes/setup'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CliRouteImport } from './routes/cli'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
 import { Route as BlogRouteRouteImport } from './routes/blog/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -54,6 +55,11 @@ const InviteRoute = InviteRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CliRoute = CliRouteImport.update({
+  id: '/cli',
+  path: '/cli',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrandKitRoute = BrandKitRouteImport.update({
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/brand-kit': typeof BrandKitRoute
+  '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/cli'
     | '/dashboard'
     | '/invite'
     | '/onboarding'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/brand-kit'
+    | '/cli'
     | '/dashboard'
     | '/invite'
     | '/onboarding'
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/cli'
     | '/dashboard'
     | '/invite'
     | '/onboarding'
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BlogRouteRoute: typeof BlogRouteRouteWithChildren
   BrandKitRoute: typeof BrandKitRoute
+  CliRoute: typeof CliRoute
   DashboardRoute: typeof DashboardRoute
   InviteRoute: typeof InviteRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -276,6 +289,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cli': {
+      id: '/cli'
+      path: '/cli'
+      fullPath: '/cli'
+      preLoaderRoute: typeof CliRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/brand-kit': {
@@ -369,6 +389,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BlogRouteRoute: BlogRouteRouteWithChildren,
   BrandKitRoute: BrandKitRoute,
+  CliRoute: CliRoute,
   DashboardRoute: DashboardRoute,
   InviteRoute: InviteRoute,
   OnboardingRoute: OnboardingRoute,
