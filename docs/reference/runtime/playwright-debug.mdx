@@ -10,10 +10,16 @@ automatically opens pull requests that fix broken scripts.
 browser provider, retries, logging, and fallback logic while adding one agent
 call in the failure path.
 
-```typescript
-import { createLibrettoDebugger } from "libretto-playwright-debug";
+Install it in the project that runs the Playwright automation:
 
-const librettoDebugger = createLibrettoDebugger({
+```bash
+pnpm add libretto-playwright-debug
+```
+
+```typescript
+import { createPlaywrightDebugger } from "libretto-playwright-debug";
+
+const playwrightDebugger = createPlaywrightDebugger({
   github: {
     owner: "acme",
     repo: "automations",
@@ -33,12 +39,22 @@ The first version supports `openai/...` and `anthropic/...`.
 try {
   await runAutomation(page);
 } catch (error) {
-  await librettoDebugger.debugPlaywrightFailure(error, page);
+  await playwrightDebugger.debugPlaywrightFailure(error, page);
 
   await sendToExistingFallbackService(error);
   throw error;
 }
 ```
+
+Create one debugger instance at module scope and add this call directly to the
+existing failure boundary. Await it before any `finally` block or teardown
+closes the page, context, or browser. Preserve the automation's existing retry,
+fallback, logging, and rethrow behavior.
+
+Do not introduce a `withPlaywrightDebugger`, `debugWorkflow`, replacement
+workflow, or second agent abstraction. The object returned by
+`createPlaywrightDebugger()` is the integration boundary, and it must receive
+the live page that observed the failure.
 
 ## What It Captures
 
@@ -48,7 +64,7 @@ frames — plus any paths you pass in `includeFiles` — to read the relevant so
 files from GitHub at `baseBranch`.
 
 ```typescript
-await librettoDebugger.debugPlaywrightFailure(error, page, {
+await playwrightDebugger.debugPlaywrightFailure(error, page, {
   includeFiles: ["src/workflows/acme.ts"],
 });
 ```

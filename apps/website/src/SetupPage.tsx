@@ -20,11 +20,15 @@ const DEBUGGER_DOCS_URL = "/docs/reference/runtime/playwright-debug";
 const DEBUGGER_CONCEPT_URL = "/docs/understand-libretto/autofix-debugging";
 const DEBUGGER_PROMPT =
   "Add the Libretto Playwright debugging agent to my existing automation. " +
-  "Install libretto-playwright-debug, then in my script's failure path call " +
-  "debugPlaywrightFailure(error, page). Follow " +
+  "Install libretto-playwright-debug, then follow " +
   "https://libretto.sh/docs/reference/runtime/playwright-debug to configure " +
-  "createLibrettoDebugger with my repo (owner, repo, baseBranch) and " +
-  "authenticate GitHub with my LIBRETTO_API_KEY.";
+  "createPlaywrightDebugger with my repo (owner, repo, baseBranch), and " +
+  "authenticate GitHub with my LIBRETTO_API_KEY. Instantiate it once and add " +
+  "one awaited debugPlaywrightFailure(error, page) call directly to the " +
+  "existing failure path before Playwright teardown. Preserve my workflow, " +
+  "fallbacks, retries, logging, and rethrow behavior. Do not add wrapper " +
+  "abstractions such as withPlaywrightDebugger or debugWorkflow, and do not " +
+  "launch another browser or page.";
 const CLOUD_SETUP_PROMPT =
   "Fetch and follow https://libretto.sh/cloud.md to set up Libretto Cloud hosted browsers for this project.";
 const CLOUD_SETUP_COMPLETE_KEY = "libretto.setup.cloudSetupComplete";

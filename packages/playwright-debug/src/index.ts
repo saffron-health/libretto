@@ -75,7 +75,7 @@ export type DebugAgentRunner = (
   context: DebugAgentContext,
 ) => Promise<AgentFix>;
 
-export type LibrettoDebuggerOptions = {
+export type PlaywrightDebuggerOptions = {
   github: GitHubDebuggerConfig;
   agent: AgentModelConfig;
   modelRunner?: DebugAgentRunner;
@@ -108,7 +108,7 @@ export type DebugPlaywrightFailureResult =
       sourceFiles: SourceFile[];
     };
 
-export type LibrettoDebugger = {
+export type PlaywrightDebugger = {
   debugPlaywrightFailure: (
     error: unknown,
     page: Page,
@@ -168,9 +168,9 @@ const agentFixSchema = z.object({
   ),
 });
 
-export function createLibrettoDebugger(
-  options: LibrettoDebuggerOptions,
-): LibrettoDebugger {
+export function createPlaywrightDebugger(
+  options: PlaywrightDebuggerOptions,
+): PlaywrightDebugger {
   const model = parseAgentModel(options.agent.model);
   const maxSourceFileBytes =
     options.agent.maxSourceFileBytes ?? DEFAULT_MAX_SOURCE_FILE_BYTES;
