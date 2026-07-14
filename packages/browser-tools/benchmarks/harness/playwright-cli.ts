@@ -1,20 +1,27 @@
 import type { SessionRun } from "../agent.js";
-import { runBrowserTask, shellQuote } from "./run-browser-task.js";
+import { closeKernelConnection, createKernelConnection, shellQuote } from "./kernel.js";
+import { runBrowserTask } from "./run-browser-task.js";
 
 export async function runPlaywrightCliHarness(
 	task: string,
 	workspace: string,
 ): Promise<SessionRun> {
-	return await runBrowserTask({
-		task,
-		workspace,
-		buildAppendSystemPrompt: ({ cdpEndpoint, sessionName }) => {
-			const session = shellQuote(sessionName);
-			const command = `playwright-cli -s=${session}`;
-			return [
-				`Attach once with: ${command} attach --cdp=${shellQuote(cdpEndpoint)}`,
-				`Then use this command prefix: ${command}`,
-			].join("\n");
-		},
-	});
+	const kernel = await createKernelConnection();
+	try {
+		const session = shellQuote(kernel.sessionName);
+		const command = `playwright-cli -s=${session}`;
+		return await runBrowserTask({
+			task,
+			workspace,
+			appendSystemPrompt: [
+				[
+					"A connection to a cloud browser has already been set up.",
+					`Use it by first attaching with ${command} attach --cdp=${shellQuote(kernel.cdpEndpoint)},`,
+					`then running Playwright CLI commands with this prefix: ${command}`,
+				].join(" "),
+			],
+		});
+	} finally {
+		await closeKernelConnection(kernel);
+	}
 }

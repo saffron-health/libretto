@@ -1,7 +1,8 @@
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import type { SessionRun } from "../agent.js";
-import { runBrowserTask, shellQuote } from "./run-browser-task.js";
+import { createKernelConnection, closeKernelConnection, shellQuote } from "./kernel.js";
+import { runBrowserTask } from "./run-browser-task.js";
 
 const require = createRequire(import.meta.url);
 const AGENT_BROWSER_SKILL_PATH = resolve(
@@ -13,19 +14,27 @@ export async function runAgentBrowserHarness(
 	task: string,
 	workspace: string,
 ): Promise<SessionRun> {
-	return await runBrowserTask({
-		task,
-		workspace,
-		skillPaths: [AGENT_BROWSER_SKILL_PATH],
-		buildAppendSystemPrompt: ({ cdpEndpoint, sessionName }) => {
-			const command = [
-				"agent-browser",
-				"--session",
-				shellQuote(sessionName),
-				"--cdp",
-				shellQuote(cdpEndpoint),
-			].join(" ");
-			return `Use this command prefix for agent-browser: ${command}`;
-		},
-	});
+	const kernel = await createKernelConnection();
+	try {
+		const command = [
+			"agent-browser",
+			"--session",
+			shellQuote(kernel.sessionName),
+			"--cdp",
+			shellQuote(kernel.cdpEndpoint),
+		].join(" ");
+		return await runBrowserTask({
+			task,
+			workspace,
+			skillPaths: [AGENT_BROWSER_SKILL_PATH],
+			appendSystemPrompt: [
+				[
+					"A connection to a cloud browser has already been set up.",
+					`Use it by running agent-browser commands with this prefix: ${command}`,
+				].join(" "),
+			],
+		});
+	} finally {
+		await closeKernelConnection(kernel);
+	}
 }
