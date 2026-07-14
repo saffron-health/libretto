@@ -12,8 +12,9 @@ import {
 	type AgentSessionEvent,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { createPiBrowserTools } from "@libretto/browser-tools/pi";
-import { KernelBrowserProvider } from "@libretto/browser-tools/kernel";
+import { SimpleCLI } from "affordance";
+import { createPiBrowserTools } from "../src/adapters/pi/index.js";
+import { KernelBrowserProvider } from "../src/providers/kernel.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -25,7 +26,8 @@ const MODEL_ID = "gpt-5.6-sol";
 const MODEL_SELECTOR = `${MODEL_PROVIDER}/${MODEL_ID}`;
 const DEFAULT_CONCURRENCY = 5;
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
-const repoRoot = resolve(import.meta.dirname, "..");
+const packageRoot = resolve(import.meta.dirname, "..");
+const repoRoot = resolve(packageRoot, "../..");
 
 type WebsiteCase = {
 	name: string;
@@ -144,9 +146,9 @@ const WEBSITE_CASES: WebsiteCase[] = [
 ];
 
 type CliOptions = {
-	casePattern: string | null;
+	casePattern?: string;
 	concurrency: number;
-	outputDir: string | null;
+	outputDir?: string;
 	repeatCount: number;
 }
 
@@ -204,80 +206,33 @@ class SessionRunError extends Error {
 	}
 }
 
-function printHelp(): void {
-	process.stdout.write(
-		[
-			"Run the 27-site browser-tools benchmark with Pi and Kernel.",
-			"",
-			"Usage:",
-			"  pnpm --dir benchmarks benchmark:browser-tools [options]",
-			"",
-			"Options:",
-			"  -t, --case <text>         Run cases whose names contain text",
-			`  --concurrency <number>    Parallel attempts (default: ${DEFAULT_CONCURRENCY})`,
-			"  --repeat-count <number>   Runs per selected case (default: 1)",
-			"  --output <directory>      Artifact directory",
-			"  -h, --help                Show this help",
-			"",
-			"Environment:",
-			"  OPENAI_API_KEY and KERNEL_API_KEY are required.",
-			"",
-		].join("\n"),
-	);
-}
-
-function positiveInteger(raw: string | undefined, flag: string): number {
-	const parsed = Number(raw);
-	if (!Number.isInteger(parsed) || parsed <= 0) {
-		throw new Error(`${flag} requires a positive integer.`);
-	}
-	return parsed;
-}
-
-function parseArgs(args: string[]): CliOptions | null {
-	const options: CliOptions = {
-		casePattern: null,
-		concurrency: DEFAULT_CONCURRENCY,
-		outputDir: null,
-		repeatCount: 1,
-	};
-
-	for (let index = 0; index < args.length; index += 1) {
-		const arg = args[index];
-		if (arg === "-h" || arg === "--help") {
-			printHelp();
-			return null;
-		}
-		if (arg === "-t" || arg === "--case") {
-			const value = args[index + 1];
-			if (!value) throw new Error(`${arg} requires a case-name substring.`);
-			options.casePattern = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--concurrency") {
-			options.concurrency = positiveInteger(args[index + 1], arg);
-			index += 1;
-			continue;
-		}
-		if (arg === "--repeat-count") {
-			options.repeatCount = positiveInteger(args[index + 1], arg);
-			index += 1;
-			continue;
-		}
-		if (arg === "--output") {
-			const value = args[index + 1];
-			if (!value) throw new Error("--output requires a directory.");
-			options.outputDir = resolve(value);
-			index += 1;
-			continue;
-		}
-		throw new Error(
-			`Unknown option "${arg}". Run pnpm --dir benchmarks benchmark:browser-tools --help.`,
-		);
-	}
-	return options;
-}
+const benchmarkInput = SimpleCLI.input({
+	positionals: [],
+	named: {
+		casePattern: SimpleCLI.option(z.string().optional(), {
+			name: "case",
+			aliases: ["t"],
+			help: "Run cases whose names contain this text",
+		}),
+		concurrency: SimpleCLI.option(
+			z.coerce.number().int().positive().default(DEFAULT_CONCURRENCY),
+			{
+				help: `Parallel attempts (default: ${DEFAULT_CONCURRENCY})`,
+			},
+		),
+		repeatCount: SimpleCLI.option(
+			z.coerce.number().int().positive().default(1),
+			{
+				name: "repeat-count",
+				help: "Runs per selected case (default: 1)",
+			},
+		),
+		outputDir: SimpleCLI.option(z.string().optional(), {
+			name: "output",
+			help: "Artifact directory",
+		}),
+	},
+});
 
 function loadRepoEnv(): void {
 	const envPath = join(repoRoot, ".env");
@@ -726,10 +681,8 @@ function summaryMarkdown(options: {
 	return `${lines.join("\n")}\n`;
 }
 
-async function main(): Promise<void> {
+async function runBenchmarks(options: CliOptions): Promise<void> {
 	loadRepoEnv();
-	const options = parseArgs(process.argv.slice(2));
-	if (!options) return;
 	requireEnvironment("OPENAI_API_KEY");
 	requireEnvironment("KERNEL_API_KEY");
 
@@ -744,8 +697,9 @@ async function main(): Promise<void> {
 		throw new Error(`No benchmark cases matched "${options.casePattern}".`);
 	}
 	const runId = createRunId();
-	const runDir =
-		options.outputDir ?? join(repoRoot, "benchmarks", "runs", runId);
+	const runDir = options.outputDir
+		? resolve(options.outputDir)
+		: join(packageRoot, "benchmarks", "runs", runId);
 	await mkdir(runDir, { recursive: true });
 	const attempts = Array.from(
 		{ length: options.repeatCount },
@@ -821,7 +775,24 @@ async function main(): Promise<void> {
 	process.stdout.write(`Summary: ${join(runDir, "summary.md")}\n`);
 }
 
-main().catch((error) => {
+const app = SimpleCLI.define(
+	"browser-tools-benchmarks",
+	{
+		run: SimpleCLI.command({
+			description: "Run the 27-site browser-tools benchmark with Pi and Kernel",
+		})
+			.input(benchmarkInput)
+			.handle(async ({ input }) => {
+				await runBenchmarks(input);
+			}),
+	},
+	{
+		appendHelpText:
+			"Environment: OPENAI_API_KEY and KERNEL_API_KEY are required.",
+	},
+);
+
+app.run(process.argv.slice(2)).catch((error) => {
 	const message = error instanceof Error ? error.stack ?? error.message : String(error);
 	process.stderr.write(`${message}\n`);
 	process.exitCode = 1;

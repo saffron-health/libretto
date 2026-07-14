@@ -8,6 +8,7 @@ dist/
 .env
 temp/
 benchmarks/**/runs/
+packages/**/benchmarks/runs/
 evals/profiles/
 evals/private/
 evals/runs/
