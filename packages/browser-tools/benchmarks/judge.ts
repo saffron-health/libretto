@@ -2,6 +2,7 @@ import {
 	defineTool,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { mkdir } from "node:fs/promises";
 import { z } from "zod";
 import {
 	createPiSession,
@@ -22,6 +23,7 @@ export async function judgeBrowserRun(options: {
 	eventsPath: string;
 	workspace: string;
 }): Promise<{ judgment: Judgment; run: SessionRun }> {
+	await mkdir(options.workspace, { recursive: true });
 	let judgment: Judgment | null = null;
 	const reportTool = defineTool({
 		name: "report_evaluation",
