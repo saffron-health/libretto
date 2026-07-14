@@ -191,42 +191,6 @@ npx libretto snapshot --session chrome-debug
 npx libretto exec --session chrome-debug "await page.url()"
 ```
 
-#### Connect to a persistent browser profile
-
-Saved auth profiles restore cookies, localStorage, and IndexedDB into a new
-browser context. Some websites also depend on sessionStorage or bind the session
-to a specific browser process. For those websites, start Chrome with a dedicated
-user-data directory and attach Libretto to the running browser:
-
-```bash theme={null}
-google-chrome \
-  --user-data-dir="$HOME/.libretto/browser-profiles/my-account" \
-  --remote-debugging-port=9222
-```
-
-After signing in through that Chrome window, connect Libretto:
-
-```bash theme={null}
-npx libretto connect http://127.0.0.1:9222 --session my-account
-npx libretto snapshot --session my-account
-```
-
-Later runs must start Chrome with the same `--user-data-dir`. Only one browser
-process can use a user-data directory at a time. Store the directory on
-persistent, access-controlled disk and use a separate directory for each
-account.
-
-This pattern works when Chrome runs on your machine or on a self-hosted worker
-whose filesystem and browser lifecycle you control. Hosted browser providers do
-not expose their user-data directory through Libretto; use the provider's native
-persistent-profile feature instead.
-
-<Note>
-  The Chrome executable name and location vary by operating system. Recent
-  Chrome versions require a non-default user-data directory when remote
-  debugging is enabled.
-</Note>
-
 <CardGroup cols={2}>
   <Card title="exec" icon="code" href="./exec">
     Execute Playwright TypeScript against the open page.
