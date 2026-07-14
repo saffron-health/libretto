@@ -15,6 +15,7 @@ export async function runBashHarness(options: {
 		sessionName: string;
 	}) => string;
 }): Promise<SessionRun> {
+	const startedMs = Date.now();
 	const provider = new KernelBrowserProvider({
 		headless: false,
 		stealth: true,
@@ -41,9 +42,13 @@ export async function runBashHarness(options: {
 	try {
 		run = await runPrompt(session, options.task);
 	} catch (error) {
+		if (error instanceof SessionRunError) {
+			error.run.durationMs = Date.now() - startedMs;
+		}
 		await closeProviderAfterFailure(provider, providerSession.sessionId);
 		throw error;
 	}
+	run.durationMs = Date.now() - startedMs;
 	try {
 		await provider.closeSession(providerSession.sessionId);
 	} catch (error) {
