@@ -56,7 +56,7 @@
     }
   },
   "scripts": {
-    "benchmarks": "pnpm --filter affordance build && tsx benchmarks/runBenchmarks.ts",
+    "benchmarks": "pnpm --filter affordance build && tsx benchmarks/index.ts",
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
