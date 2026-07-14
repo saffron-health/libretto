@@ -15,13 +15,14 @@ export async function runBashHarness(options: {
 		sessionName: string;
 	}) => string;
 }): Promise<SessionRun> {
-	const startedMs = Date.now();
 	const provider = new KernelBrowserProvider({
 		headless: false,
 		stealth: true,
 		timeoutSeconds: Math.ceil(DEFAULT_TIMEOUT_MS / 1000),
 	});
+	const provisioningStartedMs = Date.now();
 	const providerSession = await provider.createSession();
+	const provisioningDurationMs = Date.now() - provisioningStartedMs;
 	const sessionName = `benchmark-${providerSession.sessionId}`;
 	let session: Awaited<ReturnType<typeof createPiSession>>;
 	try {
@@ -43,12 +44,12 @@ export async function runBashHarness(options: {
 		run = await runPrompt(session, options.task);
 	} catch (error) {
 		if (error instanceof SessionRunError) {
-			error.run.durationMs = Date.now() - startedMs;
+			error.run.durationMs += provisioningDurationMs;
 		}
 		await closeProviderAfterFailure(provider, providerSession.sessionId);
 		throw error;
 	}
-	run.durationMs = Date.now() - startedMs;
+	run.durationMs += provisioningDurationMs;
 	try {
 		await provider.closeSession(providerSession.sessionId);
 	} catch (error) {
