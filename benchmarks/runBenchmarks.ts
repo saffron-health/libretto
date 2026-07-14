@@ -519,23 +519,21 @@ async function judgeBrowserRun(options: {
 		].join(" "),
 		customTools: [reportTool],
 	});
-	try {
-		const run = await runPrompt(
-			session,
-			[
-				`TASK:\n${options.task}`,
-				"",
-				`BROWSER AGENT TRANSCRIPT:\n${options.transcript}`,
-			].join("\n"),
+	const run = await runPrompt(
+		session,
+		[
+			`TASK:\n${options.task}`,
+			"",
+			`BROWSER AGENT TRANSCRIPT:\n${options.transcript}`,
+		].join("\n"),
+	);
+	if (!judgment) {
+		throw new SessionRunError(
+			new Error("Judge did not call report_evaluation."),
+			run,
 		);
-		if (!judgment) {
-			throw new SessionRunError(
-				new Error("Judge did not call report_evaluation."),
-				run,
-			);
-		}
-		return { judgment, run };
 	}
+	return { judgment, run };
 }
 
 function transcriptFor(session: AgentSession): string {
