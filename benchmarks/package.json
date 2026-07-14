@@ -3,8 +3,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.6",
     "@google-cloud/run": "^3.2.0",
     "@google-cloud/storage": "^7.16.0",
+    "@libretto/browser-tools": "workspace:*",
     "@mariozechner/pi-coding-agent": "^0.62.0",
     "@onkernel/sdk": "^0.44.0",
     "@sinclair/typebox": "^0.34.41",
@@ -14,6 +16,7 @@
     "zod": "^4.3.6"
   },
   "scripts": {
+    "benchmark:browser-tools": "pnpm --filter @libretto/browser-tools build && tsx runBenchmarks.ts",
     "type-check": "tsc --noEmit",
     "benchmarks": "tsx cli.ts"
   },
