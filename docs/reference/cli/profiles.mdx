@@ -77,24 +77,7 @@ the server binds to a specific browser process.
 Use a persistent browser profile when signing in again after loading a saved
 auth profile invalidates the session. Launch Chrome with a dedicated
 `--user-data-dir`, keep that browser process running, and attach Libretto with
-`connect`:
-
-```bash theme={null}
-google-chrome \
-  --user-data-dir="$HOME/.libretto/browser-profiles/my-account" \
-  --remote-debugging-port=9222
-```
-
-After signing in through that Chrome window, connect Libretto:
-
-```bash theme={null}
-npx libretto connect http://127.0.0.1:9222 --session my-account
-```
-
-Later runs must start Chrome with the same user-data directory. This pattern
-works on your machine or a self-hosted worker whose filesystem and browser
-lifecycle you control. For hosted browsers, use the provider's native profile
-feature instead.
+`connect`.
 
 <Warning>
   A persistent browser profile contains credentials and the browser's complete
