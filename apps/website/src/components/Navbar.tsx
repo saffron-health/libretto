@@ -323,15 +323,15 @@ function CliIcon() {
   );
 }
 
-function ProductsNavMenu() {
+function OpenSourceNavMenu() {
   const { display, isScrambling, hovered, onEnter, onLeave } =
-    useGlitchText("Products");
+    useGlitchText("Open source");
 
   return (
     <MenuTrigger>
       <AriaButton
         className="flex h-[1.9375rem] items-center gap-1 outline-none"
-        data-fathom-event="Nav products click"
+        data-fathom-event="Nav open source click"
         onMouseEnter={onEnter}
         onMouseLeave={onLeave}
       >
@@ -369,7 +369,7 @@ function ProductsNavMenu() {
             icon={<CliIcon />}
             title="Libretto CLI"
             description="Turn website workflows into reliable APIs"
-            fathomEvent="Nav products cli click"
+            fathomEvent="Nav open source cli click"
           />
         </Menu>
       </Popover>
@@ -558,7 +558,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             <LibrettoLogoAndName />
           </a>
           <div className="hidden items-center gap-6 lg:flex">
-            <ProductsNavMenu />
+            <OpenSourceNavMenu />
             <GlitchNavLink
               href="/docs/get-started/quickstart"
               external={false}

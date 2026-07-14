@@ -32,6 +32,7 @@ export function AutofixPR() {
     <SiteSection>
       <SectionIntro
         className="mb-12"
+        headingClassName="mb-4 [text-wrap:balance]"
         kicker="// AUTOFIX --"
         title="When automations break, AI opens pull requests"
       >

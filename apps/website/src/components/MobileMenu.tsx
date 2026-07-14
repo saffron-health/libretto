@@ -136,7 +136,7 @@ export function MobileMenu({
             <MenuItem
               href="/cli"
               className={itemClass}
-              data-fathom-event="Mobile nav products cli click"
+              data-fathom-event="Mobile nav open source cli click"
             >
               Libretto CLI
             </MenuItem>
