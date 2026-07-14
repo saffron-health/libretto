@@ -15,7 +15,7 @@ import {
 import { createPiBrowserTools } from "@libretto/browser-tools/pi";
 import { KernelBrowserProvider } from "@libretto/browser-tools/kernel";
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { z } from "zod";
@@ -194,6 +194,16 @@ type SessionRun = {
 	durationMs: number;
 }
 
+class SessionRunError extends Error {
+	readonly run: SessionRun;
+
+	constructor(error: unknown, run: SessionRun) {
+		super(error instanceof Error ? error.message : String(error));
+		this.name = "SessionRunError";
+		this.run = run;
+	}
+}
+
 function printHelp(): void {
 	process.stdout.write(
 		[
@@ -272,15 +282,7 @@ function parseArgs(args: string[]): CliOptions | null {
 function loadRepoEnv(): void {
 	const envPath = join(repoRoot, ".env");
 	if (!existsSync(envPath)) return;
-	for (const line of readFileSync(envPath, "utf8").split("\n")) {
-		const trimmed = line.trim();
-		if (!trimmed || trimmed.startsWith("#")) continue;
-		const separator = trimmed.indexOf("=");
-		if (separator <= 0) continue;
-		const key = trimmed.slice(0, separator);
-		const value = trimmed.slice(separator + 1);
-		if (process.env[key] === undefined) process.env[key] = value;
-	}
+	process.loadEnvFile(envPath);
 }
 
 function requireEnvironment(name: "OPENAI_API_KEY" | "KERNEL_API_KEY"): string {
@@ -439,6 +441,12 @@ async function runPrompt(
 			events,
 			durationMs: Date.now() - startedMs,
 		};
+	} catch (error) {
+		throw new SessionRunError(error, {
+			session,
+			events,
+			durationMs: Date.now() - startedMs,
+		});
 	} finally {
 		if (timeout) clearTimeout(timeout);
 		unsubscribe();
@@ -454,7 +462,6 @@ async function runBrowserAgent(
 			headless: false,
 			stealth: true,
 			timeoutSeconds: Math.ceil(DEFAULT_TIMEOUT_MS / 1000),
-			enableRecording: true,
 		}),
 	);
 	const session = await createPiSession({
@@ -472,9 +479,6 @@ async function runBrowserAgent(
 
 	try {
 		return await runPrompt(session, task);
-	} catch (error) {
-		session.dispose();
-		throw error;
 	} finally {
 		await toolkit.dispose();
 	}
@@ -525,17 +529,28 @@ async function judgeBrowserRun(options: {
 			].join("\n"),
 		);
 		if (!judgment) {
-			throw new Error("Judge did not call report_evaluation.");
+			throw new SessionRunError(
+				new Error("Judge did not call report_evaluation."),
+				run,
+			);
 		}
 		return { judgment, run };
-	} catch (error) {
-		session.dispose();
-		throw error;
 	}
 }
 
 function transcriptFor(session: AgentSession): string {
 	return serializeConversation(convertToLlm(session.messages)).trim();
+}
+
+async function writeAgentArtifacts(
+	run: SessionRun,
+	transcriptPath: string,
+	eventsPath: string,
+): Promise<string> {
+	const transcript = transcriptFor(run.session);
+	await writeFile(transcriptPath, `${transcript}\n`, "utf8");
+	await writeFile(eventsPath, eventsJsonl(run.events), "utf8");
+	return transcript;
 }
 
 async function runAttempt(options: {
@@ -559,20 +574,38 @@ async function runAttempt(options: {
 	process.stdout.write(`[${id}] starting\n`);
 
 	try {
-		agentRun = await runBrowserAgent(options.websiteCase.task, caseDir);
+		try {
+			agentRun = await runBrowserAgent(options.websiteCase.task, caseDir);
+		} catch (error) {
+			if (error instanceof SessionRunError) agentRun = error.run;
+			throw error;
+		}
+		const transcript = await writeAgentArtifacts(
+			agentRun,
+			transcriptPath,
+			eventsPath,
+		);
 		answer = agentRun.session.getLastAssistantText()?.trim() || null;
 		if (!answer) throw new Error("Browser agent returned no final answer.");
-		const transcript = transcriptFor(agentRun.session);
-		await writeFile(transcriptPath, `${transcript}\n`, "utf8");
-		await writeFile(eventsPath, eventsJsonl(agentRun.events), "utf8");
-		const judged = await judgeBrowserRun({
-			task: options.websiteCase.task,
-			transcript,
-			workspace: join(caseDir, "judge"),
-		});
-		judgeRun = judged.run;
-		judgment = judged.judgment;
+		try {
+			const judged = await judgeBrowserRun({
+				task: options.websiteCase.task,
+				transcript,
+				workspace: join(caseDir, "judge"),
+			});
+			judgeRun = judged.run;
+			judgment = judged.judgment;
+		} catch (error) {
+			if (error instanceof SessionRunError) judgeRun = error.run;
+			throw error;
+		}
 	} catch (error) {
+		if (
+			agentRun &&
+			(!existsSync(transcriptPath) || !existsSync(eventsPath))
+		) {
+			await writeAgentArtifacts(agentRun, transcriptPath, eventsPath);
+		}
 		errorMessage = error instanceof Error ? error.message : String(error);
 	} finally {
 		agentRun?.session.dispose();
