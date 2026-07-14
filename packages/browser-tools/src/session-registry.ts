@@ -13,7 +13,7 @@ import type { BrowserProvider } from "./provider.js";
 type SessionEntry = {
 	providerSessionId: string | undefined;
 	providerName: string;
-	ownership: "provider" | "connection" | "borrowed";
+	sessionSource: "existing-page" | "existing-cdp" | "new-session";
 	browser: Browser;
 	context: BrowserContext;
 	currentPage: Page | undefined;
@@ -78,7 +78,7 @@ export class SessionRegistry {
 			const entry = this.createSessionEntry({
 				providerSessionId: providerSession.sessionId,
 				providerName: provider.name,
-				ownership: "provider",
+				sessionSource: "new-session",
 				browser,
 				context,
 			});
@@ -109,7 +109,7 @@ export class SessionRegistry {
 			const entry = this.createSessionEntry({
 				providerSessionId: undefined,
 				providerName: "attached",
-				ownership: "connection",
+				sessionSource: "existing-cdp",
 				browser,
 				context,
 			});
@@ -136,7 +136,7 @@ export class SessionRegistry {
 		const entry = this.createSessionEntry({
 			providerSessionId: undefined,
 			providerName: "borrowed-page",
-			ownership: "borrowed",
+			sessionSource: "existing-page",
 			browser,
 			context,
 		});
@@ -202,9 +202,9 @@ export class SessionRegistry {
 		const entry = this.requireSession(sessionId);
 		this.sessions.delete(sessionId);
 		this.releaseSessionEntry(entry);
-		if (entry.ownership === "borrowed") return;
+		if (entry.sessionSource === "existing-page") return;
 		await entry.browser.close();
-		if (entry.ownership === "provider" && entry.providerSessionId) {
+		if (entry.sessionSource === "new-session" && entry.providerSessionId) {
 			await this.provider?.closeSession(entry.providerSessionId);
 		}
 	}
@@ -316,14 +316,14 @@ export class SessionRegistry {
 	private createSessionEntry(args: {
 		providerSessionId: string | undefined;
 		providerName: string;
-		ownership: SessionEntry["ownership"];
+		sessionSource: SessionEntry["sessionSource"];
 		browser: Browser;
 		context: BrowserContext;
 	}): SessionEntry {
 		const entry: SessionEntry = {
 			providerSessionId: args.providerSessionId,
 			providerName: args.providerName,
-			ownership: args.ownership,
+			sessionSource: args.sessionSource,
 			browser: args.browser,
 			context: args.context,
 			currentPage: undefined,
