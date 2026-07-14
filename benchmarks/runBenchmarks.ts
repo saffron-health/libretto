@@ -477,11 +477,30 @@ async function runBrowserAgent(
 		customTools: toolkit.tools as unknown as ToolDefinition[],
 	});
 
+	let run: SessionRun;
 	try {
-		return await runPrompt(session, task);
-	} finally {
-		await toolkit.dispose();
+		run = await runPrompt(session, task);
+	} catch (error) {
+		try {
+			await toolkit.dispose();
+		} catch (cleanupError) {
+			const message =
+				cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+			process.stderr.write(`Browser cleanup also failed: ${message}\n`);
+		}
+		throw error;
 	}
+	try {
+		await toolkit.dispose();
+	} catch (error) {
+		throw new SessionRunError(
+			new Error(
+				`Browser cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
+			),
+			run,
+		);
+	}
+	return run;
 }
 
 const JudgmentSchema = z.object({
