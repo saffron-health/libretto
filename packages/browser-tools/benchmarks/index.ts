@@ -177,11 +177,10 @@ async function writeAgentArtifacts(
 	run: SessionRun,
 	transcriptPath: string,
 	eventsPath: string,
-): Promise<string> {
+): Promise<void> {
 	const transcript = transcriptFor(run.session);
 	await writeFile(transcriptPath, `${transcript}\n`, "utf8");
 	await writeFile(eventsPath, eventsJsonl(run.events), "utf8");
-	return transcript;
 }
 
 async function runAttempt(options: {
@@ -215,7 +214,7 @@ async function runAttempt(options: {
 			if (error instanceof SessionRunError) agentRun = error.run;
 			throw error;
 		}
-		const transcript = await writeAgentArtifacts(
+		await writeAgentArtifacts(
 			agentRun,
 			transcriptPath,
 			eventsPath,
@@ -225,7 +224,7 @@ async function runAttempt(options: {
 		try {
 			const judged = await judgeBrowserRun({
 				task: options.websiteCase.task,
-				transcript,
+				eventsPath,
 				workspace: join(caseDir, "judge"),
 			});
 			judgeRun = judged.run;

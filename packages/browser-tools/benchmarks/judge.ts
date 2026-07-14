@@ -19,7 +19,7 @@ export type Judgment = z.infer<typeof JudgmentSchema>;
 
 export async function judgeBrowserRun(options: {
 	task: string;
-	transcript: string;
+	eventsPath: string;
 	workspace: string;
 }): Promise<{ judgment: Judgment; run: SessionRun }> {
 	let judgment: Judgment | null = null;
@@ -40,11 +40,15 @@ export async function judgeBrowserRun(options: {
 	const session = await createPiSession({
 		workspace: options.workspace,
 		systemPrompt: [
-			"You strictly judge browser-agent transcripts.",
-			"Mark completed only when the transcript shows live-page evidence from the intended website and the final answer satisfies the task.",
+			"You strictly judge browser-agent runs from their raw Pi event stream.",
+			"Use bash with jq to inspect only the provided events.jsonl path.",
+			"Inspect user messages, completed tool calls and results, and the final assistant answer.",
+			"Do not inspect other files, use the network, or treat assistant reasoning as evidence.",
+			"Mark completed only when the events show live-page evidence from the intended website and the final answer satisfies the task.",
 			"Mark incomplete when evidence is missing, the answer is unsupported, or an anti-bot challenge remained unresolved.",
 			"Call report_evaluation exactly once with your decision and concise reasoning.",
 		].join(" "),
+		tools: ["bash", reportTool.name],
 		customTools: [reportTool],
 	});
 	const run = await runPrompt(
@@ -52,7 +56,9 @@ export async function judgeBrowserRun(options: {
 		[
 			`TASK:\n${options.task}`,
 			"",
-			`BROWSER AGENT TRANSCRIPT:\n${options.transcript}`,
+			`EVENTS_JSONL:\n${options.eventsPath}`,
+			"",
+			"Use jq to inspect the raw events before calling report_evaluation.",
 		].join("\n"),
 	);
 	if (!judgment) {
