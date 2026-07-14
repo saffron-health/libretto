@@ -11,10 +11,18 @@ import {
 	type AgentSessionEvent,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 
 const MODEL_PROVIDER = "openai";
 const MODEL_ID = "gpt-5.6-sol";
+const BENCHMARK_SYSTEM_PROMPT =
+	"You are an AI agent in a controlled benchmark. Follow the user's instructions, use the available tools, and report only evidence you actually observed.";
+const COMMON_BROWSER_TASK_INSTRUCTIONS = [
+	"Complete the task on the requested live website and ground the final answer in observed page evidence.",
+	"If the intended site shows a CAPTCHA, bot check, or access-denied challenge, wait once for up to 60 seconds in the same page, inspect it again, and report blocked if it remains.",
+	"Do not use another site, an API, a cached copy, or prior knowledge as a fallback.",
+	"Return a concise final answer after completing the task.",
+].join(" ");
 
 export const MODEL_SELECTOR = `${MODEL_PROVIDER}/${MODEL_ID}`;
 export const DEFAULT_TIMEOUT_MS = 10 * 60_000;
@@ -51,9 +59,12 @@ export class SessionRunError extends Error {
 
 export async function createPiSession(options: {
 	workspace: string;
-	systemPrompt: string;
+	sessionFile: string;
+	systemPrompt?: string;
+	appendSystemPrompt?: string[];
 	customTools?: ToolDefinition[];
 	tools?: string[];
+	skillPaths?: string[];
 }): Promise<AgentSession> {
 	const apiKey = process.env.OPENAI_API_KEY?.trim();
 	if (!apiKey) {
@@ -80,13 +91,23 @@ export async function createPiSession(options: {
 		settingsManager,
 		noExtensions: true,
 		noSkills: true,
+		additionalSkillPaths: options.skillPaths ?? [],
 		noPromptTemplates: true,
 		noThemes: true,
 		noContextFiles: true,
 		agentsFilesOverride: () => ({ agentsFiles: [] }),
-		systemPromptOverride: () => options.systemPrompt,
+		systemPrompt: options.systemPrompt ?? BENCHMARK_SYSTEM_PROMPT,
+		appendSystemPrompt: options.appendSystemPrompt ?? [],
 	});
 	await resourceLoader.reload();
+	const skillErrors = resourceLoader
+		.getSkills()
+		.diagnostics.filter((diagnostic) => diagnostic.type === "error");
+	if (skillErrors.length > 0) {
+		throw new Error(
+			`Could not load benchmark skill resources: ${skillErrors.map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`).join("; ")}. Check that the benchmark tool packages are installed, then rerun the attempt.`,
+		);
+	}
 	const { session } = await createAgentSession({
 		cwd: options.workspace,
 		agentDir,
@@ -96,12 +117,26 @@ export async function createPiSession(options: {
 		modelRegistry,
 		resourceLoader,
 		settingsManager,
-		sessionManager: SessionManager.inMemory(options.workspace),
-		noTools: options.tools ? undefined : "builtin",
-		tools: options.tools,
+		sessionManager: SessionManager.open(
+			options.sessionFile,
+			dirname(options.sessionFile),
+			options.workspace,
+		),
+		...(options.tools ? { tools: options.tools } : {}),
 		customTools: options.customTools ?? [],
 	});
 	return session;
+}
+
+export function browserTaskPrompt(options: {
+	task: string;
+}): string {
+	return [
+		COMMON_BROWSER_TASK_INSTRUCTIONS,
+		`TASK:\n${options.task}`,
+	]
+		.filter((part): part is string => Boolean(part))
+		.join("\n\n");
 }
 
 export async function runPrompt(
@@ -217,20 +252,6 @@ function maxRequestContextTokens(events: AgentSessionEvent[]): number {
 		maxTokens = Math.max(maxTokens, input + cacheRead + cacheWrite);
 	}
 	return maxTokens;
-}
-
-function eventReplacer(key: string, value: unknown): unknown {
-	if (typeof value === "bigint") return value.toString();
-	if (key === "data" && typeof value === "string" && value.length > 10_000) {
-		return `[omitted ${value.length} characters]`;
-	}
-	return value;
-}
-
-export function eventsJsonl(events: AgentSessionEvent[]): string {
-	return `${events
-		.map((event) => JSON.stringify(event, eventReplacer))
-		.join("\n")}\n`;
 }
 
 export function transcriptFor(session: AgentSession): string {

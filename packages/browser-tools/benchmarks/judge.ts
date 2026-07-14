@@ -2,6 +2,7 @@ import {
 	defineTool,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { join } from "node:path";
 import { z } from "zod";
 import {
 	createPiSession,
@@ -14,12 +15,21 @@ const JudgmentSchema = z.object({
 	completed: z.boolean(),
 	reasoning: z.string().trim().min(1),
 });
+const JUDGE_SYSTEM_PROMPT = [
+	"You strictly judge browser-agent sessions.",
+	"Use read and bash with jq to inspect artifact files instead of asking for their contents.",
+	"Prioritize the Pi session JSONL for structured tool evidence and use transcript.md for the rendered conversation and final answer.",
+	"Mark completed only when the artifacts show live-page evidence from the intended website and the final answer satisfies the task.",
+	"Mark incomplete when evidence is missing, the answer is unsupported, or an anti-bot challenge remained unresolved.",
+	"Call report_evaluation exactly once with your decision and concise reasoning.",
+].join(" ");
 
 export type Judgment = z.infer<typeof JudgmentSchema>;
 
 export async function judgeBrowserRun(options: {
 	task: string;
-	transcript: string;
+	transcriptPath: string;
+	sessionPath: string;
 	workspace: string;
 }): Promise<{ judgment: Judgment; run: SessionRun }> {
 	let judgment: Judgment | null = null;
@@ -39,20 +49,19 @@ export async function judgeBrowserRun(options: {
 	});
 	const session = await createPiSession({
 		workspace: options.workspace,
-		systemPrompt: [
-			"You strictly judge browser-agent transcripts.",
-			"Mark completed only when the transcript shows live-page evidence from the intended website and the final answer satisfies the task.",
-			"Mark incomplete when evidence is missing, the answer is unsupported, or an anti-bot challenge remained unresolved.",
-			"Call report_evaluation exactly once with your decision and concise reasoning.",
-		].join(" "),
+		sessionFile: join(options.workspace, "judge", "session.jsonl"),
+		systemPrompt: JUDGE_SYSTEM_PROMPT,
 		customTools: [reportTool],
+		tools: ["read", "bash", "report_evaluation"],
 	});
 	const run = await runPrompt(
 		session,
 		[
 			`TASK:\n${options.task}`,
 			"",
-			`BROWSER AGENT TRANSCRIPT:\n${options.transcript}`,
+			"ARTIFACTS:",
+			`- transcript.md: ${options.transcriptPath}`,
+			`- Pi session JSONL: ${options.sessionPath}`,
 		].join("\n"),
 	);
 	if (!judgment) {

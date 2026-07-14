@@ -16,7 +16,7 @@
       "outputLogs": "errors-only"
     },
     "benchmarks": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build", "^build"],
       "cache": false
     },
     "evals": {

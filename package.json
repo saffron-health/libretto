@@ -32,7 +32,7 @@
     "prepare-release": "bash ./scripts/prepare-release.sh",
     "publish:experimental": "bash ./scripts/publish-experimental.sh",
     "evals": "node evals/run.mjs",
-    "benchmarks": "turbo run benchmarks --filter=@libretto/benchmarks --",
+    "benchmarks": "turbo run benchmarks --filter=@libretto/browser-tools --",
     "google-login": "gcloud auth login --update-adc && gcloud auth configure-docker us-central1-docker.pkg.dev --quiet",
     "cli": "pnpm -s --filter libretto cli",
     "create-tmp-workspace": "pnpm --filter @libretto/dev-tools create-tmp-workspace",

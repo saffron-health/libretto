@@ -56,7 +56,7 @@
     }
   },
   "scripts": {
-    "benchmarks": "pnpm --filter affordance build && dev-browser install && tsx benchmarks/index.ts",
+    "benchmarks": "dev-browser install && tsx benchmarks/index.ts",
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
@@ -83,6 +83,7 @@
     }
   },
   "devDependencies": {
+    "@libretto/browser-tools": "workspace:*",
     "@earendil-works/pi-coding-agent": "^0.80.6",
     "@playwright/cli": "^0.1.17",
     "@types/node": "^25.5.0",
