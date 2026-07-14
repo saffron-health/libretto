@@ -1,112 +1,26 @@
-/* Libretto docs — userland Holocron overrides */
+/* Libretto docs — userland Holocron overrides.
+   Uses CSS variables wherever possible to avoid targeting internal selectors. */
 :root {
+  /* Typography */
   --type-heading-1-size: 28px;
   --type-heading-2-size: 20px;
   --type-heading-3-size: 16px;
   --weight-heading: 650;
   --type-nav-group-size: 13px;
-}
 
-/* Match the tighter sidebar section headers from the previous docs. */
-.slot-sidebar-left nav .cursor-default {
-  margin-top: 16px !important;
-}
+  /* Sidebar */
+  --sidebar-group-margin-top: 16px;
+  --sidebar-link-radius: var(--radius-sm);
+  --sidebar-indent: 8px;
 
-/* Keep prompt quotes distinct without the default heavy quote treatment. */
-.slot-main
-  :where(blockquote):not(:where([class~='not-prose'], [class~='not-prose'] *)),
-.prose
-  :where(blockquote):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
-  margin-top: 1.25em;
-  margin-bottom: 1.25em;
-  padding-left: 16px;
-  border-left: 2px solid var(--border-subtle);
-  border-inline-start-width: 2px;
-  border-inline-start-color: var(--border-subtle);
-  font-style: italic;
-  font-weight: var(--weight-prose);
-}
+  /* Blockquote */
+  --blockquote-border-width: 2px;
+  --blockquote-border-color: var(--border-subtle);
 
-.slot-main
-  :where(blockquote p:first-of-type):not(
-    :where([class~='not-prose'], [class~='not-prose'] *)
-  )::before,
-.slot-main
-  :where(blockquote p:last-of-type):not(
-    :where([class~='not-prose'], [class~='not-prose'] *)
-  )::after,
-.prose
-  :where(blockquote p:first-of-type):not(
-    :where([class~='not-prose'], [class~='not-prose'] *)
-  )::before,
-.prose
-  :where(blockquote p:last-of-type):not(
-    :where([class~='not-prose'], [class~='not-prose'] *)
-  )::after {
-  content: none;
-}
-
-/* Give code blocks a clear surface and keep copy controls aligned within it. */
-.slot-main figure[class~='group/code'] {
-  padding: 12px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--muted);
-}
-
-.slot-main figure[class~='group/code'] button[aria-label='Copy code'] {
-  top: 8px;
-  right: 8px;
-  margin-top: 0;
-  background: var(--background);
-}
-
-.slot-main
-  figure[class~='group/code']:hover
-  button[aria-label='Copy code'] {
-  opacity: 1;
-}
-
-/* Align sidebar utility links with the search field inset. */
-.slot-sidebar-left div:has(> .search-input) {
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-}
-
-.slot-sidebar-left .search-input {
-  padding-top: 4px !important;
-  padding-right: 32px !important;
-  padding-bottom: 4px !important;
-  padding-left: 28px !important;
-  border-radius: var(--radius-md) !important;
-}
-
-.slot-sidebar-left div:has(> .search-input) > span:first-child {
-  left: 10px !important;
-}
-
-.slot-sidebar-left div:has(> .search-input) kbd {
-  border: 0 !important;
-  background: var(--accent);
-}
-
-.slot-sidebar-left nav a {
-  border-radius: var(--radius-sm);
-}
-
-.slot-sidebar-left nav > div:first-child > a {
-  align-items: center;
-  padding: 2px 10px 2px 6px;
-}
-
-.slot-sidebar-left nav > div:first-child > a > span:last-child {
-  margin-right: 0;
-}
-
-.slot-sidebar-left nav ul[class~='pl-3'] {
-  padding-left: 8px !important;
-}
-
-.slot-sidebar-left nav ul[class~='pl-3'] a {
-  padding-left: 4px;
+  /* Code blocks */
+  --code-block-background: var(--muted);
+  --code-block-border: 1px solid var(--border-subtle);
+  --code-block-radius: var(--radius-md);
+  --code-block-padding-x: 8px;
+  --code-block-padding-y: 12px;
 }
