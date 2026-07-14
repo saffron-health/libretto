@@ -807,8 +807,16 @@ const app = SimpleCLI.define(
 	},
 );
 
-app.run(process.argv.slice(2)).catch((error) => {
-	const message = error instanceof Error ? error.stack ?? error.message : String(error);
-	process.stderr.write(`${message}\n`);
-	process.exitCode = 1;
-});
+async function main(): Promise<void> {
+	try {
+		const result = await app.run(process.argv.slice(2));
+		if (typeof result === "string") process.stdout.write(`${result}\n`);
+	} catch (error) {
+		const message =
+			error instanceof Error ? error.stack ?? error.message : String(error);
+		process.stderr.write(`${message}\n`);
+		process.exitCode = 1;
+	}
+}
+
+await main();
