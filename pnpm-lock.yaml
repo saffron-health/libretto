@@ -158,8 +158,8 @@ importers:
   docs:
     dependencies:
       '@holocron.so/vite':
-        specifier: ^0.25.0
-        version: 0.25.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(hono@4.12.28)(use-sync-external-store@1.6.0(react@19.2.6))(vite@8.0.14(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))(workerd@1.20260702.1)(wrangler@4.107.1)
+        specifier: ^0.25.1
+        version: 0.25.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(hono@4.12.28)(use-sync-external-store@1.6.0(react@19.2.6))(vite@8.0.14(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))(workerd@1.20260702.1)(wrangler@4.107.1)
       react:
         specifier: ^19.2.5
         version: 19.2.6
@@ -1199,8 +1199,8 @@ packages:
     resolution: {integrity: sha512-ErvuTWGV1o9K3s5ZFFnjXJHSYlvG8gSTorCAsv9pS1vIVBMoWP9q42She94+DvTqSJR7sTNq459mpYU/x5/xug==}
     hasBin: true
 
-  '@holocron.so/vite@0.25.0':
-    resolution: {integrity: sha512-WoeLCwwuaq49cmFijOFq27VXHk7FtochHA5hPYsg+o7fn0hlVYAAGyd0cwD591D80pBL1nOQ8YJiaJHZLl/4Tw==}
+  '@holocron.so/vite@0.25.1':
+    resolution: {integrity: sha512-9iFdBZL0yuYAGnDmid2dx/ZdtWFRhcGA1oc3xAMY9e5H3Mg0/gRpT28qMB7FUOStjwtjjWtGGctgCVSGxNpqAw==}
     hasBin: true
 
   '@hono/node-server@1.19.14':
@@ -8699,7 +8699,7 @@ snapshots:
       - react-server-dom-webpack
       - vite
 
-  '@holocron.so/vite@0.25.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(hono@4.12.28)(use-sync-external-store@1.6.0(react@19.2.6))(vite@8.0.14(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))(workerd@1.20260702.1)(wrangler@4.107.1)':
+  '@holocron.so/vite@0.25.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(hono@4.12.28)(use-sync-external-store@1.6.0(react@19.2.6))(vite@8.0.14(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))(workerd@1.20260702.1)(wrangler@4.107.1)':
     dependencies:
       '@cloudflare/vite-plugin': 1.43.1(vite@8.0.14(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))(workerd@1.20260702.1)(wrangler@4.107.1)
       '@fontsource-variable/inter': 5.2.8
