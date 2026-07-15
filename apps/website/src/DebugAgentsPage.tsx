@@ -38,7 +38,7 @@ function DebugAgentsHero() {
             as="h1"
             size="5xl"
             style="serif"
-            className="crt-glow mb-6 max-w-[560px] tracking-[-0.04em] text-ink [text-wrap:balance]"
+            className="crt-glow mb-6 max-w-[560px] tracking-[-0.04em] text-ink [text-wrap:pretty]"
             htmlStyle={{
               fontWeight: 300,
               fontSize: "clamp(36px, 5vw, 64px)",
@@ -50,7 +50,7 @@ function DebugAgentsHero() {
           <Text
             as="p"
             size="lg"
-            className="mb-8 max-w-[480px] leading-relaxed text-muted [text-wrap:balance]"
+            className="mb-8 max-w-[480px] leading-relaxed text-muted [text-wrap:pretty]"
           >
             Libretto&apos;s Playwright debugging agent investigates failures on
             the live site and opens a GitHub PR with the fix — turning a broken
@@ -84,7 +84,7 @@ function FeatureListing() {
       <SectionIntro
         align="left"
         className="mb-12 max-w-[640px]"
-        headingClassName="mb-4 [text-wrap:balance]"
+        headingClassName="mb-4 [text-wrap:pretty]"
         kicker="// FEATURES --"
         title="Failure to fix, without the guesswork"
       >

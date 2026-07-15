@@ -35,7 +35,7 @@ export function BrowserToolsPage() {
             as="h1"
             size="4xl"
             style="serif"
-            className="crt-glow mb-4 tracking-[-0.03em] text-ink [text-wrap:balance]"
+            className="crt-glow mb-4 tracking-[-0.03em] text-ink [text-wrap:pretty]"
             htmlStyle={{
               fontWeight: 300,
               fontSize: "clamp(32px, 4.5vw, 52px)",
@@ -47,7 +47,7 @@ export function BrowserToolsPage() {
           <Text
             as="p"
             size="lg"
-            className="max-w-[480px] leading-relaxed text-muted [text-wrap:balance]"
+            className="max-w-[480px] leading-relaxed text-muted [text-wrap:pretty]"
           >
             Browser tools for AI agents — open, inspect, and drive real browsers
             from any agent framework. This product page is coming soon.

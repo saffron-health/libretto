@@ -35,7 +35,7 @@ function Hero({
       <div
         data-animate={AnimationTarget.Icosahedron}
         style={{ opacity: 0 }}
-        className="pointer-events-none absolute inset-0 flex -translate-y-24 max-md:-translate-y-48 items-center justify-center select-none"
+        className="pointer-events-none absolute inset-0 flex translate-y-8 max-md:translate-y-0 items-center justify-center select-none"
       >
         <CanvasAsciihedron
           className="h-[1600px] w-[1600px] min-h-[1200px] min-w-[1200px] shrink-0 max-h-[180vw] max-w-[180vw] text-ink"
@@ -61,7 +61,7 @@ function Hero({
           as="h1"
           size="5xl"
           style="serif"
-          className="crt-glow mx-auto mb-8 max-w-[720px] text-center tracking-[-0.04em] text-ink [text-wrap:balance]"
+          className="crt-glow mx-auto mb-8 max-w-[720px] text-center tracking-[-0.04em] text-ink [text-wrap:pretty]"
         >
           <AnimatedTitle
             className=""
@@ -79,7 +79,7 @@ function Hero({
           size="lg"
           data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
-          className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:balance]"
+          className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:pretty]"
         >
           Open-source CLI, debug agents, and browser tools for building and
           maintaining reliable web integrations

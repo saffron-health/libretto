@@ -26,7 +26,7 @@ function CliHero() {
             as="h1"
             size="5xl"
             style="serif"
-            className="crt-glow mx-auto mb-6 max-w-[720px] tracking-[-0.04em] text-ink [text-wrap:balance]"
+            className="crt-glow mx-auto mb-6 max-w-[720px] tracking-[-0.04em] text-ink [text-wrap:pretty]"
             htmlStyle={{
               fontWeight: 300,
               fontSize: "clamp(36px, 5vw, 64px)",
@@ -38,7 +38,7 @@ function CliHero() {
           <Text
             as="p"
             size="lg"
-            className="mx-auto mb-8 max-w-[640px] leading-relaxed text-muted [text-wrap:balance]"
+            className="mx-auto mb-8 max-w-[640px] leading-relaxed text-muted [text-wrap:pretty]"
           >
             An open-source CLI that records live browser workflows and compiles
             them into fast, reusable scripts in your codebase.

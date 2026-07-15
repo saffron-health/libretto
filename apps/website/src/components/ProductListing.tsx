@@ -74,7 +74,7 @@ export function ProductListing() {
                     as="h2"
                     size="3xl"
                     style="serif"
-                    className="crt-glow mb-4 tracking-[-0.02em] text-ink [text-wrap:balance] transition-colors group-hover:text-accent-bright"
+                    className="crt-glow mb-4 tracking-[-0.02em] text-ink [text-wrap:pretty] transition-colors group-hover:text-accent-bright"
                     htmlStyle={{
                       fontWeight: 300,
                       fontSize: "clamp(32px, 4vw, 48px)",
@@ -86,7 +86,7 @@ export function ProductListing() {
                   <Text
                     as="p"
                     size="md"
-                    className="max-w-[420px] leading-relaxed text-muted [text-wrap:balance]"
+                    className="max-w-[420px] leading-relaxed text-muted [text-wrap:pretty]"
                   >
                     {product.tagline}
                   </Text>
