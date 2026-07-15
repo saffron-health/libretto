@@ -3,8 +3,8 @@ import { Kicker } from "./Kicker.js";
 import { PRODUCTS } from "../products.js";
 import { SectionDivider } from "./SectionDivider.js";
 
-function ProductVisual({ index }: { index: number }) {
-  if (index === 0) {
+function ProductVisual({ href }: { href: string }) {
+  if (href === "/cli") {
     return (
       <div className="overflow-hidden rounded-xl border border-rule bg-panel/60 p-5 font-mono text-xs leading-6 text-muted shadow-lg shadow-black/25">
         <div className="mb-3 text-amber">$ npx libretto open</div>
@@ -23,7 +23,7 @@ function ProductVisual({ index }: { index: number }) {
     );
   }
 
-  if (index === 1) {
+  if (href === "/debug-agents") {
     return (
       <div className="overflow-hidden rounded-xl border border-rule bg-panel/60 shadow-lg shadow-black/25">
         <div className="flex items-center gap-2 border-b border-rule px-5 py-3.5">
@@ -116,7 +116,7 @@ export function ProductListing() {
                   </div>
                 </div>
                 <div className={visualLeft ? "md:order-1" : undefined}>
-                  <ProductVisual index={index} />
+                  <ProductVisual href={product.href} />
                 </div>
               </a>
             </div>
