@@ -8,10 +8,10 @@
     "light": "#2fdb4f",
     "dark": "#12ce41"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/docs/favicon.svg",
   "logo": {
-    "light": "/logos/logo-light.svg",
-    "dark": "/logos/logo-dark.svg",
+    "light": "/docs/logos/logo-light.svg",
+    "dark": "/docs/logos/logo-dark.svg",
     "href": "https://libretto.sh"
   },
   "fonts": {
