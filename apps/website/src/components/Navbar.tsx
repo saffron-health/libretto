@@ -323,6 +323,47 @@ function CliIcon() {
   );
 }
 
+function BugIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <circle cx="8" cy="9" r="3.2" />
+      <path d="M8 5.8V4.2" />
+      <path d="M4.4 7.2 3 6" />
+      <path d="M11.6 7.2 13 6" />
+      <path d="M4.4 10.8 3 12" />
+      <path d="M11.6 10.8 13 12" />
+    </svg>
+  );
+}
+
+function ToolsIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M10.2 3.2a2.4 2.4 0 0 1 2.6 2.6L9.5 9.1 6.9 6.5z" />
+      <path d="M6.5 9.5 3.2 12.8" />
+      <path d="M4.2 8.2 3 9.4l3.6 3.6 1.2-1.2" />
+    </svg>
+  );
+}
+
 function OpenSourceNavMenu() {
   const { display, isScrambling, hovered, onEnter, onLeave } =
     useGlitchText("Open source");
@@ -363,13 +404,27 @@ function OpenSourceNavMenu() {
         </span>
       </AriaButton>
       <Popover placement="bottom start" offset={6} className="z-50 outline-none">
-        <Menu className="w-[300px] rounded-lg border border-rule bg-panel p-1 shadow-lg shadow-black/35 outline-none">
+        <Menu className="w-[320px] rounded-lg border border-rule bg-panel p-1 shadow-lg shadow-black/35 outline-none">
           <DashboardMenuItem
             href="/cli"
             icon={<CliIcon />}
             title="Libretto CLI"
             description="Turn website workflows into reliable APIs"
             fathomEvent="Nav open source cli click"
+          />
+          <DashboardMenuItem
+            href="/debug-agents"
+            icon={<BugIcon />}
+            title="Debug Agents"
+            description="Failing runs become pull requests"
+            fathomEvent="Nav open source debug agents click"
+          />
+          <DashboardMenuItem
+            href="/browser-tools"
+            icon={<ToolsIcon />}
+            title="Browser Tools SDK"
+            description="Coming soon"
+            fathomEvent="Nav open source browser tools click"
           />
         </Menu>
       </Popover>

@@ -46,7 +46,17 @@ export function Footer() {
           <Text size="xs" className="text-muted/50">
             © {new Date().getFullYear()} Saffron Health
           </Text>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-end gap-x-6 gap-y-2">
+            <a href="/cli" className={linkClass} data-fathom-event="Footer cli click">
+              CLI
+            </a>
+            <a
+              href="/debug-agents"
+              className={linkClass}
+              data-fathom-event="Footer debug agents click"
+            >
+              Debug Agents
+            </a>
             <a href="/blog" className={linkClass} data-fathom-event="Footer blog click">
               Blog
             </a>

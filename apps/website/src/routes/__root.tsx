@@ -2,9 +2,9 @@ import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-r
 import type { ReactNode } from "react";
 import "../index.css";
 
-const DEFAULT_TITLE = "Libretto | Turn website workflows into reliable APIs";
+const DEFAULT_TITLE = "Libretto | Browser automation tooling for coding agents";
 const DEFAULT_DESCRIPTION =
-  "Deterministic browser automation for AI agents and developers. Build fast, reliable scripts with agent-friendly debugging and seamless cloud deployment.";
+  "Open-source CLI, debug agents, and browser tools for building and maintaining reliable web integrations.";
 
 export const Route = createRootRoute({
   head: () => ({

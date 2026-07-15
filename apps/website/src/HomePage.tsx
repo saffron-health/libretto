@@ -5,7 +5,6 @@ import {
   KonamiOverlay,
 } from "./components/CanvasAsciihedron";
 import { Text } from "./components/Text";
-import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
 import {
   OrchestrationContainer,
@@ -16,6 +15,8 @@ import { AsciiLogo } from "./components/AsciiLogo";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 import { VersionBadge } from "./components/VersionBadge";
+import { ProductListing } from "./components/ProductListing";
+import { SectionDivider } from "./components/SectionDivider.js";
 
 function Hero({
   paneUnlocked,
@@ -70,7 +71,7 @@ function Hero({
               lineHeight: 1.05,
             }}
           >
-            Turn website workflows into reliable APIs
+            Browser automation tooling for coding agents
           </AnimatedTitle>
         </Text>
         <Text
@@ -80,10 +81,14 @@ function Hero({
           htmlStyle={{ opacity: 0 }}
           className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:balance]"
         >
-          Libretto is an open-source CLI that turns website workflows into fast,
-          reusable scripts in your codebase
+          Open-source CLI, debug agents, and browser tools for building and
+          maintaining reliable web integrations
         </Text>
-        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-col items-center justify-center gap-3">
+        <div
+          data-animate={AnimationTarget.Content}
+          style={{ opacity: 0 }}
+          className="flex flex-col items-center justify-center gap-3"
+        >
           <InstallSnippet />
           <div className="text-xs text-muted">
             or{" "}
@@ -95,9 +100,6 @@ function Hero({
               BOOK A DEMO
             </a>
           </div>
-        </div>
-        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
-          <TerminalDemo />
         </div>
       </div>
     </section>
@@ -116,6 +118,8 @@ export function HomePage() {
       <Navbar animate />
       <Hero paneUnlocked={paneUnlocked} onClosePane={closePane} />
       <div className="section-rails relative mx-auto max-w-[1100px]">
+        <SectionDivider />
+        <ProductListing />
         <Footer />
       </div>
     </OrchestrationContainer>

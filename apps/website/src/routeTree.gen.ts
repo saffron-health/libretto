@@ -14,8 +14,10 @@ import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as InviteRouteImport } from './routes/invite'
+import { Route as DebugAgentsRouteImport } from './routes/debug-agents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CliRouteImport } from './routes/cli'
+import { Route as BrowserToolsRouteImport } from './routes/browser-tools'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
 import { Route as BlogRouteRouteImport } from './routes/blog/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -52,6 +54,11 @@ const InviteRoute = InviteRouteImport.update({
   path: '/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DebugAgentsRoute = DebugAgentsRouteImport.update({
+  id: '/debug-agents',
+  path: '/debug-agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -60,6 +67,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const CliRoute = CliRouteImport.update({
   id: '/cli',
   path: '/cli',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrowserToolsRoute = BrowserToolsRouteImport.update({
+  id: '/browser-tools',
+  path: '/browser-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrandKitRoute = BrandKitRouteImport.update({
@@ -117,8 +129,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/browser-tools': typeof BrowserToolsRoute
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
+  '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
   '/setup': typeof SetupRoute
@@ -135,8 +149,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/brand-kit': typeof BrandKitRoute
+  '/browser-tools': typeof BrowserToolsRoute
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
+  '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
   '/setup': typeof SetupRoute
@@ -155,8 +171,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/browser-tools': typeof BrowserToolsRoute
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
+  '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
   '/setup': typeof SetupRoute
@@ -176,8 +194,10 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/browser-tools'
     | '/cli'
     | '/dashboard'
+    | '/debug-agents'
     | '/invite'
     | '/onboarding'
     | '/setup'
@@ -194,8 +214,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/brand-kit'
+    | '/browser-tools'
     | '/cli'
     | '/dashboard'
+    | '/debug-agents'
     | '/invite'
     | '/onboarding'
     | '/setup'
@@ -213,8 +235,10 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/browser-tools'
     | '/cli'
     | '/dashboard'
+    | '/debug-agents'
     | '/invite'
     | '/onboarding'
     | '/setup'
@@ -233,8 +257,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BlogRouteRoute: typeof BlogRouteRouteWithChildren
   BrandKitRoute: typeof BrandKitRoute
+  BrowserToolsRoute: typeof BrowserToolsRoute
   CliRoute: typeof CliRoute
   DashboardRoute: typeof DashboardRoute
+  DebugAgentsRoute: typeof DebugAgentsRoute
   InviteRoute: typeof InviteRoute
   OnboardingRoute: typeof OnboardingRoute
   SetupRoute: typeof SetupRoute
@@ -284,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/debug-agents': {
+      id: '/debug-agents'
+      path: '/debug-agents'
+      fullPath: '/debug-agents'
+      preLoaderRoute: typeof DebugAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -296,6 +329,13 @@ declare module '@tanstack/react-router' {
       path: '/cli'
       fullPath: '/cli'
       preLoaderRoute: typeof CliRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/browser-tools': {
+      id: '/browser-tools'
+      path: '/browser-tools'
+      fullPath: '/browser-tools'
+      preLoaderRoute: typeof BrowserToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/brand-kit': {
@@ -389,8 +429,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BlogRouteRoute: BlogRouteRouteWithChildren,
   BrandKitRoute: BrandKitRoute,
+  BrowserToolsRoute: BrowserToolsRoute,
   CliRoute: CliRoute,
   DashboardRoute: DashboardRoute,
+  DebugAgentsRoute: DebugAgentsRoute,
   InviteRoute: InviteRoute,
   OnboardingRoute: OnboardingRoute,
   SetupRoute: SetupRoute,

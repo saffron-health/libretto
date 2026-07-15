@@ -141,6 +141,20 @@ export function MobileMenu({
               Libretto CLI
             </MenuItem>
             <MenuItem
+              href="/debug-agents"
+              className={itemClass}
+              data-fathom-event="Mobile nav open source debug agents click"
+            >
+              Debug Agents
+            </MenuItem>
+            <MenuItem
+              href="/browser-tools"
+              className={itemClass}
+              data-fathom-event="Mobile nav open source browser tools click"
+            >
+              Browser Tools SDK
+            </MenuItem>
+            <MenuItem
               href="/docs/get-started/quickstart"
               className={itemClass}
               data-fathom-event="Mobile nav docs click"
