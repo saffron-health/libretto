@@ -1,6 +1,5 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "$schema": "https://holocron.so/docs.json",
   "name": "Libretto",
   "description": "Toolkit for building, debugging, and maintaining browser automations.",
   "colors": {
@@ -9,10 +8,12 @@
     "dark": "#12ce41"
   },
   "favicon": "/docs/favicon.svg",
+  "icons": { "library": "fontawesome" },
   "logo": {
     "light": "/docs/logos/logo-light.svg",
     "dark": "/docs/logos/logo-dark.svg",
-    "href": "https://libretto.sh"
+    "href": "https://libretto.sh",
+    "text": "Libretto"
   },
   "fonts": {
     "heading": {
@@ -158,32 +159,44 @@
         {
           "anchor": "GitHub",
           "href": "https://github.com/saffron-health/libretto",
-          "icon": "github"
+          "icon": "github",
+          "placement": "sidebar"
         },
         {
           "anchor": "npm",
           "href": "https://www.npmjs.com/package/libretto",
-          "icon": "npm"
+          "icon": "lucide:package",
+          "placement": "sidebar"
         },
         {
           "anchor": "Changelog",
           "href": "https://github.com/saffron-health/libretto/releases",
-          "icon": "clock-rotate-left"
+          "icon": "lucide:history",
+          "placement": "sidebar"
         },
         {
           "anchor": "Discord",
           "href": "https://discord.gg/NYrG56hVDt",
-          "icon": "discord"
+          "icon": "fontawesome:brands:discord",
+          "placement": "sidebar"
         },
         {
           "anchor": "Talk to a dev",
           "href": "https://cal.com/team/libretto/demo",
-          "icon": "video"
+          "icon": "video",
+          "placement": "sidebar"
         }
       ]
     }
   },
-  "navbar": {},
+  "navbar": {
+    "links": [
+      {
+        "type": "github",
+        "href": "https://github.com/saffron-health/libretto"
+      }
+    ]
+  },
   "contextual": {
     "options": [
       "copy",
