@@ -52,7 +52,7 @@ function CliHero() {
                 className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
                 data-fathom-event="CLI hero demo click"
               >
-                BOOK A DEMO
+                TALK TO A DEV
               </a>
             </div>
           </div>

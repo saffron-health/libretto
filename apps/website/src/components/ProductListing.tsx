@@ -25,14 +25,32 @@ function ProductVisual({ index }: { index: number }) {
 
   if (index === 1) {
     return (
-      <div className="overflow-hidden rounded-xl border border-rule bg-panel/60 p-5 shadow-lg shadow-black/25">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="size-2 rounded-full bg-amber-bright" />
-          <span className="font-mono text-xs text-muted">playwright · failed</span>
+      <div className="overflow-hidden rounded-xl border border-rule bg-panel/60 shadow-lg shadow-black/25">
+        <div className="flex items-center gap-2 border-b border-rule px-5 py-3.5">
+          <span className="size-2 rounded-full bg-red-300" />
+          <span className="font-mono text-xs text-ink/70">
+            playwright run · failed
+          </span>
         </div>
-        <div className="rounded-md border border-rule bg-bg/70 px-3 py-2 font-mono text-xs leading-5">
-          <div className="text-red-300">TimeoutError: locator.fill</div>
-          <div className="mt-2 text-accent-bright">+ opened PR #842</div>
+        <div className="p-5">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+            Fix proposed
+          </div>
+          <div className="mb-3 text-sm text-ink">
+            Updated the renamed username field selector
+          </div>
+          <div className="overflow-hidden rounded-md border border-rule font-mono text-[11px] leading-5">
+            <div className="bg-red-500/10 px-3 py-1 text-red-300">
+              - input[name=&quot;username&quot;]
+            </div>
+            <div className="bg-green-9/15 px-3 py-1 text-accent-bright">
+              + input[name=&quot;login&quot;]
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-2 border-t border-rule pt-3 font-mono text-xs text-accent-bright">
+            <span aria-hidden="true">✓</span>
+            <span>Pull request #842 opened</span>
+          </div>
         </div>
       </div>
     );

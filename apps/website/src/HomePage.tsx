@@ -30,7 +30,7 @@ function Hero({
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden px-8 pt-24 pb-16"
+      className="relative overflow-hidden px-8 pt-32 pb-24 md:pt-40 md:pb-32"
     >
       <div
         data-animate={AnimationTarget.Icosahedron}
@@ -97,7 +97,7 @@ function Hero({
               className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
               data-fathom-event="Hero demo click"
             >
-              BOOK A DEMO
+              TALK TO A DEV
             </a>
           </div>
         </div>

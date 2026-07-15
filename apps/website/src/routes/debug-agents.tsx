@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DebugAgentsPage } from "../DebugAgentsPage";
 
-const title = "Debug Agents | Libretto";
+const title = "Playwright PR Agents | Libretto";
 const description =
-  "When Playwright automations fail, Libretto's debugging agent inspects the live page and opens a GitHub pull request with the fix.";
+  "Automatically investigate failing Playwright scripts against the live page and open a GitHub pull request with a proposed fix.";
 const url = "https://libretto.sh/debug-agents";
 
 export const Route = createFileRoute("/debug-agents")({
