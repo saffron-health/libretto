@@ -18,15 +18,15 @@ const DEMO_VIDEO_SOURCE =
 
 function CliHero() {
   return (
-    <section className="relative overflow-hidden px-8 pt-16 pb-8 md:pt-24">
-      <div className="mx-auto grid max-w-[1100px] items-center gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-14">
-        <div>
+    <section className="relative overflow-hidden px-8 pt-16 pb-16 md:pt-24">
+      <div className="relative mx-auto max-w-[1200px]">
+        <div className="text-center">
           <Kicker className="mb-4">// LIBRETTO CLI --</Kicker>
           <Text
             as="h1"
             size="5xl"
             style="serif"
-            className="crt-glow mb-6 max-w-[560px] tracking-[-0.04em] text-ink [text-wrap:balance]"
+            className="crt-glow mx-auto mb-6 max-w-[720px] tracking-[-0.04em] text-ink [text-wrap:balance]"
             htmlStyle={{
               fontWeight: 300,
               fontSize: "clamp(36px, 5vw, 64px)",
@@ -38,12 +38,12 @@ function CliHero() {
           <Text
             as="p"
             size="lg"
-            className="mb-8 max-w-[520px] leading-relaxed text-muted [text-wrap:balance]"
+            className="mx-auto mb-8 max-w-[640px] leading-relaxed text-muted [text-wrap:balance]"
           >
             An open-source CLI that records live browser workflows and compiles
             them into fast, reusable scripts in your codebase.
           </Text>
-          <div className="flex flex-col items-start gap-3">
+          <div className="mb-16 flex flex-col items-center justify-center gap-3">
             <InstallSnippet />
             <div className="text-xs text-muted">
               or{" "}
@@ -57,7 +57,7 @@ function CliHero() {
             </div>
           </div>
         </div>
-        <div className="overflow-hidden rounded-xl border border-rule bg-panel/50 shadow-lg shadow-black/30">
+        <div className="mx-auto max-w-[960px] overflow-hidden rounded-xl border border-rule bg-panel/50 shadow-lg shadow-black/30">
           <div className="flex items-center gap-2 border-b border-rule px-4 py-2.5">
             <span className="size-2.5 rounded-full bg-rule" />
             <span className="size-2.5 rounded-full bg-rule" />
