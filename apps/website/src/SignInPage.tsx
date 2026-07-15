@@ -304,14 +304,16 @@ export function SignInPage() {
         <section className="grid w-full gap-10 md:grid-cols-[1fr_440px] md:items-center">
           <div>
             <p className="mb-4 font-mono text-xs uppercase text-accent">
-              Libretto Cloud
+              Libretto
             </p>
             <h1 className="crt-glow max-w-[620px] font-serif text-[44px] font-[300] leading-[1.02] text-ink md:text-[64px]">
-              {mode === "signin" ? "Sign in to your hosted workflows." : "Create your hosted workflow account."}
+              {mode === "signin"
+                ? "Sign in to your Libretto account."
+                : "Create your Libretto account."}
             </h1>
             <p className="mt-6 max-w-[520px] text-sm leading-6 text-muted">
-              Review jobs, manage teammates, and update billing from the same
-              account used by the Libretto CLI.
+              Connect repositories for PR agents, run hosted workflows, and
+              manage your team from the same account used by the Libretto CLI.
             </p>
           </div>
 
