@@ -28,6 +28,7 @@ https://github.com/user-attachments/assets/9b9a0ab3-5133-4b20-b3be-459943349d18
 - Docs: [libretto.sh/docs](https://libretto.sh/docs)
 - Repository: [github.com/saffron-health/libretto](https://github.com/saffron-health/libretto)
 - Discord: [discord.gg/NYrG56hVDt](https://discord.gg/NYrG56hVDt)
+- Youtube: [https://www.youtube.com/watch?v=0cDpIntmHAM]
 
 ## Installation
 

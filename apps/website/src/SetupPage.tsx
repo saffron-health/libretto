@@ -20,11 +20,15 @@ const DEBUGGER_DOCS_URL = "/docs/reference/runtime/playwright-debug";
 const DEBUGGER_CONCEPT_URL = "/docs/understand-libretto/autofix-debugging";
 const DEBUGGER_PROMPT =
   "Add the Libretto Playwright debugging agent to my existing automation. " +
-  "Install libretto-playwright-debug, then in my script's failure path call " +
-  "debugPlaywrightFailure(error, page). Follow " +
-  "https://libretto.sh/docs/reference/runtime/playwright-debug to configure " +
-  "createLibrettoDebugger with my repo (owner, repo, baseBranch) and " +
-  "authenticate GitHub with my LIBRETTO_API_KEY.";
+  "Install libretto-playwright-debug, then follow " +
+  "https://libretto.sh/docs/reference/runtime/playwright-debug. Create a " +
+  "module-scope playwrightDebugger with createPlaywrightDebugger, my repo " +
+  "(owner, repo, baseBranch), and model configuration, using LIBRETTO_API_KEY " +
+  "for GitHub authentication. At the existing failure point, before " +
+  "Playwright teardown, call await " +
+  "playwrightDebugger.debugFailure(error, page) with the live page that " +
+  "observed the failure. Keep my existing workflow, fallbacks, retries, " +
+  "logging, and rethrow behavior in place.";
 const CLOUD_SETUP_PROMPT =
   "Fetch and follow https://libretto.sh/cloud.md to set up Libretto Cloud hosted browsers for this project.";
 const CLOUD_SETUP_COMPLETE_KEY = "libretto.setup.cloudSetupComplete";
@@ -553,17 +557,18 @@ export function SetupPage() {
                     Add the debugger to your Playwright script
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-muted">
-                    This is the one line that turns on autofix. Add{" "}
-                    <code className="rounded bg-ink/10 px-1 py-0.5 font-mono text-xs">
-                      debugPlaywrightFailure(error, page)
-                    </code>{" "}
-                    to your automation&apos;s failure path (its{" "}
+                    Initialize the Playwright debugger once. At your
+                    automation&apos;s existing failure point (its{" "}
                     <code className="rounded bg-ink/10 px-1 py-0.5 font-mono text-xs">
                       catch
                     </code>{" "}
-                    block). On the next failure, Libretto investigates the live
-                    page and opens a fix PR on your connected repo. Paste this
-                    prompt into your coding agent to wire it in:
+                    block), call{" "}
+                    <code className="rounded bg-ink/10 px-1 py-0.5 font-mono text-xs">
+                      playwrightDebugger.debugFailure(error, page)
+                    </code>{" "}
+                    before teardown. On the next failure, Libretto investigates
+                    the live page and opens a fix PR on your connected repo.
+                    Paste this prompt into your coding agent to wire it in:
                   </p>
                 </div>
                 <div className="flex flex-col items-start">
