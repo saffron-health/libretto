@@ -61,7 +61,7 @@ function Hero({
           as="h1"
           size="5xl"
           style="serif"
-          className="crt-glow mx-auto mb-8 max-w-[720px] text-center tracking-[-0.04em] text-ink [text-wrap:pretty]"
+          className="crt-glow mx-auto mb-8 max-w-[960px] text-center tracking-[-0.04em] text-ink [text-wrap:pretty]"
         >
           <AnimatedTitle
             className=""
