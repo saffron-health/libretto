@@ -83,11 +83,11 @@ export type PlaywrightDebuggerOptions = {
   now?: () => Date;
 };
 
-export type DebugPlaywrightFailureOptions = {
+export type DebugFailureOptions = {
   includeFiles?: string[];
 };
 
-export type DebugPlaywrightFailureResult =
+export type DebugFailureResult =
   | {
       status: "debugger_failed";
       error: string;
@@ -109,11 +109,11 @@ export type DebugPlaywrightFailureResult =
     };
 
 export type PlaywrightDebugger = {
-  debugPlaywrightFailure: (
+  debugFailure: (
     error: unknown,
     page: Page,
-    options?: DebugPlaywrightFailureOptions,
-  ) => Promise<DebugPlaywrightFailureResult>;
+    options?: DebugFailureOptions,
+  ) => Promise<DebugFailureResult>;
 };
 
 type GitRefResponse = {
@@ -176,11 +176,11 @@ export function createPlaywrightDebugger(
     options.agent.maxSourceFileBytes ?? DEFAULT_MAX_SOURCE_FILE_BYTES;
   const now = options.now ?? (() => new Date());
 
-  const runDebugPlaywrightFailure = async (
+  const runDebugFailure = async (
     error: unknown,
     page: Page,
-    failureOptions: DebugPlaywrightFailureOptions,
-  ): Promise<DebugPlaywrightFailureResult> => {
+    failureOptions: DebugFailureOptions,
+  ): Promise<DebugFailureResult> => {
       const failure = await captureFailureContext(error, page);
       const github = await GitHubClient.create({
         config: options.github,
@@ -258,9 +258,9 @@ export function createPlaywrightDebugger(
   };
 
   return {
-    async debugPlaywrightFailure(error, page, failureOptions = {}) {
+    async debugFailure(error, page, failureOptions = {}) {
       try {
-        return await runDebugPlaywrightFailure(error, page, failureOptions);
+        return await runDebugFailure(error, page, failureOptions);
       } catch (debuggerError) {
         return {
           status: "debugger_failed",
@@ -691,7 +691,7 @@ class GitHubClient {
       }));
     if (!token) {
       throw new Error(
-        "GitHub authentication is missing. Provide github.token, LIBRETTO_GITHUB_TOKEN, GITHUB_TOKEN, or LIBRETTO_API_KEY for a repository linked to Libretto Cloud.",
+        "GitHub authentication is missing. Set LIBRETTO_API_KEY for a repository linked through Libretto setup.",
       );
     }
     return new GitHubClient({

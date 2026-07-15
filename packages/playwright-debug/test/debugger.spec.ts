@@ -114,7 +114,7 @@ describe("createPlaywrightDebugger", () => {
       modelRunner: runner,
     });
 
-    const result = await debuggerInstance.debugPlaywrightFailure(
+    const result = await debuggerInstance.debugFailure(
       createError(),
       createPage(),
     );
@@ -183,7 +183,7 @@ describe("createPlaywrightDebugger", () => {
       modelRunner: runner,
     });
 
-    await debuggerInstance.debugPlaywrightFailure(error, createPage());
+    await debuggerInstance.debugFailure(error, createPage());
 
     expect(runner).toHaveBeenCalledOnce();
   });
@@ -265,7 +265,7 @@ describe("createPlaywrightDebugger", () => {
       }),
     });
 
-    const result = await debuggerInstance.debugPlaywrightFailure(
+    const result = await debuggerInstance.debugFailure(
       createError(),
       createPage(),
     );
@@ -301,7 +301,7 @@ describe("createPlaywrightDebugger", () => {
       base: "main",
     });
 
-    const secondResult = await debuggerInstance.debugPlaywrightFailure(
+    const secondResult = await debuggerInstance.debugFailure(
       createError(),
       createPage(),
     );
@@ -374,7 +374,7 @@ describe("createPlaywrightDebugger", () => {
       }),
     });
 
-    await debuggerInstance.debugPlaywrightFailure(createError(), createPage());
+    await debuggerInstance.debugFailure(createError(), createPage());
 
     expect(calls[0]).toMatchObject({
       method: "POST",
@@ -410,7 +410,7 @@ describe("createPlaywrightDebugger", () => {
     });
 
     await expect(
-      debuggerInstance.debugPlaywrightFailure(createError(), createPage()),
+      debuggerInstance.debugFailure(createError(), createPage()),
     ).resolves.toMatchObject({
       status: "debugger_failed",
       error: expect.stringContaining("GitHub authentication is missing"),
@@ -442,7 +442,7 @@ describe("createPlaywrightDebugger", () => {
       try {
         throw originalError;
       } catch (error) {
-        const debugResult = await debuggerInstance.debugPlaywrightFailure(
+        const debugResult = await debuggerInstance.debugFailure(
           error,
           createPage(),
         );
@@ -496,7 +496,7 @@ describe("createPlaywrightDebugger", () => {
     });
 
     await expect(
-      debuggerInstance.debugPlaywrightFailure(createError(), createPage()),
+      debuggerInstance.debugFailure(createError(), createPage()),
     ).resolves.toMatchObject({
       status: "debugger_failed",
       error: expect.stringContaining("Unsafe repository path"),
