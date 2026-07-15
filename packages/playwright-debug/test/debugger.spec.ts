@@ -1,7 +1,7 @@
 import type { Page } from "playwright";
 import { describe, expect, it, vi } from "vitest";
 import {
-  createLibrettoDebugger,
+  createPlaywrightDebugger,
   parseAgentModel,
   type DebugAgentRunner,
 } from "../src/index.js";
@@ -54,7 +54,7 @@ describe("parseAgentModel", () => {
   });
 });
 
-describe("createLibrettoDebugger", () => {
+describe("createPlaywrightDebugger", () => {
   it("captures failure context and returns no_changes when the agent has no fix", async () => {
     const requests: Array<{ method: string; url: string }> = [];
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -99,7 +99,7 @@ describe("createLibrettoDebugger", () => {
       };
     });
 
-    const debuggerInstance = createLibrettoDebugger({
+    const debuggerInstance = createPlaywrightDebugger({
       github: {
         owner: "acme",
         repo: "automations",
@@ -114,7 +114,7 @@ describe("createLibrettoDebugger", () => {
       modelRunner: runner,
     });
 
-    const result = await debuggerInstance.debugPlaywrightFailure(
+    const result = await debuggerInstance.debugFailure(
       createError(),
       createPage(),
     );
@@ -168,7 +168,7 @@ describe("createLibrettoDebugger", () => {
       "    at runAutomation (C:\\repo\\src\\workflow.ts:12:7)",
     ].join("\n");
 
-    const debuggerInstance = createLibrettoDebugger({
+    const debuggerInstance = createPlaywrightDebugger({
       github: {
         owner: "acme",
         repo: "automations",
@@ -183,7 +183,7 @@ describe("createLibrettoDebugger", () => {
       modelRunner: runner,
     });
 
-    await debuggerInstance.debugPlaywrightFailure(error, createPage());
+    await debuggerInstance.debugFailure(error, createPage());
 
     expect(runner).toHaveBeenCalledOnce();
   });
@@ -239,7 +239,7 @@ describe("createLibrettoDebugger", () => {
       return jsonResponse({ message: "not found" }, { status: 404 });
     }) as unknown as typeof fetch;
 
-    const debuggerInstance = createLibrettoDebugger({
+    const debuggerInstance = createPlaywrightDebugger({
       github: {
         owner: "acme",
         repo: "automations",
@@ -265,7 +265,7 @@ describe("createLibrettoDebugger", () => {
       }),
     });
 
-    const result = await debuggerInstance.debugPlaywrightFailure(
+    const result = await debuggerInstance.debugFailure(
       createError(),
       createPage(),
     );
@@ -301,7 +301,7 @@ describe("createLibrettoDebugger", () => {
       base: "main",
     });
 
-    const secondResult = await debuggerInstance.debugPlaywrightFailure(
+    const secondResult = await debuggerInstance.debugFailure(
       createError(),
       createPage(),
     );
@@ -353,7 +353,7 @@ describe("createLibrettoDebugger", () => {
       return jsonResponse({ message: "not found" }, { status: 404 });
     }) as unknown as typeof fetch;
 
-    const debuggerInstance = createLibrettoDebugger({
+    const debuggerInstance = createPlaywrightDebugger({
       github: {
         owner: "acme",
         repo: "automations",
@@ -374,7 +374,7 @@ describe("createLibrettoDebugger", () => {
       }),
     });
 
-    await debuggerInstance.debugPlaywrightFailure(createError(), createPage());
+    await debuggerInstance.debugFailure(createError(), createPage());
 
     expect(calls[0]).toMatchObject({
       method: "POST",
@@ -391,7 +391,7 @@ describe("createLibrettoDebugger", () => {
   });
 
   it("requires GitHub token auth or a Libretto Cloud API key", async () => {
-    const debuggerInstance = createLibrettoDebugger({
+    const debuggerInstance = createPlaywrightDebugger({
       github: {
         owner: "acme",
         repo: "automations",
@@ -410,7 +410,7 @@ describe("createLibrettoDebugger", () => {
     });
 
     await expect(
-      debuggerInstance.debugPlaywrightFailure(createError(), createPage()),
+      debuggerInstance.debugFailure(createError(), createPage()),
     ).resolves.toMatchObject({
       status: "debugger_failed",
       error: expect.stringContaining("GitHub authentication is missing"),
@@ -418,7 +418,7 @@ describe("createLibrettoDebugger", () => {
   });
 
   it("does not replace the original automation error or prevent fallback logic", async () => {
-    const debuggerInstance = createLibrettoDebugger({
+    const debuggerInstance = createPlaywrightDebugger({
       github: {
         owner: "acme",
         repo: "automations",
@@ -442,7 +442,7 @@ describe("createLibrettoDebugger", () => {
       try {
         throw originalError;
       } catch (error) {
-        const debugResult = await debuggerInstance.debugPlaywrightFailure(
+        const debugResult = await debuggerInstance.debugFailure(
           error,
           createPage(),
         );
@@ -475,7 +475,7 @@ describe("createLibrettoDebugger", () => {
       return jsonResponse({ message: "not found" }, { status: 404 });
     }) as unknown as typeof fetch;
 
-    const debuggerInstance = createLibrettoDebugger({
+    const debuggerInstance = createPlaywrightDebugger({
       github: {
         owner: "acme",
         repo: "automations",
@@ -496,7 +496,7 @@ describe("createLibrettoDebugger", () => {
     });
 
     await expect(
-      debuggerInstance.debugPlaywrightFailure(createError(), createPage()),
+      debuggerInstance.debugFailure(createError(), createPage()),
     ).resolves.toMatchObject({
       status: "debugger_failed",
       error: expect.stringContaining("Unsafe repository path"),

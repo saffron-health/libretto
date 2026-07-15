@@ -46,8 +46,9 @@ observed on the page.
   the repo so Libretto can open PRs on it.
 - **A `LIBRETTO_API_KEY`.** The agent exchanges it for a short-lived,
   repo-scoped GitHub token — you never manage a raw GitHub token in production.
-- **The debugger call in your script.** Add `debugPlaywrightFailure(error, page)`
-  in your automation's `catch` block.
+- **The debugger call in your script.** Add
+  `playwrightDebugger.debugFailure(error, page)` in your automation's `catch`
+  block before Playwright teardown.
 
 The [setup flow](https://libretto.sh/setup) walks through connecting GitHub,
 minting the API key, and adding the debugger to an existing script.

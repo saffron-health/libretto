@@ -10,10 +10,16 @@ automatically opens pull requests that fix broken scripts.
 browser provider, retries, logging, and fallback logic while adding one agent
 call in the failure path.
 
-```typescript
-import { createLibrettoDebugger } from "libretto-playwright-debug";
+Install it in the project that runs the Playwright automation:
 
-const librettoDebugger = createLibrettoDebugger({
+```bash
+pnpm add libretto-playwright-debug
+```
+
+```typescript
+import { createPlaywrightDebugger } from "libretto-playwright-debug";
+
+const playwrightDebugger = createPlaywrightDebugger({
   github: {
     owner: "acme",
     repo: "automations",
@@ -29,26 +35,32 @@ The `agent.model` value uses Libretto's `provider/model-id` convention. For
 example, `openai/gpt-5.4` resolves to provider `openai` and model id `gpt-5.4`.
 The first version supports `openai/...` and `anthropic/...`.
 
+Initialize this debugger once at module scope. At the existing failure point,
+await `debugFailure()` with the error and the live `Page` before Playwright
+teardown runs:
+
 ```typescript
 try {
   await runAutomation(page);
 } catch (error) {
-  await librettoDebugger.debugPlaywrightFailure(error, page);
-
-  await sendToExistingFallbackService(error);
+  await playwrightDebugger.debugFailure(error, page);
+  // Existing fallback and logging stay here.
   throw error;
 }
 ```
 
+Keep the existing automation, retry, fallback, logging, and rethrow behavior in
+place around the new call.
+
 ## What It Captures
 
-`debugPlaywrightFailure()` captures the error message, stack trace, page URL,
-page title, screenshot, and DOM snapshot from the failed page. It uses the stack
-frames — plus any paths you pass in `includeFiles` — to read the relevant source
-files from GitHub at `baseBranch`.
+`debugFailure()` captures the error message, stack trace, page URL, page title,
+screenshot, and DOM snapshot from the failed page. It uses the stack frames —
+plus any paths you pass in `includeFiles` — to read the relevant source files
+from GitHub at `baseBranch`.
 
 ```typescript
-await librettoDebugger.debugPlaywrightFailure(error, page, {
+await playwrightDebugger.debugFailure(error, page, {
   includeFiles: ["src/workflows/acme.ts"],
 });
 ```
@@ -109,19 +121,4 @@ export LIBRETTO_API_KEY=...
 
 With that setup, the debugger asks Libretto Cloud for a short-lived GitHub
 installation token scoped to the configured `owner/repo` and only the
-permissions needed to read/write contents and open pull requests.
-
-For local development, you can pass `github.token` or set
-`LIBRETTO_GITHUB_TOKEN` / `GITHUB_TOKEN`. The token needs permission to read
-contents, write contents, and open pull requests on the target repository.
-
-The GitHub App should request these repository permissions:
-
-- Contents: read and write
-- Pull requests: read and write
-- Metadata: read
-
-The hosted public Libretto app should be installable by any account. It does not
-need webhooks or device flow. It does need a callback URL and GitHub App user
-authorization so Libretto Cloud can verify and store the tenant/repository link
-before minting installation tokens.
+permissions needed to read and write contents and open pull requests.
