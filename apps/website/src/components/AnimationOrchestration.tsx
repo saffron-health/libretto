@@ -6,9 +6,8 @@ import { useEffect, type PropsWithChildren } from "react";
  *
  * Sequence:
  *  1. Title words appear one-by-one (staggered fade+translate)
- *  2. Description, install snippet, docs button, terminal demo fade in
+ *  2. Description + install snippet fade in
  *  3. Navbar slides down from top
- *  4. Icosahedron fades in + scales down from 1.15→1
  */
 
 /** Animation target names — use as `data-animate={AnimationTarget.xxx}` */
@@ -38,25 +37,13 @@ export function OrchestrationContainer({
     async function run() {
       const selector = (name: string) => `[data-animate='${name}']`;
 
-      // ── 1. ASCII logo is already visible; glow slowly fades while rest animates ──
-      animate(
-        selector(AnimationTarget.AsciiLogo),
-        {
-          filter: [
-            "drop-shadow(0 0 12px color-mix(in oklch, var(--color-amber-bright) 50%, transparent)) drop-shadow(0 0 32px color-mix(in oklch, var(--color-amber-bright) 25%, transparent))",
-            "drop-shadow(0 0 0px color-mix(in oklch, var(--color-amber-bright) 0%, transparent)) drop-shadow(0 0 0px color-mix(in oklch, var(--color-amber-bright) 0%, transparent))",
-          ],
-        },
-        { duration: 3, ease: "easeOut" },
-      );
-
-      // ── 2. Title words fade in ──
+      // ── 1. Title words fade in ──
       await animate(
         selector(AnimationTarget.TitleWord),
         { opacity: [0, 1], y: [6, 0] },
         {
           duration: 0.3,
-          delay: stagger(0.055, { startDelay: 0.3 }),
+          delay: stagger(0.055, { startDelay: 0.2 }),
         },
       );
       if (cancelled) return;
@@ -64,10 +51,10 @@ export function OrchestrationContainer({
       // ── 2. Content elements fade in together ──
       animate(
         selector(AnimationTarget.Content),
-        { opacity: [0, 1], y: [18, 0] },
+        { opacity: [0, 1], y: [12, 0] },
         {
-          duration: 0.45,
-          delay: stagger(0.12, { startDelay: 0.05 }),
+          duration: 0.4,
+          delay: stagger(0.1, { startDelay: 0.05 }),
           ease: "easeOut",
         },
       );
@@ -75,21 +62,9 @@ export function OrchestrationContainer({
       // Navbar slides down
       animate(
         selector(AnimationTarget.Navbar),
-        { opacity: [0, 1], y: [-20, 0] },
-        { duration: 0.5, delay: 0.1, ease: "easeOut" },
+        { opacity: [0, 1], y: [-16, 0] },
+        { duration: 0.4, delay: 0.05, ease: "easeOut" },
       );
-
-      // Icosahedron fades in + scales down
-      await animate(
-        selector(AnimationTarget.Icosahedron),
-        {
-          opacity: [0, 1],
-          scale: [1.15, 1],
-          filter: ["blur(4px)", "blur(0px)"],
-        },
-        { duration: 1.2, delay: 0.15 },
-      );
-      if (cancelled) return;
     }
 
     void run();

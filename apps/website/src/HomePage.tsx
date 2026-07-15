@@ -1,9 +1,3 @@
-import { useRef } from "react";
-import {
-  CanvasAsciihedron,
-  useKonamiPane,
-  KonamiOverlay,
-} from "./components/CanvasAsciihedron";
 import { Text } from "./components/Text";
 import { InstallSnippet } from "./components/InstallSnippet";
 import {
@@ -14,64 +8,33 @@ import { AnimatedTitle } from "./components/AnimatedTitle";
 import { AsciiLogo } from "./components/AsciiLogo";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
-import { VersionBadge } from "./components/VersionBadge";
 import { ProductListing } from "./components/ProductListing";
 import { SectionDivider } from "./components/SectionDivider.js";
 
-function Hero({
-  paneUnlocked,
-  onClosePane,
-}: {
-  paneUnlocked: boolean;
-  onClosePane: () => void;
-}) {
-  const sectionRef = useRef<HTMLElement>(null);
-
+function Hero() {
   return (
-    <section
-      ref={sectionRef}
-      className="relative overflow-hidden px-8 pt-32 pb-24 md:pt-40 md:pb-32"
-    >
-      <div
-        data-animate={AnimationTarget.Icosahedron}
-        style={{ opacity: 0 }}
-        className="pointer-events-none absolute inset-0 flex translate-y-8 max-md:translate-y-0 items-center justify-center select-none"
-      >
-        <CanvasAsciihedron
-          className="h-[1600px] w-[1600px] min-h-[1200px] min-w-[1200px] shrink-0 max-h-[180vw] max-w-[180vw] text-ink"
-          showAnnotations={false}
-          objectScale={1.2}
-          baseOpacity={0.11}
-          paneUnlocked={paneUnlocked}
-          onClosePane={onClosePane}
-        />
-      </div>
-      <div className="relative mx-auto max-w-[1200px]">
-        <div data-animate={AnimationTarget.Navbar} style={{ opacity: 0 }}>
-          <VersionBadge />
-        </div>
+    <section className="relative px-8 pt-28 pb-20 md:pt-36 md:pb-28">
+      <div className="relative mx-auto max-w-[720px]">
         <div
           data-animate={AnimationTarget.AsciiLogo}
-          style={{ filter: "drop-shadow(0 0 12px color-mix(in oklch, var(--color-amber-bright) 50%, transparent)) drop-shadow(0 0 32px color-mix(in oklch, var(--color-amber-bright) 25%, transparent))" }}
-          className="mb-10 flex justify-center overflow-hidden"
+          className="mb-12 flex justify-center overflow-hidden"
         >
-          <AsciiLogo className="text-[5px] sm:text-[7px] md:text-[10px] lg:text-[13px]" />
+          <AsciiLogo className="text-[5px] sm:text-[7px] md:text-[9px] text-ink/80" />
         </div>
         <Text
           as="h1"
           size="5xl"
           style="serif"
-          className="crt-glow mx-auto mb-8 max-w-[880px] text-center tracking-[-0.04em] text-ink [text-wrap:pretty]"
+          className="mx-auto mb-6 text-center tracking-[-0.04em] text-ink [text-wrap:pretty]"
         >
           <AnimatedTitle
-            className=""
             style={{
               fontWeight: 300,
-              fontSize: "clamp(40px, 6vw, 80px)",
-              lineHeight: 1.05,
+              fontSize: "clamp(36px, 5vw, 64px)",
+              lineHeight: 1.1,
             }}
           >
-            Browser automation tooling for coding agents
+            Browser automation for coding agents
           </AnimatedTitle>
         </Text>
         <Text
@@ -79,10 +42,9 @@ function Hero({
           size="lg"
           data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
-          className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:pretty]"
+          className="mx-auto mb-10 max-w-[480px] text-center leading-relaxed text-muted md:text-base [text-wrap:pretty]"
         >
-          Open-source CLI, debug agents, and browser tools for building and
-          maintaining reliable web integrations
+          Open-source CLI and tools for building reliable web integrations
         </Text>
         <div
           data-animate={AnimationTarget.Content}
@@ -107,17 +69,11 @@ function Hero({
 }
 
 export function HomePage() {
-  const { konamiProgress, konamiCompleted, paneUnlocked, closePane } =
-    useKonamiPane();
-
   return (
-    <OrchestrationContainer className="crt-page min-h-screen bg-bg text-ink">
-      {!paneUnlocked && (
-        <KonamiOverlay progress={konamiProgress} completed={konamiCompleted} />
-      )}
+    <OrchestrationContainer className="min-h-screen bg-bg text-ink">
       <Navbar animate />
-      <Hero paneUnlocked={paneUnlocked} onClosePane={closePane} />
-      <div className="section-rails relative mx-auto max-w-[1100px]">
+      <Hero />
+      <div className="relative mx-auto max-w-[1100px]">
         <SectionDivider />
         <ProductListing />
         <Footer />
