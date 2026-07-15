@@ -49,8 +49,9 @@ export function BrowserToolsPage() {
             size="lg"
             className="max-w-[480px] leading-relaxed text-muted [text-wrap:pretty]"
           >
-            Browser tools for AI agents — open, inspect, and drive real browsers
-            from any agent framework. This product page is coming soon.
+            Browser tools for AI agents that open, inspect, and drive real
+            browsers from any agent framework. This product page is coming
+            soon.
           </Text>
           <a
             href="https://github.com/saffron-health/libretto/tree/main/packages/browser-tools"

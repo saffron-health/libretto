@@ -30,7 +30,7 @@ export const PRODUCTS: ProductLink[] = [
     href: "/browser-tools",
     name: "Browser Tools SDK",
     tagline:
-      "Browser tools for AI agents — open, inspect, and drive real browsers from any agent framework.",
+      "Browser tools for AI agents that open, inspect, and drive real browsers from any agent framework.",
     kicker: "// SDK --",
     status: "soon",
     fathomEvent: "Product listing browser tools click",
