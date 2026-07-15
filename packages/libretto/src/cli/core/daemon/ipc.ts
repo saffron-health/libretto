@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { openSync, closeSync } from "node:fs";
-import { createRequire } from "node:module";
+import * as moduleBuiltin from "node:module";
 import { homedir, userInfo } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createIpcPeer, type IpcPeer } from "../../../shared/ipc/ipc.js";
@@ -10,6 +10,7 @@ import { connectToIpcSocket } from "../../../shared/ipc/socket-transport.js";
 import type { LoggerApi } from "../../../shared/logger/index.js";
 import type { SnapshotDiff } from "../../../shared/snapshot/diff-snapshots.js";
 import type { Snapshot } from "../../../shared/snapshot/types.js";
+import type { AuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
 import { REPO_ROOT } from "../context.js";
 import type { WorkflowStatus } from "../workflow-runner/runner.js";
 import type { DaemonConfig } from "./config.js";
@@ -43,6 +44,10 @@ export type DaemonSnapshotResult = {
   snapshot: Snapshot;
 };
 
+export type DaemonCaptureAuthProfileStorageStateArgs = {
+  sites: string[];
+};
+
 export type DaemonCloseResult = { replayUrl?: string };
 
 export type DaemonCommandResult<T> =
@@ -56,6 +61,9 @@ export type CliToDaemonApi = {
   pages(): DaemonPageSummary[];
   exec(args: DaemonExecArgs): DaemonExecResult;
   readonlyExec(args: DaemonReadonlyExecArgs): DaemonExecResult;
+  captureAuthProfileStorageState(
+    args: DaemonCaptureAuthProfileStorageStateArgs,
+  ): AuthProfileStorageState;
   snapshot(args: DaemonSnapshotArgs): DaemonSnapshotResult;
   getWorkflowStatus(): WorkflowStatus;
   resumeWorkflow(): void;
@@ -207,6 +215,7 @@ export type DaemonResultMap = {
   pages: DaemonPageSummary[];
   exec: DaemonExecSuccess;
   "readonly-exec": DaemonExecSuccess;
+  captureAuthProfileStorageState: AuthProfileStorageState;
   snapshot: DaemonSnapshotResult;
 };
 
@@ -237,25 +246,34 @@ export class DaemonClient {
     const daemonEntryPath = fileURLToPath(
       new URL("./daemon.js", import.meta.url),
     );
-    const require = createRequire(import.meta.url);
-    const tsxCliPath = require.resolve("tsx/cli");
+    const childArgs = [daemonEntryPath, JSON.stringify(config)];
+    const childEnv: NodeJS.ProcessEnv = { ...process.env };
+
+    if (config.workflow) {
+      const tsxPreflightPath = fileURLToPath(
+        import.meta.resolve("tsx/preflight"),
+      );
+      const tsxLoaderFlag =
+        typeof moduleBuiltin.register === "function" ? "--import" : "--loader";
+
+      childArgs.unshift(
+        "--require",
+        tsxPreflightPath,
+        tsxLoaderFlag,
+        import.meta.resolve("tsx"),
+      );
+
+      if (config.workflow.tsconfigPath) {
+        childEnv.TSX_TSCONFIG_PATH = config.workflow.tsconfigPath;
+      }
+    }
 
     const childStderrFd = openSync(logPath, "a");
-    const child = spawn(
-      process.execPath,
-      [
-        tsxCliPath,
-        ...(config.workflow?.tsconfigPath
-          ? ["--tsconfig", config.workflow.tsconfigPath]
-          : []),
-        daemonEntryPath,
-        JSON.stringify(config),
-      ],
-      {
-        detached: true,
-        stdio: ["ignore", "ignore", childStderrFd, "ipc"],
-      },
-    );
+    const child = spawn(process.execPath, childArgs, {
+      detached: true,
+      stdio: ["ignore", "ignore", childStderrFd, "ipc"],
+      env: childEnv,
+    });
     closeSync(childStderrFd);
 
     const pid = child.pid!;
@@ -443,6 +461,12 @@ export class DaemonClient {
 
   async readonlyExec(args: DaemonReadonlyExecArgs): Promise<DaemonExecResult> {
     return this.ipc.call.readonlyExec(args);
+  }
+
+  async captureAuthProfileStorageState(
+    args: DaemonCaptureAuthProfileStorageStateArgs,
+  ): Promise<AuthProfileStorageState> {
+    return this.ipc.call.captureAuthProfileStorageState(args);
   }
 
   async snapshot(

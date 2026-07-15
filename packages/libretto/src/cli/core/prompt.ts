@@ -26,6 +26,21 @@ export async function prompt(
   }
 }
 
+export async function promptConfirm(
+  question: string,
+  opts: { defaultValue?: boolean } = {},
+): Promise<boolean> {
+  const defaultValue = opts.defaultValue ?? false;
+  if (!stdin.isTTY) return defaultValue;
+
+  const suffix = defaultValue ? "[Y/n]" : "[y/N]";
+  const answer = (await prompt(`${question} ${suffix}`)).trim().toLowerCase();
+
+  if (answer.length === 0) return defaultValue;
+
+  return answer === "y" || answer === "yes";
+}
+
 const CTRL_C = "";
 const CR = "\r";
 const LF = "\n";

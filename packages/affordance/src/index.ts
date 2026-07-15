@@ -28,13 +28,24 @@ export type SimpleCLIMiddlewareArgs<
   command: SimpleCLICommandMeta;
 };
 
+export type SimpleCLIMiddlewareNextOptions<
+  TContextOut extends SimpleCLIContext,
+> = {
+  ctx?: Partial<TContextOut>;
+};
+
 export type SimpleCLIMiddleware<
   TInput = unknown,
   TContextIn extends SimpleCLIContext = {},
   TContextOut extends SimpleCLIContext = TContextIn,
+  TResult = void | TContextOut,
 > = (
-  args: SimpleCLIMiddlewareArgs<TInput, TContextIn>,
-) => void | TContextOut | Promise<void | TContextOut>;
+  args: SimpleCLIMiddlewareArgs<TInput, TContextIn> & {
+    next: (
+      options?: SimpleCLIMiddlewareNextOptions<TContextOut>,
+    ) => Promise<unknown>;
+  },
+) => TResult | Promise<TResult>;
 
 export type SimpleCLIHandler<
   TInput = unknown,
@@ -62,6 +73,7 @@ type SimpleCLIInputDefinition = {
 type SimpleCLIAppConfig = {
   globalNamed?: SimpleCLINamedDefinition;
   appendHelpText?: string;
+  middlewares?: AnySimpleCLIMiddleware[];
 };
 
 type InferPositionals<TDefs extends SimpleCLIPositionalsDefinition> = {
@@ -85,7 +97,7 @@ type InputObjectFor<
   TNamed extends SimpleCLINamedDefinition,
 > = Merge<InferPositionals<TPositionals>, InferNamed<TNamed>>;
 
-type AnySimpleCLIMiddleware = SimpleCLIMiddleware<any, any, any>;
+type AnySimpleCLIMiddleware = SimpleCLIMiddleware<any, any, any, unknown>;
 
 type NormalizedCommandDefinition<
   TInput,
@@ -184,6 +196,10 @@ function pathStartsWith(
 ): boolean {
   if (prefix.length > path.length) return false;
   return prefix.every((token, index) => path[index] === token);
+}
+
+function isContextResult(value: unknown): value is SimpleCLIContext {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function formatListEntry(label: string, description?: string): string {
@@ -333,6 +349,22 @@ export class SimpleCLICommandBuilder<
 
   use<TContextOut extends SimpleCLIContext>(
     middleware: SimpleCLIMiddleware<TInput, TContext, TContextOut>,
+  ): SimpleCLICommandBuilder<TInput, TContextIn, TContextOut, TResult>;
+  use<TContextOut extends SimpleCLIContext, TMiddlewareResult>(
+    middleware: SimpleCLIMiddleware<
+      TInput,
+      TContext,
+      TContextOut,
+      TMiddlewareResult
+    >,
+  ): SimpleCLICommandBuilder<TInput, TContextIn, TContextOut, TResult>;
+  use<TContextOut extends SimpleCLIContext, TMiddlewareResult>(
+    middleware: SimpleCLIMiddleware<
+      TInput,
+      TContext,
+      TContextOut,
+      TMiddlewareResult
+    >,
   ): SimpleCLICommandBuilder<TInput, TContextIn, TContextOut, TResult> {
     return new SimpleCLICommandBuilder<
       TInput,
@@ -417,7 +449,10 @@ export class SimpleCLIApp {
       if (this.resolvedCommands.has(command.routeKey)) {
         throw new Error(`Duplicate command route key: ${command.routeKey}`);
       }
-      this.resolvedCommands.set(command.routeKey, command);
+      this.resolvedCommands.set(command.routeKey, {
+        ...command,
+        middlewares: [...(config.middlewares ?? []), ...command.middlewares],
+      });
     }
 
     this.routeEntries = resolution.routeEntries;
@@ -449,14 +484,55 @@ export class SimpleCLIApp {
       description: command.description,
     };
 
-    for (const middleware of command.middlewares) {
-      const next = await middleware({ input, ctx, command: meta });
-      if (next !== undefined) {
-        ctx = next;
+    const runMiddleware = async (
+      index: number,
+      currentContext: SimpleCLIContext,
+    ): Promise<unknown> => {
+      const middleware = command.middlewares[index];
+      if (!middleware) {
+        return command.handler({ input, ctx: currentContext, command: meta });
       }
-    }
 
-    return command.handler({ input, ctx, command: meta });
+      let nextCalled = false;
+      const next = async (options?: {
+        ctx?: Partial<SimpleCLIContext>;
+      }): Promise<unknown> => {
+        if (nextCalled) {
+          throw new Error("SimpleCLI middleware next() called multiple times.");
+        }
+        nextCalled = true;
+        return runMiddleware(index + 1, {
+          ...currentContext,
+          ...(options?.ctx ?? {}),
+        });
+      };
+
+      const result = await middleware({
+        input,
+        ctx: currentContext,
+        command: meta,
+        next,
+      });
+
+      if (nextCalled) {
+        return result;
+      }
+
+      if (isContextResult(result)) {
+        return runMiddleware(index + 1, {
+          ...currentContext,
+          ...result,
+        });
+      }
+
+      if (result !== undefined) {
+        return result;
+      }
+
+      return runMiddleware(index + 1, currentContext);
+    };
+
+    return runMiddleware(0, ctx);
   }
 
   async run(args: readonly string[]): Promise<unknown> {
@@ -1352,6 +1428,14 @@ type SimpleCLIScope<
   use<TContextOut extends SimpleCLIContext>(
     middleware: SimpleCLIMiddleware<unknown, TContext, TContextOut>,
   ): SimpleCLIScope<TParentContext, TContextOut>;
+  use<TContextOut extends SimpleCLIContext, TMiddlewareResult>(
+    middleware: SimpleCLIMiddleware<
+      unknown,
+      TContext,
+      TContextOut,
+      TMiddlewareResult
+    >,
+  ): SimpleCLIScope<TParentContext, TContextOut>;
   group(
     config: SimpleCLIGroupConfig<TContext>,
   ): SimpleCLIGroup<TParentContext, TContext>;
@@ -1380,8 +1464,13 @@ function createScope<
   middlewares: readonly AnySimpleCLIMiddleware[],
 ): SimpleCLIScope<TParentContext, TContext> {
   return {
-    use<TContextOut extends SimpleCLIContext>(
-      middleware: SimpleCLIMiddleware<unknown, TContext, TContextOut>,
+    use<TContextOut extends SimpleCLIContext, TMiddlewareResult>(
+      middleware: SimpleCLIMiddleware<
+        unknown,
+        TContext,
+        TContextOut,
+        TMiddlewareResult
+      >,
     ): SimpleCLIScope<TParentContext, TContextOut> {
       return createScope<TParentContext, TContextOut>([
         ...middlewares,
@@ -1411,6 +1500,12 @@ function createScope<
 
 function use<TContextOut extends SimpleCLIContext>(
   middleware: SimpleCLIMiddleware<unknown, {}, TContextOut>,
+): SimpleCLIScope<{}, TContextOut>;
+function use<TContextOut extends SimpleCLIContext, TMiddlewareResult>(
+  middleware: SimpleCLIMiddleware<unknown, {}, TContextOut, TMiddlewareResult>,
+): SimpleCLIScope<{}, TContextOut>;
+function use<TContextOut extends SimpleCLIContext, TMiddlewareResult>(
+  middleware: SimpleCLIMiddleware<unknown, {}, TContextOut, TMiddlewareResult>,
 ): SimpleCLIScope<{}, TContextOut> {
   return createScope<{}, TContextOut>([middleware]);
 }

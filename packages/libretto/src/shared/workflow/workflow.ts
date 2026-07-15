@@ -1,5 +1,15 @@
 import type { Page } from "playwright";
 import { z } from "zod";
+import {
+  createRecoveryPage,
+  type RecoveryAction,
+} from "../../runtime/recovery/page-fallbacks.js";
+import type { ViewportConfig } from "../../cli/core/config.js";
+import { normalizeProfileName } from "./auth-profile-name.js";
+import {
+  mergeCredentialsIntoInput,
+  normalizeCredentialNames,
+} from "./credentials.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
@@ -13,12 +23,35 @@ export type LibrettoWorkflowHandler<Input = unknown, Output = unknown> = (
   input: Input,
 ) => Promise<Output>;
 
-export type LibrettoWorkflowSchemas<
-  InputSchema extends z.ZodType,
-  OutputSchema extends z.ZodType,
+export type LibrettoWorkflowAuthProfile =
+  | string
+  | {
+      name: string;
+      refresh?: boolean;
+    };
+
+export type LibrettoWorkflowDefinition<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
 > = {
-  input: InputSchema;
-  output: OutputSchema;
+  input?: InputSchema;
+  output?: OutputSchema;
+  credentials?: readonly string[];
+  authProfile?: LibrettoWorkflowAuthProfile;
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: ViewportConfig;
+  recoveryAction?: RecoveryAction;
+};
+
+export type LibrettoWorkflowOptions<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+> = LibrettoWorkflowDefinition<InputSchema, OutputSchema> & {
+  handler: LibrettoWorkflowHandler<
+    z.infer<InputSchema>,
+    z.infer<OutputSchema>
+  >;
 };
 
 // Thrown when input fails Zod validation. The runner surfaces `.message`
@@ -57,10 +90,44 @@ function parseWorkflowInput<InputSchema extends z.ZodType>(
   if (!inputSchema) return input as z.infer<InputSchema>;
 
   const result = inputSchema.safeParse(input);
-  if (!result.success) {
-    throw new LibrettoWorkflowInputError(workflowName, result.error);
+  if (result.success) {
+    return reattachCredentialInput(result.data, input) as z.infer<InputSchema>;
   }
-  return result.data;
+
+  const stripped = stripCredentialInput(input);
+  if (stripped !== input) {
+    const strippedResult = inputSchema.safeParse(stripped);
+    if (strippedResult.success) {
+      return reattachCredentialInput(strippedResult.data, input) as z.infer<InputSchema>;
+    }
+  }
+
+  throw new LibrettoWorkflowInputError(workflowName, result.error);
+}
+
+function stripCredentialInput(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const { credentials: _credentials, ...rest } = input as Record<string, unknown>;
+  if (!("credentials" in (input as Record<string, unknown>))) return input;
+  return rest;
+}
+
+function reattachCredentialInput(parsed: unknown, raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return parsed;
+  const rawRecord = raw as Record<string, unknown>;
+  const rawCredentials =
+    rawRecord.credentials && typeof rawRecord.credentials === "object"
+      ? rawRecord.credentials
+      : undefined;
+  if (!rawCredentials) return parsed;
+  const parsedRecord =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? { ...(parsed as Record<string, unknown>) }
+      : {};
+  return {
+    ...parsedRecord,
+    credentials: rawCredentials,
+  };
 }
 
 export type WorkflowInputValidator = {
@@ -89,6 +156,13 @@ export class LibrettoWorkflow<
   // this schema to JSON Schema at build time and exposes it via
   // /v1/workflows/get so API consumers know the workflow's output shape.
   public readonly outputSchema?: OutputSchema;
+  public readonly credentialNames: readonly string[];
+  public readonly authProfileName?: string;
+  public readonly authProfileRefresh?: boolean;
+  public readonly startUrl?: string;
+  public readonly gpu?: boolean;
+  public readonly viewport?: ViewportConfig;
+  public readonly recoveryAction?: RecoveryAction;
   private readonly handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
@@ -96,15 +170,34 @@ export class LibrettoWorkflow<
 
   constructor(
     name: string,
-    schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema> | undefined,
+    options:
+      | {
+          inputSchema?: InputSchema;
+          outputSchema?: OutputSchema;
+          credentialNames?: readonly string[];
+          authProfileName?: string;
+          authProfileRefresh?: boolean;
+          startUrl?: string;
+          gpu?: boolean;
+          viewport?: ViewportConfig;
+          recoveryAction?: RecoveryAction;
+        }
+      | undefined,
     handler: LibrettoWorkflowHandler<
       z.infer<InputSchema>,
       z.infer<OutputSchema>
     >,
   ) {
     this.name = name;
-    this.inputSchema = schemas?.input;
-    this.outputSchema = schemas?.output;
+    this.inputSchema = options?.inputSchema;
+    this.outputSchema = options?.outputSchema;
+    this.credentialNames = options?.credentialNames ?? [];
+    this.authProfileName = options?.authProfileName;
+    this.authProfileRefresh = options?.authProfileRefresh;
+    this.startUrl = options?.startUrl;
+    this.gpu = options?.gpu;
+    this.viewport = options?.viewport;
+    this.recoveryAction = options?.recoveryAction;
     this.handler = handler;
   }
 
@@ -112,8 +205,21 @@ export class LibrettoWorkflow<
     ctx: LibrettoWorkflowContext,
     input: unknown,
   ): Promise<z.infer<OutputSchema>> {
-    const parsed = parseWorkflowInput(this.name, this.inputSchema, input);
-    return this.handler(ctx, parsed);
+    const parsed = parseWorkflowInput(
+      this.name,
+      this.inputSchema,
+      mergeCredentialsIntoInput(input, this.credentialNames),
+    );
+    const workflowContext =
+      !this.recoveryAction
+        ? ctx
+        : {
+            ...ctx,
+            page: createRecoveryPage(ctx.page, {
+              recoveryAction: this.recoveryAction,
+            }),
+          };
+    return this.handler(workflowContext, parsed);
   }
 }
 
@@ -122,6 +228,13 @@ export type ExportedLibrettoWorkflow = {
   readonly name: string;
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;
+  readonly credentialNames: readonly string[];
+  readonly authProfileName?: string;
+  readonly authProfileRefresh?: boolean;
+  readonly startUrl?: string;
+  readonly gpu?: boolean;
+  readonly viewport?: ViewportConfig;
+  readonly recoveryAction?: RecoveryAction;
   run: (ctx: LibrettoWorkflowContext, input: unknown) => Promise<unknown>;
 };
 
@@ -212,22 +325,60 @@ export function getWorkflowFromModuleExports(
   return null;
 }
 
-// Recommended 3-arg form: pass Zod schemas so input is validated at run time
-// and the hosted platform can expose typed I/O metadata via /v1/workflows/get.
-export function workflow<
+function getWorkflowConstructorOptions<
   InputSchema extends z.ZodType,
   OutputSchema extends z.ZodType,
 >(
+  options:
+    | LibrettoWorkflowDefinition<InputSchema, OutputSchema>
+    | LibrettoWorkflowOptions<InputSchema, OutputSchema>,
+): {
+  inputSchema?: InputSchema;
+  outputSchema?: OutputSchema;
+  credentialNames: readonly string[];
+  authProfileName?: string;
+  authProfileRefresh?: boolean;
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: ViewportConfig;
+  recoveryAction?: RecoveryAction;
+} {
+  const authProfile = normalizeWorkflowAuthProfile(options.authProfile);
+  return {
+    inputSchema: options.input,
+    outputSchema: options.output,
+    credentialNames: normalizeCredentialNames(options.credentials),
+    authProfileName: authProfile?.name,
+    authProfileRefresh: authProfile?.refresh,
+    startUrl: options.startUrl,
+    gpu: options.gpu,
+    viewport: options.viewport,
+    recoveryAction: options.recoveryAction,
+  };
+}
+
+export function workflow<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+>(
   name: string,
-  schemas: LibrettoWorkflowSchemas<InputSchema, OutputSchema>,
+  definition: LibrettoWorkflowDefinition<InputSchema, OutputSchema>,
   handler: LibrettoWorkflowHandler<
     z.infer<InputSchema>,
     z.infer<OutputSchema>
   >,
 ): LibrettoWorkflow<InputSchema, OutputSchema>;
 
+export function workflow<
+  InputSchema extends z.ZodType = z.ZodType<unknown>,
+  OutputSchema extends z.ZodType = z.ZodType<unknown>,
+>(
+  name: string,
+  options: LibrettoWorkflowOptions<InputSchema, OutputSchema>,
+): LibrettoWorkflow<InputSchema, OutputSchema>;
+
 // Legacy 2-arg form kept so deployments built before Zod schemas existed
-// continue to load. New code should always pass schemas.
+// continue to load. New code should pass input/output schemas when possible.
 export function workflow<Input = unknown, Output = unknown>(
   name: string,
   handler: LibrettoWorkflowHandler<Input, Output>,
@@ -235,18 +386,44 @@ export function workflow<Input = unknown, Output = unknown>(
 
 export function workflow(
   name: string,
-  schemasOrHandler:
-    | LibrettoWorkflowSchemas<z.ZodType, z.ZodType>
+  definitionOrHandler:
+    | LibrettoWorkflowDefinition<z.ZodType, z.ZodType>
+    | LibrettoWorkflowOptions
     | LibrettoWorkflowHandler,
   maybeHandler?: LibrettoWorkflowHandler,
 ): LibrettoWorkflow {
-  if (typeof schemasOrHandler === "function") {
-    return new LibrettoWorkflow(name, undefined, schemasOrHandler);
+  if (typeof definitionOrHandler === "function") {
+    return new LibrettoWorkflow(name, undefined, definitionOrHandler);
+  }
+  if ("handler" in definitionOrHandler) {
+    return new LibrettoWorkflow(
+      name,
+      getWorkflowConstructorOptions(definitionOrHandler),
+      definitionOrHandler.handler,
+    );
   }
   if (!maybeHandler) {
     throw new Error(
-      `workflow("${name}") called with schemas but no handler. Pass the handler as the third argument.`,
+      `workflow("${name}") called without a handler. Pass the handler as the third argument or in the options object.`,
     );
   }
-  return new LibrettoWorkflow(name, schemasOrHandler, maybeHandler);
+  return new LibrettoWorkflow(
+    name,
+    getWorkflowConstructorOptions(definitionOrHandler),
+    maybeHandler,
+  );
+}
+
+function normalizeWorkflowAuthProfile(
+  value: LibrettoWorkflowAuthProfile | undefined,
+): { name: string; refresh?: boolean } | undefined {
+  if (!value) return undefined;
+  if (typeof value === "string") return { name: normalizeProfileName(value) };
+  const name = normalizeProfileName(value.name);
+  return {
+    name,
+    ...(value.refresh === undefined
+      ? {}
+      : { refresh: value.refresh }),
+  };
 }

@@ -7,15 +7,21 @@ import { chromium } from "playwright";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = join(root, "public", "brand-kit", "animation");
-const frameDir = mkdtempSync(join(tmpdir(), "libretto-asciihedron-frames-"));
+const frameRoot = mkdtempSync(join(tmpdir(), "libretto-brand-kit-frames-"));
+const asciihedronFrameDir = join(frameRoot, "asciihedron");
+const logoFrameDir = join(frameRoot, "logo");
 const host = "127.0.0.1";
 const port = 5198;
 const frameRate = 24;
-const frameCount = 419;
-const frameStepMs = (Math.PI * 2) / 0.00036 / frameCount;
+const asciihedronFrameCount = 419;
+const asciihedronFrameStepMs = (Math.PI * 2) / 0.00036 / asciihedronFrameCount;
+const logoFrameCount = 240;
+const logoFrameStepMs = 360 / 0.035 / logoFrameCount;
 const size = 1024;
 
 mkdirSync(outputDir, { recursive: true });
+mkdirSync(asciihedronFrameDir, { recursive: true });
+mkdirSync(logoFrameDir, { recursive: true });
 
 function run(command, args) {
   return new Promise((resolvePromise, reject) => {
@@ -31,6 +37,18 @@ function run(command, args) {
       }
     });
   });
+}
+
+function stopProcessTree(child) {
+  if (!child.pid || child.exitCode !== null) {
+    return;
+  }
+
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch {
+    child.kill("SIGTERM");
+  }
 }
 
 async function waitForServer(url) {
@@ -50,15 +68,16 @@ async function waitForServer(url) {
 
 const server = spawn(
   "pnpm",
-  ["-s", "exec", "vp", "dev", "--host", host, "--port", String(port)],
+  ["-s", "exec", "vite", "dev", "--host", host, "--port", String(port)],
   {
     cwd: root,
+    detached: true,
     stdio: ["ignore", "ignore", "inherit"],
   },
 );
 
 try {
-  await waitForServer(`http://${host}:${port}/brand-kit.html`);
+  await waitForServer(`http://${host}:${port}/brand-kit`);
 
   const browser = await chromium.launch();
   const page = await browser.newPage({
@@ -92,11 +111,51 @@ try {
     };
   });
 
-  await page.goto(`http://${host}:${port}/brand-kit.html`, {
+  await page.goto(`http://${host}:${port}/brand-kit`, {
     waitUntil: "networkidle",
   });
+
+  await page.locator("canvas").waitFor();
+  await page.evaluate((canvasSize) => {
+    const canvas = document.querySelector("canvas");
+    const container = canvas?.parentElement;
+    if (!canvas || !container) {
+      throw new Error("Solid icosahedron canvas was not mounted.");
+    }
+    container.style.width = `${canvasSize}px`;
+    container.style.height = `${canvasSize}px`;
+    container.style.minWidth = `${canvasSize}px`;
+    container.style.minHeight = `${canvasSize}px`;
+    container.style.maxWidth = `${canvasSize}px`;
+    container.style.maxHeight = `${canvasSize}px`;
+    canvas.style.width = `${canvasSize}px`;
+    canvas.style.height = `${canvasSize}px`;
+    canvas.style.minWidth = `${canvasSize}px`;
+    canvas.style.minHeight = `${canvasSize}px`;
+    canvas.style.maxWidth = `${canvasSize}px`;
+    canvas.style.maxHeight = `${canvasSize}px`;
+  }, size);
+  await page.getByRole("checkbox", { name: "Still" }).uncheck();
+  await page.evaluate(() => window.__advanceBrandKitFrame(16));
+
+  for (let frame = 0; frame < logoFrameCount; frame += 1) {
+    await page.evaluate((deltaMs) => window.__advanceBrandKitFrame(deltaMs), logoFrameStepMs);
+    const dataUrl = await page.evaluate(() => {
+      const canvas = document.querySelector("canvas");
+      if (!canvas) {
+        throw new Error("Solid icosahedron canvas was not mounted.");
+      }
+      return canvas.toDataURL("image/png");
+    });
+    const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
+    writeFileSync(
+      join(logoFrameDir, `frame-${String(frame).padStart(4, "0")}.png`),
+      Buffer.from(base64, "base64"),
+    );
+  }
+
   await page.getByRole("button", { name: "Asciihedron" }).click();
-  await page.locator('input[type="checkbox"]').uncheck();
+  await page.getByRole("checkbox", { name: "Still" }).uncheck();
   await page.locator("canvas").waitFor();
   await page.evaluate((canvasSize) => {
     const canvas = document.querySelector("canvas");
@@ -114,8 +173,8 @@ try {
 
   await page.evaluate(() => window.__advanceBrandKitFrame(16));
 
-  for (let frame = 0; frame < frameCount; frame += 1) {
-    await page.evaluate((deltaMs) => window.__advanceBrandKitFrame(deltaMs), frameStepMs);
+  for (let frame = 0; frame < asciihedronFrameCount; frame += 1) {
+    await page.evaluate((deltaMs) => window.__advanceBrandKitFrame(deltaMs), asciihedronFrameStepMs);
     const dataUrl = await page.evaluate(() => {
       const canvas = document.querySelector("canvas");
       if (!canvas) {
@@ -125,20 +184,36 @@ try {
     });
     const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
     writeFileSync(
-      join(frameDir, `frame-${String(frame).padStart(4, "0")}.png`),
+      join(asciihedronFrameDir, `frame-${String(frame).padStart(4, "0")}.png`),
       Buffer.from(base64, "base64"),
     );
   }
 
   await browser.close();
 
-  const framePattern = join(frameDir, "frame-%04d.png");
+  const asciihedronFramePattern = join(asciihedronFrameDir, "frame-%04d.png");
+  const logoFramePattern = join(logoFrameDir, "frame-%04d.png");
   await run("ffmpeg", [
     "-y",
     "-framerate",
     String(frameRate),
     "-i",
-    framePattern,
+    logoFramePattern,
+    "-vf",
+    "format=yuv420p",
+    "-c:v",
+    "libx264",
+    "-movflags",
+    "+faststart",
+    "-an",
+    join(outputDir, "libretto-icosahedron-logo-loop.mp4"),
+  ]);
+  await run("ffmpeg", [
+    "-y",
+    "-framerate",
+    String(frameRate),
+    "-i",
+    asciihedronFramePattern,
     "-vf",
     "format=rgba",
     "-c:v",
@@ -155,7 +230,7 @@ try {
     "-framerate",
     String(frameRate),
     "-i",
-    framePattern,
+    asciihedronFramePattern,
     "-vf",
     "format=yuv420p",
     "-c:v",
@@ -228,9 +303,10 @@ try {
   console.log(`Rendered ${join(outputDir, "libretto-asciihedron-loop.webm")}`);
   console.log(`Rendered ${join(outputDir, "libretto-asciihedron-loop.mp4")}`);
   console.log(`Rendered ${join(outputDir, "libretto-asciihedron-loop.webp")}`);
+  console.log(`Rendered ${join(outputDir, "libretto-icosahedron-logo-loop.mp4")}`);
   console.log(`Rendered ${join(outputDir, "libretto-icosahedron-logo-loop.webm")}`);
   console.log(`Rendered ${join(outputDir, "libretto-icosahedron-logo-loop.webp")}`);
 } finally {
-  server.kill("SIGTERM");
-  rmSync(frameDir, { force: true, recursive: true });
+  stopProcessTree(server);
+  rmSync(frameRoot, { force: true, recursive: true });
 }

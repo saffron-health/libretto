@@ -1,0 +1,87 @@
+---
+title: Runtime recovery actions
+---
+
+`recoveryAction` lets a workflow recover from a supported Playwright Page or Locator failure. When a supported action fails, Libretto runs the recovery action and retries the original action once.
+
+```typescript theme={null}
+export default workflow("reviewOrder", {
+  input,
+  output,
+  recoveryAction,
+  handler: async ({ page }, params) => {
+    await page.goto(params.url);
+    await page.locator("#review").click();
+    return { complete: true };
+  },
+});
+```
+
+## computerUseRecoveryAction
+
+`computerUseRecoveryAction()` runs a small vision agent with your instruction. It screenshots the viewport, asks the model for a browser action, executes it with Playwright coordinates, and stops when the model returns `done` or `maxSteps` is reached.
+
+One step is one screenshot, one model decision, and one browser action. The default `maxSteps` is `3`, which covers the common popup flow of close, confirm, then done.
+
+```typescript theme={null}
+import { computerUseRecoveryAction } from "libretto";
+
+const recoveryAction = computerUseRecoveryAction({
+  provider: "openai",
+  apiKey: process.env.OPENAI_API_KEY!,
+  model: "gpt-5.5",
+  instruction: "Close any visible blocker that prevents submitting the form.",
+  maxSteps: 3,
+});
+```
+
+Supported provider shortcuts:
+
+```typescript theme={null}
+{ provider: "openai", apiKey, model?: "gpt-5.5" }
+{ provider: "anthropic", apiKey, model?: "claude-sonnet-4-6" }
+```
+
+Advanced callers can pass a preconfigured AI SDK `LanguageModel` with `languageModel`.
+
+## popupRecoveryAction
+
+`popupRecoveryAction()` is a preset for the common popup case. It uses Libretto's default instruction for closing popups, cookie banners, modals, overlays, and similar blockers.
+
+```typescript theme={null}
+import { popupRecoveryAction } from "libretto";
+
+const recoveryAction = popupRecoveryAction({
+  provider: "anthropic",
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: "claude-sonnet-4-6",
+  maxSteps: 3,
+});
+```
+
+## Custom recovery logic
+
+Use a custom `RecoveryAction` when the site needs deterministic recovery logic, or when it needs to combine `popupRecoveryAction()` with other steps such as reloading the page.
+
+```typescript theme={null}
+import {
+  popupRecoveryAction,
+  type RecoveryAction,
+} from "libretto";
+
+const popupRecoveryAgent = popupRecoveryAction({
+  provider: "openai",
+  apiKey: process.env.OPENAI_API_KEY!,
+  model: "gpt-5.5",
+});
+
+const recoveryAction: RecoveryAction = async (context) => {
+  const result = await popupRecoveryAgent(context);
+  if (result.status === "incomplete") {
+    await context.page.reload();
+  }
+  return result;
+};
+```
+
+If the recovery action returns without throwing, Libretto retries the original failed method once.

@@ -33,8 +33,20 @@ jobs:
           set -euo pipefail
           package_name="$(node -p "require('./packages/libretto/package.json').name")"
           version="$(node -p "require('./packages/libretto/package.json').version")"
+          affordance_version="$(node -p "require('./packages/affordance/package.json').version")"
+          create_libretto_package_name="$(node -p "require('./packages/create-libretto/package.json').name")"
+          browser_tools_package_name="$(node -p "require('./packages/browser-tools/package.json').name")"
+          browser_tools_version="$(node -p "require('./packages/browser-tools/package.json').version")"
+          playwright_debug_package_name="$(node -p "require('./packages/playwright-debug/package.json').name")"
+          playwright_debug_version="$(node -p "require('./packages/playwright-debug/package.json').version")"
           echo "package_name=${package_name}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "affordance_version=${affordance_version}" >> "$GITHUB_OUTPUT"
+          echo "create_libretto_package_name=${create_libretto_package_name}" >> "$GITHUB_OUTPUT"
+          echo "browser_tools_package_name=${browser_tools_package_name}" >> "$GITHUB_OUTPUT"
+          echo "browser_tools_version=${browser_tools_version}" >> "$GITHUB_OUTPUT"
+          echo "playwright_debug_package_name=${playwright_debug_package_name}" >> "$GITHUB_OUTPUT"
+          echo "playwright_debug_version=${playwright_debug_version}" >> "$GITHUB_OUTPUT"
           echo "tag=v${version}" >> "$GITHUB_OUTPUT"
 
       - name: Check release state
@@ -46,6 +58,11 @@ jobs:
 
           release_exists=false
           npm_exists=false
+          affordance_npm_exists=false
+          create_libretto_npm_exists=false
+          browser_tools_npm_exists=false
+          playwright_debug_npm_exists=false
+          publish_needed=false
 
           if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
             release_exists=true
@@ -55,16 +72,41 @@ jobs:
             npm_exists=true
           fi
 
+          if npm view "affordance@${{ steps.version.outputs.affordance_version }}" version >/dev/null 2>&1; then
+            affordance_npm_exists=true
+          fi
+
+          if npm view "${{ steps.version.outputs.create_libretto_package_name }}@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
+            create_libretto_npm_exists=true
+          fi
+
+          if npm view "${{ steps.version.outputs.browser_tools_package_name }}@${{ steps.version.outputs.browser_tools_version }}" version >/dev/null 2>&1; then
+            browser_tools_npm_exists=true
+          fi
+
+          if npm view "${{ steps.version.outputs.playwright_debug_package_name }}@${{ steps.version.outputs.playwright_debug_version }}" version >/dev/null 2>&1; then
+            playwright_debug_npm_exists=true
+          fi
+
+          if [ "$release_exists" != true ] || [ "$npm_exists" != true ] || [ "$affordance_npm_exists" != true ] || [ "$create_libretto_npm_exists" != true ] || [ "$browser_tools_npm_exists" != true ] || [ "$playwright_debug_npm_exists" != true ]; then
+            publish_needed=true
+          fi
+
           echo "release_exists=${release_exists}" >> "$GITHUB_OUTPUT"
           echo "npm_exists=${npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "affordance_npm_exists=${affordance_npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "create_libretto_npm_exists=${create_libretto_npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "browser_tools_npm_exists=${browser_tools_npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "playwright_debug_npm_exists=${playwright_debug_npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "publish_needed=${publish_needed}" >> "$GITHUB_OUTPUT"
 
       - name: Skip already published version
-        if: steps.state.outputs.release_exists == 'true' && steps.state.outputs.npm_exists == 'true'
+        if: steps.state.outputs.publish_needed != 'true'
         run: |
-          echo "Version ${{ steps.version.outputs.version }} is already published to npm and GitHub."
+          echo "All release packages are already published to npm and GitHub."
 
       - name: Configure gcloud secret access for evaluator
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -105,7 +147,7 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       - name: Restore evaluator cache
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         uses: actions/cache@v4
         with:
           path: temp/libretto-cli-evaluate-cache
@@ -114,29 +156,42 @@ jobs:
             libretto-evaluate-cache-${{ runner.os }}-
 
       - name: Install dependencies
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         run: npx playwright install chromium
 
       - name: Verify release build
-        if: steps.state.outputs.release_exists != 'true' || steps.state.outputs.npm_exists != 'true'
+        if: steps.state.outputs.publish_needed == 'true'
         run: |
           pnpm check:mirrors
-          pnpm --filter libretto... build
+          pnpm --filter libretto... --filter libretto-playwright-debug... build
           pnpm --filter libretto type-check
           pnpm --filter libretto test
+          pnpm --filter libretto-browser-tools type-check
+          pnpm --filter libretto-browser-tools test
+          pnpm --filter libretto-playwright-debug type-check
+          pnpm --filter libretto-playwright-debug test
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      browser_tools_package_name: ${{ steps.version.outputs.browser_tools_package_name }}
+      browser_tools_version: ${{ steps.version.outputs.browser_tools_version }}
+      playwright_debug_package_name: ${{ steps.version.outputs.playwright_debug_package_name }}
+      playwright_debug_version: ${{ steps.version.outputs.playwright_debug_version }}
       release_exists: ${{ steps.state.outputs.release_exists }}
       npm_exists: ${{ steps.state.outputs.npm_exists }}
+      affordance_npm_exists: ${{ steps.state.outputs.affordance_npm_exists }}
+      create_libretto_npm_exists: ${{ steps.state.outputs.create_libretto_npm_exists }}
+      browser_tools_npm_exists: ${{ steps.state.outputs.browser_tools_npm_exists }}
+      playwright_debug_npm_exists: ${{ steps.state.outputs.playwright_debug_npm_exists }}
+      publish_needed: ${{ steps.state.outputs.publish_needed }}
 
   release:
     needs: verify
-    if: needs.verify.outputs.release_exists != 'true' || needs.verify.outputs.npm_exists != 'true'
+    if: needs.verify.outputs.publish_needed == 'true'
     runs-on: ubuntu-latest
     environment:
       name: release
@@ -160,9 +215,30 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build publish artifacts
-        run: pnpm --filter libretto... build
+        run: pnpm --filter libretto... --filter libretto-playwright-debug... build
+
+      - name: Publish browser tools to npm
+        if: needs.verify.outputs.browser_tools_npm_exists != 'true'
+        working-directory: packages/browser-tools
+        run: |
+          if ! npm view "${{ needs.verify.outputs.browser_tools_package_name }}@${{ needs.verify.outputs.browser_tools_version }}" version >/dev/null 2>&1; then
+            pnpm publish --access public --no-git-checks
+          else
+            echo "${{ needs.verify.outputs.browser_tools_package_name }}@${{ needs.verify.outputs.browser_tools_version }} already published, skipping."
+          fi
+
+      - name: Publish Playwright debugger to npm
+        if: needs.verify.outputs.playwright_debug_npm_exists != 'true'
+        working-directory: packages/playwright-debug
+        run: |
+          if ! npm view "${{ needs.verify.outputs.playwright_debug_package_name }}@${{ needs.verify.outputs.playwright_debug_version }}" version >/dev/null 2>&1; then
+            pnpm publish --access public --no-git-checks
+          else
+            echo "${{ needs.verify.outputs.playwright_debug_package_name }}@${{ needs.verify.outputs.playwright_debug_version }} already published, skipping."
+          fi
 
       - name: Publish affordance to npm
+        if: needs.verify.outputs.affordance_npm_exists != 'true'
         working-directory: packages/affordance
         run: |
           affordance_version="$(node -p "require('./package.json').version")"
@@ -178,6 +254,7 @@ jobs:
         run: pnpm publish --access public --no-git-checks
 
       - name: Publish create-libretto to npm
+        if: needs.verify.outputs.create_libretto_npm_exists != 'true'
         working-directory: packages/create-libretto
         run: |
           if ! npm view "create-libretto@${{ needs.verify.outputs.version }}" version >/dev/null 2>&1; then
@@ -192,7 +269,19 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ github.token }}
         working-directory: packages/libretto
-        run: pnpm generate-changelog "${{ needs.verify.outputs.tag }}" > "$RUNNER_TEMP/changelog.md"
+        run: |
+          CHANGELOG_AUDIT_FILE="$RUNNER_TEMP/changelog-audit.json" \
+            pnpm generate-changelog "${{ needs.verify.outputs.tag }}" > "$RUNNER_TEMP/changelog.md"
+
+      - name: Upload changelog audit
+        if: always() && needs.verify.outputs.release_exists != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-audit-${{ needs.verify.outputs.tag }}
+          path: |
+            ${{ runner.temp }}/changelog.md
+            ${{ runner.temp }}/changelog-audit.json
+          if-no-files-found: warn
 
       - name: Create GitHub release
         if: needs.verify.outputs.release_exists != 'true'

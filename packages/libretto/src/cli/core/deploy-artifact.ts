@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { createRequire, Module } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
@@ -21,6 +21,11 @@ import {
   getWorkflowsFromModuleExports,
   LIBRETTO_WORKFLOW_BRAND,
 } from "../../shared/workflow/workflow.js";
+import { normalizeCredentialNames } from "../../shared/workflow/credentials.js";
+import {
+  ViewportConfigSchema,
+  type ViewportConfig,
+} from "./config.js";
 
 type PackageManifest = {
   name?: string;
@@ -48,6 +53,19 @@ type HostedDeployPackage = {
   cleanup: () => void;
   entryPoint: string;
   outputDir: string;
+  workflows: WorkflowDeployMetadata[];
+};
+
+export type WorkflowDeployMetadata = {
+  name: string;
+  credentialNames: string[];
+  authProfileName?: string;
+  authProfileRefresh?: boolean;
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: ViewportConfig;
+  sourceFile?: string;
+  sourceFiles?: string[];
 };
 
 type BuildHostedDeployTarballArgs = {
@@ -60,12 +78,12 @@ type BuildHostedDeployTarballArgs = {
 type CreateHostedDeployPackageArgs = BuildHostedDeployTarballArgs;
 
 const DEFAULT_RUNTIME_EXTERNALS = [
-  "libretto",
   "playwright",
   "playwright-core",
   "chromium-bidi",
 ] as const;
 const BUILT_IN_MANIFEST_DEPENDENCIES = ["libretto"] as const;
+const DEPLOY_METADATA_FILENAME = ".libretto-workflows.json";
 const SOURCE_FILE_EXTENSIONS = [
   "",
   ".ts",
@@ -463,13 +481,17 @@ function resolveWorkspaceSourcePath(
 function workspaceSourcePlugin(
   workspacePackages: Map<string, WorkspacePackage>,
   externalPackages: ReadonlySet<string>,
+  unresolvedWorkspaceImports?: Map<string, string>,
 ) {
   return {
     name: "workspace-source-resolver",
     setup(buildApi: {
       onResolve: (
         options: { filter: RegExp },
-        callback: (args: { path: string }) => { path: string } | null,
+        callback: (args: { path: string }) =>
+          | { path: string }
+          | { path: string; external: true }
+          | null,
       ) => void;
     }) {
       // Workspace imports are treated as bundle input, so their code is
@@ -493,9 +515,8 @@ function workspaceSourcePlugin(
           match.subpath,
         );
         if (!resolvedPath) {
-          throw new Error(
-            `Unable to resolve workspace import "${args.path}" from ${match.info.dir}.`,
-          );
+          unresolvedWorkspaceImports?.set(args.path, match.info.dir);
+          return { path: args.path, external: true };
         }
 
         return { path: resolvedPath };
@@ -565,22 +586,79 @@ function resolveDependencyVersion(
   );
 }
 
+function resolveLibrettoDependencyVersion(
+  sourceDir: string,
+  packageName: string,
+): string | null {
+  try {
+    const librettoManifestPath = require.resolve("libretto/package.json", {
+      paths: [sourceDir],
+    });
+    const version = readDependencyVersionFromManifest(
+      readPackageManifest(librettoManifestPath),
+      packageName,
+    );
+    if (version) {
+      return version;
+    }
+  } catch {
+    // Fall through to the current CLI install. Source installs are optional in
+    // tests that only exercise manifest construction.
+  }
+
+  const version = readDependencyVersionFromManifest(
+    readPackageManifest(join(CURRENT_LIBRETTO_PACKAGE_DIR, "package.json")),
+    packageName,
+  );
+  if (version) {
+    return version;
+  }
+
+  try {
+    const manifestPath = require.resolve(`${packageName}/package.json`, {
+      paths: [CURRENT_LIBRETTO_PACKAGE_DIR],
+    });
+    return readPackageManifest(manifestPath).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function writeDeployManifest(args: {
   additionalExternals: readonly string[];
   deploymentName: string;
   librettoDependency: string;
   outputDir: string;
+  runtimeExternals: readonly string[];
   sourceDir: string;
 }): void {
+  const dependencyPackages = [
+    ...new Set([
+      ...BUILT_IN_MANIFEST_DEPENDENCIES,
+      ...args.runtimeExternals.filter((packageName) =>
+        resolveLibrettoDependencyVersion(args.sourceDir, packageName),
+      ),
+      ...args.additionalExternals,
+    ]),
+  ];
   const dependencies = Object.fromEntries(
-    [...BUILT_IN_MANIFEST_DEPENDENCIES, ...args.additionalExternals].map(
-      (packageName) => [
+    dependencyPackages.map((packageName) => {
+      const fallbackVersion =
+        packageName === "libretto"
+          ? args.librettoDependency
+          : (resolveLibrettoDependencyVersion(args.sourceDir, packageName) ??
+            undefined);
+      return [
         packageName,
         packageName === "libretto"
           ? args.librettoDependency
-          : resolveDependencyVersion(args.sourceDir, packageName),
-      ],
-    ),
+          : resolveDependencyVersion(
+              args.sourceDir,
+              packageName,
+              fallbackVersion,
+            ),
+      ];
+    }),
   );
 
   writeFileSync(
@@ -596,6 +674,54 @@ function writeDeployManifest(args: {
       2,
     ) + "\n",
   );
+}
+
+function writeDeployMetadata(args: {
+  outputDir: string;
+  workflows: readonly WorkflowDeployMetadata[];
+}): void {
+  writeFileSync(
+    join(args.outputDir, DEPLOY_METADATA_FILENAME),
+    JSON.stringify({ workflows: args.workflows }, null, 2) + "\n",
+  );
+}
+
+function toPortableRelativePath(args: {
+  absSourceDir: string;
+  absPath: string;
+}): string {
+  const relPath = relative(args.absSourceDir, args.absPath).replaceAll("\\", "/");
+  if (relPath.startsWith("../") || relPath === ".." || relPath.startsWith("/")) {
+    throw new Error(
+      `Deploy entry point must be inside the source directory to support cloud code sharing: ${args.absPath}`,
+    );
+  }
+  return relPath;
+}
+
+function isShareableSourceRelPath(relPath: string): boolean {
+  return !relPath.split("/").includes("node_modules");
+}
+
+function writeShareableSourceFiles(args: {
+  absSourceDir: string;
+  absSourcePaths: readonly string[];
+  outputDir: string;
+}): string[] {
+  const relPaths = [...new Set(args.absSourcePaths.map((absPath) =>
+    toPortableRelativePath({
+      absPath,
+      absSourceDir: args.absSourceDir,
+    }),
+  ))].filter(isShareableSourceRelPath).sort();
+
+  for (const relPath of relPaths) {
+    const targetPath = join(args.outputDir, ".libretto-share", "source", relPath);
+    mkdirSync(dirname(targetPath), { recursive: true });
+    cpSync(resolve(args.absSourceDir, relPath), targetPath);
+  }
+
+  return relPaths;
 }
 
 function shouldVendorCurrentLibretto(versionSpec: string): boolean {
@@ -696,11 +822,18 @@ function createExternalDiscoveryStub(): object {
   });
 }
 
-function createDiscoveryLibrettoModule(workflowNames: Set<string>): object {
+function createDiscoveryLibrettoModule(
+  workflowsByName: Map<string, WorkflowDeployMetadata>,
+): object {
   const moduleShape: Record<PropertyKey, unknown> = {
     LIBRETTO_WORKFLOW_BRAND,
-    workflow: (name: string) => {
-      workflowNames.add(name);
+    workflow: (name: string, definitionOrHandler?: unknown) => {
+      workflowsByName.set(name, {
+        name,
+        ...extractDiscoveryCredentialMetadata(definitionOrHandler),
+        ...extractDiscoveryAuthProfileMetadata(definitionOrHandler),
+        ...extractDiscoveryLaunchMetadata(definitionOrHandler),
+      });
       return {
         [LIBRETTO_WORKFLOW_BRAND]: true,
         name,
@@ -724,19 +857,104 @@ function createDiscoveryLibrettoModule(workflowNames: Set<string>): object {
   });
 }
 
-function discoverBundledWorkflowNames(args: {
+function extractDiscoveryLaunchMetadata(
+  definitionOrHandler: unknown,
+): Omit<
+  WorkflowDeployMetadata,
+  "name" | "credentialNames" | "authProfileName" | "authProfileRefresh"
+> {
+  if (!definitionOrHandler || typeof definitionOrHandler !== "object") {
+    return {};
+  }
+
+  const record = definitionOrHandler as {
+    startUrl?: unknown;
+    gpu?: unknown;
+    viewport?: unknown;
+  };
+  const metadata: Omit<
+    WorkflowDeployMetadata,
+    "name" | "credentialNames" | "authProfileName" | "authProfileRefresh"
+  > = {};
+
+  if (typeof record.startUrl === "string") {
+    metadata.startUrl = record.startUrl;
+  }
+  if (typeof record.gpu === "boolean") {
+    metadata.gpu = record.gpu;
+  }
+  if (
+    record.viewport &&
+    typeof record.viewport === "object" &&
+    !Array.isArray(record.viewport)
+  ) {
+    const viewport = ViewportConfigSchema.safeParse(record.viewport);
+    if (viewport.success) {
+      metadata.viewport = viewport.data;
+    }
+  }
+
+  return metadata;
+}
+
+function extractDiscoveryCredentialMetadata(
+  definitionOrHandler: unknown,
+): Pick<WorkflowDeployMetadata, "credentialNames"> {
+  if (
+    !definitionOrHandler ||
+    typeof definitionOrHandler !== "object" ||
+    !("credentials" in definitionOrHandler)
+  ) {
+    return { credentialNames: [] };
+  }
+  const rawCredentials = (definitionOrHandler as { credentials?: unknown })
+    .credentials;
+  return {
+    credentialNames: Array.isArray(rawCredentials)
+      ? normalizeCredentialNames(rawCredentials)
+      : [],
+  };
+}
+
+function extractDiscoveryAuthProfileMetadata(
+  definitionOrHandler: unknown,
+): Omit<WorkflowDeployMetadata, "name" | "credentialNames"> {
+  if (
+    !definitionOrHandler ||
+    typeof definitionOrHandler !== "object" ||
+    !("authProfile" in definitionOrHandler)
+  ) {
+    return {};
+  }
+  const authProfile = (definitionOrHandler as { authProfile?: unknown }).authProfile;
+  if (typeof authProfile === "string") return { authProfileName: authProfile };
+  if (!authProfile || typeof authProfile !== "object") return {};
+  const record = authProfile as {
+    name?: unknown;
+    refresh?: unknown;
+  };
+  if (typeof record.name !== "string") return {};
+  return {
+    authProfileName: record.name,
+    ...(typeof record.refresh === "boolean"
+      ? { authProfileRefresh: record.refresh }
+      : {}),
+  };
+}
+
+function discoverBundledWorkflows(args: {
   absEntryPoint: string;
   absSourceDir: string;
   bundleBuffer: Buffer;
   externalPackages: ReadonlySet<string>;
-}): string[] {
+}): WorkflowDeployMetadata[] {
   const discoveryPath = join(
     args.absSourceDir,
     `.libretto-deploy-discovery-${process.pid}-${Date.now()}.cjs`,
   );
   const originalRequire = Module.prototype.require;
-  const workflowNames = new Set<string>();
-  const discoveryLibrettoModule = createDiscoveryLibrettoModule(workflowNames);
+  const workflowsByName = new Map<string, WorkflowDeployMetadata>();
+  const discoveryLibrettoModule = createDiscoveryLibrettoModule(workflowsByName);
   let loadedModuleExports: Record<string, unknown> | null = null;
 
   try {
@@ -764,11 +982,11 @@ function discoverBundledWorkflowNames(args: {
     rmSync(discoveryPath, { force: true });
   }
 
-  const discoveredWorkflowNames = [...workflowNames].sort((left, right) =>
-    left.localeCompare(right),
+  const discoveredWorkflows = [...workflowsByName.values()].sort((left, right) =>
+    left.name.localeCompare(right.name),
   );
 
-  if (discoveredWorkflowNames.length === 0) {
+  if (discoveredWorkflows.length === 0) {
     throw new Error(
       `No workflows were found in ${args.absEntryPoint}. Import the workflow files you want to deploy from the entry point, or export a workflow directly from it.`,
     );
@@ -779,23 +997,23 @@ function discoverBundledWorkflowNames(args: {
       (workflow) => workflow.name,
     ),
   );
-  const nonExportedWorkflowNames = discoveredWorkflowNames.filter(
-    (name) => !exportedWorkflowNames.has(name),
+  const nonExportedWorkflowNames = discoveredWorkflows.filter(
+    (workflow) => !exportedWorkflowNames.has(workflow.name),
   );
 
   if (nonExportedWorkflowNames.length > 0) {
     throw new Error(
-      `Workflows discovered in ${args.absEntryPoint} must be exported from the deploy entry point. Re-export them from the entry point or export them through a \`workflows\` object. Non-exported workflows: ${nonExportedWorkflowNames.join(", ")}`,
+      `Workflows discovered in ${args.absEntryPoint} must be exported from the deploy entry point. Re-export them from the entry point or export them through a \`workflows\` object. Non-exported workflows: ${nonExportedWorkflowNames.map((workflow) => workflow.name).join(", ")}`,
     );
   }
 
-  return discoveredWorkflowNames;
+  return discoveredWorkflows;
 }
 
 function createBootstrapSource(args: {
   bundleBuffer: Buffer;
   deploymentName: string;
-  workflowNames: readonly string[];
+  workflows: readonly WorkflowDeployMetadata[];
 }): string {
   const bundleHash = createHash("sha256")
     .update(args.bundleBuffer)
@@ -805,10 +1023,17 @@ function createBootstrapSource(args: {
     "base64",
   );
   const outputPrefix = `${normalizePackageName(args.deploymentName)}-`;
-  const exportLines = args.workflowNames
+  const exportLines = args.workflows
     .map(
-      (name, index) =>
-        `export const ${getGeneratedWorkflowExportName(index)} = createWorkflowProxy(${JSON.stringify(name)});`,
+      (workflow, index) =>
+        `export const ${getGeneratedWorkflowExportName(index)} = createWorkflowProxy(${JSON.stringify(workflow.name)}, ${JSON.stringify({
+          credentialNames: workflow.credentialNames,
+          authProfileName: workflow.authProfileName,
+          authProfileRefresh: workflow.authProfileRefresh,
+          startUrl: workflow.startUrl,
+          gpu: workflow.gpu,
+          viewport: workflow.viewport,
+        })});`,
     )
     .join("\n");
 
@@ -816,7 +1041,7 @@ function createBootstrapSource(args: {
   // to discover workflow exports. The implementation bundle stays embedded in
   // the file, while external packages are resolved from node_modules when the
   // deployed code loads them.
-  return `import { createRequire } from "node:module";
+  return `import { createRequire, Module } from "node:module";
 import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -832,6 +1057,45 @@ const BUNDLE_FILENAME = join(
 const nativeRequire = createRequire(
   join(tmpdir(), ${JSON.stringify("libretto-deploy-bootstrap.cjs")}),
 );
+const packageRequire = createRequire(import.meta.url || __filename);
+
+function isBarePackageSpecifier(specifier) {
+  return (
+    !specifier.startsWith(".") &&
+    !specifier.startsWith("/") &&
+    !specifier.startsWith("node:") &&
+    !/^[A-Za-z]:[\\\\/]/.test(specifier)
+  );
+}
+
+function loadImplementation() {
+  const originalRequire = Module.prototype.require;
+  function patchedRequire(specifier) {
+    try {
+      return originalRequire.call(this, specifier);
+    } catch (error) {
+      if (
+        error?.code === "MODULE_NOT_FOUND" &&
+        isBarePackageSpecifier(specifier)
+      ) {
+        Module.prototype.require = originalRequire;
+        try {
+          return packageRequire(specifier);
+        } finally {
+          Module.prototype.require = patchedRequire;
+        }
+      }
+      throw error;
+    }
+  }
+  Module.prototype.require = patchedRequire;
+
+  try {
+    return nativeRequire(ensureBundleFile());
+  } finally {
+    Module.prototype.require = originalRequire;
+  }
+}
 
 function ensureBundleFile() {
   if (!existsSync(BUNDLE_FILENAME)) {
@@ -844,9 +1108,9 @@ function ensureBundleFile() {
   return BUNDLE_FILENAME;
 }
 
-function createWorkflowProxy(workflowName) {
-  return workflow(workflowName, async (ctx, input) => {
-    const impl = nativeRequire(ensureBundleFile());
+function createWorkflowProxy(workflowName, metadata) {
+  const handler = async (ctx, input) => {
+    const impl = loadImplementation();
     const target = getWorkflowFromModuleExports(impl, workflowName);
     if (!target || typeof target.run !== "function") {
       throw new Error(
@@ -854,6 +1118,24 @@ function createWorkflowProxy(workflowName) {
       );
     }
     return await target.run(ctx, input);
+  };
+
+  return workflow(workflowName, {
+    credentials: Array.isArray(metadata?.credentialNames)
+      ? metadata.credentialNames
+      : [],
+    ...(metadata?.authProfileName
+      ? {
+          authProfile: {
+            name: metadata.authProfileName,
+            ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),
+          },
+        }
+      : {}),
+    ...(typeof metadata?.startUrl === "string" ? { startUrl: metadata.startUrl } : {}),
+    ...(typeof metadata?.gpu === "boolean" ? { gpu: metadata.gpu } : {}),
+    ...(metadata?.viewport ? { viewport: metadata.viewport } : {}),
+    handler,
   });
 }
 
@@ -868,8 +1150,17 @@ async function writeBundledDeployEntrypoint(args: {
   externalPackages: ReadonlySet<string>;
   outputDir: string;
   workspacePackages: Map<string, WorkspacePackage>;
-}): Promise<void> {
+}): Promise<{
+  shareableSourceFiles: string[];
+  workflows: WorkflowDeployMetadata[];
+}> {
   try {
+    const unresolvedWorkspaceImports = new Map<string, string>();
+    const discoveryExternalPackages = new Set<string>([
+      ...args.externalPackages,
+      "libretto",
+    ]);
+    const unresolvedDiscoveryWorkspaceImports = new Map<string, string>();
     // The implementation bundle is CommonJS so the bootstrap can load it lazily
     // with createRequire() after workflow discovery, while external packages
     // continue to load through normal Node module resolution.
@@ -881,13 +1172,53 @@ async function writeBundledDeployEntrypoint(args: {
       format: "cjs",
       outfile: "prebundled.cjs",
       platform: "node",
+      metafile: true,
       plugins: [
-        workspaceSourcePlugin(args.workspacePackages, args.externalPackages),
+        workspaceSourcePlugin(
+          args.workspacePackages,
+          args.externalPackages,
+          unresolvedWorkspaceImports,
+        ),
       ],
       splitting: false,
       target: "node20",
       write: false,
     });
+    // Discovery intentionally keeps libretto external so the local discovery
+    // shim can observe workflow(...) calls without executing the full library.
+    const discoveryBuild = await build({
+      absWorkingDir: args.absSourceDir,
+      bundle: true,
+      entryPoints: [args.absEntryPoint],
+      external: [...discoveryExternalPackages],
+      format: "cjs",
+      outfile: "prebundled-discovery.cjs",
+      platform: "node",
+      plugins: [
+        workspaceSourcePlugin(
+          args.workspacePackages,
+          discoveryExternalPackages,
+          unresolvedDiscoveryWorkspaceImports,
+        ),
+      ],
+      splitting: false,
+      target: "node20",
+      write: false,
+    });
+    const [unresolvedImport] = unresolvedWorkspaceImports;
+    if (unresolvedImport) {
+      const [importPath, packageDir] = unresolvedImport;
+      throw new Error(
+        `Unable to resolve workspace import "${importPath}" from ${packageDir}.`,
+      );
+    }
+    const [unresolvedDiscoveryImport] = unresolvedDiscoveryWorkspaceImports;
+    if (unresolvedDiscoveryImport) {
+      const [importPath, packageDir] = unresolvedDiscoveryImport;
+      throw new Error(
+        `Unable to resolve workspace import "${importPath}" from ${packageDir}.`,
+      );
+    }
 
     const bundledImplementation = implementationBuild.outputFiles?.find(
       (file) => file.path.endsWith("prebundled.cjs"),
@@ -897,12 +1228,18 @@ async function writeBundledDeployEntrypoint(args: {
         "Bundler did not produce a deployment implementation file.",
       );
     }
+    const bundledDiscovery = discoveryBuild.outputFiles?.find((file) =>
+      file.path.endsWith("prebundled-discovery.cjs"),
+    );
+    if (!bundledDiscovery) {
+      throw new Error("Bundler did not produce a deployment discovery file.");
+    }
 
-    const workflowNames = discoverBundledWorkflowNames({
+    const workflows = discoverBundledWorkflows({
       absEntryPoint: args.absEntryPoint,
       absSourceDir: args.absSourceDir,
-      bundleBuffer: Buffer.from(bundledImplementation.contents),
-      externalPackages: args.externalPackages,
+      bundleBuffer: Buffer.from(bundledDiscovery.contents),
+      externalPackages: discoveryExternalPackages,
     });
 
     writeFileSync(
@@ -910,9 +1247,26 @@ async function writeBundledDeployEntrypoint(args: {
       createBootstrapSource({
         bundleBuffer: Buffer.from(bundledImplementation.contents),
         deploymentName: args.deploymentName,
-        workflowNames,
+        workflows,
       }),
     );
+    const shareableSourceFiles = Object.keys(implementationBuild.metafile?.inputs ?? {})
+      .map((inputPath) =>
+        isAbsolute(inputPath)
+          ? resolve(inputPath)
+          : resolve(args.absSourceDir, inputPath),
+      )
+      .filter((absPath) => {
+        const relPath = relative(args.absSourceDir, absPath);
+        return (
+          relPath !== "" &&
+          !relPath.startsWith("../") &&
+          relPath !== ".." &&
+          !isAbsolute(relPath) &&
+          isShareableSourceRelPath(relPath.replaceAll("\\", "/"))
+        );
+      });
+    return { shareableSourceFiles, workflows };
   } catch (error) {
     throw new Error(
       `Failed to bundle deploy entry point ${args.absEntryPoint}.\n${formatBuildError(error)}`,
@@ -944,7 +1298,7 @@ export async function createHostedDeployPackage(
   let callerOwnsTempRoot = false;
 
   try {
-    await writeBundledDeployEntrypoint({
+    const { shareableSourceFiles, workflows } = await writeBundledDeployEntrypoint({
       absEntryPoint,
       absSourceDir,
       deploymentName: args.deploymentName,
@@ -952,6 +1306,20 @@ export async function createHostedDeployPackage(
       outputDir,
       workspacePackages,
     });
+    const sourceFiles = writeShareableSourceFiles({
+      absSourceDir,
+      absSourcePaths: [...shareableSourceFiles, absEntryPoint],
+      outputDir,
+    });
+    const sourceFile = toPortableRelativePath({
+      absPath: absEntryPoint,
+      absSourceDir,
+    });
+    const workflowsWithShareableSource = workflows.map((workflow) => ({
+      ...workflow,
+      sourceFile,
+      sourceFiles,
+    }));
 
     if (librettoDependency === "file:./libretto") {
       copyCurrentLibrettoPackage(outputDir);
@@ -965,19 +1333,22 @@ export async function createHostedDeployPackage(
       deploymentName: args.deploymentName,
       librettoDependency,
       outputDir,
+      runtimeExternals: [...DEFAULT_RUNTIME_EXTERNALS],
       sourceDir: absSourceDir,
     });
+    writeDeployMetadata({ outputDir, workflows: workflowsWithShareableSource });
 
     // Success transfers ownership of the temp directory to the caller, who is
     // responsible for invoking cleanup() after the tarball/upload step.
     callerOwnsTempRoot = true;
-    return {
-      cleanup: () => {
-        rmSync(tempRoot, { force: true, recursive: true });
-      },
-      entryPoint: "index.js",
-      outputDir,
-    };
+      return {
+        cleanup: () => {
+          rmSync(tempRoot, { force: true, recursive: true });
+        },
+        entryPoint: "index.js",
+        outputDir,
+        workflows: workflowsWithShareableSource,
+      };
   } finally {
     // On any failure before we return, this function still owns the temp dir
     // and must remove it to avoid leaking deploy workspaces in /tmp.
@@ -989,7 +1360,7 @@ export async function createHostedDeployPackage(
 
 export async function buildHostedDeployTarball(
   args: BuildHostedDeployTarballArgs,
-): Promise<{ entryPoint: string; source: string }> {
+): Promise<{ entryPoint: string; source: string; workflows: WorkflowDeployMetadata[] }> {
   const deployPackage = await createHostedDeployPackage(args);
 
   try {
@@ -1001,6 +1372,7 @@ export async function buildHostedDeployTarball(
     return {
       entryPoint: deployPackage.entryPoint,
       source: readFileSync(tarPath).toString("base64"),
+      workflows: deployPackage.workflows,
     };
   } finally {
     deployPackage.cleanup();

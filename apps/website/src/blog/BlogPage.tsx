@@ -1,11 +1,17 @@
+import { Children } from "react";
 import type * as React from "react";
 import { SafeMdxRenderer } from "safe-mdx";
-import { AppLink } from "../routing";
 import { Button } from "../components/Button";
 import { Footer } from "../components/Footer";
 import { Navbar } from "../components/Navbar";
 import { Text } from "../components/Text";
-import { BLOG_POSTS, getBlogPost, type BlogPost } from "./posts";
+import {
+  buildBlogPostJsonLd,
+  serializeJsonLd,
+} from "./jsonLd";
+import { Prism } from "../prism";
+import { BLOG_POSTS, getBlogPost } from "./posts";
+import type { BlogPost } from "../../scripts/blog-posts.ts";
 
 const BLOG_LOGO = String.raw`
  ██████╗ ██╗      ██████╗  ██████╗
@@ -38,7 +44,7 @@ function BlogShell({ children }: { children: React.ReactNode }) {
 function BlogPostPreview({ post }: { post: BlogPost }) {
   return (
     <article className="border-t border-rule py-8">
-      <AppLink
+      <a
         href={`/blog/${post.slug}`}
         className="group block no-underline"
         data-fathom-event="Blog post click"
@@ -62,8 +68,57 @@ function BlogPostPreview({ post }: { post: BlogPost }) {
         <Text as="p" size="md" className="max-w-[660px] leading-relaxed text-muted">
           {post.description}
         </Text>
-      </AppLink>
+      </a>
     </article>
+  );
+}
+
+function BlogPostStructuredData({ post }: { post: BlogPost }) {
+  const jsonLd = serializeJsonLd(buildBlogPostJsonLd(post));
+
+  return (
+    <script type="application/ld+json">
+      {jsonLd}
+    </script>
+  );
+}
+
+function getCodeLanguage(className: string | undefined): string | undefined {
+  return className?.match(/language-(\w+)/)?.[1];
+}
+
+function getCodeText(children: React.ReactNode): string {
+  return Children.toArray(children)
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number") {
+        return String(child);
+      }
+
+      return "";
+    })
+    .join("");
+}
+
+function Code({ children, className }: React.HTMLAttributes<HTMLElement>) {
+  const language = getCodeLanguage(className);
+  const code = getCodeText(children);
+  const grammar = language ? Prism.languages[language] : undefined;
+
+  if (!language || !grammar) {
+    return (
+      <code className="rounded border border-rule bg-[#17130d] px-1 py-0.5 font-mono text-[0.95em] text-ink">
+        {children}
+      </code>
+    );
+  }
+
+  return (
+    <code
+      className="font-mono text-sm text-[#e6edf3] [&_.token.boolean]:text-[#79c0ff] [&_.token.builtin]:text-[#ffa657] [&_.token.class-name]:text-[#ffa657] [&_.token.comment]:text-[#8b949e] [&_.token.function]:text-[#d2a8ff] [&_.token.keyword]:text-[#ff7b72] [&_.token.number]:text-[#79c0ff] [&_.token.operator]:text-[#ff7b72] [&_.token.property]:text-[#79c0ff] [&_.token.punctuation]:text-[#c9d1d9] [&_.token.string]:text-[#a5d6ff] [&_.token.variable]:text-[#ffa657]"
+      dangerouslySetInnerHTML={{
+        __html: Prism.highlight(code, grammar, language),
+      }}
+    />
   );
 }
 
@@ -98,6 +153,18 @@ export function BlogIndexPage() {
 }
 
 const markdownComponents = {
+  h1({ children }: { children?: React.ReactNode }) {
+    return (
+      <Text
+        as="h1"
+        size="3xl"
+        style="serif"
+        className="mb-8 text-[2rem] font-[300] leading-tight text-ink"
+      >
+        {children}
+      </Text>
+    );
+  },
   h2({ children }: { children?: React.ReactNode }) {
     return (
       <Text
@@ -130,6 +197,48 @@ const markdownComponents = {
   li({ children }: { children?: React.ReactNode }) {
     return <li className="pl-2">{children}</li>;
   },
+  pre({ children }: { children?: React.ReactNode }) {
+    return (
+      <pre className="mb-8 overflow-x-auto rounded-md border border-amber/25 bg-[#17130d] p-4 font-mono text-sm leading-relaxed text-ink">
+        {children}
+      </pre>
+    );
+  },
+  code({ children, className }: React.HTMLAttributes<HTMLElement>) {
+    return <Code className={className}>{children}</Code>;
+  },
+  table({ children }: { children?: React.ReactNode }) {
+    return (
+      <div className="mb-8 overflow-x-auto">
+        <table className="min-w-[720px] border-collapse text-left text-sm leading-relaxed text-muted [&_thead_td]:text-white">
+          {children}
+        </table>
+      </div>
+    );
+  },
+  th({ children }: { children?: React.ReactNode }) {
+    return <th className="border-b border-rule px-3 py-3 font-semibold text-ink">{children}</th>;
+  },
+  td({ children }: { children?: React.ReactNode }) {
+    return <td className="border-b border-rule px-3 py-3 align-top">{children}</td>;
+  },
+  img({ src, alt }: React.ImgHTMLAttributes<HTMLImageElement>) {
+    if (!src) {
+      return null;
+    }
+
+    return (
+      <span className="mb-10 block">
+        <img
+          src={src}
+          alt={alt ?? ""}
+          loading="lazy"
+          className="w-full rounded-md border border-rule bg-[#17130d]"
+        />
+        {alt ? <span className="mt-3 block text-sm leading-relaxed text-muted/70">{alt}</span> : null}
+      </span>
+    );
+  },
   strong({ children }: { children?: React.ReactNode }) {
     return <strong className="font-semibold text-ink">{children}</strong>;
   },
@@ -140,14 +249,14 @@ const markdownComponents = {
     const isExternal = typeof href === "string" && /^https?:\/\//.test(href);
 
     return (
-      <AppLink
+      <a
         href={href ?? "#"}
         target={isExternal ? "_blank" : undefined}
         rel={isExternal ? "noopener noreferrer" : undefined}
         className="text-accent-bright underline decoration-accent/40 underline-offset-4 transition-colors hover:text-ink"
       >
         {children}
-      </AppLink>
+      </a>
     );
   },
 };
@@ -180,14 +289,15 @@ export function BlogPostPage({ slug }: { slug: string }) {
 
   return (
     <BlogShell>
-      <article className="mx-auto max-w-[760px] pt-8 pb-20">
-        <AppLink
+      <BlogPostStructuredData post={post} />
+      <article className="mx-auto max-w-[800px] pt-8 pb-20">
+        <a
           href="/blog"
           className="mb-10 inline-block text-sm text-muted/70 no-underline transition-colors hover:text-accent-bright"
           data-fathom-event="Blog back click"
         >
           Back to blog
-        </AppLink>
+        </a>
         <div className="mb-10 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Text as="time" size="xs" className="text-muted/70">
             {formatPostDate(post.publishedAt)}

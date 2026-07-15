@@ -1,0 +1,78 @@
+---
+title: Website authentication
+---
+
+> Authenticate into target websites during hosted Libretto Cloud runs.
+
+This page is about signing into the websites your workflows automate. For signing into Libretto Cloud itself and issuing API keys, see [Libretto Cloud authentication](/libretto-cloud-hosting/authentication).
+
+Hosted website authentication uses the same workflow code as local runs:
+
+- `credentials` declares which secrets the workflow can use for login.
+- `authProfile` declares the provider-native browser profile to reuse.
+- `librettoAuthenticate` checks whether the profile is signed in and runs sign-in if needed.
+
+```typescript theme={null}
+import { librettoAuthenticate, workflow } from "libretto";
+
+export default workflow("portalReport", {
+  credentials: ["username", "password"],
+  authProfile: {
+    name: "portal",
+    refresh: true,
+  },
+  async handler(ctx, input) {
+    await ctx.page.goto("https://portal.example.com");
+
+    await librettoAuthenticate(ctx, {
+      credentials: input.credentials,
+      isSignedIn: async ({ page }) =>
+        await page
+          .getByRole("button", { name: /account|sign out/i })
+          .isVisible()
+          .catch(() => false),
+      signIn: async ({ page }, credentials) => {
+        await page.goto("https://portal.example.com/login");
+        await page.getByLabel("Email").fill(credentials.username);
+        await page.getByLabel("Password").fill(credentials.password);
+        await page.getByRole("button", { name: /log in/i }).click();
+      },
+    });
+  },
+});
+```
+
+### Credentials in hosted runs
+
+Hosted runs resolve declared workflow credentials from Libretto Cloud's encrypted credential store. They do not read credential values from the executor environment.
+
+For local development, put matching `LIBRETTO_CLOUD_` variables in `.env`:
+
+```dotenv theme={null}
+LIBRETTO_CLOUD_USERNAME=alice@example.com
+LIBRETTO_CLOUD_PASSWORD=secret
+```
+
+Push non-empty `LIBRETTO_CLOUD_` variables to Libretto Cloud:
+
+```bash theme={null}
+npx libretto cloud credentials push
+```
+
+See [Libretto Cloud credentials](/libretto-cloud-api/credentials).
+
+### Profiles in hosted runs
+
+Hosted profiles are provider-native browser profiles. They are not local `.libretto/profiles/<name>.json` files, and Libretto does not upload local profile files during deploy.
+
+When you deploy a workflow that declares `authProfile`, Libretto Cloud registers the profile name if it does not already exist. When a hosted run starts, Libretto Cloud passes that profile name to the active browser provider.
+
+If `refresh: true` is set, the hosted provider should persist browser state changes made during the run back to that profile. This lets a successful sign-in repair an expired profile for future runs.
+
+### Local profiles versus hosted profiles
+
+Local profiles are Playwright storage-state JSON files under `.libretto/profiles/`. They are useful for local runs and local development.
+
+Hosted profiles are managed by the browser provider selected by Libretto Cloud. They are useful for deployed jobs and local CLI runs that use `--provider libretto-cloud`.
+
+The two are intentionally separate. To seed a hosted profile, run the workflow with Libretto Cloud and let sign-in create or refresh the provider-native profile.

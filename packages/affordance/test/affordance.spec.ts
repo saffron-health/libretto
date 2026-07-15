@@ -202,6 +202,128 @@ describe("SimpleCLI framework", () => {
     });
   });
 
+  test("runs app middleware around resolved commands", async () => {
+    const noInput = SimpleCLI.input({ positionals: [], named: {} });
+    const executionOrder: string[] = [];
+    let handlerContext: Record<string, unknown> | null = null;
+
+    const appMiddleware: SimpleCLIMiddleware<
+      unknown,
+      {},
+      { fromApp: true },
+      unknown
+    > = async ({ next }) => {
+      executionOrder.push("app before");
+      const result = await next({ ctx: { fromApp: true } });
+      executionOrder.push("app after");
+      return result;
+    };
+
+    const groupMiddleware: SimpleCLIMiddleware<
+      unknown,
+      {},
+      { fromGroup: true }
+    > = async ({ ctx }) => {
+      executionOrder.push("group");
+      return { ...ctx, fromGroup: true };
+    };
+
+    const app = SimpleCLI.define(
+      "libretto",
+      {
+        ai: SimpleCLI.use(groupMiddleware).group({
+          routes: {
+            configure: SimpleCLI.command({ description: "configure" })
+              .input(noInput)
+              .handle(async ({ ctx }) => {
+                executionOrder.push("handler");
+                handlerContext = ctx;
+                return "configured";
+              }),
+          },
+        }),
+      },
+      { middlewares: [appMiddleware] },
+    );
+
+    await expect(
+      app.invoke("ai.configure", { positionals: [], named: {} }),
+    ).resolves.toBe("configured");
+
+    expect(executionOrder).toEqual([
+      "app before",
+      "group",
+      "handler",
+      "app after",
+    ]);
+    expect(handlerContext).toEqual({
+      fromApp: true,
+      fromGroup: true,
+    });
+  });
+
+  test("app middleware does not run for help before command resolution", async () => {
+    const noInput = SimpleCLI.input({ positionals: [], named: {} });
+    let middlewareRan = false;
+    const app = SimpleCLI.define(
+      "libretto",
+      {
+        open: SimpleCLI.command({ description: "open" })
+          .input(noInput)
+          .handle(async () => {}),
+      },
+      {
+        middlewares: [
+          async ({ next }) => {
+            middlewareRan = true;
+            return next();
+          },
+        ],
+      },
+    );
+
+    await expect(app.run(["help"])).resolves.toContain("Usage: libretto");
+    expect(middlewareRan).toBe(false);
+  });
+
+  test("next rejects with downstream handler errors", async () => {
+    const noInput = SimpleCLI.input({ positionals: [], named: {} });
+    const executionOrder: string[] = [];
+    const app = SimpleCLI.define(
+      "libretto",
+      {
+        open: SimpleCLI.command({ description: "open" })
+          .input(noInput)
+          .handle(async () => {
+            executionOrder.push("handler");
+            throw new Error("handler failed");
+          }),
+      },
+      {
+        middlewares: [
+          async ({ next }) => {
+            executionOrder.push("middleware before");
+            try {
+              return await next();
+            } catch (error) {
+              executionOrder.push("middleware catch");
+              throw error;
+            }
+          },
+        ],
+      },
+    );
+
+    await expect(
+      app.invoke("open", { positionals: [], named: {} }),
+    ).rejects.toThrow("handler failed");
+    expect(executionOrder).toEqual([
+      "middleware before",
+      "handler",
+      "middleware catch",
+    ]);
+  });
+
   test("propagates middleware errors and does not run handler on failure", async () => {
     const noInput = SimpleCLI.input({ positionals: [], named: {} });
     let handlerRan = false;

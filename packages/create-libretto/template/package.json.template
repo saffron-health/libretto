@@ -8,9 +8,11 @@
     "build": "tsc"
   },
   "dependencies": {
-    "libretto": "{{librettoVersion}}"
+    "libretto": "{{librettoVersion}}",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "typescript": "^5.8.0"
   }
 }

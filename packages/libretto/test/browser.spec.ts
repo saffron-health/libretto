@@ -337,6 +337,34 @@ describe("Kernel provider", () => {
     });
   });
 
+  it("uses per-session headless mode before provider defaults", async () => {
+    vi.stubEnv("KERNEL_API_KEY", "env-key");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/browsers") {
+          return jsonResponse({
+            session_id: "kernel-session",
+            cdp_ws_url: "wss://kernel.example.test/cdp",
+            browser_live_view_url: null,
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createKernelProvider({
+      apiKey: "constructor-key",
+      headless: false,
+    }).createSession({ headless: true });
+
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toMatchObject({
+      headless: true,
+    });
+  });
+
   it("starts and stops replay recording when enabled", async () => {
     const fetchMock = vi.fn(
       async (url: string | URL | Request, init?: RequestInit) => {
@@ -426,6 +454,37 @@ describe("Libretto Cloud provider", () => {
     expect(session.sessionId).toBe("session-ready");
     expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
       json: { timeout_seconds: 3600 },
+    });
+  });
+
+  it("passes requested headless mode to cloud browser sessions", async () => {
+    vi.stubEnv("LIBRETTO_API_KEY", "test-key");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/v1/sessions/create") {
+          return jsonResponse({
+            json: {
+              session_id: "session-headless",
+              status: "open",
+              cdp_url: "wss://cloud.example.test/devtools/session-headless",
+              live_view_url: null,
+            },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await createLibrettoCloudProvider().createSession({
+      headless: true,
+    });
+
+    expect(session.sessionId).toBe("session-headless");
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
+      json: { timeout_seconds: 3600, headless: true },
     });
   });
 

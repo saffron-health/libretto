@@ -1,6 +1,14 @@
 import { useRef, useState } from "react";
 import type * as React from "react";
-import { AsciiLogo } from "../components/AsciiLogo.js";
+import html2canvas from "html2canvas-pro";
+import {
+  ASCII_LIBRETTO_WORDMARK_SRC,
+  AsciiLibretto,
+  BROWSER_AGENTS_SCRIPT_JOB_COMPACT_ASCII,
+  BROWSER_AGENTS_SCRIPT_JOB_TEXT,
+  LIBRETTO_LOGO_DARK_SRC,
+  LIBRETTO_LOGO_LIGHT_SRC,
+} from "../brand.js";
 import { CanvasAsciihedron } from "../components/CanvasAsciihedron.js";
 import { Kicker } from "../components/Kicker.js";
 import { Panel } from "../components/Panel.js";
@@ -10,7 +18,7 @@ import { SolidIcosahedron } from "./SolidIcosahedron.js";
 import { SOLID_ICOSAHEDRON_ROTATION } from "./solidIcosahedronGeometry.mjs";
 import type { SolidIcosahedronRotation } from "./solidIcosahedronGeometry.mjs";
 
-type BrandTab = "logos" | "asciihedron" | "wordmark" | "socials";
+type BrandTab = "logos" | "lockup" | "asciihedron" | "ascii-libretto" | "socials";
 type ThemeMode = "dark" | "light";
 type RotationAxis = keyof SolidIcosahedronRotation;
 type SocialAssetKind = "banner" | "profile";
@@ -97,8 +105,9 @@ const themeColors: Record<ThemeMode, CSSVarStyle> = {
 
 const tabs: { id: BrandTab; label: string }[] = [
   { id: "logos", label: "Logos" },
+  { id: "lockup", label: "Lockup" },
   { id: "asciihedron", label: "Asciihedron" },
-  { id: "wordmark", label: "Wordmark" },
+  { id: "ascii-libretto", label: "ASCII Libretto" },
   { id: "socials", label: "Socials" },
 ];
 
@@ -112,13 +121,13 @@ const logoStillAssets: DownloadAsset[] = [
   {
     label: "Light SVG",
     detail: "Light mode vector",
-    href: "/logos/logo-light.svg",
+    href: LIBRETTO_LOGO_LIGHT_SRC,
     download: "logo-light.svg",
   },
   {
     label: "Dark SVG",
     detail: "Dark mode vector",
-    href: "/logos/logo-dark.svg",
+    href: LIBRETTO_LOGO_DARK_SRC,
     download: "logo-dark.svg",
   },
 ];
@@ -141,6 +150,48 @@ const logoMotionAssets: DownloadAsset[] = [
     detail: "Animated web image",
     href: "/brand-kit/animation/libretto-icosahedron-logo-loop.webp",
     download: "libretto-icosahedron-logo-loop.webp",
+  },
+];
+
+const lockupDarkAssets: DownloadAsset[] = [
+  {
+    label: "SVG",
+    detail: "Dark background vector",
+    href: "/brand-kit/lockup/libretto-lockup-dark.svg",
+    download: "libretto-lockup-dark.svg",
+  },
+  {
+    label: "PNG",
+    detail: "Transparent raster",
+    href: "/brand-kit/lockup/libretto-lockup-dark.png",
+    download: "libretto-lockup-dark.png",
+  },
+  {
+    label: "WebP",
+    detail: "Dark background web image",
+    href: "/brand-kit/lockup/libretto-lockup-dark.webp",
+    download: "libretto-lockup-dark.webp",
+  },
+];
+
+const lockupLightAssets: DownloadAsset[] = [
+  {
+    label: "SVG",
+    detail: "Light background vector",
+    href: "/brand-kit/lockup/libretto-lockup-light.svg",
+    download: "libretto-lockup-light.svg",
+  },
+  {
+    label: "PNG",
+    detail: "Transparent raster",
+    href: "/brand-kit/lockup/libretto-lockup-light.png",
+    download: "libretto-lockup-light.png",
+  },
+  {
+    label: "WebP",
+    detail: "Light background web image",
+    href: "/brand-kit/lockup/libretto-lockup-light.webp",
+    download: "libretto-lockup-light.webp",
   },
 ];
 
@@ -186,11 +237,11 @@ const asciihedronMotionAssets: DownloadAsset[] = [
   },
 ];
 
-const wordmarkAssets: DownloadAsset[] = [
+const asciiLibrettoAssets: DownloadAsset[] = [
   {
     label: "SVG",
-    detail: "ASCII wordmark vector",
-    href: "/brand-kit/wordmark/libretto-ascii-wordmark.svg",
+    detail: "ASCII Libretto vector",
+    href: ASCII_LIBRETTO_WORDMARK_SRC,
     download: "libretto-ascii-wordmark.svg",
   },
   {
@@ -325,46 +376,15 @@ const ogImageAsset: ImageAsset = {
   height: 630,
 };
 
-const socialLogoHref = "/logos/logo-dark.svg";
-const socialHeadline = "DON'T MAKE BROWSER AGENTS DO A SCRIPT'S JOB";
-const socialHeadlineAscii = createCompactAscii(socialHeadline);
+const socialLogoHref = LIBRETTO_LOGO_DARK_SRC;
+const socialHeadline = BROWSER_AGENTS_SCRIPT_JOB_TEXT;
+const socialHeadlineAscii = BROWSER_AGENTS_SCRIPT_JOB_COMPACT_ASCII;
 const socialProfileLogoScale: Record<SocialPlatformId, number> = {
   instagram: 0.34,
   linkedin: 0.34,
   reddit: 0.36,
   x: 0.34,
 };
-
-function createCompactAscii(value: string) {
-  const glyphs: Record<string, string[]> = {
-    A: [" ██ ", "█  █", "████", "█  █", "█  █"],
-    B: ["███ ", "█  █", "███ ", "█  █", "███ "],
-    C: [" ███", "█   ", "█   ", "█   ", " ███"],
-    D: ["███ ", "█  █", "█  █", "█  █", "███ "],
-    E: ["████", "█   ", "███ ", "█   ", "████"],
-    G: [" ███", "█   ", "█ ██", "█  █", " ███"],
-    I: ["███", " █ ", " █ ", " █ ", "███"],
-    J: ["  ██", "   █", "   █", "█  █", " ██ "],
-    K: ["█  █", "█ █ ", "██  ", "█ █ ", "█  █"],
-    M: ["█   █", "██ ██", "█ █ █", "█   █", "█   █"],
-    N: ["█  █", "██ █", "█ ██", "█  █", "█  █"],
-    O: [" ██ ", "█  █", "█  █", "█  █", " ██ "],
-    P: ["███ ", "█  █", "███ ", "█   ", "█   "],
-    R: ["███ ", "█  █", "███ ", "█ █ ", "█  █"],
-    S: [" ███", "█   ", " ██ ", "   █", "███ "],
-    T: ["█████", "  █  ", "  █  ", "  █  ", "  █  "],
-    W: ["█   █", "█   █", "█ █ █", "██ ██", "█   █"],
-    "'": ["█", "█", " ", " ", " "],
-    " ": ["   ", "   ", "   ", "   ", "   "],
-  };
-  const characters = Array.from(value.toUpperCase());
-  return Array.from({ length: 5 }, (_, rowIndex) =>
-    characters
-      .map((character) => glyphs[character]?.[rowIndex] ?? character)
-      .join(" ")
-      .trimEnd(),
-  ).join("\n");
-}
 
 function ThemeButton({
   mode,
@@ -688,14 +708,21 @@ function SocialDownloadGrid({ assets }: { assets: SocialAsset[] }) {
 }
 
 function SocialDownloadTile({ asset }: { asset: SocialAsset }) {
+  const exportRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"idle" | "downloading" | "failed">(
     "idle",
   );
 
   async function handleDownload() {
+    const exportNode = exportRef.current;
+    if (!exportNode) {
+      setStatus("failed");
+      return;
+    }
+
     setStatus("downloading");
     try {
-      const blob = await renderSocialAssetBlob(asset);
+      const blob = await renderSocialAssetBlob(exportNode, asset);
       downloadBlob(blob, asset.download);
       setStatus("idle");
     } catch {
@@ -704,42 +731,78 @@ function SocialDownloadTile({ asset }: { asset: SocialAsset }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleDownload}
-      className="rounded-md border border-rule bg-panel-hi p-4 text-left transition-colors hover:border-accent/50 hover:bg-panel"
-    >
-      <span className="block font-mono text-sm font-semibold text-ink">
-        {status === "downloading" ? "Downloading..." : asset.label}
-      </span>
-      <span className="mt-1 block text-xs leading-relaxed text-muted">
-        {status === "failed" ? "Could not render social image." : asset.detail}
-      </span>
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleDownload}
+        className="rounded-md border border-rule bg-panel-hi p-4 text-left transition-colors hover:border-accent/50 hover:bg-panel"
+      >
+        <span className="block font-mono text-sm font-semibold text-ink">
+          {status === "downloading" ? "Downloading..." : asset.label}
+        </span>
+        <span className="mt-1 block text-xs leading-relaxed text-muted">
+          {status === "failed" ? "Could not render social image." : asset.detail}
+        </span>
+      </button>
+      <SocialAssetExportTarget asset={asset} exportRef={exportRef} />
+    </>
   );
 }
 
-const socialImageCache = new Map<string, Promise<HTMLImageElement>>();
-
-function loadSocialImage(href: string) {
-  const source = new URL(href, window.location.href).href;
-  const cached = socialImageCache.get(source);
-  if (cached) {
-    return cached;
-  }
-
-  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`Unable to load ${href}.`));
-    image.src = source;
-  });
-  socialImageCache.set(source, imagePromise);
-  return imagePromise;
+function SocialAssetExportTarget({
+  asset,
+  exportRef,
+}: {
+  asset: SocialAsset;
+  exportRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed left-[-100000px] top-0 overflow-hidden"
+      style={{
+        height: asset.height,
+        width: asset.width,
+      }}
+    >
+      <div
+        ref={exportRef}
+        style={{
+          height: asset.height,
+          width: asset.width,
+        }}
+      >
+        {asset.kind === "profile" ? (
+          <SocialProfileArt asset={asset} className="h-full w-full" />
+        ) : (
+          <SocialBannerArt asset={asset} className="h-full w-full" />
+        )}
+      </div>
+    </div>
+  );
 }
 
-async function renderSocialAssetBlob(asset: SocialAsset) {
+async function renderSocialAssetBlob(
+  exportNode: HTMLDivElement,
+  asset: SocialAsset,
+) {
   await document.fonts.load('600 24px "Commit Mono"');
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  const restoreCanvasVisibility = hideDescendantCanvases(exportNode);
+  let htmlLayer: HTMLCanvasElement;
+  try {
+    htmlLayer = await html2canvas(exportNode, {
+      backgroundColor: null,
+      height: asset.height,
+      scale: 1,
+      useCORS: true,
+      width: asset.width,
+    });
+  } finally {
+    restoreCanvasVisibility();
+  }
   const canvas = document.createElement("canvas");
   canvas.width = asset.width;
   canvas.height = asset.height;
@@ -748,11 +811,8 @@ async function renderSocialAssetBlob(asset: SocialAsset) {
     throw new Error("Unable to create social asset canvas.");
   }
 
-  if (asset.kind === "profile") {
-    await drawSocialProfile(context, asset);
-  } else {
-    await drawSocialBanner(context, asset);
-  }
+  context.drawImage(htmlLayer, 0, 0);
+  compositeSkippedCanvases(context, exportNode);
 
   const blob = await new Promise<Blob | null>((resolve) => {
     canvas.toBlob(resolve, "image/png");
@@ -763,257 +823,65 @@ async function renderSocialAssetBlob(asset: SocialAsset) {
   return blob;
 }
 
-async function drawSocialProfile(
-  context: CanvasRenderingContext2D,
-  asset: SocialAsset,
-) {
-  const logo = await loadSocialImage(socialLogoHref);
-  fillSocialBackground(context, asset.width, asset.height, 0.5, 0.5);
-
-  const logoScale = socialProfileLogoScale[asset.platformId];
-  const logoSize = Math.round(Math.min(asset.width, asset.height) * logoScale);
-  const logoX = Math.round((asset.width - logoSize) / 2);
-  const logoY = Math.round((asset.height - logoSize) / 2);
-
-  context.save();
-  context.shadowBlur = Math.max(8, asset.width * 0.045);
-  context.shadowColor = "rgba(240, 207, 90, 0.52)";
-  context.drawImage(logo, logoX, logoY, logoSize, logoSize);
-  context.restore();
-}
-
-async function drawSocialBanner(
-  context: CanvasRenderingContext2D,
-  asset: SocialAsset,
-) {
-  const oneLine = asset.platformId === "reddit" || asset.platformId === "linkedin";
-  const square = asset.width === asset.height;
-  fillSocialBackground(
-    context,
-    asset.width,
-    asset.height,
-    oneLine ? 0.5 : square ? 0.64 : 0.76,
-    0.5,
+function hideDescendantCanvases(root: HTMLElement) {
+  const previousVisibility = Array.from(root.querySelectorAll("canvas")).map(
+    (canvas) => [canvas, canvas.style.visibility] as const,
   );
-
-  const asciihedronSize = Math.round(
-    oneLine
-      ? asset.width * (asset.platformId === "reddit" ? 0.9 : 0.56)
-      : Math.max(asset.width, asset.height) * (square ? 1.28 : 0.72),
-  );
-  const asciihedronCenterX = oneLine
-    ? asset.width / 2
-    : asset.platformId === "x"
-      ? asset.width * 0.78
-      : asset.width * 0.64;
-  const asciihedronCenterY = asset.height / 2;
-
-  drawAsciihedronMotif(
-    context,
-    asciihedronCenterX,
-    asciihedronCenterY,
-    asciihedronSize,
-    oneLine ? 0.28 : square ? 0.18 : 0.32,
-  );
-
-  const lines = socialHeadlineAscii.split("\n");
-  const maxWidth = oneLine ? asset.width * 0.94 : asset.width * (square ? 0.86 : 0.56);
-  const maxHeight = asset.height * (oneLine ? 0.72 : square ? 0.42 : 0.62);
-  const fontSize = fitAsciiFontSize(context, lines, maxWidth, maxHeight);
-  const lineHeight = fontSize * 1.05;
-  const blockHeight = lineHeight * lines.length;
-  const blockWidth = measureAsciiBlockWidth(context, lines, fontSize);
-  const x = oneLine || square ? (asset.width - blockWidth) / 2 : asset.width * 0.08;
-  const y = (asset.height - blockHeight) / 2 + fontSize * 0.88;
-
-  context.save();
-  context.font = `600 ${fontSize}px "Commit Mono", ui-monospace, monospace`;
-  context.fillStyle = "#f0cf5a";
-  context.shadowBlur = Math.max(6, fontSize * 0.9);
-  context.shadowColor = "rgba(240, 207, 90, 0.38)";
-  lines.forEach((line, index) => {
-    context.fillText(line, x, y + index * lineHeight);
-  });
-  context.restore();
-}
-
-function drawAsciihedronMotif(
-  context: CanvasRenderingContext2D,
-  centerX: number,
-  centerY: number,
-  size: number,
-  alpha: number,
-) {
-  const vertices = createProjectedIcosahedronVertices(size);
-  const edges = createIcosahedronEdges();
-  const shades = ".,-~:;=!*#$@";
-  const fontSize = Math.max(5, size * 0.019);
-
-  context.save();
-  context.translate(centerX, centerY);
-  context.globalAlpha = alpha;
-  context.fillStyle = "#f0cf5a";
-  context.font = `600 ${fontSize}px "Commit Mono", ui-monospace, monospace`;
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.shadowBlur = Math.max(8, fontSize * 1.7);
-  context.shadowColor = "rgba(240, 207, 90, 0.34)";
-
-  for (const [startIndex, endIndex] of edges) {
-    const start = vertices[startIndex];
-    const end = vertices[endIndex];
-    const distance = Math.hypot(end.x - start.x, end.y - start.y);
-    const steps = Math.max(4, Math.floor(distance / (fontSize * 0.9)));
-    for (let step = 0; step <= steps; step += 1) {
-      const amount = step / steps;
-      const x = start.x + (end.x - start.x) * amount;
-      const y = start.y + (end.y - start.y) * amount;
-      const shadeIndex = Math.min(
-        shades.length - 1,
-        Math.max(0, Math.round((start.depth + end.depth + 2) * 2.7 + step) % shades.length),
-      );
-      context.fillText(shades[shadeIndex], x, y);
+  for (const [canvas] of previousVisibility) {
+    canvas.style.visibility = "hidden";
+  }
+  return () => {
+    for (const [canvas, visibility] of previousVisibility) {
+      canvas.style.visibility = visibility;
     }
-  }
-
-  for (const vertex of vertices) {
-    context.fillText("@", vertex.x, vertex.y);
-  }
-  context.restore();
+  };
 }
 
-function createProjectedIcosahedronVertices(size: number) {
-  const ringY = 1 / Math.sqrt(5);
-  const ringRadius = 2 / Math.sqrt(5);
-  const vertices: [number, number, number][] = [[0, 1, 0]];
-  for (let index = 0; index < 5; index += 1) {
-    const angle = (index * Math.PI * 2) / 5;
-    vertices.push([
-      ringRadius * Math.sin(angle),
-      ringY,
-      ringRadius * Math.cos(angle),
-    ]);
-  }
-  for (let index = 0; index < 5; index += 1) {
-    const angle = (index * Math.PI * 2) / 5 + Math.PI / 5;
-    vertices.push([
-      ringRadius * Math.sin(angle),
-      -ringY,
-      ringRadius * Math.cos(angle),
-    ]);
-  }
-  vertices.push([0, -1, 0]);
-
-  return vertices.map((vertex) => {
-    const [x, y, z] = rotateSocialPoint(
-      vertex,
-      SOLID_ICOSAHEDRON_ROTATION.x,
-      SOLID_ICOSAHEDRON_ROTATION.y,
-      SOLID_ICOSAHEDRON_ROTATION.z,
+function compositeSkippedCanvases(
+  context: CanvasRenderingContext2D,
+  exportNode: HTMLElement,
+) {
+  const exportRect = exportNode.getBoundingClientRect();
+  for (const skippedCanvas of exportNode.querySelectorAll("canvas")) {
+    const canvasRect = skippedCanvas.getBoundingClientRect();
+    context.save();
+    context.globalAlpha = opacityBetween(exportNode, skippedCanvas);
+    context.filter = filterBetween(exportNode, skippedCanvas);
+    context.drawImage(
+      skippedCanvas,
+      canvasRect.left - exportRect.left,
+      canvasRect.top - exportRect.top,
+      canvasRect.width,
+      canvasRect.height,
     );
-    return {
-      depth: z,
-      x: x * size * 0.34,
-      y: -y * size * 0.34,
-    };
-  });
-}
-
-function createIcosahedronEdges() {
-  const edges = new Set<string>();
-  const faces = [
-    [0, 1, 2], [0, 2, 3], [0, 3, 4], [0, 4, 5], [0, 5, 1],
-    [1, 6, 2], [2, 6, 7], [2, 7, 3], [3, 7, 8], [3, 8, 4],
-    [4, 8, 9], [4, 9, 5], [5, 9, 10], [5, 10, 1], [1, 10, 6],
-    [11, 7, 6], [11, 8, 7], [11, 9, 8], [11, 10, 9], [11, 6, 10],
-  ];
-
-  for (const face of faces) {
-    for (let index = 0; index < face.length; index += 1) {
-      const start = face[index];
-      const end = face[(index + 1) % face.length];
-      edges.add(start < end ? `${start},${end}` : `${end},${start}`);
-    }
+    context.restore();
   }
-  return Array.from(edges, (edge) => edge.split(",").map(Number) as [number, number]);
 }
 
-function rotateSocialPoint(
-  point: [number, number, number],
-  xDegrees: number,
-  yDegrees: number,
-  zDegrees: number,
-): [number, number, number] {
-  const xRadians = (xDegrees * Math.PI) / 180;
-  const yRadians = (yDegrees * Math.PI) / 180;
-  const zRadians = (zDegrees * Math.PI) / 180;
-  const afterX: [number, number, number] = [
-    point[0],
-    point[1] * Math.cos(xRadians) - point[2] * Math.sin(xRadians),
-    point[1] * Math.sin(xRadians) + point[2] * Math.cos(xRadians),
-  ];
-  const afterY: [number, number, number] = [
-    afterX[0] * Math.cos(yRadians) + afterX[2] * Math.sin(yRadians),
-    afterX[1],
-    -afterX[0] * Math.sin(yRadians) + afterX[2] * Math.cos(yRadians),
-  ];
-  return [
-    afterY[0] * Math.cos(zRadians) - afterY[1] * Math.sin(zRadians),
-    afterY[0] * Math.sin(zRadians) + afterY[1] * Math.cos(zRadians),
-    afterY[2],
-  ];
-}
-
-function fillSocialBackground(
-  context: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  centerX: number,
-  centerY: number,
-) {
-  const gradient = context.createRadialGradient(
-    width * centerX,
-    height * centerY,
-    0,
-    width * centerX,
-    height * centerY,
-    Math.max(width, height) * 0.82,
-  );
-  gradient.addColorStop(0, "#202320");
-  gradient.addColorStop(0.48, "#171917");
-  gradient.addColorStop(1, "#111111");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, width, height);
-}
-
-function fitAsciiFontSize(
-  context: CanvasRenderingContext2D,
-  lines: string[],
-  maxWidth: number,
-  maxHeight: number,
-) {
-  let low = 4;
-  let high = maxHeight / Math.max(1, lines.length);
-  for (let index = 0; index < 14; index += 1) {
-    const fontSize = (low + high) / 2;
-    const blockWidth = measureAsciiBlockWidth(context, lines, fontSize);
-    const blockHeight = fontSize * 1.05 * lines.length;
-    if (blockWidth <= maxWidth && blockHeight <= maxHeight) {
-      low = fontSize;
-    } else {
-      high = fontSize;
+function filterBetween(root: HTMLElement, element: HTMLElement) {
+  const filters: string[] = [];
+  let current: HTMLElement | null = element;
+  while (current && current !== root.parentElement) {
+    const filter = getComputedStyle(current).filter;
+    if (filter !== "none") {
+      filters.push(filter);
     }
+    current = current.parentElement;
   }
-  return low;
+  return filters.length > 0 ? filters.join(" ") : "none";
 }
 
-function measureAsciiBlockWidth(
-  context: CanvasRenderingContext2D,
-  lines: string[],
-  fontSize: number,
-) {
-  context.font = `600 ${fontSize}px "Commit Mono", ui-monospace, monospace`;
-  return Math.max(...lines.map((line) => context.measureText(line).width));
+function opacityBetween(root: HTMLElement, element: HTMLElement) {
+  let opacity = 1;
+  let current: HTMLElement | null = element;
+  while (current && current !== root.parentElement) {
+    const value = Number.parseFloat(getComputedStyle(current).opacity);
+    if (Number.isFinite(value)) {
+      opacity *= value;
+    }
+    current = current.parentElement;
+  }
+  return opacity;
 }
 
 function RotationControls({
@@ -1140,6 +1008,51 @@ function LogosTab({
   );
 }
 
+function LockupTab({ mode }: { mode: ThemeMode }) {
+  const activeAssets = mode === "dark" ? lockupDarkAssets : lockupLightAssets;
+  const activeLogoSrc =
+    mode === "dark" ? LIBRETTO_LOGO_DARK_SRC : LIBRETTO_LOGO_LIGHT_SRC;
+  const activeWordmarkColor = mode === "dark" ? "#EBEEEB" : "#201F18";
+
+  return (
+    <BrandTabPanel
+      kicker="Logo lockup"
+      title="Logo + wordmark"
+      description="Use the lockup when the solid gold mark and the Fraunces wordmark need to travel together."
+      preview={
+        <PreviewShell>
+          <div className="flex w-full items-center justify-center overflow-hidden">
+            <div className="flex min-h-[400px] w-full items-center justify-center overflow-clip">
+              <div
+                className="flex items-center justify-center gap-[6px]"
+                style={{
+                  fontSynthesis: "none",
+                  MozOsxFontSmoothing: "grayscale",
+                  WebkitFontSmoothing: "antialiased",
+                }}
+              >
+                <div
+                  className="h-[53px] w-[53px] shrink-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url("${activeLogoSrc}")` }}
+                />
+                <div
+                  className="font-serif text-[48px] leading-[28px]"
+                  style={{ color: activeWordmarkColor }}
+                >
+                  Libretto
+                </div>
+              </div>
+            </div>
+          </div>
+        </PreviewShell>
+      }
+      downloads={
+        <DownloadGrid assets={activeAssets} />
+      }
+    />
+  );
+}
+
 function AsciihedronTab({
   onRotationChange,
   rotation,
@@ -1216,16 +1129,16 @@ function AsciihedronTab({
   );
 }
 
-function WordmarkTab() {
+function AsciiLibrettoTab() {
   return (
     <BrandTabPanel
-      kicker="ASCII wordmark"
-      title="Libretto wordmark"
+      kicker="ASCII Libretto"
+      title="ASCII Libretto"
       description="Use the ASCII render for terminal-native moments, video title cards, and technical overlays."
       preview={
         <PreviewShell>
-          <div className="w-full overflow-hidden px-4">
-            <AsciiLogo className="text-[8px] lg:text-[12px]" />
+          <div className="flex w-full justify-center overflow-hidden px-4">
+            <AsciiLibretto className="text-[8px] lg:text-[12px]" />
           </div>
         </PreviewShell>
       }
@@ -1233,9 +1146,9 @@ function WordmarkTab() {
         <div className="grid gap-6">
           <div>
             <Text as="h3" size="md" className="mb-3 font-medium text-ink">
-              Wordmark exports
+              ASCII Libretto exports
             </Text>
-            <DownloadGrid assets={wordmarkAssets} />
+            <DownloadGrid assets={asciiLibrettoAssets} />
           </div>
           <div>
             <Text as="h3" size="md" className="mb-3 font-medium text-ink">
@@ -1753,10 +1666,11 @@ export function BrandKitPage() {
         {activeTab === "logos" ? (
           <LogosTab rotation={rotation} onRotationChange={setRotation} />
         ) : null}
+        {activeTab === "lockup" ? <LockupTab mode={mode} /> : null}
         {activeTab === "asciihedron" ? (
           <AsciihedronTab rotation={rotation} onRotationChange={setRotation} />
         ) : null}
-        {activeTab === "wordmark" ? <WordmarkTab /> : null}
+        {activeTab === "ascii-libretto" ? <AsciiLibrettoTab /> : null}
         {activeTab === "socials" ? <SocialsTab /> : null}
       </div>
     </main>

@@ -55,13 +55,13 @@ import {
   type DaemonExecResult,
   type DaemonToCliApi,
 } from "./ipc.js";
-import { wrapPageForActionLogging } from "../telemetry.js";
+import { wrapPageForActionLogging } from "../session-logs.js";
 import {
+  formatMissingLocalAuthProfileMessage,
   getProfilePath,
   hasProfile,
-  normalizeDomain,
-  normalizeUrl,
-} from "../browser.js";
+  normalizeProfileName,
+} from "../profiles.js";
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { DaemonExecRepl } from "./exec-repl.js";
@@ -90,6 +90,8 @@ import {
 } from "../workflow-runtime.js";
 import { WorkflowController } from "../workflow-runner/runner.js";
 import { validateWorkflowInput } from "../../../shared/workflow/workflow.js";
+import { captureAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
+import { applyWindowPosition } from "../../../shared/run/window-position.js";
 
 function isOperationalPage(page: Page): boolean {
   const url = page.url();
@@ -119,34 +121,17 @@ class UserFacingStartupError extends Error {
   }
 }
 
-function getMissingLocalAuthProfileError(args: {
-  normalizedDomain: string;
-  profilePath: string;
-  session: string;
-}): string {
-  return [
-    `Local auth profile not found for domain "${args.normalizedDomain}".`,
-    `Expected profile file: ${args.profilePath}`,
-    "To create it:",
-    `  1. libretto open https://${args.normalizedDomain} --headed --session ${args.session}`,
-    "  2. Log in manually in the browser window.",
-    `  3. libretto save ${args.normalizedDomain} --session ${args.session}`,
-  ].join("\n");
-}
-
 function resolveAuthProfileStorageStatePath(args: {
-  authProfileDomain?: string;
+  authProfileName?: string;
   session: string;
 }): string | undefined {
-  if (!args.authProfileDomain) return undefined;
-  const normalizedDomain = normalizeDomain(
-    normalizeUrl(args.authProfileDomain),
-  );
-  const profilePath = getProfilePath(normalizedDomain);
-  if (!hasProfile(normalizedDomain)) {
+  if (!args.authProfileName) return undefined;
+  const profileName = normalizeProfileName(args.authProfileName);
+  const profilePath = getProfilePath(profileName);
+  if (!hasProfile(profileName)) {
     throw new UserFacingStartupError(
-      getMissingLocalAuthProfileError({
-        normalizedDomain,
+      formatMissingLocalAuthProfileMessage({
+        profileName,
         profilePath,
         session: args.session,
       }),
@@ -379,6 +364,12 @@ class BrowserDaemon {
     workflow?: DaemonWorkflowConfig;
   }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
+    const storageStatePath =
+      config.storageStatePath ??
+      resolveAuthProfileStorageStatePath({
+        authProfileName: args.workflow?.authProfileName,
+        session,
+      });
     const windowPositionArg = config.windowPosition
       ? `--window-position=${config.windowPosition.x},${config.windowPosition.y}`
       : undefined;
@@ -396,13 +387,6 @@ class BrowserDaemon {
       ],
     });
 
-    const storageStatePath =
-      config.storageStatePath ??
-      resolveAuthProfileStorageStatePath({
-        authProfileDomain: args.workflow?.authProfileDomain,
-        session,
-      });
-
     const context = await browser.newContext({
       ...(storageStatePath ? { storageState: storageStatePath } : {}),
       viewport: {
@@ -414,6 +398,7 @@ class BrowserDaemon {
     });
 
     const page = await context.newPage();
+    await applyWindowPosition(browser, context, page, config.windowPosition);
     page.setDefaultTimeout(30000);
     page.setDefaultNavigationTimeout(45000);
 
@@ -491,7 +476,11 @@ class BrowserDaemon {
       getProviderSession: () => providerSession,
     });
     try {
-      providerSession = await provider.createSession();
+      providerSession = await provider.createSession({
+        authProfileName: config.authProfileName,
+        authProfilePersist: config.authProfilePersist,
+        headless: config.headless,
+      });
       const browser = await chromium.connectOverCDP(
         providerSession.cdpEndpoint,
       );
@@ -665,6 +654,10 @@ class BrowserDaemon {
         this.withRequestTimeout(() => handlePages(this.pageById, this.page)),
       exec: (args) => this.runExec(args),
       readonlyExec: (args) => this.runReadonlyExec(args),
+      captureAuthProfileStorageState: (args) =>
+        this.withRequestTimeout(() =>
+          captureAuthProfileStorageState(this.context, args.sites),
+        ),
       snapshot: (args) => this.runSnapshot(args),
       getWorkflowStatus: () => this.getWorkflowStatus(),
       resumeWorkflow: () => this.resumeWorkflow(),
@@ -810,6 +803,7 @@ class BrowserDaemon {
       page: this.page,
       context: this.context,
       logger: this.logger,
+      refreshLocalAuthProfiles: !this.externallyManaged,
       onLog: (event) => {
         void this.broadcast("workflowOutput", event);
       },
@@ -942,12 +936,29 @@ async function main(): Promise<void> {
     config.browser.kind === "launch" ? config.browser.headed : false;
 
   let loadedWorkflow: ExportedLibrettoWorkflow | undefined;
+  let workflowConfig = config.workflow;
+  let browserConfig = config.browser;
   if (config.workflow) {
     try {
       loadedWorkflow = await loadDefaultWorkflow(
         getAbsoluteIntegrationPath(config.workflow.integrationPath),
       );
       validateWorkflowInput(loadedWorkflow, config.workflow.params ?? {});
+      const authProfileName = loadedWorkflow.authProfileName;
+      const authProfilePersist =
+        loadedWorkflow.authProfileRefresh === true;
+      workflowConfig = {
+        ...config.workflow,
+        authProfileName,
+        authProfilePersist,
+      };
+      if (config.browser.kind === "provider") {
+        browserConfig = {
+          ...config.browser,
+          authProfileName,
+          authProfilePersist,
+        };
+      }
     } catch (error) {
       throw new UserFacingStartupError(
         error instanceof Error ? error.message : String(error),
@@ -956,30 +967,30 @@ async function main(): Promise<void> {
   }
 
   const daemon =
-    config.browser.kind === "provider"
+    browserConfig.kind === "provider"
       ? await BrowserDaemon.connectToProvider({
           session: config.session,
           experiments: config.experiments,
-          browser: config.browser,
+          browser: browserConfig,
         })
-      : config.browser.kind === "connect"
+      : browserConfig.kind === "connect"
         ? await BrowserDaemon.connectToEndpoint({
             session: config.session,
             experiments: config.experiments,
-            browser: config.browser,
+            browser: browserConfig,
           })
         : await BrowserDaemon.launchBrowser({
             session: config.session,
             experiments: config.experiments,
-            browser: config.browser,
-            workflow: config.workflow,
+            browser: browserConfig,
+            workflow: workflowConfig,
           });
 
-  if (config.workflow) {
+  if (workflowConfig) {
     void waitForSessionState(config.session)
       .then(() =>
         daemon.startWorkflow({
-          workflow: config.workflow!,
+          workflow: workflowConfig,
           headed,
           loadedWorkflow,
         }),

@@ -29,13 +29,33 @@ export {
 } from "./shared/state/index.js";
 
 // Recovery
-export { executeRecoveryAgent } from "./runtime/recovery/agent.js";
+export {
+  executeRecoveryAgent,
+  type BrowserAction,
+  type RecoveryAgentResult,
+  type RecoveryAgentStep,
+} from "./runtime/recovery/agent.js";
 export { attemptWithRecovery } from "./runtime/recovery/recovery.js";
 export {
   detectSubmissionError,
   type KnownSubmissionError,
   type DetectedSubmissionError,
 } from "./runtime/recovery/errors.js";
+export {
+  COMPUTER_USE_RECOVERY_MODELS,
+  POPUP_RECOVERY_INSTRUCTION,
+  computerUseRecoveryAction,
+  createRecoveryPage,
+  popupRecoveryAction,
+  type ComputerUseRecoveryActionOptions,
+  type PopupRecoveryActionOptions,
+  type RecoveryActionContext,
+  type RecoveryAction,
+  type RecoveryActionHandler,
+  type RecoveryActionOptions,
+  type RecoveryActionResult,
+  type RecoveryActionTargetType,
+} from "./runtime/recovery/page-fallbacks.js";
 
 // AI extraction
 export {
@@ -93,6 +113,10 @@ export {
 
 // Workflow helpers
 export {
+  librettoAuthenticate,
+  type LibrettoAuthenticateOptions,
+} from "./shared/workflow/authenticate.js";
+export {
   getDefaultWorkflowFromModuleExports,
   getWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,
@@ -104,10 +128,17 @@ export {
   workflow,
   type ExportedLibrettoWorkflow,
   type LibrettoWorkflowContext,
+  type LibrettoWorkflowDefinition,
   type LibrettoWorkflowHandler,
-  type LibrettoWorkflowSchemas,
+  type LibrettoWorkflowOptions,
   type WorkflowInputValidator,
 } from "./shared/workflow/workflow.js";
+export {
+  captureAuthProfileStorageState,
+  normalizeAuthProfileSite,
+  parseAuthProfileSites,
+  type AuthProfileStorageState,
+} from "./shared/workflow/auth-profile-state.js";
 const isDirectExecution = (): boolean => {
   const entryArg = process.argv[1];
   if (!entryArg) {

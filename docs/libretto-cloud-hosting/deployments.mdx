@@ -119,7 +119,15 @@ export default workflow(
 );
 ```
 
-then hit the endpoint with `workflow: "check-eligibility"`. The `params` object must match the workflow input schema:
+then create the hosted job with `workflow: "check-eligibility"`. The `params` object must match the workflow input schema:
+
+```bash theme={null}
+npx libretto cloud jobs create check-eligibility \
+  --params '{"memberId":"12345"}' \
+  --timeout-seconds 300
+```
+
+That command returns a `job_id` immediately. The equivalent API request is:
 
 ```bash theme={null}
 curl -X POST "https://api.libretto.sh/v1/jobs/create" \
@@ -136,7 +144,7 @@ curl -X POST "https://api.libretto.sh/v1/jobs/create" \
   }'
 ```
 
-That request returns a `job_id` immediately. Use that id to fetch status or the final result:
+Use the returned id to fetch status or the final result:
 
 ```bash theme={null}
 curl -X POST "https://api.libretto.sh/v1/jobs/get" \
@@ -150,6 +158,19 @@ curl -X POST "https://api.libretto.sh/v1/jobs/get" \
 ```
 
 The `workflow` value must match the workflow name declared in code and discovered during deploy, not the deployment id, filename, or export alias.
+
+### Schedule a deployed workflow
+
+Use `cloud schedules create` for recurring runs. The cron expression is standard 5-field cron, and the timezone defaults to `UTC`:
+
+```bash theme={null}
+npx libretto cloud schedules create check-eligibility \
+  --cron "0 14 * * 1-5" \
+  --timezone America/Los_Angeles \
+  --params '{"memberId":"12345"}'
+```
+
+The command prints the schedule id and next fire time. Use `--params-file` instead of `--params` when the workflow input is too large to keep inline.
 
 ### Hosting options
 

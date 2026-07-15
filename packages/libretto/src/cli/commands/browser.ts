@@ -21,6 +21,7 @@ import {
 import { warnIfLibrettoVersionsDiffer } from "../core/skill-version.js";
 import { SimpleCLI } from "affordance";
 import {
+  type SessionContext,
   sessionOption,
   withAutoSession,
   withExperiments,
@@ -80,7 +81,7 @@ export const openInput = SimpleCLI.input({
     }),
     authProfile: SimpleCLI.option(z.string().optional(), {
       name: "auth-profile",
-      help: "Override the domain used for auth profile lookup (e.g. use login.example.com's profile when opening app.example.com)",
+      help: "Named auth profile to load before opening the browser",
     }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
@@ -105,7 +106,7 @@ export const openCommand = SimpleCLI.command({
 })
   .input(openInput)
   .use(withAutoSession())
-  .use(withExperiments())
+  .use(withExperiments<SessionContext>())
   .handle(async ({ input, ctx }) => {
     warnIfLibrettoVersionsDiffer();
     assertSessionAvailableForStart(ctx.session, ctx.logger);
@@ -119,13 +120,19 @@ export const openCommand = SimpleCLI.command({
           input.readOnly,
           input.writeAccess,
         ),
-        authProfileDomain: input.authProfile,
+        authProfileName: input.authProfile,
         experiments: ctx.experiments,
       });
     } else {
+      if (input.authProfile) {
+        throw new Error(
+          "--auth-profile is only supported for local browser sessions. Hosted provider sessions use workflow-declared authProfile settings.",
+        );
+      }
       await runOpenWithProvider(
         input.url,
         providerName,
+        input.headless,
         ctx.session,
         ctx.logger,
         resolveRequestedSessionMode(input.readOnly, input.writeAccess),
@@ -166,7 +173,7 @@ export const connectCommand = SimpleCLI.command({
 })
   .input(connectInput)
   .use(withAutoSession())
-  .use(withExperiments())
+  .use(withExperiments<SessionContext>())
   .handle(async ({ input, ctx }) => {
     warnIfLibrettoVersionsDiffer();
     await runConnectWithLogger(
@@ -180,17 +187,17 @@ export const connectCommand = SimpleCLI.command({
 
 export const saveInput = SimpleCLI.input({
   positionals: [
-    SimpleCLI.positional("urlOrDomain", z.string().optional(), {
-      help: "URL or domain to save",
+    SimpleCLI.positional("profileName", z.string(), {
+      help: "Profile name to save",
     }),
   ],
   named: {
     session: sessionOption(),
+    sites: SimpleCLI.option(z.string(), {
+      help: "Comma-separated sites whose auth state should be saved",
+    }),
   },
-}).refine(
-  (input) => Boolean(input.urlOrDomain),
-  `Usage: libretto save <url|domain> --session <name>`,
-);
+});
 
 export const saveCommand = SimpleCLI.command({
   description: "Save current browser session",
@@ -198,7 +205,9 @@ export const saveCommand = SimpleCLI.command({
   .input(saveInput)
   .use(withRequiredSession())
   .handle(async ({ input, ctx }) => {
-    await runSave(input.urlOrDomain!, ctx.session, ctx.logger);
+    await runSave(input.profileName, ctx.session, ctx.logger, {
+      sites: input.sites,
+    });
   });
 
 export const pagesInput = SimpleCLI.input({

@@ -7,7 +7,6 @@ import {
 import { Text } from "./components/Text";
 import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
-import { AppLink } from "./routing";
 import {
   OrchestrationContainer,
   AnimationTarget,
@@ -21,6 +20,7 @@ import { FeatureRows } from "./components/FeatureRows";
 import { BattleTestedBanner } from "./components/BattleTestedBanner";
 import { Benchmarks } from "./components/Benchmarks";
 import { MaintainingFeatures } from "./components/MaintainingFeatures";
+import { AutofixPR } from "./components/AutofixPR";
 import { CloudProviders } from "./components/CloudProviders";
 import { FAQ } from "./components/FAQ";
 import { CTA } from "./components/CTA";
@@ -89,20 +89,20 @@ function Hero({
           htmlStyle={{ opacity: 0 }}
           className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:balance]"
         >
-          Libretto is an open-source CLI that lets agents turn website
-          workflows into fast, reusable scripts you can deploy
+          Libretto is an open-source CLI that turns website workflows into fast,
+          reusable scripts in your codebase
         </Text>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-col items-center justify-center gap-3">
           <InstallSnippet />
           <div className="text-xs text-muted">
             or{" "}
-            <AppLink
-              href="/docs/get-started/quickstart"
+            <a
+              href="https://cal.com/team/libretto/demo"
               className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
-              data-fathom-event="Hero docs click"
+              data-fathom-event="Hero demo click"
             >
-              go to docs
-            </AppLink>
+              BOOK A DEMO
+            </a>
           </div>
         </div>
         <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
@@ -133,6 +133,8 @@ export function HomePage() {
         <BattleTestedBanner />
         <SectionDivider />
         <MaintainingFeatures />
+        <SectionDivider />
+        <AutofixPR />
         <SectionDivider />
         <CloudProviders />
         <SectionDivider />

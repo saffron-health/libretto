@@ -485,18 +485,6 @@ body {
   animation: crt-scanline-scroll 10s linear infinite;
 }
 
-/* ── Blog markdown ── */
-
-.blog-markdown > h2:first-child {
-  margin-top: 0;
-  margin-bottom: 2.25rem;
-  font-size: clamp(40px, 6vw, 72px);
-  line-height: 1;
-  text-shadow:
-    0 0 12px color-mix(in oklch, var(--color-green-11) 50%, transparent),
-    0 0 32px color-mix(in oklch, var(--color-green-11) 20%, transparent);
-}
-
 /* ── CRT global effects ── */
 
 .crt-page {

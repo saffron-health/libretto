@@ -85,9 +85,7 @@ pnpm evals --model openai/gpt-5.5
 
 The public website benchmark compares agents on the same set of live website
 tasks. The shared task registry lives in `evals/public-website-benchmark.ts`.
-`evals/public-websites.eval.ts` registers the full suite, while
-`evals/anti-bot-public-websites.eval.ts` registers the subset that previously
-did not show clear anti-bot failures.
+`evals/public-websites.eval.ts` registers the full suite.
 
 Run the full benchmark locally:
 
@@ -99,12 +97,6 @@ Run the full benchmark on Cloud Run:
 
 ```bash
 pnpm evals public-websites.eval.ts --agents libretto,libretto-cached,browser-use --provider steel --concurrency 20 --gcp
-```
-
-Run the anti-bot-clean subset on Cloud Run:
-
-```bash
-pnpm evals anti-bot-public-websites.eval.ts --agents libretto,libretto-cached,browser-use --provider steel --concurrency 10 --gcp
 ```
 
 `libretto-cached` replays the workflow produced by the corresponding

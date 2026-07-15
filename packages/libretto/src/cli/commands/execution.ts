@@ -6,11 +6,8 @@ import type { LoggerApi } from "../../shared/logger/index.js";
 import {
   connect,
   disconnectBrowser,
-  getProfilePath,
-  hasProfile,
-  normalizeDomain,
-  normalizeUrl,
   runClose,
+  resolveWindowPosition,
   resolveViewport,
 } from "../core/browser.js";
 import { parseViewportArg } from "./browser.js";
@@ -26,13 +23,18 @@ import {
   type SessionState,
 } from "../core/session.js";
 import { warnIfLibrettoVersionsDiffer } from "../core/skill-version.js";
-import { readLibrettoConfig } from "../core/config.js";
+import {
+  readLibrettoConfig,
+  type WindowPositionConfig,
+} from "../core/config.js";
 import { renderSnapshotDiff } from "../../shared/snapshot/diff-snapshots.js";
 import {
   getProviderStartupTimeoutMs,
   resolveProviderName,
 } from "../core/providers/index.js";
-import { getAbsoluteIntegrationPath } from "../core/workflow-runtime.js";
+import {
+  getAbsoluteIntegrationPath,
+} from "../core/workflow-runtime.js";
 import {
   compileExecFunction,
   stripEmptyCatchHandlers,
@@ -43,17 +45,19 @@ import {
   type DaemonExecResult,
   type DaemonToCliApi,
 } from "../core/daemon/ipc.js";
+import type { DaemonConfig } from "../core/daemon/config.js";
 import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
 import {
   readActionLog,
   readNetworkLog,
   wrapPageForActionLogging,
-} from "../core/telemetry.js";
+} from "../core/session-logs.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import type { Experiments } from "../core/experiments.js";
 import { SimpleCLI } from "affordance";
 import {
   pageOption,
+  type SessionContext,
   sessionOption,
   withAutoSession,
   withExperiments,
@@ -67,8 +71,8 @@ type RunIntegrationCommandRequest = {
   headless: boolean;
   visualize: boolean;
   viewport?: { width: number; height: number };
+  windowPosition?: WindowPositionConfig;
   accessMode: SessionAccessMode;
-  authProfileDomain?: string;
   providerName?: string;
   stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
@@ -77,6 +81,30 @@ type RunIntegrationCommandRequest = {
 type ExecMode = "exec" | "readonly-exec";
 
 const require = moduleBuiltin.createRequire(import.meta.url);
+
+export function createRunBrowserConfig(args: {
+  providerName?: string;
+  headless: boolean;
+  viewport?: { width: number; height: number };
+  windowPosition?: WindowPositionConfig;
+}): DaemonConfig["browser"] {
+  if (args.providerName) {
+    return {
+      kind: "provider",
+      providerName: args.providerName,
+      headless: args.headless,
+    };
+  }
+
+  return {
+    kind: "launch",
+    headed: !args.headless,
+    viewport: args.viewport ?? { width: 1366, height: 768 },
+    ...(!args.headless && args.windowPosition
+      ? { windowPosition: args.windowPosition }
+      : {}),
+  };
+}
 
 function writeDaemonExecOutput(output?: { stdout: string; stderr: string }) {
   if (output?.stdout) {
@@ -564,22 +592,6 @@ async function runIntegrationFromFile(
   const absoluteIntegrationPath = getAbsoluteIntegrationPath(
     args.integrationPath,
   );
-  if (args.authProfileDomain) {
-    const normalizedDomain = normalizeDomain(normalizeUrl(args.authProfileDomain));
-    if (!hasProfile(normalizedDomain)) {
-      const profilePath = getProfilePath(normalizedDomain);
-      throw new Error(
-        [
-          `Local auth profile not found for domain "${normalizedDomain}".`,
-          `Expected profile file: ${profilePath}`,
-          "To create it:",
-          `  1. libretto open https://${normalizedDomain} --headed --session ${args.session}`,
-          "  2. Log in manually in the browser window.",
-          `  3. libretto save ${normalizedDomain} --session ${args.session}`,
-        ].join("\n"),
-      );
-    }
-  }
 
   const runLogPath = logFileForSession(args.session);
   const workflowOutcome = createDeferred<WorkflowOutcome>();
@@ -593,20 +605,13 @@ async function runIntegrationFromFile(
     config: {
       session: args.session,
       experiments: args.experiments,
-      browser: args.providerName
-        ? { kind: "provider", providerName: args.providerName }
-        : {
-            kind: "launch",
-            headed: !args.headless,
-            viewport: args.viewport ?? { width: 1366, height: 768 },
-      },
+      browser: createRunBrowserConfig(args),
       workflow: {
         integrationPath: absoluteIntegrationPath,
         params: args.params,
         visualize: args.visualize,
         stayOpenOnSuccess: args.stayOpenOnSuccess,
         tsconfigPath: args.tsconfigPath,
-        authProfileDomain: args.authProfileDomain,
       },
     },
     logger,
@@ -809,10 +814,6 @@ export const runInput = SimpleCLI.input({
       name: "stay-open-on-success",
       help: "Keep the browser session open after the workflow completes successfully",
     }),
-    authProfile: SimpleCLI.option(z.string().optional(), {
-      name: "auth-profile",
-      help: "Domain for local auth profile (e.g. apps.example.com)",
-    }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Viewport size as WIDTHxHEIGHT (e.g. 1920x1080)",
     }),
@@ -865,7 +866,7 @@ export const runCommand = SimpleCLI.command({
 })
   .input(runInput)
   .use(withAutoSession())
-  .use(withExperiments())
+  .use(withExperiments<SessionContext>())
   .handle(async ({ input, ctx }) => {
     warnIfLibrettoVersionsDiffer();
     await stopExistingFailedRunSession(ctx.session, ctx.logger);
@@ -895,16 +896,21 @@ export const runCommand = SimpleCLI.command({
       console.log(`Connecting to ${providerName} browser...`);
     }
 
+    const headless = headlessMode ?? false;
+    const windowPosition = headless
+      ? undefined
+      : resolveWindowPosition(ctx.logger);
+
     await runIntegrationFromFile(
       {
         integrationPath: input.integrationFile!,
         session: ctx.session,
         params,
         tsconfigPath: input.tsconfig,
-        headless: daemonProviderName ? true : (headlessMode ?? false),
+        headless,
         visualize,
-        authProfileDomain: input.authProfile,
         viewport,
+        windowPosition,
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
         providerName: daemonProviderName,
         stayOpenOnSuccess: input.stayOpenOnSuccess,

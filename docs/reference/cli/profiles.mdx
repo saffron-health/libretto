@@ -6,10 +6,10 @@ title: profiles
 
 ### save
 
-The `save` command saves the current browser session's cookies and localStorage as a named auth profile. Load the profile later with `--auth-profile` to skip manual login.
+The `save` command saves the current browser session's cookies, localStorage, and IndexedDB as a named local auth profile. Workflows load it by declaring `authProfile`.
 
 ```bash theme={null}
-npx libretto save linkedin.com --session app-login
+npx libretto save linkedin --session app-login --sites linkedin.com
 ```
 
 #### When to use `save`
@@ -29,25 +29,27 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
 
   <Step title="Save the session">
     ```bash  theme={null}
-    npx libretto save linkedin.com --session app-login
+    npx libretto save linkedin --session app-login --sites linkedin.com
     ```
 
-    The profile is saved to `.libretto/profiles/linkedin.com.json`.
+    The profile is saved to `.libretto/profiles/linkedin.json`.
 
   </Step>
 
   <Step title="Use the profile in future runs">
+    Declare `authProfile: "linkedin"` in the workflow, then run it normally:
+
     ```bash  theme={null}
-    npx libretto run ./integration.ts --auth-profile linkedin.com
+    npx libretto run ./integration.ts
     ```
   </Step>
 </Steps>
 
 #### Flags
 
-<ParamField path="domain" type="string" required>
-  The domain (or URL) used to name the saved profile. Passed as the first
-  positional argument. Example: `linkedin.com`.
+<ParamField path="profileName" type="string" required>
+  The local profile name. Passed as the first positional argument. Example:
+  `linkedin`, `twitter`, or `twitter2`.
 </ParamField>
 
 <ParamField path="--session" type="string" required>
@@ -55,11 +57,90 @@ Only use `save` when you want to save or reuse authenticated browser state. A ty
   --session`.
 </ParamField>
 
+<ParamField path="--sites" type="string" required>
+  Comma-separated site or domain list to capture, for example
+  `linkedin.com,auth.linkedin.com`.
+</ParamField>
+
+Subdomains do not need to be listed separately when the parent domain is enough
+for the login. For example, `linkedin.com` captures cookies for
+`www.linkedin.com` and `auth.linkedin.com`. Add multiple sites when the login
+uses separate parent domains, such as `example.com,example-login.com`.
+
+### Storage-state profiles and persistent browser profiles
+
+The `save` command creates a Playwright storage-state profile. It preserves
+cookies, localStorage, and IndexedDB, which is sufficient for most websites. It
+does not preserve sessionStorage, service-worker memory, or authentication that
+the server binds to a specific browser process.
+
+Use a persistent browser profile when signing in again after loading a saved
+auth profile invalidates the session. Launch Chrome with a dedicated
+`--user-data-dir`, keep that browser process running, and attach Libretto with
+`connect`.
+
+<Warning>
+  A persistent browser profile contains credentials and the browser's complete
+  local state. Give each account a separate directory, restrict filesystem
+  access, and do not run multiple browser processes against the same directory.
+</Warning>
+
+### import-chrome-profiles
+
+The `import-chrome-profiles` command imports cookies, localStorage, and IndexedDB
+from an existing Chrome DevTools Protocol session into a named local profile.
+The profile name is the local Libretto profile you want to create. The `--sites`
+list decides which signed-in sites are copied from Chrome.
+
+```bash theme={null}
+npx libretto import-chrome-profiles twitter --cdp-url http://127.0.0.1:9222 --sites x.com,twitter.com
+```
+
+Start Chrome with remote debugging enabled, log in normally, then run the fetch
+command. The CDP URL comes from the Chrome process you launched with
+`--remote-debugging-port`; for example, port `9222` gives
+`http://127.0.0.1:9222`. The profile is saved under
+`.libretto/profiles/<profileName>.json`.
+
+The command asks before attaching because disconnecting from an existing CDP
+session can close or relaunch that Chrome window. Use `--yes` only when the
+user has already consented.
+
+Recent Chrome versions reject remote debugging against the default user-data
+directory; if Chrome prints that error, copy the desired profile to a temporary
+user-data directory and launch Chrome from that copy.
+
+### cloud profiles list
+
+List hosted auth profile names known to Libretto Cloud:
+
+```bash theme={null}
+npx libretto cloud profiles list
+```
+
+`libretto cloud deploy` automatically registers any `authProfile` names declared
+by deployed workflows. Hosted runs use the browser provider's native profile API;
+local profile files are not uploaded.
+
+Local profiles and cloud profiles are intentionally separate. There is no command
+to copy a local profile file into a cloud profile, or to download a cloud profile
+into `.libretto/profiles/`. Local profiles are Playwright storage-state JSON for
+local runs; cloud profiles are provider-native browser profiles managed by the
+hosted browser provider.
+
+### cloud profiles delete
+
+Delete a hosted auth profile name and its provider mappings:
+
+```bash theme={null}
+npx libretto cloud profiles delete twitter
+```
+
 ---
 
 ### Profile storage
 
-Profiles are stored in `.libretto/profiles/<domain>.json`. They are:
+Profiles are stored in `.libretto/profiles/<profileName>.json`. They are:
 
 - Machine-local, not shared across environments or team members.
 - Git-ignored by default.

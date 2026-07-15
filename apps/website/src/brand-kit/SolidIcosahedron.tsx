@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { LIBRETTO_LOGO_DARK_SRC } from "../brand.js";
 import {
   buildIcosahedronMesh,
   mixColorWithWhite,
@@ -459,7 +460,7 @@ export function SolidIcosahedron({
   if (!hasWebGL) {
     return (
       <img
-        src="/logos/logo-dark.svg"
+        src={LIBRETTO_LOGO_DARK_SRC}
         alt="Solid gold icosahedron logo"
         className={className}
         style={style}

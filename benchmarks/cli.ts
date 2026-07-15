@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { SimpleCLI } from "./libretto-internals.js";
+import { SimpleCLI } from "affordance";
 import { webVoyagerCommands } from "./webVoyager/commands.js";
 
 type BenchmarksCLIResult =

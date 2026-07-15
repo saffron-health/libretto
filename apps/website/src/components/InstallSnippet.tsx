@@ -4,25 +4,34 @@ import { Button } from "./Button";
 const PROMPT =
   "Fetch and follow https://libretto.sh/start.md to set up Libretto and create a new browser automation.";
 
-export function InstallSnippet() {
+export function InstallSnippet({
+  fathomEvent = "Hero copy prompt click",
+  onCopy,
+  prompt = PROMPT,
+}: {
+  fathomEvent?: string;
+  onCopy?: () => void;
+  prompt?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
-    void navigator.clipboard.writeText(PROMPT);
+    void navigator.clipboard.writeText(prompt).catch(() => {});
     setCopied(true);
+    onCopy?.();
     setTimeout(() => setCopied(false), 1500);
   }
 
   return (
     <div className="install-prompt inline-flex max-w-full items-stretch overflow-hidden">
       <span className="install-prompt__snippet" aria-hidden="true">
-        <span className="install-prompt__snippet-text">{PROMPT}</span>
+        <span className="install-prompt__snippet-text">{prompt}</span>
       </span>
       <Button
         onClick={handleCopy}
         aria-label="Copy Libretto setup prompt"
         className="install-prompt__button"
-        data-fathom-event="Hero copy prompt click"
+        data-fathom-event={fathomEvent}
       >
         {copied ? "Copied" : "Copy prompt"}
       </Button>

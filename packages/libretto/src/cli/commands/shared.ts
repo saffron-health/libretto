@@ -9,9 +9,9 @@ import {
   type SessionState,
   validateSessionName,
 } from "../core/session.js";
+import { resolveApiUrl } from "../core/auth-fetch.js";
 import {
   SimpleCLI,
-  type SimpleCLIMiddlewareArgs,
   type SimpleCLIContext,
   type SimpleCLIMiddleware,
 } from "affordance";
@@ -41,16 +41,41 @@ export type ExperimentsContext = {
   experiments: Experiments;
 };
 
-export function withExperiments() {
-  return async <TInput, TContext extends SimpleCLIContext>({
-    ctx,
-  }: SimpleCLIMiddlewareArgs<
-    TInput,
-    TContext
-  >): Promise<TContext & ExperimentsContext> => ({
+export type CloudApiKeyContext = {
+  apiUrl: string;
+  credential: { source: "env-api-key"; apiKey: string };
+};
+
+export function withExperiments<
+  TContext extends SimpleCLIContext,
+>(): SimpleCLIMiddleware<unknown, TContext, TContext & ExperimentsContext> {
+  return async ({ ctx }) => ({
     ...ctx,
     experiments: resolveExperiments(),
   });
+}
+
+export function withCloudApiKey<
+  TContext extends SimpleCLIContext,
+>(
+  action: string,
+  formatMissingMessage?: () => string | Promise<string>,
+): SimpleCLIMiddleware<unknown, TContext, TContext & CloudApiKeyContext> {
+  return async ({ ctx }) => {
+    const apiKey = process.env.LIBRETTO_API_KEY?.trim();
+    if (!apiKey) {
+      throw new Error(
+        formatMissingMessage
+          ? await formatMissingMessage()
+          : `LIBRETTO_API_KEY is required to ${action}. Issue one with \`libretto cloud auth api-key issue --label <label>\`.`,
+      );
+    }
+    return {
+      ...ctx,
+      apiUrl: resolveApiUrl(null),
+      credential: { source: "env-api-key", apiKey },
+    };
+  };
 }
 
 export function withRequiredSession(): SimpleCLIMiddleware<

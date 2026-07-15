@@ -34,7 +34,10 @@ export async function attemptWithRecovery<T>(
     }
 
     if (!model) {
-      throw error;
+      throw new Error(
+        "Recovery was not attempted because no model is configured. Pass a LanguageModel as the fourth argument to attemptWithRecovery, or call the action directly without recovery.",
+        { cause: error },
+      );
     }
 
     log.info("Action failed, attempting popup recovery", {

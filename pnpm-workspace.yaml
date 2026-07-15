@@ -24,6 +24,7 @@ enablePrePostScripts: false
 blockExoticSubdeps: true
 
 allowBuilds:
+  '@google/genai': false
   esbuild: true
   fallow: false
   glimpseui: false

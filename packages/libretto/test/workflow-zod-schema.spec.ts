@@ -37,6 +37,63 @@ describe("workflow() with Zod schemas", () => {
     expect(wf.outputSchema).toBe(outputSchema);
   });
 
+  it("exposes auth profile metadata for local runs and hosted workflow discovery", () => {
+    const wf = workflow(
+      "profiled",
+      {
+        input: inputSchema,
+        output: outputSchema,
+        authProfile: { name: "twitter", refresh: true },
+      },
+      async (_ctx, input) => ({
+        pageTitle: "x",
+        finalUrl: input.url,
+      }),
+    );
+
+    expect(wf.authProfileName).toBe("twitter");
+    expect(wf.authProfileRefresh).toBe(true);
+    expect("authProfileSites" in wf).toBe(false);
+  });
+
+  it("exposes browser launch metadata for hosted workflow discovery", () => {
+    const wf = workflow(
+      "launch-configured",
+      {
+        input: inputSchema,
+        output: outputSchema,
+        startUrl: "https://example.com/start",
+        gpu: true,
+        viewport: { width: 1440, height: 900 },
+      },
+      async (_ctx, input) => ({
+        pageTitle: "x",
+        finalUrl: input.url,
+      }),
+    );
+
+    expect(wf.startUrl).toBe("https://example.com/start");
+    expect(wf.gpu).toBe(true);
+    expect(wf.viewport).toEqual({ width: 1440, height: 900 });
+  });
+
+  it("rejects invalid workflow auth profile names", () => {
+    expect(() =>
+      workflow(
+        "invalid-profile",
+        { input: inputSchema, authProfile: { name: " " } },
+        async () => ({ pageTitle: "x", finalUrl: "https://example.com" }),
+      ),
+    ).toThrow("Profile name is required");
+    expect(() =>
+      workflow(
+        "path-profile",
+        { input: inputSchema, authProfile: "../twitter" },
+        async () => ({ pageTitle: "x", finalUrl: "https://example.com" }),
+      ),
+    ).toThrow("Invalid profile name");
+  });
+
   it("passes parsed input through to the handler when input is valid", async () => {
     const wf = workflow(
       "valid",
@@ -51,6 +108,26 @@ describe("workflow() with Zod schemas", () => {
       url: "https://example.com",
     });
     expect(result).toEqual({ pageTitle: "ok", finalUrl: "https://example.com" });
+  });
+
+  it("accepts input and output schemas in the options object", async () => {
+    const wf = workflow("options-object", {
+      input: inputSchema,
+      output: outputSchema,
+      handler: async (_ctx, input) => ({
+        pageTitle: "ok",
+        finalUrl: input.url,
+      }),
+    });
+
+    expect(wf.inputSchema).toBe(inputSchema);
+    expect(wf.outputSchema).toBe(outputSchema);
+    await expect(
+      wf.run(fakeCtx, { url: "https://example.com" }),
+    ).resolves.toEqual({
+      pageTitle: "ok",
+      finalUrl: "https://example.com",
+    });
   });
 
   it("throws LibrettoWorkflowInputError with a field-by-field message when input is invalid", async () => {

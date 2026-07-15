@@ -1,11 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import {
+  Menu,
+  MenuItem,
+  MenuSection,
+  MenuTrigger,
+  Popover,
+  Separator,
+  Button as AriaButton,
+} from "react-aria-components";
 import { Text } from "./Text";
 import { Button } from "./Button";
-import { GitHubStarIcon, NpmIcon } from "../icons";
+import { GitHubStarIcon } from "../icons";
 import { AnimationTarget } from "./AnimationOrchestration";
-import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
-import { AppLink } from "../routing";
+import { RELEASES_URL, REPO_URL } from "../site";
 import { MobileMenu } from "./MobileMenu";
+import { LibrettoLogoAndName } from "../brand.js";
+import {
+  authPost,
+  getCloudSession,
+  getSetupStatus,
+  type CloudSession,
+} from "../cloudApi";
 
 const GLITCH_CHARS = "@#$%&*+=<>{}[]|/\\~^!?";
 
@@ -25,13 +41,12 @@ function useGlitchText(text: string) {
     if (!hovered) return;
 
     const chars = text.split("");
-    // Each character gets a random settle time (in ms)
     const settleTimes = chars.map(() => 150 + Math.random() * 350);
     const start = performance.now();
     let settled = false;
 
     let lastUpdate = 0;
-    const INTERVAL = 60; // ms between character changes
+    const INTERVAL = 60;
 
     function tick(now: number) {
       const elapsed = now - start;
@@ -65,38 +80,66 @@ function useGlitchText(text: string) {
   return { display, isScrambling, hovered, onEnter, onLeave };
 }
 
+function ExternalIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M6 4H4.5A1.5 1.5 0 0 0 3 5.5v6A1.5 1.5 0 0 0 4.5 13h6A1.5 1.5 0 0 0 12 11.5V10" />
+      <path d="M9 3h4v4" />
+      <path d="m8 8 5-5" />
+    </svg>
+  );
+}
+
 function GlitchNavLink({
   href,
   children,
   external = true,
+  trailingIcon = false,
   fathomEvent,
 }: {
   href: string;
   children: string;
   external?: boolean;
+  trailingIcon?: boolean;
   fathomEvent: string;
 }) {
   const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText(children);
 
   return (
-    <AppLink
+    <a
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
-      className="no-underline"
+      className="flex h-[1.9375rem] items-center no-underline"
       data-fathom-event={fathomEvent}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
-      <Text
-        size="sm"
-        className={`font-medium transition-colors duration-75 ${
-          isScrambling ? "text-amber font-mono" : hovered ? "text-accent-bright" : "text-ink"
+      <span
+        className={`inline-flex items-center gap-1.5 transition-colors duration-75 ${
+          isScrambling ? "text-amber" : hovered ? "text-accent-bright" : "text-ink"
         }`}
       >
-        {display}
-      </Text>
-    </AppLink>
+        <Text
+          size="sm"
+          className={`font-medium leading-none ${
+            isScrambling ? "font-mono" : ""
+          }`}
+        >
+          {display}
+        </Text>
+        {trailingIcon && <ExternalIcon />}
+      </span>
+    </a>
   );
 }
 
@@ -125,60 +168,359 @@ function formatStars(count: number): string {
   return String(count);
 }
 
+function userInitial(session: CloudSession): string {
+  return session.user.email.slice(0, 1).toUpperCase();
+}
+
+function getCurrentPageLabel(): string {
+  if (typeof window === "undefined") return "Dashboard";
+  const pathname = window.location.pathname;
+  if (pathname === "/dashboard/cloud-browsers") return "Cloud Browsers";
+  if (pathname === "/dashboard") return "Libretto PR Agents";
+  if (
+    pathname === "/setup" ||
+    pathname === "/github/setup" ||
+    pathname === "/onboarding"
+  ) {
+    return "Setup";
+  }
+  return "Dashboard";
+}
+
+function PullRequestIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <circle cx="4" cy="4" r="1.6" />
+      <circle cx="4" cy="12" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <path d="M4 5.6v4.8" />
+      <path d="M12 10.4V7.8A3.8 3.8 0 0 0 8.2 4H7" />
+      <path d="m8.2 2.4-1.6 1.6 1.6 1.6" />
+    </svg>
+  );
+}
+
+function SignOutIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M6 14H3.5A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2H6" />
+      <path d="M10.5 11 14 8l-3.5-3" />
+      <path d="M14 8H6" />
+    </svg>
+  );
+}
+
+function CloudBrowserIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M5 11.5H4.2A3.2 3.2 0 0 1 4.1 5.1 4.4 4.4 0 0 1 12.5 7a2.3 2.3 0 0 1-.3 4.5H11" />
+      <path d="M6 9.5h4v3H6z" />
+      <path d="M7.2 12.5h1.6" />
+    </svg>
+  );
+}
+
+function SetupIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    >
+      <path d="M3 4.5h10" />
+      <path d="M3 8h10" />
+      <path d="M3 11.5h5" />
+      <path d="m10.5 11.2 1.2 1.2 2-2.4" />
+    </svg>
+  );
+}
+
+function DashboardMenuItem({
+  href,
+  icon,
+  title,
+  description,
+  fathomEvent,
+  current = false,
+}: {
+  href: string;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  fathomEvent: string;
+  current?: boolean;
+}) {
+  return (
+    <MenuItem
+      href={href}
+      className={`grid cursor-pointer grid-cols-[28px_1fr] gap-2 rounded-md px-2 py-2 text-ink outline-none transition-colors data-[focused]:bg-ink/[0.07] data-[pressed]:bg-ink/[0.1] ${
+        current ? "bg-green-9/15" : ""
+      }`}
+      data-fathom-event={fathomEvent}
+    >
+      <span className="grid size-7 place-items-center rounded-md border border-rule bg-bg/70 text-accent-bright">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium leading-5">
+          {title}
+        </span>
+        <span className="block truncate text-xs leading-4 text-muted">
+          {description}
+        </span>
+      </span>
+    </MenuItem>
+  );
+}
+
+function CloudAccountLink({ session }: { session: CloudSession | null }) {
+  const [pageLabel, setPageLabel] = useState("Dashboard");
+  const [signingOut, setSigningOut] = useState(false);
+  const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setPageLabel(getCurrentPageLabel());
+  }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setSetupComplete(null);
+      return;
+    }
+
+    let cancelled = false;
+    setSetupComplete(null);
+    getSetupStatus()
+      .then((status) => {
+        if (!cancelled) setSetupComplete(status.setup_complete);
+      })
+      .catch(() => {
+        if (!cancelled) setSetupComplete(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await authPost("/api/auth/sign-out", {});
+      window.location.assign("/");
+    } catch {
+      setSigningOut(false);
+    }
+  }
+
+  if (!session) {
+    return (
+      <Button
+        href="/signin?mode=signup"
+        size="sm"
+        data-fathom-event="Nav cloud sign up click"
+      >
+        Sign in/up
+      </Button>
+    );
+  }
+
+  return (
+    <MenuTrigger>
+      <AriaButton
+        className="inline-flex h-10 items-center gap-2 rounded-lg border border-rule bg-panel px-3 text-sm text-ink outline-none transition-colors hover:border-accent/45 hover:bg-panel-hi focus-visible:ring-2 focus-visible:ring-accent/40"
+        data-fathom-event="Nav dashboard menu click"
+        aria-label={`Open account menu for ${session.user.email}`}
+      >
+        <span className="grid size-6 shrink-0 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
+          {userInitial(session)}
+        </span>
+        <span className="hidden max-w-[180px] truncate sm:block">
+          {pageLabel}
+        </span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          className="hidden size-3.5 text-muted sm:block"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        >
+          <path d="m4 6 4 4 4-4" />
+        </svg>
+      </AriaButton>
+      <Popover placement="bottom end" offset={6} className="z-50 outline-none">
+        <Menu className="w-[300px] rounded-lg border border-rule bg-panel p-1 shadow-lg shadow-black/35 outline-none">
+          <DashboardMenuItem
+            href="/dashboard"
+            icon={<PullRequestIcon />}
+            title="Libretto PR Agents"
+            description="Auto-fix failing workflows"
+            fathomEvent="Nav PR agents dashboard click"
+            current={pageLabel === "Libretto PR Agents"}
+          />
+          <DashboardMenuItem
+            href="/dashboard/cloud-browsers"
+            icon={<CloudBrowserIcon />}
+            title="Cloud Browsers"
+            description="Run automations on managed browsers"
+            fathomEvent="Nav cloud browsers dashboard click"
+            current={pageLabel === "Cloud Browsers"}
+          />
+          {setupComplete === false && (
+            <DashboardMenuItem
+              href="/setup"
+              icon={<SetupIcon />}
+              title="Setup"
+              description="Finish workspace setup"
+              fathomEvent="Nav setup click"
+              current={pageLabel === "Setup"}
+            />
+          )}
+          <Separator className="mx-2 my-1 h-px bg-rule" />
+          <MenuSection className="rounded-md bg-ink/[0.04] p-1">
+            <MenuItem
+              id="account-email"
+              isDisabled
+              className="grid cursor-default grid-cols-[28px_1fr] items-center gap-2 rounded-md px-2 py-1.5 outline-none data-[disabled]:opacity-100"
+              textValue={session.user.email}
+            >
+              <span className="grid size-7 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
+                {userInitial(session)}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Signed in as
+                </span>
+                <span className="block truncate text-xs text-ink">
+                  {session.user.email}
+                </span>
+              </span>
+            </MenuItem>
+            <MenuItem
+              id="signout"
+              onAction={signOut}
+              isDisabled={signingOut}
+              className="grid cursor-pointer grid-cols-[28px_1fr] items-center gap-2 rounded-md px-2 py-2 text-sm text-muted outline-none transition-colors data-[disabled]:cursor-default data-[disabled]:opacity-60 data-[focused]:bg-ink/[0.07] data-[focused]:text-ink data-[pressed]:bg-ink/[0.1]"
+              data-fathom-event="Nav sign out click"
+            >
+              <span className="grid size-7 place-items-center">
+                <SignOutIcon />
+              </span>
+              <span>{signingOut ? "Signing out..." : "Sign out"}</span>
+            </MenuItem>
+          </MenuSection>
+        </Menu>
+      </Popover>
+    </MenuTrigger>
+  );
+}
+
 export function Navbar({ animate = false }: { animate?: boolean }) {
   const stars = useGitHubStars("saffron-health/libretto");
+  const [session, setSession] = useState<CloudSession | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCloudSession()
+      .then((result) => {
+        if (!cancelled) setSession(result);
+      })
+      .catch(() => {
+        if (!cancelled) setSession(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const animateProps = animate
     ? { "data-animate": AnimationTarget.Navbar, style: { opacity: 0 } as const }
     : {};
 
   return (
-    <nav {...animateProps} className="px-8 pt-6">
-      <div className="relative mx-auto flex max-w-[800px] items-center justify-between">
-        <div className="flex items-center gap-10">
-          <AppLink href="/" className="no-underline">
-            <Text size="xl" style="serif" className="text-ink font-[300] crt-glow-sm">
-              Libretto
-            </Text>
-          </AppLink>
-          <div className="absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
+    <nav
+      {...animateProps}
+      className="sticky top-0 z-50 px-4 py-4 backdrop-blur-md md:px-8"
+    >
+      <div className="relative mx-auto flex max-w-[980px] items-center justify-between">
+        <div className="flex items-center gap-6">
+          <a
+            href="/"
+            className="flex h-[1.9375rem] -translate-y-px items-center no-underline lg:-translate-y-[2.5px]"
+          >
+            <LibrettoLogoAndName />
+          </a>
+          <div className="hidden items-center gap-6 lg:flex">
+            <GlitchNavLink
+              href="/docs/get-started/quickstart"
+              external={false}
+              trailingIcon
+              fathomEvent="Nav docs click"
+            >
+              Docs
+            </GlitchNavLink>
             <GlitchNavLink href="/blog" external={false} fathomEvent="Nav blog click">
               Blog
-            </GlitchNavLink>
-            <GlitchNavLink href={DISCUSSIONS_URL} fathomEvent="Nav forum click">
-              Forum
             </GlitchNavLink>
             <GlitchNavLink href={RELEASES_URL} fathomEvent="Nav changelog click">
               Changelog
             </GlitchNavLink>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <a
-            href={NPM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Libretto on npm"
-            className="hidden text-ink/70 transition-colors hover:text-ink md:flex"
-            data-fathom-event="Nav npm click"
-          >
-            <NpmIcon width={36} height={14} />
-          </a>
+        <div className="flex items-center gap-3 md:gap-4">
           <a
             href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden items-center gap-1.5 text-ink/70 transition-colors hover:text-ink md:flex"
+            className="hidden h-[1.9375rem] items-center gap-1.5 text-ink/70 transition-colors hover:text-ink lg:flex"
             data-fathom-event="Nav github click"
           >
             <GitHubStarIcon width={15} height={15} />
             {stars !== null && <span className="text-sm font-medium">{formatStars(stars)}</span>}
           </a>
-          <Button href="/docs/get-started/quickstart" size="sm" data-fathom-event="Nav docs click">
-            Go to docs
-          </Button>
-          <div className="md:hidden">
-            <MobileMenu stars={stars !== null ? formatStars(stars) : null} />
+          <div className="hidden sm:block">
+            <CloudAccountLink session={session} />
+          </div>
+          <div className="lg:hidden">
+            <MobileMenu
+              stars={stars !== null ? formatStars(stars) : null}
+              session={session}
+            />
           </div>
         </div>
       </div>

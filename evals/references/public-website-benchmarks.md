@@ -31,10 +31,6 @@ but it measures the cached automation path that Libretto is designed to enable.
 - `evals/public-website-benchmark.ts` contains the shared task list, scoring
   criteria, agent prompts, cached workflow replay, and registration helper.
 - `evals/public-websites.eval.ts` registers all public website tasks.
-- `evals/anti-bot-public-websites.eval.ts` registers the subset that previously
-  did not show clear anti-bot failures.
-- `evals/captcha-public-websites-smoke.eval.ts` registers a small smoke subset
-  that previously encountered CAPTCHA or anti-bot pages.
 - `evals/agents.ts` implements the `libretto`, `libretto-cached`, and
   `browser-use` agent adapters.
 - `evals/browser-use-runner.py` runs Browser Use and writes normalized JSON
@@ -95,7 +91,7 @@ pnpm exec libretto run generated-workflow.ts --headless
 
 ## Scoring
 
-Each public website case has two scoring criteria:
+Each public website case has two baseline scoring criteria:
 
 - Live page evidence: the agent reached the requested website or task area,
   performed the requested search or lookup, and returned a plausible answer
@@ -104,13 +100,19 @@ Each public website case has two scoring criteria:
   access-denied pages, 403 pages, unusual traffic pages, or similar anti-bot
   states after waiting and checking the intended site again.
 
+Libretto agent runs have one additional scoring criterion:
+
+- Workflow creation and validation: the assistant created the requested
+  reusable Libretto workflow file at the exact path from the prompt and
+  attempted the requested headless validation command for that workflow.
+
 The score is informational. Failed criteria are recorded in artifacts and
 summaries. The eval command fails only when setup, execution, or result
 collection fails.
 
 The infrastructure classification is derived from the score:
 
-- `clean-pass` means both criteria passed.
+- `clean-pass` means all criteria for that run passed.
 - `anti-bot-failure` means the anti-bot criterion failed.
 - `ordinary-failure` means another scoring criterion failed.
 
@@ -204,12 +206,6 @@ Run the full suite on Cloud Run:
 
 ```bash
 pnpm evals public-websites.eval.ts --agents libretto,libretto-cached,browser-use --provider steel --concurrency 20 --gcp
-```
-
-Run the anti-bot-clean subset:
-
-```bash
-pnpm evals anti-bot-public-websites.eval.ts --agents libretto,libretto-cached,browser-use --provider steel --concurrency 10 --gcp
 ```
 
 Reuse an existing image instead of building a new image:

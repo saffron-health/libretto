@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { MenuTrigger, Menu, MenuItem, Popover, Button as AriaButton } from "react-aria-components";
 import { motion } from "motion/react";
-import { GitHubStarIcon, NpmIcon } from "../icons";
-import { DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
+import { GitHubStarIcon } from "../icons";
+import { RELEASES_URL, REPO_URL } from "../site";
 import { CrossfadeIcon } from "./CrossfadeIcon";
+import type { CloudSession } from "../cloudApi";
 
 type AnimationState = "unmounted" | "hidden" | "visible";
 
@@ -69,7 +70,13 @@ function CloseIcon() {
 const itemClass =
   "flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-ink outline-none rounded-lg cursor-pointer data-[focused]:bg-ink/[0.08] data-[pressed]:bg-ink/[0.12]";
 
-export function MobileMenu({ stars }: { stars: string | null }) {
+export function MobileMenu({
+  stars,
+  session,
+}: {
+  stars: string | null;
+  session: CloudSession | null;
+}) {
   const [animation, setAnimation] = useState<AnimationState>("unmounted");
 
   return (
@@ -108,17 +115,33 @@ export function MobileMenu({ stars }: { stars: string | null }) {
           className="min-w-[180px] origin-top-right rounded-xl border border-accent/20 bg-panel p-1.5 shadow-lg shadow-black/30"
         >
           <Menu className="outline-none">
+            <MenuItem
+              href={session ? "/dashboard" : "/signin?mode=signup"}
+              className={itemClass}
+              data-fathom-event={
+                session ? "Mobile nav dashboard click" : "Mobile nav cloud sign up click"
+              }
+            >
+              {session ? "Libretto PR Agents" : "Sign in/up"}
+            </MenuItem>
+            {session && (
+              <MenuItem
+                href="/dashboard/cloud-browsers"
+                className={itemClass}
+                data-fathom-event="Mobile nav cloud browsers click"
+              >
+                Cloud Browsers
+              </MenuItem>
+            )}
+            <MenuItem
+              href="/docs/get-started/quickstart"
+              className={itemClass}
+              data-fathom-event="Mobile nav docs click"
+            >
+              Docs
+            </MenuItem>
             <MenuItem href="/blog" className={itemClass} data-fathom-event="Mobile nav blog click">
               Blog
-            </MenuItem>
-            <MenuItem
-              href={DISCUSSIONS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={itemClass}
-              data-fathom-event="Mobile nav forum click"
-            >
-              Forum
             </MenuItem>
             <MenuItem
               href={RELEASES_URL}
@@ -128,16 +151,6 @@ export function MobileMenu({ stars }: { stars: string | null }) {
               data-fathom-event="Mobile nav changelog click"
             >
               Changelog
-            </MenuItem>
-            <MenuItem
-              href={NPM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={itemClass}
-              data-fathom-event="Mobile nav npm click"
-            >
-              <NpmIcon width={28} height={12} />
-              npm
             </MenuItem>
             <MenuItem
               href={REPO_URL}

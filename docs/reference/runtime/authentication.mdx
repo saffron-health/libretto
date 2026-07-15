@@ -1,0 +1,87 @@
+---
+title: Authentication
+---
+
+> Check whether a session is signed in and run scripted sign-in logic when it is not.
+
+### `librettoAuthenticate()`
+
+`librettoAuthenticate` is the runtime helper for workflows that combine an auth profile with scripted sign-in logic.
+
+```typescript theme={null}
+async function librettoAuthenticate(
+  ctx: LibrettoWorkflowContext,
+  options: LibrettoAuthenticateOptions,
+): Promise<{ usedProfile: boolean }>;
+```
+
+#### Options
+
+<ParamField path="isSignedIn" type="(ctx: LibrettoWorkflowContext) => Promise<boolean> | boolean" required>
+  Checks whether the current browser page is already signed in. Return `true`
+  only when the workflow can safely continue.
+</ParamField>
+
+<ParamField path="signIn" type="(ctx: LibrettoWorkflowContext, credentials: Record<string, string>) => Promise<void> | void" required>
+  Performs the sign-in flow when `isSignedIn` returns `false`.
+</ParamField>
+
+<ParamField path="credentials" type="Record<string, unknown>">
+  Credential values to pass to `signIn`. In workflows, pass
+  `input.credentials` from declared workflow credentials.
+</ParamField>
+
+<ParamField path="envPrefix" type="string">
+  Optional environment variable prefix used only when `credentials` is omitted.
+  Workflow code should normally pass `input.credentials` instead.
+</ParamField>
+
+#### Return value
+
+<ResponseField name="usedProfile" type="boolean">
+  `true` when the initial `isSignedIn` check passed, meaning the saved profile
+  was already signed in. `false` when Libretto ran the `signIn` step.
+</ResponseField>
+
+#### Example
+
+```typescript theme={null}
+import { librettoAuthenticate, workflow } from "libretto";
+
+export default workflow("portalReport", {
+  credentials: ["username", "password"],
+  authProfile: {
+    name: "portal",
+    refresh: true,
+  },
+  async handler(ctx, input) {
+    const { page } = ctx;
+
+    await page.goto("https://portal.example.com");
+
+    await librettoAuthenticate(ctx, {
+      credentials: input.credentials,
+      isSignedIn: async ({ page }) =>
+        await page
+          .getByRole("button", { name: /account|sign out/i })
+          .isVisible()
+          .catch(() => false),
+      signIn: async ({ page }, credentials) => {
+        await page.goto("https://portal.example.com/login");
+        await page.getByLabel("Email").fill(credentials.username);
+        await page.getByLabel("Password").fill(credentials.password);
+        await page.getByRole("button", { name: /log in/i }).click();
+      },
+    });
+
+    // Continue with authenticated workflow steps.
+  },
+});
+```
+
+After `signIn` runs, `librettoAuthenticate` calls `isSignedIn` again. If the session is still not signed in, it throws an error instead of letting the workflow continue in a logged-out state.
+
+<Note>
+  Pair `librettoAuthenticate` with `authProfile: { name, refresh: true }` when
+  a successful sign-in should update the profile for future runs.
+</Note>
