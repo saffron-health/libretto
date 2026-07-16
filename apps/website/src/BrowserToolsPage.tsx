@@ -27,14 +27,23 @@ function CodeWindow() {
           <span className="text-faint">;</span>
           {"\n"}
           <span className="text-faint">import</span>
-          <span className="text-ink"> {"{ createAiSdkBrowserTools }"} </span>
+          <span className="text-ink"> {"{\n  createAiSdkBrowserTools,\n}"} </span>
           <span className="text-faint">from</span>
-          <span className="text-amber">
-            {" "}
-            &quot;libretto-browser-tools/ai-sdk&quot;
-          </span>
+          <span className="text-amber"> &quot;libretto-browser-tools/ai-sdk&quot;</span>
+          <span className="text-faint">;</span>
+          {"\n"}
+          <span className="text-faint">import</span>
+          <span className="text-ink"> {"{\n  LocalBrowserProvider,\n}"} </span>
+          <span className="text-faint">from</span>
+          <span className="text-amber"> &quot;libretto-browser-tools&quot;</span>
           <span className="text-faint">;</span>
           {"\n\n"}
+          <span className="text-faint">const</span>
+          <span className="text-ink"> provider = </span>
+          <span className="text-faint">new</span>
+          <span className="text-accent-bright"> LocalBrowserProvider</span>
+          <span className="text-ink">();</span>
+          {"\n"}
           <span className="text-faint">const</span>
           <span className="text-ink"> {"{ tools }"} = </span>
           <span className="text-accent-bright">createAiSdkBrowserTools</span>
