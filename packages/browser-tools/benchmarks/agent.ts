@@ -19,7 +19,7 @@ const BENCHMARK_SYSTEM_PROMPT =
   "You are an AI agent in a controlled benchmark. Follow the user's instructions, use the available tools, and report only evidence you actually observed.";
 const COMMON_BROWSER_TASK_INSTRUCTIONS = [
   "Complete the task on the requested live website and ground the final answer in observed page evidence.",
-  "If the intended site shows a CAPTCHA, bot check, or access-denied challenge, wait once for up to 60 seconds in the same page, inspect it again, and report blocked if it remains.",
+  "If the intended site shows a CAPTCHA, reCAPTCHA, Cloudflare challenge, or similar test, wait up to 2 minutes for the browser's automatic solver. Do not try to solve it yourself or click a Cloudflare checkbox. If Cloudflare shows Ready, continue with the task; report blocked only if the challenge remains after waiting.",
   "Do not use another site, an API, a cached copy, or prior knowledge as a fallback.",
   "Return a concise final answer after completing the task.",
 ].join(" ");
