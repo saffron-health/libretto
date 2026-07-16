@@ -207,9 +207,10 @@ export function SignInPage() {
         password,
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
-          : `${window.location.origin}${
-              sanitizeReturnToForAuthState(getSafeReturnTo(), true) ?? "/signin"
-            }`,
+          : `${window.location.origin}${withReturnTo(
+              "/signin",
+              sanitizeReturnToForAuthState(getSafeReturnTo(), true),
+            )}`,
       });
       if (result.url) {
         window.location.assign(result.url);
@@ -263,9 +264,10 @@ export function SignInPage() {
         provider,
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
-          : `${window.location.origin}${
-              callbackReturnTo ?? "/signin"
-            }`,
+          : `${window.location.origin}${withReturnTo(
+              "/signin",
+              callbackReturnTo,
+            )}`,
       });
       if (result.url) {
         window.location.assign(result.url);

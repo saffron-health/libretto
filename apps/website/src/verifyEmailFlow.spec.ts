@@ -1,7 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { redirectAfterVerifiedEmail } from "./verifyEmailFlow";
 
 describe("redirectAfterVerifiedEmail", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", {
+      location: { origin: "https://libretto.sh" },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("waits for CLI login approval before returning the redirect target", async () => {
     let approve!: (value: boolean) => void;
     const approval = new Promise<boolean>((resolve) => {
@@ -93,6 +103,30 @@ describe("redirectAfterVerifiedEmail", () => {
         approveCliLogin: async () => true,
       }),
     ).resolves.toBe("/dashboard");
+  });
+
+  it("does not let an incomplete tenant return directly to the dashboard", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: true,
+        setupComplete: false,
+        returnTo: "/dashboard/cloud-browsers",
+        hasCliLoginParams: false,
+        approveCliLogin: async () => true,
+      }),
+    ).resolves.toBe("/setup");
+  });
+
+  it("preserves dashboard return targets after setup is complete", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: true,
+        setupComplete: true,
+        returnTo: "/dashboard/cloud-browsers",
+        hasCliLoginParams: false,
+        approveCliLogin: async () => true,
+      }),
+    ).resolves.toBe("/dashboard/cloud-browsers");
   });
 
   it("drops dashboard return targets before tenant setup exists", async () => {
