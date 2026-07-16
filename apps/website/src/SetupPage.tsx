@@ -13,22 +13,12 @@ import {
   type SetupStatus,
 } from "./cloudApi";
 import { GitHubIcon } from "./icons";
-
-const GITHUB_APP_INSTALL_URL =
-  "https://github.com/apps/libretto-agent/installations/new";
-const DEBUGGER_DOCS_URL = "/docs/reference/runtime/playwright-debugger";
-const DEBUGGER_CONCEPT_URL = "/docs/understand-libretto/autofix-debugging";
-const DEBUGGER_PROMPT =
-  "Add the Libretto Playwright debugging agent to my existing automation. " +
-  "Install libretto-playwright-debugger, then follow " +
-  "https://libretto.sh/docs/reference/runtime/playwright-debugger. Create a " +
-  "module-scope playwrightDebugger with createPlaywrightDebugger, my repo " +
-  "(owner, repo, baseBranch), and model configuration, using LIBRETTO_API_KEY " +
-  "for GitHub authentication. At the existing failure point, before " +
-  "Playwright teardown, call await " +
-  "playwrightDebugger.debugFailure(error, page) with the live page that " +
-  "observed the failure. Keep my existing workflow, fallbacks, retries, " +
-  "logging, and rethrow behavior in place.";
+import {
+  DEBUGGER_CONCEPT_URL,
+  DEBUGGER_DOCS_URL,
+  DEBUGGER_PROMPT,
+  GITHUB_APP_INSTALL_URL,
+} from "./prAgentSetup";
 const CLOUD_SETUP_PROMPT =
   "Fetch and follow https://libretto.sh/cloud.md to set up Libretto Cloud hosted browsers for this project.";
 const CLOUD_SETUP_COMPLETE_KEY = "libretto.setup.cloudSetupComplete";

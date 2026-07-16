@@ -12,9 +12,11 @@ import {
   type SetupStatus,
 } from "./cloudApi";
 import { GitHubIcon } from "./icons";
-
-const GITHUB_APP_INSTALL_URL =
-  "https://github.com/apps/libretto-agent/installations/new";
+import {
+  DEBUGGER_DOCS_URL,
+  DEBUGGER_PROMPT,
+  GITHUB_APP_INSTALL_URL,
+} from "./prAgentSetup";
 const HOSTED_BROWSERS_BANNER_DISMISSED_KEY =
   "libretto.dashboard.hostedBrowsersBannerDismissed";
 
@@ -192,34 +194,17 @@ export function DashboardPage() {
     [session?.user.id, users],
   );
   const canRemoveUsers = currentDashboardUser?.role === "owner";
-  const localAgentReady = setupStatus?.local_agent_setup_complete === true;
+  const debuggerReady = setupStatus?.debugger_added === true;
   const hasRepos = (repositories?.length ?? 0) > 0;
 
-  async function completeLocalAgentSetup() {
+  async function completeDebuggerSetup() {
     setSavingStep(true);
     setError(null);
     try {
       const updated = await updateSetupStatus({
-        local_agent_setup_complete: true,
+        debugger_added: true,
       });
       setSetupStatus(updated);
-      window.localStorage.setItem("libretto.dashboard.localAgentSetup", "1");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update setup.");
-    } finally {
-      setSavingStep(false);
-    }
-  }
-
-  async function showLocalAgentSetup() {
-    setSavingStep(true);
-    setError(null);
-    try {
-      const updated = await updateSetupStatus({
-        local_agent_setup_complete: false,
-      });
-      setSetupStatus(updated);
-      window.localStorage.removeItem("libretto.dashboard.localAgentSetup");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update setup.");
     } finally {
@@ -434,109 +419,112 @@ export function DashboardPage() {
 
             {repositories === null ? (
               <EmptyState>Loading connected repositories...</EmptyState>
-            ) : hasRepos ? (
-              <div>
-                <div className="hidden grid-cols-[minmax(260px,1fr)_110px_170px_90px] border-b border-rule px-4 py-3 text-xs uppercase text-muted md:grid">
-                  <span>Repository</span>
-                  <span>Access</span>
-                  <span>Linked</span>
-                  <span>Status</span>
-                </div>
-                {repositories.map((repository) => (
-                  <div
-                    key={repository.id}
-                    className="grid gap-3 border-b border-rule px-4 py-3 last:border-b-0 md:grid-cols-[minmax(260px,1fr)_110px_170px_90px] md:items-center"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <GitHubIcon className="size-4 shrink-0 text-accent-bright" />
-                        <p className="truncate text-sm text-ink">
-                          {repository.full_name}
-                        </p>
-                      </div>
-                      <p className="mt-1 truncate text-xs text-muted">
-                        Installed on {repository.account_login}
-                      </p>
-                    </div>
-                    <span className="text-sm text-muted">
-                      {repository.private ? "Private" : "Public"}
-                    </span>
-                    <span className="text-xs text-muted">
-                      {formatDate(repository.linked_at)}
-                    </span>
-                    <span className="w-fit rounded-full border border-accent/35 bg-green-9/15 px-2 py-1 text-xs text-accent-bright">
-                      Linked
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
+            ) : !hasRepos ? (
               <div className="p-4">
                 <div className="rounded-lg border border-accent/25 bg-green-9/10 p-4 md:p-5">
-                  {!localAgentReady ? (
-                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                      <div>
-                        <p className="mb-2 font-mono text-xs uppercase text-accent">
-                          Step 1 of 2
-                        </p>
-                        <h3 className="text-lg font-semibold text-ink">
-                          Set up your local agent
-                        </h3>
-                      </div>
-                      <div className="flex min-w-0 flex-col gap-3 md:items-end">
-                        <InstallSnippet
-                          fathomEvent="Dashboard copy local setup prompt click"
-                          onCopy={() => void completeLocalAgentSetup()}
-                        />
-                        <button
-                          type="button"
-                          disabled={savingStep}
-                          onClick={() => void completeLocalAgentSetup()}
-                          className="w-fit text-xs text-muted underline decoration-muted underline-offset-4 transition-colors hover:text-ink hover:decoration-accent disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Already set up? Go to step 2
-                        </button>
-                      </div>
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                    <div className="min-w-0">
+                      <p className="mb-2 font-mono text-xs uppercase text-accent">
+                        Step 1 of 2
+                      </p>
+                      <h3 className="flex items-center gap-3 text-lg font-semibold text-ink">
+                        <GitHubIcon className="size-5 shrink-0 text-accent-bright" />
+                        Connect a GitHub repository
+                      </h3>
+                      <p className="mt-2 max-w-[620px] text-sm text-muted">
+                        Connect the repository where your automations live so
+                        Libretto can open scoped fix pull requests.
+                      </p>
                     </div>
-                  ) : (
-                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                      <div className="min-w-0">
-                        <p className="mb-2 font-mono text-xs uppercase text-accent">
-                          Step 2 of 2
-                        </p>
-                        <h3 className="flex items-center gap-3 text-lg font-semibold text-ink">
-                          <GitHubIcon className="size-5 shrink-0 text-accent-bright" />
-                          Connect a GitHub repository
-                        </h3>
-                        <p className="mt-2 max-w-[620px] text-sm text-muted">
-                          Let Libretto open PRs when scripts break.
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-2 md:items-end">
-                        <a
-                          href={GITHUB_APP_INSTALL_URL}
-                          className="libretto-button libretto-button--sm inline-flex h-9 min-w-[148px] items-center justify-center whitespace-nowrap px-4"
-                        >
-                          Connect GitHub
-                        </a>
-                        <button
-                          type="button"
-                          disabled={savingStep}
-                          onClick={() => void showLocalAgentSetup()}
-                          className="w-fit text-xs text-muted underline decoration-muted underline-offset-4 transition-colors hover:text-ink hover:decoration-accent disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Show step 1
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {error && (
-                    <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-5 text-red-200">
-                      {error}
-                    </p>
-                  )}
+                    <a
+                      href={GITHUB_APP_INSTALL_URL}
+                      className="libretto-button libretto-button--sm inline-flex h-9 min-w-[148px] items-center justify-center whitespace-nowrap px-4"
+                    >
+                      Connect GitHub
+                    </a>
                   </div>
+                </div>
               </div>
+            ) : (
+              <>
+                <div>
+                  <div className="hidden grid-cols-[minmax(260px,1fr)_110px_170px_90px] border-b border-rule px-4 py-3 text-xs uppercase text-muted md:grid">
+                    <span>Repository</span>
+                    <span>Access</span>
+                    <span>Linked</span>
+                    <span>Status</span>
+                  </div>
+                  {repositories.map((repository) => (
+                    <div
+                      key={repository.id}
+                      className="grid gap-3 border-b border-rule px-4 py-3 last:border-b-0 md:grid-cols-[minmax(260px,1fr)_110px_170px_90px] md:items-center"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <GitHubIcon className="size-4 shrink-0 text-accent-bright" />
+                          <p className="truncate text-sm text-ink">
+                            {repository.full_name}
+                          </p>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted">
+                          Installed on {repository.account_login}
+                        </p>
+                      </div>
+                      <span className="text-sm text-muted">
+                        {repository.private ? "Private" : "Public"}
+                      </span>
+                      <span className="text-xs text-muted">
+                        {formatDate(repository.linked_at)}
+                      </span>
+                      <span className="w-fit rounded-full border border-accent/35 bg-green-9/15 px-2 py-1 text-xs text-accent-bright">
+                        Linked
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {!debuggerReady && setupStatus !== null && (
+                  <div className="border-t border-rule p-4">
+                    <div className="rounded-lg border border-accent/25 bg-green-9/10 p-4 md:p-5">
+                      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                        <div className="min-w-0">
+                          <p className="mb-2 font-mono text-xs uppercase text-accent">
+                            Step 2 of 2
+                          </p>
+                          <h3 className="text-lg font-semibold text-ink">
+                            Add the debugger to your Playwright script
+                          </h3>
+                          <p className="mt-2 max-w-[620px] text-sm leading-6 text-muted">
+                            Paste this prompt into your coding agent to install
+                            the Playwright debugger and wire failure reporting
+                            into your existing automation.
+                          </p>
+                          <a
+                            href={DEBUGGER_DOCS_URL}
+                            className="mt-2 inline-block text-xs text-accent-bright underline decoration-accent/40 underline-offset-4 hover:decoration-accent"
+                          >
+                            View runtime reference
+                          </a>
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-3 md:items-end">
+                          <InstallSnippet
+                            prompt={DEBUGGER_PROMPT}
+                            fathomEvent="Dashboard copy debugger prompt click"
+                          />
+                          <button
+                            type="button"
+                            disabled={savingStep}
+                            onClick={() => void completeDebuggerSetup()}
+                            className="w-fit text-xs text-muted underline decoration-muted underline-offset-4 transition-colors hover:text-ink hover:decoration-accent disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {savingStep ? "Saving..." : "I've added the debugger"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}
