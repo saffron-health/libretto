@@ -318,7 +318,7 @@ function FinalCta() {
 
 export function BrowserToolsPage() {
   return (
-    <div className="crt-page min-h-screen bg-bg text-ink">
+    <div className="crt-page min-h-screen bg-bg text-ink [&>nav]:bg-bg/90">
       <Navbar />
       <BrowserToolsHero />
       <div className="section-rails relative mx-auto max-w-[1100px]">
