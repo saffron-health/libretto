@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { getSafeReturnTo, postAuthRedirect, sanitizeReturnToForAuthState } from "./authRedirect";
+import { getSafeReturnTo, postAuthRedirect } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
-import { getAuthStatus, orpcCall } from "./cloudApi";
+import {
+  getAuthStatus,
+  getSetupStatus,
+  isPrAgentSetupComplete,
+  orpcCall,
+} from "./cloudApi";
 
 type OrgCreateResponse = {
   organizationId: string;
@@ -31,16 +36,20 @@ export function OnboardingPage() {
 
   useEffect(() => {
     getAuthStatus()
-      .then((status) => {
+      .then(async (status) => {
         if (!status.emailVerified) {
           window.location.assign("/verify-email");
           return;
         }
         if (status.hasTenant) {
+          const setupComplete = await getSetupStatus()
+            .then(isPrAgentSetupComplete)
+            .catch(() => false);
           window.location.assign(
             postAuthRedirect({
               emailVerified: status.emailVerified,
               hasTenant: status.hasTenant,
+              setupComplete,
               returnTo: getSafeReturnTo(),
             }),
           );
@@ -74,7 +83,12 @@ export function OnboardingPage() {
         debugNotificationEmail: debugNotificationEmail || email,
       });
       window.location.assign(
-        sanitizeReturnToForAuthState(getSafeReturnTo(), true) ?? "/setup",
+        postAuthRedirect({
+          emailVerified: true,
+          hasTenant: true,
+          setupComplete: false,
+          returnTo: getSafeReturnTo(),
+        }),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Organization setup failed.");

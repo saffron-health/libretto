@@ -106,7 +106,7 @@
               "reference/runtime/network-requests",
               "reference/runtime/file-downloads",
               "reference/runtime/page-fallbacks",
-              "reference/runtime/playwright-debug"
+              "reference/runtime/playwright-debugger"
             ]
           }
         ]

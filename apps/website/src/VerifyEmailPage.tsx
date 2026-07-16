@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { getSafeReturnTo } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
-import { getAuthStatus, orpcCall } from "./cloudApi";
+import {
+  getAuthStatus,
+  getSetupStatus,
+  isPrAgentSetupComplete,
+  orpcCall,
+} from "./cloudApi";
 import { redirectAfterVerifiedEmail } from "./verifyEmailFlow";
 
 type CliLoginParams = {
@@ -44,8 +49,14 @@ export function VerifyEmailPage() {
         const status = await getAuthStatus();
         if (cancelled) return;
         if (status.emailVerified) {
+          const setupComplete = status.hasTenant
+            ? await getSetupStatus()
+                .then(isPrAgentSetupComplete)
+                .catch(() => false)
+            : false;
           const redirectTo = await redirectAfterVerifiedEmail({
             hasTenant: status.hasTenant,
+            setupComplete,
             returnTo: getSafeReturnTo(),
             hasCliLoginParams: Boolean(getCliLoginParams()),
             approveCliLogin: approveCliLoginIfPresent,

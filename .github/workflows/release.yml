@@ -37,16 +37,16 @@ jobs:
           create_libretto_package_name="$(node -p "require('./packages/create-libretto/package.json').name")"
           browser_tools_package_name="$(node -p "require('./packages/browser-tools/package.json').name")"
           browser_tools_version="$(node -p "require('./packages/browser-tools/package.json').version")"
-          playwright_debug_package_name="$(node -p "require('./packages/playwright-debug/package.json').name")"
-          playwright_debug_version="$(node -p "require('./packages/playwright-debug/package.json').version")"
+          playwright_debugger_package_name="$(node -p "require('./packages/playwright-debugger/package.json').name")"
+          playwright_debugger_version="$(node -p "require('./packages/playwright-debugger/package.json').version")"
           echo "package_name=${package_name}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "affordance_version=${affordance_version}" >> "$GITHUB_OUTPUT"
           echo "create_libretto_package_name=${create_libretto_package_name}" >> "$GITHUB_OUTPUT"
           echo "browser_tools_package_name=${browser_tools_package_name}" >> "$GITHUB_OUTPUT"
           echo "browser_tools_version=${browser_tools_version}" >> "$GITHUB_OUTPUT"
-          echo "playwright_debug_package_name=${playwright_debug_package_name}" >> "$GITHUB_OUTPUT"
-          echo "playwright_debug_version=${playwright_debug_version}" >> "$GITHUB_OUTPUT"
+          echo "playwright_debugger_package_name=${playwright_debugger_package_name}" >> "$GITHUB_OUTPUT"
+          echo "playwright_debugger_version=${playwright_debugger_version}" >> "$GITHUB_OUTPUT"
           echo "tag=v${version}" >> "$GITHUB_OUTPUT"
 
       - name: Check release state
@@ -61,7 +61,7 @@ jobs:
           affordance_npm_exists=false
           create_libretto_npm_exists=false
           browser_tools_npm_exists=false
-          playwright_debug_npm_exists=false
+          playwright_debugger_npm_exists=false
           publish_needed=false
 
           if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
@@ -84,11 +84,11 @@ jobs:
             browser_tools_npm_exists=true
           fi
 
-          if npm view "${{ steps.version.outputs.playwright_debug_package_name }}@${{ steps.version.outputs.playwright_debug_version }}" version >/dev/null 2>&1; then
-            playwright_debug_npm_exists=true
+          if npm view "${{ steps.version.outputs.playwright_debugger_package_name }}@${{ steps.version.outputs.playwright_debugger_version }}" version >/dev/null 2>&1; then
+            playwright_debugger_npm_exists=true
           fi
 
-          if [ "$release_exists" != true ] || [ "$npm_exists" != true ] || [ "$affordance_npm_exists" != true ] || [ "$create_libretto_npm_exists" != true ] || [ "$browser_tools_npm_exists" != true ] || [ "$playwright_debug_npm_exists" != true ]; then
+          if [ "$release_exists" != true ] || [ "$npm_exists" != true ] || [ "$affordance_npm_exists" != true ] || [ "$create_libretto_npm_exists" != true ] || [ "$browser_tools_npm_exists" != true ] || [ "$playwright_debugger_npm_exists" != true ]; then
             publish_needed=true
           fi
 
@@ -97,7 +97,7 @@ jobs:
           echo "affordance_npm_exists=${affordance_npm_exists}" >> "$GITHUB_OUTPUT"
           echo "create_libretto_npm_exists=${create_libretto_npm_exists}" >> "$GITHUB_OUTPUT"
           echo "browser_tools_npm_exists=${browser_tools_npm_exists}" >> "$GITHUB_OUTPUT"
-          echo "playwright_debug_npm_exists=${playwright_debug_npm_exists}" >> "$GITHUB_OUTPUT"
+          echo "playwright_debugger_npm_exists=${playwright_debugger_npm_exists}" >> "$GITHUB_OUTPUT"
           echo "publish_needed=${publish_needed}" >> "$GITHUB_OUTPUT"
 
       - name: Skip already published version
@@ -167,26 +167,26 @@ jobs:
         if: steps.state.outputs.publish_needed == 'true'
         run: |
           pnpm check:mirrors
-          pnpm --filter libretto... --filter libretto-playwright-debug... build
+          pnpm --filter libretto... --filter libretto-playwright-debugger... build
           pnpm --filter libretto type-check
           pnpm --filter libretto test
           pnpm --filter libretto-browser-tools type-check
           pnpm --filter libretto-browser-tools test
-          pnpm --filter libretto-playwright-debug type-check
-          pnpm --filter libretto-playwright-debug test
+          pnpm --filter libretto-playwright-debugger type-check
+          pnpm --filter libretto-playwright-debugger test
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       browser_tools_package_name: ${{ steps.version.outputs.browser_tools_package_name }}
       browser_tools_version: ${{ steps.version.outputs.browser_tools_version }}
-      playwright_debug_package_name: ${{ steps.version.outputs.playwright_debug_package_name }}
-      playwright_debug_version: ${{ steps.version.outputs.playwright_debug_version }}
+      playwright_debugger_package_name: ${{ steps.version.outputs.playwright_debugger_package_name }}
+      playwright_debugger_version: ${{ steps.version.outputs.playwright_debugger_version }}
       release_exists: ${{ steps.state.outputs.release_exists }}
       npm_exists: ${{ steps.state.outputs.npm_exists }}
       affordance_npm_exists: ${{ steps.state.outputs.affordance_npm_exists }}
       create_libretto_npm_exists: ${{ steps.state.outputs.create_libretto_npm_exists }}
       browser_tools_npm_exists: ${{ steps.state.outputs.browser_tools_npm_exists }}
-      playwright_debug_npm_exists: ${{ steps.state.outputs.playwright_debug_npm_exists }}
+      playwright_debugger_npm_exists: ${{ steps.state.outputs.playwright_debugger_npm_exists }}
       publish_needed: ${{ steps.state.outputs.publish_needed }}
 
   release:
@@ -215,7 +215,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build publish artifacts
-        run: pnpm --filter libretto... --filter libretto-playwright-debug... build
+        run: pnpm --filter libretto... --filter libretto-playwright-debugger... build
 
       - name: Publish browser tools to npm
         if: needs.verify.outputs.browser_tools_npm_exists != 'true'
@@ -228,13 +228,13 @@ jobs:
           fi
 
       - name: Publish Playwright debugger to npm
-        if: needs.verify.outputs.playwright_debug_npm_exists != 'true'
-        working-directory: packages/playwright-debug
+        if: needs.verify.outputs.playwright_debugger_npm_exists != 'true'
+        working-directory: packages/playwright-debugger
         run: |
-          if ! npm view "${{ needs.verify.outputs.playwright_debug_package_name }}@${{ needs.verify.outputs.playwright_debug_version }}" version >/dev/null 2>&1; then
+          if ! npm view "${{ needs.verify.outputs.playwright_debugger_package_name }}@${{ needs.verify.outputs.playwright_debugger_version }}" version >/dev/null 2>&1; then
             pnpm publish --access public --no-git-checks
           else
-            echo "${{ needs.verify.outputs.playwright_debug_package_name }}@${{ needs.verify.outputs.playwright_debug_version }} already published, skipping."
+            echo "${{ needs.verify.outputs.playwright_debugger_package_name }}@${{ needs.verify.outputs.playwright_debugger_version }} already published, skipping."
           fi
 
       - name: Publish affordance to npm

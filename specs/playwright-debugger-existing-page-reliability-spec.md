@@ -28,9 +28,9 @@ Add a borrowed-page browser-tools adapter that operates directly on the supplied
 - `packages/browser-tools/src/adapters/ai-sdk/index.ts` — exposes browser tools to the AI SDK.
 - `packages/browser-tools/src/index.ts` — public browser-tools exports.
 - `packages/browser-tools/src/adapters/ai-sdk/index.spec.ts` — real Chromium coverage for borrowed pages.
-- `packages/playwright-debug/src/index.ts` — debugging agent, structured results, branch creation, and error boundary.
-- `packages/playwright-debug/test/debugger.spec.ts` — debugger contract and GitHub request coverage.
-- `docs/reference/runtime/playwright-debug.mdx` — public failure-handling behavior.
+- `packages/playwright-debugger/src/index.ts` — debugging agent, structured results, branch creation, and error boundary.
+- `packages/playwright-debugger/test/debugger.spec.ts` — debugger contract and GitHub request coverage.
+- `docs/reference/runtime/playwright-debugger.mdx` — public failure-handling behavior.
 - [Playwright Page](https://playwright.dev/docs/api/class-page) — a page retains its browser context and live state.
 - [Playwright BrowserContext](https://playwright.dev/docs/api/class-browsercontext) — context ownership, pages, cookies, and storage behavior.
 
@@ -66,7 +66,7 @@ export function createBrowserToolsForPage(page: Page) {
 Pass the supplied `Page` to the default agent runner and seed its attached session ID in the prompt. The agent must inspect that session instead of calling `browser_open`.
 
 ```ts
-// packages/playwright-debug/src/index.ts
+// packages/playwright-debugger/src/index.ts
 async function runBrowserToolsDebugAgent(context, page, apiKey) {
   const browser = createAiSdkBrowserToolsForPage(page);
   await generateText({
@@ -88,7 +88,7 @@ async function runBrowserToolsDebugAgent(context, page, apiKey) {
 Wrap the full debugging workflow in a best-effort boundary and add a `debugger_failed` result. Append a random suffix to readable timestamp-based branch names so simultaneous failures cannot share a Git ref.
 
 ```ts
-// packages/playwright-debug/src/index.ts
+// packages/playwright-debugger/src/index.ts
 async function debugPlaywrightFailure(error, page, options) {
   try {
     return await investigateAndOpenPullRequest(error, page, options);
@@ -104,4 +104,4 @@ async function debugPlaywrightFailure(error, page, options) {
 - [x] Add a random suffix to library-generated branch names.
 - [x] Test two failures with the same owner, repository, and timestamp produce different branch names.
 - [x] Test broker/GitHub failure returns `debugger_failed` and allows caller fallback plus original error rethrow.
-- [x] Run frozen install, browser-tools tests, playwright-debug tests, CLI tests, type checking, and linting.
+- [x] Run frozen install, browser-tools tests, playwright-debugger tests, CLI tests, type checking, and linting.

@@ -10,7 +10,7 @@ change instead of a pager alert.
 
 You add one call in your script's failure path; Libretto does the rest. For the
 API and configuration, see the
-[Playwright debugging agent reference](../reference/runtime/playwright-debug).
+[Playwright debugging agent reference](../reference/runtime/playwright-debugger).
 
 ## Why it inspects the live page
 
@@ -20,7 +20,7 @@ the real field is `name="login"`, because the page redirected, or because an
 element loads late — and the source code alone cannot tell you which.
 
 The debugging agent does not guess. It runs an agent loop on the
-[`libretto-browser-tools`](../reference/runtime/playwright-debug) SDK and
+[`libretto-browser-tools`](https://www.npmjs.com/package/libretto-browser-tools) SDK and
 drives the supplied failed page in its existing browser context. Authentication,
 storage, open tabs, network routes, and in-memory state remain available while
 the agent confirms the cause. Fixes are grounded in what the agent actually

@@ -16,12 +16,12 @@ import { GitHubIcon } from "./icons";
 
 const GITHUB_APP_INSTALL_URL =
   "https://github.com/apps/libretto-agent/installations/new";
-const DEBUGGER_DOCS_URL = "/docs/reference/runtime/playwright-debug";
+const DEBUGGER_DOCS_URL = "/docs/reference/runtime/playwright-debugger";
 const DEBUGGER_CONCEPT_URL = "/docs/understand-libretto/autofix-debugging";
 const DEBUGGER_PROMPT =
   "Add the Libretto Playwright debugging agent to my existing automation. " +
-  "Install libretto-playwright-debug, then follow " +
-  "https://libretto.sh/docs/reference/runtime/playwright-debug. Create a " +
+  "Install libretto-playwright-debugger, then follow " +
+  "https://libretto.sh/docs/reference/runtime/playwright-debugger. Create a " +
   "module-scope playwrightDebugger with createPlaywrightDebugger, my repo " +
   "(owner, repo, baseBranch), and model configuration, using LIBRETTO_API_KEY " +
   "for GitHub authentication. At the existing failure point, before " +
@@ -35,7 +35,6 @@ const CLOUD_SETUP_COMPLETE_KEY = "libretto.setup.cloudSetupComplete";
 const CLOUD_SETUP_DISMISSED_KEY = "libretto.dashboard.cloudSetupDismissed";
 
 type Screen =
-  | "local"
   | "intro"
   | "github"
   | "confirm"
@@ -49,7 +48,6 @@ type Screen =
 // Where each screen's "Back" goes. GitHub can't be un-linked, so the repo
 // confirmation steps back to the first step rather than the connect screen.
 const BACK_TARGET: Record<Screen, Screen | null> = {
-  local: null,
   intro: null,
   github: "intro",
   confirm: "intro",
@@ -67,11 +65,6 @@ const WIDE_ACTION_BUTTON_CLASS =
   "libretto-button libretto-button--sm inline-flex h-9 min-w-[220px] items-center justify-center whitespace-nowrap px-4 disabled:cursor-not-allowed disabled:opacity-60";
 const NAV_BUTTON_CLASS =
   "w-fit text-xs text-muted underline decoration-muted underline-offset-4 transition-colors hover:text-ink hover:decoration-accent disabled:cursor-not-allowed disabled:opacity-60";
-
-function getLocalAgentStepComplete(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem("libretto.dashboard.localAgentSetup") === "1";
-}
 
 function getInitialSetupStep(): string | null {
   if (typeof window === "undefined") return null;
@@ -120,27 +113,13 @@ export function SetupPage() {
 
         try {
           const setup = await getSetupStatus();
-          const hasLocalStorageCompletion = getLocalAgentStepComplete();
           const initialStep = getInitialSetupStep();
-          if (hasLocalStorageCompletion && !setup.local_agent_setup_complete) {
-            const updated = await updateSetupStatus({
-              local_agent_setup_complete: true,
-            });
-            setSetupStatus(updated);
-            if (
-              initialStep === "github-repositories" &&
-              updated.github_repository_linked
-            ) {
-              setManualScreen("confirm");
-            }
-          } else {
-            setSetupStatus(setup);
-            if (
-              initialStep === "github-repositories" &&
-              setup.github_repository_linked
-            ) {
-              setManualScreen("confirm");
-            }
+          setSetupStatus(setup);
+          if (
+            initialStep === "github-repositories" &&
+            setup.github_repository_linked
+          ) {
+            setManualScreen("confirm");
           }
         } catch (err) {
           setSetupStatus({
@@ -193,14 +172,6 @@ export function SetupPage() {
     }
   }
 
-  async function completeLocalAgentSetup() {
-    const updated = await patchSetup({ local_agent_setup_complete: true });
-    if (updated) {
-      window.localStorage.setItem("libretto.dashboard.localAgentSetup", "1");
-      setManualScreen("intro");
-    }
-  }
-
   async function mintApiKey(name = "Libretto autofix") {
     setSavingStep(true);
     setError(null);
@@ -249,15 +220,12 @@ export function SetupPage() {
     setTimeout(() => setKeyCopied(false), 1500);
   }
 
-  const localAgentDone = setupStatus?.local_agent_setup_complete === true;
   const githubDone = setupStatus?.github_repository_linked === true;
   const apiKeyDone = setupStatus?.api_key_created === true;
   const debuggerDone = setupStatus?.debugger_added === true;
 
   const prSetupComplete = githubDone && apiKeyDone && debuggerDone;
-  const derivedScreen: Screen = !localAgentDone || !prSetupComplete
-    ? "local"
-    : "done";
+  const derivedScreen: Screen = prSetupComplete ? "done" : "intro";
   const screen = manualScreen ?? derivedScreen;
 
   function goBack() {
@@ -307,38 +275,6 @@ export function SetupPage() {
         ) : (
           <>
             <section className="rounded-lg border border-accent/25 bg-green-9/10 p-4 md:p-5">
-            {screen === "local" && (
-              <div className="grid gap-5">
-                <div>
-                  <AreaLabel title="Local repo setup" />
-                  <h2 className="text-lg font-semibold text-ink">
-                    Set up your local agent
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-muted">
-                    Libretto runs as a local agent on your machine, where you
-                    build and run browser automations. Copy this prompt into
-                    your coding agent (Claude Code, Cursor, Codex...) so it
-                    installs the Libretto CLI and scaffolds your first workflow.
-                  </p>
-                </div>
-                <div className="flex flex-col items-start">
-                  <InstallSnippet fathomEvent="Setup copy local setup prompt click" />
-                </div>
-                <StepFooter
-                  next={
-                    <button
-                      type="button"
-                      disabled={savingStep}
-                      onClick={() => void completeLocalAgentSetup()}
-                      className={NAV_BUTTON_CLASS}
-                    >
-                      {savingStep ? "Saving..." : "Next →"}
-                    </button>
-                  }
-                />
-              </div>
-            )}
-
             {screen === "intro" && (
               <div className="grid gap-5">
                 <div>
@@ -355,11 +291,8 @@ export function SetupPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-rule/50 pt-4">
-                  <h3 className="font-mono text-xs uppercase text-muted">
-                    How PR agents work
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-muted">
+                <div className="border-t border-rule/50 pt-2">
+                  <p className="text-sm leading-6 text-muted">
                     PR autofix agents work with any browser runtime or cloud
                     provider. Add the Playwright debugger to your automation,
                     and Libretto can inspect failures from your runs and open
@@ -744,10 +677,10 @@ export function SetupPage() {
                     Setup complete
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-muted">
-                    Your local repo and PR autofix agent are ready. When a script
-                    fails, Libretto can investigate the live page and open a fix
-                    PR on your connected repo. Cloud browsers are optional and can
-                    be set up separately.
+                    Your PR autofix agent is ready. When a script fails, Libretto
+                    can investigate the live page and open a fix PR on your
+                    connected repo. Cloud browsers are optional and can be set up
+                    separately.
                   </p>
                 </div>
                 <StepFooter
