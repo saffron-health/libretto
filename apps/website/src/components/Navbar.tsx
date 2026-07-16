@@ -423,7 +423,7 @@ function OpenSourceNavMenu() {
             href="/browser-tools"
             icon={<ToolsIcon />}
             title="Browser Tools SDK"
-            description="Coming soon"
+            description="Give any agent a real browser"
             fathomEvent="Nav open source browser tools click"
           />
         </Menu>
