@@ -1,7 +1,7 @@
 import { postAuthRedirect } from "./authRedirect";
 
 export function targetAfterVerification(hasTenant: boolean): string {
-  return hasTenant ? "/dashboard" : "/onboarding";
+  return hasTenant ? "/setup" : "/onboarding";
 }
 
 export async function redirectAfterVerifiedEmail(input: {

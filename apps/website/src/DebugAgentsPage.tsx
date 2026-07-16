@@ -42,7 +42,7 @@ const PR_AGENT_FAQS: FAQItem[] = [
     id: "runtime",
     question: "Do I need to use the Libretto runtime?",
     answer:
-      "No. Add libretto-playwright-debug to an existing Playwright project, initialize the debugger once, and call debugFailure() from the failure path. Your current runtime, browser provider, deployment, and workflow structure stay in place.",
+      "No. Add libretto-playwright-debugger to an existing Playwright project, initialize the debugger once, and call debugFailure() from the failure path. Your current runtime, browser provider, deployment, and workflow structure stay in place.",
   },
   {
     id: "frameworks",
@@ -70,7 +70,7 @@ const PR_AGENT_FAQS: FAQItem[] = [
         Yes. The Playwright debugger package is open source under the MIT
         license in the{" "}
         <a
-          href="https://github.com/saffron-health/libretto/tree/main/packages/playwright-debug"
+          href="https://github.com/saffron-health/libretto/tree/main/packages/playwright-debugger"
           className="underline text-accent transition-colors hover:text-accent-bright"
           data-fathom-event="Debug agents FAQ GitHub click"
         >

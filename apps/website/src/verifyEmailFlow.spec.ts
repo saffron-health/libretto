@@ -27,7 +27,7 @@ describe("redirectAfterVerifiedEmail", () => {
 
     approve(true);
 
-    await expect(redirectPromise).resolves.toBe("/dashboard");
+    await expect(redirectPromise).resolves.toBe("/setup");
   });
 
   it("does not redirect when CLI login approval fails", async () => {
@@ -65,6 +65,17 @@ describe("redirectAfterVerifiedEmail", () => {
         },
       }),
     ).resolves.toBe("/onboarding");
+  });
+
+  it("sends an existing tenant to setup after email verification", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: true,
+        returnTo: null,
+        hasCliLoginParams: false,
+        approveCliLogin: async () => true,
+      }),
+    ).resolves.toBe("/setup");
   });
 
   it("drops dashboard return targets before tenant setup exists", async () => {

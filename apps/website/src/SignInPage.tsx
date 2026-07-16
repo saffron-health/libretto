@@ -139,7 +139,7 @@ export function SignInPage() {
     window.history.replaceState(null, "", withoutCliLoginParams());
     try {
       window.location.assign(
-        statusBeforeApproval.hasTenant ? "/dashboard" : "/onboarding",
+        statusBeforeApproval.hasTenant ? "/setup" : "/onboarding",
       );
     } catch {
       window.location.assign("/onboarding");
@@ -190,7 +190,7 @@ export function SignInPage() {
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
           : `${window.location.origin}${
-              sanitizeReturnToForAuthState(getSafeReturnTo(), true) ?? "/dashboard"
+              sanitizeReturnToForAuthState(getSafeReturnTo(), true) ?? "/setup"
             }`,
       });
       if (result.url) {
@@ -198,7 +198,7 @@ export function SignInPage() {
         return;
       }
       if (await approveCliLogin()) return;
-      window.location.assign("/dashboard");
+      window.location.assign("/setup");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email sign-in failed.");
       setLoading(null);
@@ -246,7 +246,7 @@ export function SignInPage() {
           : `${window.location.origin}${
               mode === "signup"
                 ? withReturnTo("/onboarding", callbackReturnTo)
-                : callbackReturnTo ?? "/dashboard"
+                : callbackReturnTo ?? "/setup"
             }`,
       });
       if (result.url) {
@@ -257,7 +257,7 @@ export function SignInPage() {
       window.location.assign(
         mode === "signup"
           ? withReturnTo("/onboarding", callbackReturnTo)
-          : callbackReturnTo ?? "/dashboard",
+          : callbackReturnTo ?? "/setup",
       );
     } catch (err) {
       setError(

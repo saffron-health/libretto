@@ -1,6 +1,6 @@
-# libretto-playwright-debug
+# libretto-playwright-debugger
 
-`libretto-playwright-debug` adds a Playwright debugging agent that investigates
+`libretto-playwright-debugger` adds a Playwright debugging agent that investigates
 failed runs on the supplied live page and automatically opens pull requests to
 fix broken scripts. It preserves the page's browser context and treats debugger
 infrastructure failures as best-effort results instead of replacing the original
@@ -11,7 +11,7 @@ automation error.
 Add the package to the project that runs the Playwright automation:
 
 ```bash
-pnpm add libretto-playwright-debug
+pnpm add libretto-playwright-debugger
 ```
 
 The project must already depend on Playwright.
@@ -32,7 +32,7 @@ Store both keys in the project's existing secret-management system.
 Initialize the debugger once at module scope:
 
 ```ts
-import { createPlaywrightDebugger } from "libretto-playwright-debug";
+import { createPlaywrightDebugger } from "libretto-playwright-debugger";
 
 const playwrightDebugger = createPlaywrightDebugger({
   github: {

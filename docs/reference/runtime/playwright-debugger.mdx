@@ -6,18 +6,18 @@ description: Investigate failures and automatically open pull requests to fix Pl
 The Playwright debugging agent investigates failed browser automations and
 automatically opens pull requests that fix broken scripts.
 
-`libretto-playwright-debug` lets an existing Playwright script keep its current
+`libretto-playwright-debugger` lets an existing Playwright script keep its current
 browser provider, retries, logging, and fallback logic while adding one agent
 call in the failure path.
 
 Install it in the project that runs the Playwright automation:
 
 ```bash
-pnpm add libretto-playwright-debug
+pnpm add libretto-playwright-debugger
 ```
 
 ```typescript
-import { createPlaywrightDebugger } from "libretto-playwright-debug";
+import { createPlaywrightDebugger } from "libretto-playwright-debugger";
 
 const playwrightDebugger = createPlaywrightDebugger({
   github: {
