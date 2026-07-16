@@ -176,7 +176,7 @@ function getCurrentPageLabel(): string {
   if (typeof window === "undefined") return "Dashboard";
   const pathname = window.location.pathname;
   if (pathname === "/dashboard/cloud-browsers") return "Cloud Browsers";
-  if (pathname === "/dashboard") return "Libretto PR Agents";
+  if (pathname === "/dashboard") return "PR Agents";
   if (
     pathname === "/setup" ||
     pathname === "/github/setup" ||
@@ -515,10 +515,10 @@ function CloudAccountLink({ session }: { session: CloudSession | null }) {
           <DashboardMenuItem
             href="/dashboard"
             icon={<PullRequestIcon />}
-            title="Libretto PR Agents"
+            title="PR Agents"
             description="Auto-fix failing workflows"
             fathomEvent="Nav PR agents dashboard click"
-            current={pageLabel === "Libretto PR Agents"}
+            current={pageLabel === "PR Agents"}
           />
           <DashboardMenuItem
             href="/dashboard/cloud-browsers"
