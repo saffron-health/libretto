@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { getSafeReturnTo, postAuthRedirect, sanitizeReturnToForAuthState } from "./authRedirect";
+import { getSafeReturnTo, postAuthRedirect } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
 import {
   getAuthStatus,
@@ -83,7 +83,12 @@ export function OnboardingPage() {
         debugNotificationEmail: debugNotificationEmail || email,
       });
       window.location.assign(
-        sanitizeReturnToForAuthState(getSafeReturnTo(), true) ?? "/setup",
+        postAuthRedirect({
+          emailVerified: true,
+          hasTenant: true,
+          setupComplete: false,
+          returnTo: getSafeReturnTo(),
+        }),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Organization setup failed.");
