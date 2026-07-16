@@ -93,3 +93,4 @@ In `packages/browser-tools`, format caught errors with `errorMessage()` from `sr
 ## Cursor Cloud specific instructions
 
 - **Browser runs are headless here** (no display). Pass `--headless` to `libretto open`/`run`, or they default to headed and hang.
+- The Notion CLI (`ntn`) is installed by `.cursor/environment.json`. Authenticate unattended CLI usage by adding a Cursor Cloud environment-scoped Runtime Secret named `NOTION_API_TOKEN`; optionally add `NOTION_WORKSPACE_ID` to select a workspace without prompting. If `NOTION_API_TOKEN` is unavailable when an authenticated `ntn` command is needed, ask the user to add the secret and start a new agent. Do not run `ntn login`: it requires an interactive browser and a persistent system keychain that Cloud Agents may not provide.

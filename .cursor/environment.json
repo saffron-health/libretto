@@ -1,0 +1,3 @@
+{
+  "install": "pnpm install --frozen-lockfile && npm install --global ntn"
+}
