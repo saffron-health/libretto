@@ -2,6 +2,7 @@ import {
 	defineTool,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import {
@@ -17,8 +18,8 @@ const JudgmentSchema = z.object({
 });
 const JUDGE_SYSTEM_PROMPT = [
 	"You judge whether a browser agent completed the user's task.",
-	"Use read and bash with jq to inspect artifact files instead of asking for their contents.",
-	"Use the Pi session JSONL for structured tool evidence and transcript.md for the final answer.",
+	"Use bash with jq to inspect only the provided events.jsonl path.",
+	"Inspect user messages, completed tool calls and results, and the final assistant answer. Do not inspect other files, use the network, or treat assistant reasoning as evidence.",
 	"Mark completed only when the agent provides the requested result and the live website evidence reasonably supports it.",
 	"If any issue prevented the agent from providing the requested result, mark incomplete. Accurately reporting a CAPTCHA, access denial, timeout, tool failure, or other blocker is not task completion.",
 	"Call report_evaluation exactly once with your decision and concise reasoning.",
@@ -28,10 +29,10 @@ export type Judgment = z.infer<typeof JudgmentSchema>;
 
 export async function judgeBrowserRun(options: {
 	task: string;
-	transcriptPath: string;
-	sessionPath: string;
+	eventsPath: string;
 	workspace: string;
 }): Promise<{ judgment: Judgment; run: SessionRun }> {
+	await mkdir(options.workspace, { recursive: true });
 	let judgment: Judgment | null = null;
 	const reportTool = defineTool({
 		name: "report_evaluation",
@@ -49,19 +50,19 @@ export async function judgeBrowserRun(options: {
 	});
 	const session = await createPiSession({
 		workspace: options.workspace,
-		sessionFile: join(options.workspace, "judge", "session.jsonl"),
+		sessionFile: join(options.workspace, "session.jsonl"),
 		systemPrompt: JUDGE_SYSTEM_PROMPT,
 		customTools: [reportTool],
-		tools: ["read", "bash", "report_evaluation"],
+		tools: ["bash", reportTool.name],
 	});
 	const run = await runPrompt(
 		session,
 		[
 			`TASK:\n${options.task}`,
 			"",
-			"ARTIFACTS:",
-			`- transcript.md: ${options.transcriptPath}`,
-			`- Pi session JSONL: ${options.sessionPath}`,
+			`EVENTS_JSONL:\n${options.eventsPath}`,
+			"",
+			"Use jq to inspect the raw events before calling report_evaluation.",
 		].join("\n"),
 	);
 	if (!judgment) {

@@ -251,6 +251,20 @@ function maxRequestContextTokens(events: AgentSessionEvent[]): number {
   return maxTokens;
 }
 
+function eventReplacer(key: string, value: unknown): unknown {
+  if (typeof value === "bigint") return value.toString();
+  if (key === "data" && typeof value === "string" && value.length > 10_000) {
+    return `[omitted ${value.length} characters]`;
+  }
+  return value;
+}
+
+export function eventsJsonl(events: AgentSessionEvent[]): string {
+  return `${events
+    .map((event) => JSON.stringify(event, eventReplacer))
+    .join("\n")}\n`;
+}
+
 export function transcriptFor(session: AgentSession): string {
   return serializeConversation(convertToLlm(session.messages)).trim();
 }

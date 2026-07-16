@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { z } from "zod";
 import {
 	emptyMetrics,
+	eventsJsonl,
 	MODEL_SELECTOR,
 	SessionRunError,
 	transcriptFor,
@@ -108,6 +109,7 @@ type AttemptResult = {
 	finishedAt: string;
 	error: string | null;
 	artifacts: {
+		events: string;
 		transcript: string;
 		session: string;
 		result: string;
@@ -220,9 +222,11 @@ function jsonReplacer(key: string, value: unknown): unknown {
 async function writeAgentArtifacts(
 	run: SessionRun,
 	transcriptPath: string,
+	eventsPath: string,
 ): Promise<void> {
 	const transcript = transcriptFor(run.session);
 	await writeFile(transcriptPath, `${transcript}\n`, "utf8");
+	await writeFile(eventsPath, eventsJsonl(run.events), "utf8");
 }
 
 async function runAttempt(options: {
@@ -235,6 +239,7 @@ async function runAttempt(options: {
 	const id = `${slug(options.websiteCase.name)}-${options.harness}-run-${options.repeat}`;
 	const caseDir = join(options.runDir, "cases", id);
 	const transcriptPath = join(caseDir, "transcript.md");
+	const eventsPath = join(caseDir, "events.jsonl");
 	const sessionPath = join(caseDir, "session.jsonl");
 	const resultPath = join(caseDir, "result.json");
 	await mkdir(caseDir, { recursive: true });
@@ -258,15 +263,18 @@ async function runAttempt(options: {
 			if (error instanceof SessionRunError) agentRun = error.run;
 			throw error;
 		}
-		await writeAgentArtifacts(agentRun, transcriptPath);
+		await writeAgentArtifacts(
+			agentRun,
+			transcriptPath,
+			eventsPath,
+		);
 		answer = agentRun.session.getLastAssistantText()?.trim() || null;
 		if (!answer) throw new Error("Browser agent returned no final answer.");
 		try {
 			const judged = await judgeBrowserRun({
 				task: options.websiteCase.task,
-				transcriptPath,
-				sessionPath,
-				workspace: caseDir,
+				eventsPath,
+				workspace: join(caseDir, "judge"),
 			});
 			judgeRun = judged.run;
 			judgment = judged.judgment;
@@ -275,8 +283,11 @@ async function runAttempt(options: {
 			throw error;
 		}
 	} catch (error) {
-		if (agentRun && !existsSync(transcriptPath)) {
-			await writeAgentArtifacts(agentRun, transcriptPath);
+		if (
+			agentRun &&
+			(!existsSync(transcriptPath) || !existsSync(eventsPath))
+		) {
+			await writeAgentArtifacts(agentRun, transcriptPath, eventsPath);
 		}
 		errorMessage = error instanceof Error ? error.message : String(error);
 	} finally {
@@ -299,6 +310,7 @@ async function runAttempt(options: {
 		finishedAt: new Date().toISOString(),
 		error: errorMessage,
 		artifacts: {
+			events: eventsPath,
 			transcript: transcriptPath,
 			session: sessionPath,
 			result: resultPath,
