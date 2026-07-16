@@ -47,10 +47,11 @@ export function sanitizeReturnToForAuthState(
 export function postAuthRedirect(input: {
   emailVerified: boolean;
   hasTenant: boolean;
+  setupComplete: boolean;
   returnTo: string | null;
 }): string {
   const returnTo = sanitizeReturnToForAuthState(input.returnTo, input.hasTenant);
   if (!input.emailVerified) return withReturnTo("/verify-email", returnTo);
   if (!input.hasTenant) return withReturnTo("/onboarding", returnTo);
-  return returnTo ?? "/setup";
+  return returnTo ?? (input.setupComplete ? "/dashboard" : "/setup");
 }

@@ -11,6 +11,7 @@ describe("redirectAfterVerifiedEmail", () => {
 
     const redirectPromise = redirectAfterVerifiedEmail({
       hasTenant: true,
+      setupComplete: false,
       returnTo: null,
       hasCliLoginParams: true,
       approveCliLogin,
@@ -34,6 +35,7 @@ describe("redirectAfterVerifiedEmail", () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: true,
+        setupComplete: false,
         returnTo: "/invite?accept=1",
         hasCliLoginParams: true,
         approveCliLogin: async () => false,
@@ -45,6 +47,7 @@ describe("redirectAfterVerifiedEmail", () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: true,
+        setupComplete: false,
         returnTo: "/dashboard",
         hasCliLoginParams: true,
         approveCliLogin: async () => {
@@ -58,6 +61,7 @@ describe("redirectAfterVerifiedEmail", () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: false,
+        setupComplete: false,
         returnTo: null,
         hasCliLoginParams: false,
         approveCliLogin: async () => {
@@ -71,6 +75,7 @@ describe("redirectAfterVerifiedEmail", () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: true,
+        setupComplete: false,
         returnTo: null,
         hasCliLoginParams: false,
         approveCliLogin: async () => true,
@@ -78,10 +83,23 @@ describe("redirectAfterVerifiedEmail", () => {
     ).resolves.toBe("/setup");
   });
 
+  it("sends a fully configured tenant to the dashboard", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: true,
+        setupComplete: true,
+        returnTo: null,
+        hasCliLoginParams: false,
+        approveCliLogin: async () => true,
+      }),
+    ).resolves.toBe("/dashboard");
+  });
+
   it("drops dashboard return targets before tenant setup exists", async () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: false,
+        setupComplete: false,
         returnTo: "/dashboard",
         hasCliLoginParams: false,
         approveCliLogin: async () => true,
@@ -93,6 +111,7 @@ describe("redirectAfterVerifiedEmail", () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: false,
+        setupComplete: false,
         returnTo: "/github/setup?installation_id=123&setup_action=install",
         hasCliLoginParams: false,
         approveCliLogin: async () => true,

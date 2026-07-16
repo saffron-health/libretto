@@ -38,6 +38,14 @@ export type SetupStatus = {
   setup_complete: boolean;
 };
 
+export function isPrAgentSetupComplete(setup: SetupStatus): boolean {
+  return (
+    setup.github_repository_linked &&
+    setup.api_key_created &&
+    setup.debugger_added
+  );
+}
+
 export type ApiKeyCreateResponse = {
   id: string;
   name?: string | null;

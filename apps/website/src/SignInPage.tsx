@@ -7,7 +7,15 @@ import {
   withReturnTo,
 } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
-import { authPost, getAuthStatus, getCloudSession, orpcCall } from "./cloudApi";
+import {
+  authPost,
+  getAuthStatus,
+  getCloudSession,
+  getSetupStatus,
+  isPrAgentSetupComplete,
+  orpcCall,
+  type AuthStatus,
+} from "./cloudApi";
 import { GitHubIcon } from "./icons";
 
 type AuthResponse = {
@@ -58,6 +66,24 @@ function currentSigninCallbackUrl(): string {
     url.searchParams.set("cliLoginSecret", cliLogin.secret);
   }
   return url.toString();
+}
+
+async function resolvePostAuthRedirect(
+  status: AuthStatus,
+  returnTo: string | null,
+): Promise<string> {
+  const setupComplete =
+    status.emailVerified && status.hasTenant
+      ? await getSetupStatus()
+          .then(isPrAgentSetupComplete)
+          .catch(() => false)
+      : false;
+  return postAuthRedirect({
+    emailVerified: status.emailVerified,
+    hasTenant: status.hasTenant,
+    setupComplete,
+    returnTo,
+  });
 }
 
 function GoogleLogo() {
@@ -137,13 +163,9 @@ export function SignInPage() {
       return true;
     }
     window.history.replaceState(null, "", withoutCliLoginParams());
-    try {
-      window.location.assign(
-        statusBeforeApproval.hasTenant ? "/setup" : "/onboarding",
-      );
-    } catch {
-      window.location.assign("/onboarding");
-    }
+    window.location.assign(
+      await resolvePostAuthRedirect(statusBeforeApproval, null),
+    );
     return true;
   }
 
@@ -162,13 +184,9 @@ export function SignInPage() {
           return;
         }
         getAuthStatus()
-          .then((status) => {
+          .then(async (status) => {
             window.location.assign(
-              postAuthRedirect({
-                emailVerified: status.emailVerified,
-                hasTenant: status.hasTenant,
-                returnTo: getSafeReturnTo(),
-              }),
+              await resolvePostAuthRedirect(status, getSafeReturnTo()),
             );
           })
           .catch(() => {
@@ -190,7 +208,7 @@ export function SignInPage() {
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
           : `${window.location.origin}${
-              sanitizeReturnToForAuthState(getSafeReturnTo(), true) ?? "/setup"
+              sanitizeReturnToForAuthState(getSafeReturnTo(), true) ?? "/signin"
             }`,
       });
       if (result.url) {
@@ -198,7 +216,9 @@ export function SignInPage() {
         return;
       }
       if (await approveCliLogin()) return;
-      window.location.assign("/setup");
+      window.location.assign(
+        await resolvePostAuthRedirect(await getAuthStatus(), getSafeReturnTo()),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email sign-in failed.");
       setLoading(null);
@@ -244,9 +264,7 @@ export function SignInPage() {
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
           : `${window.location.origin}${
-              mode === "signup"
-                ? withReturnTo("/onboarding", callbackReturnTo)
-                : callbackReturnTo ?? "/setup"
+              callbackReturnTo ?? "/signin"
             }`,
       });
       if (result.url) {
@@ -255,9 +273,7 @@ export function SignInPage() {
       }
       if (await approveCliLogin()) return;
       window.location.assign(
-        mode === "signup"
-          ? withReturnTo("/onboarding", callbackReturnTo)
-          : callbackReturnTo ?? "/setup",
+        await resolvePostAuthRedirect(await getAuthStatus(), callbackReturnTo),
       );
     } catch (err) {
       setError(
