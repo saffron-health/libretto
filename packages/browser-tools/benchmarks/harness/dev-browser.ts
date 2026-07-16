@@ -1,19 +1,26 @@
 import type { SessionRun } from "../agent.js";
-import { closeKernelConnection, createKernelConnection, shellQuote } from "./kernel.js";
+import {
+	closeCloudBrowserConnection,
+	createCloudBrowserConnection,
+	packageCliCommand,
+	shellQuote,
+	type BrowserProviderName,
+} from "./cloud-browser.js";
 import { runBrowserTask } from "./run-browser-task.js";
 
 export async function runDevBrowserHarness(
 	task: string,
 	workspace: string,
+	provider: BrowserProviderName,
 ): Promise<SessionRun> {
-	const kernel = await createKernelConnection();
+	const browser = await createCloudBrowserConnection(provider);
 	try {
 		const command = [
-			"dev-browser",
+			packageCliCommand("dev-browser"),
 			"--browser",
-			shellQuote(kernel.sessionName),
+			shellQuote(browser.sessionName),
 			"--connect",
-			shellQuote(kernel.cdpEndpoint),
+			shellQuote(browser.cdpEndpoint),
 			"--timeout",
 			"110",
 		].join(" ");
@@ -28,6 +35,6 @@ export async function runDevBrowserHarness(
 			],
 		});
 	} finally {
-		await closeKernelConnection(kernel);
+		await closeCloudBrowserConnection(browser);
 	}
 }

@@ -1,23 +1,17 @@
 import { createPiBrowserTools } from "@libretto/browser-tools/pi";
-import { KernelBrowserProvider } from "@libretto/browser-tools/kernel";
+import { SessionRunError, type SessionRun } from "../agent.js";
 import {
-	DEFAULT_TIMEOUT_MS,
-	SessionRunError,
-	type SessionRun,
-} from "../agent.js";
+	createBenchmarkBrowserProvider,
+	type BrowserProviderName,
+} from "./cloud-browser.js";
 import { runBrowserTask } from "./run-browser-task.js";
 
 export async function runBrowserToolsHarness(
 	task: string,
 	workspace: string,
+	provider: BrowserProviderName,
 ): Promise<SessionRun> {
-	const toolkit = createPiBrowserTools(
-		new KernelBrowserProvider({
-			headless: false,
-			stealth: true,
-			timeoutSeconds: Math.ceil(DEFAULT_TIMEOUT_MS / 1000),
-		}),
-	);
+	const toolkit = createPiBrowserTools(createBenchmarkBrowserProvider(provider));
 	let run: SessionRun;
 	try {
 		run = await runBrowserTask({

@@ -16,11 +16,11 @@ const JudgmentSchema = z.object({
 	reasoning: z.string().trim().min(1),
 });
 const JUDGE_SYSTEM_PROMPT = [
-	"You strictly judge browser-agent sessions.",
+	"You judge whether a browser agent completed the user's task.",
 	"Use read and bash with jq to inspect artifact files instead of asking for their contents.",
-	"Prioritize the Pi session JSONL for structured tool evidence and use transcript.md for the rendered conversation and final answer.",
-	"Mark completed only when the artifacts show live-page evidence from the intended website and the final answer satisfies the task.",
-	"Mark incomplete when evidence is missing, the answer is unsupported, or an anti-bot challenge remained unresolved.",
+	"Use the Pi session JSONL for structured tool evidence and transcript.md for the final answer.",
+	"Mark completed only when the agent provides the requested result and the live website evidence reasonably supports it.",
+	"If any issue prevented the agent from providing the requested result, mark incomplete. Accurately reporting a CAPTCHA, access denial, timeout, tool failure, or other blocker is not task completion.",
 	"Call report_evaluation exactly once with your decision and concise reasoning.",
 ].join(" ");
 

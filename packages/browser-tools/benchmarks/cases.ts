@@ -8,10 +8,10 @@ export const WEBSITE_CASES: WebsiteCase[] = [
 		name: "craigslist used bikes search",
 		task: "Search Craigslist for used bikes in San Francisco. Tell me the title and price of the first relevant listing.",
 	},
-	{
-		name: "apartments.com austin apartment search",
-		task: "Search Apartments.com for apartments in Austin under $2,000. Tell me the first listing name, price, and neighborhood.",
-	},
+	// {
+	// 	name: "apartments.com austin apartment search",
+	// 	task: "Search Apartments.com for apartments in Austin under $2,000. Tell me the first listing name, price, and neighborhood.",
+	// },
 	{
 		name: "apple newest iphone lookup",
 		task: "Find the newest iPhone on Apple.com. Tell me its starting price and available colors.",

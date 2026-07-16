@@ -2,10 +2,7 @@ import { chromium } from "playwright";
 import { expect, test } from "vitest";
 import { BrowserbaseBrowserProvider } from "./browserbase.js";
 
-test.skipIf(
-	!process.env.BROWSERBASE_API_KEY?.trim() ||
-		!process.env.BROWSERBASE_PROJECT_ID?.trim(),
-)(
+test.skipIf(!process.env.BROWSERBASE_API_KEY?.trim())(
 	"creates, connects to, and closes a Browserbase browser",
 	async () => {
 		const provider = new BrowserbaseBrowserProvider();

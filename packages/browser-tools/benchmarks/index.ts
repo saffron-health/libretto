@@ -16,6 +16,10 @@ import {
 import { WEBSITE_CASES, type WebsiteCase } from "./cases.js";
 import { runAgentBrowserHarness } from "./harness/agent-browser.js";
 import { runBrowserToolsHarness } from "./harness/browser-tools.js";
+import {
+	BROWSER_PROVIDERS,
+	type BrowserProviderName,
+} from "./harness/cloud-browser.js";
 import { runDevBrowserHarness } from "./harness/dev-browser.js";
 import { runPlaywrightCliHarness } from "./harness/playwright-cli.js";
 import { judgeBrowserRun, type Judgment } from "./judge.js";
@@ -29,9 +33,14 @@ const HARNESS_NAMES = [
 ] as const;
 type HarnessName = (typeof HARNESS_NAMES)[number];
 const HarnessNameSchema = z.enum(HARNESS_NAMES);
+const BrowserProviderNameSchema = z.enum(BROWSER_PROVIDERS);
 const HARNESS_RUNNERS: Record<
 	HarnessName,
-	(task: string, workspace: string) => Promise<SessionRun>
+	(
+		task: string,
+		workspace: string,
+		provider: BrowserProviderName,
+	) => Promise<SessionRun>
 > = {
 	"browser-tools": runBrowserToolsHarness,
 	"agent-browser": runAgentBrowserHarness,
@@ -42,19 +51,23 @@ const packageRoot = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageRoot, "../..");
 
 type CliOptions = {
+	caseLimit?: number;
 	casePattern?: string;
 	concurrency: number;
 	harnesses: HarnessName[];
 	outputDir?: string;
+	provider: BrowserProviderName;
 	repeatCount: number;
 }
 
 const CliOptionsSchema = z
 	.object({
+		caseLimit: z.number().int().positive().optional(),
 		casePattern: z.string().optional(),
 		concurrency: z.number().int().positive(),
 		harnesses: z.string().trim().min(1),
 		outputDir: z.string().optional(),
+		provider: z.string().trim().min(1),
 		repeatCount: z.number().int().positive(),
 	})
 	.transform((input): CliOptions => {
@@ -67,9 +80,16 @@ const CliOptionsSchema = z
 			}
 			return parsed.data;
 		});
+		const provider = BrowserProviderNameSchema.safeParse(input.provider);
+		if (!provider.success) {
+			throw new Error(
+				`Unknown provider "${input.provider}". Valid providers: ${BROWSER_PROVIDERS.join(", ")}.`,
+			);
+		}
 		return {
 			...input,
 			harnesses: [...new Set(harnesses)],
+			provider: provider.data,
 		};
 	});
 
@@ -103,6 +123,13 @@ function forAffordance(schema: z.ZodType): AffordanceSchema {
 const benchmarkInput = SimpleCLI.input({
 	positionals: [],
 	named: {
+		caseLimit: SimpleCLI.option(
+			forAffordance(z.coerce.number().int().positive().optional()),
+			{
+				name: "case-limit",
+				help: "Run only the first N matching cases",
+			},
+		),
 		casePattern: SimpleCLI.option(forAffordance(z.string().optional()), {
 			name: "case",
 			aliases: ["t"],
@@ -120,6 +147,12 @@ const benchmarkInput = SimpleCLI.input({
 			forAffordance(z.string().default(HARNESS_NAMES.join(","))),
 			{
 				help: `Comma-separated harnesses (default: ${HARNESS_NAMES.join(",")})`,
+			},
+		),
+		provider: SimpleCLI.option(
+			forAffordance(z.string().default("kernel")),
+			{
+				help: `Cloud browser provider (default: kernel). Valid: ${BROWSER_PROVIDERS.join(", ")}`,
 			},
 		),
 		repeatCount: SimpleCLI.option(
@@ -142,7 +175,7 @@ function loadRepoEnv(): void {
 	process.loadEnvFile(envPath);
 }
 
-function requireEnvironment(name: "OPENAI_API_KEY" | "KERNEL_API_KEY"): string {
+function requireEnvironment(name: string): string {
 	const value = process.env[name]?.trim();
 	if (!value) {
 		throw new Error(
@@ -150,6 +183,18 @@ function requireEnvironment(name: "OPENAI_API_KEY" | "KERNEL_API_KEY"): string {
 		);
 	}
 	return value;
+}
+
+function requireProviderEnvironment(provider: BrowserProviderName): void {
+	requireEnvironment("OPENAI_API_KEY");
+	switch (provider) {
+		case "kernel":
+			requireEnvironment("KERNEL_API_KEY");
+			return;
+		case "browserbase":
+			requireEnvironment("BROWSERBASE_API_KEY");
+			return;
+	}
 }
 
 function slug(value: string): string {
@@ -183,6 +228,7 @@ async function writeAgentArtifacts(
 async function runAttempt(options: {
 	websiteCase: WebsiteCase;
 	harness: HarnessName;
+	provider: BrowserProviderName;
 	repeat: number;
 	runDir: string;
 }): Promise<AttemptResult> {
@@ -206,6 +252,7 @@ async function runAttempt(options: {
 			agentRun = await HARNESS_RUNNERS[options.harness](
 				options.websiteCase.task,
 				caseDir,
+				options.provider,
 			);
 		} catch (error) {
 			if (error instanceof SessionRunError) agentRun = error.run;
@@ -303,6 +350,7 @@ function maxContextTokens(results: AttemptResult[]): number {
 }
 
 function summaryMarkdown(options: {
+	provider: BrowserProviderName;
 	runId: string;
 	results: AttemptResult[];
 	startedAt: string;
@@ -319,7 +367,7 @@ function summaryMarkdown(options: {
 		"",
 		`- Run: \`${options.runId}\``,
 		`- Model: \`${MODEL_SELECTOR}\``,
-		"- Browser provider: `kernel`",
+		`- Browser provider: \`${options.provider}\``,
 		`- Started: \`${options.startedAt}\``,
 		`- Finished: \`${options.finishedAt}\``,
 		`- Attempts: \`${options.results.length}\``,
@@ -362,16 +410,18 @@ function summaryMarkdown(options: {
 
 async function runBenchmarks(options: CliOptions): Promise<void> {
 	loadRepoEnv();
-	requireEnvironment("OPENAI_API_KEY");
-	requireEnvironment("KERNEL_API_KEY");
+	requireProviderEnvironment(options.provider);
 
-	const selectedCases = options.casePattern
+	const matchingCases = options.casePattern
 		? WEBSITE_CASES.filter((websiteCase) =>
 				websiteCase.name
 					.toLowerCase()
 					.includes(options.casePattern!.toLowerCase()),
 			)
 		: WEBSITE_CASES;
+	const selectedCases = options.caseLimit
+		? matchingCases.slice(0, options.caseLimit)
+		: matchingCases;
 	if (selectedCases.length === 0) {
 		throw new Error(`No benchmark cases matched "${options.casePattern}".`);
 	}
@@ -399,7 +449,7 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 				runId,
 				model: MODEL_SELECTOR,
 				harnesses: options.harnesses,
-				browserProvider: "kernel",
+				browserProvider: options.provider,
 				concurrency: options.concurrency,
 				repeatCount: options.repeatCount,
 				cases: selectedCases,
@@ -411,7 +461,7 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 		"utf8",
 	);
 	process.stdout.write(
-		`Running ${attempts.length} attempt(s) across ${options.harnesses.join(", ")} with ${MODEL_SELECTOR} and Kernel (concurrency ${options.concurrency}).\n`,
+		`Running ${attempts.length} attempt(s) across ${options.harnesses.join(", ")} with ${MODEL_SELECTOR} and ${options.provider} (concurrency ${options.concurrency}).\n`,
 	);
 	process.stdout.write(`Output: ${runDir}\n`);
 	const results = await mapWithConcurrency(
@@ -420,6 +470,7 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 		async (attempt) =>
 			await runAttempt({
 				...attempt,
+				provider: options.provider,
 				runDir,
 			}),
 	);
@@ -428,7 +479,7 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 		runId,
 		model: MODEL_SELECTOR,
 		harnesses: options.harnesses,
-		browserProvider: "kernel",
+		browserProvider: options.provider,
 		startedAt,
 		finishedAt,
 		attempts: results.length,
@@ -449,7 +500,13 @@ async function runBenchmarks(options: CliOptions): Promise<void> {
 	);
 	await writeFile(
 		join(runDir, "summary.md"),
-		summaryMarkdown({ runId, results, startedAt, finishedAt }),
+		summaryMarkdown({
+			provider: options.provider,
+			runId,
+			results,
+			startedAt,
+			finishedAt,
+		}),
 		"utf8",
 	);
 	process.stdout.write(
@@ -462,7 +519,8 @@ const app = SimpleCLI.define(
 	"browser-tools-benchmarks",
 	{
 		run: SimpleCLI.command({
-			description: "Compare browser harnesses on 27 public websites with Pi and Kernel",
+			description:
+				"Compare browser harnesses on 27 public websites with Pi and a cloud browser provider",
 		})
 			.input(benchmarkInput)
 			.handle(async ({ input }) => {
@@ -470,8 +528,11 @@ const app = SimpleCLI.define(
 			}),
 	},
 	{
-		appendHelpText:
-			"Environment: OPENAI_API_KEY and KERNEL_API_KEY are required.",
+		appendHelpText: [
+			"Environment: OPENAI_API_KEY is always required.",
+			"For --provider kernel: KERNEL_API_KEY.",
+			"For --provider browserbase: BROWSERBASE_API_KEY.",
+		].join(" "),
 	},
 );
 

@@ -1,7 +1,13 @@
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import type { SessionRun } from "../agent.js";
-import { createKernelConnection, closeKernelConnection, shellQuote } from "./kernel.js";
+import {
+	closeCloudBrowserConnection,
+	createCloudBrowserConnection,
+	packageCliCommand,
+	shellQuote,
+	type BrowserProviderName,
+} from "./cloud-browser.js";
 import { runBrowserTask } from "./run-browser-task.js";
 
 const require = createRequire(import.meta.url);
@@ -13,15 +19,16 @@ const AGENT_BROWSER_SKILL_PATH = resolve(
 export async function runAgentBrowserHarness(
 	task: string,
 	workspace: string,
+	provider: BrowserProviderName,
 ): Promise<SessionRun> {
-	const kernel = await createKernelConnection();
+	const browser = await createCloudBrowserConnection(provider);
 	try {
 		const command = [
-			"agent-browser",
+			packageCliCommand("agent-browser"),
 			"--session",
-			shellQuote(kernel.sessionName),
+			shellQuote(browser.sessionName),
 			"--cdp",
-			shellQuote(kernel.cdpEndpoint),
+			shellQuote(browser.cdpEndpoint),
 		].join(" ");
 		return await runBrowserTask({
 			task,
@@ -35,6 +42,6 @@ export async function runAgentBrowserHarness(
 			],
 		});
 	} finally {
-		await closeKernelConnection(kernel);
+		await closeCloudBrowserConnection(browser);
 	}
 }
