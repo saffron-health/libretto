@@ -6,6 +6,7 @@ dist/
 .idea
 .vscode/settings.json
 .env
+.playwright-cli/
 temp/
 benchmarks/**/runs/
 packages/**/benchmarks/runs/

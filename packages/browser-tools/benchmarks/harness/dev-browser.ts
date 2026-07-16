@@ -29,7 +29,7 @@ export async function runDevBrowserHarness(
 			workspace,
 			appendSystemPrompt: [
 				[
-					"A connection to a cloud browser has already been set up.",
+					"A browser connection has already been set up.",
 					`Use it by piping JavaScript into: ${command}`,
 				].join(" "),
 			],

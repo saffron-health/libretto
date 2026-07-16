@@ -22,7 +22,7 @@ export async function runPlaywrightCliHarness(
 			workspace,
 			appendSystemPrompt: [
 				[
-					"A connection to a cloud browser has already been set up.",
+					"A browser connection has already been set up.",
 					`Use it by first attaching with ${command} attach --cdp=${shellQuote(browser.cdpEndpoint)},`,
 					`then running Playwright CLI commands with this prefix: ${command}`,
 				].join(" "),

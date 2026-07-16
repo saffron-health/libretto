@@ -2,18 +2,20 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { BrowserbaseBrowserProvider } from "../../src/providers/browserbase.js";
 import { KernelBrowserProvider } from "../../src/providers/kernel.js";
+import { LocalBrowserProvider } from "../../src/providers/local.js";
 import { DEFAULT_TIMEOUT_MS } from "../agent.js";
 
 type BenchmarkBrowserProvider =
 	| BrowserbaseBrowserProvider
-	| KernelBrowserProvider;
+	| KernelBrowserProvider
+	| LocalBrowserProvider;
 
 const BROWSER_TOOLS_PACKAGE_DIR = resolve(
 	dirname(fileURLToPath(import.meta.url)),
 	"../..",
 );
 
-export const BROWSER_PROVIDERS = ["kernel", "browserbase"] as const;
+export const BROWSER_PROVIDERS = ["kernel", "browserbase", "local"] as const;
 export type BrowserProviderName = (typeof BROWSER_PROVIDERS)[number];
 
 export type CloudBrowserConnection = {
@@ -39,6 +41,11 @@ export function createBenchmarkBrowserProvider(
 				headless: false,
 				stealth: true,
 				timeoutSeconds: Math.ceil(DEFAULT_TIMEOUT_MS / 1000),
+			});
+		case "local":
+			return new LocalBrowserProvider({
+				channel: "chrome",
+				headless: false,
 			});
 	}
 }

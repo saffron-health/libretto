@@ -154,7 +154,7 @@ const benchmarkInput = SimpleCLI.input({
 		provider: SimpleCLI.option(
 			forAffordance(z.string().default("kernel")),
 			{
-				help: `Cloud browser provider (default: kernel). Valid: ${BROWSER_PROVIDERS.join(", ")}`,
+				help: `Browser provider (default: kernel). Valid: ${BROWSER_PROVIDERS.join(", ")}`,
 			},
 		),
 		repeatCount: SimpleCLI.option(
@@ -195,6 +195,8 @@ function requireProviderEnvironment(provider: BrowserProviderName): void {
 			return;
 		case "browserbase":
 			requireEnvironment("BROWSERBASE_API_KEY");
+			return;
+		case "local":
 			return;
 	}
 }
@@ -532,7 +534,7 @@ const app = SimpleCLI.define(
 	{
 		run: SimpleCLI.command({
 			description:
-				"Compare browser harnesses on 27 public websites with Pi and a cloud browser provider",
+				"Compare browser harnesses on public websites with Pi and a browser provider",
 		})
 			.input(benchmarkInput)
 			.handle(async ({ input }) => {

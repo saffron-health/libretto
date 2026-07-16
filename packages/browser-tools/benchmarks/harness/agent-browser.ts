@@ -36,7 +36,7 @@ export async function runAgentBrowserHarness(
 			skillPaths: [AGENT_BROWSER_SKILL_PATH],
 			appendSystemPrompt: [
 				[
-					"A connection to a cloud browser has already been set up.",
+					"A browser connection has already been set up.",
 					`Use it by running agent-browser commands with this prefix: ${command}`,
 				].join(" "),
 			],

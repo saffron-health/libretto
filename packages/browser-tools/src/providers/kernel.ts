@@ -8,6 +8,7 @@ export type KernelBrowserProviderOptions = {
 	apiKey?: string;
 	headless?: boolean;
 	stealth?: boolean;
+	proxyId?: string;
 	timeoutSeconds?: number;
 	enableRecording?: boolean;
 }
@@ -96,6 +97,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 	private readonly endpoint: string;
 	private readonly headless: boolean;
 	private readonly stealth: boolean;
+	private readonly proxyId: string | undefined;
 	private readonly timeoutSeconds: number;
 	private readonly enableRecording: boolean;
 	private readonly replayUrlBySession = new Map<string, string>();
@@ -114,6 +116,8 @@ export class KernelBrowserProvider implements BrowserProvider {
 		this.headless =
 			options.headless ?? readBooleanEnv("KERNEL_HEADLESS", true);
 		this.stealth = options.stealth ?? readBooleanEnv("KERNEL_STEALTH", false);
+		this.proxyId =
+			options.proxyId?.trim() || process.env.KERNEL_PROXY_ID?.trim() || undefined;
 		this.timeoutSeconds = readTimeoutSeconds(options.timeoutSeconds);
 		this.enableRecording =
 			options.enableRecording ??
@@ -136,6 +140,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 				body: JSON.stringify({
 					headless: this.headless,
 					stealth: this.stealth,
+					...(this.proxyId ? { proxy_id: this.proxyId } : {}),
 					timeout_seconds: this.timeoutSeconds,
 				}),
 			},
