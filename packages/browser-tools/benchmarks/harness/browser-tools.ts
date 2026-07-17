@@ -18,6 +18,9 @@ export async function runBrowserToolsHarness(
 			task,
 			workspace,
 			customTools: toolkit.tools,
+			appendSystemPrompt: [
+				"Use the provided browser tools to complete the task.",
+			],
 		});
 	} catch (error) {
 		try {

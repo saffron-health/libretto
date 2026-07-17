@@ -1,21 +1,31 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { BrowserbaseBrowserProvider } from "../../src/providers/browserbase.js";
+import { BrowserUseBrowserProvider } from "../../src/providers/browser-use.js";
 import { KernelBrowserProvider } from "../../src/providers/kernel.js";
 import { LocalBrowserProvider } from "../../src/providers/local.js";
+import { SteelBrowserProvider } from "../../src/providers/steel.js";
 import { DEFAULT_TIMEOUT_MS } from "../agent.js";
 
 type BenchmarkBrowserProvider =
 	| BrowserbaseBrowserProvider
+	| BrowserUseBrowserProvider
 	| KernelBrowserProvider
-	| LocalBrowserProvider;
+	| LocalBrowserProvider
+	| SteelBrowserProvider;
 
 const BROWSER_TOOLS_PACKAGE_DIR = resolve(
 	dirname(fileURLToPath(import.meta.url)),
 	"../..",
 );
 
-export const BROWSER_PROVIDERS = ["kernel", "browserbase", "local"] as const;
+export const BROWSER_PROVIDERS = [
+	"kernel",
+	"browserbase",
+	"browser-use",
+	"local",
+	"steel",
+] as const;
 export type BrowserProviderName = (typeof BROWSER_PROVIDERS)[number];
 
 export type CloudBrowserConnection = {
@@ -42,10 +52,22 @@ export function createBenchmarkBrowserProvider(
 				stealth: true,
 				timeoutSeconds: Math.ceil(DEFAULT_TIMEOUT_MS / 1000),
 			});
+		case "browser-use":
+			return new BrowserUseBrowserProvider({
+				proxyCountryCode: "us",
+				timeoutMinutes: Math.ceil(DEFAULT_TIMEOUT_MS / 60_000),
+			});
 		case "local":
 			return new LocalBrowserProvider({
 				channel: "chrome",
 				headless: false,
+			});
+		case "steel":
+			return new SteelBrowserProvider({
+				useProxy: true,
+				solveCaptcha: true,
+				timeoutMs: DEFAULT_TIMEOUT_MS,
+				inactivityTimeoutMs: DEFAULT_TIMEOUT_MS,
 			});
 	}
 }

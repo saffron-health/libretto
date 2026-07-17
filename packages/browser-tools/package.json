@@ -44,6 +44,11 @@
       "import": "./dist/providers/browserbase.js",
       "default": "./dist/providers/browserbase.js"
     },
+    "./browser-use": {
+      "types": "./dist/providers/browser-use.d.ts",
+      "import": "./dist/providers/browser-use.js",
+      "default": "./dist/providers/browser-use.js"
+    },
     "./steel": {
       "types": "./dist/providers/steel.d.ts",
       "import": "./dist/providers/steel.js",
