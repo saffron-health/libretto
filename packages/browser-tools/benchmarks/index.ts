@@ -198,6 +198,9 @@ function requireProviderEnvironment(provider: BrowserProviderName): void {
 			return;
 		case "local":
 			return;
+		case "steel":
+			requireEnvironment("STEEL_API_KEY");
+			return;
 	}
 }
 
@@ -546,6 +549,7 @@ const app = SimpleCLI.define(
 			"Environment: OPENAI_API_KEY is always required.",
 			"For --provider kernel: KERNEL_API_KEY.",
 			"For --provider browserbase: BROWSERBASE_API_KEY.",
+			"For --provider steel: STEEL_API_KEY.",
 		].join(" "),
 	},
 );

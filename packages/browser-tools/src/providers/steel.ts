@@ -11,6 +11,17 @@ export type SteelBrowserProviderOptions = {
 	apiKey?: string;
 	endpoint?: string;
 	connectEndpoint?: string;
+	useProxy?: boolean;
+	solveCaptcha?: boolean;
+	timeoutMs?: number;
+	inactivityTimeoutMs?: number;
+}
+
+type SteelSessionRequest = {
+	useProxy?: boolean;
+	solveCaptcha?: boolean;
+	timeout?: number;
+	inactivityTimeout?: number;
 }
 
 type SteelSessionResponse = {
@@ -34,6 +45,10 @@ export class SteelBrowserProvider implements BrowserProvider {
 	private readonly apiKey: string;
 	private readonly endpoint: string;
 	private readonly connectEndpoint: string;
+	private readonly useProxy: boolean | undefined;
+	private readonly solveCaptcha: boolean | undefined;
+	private readonly timeoutMs: number | undefined;
+	private readonly inactivityTimeoutMs: number | undefined;
 
 	constructor(options: SteelBrowserProviderOptions = {}) {
 		const apiKey = (options.apiKey ?? process.env.STEEL_API_KEY)?.trim();
@@ -54,16 +69,30 @@ export class SteelBrowserProvider implements BrowserProvider {
 			options.connectEndpoint ??
 			process.env.STEEL_CONNECT_URL?.trim() ??
 			DEFAULT_STEEL_CONNECT_ENDPOINT;
+		this.useProxy = options.useProxy;
+		this.solveCaptcha = options.solveCaptcha;
+		this.timeoutMs = options.timeoutMs;
+		this.inactivityTimeoutMs = options.inactivityTimeoutMs;
 	}
 
 	async createSession(): Promise<ProviderSession> {
+		const request: SteelSessionRequest = {
+			...(this.useProxy === undefined ? {} : { useProxy: this.useProxy }),
+			...(this.solveCaptcha === undefined
+				? {}
+				: { solveCaptcha: this.solveCaptcha }),
+			...(this.timeoutMs === undefined ? {} : { timeout: this.timeoutMs }),
+			...(this.inactivityTimeoutMs === undefined
+				? {}
+				: { inactivityTimeout: this.inactivityTimeoutMs }),
+		};
 		const response = await fetch(`${this.endpoint}/v1/sessions`, {
 			method: "POST",
 			headers: {
 				"steel-api-key": this.apiKey,
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({}),
+			body: JSON.stringify(request),
 		});
 		if (!response.ok) {
 			const body = await response.text();
