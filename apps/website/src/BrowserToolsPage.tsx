@@ -79,7 +79,8 @@ function BrowserToolsHero() {
             as="h1"
             size="5xl"
             style="serif"
-            className="crt-glow mb-6 max-w-[620px] tracking-[-0.045em] text-ink [text-wrap:balance]"
+            wrap="balance"
+            className="crt-glow mb-6 max-w-[620px] tracking-[-0.045em] text-ink"
             htmlStyle={{
               fontWeight: 300,
               fontSize: "clamp(42px, 6vw, 72px)",
@@ -137,7 +138,7 @@ function ToolCard({
       <div className="mb-8 font-mono text-[10px] uppercase tracking-[0.15em] text-amber">
         {label}
       </div>
-      <Text as="h3" size="xl" className="mb-3 text-accent-bright">
+      <Text as="h3" size="xl" wrap="balance" className="mb-3 text-accent-bright">
         {name}
       </Text>
       <Text as="p" size="sm" className="max-w-[390px] leading-relaxed text-muted">
@@ -160,7 +161,8 @@ function ToolsSection() {
             as="h2"
             size="4xl"
             style="serif"
-            className="mb-5 tracking-[-0.035em] text-ink [text-wrap:balance]"
+            wrap="balance"
+            className="mb-5 tracking-[-0.035em] text-ink"
             htmlStyle={{
               fontWeight: 300,
               fontSize: "clamp(34px, 5vw, 52px)",
@@ -256,6 +258,7 @@ function BenchmarksPlaceholder() {
               as="h2"
               size="4xl"
               style="serif"
+              wrap="balance"
               className="tracking-[-0.035em] text-ink"
               htmlStyle={{ fontWeight: 300 }}
             >
@@ -295,6 +298,7 @@ function IntegrationsSection() {
             as="h2"
             size="4xl"
             style="serif"
+            wrap="balance"
             className="mb-5 tracking-[-0.035em] text-ink"
             htmlStyle={{
               fontWeight: 300,
@@ -358,7 +362,8 @@ function WhyBuiltSection() {
             as="h2"
             size="4xl"
             style="serif"
-            className="tracking-[-0.035em] text-ink [text-wrap:balance]"
+            wrap="balance"
+            className="tracking-[-0.035em] text-ink"
             htmlStyle={{
               fontWeight: 300,
               fontSize: "clamp(34px, 5vw, 52px)",
@@ -397,6 +402,7 @@ function ProductLinksSection() {
             as="h2"
             size="4xl"
             style="serif"
+            wrap="balance"
             className="tracking-[-0.035em] text-ink"
             htmlStyle={{ fontWeight: 300 }}
           >
@@ -412,7 +418,12 @@ function ProductLinksSection() {
             <div className="mb-8 font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
               Libretto CLI
             </div>
-            <Text as="h3" size="xl" className="mb-3 block text-ink group-hover:text-accent-bright">
+            <Text
+              as="h3"
+              size="xl"
+              wrap="balance"
+              className="mb-3 block text-ink group-hover:text-accent-bright"
+            >
               Turn browser workflows into APIs.
             </Text>
             <Text as="p" size="sm" className="leading-relaxed text-muted">
@@ -427,7 +438,12 @@ function ProductLinksSection() {
             <div className="mb-8 font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
               Debug Agents
             </div>
-            <Text as="h3" size="xl" className="mb-3 block text-ink group-hover:text-accent-bright">
+            <Text
+              as="h3"
+              size="xl"
+              wrap="balance"
+              className="mb-3 block text-ink group-hover:text-accent-bright"
+            >
               Fix failed browser runs.
             </Text>
             <Text as="p" size="sm" className="leading-relaxed text-muted">
@@ -478,6 +494,7 @@ function BrowserToolsFaq() {
             as="h2"
             size="4xl"
             style="serif"
+            wrap="balance"
             className="tracking-[-0.035em] text-ink"
             htmlStyle={{ fontWeight: 300 }}
           >
@@ -514,7 +531,8 @@ function FinalCta() {
           as="h2"
           size="4xl"
           style="serif"
-          className="crt-glow mb-5 tracking-[-0.04em] text-ink [text-wrap:balance]"
+          wrap="balance"
+          className="crt-glow mb-5 tracking-[-0.04em] text-ink"
           htmlStyle={{
             fontWeight: 300,
             fontSize: "clamp(38px, 5vw, 56px)",
