@@ -322,6 +322,7 @@
   > [class~='text-primary']:last-child {
   order: 2;
   flex: 0 0 auto;
+  color: var(--primary);
 }
 
 .slot-main :where(a):hover > [class~='group/card'] {
