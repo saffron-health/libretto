@@ -271,9 +271,6 @@ importers:
       dev-browser:
         specifier: ^0.2.8
         version: 0.2.8
-      libretto-browser-tools:
-        specifier: workspace:*
-        version: 'link:'
       outdent:
         specifier: ^0.8.0
         version: 0.8.0
