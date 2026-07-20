@@ -4,6 +4,7 @@ import { Text } from "./components/Text";
 import { Kicker } from "./components/Kicker";
 import { SectionDivider } from "./components/SectionDivider";
 import { ShellCommand } from "./components/ShellCommand";
+import { CanvasAsciihedron } from "./components/CanvasAsciihedron";
 
 const INSTALL_COMMAND = "npm i libretto-browser-tools";
 
@@ -58,6 +59,14 @@ function BrowserToolsHero() {
   return (
     <section className="relative overflow-hidden px-6 pt-16 pb-20 md:px-8 md:pt-24 md:pb-28">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_at_64%_28%,color-mix(in_oklch,var(--color-green-9)_11%,transparent),transparent_48%)]" />
+      <div className="pointer-events-none absolute inset-0 flex translate-y-6 items-center justify-center select-none max-md:translate-y-0 lg:justify-end lg:pr-[4%]">
+        <CanvasAsciihedron
+          className="h-[1200px] w-[1200px] min-h-[900px] min-w-[900px] max-h-[160vw] max-w-[160vw] shrink-0 text-ink lg:h-[1400px] lg:w-[1400px]"
+          showAnnotations={false}
+          objectScale={1.15}
+          baseOpacity={0.1}
+        />
+      </div>
       <div className="relative mx-auto grid max-w-[1120px] items-center gap-14 lg:grid-cols-[0.92fr_1.08fr] lg:gap-20">
         <div>
           <Kicker className="mb-5">// BROWSER TOOLS SDK --</Kicker>
