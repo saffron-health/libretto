@@ -39,6 +39,7 @@ export async function runDevBrowserHarness(
 				[
 					"A browser connection has already been set up.",
 					`Use it by piping JavaScript into: ${command}`,
+					"Before giving your final answer, close every page you used with page.close() in a final dev-browser script.",
 				].join(" "),
 			],
 		});

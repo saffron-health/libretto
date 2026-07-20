@@ -38,6 +38,7 @@ export async function runAgentBrowserHarness(
 				[
 					"A browser connection has already been set up.",
 					`Use it by running agent-browser commands with this prefix: ${command}`,
+					`Before giving your final answer, close the browser by running: ${command} close`,
 				].join(" "),
 			],
 		});

@@ -19,7 +19,7 @@ export async function runBrowserToolsHarness(
 			workspace,
 			customTools: toolkit.tools,
 			appendSystemPrompt: [
-				"Use the provided browser tools to complete the task.",
+				"Use the provided browser tools to complete the task. Before giving your final answer, close every browser session you opened with browser_close.",
 			],
 		});
 	} catch (error) {
