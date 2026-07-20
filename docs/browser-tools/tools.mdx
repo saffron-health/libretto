@@ -5,4 +5,115 @@ sidebarTitle: Tools
 
 > Reference for the six browser tools agents call.
 
-TODO: document `browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, and `browser_close`.
+Every tool returns the same envelope: `{ ok: true, ...payload }` on success, or `{ ok: false, error }` for model-fixable failures (unknown session ID, thrown Playwright code). Errors include a next step when possible. Host misconfiguration (missing API keys) and [domain policy](/browser-tools/advanced#domain-policy) violations throw instead of returning `{ ok: false }`.
+
+## browser_open
+
+Open a new browser session through the configured provider. Optionally navigates to `url` after opening. Returns a `sessionId` for later tools.
+
+<ParamField path="url" type="string">
+  Optional URL to open after the session starts. Use a full `https://` URL, or omit `url` and navigate with `browser_exec` via `await page.goto(...)`.
+</ParamField>
+
+Success: `{ ok: true, sessionId }`.
+
+If navigation fails, the session is closed and the tool returns `{ ok: false, error }` so the agent can open again.
+
+## browser_connect
+
+Attach to an already-running browser via its CDP websocket URL. Returns a session ID like `browser_open`, but `browser_close` detaches without killing the externally managed browser.
+
+<ParamField path="cdpUrl" type="string" required>
+  CDP websocket URL, for example `ws://127.0.0.1:9222/devtools/browser/...`.
+</ParamField>
+
+Success: `{ ok: true, sessionId }`.
+
+Use this for Electron apps or any Chromium already started with remote debugging. See [CDP attach](/browser-tools/advanced#cdp-attach).
+
+## browser_exec
+
+Run Playwright code against an open session. The code runs as the body of a fresh async function — use `return` to produce a result.
+
+Nothing persists between calls (no variables, no imports). The browser is the only state. In scope: `page`, `context`, `browser`. TypeScript is fine (stripped with Sucrase). `console.log` / `console.error` are captured as `stdout` / `stderr`.
+
+Results are JSON-serialized when possible; values that cannot be serialized become strings.
+
+<ParamField path="sessionId" type="string" required>
+  Session ID from `browser_open` or `browser_connect`.
+</ParamField>
+
+<ParamField path="code" type="string" required>
+  Playwright/TypeScript body to run. Example: `return await page.title()`.
+</ParamField>
+
+<ParamField path="pageId" type="string">
+  Optional page ID from `browser_status`. Defaults to the most recently opened tab.
+</ParamField>
+
+Success:
+
+```typescript theme={null}
+{
+  ok: true,
+  result: unknown,
+  stdout: string,
+  stderr: string,
+  snapshotDiff: string, // a11y-tree diff since the previous exec; empty when unchanged
+}
+```
+
+Code-level failures return `{ ok: false, error, stdout?, stderr? }` — fix the code and retry.
+
+### Snapshot vs snapshotDiff
+
+- Call `browser_snapshot` to orient on a full accessibility tree before interacting, or to verify state after a change.
+- Successful `browser_exec` calls already return `snapshotDiff` for what changed since the previous exec on that session. Prefer reading that before taking another full snapshot.
+
+## browser_snapshot
+
+Capture the current page as a compact text accessibility tree. Nodes include `ref` handles (for example `l7`) so the agent can refer to structure while writing Playwright locators in `browser_exec`.
+
+<ParamField path="sessionId" type="string" required>
+  Session ID from `browser_open` or `browser_connect`.
+</ParamField>
+
+<ParamField path="screenshot" type="boolean">
+  When `true`, also return a PNG as `{ base64, mimeType: "image/png" }`. Framework adapters (AI SDK, Pi) can surface that image to the model.
+</ParamField>
+
+<ParamField path="pageId" type="string">
+  Optional page ID from `browser_status`. Defaults to the most recently opened tab.
+</ParamField>
+
+Success: `{ ok: true, tree, screenshot? }`.
+
+## browser_status
+
+Inspect open sessions and pages. Start here when the agent is unsure which tab to target.
+
+| Args | Returns |
+| --- | --- |
+| (none) | `{ ok: true, sessions }` — each session lists `sessionId`, `provider`, and `pages` |
+| `sessionId` | `{ ok: true, pages }` for that session |
+| `sessionId` + `pageId` | Page detail: `url`, `title`, `viewport`, `active`, `readyState` |
+
+<ParamField path="sessionId" type="string">
+  Session ID from `browser_open` or `browser_connect`.
+</ParamField>
+
+<ParamField path="pageId" type="string">
+  Page ID from a prior `browser_status` call. Requires `sessionId`.
+</ParamField>
+
+## browser_close
+
+Close a session by ID. For provider-owned sessions this releases the remote browser. For `browser_connect` sessions it detaches without killing the external browser.
+
+<ParamField path="sessionId" type="string" required>
+  Session ID to close.
+</ParamField>
+
+Success: `{ ok: true }`.
+
+Calling `dispose()` on the toolkit closes every session that toolkit still owns.

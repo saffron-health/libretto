@@ -115,9 +115,8 @@
         "tab": "Browser Tools",
         "groups": [
           {
-            "group": "Browser Tools",
+            "group": "Overview",
             "pages": [
-              "browser-tools/overview",
               "browser-tools/quickstart",
               "browser-tools/tools",
               "browser-tools/advanced"
@@ -127,7 +126,8 @@
             "group": "Adapters",
             "pages": [
               "browser-tools/adapters/ai-sdk",
-              "browser-tools/adapters/pi"
+              "browser-tools/adapters/pi",
+              "browser-tools/adapters/custom"
             ]
           },
           {
@@ -139,7 +139,8 @@
               "browser-tools/providers/kernel",
               "browser-tools/providers/browserbase",
               "browser-tools/providers/browser-use",
-              "browser-tools/providers/steel"
+              "browser-tools/providers/steel",
+              "browser-tools/providers/custom"
             ]
           }
         ]
