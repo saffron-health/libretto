@@ -8,6 +8,7 @@ import type {
 } from "../provider.js";
 
 export type LocalBrowserProviderOptions = {
+	channel?: string;
 	headless?: boolean;
 }
 
@@ -54,17 +55,20 @@ async function fetchWebSocketDebuggerUrl(port: number): Promise<string> {
  */
 export class LocalBrowserProvider implements BrowserProvider {
 	readonly name = "local";
+	private readonly channel: string | undefined;
 	private readonly headless: boolean;
 	private readonly browsers = new Map<string, Browser>();
 	private nextSessionNumber = 1;
 
 	constructor(options: LocalBrowserProviderOptions = {}) {
+		this.channel = options.channel;
 		this.headless = options.headless ?? false;
 	}
 
 	async createSession(): Promise<ProviderSession> {
 		const port = await pickFreePort();
 		const browser = await chromium.launch({
+			...(this.channel ? { channel: this.channel } : {}),
 			headless: this.headless,
 			args: [`--remote-debugging-port=${port}`],
 		});

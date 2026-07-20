@@ -1,3 +1,6 @@
+import { randomBytes } from "node:crypto";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import type {
 	BrowserProvider,
 	ProviderSession,
@@ -8,6 +11,7 @@ export type KernelBrowserProviderOptions = {
 	apiKey?: string;
 	headless?: boolean;
 	stealth?: boolean;
+	proxyId?: string;
 	timeoutSeconds?: number;
 	enableRecording?: boolean;
 }
@@ -20,6 +24,62 @@ type KernelBrowserResponse = {
 
 type KernelReplayResponse = {
 	replay_view_url?: string | null;
+}
+
+const CDP_READY_ATTEMPTS = 3;
+const CDP_HANDSHAKE_TIMEOUT_MS = 10_000;
+
+async function cdpHandshakeStatus(cdpEndpoint: string): Promise<number> {
+	const url = new URL(cdpEndpoint);
+	const request = url.protocol === "wss:" ? httpsRequest : httpRequest;
+	url.protocol = url.protocol === "wss:" ? "https:" : "http:";
+	return await new Promise((resolve, reject) => {
+		const clientRequest = request(url, {
+			headers: {
+				Connection: "Upgrade",
+				"Sec-WebSocket-Key": randomBytes(16).toString("base64"),
+				"Sec-WebSocket-Version": "13",
+				Upgrade: "websocket",
+			},
+		});
+		clientRequest.once("upgrade", (_response, socket) => {
+			socket.destroy();
+			resolve(101);
+		});
+		clientRequest.once("response", (response) => {
+			response.resume();
+			resolve(response.statusCode ?? 0);
+		});
+		clientRequest.once("error", reject);
+		clientRequest.setTimeout(CDP_HANDSHAKE_TIMEOUT_MS, () => {
+			clientRequest.destroy(
+				new Error(
+					`Kernel CDP WebSocket handshake timed out after ${CDP_HANDSHAKE_TIMEOUT_MS}ms.`,
+				),
+			);
+		});
+		clientRequest.end();
+	});
+}
+
+async function waitForCdpReady(cdpEndpoint: string): Promise<void> {
+	for (let attempt = 1; attempt <= CDP_READY_ATTEMPTS; attempt += 1) {
+		const status = await cdpHandshakeStatus(cdpEndpoint);
+		if (status === 101) return;
+		if (status !== 401) {
+			throw new Error(
+				`Kernel CDP WebSocket handshake failed with HTTP ${status}. Create a fresh browser session and try again.`,
+			);
+		}
+		if (attempt === CDP_READY_ATTEMPTS) {
+			throw new Error(
+				`Kernel CDP WebSocket rejected its JWT with HTTP 401 after ${CDP_READY_ATTEMPTS} attempts. Create a fresh browser session and try again.`,
+			);
+		}
+		await new Promise((resolve) =>
+			setTimeout(resolve, attempt === 1 ? 1_000 : 2_000),
+		);
+	}
 }
 
 function readBooleanEnv(name: string, defaultValue: boolean): boolean {
@@ -96,6 +156,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 	private readonly endpoint: string;
 	private readonly headless: boolean;
 	private readonly stealth: boolean;
+	private readonly proxyId: string | undefined;
 	private readonly timeoutSeconds: number;
 	private readonly enableRecording: boolean;
 	private readonly replayUrlBySession = new Map<string, string>();
@@ -114,6 +175,8 @@ export class KernelBrowserProvider implements BrowserProvider {
 		this.headless =
 			options.headless ?? readBooleanEnv("KERNEL_HEADLESS", true);
 		this.stealth = options.stealth ?? readBooleanEnv("KERNEL_STEALTH", false);
+		this.proxyId =
+			options.proxyId?.trim() || process.env.KERNEL_PROXY_ID?.trim() || undefined;
 		this.timeoutSeconds = readTimeoutSeconds(options.timeoutSeconds);
 		this.enableRecording =
 			options.enableRecording ??
@@ -136,10 +199,22 @@ export class KernelBrowserProvider implements BrowserProvider {
 				body: JSON.stringify({
 					headless: this.headless,
 					stealth: this.stealth,
+					...(this.proxyId ? { proxy_id: this.proxyId } : {}),
 					timeout_seconds: this.timeoutSeconds,
 				}),
 			},
 		);
+		try {
+			await waitForCdpReady(browser.cdp_ws_url);
+		} catch (error) {
+			await kernelFetchNoBody(
+				this.endpoint,
+				this.apiKey,
+				`/browsers/${browser.session_id}`,
+				{ method: "DELETE" },
+			).catch(() => {});
+			throw error;
+		}
 
 		let replay: KernelReplayResponse | undefined;
 		if (this.enableRecording) {

@@ -1,4 +1,5 @@
 node_modules/
+.pnpm-store/
 dist/
 *.tsbuildinfo
 .DS_Store
@@ -6,8 +7,10 @@ dist/
 .idea
 .vscode/settings.json
 .env
+.playwright-cli/
 temp/
 benchmarks/**/runs/
+packages/**/benchmarks/runs/
 evals/profiles/
 evals/private/
 evals/runs/
