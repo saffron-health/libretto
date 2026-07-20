@@ -3,7 +3,7 @@ import { BrowserToolsPage } from "../BrowserToolsPage";
 
 const title = "Browser Tools SDK | Libretto";
 const description =
-  "Let any AI agent open a real browser, read the page, and act with Playwright.";
+  "Six tools let any AI agent open a real browser, read the page, and act with Playwright.";
 const url = "https://libretto.sh/browser-tools";
 
 export const Route = createFileRoute("/browser-tools")({

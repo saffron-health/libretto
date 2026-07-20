@@ -93,8 +93,8 @@ function BrowserToolsHero() {
             size="lg"
             className="mb-9 max-w-[560px] leading-relaxed text-muted [text-wrap:pretty]"
           >
-            Let any AI agent open a real browser, read the page, and act with
-            Playwright.
+            Six tools let any AI agent open a real browser, read the page, and
+            act with Playwright.
           </Text>
           <ShellCommand
             ariaLabel="Copy browser tools install command"
@@ -116,47 +116,17 @@ function BrowserToolsHero() {
   );
 }
 
-function InstallSection() {
-  return (
-    <section className="px-6 py-24 md:px-12 md:py-32">
-      <div className="mx-auto grid max-w-[900px] gap-10 md:grid-cols-[0.8fr_1.2fr] md:items-center">
-        <div>
-          <Kicker className="mb-4">// ZERO TO BROWSER --</Kicker>
-          <Text
-            as="h2"
-            size="4xl"
-            style="serif"
-            className="tracking-[-0.035em] text-ink"
-            htmlStyle={{ fontWeight: 300, lineHeight: 1.05 }}
-          >
-            Install one package.
-          </Text>
-        </div>
-        <div>
-          <ShellCommand
-            ariaLabel="Copy npm install command"
-            command={INSTALL_COMMAND}
-            fathomEvent="Browser tools install section copy"
-          />
-          <Text as="p" size="sm" className="mt-4 leading-relaxed text-muted">
-            Use your model and agent loop. The SDK opens and closes browser
-            sessions and tracks each page.
-          </Text>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function ToolCard({
   index,
   name,
   label,
+  example,
   children,
 }: {
   index: string;
   name: string;
   label: string;
+  example: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -173,6 +143,9 @@ function ToolCard({
       <Text as="p" size="sm" className="max-w-[390px] leading-relaxed text-muted">
         {children}
       </Text>
+      <div className="mt-6 overflow-hidden rounded-lg border border-rule bg-[#0b0e0b]">
+        {example}
+      </div>
     </div>
   );
 }
@@ -182,7 +155,7 @@ function ToolsSection() {
     <section className="section-crt px-6 py-24 md:px-12 md:py-32">
       <div className="relative mx-auto max-w-[920px]">
         <div className="mx-auto mb-14 max-w-[620px] text-center">
-          <Kicker className="mb-4">// OBSERVE, THEN ACT --</Kicker>
+          <Kicker className="mb-4">// HOW IT WORKS --</Kicker>
           <Text
             as="h2"
             size="4xl"
@@ -194,20 +167,56 @@ function ToolsSection() {
               lineHeight: 1.05,
             }}
           >
-            See the page. Then act.
+            Two tools do most of the work.
           </Text>
           <Text as="p" className="leading-relaxed text-muted">
-            The agent reads a compact page snapshot, decides what to do, and
-            runs Playwright code.
+            The agent reads a short page snapshot, then runs the Playwright code
+            it needs.
           </Text>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <ToolCard index="01" label="See the page" name="browser_snapshot">
+          <ToolCard
+            index="01"
+            label="See the page"
+            name="browser_snapshot"
+            example={
+              <pre className="overflow-x-auto p-5 font-mono text-[11px] leading-6 text-muted">
+                <span className="text-faint">&lt;page title=&quot;Hacker News&quot;&gt;</span>
+                {"\n  "}
+                <span className="text-ink">heading</span> &quot;Hacker News&quot;
+                {"\n  "}
+                <span className="text-accent-bright">link</span> &quot;Show HN:
+                Browser Tools&quot; <span className="text-amber">[ref=l12]</span>
+                {"\n  "}
+                <span className="text-accent-bright">link</span> &quot;42
+                comments&quot; <span className="text-amber">[ref=l13]</span>
+              </pre>
+            }
+          >
             Returns a compact accessibility tree with stable refs. The agent
             can read the page structure without raw HTML.
           </ToolCard>
-          <ToolCard index="02" label="Use the browser" name="browser_exec">
+          <ToolCard
+            index="02"
+            label="Use the browser"
+            name="browser_exec"
+            example={
+              <pre className="overflow-x-auto p-5 font-mono text-[11px] leading-6 text-muted">
+                <span className="text-faint">const</span> story = page
+                {"\n  "}.locator(
+                <span className="text-amber">&quot;.titleline &gt; a&quot;</span>)
+                {"\n  "}.first();
+                {"\n"}
+                <span className="text-faint">const</span> title ={" "}
+                <span className="text-faint">await</span> story.innerText();
+                {"\n"}
+                <span className="text-faint">await</span> story.click();
+                {"\n"}
+                <span className="text-faint">return</span> {"{ title, url: page.url() };"}
+              </pre>
+            }
+          >
             Runs Playwright code on the live page. Each call returns a compact
             snapshot diff that shows what changed.
           </ToolCard>
@@ -276,6 +285,226 @@ function BenchmarksPlaceholder() {
   );
 }
 
+function IntegrationsSection() {
+  return (
+    <section className="px-6 py-24 md:px-12 md:py-32">
+      <div className="mx-auto max-w-[900px]">
+        <div className="mx-auto mb-12 max-w-[620px] text-center">
+          <Kicker className="mb-4">// INTEGRATIONS --</Kicker>
+          <Text
+            as="h2"
+            size="4xl"
+            style="serif"
+            className="mb-5 tracking-[-0.035em] text-ink"
+            htmlStyle={{
+              fontWeight: 300,
+              fontSize: "clamp(34px, 5vw, 52px)",
+              lineHeight: 1.05,
+            }}
+          >
+            Use the agent framework you know.
+          </Text>
+          <Text as="p" className="leading-relaxed text-muted">
+            Built-in adapters give AI SDK and Pi the right tool shape and return
+            format.
+          </Text>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <a
+            href="https://ai-sdk.dev/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex min-h-44 items-center justify-between rounded-xl border border-rule bg-panel/60 p-8 no-underline transition-colors hover:border-accent/40"
+            data-fathom-event="Browser tools AI SDK integration click"
+          >
+            <img src="/logos/ai-sdk.svg" alt="AI SDK" className="h-10 w-auto max-w-40" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent-bright">
+              Ready
+            </span>
+          </a>
+          <a
+            href="https://pi.dev/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex min-h-44 items-center justify-between rounded-xl border border-rule bg-panel/60 p-8 no-underline transition-colors hover:border-accent/40"
+            data-fathom-event="Browser tools Pi integration click"
+          >
+            <span className="flex items-center gap-4">
+              <img src="/logos/pi.svg" alt="" className="size-14" />
+              <span className="font-mono text-2xl text-ink">Pi</span>
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent-bright">
+              Ready
+            </span>
+          </a>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-dashed border-rule px-6 py-5 text-center font-mono text-xs text-muted">
+          More framework adapters are coming.
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WhyBuiltSection() {
+  return (
+    <section className="section-crt px-6 py-24 md:px-12 md:py-32">
+      <div className="relative mx-auto grid max-w-[900px] gap-10 md:grid-cols-[0.8fr_1.2fr] md:gap-20">
+        <div>
+          <Kicker className="mb-4">// WHY WE BUILT IT --</Kicker>
+          <Text
+            as="h2"
+            size="4xl"
+            style="serif"
+            className="tracking-[-0.035em] text-ink [text-wrap:balance]"
+            htmlStyle={{
+              fontWeight: 300,
+              fontSize: "clamp(34px, 5vw, 52px)",
+              lineHeight: 1.05,
+            }}
+          >
+            Models already know Playwright.
+          </Text>
+        </div>
+        <div className="space-y-5">
+          <Text as="p" size="lg" className="leading-relaxed text-ink">
+            Browser tools often make agents choose among many narrow actions or
+            read a full page of raw data.
+          </Text>
+          <Text as="p" className="leading-relaxed text-muted">
+            Both waste context and make each step harder. Browser Tools SDK uses
+            six tools instead. The agent reads a compact page view, then writes
+            the Playwright code it needs.
+          </Text>
+          <Text as="p" className="leading-relaxed text-muted">
+            You keep your model, agent loop, and browser provider.
+          </Text>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProductLinksSection() {
+  return (
+    <section className="px-6 py-24 md:px-12 md:py-32">
+      <div className="mx-auto max-w-[900px]">
+        <div className="mb-12">
+          <Kicker className="mb-4">// MORE FROM LIBRETTO --</Kicker>
+          <Text
+            as="h2"
+            size="4xl"
+            style="serif"
+            className="tracking-[-0.035em] text-ink"
+            htmlStyle={{ fontWeight: 300 }}
+          >
+            Build and repair browser workflows.
+          </Text>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <a
+            href="/cli"
+            className="group rounded-xl border border-rule bg-panel/60 p-7 no-underline transition-colors hover:border-accent/40"
+            data-fathom-event="Browser tools Libretto CLI click"
+          >
+            <div className="mb-8 font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+              Libretto CLI
+            </div>
+            <Text as="h3" size="xl" className="mb-3 block text-ink group-hover:text-accent-bright">
+              Turn browser workflows into APIs.
+            </Text>
+            <Text as="p" size="sm" className="leading-relaxed text-muted">
+              Record a live workflow and save it as a reusable TypeScript script.
+            </Text>
+          </a>
+          <a
+            href="/debug-agents"
+            className="group rounded-xl border border-rule bg-panel/60 p-7 no-underline transition-colors hover:border-accent/40"
+            data-fathom-event="Browser tools Debug Agents click"
+          >
+            <div className="mb-8 font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+              Debug Agents
+            </div>
+            <Text as="h3" size="xl" className="mb-3 block text-ink group-hover:text-accent-bright">
+              Fix failed browser runs.
+            </Text>
+            <Text as="p" size="sm" className="leading-relaxed text-muted">
+              Give a failed run to an agent. Get a tested pull request back.
+            </Text>
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const BROWSER_TOOLS_FAQS = [
+  {
+    question: "Which agent frameworks work today?",
+    answer:
+      "The package includes adapters for AI SDK and Pi. The base tools are framework-neutral, so you can also wire them into your own agent loop.",
+  },
+  {
+    question: "Which browser providers can I use?",
+    answer:
+      "Run Chromium on your machine with LocalBrowserProvider, or use the built-in providers for Libretto Cloud, Browserbase, Kernel, and Steel.",
+  },
+  {
+    question: "Why does the SDK expose only six tools?",
+    answer:
+      "Most browser work needs two tools: browser_snapshot to read the page and browser_exec to run Playwright. The other four tools open, connect, inspect, and close browser sessions.",
+  },
+  {
+    question: "Does Browser Tools SDK replace Playwright?",
+    answer:
+      "No. It gives an agent a small tool set and runs its browser_exec code through Playwright. You still have the Playwright API.",
+  },
+  {
+    question: "Is Browser Tools SDK open source?",
+    answer:
+      "Yes. The package is available under the MIT license in the Libretto repository.",
+  },
+];
+
+function BrowserToolsFaq() {
+  return (
+    <section className="section-crt px-6 py-24 md:px-12 md:py-32">
+      <div className="relative mx-auto grid max-w-[900px] gap-12 md:grid-cols-[0.8fr_1.2fr] md:gap-20">
+        <div>
+          <Kicker className="mb-4">// FAQ --</Kicker>
+          <Text
+            as="h2"
+            size="4xl"
+            style="serif"
+            className="tracking-[-0.035em] text-ink"
+            htmlStyle={{ fontWeight: 300 }}
+          >
+            Common questions
+          </Text>
+        </div>
+        <div className="border-t border-rule">
+          {BROWSER_TOOLS_FAQS.map((item) => (
+            <details
+              key={item.question}
+              className="group border-b border-rule [&_summary::-webkit-details-marker]:hidden"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-left text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent/30">
+                {item.question}
+                <span className="font-mono text-lg text-accent group-open:rotate-45">+</span>
+              </summary>
+              <Text as="p" size="sm" className="pb-6 leading-relaxed text-muted">
+                {item.answer}
+              </Text>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FinalCta() {
   return (
     <section className="section-crt px-6 py-24 text-center md:px-12 md:py-32">
@@ -324,11 +553,17 @@ export function BrowserToolsPage() {
       <BrowserToolsHero />
       <div className="section-rails relative mx-auto max-w-[1100px]">
         <SectionDivider />
-        <InstallSection />
+        <BenchmarksPlaceholder />
+        <SectionDivider />
+        <IntegrationsSection />
+        <SectionDivider />
+        <WhyBuiltSection />
         <SectionDivider />
         <ToolsSection />
         <SectionDivider />
-        <BenchmarksPlaceholder />
+        <ProductLinksSection />
+        <SectionDivider />
+        <BrowserToolsFaq />
         <SectionDivider />
         <FinalCta />
         <Footer />
