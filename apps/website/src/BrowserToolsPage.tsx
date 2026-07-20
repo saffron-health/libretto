@@ -395,14 +395,23 @@ function ReadyIntegrationCard({
 function ComingSoonIntegrationCard({
   name,
   href,
+  logoSrc,
+  logoClassName = "size-12 rounded-lg",
 }: {
   name: string;
   href?: string;
+  logoSrc: string;
+  logoClassName?: string;
 }) {
   const content = (
     <>
-      <span className="font-mono text-lg tracking-tight text-ink/55">{name}</span>
-      <span className="relative text-faint">
+      <span className="flex items-center gap-4">
+        <img src={logoSrc} alt="" className={logoClassName} />
+        <span className="font-mono text-lg tracking-tight text-ink/55">
+          {name}
+        </span>
+      </span>
+      <span className="relative text-amber">
         <ClockIcon />
         <span className="pointer-events-none absolute top-full right-0 z-10 mt-2 whitespace-nowrap rounded-md border border-rule bg-panel px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted opacity-0 shadow-lg shadow-black/40 transition-opacity group-hover:opacity-100">
           Coming soon
@@ -488,12 +497,17 @@ function IntegrationsSection() {
           <ComingSoonIntegrationCard
             name="Flue"
             href="https://flueframework.com/"
+            logoSrc="/logos/flue.svg"
           />
           <ComingSoonIntegrationCard
             name="Executor"
             href="https://executor.sh/"
+            logoSrc="/logos/executor.png"
           />
-          <ComingSoonIntegrationCard name="Eve" />
+          <ComingSoonIntegrationCard
+            name="eve"
+            logoSrc="/logos/eve.svg"
+          />
         </div>
       </div>
     </section>
