@@ -79,7 +79,7 @@ function BrowserToolsHero() {
             as="h1"
             size="5xl"
             style="serif"
-            wrap="balance"
+            wrap="pretty"
             className="crt-glow mb-6 max-w-[620px] tracking-[-0.045em] text-ink"
             htmlStyle={{
               fontWeight: 300,
@@ -92,7 +92,8 @@ function BrowserToolsHero() {
           <Text
             as="p"
             size="lg"
-            className="mb-9 max-w-[560px] leading-relaxed text-muted [text-wrap:pretty]"
+            wrap="pretty"
+            className="mb-9 max-w-[560px] leading-relaxed text-muted"
           >
             Six tools let any AI agent open a real browser, read the page, and
             act with Playwright.
@@ -138,10 +139,15 @@ function ToolCard({
       <div className="mb-8 font-mono text-[10px] uppercase tracking-[0.15em] text-amber">
         {label}
       </div>
-      <Text as="h3" size="xl" wrap="balance" className="mb-3 text-accent-bright">
+      <Text as="h3" size="xl" wrap="pretty" className="mb-3 text-accent-bright">
         {name}
       </Text>
-      <Text as="p" size="sm" className="max-w-[390px] leading-relaxed text-muted">
+      <Text
+        as="p"
+        size="sm"
+        wrap="pretty"
+        className="max-w-[390px] leading-relaxed text-muted"
+      >
         {children}
       </Text>
       <div className="mt-6 overflow-hidden rounded-lg border border-rule bg-[#0b0e0b]">
@@ -161,7 +167,7 @@ function ToolsSection() {
             as="h2"
             size="4xl"
             style="serif"
-            wrap="balance"
+            wrap="pretty"
             className="mb-5 tracking-[-0.035em] text-ink"
             htmlStyle={{
               fontWeight: 300,
@@ -171,7 +177,7 @@ function ToolsSection() {
           >
             Two tools do most of the work.
           </Text>
-          <Text as="p" className="leading-relaxed text-muted">
+          <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
             The agent reads a short page snapshot, then runs the Playwright code
             it needs.
           </Text>
@@ -258,7 +264,7 @@ function BenchmarksPlaceholder() {
               as="h2"
               size="4xl"
               style="serif"
-              wrap="balance"
+              wrap="pretty"
               className="tracking-[-0.035em] text-ink"
               htmlStyle={{ fontWeight: 300 }}
             >
@@ -272,7 +278,11 @@ function BenchmarksPlaceholder() {
         <div className="relative overflow-hidden rounded-xl border border-rule bg-panel/50 p-8 md:p-12">
           <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent,transparent_12px,color-mix(in_oklch,var(--color-green-9)_3%,transparent)_12px,color-mix(in_oklch,var(--color-green-9)_3%,transparent)_24px)]" />
           <div className="relative grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
-            <Text as="p" className="max-w-[560px] leading-relaxed text-muted">
+            <Text
+              as="p"
+              wrap="pretty"
+              className="max-w-[560px] leading-relaxed text-muted"
+            >
               We are measuring task success, speed, and token use across common
               browser tools. We will publish the method and results when the
               tests are complete.
@@ -298,7 +308,7 @@ function IntegrationsSection() {
             as="h2"
             size="4xl"
             style="serif"
-            wrap="balance"
+            wrap="pretty"
             className="mb-5 tracking-[-0.035em] text-ink"
             htmlStyle={{
               fontWeight: 300,
@@ -308,7 +318,7 @@ function IntegrationsSection() {
           >
             Use the agent framework you know.
           </Text>
-          <Text as="p" className="leading-relaxed text-muted">
+          <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
             Built-in adapters give AI SDK and Pi the right tool shape and return
             format.
           </Text>
@@ -362,7 +372,7 @@ function WhyBuiltSection() {
             as="h2"
             size="4xl"
             style="serif"
-            wrap="balance"
+            wrap="pretty"
             className="tracking-[-0.035em] text-ink"
             htmlStyle={{
               fontWeight: 300,
@@ -374,16 +384,21 @@ function WhyBuiltSection() {
           </Text>
         </div>
         <div className="space-y-5">
-          <Text as="p" size="lg" className="leading-relaxed text-ink">
+          <Text
+            as="p"
+            size="lg"
+            wrap="pretty"
+            className="leading-relaxed text-ink"
+          >
             Browser tools often make agents choose among many narrow actions or
             read a full page of raw data.
           </Text>
-          <Text as="p" className="leading-relaxed text-muted">
+          <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
             Both waste context and make each step harder. Browser Tools SDK uses
             six tools instead. The agent reads a compact page view, then writes
             the Playwright code it needs.
           </Text>
-          <Text as="p" className="leading-relaxed text-muted">
+          <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
             You keep your model, agent loop, and browser provider.
           </Text>
         </div>
@@ -402,7 +417,7 @@ function ProductLinksSection() {
             as="h2"
             size="4xl"
             style="serif"
-            wrap="balance"
+            wrap="pretty"
             className="tracking-[-0.035em] text-ink"
             htmlStyle={{ fontWeight: 300 }}
           >
@@ -421,12 +436,17 @@ function ProductLinksSection() {
             <Text
               as="h3"
               size="xl"
-              wrap="balance"
+              wrap="pretty"
               className="mb-3 block text-ink group-hover:text-accent-bright"
             >
               Turn browser workflows into APIs.
             </Text>
-            <Text as="p" size="sm" className="leading-relaxed text-muted">
+            <Text
+              as="p"
+              size="sm"
+              wrap="pretty"
+              className="leading-relaxed text-muted"
+            >
               Record a live workflow and save it as a reusable TypeScript script.
             </Text>
           </a>
@@ -441,12 +461,17 @@ function ProductLinksSection() {
             <Text
               as="h3"
               size="xl"
-              wrap="balance"
+              wrap="pretty"
               className="mb-3 block text-ink group-hover:text-accent-bright"
             >
               Fix failed browser runs.
             </Text>
-            <Text as="p" size="sm" className="leading-relaxed text-muted">
+            <Text
+              as="p"
+              size="sm"
+              wrap="pretty"
+              className="leading-relaxed text-muted"
+            >
               Give a failed run to an agent. Get a tested pull request back.
             </Text>
           </a>
@@ -494,7 +519,7 @@ function BrowserToolsFaq() {
             as="h2"
             size="4xl"
             style="serif"
-            wrap="balance"
+            wrap="pretty"
             className="tracking-[-0.035em] text-ink"
             htmlStyle={{ fontWeight: 300 }}
           >
@@ -511,7 +536,12 @@ function BrowserToolsFaq() {
                 {item.question}
                 <span className="font-mono text-lg text-accent group-open:rotate-45">+</span>
               </summary>
-              <Text as="p" size="sm" className="pb-6 leading-relaxed text-muted">
+              <Text
+                as="p"
+                size="sm"
+                wrap="pretty"
+                className="pb-6 leading-relaxed text-muted"
+              >
                 {item.answer}
               </Text>
             </details>
@@ -531,7 +561,7 @@ function FinalCta() {
           as="h2"
           size="4xl"
           style="serif"
-          wrap="balance"
+          wrap="pretty"
           className="crt-glow mb-5 tracking-[-0.04em] text-ink"
           htmlStyle={{
             fontWeight: 300,
@@ -541,7 +571,11 @@ function FinalCta() {
         >
           Add browser tools to your agent.
         </Text>
-        <Text as="p" className="mx-auto mb-8 max-w-[520px] leading-relaxed text-muted">
+        <Text
+          as="p"
+          wrap="pretty"
+          className="mx-auto mb-8 max-w-[520px] leading-relaxed text-muted"
+        >
           Install the package. Keep your current model and agent framework.
         </Text>
         <ShellCommand
