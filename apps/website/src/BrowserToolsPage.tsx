@@ -99,13 +99,6 @@ function BrowserToolsHero() {
             fathomEvent="Browser tools hero install copy"
             className="max-w-[390px]"
           />
-          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-            <span>Open source</span>
-            <span aria-hidden="true">/</span>
-            <span>TypeScript</span>
-            <span aria-hidden="true">/</span>
-            <span>AI SDK adapter</span>
-          </div>
         </div>
         <CodeWindow />
       </div>
