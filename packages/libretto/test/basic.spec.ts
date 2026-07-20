@@ -122,7 +122,7 @@ function expectedRootHelp(): string {
       run  Run the default-exported Libretto workflow from a file
       resume  Resume a paused workflow for the current session
       search  Search the current page HTML snapshot
-      setup  Set up libretto in the current project
+      setup  Set up libretto in the current project. Use \`update\` to update existing installations
       status  Show workspace status and open sessions
       snapshot  Capture a screenshot and compact accessibility snapshot
       update  Update Libretto to the latest version
