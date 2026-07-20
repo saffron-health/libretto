@@ -122,7 +122,37 @@ export function MobileMenu({
                 session ? "Mobile nav dashboard click" : "Mobile nav cloud sign up click"
               }
             >
-              {session ? "Cloud dashboard" : "Cloud sign in/up"}
+              {session ? "Libretto PR Agents" : "Sign in/up"}
+            </MenuItem>
+            {session && (
+              <MenuItem
+                href="/dashboard/cloud-browsers"
+                className={itemClass}
+                data-fathom-event="Mobile nav cloud browsers click"
+              >
+                Cloud Browsers
+              </MenuItem>
+            )}
+            <MenuItem
+              href="/cli"
+              className={itemClass}
+              data-fathom-event="Mobile nav open source cli click"
+            >
+              Libretto CLI
+            </MenuItem>
+            <MenuItem
+              href="/debug-agents"
+              className={itemClass}
+              data-fathom-event="Mobile nav open source debug agents click"
+            >
+              Debug Agents
+            </MenuItem>
+            <MenuItem
+              href="/browser-tools"
+              className={itemClass}
+              data-fathom-event="Mobile nav open source browser tools click"
+            >
+              Browser Tools SDK
             </MenuItem>
             <MenuItem
               href="/docs/get-started/quickstart"

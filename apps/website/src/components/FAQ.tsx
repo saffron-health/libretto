@@ -6,7 +6,7 @@ import { REPO_URL, DISCORD_URL } from "../site";
 
 const linkClass = "underline text-accent hover:text-accent-bright transition-colors";
 
-interface FAQItem {
+export interface FAQItem {
   id: string;
   question: string;
   answer: ReactNode;
@@ -176,19 +176,29 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
   );
 }
 
-export function FAQ() {
+interface FAQProps {
+  id?: string;
+  items?: FAQItem[];
+  title?: ReactNode;
+}
+
+export function FAQ({
+  id = "comparisons",
+  items = faqs,
+  title = "Frequently asked questions",
+}: FAQProps = {}) {
   return (
-    <SiteSection id="comparisons" innerClassName="flex flex-col gap-12 md:flex-row md:gap-16">
+    <SiteSection id={id} innerClassName="flex flex-col gap-12 md:flex-row md:gap-16">
       <div className="md:w-1/2 md:shrink-0 md:pt-5">
         <SectionIntro
           align="left"
           headingClassName="mb-0"
           kicker="// FAQ --"
-          title="Frequently asked questions"
+          title={title}
         />
       </div>
       <div className="border-t border-ink/10 md:w-1/2">
-        {faqs.map((faq) => (
+        {items.map((faq) => (
           <FAQAccordionItem key={faq.id} item={faq} />
         ))}
       </div>

@@ -11,9 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SigninRouteImport } from './routes/signin'
+import { Route as SetupRouteImport } from './routes/setup'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as InviteRouteImport } from './routes/invite'
+import { Route as DebugAgentsRouteImport } from './routes/debug-agents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CliRouteImport } from './routes/cli'
+import { Route as BrowserToolsRouteImport } from './routes/browser-tools'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
 import { Route as BlogRouteRouteImport } from './routes/blog/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -21,6 +25,8 @@ import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as VsStagehandRouteImport } from './routes/vs/stagehand'
 import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs/playwright-codegen'
 import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
+import { Route as GithubSetupRouteImport } from './routes/github.setup'
+import { Route as DashboardCloudBrowsersRouteImport } from './routes/dashboard_.cloud-browsers'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
@@ -33,6 +39,11 @@ const SigninRoute = SigninRouteImport.update({
   path: '/signin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -43,9 +54,24 @@ const InviteRoute = InviteRouteImport.update({
   path: '/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DebugAgentsRoute = DebugAgentsRouteImport.update({
+  id: '/debug-agents',
+  path: '/debug-agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CliRoute = CliRouteImport.update({
+  id: '/cli',
+  path: '/cli',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrowserToolsRoute = BrowserToolsRouteImport.update({
+  id: '/browser-tools',
+  path: '/browser-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrandKitRoute = BrandKitRouteImport.update({
@@ -83,6 +109,16 @@ const VsBrowserUseRoute = VsBrowserUseRouteImport.update({
   path: '/vs/browser-use',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GithubSetupRoute = GithubSetupRouteImport.update({
+  id: '/github/setup',
+  path: '/github/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardCloudBrowsersRoute = DashboardCloudBrowsersRouteImport.update({
+  id: '/dashboard_/cloud-browsers',
+  path: '/dashboard/cloud-browsers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BlogSlugRoute = BlogSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -93,12 +129,18 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/browser-tools': typeof BrowserToolsRoute
+  '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
+  '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
+  '/setup': typeof SetupRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard/cloud-browsers': typeof DashboardCloudBrowsersRoute
+  '/github/setup': typeof GithubSetupRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -107,12 +149,18 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/brand-kit': typeof BrandKitRoute
+  '/browser-tools': typeof BrowserToolsRoute
+  '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
+  '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
+  '/setup': typeof SetupRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard/cloud-browsers': typeof DashboardCloudBrowsersRoute
+  '/github/setup': typeof GithubSetupRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -123,12 +171,18 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/browser-tools': typeof BrowserToolsRoute
+  '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
+  '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
+  '/setup': typeof SetupRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard_/cloud-browsers': typeof DashboardCloudBrowsersRoute
+  '/github/setup': typeof GithubSetupRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -140,12 +194,18 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/browser-tools'
+    | '/cli'
     | '/dashboard'
+    | '/debug-agents'
     | '/invite'
     | '/onboarding'
+    | '/setup'
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
+    | '/dashboard/cloud-browsers'
+    | '/github/setup'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -154,12 +214,18 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/brand-kit'
+    | '/browser-tools'
+    | '/cli'
     | '/dashboard'
+    | '/debug-agents'
     | '/invite'
     | '/onboarding'
+    | '/setup'
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
+    | '/dashboard/cloud-browsers'
+    | '/github/setup'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -169,12 +235,18 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/browser-tools'
+    | '/cli'
     | '/dashboard'
+    | '/debug-agents'
     | '/invite'
     | '/onboarding'
+    | '/setup'
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
+    | '/dashboard_/cloud-browsers'
+    | '/github/setup'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -185,11 +257,17 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BlogRouteRoute: typeof BlogRouteRouteWithChildren
   BrandKitRoute: typeof BrandKitRoute
+  BrowserToolsRoute: typeof BrowserToolsRoute
+  CliRoute: typeof CliRoute
   DashboardRoute: typeof DashboardRoute
+  DebugAgentsRoute: typeof DebugAgentsRoute
   InviteRoute: typeof InviteRoute
   OnboardingRoute: typeof OnboardingRoute
+  SetupRoute: typeof SetupRoute
   SigninRoute: typeof SigninRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  DashboardCloudBrowsersRoute: typeof DashboardCloudBrowsersRoute
+  GithubSetupRoute: typeof GithubSetupRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
@@ -211,6 +289,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SigninRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding': {
       id: '/onboarding'
       path: '/onboarding'
@@ -225,11 +310,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/debug-agents': {
+      id: '/debug-agents'
+      path: '/debug-agents'
+      fullPath: '/debug-agents'
+      preLoaderRoute: typeof DebugAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cli': {
+      id: '/cli'
+      path: '/cli'
+      fullPath: '/cli'
+      preLoaderRoute: typeof CliRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/browser-tools': {
+      id: '/browser-tools'
+      path: '/browser-tools'
+      fullPath: '/browser-tools'
+      preLoaderRoute: typeof BrowserToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/brand-kit': {
@@ -281,6 +387,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VsBrowserUseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/github/setup': {
+      id: '/github/setup'
+      path: '/github/setup'
+      fullPath: '/github/setup'
+      preLoaderRoute: typeof GithubSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard_/cloud-browsers': {
+      id: '/dashboard_/cloud-browsers'
+      path: '/dashboard/cloud-browsers'
+      fullPath: '/dashboard/cloud-browsers'
+      preLoaderRoute: typeof DashboardCloudBrowsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/blog/$slug': {
       id: '/blog/$slug'
       path: '/$slug'
@@ -309,11 +429,17 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BlogRouteRoute: BlogRouteRouteWithChildren,
   BrandKitRoute: BrandKitRoute,
+  BrowserToolsRoute: BrowserToolsRoute,
+  CliRoute: CliRoute,
   DashboardRoute: DashboardRoute,
+  DebugAgentsRoute: DebugAgentsRoute,
   InviteRoute: InviteRoute,
   OnboardingRoute: OnboardingRoute,
+  SetupRoute: SetupRoute,
   SigninRoute: SigninRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  DashboardCloudBrowsersRoute: DashboardCloudBrowsersRoute,
+  GithubSetupRoute: GithubSetupRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,

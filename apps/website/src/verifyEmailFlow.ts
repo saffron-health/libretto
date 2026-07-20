@@ -1,9 +1,8 @@
-export function targetAfterVerification(hasTenant: boolean): string {
-  return hasTenant ? "/dashboard" : "/onboarding";
-}
+import { postAuthRedirect } from "./authRedirect";
 
 export async function redirectAfterVerifiedEmail(input: {
   hasTenant: boolean;
+  setupComplete: boolean;
   returnTo: string | null;
   hasCliLoginParams: boolean;
   approveCliLogin: () => Promise<boolean>;
@@ -13,5 +12,10 @@ export async function redirectAfterVerifiedEmail(input: {
     if (!approved) return null;
   }
 
-  return input.returnTo ?? targetAfterVerification(input.hasTenant);
+  return postAuthRedirect({
+    emailVerified: true,
+    hasTenant: input.hasTenant,
+    setupComplete: input.setupComplete,
+    returnTo: input.returnTo,
+  });
 }

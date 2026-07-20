@@ -67,6 +67,24 @@ for the login. For example, `linkedin.com` captures cookies for
 `www.linkedin.com` and `auth.linkedin.com`. Add multiple sites when the login
 uses separate parent domains, such as `example.com,example-login.com`.
 
+### Storage-state profiles and persistent browser profiles
+
+The `save` command creates a Playwright storage-state profile. It preserves
+cookies, localStorage, and IndexedDB, which is sufficient for most websites. It
+does not preserve sessionStorage, service-worker memory, or authentication that
+the server binds to a specific browser process.
+
+Use a persistent browser profile when signing in again after loading a saved
+auth profile invalidates the session. Launch Chrome with a dedicated
+`--user-data-dir`, keep that browser process running, and attach Libretto with
+`connect`.
+
+<Warning>
+  A persistent browser profile contains credentials and the browser's complete
+  local state. Give each account a separate directory, restrict filesystem
+  access, and do not run multiple browser processes against the same directory.
+</Warning>
+
 ### import-chrome-profiles
 
 The `import-chrome-profiles` command imports cookies, localStorage, and IndexedDB

@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
+import { getSafeReturnTo } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
-import { getAuthStatus, orpcCall } from "./cloudApi";
+import {
+  getAuthStatus,
+  getSetupStatus,
+  isPrAgentSetupComplete,
+  orpcCall,
+} from "./cloudApi";
 import { redirectAfterVerifiedEmail } from "./verifyEmailFlow";
 
 type CliLoginParams = {
@@ -14,18 +20,6 @@ function getCliLoginParams(): CliLoginParams | null {
   const secret = params.get("cliLoginSecret")?.trim();
   if (!requestId || !secret) return null;
   return { requestId, secret };
-}
-
-function getSafeReturnTo(): string | null {
-  const rawReturnTo = new URLSearchParams(window.location.search).get("returnTo");
-  if (!rawReturnTo) return null;
-  try {
-    const parsed = new URL(rawReturnTo, window.location.origin);
-    if (parsed.origin !== window.location.origin) return null;
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    return null;
-  }
 }
 
 async function approveCliLoginIfPresent(): Promise<boolean> {
@@ -55,8 +49,14 @@ export function VerifyEmailPage() {
         const status = await getAuthStatus();
         if (cancelled) return;
         if (status.emailVerified) {
+          const setupComplete = status.hasTenant
+            ? await getSetupStatus()
+                .then(isPrAgentSetupComplete)
+                .catch(() => false)
+            : false;
           const redirectTo = await redirectAfterVerifiedEmail({
             hasTenant: status.hasTenant,
+            setupComplete,
             returnTo: getSafeReturnTo(),
             hasCliLoginParams: Boolean(getCliLoginParams()),
             approveCliLogin: approveCliLoginIfPresent,

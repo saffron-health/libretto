@@ -16,8 +16,24 @@
       "outputLogs": "errors-only"
     },
     "benchmarks": {
-      "dependsOn": ["^build"],
-      "cache": false
+      "dependsOn": ["build", "^build"],
+      "cache": false,
+      "env": [
+        "BROWSERBASE_API_KEY",
+        "BROWSERBASE_ENDPOINT",
+        "BROWSERBASE_PROJECT_ID",
+        "BROWSER_USE_API_KEY",
+        "BROWSER_USE_BASE_URL",
+        "KERNEL_API_ENDPOINT",
+        "KERNEL_API_KEY",
+        "KERNEL_ENDPOINT",
+        "KERNEL_PROXY_ID",
+        "KERNEL_TIMEOUT_SECONDS",
+        "OPENAI_API_KEY",
+        "STEEL_API_KEY",
+        "STEEL_BASE_URL",
+        "STEEL_CONNECT_URL"
+      ]
     },
     "evals": {
       "dependsOn": ["^build"],

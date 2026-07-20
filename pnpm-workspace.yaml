@@ -25,6 +25,8 @@ blockExoticSubdeps: true
 
 allowBuilds:
   '@google/genai': false
+  agent-browser: true
+  dev-browser: true
   esbuild: true
   fallow: false
   glimpseui: false

@@ -103,7 +103,8 @@ export const setupInput = SimpleCLI.input({
 });
 
 export const setupCommand = SimpleCLI.command({
-  description: "Set up libretto in the current project",
+  description:
+    "Set up libretto in the current project. Use `update` to update existing installations",
 })
   .input(setupInput)
   .handle(async ({ input }) => {

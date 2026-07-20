@@ -1,0 +1,124 @@
+---
+title: Playwright debugging agent
+description: Investigate failures and automatically open pull requests to fix Playwright scripts as they break.
+---
+
+The Playwright debugging agent investigates failed browser automations and
+automatically opens pull requests that fix broken scripts.
+
+`libretto-playwright-debugger` lets an existing Playwright script keep its current
+browser provider, retries, logging, and fallback logic while adding one agent
+call in the failure path.
+
+Install it in the project that runs the Playwright automation:
+
+```bash
+pnpm add libretto-playwright-debugger
+```
+
+```typescript
+import { createPlaywrightDebugger } from "libretto-playwright-debugger";
+
+const playwrightDebugger = createPlaywrightDebugger({
+  github: {
+    owner: "acme",
+    repo: "automations",
+    baseBranch: "main",
+  },
+  agent: {
+    model: "openai/gpt-5.4",
+  },
+});
+```
+
+The `agent.model` value uses Libretto's `provider/model-id` convention. For
+example, `openai/gpt-5.4` resolves to provider `openai` and model id `gpt-5.4`.
+The first version supports `openai/...` and `anthropic/...`.
+
+Initialize this debugger once at module scope. At the existing failure point,
+await `debugFailure()` with the error and the live `Page` before Playwright
+teardown runs:
+
+```typescript
+try {
+  await runAutomation(page);
+} catch (error) {
+  await playwrightDebugger.debugFailure(error, page);
+  // Existing fallback and logging stay here.
+  throw error;
+}
+```
+
+Keep the existing automation, retry, fallback, logging, and rethrow behavior in
+place around the new call.
+
+## What It Captures
+
+`debugFailure()` captures the error message, stack trace, page URL, page title,
+screenshot, and DOM snapshot from the failed page. It uses the stack frames —
+plus any paths you pass in `includeFiles` — to read the relevant source files
+from GitHub at `baseBranch`.
+
+```typescript
+await playwrightDebugger.debugFailure(error, page, {
+  includeFiles: ["src/workflows/acme.ts"],
+});
+```
+
+`includeFiles` is optional. When the error stack references files inside the
+repository, the debugger discovers them automatically; pass `includeFiles` when
+the stack does not cover the file that needs the fix (for example bundled or
+minified stacks, or a cross-file change).
+
+## How It Investigates
+
+The debugger does not guess a fix from a static snapshot. It runs an agent loop
+built on the [`libretto-browser-tools`](https://www.npmjs.com/package/libretto-browser-tools)
+SDK: the model is given the failure context and source files, then drives a real
+browser to confirm the root cause before proposing a change. It stays attached
+to the supplied failed `Page`, preserving its authentication, storage, routes,
+open tabs, and in-memory state. It can:
+
+- `browser_status` the existing pages in the failed browser context,
+- `browser_snapshot` the live accessibility tree (and a screenshot), and
+- `browser_exec` Playwright code against the page — for example counting a
+  selector's matches to check whether it actually resolves.
+
+Only once the live page confirms the cause does the agent submit full-file
+replacements. The debugger writes those files to a new branch with the GitHub
+Git API and opens a pull request whose body cites the observed evidence. If the
+evidence is insufficient for a safe fix, it opens no PR and returns
+`status: "no_changes"`.
+
+The debugger does not launch or close a second browser. Debugger infrastructure
+failures resolve with `status: "debugger_failed"` so the caller's existing
+fallback and original error handling can continue.
+
+## Model Keys
+
+Set the provider API key in the environment where the Playwright script runs:
+
+```bash
+export OPENAI_API_KEY=...
+# or
+export ANTHROPIC_API_KEY=...
+```
+
+You can also pass `agent.apiKey` directly when the key is provided by your
+secrets manager.
+
+## GitHub Authentication
+
+The debugger uses Libretto's public GitHub App through Libretto Cloud.
+
+First use the [Libretto setup flow](https://libretto.sh/setup) to connect the
+repository. The flow verifies the GitHub user can access the installed Libretto
+GitHub App and stores the tenant/repository link. Then provide:
+
+```bash
+export LIBRETTO_API_KEY=...
+```
+
+With that setup, the debugger asks Libretto Cloud for a short-lived GitHub
+installation token scoped to the configured `owner/repo` and only the
+permissions needed to read and write contents and open pull requests.

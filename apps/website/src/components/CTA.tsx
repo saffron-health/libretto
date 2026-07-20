@@ -19,7 +19,7 @@ export function CTA() {
             variant="secondary"
             data-fathom-event="CTA demo click"
           >
-            book a demo
+            TALK TO A DEV
           </Button>
         </div>
       </div>
