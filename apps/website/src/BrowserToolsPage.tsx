@@ -20,29 +20,19 @@ function CodeWindow() {
       </div>
       <pre className="overflow-x-auto p-5 font-mono text-[12px] leading-[1.85] sm:p-7 sm:text-[13px]">
         <code>
-          <span className="text-faint">import</span>
-          <span className="text-ink"> {"{ generateText }"} </span>
-          <span className="text-faint">from</span>
-          <span className="text-amber"> &quot;ai&quot;</span>
-          <span className="text-faint">;</span>
+          <span className="text-faint">
+            {"// Supports Kernel, Browserbase, and more"}
+          </span>
           {"\n"}
-          <span className="text-faint">import</span>
-          <span className="text-ink"> {"{\n  createAiSdkBrowserTools,\n}"} </span>
-          <span className="text-faint">from</span>
-          <span className="text-amber"> &quot;libretto-browser-tools/ai-sdk&quot;</span>
-          <span className="text-faint">;</span>
-          {"\n"}
-          <span className="text-faint">import</span>
-          <span className="text-ink"> {"{\n  LocalBrowserProvider,\n}"} </span>
-          <span className="text-faint">from</span>
-          <span className="text-amber"> &quot;libretto-browser-tools&quot;</span>
-          <span className="text-faint">;</span>
-          {"\n\n"}
           <span className="text-faint">const</span>
           <span className="text-ink"> provider = </span>
           <span className="text-faint">new</span>
           <span className="text-accent-bright"> LocalBrowserProvider</span>
           <span className="text-ink">();</span>
+          {"\n\n"}
+          <span className="text-faint">
+            {"// Integrates with Pi SDK, and more coming soon"}
+          </span>
           {"\n"}
           <span className="text-faint">const</span>
           <span className="text-ink"> {"{ tools }"} = </span>
@@ -60,10 +50,6 @@ function CodeWindow() {
           <span className="text-ink">{",\n});"}</span>
         </code>
       </pre>
-      <div className="flex items-center gap-3 border-t border-rule bg-green-3/20 px-5 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-bright">
-        <span className="size-1.5 animate-pulse rounded-full bg-accent" />
-        6 browser tools attached
-      </div>
     </div>
   );
 }
@@ -118,16 +104,29 @@ function BrowserToolsHero() {
   );
 }
 
+function ToolCallExample({
+  call,
+  result,
+}: {
+  call: React.ReactNode;
+  result: React.ReactNode;
+}) {
+  return (
+    <pre className="overflow-x-auto p-5 font-mono text-[11px] leading-6">
+      <div className="text-accent-bright">{call}</div>
+      <div className="mt-3 border-t border-rule/80 pt-3 text-muted">{result}</div>
+    </pre>
+  );
+}
+
 function ToolCard({
   index,
   name,
-  label,
   example,
   children,
 }: {
   index: string;
   name: string;
-  label: string;
   example: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -135,9 +134,6 @@ function ToolCard({
     <div className="relative overflow-hidden rounded-xl border border-rule bg-panel/70 p-6 md:p-8">
       <div className="absolute top-0 right-0 border-b border-l border-rule px-3 py-2 font-mono text-[10px] text-faint">
         {index}
-      </div>
-      <div className="mb-8 font-mono text-[10px] uppercase tracking-[0.15em] text-amber">
-        {label}
       </div>
       <Text as="h3" size="xl" wrap="pretty" className="mb-3 text-accent-bright">
         {name}
@@ -186,20 +182,29 @@ function ToolsSection() {
         <div className="grid gap-4 md:grid-cols-2">
           <ToolCard
             index="01"
-            label="See the page"
             name="browser_snapshot"
             example={
-              <pre className="overflow-x-auto p-5 font-mono text-[11px] leading-6 text-muted">
-                <span className="text-faint">&lt;page title=&quot;Hacker News&quot;&gt;</span>
-                {"\n  "}
-                <span className="text-ink">heading</span> &quot;Hacker News&quot;
-                {"\n  "}
-                <span className="text-accent-bright">link</span> &quot;Show HN:
-                Browser Tools&quot; <span className="text-amber">[ref=l12]</span>
-                {"\n  "}
-                <span className="text-accent-bright">link</span> &quot;42
-                comments&quot; <span className="text-amber">[ref=l13]</span>
-              </pre>
+              <ToolCallExample
+                call={
+                  <>
+                    <span className="text-ink">browser_snapshot</span>
+                    <span className="text-faint"> ses-4f2a</span>
+                  </>
+                }
+                result={
+                  <>
+                    <span className="text-faint">&lt;page title=&quot;Hacker News&quot;&gt;</span>
+                    {"\n  "}
+                    <span className="text-ink">heading</span> &quot;Hacker News&quot;
+                    {"\n  "}
+                    <span className="text-accent-bright">link</span> &quot;Show HN:
+                    Browser Tools&quot; <span className="text-amber">[ref=l12]</span>
+                    {"\n  "}
+                    <span className="text-accent-bright">link</span> &quot;42
+                    comments&quot; <span className="text-amber">[ref=l13]</span>
+                  </>
+                }
+              />
             }
           >
             Returns a compact accessibility tree with stable refs. The agent
@@ -207,22 +212,34 @@ function ToolsSection() {
           </ToolCard>
           <ToolCard
             index="02"
-            label="Use the browser"
             name="browser_exec"
             example={
-              <pre className="overflow-x-auto p-5 font-mono text-[11px] leading-6 text-muted">
-                <span className="text-faint">const</span> story = page
-                {"\n  "}.locator(
-                <span className="text-amber">&quot;.titleline &gt; a&quot;</span>)
-                {"\n  "}.first();
-                {"\n"}
-                <span className="text-faint">const</span> title ={" "}
-                <span className="text-faint">await</span> story.innerText();
-                {"\n"}
-                <span className="text-faint">await</span> story.click();
-                {"\n"}
-                <span className="text-faint">return</span> {"{ title, url: page.url() };"}
-              </pre>
+              <ToolCallExample
+                call={
+                  <>
+                    <span className="text-ink">browser_exec</span>{" "}
+                    <span className="text-amber">
+                      &quot;await page.locator(&apos;.titleline &gt; a&apos;).first().click()&quot;
+                    </span>
+                  </>
+                }
+                result={
+                  <>
+                    <span className="text-faint">{"{"}</span>
+                    {"\n  "}
+                    <span className="text-ink">ok</span>
+                    <span className="text-faint">: </span>
+                    <span className="text-accent-bright">true</span>
+                    <span className="text-faint">,</span>
+                    {"\n  "}
+                    <span className="text-ink">snapshotDiff</span>
+                    <span className="text-faint">: </span>
+                    <span className="text-amber">&quot;+ article [ref=l20]&quot;</span>
+                    {"\n"}
+                    <span className="text-faint">{"}"}</span>
+                  </>
+                }
+              />
             }
           >
             Runs Playwright code on the live page. Each call returns a compact
@@ -298,6 +315,125 @@ function BenchmarksPlaceholder() {
   );
 }
 
+function CheckCircleIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      className="size-5 text-accent-bright"
+      fill="none"
+    >
+      <circle
+        cx="10"
+        cy="10"
+        r="8.25"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M6.25 10.25 8.75 12.75 13.75 7.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      className="size-5"
+      fill="none"
+    >
+      <circle
+        cx="10"
+        cy="10"
+        r="8.25"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M10 6.25V10l2.75 1.75"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ReadyIntegrationCard({
+  href,
+  fathomEvent,
+  children,
+}: {
+  href: string;
+  fathomEvent: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex min-h-36 items-center justify-between rounded-xl border border-rule bg-panel/60 p-7 no-underline transition-colors hover:border-accent/40"
+      data-fathom-event={fathomEvent}
+    >
+      {children}
+      <CheckCircleIcon />
+    </a>
+  );
+}
+
+function ComingSoonIntegrationCard({
+  name,
+  href,
+}: {
+  name: string;
+  href?: string;
+}) {
+  const content = (
+    <>
+      <span className="font-mono text-lg tracking-tight text-ink/55">{name}</span>
+      <span className="relative text-faint">
+        <ClockIcon />
+        <span className="pointer-events-none absolute top-full right-0 z-10 mt-2 whitespace-nowrap rounded-md border border-rule bg-panel px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted opacity-0 shadow-lg shadow-black/40 transition-opacity group-hover:opacity-100">
+          Coming soon
+        </span>
+      </span>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group flex min-h-36 items-center justify-between rounded-xl border border-rule/70 bg-panel/30 p-7 no-underline opacity-55 transition-opacity hover:opacity-80"
+        data-fathom-event={`Browser tools ${name} integration click`}
+        title="Coming soon"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div
+      className="group flex min-h-36 cursor-default items-center justify-between rounded-xl border border-rule/70 bg-panel/30 p-7 opacity-55"
+      title="Coming soon"
+    >
+      {content}
+    </div>
+  );
+}
+
 function IntegrationsSection() {
   return (
     <section className="px-6 py-24 md:px-12 md:py-32">
@@ -319,88 +455,43 @@ function IntegrationsSection() {
             Use the agent framework you know.
           </Text>
           <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
-            Built-in adapters give AI SDK and Pi the right tool shape and return
-            format.
+            Built-in adapters for AI SDK and Pi. More frameworks are on the way.
           </Text>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <a
+          <ReadyIntegrationCard
             href="https://ai-sdk.dev/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex min-h-44 items-center justify-between rounded-xl border border-rule bg-panel/60 p-8 no-underline transition-colors hover:border-accent/40"
-            data-fathom-event="Browser tools AI SDK integration click"
+            fathomEvent="Browser tools AI SDK integration click"
           >
-            <img src="/logos/ai-sdk.svg" alt="AI SDK" className="h-10 w-auto max-w-40" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent-bright">
-              Ready
-            </span>
-          </a>
-          <a
+            <img
+              src="/logos/ai-sdk.svg"
+              alt="AI SDK"
+              className="h-10 w-auto max-w-40"
+            />
+          </ReadyIntegrationCard>
+          <ReadyIntegrationCard
             href="https://pi.dev/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex min-h-44 items-center justify-between rounded-xl border border-rule bg-panel/60 p-8 no-underline transition-colors hover:border-accent/40"
-            data-fathom-event="Browser tools Pi integration click"
+            fathomEvent="Browser tools Pi integration click"
           >
             <span className="flex items-center gap-4">
-              <img src="/logos/pi.svg" alt="" className="size-14" />
+              <img
+                src="/logos/pi.svg"
+                alt=""
+                className="size-12 brightness-0 invert"
+              />
               <span className="font-mono text-2xl text-ink">Pi</span>
             </span>
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent-bright">
-              Ready
-            </span>
-          </a>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-dashed border-rule px-6 py-5 text-center font-mono text-xs text-muted">
-          More framework adapters are coming.
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function WhyBuiltSection() {
-  return (
-    <section className="section-crt px-6 py-24 md:px-12 md:py-32">
-      <div className="relative mx-auto grid max-w-[900px] gap-10 md:grid-cols-[0.8fr_1.2fr] md:gap-20">
-        <div>
-          <Kicker className="mb-4">// WHY WE BUILT IT --</Kicker>
-          <Text
-            as="h2"
-            size="4xl"
-            style="serif"
-            wrap="pretty"
-            className="tracking-[-0.035em] text-ink"
-            htmlStyle={{
-              fontWeight: 300,
-              fontSize: "clamp(34px, 5vw, 52px)",
-              lineHeight: 1.05,
-            }}
-          >
-            Models already know Playwright.
-          </Text>
-        </div>
-        <div className="space-y-5">
-          <Text
-            as="p"
-            size="lg"
-            wrap="pretty"
-            className="leading-relaxed text-ink"
-          >
-            Browser tools often make agents choose among many narrow actions or
-            read a full page of raw data.
-          </Text>
-          <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
-            Both waste context and make each step harder. Browser Tools SDK uses
-            six tools instead. The agent reads a compact page view, then writes
-            the Playwright code it needs.
-          </Text>
-          <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
-            You keep your model, agent loop, and browser provider.
-          </Text>
+          </ReadyIntegrationCard>
+          <ComingSoonIntegrationCard
+            name="Flue"
+            href="https://flueframework.com/"
+          />
+          <ComingSoonIntegrationCard
+            name="Executor"
+            href="https://executor.sh/"
+          />
+          <ComingSoonIntegrationCard name="Eve" />
         </div>
       </div>
     </section>
@@ -430,7 +521,7 @@ function ProductLinksSection() {
             className="group rounded-xl border border-rule bg-panel/60 p-7 no-underline transition-colors hover:border-accent/40"
             data-fathom-event="Browser tools Libretto CLI click"
           >
-            <div className="mb-8 font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+            <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
               Libretto CLI
             </div>
             <Text
@@ -455,7 +546,7 @@ function ProductLinksSection() {
             className="group rounded-xl border border-rule bg-panel/60 p-7 no-underline transition-colors hover:border-accent/40"
             data-fathom-event="Browser tools Debug Agents click"
           >
-            <div className="mb-8 font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+            <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
               Debug Agents
             </div>
             <Text
@@ -608,8 +699,6 @@ export function BrowserToolsPage() {
         <BenchmarksPlaceholder />
         <SectionDivider />
         <IntegrationsSection />
-        <SectionDivider />
-        <WhyBuiltSection />
         <SectionDivider />
         <ToolsSection />
         <SectionDivider />
