@@ -4,13 +4,12 @@ import { SimpleCLI } from "affordance";
 // ── Session status printing ─────────────────────────────────────────────────
 
 function printOpenSessions(sessions: SessionState[]): void {
-  console.log("\nOpen sessions:");
-
   if (sessions.length === 0) {
-    console.log("  No open sessions.");
+    console.log("\nNo open sessions.");
     return;
   }
 
+  console.log("\nOpen sessions:");
   for (const session of sessions) {
     const statusLabel = session.status ? ` [${session.status}]` : "";
     const endpoint = session.provider
