@@ -266,7 +266,7 @@
   padding: 12px;
   border: 0;
   border-radius: 6px;
-  background: transparent;
+  background: var(--card);
   box-shadow: none;
 }
 
@@ -292,6 +292,9 @@
 }
 
 .slot-main [class~='group/card'] {
+  flex-flow: row wrap;
+  align-content: flex-start;
+  align-items: flex-start;
   gap: 9px;
   padding: 12px !important;
   border-color: transparent;
@@ -303,12 +306,28 @@
     border-color 80ms ease-in-out;
 }
 
+.slot-main [class~='group/card'] > :first-child {
+  order: 1;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.slot-main [class~='group/card'] > :nth-child(2) {
+  order: 3;
+  flex: 0 0 100%;
+}
+
+.slot-main
+  [class~='group/card']
+  > [class~='text-primary']:last-child {
+  order: 2;
+  flex: 0 0 auto;
+}
+
 .slot-main :where(a):hover > [class~='group/card'] {
   border-color: transparent;
   background: var(--docs-hover);
-  box-shadow:
-    0 0 0 1px var(--ring),
-    var(--docs-shadow-minimal);
+  box-shadow: var(--docs-shadow-minimal);
 }
 
 .slot-main
