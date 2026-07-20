@@ -554,7 +554,7 @@ function ProductLinksSection() {
               wrap="pretty"
               className="leading-relaxed text-muted"
             >
-              Record a live workflow and save it as a reusable TypeScript script.
+              Record a live workflow and save it as a reusable typescript file.
             </Text>
           </a>
           <a
