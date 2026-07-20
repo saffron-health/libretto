@@ -93,8 +93,8 @@ function BrowserToolsHero() {
             size="lg"
             className="mb-9 max-w-[560px] leading-relaxed text-muted [text-wrap:pretty]"
           >
-            Framework-native tools for AI agents to open real browsers, inspect
-            pages, and act with Playwright.
+            Let any AI agent open a real browser, read the page, and act with
+            Playwright.
           </Text>
           <ShellCommand
             ariaLabel="Copy browser tools install command"
@@ -139,8 +139,8 @@ function InstallSection() {
             fathomEvent="Browser tools install section copy"
           />
           <Text as="p" size="sm" className="mt-4 leading-relaxed text-muted">
-            Bring your own model and agent loop. The SDK handles browser
-            sessions, page state, and cleanup.
+            Use your model and agent loop. The SDK opens and closes browser
+            sessions and tracks each page.
           </Text>
         </div>
       </div>
@@ -194,21 +194,22 @@ function ToolsSection() {
               lineHeight: 1.05,
             }}
           >
-            A tight loop between page and agent
+            See the page. Then act.
           </Text>
           <Text as="p" className="leading-relaxed text-muted">
-            Compact page context goes in. Precise Playwright actions come out.
+            The agent reads a compact page snapshot, decides what to do, and
+            runs Playwright code.
           </Text>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <ToolCard index="01" label="See the page" name="browser_snapshot">
-            Captures a compact accessibility tree with stable refs. Agents get
-            the structure they need without paying for a wall of HTML.
+            Returns a compact accessibility tree with stable refs. The agent
+            can read the page structure without raw HTML.
           </ToolCard>
           <ToolCard index="02" label="Use the browser" name="browser_exec">
-            Runs focused Playwright code against the live page. Every action
-            returns a concise snapshot diff of what changed.
+            Runs Playwright code on the live page. Each call returns a compact
+            snapshot diff that shows what changed.
           </ToolCard>
         </div>
 
@@ -249,7 +250,7 @@ function BenchmarksPlaceholder() {
               className="tracking-[-0.035em] text-ink"
               htmlStyle={{ fontWeight: 300 }}
             >
-              Less context. More signal.
+              Benchmarks are in progress.
             </Text>
           </div>
           <span className="hidden font-mono text-[10px] uppercase tracking-[0.15em] text-amber sm:block">
@@ -260,9 +261,9 @@ function BenchmarksPlaceholder() {
           <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent,transparent_12px,color-mix(in_oklch,var(--color-green-9)_3%,transparent)_12px,color-mix(in_oklch,var(--color-green-9)_3%,transparent)_24px)]" />
           <div className="relative grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
             <Text as="p" className="max-w-[560px] leading-relaxed text-muted">
-              We are testing browser-task success rate, latency, and token use
-              against common agent browser stacks. Full methodology and
-              reproducible results are coming soon.
+              We are measuring task success, speed, and token use across common
+              browser tools. We will publish the method and results when the
+              tests are complete.
             </Text>
             <div className="inline-flex w-fit items-center gap-3 rounded-full border border-amber/30 bg-amber/5 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-amber">
               <span className="size-1.5 animate-pulse rounded-full bg-amber" />
@@ -279,7 +280,7 @@ function FinalCta() {
   return (
     <section className="section-crt px-6 py-24 text-center md:px-12 md:py-32">
       <div className="relative mx-auto max-w-[720px]">
-        <Kicker className="mb-4">// SHIP THE BROWSER --</Kicker>
+        <Kicker className="mb-4">// GET STARTED --</Kicker>
         <Text
           as="h2"
           size="4xl"
@@ -291,10 +292,10 @@ function FinalCta() {
             lineHeight: 1.04,
           }}
         >
-          Your agent is one install away.
+          Add browser tools to your agent.
         </Text>
         <Text as="p" className="mx-auto mb-8 max-w-[520px] leading-relaxed text-muted">
-          Add production-grade browser tools to the agent framework you already use.
+          Install the package. Keep your current model and agent framework.
         </Text>
         <ShellCommand
           ariaLabel="Copy browser tools install command"
