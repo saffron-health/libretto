@@ -7,6 +7,7 @@ import {
 } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import satori from "satori";
 import sharp from "sharp";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -16,9 +17,16 @@ const config = JSON.parse(readFileSync(join(docsRoot, "docs.json"), "utf8"));
 const logoDataUri = `data:image/svg+xml;base64,${readFileSync(
   join(docsRoot, "public", "logos", "logo-light.svg"),
 ).toString("base64")}`;
-const serifFontDataUri = `data:font/truetype;base64,${readFileSync(
+const serifFontData = readFileSync(
   join(root, "apps", "website", "public", "fonts", "Fraunces-Regular.ttf"),
-).toString("base64")}`;
+);
+const sansFontData = readFileSync(
+  fileURLToPath(
+    import.meta.resolve(
+      "@fontsource/inter/files/inter-latin-400-normal.woff",
+    ),
+  ),
+);
 const pageGroups = buildPageGroupMap(config.navigation?.tabs ?? []);
 
 const OG_WIDTH = 1200;
@@ -43,7 +51,7 @@ for (const pagePath of pages) {
   const imagePath = join(outputRoot, `${slug}.png`);
 
   mkdirSync(dirname(imagePath), { recursive: true });
-  await sharp(Buffer.from(renderOgSvg({ description, group, title })))
+  await sharp(Buffer.from(await renderOgSvg({ description, group, title })))
     .png({ compressionLevel: 9, palette: true, quality: 100 })
     .toFile(imagePath);
 
@@ -189,100 +197,113 @@ function titleFromSlug(value) {
   return title.charAt(0).toUpperCase() + title.slice(1);
 }
 
-function renderOgSvg({ description, group, title }) {
-  const titleLines = wrapText(title, 11.5, 2);
-  const descriptionLines = wrapText(description, 25, 2);
-  const titleY = 310;
-  const titleLineHeight = 70;
-  const descriptionY =
-    titleY + titleLines.length * titleLineHeight + (titleLines.length > 1 ? 16 : 22);
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${OG_WIDTH}" height="${OG_HEIGHT}" viewBox="0 0 ${OG_WIDTH} ${OG_HEIGHT}">
-  <defs>
-    <style>
-      @font-face {
-        font-family: "Libretto Serif";
-        font-style: normal;
-        font-weight: 400;
-        src: url("${serifFontDataUri}") format("truetype");
-      }
-    </style>
-    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#090a09"/>
-      <stop offset="0.52" stop-color="#0b140e"/>
-      <stop offset="1" stop-color="#087326"/>
-    </linearGradient>
-  </defs>
-  <rect width="${OG_WIDTH}" height="${OG_HEIGHT}" fill="url(#background)"/>
-  <image href="${logoDataUri}" x="58" y="64" width="48" height="48"/>
-  <text x="60" y="286" fill="#12ce41" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="400">${escapeXml(group)}</text>
-  <text x="58" y="${titleY + 52}" fill="#f3f4f6" font-family="Libretto Serif, Georgia, serif" font-size="64" font-weight="400">
-    ${renderTextLines(titleLines, titleLineHeight)}
-  </text>
-  <text x="58" y="${descriptionY + 31}" fill="#b7bbb8" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="400">
-    ${renderTextLines(descriptionLines, 42)}
-  </text>
-</svg>`;
+async function renderOgSvg({ description, group, title }) {
+  return satori(
+    element(
+      "div",
+      {
+        style: {
+          alignItems: "flex-start",
+          backgroundImage:
+            "linear-gradient(135deg, #090a09 0%, #0b140e 52%, #087326 100%)",
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          justifyContent: "space-between",
+          padding: 58,
+          width: "100%",
+        },
+      },
+      element("img", {
+        height: 48,
+        src: logoDataUri,
+        style: { height: 48, width: 48 },
+        width: 48,
+      }),
+      element(
+        "div",
+        {
+          style: {
+            alignItems: "flex-start",
+            display: "flex",
+            flexDirection: "column",
+            width: 720,
+          },
+        },
+        element(
+          "div",
+          {
+            style: {
+              color: "#12ce41",
+              fontFamily: "Inter",
+              fontSize: 27,
+              lineHeight: 1.2,
+              marginBottom: 14,
+            },
+          },
+          group,
+        ),
+        element(
+          "div",
+          {
+            style: {
+              color: "#f3f4f6",
+              fontFamily: "Libretto Serif",
+              fontSize: 64,
+              fontWeight: 400,
+              lineClamp: 2,
+              lineHeight: 1.1,
+              textOverflow: "ellipsis",
+              width: "100%",
+            },
+          },
+          title,
+        ),
+        element(
+          "div",
+          {
+            style: {
+              color: "#b7bbb8",
+              fontFamily: "Inter",
+              fontSize: 28,
+              lineClamp: 2,
+              lineHeight: 1.5,
+              marginTop: 22,
+              textOverflow: "ellipsis",
+              width: "100%",
+            },
+          },
+          description,
+        ),
+      ),
+    ),
+    {
+      fonts: [
+        {
+          data: serifFontData,
+          name: "Libretto Serif",
+          style: "normal",
+          weight: 400,
+        },
+        {
+          data: sansFontData,
+          name: "Inter",
+          style: "normal",
+          weight: 400,
+        },
+      ],
+      height: OG_HEIGHT,
+      width: OG_WIDTH,
+    },
+  );
 }
 
-function renderTextLines(lines, lineHeight) {
-  return lines
-    .map(
-      (line, index) =>
-        `<tspan x="58" dy="${index === 0 ? 0 : lineHeight}">${escapeXml(line)}</tspan>`,
-    )
-    .join("");
-}
-
-function wrapText(value, maxUnits, maxLines) {
-  const words = value.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [""];
-  const lines = [];
-  let current = "";
-  for (let index = 0; index < words.length; index += 1) {
-    const candidate = current ? `${current} ${words[index]}` : words[index];
-    if (!current || textUnits(candidate) <= maxUnits) {
-      current = candidate;
-      continue;
-    }
-    lines.push(current);
-    current = words[index];
-    if (lines.length === maxLines - 1) {
-      const remaining = [current, ...words.slice(index + 1)].join(" ");
-      lines.push(truncateToUnits(remaining, maxUnits));
-      return lines;
-    }
-  }
-  if (current) lines.push(current);
-  return lines.slice(0, maxLines);
-}
-
-function truncateToUnits(value, maxUnits) {
-  if (textUnits(value) <= maxUnits) return value;
-  let result = value;
-  while (result && textUnits(`${result}…`) > maxUnits) {
-    result = result.slice(0, -1).trimEnd();
-  }
-  return `${result}…`;
-}
-
-function textUnits(value) {
-  let units = 0;
-  for (const character of value) {
-    if (character === " ") units += 0.3;
-    else if ("ilI.,:;!'|".includes(character)) units += 0.28;
-    else if ("mwMW@%&".includes(character)) units += 0.9;
-    else if (/[A-Z0-9]/.test(character)) units += 0.65;
-    else units += 0.55;
-  }
-  return units;
-}
-
-function escapeXml(value) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
+function element(type, props = {}, ...children) {
+  return {
+    props: {
+      ...props,
+      children: children.length === 1 ? children[0] : children,
+    },
+    type,
+  };
 }
