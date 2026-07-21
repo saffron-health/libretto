@@ -272,45 +272,120 @@ function ToolsSection() {
   );
 }
 
-function BenchmarksPlaceholder() {
+const BENCHMARK_RESULTS_URL =
+  "https://github.com/saffron-health/libretto/blob/main/packages/browser-tools/benchmarks/RESULTS.md";
+
+const BENCHMARK_HARNESSES = [
+  {
+    name: "browser-tools",
+    label: "Browser Tools",
+    passed: "24/26",
+    costPerPass: "$0.106",
+    tokens: "1.45M",
+    highlight: true,
+  },
+  {
+    name: "dev-browser",
+    label: "dev-browser",
+    passed: "24/26",
+    costPerPass: "$0.257",
+    tokens: "3.51M",
+    highlight: false,
+  },
+  {
+    name: "agent-browser",
+    label: "agent-browser",
+    passed: "23/26",
+    costPerPass: "$0.235",
+    tokens: "2.29M",
+    highlight: false,
+  },
+  {
+    name: "playwright-cli",
+    label: "playwright-cli",
+    passed: "22/26",
+    costPerPass: "$0.293",
+    tokens: "3.48M",
+    highlight: false,
+  },
+] as const;
+
+function BenchmarksSection() {
   return (
     <section className="px-6 py-24 md:px-12 md:py-32">
       <div className="mx-auto max-w-[900px]">
-        <div className="mb-10 flex items-end justify-between gap-8">
-          <div>
-            <Kicker className="mb-4">// BENCHMARKS --</Kicker>
-            <Text
-              as="h2"
-              size="4xl"
-              style="serif"
-              wrap="pretty"
-              className="tracking-[-0.035em] text-ink"
-              htmlStyle={{ fontWeight: 300 }}
-            >
-              Benchmarks are in progress.
-            </Text>
-          </div>
-          <span className="hidden font-mono text-[10px] uppercase tracking-[0.15em] text-amber sm:block">
-            Results incoming
-          </span>
+        <div className="mb-10 max-w-[640px]">
+          <Kicker className="mb-4">// BENCHMARKS --</Kicker>
+          <Text
+            as="h2"
+            size="4xl"
+            style="serif"
+            wrap="pretty"
+            className="mb-5 tracking-[-0.035em] text-ink"
+            htmlStyle={{ fontWeight: 300 }}
+          >
+            Same pass rate. 59% less cost.
+          </Text>
+          <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
+            On 26 live-site tasks, Browser Tools tied the top harness at 24/26
+            and used 59% fewer tokens than the next tool at that score.
+          </Text>
         </div>
-        <div className="relative overflow-hidden rounded-xl border border-rule bg-panel/50 p-8 md:p-12">
-          <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent,transparent_12px,color-mix(in_oklch,var(--color-green-9)_3%,transparent)_12px,color-mix(in_oklch,var(--color-green-9)_3%,transparent)_24px)]" />
-          <div className="relative grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
-            <Text
-              as="p"
-              wrap="pretty"
-              className="max-w-[560px] leading-relaxed text-muted"
-            >
-              We are measuring task success, speed, and token use across common
-              browser tools. We will publish the method and results when the
-              tests are complete.
-            </Text>
-            <div className="inline-flex w-fit items-center gap-3 rounded-full border border-amber/30 bg-amber/5 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-amber">
-              <span className="size-1.5 animate-pulse rounded-full bg-amber" />
-              Running
-            </div>
+
+        <div className="overflow-hidden rounded-xl border border-rule">
+          <div className="hidden grid-cols-[1.4fr_0.7fr_0.9fr_0.9fr] gap-4 border-b border-rule bg-panel/40 px-5 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-faint sm:grid">
+            <span>Harness</span>
+            <span>Passed</span>
+            <span>Cost / pass</span>
+            <span>Tokens</span>
           </div>
+          {BENCHMARK_HARNESSES.map((row) => (
+            <div
+              key={row.name}
+              className={`grid gap-2 border-b border-rule px-5 py-4 last:border-b-0 sm:grid-cols-[1.4fr_0.7fr_0.9fr_0.9fr] sm:items-center sm:gap-4 ${
+                row.highlight ? "bg-green-3/25" : "bg-panel/20"
+              }`}
+            >
+              <div className="font-mono text-sm text-ink">
+                {row.label}
+                {row.highlight ? (
+                  <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-bright">
+                    ours
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex justify-between font-mono text-sm text-muted sm:block sm:text-ink">
+                <span className="sm:hidden">Passed</span>
+                <span>{row.passed}</span>
+              </div>
+              <div className="flex justify-between font-mono text-sm text-muted sm:block sm:text-ink">
+                <span className="sm:hidden">Cost / pass</span>
+                <span className={row.highlight ? "text-accent-bright" : undefined}>
+                  {row.costPerPass}
+                </span>
+              </div>
+              <div className="flex justify-between font-mono text-sm text-muted sm:block sm:text-ink">
+                <span className="sm:hidden">Tokens</span>
+                <span>{row.tokens}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Text as="p" className="text-xs leading-relaxed text-faint">
+            Best result per harness across three Browser Use Cloud runs (July
+            2026). GPT-5.6 Sol via Pi. Exploratory — not a causal ranking.
+          </Text>
+          <a
+            href={BENCHMARK_RESULTS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 font-mono text-xs text-muted underline decoration-muted/50 underline-offset-4 transition-colors hover:text-ink hover:decoration-accent"
+            data-fathom-event="Browser tools benchmarks results click"
+          >
+            Full method and results →
+          </a>
         </div>
       </div>
     </section>
@@ -689,7 +764,7 @@ export function BrowserToolsPage() {
       <BrowserToolsHero />
       <div className="section-rails relative mx-auto max-w-[1100px]">
         <SectionDivider />
-        <BenchmarksPlaceholder />
+        <BenchmarksSection />
         <SectionDivider />
         <IntegrationsSection />
         <SectionDivider />
