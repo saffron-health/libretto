@@ -324,7 +324,7 @@ function BenchmarksSection() {
             className="mb-5 tracking-[-0.035em] text-ink"
             htmlStyle={{ fontWeight: 300 }}
           >
-            Same pass rate. 59% less cost.
+            59% lower cost than alternatives
           </Text>
           <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
             On 26 live-site tasks, Browser Tools tied the top harness at 24/26
