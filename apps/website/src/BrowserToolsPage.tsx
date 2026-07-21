@@ -450,7 +450,7 @@ function BrowserToolsBenchmarkBar({
           {display}
         </span>
       </div>
-      <div className="h-3 overflow-hidden rounded-sm bg-black/40 ring-1 ring-ink/10">
+      <div className="h-5 overflow-hidden rounded-sm bg-black/40 ring-1 ring-ink/10">
         <div
           className={`h-full rounded-sm transition-[width] duration-500 ease-out ${barClass}`}
           style={{ width }}
@@ -568,8 +568,8 @@ function BenchmarksSection() {
               ))}
             </div>
             <Text size="xs" className="leading-relaxed text-faint">
-              Best result per harness across three Browser Use Cloud runs (July
-              2026). GPT-5.6 Sol via Pi. Exploratory — not a causal ranking.{" "}
+              Measured across 26 tasks on public websites with GPT 5.6 Sol. Best
+              results taken from 3 runs.{" "}
               <a
                 href={BENCHMARK_RESULTS_URL}
                 target="_blank"
@@ -579,7 +579,6 @@ function BenchmarksSection() {
               >
                 Full method and results
               </a>
-              .
             </Text>
           </div>
         </div>
