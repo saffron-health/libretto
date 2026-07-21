@@ -58,19 +58,23 @@
   "rewrites": [
     {
       "source": "/llms.txt",
-      "destination": "https://libretto.sh/docs/llms.txt"
+      "destination": "https://libretto-docs.vercel.app/docs/llms.txt"
     },
     {
       "source": "/llms-full.txt",
-      "destination": "https://libretto.sh/docs/llms-full.txt"
+      "destination": "https://libretto-docs.vercel.app/docs/llms-full.txt"
     },
     {
       "source": "/docs",
-      "destination": "https://saffron-health-libretto-73.mintlify.dev/docs"
+      "destination": "https://libretto-docs.vercel.app/docs/get-started/quickstart"
+    },
+    {
+      "source": "/docs/",
+      "destination": "https://libretto-docs.vercel.app/docs/get-started/quickstart"
     },
     {
       "source": "/docs/:path*",
-      "destination": "https://saffron-health-libretto-73.mintlify.dev/docs/:path*"
+      "destination": "https://libretto-docs.vercel.app/docs/:path*"
     }
   ]
 }

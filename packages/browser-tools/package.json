@@ -88,7 +88,6 @@
     }
   },
   "devDependencies": {
-    "@libretto/browser-tools": "workspace:*",
     "@earendil-works/pi-coding-agent": "^0.80.6",
     "@playwright/cli": "^0.1.17",
     "@types/node": "^25.5.0",
