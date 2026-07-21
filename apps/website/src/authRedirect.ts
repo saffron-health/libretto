@@ -56,7 +56,8 @@ export function postAuthRedirect(input: {
   if (
     !input.setupComplete &&
     returnTo &&
-    new URL(returnTo, window.location.origin).pathname.startsWith("/dashboard")
+    new URL(returnTo, window.location.origin).pathname.startsWith("/dashboard") &&
+    new URL(returnTo, window.location.origin).pathname !== "/dashboard/cloud-browsers"
   ) {
     return "/setup";
   }

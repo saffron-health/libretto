@@ -105,12 +105,24 @@ describe("redirectAfterVerifiedEmail", () => {
     ).resolves.toBe("/dashboard");
   });
 
-  it("does not let an incomplete tenant return directly to the dashboard", async () => {
+  it("lets an incomplete tenant return to the cloud browser dashboard", async () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: true,
         setupComplete: false,
         returnTo: "/dashboard/cloud-browsers",
+        hasCliLoginParams: false,
+        approveCliLogin: async () => true,
+      }),
+    ).resolves.toBe("/dashboard/cloud-browsers");
+  });
+
+  it("keeps other dashboard routes behind tenant setup", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: true,
+        setupComplete: false,
+        returnTo: "/dashboard",
         hasCliLoginParams: false,
         approveCliLogin: async () => true,
       }),

@@ -208,7 +208,9 @@ export function CloudBrowsersDashboardPage() {
     getCloudSession()
       .then(async (result) => {
         if (!result) {
-          window.location.assign("/signin");
+          window.location.assign(
+            `/signin?returnTo=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`,
+          );
           return;
         }
         let status;
