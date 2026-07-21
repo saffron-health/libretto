@@ -20,6 +20,7 @@
     "lint": "oxlint --type-aware && fallow --summary",
     "docs:dev": "pnpm --dir docs dev",
     "docs:build": "pnpm --dir docs build",
+    "docs:og": "node scripts/render-docs-og-images.mjs",
     "website:build": "pnpm --dir ./apps/website build",
     "sync:mirrors": "node packages/dev-tools/scripts/sync-mirrors.mjs",
     "check:mirrors": "node packages/dev-tools/scripts/check-mirrors-sync.mjs",
