@@ -14,6 +14,7 @@ import { Route as SigninRouteImport } from './routes/signin'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ChromeExtensionRouteImport } from './routes/chrome-extension'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
 import { Route as BlogRouteRouteImport } from './routes/blog/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -21,6 +22,9 @@ import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as VsStagehandRouteImport } from './routes/vs/stagehand'
 import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs/playwright-codegen'
 import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
+import { Route as DashboardPrAgentRouteImport } from './routes/dashboard_.pr-agent'
+import { Route as DashboardCloudBrowsersRouteImport } from './routes/dashboard_.cloud-browsers'
+import { Route as DashboardChromeExtensionRouteImport } from './routes/dashboard_.chrome-extension'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
@@ -46,6 +50,11 @@ const InviteRoute = InviteRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChromeExtensionRoute = ChromeExtensionRouteImport.update({
+  id: '/chrome-extension',
+  path: '/chrome-extension',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrandKitRoute = BrandKitRouteImport.update({
@@ -83,6 +92,22 @@ const VsBrowserUseRoute = VsBrowserUseRouteImport.update({
   path: '/vs/browser-use',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardPrAgentRoute = DashboardPrAgentRouteImport.update({
+  id: '/dashboard_/pr-agent',
+  path: '/dashboard/pr-agent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardCloudBrowsersRoute = DashboardCloudBrowsersRouteImport.update({
+  id: '/dashboard_/cloud-browsers',
+  path: '/dashboard/cloud-browsers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardChromeExtensionRoute =
+  DashboardChromeExtensionRouteImport.update({
+    id: '/dashboard_/chrome-extension',
+    path: '/dashboard/chrome-extension',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const BlogSlugRoute = BlogSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -93,12 +118,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/dashboard': typeof DashboardRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard/chrome-extension': typeof DashboardChromeExtensionRoute
+  '/dashboard/cloud-browsers': typeof DashboardCloudBrowsersRoute
+  '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -107,12 +136,16 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/brand-kit': typeof BrandKitRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/dashboard': typeof DashboardRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard/chrome-extension': typeof DashboardChromeExtensionRoute
+  '/dashboard/cloud-browsers': typeof DashboardCloudBrowsersRoute
+  '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -123,12 +156,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/dashboard': typeof DashboardRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard_/chrome-extension': typeof DashboardChromeExtensionRoute
+  '/dashboard_/cloud-browsers': typeof DashboardCloudBrowsersRoute
+  '/dashboard_/pr-agent': typeof DashboardPrAgentRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -140,12 +177,16 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/chrome-extension'
     | '/dashboard'
     | '/invite'
     | '/onboarding'
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
+    | '/dashboard/chrome-extension'
+    | '/dashboard/cloud-browsers'
+    | '/dashboard/pr-agent'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -154,12 +195,16 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/brand-kit'
+    | '/chrome-extension'
     | '/dashboard'
     | '/invite'
     | '/onboarding'
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
+    | '/dashboard/chrome-extension'
+    | '/dashboard/cloud-browsers'
+    | '/dashboard/pr-agent'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -169,12 +214,16 @@ export interface FileRouteTypes {
     | '/'
     | '/blog'
     | '/brand-kit'
+    | '/chrome-extension'
     | '/dashboard'
     | '/invite'
     | '/onboarding'
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
+    | '/dashboard_/chrome-extension'
+    | '/dashboard_/cloud-browsers'
+    | '/dashboard_/pr-agent'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -185,11 +234,15 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BlogRouteRoute: typeof BlogRouteRouteWithChildren
   BrandKitRoute: typeof BrandKitRoute
+  ChromeExtensionRoute: typeof ChromeExtensionRoute
   DashboardRoute: typeof DashboardRoute
   InviteRoute: typeof InviteRoute
   OnboardingRoute: typeof OnboardingRoute
   SigninRoute: typeof SigninRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  DashboardChromeExtensionRoute: typeof DashboardChromeExtensionRoute
+  DashboardCloudBrowsersRoute: typeof DashboardCloudBrowsersRoute
+  DashboardPrAgentRoute: typeof DashboardPrAgentRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
@@ -230,6 +283,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chrome-extension': {
+      id: '/chrome-extension'
+      path: '/chrome-extension'
+      fullPath: '/chrome-extension'
+      preLoaderRoute: typeof ChromeExtensionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/brand-kit': {
@@ -281,6 +341,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VsBrowserUseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard_/pr-agent': {
+      id: '/dashboard_/pr-agent'
+      path: '/dashboard/pr-agent'
+      fullPath: '/dashboard/pr-agent'
+      preLoaderRoute: typeof DashboardPrAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard_/cloud-browsers': {
+      id: '/dashboard_/cloud-browsers'
+      path: '/dashboard/cloud-browsers'
+      fullPath: '/dashboard/cloud-browsers'
+      preLoaderRoute: typeof DashboardCloudBrowsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard_/chrome-extension': {
+      id: '/dashboard_/chrome-extension'
+      path: '/dashboard/chrome-extension'
+      fullPath: '/dashboard/chrome-extension'
+      preLoaderRoute: typeof DashboardChromeExtensionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/blog/$slug': {
       id: '/blog/$slug'
       path: '/$slug'
@@ -309,11 +390,15 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BlogRouteRoute: BlogRouteRouteWithChildren,
   BrandKitRoute: BrandKitRoute,
+  ChromeExtensionRoute: ChromeExtensionRoute,
   DashboardRoute: DashboardRoute,
   InviteRoute: InviteRoute,
   OnboardingRoute: OnboardingRoute,
   SigninRoute: SigninRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  DashboardChromeExtensionRoute: DashboardChromeExtensionRoute,
+  DashboardCloudBrowsersRoute: DashboardCloudBrowsersRoute,
+  DashboardPrAgentRoute: DashboardPrAgentRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,

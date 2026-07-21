@@ -132,7 +132,11 @@ function setDashboardTabUrl(tab: Tab) {
   } else {
     url.searchParams.set("tab", tab);
   }
-  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  window.history.replaceState(
+    null,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
 }
 
 function formatDate(value: string | null): string {
@@ -146,7 +150,8 @@ function formatDate(value: string | null): string {
 }
 
 function statusClass(status: DashboardJob["status"]) {
-  if (status === "completed") return "border-accent/35 bg-green-9/10 text-accent-bright";
+  if (status === "completed")
+    return "border-accent/35 bg-green-9/10 text-accent-bright";
   if (status === "failed" || status === "cancelled") {
     return "border-red-400/30 bg-red-500/10 text-red-200";
   }
@@ -183,7 +188,7 @@ function EmptyState({ children }: { children: string }) {
   );
 }
 
-export function DashboardPage() {
+export function CloudBrowsersDashboardPage() {
   const [session, setSession] = useState<CloudSession | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(getInitialTab);
   const [jobs, setJobs] = useState<DashboardJob[] | null>(null);
@@ -196,23 +201,25 @@ export function DashboardPage() {
   const [busy, setBusy] = useState<string | null>("session");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<string | null>(null);
+  const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<string | null>(
+    null,
+  );
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
 
-	useEffect(() => {
-	    getCloudSession()
-	      .then(async (result) => {
-	        if (!result) {
-	          window.location.assign("/signin");
-	          return;
-	        }
-	        const status = await getAuthStatus();
-	        if (!status.hasTenant) {
-	          window.location.assign("/onboarding");
-	          return;
-	        }
-	        setSession(result);
-	      })
+  useEffect(() => {
+    getCloudSession()
+      .then(async (result) => {
+        if (!result) {
+          window.location.assign("/signin");
+          return;
+        }
+        const status = await getAuthStatus();
+        if (!status.hasTenant) {
+          window.location.assign("/onboarding?product=cloud-browsers");
+          return;
+        }
+        setSession(result);
+      })
       .catch(() => window.location.assign("/signin"))
       .finally(() => setBusy(null));
   }, []);
@@ -238,7 +245,9 @@ export function DashboardPage() {
       orpcCall<UsersResponse>("/v1/dashboard/users")
         .then(setUsers)
         .catch((err) =>
-          setError(err instanceof Error ? err.message : "Could not load users."),
+          setError(
+            err instanceof Error ? err.message : "Could not load users.",
+          ),
         )
         .finally(() => setBusy(null));
     }
@@ -251,7 +260,9 @@ export function DashboardPage() {
           setSessionsCursor(result.next_cursor ?? null);
         })
         .catch((err) =>
-          setError(err instanceof Error ? err.message : "Could not load sessions."),
+          setError(
+            err instanceof Error ? err.message : "Could not load sessions.",
+          ),
         )
         .finally(() => setBusy(null));
     }
@@ -261,7 +272,9 @@ export function DashboardPage() {
       orpcCall<BillingResponse>("/v1/billing/subscription")
         .then(setBilling)
         .catch((err) =>
-          setError(err instanceof Error ? err.message : "Could not load billing."),
+          setError(
+            err instanceof Error ? err.message : "Could not load billing.",
+          ),
         )
         .finally(() => setBusy(null));
     }
@@ -290,7 +303,9 @@ export function DashboardPage() {
       setJobs((current) => [...(current ?? []), ...result.jobs]);
       setJobsCursor(result.next_cursor ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load more jobs.");
+      setError(
+        err instanceof Error ? err.message : "Could not load more jobs.",
+      );
     } finally {
       setBusy(null);
     }
@@ -301,14 +316,19 @@ export function DashboardPage() {
     setBusy("sessions-more");
     setError(null);
     try {
-      const result = await orpcCall<SessionsResponse>("/v1/dashboard/sessions", {
-        limit: 25,
-        cursor: sessionsCursor,
-      });
+      const result = await orpcCall<SessionsResponse>(
+        "/v1/dashboard/sessions",
+        {
+          limit: 25,
+          cursor: sessionsCursor,
+        },
+      );
       setSessions((current) => [...(current ?? []), ...result.sessions]);
       setSessionsCursor(result.next_cursor ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load more sessions.");
+      setError(
+        err instanceof Error ? err.message : "Could not load more sessions.",
+      );
     } finally {
       setBusy(null);
     }
@@ -321,10 +341,13 @@ export function DashboardPage() {
     setError(null);
     setNotice(null);
     try {
-      const invite = await orpcCall<InviteResponse>("/v1/dashboard/inviteUser", {
-        email: inviteEmail,
-        role: "member",
-      });
+      const invite = await orpcCall<InviteResponse>(
+        "/v1/dashboard/inviteUser",
+        {
+          email: inviteEmail,
+          role: "member",
+        },
+      );
       setInviteEmail("");
       setNotice(`Invite sent to ${invite.email}.`);
     } catch (err) {
@@ -347,7 +370,9 @@ export function DashboardPage() {
         current
           ? {
               ...current,
-              users: current.users.filter((user) => user.id !== result.removedUserId),
+              users: current.users.filter(
+                (user) => user.id !== result.removedUserId,
+              ),
             }
           : current,
       );
@@ -360,7 +385,10 @@ export function DashboardPage() {
     }
   }
 
-  async function updateUserRole(userId: string, role: UpdateRoleResponse["role"]) {
+  async function updateUserRole(
+    userId: string,
+    role: UpdateRoleResponse["role"],
+  ) {
     setBusy(`role-${userId}`);
     setError(null);
     setNotice(null);
@@ -374,14 +402,18 @@ export function DashboardPage() {
           ? {
               ...current,
               users: current.users.map((user) =>
-                user.id === result.userId ? { ...user, role: result.role } : user,
+                user.id === result.userId
+                  ? { ...user, role: result.role }
+                  : user,
               ),
             }
           : current,
       );
       setNotice("User role updated.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update user role.");
+      setError(
+        err instanceof Error ? err.message : "Could not update user role.",
+      );
     } finally {
       setBusy(null);
     }
@@ -391,7 +423,9 @@ export function DashboardPage() {
     setBusy("billing-portal");
     setError(null);
     try {
-      const result = await orpcCall<{ url: string }>("/v1/billing/openPlansPage");
+      const result = await orpcCall<{ url: string }>(
+        "/v1/billing/openPlansPage",
+      );
       window.open(result.url, "_blank", "noopener,noreferrer");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not open billing.");
@@ -416,7 +450,9 @@ export function DashboardPage() {
       await orpcCall<DeleteAccountResponse>("/v1/dashboard/deleteAccount");
       window.location.assign("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete account.");
+      setError(
+        err instanceof Error ? err.message : "Could not delete account.",
+      );
       setShowDeleteAccountDialog(false);
       setBusy(null);
     }
@@ -441,7 +477,9 @@ export function DashboardPage() {
                 {userInitial}
               </div>
               <div className="min-w-0 text-right">
-                <p className="truncate text-sm text-ink">{session.user.email}</p>
+                <p className="truncate text-sm text-ink">
+                  {session.user.email}
+                </p>
                 <button
                   type="button"
                   onClick={signOut}
@@ -498,7 +536,9 @@ export function DashboardPage() {
                 <span>Runtime</span>
               </div>
               {busy === "jobs" && <EmptyState>Loading jobs...</EmptyState>}
-              {jobs?.length === 0 && <EmptyState>No hosted jobs yet.</EmptyState>}
+              {jobs?.length === 0 && (
+                <EmptyState>No hosted jobs yet.</EmptyState>
+              )}
               {jobs?.map((job) => (
                 <div
                   key={job.job_id}
@@ -520,7 +560,8 @@ export function DashboardPage() {
                       Created {formatDate(job.created_at)}
                     </span>
                     <span className="text-xs text-muted lg:hidden">
-                      Runtime {formatDuration(
+                      Runtime{" "}
+                      {formatDuration(
                         job.started_at && job.completed_at
                           ? new Date(job.completed_at).getTime() -
                               new Date(job.started_at).getTime()
@@ -567,7 +608,9 @@ export function DashboardPage() {
                 <span>Created</span>
                 <span>Runtime</span>
               </div>
-              {busy === "sessions" && <EmptyState>Loading sessions...</EmptyState>}
+              {busy === "sessions" && (
+                <EmptyState>Loading sessions...</EmptyState>
+              )}
               {sessions?.length === 0 && (
                 <EmptyState>No browser sessions yet.</EmptyState>
               )}
@@ -658,7 +701,9 @@ export function DashboardPage() {
                           </span>
                         )}
                       </div>
-                      <p className="truncate text-xs text-muted">{user.email}</p>
+                      <p className="truncate text-xs text-muted">
+                        {user.email}
+                      </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       {canRemoveUsers && user.id !== session?.user.id ? (
@@ -696,16 +741,21 @@ export function DashboardPage() {
                         >
                           Delete account
                         </button>
-                      ) : canRemoveUsers && (
-                        confirmRemoveUserId === user.id ? (
+                      ) : (
+                        canRemoveUsers &&
+                        (confirmRemoveUserId === user.id ? (
                           <div className="flex flex-wrap gap-2 md:justify-end">
                             <button
                               type="button"
-                              onClick={() => void removeUser(user.id, user.email)}
+                              onClick={() =>
+                                void removeUser(user.id, user.email)
+                              }
                               disabled={busy === `remove-${user.id}`}
                               className="h-8 rounded-md border border-red-400/35 bg-red-500/10 px-2.5 text-xs text-red-100 transition-colors hover:border-red-300/55 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              {busy === `remove-${user.id}` ? "Removing..." : "Confirm"}
+                              {busy === `remove-${user.id}`
+                                ? "Removing..."
+                                : "Confirm"}
                             </button>
                             <button
                               type="button"
@@ -724,7 +774,7 @@ export function DashboardPage() {
                           >
                             Remove
                           </button>
-                        )
+                        ))
                       )}
                     </div>
                   </div>
@@ -736,7 +786,9 @@ export function DashboardPage() {
               onSubmit={inviteUser}
               className="h-fit rounded-lg border border-rule bg-panel/70 p-4"
             >
-              <h2 className="mb-4 text-base font-medium text-ink">Invite user</h2>
+              <h2 className="mb-4 text-base font-medium text-ink">
+                Invite user
+              </h2>
               <label className="block">
                 <span className="mb-2 block text-xs uppercase text-muted">
                   Email
@@ -767,11 +819,13 @@ export function DashboardPage() {
               <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-center">
                 <div>
                   <p className="mb-2 text-sm text-muted">Current plan</p>
-                  <h2 className="text-3xl font-medium text-ink">{billing.plan}</h2>
+                  <h2 className="text-3xl font-medium text-ink">
+                    {billing.plan}
+                  </h2>
                   <p className="mt-3 text-sm text-muted">
                     {billing.browserHoursUsedThisPeriod.toFixed(2)} of{" "}
-                    {billing.browserHoursLimit ?? "unlimited"} browser hours used
-                    this period.
+                    {billing.browserHoursLimit ?? "unlimited"} browser hours
+                    used this period.
                   </p>
                   <p className="mt-1 text-xs text-muted/75">
                     Status: {billing.status}
