@@ -343,6 +343,7 @@ function IntegrationCard({
   logoClassName = "",
 }: IntegrationCardProps) {
   const soon = status === "soon";
+  const external = Boolean(href?.startsWith("http"));
   const className = soon
     ? "relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-rule/60 bg-panel/20 no-underline opacity-35"
     : "group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-rule bg-panel/30 no-underline transition-[border-color,background-color,box-shadow,opacity] duration-200 hover:border-[color-mix(in_oklch,var(--brand)_70%,transparent)] hover:bg-[color-mix(in_oklch,var(--brand)_12%,var(--color-panel))] hover:shadow-[0_0_0_1px_color-mix(in_oklch,var(--brand)_35%,transparent)]";
@@ -375,8 +376,9 @@ function IntegrationCard({
     return (
       <a
         href={href}
-        target="_blank"
-        rel="noopener noreferrer"
+        {...(external
+          ? { target: "_blank", rel: "noopener noreferrer" }
+          : {})}
         className={className}
         style={{ ...INTEGRATION_HATCH, ["--brand" as string]: brand }}
         data-fathom-event={fathomEvent}
@@ -403,7 +405,7 @@ const INTEGRATIONS: IntegrationCardProps[] = [
     name: "AI SDK",
     logoSrc: "/logos/ai-sdk.svg",
     brand: "#EDEDED",
-    href: "https://ai-sdk.dev/",
+    href: "/docs/browser-tools/adapters/ai-sdk",
     status: "ready",
     fathomEvent: "Browser tools AI SDK integration click",
     logoClassName: "max-h-[28%] max-w-[72%]",
@@ -412,10 +414,18 @@ const INTEGRATIONS: IntegrationCardProps[] = [
     name: "Pi",
     logoSrc: "/logos/pi.svg",
     brand: "#FFFFFF",
-    href: "https://pi.dev/",
+    href: "/docs/browser-tools/adapters/pi",
     status: "ready",
     fathomEvent: "Browser tools Pi integration click",
     logoClassName: "brightness-0 invert",
+  },
+  {
+    name: "Custom",
+    logoSrc: "/logos/custom.svg",
+    brand: "#2fdb4f",
+    href: "/docs/browser-tools/adapters/custom",
+    status: "ready",
+    fathomEvent: "Browser tools Custom integration click",
   },
   {
     name: "Flue",
@@ -465,11 +475,12 @@ function IntegrationsSection() {
             Use the agent framework you know.
           </Text>
           <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
-            Built-in adapters for AI SDK and Pi. More frameworks are on the way.
+            Built-in adapters for AI SDK and Pi, plus a custom path for anything
+            else. More frameworks are on the way.
           </Text>
         </div>
 
-        <div className="mx-auto grid max-w-[720px] grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+        <div className="mx-auto grid max-w-[720px] grid-cols-2 gap-3 sm:grid-cols-3">
           {INTEGRATIONS.map((integration) => (
             <IntegrationCard key={integration.name} {...integration} />
           ))}
