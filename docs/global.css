@@ -64,6 +64,11 @@
   --docs-focus:
     0 0 0 1px rgba(6, 122, 34, 0.65),
     0 0 8px 1px rgba(6, 122, 34, 0.1);
+  --code-block-background: #f7f7f7;
+  --code-block-border: 0;
+  --code-block-radius: 6px;
+  --code-block-padding-x: 12px;
+  --code-block-padding-y: 12px;
 }
 
 .dark {
@@ -103,6 +108,8 @@
   --docs-focus:
     0 0 0 1px rgba(18, 206, 65, 0.65),
     0 0 8px 1px rgba(18, 206, 65, 0.1);
+  --code-block-background: var(--card);
+  --code-block-border: 1px solid var(--docs-outline);
 
   --prism-fg: #eeeeee;
   --prism-keyword: #7ee79a;
@@ -267,7 +274,7 @@
   border: 0;
   border-radius: 6px;
   background: var(--card);
-  box-shadow: none;
+  box-shadow: var(--docs-shadow-minimal);
 }
 
 .dark .slot-main figure[class~='group/code'] {
