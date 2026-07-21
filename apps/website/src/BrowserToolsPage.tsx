@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 import { Text } from "./components/Text";
@@ -275,42 +276,230 @@ function ToolsSection() {
 const BENCHMARK_RESULTS_URL =
   "https://github.com/saffron-health/libretto/blob/main/packages/browser-tools/benchmarks/RESULTS.md";
 
-const BENCHMARK_HARNESSES = [
+type BrowserToolsBenchmarkMetricId = "outcome" | "cost" | "tokens";
+
+type BrowserToolsBenchmarkRow = {
+  id: string;
+  label: string;
+  highlight: boolean;
+  outcome: number;
+  outcomeDisplay: string;
+  cost: number;
+  costDisplay: string;
+  tokens: number;
+  tokensDisplay: string;
+};
+
+const BROWSER_TOOLS_BENCHMARK_ROWS: BrowserToolsBenchmarkRow[] = [
   {
-    name: "browser-tools",
+    id: "browser-tools",
     label: "Browser Tools",
-    passed: "24/26",
-    costPerPass: "$0.106",
-    tokens: "1.45M",
     highlight: true,
+    outcome: 24,
+    outcomeDisplay: "24/26",
+    cost: 0.106,
+    costDisplay: "$0.106",
+    tokens: 1.45,
+    tokensDisplay: "1.45M",
   },
   {
-    name: "dev-browser",
+    id: "dev-browser",
     label: "dev-browser",
-    passed: "24/26",
-    costPerPass: "$0.257",
-    tokens: "3.51M",
     highlight: false,
+    outcome: 24,
+    outcomeDisplay: "24/26",
+    cost: 0.257,
+    costDisplay: "$0.257",
+    tokens: 3.51,
+    tokensDisplay: "3.51M",
   },
   {
-    name: "agent-browser",
+    id: "agent-browser",
     label: "agent-browser",
-    passed: "23/26",
-    costPerPass: "$0.235",
-    tokens: "2.29M",
     highlight: false,
+    outcome: 23,
+    outcomeDisplay: "23/26",
+    cost: 0.235,
+    costDisplay: "$0.235",
+    tokens: 2.29,
+    tokensDisplay: "2.29M",
   },
   {
-    name: "playwright-cli",
+    id: "playwright-cli",
     label: "playwright-cli",
-    passed: "22/26",
-    costPerPass: "$0.293",
-    tokens: "3.48M",
     highlight: false,
+    outcome: 22,
+    outcomeDisplay: "22/26",
+    cost: 0.293,
+    costDisplay: "$0.293",
+    tokens: 3.48,
+    tokensDisplay: "3.48M",
   },
-] as const;
+];
+
+const BROWSER_TOOLS_BENCHMARK_METRICS: {
+  id: BrowserToolsBenchmarkMetricId;
+  label: string;
+  icon: "outcome" | "dollar" | "tokens";
+}[] = [
+  { id: "outcome", label: "Outcome", icon: "outcome" },
+  { id: "cost", label: "Cost", icon: "dollar" },
+  { id: "tokens", label: "Token usage", icon: "tokens" },
+];
+
+function BrowserToolsBenchmarkMetricIcon({
+  icon,
+}: {
+  icon: "outcome" | "dollar" | "tokens";
+}) {
+  if (icon === "outcome") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true" className="size-4">
+        <circle
+          cx="8"
+          cy="8"
+          r="5.75"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M5.5 8.1 7.2 9.8 10.6 6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (icon === "dollar") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true" className="size-4">
+        <path
+          d="M8 2.75v10.5M10.75 5.25C10.2 4.45 9.22 4 8.05 4 6.55 4 5.5 4.7 5.5 5.75c0 2.4 5.25 1.1 5.25 3.75 0 1.05-1.08 1.75-2.62 1.75-1.28 0-2.35-.48-2.88-1.3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-4">
+      <path
+        d="M3.5 4.25h9M3.5 8h9M3.5 11.75h9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M5.5 2.75 4.25 13.25M11.75 2.75 10.5 13.25"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function BrowserToolsBenchmarkBar({
+  label,
+  value,
+  display,
+  max,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  display: string;
+  max: number;
+  highlight: boolean;
+}) {
+  const width = value === 0 ? "0%" : `${Math.max(8, (value / max) * 100)}%`;
+  const barClass = highlight
+    ? "bg-accent shadow-[0_0_18px_color-mix(in_oklch,var(--color-green-9)_35%,transparent)]"
+    : "bg-ink/24";
+  const rowClass = highlight
+    ? "rounded-sm border border-accent/25 bg-accent/10 p-3"
+    : "rounded-sm border border-transparent p-3";
+
+  return (
+    <div className={rowClass}>
+      <div className="mb-2 flex items-baseline justify-between gap-4">
+        <Text
+          size="xs"
+          className={highlight ? "text-accent" : "text-muted"}
+        >
+          {label}
+        </Text>
+        <span
+          className={
+            highlight
+              ? "font-mono text-sm text-accent"
+              : "font-mono text-sm text-ink/60"
+          }
+        >
+          {display}
+        </span>
+      </div>
+      <div className="h-3 overflow-hidden rounded-sm bg-black/40 ring-1 ring-ink/10">
+        <div
+          className={`h-full rounded-sm transition-[width] duration-500 ease-out ${barClass}`}
+          style={{ width }}
+        />
+      </div>
+    </div>
+  );
+}
 
 function BenchmarksSection() {
+  const [activeMetricId, setActiveMetricId] =
+    useState<BrowserToolsBenchmarkMetricId>("cost");
+  const activeMetric =
+    BROWSER_TOOLS_BENCHMARK_METRICS.find(
+      (metric) => metric.id === activeMetricId,
+    ) ?? BROWSER_TOOLS_BENCHMARK_METRICS[1];
+
+  const values = BROWSER_TOOLS_BENCHMARK_ROWS.map((row) => {
+    if (activeMetricId === "outcome") {
+      return {
+        id: row.id,
+        label: row.label,
+        highlight: row.highlight,
+        value: row.outcome,
+        display: row.outcomeDisplay,
+      };
+    }
+    if (activeMetricId === "cost") {
+      return {
+        id: row.id,
+        label: row.label,
+        highlight: row.highlight,
+        value: row.cost,
+        display: row.costDisplay,
+      };
+    }
+    return {
+      id: row.id,
+      label: row.label,
+      highlight: row.highlight,
+      value: row.tokens,
+      display: row.tokensDisplay,
+    };
+  });
+  const maxValue =
+    activeMetricId === "outcome"
+      ? 26
+      : Math.max(...values.map((row) => row.value), 1);
+
   return (
     <section className="px-6 py-24 md:px-12 md:py-32">
       <div className="mx-auto max-w-[900px]">
@@ -332,60 +521,67 @@ function BenchmarksSection() {
           </Text>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-rule">
-          <div className="hidden grid-cols-[1.4fr_0.7fr_0.9fr_0.9fr] gap-4 border-b border-rule bg-panel/40 px-5 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-faint sm:grid">
-            <span>Harness</span>
-            <span>Passed</span>
-            <span>Cost / pass</span>
-            <span>Tokens</span>
-          </div>
-          {BENCHMARK_HARNESSES.map((row) => (
-            <div
-              key={row.name}
-              className={`grid gap-2 border-b border-rule px-5 py-4 last:border-b-0 sm:grid-cols-[1.4fr_0.7fr_0.9fr_0.9fr] sm:items-center sm:gap-4 ${
-                row.highlight ? "bg-green-3/25" : "bg-panel/20"
-              }`}
-            >
-              <div className="font-mono text-sm text-ink">
-                {row.label}
-                {row.highlight ? (
-                  <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-bright">
-                    ours
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex justify-between font-mono text-sm text-muted sm:block sm:text-ink">
-                <span className="sm:hidden">Passed</span>
-                <span>{row.passed}</span>
-              </div>
-              <div className="flex justify-between font-mono text-sm text-muted sm:block sm:text-ink">
-                <span className="sm:hidden">Cost / pass</span>
-                <span className={row.highlight ? "text-accent-bright" : undefined}>
-                  {row.costPerPass}
-                </span>
-              </div>
-              <div className="flex justify-between font-mono text-sm text-muted sm:block sm:text-ink">
-                <span className="sm:hidden">Tokens</span>
-                <span>{row.tokens}</span>
-              </div>
-            </div>
-          ))}
+        <div className="mb-5 grid grid-cols-3 gap-2 rounded-sm border border-ink/10 bg-black/20 p-1.5">
+          {BROWSER_TOOLS_BENCHMARK_METRICS.map((metric) => {
+            const isActive = metric.id === activeMetric.id;
+            return (
+              <button
+                key={metric.id}
+                type="button"
+                aria-pressed={isActive}
+                data-fathom-event={`Browser tools benchmarks ${metric.label} tab click`}
+                onClick={() => setActiveMetricId(metric.id)}
+                className={`flex h-11 cursor-pointer items-center justify-center gap-2 rounded-sm px-2 text-[11px] uppercase tracking-[0.08em] transition-colors focus-visible:ring-2 focus-visible:ring-accent/30 sm:px-3 sm:text-xs ${
+                  isActive
+                    ? "bg-accent text-black"
+                    : "text-muted hover:bg-ink/5 hover:text-ink"
+                }`}
+              >
+                <BrowserToolsBenchmarkMetricIcon icon={metric.icon} />
+                <span>{metric.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Text as="p" className="text-xs leading-relaxed text-faint">
-            Best result per harness across three Browser Use Cloud runs (July
-            2026). GPT-5.6 Sol via Pi. Exploratory — not a causal ranking.
-          </Text>
-          <a
-            href={BENCHMARK_RESULTS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 font-mono text-xs text-muted underline decoration-muted/50 underline-offset-4 transition-colors hover:text-ink hover:decoration-accent"
-            data-fathom-event="Browser tools benchmarks results click"
-          >
-            Full method and results →
-          </a>
+        <div className="relative min-h-[320px] overflow-hidden border border-ink/10 bg-black/30 p-5 md:p-7">
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 opacity-30"
+            style={{
+              background:
+                "linear-gradient(var(--color-rule) 1px, transparent 1px), linear-gradient(90deg, var(--color-rule) 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+            }}
+          />
+          <div className="relative z-10 flex min-h-[266px] flex-col justify-center gap-6">
+            <div className="flex flex-col gap-4">
+              {values.map((row) => (
+                <BrowserToolsBenchmarkBar
+                  key={`${activeMetricId}-${row.id}`}
+                  label={row.label}
+                  value={row.value}
+                  display={row.display}
+                  max={maxValue}
+                  highlight={row.highlight}
+                />
+              ))}
+            </div>
+            <Text size="xs" className="leading-relaxed text-faint">
+              Best result per harness across three Browser Use Cloud runs (July
+              2026). GPT-5.6 Sol via Pi. Exploratory — not a causal ranking.{" "}
+              <a
+                href={BENCHMARK_RESULTS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted underline decoration-muted underline-offset-4 transition-colors hover:text-accent hover:decoration-accent"
+                data-fathom-event="Browser tools benchmarks results click"
+              >
+                Full method and results
+              </a>
+              .
+            </Text>
+          </div>
         </div>
       </div>
     </section>
