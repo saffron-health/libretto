@@ -156,7 +156,8 @@ function cleanMarkdown(value) {
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/[`*_~]/g, "")
-    .replace(/<[^>]+>/g, "")
+    .replaceAll("<", " ")
+    .replaceAll(">", " ")
     .replace(/\s+/g, " ")
     .trim();
 }
