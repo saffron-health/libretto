@@ -33,7 +33,7 @@ function CodeWindow() {
           <span className="text-ink">();</span>
           {"\n\n"}
           <span className="text-faint">
-            {"// Integrates with Pi SDK, and more coming soon"}
+            {"// AI SDK adapter — Pi and more coming soon"}
           </span>
           {"\n"}
           <span className="text-faint">const</span>
@@ -115,10 +115,10 @@ function ToolCallExample({
   result: React.ReactNode;
 }) {
   return (
-    <pre className="overflow-x-auto p-5 font-mono text-[11px] leading-6">
+    <div className="overflow-x-auto p-5 font-mono text-[11px] leading-6">
       <div className="text-accent-bright">{call}</div>
       <div className="mt-3 border-t border-rule/80 pt-3 text-muted">{result}</div>
-    </pre>
+    </div>
   );
 }
 
@@ -652,7 +652,7 @@ function IntegrationCard({
     </>
   );
 
-  if (href) {
+  if (href && !soon) {
     return (
       <a
         href={href}
@@ -660,9 +660,8 @@ function IntegrationCard({
           ? { target: "_blank", rel: "noopener noreferrer" }
           : {})}
         className={className}
-        style={soon ? SOON_HATCH : undefined}
         data-fathom-event={fathomEvent}
-        title={soon ? "Coming soon" : name}
+        title={name}
       >
         {content}
       </a>
@@ -707,16 +706,12 @@ const INTEGRATIONS: IntegrationCardProps[] = [
   {
     name: "Flue",
     logoSrc: "/logos/flue.svg",
-    href: "https://flueframework.com/",
     status: "soon",
-    fathomEvent: "Browser tools Flue integration click",
   },
   {
     name: "Executor",
     logoSrc: "/logos/executor.png",
-    href: "https://executor.sh/",
     status: "soon",
-    fathomEvent: "Browser tools Executor integration click",
   },
   {
     name: "eve",
