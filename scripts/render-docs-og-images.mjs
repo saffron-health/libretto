@@ -195,7 +195,7 @@ function renderOgSvg({ description, group, title }) {
   const titleY = 310;
   const titleLineHeight = 70;
   const descriptionY =
-    titleY + titleLines.length * titleLineHeight + (titleLines.length > 1 ? 6 : 12);
+    titleY + titleLines.length * titleLineHeight + (titleLines.length > 1 ? 16 : 22);
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${OG_WIDTH}" height="${OG_HEIGHT}" viewBox="0 0 ${OG_WIDTH} ${OG_HEIGHT}">
   <defs>
@@ -208,18 +208,18 @@ function renderOgSvg({ description, group, title }) {
       }
     </style>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.48" stop-color="#f2fff5"/>
-      <stop offset="1" stop-color="#70df8c"/>
+      <stop offset="0" stop-color="#090a09"/>
+      <stop offset="0.52" stop-color="#0b140e"/>
+      <stop offset="1" stop-color="#087326"/>
     </linearGradient>
   </defs>
   <rect width="${OG_WIDTH}" height="${OG_HEIGHT}" fill="url(#background)"/>
   <image href="${logoDataUri}" x="58" y="64" width="48" height="48"/>
   <text x="60" y="286" fill="#12ce41" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="400">${escapeXml(group)}</text>
-  <text x="58" y="${titleY + 52}" fill="#111827" font-family="Libretto Serif, Georgia, serif" font-size="64" font-weight="400">
+  <text x="58" y="${titleY + 52}" fill="#f3f4f6" font-family="Libretto Serif, Georgia, serif" font-size="64" font-weight="400">
     ${renderTextLines(titleLines, titleLineHeight)}
   </text>
-  <text x="58" y="${descriptionY + 31}" fill="#4b5563" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="400">
+  <text x="58" y="${descriptionY + 31}" fill="#b7bbb8" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="400">
     ${renderTextLines(descriptionLines, 42)}
   </text>
 </svg>`;
