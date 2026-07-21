@@ -1,6 +1,33 @@
-# libretto-browser-tools
+<div align="center">
+  <a href="https://libretto.sh/browser-tools">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="../../apps/website/public/logos/logo-dark.svg" alt="Libretto">
+      <img src="../../apps/website/public/logos/logo-light.svg" alt="Libretto" height="72">
+    </picture>
+  </a>
+  <br/>
+  <br/>
+  <h3>Browser Tools SDK gives any AI agent a real browser.</h3>
+  <p>Six tools to open, inspect, and drive browsers from AI SDK, Pi, or your own agent loop.</p>
+  <p>
+    <a href="https://libretto.sh/docs/browser-tools/quickstart">Quickstart</a> •
+    <a href="https://libretto.sh/docs/browser-tools/quickstart">Documentation</a> •
+    <a href="https://libretto.sh/browser-tools">Product</a> •
+    <a href="https://www.npmjs.com/package/libretto-browser-tools">npm</a> •
+    <a href="https://discord.gg/NYrG56hVDt">Discord</a>
+  </p>
+</div>
 
-Browser tools for AI agents. Gives any agent framework a set of tools to open real browsers (local or cloud), inspect pages via accessibility snapshots, and drive them with Playwright code.
+## Install
+
+```bash
+npm i libretto-browser-tools
+npx playwright install chromium
+```
+
+For the AI SDK adapter, also install `ai` and a model provider package.
+
+## Example
 
 ```typescript
 import { anthropic } from "@ai-sdk/anthropic";
@@ -24,15 +51,6 @@ const result = await generateText({
 
 await dispose(); // close any sessions the agent left open
 ```
-
-## Install
-
-```bash
-npm i libretto-browser-tools
-npx playwright install chromium
-```
-
-For the AI SDK adapter, also install `ai` and a model provider package.
 
 ## Docs
 
