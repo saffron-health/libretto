@@ -60,12 +60,13 @@
     0 0 0 1px rgba(0, 0, 0, 0.04),
     0 1px 1px -0.5px rgba(0, 0, 0, 0.08),
     0 3px 3px -1.5px rgba(0, 0, 0, 0.08);
-  --docs-shadow-minimal: 0 1px 1px -0.5px rgba(0, 0, 0, 0.08);
+  --docs-shadow-minimal:
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 1px 1px -0.5px rgba(0, 0, 0, 0.08);
   --docs-focus:
     0 0 0 1px rgba(6, 122, 34, 0.65),
     0 0 8px 1px rgba(6, 122, 34, 0.1);
   --code-block-background: #f7f7f7;
-  --code-block-border: 0;
   --code-block-radius: 6px;
   --code-block-padding-x: 12px;
   --code-block-padding-y: 12px;
@@ -104,7 +105,9 @@
     0 0 0 1px rgba(255, 255, 255, 0.06),
     0 1px 1px -0.5px rgba(0, 0, 0, 0.12),
     0 3px 3px -1.5px rgba(0, 0, 0, 0.12);
-  --docs-shadow-minimal: 0 1px 1px -0.5px rgba(0, 0, 0, 0.12);
+  --docs-shadow-minimal:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 1px 1px -0.5px rgba(0, 0, 0, 0.12);
   --docs-focus:
     0 0 0 1px rgba(18, 206, 65, 0.65),
     0 0 8px 1px rgba(18, 206, 65, 0.1);
