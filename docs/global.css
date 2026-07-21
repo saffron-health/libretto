@@ -291,6 +291,21 @@
   opacity: 1;
 }
 
+.slot-main pre:has(code.language-text) {
+  overflow-x: hidden;
+}
+
+.slot-main pre:has(code.language-text) > div {
+  min-width: 0;
+}
+
+.slot-main code.language-text {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere;
+}
+
 .slot-main [class~='group/card'] {
   flex-flow: row wrap;
   align-content: flex-start;
