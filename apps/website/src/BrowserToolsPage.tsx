@@ -513,11 +513,11 @@ function BenchmarksSection() {
             className="mb-5 tracking-[-0.035em] text-ink"
             htmlStyle={{ fontWeight: 300 }}
           >
-            59% lower cost than alternatives
+            55% lower cost than alternatives
           </Text>
           <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
-            On 26 live-site tasks, Browser Tools tied the top harness at 24/26
-            and used 59% fewer tokens than the next tool at that score.
+            Tied for the best pass rate, at a much lower cost per successful
+            task.
           </Text>
         </div>
 
