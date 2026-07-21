@@ -5,4 +5,64 @@ sidebarTitle: AI SDK
 
 > Use browser tools with the Vercel AI SDK.
 
-TODO: document `libretto-browser-tools/ai-sdk`, `createAiSdkBrowserTools`, and a `generateText` example.
+Import from `libretto-browser-tools/ai-sdk`. Install the optional peer dependency `ai` (v6+) alongside a model provider package.
+
+```bash theme={null}
+pnpm add libretto-browser-tools ai @ai-sdk/anthropic
+npx playwright install chromium
+```
+
+## createAiSdkBrowserTools
+
+Wraps the six browser tools as AI SDK tools for `generateText` / `streamText` / `ToolLoopAgent`.
+
+```typescript theme={null}
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText, stepCountIs } from "ai";
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+import { LocalBrowserProvider } from "libretto-browser-tools";
+
+const { tools, dispose } = createAiSdkBrowserTools(
+  new LocalBrowserProvider({ headless: true }),
+  // optional: { allowedDomains: ["example.com"] }
+);
+
+try {
+  const result = await generateText({
+    model: anthropic("claude-sonnet-4-5"),
+    tools,
+    stopWhen: stepCountIs(20),
+    prompt: "Go to example.com and tell me the page title",
+  });
+  console.log(result.text);
+} finally {
+  await dispose();
+}
+```
+
+`tools` is a `ToolSet` keyed by tool name (`browser_open`, `browser_exec`, and the rest). Pass domain policy options as the second argument — see [Advanced](/browser-tools/advanced#domain-policy).
+
+Swap `LocalBrowserProvider` for any [provider](/browser-tools/providers/overview).
+
+## Screenshots
+
+When the agent calls `browser_snapshot` with `screenshot: true`, the adapter uses `toModelOutput` so the model receives the accessibility tree as text plus the PNG as image content. Without `screenshot: true`, only the tree text is returned.
+
+## Borrowed pages
+
+Attach tools to an existing Playwright `Page` without owning browser lifecycle:
+
+```typescript theme={null}
+import { createAiSdkBrowserToolsForPage } from "libretto-browser-tools/ai-sdk";
+
+const { sessionId, tools, dispose } = createAiSdkBrowserToolsForPage(page);
+// tools: browser_exec, browser_snapshot, browser_status
+await dispose(); // detaches tools; does not close the page
+```
+
+Used by [libretto-playwright-debugger](/reference/runtime/playwright-debugger).
+
+## See also
+
+- [Tools](/browser-tools/tools) — inputs and outputs for each tool
+- [Custom adapters](/browser-tools/adapters/custom) — wrap `createBrowserTools` for another framework
