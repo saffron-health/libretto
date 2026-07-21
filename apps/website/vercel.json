@@ -69,6 +69,10 @@
       "destination": "https://libretto-docs.vercel.app/docs/get-started/quickstart"
     },
     {
+      "source": "/docs/",
+      "destination": "https://libretto-docs.vercel.app/docs/get-started/quickstart"
+    },
+    {
       "source": "/docs/:path*",
       "destination": "https://libretto-docs.vercel.app/docs/:path*"
     }
