@@ -317,106 +317,57 @@ function BenchmarksPlaceholder() {
   );
 }
 
-function CheckCircleIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      className="size-5 text-accent-bright"
-      fill="none"
-    >
-      <circle
-        cx="10"
-        cy="10"
-        r="8.25"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M6.25 10.25 8.75 12.75 13.75 7.5"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+const INTEGRATION_HATCH = {
+  backgroundImage:
+    "repeating-linear-gradient(315deg, color-mix(in oklch, var(--color-gray-12) 5%, transparent) 0, color-mix(in oklch, var(--color-gray-12) 5%, transparent) 1px, transparent 0, transparent 50%)",
+  backgroundSize: "10px 10px",
+} as const;
 
-function ClockIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      className="size-5"
-      fill="none"
-    >
-      <circle
-        cx="10"
-        cy="10"
-        r="8.25"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M10 6.25V10l2.75 1.75"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ReadyIntegrationCard({
-  href,
-  fathomEvent,
-  children,
-}: {
-  href: string;
-  fathomEvent: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex min-h-36 items-center justify-between rounded-xl border border-rule bg-panel/60 p-7 no-underline transition-colors hover:border-accent/40"
-      data-fathom-event={fathomEvent}
-    >
-      {children}
-      <CheckCircleIcon />
-    </a>
-  );
-}
-
-function ComingSoonIntegrationCard({
-  name,
-  href,
-  logoSrc,
-  logoClassName = "size-12 rounded-lg",
-}: {
+type IntegrationCardProps = {
   name: string;
-  href?: string;
   logoSrc: string;
+  brand: string;
+  href?: string;
+  status: "ready" | "soon";
+  fathomEvent?: string;
   logoClassName?: string;
-}) {
+};
+
+function IntegrationCard({
+  name,
+  logoSrc,
+  brand,
+  href,
+  status,
+  fathomEvent,
+  logoClassName = "",
+}: IntegrationCardProps) {
+  const soon = status === "soon";
+  const className = soon
+    ? "relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-rule/60 bg-panel/20 no-underline opacity-35"
+    : "group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-rule bg-panel/30 no-underline transition-[border-color,background-color,box-shadow,opacity] duration-200 hover:border-[color-mix(in_oklch,var(--brand)_70%,transparent)] hover:bg-[color-mix(in_oklch,var(--brand)_12%,var(--color-panel))] hover:shadow-[0_0_0_1px_color-mix(in_oklch,var(--brand)_35%,transparent)]";
+
   const content = (
     <>
-      <span className="flex items-center gap-4">
-        <img src={logoSrc} alt="" className={logoClassName} />
-        <span className="font-mono text-lg tracking-tight text-ink/55">
-          {name}
-        </span>
-      </span>
-      <span className="relative text-amber">
-        <ClockIcon />
-        <span className="pointer-events-none absolute top-full right-0 z-10 mt-2 whitespace-nowrap rounded-md border border-rule bg-panel px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted opacity-0 shadow-lg shadow-black/40 transition-opacity group-hover:opacity-100">
+      {soon ? (
+        <span className="absolute top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md border border-amber/40 bg-bg/90 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-amber">
           Coming soon
         </span>
-      </span>
+      ) : null}
+      <img
+        src={logoSrc}
+        alt=""
+        className={
+          soon
+            ? `max-h-[42%] max-w-[58%] object-contain opacity-70 grayscale ${logoClassName}`
+            : `max-h-[42%] max-w-[58%] object-contain opacity-40 grayscale transition-[opacity,filter,transform] duration-200 group-hover:scale-105 group-hover:opacity-100 group-hover:grayscale-0 ${logoClassName}`
+        }
+      />
+      {soon ? null : (
+        <span className="pointer-events-none absolute inset-x-3 bottom-4 text-center font-mono text-xs tracking-tight text-[var(--brand)] opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          {name}
+        </span>
+      )}
     </>
   );
 
@@ -426,9 +377,10 @@ function ComingSoonIntegrationCard({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="group flex min-h-36 items-center justify-between rounded-xl border border-rule/70 bg-panel/30 p-7 no-underline opacity-55 transition-opacity hover:opacity-80"
-        data-fathom-event={`Browser tools ${name} integration click`}
-        title="Coming soon"
+        className={className}
+        style={{ ...INTEGRATION_HATCH, ["--brand" as string]: brand }}
+        data-fathom-event={fathomEvent}
+        title={soon ? "Coming soon" : name}
       >
         {content}
       </a>
@@ -437,13 +389,60 @@ function ComingSoonIntegrationCard({
 
   return (
     <div
-      className="group flex min-h-36 cursor-default items-center justify-between rounded-xl border border-rule/70 bg-panel/30 p-7 opacity-55"
-      title="Coming soon"
+      className={`${className} cursor-default`}
+      style={{ ...INTEGRATION_HATCH, ["--brand" as string]: brand }}
+      title={soon ? "Coming soon" : name}
     >
       {content}
     </div>
   );
 }
+
+const INTEGRATIONS: IntegrationCardProps[] = [
+  {
+    name: "AI SDK",
+    logoSrc: "/logos/ai-sdk.svg",
+    brand: "#EDEDED",
+    href: "https://ai-sdk.dev/",
+    status: "ready",
+    fathomEvent: "Browser tools AI SDK integration click",
+    logoClassName: "max-h-[28%] max-w-[72%]",
+  },
+  {
+    name: "Pi",
+    logoSrc: "/logos/pi.svg",
+    brand: "#FFFFFF",
+    href: "https://pi.dev/",
+    status: "ready",
+    fathomEvent: "Browser tools Pi integration click",
+    logoClassName: "brightness-0 invert",
+  },
+  {
+    name: "Flue",
+    logoSrc: "/logos/flue.svg",
+    brand: "#007AFF",
+    href: "https://flueframework.com/",
+    status: "soon",
+    fathomEvent: "Browser tools Flue integration click",
+    logoClassName: "rounded-lg",
+  },
+  {
+    name: "Executor",
+    logoSrc: "/logos/executor.png",
+    brand: "#0EA514",
+    href: "https://executor.sh/",
+    status: "soon",
+    fathomEvent: "Browser tools Executor integration click",
+    logoClassName: "rounded-full",
+  },
+  {
+    name: "eve",
+    logoSrc: "/logos/eve.svg",
+    brand: "#FFFFFF",
+    status: "soon",
+    logoClassName: "rounded-lg",
+  },
+];
 
 function IntegrationsSection() {
   return (
@@ -470,44 +469,10 @@ function IntegrationsSection() {
           </Text>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <ReadyIntegrationCard
-            href="https://ai-sdk.dev/"
-            fathomEvent="Browser tools AI SDK integration click"
-          >
-            <img
-              src="/logos/ai-sdk.svg"
-              alt="AI SDK"
-              className="h-10 w-auto max-w-40"
-            />
-          </ReadyIntegrationCard>
-          <ReadyIntegrationCard
-            href="https://pi.dev/"
-            fathomEvent="Browser tools Pi integration click"
-          >
-            <span className="flex items-center gap-4">
-              <img
-                src="/logos/pi.svg"
-                alt=""
-                className="size-12 brightness-0 invert"
-              />
-              <span className="font-mono text-2xl text-ink">Pi</span>
-            </span>
-          </ReadyIntegrationCard>
-          <ComingSoonIntegrationCard
-            name="Flue"
-            href="https://flueframework.com/"
-            logoSrc="/logos/flue.svg"
-          />
-          <ComingSoonIntegrationCard
-            name="Executor"
-            href="https://executor.sh/"
-            logoSrc="/logos/executor.png"
-          />
-          <ComingSoonIntegrationCard
-            name="eve"
-            logoSrc="/logos/eve.svg"
-          />
+        <div className="mx-auto grid max-w-[720px] grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+          {INTEGRATIONS.map((integration) => (
+            <IntegrationCard key={integration.name} {...integration} />
+          ))}
         </div>
       </div>
     </section>
