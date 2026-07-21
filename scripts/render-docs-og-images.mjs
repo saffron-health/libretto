@@ -16,6 +16,9 @@ const config = JSON.parse(readFileSync(join(docsRoot, "docs.json"), "utf8"));
 const logoDataUri = `data:image/svg+xml;base64,${readFileSync(
   join(docsRoot, "public", "logos", "logo-light.svg"),
 ).toString("base64")}`;
+const serifFontDataUri = `data:font/truetype;base64,${readFileSync(
+  join(root, "apps", "website", "public", "fonts", "Fraunces-Regular.ttf"),
+).toString("base64")}`;
 const pageGroups = buildPageGroupMap(config.navigation?.tabs ?? []);
 
 const OG_WIDTH = 1200;
@@ -196,6 +199,14 @@ function renderOgSvg({ description, group, title }) {
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${OG_WIDTH}" height="${OG_HEIGHT}" viewBox="0 0 ${OG_WIDTH} ${OG_HEIGHT}">
   <defs>
+    <style>
+      @font-face {
+        font-family: "Libretto Serif";
+        font-style: normal;
+        font-weight: 400;
+        src: url("${serifFontDataUri}") format("truetype");
+      }
+    </style>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#ffffff"/>
       <stop offset="0.48" stop-color="#f2fff5"/>
@@ -205,7 +216,7 @@ function renderOgSvg({ description, group, title }) {
   <rect width="${OG_WIDTH}" height="${OG_HEIGHT}" fill="url(#background)"/>
   <image href="${logoDataUri}" x="58" y="64" width="48" height="48"/>
   <text x="60" y="286" fill="#12ce41" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="400">${escapeXml(group)}</text>
-  <text x="58" y="${titleY + 52}" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="700">
+  <text x="58" y="${titleY + 52}" fill="#111827" font-family="Libretto Serif, Georgia, serif" font-size="64" font-weight="400">
     ${renderTextLines(titleLines, titleLineHeight)}
   </text>
   <text x="58" y="${descriptionY + 31}" fill="#4b5563" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="400">
