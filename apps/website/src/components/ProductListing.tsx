@@ -56,20 +56,35 @@ function ProductVisual({ href }: { href: string }) {
     );
   }
 
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-dashed border-amber/50 bg-panel/40 p-5 shadow-lg shadow-black/25">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="-rotate-6 border-2 border-amber bg-bg/90 px-4 py-2 font-mono text-sm font-medium tracking-wide text-amber shadow-[4px_4px_0_color-mix(in_oklch,var(--color-amber)_35%,transparent)]">
-          COMING SOON
+  if (href === "/browser-tools") {
+    return (
+      <div className="overflow-hidden rounded-xl border border-rule bg-panel/60 p-5 font-mono text-xs leading-6 text-muted shadow-lg shadow-black/25">
+        <div className="mb-3 text-[10px] uppercase tracking-[0.12em] text-faint">
+          AGENT.TS
         </div>
+        <div>
+          <span className="text-faint">const</span>
+          <span className="text-ink"> {"{ tools }"} = </span>
+          <span className="text-accent-bright">createAiSdkBrowserTools</span>
+          <span className="text-ink">(provider);</span>
+        </div>
+        <div className="mt-3">
+          <span className="text-faint">await</span>
+          <span className="text-accent-bright"> generateText</span>
+          <span className="text-ink">({"{"}</span>
+        </div>
+        <div className="pl-3 text-ink">tools,</div>
+        <div className="pl-3">
+          <span className="text-ink">prompt: </span>
+          <span className="text-amber">&quot;Find the top story&quot;</span>
+          <span className="text-ink">,</span>
+        </div>
+        <div className="text-ink">{"})"};</div>
       </div>
-      <div className="font-mono text-xs leading-6 text-muted/50">
-        <div>createBrowserTools(page)</div>
-        <div>tools.snapshot()</div>
-        <div>tools.exec(...)</div>
-      </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }
 
 export function ProductListing() {
