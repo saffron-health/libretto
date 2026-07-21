@@ -1,0 +1,63 @@
+---
+title: Pi
+sidebarTitle: Pi
+---
+
+> Use browser tools with the Pi coding agent.
+
+Import from `libretto-browser-tools/pi`. Install the optional peer dependency `@earendil-works/pi-coding-agent`.
+
+```bash theme={null}
+pnpm add libretto-browser-tools @earendil-works/pi-coding-agent
+npx playwright install chromium
+```
+
+## createPiBrowserTools
+
+Wraps the six browser tools as Pi `ToolDefinition`s. Pass them to `createAgentSession` as `customTools`.
+
+```typescript theme={null}
+import {
+  AuthStorage,
+  createAgentSession,
+  ModelRegistry,
+} from "@earendil-works/pi-coding-agent";
+import { createPiBrowserTools } from "libretto-browser-tools/pi";
+import { LocalBrowserProvider } from "libretto-browser-tools";
+
+const { tools, dispose } = createPiBrowserTools(
+  new LocalBrowserProvider({ headless: true }),
+  // optional: { allowedDomains: ["example.com"] }
+);
+
+const authStorage = AuthStorage.create();
+const modelRegistry = ModelRegistry.create(authStorage);
+const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
+if (!model) throw new Error("Model not found");
+
+try {
+  const { session } = await createAgentSession({
+    model,
+    authStorage,
+    modelRegistry,
+    customTools: tools,
+  });
+
+  await session.prompt("Go to example.com and tell me the page title");
+} finally {
+  await dispose();
+}
+```
+
+`tools` is an array of Pi tool definitions (not a keyed object). Tool execution is sequential. Pass domain policy options as the second argument — see [Advanced](/browser-tools/advanced#domain-policy).
+
+Swap `LocalBrowserProvider` for any [provider](/browser-tools/providers/overview).
+
+## Screenshots
+
+When the agent calls `browser_snapshot` with `screenshot: true`, the adapter returns JSON text for the tool result plus a Pi image content part (`type: "image"`) with the PNG bytes. Without a screenshot, only JSON text is returned.
+
+## See also
+
+- [Tools](/browser-tools/tools) — inputs and outputs for each tool
+- [Custom adapters](/browser-tools/adapters/custom) — wrap `createBrowserTools` for another framework

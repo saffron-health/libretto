@@ -44,6 +44,11 @@
       "import": "./dist/providers/browserbase.js",
       "default": "./dist/providers/browserbase.js"
     },
+    "./browser-use": {
+      "types": "./dist/providers/browser-use.d.ts",
+      "import": "./dist/providers/browser-use.js",
+      "default": "./dist/providers/browser-use.js"
+    },
     "./steel": {
       "types": "./dist/providers/steel.d.ts",
       "import": "./dist/providers/steel.js",
@@ -56,6 +61,7 @@
     }
   },
   "scripts": {
+    "benchmarks": "dev-browser install && tsx benchmarks/index.ts",
     "build": "tsup --config tsup.config.ts",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
@@ -82,11 +88,16 @@
     }
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.3",
+    "@earendil-works/pi-coding-agent": "^0.80.6",
+    "@playwright/cli": "^0.1.17",
     "@types/node": "^25.5.0",
+    "affordance": "workspace:*",
+    "agent-browser": "^0.31.2",
     "ai": "^6.0.116",
+    "dev-browser": "^0.2.8",
     "outdent": "^0.8.0",
     "tsup": "^8.5.1",
+    "tsx": "^4.23.0",
     "typebox": "^1.3.4",
     "typescript": "^5.9.3",
     "vitest": "^4.1.5"

@@ -205,6 +205,7 @@ describe("state-driven CLI subprocess behavior", () => {
   }) => {
     const status = await librettoCli("status");
     expect(status.stdout).toContain("No open sessions.");
+    expect(status.stdout).not.toContain("Open sessions:");
   });
 
   test("open and connect sessions default to write-access and support --read-only", async ({

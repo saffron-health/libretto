@@ -8,6 +8,9 @@ export type BrowserbaseBrowserProviderOptions = {
 	apiKey?: string;
 	projectId?: string;
 	endpoint?: string;
+	proxies?: boolean;
+	solveCaptchas?: boolean;
+	timeoutSeconds?: number;
 }
 
 type BrowserbaseSessionResponse = {
@@ -15,11 +18,23 @@ type BrowserbaseSessionResponse = {
 	connectUrl: string;
 }
 
+type BrowserbaseSessionRequest = {
+	projectId?: string;
+	proxies?: boolean;
+	timeout?: number;
+	browserSettings?: {
+		solveCaptchas?: boolean;
+	};
+}
+
 export class BrowserbaseBrowserProvider implements BrowserProvider {
 	readonly name = "browserbase";
 	private readonly apiKey: string;
-	private readonly projectId: string;
+	private readonly projectId: string | undefined;
 	private readonly endpoint: string;
+	private readonly proxies: boolean | undefined;
+	private readonly solveCaptchas: boolean | undefined;
+	private readonly timeoutSeconds: number | undefined;
 
 	constructor(options: BrowserbaseBrowserProviderOptions = {}) {
 		const apiKey = (
@@ -32,33 +47,41 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 			);
 		}
 
-		const projectId = (
+		this.apiKey = apiKey;
+		this.projectId = (
 			options.projectId ?? process.env.BROWSERBASE_PROJECT_ID
 		)?.trim();
-		if (!projectId) {
-			throw new Error(
-				"BrowserbaseBrowserProvider: missing project ID. " +
-					"Pass new BrowserbaseBrowserProvider({ projectId }) or set BROWSERBASE_PROJECT_ID.",
-			);
-		}
-
-		this.apiKey = apiKey;
-		this.projectId = projectId;
 		this.endpoint = (
 			options.endpoint ??
 			process.env.BROWSERBASE_ENDPOINT?.trim() ??
 			"https://api.browserbase.com"
 		).replace(/\/$/, "");
+		this.proxies = options.proxies;
+		this.solveCaptchas = options.solveCaptchas;
+		this.timeoutSeconds = options.timeoutSeconds;
 	}
 
 	async createSession(): Promise<ProviderSession> {
+		const browserSettings = {
+			...(this.solveCaptchas === undefined
+				? {}
+				: { solveCaptchas: this.solveCaptchas }),
+		};
+		const request: BrowserbaseSessionRequest = {
+			...(this.projectId ? { projectId: this.projectId } : {}),
+			...(this.proxies === undefined ? {} : { proxies: this.proxies }),
+			...(this.timeoutSeconds === undefined
+				? {}
+				: { timeout: this.timeoutSeconds }),
+			...(Object.keys(browserSettings).length > 0 ? { browserSettings } : {}),
+		};
 		const response = await fetch(`${this.endpoint}/v1/sessions`, {
 			method: "POST",
 			headers: {
 				"X-BB-API-Key": this.apiKey,
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({ projectId: this.projectId }),
+			body: JSON.stringify(request),
 		});
 		if (!response.ok) {
 			const body = await response.text();

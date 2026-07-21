@@ -1,0 +1,44 @@
+---
+title: Browser Use
+sidebarTitle: Browser Use
+---
+
+> Run agent browser sessions on Browser Use.
+
+Import from `libretto-browser-tools/browser-use`.
+
+## Configure
+
+```dotenv theme={null}
+BROWSER_USE_API_KEY=<browser-use-api-key>
+# optional
+# BROWSER_USE_BASE_URL=https://api.browser-use.com/api/v3
+```
+
+## Options
+
+| Option | Env | Default | Description |
+| --- | --- | --- | --- |
+| `apiKey` | `BROWSER_USE_API_KEY` | (required) | API key |
+| `endpoint` | `BROWSER_USE_BASE_URL` | `https://api.browser-use.com/api/v3` | API base URL |
+| `proxyCountryCode` | — | — | Optional proxy country code (`null` clears) |
+| `timeoutMinutes` | — | — | Session timeout in minutes |
+
+Created sessions may include `liveViewUrl`. If the API returns no CDP URL, stop the session in the Browser Use dashboard and create a fresh one.
+
+## Example
+
+```typescript theme={null}
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+import { BrowserUseBrowserProvider } from "libretto-browser-tools/browser-use";
+
+const { tools, dispose } = createAiSdkBrowserTools(
+  new BrowserUseBrowserProvider(),
+);
+
+try {
+  // agent loop using tools…
+} finally {
+  await dispose();
+}
+```

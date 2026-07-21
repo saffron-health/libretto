@@ -1,13 +1,23 @@
 packages:
   - "apps/*"
   - "benchmarks"
+  - "docs"
   - "evals"
   - "packages/*"
 
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
+  - "@holocron.so/*"
+  - "@mintlify/*"
   - affordance
+  - framer-motion
   - libretto
+  - lodash
+  - mint
+  - motion
+  - safe-mdx
+  - spiceflow
+  - "@spiceflow/*"
 
 enablePrePostScripts: false
 
@@ -15,6 +25,8 @@ blockExoticSubdeps: true
 
 allowBuilds:
   '@google/genai': false
+  agent-browser: true
+  dev-browser: true
   esbuild: true
   fallow: false
   glimpseui: false
@@ -23,3 +35,4 @@ allowBuilds:
   protobufjs: true
   puppeteer: true
   sharp: true
+  workerd: true

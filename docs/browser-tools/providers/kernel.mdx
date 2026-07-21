@@ -1,0 +1,51 @@
+---
+title: Kernel
+sidebarTitle: Kernel
+---
+
+> Run agent browser sessions on Kernel.
+
+Import from `libretto-browser-tools/kernel`. For Libretto CLI `open` / `run` on Kernel, see [Alternative providers: Kernel](/alternative-providers/kernel).
+
+## Configure
+
+```dotenv theme={null}
+KERNEL_API_KEY=<kernel-api-key>
+# optional
+# KERNEL_HEADLESS=true
+# KERNEL_STEALTH=false
+# KERNEL_TIMEOUT_SECONDS=300
+# KERNEL_PROXY_ID=
+# KERNEL_ENABLE_RECORDING=false
+# KERNEL_API_ENDPOINT=https://api.onkernel.com
+```
+
+## Options
+
+| Option | Env | Default | Description |
+| --- | --- | --- | --- |
+| `apiKey` | `KERNEL_API_KEY` | (required) | API key |
+| `headless` | `KERNEL_HEADLESS` | `true` | Headless browser |
+| `stealth` | `KERNEL_STEALTH` | `false` | Kernel stealth mode |
+| `proxyId` | `KERNEL_PROXY_ID` | — | Optional Kernel proxy id |
+| `timeoutSeconds` | `KERNEL_TIMEOUT_SECONDS` | `300` | Session timeout in seconds |
+| `enableRecording` | `KERNEL_ENABLE_RECORDING` | `false` | Start a replay; requires `headless: false` |
+
+Created sessions may include `liveViewUrl` and, when recording is enabled, `recordingUrl`. Closing returns `replayUrl` when a replay was started.
+
+## Example
+
+```typescript theme={null}
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+import { KernelBrowserProvider } from "libretto-browser-tools/kernel";
+
+const { tools, dispose } = createAiSdkBrowserTools(
+  new KernelBrowserProvider({ stealth: true }),
+);
+
+try {
+  // agent loop using tools…
+} finally {
+  await dispose();
+}
+```
