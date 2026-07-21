@@ -516,8 +516,8 @@ function BenchmarksSection() {
             55% lower cost than alternatives
           </Text>
           <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
-            Tied for the best pass rate, at a much lower cost per successful
-            task.
+            Lets your agent work through complex pages with less overhead — and
+            a lot less cost.
           </Text>
         </div>
 
