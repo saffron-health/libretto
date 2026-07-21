@@ -40,7 +40,8 @@ export function SectionIntro({
         <Text
           as="p"
           size="md"
-          className={`${copyAlignment} max-w-[580px] leading-relaxed text-muted [text-wrap:balance] ${copyClassName}`.trim()}
+          wrap="pretty"
+          className={`${copyAlignment} max-w-[580px] leading-relaxed text-muted ${copyClassName}`.trim()}
         >
           {children}
         </Text>
