@@ -632,7 +632,7 @@ function IntegrationCard({
       ) : (
         <span
           aria-hidden="true"
-          className="integration-hatch-motion pointer-events-none absolute inset-[12%] rounded-lg opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+          className="integration-hatch-motion pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
           style={READY_HATCH}
         />
       )}
