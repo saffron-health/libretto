@@ -7,11 +7,13 @@
     "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai": "^3.0.41",
+    "@fontsource/inter": "^5.2.8",
     "@types/sharp": "^0.32.0",
     "fallow": "^2.55.0",
     "oxlint": "^1.72.0",
     "oxlint-tsgolint": "^0.24.0",
     "playwright": "^1.58.2",
+    "satori": "^0.28.0",
     "sharp": "^0.34.5",
     "turbo": "^2.8.20"
   },
