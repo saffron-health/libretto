@@ -558,6 +558,19 @@ body {
   }
 }
 
+@keyframes integration-hatch-scroll {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 14px 14px;
+  }
+}
+
+.integration-hatch-motion {
+  animation: integration-hatch-scroll 1.8s linear infinite;
+}
+
 @keyframes crt-flicker {
   0%,
   100% {

@@ -317,16 +317,21 @@ function BenchmarksPlaceholder() {
   );
 }
 
-const INTEGRATION_HATCH = {
+const SOON_HATCH = {
   backgroundImage:
     "repeating-linear-gradient(315deg, color-mix(in oklch, var(--color-gray-12) 5%, transparent) 0, color-mix(in oklch, var(--color-gray-12) 5%, transparent) 1px, transparent 0, transparent 50%)",
   backgroundSize: "10px 10px",
 } as const;
 
+const READY_HATCH = {
+  backgroundImage:
+    "repeating-linear-gradient(315deg, color-mix(in oklch, var(--color-green-9) 18%, transparent) 0, color-mix(in oklch, var(--color-green-9) 18%, transparent) 1px, transparent 0, transparent 50%)",
+  backgroundSize: "14px 14px",
+} as const;
+
 type IntegrationCardProps = {
   name: string;
   logoSrc: string;
-  brand: string;
   href?: string;
   status: "ready" | "soon";
   fathomEvent?: string;
@@ -336,7 +341,6 @@ type IntegrationCardProps = {
 function IntegrationCard({
   name,
   logoSrc,
-  brand,
   href,
   status,
   fathomEvent,
@@ -346,7 +350,7 @@ function IntegrationCard({
   const external = Boolean(href?.startsWith("http"));
   const className = soon
     ? "relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-rule/60 bg-panel/20 no-underline opacity-35"
-    : "group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-rule bg-panel/30 no-underline transition-[border-color,background-color,box-shadow,opacity] duration-200 hover:border-[color-mix(in_oklch,var(--brand)_70%,transparent)] hover:bg-[color-mix(in_oklch,var(--brand)_12%,var(--color-panel))] hover:shadow-[0_0_0_1px_color-mix(in_oklch,var(--brand)_35%,transparent)]";
+    : "group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-transparent no-underline transition-[border-color,box-shadow] duration-300 hover:border-accent/45 hover:shadow-[0_0_24px_-8px_color-mix(in_oklch,var(--color-green-9)_55%,transparent)]";
 
   const content = (
     <>
@@ -354,18 +358,24 @@ function IntegrationCard({
         <span className="absolute top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md border border-amber/40 bg-bg/90 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-amber">
           Coming soon
         </span>
-      ) : null}
+      ) : (
+        <span
+          aria-hidden="true"
+          className="integration-hatch-motion pointer-events-none absolute inset-[12%] rounded-lg opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+          style={READY_HATCH}
+        />
+      )}
       <img
         src={logoSrc}
         alt=""
         className={
           soon
-            ? `max-h-[42%] max-w-[58%] object-contain opacity-70 grayscale ${logoClassName}`
-            : `max-h-[42%] max-w-[58%] object-contain opacity-40 grayscale transition-[opacity,filter,transform] duration-200 group-hover:scale-105 group-hover:opacity-100 group-hover:grayscale-0 ${logoClassName}`
+            ? `relative z-[1] max-h-[42%] max-w-[58%] object-contain opacity-70 ${logoClassName}`
+            : `relative z-[1] max-h-[42%] max-w-[58%] object-contain opacity-45 transition-[opacity,transform,filter] duration-300 ease-out group-hover:scale-110 group-hover:opacity-100 group-hover:brightness-110 ${logoClassName}`
         }
       />
       {soon ? null : (
-        <span className="pointer-events-none absolute inset-x-3 bottom-4 text-center font-mono text-xs tracking-tight text-[var(--brand)] opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <span className="pointer-events-none absolute inset-x-3 bottom-3 z-[1] text-center font-mono text-sm tracking-tight text-accent-bright opacity-0 transition-opacity duration-300 group-hover:opacity-100">
           {name}
         </span>
       )}
@@ -380,7 +390,7 @@ function IntegrationCard({
           ? { target: "_blank", rel: "noopener noreferrer" }
           : {})}
         className={className}
-        style={{ ...INTEGRATION_HATCH, ["--brand" as string]: brand }}
+        style={soon ? SOON_HATCH : undefined}
         data-fathom-event={fathomEvent}
         title={soon ? "Coming soon" : name}
       >
@@ -392,7 +402,7 @@ function IntegrationCard({
   return (
     <div
       className={`${className} cursor-default`}
-      style={{ ...INTEGRATION_HATCH, ["--brand" as string]: brand }}
+      style={soon ? SOON_HATCH : undefined}
       title={soon ? "Coming soon" : name}
     >
       {content}
@@ -404,7 +414,6 @@ const INTEGRATIONS: IntegrationCardProps[] = [
   {
     name: "AI SDK",
     logoSrc: "/logos/ai-sdk.svg",
-    brand: "#EDEDED",
     href: "/docs/browser-tools/adapters/ai-sdk",
     status: "ready",
     fathomEvent: "Browser tools AI SDK integration click",
@@ -413,7 +422,6 @@ const INTEGRATIONS: IntegrationCardProps[] = [
   {
     name: "Pi",
     logoSrc: "/logos/pi.svg",
-    brand: "#FFFFFF",
     href: "/docs/browser-tools/adapters/pi",
     status: "ready",
     fathomEvent: "Browser tools Pi integration click",
@@ -422,7 +430,6 @@ const INTEGRATIONS: IntegrationCardProps[] = [
   {
     name: "Custom",
     logoSrc: "/logos/custom.svg",
-    brand: "#2fdb4f",
     href: "/docs/browser-tools/adapters/custom",
     status: "ready",
     fathomEvent: "Browser tools Custom integration click",
@@ -430,27 +437,21 @@ const INTEGRATIONS: IntegrationCardProps[] = [
   {
     name: "Flue",
     logoSrc: "/logos/flue.svg",
-    brand: "#007AFF",
     href: "https://flueframework.com/",
     status: "soon",
     fathomEvent: "Browser tools Flue integration click",
-    logoClassName: "rounded-lg",
   },
   {
     name: "Executor",
     logoSrc: "/logos/executor.png",
-    brand: "#0EA514",
     href: "https://executor.sh/",
     status: "soon",
     fathomEvent: "Browser tools Executor integration click",
-    logoClassName: "rounded-full",
   },
   {
     name: "eve",
     logoSrc: "/logos/eve.svg",
-    brand: "#FFFFFF",
     status: "soon",
-    logoClassName: "rounded-lg",
   },
 ];
 
