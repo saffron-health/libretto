@@ -109,7 +109,6 @@
     0 0 0 1px rgba(18, 206, 65, 0.65),
     0 0 8px 1px rgba(18, 206, 65, 0.1);
   --code-block-background: var(--card);
-  --code-block-border: 1px solid var(--docs-outline);
 
   --prism-fg: #eeeeee;
   --prism-keyword: #7ee79a;
@@ -275,11 +274,6 @@
   border-radius: 6px;
   background: var(--code-block-background);
   box-shadow: var(--docs-shadow-minimal);
-}
-
-.dark .slot-main figure[class~='group/code'] {
-  border: 1px solid var(--docs-outline);
-  background: var(--code-block-background);
 }
 
 .slot-main figure[class~='group/code'] button[aria-label='Copy code'] {
