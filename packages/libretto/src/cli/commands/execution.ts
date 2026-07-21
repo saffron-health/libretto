@@ -17,7 +17,6 @@ import {
   clearSessionState,
   logFileForSession,
   readSessionState,
-  readSessionStateOrThrow,
   setSessionStatus,
   writeSessionState,
   type SessionState,
@@ -337,25 +336,31 @@ async function runExec(
   code: string,
   session: string,
   logger: LoggerApi,
+  sessionState: SessionState,
   options: {
     visualize?: boolean;
     pageId?: string;
     mode?: ExecMode;
   } = {},
 ): Promise<void> {
-  const state = readSessionStateOrThrow(session);
-  if (!state.daemonSocketPath) {
+  if (!sessionState.daemonSocketPath) {
     // Compatibility fallback for older sessions that predate daemon-backed
     // command handling. Keep `exec` inspection working when state has a live
     // CDP endpoint/port but no daemon socket.
     logger.warn(`${options.mode ?? "exec"}-daemon-socket-missing-cdp-fallback`, {
       session,
-      hasCdpEndpoint: Boolean(state.cdpEndpoint),
-      port: state.port,
+      hasCdpEndpoint: Boolean(sessionState.cdpEndpoint),
+      port: sessionState.port,
     });
     return execViaCdpFallback(code, session, logger, options);
   }
-  return execViaDaemon(code, session, state.daemonSocketPath, logger, options);
+  return execViaDaemon(
+    code,
+    session,
+    sessionState.daemonSocketPath,
+    logger,
+    options,
+  );
 }
 
 function parseJsonArg(label: string, raw: string): unknown {
@@ -734,6 +739,7 @@ export const execCommand = SimpleCLI.command({
       codeFromArgsOrStdin,
       ctx.session,
       ctx.logger,
+      ctx.sessionState,
       {
         visualize: input.visualize,
         pageId: input.page,
@@ -770,10 +776,16 @@ export const readonlyExecCommand = SimpleCLI.command({
         "Missing stdin input for `readonly-exec -`. Pipe inspection code into stdin.",
       );
     }
-    await runExec(codeFromArgsOrStdin, ctx.session, ctx.logger, {
-      pageId: input.page,
-      mode: "readonly-exec",
-    });
+    await runExec(
+      codeFromArgsOrStdin,
+      ctx.session,
+      ctx.logger,
+      ctx.sessionState,
+      {
+        pageId: input.page,
+        mode: "readonly-exec",
+      },
+    );
   });
 
 const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH] [--provider <provider>]`;
