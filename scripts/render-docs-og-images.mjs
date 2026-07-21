@@ -44,7 +44,7 @@ for (const pagePath of pages) {
     .png({ compressionLevel: 9, palette: true, quality: 100 })
     .toFile(imagePath);
 
-  const publicImagePath = `/docs/og/${slug}.png`;
+  const publicImagePath = `https://libretto.sh/docs/og/${slug}.png`;
   const updatedSource = setOgImage(source, publicImagePath, pagePath);
   if (updatedSource !== source) {
     writeFileSync(pagePath, updatedSource);
