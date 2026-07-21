@@ -1,0 +1,35 @@
+---
+title: Custom
+sidebarTitle: Custom
+---
+
+> Adapt browser tools to an agent framework that is not AI SDK or Pi.
+
+Built-in adapters wrap the framework-agnostic tools from `createBrowserTools`. For another framework, call that factory and map each `BrowserTool` into your framework's tool shape.
+
+```typescript theme={null}
+import { createBrowserTools } from "libretto-browser-tools";
+import { LocalBrowserProvider } from "libretto-browser-tools";
+
+const { tools, dispose } = createBrowserTools(new LocalBrowserProvider());
+
+// Each entry is a BrowserTool: { name, description, inputSchema, execute }
+const { browser_open, browser_exec, browser_snapshot, browser_status, browser_close, browser_connect } =
+  tools;
+
+// Map into your framework, for example:
+// myFramework.tool({
+//   name: browser_open.name,
+//   description: browser_open.description,
+//   parameters: browser_open.inputSchema, // Standard Schema / zod
+//   execute: (input) => browser_open.execute(input),
+// });
+```
+
+`execute` returns `{ ok: true, ...payload }` or `{ ok: false, error }`. Host misconfiguration and domain-policy violations throw — surface those to the host, not as model-fixable tool errors.
+
+`inputSchema` is a Standard Schema (authored in zod). Pass it through when your framework accepts zod or Standard Schema; otherwise convert it.
+
+Always expose `dispose()` from the host so leftover sessions close when the agent loop ends. For snapshot screenshots, the base tool returns `{ base64, mimeType: "image/png" }` — convert that into your framework's multimodal content type if needed (see the [AI SDK](/browser-tools/adapters/ai-sdk) and [Pi](/browser-tools/adapters/pi) adapters).
+
+Borrowed-page toolkits use `createBrowserToolsForPage(page)` and only include `browser_exec`, `browser_snapshot`, and `browser_status`.

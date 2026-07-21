@@ -1,0 +1,56 @@
+---
+title: Advanced
+sidebarTitle: Advanced
+---
+
+> Domain policy, borrowed pages, and CDP attach.
+
+## Domain policy
+
+Pass `allowedDomains` and/or `blockedDomains` into the toolkit factory to restrict http(s) navigations in the provider-managed browser context.
+
+```typescript theme={null}
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+import { LocalBrowserProvider } from "libretto-browser-tools";
+
+const { tools, dispose } = createAiSdkBrowserTools(new LocalBrowserProvider(), {
+  allowedDomains: ["example.com", "*.example.com"],
+  blockedDomains: ["ads.example.com"],
+});
+```
+
+Matching is hostname-based. Patterns may be exact hosts or `*.suffix` wildcards. Non-http(s) URLs are not filtered.
+
+Blocked navigations throw `DomainPolicyRestricted` (not `{ ok: false }`) so the host can inspect `attemptedNavigationUrl` and the configured policy.
+
+Domain policy is not a sandbox for `browser_exec` code and does not cover caller-created browser contexts outside the toolkit.
+
+## Borrowed pages
+
+When you already have a Playwright `Page` (for example inside a failing automation), attach tools without owning the browser lifecycle:
+
+```typescript theme={null}
+import { createBrowserToolsForPage } from "libretto-browser-tools";
+// or: createAiSdkBrowserToolsForPage from "libretto-browser-tools/ai-sdk"
+
+const { sessionId, tools, dispose } = createBrowserToolsForPage(page);
+// tools: browser_exec, browser_snapshot, browser_status only
+await dispose(); // detaches tools; does not close page / context / browser
+```
+
+`libretto-playwright-debugger` uses this pattern so a debugging agent can inspect and drive the live failed page. See [Playwright debugging agent](/reference/runtime/playwright-debugger).
+
+## CDP attach
+
+Use `browser_connect` when Chromium (or an Electron app) is already running with a remote-debugging endpoint:
+
+```typescript theme={null}
+// Agent tool call shape
+await tools.browser_connect.execute({
+  cdpUrl: "ws://127.0.0.1:9222/devtools/browser/<id>",
+});
+```
+
+Closing that session detaches Playwright and leaves the external browser running. Prefer `browser_open` when the provider should create and tear down the browser for you.
+
+For a provider that allocates browsers for you, see [Custom providers](/browser-tools/providers/custom).

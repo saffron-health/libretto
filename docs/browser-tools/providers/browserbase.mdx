@@ -1,0 +1,45 @@
+---
+title: Browserbase
+sidebarTitle: Browserbase
+---
+
+> Run agent browser sessions on Browserbase.
+
+Import from `libretto-browser-tools/browserbase`. For Libretto CLI `open` / `run` on Browserbase, see [Alternative providers: Browserbase](/alternative-providers/browserbase).
+
+## Configure
+
+```dotenv theme={null}
+BROWSERBASE_API_KEY=<browserbase-api-key>
+BROWSERBASE_PROJECT_ID=<browserbase-project-id>
+# optional
+# BROWSERBASE_ENDPOINT=https://api.browserbase.com
+```
+
+## Options
+
+| Option | Env | Default | Description |
+| --- | --- | --- | --- |
+| `apiKey` | `BROWSERBASE_API_KEY` | (required) | API key |
+| `projectId` | `BROWSERBASE_PROJECT_ID` | — | Browserbase project id (recommended) |
+| `endpoint` | `BROWSERBASE_ENDPOINT` | `https://api.browserbase.com` | API base URL |
+| `proxies` | — | — | Enable Browserbase proxies when `true` |
+| `solveCaptchas` | — | — | Enable captcha solving when `true` |
+| `timeoutSeconds` | — | — | Session timeout in seconds |
+
+## Example
+
+```typescript theme={null}
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+import { BrowserbaseBrowserProvider } from "libretto-browser-tools/browserbase";
+
+const { tools, dispose } = createAiSdkBrowserTools(
+  new BrowserbaseBrowserProvider({ proxies: true }),
+);
+
+try {
+  // agent loop using tools…
+} finally {
+  await dispose();
+}
+```

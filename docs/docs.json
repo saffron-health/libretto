@@ -112,6 +112,40 @@
         ]
       },
       {
+        "tab": "Browser Tools",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "browser-tools/quickstart",
+              "browser-tools/tools",
+              "browser-tools/advanced"
+            ]
+          },
+          {
+            "group": "Adapters",
+            "pages": [
+              "browser-tools/adapters/ai-sdk",
+              "browser-tools/adapters/pi",
+              "browser-tools/adapters/custom"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "browser-tools/providers/overview",
+              "browser-tools/providers/local",
+              "browser-tools/providers/libretto-cloud",
+              "browser-tools/providers/kernel",
+              "browser-tools/providers/browserbase",
+              "browser-tools/providers/browser-use",
+              "browser-tools/providers/steel",
+              "browser-tools/providers/custom"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Hosting",
         "groups": [
           {
