@@ -194,8 +194,13 @@ function renderOgSvg({ description, group, title }) {
   const descriptionLines = wrapText(description, 25, 2);
   const titleY = 310;
   const titleLineHeight = 70;
+  const descriptionLineHeight = 42;
   const descriptionY =
     titleY + titleLines.length * titleLineHeight + (titleLines.length > 1 ? 16 : 22);
+  const descriptionBaseline = descriptionY + 31;
+  const lastDescriptionBaseline =
+    descriptionBaseline + (descriptionLines.length - 1) * descriptionLineHeight;
+  const verticalOffset = OG_HEIGHT - 64 - lastDescriptionBaseline;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${OG_WIDTH}" height="${OG_HEIGHT}" viewBox="0 0 ${OG_WIDTH} ${OG_HEIGHT}">
   <defs>
@@ -215,12 +220,12 @@ function renderOgSvg({ description, group, title }) {
   </defs>
   <rect width="${OG_WIDTH}" height="${OG_HEIGHT}" fill="url(#background)"/>
   <image href="${logoDataUri}" x="58" y="64" width="48" height="48"/>
-  <text x="60" y="286" fill="#12ce41" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="400">${escapeXml(group)}</text>
-  <text x="58" y="${titleY + 52}" fill="#f3f4f6" font-family="Libretto Serif, Georgia, serif" font-size="64" font-weight="400">
+  <text x="60" y="${286 + verticalOffset}" fill="#12ce41" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="400">${escapeXml(group)}</text>
+  <text x="58" y="${titleY + 52 + verticalOffset}" fill="#f3f4f6" font-family="Libretto Serif, Georgia, serif" font-size="64" font-weight="400">
     ${renderTextLines(titleLines, titleLineHeight)}
   </text>
-  <text x="58" y="${descriptionY + 31}" fill="#b7bbb8" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="400">
-    ${renderTextLines(descriptionLines, 42)}
+  <text x="58" y="${descriptionBaseline + verticalOffset}" fill="#b7bbb8" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="400">
+    ${renderTextLines(descriptionLines, descriptionLineHeight)}
   </text>
 </svg>`;
 }
