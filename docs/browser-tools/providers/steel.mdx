@@ -17,7 +17,9 @@ STEEL_API_KEY=<steel-api-key>
 # STEEL_CONNECT_URL=wss://connect.steel.dev
 ```
 
-## Options
+## Provider options
+
+Constructor / env settings for the provider itself:
 
 | Option | Env | Default | Description |
 | --- | --- | --- | --- |
@@ -28,8 +30,15 @@ STEEL_API_KEY=<steel-api-key>
 | `solveCaptcha` | — | — | Enable captcha solving when `true` |
 | `timeoutMs` | — | — | Session timeout in milliseconds |
 | `inactivityTimeoutMs` | — | — | Inactivity timeout in milliseconds |
-| `viewport` | — | — | `{ width, height }` via Steel `dimensions` |
-| `startUrl` | — | — | Accepted for API symmetry; Steel cannot preload it — navigate after connect |
+
+## Session create options
+
+Pass these to `provider.createSession({ ... })` (or via `browser_open({ url })` for `startUrl`):
+
+| Option | Description |
+| --- | --- |
+| `viewport` | `{ width, height }` via Steel `dimensions` |
+| `startUrl` | Accepted for API symmetry; Steel cannot preload it — `browser_open` navigates after connect |
 
 Created sessions may include `liveViewUrl` (Steel session viewer).
 

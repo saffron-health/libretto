@@ -2,6 +2,7 @@ import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "../provider.js";
 
 const DEFAULT_BROWSER_USE_ENDPOINT = "https://api.browser-use.com/api/v3";
@@ -54,7 +55,9 @@ export class BrowserUseBrowserProvider implements BrowserProvider {
 		this.timeoutMinutes = options.timeoutMinutes;
 	}
 
-	async createSession(): Promise<ProviderSession> {
+	async createSession(
+		_options: ProviderSessionCreateOptions = {},
+	): Promise<ProviderSession> {
 		const response = await fetch(`${this.endpoint}/browsers`, {
 			method: "POST",
 			headers: {
@@ -85,6 +88,7 @@ export class BrowserUseBrowserProvider implements BrowserProvider {
 			sessionId: session.id,
 			cdpEndpoint: normalizeCdpEndpoint(session.cdpUrl),
 			...(session.liveUrl ? { liveViewUrl: session.liveUrl } : {}),
+			startUrlPreloaded: false,
 		};
 	}
 

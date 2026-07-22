@@ -5,6 +5,7 @@ import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type KernelBrowserProviderOptions = {
@@ -14,11 +15,6 @@ export type KernelBrowserProviderOptions = {
 	proxyId?: string;
 	timeoutSeconds?: number;
 	enableRecording?: boolean;
-	/** URL Kernel opens before CDP attach. Prefer this over page.goto after connect. */
-	startUrl?: string;
-	/** Hardware-accelerated Kernel browser. Requires a plan that supports GPU. */
-	gpu?: boolean;
-	viewport?: { width: number; height: number };
 }
 
 type KernelBrowserResponse = {
@@ -164,9 +160,6 @@ export class KernelBrowserProvider implements BrowserProvider {
 	private readonly proxyId: string | undefined;
 	private readonly timeoutSeconds: number;
 	private readonly enableRecording: boolean;
-	private readonly startUrl: string | undefined;
-	private readonly gpu: boolean | undefined;
-	private readonly viewport: { width: number; height: number } | undefined;
 	private readonly replayUrlBySession = new Map<string, string>();
 
 	constructor(options: KernelBrowserProviderOptions = {}) {
@@ -189,9 +182,6 @@ export class KernelBrowserProvider implements BrowserProvider {
 		this.enableRecording =
 			options.enableRecording ??
 			readBooleanEnv("KERNEL_ENABLE_RECORDING", false);
-		this.startUrl = options.startUrl?.trim() || undefined;
-		this.gpu = options.gpu;
-		this.viewport = options.viewport;
 		if (this.enableRecording && this.headless) {
 			throw new Error(
 				"KernelBrowserProvider: replays require a headed browser. " +
@@ -200,7 +190,12 @@ export class KernelBrowserProvider implements BrowserProvider {
 		}
 	}
 
-	async createSession(): Promise<ProviderSession> {
+	async createSession(
+		options: ProviderSessionCreateOptions = {},
+	): Promise<ProviderSession> {
+		const startUrl = options.startUrl?.trim() || undefined;
+		const gpu = options.gpu;
+		const viewport = options.viewport;
 		const browser = await kernelFetchJson<KernelBrowserResponse>(
 			this.endpoint,
 			this.apiKey,
@@ -211,13 +206,13 @@ export class KernelBrowserProvider implements BrowserProvider {
 					headless: this.headless,
 					stealth: this.stealth,
 					...(this.proxyId ? { proxy_id: this.proxyId } : {}),
-					...(this.startUrl ? { start_url: this.startUrl } : {}),
-					...(this.gpu !== undefined ? { gpu: this.gpu } : {}),
-					...(this.viewport
+					...(startUrl ? { start_url: startUrl } : {}),
+					...(gpu !== undefined ? { gpu } : {}),
+					...(viewport
 						? {
 								viewport: {
-									width: this.viewport.width,
-									height: this.viewport.height,
+									width: viewport.width,
+									height: viewport.height,
 								},
 							}
 						: {}),
@@ -268,6 +263,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 			cdpEndpoint: browser.cdp_ws_url,
 			liveViewUrl: browser.browser_live_view_url ?? undefined,
 			recordingUrl: replay?.replay_view_url ?? undefined,
+			startUrlPreloaded: Boolean(startUrl),
 		};
 	}
 

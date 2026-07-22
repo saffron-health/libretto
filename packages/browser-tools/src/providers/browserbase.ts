@@ -2,6 +2,7 @@ import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type BrowserbaseBrowserProviderOptions = {
@@ -11,9 +12,6 @@ export type BrowserbaseBrowserProviderOptions = {
 	proxies?: boolean;
 	solveCaptchas?: boolean;
 	timeoutSeconds?: number;
-	/** Browserbase has no create-time start URL; callers should navigate after connect. */
-	startUrl?: string;
-	viewport?: { width: number; height: number };
 }
 
 type BrowserbaseSessionResponse = {
@@ -39,7 +37,6 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 	private readonly proxies: boolean | undefined;
 	private readonly solveCaptchas: boolean | undefined;
 	private readonly timeoutSeconds: number | undefined;
-	private readonly viewport: { width: number; height: number } | undefined;
 
 	constructor(options: BrowserbaseBrowserProviderOptions = {}) {
 		const apiKey = (
@@ -64,19 +61,23 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 		this.proxies = options.proxies;
 		this.solveCaptchas = options.solveCaptchas;
 		this.timeoutSeconds = options.timeoutSeconds;
-		this.viewport = options.viewport;
 	}
 
-	async createSession(): Promise<ProviderSession> {
+	async createSession(
+		options: ProviderSessionCreateOptions = {},
+	): Promise<ProviderSession> {
+		// Browserbase has no create-time start URL; callers should navigate after
+		// connect when startUrl is set. Viewport is forwarded via browserSettings.
+		const viewport = options.viewport;
 		const browserSettings = {
 			...(this.solveCaptchas === undefined
 				? {}
 				: { solveCaptchas: this.solveCaptchas }),
-			...(this.viewport
+			...(viewport
 				? {
 						viewport: {
-							width: this.viewport.width,
-							height: this.viewport.height,
+							width: viewport.width,
+							height: viewport.height,
 						},
 					}
 				: {}),
@@ -105,6 +106,7 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 		return {
 			sessionId: session.id,
 			cdpEndpoint: session.connectUrl,
+			startUrlPreloaded: false,
 		};
 	}
 

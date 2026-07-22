@@ -17,7 +17,9 @@ BROWSERBASE_PROJECT_ID=<browserbase-project-id>
 # BROWSERBASE_ENDPOINT=https://api.browserbase.com
 ```
 
-## Options
+## Provider options
+
+Constructor / env settings for the provider itself:
 
 | Option | Env | Default | Description |
 | --- | --- | --- | --- |
@@ -27,8 +29,15 @@ BROWSERBASE_PROJECT_ID=<browserbase-project-id>
 | `proxies` | — | — | Enable Browserbase proxies when `true` |
 | `solveCaptchas` | — | — | Enable captcha solving when `true` |
 | `timeoutSeconds` | — | — | Session timeout in seconds |
-| `viewport` | — | — | `{ width, height }` via Browserbase `browserSettings.viewport` |
-| `startUrl` | — | — | Accepted for API symmetry; Browserbase cannot preload it — navigate after connect |
+
+## Session create options
+
+Pass these to `provider.createSession({ ... })` (or via `browser_open({ url })` for `startUrl`):
+
+| Option | Description |
+| --- | --- |
+| `viewport` | `{ width, height }` via Browserbase `browserSettings.viewport` |
+| `startUrl` | Accepted for API symmetry; Browserbase cannot preload it — `browser_open` navigates after connect |
 
 ## Example
 

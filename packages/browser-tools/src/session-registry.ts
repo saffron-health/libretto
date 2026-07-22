@@ -8,7 +8,10 @@ import {
 } from "./domain-policy.js";
 import type { Snapshot } from "./snapshot/capture-snapshot.js";
 import { snapshot as captureSnapshot } from "./snapshot/capture-snapshot.js";
-import type { BrowserProvider } from "./provider.js";
+import type {
+	BrowserProvider,
+	ProviderSessionCreateOptions,
+} from "./provider.js";
 
 type SessionEntry = {
 	providerSessionId: string | undefined;
@@ -63,12 +66,14 @@ export class SessionRegistry {
 		private readonly domainPolicy: DomainPolicyOptions = {},
 	) {}
 
-	async openSession(): Promise<{ sessionId: string }> {
+	async openSession(
+		options: ProviderSessionCreateOptions = {},
+	): Promise<{ sessionId: string; startUrlPreloaded: boolean }> {
 		const provider = this.provider;
 		if (!provider) {
 			throw new Error("This browser toolkit only operates on its attached page.");
 		}
-		const providerSession = await provider.createSession();
+		const providerSession = await provider.createSession(options);
 		let browser: Browser | undefined;
 		try {
 			browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
@@ -92,7 +97,10 @@ export class SessionRegistry {
 			const sessionId = this.generateSessionId();
 			this.sessions.set(sessionId, entry);
 			this.installBeforeExitHook();
-			return { sessionId };
+			return {
+				sessionId,
+				startUrlPreloaded: Boolean(providerSession.startUrlPreloaded),
+			};
 		} catch (error) {
 			await browser?.close().catch(() => {});
 			await provider.closeSession(providerSession.sessionId).catch(() => {});

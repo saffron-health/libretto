@@ -5,6 +5,7 @@ import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type LocalBrowserProviderOptions = {
@@ -65,7 +66,9 @@ export class LocalBrowserProvider implements BrowserProvider {
 		this.headless = options.headless ?? false;
 	}
 
-	async createSession(): Promise<ProviderSession> {
+	async createSession(
+		_options: ProviderSessionCreateOptions = {},
+	): Promise<ProviderSession> {
 		const port = await pickFreePort();
 		const browser = await chromium.launch({
 			...(this.channel ? { channel: this.channel } : {}),
@@ -75,7 +78,7 @@ export class LocalBrowserProvider implements BrowserProvider {
 		const cdpEndpoint = await fetchWebSocketDebuggerUrl(port);
 		const sessionId = `local-${this.nextSessionNumber++}`;
 		this.browsers.set(sessionId, browser);
-		return { sessionId, cdpEndpoint };
+		return { sessionId, cdpEndpoint, startUrlPreloaded: false };
 	}
 
 	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {

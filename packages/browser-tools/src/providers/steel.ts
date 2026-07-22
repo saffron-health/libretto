@@ -2,6 +2,7 @@ import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "../provider.js";
 
 const DEFAULT_STEEL_API_ENDPOINT = "https://api.steel.dev";
@@ -15,9 +16,6 @@ export type SteelBrowserProviderOptions = {
 	solveCaptcha?: boolean;
 	timeoutMs?: number;
 	inactivityTimeoutMs?: number;
-	/** Steel has no create-time start URL; callers should navigate after connect. */
-	startUrl?: string;
-	viewport?: { width: number; height: number };
 }
 
 type SteelSessionRequest = {
@@ -53,7 +51,6 @@ export class SteelBrowserProvider implements BrowserProvider {
 	private readonly solveCaptcha: boolean | undefined;
 	private readonly timeoutMs: number | undefined;
 	private readonly inactivityTimeoutMs: number | undefined;
-	private readonly viewport: { width: number; height: number } | undefined;
 
 	constructor(options: SteelBrowserProviderOptions = {}) {
 		const apiKey = (options.apiKey ?? process.env.STEEL_API_KEY)?.trim();
@@ -78,10 +75,14 @@ export class SteelBrowserProvider implements BrowserProvider {
 		this.solveCaptcha = options.solveCaptcha;
 		this.timeoutMs = options.timeoutMs;
 		this.inactivityTimeoutMs = options.inactivityTimeoutMs;
-		this.viewport = options.viewport;
 	}
 
-	async createSession(): Promise<ProviderSession> {
+	async createSession(
+		options: ProviderSessionCreateOptions = {},
+	): Promise<ProviderSession> {
+		// Steel has no create-time start URL; callers should navigate after
+		// connect when startUrl is set. Viewport maps to dimensions.
+		const viewport = options.viewport;
 		const request: SteelSessionRequest = {
 			...(this.useProxy === undefined ? {} : { useProxy: this.useProxy }),
 			...(this.solveCaptcha === undefined
@@ -91,11 +92,11 @@ export class SteelBrowserProvider implements BrowserProvider {
 			...(this.inactivityTimeoutMs === undefined
 				? {}
 				: { inactivityTimeout: this.inactivityTimeoutMs }),
-			...(this.viewport
+			...(viewport
 				? {
 						dimensions: {
-							width: this.viewport.width,
-							height: this.viewport.height,
+							width: viewport.width,
+							height: viewport.height,
 						},
 					}
 				: {}),
@@ -121,6 +122,7 @@ export class SteelBrowserProvider implements BrowserProvider {
 				session.id,
 			),
 			liveViewUrl: session.sessionViewerUrl,
+			startUrlPreloaded: false,
 		};
 	}
 
