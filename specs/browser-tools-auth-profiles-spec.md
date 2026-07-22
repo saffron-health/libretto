@@ -210,7 +210,7 @@ async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
 - [x] Mark the provider as supporting auth profiles.
 - [x] Add mocked HTTP tests for profile-bearing and unchanged unprofiled request bodies.
 - [x] Keep close endpoints unchanged; Phase 2 makes them the persistence trigger.
-- [ ] Run the Libretto Cloud provider spec plus package type-check.
+- [x] Run the Libretto Cloud provider spec plus package type-check.
 
 ### Phase 6: Add named Kernel profiles
 
