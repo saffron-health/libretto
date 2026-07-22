@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { snapshot as captureSnapshot } from "../snapshot/capture-snapshot.js";
 import { renderSnapshot } from "../snapshot/render-snapshot.js";
-import { waitForPageStable } from "../snapshot/wait-for-page-stable.js";
+import {
+	waitForPageStable,
+	type PageStabilityWaitOptions,
+} from "../snapshot/wait-for-page-stable.js";
 import { errorMessage } from "../errors.js";
 import type { SessionRegistry } from "../session-registry.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
@@ -38,7 +41,10 @@ export type SnapshotTool = {
 	inputSchema: typeof snapshotInputSchema;
 } & BrowserTool<SnapshotToolInput, SnapshotToolOutput>
 
-export function createSnapshotTool(registry: SessionRegistry): SnapshotTool {
+export function createSnapshotTool(
+	registry: SessionRegistry,
+	pageStability: PageStabilityWaitOptions = {},
+): SnapshotTool {
 	return {
 		name: "browser_snapshot",
 		description:
@@ -65,7 +71,7 @@ export function createSnapshotTool(registry: SessionRegistry): SnapshotTool {
 			}
 
 			try {
-				await waitForPageStable(page);
+				await waitForPageStable(page, pageStability);
 				const raw = await captureSnapshot(page);
 				const tree = renderSnapshot(raw);
 				const output: SnapshotToolOutput = { tree };

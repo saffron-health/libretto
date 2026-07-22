@@ -6,7 +6,10 @@ import {
 	diffSnapshots,
 	renderSnapshotDiff,
 } from "../snapshot/diff-snapshots.js";
-import { waitForPageStable } from "../snapshot/wait-for-page-stable.js";
+import {
+	waitForPageStable,
+	type PageStabilityWaitOptions,
+} from "../snapshot/wait-for-page-stable.js";
 import type { SessionRegistry } from "../session-registry.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
 
@@ -47,7 +50,10 @@ export type ExecTool = {
 	inputSchema: typeof execInputSchema;
 } & BrowserTool<ExecToolInput, ExecToolOutput>
 
-export function createExecTool(registry: SessionRegistry): ExecTool {
+export function createExecTool(
+	registry: SessionRegistry,
+	pageStability: PageStabilityWaitOptions = {},
+): ExecTool {
 	return {
 		name: "browser_exec",
 		description:
@@ -97,7 +103,7 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 
 			let snapshotDiff = "";
 			try {
-				await waitForPageStable(scope.page);
+				await waitForPageStable(scope.page, pageStability);
 				const after = await registry.captureSnapshotAfterExec(sessionId, pageId);
 				snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
 			} catch {
