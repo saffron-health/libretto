@@ -1,4 +1,5 @@
 import type { DomainPolicyOptions } from "./domain-policy.js";
+import type { PageStabilityWaitOptions } from "./snapshot/wait-for-page-stable.js";
 import type { BrowserProvider } from "./provider.js";
 import type { Page } from "playwright";
 import { SessionRegistry } from "./session-registry.js";
@@ -28,7 +29,18 @@ export type BrowserToolkit = {
 	dispose(): Promise<void>;
 }
 
-export type BrowserToolkitOptions = DomainPolicyOptions;
+export type BrowserToolkitOptions = DomainPolicyOptions & {
+	pageStability?: PageStabilityWaitOptions;
+	captureExecSnapshotDiff?: boolean;
+	onTiming?: (event: BrowserToolTimingEvent) => void | Promise<void>;
+};
+
+export type BrowserToolTimingEvent = {
+	tool: "browser_exec" | "browser_snapshot";
+	durationMs: number;
+	phases: Record<string, number>;
+	outcome: "success" | "error";
+};
 
 export type BorrowedPageBrowserToolkit = {
 	sessionId: string;
@@ -53,8 +65,17 @@ export function createBrowserTools(
 	return {
 		tools: {
 			browser_open: createOpenTool(registry),
-			browser_exec: createExecTool(registry),
-			browser_snapshot: createSnapshotTool(registry),
+			browser_exec: createExecTool(
+				registry,
+				options.pageStability,
+				options.onTiming,
+				options.captureExecSnapshotDiff,
+			),
+			browser_snapshot: createSnapshotTool(
+				registry,
+				options.pageStability,
+				options.onTiming,
+			),
 			browser_status: createStatusTool(registry),
 			browser_close: createCloseTool(registry),
 			browser_connect: createConnectTool(registry),

@@ -6,8 +6,12 @@ import {
 	diffSnapshots,
 	renderSnapshotDiff,
 } from "../snapshot/diff-snapshots.js";
-import { waitForPageStable } from "../snapshot/wait-for-page-stable.js";
+import {
+	waitForPageStable,
+	type PageStabilityWaitOptions,
+} from "../snapshot/wait-for-page-stable.js";
 import type { SessionRegistry } from "../session-registry.js";
+import type { BrowserToolTimingEvent } from "../create-browser-tools.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
 
 const execInputSchema = z.object({
@@ -47,7 +51,12 @@ export type ExecTool = {
 	inputSchema: typeof execInputSchema;
 } & BrowserTool<ExecToolInput, ExecToolOutput>
 
-export function createExecTool(registry: SessionRegistry): ExecTool {
+export function createExecTool(
+	registry: SessionRegistry,
+	pageStability: PageStabilityWaitOptions = {},
+	onTiming?: (event: BrowserToolTimingEvent) => void | Promise<void>,
+	captureSnapshotDiff = true,
+): ExecTool {
 	return {
 		name: "browser_exec",
 		description:
@@ -57,12 +66,26 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			"itself is the only state. In scope: `page` (the current playwright " +
 			"Page), `context` (BrowserContext), `browser` (Browser). TypeScript is " +
 			"fine. `console.log`/`console.error` output is captured and returned as " +
-			"stdout/stderr. Successful execs also return `snapshotDiff` — a compact " +
-			"text diff of accessibility-tree changes since the previous exec (empty when " +
-			"unchanged). Failures come back as `{ ok: false, error }` — read the error, " +
+			"stdout/stderr. " +
+			(captureSnapshotDiff
+				? "Successful execs also return `snapshotDiff` — a compact text diff of accessibility-tree changes since the previous exec (empty when unchanged). "
+				: "Call browser_snapshot after an exec when you need to inspect or verify page changes. ") +
+			"Failures come back as `{ ok: false, error }` — read the error, " +
 			"fix the code, and try again.",
 		inputSchema: execInputSchema,
 		async execute({ sessionId, code, pageId }): Promise<ToolResult<ExecToolOutput>> {
+			const startedAt = Date.now();
+			const phases: Record<string, number> = {};
+			const emitTiming = async (outcome: "success" | "error") => {
+				await Promise.resolve(
+					onTiming?.({
+						tool: "browser_exec",
+						durationMs: Date.now() - startedAt,
+						phases,
+						outcome,
+					}),
+				).catch(() => undefined);
+			};
 			let scope: ExecScope;
 			try {
 				const page = registry.getCurrentPage(sessionId, pageId);
@@ -87,19 +110,41 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 				};
 			}
 
-			const before = await registry.readSnapshotBaseline(sessionId, pageId);
+			let before:
+				| Awaited<ReturnType<SessionRegistry["readSnapshotBaseline"]>>
+				| undefined;
+			if (captureSnapshotDiff) {
+				const baselineStartedAt = Date.now();
+				before = await registry.readSnapshotBaseline(sessionId, pageId);
+				phases.baselineSnapshotMs = Date.now() - baselineStartedAt;
+			}
+			const executionStartedAt = Date.now();
 			const execResult = await runExecCode(code, scope);
+			phases.executionMs = Date.now() - executionStartedAt;
 			const executionPolicyError = registry.consumeBlockedNavigationError(
 				scope.page,
 			);
 			if (executionPolicyError) throw executionPolicyError;
-			if (!execResult.ok) return execResult;
+			if (!execResult.ok) {
+				await emitTiming("error");
+				return execResult;
+			}
+			if (!captureSnapshotDiff || !before) {
+				await emitTiming("success");
+				return { ...execResult, snapshotDiff: "" };
+			}
 
 			let snapshotDiff = "";
 			try {
-				await waitForPageStable(scope.page);
+				const stabilityStartedAt = Date.now();
+				await waitForPageStable(scope.page, pageStability);
+				phases.stabilityMs = Date.now() - stabilityStartedAt;
+				const snapshotStartedAt = Date.now();
 				const after = await registry.captureSnapshotAfterExec(sessionId, pageId);
+				phases.snapshotMs = Date.now() - snapshotStartedAt;
+				const diffStartedAt = Date.now();
 				snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
+				phases.diffMs = Date.now() - diffStartedAt;
 			} catch {
 				registry.clearSnapshotCache(sessionId);
 			}
@@ -107,6 +152,7 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 				registry.consumeBlockedNavigationError(scope.page);
 			if (stabilizationPolicyError) throw stabilizationPolicyError;
 
+			await emitTiming("success");
 			return { ...execResult, snapshotDiff };
 		},
 	};

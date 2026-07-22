@@ -1,9 +1,13 @@
 import { z } from "zod";
 import { snapshot as captureSnapshot } from "../snapshot/capture-snapshot.js";
 import { renderSnapshot } from "../snapshot/render-snapshot.js";
-import { waitForPageStable } from "../snapshot/wait-for-page-stable.js";
+import {
+	waitForPageStable,
+	type PageStabilityWaitOptions,
+} from "../snapshot/wait-for-page-stable.js";
 import { errorMessage } from "../errors.js";
 import type { SessionRegistry } from "../session-registry.js";
+import type { BrowserToolTimingEvent } from "../create-browser-tools.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
 
 const snapshotInputSchema = z.object({
@@ -38,7 +42,11 @@ export type SnapshotTool = {
 	inputSchema: typeof snapshotInputSchema;
 } & BrowserTool<SnapshotToolInput, SnapshotToolOutput>
 
-export function createSnapshotTool(registry: SessionRegistry): SnapshotTool {
+export function createSnapshotTool(
+	registry: SessionRegistry,
+	pageStability: PageStabilityWaitOptions = {},
+	onTiming?: (event: BrowserToolTimingEvent) => void | Promise<void>,
+): SnapshotTool {
 	return {
 		name: "browser_snapshot",
 		description:
@@ -52,6 +60,18 @@ export function createSnapshotTool(registry: SessionRegistry): SnapshotTool {
 			screenshot,
 			pageId,
 		}): Promise<ToolResult<SnapshotToolOutput>> {
+			const startedAt = Date.now();
+			const phases: Record<string, number> = {};
+			const emitTiming = async (outcome: "success" | "error") => {
+				await Promise.resolve(
+					onTiming?.({
+						tool: "browser_snapshot",
+						durationMs: Date.now() - startedAt,
+						phases,
+						outcome,
+					}),
+				).catch(() => undefined);
+			};
 			let page;
 			try {
 				page = registry.getCurrentPage(sessionId, pageId);
@@ -65,21 +85,29 @@ export function createSnapshotTool(registry: SessionRegistry): SnapshotTool {
 			}
 
 			try {
-				await waitForPageStable(page);
+				const stabilityStartedAt = Date.now();
+				await waitForPageStable(page, pageStability);
+				phases.stabilityMs = Date.now() - stabilityStartedAt;
+				const snapshotStartedAt = Date.now();
 				const raw = await captureSnapshot(page);
 				const tree = renderSnapshot(raw);
+				phases.snapshotMs = Date.now() - snapshotStartedAt;
 				const output: SnapshotToolOutput = { tree };
 
 				if (screenshot) {
+					const screenshotStartedAt = Date.now();
 					const bytes = await page.screenshot({ type: "png" });
+					phases.screenshotMs = Date.now() - screenshotStartedAt;
 					output.screenshot = {
 						base64: bytes.toString("base64"),
 						mimeType: "image/png",
 					};
 				}
 
+				await emitTiming("success");
 				return { ok: true, ...output };
 			} catch (err) {
+				await emitTiming("error");
 				return {
 					ok: false,
 					error:

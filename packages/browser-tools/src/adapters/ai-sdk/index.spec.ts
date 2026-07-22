@@ -201,6 +201,84 @@ test("createAiSdkBrowserTools forwards domain policy options", async () => {
 	await toolkit.dispose();
 });
 
+test("browser tools report phase timing without page content", async () => {
+	const timings: unknown[] = [];
+	const toolkit = createAiSdkBrowserTools(
+		new LocalBrowserProvider({ headless: true }),
+		{
+			pageStability: { timeoutMs: 500, minimumWaitMs: 0 },
+			onTiming: (event) => {
+				timings.push(event);
+			},
+		},
+	);
+	const sessionId = await openSession(
+		toolkit.tools,
+		"data:text/html,<main><h1>Timing marker</h1></main>",
+	);
+	await callTool(toolkit.tools, "browser_snapshot", { sessionId });
+	await callTool(toolkit.tools, "browser_exec", {
+		sessionId,
+		code: "return await page.title();",
+	});
+
+	expect(timings).toEqual([
+		expect.objectContaining({
+			tool: "browser_snapshot",
+			durationMs: expect.any(Number),
+			phases: expect.objectContaining({
+				stabilityMs: expect.any(Number),
+				snapshotMs: expect.any(Number),
+			}),
+			outcome: "success",
+		}),
+		expect.objectContaining({
+			tool: "browser_exec",
+			durationMs: expect.any(Number),
+			phases: expect.objectContaining({
+				baselineSnapshotMs: expect.any(Number),
+				executionMs: expect.any(Number),
+				stabilityMs: expect.any(Number),
+				snapshotMs: expect.any(Number),
+			}),
+			outcome: "success",
+		}),
+	]);
+	expect(JSON.stringify(timings)).not.toContain("Timing marker");
+	await toolkit.dispose();
+});
+
+test("browser_exec can skip its automatic post-exec snapshot", async () => {
+	const timings: unknown[] = [];
+	const toolkit = createAiSdkBrowserTools(
+		new LocalBrowserProvider({ headless: true }),
+		{
+			captureExecSnapshotDiff: false,
+			onTiming: (event) => {
+				timings.push(event);
+			},
+		},
+	);
+	const sessionId = await openSession(
+		toolkit.tools,
+		"data:text/html,<title>fast exec</title>",
+	);
+	const result = await callTool(toolkit.tools, "browser_exec", {
+		sessionId,
+		code: "return await page.title();",
+	});
+
+	expect(result).toMatchObject({ ok: true, result: "fast exec", snapshotDiff: "" });
+	expect(timings).toEqual([
+		expect.objectContaining({
+			tool: "browser_exec",
+			phases: { executionMs: expect.any(Number) },
+			outcome: "success",
+		}),
+	]);
+	await toolkit.dispose();
+});
+
 test("browser_exec runs Playwright code against the opened page", async ({
 	toolkit,
 }) => {
