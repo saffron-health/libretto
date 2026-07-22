@@ -22,3 +22,5 @@ When adding a transport, filter incoming messages to valid IPC protocol messages
 `createIpcPeer` serializes handler throws into rejected call promises. Callers should usually let those rejections propagate instead of wrapping them in subsystem-specific error adapters.
 
 Use explicit result shapes only when failure is part of the method contract. For example, daemon `exec` and `readonlyExec` return user-code failures as `{ ok: false, message, output }` so CLI callers can preserve captured stdout and stderr.
+
+Internal TypeScript may return `T | SpecificError` (see root `AGENTS.md` "Errors as values"). Do not replace these IPC result envelopes with bare `Error` returns over the wire — map typed errors to `{ ok: false, message, ... }` at the daemon boundary when failure is part of the contract.
