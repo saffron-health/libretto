@@ -24,7 +24,8 @@ const test = base.extend<{
 			if (request.url === "/login") {
 				response.writeHead(302, {
 					location: "/dashboard",
-					"set-cookie": "session=valid; HttpOnly; Path=/; SameSite=Lax",
+					"set-cookie":
+						"session=valid; HttpOnly; Path=/; SameSite=Lax; Max-Age=3600",
 				});
 				response.end();
 				return;
