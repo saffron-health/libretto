@@ -166,6 +166,9 @@ export class LocalBrowserProvider implements BrowserProvider {
 						authProfilePath,
 						{
 							...launchOptions,
+							...(this.headless && !this.channel
+								? { channel: "chromium" }
+								: {}),
 							args: [
 								...launchOptions.args,
 								"--restore-last-session",
