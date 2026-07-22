@@ -130,10 +130,11 @@ export default workflow(
   this when you do not pass `--viewport` on the CLI.
 </ParamField>
 
-These fields are stored in deploy metadata. Hosted jobs and schedules inherit
-them from the deployed workflow. Override them for a single run with
+These fields are stored in deploy metadata. Prefer declaring them on the
+workflow rather than repeating flags on every job. Until the hosted executor
+reads that metadata, pass the same values with
 `libretto cloud jobs create --start-url ... --gpu --viewport WxH` (or the
-matching schedule flags).
+matching schedule flags) when a hosted run needs them.
 
 ---
 

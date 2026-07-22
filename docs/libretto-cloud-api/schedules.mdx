@@ -35,7 +35,7 @@ Request fields:
 
 If you set `callback_url`, you must also set `callback_secret`.
 
-Prefer declaring `startUrl`, `gpu`, and `viewport` on the workflow definition so schedule fires inherit them. Use the schedule-level fields only for one-off overrides.
+Prefer declaring `startUrl`, `gpu`, and `viewport` on the workflow definition so they travel with the deploy artifact. Use the schedule-level fields when you need a one-off override, or until the hosted executor applies workflow launch metadata automatically.
 
 Use `residential_proxy` for recurring workflows that need traffic to originate from a specific residential proxy country, US state, city, ZIP code, or ASN. See [Residential proxy locations](/libretto-cloud-hosting/stealth#residential-proxy-locations) for the supported fields and combination rules.
 
