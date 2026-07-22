@@ -1,3 +1,10 @@
+import * as errore from "errore";
+
+export class AuthProfileError extends errore.createTaggedError({
+	name: "AuthProfileError",
+	message: "$message $recovery",
+}) {}
+
 /**
  * Every provider reduces to "produce a CDP endpoint"; the session registry
  * connects Playwright to it. Provider-level settings (API keys, regions,
@@ -5,6 +12,7 @@
  * fallback. Per-session launch options go on createSession.
  */
 export type ProviderSessionCreateOptions = {
+	authProfile?: string;
 	startUrl?: string;
 	gpu?: boolean;
 	viewport?: { width: number; height: number };
@@ -13,9 +21,11 @@ export type ProviderSessionCreateOptions = {
 export type BrowserProvider = {
 	/** Shown in `status` output, e.g. "local", "kernel". */
 	readonly name: string;
+	/** Whether this provider can restore and persist named auth profiles. */
+	readonly supportsAuthProfiles?: boolean;
 	createSession(
 		options?: ProviderSessionCreateOptions,
-	): Promise<ProviderSession>;
+	): Promise<AuthProfileError | ProviderSession>;
 	closeSession(sessionId: string): Promise<ProviderSessionClosed>;
 }
 

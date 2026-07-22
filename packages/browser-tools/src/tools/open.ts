@@ -11,6 +11,13 @@ const openInputSchema = z.object({
 			"Optional start URL for the session. Providers that support create-time " +
 				"navigation open it before CDP attach; others navigate after connect.",
 		),
+	authProfile: z
+		.string()
+		.min(1)
+		.optional()
+		.describe(
+			"Optional auth profile to restore for this session and save when it closes.",
+		),
 });
 
 export type OpenToolInput = z.infer<typeof openInputSchema>;
@@ -33,14 +40,18 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 		name: "browser_open",
 		description:
 			"Open a new browser session. Optionally opens `url` at session create " +
-			"(or after connect when the provider cannot preload). " +
+			"(or after connect when the provider cannot preload) and restores `authProfile`. " +
+			"Profile changes save when the session closes. " +
 			"Returns a `sessionId` to pass to subsequent browser tools.",
 		inputSchema: openInputSchema,
-		async execute({ url }): Promise<ToolResult<OpenToolOutput>> {
+		async execute({ url, authProfile }): Promise<ToolResult<OpenToolOutput>> {
 			const startUrl = url?.trim() || undefined;
-			const { sessionId, startUrlPreloaded } = await registry.openSession(
-				startUrl ? { startUrl } : {},
-			);
+			const opened = await registry.openSession({
+				authProfile,
+				...(startUrl ? { startUrl } : {}),
+			});
+			if (opened instanceof Error) return { ok: false, error: opened.message };
+			const { sessionId, startUrlPreloaded } = opened;
 			if (startUrl !== undefined && !startUrlPreloaded) {
 				const page = registry.getCurrentPage(sessionId);
 				try {

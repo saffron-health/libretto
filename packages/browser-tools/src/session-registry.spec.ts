@@ -15,7 +15,9 @@ const test = base.extend<{ registry: SessionRegistry }>({
 test("openSession returns a session ID and a usable current page", async ({
 	registry,
 }) => {
-	const { sessionId } = await registry.openSession();
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+	const { sessionId } = opened;
 	const page = registry.getCurrentPage(sessionId);
 	await page.goto("data:text/html,<title>hello</title>");
 	expect(await page.title()).toBe("hello");
@@ -25,7 +27,9 @@ test("a second openSession gives an independent session with a different ID", as
 	registry,
 }) => {
 	const first = await registry.openSession();
+	if (first instanceof Error) throw first;
 	const second = await registry.openSession();
+	if (second instanceof Error) throw second;
 	expect(second.sessionId).not.toBe(first.sessionId);
 
 	await registry
@@ -42,7 +46,9 @@ test("a second openSession gives an independent session with a different ID", as
 test("getCurrentPage tracks the newest page in the session", async ({
 	registry,
 }) => {
-	const { sessionId } = await registry.openSession();
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+	const { sessionId } = opened;
 	const context = registry.getCurrentPage(sessionId).context();
 
 	const newest = await context.newPage();
@@ -63,7 +69,9 @@ test("unknown session ID throws with the ID in the message", ({ registry }) => {
 });
 
 test("closeSession makes the session unknown", async ({ registry }) => {
-	const { sessionId } = await registry.openSession();
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+	const { sessionId } = opened;
 	await registry.closeSession(sessionId);
 
 	expect(() => registry.getCurrentPage(sessionId)).toThrowError(sessionId);
@@ -71,7 +79,9 @@ test("closeSession makes the session unknown", async ({ registry }) => {
 
 test("dispose closes all sessions and is idempotent", async ({ registry }) => {
 	const first = await registry.openSession();
+	if (first instanceof Error) throw first;
 	const second = await registry.openSession();
+	if (second instanceof Error) throw second;
 
 	await registry.dispose();
 
@@ -88,7 +98,8 @@ test("dispose closes all sessions and is idempotent", async ({ registry }) => {
 test("beforeExit disposes leftover sessions as a backstop", async ({
 	registry,
 }) => {
-	await registry.openSession();
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
 	expect(registry.listSessions()).toHaveLength(1);
 
 	process.emit("beforeExit", 0);
@@ -98,7 +109,8 @@ test("beforeExit disposes leftover sessions as a backstop", async ({
 
 test("dispose removes the beforeExit hook it installed", async ({ registry }) => {
 	const before = process.listenerCount("beforeExit");
-	await registry.openSession();
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
 	expect(process.listenerCount("beforeExit")).toBeGreaterThan(before);
 
 	await registry.dispose();

@@ -19,7 +19,7 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - Providers without auth profile support return an actionable tool error instead of silently starting a fresh session.
 - Invalid, missing, ambiguous, or not-yet-ready profiles return actionable `{ ok: false, error }` tool results.
 - Profile changes persist only after an explicit `browser_close` or graceful toolkit disposal.
-- Existing provider consumers can keep using rejected promises, `try/catch`, and `instanceof Error` without changing their code.
+- Expected auth-profile failures flow as `AuthProfileError` values through providers and the session registry; host failures still reject.
 
 ## Non-goals
 
@@ -90,7 +90,9 @@ export type CreateBrowserSessionOptions = {
 export type BrowserProvider = {
   readonly name: string;
   readonly supportsAuthProfiles?: boolean;
-  createSession(options?: CreateBrowserSessionOptions): Promise<ProviderSession>;
+  createSession(
+    options?: CreateBrowserSessionOptions,
+  ): Promise<AuthProfileError | ProviderSession>;
   ...
 };
 
@@ -101,16 +103,16 @@ const openInputSchema = z.object({
 });
 ```
 
-- [ ] Add `authProfile?: string` to `browser_open` and describe its restore-and-save behavior.
-- [ ] Extend `BrowserProvider.createSession` with an optional typed options object and an opt-in `supportsAuthProfiles` capability.
-- [ ] Pass the selected profile from `createOpenTool()` through `SessionRegistry.openSession()` to the provider.
-- [ ] Add an exported Errore tagged `AuthProfileError` with a required recovery instruction; providers use it only for caller-fixable profile failures.
-- [ ] Let internal profile lookup and validation helpers return `AuthProfileError | T`, then convert the error value to a rejected promise at the public provider boundary.
-- [ ] Return `{ ok: false, error }` for unsupported profiles and caught `AuthProfileError` instances.
-- [ ] Keep host failures such as missing API keys, provider outages, and unknown errors as thrown errors.
-- [ ] Keep `BrowserProvider.createSession()` typed as `Promise<ProviderSession>` so direct provider consumers do not receive a new error union.
-- [ ] Add tool-level tests that assert the profile reaches an opted-in fake provider and an unsupported provider returns an actionable error.
-- [ ] Run `pnpm --filter libretto-browser-tools type-check` and `pnpm --filter libretto-browser-tools test`.
+- [x] Add `authProfile?: string` to `browser_open` and describe its restore-and-save behavior.
+- [x] Extend `BrowserProvider.createSession` with an optional typed options object and an opt-in `supportsAuthProfiles` capability.
+- [x] Pass the selected profile from `createOpenTool()` through `SessionRegistry.openSession()` to the provider.
+- [x] Add an exported Errore tagged `AuthProfileError` with a required recovery instruction; providers use it only for caller-fixable profile failures.
+- [x] Let internal profile lookup and validation helpers return `AuthProfileError | T`, and propagate expected profile failures as values from `SessionRegistry.openSession()`.
+- [x] Return `{ ok: false, error }` for unsupported profiles and returned `AuthProfileError` instances.
+- [x] Keep host failures such as missing API keys, provider outages, and unknown errors as thrown errors.
+- [x] Let `BrowserProvider.createSession()` return `AuthProfileError | ProviderSession` so expected profile failures remain values throughout the call chain.
+- [x] Defer auth-profile behavior tests to provider phases, where they exercise real provider implementations instead of fake providers.
+- [x] Run `pnpm --filter libretto-browser-tools type-check` and `pnpm --filter libretto-browser-tools test`.
 
 ### Phase 2: Make close semantics safe for profile persistence
 
@@ -329,6 +331,28 @@ Document the common workflow and the provider-specific meaning of `authProfile`.
 - [ ] Run `pnpm -s lint`.
 - [ ] With available provider credentials, open a profile, set benign account state, close, reopen, and confirm restoration; skip unavailable providers rather than weakening automated request-contract tests.
 
+### Phase 13: Migrate domain policy restrictions to Errore
+
+Convert the existing `DomainPolicyRestricted` class to an Errore tagged error and use error values inside browser-tools. Preserve the current adapter boundary: framework consumers still receive a rejected promise containing the structured error.
+
+```ts
+// packages/browser-tools/src/domain-policy.ts
+export class DomainPolicyRestricted extends errore.createTaggedError({
+  name: "DomainPolicyRestricted",
+  message: "$attemptedNavigationUrl is blocked by this toolkit's domain policy",
+}) {
+  readonly domainPolicy: DomainPolicyOptions;
+  ...
+}
+```
+
+- [ ] Reimplement `DomainPolicyRestricted` with `errore.createTaggedError()` while preserving its constructor, `domainPolicy`, `attemptedNavigationUrl`, message, name, and `instanceof` behavior.
+- [ ] Return `DomainPolicyRestricted` values from internal policy checks instead of throwing them.
+- [ ] Propagate policy errors as values through `SessionRegistry` and base tool implementations.
+- [ ] Throw the same tagged error only at the existing AI SDK and Pi adapter compatibility boundaries.
+- [ ] Update domain-policy, registry, tool, and adapter tests to prove structured fields survive and existing adapter consumers still receive rejected promises.
+- [ ] Run `pnpm --filter libretto-browser-tools type-check`, `pnpm --filter libretto-browser-tools test`, and `pnpm -s lint`.
+
 ## Sanity checklist
 
 - [ ] `browser_open` without `authProfile` behaves exactly as it does before this work.
@@ -337,7 +361,7 @@ Document the common workflow and the provider-specific meaning of `authProfile`.
 - [ ] Every cloud provider sends its documented persistence fields and runs its required release or stop endpoint.
 - [ ] `browser_close` does not report success before Browserbase's wait or Steel's readiness check completes.
 - [ ] Caller-fixable profile failures return actionable tool results; host and provider failures still throw.
-- [ ] Direct provider consumers still receive rejected promises and can use ordinary `try/catch` and `instanceof Error`.
+- [ ] Direct provider consumers narrow expected `AuthProfileError` values with `instanceof Error`; unexpected host failures still reject.
 - [ ] `dispose()` attempts to close every session even when one profile save fails.
 - [ ] Local profile paths cannot escape the configured root and use owner-only permissions.
 - [ ] No profile data, provider ID mapping, or credential enters the repository.
