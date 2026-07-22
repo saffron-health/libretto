@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { expect, test as base } from "vitest";
 import { LocalBrowserProvider } from "../../providers/local.js";
 import {
@@ -60,7 +61,7 @@ test("MCP clients discover all six browser tools with safety annotations", async
 		readOnlyHint: true,
 		destructiveHint: false,
 		idempotentHint: true,
-		openWorldHint: false,
+		openWorldHint: true,
 	});
 	expect(
 		listed.tools.find((tool) => tool.name === "browser_exec")?.annotations,
@@ -70,16 +71,25 @@ test("MCP clients discover all six browser tools with safety annotations", async
 		idempotentHint: false,
 		openWorldHint: true,
 	});
+	expect(
+		listed.tools.find((tool) => tool.name === "browser_connect")?.annotations,
+	).toMatchObject({
+		readOnlyHint: false,
+		destructiveHint: false,
+		idempotentHint: false,
+		openWorldHint: true,
+	});
 });
 
 test("MCP clients can open a browser and run Playwright against it", async ({
 	mcp,
 }) => {
-	const opened = await mcp.client.callTool({
-		name: "browser_open",
-		arguments: { url: "data:text/html,<title>hello from mcp</title>" },
-	});
-	if (!("content" in opened)) throw new Error("Expected an MCP tool result");
+	const opened = CallToolResultSchema.parse(
+		await mcp.client.callTool({
+			name: "browser_open",
+			arguments: { url: "data:text/html,<title>hello from mcp</title>" },
+		}),
+	);
 	const openedText = opened.content.find((content) => content.type === "text");
 	if (openedText?.type !== "text") throw new Error("Expected text content");
 	const openedDetails = JSON.parse(openedText.text) as {
@@ -91,14 +101,15 @@ test("MCP clients can open a browser and run Playwright against it", async ({
 		sessionId: expect.any(String),
 	});
 
-	const executed = await mcp.client.callTool({
-		name: "browser_exec",
-		arguments: {
-			sessionId: openedDetails.sessionId,
-			code: "return await page.title();",
-		},
-	});
-	if (!("content" in executed)) throw new Error("Expected an MCP tool result");
+	const executed = CallToolResultSchema.parse(
+		await mcp.client.callTool({
+			name: "browser_exec",
+			arguments: {
+				sessionId: openedDetails.sessionId,
+				code: "return await page.title();",
+			},
+		}),
+	);
 	const executedText = executed.content.find(
 		(content) => content.type === "text",
 	);
@@ -110,20 +121,22 @@ test("MCP clients can open a browser and run Playwright against it", async ({
 });
 
 test("MCP snapshots return screenshots as image content", async ({ mcp }) => {
-	const opened = await mcp.client.callTool({
-		name: "browser_open",
-		arguments: { url: "data:text/html,<main>hello</main>" },
-	});
-	if (!("content" in opened)) throw new Error("Expected an MCP tool result");
+	const opened = CallToolResultSchema.parse(
+		await mcp.client.callTool({
+			name: "browser_open",
+			arguments: { url: "data:text/html,<main>hello</main>" },
+		}),
+	);
 	const openedText = opened.content.find((content) => content.type === "text");
 	if (openedText?.type !== "text") throw new Error("Expected text content");
 	const { sessionId } = JSON.parse(openedText.text) as { sessionId: string };
 
-	const snapshot = await mcp.client.callTool({
-		name: "browser_snapshot",
-		arguments: { sessionId, screenshot: true },
-	});
-	if (!("content" in snapshot)) throw new Error("Expected an MCP tool result");
+	const snapshot = CallToolResultSchema.parse(
+		await mcp.client.callTool({
+			name: "browser_snapshot",
+			arguments: { sessionId, screenshot: true },
+		}),
+	);
 	expect(snapshot.content).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({ type: "text" }),
@@ -139,14 +152,15 @@ test("MCP snapshots return screenshots as image content", async ({ mcp }) => {
 test("MCP tool failures set isError and give the agent a next step", async ({
 	mcp,
 }) => {
-	const result = await mcp.client.callTool({
-		name: "browser_exec",
-		arguments: {
-			sessionId: "ses-missing",
-			code: "return await page.title();",
-		},
-	});
-	if (!("content" in result)) throw new Error("Expected an MCP tool result");
+	const result = CallToolResultSchema.parse(
+		await mcp.client.callTool({
+			name: "browser_exec",
+			arguments: {
+				sessionId: "ses-missing",
+				code: "return await page.title();",
+			},
+		}),
+	);
 	const text = result.content.find((content) => content.type === "text");
 	if (text?.type !== "text") throw new Error("Expected text content");
 

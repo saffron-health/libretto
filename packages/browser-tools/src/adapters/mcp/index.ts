@@ -15,7 +15,7 @@ export type McpBrowserToolkit = {
 	dispose(): Promise<void>;
 };
 
-const READ_ONLY_ANNOTATIONS: ToolAnnotations = {
+const READ_ONLY_CLOSED_WORLD_ANNOTATIONS: ToolAnnotations = {
 	readOnlyHint: true,
 	destructiveHint: false,
 	idempotentHint: true,
@@ -131,7 +131,12 @@ export function registerMcpBrowserTools(
 		{
 			description: browser_snapshot.description,
 			inputSchema: browser_snapshot.inputSchema,
-			annotations: READ_ONLY_ANNOTATIONS,
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: true,
+			},
 		},
 		async (input) => snapshotResult(await browser_snapshot.execute(input)),
 	);
@@ -141,7 +146,7 @@ export function registerMcpBrowserTools(
 		{
 			description: browser_status.description,
 			inputSchema: browser_status.inputSchema,
-			annotations: READ_ONLY_ANNOTATIONS,
+			annotations: READ_ONLY_CLOSED_WORLD_ANNOTATIONS,
 		},
 		async (input) => textResult(await browser_status.execute(input)),
 	);
@@ -167,7 +172,7 @@ export function registerMcpBrowserTools(
 			description: browser_connect.description,
 			inputSchema: browser_connect.inputSchema,
 			annotations: {
-				readOnlyHint: true,
+				readOnlyHint: false,
 				destructiveHint: false,
 				idempotentHint: false,
 				openWorldHint: true,
