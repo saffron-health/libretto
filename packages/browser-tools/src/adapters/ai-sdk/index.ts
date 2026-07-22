@@ -6,6 +6,7 @@ import {
 } from "../../create-browser-tools.js";
 import type { BrowserToolkitOptions } from "../../create-browser-tools.js";
 import type { BrowserProvider } from "../../provider.js";
+import type { BrowserCleanupError } from "../../session-registry.js";
 import { snapshotToModelOutput } from "./snapshot-to-model-output.js";
 
 /**
@@ -18,7 +19,7 @@ export function createAiSdkBrowserTools(
 	options: BrowserToolkitOptions = {},
 ): {
 	tools: ToolSet;
-	dispose(): Promise<void>;
+	dispose(): Promise<BrowserCleanupError | null>;
 } {
 	const base = createBrowserTools(provider, options);
 	const {
@@ -70,7 +71,7 @@ export function createAiSdkBrowserTools(
 export function createAiSdkBrowserToolsForPage(page: Page): {
 	sessionId: string;
 	tools: ToolSet;
-	dispose(): Promise<void>;
+	dispose(): Promise<BrowserCleanupError | null>;
 } {
 	const base = createBrowserToolsForPage(page);
 	const { browser_exec, browser_snapshot, browser_status } = base.tools;

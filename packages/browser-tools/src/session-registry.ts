@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import * as errore from "errore";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { chromium } from "playwright";
 import type { DomainPolicyOptions } from "./domain-policy.js";
@@ -6,13 +7,51 @@ import {
 	DomainPolicyRestricted,
 	isUrlAllowed,
 } from "./domain-policy.js";
+import { errorMessage } from "./errors.js";
 import type { Snapshot } from "./snapshot/capture-snapshot.js";
 import { snapshot as captureSnapshot } from "./snapshot/capture-snapshot.js";
 import {
 	AuthProfileError,
+	ProviderCloseError,
 	type BrowserProvider,
 	type ProviderSessionCreateOptions,
 } from "./provider.js";
+
+export class BrowserCloseError extends errore.createTaggedError({
+	name: "BrowserCloseError",
+	message: "Failed to disconnect $session: $detail $recovery",
+}) {}
+
+export type BrowserCleanupError =
+	| AggregateError
+	| BrowserCloseError
+	| ProviderCloseError;
+
+function aggregateErrors(
+	errors: readonly Error[],
+	message: string,
+): BrowserCleanupError | null {
+	if (errors.length === 0) return null;
+	if (errors.length === 1) {
+		const [error] = errors;
+		return error instanceof ProviderCloseError ||
+			error instanceof BrowserCloseError ||
+			error instanceof AggregateError
+			? error
+			: new AggregateError([error], message);
+	}
+	return new AggregateError(errors, message);
+}
+
+export function browserCleanupErrorMessage(error: Error): string {
+	if (!(error instanceof AggregateError)) return error.message;
+	const details = error.errors.map((nestedError) =>
+		nestedError instanceof Error
+			? browserCleanupErrorMessage(nestedError)
+			: errorMessage(nestedError),
+	);
+	return `${error.message} ${details.join(" ")}`;
+}
 
 function validateAuthProfile(
 	provider: BrowserProvider,
@@ -138,9 +177,43 @@ export class SessionRegistry {
 				startUrlPreloaded: Boolean(providerSession.startUrlPreloaded),
 			};
 		} catch (error) {
-			await browser?.close().catch(() => {});
-			await provider.closeSession(providerSession.sessionId).catch(() => {});
-			throw error;
+			const providerResult = await provider
+				.closeSession(providerSession.sessionId)
+				.catch(
+					(cause: unknown) =>
+						new ProviderCloseError({
+							provider: provider.name,
+							providerSessionId: providerSession.sessionId,
+							detail: errorMessage(cause),
+							recovery:
+								"Ask the toolkit developer to fix closeSession so it returns ProviderCloseError values, then close the provider session manually.",
+							cause,
+						}),
+				);
+			const connectedBrowser = browser?.isConnected() === true ? browser : null;
+			const browserResult =
+				(await connectedBrowser
+					?.close()
+					.then(() => null)
+					.catch(
+						(cause: unknown) =>
+							new BrowserCloseError({
+								session: `provider session ${providerSession.sessionId}`,
+								detail: errorMessage(cause),
+								recovery:
+									"Call browser_status to confirm the session is gone, then use browser_open for a new session.",
+								cause,
+							}),
+					)) ?? null;
+			const [, cleanupErrors] = errore.partition([
+				providerResult,
+				browserResult,
+			]);
+			if (cleanupErrors.length === 0) throw error;
+			throw new AggregateError(
+				[error, ...cleanupErrors],
+				"Browser session setup and cleanup both failed.",
+			);
 		}
 	}
 
@@ -166,7 +239,24 @@ export class SessionRegistry {
 			this.installBeforeExitHook();
 			return { sessionId };
 		} catch (error) {
-			await browser.close().catch(() => {});
+			const browserResult = await browser
+				.close()
+				.then(() => null)
+				.catch((cause: unknown) =>
+					new BrowserCloseError({
+						session: "attached browser",
+						detail: errorMessage(cause),
+						recovery:
+							"Call browser_status to confirm the session is gone, then use browser_open for a new session.",
+						cause,
+					}),
+				);
+			if (browserResult instanceof Error) {
+				throw new AggregateError(
+					[error, browserResult],
+					"Browser connection setup and cleanup both failed.",
+				);
+			}
 			throw error;
 		}
 	}
@@ -242,15 +332,48 @@ export class SessionRegistry {
 		};
 	}
 
-	async closeSession(sessionId: string): Promise<void> {
+	async closeSession(sessionId: string): Promise<BrowserCleanupError | null> {
 		const entry = this.requireSession(sessionId);
 		this.sessions.delete(sessionId);
 		this.releaseSessionEntry(entry);
-		if (entry.sessionSource === "existing-page") return;
-		await entry.browser.close();
-		if (entry.sessionSource === "new-session" && entry.providerSessionId) {
-			await this.provider?.closeSession(entry.providerSessionId);
-		}
+		if (entry.sessionSource === "existing-page") return null;
+
+		const provider = this.provider;
+		const providerSessionId = entry.providerSessionId;
+		const providerResult =
+			entry.sessionSource === "new-session" && providerSessionId && provider
+				? await provider.closeSession(providerSessionId).catch(
+						(cause: unknown) =>
+							new ProviderCloseError({
+								provider: provider.name,
+								providerSessionId,
+								detail: errorMessage(cause),
+								recovery:
+									"Ask the toolkit developer to fix closeSession so it returns ProviderCloseError values, then close the provider session manually.",
+								cause,
+							}),
+					)
+				: null;
+		const browserResult = entry.browser.isConnected()
+			? await entry.browser
+					.close()
+					.then(() => null)
+					.catch(
+						(cause: unknown) =>
+							new BrowserCloseError({
+								session: sessionId,
+								detail: errorMessage(cause),
+								recovery:
+									"Call browser_status to confirm the session is gone, then use browser_open for a new session.",
+								cause,
+							}),
+					)
+			: null;
+		const [, errors] = errore.partition([providerResult, browserResult]);
+		return aggregateErrors(
+			errors,
+			`Failed to fully close session "${sessionId}".`,
+		);
 	}
 
 	/** Baseline for the next exec diff — cached post-exec snapshot or a fresh capture. */
@@ -291,12 +414,14 @@ export class SessionRegistry {
 		return error;
 	}
 
-	async dispose(): Promise<void> {
+	async dispose(): Promise<BrowserCleanupError | null> {
 		this.removeBeforeExitHook();
 		const sessionIds = [...this.sessions.keys()];
-		for (const sessionId of sessionIds) {
-			await this.closeSession(sessionId);
-		}
+		const results = await Promise.all(
+			sessionIds.map((sessionId) => this.closeSession(sessionId)),
+		);
+		const [, errors] = errore.partition(results);
+		return aggregateErrors(errors, "Failed to close all browser sessions.");
 	}
 
 	/**
@@ -317,7 +442,21 @@ export class SessionRegistry {
 	}
 
 	private readonly handleBeforeExit = (): void => {
-		void this.dispose();
+		void this.dispose().then(
+			(result) => {
+				if (result instanceof Error) {
+					console.error(
+						"Failed to dispose browser sessions before exit:",
+						result,
+					);
+				}
+			},
+			(error: unknown) => {
+				console.error(
+					`Unexpected failure while disposing browser sessions before exit: ${errorMessage(error)}`,
+				);
+			},
+		);
 	};
 
 	private async applyDomainPolicy(context: BrowserContext): Promise<void> {

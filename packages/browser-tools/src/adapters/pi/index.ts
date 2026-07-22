@@ -8,12 +8,13 @@ import {
 	type BrowserToolkitOptions,
 } from "../../create-browser-tools.js";
 import type { BrowserProvider } from "../../provider.js";
+import type { BrowserCleanupError } from "../../session-registry.js";
 import type { BrowserTool, ToolResult } from "../../tool.js";
 import type { SnapshotToolOutput } from "../../tools/snapshot.js";
 
 export type PiBrowserToolkit = {
 	tools: ToolDefinition[];
-	dispose(): Promise<void>;
+	dispose(): Promise<BrowserCleanupError | null>;
 };
 
 type PiToolContent =
