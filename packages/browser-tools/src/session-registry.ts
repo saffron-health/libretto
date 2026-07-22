@@ -145,6 +145,7 @@ export class SessionRegistry {
 		if (
 			startUrl !== undefined &&
 			hasDomainPolicy &&
+			URL.canParse(startUrl) &&
 			!isUrlAllowed(startUrl, this.domainPolicy)
 		) {
 			throw new DomainPolicyRestricted(this.domainPolicy, startUrl);
