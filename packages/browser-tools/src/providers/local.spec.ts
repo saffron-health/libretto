@@ -140,8 +140,8 @@ test("local auth profiles restore login state after browser_close", async ({
 	const changed = await toolkit.tools.browser_exec.execute({
 		sessionId: loginSession.sessionId,
 		code:
-			"localStorage.setItem('workspace', 'saved'); " +
-			"return document.querySelector('main')?.textContent;",
+			"await page.evaluate(() => localStorage.setItem('workspace', 'saved')); " +
+			"return await page.locator('main').textContent();",
 	});
 	expect(changed).toMatchObject({
 		ok: true,
@@ -161,8 +161,8 @@ test("local auth profiles restore login state after browser_close", async ({
 	const restored = await toolkit.tools.browser_exec.execute({
 		sessionId: restoredSession.sessionId,
 		code:
-			"return { dashboard: document.querySelector('main')?.textContent, " +
-			"workspace: localStorage.getItem('workspace') };",
+			"return { dashboard: await page.locator('main').textContent(), " +
+			"workspace: await page.evaluate(() => localStorage.getItem('workspace')) };",
 	});
 	expect(restored).toMatchObject({
 		ok: true,
@@ -198,7 +198,9 @@ test("local auth profiles isolate login state by name", async ({
 	if (!workSession.ok) throw new Error(workSession.error);
 	const changed = await toolkit.tools.browser_exec.execute({
 		sessionId: workSession.sessionId,
-		code: "localStorage.setItem('workspace', 'work'); return true;",
+		code:
+			"await page.evaluate(() => localStorage.setItem('workspace', 'work')); " +
+			"return true;",
 	});
 	expect(changed).toMatchObject({ ok: true, result: true });
 	expect(
@@ -215,8 +217,8 @@ test("local auth profiles isolate login state by name", async ({
 	const isolated = await toolkit.tools.browser_exec.execute({
 		sessionId: personalSession.sessionId,
 		code:
-			"return { dashboard: document.querySelector('main')?.textContent, " +
-			"workspace: localStorage.getItem('workspace') };",
+			"return { dashboard: await page.locator('main').textContent(), " +
+			"workspace: await page.evaluate(() => localStorage.getItem('workspace')) };",
 	});
 	expect(isolated).toMatchObject({
 		ok: true,
