@@ -65,11 +65,11 @@ export default workflow(
   {
     input: inputSchema,
     output: outputSchema,
+    startUrl: "https://example.com/search",
   },
   async (ctx, input) => {
     const { page } = ctx;
 
-    await page.goto("https://example.com/search");
     await page.fill("#query", input.query);
     await page.click("#submit");
     await page.waitForSelector(".results");
@@ -92,6 +92,49 @@ npx libretto run ./my-workflow.ts
 ```
 
 The CLI compiles the file with `tsx`, launches a Chromium browser, and calls your handler with the session context it constructs.
+
+#### Browser launch options
+
+Always declare `startUrl` on every workflow. It is the entry URL Libretto opens before the handler runs. Kernel and Libretto Cloud preload it at browser create time (before CDP attach). Browserbase and Steel open it immediately after CDP connect.
+
+```typescript theme={null}
+export default workflow(
+  "bookMarriott",
+  {
+    input: z.object({ checkIn: z.string() }),
+    output: z.object({ confirmation: z.string() }),
+    startUrl: "https://www.marriott.com/",
+    gpu: true,
+    viewport: { width: 1440, height: 900 },
+  },
+  async (ctx, input) => {
+    // Browser is already on startUrl — do not page.goto the same URL here.
+  },
+);
+```
+
+<ParamField path="startUrl" type="string">
+  Entry URL for the workflow. Declare this on every workflow. Libretto opens it
+  before the handler runs. On Kernel, Libretto sends it as `start_url` at
+  session create time and does not navigate again after connect. Prefer this
+  over an initial `page.goto` in the handler.
+</ParamField>
+
+<ParamField path="gpu" type="boolean">
+  Request a GPU-accelerated browser when the provider supports it. Prefer
+  declaring this per workflow; GPU is expensive to leave on by default.
+</ParamField>
+
+<ParamField path="viewport" type="{ width: number; height: number }">
+  Browser viewport for the session. Hosted jobs and Kernel provider runs use
+  this when you do not pass `--viewport` on the CLI.
+</ParamField>
+
+These fields are stored in deploy metadata. Prefer declaring them on the
+workflow rather than repeating flags on every job. Until the hosted executor
+reads that metadata, pass the same values with
+`libretto cloud jobs create --start-url ... --gpu --viewport WxH` (or the
+matching schedule flags) when a hosted run needs them.
 
 ---
 

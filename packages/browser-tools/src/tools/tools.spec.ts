@@ -119,6 +119,38 @@ test("browser_open reports a blocked top-level navigation as a domain policy err
 	await registry.dispose();
 });
 
+test("browser_open does not create a provider session for a blocked start URL", async () => {
+	let created = false;
+	const registry = new SessionRegistry(
+		{
+			name: "preload",
+			async createSession() {
+				created = true;
+				return {
+					sessionId: "provider-session",
+					cdpEndpoint: "ws://127.0.0.1:1",
+					startUrlPreloaded: true,
+				};
+			},
+			async closeSession() {
+				return {};
+			},
+		},
+		{ blockedDomains: ["example.com"] },
+	);
+
+	await expect(
+		createOpenTool(registry).execute({
+			url: "https://example.com/",
+		}),
+	).rejects.toMatchObject({
+		name: "DomainPolicyRestricted",
+		attemptedNavigationUrl: "https://example.com/",
+	});
+	expect(created).toBe(false);
+	await registry.dispose();
+});
+
 test("browser_open closes provider sessions when browser setup fails", async () => {
 	let closedSessionId: string | undefined;
 	const registry = new SessionRegistry({

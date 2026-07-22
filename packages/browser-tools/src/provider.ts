@@ -5,22 +5,26 @@ export class AuthProfileError extends errore.createTaggedError({
 	message: "$message $recovery",
 }) {}
 
-export type CreateBrowserSessionOptions = {
-	authProfile?: string;
-}
-
 /**
  * Every provider reduces to "produce a CDP endpoint"; the session registry
- * connects Playwright to it. Provider-specific settings (API keys, regions)
- * live in each provider's constructor, with env-var fallback.
+ * connects Playwright to it. Provider-level settings (API keys, regions,
+ * default headless/stealth) live in each provider's constructor, with env-var
+ * fallback. Per-session launch options go on createSession.
  */
+export type ProviderSessionCreateOptions = {
+	authProfile?: string;
+	startUrl?: string;
+	gpu?: boolean;
+	viewport?: { width: number; height: number };
+}
+
 export type BrowserProvider = {
 	/** Shown in `status` output, e.g. "local", "kernel". */
 	readonly name: string;
 	/** Whether this provider can restore and persist named auth profiles. */
 	readonly supportsAuthProfiles?: boolean;
 	createSession(
-		options?: CreateBrowserSessionOptions,
+		options?: ProviderSessionCreateOptions,
 	): Promise<AuthProfileError | ProviderSession>;
 	closeSession(sessionId: string): Promise<ProviderSessionClosed>;
 }
@@ -32,6 +36,11 @@ export type ProviderSession = {
 	cdpEndpoint: string;
 	liveViewUrl?: string;
 	recordingUrl?: string;
+	/**
+	 * True when the provider opened startUrl before CDP attach. Callers should
+	 * not navigate again with page.goto in that case.
+	 */
+	startUrlPreloaded?: boolean;
 }
 
 export type ProviderSessionClosed = {

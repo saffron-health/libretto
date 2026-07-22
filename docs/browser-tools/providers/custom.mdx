@@ -13,17 +13,21 @@ import type {
   BrowserProvider,
   ProviderSession,
   ProviderSessionClosed,
+  ProviderSessionCreateOptions,
 } from "libretto-browser-tools";
 
 class MyProvider implements BrowserProvider {
   readonly name = "my-provider";
 
-  async createSession(): Promise<ProviderSession> {
+  async createSession(
+    options: ProviderSessionCreateOptions = {},
+  ): Promise<ProviderSession> {
     // Start or allocate a browser, then return its CDP endpoint.
+    // Per-session launch options (startUrl, gpu, viewport) arrive here.
     return {
       sessionId: "my-1",
       cdpEndpoint: "ws://127.0.0.1:9222/devtools/browser/...",
-      // optional: liveViewUrl, recordingUrl
+      // optional: liveViewUrl, recordingUrl, startUrlPreloaded
     };
   }
 
@@ -34,6 +38,6 @@ class MyProvider implements BrowserProvider {
 }
 ```
 
-Pass `new MyProvider()` into `createBrowserTools` or any framework adapter. Provider-specific credentials and options belong on the constructor (with env-var fallbacks), not on the toolkit factory.
+Pass `new MyProvider()` into `createBrowserTools` or any framework adapter. Provider credentials and defaults belong on the constructor (with env-var fallbacks). Per-session launch options belong on `createSession`.
 
 Built-in providers live under import subpaths such as `libretto-browser-tools/kernel`. See [Providers](/browser-tools/providers/overview).

@@ -133,6 +133,7 @@
             "pages": [
               "browser-tools/adapters/ai-sdk",
               "browser-tools/adapters/pi",
+              "browser-tools/adapters/mcp",
               "browser-tools/adapters/custom"
             ]
           },

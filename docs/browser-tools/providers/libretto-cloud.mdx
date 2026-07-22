@@ -17,7 +17,9 @@ LIBRETTO_API_KEY=<libretto-api-key>
 # LIBRETTO_TIMEOUT_SECONDS=3600
 ```
 
-## Options
+## Provider options
+
+Constructor / env settings for the provider itself:
 
 | Option | Env | Default | Description |
 | --- | --- | --- | --- |
@@ -26,7 +28,17 @@ LIBRETTO_API_KEY=<libretto-api-key>
 | `timeoutSeconds` | `LIBRETTO_TIMEOUT_SECONDS` | `3600` | Browser session TTL at create time |
 | `headless` | — | `true` | Request a headless session |
 
-Sessions may queue briefly until capacity is available (up to 10 minutes). Ready sessions expose `liveViewUrl`. Closing a session may return `replayUrl` when a recording is available.
+## Session create options
+
+Pass these to `provider.createSession({ ... })` (or via `browser_open({ url })` for `startUrl`):
+
+| Option | Description |
+| --- | --- |
+| `startUrl` | URL opened before CDP is returned |
+| `gpu` | Request GPU acceleration |
+| `viewport` | `{ width, height }` window size |
+
+Sessions may queue briefly until capacity is available (up to 10 minutes). Ready sessions expose `liveViewUrl`. Closing a session may return `replayUrl` when a recording is available. When `startUrl` is sent, the session returns `startUrlPreloaded: true`.
 
 ## Example
 

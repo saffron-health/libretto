@@ -7,7 +7,10 @@ const openInputSchema = z.object({
 	url: z
 		.string()
 		.optional()
-		.describe("Optional URL to navigate to after the session opens."),
+		.describe(
+			"Optional start URL for the session. Providers that support create-time " +
+				"navigation open it before CDP attach; others navigate after connect.",
+		),
 	authProfile: z
 		.string()
 		.min(1)
@@ -36,18 +39,23 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 	return {
 		name: "browser_open",
 		description:
-			"Open a new browser session. Optionally restores `authProfile` and navigates to `url`. " +
+			"Open a new browser session. Optionally opens `url` at session create " +
+			"(or after connect when the provider cannot preload) and restores `authProfile`. " +
 			"Profile changes save when the session closes. " +
 			"Returns a `sessionId` to pass to subsequent browser tools.",
 		inputSchema: openInputSchema,
 		async execute({ url, authProfile }): Promise<ToolResult<OpenToolOutput>> {
-			const opened = await registry.openSession({ authProfile });
+			const startUrl = url?.trim() || undefined;
+			const opened = await registry.openSession({
+				authProfile,
+				...(startUrl ? { startUrl } : {}),
+			});
 			if (opened instanceof Error) return { ok: false, error: opened.message };
-			const { sessionId } = opened;
-			if (url !== undefined) {
+			const { sessionId, startUrlPreloaded } = opened;
+			if (startUrl !== undefined && !startUrlPreloaded) {
 				const page = registry.getCurrentPage(sessionId);
 				try {
-					await page.goto(url);
+					await page.goto(startUrl);
 				} catch (err) {
 					const policyError = registry.consumeBlockedNavigationError(page);
 					await registry.closeSession(sessionId);
@@ -55,7 +63,7 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 					return {
 						ok: false,
 						error:
-							`Could not navigate to ${url} (${errorMessage(err)}). ` +
+							`Could not navigate to ${startUrl} (${errorMessage(err)}). ` +
 							"The session was closed. Call browser_open again — use a full https:// URL, " +
 							"or omit url and navigate with browser_exec via `await page.goto(...)`.",
 					};

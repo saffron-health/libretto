@@ -11,13 +11,13 @@ import { snapshot as captureSnapshot } from "./snapshot/capture-snapshot.js";
 import {
 	AuthProfileError,
 	type BrowserProvider,
-	type CreateBrowserSessionOptions,
+	type ProviderSessionCreateOptions,
 } from "./provider.js";
 
-function resolveCreateSessionOptions(
+function validateAuthProfile(
 	provider: BrowserProvider,
 	authProfile: string | undefined,
-): AuthProfileError | CreateBrowserSessionOptions | null {
+): AuthProfileError | null {
 	if (authProfile === undefined) return null;
 	if (!authProfile.trim()) {
 		return new AuthProfileError({
@@ -32,7 +32,7 @@ function resolveCreateSessionOptions(
 				"Call browser_open without authProfile, or ask the toolkit developer to configure a provider that supports auth profiles.",
 		});
 	}
-	return { authProfile };
+	return null;
 }
 
 type SessionEntry = {
@@ -89,22 +89,26 @@ export class SessionRegistry {
 	) {}
 
 	async openSession(
-		options: CreateBrowserSessionOptions = {},
-	): Promise<AuthProfileError | { sessionId: string }> {
+		options: ProviderSessionCreateOptions = {},
+	): Promise<
+		AuthProfileError | { sessionId: string; startUrlPreloaded: boolean }
+	> {
 		const provider = this.provider;
 		if (!provider) {
 			throw new Error("This browser toolkit only operates on its attached page.");
 		}
-		const createOptions = resolveCreateSessionOptions(
-			provider,
-			options.authProfile,
-		);
-		if (createOptions instanceof Error) return createOptions;
-
-		const providerSession =
-			createOptions === null
-				? await provider.createSession()
-				: await provider.createSession(createOptions);
+		// Reject blocked start URLs before createSession so preload providers
+		// (Kernel, Libretto Cloud) never contact a disallowed domain.
+		const startUrl = options.startUrl?.trim() || undefined;
+		if (startUrl !== undefined && !isUrlAllowed(startUrl, this.domainPolicy)) {
+			throw new DomainPolicyRestricted(this.domainPolicy, startUrl);
+		}
+		const authProfileError = validateAuthProfile(provider, options.authProfile);
+		if (authProfileError) return authProfileError;
+		const providerSession = await provider.createSession({
+			...options,
+			startUrl,
+		});
 		if (providerSession instanceof AuthProfileError) return providerSession;
 		let browser: Browser | undefined;
 		try {
@@ -129,7 +133,10 @@ export class SessionRegistry {
 			const sessionId = this.generateSessionId();
 			this.sessions.set(sessionId, entry);
 			this.installBeforeExitHook();
-			return { sessionId };
+			return {
+				sessionId,
+				startUrlPreloaded: Boolean(providerSession.startUrlPreloaded),
+			};
 		} catch (error) {
 			await browser?.close().catch(() => {});
 			await provider.closeSession(providerSession.sessionId).catch(() => {});

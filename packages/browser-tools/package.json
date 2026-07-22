@@ -1,6 +1,6 @@
 {
   "name": "libretto-browser-tools",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Browser tools for AI agents — open, inspect, and drive real browsers from any agent framework",
   "license": "MIT",
   "homepage": "https://libretto.sh",
@@ -33,6 +33,11 @@
       "types": "./dist/adapters/pi/index.d.ts",
       "import": "./dist/adapters/pi/index.js",
       "default": "./dist/adapters/pi/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/adapters/mcp/index.d.ts",
+      "import": "./dist/adapters/mcp/index.js",
+      "default": "./dist/adapters/mcp/index.js"
     },
     "./kernel": {
       "types": "./dist/providers/kernel.d.ts",
@@ -78,10 +83,14 @@
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.3",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "ai": "^6.0.0"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@modelcontextprotocol/sdk": {
       "optional": true
     },
     "ai": {
@@ -90,6 +99,7 @@
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.6",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@playwright/cli": "^0.1.17",
     "@types/node": "^25.5.0",
     "affordance": "workspace:*",

@@ -4,17 +4,19 @@
 import { workflow } from "libretto";
 import { log } from "../shared/utils.js";
 
-export default workflow("star-repo", async ({ page }) => {
-  log("Navigating to Libretto repo...");
-  await page.goto("https://github.com/saffron-health/libretto");
+export default workflow("star-repo", {
+  startUrl: "https://github.com/saffron-health/libretto",
+  handler: async ({ page }) => {
+    log("Reading Libretto repo...");
 
-  const description = await page
-    .locator('meta[name="description"]')
-    .getAttribute("content");
-  log(`Repo description: ${description}`);
+    const description = await page
+      .locator('meta[name="description"]')
+      .getAttribute("content");
+    log(`Repo description: ${description}`);
 
-  const stars = await page.locator("#repo-stars-counter-star").textContent();
-  log(`Stars: ${stars?.trim()}`);
+    const stars = await page.locator("#repo-stars-counter-star").textContent();
+    log(`Stars: ${stars?.trim()}`);
 
-  log("Done! Edit this workflow or create your own in src/workflows/.");
+    log("Done! Edit this workflow or create your own in src/workflows/.");
+  },
 });

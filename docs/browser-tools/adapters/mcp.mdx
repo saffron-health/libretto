@@ -1,0 +1,66 @@
+---
+title: Model Context Protocol
+sidebarTitle: MCP
+"og:image": "https://libretto.sh/docs/og/browser-tools/adapters/mcp.png"
+---
+
+> Expose browser tools to MCP clients and gateways.
+
+Import from `libretto-browser-tools/mcp`. Install the optional peer dependency `@modelcontextprotocol/sdk`.
+
+```bash theme={null}
+pnpm add libretto-browser-tools @modelcontextprotocol/sdk
+npx playwright install chromium
+```
+
+## registerMcpBrowserTools
+
+Registers all six browser tools on a caller-owned `McpServer`. Your host owns the transport, authentication, and server lifecycle.
+
+```typescript theme={null}
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { LocalBrowserProvider } from "libretto-browser-tools";
+import { registerMcpBrowserTools } from "libretto-browser-tools/mcp";
+
+const server = new McpServer({
+  name: "libretto-browser-tools",
+  version: "1.0.0",
+});
+const { dispose } = registerMcpBrowserTools(
+  server,
+  new LocalBrowserProvider({ headless: true }),
+  // optional: { allowedDomains: ["example.com"] }
+);
+
+await server.connect(new StdioServerTransport());
+
+async function shutdown() {
+  await server.close();
+  await dispose();
+}
+
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
+```
+
+Pass domain policy options as the third argument — see [Advanced](/browser-tools/advanced#domain-policy). Swap `LocalBrowserProvider` for any [provider](/browser-tools/providers/overview).
+
+## Connect a gateway
+
+MCP gateways such as [Executor](https://executor.sh/docs/mcp-proxy) need a Streamable HTTP MCP URL. Mount a caller-owned server on your HTTP host, register the browser tools on it, then add that URL as an MCP integration.
+
+Hosted gateways cannot reach a server bound to `localhost`. Deploy the MCP server on a reachable host, or run the gateway and server on the same network.
+
+Create one browser toolkit per authenticated user or connection. A shared toolkit also shares its browser session registry, including sessions returned by `browser_status`.
+
+## Tool results
+
+Tool failures set MCP `isError: true` and keep the actionable Libretto error in text content. A `browser_snapshot` call with `screenshot: true` returns the accessibility tree as text and the PNG as MCP image content.
+
+The adapter publishes safety annotations for each tool. `browser_exec` is marked destructive and open-world because one Playwright script can read or change any page the browser can reach. Enforce access with host policies and [domain policy](/browser-tools/advanced#domain-policy); annotations are hints, not a sandbox.
+
+## See also
+
+- [Tools](/browser-tools/tools) — inputs and outputs for each tool
+- [Custom adapters](/browser-tools/adapters/custom) — wrap `createBrowserTools` for another framework

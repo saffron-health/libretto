@@ -77,6 +77,8 @@ npx libretto run ./workflow.ts --provider kernel --headless
 
 The workflow code does not need to change. Libretto creates the Kernel browser session, connects to it over CDP, runs the workflow, and closes the provider session when the run finishes.
 
+When the workflow declares `startUrl`, Libretto passes it to Kernel as `start_url` at create time and does not call `page.goto` after CDP attach. Libretto Cloud does the same for hosted sessions. Browserbase and Steel do not support create-time start URLs, so Libretto opens `startUrl` with Playwright right after CDP connect. Declare `gpu` and `viewport` on the workflow the same way when those sites need them. See [Workflow browser launch options](/reference/runtime/workflow#browser-launch-options).
+
 ## When to use Kernel
 
 Choose Kernel when you want a managed browser runtime with minimal infrastructure work. If you need to own the container runtime, scheduler, network, and secrets layer yourself, use [GCP](/alternative-providers/gcp) or [AWS](/alternative-providers/aws) instead.

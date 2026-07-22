@@ -109,10 +109,9 @@ export default workflow(
     output: z.object({
       status: z.string(),
     }),
+    startUrl: "https://example.com/eligibility",
   },
   async ({ page }, input) => {
-    await page.goto("https://example.com/eligibility");
-
     return {
       status: "eligible",
     };

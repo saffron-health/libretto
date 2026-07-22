@@ -5,6 +5,7 @@ import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type KernelBrowserProviderOptions = {
@@ -189,7 +190,12 @@ export class KernelBrowserProvider implements BrowserProvider {
 		}
 	}
 
-	async createSession(): Promise<ProviderSession> {
+	async createSession(
+		options: ProviderSessionCreateOptions = {},
+	): Promise<ProviderSession> {
+		const startUrl = options.startUrl?.trim() || undefined;
+		const gpu = options.gpu;
+		const viewport = options.viewport;
 		const browser = await kernelFetchJson<KernelBrowserResponse>(
 			this.endpoint,
 			this.apiKey,
@@ -200,6 +206,16 @@ export class KernelBrowserProvider implements BrowserProvider {
 					headless: this.headless,
 					stealth: this.stealth,
 					...(this.proxyId ? { proxy_id: this.proxyId } : {}),
+					...(startUrl ? { start_url: startUrl } : {}),
+					...(gpu !== undefined ? { gpu } : {}),
+					...(viewport
+						? {
+								viewport: {
+									width: viewport.width,
+									height: viewport.height,
+								},
+							}
+						: {}),
 					timeout_seconds: this.timeoutSeconds,
 				}),
 			},
@@ -247,6 +263,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 			cdpEndpoint: browser.cdp_ws_url,
 			liveViewUrl: browser.browser_live_view_url ?? undefined,
 			recordingUrl: replay?.replay_view_url ?? undefined,
+			startUrlPreloaded: Boolean(startUrl),
 		};
 	}
 

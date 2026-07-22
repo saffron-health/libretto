@@ -1,3 +1,12 @@
+export type ProviderSessionCreateOptions = {
+  authProfileName?: string;
+  authProfilePersist?: boolean;
+  headless?: boolean;
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: { width: number; height: number };
+};
+
 export type ProviderSession = {
   sessionId: string; // remote session id for cleanup
   cdpEndpoint: string; // CDP WebSocket URL
@@ -8,6 +17,9 @@ export type ProviderSession = {
   // Provider-hosted URL for watching the recording for this session. It may be
   // available as soon as recording starts, before the provider has finalized it.
   recordingUrl?: string;
+  // True when the provider opened startUrl before CDP attach, so callers
+  // should not navigate again with page.goto.
+  startUrlPreloaded?: boolean;
 };
 
 export type ProviderCloseResult = {
@@ -18,10 +30,8 @@ export type ProviderCloseResult = {
 };
 
 export type ProviderApi = {
-  createSession(options?: {
-    authProfileName?: string;
-    authProfilePersist?: boolean;
-    headless?: boolean;
-  }): Promise<ProviderSession>;
+  createSession(
+    options?: ProviderSessionCreateOptions,
+  ): Promise<ProviderSession>;
   closeSession(sessionId: string): Promise<ProviderCloseResult>;
 };

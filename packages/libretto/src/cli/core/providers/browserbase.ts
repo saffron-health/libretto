@@ -15,14 +15,28 @@ export function createBrowserbaseProvider(): ProviderApi {
     process.env.BROWSERBASE_ENDPOINT ?? "https://api.browserbase.com";
 
   return {
-    async createSession() {
+    async createSession(options) {
+      // Browserbase has no create-time start_url. Viewport is supported via
+      // browserSettings; startUrl is opened after CDP connect by the daemon.
+      const viewport = options?.viewport;
+      const browserSettings = viewport
+        ? {
+            viewport: {
+              width: viewport.width,
+              height: viewport.height,
+            },
+          }
+        : undefined;
       const resp = await fetch(`${endpoint}/v1/sessions`, {
         method: "POST",
         headers: {
           "X-BB-API-Key": apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({
+          projectId,
+          ...(browserSettings ? { browserSettings } : {}),
+        }),
       });
       if (!resp.ok) {
         const body = await resp.text();
@@ -35,6 +49,7 @@ export function createBrowserbaseProvider(): ProviderApi {
       return {
         sessionId: json.id,
         cdpEndpoint: json.connectUrl,
+        startUrlPreloaded: false,
       };
     },
     async closeSession(sessionId) {
