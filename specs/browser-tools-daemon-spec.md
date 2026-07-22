@@ -27,7 +27,7 @@ Keep process launch and provider selection outside the package in v1. A future E
 - No HTTP, TCP, Windows named-pipe, or cross-machine transport.
 - No daemon authentication or multi-tenant routing.
 - No parallel execution within one toolkit; the daemon serializes tool calls.
-- No remote borrowed-page support beyond what an already-created toolkit exposes.
+- No daemon hosting for `createBrowserToolsForPage`; v1 accepts only a full `BrowserToolkit`.
 - No migrations or backfills.
 
 ## Important files/docs/websites for implementation
@@ -160,7 +160,8 @@ const opened = await client.execute("browser_open", {
 });
 
 client.disconnect();
-await client.shutdown();
+const admin = await connectBrowserToolsDaemon({ socketPath });
+await admin.shutdown();
 ```
 
 - [ ] Add `connectBrowserToolsDaemon({ socketPath })`.
@@ -191,7 +192,7 @@ const status = await second.execute("browser_status", {
 
 - [ ] Add a test fixture that starts a child process hosting `createBrowserTools(new LocalBrowserProvider({ headless: true }))`.
 - [ ] Open a page through one client, disconnect it, and use a second client to inspect and execute against the same session ID.
-- [ ] Assert an exec followed by another call retains the daemon-side snapshot baseline and returns a snapshot diff.
+- [ ] Run exec calls from separate clients and assert the second call's snapshot diff uses the first call's cached post-exec baseline.
 - [ ] Close the browser session through the second client, then shut down the daemon and assert the child exits and the socket disappears.
 - [ ] Add a failure-path test where the daemon exits with a pending request and the client rejects instead of hanging.
 - [ ] Run `pnpm -s --filter libretto-browser-tools test`.
