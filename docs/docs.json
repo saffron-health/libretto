@@ -9,12 +9,12 @@
   },
   "icons": { "library": "fontawesome" },
   "favicon": {
-    "light": "/docs/brand-kit/logos/libretto-icosahedron-light.svg",
-    "dark": "/docs/brand-kit/logos/libretto-icosahedron-dark.svg"
+    "light": "/brand-kit/logos/libretto-icosahedron-light.svg",
+    "dark": "/brand-kit/logos/libretto-icosahedron-dark.svg"
   },
   "logo": {
-    "light": "/docs/logos/logo-light.svg",
-    "dark": "/docs/logos/logo-dark.svg",
+    "light": "/logos/logo-light.svg",
+    "dark": "/logos/logo-dark.svg",
     "href": "https://libretto.sh",
     "text": "Libretto"
   },
@@ -119,6 +119,7 @@
       },
       {
         "tab": "Browser Tools",
+        "icon": "globe",
         "groups": [
           {
             "group": "Overview",

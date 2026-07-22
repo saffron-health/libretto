@@ -24,7 +24,7 @@ When a workflow fails in production or a remote environment, the browser often s
   <Step title="Prompt your agent to investigate">
     Tell the agent what went wrong and point it at the open session.
 
-    ```text Example prompt
+    ```text Example prompt wrap
     Use the Libretto skill. I have a remote browser session open at --session remote-debug. The eligibility check workflow failed with a broken selector error. Inspect the current page state and figure out what changed.
     ```
 
@@ -46,7 +46,7 @@ When you have error output from a failed run (stack traces, log files, GCP logs,
   <Step title="Prompt your agent with the failure">
     Describe the **script**, what it's **supposed to do**, and what's **going wrong**. Include the error output.
 
-    ```text Example prompt
+    ```text Example prompt wrap
     Use the Libretto skill. The workflow at ./integration.ts is supposed to go to Availity and perform an eligibility check for a patient. But I'm getting a broken selector error. Fix it.
     ```
 
