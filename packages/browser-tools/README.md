@@ -21,39 +21,3 @@ const result = await generateText({
 
 await dispose(); // close any sessions the agent left open
 ```
-
-## MCP
-
-Install the optional MCP peer dependency when you use the MCP adapter:
-
-```bash
-npm install libretto-browser-tools @modelcontextprotocol/sdk
-```
-
-Register the tools on a caller-owned MCP server, then connect any transport:
-
-```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { LocalBrowserProvider } from "libretto-browser-tools";
-import { registerMcpBrowserTools } from "libretto-browser-tools/mcp";
-
-const server = new McpServer({
-  name: "libretto-browser-tools",
-  version: "1.0.0",
-});
-const { dispose } = registerMcpBrowserTools(
-  server,
-  new LocalBrowserProvider({ headless: true }),
-);
-
-await server.connect(new StdioServerTransport());
-
-process.once("SIGTERM", async () => {
-  await dispose();
-  await server.close();
-});
-```
-
-Use one toolkit per user or connection when browser sessions must stay
-isolated. The host owns authentication, transport, and shutdown.

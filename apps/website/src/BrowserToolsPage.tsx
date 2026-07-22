@@ -33,7 +33,7 @@ function CodeWindow() {
           <span className="text-ink">();</span>
           {"\n\n"}
           <span className="text-faint">
-            {"// AI SDK adapter — Pi and more coming soon"}
+            {"// Adapters for AI SDK, Pi, and MCP"}
           </span>
           {"\n"}
           <span className="text-faint">const</span>
@@ -697,6 +697,14 @@ const INTEGRATIONS: IntegrationCardProps[] = [
     logoClassName: "brightness-0 invert",
   },
   {
+    name: "MCP",
+    logoSrc: "/logos/mcp.svg",
+    href: "/docs/browser-tools/adapters/mcp",
+    status: "ready",
+    fathomEvent: "Browser tools MCP integration click",
+    logoClassName: "max-h-[38%] max-w-[48%]",
+  },
+  {
     name: "Custom",
     logoSrc: "/logos/custom.svg",
     href: "/docs/browser-tools/adapters/custom",
@@ -741,12 +749,12 @@ function IntegrationsSection() {
             Use the agent framework you know.
           </Text>
           <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
-            Built-in adapters for AI SDK and Pi, plus a custom path for anything
-            else. More frameworks are on the way.
+            Built-in adapters for AI SDK, Pi, and MCP, plus a custom path for
+            anything else. More frameworks are on the way.
           </Text>
         </div>
 
-        <div className="mx-auto grid max-w-[720px] grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="mx-auto grid max-w-[900px] grid-cols-2 gap-3 sm:grid-cols-4">
           {INTEGRATIONS.map((integration) => (
             <IntegrationCard key={integration.name} {...integration} />
           ))}
@@ -834,7 +842,7 @@ const BROWSER_TOOLS_FAQS = [
   {
     question: "Which agent frameworks work today?",
     answer:
-      "The package includes adapters for AI SDK and Pi. The base tools are framework-neutral, so you can also wire them into your own agent loop.",
+      "The package includes adapters for AI SDK, Pi, and MCP. The base tools are framework-neutral, so you can also wire them into your own agent loop.",
   },
   {
     question: "Which browser providers can I use?",
