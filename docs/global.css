@@ -71,9 +71,21 @@
   --code-block-padding-x: 12px;
   --code-block-padding-y: 12px;
 
-  /* Thin blockquote rule. */
+  /* Thin blockquote rule, heavier weight. */
   --blockquote-border-width: 2px;
   --blockquote-border-color: var(--border-subtle);
+  --blockquote-font-weight: 500;
+
+  /* Compact cards with shadow instead of border. */
+  --card-padding: 12px;
+  --card-border: none;
+  --card-shadow:
+    rgba(38, 36, 42, 0.06) 0 0 0 1px,
+    rgba(0, 0, 0, 0.06) 0 1px 1px -0.5px,
+    rgba(0, 0, 0, 0.06) 0 3px 3px -1.5px;
+
+  /* Rounded tables. */
+  --table-radius: 6px;
 }
 
 .dark {
@@ -95,6 +107,10 @@
   --text-tertiary: #6e6e6e;
 
   --code-block-background: var(--card);
+  --card-shadow:
+    rgba(227, 226, 229, 0.06) 0 0 0 1px,
+    rgba(0, 0, 0, 0.12) 0 1px 1px -0.5px,
+    rgba(0, 0, 0, 0.12) 0 3px 3px -1.5px;
   --code-block-shadow:
     rgba(227, 226, 229, 0.06) 0 0 0 1px,
     rgba(0, 0, 0, 0.12) 0 1px 1px -0.5px,

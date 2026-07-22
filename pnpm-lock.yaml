@@ -176,8 +176,8 @@ importers:
   docs:
     dependencies:
       '@holocron.so/vite':
-        specifier: ^0.27.1
-        version: 0.27.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(hono@4.12.31)(use-sync-external-store@1.6.0(react@19.2.7))(vite@8.0.16(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))(wrangler@4.113.0)
+        specifier: ^0.28.0
+        version: 0.28.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(hono@4.12.31)(use-sync-external-store@1.6.0(react@19.2.7))(vite@8.0.16(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))(wrangler@4.113.0)
       react:
         specifier: ^19.2.5
         version: 19.2.7
@@ -1494,8 +1494,8 @@ packages:
     resolution: {integrity: sha512-ErvuTWGV1o9K3s5ZFFnjXJHSYlvG8gSTorCAsv9pS1vIVBMoWP9q42She94+DvTqSJR7sTNq459mpYU/x5/xug==}
     hasBin: true
 
-  '@holocron.so/vite@0.27.1':
-    resolution: {integrity: sha512-cXkEjN+ZVIN3FoIonoZsSxUkUYk1UEUa7jZ2Ds/zVXVSfqDP4oxUPwoSlgN4sOBDBDAEJBlYBrZ5vZk5acP6lQ==}
+  '@holocron.so/vite@0.28.0':
+    resolution: {integrity: sha512-oaauNPvn3O8ZA/WnpvAtIJE+vcYgskoayxnKLFdFwQ0FWzaB/zTzmp2mIDp7KF4lp0/yk0MSjDcmdw09TG85jQ==}
     hasBin: true
 
   '@hono/node-server@1.19.14':
@@ -9272,7 +9272,7 @@ snapshots:
       - react-server-dom-webpack
       - vite
 
-  '@holocron.so/vite@0.27.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(hono@4.12.31)(use-sync-external-store@1.6.0(react@19.2.7))(vite@8.0.16(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))(wrangler@4.113.0)':
+  '@holocron.so/vite@0.28.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(hono@4.12.31)(use-sync-external-store@1.6.0(react@19.2.7))(vite@8.0.16(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))(wrangler@4.113.0)':
     dependencies:
       '@cloudflare/vite-plugin': 1.46.0(vite@8.0.16(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))(wrangler@4.113.0)
       '@fontsource-variable/inter': 5.3.0
