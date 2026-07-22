@@ -103,6 +103,17 @@ test("browser_open navigates to a url and returns a session ID", async ({
 	expect(result).toEqual({ ok: true, sessionId: expect.any(String) });
 });
 
+test("browser_open returns an actionable error for an invalid URL", async ({
+	openTool,
+}) => {
+	const result = await openTool.execute({ url: "not-a-url" });
+
+	expect(result).toMatchObject({ ok: false });
+	if (result.ok) throw new Error("Expected browser_open to reject an invalid URL");
+	expect(result.error).toContain("Could not navigate");
+	expect(result.error).toContain("full https:// URL");
+});
+
 test("browser_open reports a blocked top-level navigation as a domain policy error", async () => {
 	const registry = new SessionRegistry(
 		new LocalBrowserProvider({ headless: true }),

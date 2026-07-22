@@ -139,7 +139,14 @@ export class SessionRegistry {
 		// Reject blocked start URLs before createSession so preload providers
 		// (Kernel, Libretto Cloud) never contact a disallowed domain.
 		const startUrl = options.startUrl?.trim() || undefined;
-		if (startUrl !== undefined && !isUrlAllowed(startUrl, this.domainPolicy)) {
+		const hasDomainPolicy =
+			this.domainPolicy.allowedDomains !== undefined ||
+			Boolean(this.domainPolicy.blockedDomains?.length);
+		if (
+			startUrl !== undefined &&
+			hasDomainPolicy &&
+			!isUrlAllowed(startUrl, this.domainPolicy)
+		) {
 			throw new DomainPolicyRestricted(this.domainPolicy, startUrl);
 		}
 		const authProfileError = validateAuthProfile(provider, options.authProfile);
