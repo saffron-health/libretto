@@ -326,6 +326,7 @@ describe("Kernel provider", () => {
       cdpEndpoint: "wss://kernel.example.test/cdp",
       liveViewUrl: "https://kernel.example.test/live",
       recordingUrl: undefined,
+      startUrlPreloaded: false,
     });
     expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
       Authorization: "Bearer constructor-key",
@@ -444,6 +445,7 @@ describe("Kernel provider", () => {
       cdpEndpoint: "wss://kernel.example.test/recorded",
       liveViewUrl: "https://kernel.example.test/live",
       recordingUrl: "https://kernel.example.test/replay",
+      startUrlPreloaded: false,
     });
 
     await expect(provider.closeSession("kernel-recorded")).resolves.toEqual({
