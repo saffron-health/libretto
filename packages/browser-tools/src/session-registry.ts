@@ -8,7 +8,32 @@ import {
 } from "./domain-policy.js";
 import type { Snapshot } from "./snapshot/capture-snapshot.js";
 import { snapshot as captureSnapshot } from "./snapshot/capture-snapshot.js";
-import type { BrowserProvider } from "./provider.js";
+import {
+	AuthProfileError,
+	type BrowserProvider,
+	type CreateBrowserSessionOptions,
+} from "./provider.js";
+
+function resolveCreateSessionOptions(
+	provider: BrowserProvider,
+	authProfile: string | undefined,
+): AuthProfileError | CreateBrowserSessionOptions | null {
+	if (authProfile === undefined) return null;
+	if (!authProfile.trim()) {
+		return new AuthProfileError({
+			message: "Auth profile name is empty.",
+			recovery: "Pass a non-empty authProfile to browser_open.",
+		});
+	}
+	if (!provider.supportsAuthProfiles) {
+		return new AuthProfileError({
+			message: `Browser provider "${provider.name}" does not support auth profiles.`,
+			recovery:
+				"Call browser_open without authProfile, or ask the toolkit developer to configure a provider that supports auth profiles.",
+		});
+	}
+	return { authProfile };
+}
 
 type SessionEntry = {
 	providerSessionId: string | undefined;
@@ -63,12 +88,24 @@ export class SessionRegistry {
 		private readonly domainPolicy: DomainPolicyOptions = {},
 	) {}
 
-	async openSession(): Promise<{ sessionId: string }> {
+	async openSession(
+		options: CreateBrowserSessionOptions = {},
+	): Promise<AuthProfileError | { sessionId: string }> {
 		const provider = this.provider;
 		if (!provider) {
 			throw new Error("This browser toolkit only operates on its attached page.");
 		}
-		const providerSession = await provider.createSession();
+		const createOptions = resolveCreateSessionOptions(
+			provider,
+			options.authProfile,
+		);
+		if (createOptions instanceof Error) return createOptions;
+
+		const providerSession =
+			createOptions === null
+				? await provider.createSession()
+				: await provider.createSession(createOptions);
+		if (providerSession instanceof AuthProfileError) return providerSession;
 		let browser: Browser | undefined;
 		try {
 			browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);

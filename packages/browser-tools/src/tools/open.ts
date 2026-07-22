@@ -8,6 +8,13 @@ const openInputSchema = z.object({
 		.string()
 		.optional()
 		.describe("Optional URL to navigate to after the session opens."),
+	authProfile: z
+		.string()
+		.min(1)
+		.optional()
+		.describe(
+			"Optional auth profile to restore for this session and save when it closes.",
+		),
 });
 
 export type OpenToolInput = z.infer<typeof openInputSchema>;
@@ -29,11 +36,14 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 	return {
 		name: "browser_open",
 		description:
-			"Open a new browser session. Optionally navigates to `url` after opening. " +
+			"Open a new browser session. Optionally restores `authProfile` and navigates to `url`. " +
+			"Profile changes save when the session closes. " +
 			"Returns a `sessionId` to pass to subsequent browser tools.",
 		inputSchema: openInputSchema,
-		async execute({ url }): Promise<ToolResult<OpenToolOutput>> {
-			const { sessionId } = await registry.openSession();
+		async execute({ url, authProfile }): Promise<ToolResult<OpenToolOutput>> {
+			const opened = await registry.openSession({ authProfile });
+			if (opened instanceof Error) return { ok: false, error: opened.message };
+			const { sessionId } = opened;
 			if (url !== undefined) {
 				const page = registry.getCurrentPage(sessionId);
 				try {
