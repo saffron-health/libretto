@@ -618,9 +618,11 @@ function IntegrationCard({
 }: IntegrationCardProps) {
   const soon = status === "soon";
   const external = Boolean(href?.startsWith("http"));
-  const className = soon
-    ? "relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-rule/60 bg-panel/20 no-underline opacity-35"
-    : "group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-transparent no-underline transition-[border-color,box-shadow] duration-300 hover:border-accent/45 hover:shadow-[0_0_24px_-8px_color-mix(in_oklch,var(--color-green-9)_55%,transparent)]";
+  const className = `w-[calc(50%-0.375rem)] sm:w-[calc(25%-0.5625rem)] ${
+    soon
+      ? "relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-rule/60 bg-panel/20 no-underline opacity-35"
+      : "group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-transparent no-underline transition-[border-color,box-shadow] duration-300 hover:border-accent/45 hover:shadow-[0_0_24px_-8px_color-mix(in_oklch,var(--color-green-9)_55%,transparent)]"
+  }`;
 
   const content = (
     <>
@@ -746,7 +748,7 @@ function IntegrationsSection() {
               lineHeight: 1.05,
             }}
           >
-            Use the agent framework you know.
+            Use the agent stack you know.
           </Text>
           <Text as="p" wrap="pretty" className="leading-relaxed text-muted">
             Built-in adapters for AI SDK, Pi, and MCP, plus a custom path for
@@ -754,7 +756,7 @@ function IntegrationsSection() {
           </Text>
         </div>
 
-        <div className="mx-auto grid max-w-[900px] grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mx-auto flex max-w-[900px] flex-wrap justify-center gap-3">
           {INTEGRATIONS.map((integration) => (
             <IntegrationCard key={integration.name} {...integration} />
           ))}
@@ -840,7 +842,7 @@ function ProductLinksSection() {
 
 const BROWSER_TOOLS_FAQS = [
   {
-    question: "Which agent frameworks work today?",
+    question: "Which integrations work today?",
     answer:
       "The package includes adapters for AI SDK, Pi, and MCP. The base tools are framework-neutral, so you can also wire them into your own agent loop.",
   },
