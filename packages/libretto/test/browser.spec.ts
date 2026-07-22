@@ -365,6 +365,43 @@ describe("Kernel provider", () => {
     });
   });
 
+  it("forwards startUrl, gpu, and viewport and marks startUrlPreloaded", async () => {
+    vi.stubEnv("KERNEL_API_KEY", "env-key");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/browsers") {
+          return jsonResponse({
+            session_id: "kernel-session",
+            cdp_ws_url: "wss://kernel.example.test/cdp",
+            browser_live_view_url: null,
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await createKernelProvider({
+      apiKey: "constructor-key",
+    }).createSession({
+      startUrl: "https://www.marriott.com/",
+      gpu: true,
+      viewport: { width: 1440, height: 900 },
+    });
+
+    expect(session.startUrlPreloaded).toBe(true);
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
+      headless: true,
+      stealth: false,
+      timeout_seconds: 300,
+      start_url: "https://www.marriott.com/",
+      gpu: true,
+      viewport: { width: 1440, height: 900 },
+    });
+  });
+
   it("starts and stops replay recording when enabled", async () => {
     const fetchMock = vi.fn(
       async (url: string | URL | Request, init?: RequestInit) => {

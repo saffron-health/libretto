@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { SimpleCLI } from "affordance";
 import { orpcCall } from "../core/auth-fetch.js";
+import { parseViewportArg } from "./browser.js";
 import { withCloudApiKey } from "./shared.js";
 
 type ScheduleResponse = {
@@ -75,6 +76,20 @@ export const createCloudScheduleInput = SimpleCLI.input({
       name: "timeout-seconds",
       help: "Job timeout in seconds for each schedule fire",
     }),
+    startUrl: SimpleCLI.option(z.string().optional(), {
+      name: "start-url",
+      help: "Override workflow start URL for browser launch",
+    }),
+    gpu: SimpleCLI.flag({
+      help: "Enable GPU for the browser session (overrides workflow)",
+    }),
+    noGpu: SimpleCLI.flag({
+      name: "no-gpu",
+      help: "Disable GPU for the browser session (overrides workflow)",
+    }),
+    viewport: SimpleCLI.option(z.string().optional(), {
+      help: "Override browser viewport as WIDTHxHEIGHT",
+    }),
     callbackUrl: SimpleCLI.option(z.string().optional(), {
       name: "callback-url",
       help: "Per-schedule callback URL",
@@ -102,6 +117,10 @@ export const createCloudScheduleInput = SimpleCLI.input({
     "Pass either --params or --params-file, not both.",
   )
   .refine(
+    (input) => !(input.gpu && input.noGpu),
+    "Cannot pass both --gpu and --no-gpu.",
+  )
+  .refine(
     (input) =>
       (!input.callbackUrl && !input.callbackSecret) ||
       Boolean(input.callbackUrl && input.callbackSecret),
@@ -122,6 +141,7 @@ export const createCloudScheduleCommand = SimpleCLI.command({
     const residentialProxy = input.residentialProxy
       ? parseJsonObject("--residential-proxy", input.residentialProxy)
       : undefined;
+    const viewport = parseViewportArg(input.viewport);
 
     const payload: Record<string, unknown> = {
       workflow: input.workflow!,
@@ -133,6 +153,10 @@ export const createCloudScheduleCommand = SimpleCLI.command({
     if (input.timeoutSeconds !== undefined) {
       payload.timeout_seconds = input.timeoutSeconds;
     }
+    if (input.startUrl) payload.start_url = input.startUrl;
+    if (input.gpu) payload.gpu = true;
+    if (input.noGpu) payload.gpu = false;
+    if (viewport) payload.viewport = viewport;
     if (input.callbackUrl) payload.callback_url = input.callbackUrl;
     if (input.callbackSecret) payload.callback_secret = input.callbackSecret;
     if (input.skipCallbacks) payload.skip_callbacks = true;

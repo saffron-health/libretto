@@ -14,6 +14,11 @@ export type KernelBrowserProviderOptions = {
 	proxyId?: string;
 	timeoutSeconds?: number;
 	enableRecording?: boolean;
+	/** URL Kernel opens before CDP attach. Prefer this over page.goto after connect. */
+	startUrl?: string;
+	/** Hardware-accelerated Kernel browser. Requires a plan that supports GPU. */
+	gpu?: boolean;
+	viewport?: { width: number; height: number };
 }
 
 type KernelBrowserResponse = {
@@ -159,6 +164,9 @@ export class KernelBrowserProvider implements BrowserProvider {
 	private readonly proxyId: string | undefined;
 	private readonly timeoutSeconds: number;
 	private readonly enableRecording: boolean;
+	private readonly startUrl: string | undefined;
+	private readonly gpu: boolean | undefined;
+	private readonly viewport: { width: number; height: number } | undefined;
 	private readonly replayUrlBySession = new Map<string, string>();
 
 	constructor(options: KernelBrowserProviderOptions = {}) {
@@ -181,6 +189,9 @@ export class KernelBrowserProvider implements BrowserProvider {
 		this.enableRecording =
 			options.enableRecording ??
 			readBooleanEnv("KERNEL_ENABLE_RECORDING", false);
+		this.startUrl = options.startUrl?.trim() || undefined;
+		this.gpu = options.gpu;
+		this.viewport = options.viewport;
 		if (this.enableRecording && this.headless) {
 			throw new Error(
 				"KernelBrowserProvider: replays require a headed browser. " +
@@ -200,6 +211,16 @@ export class KernelBrowserProvider implements BrowserProvider {
 					headless: this.headless,
 					stealth: this.stealth,
 					...(this.proxyId ? { proxy_id: this.proxyId } : {}),
+					...(this.startUrl ? { start_url: this.startUrl } : {}),
+					...(this.gpu !== undefined ? { gpu: this.gpu } : {}),
+					...(this.viewport
+						? {
+								viewport: {
+									width: this.viewport.width,
+									height: this.viewport.height,
+								},
+							}
+						: {}),
 					timeout_seconds: this.timeoutSeconds,
 				}),
 			},

@@ -93,6 +93,48 @@ npx libretto run ./my-workflow.ts
 
 The CLI compiles the file with `tsx`, launches a Chromium browser, and calls your handler with the session context it constructs.
 
+#### Browser launch options
+
+Declare browser startup requirements on the workflow so hosted jobs and local Kernel runs do not need per-job flags:
+
+```typescript theme={null}
+export default workflow(
+  "bookMarriott",
+  {
+    input: z.object({ checkIn: z.string() }),
+    output: z.object({ confirmation: z.string() }),
+    startUrl: "https://www.marriott.com/",
+    gpu: true,
+    viewport: { width: 1440, height: 900 },
+  },
+  async (ctx, input) => {
+    // ...
+  },
+);
+```
+
+<ParamField path="startUrl" type="string">
+  URL the browser should open before Playwright attaches. Required for sites
+  that block CDP attach followed by `page.goto()`. On Kernel, Libretto sends
+  this as `start_url` at session create time and does not navigate again after
+  connect.
+</ParamField>
+
+<ParamField path="gpu" type="boolean">
+  Request a GPU-accelerated browser when the provider supports it. Prefer
+  declaring this per workflow; GPU is expensive to leave on by default.
+</ParamField>
+
+<ParamField path="viewport" type="{ width: number; height: number }">
+  Browser viewport for the session. Hosted jobs and Kernel provider runs use
+  this when you do not pass `--viewport` on the CLI.
+</ParamField>
+
+These fields are stored in deploy metadata. Hosted jobs and schedules inherit
+them from the deployed workflow. Override them for a single run with
+`libretto cloud jobs create --start-url ... --gpu --viewport WxH` (or the
+matching schedule flags).
+
 ---
 
 ### `launchBrowser()`

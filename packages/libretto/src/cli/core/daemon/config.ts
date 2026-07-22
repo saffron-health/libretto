@@ -41,9 +41,36 @@ export type DaemonBrowserProviderConfig = {
   providerName: string;
   headless?: boolean;
   initialUrl?: string;
+  // Preferred start URL for providers that preload before CDP attach.
+  // Falls back to initialUrl when unset.
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: { width: number; height: number };
   authProfileName?: string;
   authProfilePersist?: boolean;
 };
+
+export type DaemonWorkflowLaunchOptions = {
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: { width: number; height: number };
+};
+
+/**
+ * Merge workflow-declared launch options into a provider browser config.
+ * Explicit daemon/CLI viewport wins over workflow viewport.
+ */
+export function mergeWorkflowLaunchIntoProviderConfig(
+  browser: DaemonBrowserProviderConfig,
+  workflow: DaemonWorkflowLaunchOptions,
+): DaemonBrowserProviderConfig {
+  return {
+    ...browser,
+    startUrl: workflow.startUrl ?? browser.startUrl,
+    gpu: workflow.gpu ?? browser.gpu,
+    viewport: browser.viewport ?? workflow.viewport,
+  };
+}
 
 export type DaemonWorkflowConfig = {
   integrationPath: string;

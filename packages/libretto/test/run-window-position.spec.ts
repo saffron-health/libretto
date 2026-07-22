@@ -44,6 +44,21 @@ describe("createRunBrowserConfig", () => {
     });
   });
 
+  it("passes viewport through to provider workflow runs", () => {
+    expect(
+      createRunBrowserConfig({
+        providerName: "kernel",
+        headless: true,
+        viewport: { width: 1440, height: 900 },
+      }),
+    ).toEqual({
+      kind: "provider",
+      providerName: "kernel",
+      headless: true,
+      viewport: { width: 1440, height: 900 },
+    });
+  });
+
   it("passes headed mode to provider workflow runs", () => {
     expect(
       createRunBrowserConfig({

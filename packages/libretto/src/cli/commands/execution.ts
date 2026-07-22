@@ -93,6 +93,7 @@ export function createRunBrowserConfig(args: {
       kind: "provider",
       providerName: args.providerName,
       headless: args.headless,
+      ...(args.viewport ? { viewport: args.viewport } : {}),
     };
   }
 

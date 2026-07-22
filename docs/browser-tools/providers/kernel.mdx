@@ -31,8 +31,13 @@ KERNEL_API_KEY=<kernel-api-key>
 | `proxyId` | `KERNEL_PROXY_ID` | — | Optional Kernel proxy id |
 | `timeoutSeconds` | `KERNEL_TIMEOUT_SECONDS` | `300` | Session timeout in seconds |
 | `enableRecording` | `KERNEL_ENABLE_RECORDING` | `false` | Start a replay; requires `headless: false` |
+| `startUrl` | — | — | URL Kernel opens before CDP attach |
+| `gpu` | — | — | Enable Kernel GPU acceleration |
+| `viewport` | — | — | `{ width, height }` window size |
 
 Created sessions may include `liveViewUrl` and, when recording is enabled, `recordingUrl`. Closing returns `replayUrl` when a replay was started.
+
+Pass `startUrl` when the site blocks Playwright attach followed by `page.goto()`. Kernel navigates during browser create, before CDP is available.
 
 ## Example
 
@@ -41,7 +46,12 @@ import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
 import { KernelBrowserProvider } from "libretto-browser-tools/kernel";
 
 const { tools, dispose } = createAiSdkBrowserTools(
-  new KernelBrowserProvider({ stealth: true }),
+  new KernelBrowserProvider({
+    stealth: true,
+    startUrl: "https://www.marriott.com/",
+    gpu: true,
+    viewport: { width: 1440, height: 900 },
+  }),
 );
 
 try {
