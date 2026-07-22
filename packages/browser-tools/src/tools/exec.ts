@@ -55,6 +55,7 @@ export function createExecTool(
 	registry: SessionRegistry,
 	pageStability: PageStabilityWaitOptions = {},
 	onTiming?: (event: BrowserToolTimingEvent) => void | Promise<void>,
+	captureSnapshotDiff = true,
 ): ExecTool {
 	return {
 		name: "browser_exec",
@@ -65,9 +66,11 @@ export function createExecTool(
 			"itself is the only state. In scope: `page` (the current playwright " +
 			"Page), `context` (BrowserContext), `browser` (Browser). TypeScript is " +
 			"fine. `console.log`/`console.error` output is captured and returned as " +
-			"stdout/stderr. Successful execs also return `snapshotDiff` — a compact " +
-			"text diff of accessibility-tree changes since the previous exec (empty when " +
-			"unchanged). Failures come back as `{ ok: false, error }` — read the error, " +
+			"stdout/stderr. " +
+			(captureSnapshotDiff
+				? "Successful execs also return `snapshotDiff` — a compact text diff of accessibility-tree changes since the previous exec (empty when unchanged). "
+				: "Call browser_snapshot after an exec when you need to inspect or verify page changes. ") +
+			"Failures come back as `{ ok: false, error }` — read the error, " +
 			"fix the code, and try again.",
 		inputSchema: execInputSchema,
 		async execute({ sessionId, code, pageId }): Promise<ToolResult<ExecToolOutput>> {
@@ -107,9 +110,14 @@ export function createExecTool(
 				};
 			}
 
-			const baselineStartedAt = Date.now();
-			const before = await registry.readSnapshotBaseline(sessionId, pageId);
-			phases.baselineSnapshotMs = Date.now() - baselineStartedAt;
+			let before:
+				| Awaited<ReturnType<SessionRegistry["readSnapshotBaseline"]>>
+				| undefined;
+			if (captureSnapshotDiff) {
+				const baselineStartedAt = Date.now();
+				before = await registry.readSnapshotBaseline(sessionId, pageId);
+				phases.baselineSnapshotMs = Date.now() - baselineStartedAt;
+			}
 			const executionStartedAt = Date.now();
 			const execResult = await runExecCode(code, scope);
 			phases.executionMs = Date.now() - executionStartedAt;
@@ -120,6 +128,10 @@ export function createExecTool(
 			if (!execResult.ok) {
 				await emitTiming("error");
 				return execResult;
+			}
+			if (!captureSnapshotDiff || !before) {
+				await emitTiming("success");
+				return { ...execResult, snapshotDiff: "" };
 			}
 
 			let snapshotDiff = "";

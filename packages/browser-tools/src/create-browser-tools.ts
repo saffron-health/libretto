@@ -31,6 +31,7 @@ export type BrowserToolkit = {
 
 export type BrowserToolkitOptions = DomainPolicyOptions & {
 	pageStability?: PageStabilityWaitOptions;
+	captureExecSnapshotDiff?: boolean;
 	onTiming?: (event: BrowserToolTimingEvent) => void | Promise<void>;
 };
 
@@ -68,6 +69,7 @@ export function createBrowserTools(
 				registry,
 				options.pageStability,
 				options.onTiming,
+				options.captureExecSnapshotDiff,
 			),
 			browser_snapshot: createSnapshotTool(
 				registry,

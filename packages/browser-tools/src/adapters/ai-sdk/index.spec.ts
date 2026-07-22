@@ -248,6 +248,37 @@ test("browser tools report phase timing without page content", async () => {
 	await toolkit.dispose();
 });
 
+test("browser_exec can skip its automatic post-exec snapshot", async () => {
+	const timings: unknown[] = [];
+	const toolkit = createAiSdkBrowserTools(
+		new LocalBrowserProvider({ headless: true }),
+		{
+			captureExecSnapshotDiff: false,
+			onTiming: (event) => {
+				timings.push(event);
+			},
+		},
+	);
+	const sessionId = await openSession(
+		toolkit.tools,
+		"data:text/html,<title>fast exec</title>",
+	);
+	const result = await callTool(toolkit.tools, "browser_exec", {
+		sessionId,
+		code: "return await page.title();",
+	});
+
+	expect(result).toMatchObject({ ok: true, result: "fast exec", snapshotDiff: "" });
+	expect(timings).toEqual([
+		expect.objectContaining({
+			tool: "browser_exec",
+			phases: { executionMs: expect.any(Number) },
+			outcome: "success",
+		}),
+	]);
+	await toolkit.dispose();
+});
+
 test("browser_exec runs Playwright code against the opened page", async ({
 	toolkit,
 }) => {
