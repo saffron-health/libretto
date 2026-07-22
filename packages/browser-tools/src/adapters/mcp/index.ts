@@ -5,11 +5,12 @@ import {
 	type BrowserToolkitOptions,
 } from "../../create-browser-tools.js";
 import type { BrowserProvider } from "../../provider.js";
+import type { BrowserCleanupError } from "../../session-registry.js";
 import type { ToolResult } from "../../tool.js";
 import type { SnapshotToolOutput } from "../../tools/snapshot.js";
 
 export type McpBrowserToolkit = {
-	dispose(): Promise<void>;
+	dispose(): Promise<BrowserCleanupError | null>;
 };
 
 function textResult(result: unknown): CallToolResult {

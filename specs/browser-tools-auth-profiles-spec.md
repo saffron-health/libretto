@@ -20,6 +20,7 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - Invalid, missing, ambiguous, or not-yet-ready profiles return actionable `{ ok: false, error }` tool results.
 - Profile changes persist only after an explicit `browser_close` or graceful toolkit disposal.
 - Expected auth-profile failures flow as `AuthProfileError` values through providers and the session registry; host failures still reject.
+- Provider and browser cleanup failures return typed error values, including every cause when more than one cleanup step fails.
 
 ## Non-goals
 
@@ -83,15 +84,18 @@ export class AuthProfileError extends errore.createTaggedError({
   message: "$message $recovery",
 }) {}
 
-export type CreateBrowserSessionOptions = {
+export type ProviderSessionCreateOptions = {
   authProfile?: string;
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: { width: number; height: number };
 };
 
 export type BrowserProvider = {
   readonly name: string;
   readonly supportsAuthProfiles?: boolean;
   createSession(
-    options?: CreateBrowserSessionOptions,
+    options?: ProviderSessionCreateOptions,
   ): Promise<AuthProfileError | ProviderSession>;
   ...
 };
@@ -116,29 +120,34 @@ const openInputSchema = z.object({
 
 ### Phase 2: Make close semantics safe for profile persistence
 
-Cloud providers save profile changes when their release, stop, or delete endpoint runs. Change owned-session cleanup so provider release happens while the browser is still available, then detach the Playwright CDP client even if provider cleanup fails.
+Cloud providers save profile changes when their release, stop, or delete endpoint runs. Return typed cleanup errors as values, release the provider while the browser is still available, then detach the Playwright CDP client even if provider cleanup fails.
 
 ```ts
 // packages/browser-tools/src/session-registry.ts
-async closeSession(sessionId: string): Promise<void> {
+async closeSession(sessionId: string): Promise<BrowserCleanupError | null> {
   const entry = this.requireSession(sessionId);
   ...
-  try {
-    await this.provider?.closeSession(entry.providerSessionId);
-  } finally {
-    await entry.browser.close().catch(() => {});
-  }
+  const providerResult = await this.provider?.closeSession(entry.providerSessionId);
+  const browserResult = await entry.browser.close()
+    .then(() => null)
+    .catch((cause) => new BrowserCloseError({ ... }));
+  const [, errors] = errore.partition([providerResult, browserResult]);
+  return aggregateErrors(errors, `Failed to fully close session "${sessionId}".`);
 }
 ```
 
-- [ ] Release a provider-owned session before closing its CDP connection.
-- [ ] Preserve existing behavior for attached CDP sessions and caller-owned pages.
-- [ ] Ensure failed provider cleanup still removes registry state and detaches the CDP client.
-- [ ] Make `dispose()` attempt every remaining session after one close fails, then report all cleanup failures.
-- [ ] Add a registry test whose fake provider records that it closes before the browser disconnects.
-- [ ] Add a failure-path test that confirms the session becomes unknown after provider cleanup throws.
-- [ ] Add a disposal test with two sessions that proves the second session closes when the first provider release fails.
-- [ ] Run `pnpm --filter libretto-browser-tools test -- src/session-registry.spec.ts`.
+- [x] Release a provider-owned session before closing its CDP connection.
+- [x] Return `ProviderCloseError` values from every bundled provider instead of rejecting for expected close failures.
+- [x] Return `BrowserCloseError | ProviderCloseError | AggregateError | null` from registry and toolkit cleanup APIs.
+- [x] Use `errore.partition()` to collect cleanup error values and preserve multiple causes with native `AggregateError`.
+- [x] Preserve existing behavior for attached CDP sessions and caller-owned pages.
+- [x] Ensure failed provider cleanup still removes registry state and detaches the CDP client.
+- [x] Make `dispose()` attempt every remaining session after one close fails, then report all cleanup failures.
+- [x] Add a registry test whose fake provider records that it closes before the browser disconnects.
+- [x] Add a failure-path test that confirms the session becomes unknown after provider cleanup throws.
+- [x] Add a disposal test with two sessions that proves the second session closes when the first provider release fails.
+- [x] Catch and log best-effort `beforeExit` disposal failures instead of creating an unhandled rejection.
+- [x] Run `pnpm --filter libretto-browser-tools test -- src/session-registry.spec.ts`.
 
 ### Phase 3: Persist full local Chromium profiles
 
@@ -151,7 +160,7 @@ export type LocalBrowserProviderOptions = {
   authProfileDirectory?: string;
 };
 
-async createSession({ authProfile }: CreateBrowserSessionOptions = {}) {
+async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
   const context = authProfile
     ? await chromium.launchPersistentContext(
         resolveProfilePath(this.authProfileDirectory, authProfile),
@@ -186,7 +195,7 @@ Map the common string to Libretto Cloud's named profile fields and request write
 
 ```ts
 // packages/browser-tools/src/providers/libretto-cloud.ts
-async createSession({ authProfile }: CreateBrowserSessionOptions = {}) {
+async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
   return this.createCloudSession({
     ...this.sessionOptions,
     ...(authProfile ? {
@@ -209,7 +218,7 @@ Create a named Kernel profile when needed, then attach it with write-back enable
 
 ```ts
 // packages/browser-tools/src/providers/kernel.ts
-async createSession({ authProfile }: CreateBrowserSessionOptions = {}) {
+async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
   if (authProfile) await this.ensureProfileExists(authProfile);
   return this.createBrowser({
     ...
@@ -233,7 +242,7 @@ Resolve a profile by exact name and create it when absent, then start and stop t
 
 ```ts
 // packages/browser-tools/src/providers/browser-use.ts
-async createSession({ authProfile }: CreateBrowserSessionOptions = {}) {
+async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
   const profileId = authProfile
     ? await this.findOrCreateProfileId(authProfile)
     : undefined;
@@ -262,7 +271,7 @@ Pass an existing Browserbase context ID as `authProfile`. Browserbase has no con
 
 ```ts
 // packages/browser-tools/src/providers/browserbase.ts
-async createSession({ authProfile }: CreateBrowserSessionOptions = {}) {
+async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
   return this.createBrowser({
     ...
     ...(authProfile
@@ -290,7 +299,7 @@ Pass an existing Steel profile ID as `authProfile` and request write-back. After
 
 ```ts
 // packages/browser-tools/src/providers/steel.ts
-async createSession({ authProfile }: CreateBrowserSessionOptions = {}) {
+async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
   return this.createSteelSession({
     ...
     ...(authProfile ? {

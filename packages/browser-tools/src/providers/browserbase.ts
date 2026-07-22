@@ -1,8 +1,10 @@
-import type {
-	BrowserProvider,
-	ProviderSession,
-	ProviderSessionClosed,
-	ProviderSessionCreateOptions,
+import { errorMessage } from "../errors.js";
+import {
+	ProviderCloseError,
+	type BrowserProvider,
+	type ProviderCloseResult,
+	type ProviderSession,
+	type ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type BrowserbaseBrowserProviderOptions = {
@@ -110,7 +112,7 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 		};
 	}
 
-	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+	async closeSession(sessionId: string): Promise<ProviderCloseResult> {
 		const response = await fetch(
 			`${this.endpoint}/v1/sessions/${sessionId}`,
 			{
@@ -121,12 +123,27 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 				},
 				body: JSON.stringify({ status: "REQUEST_RELEASE" }),
 			},
+		).catch(
+			(cause: unknown) =>
+				new ProviderCloseError({
+					provider: this.name,
+					providerSessionId: sessionId,
+					detail: errorMessage(cause),
+					recovery: "Release the session in the Browserbase dashboard.",
+					cause,
+				}),
 		);
+		if (response instanceof Error) return response;
 		if (!response.ok) {
-			const body = await response.text();
-			throw new Error(
-				`Browserbase API error closing session ${sessionId} (${response.status}): ${body}`,
-			);
+			const body = await response
+				.text()
+				.catch((cause: unknown) => errorMessage(cause));
+			return new ProviderCloseError({
+				provider: this.name,
+				providerSessionId: sessionId,
+				detail: `Browserbase API error (${response.status}): ${body}`,
+				recovery: "Release the session in the Browserbase dashboard.",
+			});
 		}
 		return {};
 	}

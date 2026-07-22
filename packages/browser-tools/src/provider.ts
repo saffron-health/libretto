@@ -5,6 +5,12 @@ export class AuthProfileError extends errore.createTaggedError({
 	message: "$message $recovery",
 }) {}
 
+export class ProviderCloseError extends errore.createTaggedError({
+	name: "ProviderCloseError",
+	message:
+		"Failed to close $provider session $providerSessionId: $detail $recovery",
+}) {}
+
 /**
  * Every provider reduces to "produce a CDP endpoint"; the session registry
  * connects Playwright to it. Provider-level settings (API keys, regions,
@@ -26,7 +32,7 @@ export type BrowserProvider = {
 	createSession(
 		options?: ProviderSessionCreateOptions,
 	): Promise<AuthProfileError | ProviderSession>;
-	closeSession(sessionId: string): Promise<ProviderSessionClosed>;
+	closeSession(sessionId: string): Promise<ProviderCloseResult>;
 }
 
 export type ProviderSession = {
@@ -46,3 +52,5 @@ export type ProviderSession = {
 export type ProviderSessionClosed = {
 	replayUrl?: string;
 }
+
+export type ProviderCloseResult = ProviderCloseError | ProviderSessionClosed;

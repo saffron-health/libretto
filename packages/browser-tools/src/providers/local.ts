@@ -1,11 +1,13 @@
 import { createServer } from "node:net";
 import type { Browser } from "playwright";
 import { chromium } from "playwright";
-import type {
-	BrowserProvider,
-	ProviderSession,
-	ProviderSessionClosed,
-	ProviderSessionCreateOptions,
+import { errorMessage } from "../errors.js";
+import {
+	ProviderCloseError,
+	type BrowserProvider,
+	type ProviderCloseResult,
+	type ProviderSession,
+	type ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type LocalBrowserProviderOptions = {
@@ -75,18 +77,39 @@ export class LocalBrowserProvider implements BrowserProvider {
 			headless: this.headless,
 			args: [`--remote-debugging-port=${port}`],
 		});
-		const cdpEndpoint = await fetchWebSocketDebuggerUrl(port);
 		const sessionId = `local-${this.nextSessionNumber++}`;
 		this.browsers.set(sessionId, browser);
+		const cdpEndpoint = await fetchWebSocketDebuggerUrl(port).catch(
+			async (createError: unknown) => {
+				const closeError = await this.closeSession(sessionId);
+				if (closeError instanceof Error) {
+					throw new AggregateError(
+						[createError, closeError],
+						"Local browser creation and cleanup both failed.",
+					);
+				}
+				throw createError;
+			},
+		);
 		return { sessionId, cdpEndpoint, startUrlPreloaded: false };
 	}
 
-	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+	async closeSession(sessionId: string): Promise<ProviderCloseResult> {
 		const browser = this.browsers.get(sessionId);
-		if (browser) {
-			this.browsers.delete(sessionId);
-			await browser.close();
-		}
+		if (!browser) return {};
+		const closed = await browser.close().catch(
+			(cause: unknown) =>
+				new ProviderCloseError({
+					provider: this.name,
+					providerSessionId: sessionId,
+					detail: errorMessage(cause),
+					recovery:
+						"Call closeSession again; if it still fails, stop the local Chromium process.",
+					cause,
+				}),
+		);
+		if (closed instanceof Error) return closed;
+		this.browsers.delete(sessionId);
 		return {};
 	}
 }

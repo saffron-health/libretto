@@ -11,6 +11,7 @@ test.skipIf(!process.env.KERNEL_API_KEY?.trim())(
 
 		expect(browser.isConnected()).toBe(true);
 
-		await provider.closeSession(session.sessionId);
+		const closed = await provider.closeSession(session.sessionId);
+		if (closed instanceof Error) throw closed;
 	},
 );
