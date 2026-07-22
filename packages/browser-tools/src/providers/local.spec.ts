@@ -244,6 +244,7 @@ test("browser_open navigates the newest restored profile tab", async ({
 	const toolkit = createBrowserTools(
 		new LocalBrowserProvider({
 			authProfileDirectory: join(tempDirectory, "profiles"),
+			channel: "chromium",
 			headless: true,
 		}),
 	);

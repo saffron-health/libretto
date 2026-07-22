@@ -171,7 +171,6 @@ export class LocalBrowserProvider implements BrowserProvider {
 								"--restore-last-session",
 							],
 							ignoreDefaultArgs: [
-								"about:blank",
 								"--disable-component-extensions-with-background-pages",
 								"--disable-extensions",
 							],
