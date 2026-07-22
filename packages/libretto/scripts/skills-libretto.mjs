@@ -7,6 +7,7 @@ export const SKILL_MIRRORS = [
     name: "libretto",
     source: "packages/libretto/skills/libretto",
     targets: [".agents/skills/libretto", ".claude/skills/libretto"],
+    syncPackageVersion: true,
   },
   {
     name: "libretto-readonly",
@@ -15,6 +16,13 @@ export const SKILL_MIRRORS = [
       ".agents/skills/libretto-readonly",
       ".claude/skills/libretto-readonly",
     ],
+    syncPackageVersion: true,
+  },
+  {
+    name: "errore",
+    source: "packages/libretto/skills/errore",
+    targets: [".agents/skills/errore", ".claude/skills/errore"],
+    syncPackageVersion: false,
   },
 ];
 
