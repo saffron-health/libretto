@@ -109,6 +109,7 @@ async function waitForCloudSessionReady(args: {
  */
 export class LibrettoCloudBrowserProvider implements BrowserProvider {
 	readonly name = "libretto-cloud";
+	readonly supportsAuthProfiles = true;
 	private readonly apiKey: string;
 	private readonly endpoint: string;
 	private readonly timeoutSeconds: number;
@@ -140,6 +141,7 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 		options: ProviderSessionCreateOptions = {},
 	): Promise<ProviderSession> {
 		const startUrl = options.startUrl?.trim() || undefined;
+		const authProfile = options.authProfile;
 		const gpu = options.gpu;
 		const viewport = options.viewport;
 		const created = await cloudFetchJson<CloudSessionResponse>(
@@ -149,6 +151,9 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 			{
 				timeout_seconds: this.timeoutSeconds,
 				headless: this.headless,
+				...(authProfile
+					? { profile_name: authProfile, profile_persist: true }
+					: {}),
 				...(startUrl ? { start_url: startUrl } : {}),
 				...(gpu !== undefined ? { gpu } : {}),
 				...(viewport

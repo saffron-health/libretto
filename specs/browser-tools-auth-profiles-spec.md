@@ -206,10 +206,10 @@ async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
 }
 ```
 
-- [ ] Send Libretto Cloud `profile_name` and `profile_persist: true` when a profile is supplied.
-- [ ] Mark the provider as supporting auth profiles.
-- [ ] Add mocked HTTP tests for profile-bearing and unchanged unprofiled request bodies.
-- [ ] Keep close endpoints unchanged; Phase 2 makes them the persistence trigger.
+- [x] Send Libretto Cloud `profile_name` and `profile_persist: true` when a profile is supplied.
+- [x] Mark the provider as supporting auth profiles.
+- [x] Add mocked HTTP tests for profile-bearing and unchanged unprofiled request bodies.
+- [x] Keep close endpoints unchanged; Phase 2 makes them the persistence trigger.
 - [ ] Run the Libretto Cloud provider spec plus package type-check.
 
 ### Phase 6: Add named Kernel profiles
