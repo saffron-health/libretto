@@ -60,9 +60,14 @@
     0 0 0 1px rgba(0, 0, 0, 0.04),
     0 1px 1px -0.5px rgba(0, 0, 0, 0.08),
     0 3px 3px -1.5px rgba(0, 0, 0, 0.08);
+  --docs-shadow-foreground-rgb: 38, 36, 42;
+  --docs-shadow-blur-opacity: 0.06;
   --docs-shadow-minimal:
-    0 0 0 1px rgba(0, 0, 0, 0.06),
-    0 1px 1px -0.5px rgba(0, 0, 0, 0.08);
+    rgba(0, 0, 0, 0) 0 0 0 0,
+    rgba(0, 0, 0, 0) 0 0 0 0,
+    rgba(var(--docs-shadow-foreground-rgb), 0.06) 0 0 0 1px,
+    rgba(0, 0, 0, var(--docs-shadow-blur-opacity)) 0 1px 1px -0.5px,
+    rgba(0, 0, 0, var(--docs-shadow-blur-opacity)) 0 3px 3px -1.5px;
   --docs-focus:
     0 0 0 1px rgba(6, 122, 34, 0.65),
     0 0 8px 1px rgba(6, 122, 34, 0.1);
@@ -105,9 +110,8 @@
     0 0 0 1px rgba(255, 255, 255, 0.06),
     0 1px 1px -0.5px rgba(0, 0, 0, 0.12),
     0 3px 3px -1.5px rgba(0, 0, 0, 0.12);
-  --docs-shadow-minimal:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 1px 1px -0.5px rgba(0, 0, 0, 0.12);
+  --docs-shadow-foreground-rgb: 227, 226, 229;
+  --docs-shadow-blur-opacity: 0.12;
   --docs-focus:
     0 0 0 1px rgba(18, 206, 65, 0.65),
     0 0 8px 1px rgba(18, 206, 65, 0.1);
