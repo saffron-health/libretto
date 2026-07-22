@@ -78,10 +78,6 @@ export const createCloudJobInput = SimpleCLI.input({
     gpu: SimpleCLI.flag({
       help: "Enable GPU for the browser session (overrides workflow)",
     }),
-    noGpu: SimpleCLI.flag({
-      name: "no-gpu",
-      help: "Disable GPU for the browser session (overrides workflow)",
-    }),
     viewport: SimpleCLI.option(z.string().optional(), {
       help: "Override browser viewport as WIDTHxHEIGHT",
     }),
@@ -111,10 +107,6 @@ export const createCloudJobInput = SimpleCLI.input({
   .refine(
     (input) => !(input.headed && input.headless),
     "Cannot pass both --headed and --headless.",
-  )
-  .refine(
-    (input) => !(input.gpu && input.noGpu),
-    "Cannot pass both --gpu and --no-gpu.",
   )
   .refine(
     (input) =>
@@ -151,7 +143,6 @@ export const createCloudJobCommand = SimpleCLI.command({
     if (input.headless) payload.headless = true;
     if (input.startUrl) payload.start_url = input.startUrl;
     if (input.gpu) payload.gpu = true;
-    if (input.noGpu) payload.gpu = false;
     if (viewport) payload.viewport = viewport;
     if (input.callbackUrl) payload.callback_url = input.callbackUrl;
     if (input.callbackSecret) payload.callback_secret = input.callbackSecret;

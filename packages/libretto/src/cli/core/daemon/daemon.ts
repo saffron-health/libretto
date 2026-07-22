@@ -80,7 +80,6 @@ import {
   type DaemonBrowserConnectConfig,
   type DaemonBrowserProviderConfig,
   type DaemonWorkflowConfig,
-  mergeWorkflowLaunchIntoProviderConfig,
 } from "./config.js";
 import type { Experiments } from "../experiments.js";
 import { getCloudProviderApi } from "../providers/index.js";
@@ -966,18 +965,15 @@ async function main(): Promise<void> {
         authProfilePersist,
       };
       if (config.browser.kind === "provider") {
-        browserConfig = mergeWorkflowLaunchIntoProviderConfig(
-          {
-            ...config.browser,
-            authProfileName,
-            authProfilePersist,
-          },
-          {
-            startUrl: loadedWorkflow.startUrl,
-            gpu: loadedWorkflow.gpu,
-            viewport: loadedWorkflow.viewport,
-          },
-        );
+        browserConfig = {
+          ...config.browser,
+          authProfileName,
+          authProfilePersist,
+          startUrl: loadedWorkflow.startUrl ?? config.browser.startUrl,
+          gpu: loadedWorkflow.gpu ?? config.browser.gpu,
+          // Explicit daemon/CLI viewport wins over workflow viewport.
+          viewport: config.browser.viewport ?? loadedWorkflow.viewport,
+        };
       }
     } catch (error) {
       throw new UserFacingStartupError(
