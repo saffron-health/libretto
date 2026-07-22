@@ -171,23 +171,23 @@ async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
 }
 ```
 
-- [ ] Add `authProfileDirectory` for tests and hosts that need an explicit storage root.
-- [ ] Validate local profile names to allow letters, numbers, dots, underscores, and hyphens while rejecting path traversal.
-- [ ] Create profile directories with owner-only permissions, repair an existing profile directory to owner-only permissions before launch, and reject an existing symbolic-link profile path.
-- [ ] Use one persistent user data directory per profile and close the owned persistent context during provider release.
-- [ ] Keep the existing ephemeral launch path unchanged when `authProfile` is absent.
-- [ ] Preserve current URL behavior: when a restored profile has tabs, `browser_open({ url })` navigates the newest restored tab and leaves other tabs open.
-- [ ] Add focused tests for valid names, traversal rejection, symlink rejection, and owner-only directory creation.
+- [x] Add `authProfileDirectory` for tests and hosts that need an explicit storage root.
+- [x] Validate local profile names to allow letters, numbers, dots, underscores, and hyphens while rejecting path traversal.
+- [x] Create profile directories with owner-only permissions, repair an existing profile directory to owner-only permissions before launch, and reject an existing symbolic-link profile path.
+- [x] Use one persistent user data directory per profile and close the owned persistent context during provider release.
+- [x] Keep the existing ephemeral launch path unchanged when `authProfile` is absent.
+- [x] Preserve current URL behavior: when a restored profile has tabs, `browser_open({ url })` navigates the newest restored tab and leaves other tabs open.
+- [x] Add focused tests for valid names, traversal rejection, symlink rejection, and owner-only directory creation.
 - [ ] Run the local provider spec and package type-check.
 
 ### Phase 4: Verify the local login round trip
 
 Exercise the public tools against a local HTTP fixture. Keep these user-flow tests separate from local launch plumbing so both phases stay commit-sized.
 
-- [ ] Add a user-flow test: open a local profile, set cookie and local-storage login state, close, reopen the same profile, and assert both values remain.
-- [ ] Add a test that two different profile names do not share state.
+- [x] Add a user-flow test: open a local profile, set cookie and local-storage login state, close, reopen the same profile, and assert both values remain.
+- [x] Add a test that two different profile names do not share state.
 - [ ] Add a restored-tabs test that locks the documented `browser_open({ url })` behavior.
-- [ ] Run `pnpm --filter libretto-browser-tools test -- src/tools/tools.spec.ts`.
+- [ ] Run `pnpm --filter libretto-browser-tools test -- src/providers/local.spec.ts` and package type-check.
 
 ### Phase 5: Add named Libretto Cloud profiles
 
