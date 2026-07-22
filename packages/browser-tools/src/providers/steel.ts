@@ -2,6 +2,7 @@ import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "../provider.js";
 
 const DEFAULT_STEEL_API_ENDPOINT = "https://api.steel.dev";
@@ -22,6 +23,7 @@ type SteelSessionRequest = {
 	solveCaptcha?: boolean;
 	timeout?: number;
 	inactivityTimeout?: number;
+	dimensions?: { width: number; height: number };
 }
 
 type SteelSessionResponse = {
@@ -75,7 +77,12 @@ export class SteelBrowserProvider implements BrowserProvider {
 		this.inactivityTimeoutMs = options.inactivityTimeoutMs;
 	}
 
-	async createSession(): Promise<ProviderSession> {
+	async createSession(
+		options: ProviderSessionCreateOptions = {},
+	): Promise<ProviderSession> {
+		// Steel has no create-time start URL; callers should navigate after
+		// connect when startUrl is set. Viewport maps to dimensions.
+		const viewport = options.viewport;
 		const request: SteelSessionRequest = {
 			...(this.useProxy === undefined ? {} : { useProxy: this.useProxy }),
 			...(this.solveCaptcha === undefined
@@ -85,6 +92,14 @@ export class SteelBrowserProvider implements BrowserProvider {
 			...(this.inactivityTimeoutMs === undefined
 				? {}
 				: { inactivityTimeout: this.inactivityTimeoutMs }),
+			...(viewport
+				? {
+						dimensions: {
+							width: viewport.width,
+							height: viewport.height,
+						},
+					}
+				: {}),
 		};
 		const response = await fetch(`${this.endpoint}/v1/sessions`, {
 			method: "POST",
@@ -107,6 +122,7 @@ export class SteelBrowserProvider implements BrowserProvider {
 				session.id,
 			),
 			liveViewUrl: session.sessionViewerUrl,
+			startUrlPreloaded: false,
 		};
 	}
 

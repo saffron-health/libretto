@@ -375,6 +375,9 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("--params-file");
     expect(result.stdout).toContain("--timeout-seconds");
     expect(result.stdout).toContain("--headless");
+    expect(result.stdout).toContain("--start-url");
+    expect(result.stdout).toContain("--gpu");
+    expect(result.stdout).toContain("--viewport");
     expect(result.stderr).toBe("");
   });
 
@@ -399,6 +402,9 @@ describe("basic CLI subprocess behavior", () => {
     );
     expect(result.stdout).toContain("--cron");
     expect(result.stdout).toContain("--timezone");
+    expect(result.stdout).toContain("--start-url");
+    expect(result.stdout).toContain("--gpu");
+    expect(result.stdout).toContain("--viewport");
     expect(result.stderr).toBe("");
   });
 

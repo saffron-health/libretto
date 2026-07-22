@@ -28,6 +28,9 @@ export function createLibrettoCloudProvider(): ProviderApi {
         "LIBRETTO_TIMEOUT_SECONDS",
         DEFAULT_BROWSER_SESSION_TIMEOUT_SECONDS,
       );
+      const startUrl = options?.startUrl?.trim() || undefined;
+      const gpu = options?.gpu;
+      const viewport = options?.viewport;
       const resp = await fetch(`${endpoint}/v1/sessions/create`, {
         method: "POST",
         headers: {
@@ -40,6 +43,16 @@ export function createLibrettoCloudProvider(): ProviderApi {
             profile_name: options?.authProfileName,
             profile_persist: options?.authProfilePersist,
             headless: options?.headless,
+            ...(startUrl ? { start_url: startUrl } : {}),
+            ...(gpu !== undefined ? { gpu } : {}),
+            ...(viewport
+              ? {
+                  viewport: {
+                    width: viewport.width,
+                    height: viewport.height,
+                  },
+                }
+              : {}),
           },
         }),
       });
@@ -78,6 +91,8 @@ export function createLibrettoCloudProvider(): ProviderApi {
         sessionId: readySession.session_id,
         cdpEndpoint: readySession.cdp_url,
         liveViewUrl: readySession.live_view_url ?? undefined,
+        // Hosted sessions apply start_url before CDP is returned when set.
+        startUrlPreloaded: Boolean(startUrl),
       };
     },
     async closeSession(sessionId) {

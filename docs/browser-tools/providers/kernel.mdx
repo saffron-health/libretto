@@ -21,7 +21,9 @@ KERNEL_API_KEY=<kernel-api-key>
 # KERNEL_API_ENDPOINT=https://api.onkernel.com
 ```
 
-## Options
+## Provider options
+
+Constructor / env settings for the provider itself:
 
 | Option | Env | Default | Description |
 | --- | --- | --- | --- |
@@ -34,6 +36,18 @@ KERNEL_API_KEY=<kernel-api-key>
 
 Created sessions may include `liveViewUrl` and, when recording is enabled, `recordingUrl`. Closing returns `replayUrl` when a replay was started.
 
+## Session create options
+
+Pass these to `provider.createSession({ ... })` (or via `browser_open({ url })` for `startUrl`):
+
+| Option | Description |
+| --- | --- |
+| `startUrl` | URL Kernel opens before CDP attach |
+| `gpu` | Enable Kernel GPU acceleration |
+| `viewport` | `{ width, height }` window size |
+
+Pass `startUrl` when the site blocks Playwright attach followed by `page.goto()`. Kernel navigates during browser create, before CDP is available, and returns `startUrlPreloaded: true` so callers skip a second navigation.
+
 ## Example
 
 ```typescript theme={null}
@@ -45,6 +59,7 @@ const { tools, dispose } = createAiSdkBrowserTools(
 );
 
 try {
+  // Prefer browser_open({ url }) so Kernel can preload startUrl.
   // agent loop using tools…
 } finally {
   await dispose();

@@ -6,6 +6,7 @@ export type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "./provider.js";
 export {
 	createBrowserTools,

@@ -2,6 +2,7 @@ import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type BrowserbaseBrowserProviderOptions = {
@@ -24,6 +25,7 @@ type BrowserbaseSessionRequest = {
 	timeout?: number;
 	browserSettings?: {
 		solveCaptchas?: boolean;
+		viewport?: { width: number; height: number };
 	};
 }
 
@@ -61,11 +63,24 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 		this.timeoutSeconds = options.timeoutSeconds;
 	}
 
-	async createSession(): Promise<ProviderSession> {
+	async createSession(
+		options: ProviderSessionCreateOptions = {},
+	): Promise<ProviderSession> {
+		// Browserbase has no create-time start URL; callers should navigate after
+		// connect when startUrl is set. Viewport is forwarded via browserSettings.
+		const viewport = options.viewport;
 		const browserSettings = {
 			...(this.solveCaptchas === undefined
 				? {}
 				: { solveCaptchas: this.solveCaptchas }),
+			...(viewport
+				? {
+						viewport: {
+							width: viewport.width,
+							height: viewport.height,
+						},
+					}
+				: {}),
 		};
 		const request: BrowserbaseSessionRequest = {
 			...(this.projectId ? { projectId: this.projectId } : {}),
@@ -91,6 +106,7 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 		return {
 			sessionId: session.id,
 			cdpEndpoint: session.connectUrl,
+			startUrlPreloaded: false,
 		};
 	}
 

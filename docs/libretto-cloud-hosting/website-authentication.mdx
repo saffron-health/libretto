@@ -17,14 +17,13 @@ Hosted website authentication uses the same workflow code as local runs:
 import { librettoAuthenticate, workflow } from "libretto";
 
 export default workflow("portalReport", {
+  startUrl: "https://portal.example.com",
   credentials: ["username", "password"],
   authProfile: {
     name: "portal",
     refresh: true,
   },
   async handler(ctx, input) {
-    await ctx.page.goto("https://portal.example.com");
-
     await librettoAuthenticate(ctx, {
       credentials: input.credentials,
       isSignedIn: async ({ page }) =>

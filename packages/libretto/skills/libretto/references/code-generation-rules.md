@@ -26,11 +26,14 @@ const outputSchema = z.object({
 export default workflow("myWorkflow", {
   input: inputSchema,
   output: outputSchema,
+  // Always declare the entry URL. Libretto opens it before the handler runs
+  // (and before CDP attach on Kernel / cloud providers).
+  startUrl: "https://example.com",
   handler: async (ctx: LibrettoWorkflowContext, input) => {
     const { session, page } = ctx;
 
     console.log("workflow-start", { session, query: input.query });
-    await page.goto("https://example.com");
+    // Do not page.goto(startUrl) here — the browser is already on startUrl.
     await pause(session);
 
     return { results: [] };
@@ -40,7 +43,9 @@ export default workflow("myWorkflow", {
 
 Key points:
 
-- `workflow(name, { input, output, credentials, authProfile, recoveryAction, handler })` takes a unique workflow name, optional Zod input/output schemas, optional declared credential names, an optional auth profile, an optional recovery action, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
+- `workflow(name, { input, output, startUrl, credentials, authProfile, recoveryAction, handler })` takes a unique workflow name, optional Zod input/output schemas, a `startUrl`, optional declared credential names, an optional auth profile, an optional recovery action, and the async handler. The handler's `input` parameter is inferred from the input schema — do not redeclare it with a separate `type Input = ...`.
+- Always set `startUrl` to the workflow's first user-facing URL (homepage, login, search page, and so on). Prefer that over an initial `page.goto` in the handler. Cloud providers preload `startUrl` before CDP attach; a second navigation to the same URL can trigger bot detection.
+- Use `page.goto` only for later navigations to different URLs, not to re-open `startUrl` at the top of the handler.
 - At run time, Libretto validates `input` against `inputSchema` before calling the handler. Invalid input throws a clear error listing each failing field; the workflow handler never sees malformed input.
 - `npx libretto run ./file.ts` executes the file's default-exported workflow, so always use `export default workflow(...)`.
 - `ctx` provides `session` and `page`. Use `console.log`/`console.warn`/`console.error` for logging — the runtime wraps these with structured metadata automatically.
@@ -55,6 +60,7 @@ Declare `credentials` for runtime secrets instead of putting them in the Zod inp
 
 ```typescript
 export default workflow("sentimentWorkflow", {
+  startUrl: "https://example.com",
   credentials: ["openai_api_key"],
   input: z.object({
     pageUrl: z.string().url(),
@@ -65,6 +71,8 @@ export default workflow("sentimentWorkflow", {
   async handler(ctx, input) {
     const apiKey = input.credentials.openai_api_key;
     // Use apiKey for server-side API calls.
+    // Navigate only when leaving startUrl for a different page.
+    await ctx.page.goto(input.pageUrl);
     return { sentiment: "neutral" };
   },
 });

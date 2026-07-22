@@ -10,10 +10,10 @@ Every tool returns the same envelope: `{ ok: true, ...payload }` on success, or 
 
 ## browser_open
 
-Open a new browser session through the configured provider. Optionally navigates to `url` after opening. Returns a `sessionId` for later tools.
+Open a new browser session through the configured provider. Optionally opens `url` at session create (providers that support preload) or after connect. Returns a `sessionId` for later tools.
 
 <ParamField path="url" type="string">
-  Optional URL to open after the session starts. Use a full `https://` URL, or omit `url` and navigate with `browser_exec` via `await page.goto(...)`.
+  Optional start URL for the session. Use a full `https://` URL, or omit `url` and navigate with `browser_exec` via `await page.goto(...)`. Kernel and Libretto Cloud can open this before CDP attach; other providers navigate after connect.
 </ParamField>
 
 Success: `{ ok: true, sessionId }`.
