@@ -204,9 +204,7 @@ export function updateLibrettoSkillVersion(skillSource, version) {
 }
 
 export function setLibrettoSkillVersion(repoRoot, version) {
-  for (const skillMirror of SKILL_MIRRORS.filter(
-    (mirror) => mirror.syncPackageVersion,
-  )) {
+  for (const skillMirror of SKILL_MIRRORS) {
     const skillPath = resolve(repoRoot, `${skillMirror.source}/SKILL.md`);
     const currentContent = readFileSync(skillPath, "utf8");
     writeFileSync(
@@ -300,9 +298,7 @@ function getSkillVersionIssue(repoRoot) {
   const packageJson = JSON.parse(
     readFileSync(resolve(repoRoot, PACKAGE_JSON_PATH), "utf8"),
   );
-  for (const skillMirror of SKILL_MIRRORS.filter(
-    (mirror) => mirror.syncPackageVersion,
-  )) {
+  for (const skillMirror of SKILL_MIRRORS) {
     const skillPath = `${skillMirror.source}/SKILL.md`;
     const skillSource = readFileSync(resolve(repoRoot, skillPath), "utf8");
     const skillVersion = getLibrettoSkillVersion(skillSource);

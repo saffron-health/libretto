@@ -47,9 +47,9 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - `packages/browser-tools/src/session-registry.spec.ts` — tests provider cleanup order and unsupported-provider behavior.
 - `packages/browser-tools/src/providers/*.spec.ts` — tests provider request bodies and profile lookup/create behavior with mocked HTTP responses.
 - `packages/browser-tools/package.json` — adds the `errore` runtime dependency.
-- `packages/libretto/skills/errore/SKILL.md` — source skill for the Errore convention.
-- `packages/libretto/scripts/skills-libretto.mjs` — mirrors the source skill into agent-specific skill directories.
-- `AGENTS.md` — tells agents when Errore applies and when to read its skill.
+- `.agents/skills/errore/SKILL.md` — upstream Errore skill installed at repository scope.
+- `skills-lock.json` — tracks the upstream skill source and content hash.
+- `AGENTS.md` — scopes incremental Errore adoption and tells agents when to read its skill.
 - `packages/browser-tools/README.md` — documents profile use, provider-specific references, persistence timing, and security.
 - [Errore](https://errore.org/) — tagged errors and internal error-as-value unions.
 - [Playwright persistent authentication](https://playwright.dev/docs/auth) — background on persisted browser state.
@@ -64,12 +64,11 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 
 Add the package and skill before changing error behavior. Scope the new convention to expected failures in `packages/browser-tools` so the rest of the repository can adopt it separately.
 
-- [ ] Add the latest `errore` release as a runtime dependency of `libretto-browser-tools`.
-- [ ] Add the Errore skill source at `packages/libretto/skills/errore/SKILL.md`.
-- [ ] Add Errore to `SKILL_MIRRORS`, then run `pnpm sync:mirrors` to generate `.agents/skills/errore` and `.claude/skills/errore`.
-- [ ] Update `AGENTS.md`: before editing expected-failure paths in `packages/browser-tools`, read the Errore skill and use error values internally.
-- [ ] Do not change runtime error behavior or public TypeScript signatures in this phase.
-- [ ] Run `pnpm check:mirrors`, `pnpm --filter libretto-browser-tools type-check`, and `pnpm -s lint`.
+- [x] Add `errore` 0.14.1 as a runtime dependency of `libretto-browser-tools`.
+- [x] Install the upstream `remorses/errore` skill at repository scope and track it in `skills-lock.json`; do not add it to Libretto's exported skill mirrors.
+- [x] Update `AGENTS.md`: do not use Errore by default during incremental adoption; read the skill only for tasks or code paths that explicitly opt in.
+- [x] Keep runtime error behavior and public TypeScript signatures unchanged in this phase.
+- [x] Run `pnpm check:mirrors`, `pnpm --filter libretto-browser-tools type-check`, `pnpm --filter libretto-browser-tools test`, and `pnpm -s lint`.
 
 ### Phase 1: Add the browser-open auth profile contract
 
