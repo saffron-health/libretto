@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "."
+    "rootDir": "..",
+    "paths": {
+      "affordance": ["../affordance/src/index.ts"],
+      "libretto-browser-tools/pi": ["./src/adapters/pi/index.ts"]
+    }
   },
   "include": ["src/**/*.ts", "benchmarks/**/*.ts"],
   "exclude": ["node_modules", "dist"]
