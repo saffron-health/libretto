@@ -1,8 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-	CallToolResult,
-	ToolAnnotations,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
 	createBrowserTools,
 	type BrowserToolkitOptions,
@@ -13,13 +10,6 @@ import type { SnapshotToolOutput } from "../../tools/snapshot.js";
 
 export type McpBrowserToolkit = {
 	dispose(): Promise<void>;
-};
-
-const READ_ONLY_CLOSED_WORLD_ANNOTATIONS: ToolAnnotations = {
-	readOnlyHint: true,
-	destructiveHint: false,
-	idempotentHint: true,
-	openWorldHint: false,
 };
 
 function textResult(result: unknown): CallToolResult {
@@ -146,7 +136,12 @@ export function registerMcpBrowserTools(
 		{
 			description: browser_status.description,
 			inputSchema: browser_status.inputSchema,
-			annotations: READ_ONLY_CLOSED_WORLD_ANNOTATIONS,
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 		},
 		async (input) => textResult(await browser_status.execute(input)),
 	);
