@@ -186,7 +186,7 @@ Exercise the public tools against a local HTTP fixture. Keep these user-flow tes
 
 - [x] Add a user-flow test: open a local profile, set cookie and local-storage login state, close, reopen the same profile, and assert both values remain.
 - [x] Add a test that two different profile names do not share state.
-- [ ] Add a restored-tabs test that locks the documented `browser_open({ url })` behavior.
+- [x] Add a restored-tabs test that locks the documented `browser_open({ url })` behavior.
 - [ ] Run `pnpm --filter libretto-browser-tools test -- src/providers/local.spec.ts` and package type-check.
 
 ### Phase 5: Add named Libretto Cloud profiles

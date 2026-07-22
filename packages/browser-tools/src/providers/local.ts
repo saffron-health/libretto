@@ -164,7 +164,17 @@ export class LocalBrowserProvider implements BrowserProvider {
 				? null
 				: await chromium.launchPersistentContext(
 						authProfilePath,
-						launchOptions,
+						{
+							...launchOptions,
+							args: [
+								...launchOptions.args,
+								"--restore-last-session",
+							],
+							ignoreDefaultArgs: [
+								"--disable-component-extensions-with-background-pages",
+								"--disable-extensions",
+							],
+						},
 					);
 		const browser =
 			persistentContext === null
