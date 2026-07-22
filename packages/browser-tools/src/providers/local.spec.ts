@@ -236,3 +236,69 @@ test("local auth profiles isolate login state by name", async ({
 	const disposed = await toolkit.dispose();
 	if (disposed instanceof Error) throw disposed;
 });
+
+test("browser_open navigates the newest restored profile tab", async ({
+	authServer,
+	tempDirectory,
+}) => {
+	const toolkit = createBrowserTools(
+		new LocalBrowserProvider({
+			authProfileDirectory: join(tempDirectory, "profiles"),
+			headless: true,
+		}),
+	);
+
+	const firstSession = await toolkit.tools.browser_open.execute({
+		authProfile: "work",
+		url: `${authServer.origin}/dashboard?tab=first`,
+	});
+	if (!firstSession.ok) throw new Error(firstSession.error);
+	const openedTabs = await toolkit.tools.browser_exec.execute({
+		sessionId: firstSession.sessionId,
+		code:
+			"const newest = await context.newPage(); " +
+			`await newest.goto('${authServer.origin}/dashboard?tab=newest'); ` +
+			"return context.pages().map((tab) => tab.url());",
+	});
+	expect(openedTabs).toMatchObject({
+		ok: true,
+		result: expect.arrayContaining([
+			`${authServer.origin}/dashboard?tab=first`,
+			`${authServer.origin}/dashboard?tab=newest`,
+		]),
+	});
+	expect(
+		await toolkit.tools.browser_close.execute({
+			sessionId: firstSession.sessionId,
+		}),
+	).toEqual({ ok: true });
+
+	const restoredSession = await toolkit.tools.browser_open.execute({
+		authProfile: "work",
+		url: `${authServer.origin}/dashboard?tab=target`,
+	});
+	if (!restoredSession.ok) throw new Error(restoredSession.error);
+	const restoredTabs = await toolkit.tools.browser_exec.execute({
+		sessionId: restoredSession.sessionId,
+		code:
+			"return { current: page.url(), " +
+			"tabs: context.pages().map((tab) => tab.url()) };",
+	});
+	expect(restoredTabs).toMatchObject({
+		ok: true,
+		result: {
+			current: `${authServer.origin}/dashboard?tab=target`,
+			tabs: expect.arrayContaining([
+				`${authServer.origin}/dashboard?tab=first`,
+				`${authServer.origin}/dashboard?tab=target`,
+			]),
+		},
+	});
+	expect(
+		await toolkit.tools.browser_close.execute({
+			sessionId: restoredSession.sessionId,
+		}),
+	).toEqual({ ok: true });
+	const disposed = await toolkit.dispose();
+	if (disposed instanceof Error) throw disposed;
+});
