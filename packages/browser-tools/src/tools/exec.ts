@@ -11,6 +11,7 @@ import {
 	type PageStabilityWaitOptions,
 } from "../snapshot/wait-for-page-stable.js";
 import type { SessionRegistry } from "../session-registry.js";
+import type { BrowserToolTimingEvent } from "../create-browser-tools.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
 
 const execInputSchema = z.object({
@@ -53,6 +54,7 @@ export type ExecTool = {
 export function createExecTool(
 	registry: SessionRegistry,
 	pageStability: PageStabilityWaitOptions = {},
+	onTiming?: (event: BrowserToolTimingEvent) => void | Promise<void>,
 ): ExecTool {
 	return {
 		name: "browser_exec",
@@ -69,6 +71,18 @@ export function createExecTool(
 			"fix the code, and try again.",
 		inputSchema: execInputSchema,
 		async execute({ sessionId, code, pageId }): Promise<ToolResult<ExecToolOutput>> {
+			const startedAt = Date.now();
+			const phases: Record<string, number> = {};
+			const emitTiming = async (outcome: "success" | "error") => {
+				await Promise.resolve(
+					onTiming?.({
+						tool: "browser_exec",
+						durationMs: Date.now() - startedAt,
+						phases,
+						outcome,
+					}),
+				).catch(() => undefined);
+			};
 			let scope: ExecScope;
 			try {
 				const page = registry.getCurrentPage(sessionId, pageId);
@@ -93,19 +107,32 @@ export function createExecTool(
 				};
 			}
 
+			const baselineStartedAt = Date.now();
 			const before = await registry.readSnapshotBaseline(sessionId, pageId);
+			phases.baselineSnapshotMs = Date.now() - baselineStartedAt;
+			const executionStartedAt = Date.now();
 			const execResult = await runExecCode(code, scope);
+			phases.executionMs = Date.now() - executionStartedAt;
 			const executionPolicyError = registry.consumeBlockedNavigationError(
 				scope.page,
 			);
 			if (executionPolicyError) throw executionPolicyError;
-			if (!execResult.ok) return execResult;
+			if (!execResult.ok) {
+				await emitTiming("error");
+				return execResult;
+			}
 
 			let snapshotDiff = "";
 			try {
+				const stabilityStartedAt = Date.now();
 				await waitForPageStable(scope.page, pageStability);
+				phases.stabilityMs = Date.now() - stabilityStartedAt;
+				const snapshotStartedAt = Date.now();
 				const after = await registry.captureSnapshotAfterExec(sessionId, pageId);
+				phases.snapshotMs = Date.now() - snapshotStartedAt;
+				const diffStartedAt = Date.now();
 				snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
+				phases.diffMs = Date.now() - diffStartedAt;
 			} catch {
 				registry.clearSnapshotCache(sessionId);
 			}
@@ -113,6 +140,7 @@ export function createExecTool(
 				registry.consumeBlockedNavigationError(scope.page);
 			if (stabilizationPolicyError) throw stabilizationPolicyError;
 
+			await emitTiming("success");
 			return { ...execResult, snapshotDiff };
 		},
 	};

@@ -31,6 +31,14 @@ export type BrowserToolkit = {
 
 export type BrowserToolkitOptions = DomainPolicyOptions & {
 	pageStability?: PageStabilityWaitOptions;
+	onTiming?: (event: BrowserToolTimingEvent) => void | Promise<void>;
+};
+
+export type BrowserToolTimingEvent = {
+	tool: "browser_exec" | "browser_snapshot";
+	durationMs: number;
+	phases: Record<string, number>;
+	outcome: "success" | "error";
 };
 
 export type BorrowedPageBrowserToolkit = {
@@ -56,8 +64,16 @@ export function createBrowserTools(
 	return {
 		tools: {
 			browser_open: createOpenTool(registry),
-			browser_exec: createExecTool(registry, options.pageStability),
-			browser_snapshot: createSnapshotTool(registry, options.pageStability),
+			browser_exec: createExecTool(
+				registry,
+				options.pageStability,
+				options.onTiming,
+			),
+			browser_snapshot: createSnapshotTool(
+				registry,
+				options.pageStability,
+				options.onTiming,
+			),
 			browser_status: createStatusTool(registry),
 			browser_close: createCloseTool(registry),
 			browser_connect: createConnectTool(registry),
