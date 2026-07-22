@@ -41,6 +41,7 @@ pnpm -s cli
 - Do not add new dependencies without asking.
 - Do not remove or comment out code to "clean up" without asking — it may be there for a reason.
 - When code prints user-facing Libretto CLI commands, use the native `libretto` command in examples and guidance.
+- In `packages/browser-tools`, use Errore for new expected-failure paths. Read the `errore` skill before editing those paths, and keep existing public thrown-error contracts unless the task explicitly changes them.
 
 ## Testing
 
