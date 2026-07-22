@@ -49,6 +49,15 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 		inputSchema: openInputSchema,
 		async execute({ url, authProfile }): Promise<ToolResult<OpenToolOutput>> {
 			const startUrl = url?.trim() || undefined;
+			if (startUrl !== undefined && !URL.canParse(startUrl)) {
+				return {
+					ok: false,
+					error:
+						`Could not navigate to ${startUrl} (Invalid URL). ` +
+						"Call browser_open again — use a full https:// URL, " +
+						"or omit url and navigate with browser_exec via `await page.goto(...)`.",
+				};
+			}
 			const opened = await registry.openSession({
 				authProfile,
 				...(startUrl ? { startUrl } : {}),
