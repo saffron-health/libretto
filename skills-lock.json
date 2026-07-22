@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "errore": {
+      "source": "remorses/errore",
+      "sourceType": "github",
+      "skillPath": "skills/errore/SKILL.md",
+      "computedHash": "c8c58707dfee91f71d479431d3ab3d64d63f824c22760444e7ae08b6397fd378"
+    },
     "glimpse-changes": {
       "source": "tanishqkancharla/glimpse-changes",
       "sourceType": "github",
