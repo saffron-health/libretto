@@ -50,99 +50,9 @@ Keep `browser_connect` unchanged as the explicit raw-CDP tool. It remains regist
 
 ## Implementation
 
-### Phase 1: Add provider-selected page registration
+### Phase 1: Switch providers and the registry to pages
 
-Add the page path first so Craft can use it without changing built-in providers in the same commit. The temporary endpoint branch keeps the tree working while providers migrate; the final phase removes it.
-
-```ts
-// packages/browser-tools/src/provider.ts
-export type ProviderSession =
-  | { sessionId: string; page: Page; cdpEndpoint?: never; /* metadata */ }
-  | { sessionId: string; cdpEndpoint: string; page?: never; /* metadata */ };
-
-// packages/browser-tools/src/session-registry.ts
-async openSession(options: ProviderSessionCreateOptions = {}) {
-  const session = await this.provider.createSession(options);
-  return session.page
-    ? this.registerProviderPage(session)
-    : this.registerProviderEndpoint(session);
-}
-```
-
-- [ ] Add a typed provider-session variant containing `sessionId`, `page`, and existing metadata.
-- [ ] Register only the supplied page initially for the page variant.
-- [ ] Derive the context and browser from `page.context()` without calling `connectOverCDP()`.
-- [ ] Keep `context.on("page")` tracking for pages opened after registration.
-- [ ] On close or registration failure, remove registry listeners and call `provider.closeSession(sessionId)` without calling `browser.close()` for the page variant.
-- [ ] Keep the current endpoint path unchanged during provider migration.
-- [ ] Add a test with two pages proving the registry selects the page returned by the provider.
-- [ ] Add a test proving close calls provider cleanup once while leaving the returned page and host browser open.
-- [ ] Add a blocked-page test proving partial registration calls provider cleanup once.
-- [ ] Verify `pnpm --filter libretto-browser-tools type-check` passes.
-- [ ] Verify `pnpm --filter libretto-browser-tools test -- src/session-registry.spec.ts src/tools/tools.spec.ts` passes.
-
-### Phase 2: Migrate local, Browserbase, and Browser Use providers
-
-Move CDP attachment into the first provider group. Each provider stores its Playwright browser handle by provider session ID so `closeSession()` can detach Playwright and then perform existing browser or API cleanup.
-
-```ts
-// packages/browser-tools/src/providers/browserbase.ts
-class BrowserbaseBrowserProvider implements BrowserProvider {
-  private readonly browsers = new Map<string, Browser>();
-  ...
-
-  async createSession(options = {}) {
-    const remote = await this.createRemoteSession(options);
-    const { browser, page } = await connectProviderPage(remote.connectUrl);
-    this.browsers.set(remote.id, browser);
-    return { sessionId: remote.id, page, startUrlPreloaded: false };
-  }
-}
-```
-
-- [ ] Add one small internal CDP helper that connects and returns `{ browser, page }`; it must close a partial connection if page selection fails.
-- [ ] Update `LocalBrowserProvider`, `BrowserbaseBrowserProvider`, and `BrowserUseBrowserProvider` to return `page`.
-- [ ] Store each Playwright browser by `sessionId` and remove it from the map before awaiting close.
-- [ ] Make `closeSession()` detach or close Playwright before running existing provider cleanup.
-- [ ] If internal CDP attachment fails after remote allocation, release the remote session before rejecting `createSession()`.
-- [ ] Preserve local channel and headless options, Browserbase settings, and Browser Use proxy and timeout options.
-- [ ] Update provider tests to execute against `session.page` and close through `provider.closeSession(session.sessionId)`.
-- [ ] Add a local test proving two `closeSession()` calls close the browser once.
-- [ ] Verify `pnpm --filter libretto-browser-tools type-check` passes.
-- [ ] Verify the three provider test files pass.
-
-### Phase 3: Migrate Kernel, Steel, and Libretto Cloud providers
-
-Apply the same provider-owned attachment and cleanup path to the remaining providers. Preserve preload and recording behavior rather than changing their API requests.
-
-```ts
-// packages/browser-tools/src/providers/kernel.ts
-async createSession(options = {}) {
-  const remote = await this.createKernelBrowser(options);
-  const { browser, page } = await connectProviderPage(remote.cdp_ws_url);
-  this.browsers.set(remote.session_id, browser);
-  return {
-    sessionId: remote.session_id,
-    page,
-    liveViewUrl: remote.browser_live_view_url ?? undefined,
-    startUrlPreloaded: Boolean(options.startUrl),
-  };
-}
-```
-
-- [ ] Update Kernel, Steel, and Libretto Cloud providers to return their selected page.
-- [ ] Keep provider browser handles keyed by `sessionId` and make close idempotent.
-- [ ] Preserve Kernel CDP readiness retries, replay URLs, start URL, GPU, viewport, stealth, and proxy options.
-- [ ] Preserve Steel viewer URL, dimensions, proxy, captcha, and timeout options.
-- [ ] Preserve Libretto Cloud queue polling, live-view URL, recording lookup, start URL, GPU, viewport, headless, and timeout options.
-- [ ] Release each remote session if internal Playwright attachment fails.
-- [ ] Update the three provider integration tests to use the returned page and `closeSession()`.
-- [ ] Verify `pnpm --filter libretto-browser-tools type-check` passes.
-- [ ] Verify the three provider test files pass.
-
-### Phase 4: Remove endpoint sessions from the provider contract
-
-Finish the contract after every built-in provider returns a page. Keep endpoint data private for benchmarks and update the two provider docs.
+Change the contract atomically so `ProviderSession` has one representation. Built-in providers connect to CDP internally, while the registry accepts only the page they select.
 
 ```ts
 // packages/browser-tools/src/provider.ts
@@ -153,9 +63,38 @@ export type ProviderSession = {
   recordingUrl?: string;
   startUrlPreloaded?: boolean;
 };
+
+// packages/browser-tools/src/session-registry.ts
+async openSession(options: ProviderSessionCreateOptions = {}) {
+  const session = await this.provider.createSession(options);
+  return this.registerProviderPage(session);
+}
 ```
 
-- [ ] Remove `cdpEndpoint` from the public `ProviderSession` contract and delete the temporary registry endpoint branch.
+- [ ] Replace `ProviderSession.cdpEndpoint` with required `ProviderSession.page`.
+- [ ] Add one small internal CDP helper that connects and returns `{ browser, page }`; close a partial connection if page selection fails.
+- [ ] Update all six built-in providers to connect internally and return `page`.
+- [ ] Keep each provider's Playwright browser handle by `sessionId` so `closeSession()` owns Playwright and remote cleanup.
+- [ ] Remove provider state before awaiting close so repeated `closeSession()` calls cannot clean up twice.
+- [ ] If CDP attachment fails after remote allocation, release the remote session before rejecting `createSession()`.
+- [ ] Preserve all existing provider options, live-view data, recording data, preload state, and close results.
+- [ ] Register only the supplied page initially.
+- [ ] Derive the context and browser from `page.context()` without calling `connectOverCDP()`.
+- [ ] Keep `context.on("page")` tracking for pages opened after registration.
+- [ ] On close or registration failure, remove registry listeners and call `provider.closeSession(sessionId)` without calling `browser.close()`.
+- [ ] Keep `browser_connect` and `createBrowserToolsForPage()` unchanged.
+- [ ] Add a test with two pages proving the registry selects the page returned by the provider.
+- [ ] Add a test proving close calls provider cleanup once while leaving the returned page and host browser open.
+- [ ] Add a blocked-page test proving partial registration calls provider cleanup once.
+- [ ] Update built-in provider tests to execute against `session.page` and close through `provider.closeSession(session.sessionId)`.
+- [ ] Add a local test proving two `closeSession()` calls close the browser once.
+- [ ] Verify `pnpm --filter libretto-browser-tools type-check` passes.
+- [ ] Verify `pnpm --filter libretto-browser-tools test` passes.
+
+### Phase 2: Update benchmarks and provider documentation
+
+Keep endpoint data private for the benchmark harness and document the one canonical provider-session representation.
+
 - [ ] Retain provider CDP endpoints only through an internal benchmark accessor.
 - [ ] Update the benchmark harness to close through `provider.closeSession()`.
 - [ ] Update custom-provider docs to return an exact page from `createSession()`.
