@@ -65,6 +65,15 @@ Writing rules, from Orwell, 1946. These govern prose: docs, PR text, messages. N
 
 Review every prose output against these rules before delivering.
 
+## Errors as values (errore.org convention)
+
+This codebase uses the errore.org convention for internal TypeScript.
+ALWAYS read the `.agents/skills/errore` skill before changing error-handling code.
+
+- Expected domain failures: return `T | SpecificError` and check with `instanceof`.
+- Host misconfiguration agents cannot fix: throw (unchanged policy).
+- Agent-facing tools and daemon exec: keep `{ ok: false, error|message }` envelopes; map typed errors to actionable strings at that boundary only.
+
 ## Agent-facing error messages
 
 Errors returned to agents (tool `{ ok: false, error }` results, MCP `isError` content, CLI output an agent reads) must tell the agent what to do next — not just what went wrong.

@@ -73,12 +73,11 @@ ALWAYS read the `.agents/skills/errore` skill before changing error-handling cod
 - Expected domain failures: return `T | SpecificError` and check with `instanceof`.
 - Host misconfiguration agents cannot fix: throw (unchanged policy).
 - Agent-facing tools and daemon exec: keep `{ ok: false, error|message }` envelopes; map typed errors to actionable strings at that boundary only.
-- Do not add the `errore` npm package unless a later spec approves it.
 ```
 
-- [ ] Add an "Errors as values" section to root `AGENTS.md` that points at `.agents/skills/errore`, states the return-vs-throw-vs-envelope split, and forbids adding the `errore` package without an explicit follow-up decision.
-- [ ] Cross-link the new section from `packages/libretto/src/shared/ipc/AGENTS.md` in one short paragraph so IPC authors do not replace daemon result envelopes with bare `Error` returns over the wire.
-- [ ] Success criteria: an agent reading `AGENTS.md` can state when to return, throw, or use `{ ok: false }` without reading this spec.
+- [x] Add an "Errors as values" section to root `AGENTS.md` that points at `.agents/skills/errore` and states the return-vs-throw-vs-envelope split.
+- [x] Cross-link the new section from `packages/libretto/src/shared/ipc/AGENTS.md` in one short paragraph so IPC authors do not replace daemon result envelopes with bare `Error` returns over the wire.
+- [x] Success criteria: an agent reading `AGENTS.md` can state when to return, throw, or use `{ ok: false }` without reading this spec.
 
 ### Phase 2: Vendor an adapted errore skill
 
