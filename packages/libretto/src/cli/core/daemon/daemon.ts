@@ -508,9 +508,9 @@ class BrowserDaemon {
         initialPages: operationalPages.length > 0 ? operationalPages : [page],
         // Providers that preload start_url before CDP attach must not get a
         // second page.goto — that re-triggers bot detection on some sites.
-        navigateUrl: providerSession.startUrlPreloaded
-          ? undefined
-          : config.initialUrl,
+        // Providers without create-time start_url still navigate here so
+        // workflow startUrl works without a first-handler page.goto.
+        navigateUrl: providerSession.startUrlPreloaded ? undefined : startUrl,
         readyProvider: {
           name: config.providerName,
           sessionId: providerSession.sessionId,

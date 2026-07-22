@@ -146,13 +146,16 @@ describe("Steel provider", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const session = await createSteelProvider().createSession();
+    const session = await createSteelProvider().createSession({
+      viewport: { width: 1440, height: 900 },
+    });
 
     expect(session).toEqual({
       sessionId: "session-ready",
       cdpEndpoint:
         "wss://connect.example.test/?apiKey=test-key&sessionId=session-ready",
       liveViewUrl: "https://app.steel.dev/sessions/session-ready",
+      startUrlPreloaded: false,
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://steel.example.test/v1/sessions",
@@ -170,6 +173,7 @@ describe("Steel provider", () => {
             autoCaptchaSolving: true,
             skipFingerprintInjection: false,
           },
+          dimensions: { width: 1440, height: 900 },
         }),
       }),
     );
@@ -491,6 +495,7 @@ describe("Libretto Cloud provider", () => {
     const session = await createLibrettoCloudProvider().createSession();
 
     expect(session.sessionId).toBe("session-ready");
+    expect(session.startUrlPreloaded).toBe(false);
     expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
       json: { timeout_seconds: 3600 },
     });
@@ -524,6 +529,44 @@ describe("Libretto Cloud provider", () => {
     expect(session.sessionId).toBe("session-headless");
     expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
       json: { timeout_seconds: 3600, headless: true },
+    });
+  });
+
+  it("forwards startUrl, gpu, and viewport to cloud browser sessions", async () => {
+    vi.stubEnv("LIBRETTO_API_KEY", "test-key");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/v1/sessions/create") {
+          return jsonResponse({
+            json: {
+              session_id: "session-launch",
+              status: "open",
+              cdp_url: "wss://cloud.example.test/devtools/session-launch",
+              live_view_url: null,
+            },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await createLibrettoCloudProvider().createSession({
+      startUrl: "https://www.marriott.com/",
+      gpu: true,
+      viewport: { width: 1440, height: 900 },
+    });
+
+    expect(session.startUrlPreloaded).toBe(true);
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
+      json: {
+        timeout_seconds: 3600,
+        start_url: "https://www.marriott.com/",
+        gpu: true,
+        viewport: { width: 1440, height: 900 },
+      },
     });
   });
 
@@ -572,6 +615,7 @@ describe("Libretto Cloud provider", () => {
       sessionId: "session-queued",
       cdpEndpoint: "wss://cloud.example.test/devtools/session-queued",
       liveViewUrl: "https://cloud.example.test/live",
+      startUrlPreloaded: false,
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({

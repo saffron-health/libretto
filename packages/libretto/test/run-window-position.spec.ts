@@ -59,6 +59,19 @@ describe("createRunBrowserConfig", () => {
     });
   });
 
+  it("omits viewport on provider runs when none is explicit", () => {
+    expect(
+      createRunBrowserConfig({
+        providerName: "browserbase",
+        headless: true,
+      }),
+    ).toEqual({
+      kind: "provider",
+      providerName: "browserbase",
+      headless: true,
+    });
+  });
+
   it("passes headed mode to provider workflow runs", () => {
     expect(
       createRunBrowserConfig({

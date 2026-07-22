@@ -33,14 +33,27 @@ export function createSteelProvider(
     process.env.STEEL_CONNECT_URL ?? DEFAULT_STEEL_CONNECT_ENDPOINT;
 
   return {
-    async createSession() {
+    async createSession(sessionOptions) {
+      // Steel has no create-time start_url. Viewport maps to dimensions;
+      // startUrl is opened after CDP connect by the daemon.
+      const viewport = sessionOptions?.viewport;
       const resp = await fetch(`${endpoint}/v1/sessions`, {
         method: "POST",
         headers: {
           "steel-api-key": apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(STEEL_STEALTH_SESSION_OPTIONS),
+        body: JSON.stringify({
+          ...STEEL_STEALTH_SESSION_OPTIONS,
+          ...(viewport
+            ? {
+                dimensions: {
+                  width: viewport.width,
+                  height: viewport.height,
+                },
+              }
+            : {}),
+        }),
       });
       if (!resp.ok) {
         const body = await resp.text();
@@ -51,6 +64,7 @@ export function createSteelProvider(
         sessionId: json.id,
         cdpEndpoint: buildSteelCdpEndpoint(connectEndpoint, apiKey, json.id),
         liveViewUrl: json.sessionViewerUrl,
+        startUrlPreloaded: false,
       };
     },
     async closeSession(sessionId) {

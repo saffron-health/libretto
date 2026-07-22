@@ -11,6 +11,9 @@ export type BrowserbaseBrowserProviderOptions = {
 	proxies?: boolean;
 	solveCaptchas?: boolean;
 	timeoutSeconds?: number;
+	/** Browserbase has no create-time start URL; callers should navigate after connect. */
+	startUrl?: string;
+	viewport?: { width: number; height: number };
 }
 
 type BrowserbaseSessionResponse = {
@@ -24,6 +27,7 @@ type BrowserbaseSessionRequest = {
 	timeout?: number;
 	browserSettings?: {
 		solveCaptchas?: boolean;
+		viewport?: { width: number; height: number };
 	};
 }
 
@@ -35,6 +39,7 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 	private readonly proxies: boolean | undefined;
 	private readonly solveCaptchas: boolean | undefined;
 	private readonly timeoutSeconds: number | undefined;
+	private readonly viewport: { width: number; height: number } | undefined;
 
 	constructor(options: BrowserbaseBrowserProviderOptions = {}) {
 		const apiKey = (
@@ -59,6 +64,7 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 		this.proxies = options.proxies;
 		this.solveCaptchas = options.solveCaptchas;
 		this.timeoutSeconds = options.timeoutSeconds;
+		this.viewport = options.viewport;
 	}
 
 	async createSession(): Promise<ProviderSession> {
@@ -66,6 +72,14 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 			...(this.solveCaptchas === undefined
 				? {}
 				: { solveCaptchas: this.solveCaptchas }),
+			...(this.viewport
+				? {
+						viewport: {
+							width: this.viewport.width,
+							height: this.viewport.height,
+						},
+					}
+				: {}),
 		};
 		const request: BrowserbaseSessionRequest = {
 			...(this.projectId ? { projectId: this.projectId } : {}),

@@ -880,10 +880,12 @@ export const runCommand = SimpleCLI.command({
         ? true
         : undefined;
     const visualize = !input.noVisualize;
-    const viewport = resolveViewport(
-      parseViewportArg(input.viewport),
-      ctx.logger,
-    );
+    const cliViewport = parseViewportArg(input.viewport);
+    const configViewport = readLibrettoConfig().viewport;
+    // Only pass an explicit CLI/config viewport into provider runs so workflow
+    // viewport metadata can fill in. Local launches still resolve a default.
+    const explicitViewport = cliViewport ?? configViewport;
+    const viewport = resolveViewport(cliViewport, ctx.logger);
 
     const providerName = resolveProviderName(input.provider);
     const daemonProviderName = providerName === "local" ? undefined : providerName;
@@ -910,7 +912,7 @@ export const runCommand = SimpleCLI.command({
         tsconfigPath: input.tsconfig,
         headless,
         visualize,
-        viewport,
+        viewport: daemonProviderName ? explicitViewport : viewport,
         windowPosition,
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
         providerName: daemonProviderName,

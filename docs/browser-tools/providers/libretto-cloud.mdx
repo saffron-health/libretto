@@ -25,6 +25,9 @@ LIBRETTO_API_KEY=<libretto-api-key>
 | `apiUrl` | `LIBRETTO_API_URL` | `https://api.libretto.sh` | API base URL |
 | `timeoutSeconds` | `LIBRETTO_TIMEOUT_SECONDS` | `3600` | Browser session TTL at create time |
 | `headless` | — | `true` | Request a headless session |
+| `startUrl` | — | — | URL opened before CDP is returned |
+| `gpu` | — | — | Request GPU acceleration |
+| `viewport` | — | — | `{ width, height }` window size |
 
 Sessions may queue briefly until capacity is available (up to 10 minutes). Ready sessions expose `liveViewUrl`. Closing a session may return `replayUrl` when a recording is available.
 

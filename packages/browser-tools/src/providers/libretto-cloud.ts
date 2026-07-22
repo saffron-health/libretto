@@ -15,6 +15,10 @@ export type LibrettoCloudBrowserProviderOptions = {
 	/** Browser session TTL requested at create time. */
 	timeoutSeconds?: number;
 	headless?: boolean;
+	/** URL opened before CDP is returned when the hosted provider supports it. */
+	startUrl?: string;
+	gpu?: boolean;
+	viewport?: { width: number; height: number };
 }
 
 type CloudSessionResponse = {
@@ -110,6 +114,9 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 	private readonly endpoint: string;
 	private readonly timeoutSeconds: number;
 	private readonly headless: boolean;
+	private readonly startUrl: string | undefined;
+	private readonly gpu: boolean | undefined;
+	private readonly viewport: { width: number; height: number } | undefined;
 
 	constructor(options: LibrettoCloudBrowserProviderOptions = {}) {
 		const apiKey = (options.apiKey ?? process.env.LIBRETTO_API_KEY)?.trim();
@@ -131,6 +138,9 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 			(Number(process.env.LIBRETTO_TIMEOUT_SECONDS) ||
 				DEFAULT_BROWSER_SESSION_TIMEOUT_SECONDS);
 		this.headless = options.headless ?? true;
+		this.startUrl = options.startUrl?.trim() || undefined;
+		this.gpu = options.gpu;
+		this.viewport = options.viewport;
 	}
 
 	async createSession(): Promise<ProviderSession> {
@@ -141,6 +151,16 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 			{
 				timeout_seconds: this.timeoutSeconds,
 				headless: this.headless,
+				...(this.startUrl ? { start_url: this.startUrl } : {}),
+				...(this.gpu !== undefined ? { gpu: this.gpu } : {}),
+				...(this.viewport
+					? {
+							viewport: {
+								width: this.viewport.width,
+								height: this.viewport.height,
+							},
+						}
+					: {}),
 			},
 		);
 

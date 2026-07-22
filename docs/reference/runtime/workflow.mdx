@@ -95,7 +95,7 @@ The CLI compiles the file with `tsx`, launches a Chromium browser, and calls you
 
 #### Browser launch options
 
-Always declare `startUrl` on every workflow. It is the entry URL Libretto opens before the handler runs. On Kernel and other cloud providers, Libretto also sends it at browser create time so the first navigation happens before CDP attach.
+Always declare `startUrl` on every workflow. It is the entry URL Libretto opens before the handler runs. Kernel and Libretto Cloud preload it at browser create time (before CDP attach). Browserbase and Steel open it immediately after CDP connect.
 
 ```typescript theme={null}
 export default workflow(

@@ -15,6 +15,9 @@ export type SteelBrowserProviderOptions = {
 	solveCaptcha?: boolean;
 	timeoutMs?: number;
 	inactivityTimeoutMs?: number;
+	/** Steel has no create-time start URL; callers should navigate after connect. */
+	startUrl?: string;
+	viewport?: { width: number; height: number };
 }
 
 type SteelSessionRequest = {
@@ -22,6 +25,7 @@ type SteelSessionRequest = {
 	solveCaptcha?: boolean;
 	timeout?: number;
 	inactivityTimeout?: number;
+	dimensions?: { width: number; height: number };
 }
 
 type SteelSessionResponse = {
@@ -49,6 +53,7 @@ export class SteelBrowserProvider implements BrowserProvider {
 	private readonly solveCaptcha: boolean | undefined;
 	private readonly timeoutMs: number | undefined;
 	private readonly inactivityTimeoutMs: number | undefined;
+	private readonly viewport: { width: number; height: number } | undefined;
 
 	constructor(options: SteelBrowserProviderOptions = {}) {
 		const apiKey = (options.apiKey ?? process.env.STEEL_API_KEY)?.trim();
@@ -73,6 +78,7 @@ export class SteelBrowserProvider implements BrowserProvider {
 		this.solveCaptcha = options.solveCaptcha;
 		this.timeoutMs = options.timeoutMs;
 		this.inactivityTimeoutMs = options.inactivityTimeoutMs;
+		this.viewport = options.viewport;
 	}
 
 	async createSession(): Promise<ProviderSession> {
@@ -85,6 +91,14 @@ export class SteelBrowserProvider implements BrowserProvider {
 			...(this.inactivityTimeoutMs === undefined
 				? {}
 				: { inactivityTimeout: this.inactivityTimeoutMs }),
+			...(this.viewport
+				? {
+						dimensions: {
+							width: this.viewport.width,
+							height: this.viewport.height,
+						},
+					}
+				: {}),
 		};
 		const response = await fetch(`${this.endpoint}/v1/sessions`, {
 			method: "POST",
