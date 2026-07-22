@@ -5,7 +5,7 @@ import { chromium } from "playwright";
 import sharp from "sharp";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const outputPath = join(root, "public", "og", "browser-tools.png");
+const outputPath = join(root, "public", "og", "browser-tools-v2.png");
 const asciihedronImage = readFileSync(join(root, "public", "og", "paper-asciihedron.png"));
 const monoFont = readFileSync(join(root, "public", "fonts", "CommitMono-VF.woff2"));
 

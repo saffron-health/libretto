@@ -8,6 +8,8 @@ sidebarTitle: Overview
 
 A provider implements `BrowserProvider`: it creates a CDP endpoint for each session and tears it down on close. Pass any provider into `createBrowserTools`, `createAiSdkBrowserTools`, or `createPiBrowserTools`.
 
+Provider credentials and defaults live on the constructor. Per-session launch options (`startUrl`, `gpu`, `viewport`) go on `createSession` — `browser_open({ url })` passes `startUrl` that way.
+
 This is the SDK surface. For Libretto CLI `open` / `run` provider config, see [Alternative providers](/alternative-providers/overview).
 
 ## Built-in providers

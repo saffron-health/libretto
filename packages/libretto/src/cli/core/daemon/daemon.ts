@@ -476,10 +476,14 @@ class BrowserDaemon {
       getProviderSession: () => providerSession,
     });
     try {
+      const startUrl = config.startUrl ?? config.initialUrl;
       providerSession = await provider.createSession({
         authProfileName: config.authProfileName,
         authProfilePersist: config.authProfilePersist,
         headless: config.headless,
+        startUrl,
+        gpu: config.gpu,
+        viewport: config.viewport,
       });
       const browser = await chromium.connectOverCDP(
         providerSession.cdpEndpoint,
@@ -502,7 +506,11 @@ class BrowserDaemon {
         context,
         page,
         initialPages: operationalPages.length > 0 ? operationalPages : [page],
-        navigateUrl: config.initialUrl,
+        // Providers that preload start_url before CDP attach must not get a
+        // second page.goto — that re-triggers bot detection on some sites.
+        // Providers without create-time start_url still navigate here so
+        // workflow startUrl works without a first-handler page.goto.
+        navigateUrl: providerSession.startUrlPreloaded ? undefined : startUrl,
         readyProvider: {
           name: config.providerName,
           sessionId: providerSession.sessionId,
@@ -523,6 +531,10 @@ class BrowserDaemon {
         provider: config.providerName,
         sessionId: providerSession.sessionId,
         url: config.initialUrl,
+        startUrl,
+        startUrlPreloaded: providerSession.startUrlPreloaded === true,
+        gpu: config.gpu,
+        viewport: config.viewport,
         pid: process.pid,
         session,
       });
@@ -957,6 +969,19 @@ async function main(): Promise<void> {
           ...config.browser,
           authProfileName,
           authProfilePersist,
+          startUrl: loadedWorkflow.startUrl ?? config.browser.startUrl,
+          gpu: loadedWorkflow.gpu ?? config.browser.gpu,
+          // Explicit daemon/CLI viewport wins over workflow viewport.
+          viewport: config.browser.viewport ?? loadedWorkflow.viewport,
+        };
+      } else if (
+        config.browser.kind === "launch" &&
+        loadedWorkflow.startUrl &&
+        !config.browser.initialUrl
+      ) {
+        browserConfig = {
+          ...config.browser,
+          initialUrl: loadedWorkflow.startUrl,
         };
       }
     } catch (error) {

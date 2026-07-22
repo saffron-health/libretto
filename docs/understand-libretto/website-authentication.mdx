@@ -17,6 +17,7 @@ import { librettoAuthenticate, workflow } from "libretto";
 import { z } from "zod";
 
 export default workflow("portalReport", {
+  startUrl: "https://portal.example.com",
   credentials: ["username", "password"],
   authProfile: {
     name: "portal",
@@ -30,8 +31,6 @@ export default workflow("portalReport", {
   }),
   async handler(ctx, input) {
     const { page } = ctx;
-
-    await page.goto("https://portal.example.com");
 
     await librettoAuthenticate(ctx, {
       credentials: input.credentials,

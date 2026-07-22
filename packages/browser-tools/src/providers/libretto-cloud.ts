@@ -2,6 +2,7 @@ import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
+	ProviderSessionCreateOptions,
 } from "../provider.js";
 
 const DEFAULT_HOSTED_API_URL = "https://api.libretto.sh";
@@ -133,7 +134,12 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 		this.headless = options.headless ?? true;
 	}
 
-	async createSession(): Promise<ProviderSession> {
+	async createSession(
+		options: ProviderSessionCreateOptions = {},
+	): Promise<ProviderSession> {
+		const startUrl = options.startUrl?.trim() || undefined;
+		const gpu = options.gpu;
+		const viewport = options.viewport;
 		const created = await cloudFetchJson<CloudSessionResponse>(
 			this.endpoint,
 			this.apiKey,
@@ -141,6 +147,16 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 			{
 				timeout_seconds: this.timeoutSeconds,
 				headless: this.headless,
+				...(startUrl ? { start_url: startUrl } : {}),
+				...(gpu !== undefined ? { gpu } : {}),
+				...(viewport
+					? {
+							viewport: {
+								width: viewport.width,
+								height: viewport.height,
+							},
+						}
+					: {}),
 			},
 		);
 
@@ -162,6 +178,7 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 			sessionId: ready.session_id,
 			cdpEndpoint: ready.cdp_url,
 			liveViewUrl: ready.live_view_url ?? undefined,
+			startUrlPreloaded: Boolean(startUrl),
 		};
 	}
 

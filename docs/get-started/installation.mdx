@@ -72,9 +72,9 @@ If you already have a Node.js package that you plan to use for Libretto automati
         output: z.object({
           title: z.string(),
         }),
+        startUrl: "https://example.com",
       },
       async ({ page }) => {
-        await page.goto("https://example.com");
         const title = await page.title();
         console.log(`Page title: ${title}`);
 

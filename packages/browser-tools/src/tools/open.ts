@@ -7,7 +7,10 @@ const openInputSchema = z.object({
 	url: z
 		.string()
 		.optional()
-		.describe("Optional URL to navigate to after the session opens."),
+		.describe(
+			"Optional start URL for the session. Providers that support create-time " +
+				"navigation open it before CDP attach; others navigate after connect.",
+		),
 });
 
 export type OpenToolInput = z.infer<typeof openInputSchema>;
@@ -29,15 +32,19 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 	return {
 		name: "browser_open",
 		description:
-			"Open a new browser session. Optionally navigates to `url` after opening. " +
+			"Open a new browser session. Optionally opens `url` at session create " +
+			"(or after connect when the provider cannot preload). " +
 			"Returns a `sessionId` to pass to subsequent browser tools.",
 		inputSchema: openInputSchema,
 		async execute({ url }): Promise<ToolResult<OpenToolOutput>> {
-			const { sessionId } = await registry.openSession();
-			if (url !== undefined) {
+			const startUrl = url?.trim() || undefined;
+			const { sessionId, startUrlPreloaded } = await registry.openSession(
+				startUrl ? { startUrl } : {},
+			);
+			if (startUrl !== undefined && !startUrlPreloaded) {
 				const page = registry.getCurrentPage(sessionId);
 				try {
-					await page.goto(url);
+					await page.goto(startUrl);
 				} catch (err) {
 					const policyError = registry.consumeBlockedNavigationError(page);
 					await registry.closeSession(sessionId);
@@ -45,7 +52,7 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 					return {
 						ok: false,
 						error:
-							`Could not navigate to ${url} (${errorMessage(err)}). ` +
+							`Could not navigate to ${startUrl} (${errorMessage(err)}). ` +
 							"The session was closed. Call browser_open again — use a full https:// URL, " +
 							"or omit url and navigate with browser_exec via `await page.goto(...)`.",
 					};
