@@ -178,7 +178,7 @@ async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
 - [x] Keep the existing ephemeral launch path unchanged when `authProfile` is absent.
 - [x] Preserve current URL behavior: when a restored profile has tabs, `browser_open({ url })` navigates the newest restored tab and leaves other tabs open.
 - [x] Add focused tests for valid names, traversal rejection, symlink rejection, and owner-only directory creation.
-- [ ] Run the local provider spec and package type-check.
+- [x] Run the local provider spec and package type-check.
 
 ### Phase 4: Verify the local login round trip
 
@@ -187,7 +187,7 @@ Exercise the public tools against a local HTTP fixture. Keep these user-flow tes
 - [x] Add a user-flow test: open a local profile, set cookie and local-storage login state, close, reopen the same profile, and assert both values remain.
 - [x] Add a test that two different profile names do not share state.
 - [x] Add a restored-tabs test that locks the documented `browser_open({ url })` behavior.
-- [ ] Run `pnpm --filter libretto-browser-tools test -- src/providers/local.spec.ts` and package type-check.
+- [x] Run `pnpm --filter libretto-browser-tools test -- src/providers/local.spec.ts` and package type-check.
 
 ### Phase 5: Add named Libretto Cloud profiles
 
