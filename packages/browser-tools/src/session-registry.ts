@@ -73,7 +73,16 @@ export class SessionRegistry {
 		if (!provider) {
 			throw new Error("This browser toolkit only operates on its attached page.");
 		}
-		const providerSession = await provider.createSession(options);
+		// Reject blocked start URLs before createSession so preload providers
+		// (Kernel, Libretto Cloud) never contact a disallowed domain.
+		const startUrl = options.startUrl?.trim() || undefined;
+		if (startUrl !== undefined && !isUrlAllowed(startUrl, this.domainPolicy)) {
+			throw new DomainPolicyRestricted(this.domainPolicy, startUrl);
+		}
+		const providerSession = await provider.createSession({
+			...options,
+			startUrl,
+		});
 		let browser: Browser | undefined;
 		try {
 			browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
