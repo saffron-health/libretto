@@ -974,6 +974,15 @@ async function main(): Promise<void> {
           // Explicit daemon/CLI viewport wins over workflow viewport.
           viewport: config.browser.viewport ?? loadedWorkflow.viewport,
         };
+      } else if (
+        config.browser.kind === "launch" &&
+        loadedWorkflow.startUrl &&
+        !config.browser.initialUrl
+      ) {
+        browserConfig = {
+          ...config.browser,
+          initialUrl: loadedWorkflow.startUrl,
+        };
       }
     } catch (error) {
       throw new UserFacingStartupError(

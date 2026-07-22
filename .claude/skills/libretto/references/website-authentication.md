@@ -12,11 +12,10 @@ Use `librettoAuthenticate` so the workflow can sign in from a fresh browser. Dec
 import { librettoAuthenticate, workflow } from "libretto";
 
 export default workflow("accountWorkflow", {
+  startUrl: "https://app.example.com/dashboard",
   credentials: ["portal_username", "portal_password"],
   async handler(ctx, input) {
     const { page } = ctx;
-
-    await page.goto("https://app.example.com/dashboard");
 
     // Sign in when the session is not already authenticated.
     await librettoAuthenticate(ctx, {
@@ -58,6 +57,7 @@ Add the profile to the workflow you already verified:
 
 ```typescript
 export default workflow("accountWorkflow", {
+  startUrl: "https://app.example.com/dashboard",
   // Added only after the signIn step above is verified standalone.
   authProfile: { name: "example-account", refresh: true },
   credentials: ["portal_username", "portal_password"],
