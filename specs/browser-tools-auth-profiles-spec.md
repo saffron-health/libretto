@@ -47,6 +47,9 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - `packages/browser-tools/src/session-registry.spec.ts` — tests provider cleanup order and unsupported-provider behavior.
 - `packages/browser-tools/src/providers/*.spec.ts` — tests provider request bodies and profile lookup/create behavior with mocked HTTP responses.
 - `packages/browser-tools/package.json` — adds the `errore` runtime dependency.
+- `packages/libretto/skills/errore/SKILL.md` — source skill for the Errore convention.
+- `packages/libretto/scripts/skills-libretto.mjs` — mirrors the source skill into agent-specific skill directories.
+- `AGENTS.md` — tells agents when Errore applies and when to read its skill.
 - `packages/browser-tools/README.md` — documents profile use, provider-specific references, persistence timing, and security.
 - [Errore](https://errore.org/) — tagged errors and internal error-as-value unions.
 - [Playwright persistent authentication](https://playwright.dev/docs/auth) — background on persisted browser state.
@@ -56,6 +59,17 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - [Steel Profiles](https://docs.steel.dev/cookbook/profiles) — profile IDs and `persistProfile: true`.
 
 ## Implementation
+
+### Phase 0: Install Errore and its agent guidance
+
+Add the package and skill before changing error behavior. Scope the new convention to expected failures in `packages/browser-tools` so the rest of the repository can adopt it separately.
+
+- [ ] Add the latest `errore` release as a runtime dependency of `libretto-browser-tools`.
+- [ ] Add the Errore skill source at `packages/libretto/skills/errore/SKILL.md`.
+- [ ] Add Errore to `SKILL_MIRRORS`, then run `pnpm sync:mirrors` to generate `.agents/skills/errore` and `.claude/skills/errore`.
+- [ ] Update `AGENTS.md`: before editing expected-failure paths in `packages/browser-tools`, read the Errore skill and use error values internally.
+- [ ] Do not change runtime error behavior or public TypeScript signatures in this phase.
+- [ ] Run `pnpm check:mirrors`, `pnpm --filter libretto-browser-tools type-check`, and `pnpm -s lint`.
 
 ### Phase 1: Add the browser-open auth profile contract
 
@@ -89,7 +103,6 @@ const openInputSchema = z.object({
 ```
 
 - [ ] Add `authProfile?: string` to `browser_open` and describe its restore-and-save behavior.
-- [ ] Add the latest `errore` package as a runtime dependency of `libretto-browser-tools`.
 - [ ] Extend `BrowserProvider.createSession` with an optional typed options object and an opt-in `supportsAuthProfiles` capability.
 - [ ] Pass the selected profile from `createOpenTool()` through `SessionRegistry.openSession()` to the provider.
 - [ ] Add an exported Errore tagged `AuthProfileError` with a required recovery instruction; providers use it only for caller-fixable profile failures.
