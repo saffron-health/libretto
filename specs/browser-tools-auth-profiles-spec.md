@@ -19,6 +19,7 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - Providers without auth profile support return an actionable tool error instead of silently starting a fresh session.
 - Invalid, missing, ambiguous, or not-yet-ready profiles return actionable `{ ok: false, error }` tool results.
 - Profile changes persist only after an explicit `browser_close` or graceful toolkit disposal.
+- Existing provider consumers can keep using rejected promises, `try/catch`, and `instanceof Error` without changing their code.
 
 ## Non-goals
 
@@ -29,6 +30,7 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - No guarantee that profile changes survive `SIGKILL`, OOM, provider failure, or other hard crashes.
 - No support for concurrent writable sessions using the same profile.
 - No auth profile behavior for `browser_connect` or caller-owned pages.
+- No repo-wide conversion to errors as values; this work adopts Errore only for auth profile errors.
 
 ## Important files/docs/websites for implementation
 
@@ -44,7 +46,9 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - `packages/browser-tools/src/tools/tools.spec.ts` — tests user-level `browser_open` → browser work → `browser_close` flows.
 - `packages/browser-tools/src/session-registry.spec.ts` — tests provider cleanup order and unsupported-provider behavior.
 - `packages/browser-tools/src/providers/*.spec.ts` — tests provider request bodies and profile lookup/create behavior with mocked HTTP responses.
+- `packages/browser-tools/package.json` — adds the `errore` runtime dependency.
 - `packages/browser-tools/README.md` — documents profile use, provider-specific references, persistence timing, and security.
+- [Errore](https://errore.org/) — tagged errors and internal error-as-value unions.
 - [Playwright persistent authentication](https://playwright.dev/docs/auth) — background on persisted browser state.
 - [Kernel Profiles](https://www.kernel.sh/docs/auth/profiles) — named profiles and `save_changes`.
 - [Browser Use Profiles](https://docs.browser-use.com/cloud/guides/authentication) — profile lookup/create and save-on-stop behavior.
@@ -59,10 +63,12 @@ Add the caller-facing input and provider capability contract without changing de
 
 ```ts
 // packages/browser-tools/src/provider.ts
-export class AuthProfileError extends Error {
-  readonly recovery: string;
-  ...
-}
+import * as errore from "errore";
+
+export class AuthProfileError extends errore.createTaggedError({
+  name: "AuthProfileError",
+  message: "$message $recovery",
+}) {}
 
 export type CreateBrowserSessionOptions = {
   authProfile?: string;
@@ -83,11 +89,14 @@ const openInputSchema = z.object({
 ```
 
 - [ ] Add `authProfile?: string` to `browser_open` and describe its restore-and-save behavior.
+- [ ] Add the latest `errore` package as a runtime dependency of `libretto-browser-tools`.
 - [ ] Extend `BrowserProvider.createSession` with an optional typed options object and an opt-in `supportsAuthProfiles` capability.
 - [ ] Pass the selected profile from `createOpenTool()` through `SessionRegistry.openSession()` to the provider.
-- [ ] Add an exported `AuthProfileError` with a required recovery instruction; providers use it only for caller-fixable profile failures.
+- [ ] Add an exported Errore tagged `AuthProfileError` with a required recovery instruction; providers use it only for caller-fixable profile failures.
+- [ ] Let internal profile lookup and validation helpers return `AuthProfileError | T`, then convert the error value to a rejected promise at the public provider boundary.
 - [ ] Return `{ ok: false, error }` for unsupported profiles and caught `AuthProfileError` instances.
 - [ ] Keep host failures such as missing API keys, provider outages, and unknown errors as thrown errors.
+- [ ] Keep `BrowserProvider.createSession()` typed as `Promise<ProviderSession>` so direct provider consumers do not receive a new error union.
 - [ ] Add tool-level tests that assert the profile reaches an opted-in fake provider and an unsupported provider returns an actionable error.
 - [ ] Run `pnpm --filter libretto-browser-tools type-check` and `pnpm --filter libretto-browser-tools test`.
 
@@ -316,6 +325,7 @@ Document the common workflow and the provider-specific meaning of `authProfile`.
 - [ ] Every cloud provider sends its documented persistence fields and runs its required release or stop endpoint.
 - [ ] `browser_close` does not report success before Browserbase's wait or Steel's readiness check completes.
 - [ ] Caller-fixable profile failures return actionable tool results; host and provider failures still throw.
+- [ ] Direct provider consumers still receive rejected promises and can use ordinary `try/catch` and `instanceof Error`.
 - [ ] `dispose()` attempts to close every session even when one profile save fails.
 - [ ] Local profile paths cannot escape the configured root and use owner-only permissions.
 - [ ] No profile data, provider ID mapping, or credential enters the repository.
