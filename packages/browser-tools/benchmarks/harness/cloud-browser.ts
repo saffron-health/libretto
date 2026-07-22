@@ -77,13 +77,15 @@ export async function createCloudBrowserConnection(
 ): Promise<CloudBrowserConnection> {
 	const provider = createBenchmarkBrowserProvider(providerName);
 	const session = await provider.createSession();
+	if (session instanceof Error) throw session;
 	return {
 		provider: providerName,
 		cdpEndpoint: session.cdpEndpoint,
 		sessionId: session.sessionId,
 		sessionName: `benchmark-${session.sessionId}`,
 		async close() {
-			await provider.closeSession(session.sessionId);
+			const closed = await provider.closeSession(session.sessionId);
+			if (closed instanceof Error) throw closed;
 		},
 	};
 }
