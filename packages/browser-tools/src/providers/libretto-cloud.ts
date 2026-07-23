@@ -1,5 +1,6 @@
 import { errorMessage } from "../errors.js";
 import {
+	AuthProfileError,
 	ProviderCloseError,
 	type BrowserProvider,
 	type ProviderCloseResult,
@@ -139,9 +140,15 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 
 	async createSession(
 		options: ProviderSessionCreateOptions = {},
-	): Promise<ProviderSession> {
+	): Promise<AuthProfileError | ProviderSession> {
 		const startUrl = options.startUrl?.trim() || undefined;
 		const authProfile = options.authProfile;
+		if (authProfile !== undefined && !authProfile.trim()) {
+			return new AuthProfileError({
+				message: "Auth profile name is empty.",
+				recovery: "Pass a non-empty authProfile to createSession.",
+			});
+		}
 		const gpu = options.gpu;
 		const viewport = options.viewport;
 		const created = await cloudFetchJson<CloudSessionResponse>(

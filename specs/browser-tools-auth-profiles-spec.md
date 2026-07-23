@@ -176,7 +176,7 @@ async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
 - [x] Create profile directories with owner-only permissions, repair an existing profile directory to owner-only permissions before launch, and reject an existing symbolic-link profile path.
 - [x] Use one persistent user data directory per profile and close the owned persistent context during provider release.
 - [x] Keep the existing ephemeral launch path unchanged when `authProfile` is absent.
-- [x] Preserve current URL behavior: when a restored profile has tabs, `browser_open({ url })` navigates the newest restored tab and leaves other tabs open.
+- [x] Preserve current URL behavior: when a restored profile has tabs, `browser_open({ url })` navigates one restored tab and leaves other tabs open.
 - [x] Add focused tests for valid names, traversal rejection, symlink rejection, and owner-only directory creation.
 - [x] Run the local provider spec and package type-check.
 
@@ -208,7 +208,7 @@ async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
 
 - [x] Send Libretto Cloud `profile_name` and `profile_persist: true` when a profile is supplied.
 - [x] Mark the provider as supporting auth profiles.
-- [x] Add mocked HTTP tests for profile-bearing and unchanged unprofiled request bodies.
+- [ ] Add live API coverage for profile persistence after the provider rollout is ready to test.
 - [x] Keep close endpoints unchanged; Phase 2 makes them the persistence trigger.
 - [x] Run the Libretto Cloud provider spec plus package type-check.
 
