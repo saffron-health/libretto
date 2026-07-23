@@ -4,8 +4,7 @@ import { Text } from "./Text.js";
 import { SiteSection } from "./SiteSection.js";
 import { REPO_URL, DISCORD_URL } from "../site";
 
-const linkClass =
-  "underline text-accent hover:text-accent-bright transition-colors";
+const linkClass = "underline text-accent hover:text-accent-bright transition-colors";
 
 interface FAQItem {
   id: string;
@@ -19,17 +18,14 @@ const faqs: FAQItem[] = [
     question: "What is Libretto?",
     answer: (
       <>
-        Libretto is a family of tools for automating work in a browser. The{" "}
-        <a href="/chrome-extension" className={linkClass}>
-          Chrome extension
+        Libretto is an open-source toolkit for building browser automations. It
+        gives your coding agent a live browser and a CLI to inspect pages,
+        capture network traffic, record user actions, and turn them into
+        deterministic automation scripts. Check out the{" "}
+        <a href="/docs/get-started/quickstart" className={linkClass} data-fathom-event="FAQ docs click">
+          docs
         </a>{" "}
-        helps people hand off everyday browser tasks without code. The developer
-        tools help teams build, host, repair, and embed reliable browser
-        automations. Explore the{" "}
-        <a href="#products" className={linkClass}>
-          product guide
-        </a>{" "}
-        to find the right place to start.
+        to get started.
       </>
     ),
   },
@@ -37,54 +33,56 @@ const faqs: FAQItem[] = [
     id: "who",
     question: "Who is Libretto good for?",
     answer:
-      "Libretto is for anyone whose work or product depends on a website.\n\n- Use the Chrome extension to automate one-time tasks and recurring browser work without code.\n- Use the CLI to turn known workflows into fast, reliable scripts in your codebase.\n- Use Cloud Browsers to host and schedule production automations.\n- Use PR Review Agents to repair self-hosted Playwright workflows.\n- Use the Browser Tools SDK to give an agentic application a browser.",
+      "Libretto is best for teams that need reliable workflows against websites where the official API is missing, incomplete, read-only, too slow to access, or does not support the action they need.\n\nGood fits include teams that:\n\n- Integrate with customer portals, EHRs, payer sites, government systems, financial dashboards, CRMs, or legacy admin tools.\n- Need to automate workflows that exist in the web UI but are not exposed through an API.\n- Need repeatable scripts that are faster, cheaper, and easier to debug than runtime browser agents.\n- Already use Playwright or browser agents, but want agents to help build and repair automation instead of making decisions on every run.\n\nLibretto is probably not the right tool if the API already covers the full workflow cleanly, or if you only need a one-off scrape.",
   },
   {
     id: "diff",
-    question: "Which Libretto product should I start with?",
+    question:
+      "How is Libretto different from Browser Use, Stagehand, and Playwright codegen?",
     answer: (
       <>
-        If you do not want to write code, start with the Chrome extension. If
-        you are building an automation, start with the CLI. Add Cloud Browsers
-        when you want Libretto to host it, or PR Review Agents when you want to
-        keep hosting it yourself. Choose the Browser Tools SDK when the browser
-        is part of an agentic application rather than a fixed workflow.
+        Libretto generates deterministic TypeScript workflows that can use UI
+        automation and direct network requests. Browser Use is a runtime agent,
+        Stagehand adds AI actions on top of Playwright, and Playwright codegen is
+        a recorder for simple browser tests.
+        {"\n\n"}
+        Read the detailed comparisons: {" "}
+        <a href="/vs/browser-use" className={linkClass} data-fathom-event="FAQ Browser Use comparison click">
+          Libretto vs Browser Use
+        </a>
+        , {" "}
+        <a href="/vs/stagehand" className={linkClass} data-fathom-event="FAQ Stagehand comparison click">
+          Libretto vs Stagehand
+        </a>
+        , and {" "}
+        <a href="/vs/playwright-codegen" className={linkClass} data-fathom-event="FAQ Playwright codegen comparison click">
+          Libretto vs Playwright codegen
+        </a>
+        .
       </>
     ),
   },
   {
     id: "providers",
-    question: "Can I run Libretto in my own infrastructure?",
+    question: "What cloud providers do you support?",
     answer: (
       <>
-        Yes. Workflows produced with the CLI live in your codebase and can run
-        wherever you choose. The CLI has built-in support for{" "}
-        <a
-          href="https://www.browserbase.com/"
-          className={linkClass}
-          data-fathom-event="FAQ Browserbase click"
-        >
+        The CLI has built-in support for{" "}
+        <a href="https://www.browserbase.com/" className={linkClass} data-fathom-event="FAQ Browserbase click">
           Browserbase
         </a>{" "}
         and{" "}
-        <a
-          href="https://www.kernel.sh/"
-          className={linkClass}
-          data-fathom-event="FAQ Kernel click"
-        >
+        <a href="https://www.kernel.sh/" className={linkClass} data-fathom-event="FAQ Kernel click">
           Kernel
         </a>
         , and{" "}
-        <a
-          href="https://steel.dev/"
-          className={linkClass}
-          data-fathom-event="FAQ Steel click"
-        >
+        <a href="https://steel.dev/" className={linkClass} data-fathom-event="FAQ Steel click">
           Steel
-        </a>{" "}
-        to spin up browser sessions directly, and it can connect to any browser
-        that exposes a CDP endpoint. Use Libretto Cloud Browsers when you prefer
-        a managed option.
+        </a>
+        {" "}to spin up browser sessions directly. Libretto can also connect to any
+        browser that exposes a CDP endpoint, so you can run scripts against any
+        arbitrary browser. Since the code lives in your repo, you can deploy it
+        wherever you want, like AWS or GCP.
       </>
     ),
   },
@@ -93,13 +91,8 @@ const faqs: FAQItem[] = [
     question: "Is it open source?",
     answer: (
       <>
-        The Libretto CLI and developer tooling are open source under the MIT
-        license. You can find the code on{" "}
-        <a
-          href={REPO_URL}
-          className={linkClass}
-          data-fathom-event="FAQ github click"
-        >
+        Yes, fully open source under the MIT license. You can find the code on{" "}
+        <a href={REPO_URL} className={linkClass} data-fathom-event="FAQ github click">
           GitHub
         </a>
         .
@@ -112,27 +105,15 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         Jump into our{" "}
-        <a
-          href={DISCORD_URL}
-          className={linkClass}
-          data-fathom-event="FAQ discord click"
-        >
+        <a href={DISCORD_URL} className={linkClass} data-fathom-event="FAQ discord click">
           Discord
         </a>{" "}
         for quick help, open an issue on{" "}
-        <a
-          href={REPO_URL}
-          className={linkClass}
-          data-fathom-event="FAQ github click"
-        >
+        <a href={REPO_URL} className={linkClass} data-fathom-event="FAQ github click">
           GitHub
         </a>
         , or read through the{" "}
-        <a
-          href="/docs/get-started/quickstart"
-          className={linkClass}
-          data-fathom-event="FAQ docs click"
-        >
+        <a href="/docs/get-started/quickstart" className={linkClass} data-fathom-event="FAQ docs click">
           docs
         </a>
         .
@@ -187,11 +168,7 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
         </span>
       </summary>
       <div className="overflow-hidden">
-        <Text
-          as="p"
-          size="sm"
-          className="pb-5 leading-relaxed text-muted whitespace-pre-line"
-        >
+        <Text as="p" size="sm" className="pb-5 leading-relaxed text-muted whitespace-pre-line">
           {item.answer}
         </Text>
       </div>
@@ -201,10 +178,7 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
 
 export function FAQ() {
   return (
-    <SiteSection
-      id="comparisons"
-      innerClassName="flex flex-col gap-12 md:flex-row md:gap-16"
-    >
+    <SiteSection id="comparisons" innerClassName="flex flex-col gap-12 md:flex-row md:gap-16">
       <div className="md:w-1/2 md:shrink-0 md:pt-5">
         <SectionIntro
           align="left"
