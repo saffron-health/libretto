@@ -13,12 +13,15 @@ import type {
 	ProviderSessionCreateOptions,
 } from "./provider.js";
 
+type RouteHandler = Parameters<BrowserContext["route"]>[1];
+
 type SessionEntry = {
 	providerSessionId: string | undefined;
 	providerName: string;
 	sessionSource: "existing-page" | "existing-cdp" | "new-session";
 	browser: Browser;
 	context: BrowserContext;
+	domainPolicyRouteHandler: RouteHandler | undefined;
 	currentPage: Page | undefined;
 	pageById: Map<string, Page>;
 	contextPageListener: (page: Page) => void;
@@ -83,25 +86,27 @@ export class SessionRegistry {
 			...options,
 			startUrl,
 		});
-		let browser: Browser | undefined;
+		const page = providerSession.page;
+		const context = page.context();
+		const browser = context.browser();
+		let domainPolicyRouteHandler: RouteHandler | undefined;
 		try {
-			browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
-			const context = browser.contexts()[0] ?? (await browser.newContext());
-			await this.applyDomainPolicy(context);
-			this.assertCurrentPagesAllowed(context);
+			if (!browser) {
+				throw new Error(
+					"The provider returned a page that is not connected to a Playwright browser.",
+				);
+			}
+			domainPolicyRouteHandler = await this.applyDomainPolicy(context);
+			this.assertPageAllowed(page);
 			const entry = this.createSessionEntry({
 				providerSessionId: providerSession.sessionId,
 				providerName: provider.name,
 				sessionSource: "new-session",
 				browser,
 				context,
+				domainPolicyRouteHandler,
 			});
-			if (context.pages().length === 0) {
-				await context.newPage();
-			}
-			for (const page of context.pages()) {
-				this.trackPage(entry, page);
-			}
+			this.trackPage(entry, page);
 
 			const sessionId = this.generateSessionId();
 			this.sessions.set(sessionId, entry);
@@ -111,7 +116,11 @@ export class SessionRegistry {
 				startUrlPreloaded: Boolean(providerSession.startUrlPreloaded),
 			};
 		} catch (error) {
-			await browser?.close().catch(() => {});
+			if (domainPolicyRouteHandler) {
+				await context
+					.unroute("**/*", domainPolicyRouteHandler)
+					.catch(() => {});
+			}
 			await provider.closeSession(providerSession.sessionId).catch(() => {});
 			throw error;
 		}
@@ -121,7 +130,7 @@ export class SessionRegistry {
 		const browser = await chromium.connectOverCDP(cdpEndpoint);
 		try {
 			const context = browser.contexts()[0] ?? (await browser.newContext());
-			await this.applyDomainPolicy(context);
+			const domainPolicyRouteHandler = await this.applyDomainPolicy(context);
 			this.assertCurrentPagesAllowed(context);
 			const entry = this.createSessionEntry({
 				providerSessionId: undefined,
@@ -129,6 +138,7 @@ export class SessionRegistry {
 				sessionSource: "existing-cdp",
 				browser,
 				context,
+				domainPolicyRouteHandler,
 			});
 			for (const page of context.pages()) {
 				this.trackPage(entry, page);
@@ -218,11 +228,14 @@ export class SessionRegistry {
 	async closeSession(sessionId: string): Promise<void> {
 		const entry = this.requireSession(sessionId);
 		this.sessions.delete(sessionId);
-		this.releaseSessionEntry(entry);
-		if (entry.sessionSource === "existing-page") return;
-		await entry.browser.close();
-		if (entry.sessionSource === "new-session" && entry.providerSessionId) {
-			await this.provider?.closeSession(entry.providerSessionId);
+		try {
+			await this.releaseSessionEntry(entry);
+		} finally {
+			if (entry.sessionSource === "new-session" && entry.providerSessionId) {
+				await this.provider?.closeSession(entry.providerSessionId);
+			} else if (entry.sessionSource === "existing-cdp") {
+				await entry.browser.close();
+			}
 		}
 	}
 
@@ -293,15 +306,17 @@ export class SessionRegistry {
 		void this.dispose();
 	};
 
-	private async applyDomainPolicy(context: BrowserContext): Promise<void> {
+	private async applyDomainPolicy(
+		context: BrowserContext,
+	): Promise<RouteHandler | undefined> {
 		if (
 			this.domainPolicy.allowedDomains === undefined &&
 			!this.domainPolicy.blockedDomains?.length
 		) {
-			return;
+			return undefined;
 		}
 
-		await context.route("**/*", async (route, request) => {
+		const handler: RouteHandler = async (route, request) => {
 			const url = request.url();
 			if (isUrlAllowed(url, this.domainPolicy)) {
 				await route.continue();
@@ -318,7 +333,9 @@ export class SessionRegistry {
 				}
 			}
 			await route.abort("blockedbyclient");
-		});
+		};
+		await context.route("**/*", handler);
+		return handler;
 	}
 
 	private assertCurrentPagesAllowed(context: BrowserContext): void {
@@ -330,12 +347,20 @@ export class SessionRegistry {
 		}
 	}
 
+	private assertPageAllowed(page: Page): void {
+		const url = page.url();
+		if (!isUrlAllowed(url, this.domainPolicy)) {
+			throw new DomainPolicyRestricted(this.domainPolicy, url);
+		}
+	}
+
 	private createSessionEntry(args: {
 		providerSessionId: string | undefined;
 		providerName: string;
 		sessionSource: SessionEntry["sessionSource"];
 		browser: Browser;
 		context: BrowserContext;
+		domainPolicyRouteHandler?: RouteHandler;
 	}): SessionEntry {
 		const entry: SessionEntry = {
 			providerSessionId: args.providerSessionId,
@@ -343,6 +368,7 @@ export class SessionRegistry {
 			sessionSource: args.sessionSource,
 			browser: args.browser,
 			context: args.context,
+			domainPolicyRouteHandler: args.domainPolicyRouteHandler,
 			currentPage: undefined,
 			pageById: new Map(),
 			contextPageListener: () => {},
@@ -380,7 +406,7 @@ export class SessionRegistry {
 		return pageId;
 	}
 
-	private releaseSessionEntry(entry: SessionEntry): void {
+	private async releaseSessionEntry(entry: SessionEntry): Promise<void> {
 		entry.context.off("page", entry.contextPageListener);
 		for (const [page, listener] of entry.pageCloseListenerByPage) {
 			page.off("close", listener);
@@ -389,6 +415,9 @@ export class SessionRegistry {
 		entry.pageById.clear();
 		entry.latestSnapshotByPage.clear();
 		entry.currentPage = undefined;
+		if (entry.domainPolicyRouteHandler) {
+			await entry.context.unroute("**/*", entry.domainPolicyRouteHandler);
+		}
 	}
 
 	private findPageId(entry: SessionEntry, page: Page): string | undefined {
