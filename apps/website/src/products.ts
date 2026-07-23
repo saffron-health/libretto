@@ -9,6 +9,15 @@ export interface ProductLink {
 
 export const PRODUCTS: ProductLink[] = [
   {
+    href: "/chrome-extension",
+    name: "Chrome Extension",
+    tagline:
+      "Tell an agent what you need done in Chrome, then save it as a workflow you can run again or schedule in the cloud.",
+    kicker: "// NO CODE --",
+    status: "live",
+    fathomEvent: "Product listing chrome extension click",
+  },
+  {
     href: "/cli",
     name: "Libretto CLI",
     tagline:

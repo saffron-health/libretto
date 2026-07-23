@@ -4,6 +4,33 @@ import { PRODUCTS } from "../products.js";
 import { SectionDivider } from "./SectionDivider.js";
 
 function ProductVisual({ href }: { href: string }) {
+  if (href === "/chrome-extension") {
+    return (
+      <div className="overflow-hidden rounded-xl border border-rule bg-panel/60 shadow-lg shadow-black/25">
+        <div className="flex items-center gap-2 border-b border-rule px-5 py-3.5">
+          <span className="size-2 rounded-full bg-accent shadow-[0_0_8px_rgba(42,255,97,0.55)]" />
+          <span className="font-mono text-xs text-ink/70">
+            Libretto for Chrome
+          </span>
+        </div>
+        <div className="space-y-4 p-5">
+          <div className="rounded-lg border border-accent/20 bg-green-9/10 px-4 py-3 text-sm leading-6 text-ink">
+            Download this month&apos;s invoices from every vendor portal.
+          </div>
+          <div>
+            <div className="mb-2 flex justify-between font-mono text-[11px] text-muted">
+              <span>Working across 12 websites</span>
+              <span className="text-accent-bright">9 complete</span>
+            </div>
+            <div className="h-1 overflow-hidden bg-rule">
+              <div className="h-full w-3/4 bg-accent" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (href === "/cli") {
     return (
       <div className="overflow-hidden rounded-xl border border-rule bg-panel/60 p-5 font-mono text-xs leading-6 text-muted shadow-lg shadow-black/25">
