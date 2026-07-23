@@ -1,11 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
-import type {
-	BrowserProvider,
-	ProviderSession,
-	ProviderSessionClosed,
-	ProviderSessionCreateOptions,
+import { errorMessage } from "../errors.js";
+import {
+	ProviderCloseError,
+	type BrowserProvider,
+	type ProviderCloseResult,
+	type ProviderSession,
+	type ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type KernelBrowserProviderOptions = {
@@ -223,13 +225,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 		try {
 			await waitForCdpReady(browser.cdp_ws_url);
 		} catch (error) {
-			await kernelFetchNoBody(
-				this.endpoint,
-				this.apiKey,
-				`/browsers/${browser.session_id}`,
-				{ method: "DELETE" },
-			).catch(() => {});
-			throw error;
+			return this.throwAfterFailedCreateCleanup(browser.session_id, error);
 		}
 
 		let replay: KernelReplayResponse | undefined;
@@ -248,13 +244,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 					);
 				}
 			} catch (error) {
-				await kernelFetchNoBody(
-					this.endpoint,
-					this.apiKey,
-					`/browsers/${browser.session_id}`,
-					{ method: "DELETE" },
-				).catch(() => {});
-				throw error;
+				return this.throwAfterFailedCreateCleanup(browser.session_id, error);
 			}
 		}
 
@@ -267,15 +257,40 @@ export class KernelBrowserProvider implements BrowserProvider {
 		};
 	}
 
-	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+	private async throwAfterFailedCreateCleanup(
+		sessionId: string,
+		createError: unknown,
+	): Promise<never> {
+		const closeError = await this.closeSession(sessionId);
+		if (closeError instanceof Error) {
+			throw new AggregateError(
+				[createError, closeError],
+				"Kernel session creation and cleanup both failed.",
+			);
+		}
+		throw createError;
+	}
+
+	async closeSession(sessionId: string): Promise<ProviderCloseResult> {
 		const replayUrl = this.replayUrlBySession.get(sessionId);
 
-		await kernelFetchNoBody(
+		const closed = await kernelFetchNoBody(
 			this.endpoint,
 			this.apiKey,
 			`/browsers/${sessionId}`,
 			{ method: "DELETE" },
+		).catch(
+			(cause: unknown) =>
+				new ProviderCloseError({
+					provider: this.name,
+					providerSessionId: sessionId,
+					detail: errorMessage(cause),
+					recovery:
+						"Call closeSession again, or delete the browser in the Kernel dashboard.",
+					cause,
+				}),
 		);
+		if (closed instanceof Error) return closed;
 		this.replayUrlBySession.delete(sessionId);
 
 		return { replayUrl };

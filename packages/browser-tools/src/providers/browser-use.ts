@@ -1,8 +1,10 @@
-import type {
-	BrowserProvider,
-	ProviderSession,
-	ProviderSessionClosed,
-	ProviderSessionCreateOptions,
+import { errorMessage } from "../errors.js";
+import {
+	ProviderCloseError,
+	type BrowserProvider,
+	type ProviderCloseResult,
+	type ProviderSession,
+	type ProviderSessionCreateOptions,
 } from "../provider.js";
 
 const DEFAULT_BROWSER_USE_ENDPOINT = "https://api.browser-use.com/api/v3";
@@ -80,9 +82,17 @@ export class BrowserUseBrowserProvider implements BrowserProvider {
 
 		const session = (await response.json()) as BrowserUseSessionResponse;
 		if (!session.cdpUrl) {
-			throw new Error(
+			const createError = new Error(
 				`Browser Use session ${session.id} did not return a CDP URL. Stop the session in the Browser Use dashboard, then create a fresh session.`,
 			);
+			const closeError = await this.closeSession(session.id);
+			if (closeError instanceof Error) {
+				throw new AggregateError(
+					[createError, closeError],
+					"Browser Use session creation and cleanup both failed.",
+				);
+			}
+			throw createError;
 		}
 		return {
 			sessionId: session.id,
@@ -92,7 +102,7 @@ export class BrowserUseBrowserProvider implements BrowserProvider {
 		};
 	}
 
-	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+	async closeSession(sessionId: string): Promise<ProviderCloseResult> {
 		const response = await fetch(`${this.endpoint}/browsers/${sessionId}`, {
 			method: "PATCH",
 			headers: {
@@ -100,12 +110,27 @@ export class BrowserUseBrowserProvider implements BrowserProvider {
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({ action: "stop" }),
-		});
+		}).catch(
+			(cause: unknown) =>
+				new ProviderCloseError({
+					provider: this.name,
+					providerSessionId: sessionId,
+					detail: errorMessage(cause),
+					recovery: "Stop the session in the Browser Use dashboard.",
+					cause,
+				}),
+		);
+		if (response instanceof Error) return response;
 		if (!response.ok) {
-			const body = await response.text();
-			throw new Error(
-				`Browser Use API error closing session ${sessionId} (${response.status}): ${body}. Stop the session in the Browser Use dashboard.`,
-			);
+			const body = await response
+				.text()
+				.catch((cause: unknown) => errorMessage(cause));
+			return new ProviderCloseError({
+				provider: this.name,
+				providerSessionId: sessionId,
+				detail: `Browser Use API error (${response.status}): ${body}`,
+				recovery: "Stop the session in the Browser Use dashboard.",
+			});
 		}
 		return {};
 	}

@@ -7,10 +7,12 @@ test.skipIf(!process.env.LIBRETTO_API_KEY?.trim())(
 	async () => {
 		const provider = new LibrettoCloudBrowserProvider();
 		const session = await provider.createSession();
+		if (session instanceof Error) throw session;
 		const browser = await chromium.connectOverCDP(session.cdpEndpoint);
 
 		expect(browser.isConnected()).toBe(true);
 
-		await provider.closeSession(session.sessionId);
+		const closed = await provider.closeSession(session.sessionId);
+		if (closed instanceof Error) throw closed;
 	},
 );

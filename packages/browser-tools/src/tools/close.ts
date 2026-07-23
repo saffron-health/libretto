@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { errorMessage } from "../errors.js";
-import type { SessionRegistry } from "../session-registry.js";
+import {
+	browserCleanupErrorMessage,
+	type SessionRegistry,
+} from "../session-registry.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
 
 const closeInputSchema = z.object({
@@ -27,7 +30,10 @@ export function createCloseTool(registry: SessionRegistry): CloseTool {
 		inputSchema: closeInputSchema,
 		async execute({ sessionId }): Promise<ToolResult<CloseToolOutput>> {
 			try {
-				await registry.closeSession(sessionId);
+				const closed = await registry.closeSession(sessionId);
+				if (closed instanceof Error) {
+					return { ok: false, error: browserCleanupErrorMessage(closed) };
+				}
 				return { ok: true };
 			} catch (err) {
 				return {

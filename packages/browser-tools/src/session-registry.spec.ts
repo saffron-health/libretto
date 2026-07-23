@@ -1,21 +1,38 @@
-import { expect, test as base, vi } from "vitest";
+import { expect, test as base } from "vitest";
+import { type BrowserProvider, ProviderCloseError } from "./provider.js";
 import { LocalBrowserProvider } from "./providers/local.js";
 import { SessionRegistry } from "./session-registry.js";
 
-const test = base.extend<{ registry: SessionRegistry }>({
+const test = base.extend<{
+	createRegistry: (provider: BrowserProvider) => SessionRegistry;
+	registry: SessionRegistry;
+}>({
+	createRegistry: async ({}, use) => {
+		let registry: SessionRegistry | undefined;
+		await use((provider) => {
+			if (registry) throw new Error("This fixture owns one registry per test.");
+			registry = new SessionRegistry(provider);
+			return registry;
+		});
+		const disposed = await registry?.dispose();
+		if (disposed instanceof Error) throw disposed;
+	},
 	registry: async ({}, use) => {
 		const registry = new SessionRegistry(
 			new LocalBrowserProvider({ headless: true }),
 		);
 		await use(registry);
-		await registry.dispose();
+		const disposed = await registry.dispose();
+		if (disposed instanceof Error) throw disposed;
 	},
 });
 
 test("openSession returns a session ID and a usable current page", async ({
 	registry,
 }) => {
-	const { sessionId } = await registry.openSession();
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+	const { sessionId } = opened;
 	const page = registry.getCurrentPage(sessionId);
 	await page.goto("data:text/html,<title>hello</title>");
 	expect(await page.title()).toBe("hello");
@@ -25,7 +42,9 @@ test("a second openSession gives an independent session with a different ID", as
 	registry,
 }) => {
 	const first = await registry.openSession();
+	if (first instanceof Error) throw first;
 	const second = await registry.openSession();
+	if (second instanceof Error) throw second;
 	expect(second.sessionId).not.toBe(first.sessionId);
 
 	await registry
@@ -42,7 +61,9 @@ test("a second openSession gives an independent session with a different ID", as
 test("getCurrentPage tracks the newest page in the session", async ({
 	registry,
 }) => {
-	const { sessionId } = await registry.openSession();
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+	const { sessionId } = opened;
 	const context = registry.getCurrentPage(sessionId).context();
 
 	const newest = await context.newPage();
@@ -63,17 +84,111 @@ test("unknown session ID throws with the ID in the message", ({ registry }) => {
 });
 
 test("closeSession makes the session unknown", async ({ registry }) => {
-	const { sessionId } = await registry.openSession();
-	await registry.closeSession(sessionId);
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+	const { sessionId } = opened;
+	const closed = await registry.closeSession(sessionId);
+	if (closed instanceof Error) throw closed;
 
 	expect(() => registry.getCurrentPage(sessionId)).toThrowError(sessionId);
 });
 
+test("closeSession releases the provider before disconnecting CDP", async ({
+	createRegistry,
+}) => {
+	const localProvider = new LocalBrowserProvider({ headless: true });
+	let registryBrowserConnectedWhenProviderClosed = false;
+	let registryBrowserConnected: (() => boolean) | undefined;
+	const registry = createRegistry({
+		name: "ordered-close",
+		createSession: () => localProvider.createSession(),
+		async closeSession(sessionId) {
+			registryBrowserConnectedWhenProviderClosed =
+				registryBrowserConnected?.() ?? false;
+			return localProvider.closeSession(sessionId);
+		},
+	});
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+	const browser = registry.getCurrentPage(opened.sessionId).context().browser();
+	if (!browser) throw new Error("Expected a connected browser.");
+	registryBrowserConnected = () => browser.isConnected();
+
+	const closed = await registry.closeSession(opened.sessionId);
+	if (closed instanceof Error) throw closed;
+
+	expect(registryBrowserConnectedWhenProviderClosed).toBe(true);
+	expect(browser.isConnected()).toBe(false);
+});
+
+test("closeSession removes the session when provider cleanup fails", async ({
+	createRegistry,
+}) => {
+	const localProvider = new LocalBrowserProvider({ headless: true });
+	const registry = createRegistry({
+		name: "failing-close",
+		createSession: () => localProvider.createSession(),
+		async closeSession(sessionId) {
+			const closed = await localProvider.closeSession(sessionId);
+			if (closed instanceof Error) return closed;
+			throw new Error("provider cleanup failed");
+		},
+	});
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+
+	const closed = await registry.closeSession(opened.sessionId);
+	expect(closed).toBeInstanceOf(ProviderCloseError);
+	expect(closed?.message).toContain("provider cleanup failed");
+	expect(() => registry.getCurrentPage(opened.sessionId)).toThrowError(
+		opened.sessionId,
+	);
+	expect(registry.listSessions()).toEqual([]);
+});
+
+test("dispose closes remaining sessions after one provider cleanup fails", async ({
+	createRegistry,
+}) => {
+	const localProvider = new LocalBrowserProvider({ headless: true });
+	const closedProviderSessionIds: string[] = [];
+	const registry = createRegistry({
+		name: "partly-failing-close",
+		createSession: () => localProvider.createSession(),
+		async closeSession(sessionId) {
+			closedProviderSessionIds.push(sessionId);
+			const closed = await localProvider.closeSession(sessionId);
+			if (closed instanceof Error) return closed;
+			if (sessionId === "local-1") {
+				return new ProviderCloseError({
+					provider: "partly-failing-close",
+					providerSessionId: sessionId,
+					detail: "first provider cleanup failed",
+					recovery: "Retry provider cleanup.",
+				});
+			}
+			return {};
+		},
+	});
+	const first = await registry.openSession();
+	if (first instanceof Error) throw first;
+	const second = await registry.openSession();
+	if (second instanceof Error) throw second;
+
+	const disposed = await registry.dispose();
+	expect(disposed).toBeInstanceOf(ProviderCloseError);
+	expect(disposed?.message).toContain("first provider cleanup failed");
+	expect(closedProviderSessionIds).toEqual(["local-1", "local-2"]);
+	expect(registry.listSessions()).toEqual([]);
+});
+
 test("dispose closes all sessions and is idempotent", async ({ registry }) => {
 	const first = await registry.openSession();
+	if (first instanceof Error) throw first;
 	const second = await registry.openSession();
+	if (second instanceof Error) throw second;
 
-	await registry.dispose();
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 
 	expect(() => registry.getCurrentPage(first.sessionId)).toThrowError(
 		first.sessionId,
@@ -82,25 +197,6 @@ test("dispose closes all sessions and is idempotent", async ({ registry }) => {
 		second.sessionId,
 	);
 
-	await registry.dispose();
-});
-
-test("beforeExit disposes leftover sessions as a backstop", async ({
-	registry,
-}) => {
-	await registry.openSession();
-	expect(registry.listSessions()).toHaveLength(1);
-
-	process.emit("beforeExit", 0);
-
-	await vi.waitFor(() => expect(registry.listSessions()).toHaveLength(0));
-});
-
-test("dispose removes the beforeExit hook it installed", async ({ registry }) => {
-	const before = process.listenerCount("beforeExit");
-	await registry.openSession();
-	expect(process.listenerCount("beforeExit")).toBeGreaterThan(before);
-
-	await registry.dispose();
-	expect(process.listenerCount("beforeExit")).toBe(before);
+	const disposedAgain = await registry.dispose();
+	if (disposedAgain instanceof Error) throw disposedAgain;
 });

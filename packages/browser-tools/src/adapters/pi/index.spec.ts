@@ -34,7 +34,8 @@ const test = base.extend<{ toolkit: PiBrowserToolkit }>({
 			new LocalBrowserProvider({ headless: true }),
 		);
 		await use(toolkit);
-		await toolkit.dispose();
+		const disposed = await toolkit.dispose();
+		if (disposed instanceof Error) throw disposed;
 	},
 });
 
@@ -100,5 +101,6 @@ test("createPiBrowserTools forwards domain policy options", async () => {
 			url: "https://example.com/",
 		}),
 	).rejects.toBeInstanceOf(DomainPolicyRestricted);
-	await toolkit.dispose();
+	const disposed = await toolkit.dispose();
+	if (disposed instanceof Error) throw disposed;
 });

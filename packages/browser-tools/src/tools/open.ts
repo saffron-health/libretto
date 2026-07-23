@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { errorMessage } from "../errors.js";
-import type { SessionRegistry } from "../session-registry.js";
+import {
+	browserCleanupErrorMessage,
+	type SessionRegistry,
+} from "../session-registry.js";
 import type { BrowserTool, ToolResult } from "../tool.js";
 
 const openInputSchema = z.object({
@@ -10,6 +13,13 @@ const openInputSchema = z.object({
 		.describe(
 			"Optional start URL for the session. Providers that support create-time " +
 				"navigation open it before CDP attach; others navigate after connect.",
+		),
+	authProfile: z
+		.string()
+		.min(1)
+		.optional()
+		.describe(
+			"Optional auth profile to restore for this session and save when it closes.",
 		),
 });
 
@@ -33,22 +43,51 @@ export function createOpenTool(registry: SessionRegistry): OpenTool {
 		name: "browser_open",
 		description:
 			"Open a new browser session. Optionally opens `url` at session create " +
-			"(or after connect when the provider cannot preload). " +
+			"(or after connect when the provider cannot preload) and restores `authProfile`. " +
+			"Profile changes save when the session closes. " +
 			"Returns a `sessionId` to pass to subsequent browser tools.",
 		inputSchema: openInputSchema,
-		async execute({ url }): Promise<ToolResult<OpenToolOutput>> {
+		async execute({ url, authProfile }): Promise<ToolResult<OpenToolOutput>> {
 			const startUrl = url?.trim() || undefined;
-			const { sessionId, startUrlPreloaded } = await registry.openSession(
-				startUrl ? { startUrl } : {},
-			);
+			if (startUrl !== undefined && !URL.canParse(startUrl)) {
+				return {
+					ok: false,
+					error:
+						`Could not navigate to ${startUrl} (Invalid URL). ` +
+						"Call browser_open again — use a full https:// URL, " +
+						"or omit url and navigate with browser_exec via `await page.goto(...)`.",
+				};
+			}
+			const opened = await registry.openSession({
+				authProfile,
+				...(startUrl ? { startUrl } : {}),
+			});
+			if (opened instanceof Error) return { ok: false, error: opened.message };
+			const { sessionId, startUrlPreloaded } = opened;
 			if (startUrl !== undefined && !startUrlPreloaded) {
 				const page = registry.getCurrentPage(sessionId);
 				try {
 					await page.goto(startUrl);
 				} catch (err) {
 					const policyError = registry.consumeBlockedNavigationError(page);
-					await registry.closeSession(sessionId);
-					if (policyError) throw policyError;
+					const closeError = await registry.closeSession(sessionId);
+					if (policyError) {
+						if (closeError) {
+							console.error(
+								"Browser cleanup also failed after a blocked navigation:",
+								closeError,
+							);
+						}
+						throw policyError;
+					}
+					if (closeError) {
+						return {
+							ok: false,
+							error:
+								`Could not navigate to ${url} (${errorMessage(err)}). ` +
+								`The session was removed, but cleanup failed: ${browserCleanupErrorMessage(closeError)}`,
+						};
+					}
 					return {
 						ok: false,
 						error:

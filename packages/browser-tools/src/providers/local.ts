@@ -1,16 +1,86 @@
+import { chmod, lstat, mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
-import type { Browser } from "playwright";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import type { Browser, BrowserContext } from "playwright";
 import { chromium } from "playwright";
-import type {
-	BrowserProvider,
-	ProviderSession,
-	ProviderSessionClosed,
-	ProviderSessionCreateOptions,
+import { errorMessage } from "../errors.js";
+import {
+	AuthProfileError,
+	ProviderCloseError,
+	type BrowserProvider,
+	type ProviderCloseResult,
+	type ProviderSession,
+	type ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type LocalBrowserProviderOptions = {
+	authProfileDirectory?: string;
 	channel?: string;
 	headless?: boolean;
+}
+
+type LocalSession = {
+	browser: Browser;
+	persistentContext: BrowserContext | null;
+}
+
+const AUTH_PROFILE_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+
+async function resolveAuthProfilePath(
+	authProfileDirectory: string,
+	authProfile: string,
+): Promise<AuthProfileError | string> {
+	if (
+		authProfile === "." ||
+		authProfile === ".." ||
+		!AUTH_PROFILE_NAME_PATTERN.test(authProfile)
+	) {
+		return new AuthProfileError({
+			message: `Invalid local auth profile name "${authProfile}".`,
+			recovery:
+				"Use only letters, numbers, dots, underscores, or hyphens in authProfile.",
+		});
+	}
+
+	const root = resolve(authProfileDirectory);
+	const profilePath = resolve(root, authProfile);
+	if (dirname(profilePath) !== root) {
+		return new AuthProfileError({
+			message: `Local auth profile "${authProfile}" escapes the profile directory.`,
+			recovery: "Choose an authProfile name without path segments.",
+		});
+	}
+
+	await mkdir(root, { recursive: true, mode: 0o700 });
+	await chmod(root, 0o700);
+	const existing = await lstat(profilePath).catch((cause: unknown) => {
+		if (
+			cause instanceof Error &&
+			"code" in cause &&
+			cause.code === "ENOENT"
+		) {
+			return null;
+		}
+		throw cause;
+	});
+	if (existing?.isSymbolicLink()) {
+		return new AuthProfileError({
+			message: `Local auth profile "${authProfile}" is a symbolic link.`,
+			recovery:
+				"Ask the toolkit developer to remove the link or choose another authProfile.",
+		});
+	}
+	if (existing && !existing.isDirectory()) {
+		return new AuthProfileError({
+			message: `Local auth profile "${authProfile}" is not a directory.`,
+			recovery:
+				"Ask the toolkit developer to remove the file or choose another authProfile.",
+		});
+	}
+	if (!existing) await mkdir(profilePath, { mode: 0o700 });
+	await chmod(profilePath, 0o700);
+	return profilePath;
 }
 
 async function pickFreePort(): Promise<number> {
@@ -56,37 +126,102 @@ async function fetchWebSocketDebuggerUrl(port: number): Promise<string> {
  */
 export class LocalBrowserProvider implements BrowserProvider {
 	readonly name = "local";
+	readonly supportsAuthProfiles = true;
+	private readonly authProfileDirectory: string;
 	private readonly channel: string | undefined;
 	private readonly headless: boolean;
-	private readonly browsers = new Map<string, Browser>();
+	private readonly sessions = new Map<string, LocalSession>();
 	private nextSessionNumber = 1;
 
 	constructor(options: LocalBrowserProviderOptions = {}) {
+		this.authProfileDirectory =
+			options.authProfileDirectory ??
+			join(homedir(), ".libretto", "browser-tools", "profiles");
 		this.channel = options.channel;
 		this.headless = options.headless ?? false;
 	}
 
 	async createSession(
-		_options: ProviderSessionCreateOptions = {},
-	): Promise<ProviderSession> {
+		options: ProviderSessionCreateOptions = {},
+	): Promise<AuthProfileError | ProviderSession> {
 		const port = await pickFreePort();
-		const browser = await chromium.launch({
+		const launchOptions = {
 			...(this.channel ? { channel: this.channel } : {}),
 			headless: this.headless,
 			args: [`--remote-debugging-port=${port}`],
-		});
-		const cdpEndpoint = await fetchWebSocketDebuggerUrl(port);
+		};
+		const authProfilePath =
+			options.authProfile === undefined
+				? null
+				: await resolveAuthProfilePath(
+					this.authProfileDirectory,
+					options.authProfile,
+				);
+		if (authProfilePath instanceof Error) return authProfilePath;
+
+		const persistentContext =
+			authProfilePath === null
+				? null
+				: await chromium.launchPersistentContext(
+						authProfilePath,
+						{
+							...launchOptions,
+							...(this.headless && !this.channel
+								? { channel: "chromium" }
+								: {}),
+							args: [
+								...launchOptions.args,
+								"--restore-last-session",
+							],
+							ignoreDefaultArgs: [
+								"--disable-component-extensions-with-background-pages",
+								"--disable-extensions",
+							],
+						},
+					);
+		const browser =
+			persistentContext === null
+				? await chromium.launch(launchOptions)
+				: persistentContext.browser();
+		if (!browser) {
+			await persistentContext?.close();
+			throw new Error("Persistent Chromium context has no connected browser.");
+		}
 		const sessionId = `local-${this.nextSessionNumber++}`;
-		this.browsers.set(sessionId, browser);
+		this.sessions.set(sessionId, { browser, persistentContext });
+		const cdpEndpoint = await fetchWebSocketDebuggerUrl(port).catch(
+			async (createError: unknown) => {
+				const closeError = await this.closeSession(sessionId);
+				if (closeError instanceof Error) {
+					throw new AggregateError(
+						[createError, closeError],
+						"Local browser creation and cleanup both failed.",
+					);
+				}
+				throw createError;
+			},
+		);
 		return { sessionId, cdpEndpoint, startUrlPreloaded: false };
 	}
 
-	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
-		const browser = this.browsers.get(sessionId);
-		if (browser) {
-			this.browsers.delete(sessionId);
-			await browser.close();
-		}
+	async closeSession(sessionId: string): Promise<ProviderCloseResult> {
+		const session = this.sessions.get(sessionId);
+		if (!session) return {};
+		const closed = await (
+			session.persistentContext?.close() ?? session.browser.close()
+		).catch(
+			(cause: unknown) =>
+				new ProviderCloseError({
+					provider: this.name,
+					providerSessionId: sessionId,
+					detail: errorMessage(cause),
+					recovery:
+						"Call closeSession again; if it still fails, stop the local Chromium process.",
+					cause,
+				}),
+		);
+		if (closed instanceof Error) return closed;
+		this.sessions.delete(sessionId);
 		return {};
 	}
 }

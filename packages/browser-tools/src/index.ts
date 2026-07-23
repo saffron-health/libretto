@@ -4,14 +4,18 @@ export type { DomainPolicyOptions } from "./domain-policy.js";
 export type { BrowserTool, ToolErrorResult, ToolResult } from "./tool.js";
 export type {
 	BrowserProvider,
+	ProviderCloseResult,
 	ProviderSession,
 	ProviderSessionClosed,
 	ProviderSessionCreateOptions,
 } from "./provider.js";
+export { AuthProfileError, ProviderCloseError } from "./provider.js";
 export {
 	createBrowserTools,
 	createBrowserToolsForPage,
 } from "./create-browser-tools.js";
+export { BrowserCloseError } from "./session-registry.js";
+export type { BrowserCleanupError } from "./session-registry.js";
 export type {
 	BorrowedPageBrowserToolkit,
 	BrowserToolkit,

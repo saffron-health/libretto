@@ -1,7 +1,10 @@
 import type { DomainPolicyOptions } from "./domain-policy.js";
 import type { BrowserProvider } from "./provider.js";
 import type { Page } from "playwright";
-import { SessionRegistry } from "./session-registry.js";
+import {
+	type BrowserCleanupError,
+	SessionRegistry,
+} from "./session-registry.js";
 import type { CloseTool } from "./tools/close.js";
 import { createCloseTool } from "./tools/close.js";
 import type { ConnectTool } from "./tools/connect.js";
@@ -25,7 +28,7 @@ export type BrowserToolkit = {
 		browser_connect: ConnectTool;
 	};
 	/** Closes every session opened through this toolkit. */
-	dispose(): Promise<void>;
+	dispose(): Promise<BrowserCleanupError | null>;
 }
 
 export type BrowserToolkitOptions = DomainPolicyOptions;
@@ -38,7 +41,7 @@ export type BorrowedPageBrowserToolkit = {
 		browser_status: StatusTool;
 	};
 	/** Detaches tools without closing the caller-owned page, context, or browser. */
-	dispose(): Promise<void>;
+	dispose(): Promise<BrowserCleanupError | null>;
 }
 
 /**
