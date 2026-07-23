@@ -1,0 +1,40 @@
+---
+title: Providers
+sidebarTitle: Overview
+"og:image": "https://libretto.sh/docs/og/browser-tools/providers/overview.png"
+---
+
+> Choose where agent browser sessions run — local Chromium or a managed cloud provider.
+
+A provider implements `BrowserProvider`: it creates a CDP endpoint for each session and tears it down on close. Pass any provider into `createBrowserTools`, `createAiSdkBrowserTools`, or `createPiBrowserTools`.
+
+Provider credentials and defaults live on the constructor. Per-session launch options (`startUrl`, `gpu`, `viewport`) go on `createSession` — `browser_open({ url })` passes `startUrl` that way.
+
+This is the SDK surface. For Libretto CLI `open` / `run` provider config, see [Alternative providers](/alternative-providers/overview).
+
+## Built-in providers
+
+| Provider | Import | Required env |
+| --- | --- | --- |
+| [Local](/browser-tools/providers/local) | `libretto-browser-tools` | (Chromium via `npx playwright install chromium`) |
+| [Libretto Cloud](/browser-tools/providers/libretto-cloud) | `libretto-browser-tools/libretto-cloud` | `LIBRETTO_API_KEY` |
+| [Kernel](/browser-tools/providers/kernel) | `libretto-browser-tools/kernel` | `KERNEL_API_KEY` |
+| [Browserbase](/browser-tools/providers/browserbase) | `libretto-browser-tools/browserbase` | `BROWSERBASE_API_KEY` |
+| [Browser Use](/browser-tools/providers/browser-use) | `libretto-browser-tools/browser-use` | `BROWSER_USE_API_KEY` |
+| [Steel](/browser-tools/providers/steel) | `libretto-browser-tools/steel` | `STEEL_API_KEY` |
+| [Custom](/browser-tools/providers/custom) | implement `BrowserProvider` | (your credentials) |
+
+Cloud providers attach over CDP and do not need a local Chromium download. Only [Local](/browser-tools/providers/local) requires `npx playwright install chromium`.
+
+## Usage
+
+```typescript theme={null}
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+import { KernelBrowserProvider } from "libretto-browser-tools/kernel";
+
+const { tools, dispose } = createAiSdkBrowserTools(
+  new KernelBrowserProvider(), // reads KERNEL_API_KEY from the environment
+);
+```
+
+Missing API keys throw from the provider constructor (host-level errors), not as `{ ok: false }` tool results.

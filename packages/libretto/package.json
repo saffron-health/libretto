@@ -1,6 +1,6 @@
 {
   "name": "libretto",
-  "version": "0.6.33",
+  "version": "0.6.37",
   "description": "AI-powered browser automation library and CLI built on Playwright",
   "license": "MIT",
   "homepage": "https://libretto.sh",
@@ -39,7 +39,6 @@
     "sync-skills": "pnpm run sync:mirrors",
     "check:skills": "pnpm run check:mirrors",
     "build": "tsup --config tsup.config.ts",
-    "lint": "lintcn lint --tsconfig tsconfig.json",
     "type-check": "tsc --noEmit",
     "test": "turbo run test:vitest --filter=libretto --log-order=grouped",
     "test:vitest": "vitest run",

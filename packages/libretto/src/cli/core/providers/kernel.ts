@@ -101,6 +101,9 @@ export function createKernelProvider(
   return {
     async createSession(sessionOptions) {
       const sessionHeadless = sessionOptions?.headless ?? headless;
+      const startUrl = sessionOptions?.startUrl?.trim() || undefined;
+      const gpu = sessionOptions?.gpu;
+      const viewport = sessionOptions?.viewport;
       const json = await kernelFetchJson<KernelBrowserResponse>(
         endpoint,
         apiKey,
@@ -111,6 +114,16 @@ export function createKernelProvider(
             headless: sessionHeadless,
             stealth,
             timeout_seconds: timeoutSeconds,
+            ...(startUrl ? { start_url: startUrl } : {}),
+            ...(gpu !== undefined ? { gpu } : {}),
+            ...(viewport
+              ? {
+                  viewport: {
+                    width: viewport.width,
+                    height: viewport.height,
+                  },
+                }
+              : {}),
           }),
         },
       );
@@ -144,6 +157,7 @@ export function createKernelProvider(
         cdpEndpoint: json.cdp_ws_url,
         liveViewUrl: json.browser_live_view_url ?? undefined,
         recordingUrl: replay?.replay_view_url ?? undefined,
+        startUrlPreloaded: Boolean(startUrl),
       };
     },
     async closeSession(sessionId) {

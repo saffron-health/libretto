@@ -1,5 +1,6 @@
 ---
 title: One-shot workflow generation
+"og:image": "https://libretto.sh/docs/og/guides/one-shot-workflow-generation.png"
 ---
 
 > Give your agent a goal and a URL, and get back a complete browser automation script.
@@ -63,11 +64,11 @@ One-shot generation is the fastest way to go from an idea to a working automatio
       {
         input: z.object({}),
         output: outputSchema,
+        startUrl: "https://sfbay.craigslist.org/search/zip",
       },
       async (ctx) => {
         const { page } = ctx;
 
-        await page.goto("https://sfbay.craigslist.org/search/zip");
         await page.waitForSelector(".result-row");
 
         const rows = await page.locator(".result-row").all();
@@ -85,6 +86,7 @@ One-shot generation is the fastest way to go from an idea to a working automatio
     ```
 
     Things to check:
+    - **`startUrl`** is set to the workflow's entry page
     - **Input/output schemas** match what you asked for
     - **Selectors** look reasonable (class names, data attributes, or ARIA roles, not brittle positional selectors)
     - **Pagination** logic is present if you asked for more items than fit on one page

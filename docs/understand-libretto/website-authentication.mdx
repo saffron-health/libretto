@@ -1,5 +1,6 @@
 ---
 title: Website authentication
+"og:image": "https://libretto.sh/docs/og/understand-libretto/website-authentication.png"
 ---
 
 > Use credentials for scripted login, auth profiles for saved browser state, and `librettoAuthenticate` to recover when a saved session is missing or expired.
@@ -16,6 +17,7 @@ import { librettoAuthenticate, workflow } from "libretto";
 import { z } from "zod";
 
 export default workflow("portalReport", {
+  startUrl: "https://portal.example.com",
   credentials: ["username", "password"],
   authProfile: {
     name: "portal",
@@ -29,8 +31,6 @@ export default workflow("portalReport", {
   }),
   async handler(ctx, input) {
     const { page } = ctx;
-
-    await page.goto("https://portal.example.com");
 
     await librettoAuthenticate(ctx, {
       credentials: input.credentials,

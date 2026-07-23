@@ -1,0 +1,58 @@
+---
+title: Local
+sidebarTitle: Local
+"og:image": "https://libretto.sh/docs/og/browser-tools/providers/local.png"
+---
+
+> Run agent browser sessions on local Chromium.
+
+`LocalBrowserProvider` launches Chromium with an ephemeral remote-debugging port and returns its CDP websocket. This is the only built-in provider that needs a local browser binary.
+
+```bash theme={null}
+npx playwright install chromium
+```
+
+Import from the package root (not a subpath):
+
+```typescript theme={null}
+import { LocalBrowserProvider } from "libretto-browser-tools";
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+
+const { tools, dispose } = createAiSdkBrowserTools(
+  new LocalBrowserProvider({ headless: true }),
+);
+```
+
+## Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `headless` | `false` | Run Chromium headless. Use `true` on servers without a display. |
+| `channel` | (Playwright Chromium) | Optional Playwright browser channel, for example `"chrome"`. |
+
+## Example
+
+```typescript theme={null}
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText, stepCountIs } from "ai";
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+import { LocalBrowserProvider } from "libretto-browser-tools";
+
+const { tools, dispose } = createAiSdkBrowserTools(
+  new LocalBrowserProvider({ headless: true }),
+);
+
+try {
+  const result = await generateText({
+    model: anthropic("claude-sonnet-4-5"),
+    tools,
+    stopWhen: stepCountIs(20),
+    prompt: "Go to example.com and tell me the page title",
+  });
+  console.log(result.text);
+} finally {
+  await dispose();
+}
+```
+
+For managed browsers with stealth or live view, use a [cloud provider](/browser-tools/providers/overview).

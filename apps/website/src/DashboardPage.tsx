@@ -1,65 +1,40 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Navbar } from "./components/Navbar";
+import { InstallSnippet } from "./components/InstallSnippet";
 import {
-  authPost,
   getAuthStatus,
   getCloudSession,
+  getSetupStatus,
+  updateSetupStatus,
   orpcCall,
   type CloudSession,
+  type SetupStatus,
 } from "./cloudApi";
+import { GitHubIcon } from "./icons";
+import {
+  DEBUGGER_DOCS_URL,
+  DEBUGGER_PROMPT,
+  GITHUB_APP_INSTALL_URL,
+} from "./prAgentSetup";
+const HOSTED_BROWSERS_BANNER_DISMISSED_KEY =
+  "libretto.dashboard.hostedBrowsersBannerDismissed";
 
-type Tab = "jobs" | "sessions" | "users" | "billing";
+type Tab = "repositories" | "users";
 
-type DashboardJob = {
-  job_id: string;
-  workflow: string | null;
-  status:
-    | "queued"
-    | "starting_browser"
-    | "running"
-    | "completed"
-    | "failed"
-    | "cancelled";
-  created_at: string;
-  started_at: string | null;
-  completed_at: string | null;
-  failure_class: string | null;
+type LinkedRepository = {
+  id: string;
+  owner: string;
+  name: string;
+  full_name: string;
+  private: boolean;
+  linked_at: string;
+  installation_id: string;
+  account_login: string;
 };
 
-type JobsResponse = {
-  jobs: DashboardJob[];
-  next_cursor?: string;
-};
-
-type DashboardSession = {
-  session_id: string;
-  provider_session_id: string | null;
-  browser_provider: string | null;
-  status:
-    | "queued"
-    | "starting"
-    | "open"
-    | "preserved"
-    | "debugging"
-    | "closing"
-    | "closed"
-    | "unknown";
-  source: "cli" | "job" | "workflow_build" | null;
-  owner_type: "job" | "workflow_build" | "manual" | "debug" | null;
-  owner_id: string | null;
-  auth_profile_name: string | null;
-  live_view_url: string | null;
-  started_at: string;
-  ended_at: string | null;
-  duration_ms: number | null;
-  billed_seconds: number | null;
-  created_at: string;
-};
-
-type SessionsResponse = {
-  sessions: DashboardSession[];
-  next_cursor?: string;
+type LinkedRepositoriesResponse = {
+  repositories: LinkedRepository[];
 };
 
 type UsersResponse = {
@@ -77,15 +52,6 @@ type UsersResponse = {
     image: string | null;
     created_at: string;
   }>;
-};
-
-type BillingResponse = {
-  plan: string;
-  status: string;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-  browserHoursUsedThisPeriod: number;
-  browserHoursLimit: number | null;
 };
 
 type InviteResponse = {
@@ -109,10 +75,8 @@ type DeleteAccountResponse = {
 };
 
 const tabs: Array<{ id: Tab; label: string }> = [
-  { id: "jobs", label: "Jobs" },
-  { id: "sessions", label: "Sessions" },
+  { id: "repositories", label: "Connected repos" },
   { id: "users", label: "Users" },
-  { id: "billing", label: "Billing" },
 ];
 
 function isDashboardTab(value: string | null): value is Tab {
@@ -120,23 +84,19 @@ function isDashboardTab(value: string | null): value is Tab {
 }
 
 function getInitialTab(): Tab {
-  if (typeof window === "undefined") return "jobs";
+  if (typeof window === "undefined") return "repositories";
   const tab = new URLSearchParams(window.location.search).get("tab");
-  return isDashboardTab(tab) ? tab : "jobs";
+  return isDashboardTab(tab) ? tab : "repositories";
 }
 
 function setDashboardTabUrl(tab: Tab) {
   const url = new URL(window.location.href);
-  if (tab === "jobs") {
+  if (tab === "repositories") {
     url.searchParams.delete("tab");
   } else {
     url.searchParams.set("tab", tab);
   }
-  window.history.replaceState(
-    null,
-    "",
-    `${url.pathname}${url.search}${url.hash}`,
-  );
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function formatDate(value: string | null): string {
@@ -149,37 +109,6 @@ function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
-function statusClass(status: DashboardJob["status"]) {
-  if (status === "completed")
-    return "border-accent/35 bg-green-9/10 text-accent-bright";
-  if (status === "failed" || status === "cancelled") {
-    return "border-red-400/30 bg-red-500/10 text-red-200";
-  }
-  return "border-amber/30 bg-amber/10 text-amber-bright";
-}
-
-function sessionStatusClass(status: DashboardSession["status"]) {
-  if (status === "open" || status === "preserved") {
-    return "border-accent/35 bg-green-9/10 text-accent-bright";
-  }
-  if (status === "closed") {
-    return "border-rule bg-bg/70 text-muted";
-  }
-  if (status === "unknown") {
-    return "border-red-400/30 bg-red-500/10 text-red-200";
-  }
-  return "border-amber/30 bg-amber/10 text-amber-bright";
-}
-
-function formatDuration(value: number | null): string {
-  if (value === null) return "--";
-  const totalSeconds = Math.max(0, Math.round(value / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes === 0) return `${seconds}s`;
-  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
-}
-
 function EmptyState({ children }: { children: string }) {
   return (
     <div className="rounded-lg border border-dashed border-rule bg-panel/45 px-4 py-10 text-center text-sm text-muted">
@@ -188,23 +117,20 @@ function EmptyState({ children }: { children: string }) {
   );
 }
 
-export function CloudBrowsersDashboardPage() {
+export function DashboardPage() {
   const [session, setSession] = useState<CloudSession | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(getInitialTab);
-  const [jobs, setJobs] = useState<DashboardJob[] | null>(null);
-  const [jobsCursor, setJobsCursor] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<DashboardSession[] | null>(null);
-  const [sessionsCursor, setSessionsCursor] = useState<string | null>(null);
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
+  const [repositories, setRepositories] = useState<LinkedRepository[] | null>(null);
   const [users, setUsers] = useState<UsersResponse | null>(null);
-  const [billing, setBilling] = useState<BillingResponse | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [busy, setBusy] = useState<string | null>("session");
+  const [savingStep, setSavingStep] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<string | null>(
-    null,
-  );
+  const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<string | null>(null);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [showHostedBrowsersBanner, setShowHostedBrowsersBanner] = useState(false);
 
   useEffect(() => {
     getCloudSession()
@@ -213,124 +139,76 @@ export function CloudBrowsersDashboardPage() {
           window.location.assign("/signin");
           return;
         }
-        const status = await getAuthStatus();
-        if (!status.hasTenant) {
-          window.location.assign("/onboarding?product=cloud-browsers");
+
+        let status;
+        try {
+          status = await getAuthStatus();
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Could not load account status.",
+          );
           return;
         }
+
+        if (!status.hasTenant) {
+          window.location.assign("/onboarding");
+          return;
+        }
+
         setSession(result);
+        await Promise.all([
+          getSetupStatus()
+            .then(setSetupStatus)
+            .catch(() => setSetupStatus(null)),
+          orpcCall<LinkedRepositoriesResponse>("/v1/github/listLinkedRepositories")
+            .then((result) => setRepositories(result.repositories))
+            .catch((err) =>
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : "Could not load connected repositories.",
+              ),
+            ),
+          orpcCall<UsersResponse>("/v1/dashboard/users")
+            .then(setUsers)
+            .catch((err) =>
+              setError(err instanceof Error ? err.message : "Could not load users."),
+            ),
+        ]);
       })
       .catch(() => window.location.assign("/signin"))
       .finally(() => setBusy(null));
   }, []);
 
   useEffect(() => {
-    if (!session) return;
-    if (activeTab === "jobs" && jobs === null) {
-      setBusy("jobs");
-      setError(null);
-      orpcCall<JobsResponse>("/v1/dashboard/jobs", { limit: 25 })
-        .then((result) => {
-          setJobs(result.jobs);
-          setJobsCursor(result.next_cursor ?? null);
-        })
-        .catch((err) =>
-          setError(err instanceof Error ? err.message : "Could not load jobs."),
-        )
-        .finally(() => setBusy(null));
-    }
-    if (activeTab === "users" && users === null) {
-      setBusy("users");
-      setError(null);
-      orpcCall<UsersResponse>("/v1/dashboard/users")
-        .then(setUsers)
-        .catch((err) =>
-          setError(
-            err instanceof Error ? err.message : "Could not load users.",
-          ),
-        )
-        .finally(() => setBusy(null));
-    }
-    if (activeTab === "sessions" && sessions === null) {
-      setBusy("sessions");
-      setError(null);
-      orpcCall<SessionsResponse>("/v1/dashboard/sessions", { limit: 25 })
-        .then((result) => {
-          setSessions(result.sessions);
-          setSessionsCursor(result.next_cursor ?? null);
-        })
-        .catch((err) =>
-          setError(
-            err instanceof Error ? err.message : "Could not load sessions.",
-          ),
-        )
-        .finally(() => setBusy(null));
-    }
-    if (activeTab === "billing" && billing === null) {
-      setBusy("billing");
-      setError(null);
-      orpcCall<BillingResponse>("/v1/billing/subscription")
-        .then(setBilling)
-        .catch((err) =>
-          setError(
-            err instanceof Error ? err.message : "Could not load billing.",
-          ),
-        )
-        .finally(() => setBusy(null));
-    }
-  }, [activeTab, billing, jobs, session, sessions, users]);
-
-  const userInitial = useMemo(
-    () => session?.user.email.slice(0, 1).toUpperCase() ?? "L",
-    [session],
-  );
+    if (typeof window === "undefined") return;
+    setShowHostedBrowsersBanner(
+      window.localStorage.getItem(HOSTED_BROWSERS_BANNER_DISMISSED_KEY) !== "1",
+    );
+  }, []);
 
   const currentDashboardUser = useMemo(
     () => users?.users.find((user) => user.id === session?.user.id) ?? null,
     [session?.user.id, users],
   );
   const canRemoveUsers = currentDashboardUser?.role === "owner";
+  const debuggerReady = setupStatus?.debugger_added === true;
+  const hasRepos = (repositories?.length ?? 0) > 0;
 
-  async function loadMoreJobs() {
-    if (!jobsCursor) return;
-    setBusy("jobs-more");
+  async function completeDebuggerSetup() {
+    setSavingStep(true);
     setError(null);
     try {
-      const result = await orpcCall<JobsResponse>("/v1/dashboard/jobs", {
-        limit: 25,
-        cursor: jobsCursor,
+      const updated = await updateSetupStatus({
+        debugger_added: true,
       });
-      setJobs((current) => [...(current ?? []), ...result.jobs]);
-      setJobsCursor(result.next_cursor ?? null);
+      setSetupStatus(updated);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not load more jobs.",
-      );
+      setError(err instanceof Error ? err.message : "Could not update setup.");
     } finally {
-      setBusy(null);
-    }
-  }
-
-  async function loadMoreSessions() {
-    if (!sessionsCursor) return;
-    setBusy("sessions-more");
-    setError(null);
-    try {
-      const result = await orpcCall<SessionsResponse>(
-        "/v1/dashboard/sessions",
-        {
-          limit: 25,
-          cursor: sessionsCursor,
-        },
-      );
-      setSessions((current) => [...(current ?? []), ...result.sessions]);
-      setSessionsCursor(result.next_cursor ?? null);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not load more sessions.",
-      );
-    } finally {
-      setBusy(null);
+      setSavingStep(false);
     }
   }
 
@@ -341,13 +219,10 @@ export function CloudBrowsersDashboardPage() {
     setError(null);
     setNotice(null);
     try {
-      const invite = await orpcCall<InviteResponse>(
-        "/v1/dashboard/inviteUser",
-        {
-          email: inviteEmail,
-          role: "member",
-        },
-      );
+      const invite = await orpcCall<InviteResponse>("/v1/dashboard/inviteUser", {
+        email: inviteEmail,
+        role: "member",
+      });
       setInviteEmail("");
       setNotice(`Invite sent to ${invite.email}.`);
     } catch (err) {
@@ -370,9 +245,7 @@ export function CloudBrowsersDashboardPage() {
         current
           ? {
               ...current,
-              users: current.users.filter(
-                (user) => user.id !== result.removedUserId,
-              ),
+              users: current.users.filter((user) => user.id !== result.removedUserId),
             }
           : current,
       );
@@ -385,10 +258,7 @@ export function CloudBrowsersDashboardPage() {
     }
   }
 
-  async function updateUserRole(
-    userId: string,
-    role: UpdateRoleResponse["role"],
-  ) {
+  async function updateUserRole(userId: string, role: UpdateRoleResponse["role"]) {
     setBusy(`role-${userId}`);
     setError(null);
     setNotice(null);
@@ -402,44 +272,16 @@ export function CloudBrowsersDashboardPage() {
           ? {
               ...current,
               users: current.users.map((user) =>
-                user.id === result.userId
-                  ? { ...user, role: result.role }
-                  : user,
+                user.id === result.userId ? { ...user, role: result.role } : user,
               ),
             }
           : current,
       );
       setNotice("User role updated.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not update user role.",
-      );
+      setError(err instanceof Error ? err.message : "Could not update user role.");
     } finally {
       setBusy(null);
-    }
-  }
-
-  async function openBilling() {
-    setBusy("billing-portal");
-    setError(null);
-    try {
-      const result = await orpcCall<{ url: string }>(
-        "/v1/billing/openPlansPage",
-      );
-      window.open(result.url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not open billing.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function signOut() {
-    setBusy("signout");
-    try {
-      await authPost("/api/auth/sign-out", {});
-    } finally {
-      window.location.assign("/");
     }
   }
 
@@ -450,46 +292,74 @@ export function CloudBrowsersDashboardPage() {
       await orpcCall<DeleteAccountResponse>("/v1/dashboard/deleteAccount");
       window.location.assign("/");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not delete account.",
-      );
+      setError(err instanceof Error ? err.message : "Could not delete account.");
       setShowDeleteAccountDialog(false);
       setBusy(null);
     }
+  }
+
+  function dismissHostedBrowsersBanner() {
+    window.localStorage.setItem(HOSTED_BROWSERS_BANNER_DISMISSED_KEY, "1");
+    setShowHostedBrowsersBanner(false);
   }
 
   return (
     <div className="crt-page min-h-screen bg-bg text-ink">
       <Navbar />
       <main className="mx-auto w-full max-w-[1120px] px-4 py-8 md:px-8">
+        {showHostedBrowsersBanner && (
+          <section className="mb-6 flex flex-col gap-3 rounded-md border border-rule bg-panel/60 px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-ink">
+                Need hosted browsers?
+              </h2>
+            </div>
+            <div className="flex items-center gap-4 md:justify-end">
+              <a
+                href="/dashboard/cloud-browsers"
+                className="text-xs text-accent-bright underline decoration-accent/60 underline-offset-4 transition-colors hover:text-ink hover:decoration-accent"
+              >
+                Open cloud browsers
+              </a>
+              <button
+                type="button"
+                onClick={dismissHostedBrowsersBanner}
+                aria-label="Dismiss hosted browsers banner"
+                className="grid size-7 shrink-0 place-items-center rounded-md border border-rule text-muted transition-colors hover:border-accent/45 hover:text-ink"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 16 16"
+                  className="size-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                >
+                  <path d="m4 4 8 8" />
+                  <path d="m12 4-8 8" />
+                </svg>
+              </button>
+            </div>
+          </section>
+        )}
+
         <div className="mb-7 flex flex-col gap-4 border-b border-rule pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 font-mono text-xs uppercase text-accent">
-              Libretto Cloud
-            </p>
-            <h1 className="font-serif text-[34px] font-[300] leading-tight md:text-[46px]">
-              Dashboard
-            </h1>
-          </div>
-          {session && (
-            <div className="flex items-center gap-3">
-              <div className="grid size-9 shrink-0 place-items-center rounded-full border border-rule bg-panel-hi text-sm text-accent-bright">
-                {userInitial}
-              </div>
-              <div className="min-w-0 text-right">
-                <p className="truncate text-sm text-ink">
-                  {session.user.email}
-                </p>
-                <button
-                  type="button"
-                  onClick={signOut}
-                  className="text-xs text-muted transition-colors hover:text-accent-bright"
-                >
-                  Sign out
-                </button>
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="font-serif text-[34px] font-[300] leading-tight md:text-[46px]">
+                Libretto PR Agents
+              </h1>
+              <span className="rounded-full border border-accent/35 bg-green-9/15 px-2 py-0.5 text-[11px] uppercase text-accent-bright">
+                Free
+              </span>
             </div>
-          )}
+            <p className="mt-3 max-w-[680px] text-sm leading-6 text-muted">
+              Connect your local agent and GitHub repos to automatically open PRs
+              when scripts break.
+            </p>
+          </div>
         </div>
 
         <div className="mb-6 flex w-full overflow-x-auto rounded-lg border border-rule bg-panel p-1 md:w-fit">
@@ -506,7 +376,7 @@ export function CloudBrowsersDashboardPage() {
                 setShowDeleteAccountDialog(false);
               }}
               aria-pressed={activeTab === tab.id}
-              className="h-9 min-w-[104px] rounded-md px-4 text-sm font-medium text-muted transition-colors hover:text-ink aria-pressed:bg-panel-hi aria-pressed:text-accent-bright"
+              className="h-9 min-w-[132px] rounded-md px-4 text-sm font-medium text-muted transition-colors hover:text-ink aria-pressed:bg-panel-hi aria-pressed:text-accent-bright"
             >
               {tab.label}
             </button>
@@ -526,153 +396,136 @@ export function CloudBrowsersDashboardPage() {
 
         {busy === "session" && <EmptyState>Loading account...</EmptyState>}
 
-        {activeTab === "jobs" && busy !== "session" && (
+        {activeTab === "repositories" && busy !== "session" && (
           <section className="overflow-hidden rounded-lg border border-rule bg-panel/70">
-            <div>
-              <div className="hidden grid-cols-[1fr_132px_150px_92px] border-b border-rule px-4 py-3 text-xs uppercase text-muted lg:grid">
-                <span>Workflow</span>
-                <span>Status</span>
-                <span>Created</span>
-                <span>Runtime</span>
+            <div className="flex flex-col gap-3 border-b border-rule px-4 py-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-base font-medium text-ink">
+                  Connected repositories
+                </h2>
+                <p className="mt-1 text-sm text-muted">
+                  Repositories where Libretto can open PRs when scripts break.
+                </p>
               </div>
-              {busy === "jobs" && <EmptyState>Loading jobs...</EmptyState>}
-              {jobs?.length === 0 && (
-                <EmptyState>No hosted jobs yet.</EmptyState>
-              )}
-              {jobs?.map((job) => (
-                <div
-                  key={job.job_id}
-                  className="grid gap-3 border-b border-rule px-4 py-3 last:border-b-0 lg:grid-cols-[1fr_132px_150px_92px] lg:items-center"
+              {hasRepos && (
+                <a
+                  href={GITHUB_APP_INSTALL_URL}
+                  className="libretto-button libretto-button--sm inline-flex h-9 w-fit items-center justify-center whitespace-nowrap px-4"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm text-ink">
-                      {job.workflow || "Untitled workflow"}
-                    </p>
-                    <p className="truncate text-xs text-muted">{job.job_id}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 md:block">
-                    <span
-                      className={`w-fit rounded-full border px-2 py-1 text-xs ${statusClass(job.status)}`}
-                    >
-                      {job.status.replace("_", " ")}
-                    </span>
-                    <span className="text-xs text-muted lg:hidden">
-                      Created {formatDate(job.created_at)}
-                    </span>
-                    <span className="text-xs text-muted lg:hidden">
-                      Runtime{" "}
-                      {formatDuration(
-                        job.started_at && job.completed_at
-                          ? new Date(job.completed_at).getTime() -
-                              new Date(job.started_at).getTime()
-                          : null,
-                      )}
-                    </span>
-                  </div>
-                  <span className="hidden text-xs text-muted lg:block">
-                    {formatDate(job.created_at)}
-                  </span>
-                  <span className="text-xs text-muted">
-                    {formatDuration(
-                      job.started_at && job.completed_at
-                        ? new Date(job.completed_at).getTime() -
-                            new Date(job.started_at).getTime()
-                        : null,
-                    )}
-                  </span>
-                </div>
-              ))}
-              {jobsCursor && (
-                <div className="border-t border-rule p-3">
-                  <button
-                    type="button"
-                    onClick={loadMoreJobs}
-                    disabled={busy === "jobs-more"}
-                    className="h-9 rounded-md border border-rule bg-bg px-3 text-sm text-muted transition-colors hover:border-accent/45 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {busy === "jobs-more" ? "Loading..." : "Load more"}
-                  </button>
-                </div>
+                  Connect repo
+                </a>
               )}
             </div>
-          </section>
-        )}
 
-        {activeTab === "sessions" && busy !== "session" && (
-          <section className="overflow-hidden rounded-lg border border-rule bg-panel/70">
-            <div>
-              <div className="hidden grid-cols-[minmax(260px,1fr)_120px_126px_150px_92px] border-b border-rule px-4 py-3 text-left text-xs uppercase text-muted lg:grid">
-                <span>Session</span>
-                <span>Status</span>
-                <span>Source</span>
-                <span>Created</span>
-                <span>Runtime</span>
-              </div>
-              {busy === "sessions" && (
-                <EmptyState>Loading sessions...</EmptyState>
-              )}
-              {sessions?.length === 0 && (
-                <EmptyState>No browser sessions yet.</EmptyState>
-              )}
-              {sessions?.map((browserSession) => (
-                <div
-                  key={browserSession.session_id}
-                  className="grid gap-3 border-b border-rule px-4 py-3 text-left last:border-b-0 lg:grid-cols-[minmax(260px,1fr)_120px_126px_150px_92px] lg:items-center"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm text-ink">
-                      {browserSession.source === "job"
-                        ? "Job browser session"
-                        : browserSession.source === "workflow_build"
-                          ? "Workflow build session"
-                          : "Browser session"}
-                    </p>
-                    <p className="truncate text-xs text-muted">
-                      {browserSession.session_id}
-                    </p>
-                    {browserSession.auth_profile_name && (
-                      <p className="truncate text-xs text-muted/75">
-                        Profile: {browserSession.auth_profile_name}
+            {repositories === null ? (
+              <EmptyState>Loading connected repositories...</EmptyState>
+            ) : !hasRepos ? (
+              <div className="p-4">
+                <div className="rounded-lg border border-accent/25 bg-green-9/10 p-4 md:p-5">
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                    <div className="min-w-0">
+                      <p className="mb-2 font-mono text-xs uppercase text-accent">
+                        Step 1 of 2
                       </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 lg:block">
-                    <span
-                      className={`inline-flex w-fit min-w-[64px] justify-center rounded-full border px-2 py-1 text-xs ${sessionStatusClass(browserSession.status)}`}
+                      <h3 className="flex items-center gap-3 text-lg font-semibold text-ink">
+                        <GitHubIcon className="size-5 shrink-0 text-accent-bright" />
+                        Connect a GitHub repository
+                      </h3>
+                      <p className="mt-2 max-w-[620px] text-sm text-muted">
+                        Connect the repository where your automations live so
+                        Libretto can open scoped fix pull requests.
+                      </p>
+                    </div>
+                    <a
+                      href={GITHUB_APP_INSTALL_URL}
+                      className="libretto-button libretto-button--sm inline-flex h-9 min-w-[148px] items-center justify-center whitespace-nowrap px-4"
                     >
-                      {browserSession.status.replace("_", " ")}
-                    </span>
-                    <span className="text-xs text-muted lg:hidden">
-                      Created {formatDate(browserSession.created_at)}
-                    </span>
-                    <span className="text-xs text-muted lg:hidden">
-                      Runtime {formatDuration(browserSession.duration_ms)}
-                    </span>
+                      Connect GitHub
+                    </a>
                   </div>
-                  <span className="text-xs text-muted">
-                    {browserSession.source ?? browserSession.owner_type ?? "--"}
-                  </span>
-                  <span className="hidden text-xs text-muted lg:block">
-                    {formatDate(browserSession.created_at)}
-                  </span>
-                  <span className="text-xs text-muted">
-                    {formatDuration(browserSession.duration_ms)}
-                  </span>
                 </div>
-              ))}
-              {sessionsCursor && (
-                <div className="border-t border-rule p-3">
-                  <button
-                    type="button"
-                    onClick={loadMoreSessions}
-                    disabled={busy === "sessions-more"}
-                    className="h-9 rounded-md border border-rule bg-bg px-3 text-sm text-muted transition-colors hover:border-accent/45 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {busy === "sessions-more" ? "Loading..." : "Load more"}
-                  </button>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <div className="hidden grid-cols-[minmax(260px,1fr)_110px_170px_90px] border-b border-rule px-4 py-3 text-xs uppercase text-muted md:grid">
+                    <span>Repository</span>
+                    <span>Access</span>
+                    <span>Linked</span>
+                    <span>Status</span>
+                  </div>
+                  {repositories.map((repository) => (
+                    <div
+                      key={repository.id}
+                      className="grid gap-3 border-b border-rule px-4 py-3 last:border-b-0 md:grid-cols-[minmax(260px,1fr)_110px_170px_90px] md:items-center"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <GitHubIcon className="size-4 shrink-0 text-accent-bright" />
+                          <p className="truncate text-sm text-ink">
+                            {repository.full_name}
+                          </p>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted">
+                          Installed on {repository.account_login}
+                        </p>
+                      </div>
+                      <span className="text-sm text-muted">
+                        {repository.private ? "Private" : "Public"}
+                      </span>
+                      <span className="text-xs text-muted">
+                        {formatDate(repository.linked_at)}
+                      </span>
+                      <span className="w-fit rounded-full border border-accent/35 bg-green-9/15 px-2 py-1 text-xs text-accent-bright">
+                        Linked
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+
+                {!debuggerReady && setupStatus !== null && (
+                  <div className="border-t border-rule p-4">
+                    <div className="rounded-lg border border-accent/25 bg-green-9/10 p-4 md:p-5">
+                      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                        <div className="min-w-0">
+                          <p className="mb-2 font-mono text-xs uppercase text-accent">
+                            Step 2 of 2
+                          </p>
+                          <h3 className="text-lg font-semibold text-ink">
+                            Add the debugger to your Playwright script
+                          </h3>
+                          <p className="mt-2 max-w-[620px] text-sm leading-6 text-muted">
+                            Paste this prompt into your coding agent to install
+                            the Playwright debugger and wire failure reporting
+                            into your existing automation.
+                          </p>
+                          <a
+                            href={DEBUGGER_DOCS_URL}
+                            className="mt-2 inline-block text-xs text-accent-bright underline decoration-accent/40 underline-offset-4 hover:decoration-accent"
+                          >
+                            View runtime reference
+                          </a>
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-3 md:items-end">
+                          <InstallSnippet
+                            prompt={DEBUGGER_PROMPT}
+                            fathomEvent="Dashboard copy debugger prompt click"
+                          />
+                          <button
+                            type="button"
+                            disabled={savingStep}
+                            onClick={() => void completeDebuggerSetup()}
+                            className="w-fit text-xs text-muted underline decoration-muted underline-offset-4 transition-colors hover:text-ink hover:decoration-accent disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {savingStep ? "Saving..." : "I've added the debugger"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </section>
         )}
 
@@ -701,9 +554,7 @@ export function CloudBrowsersDashboardPage() {
                           </span>
                         )}
                       </div>
-                      <p className="truncate text-xs text-muted">
-                        {user.email}
-                      </p>
+                      <p className="truncate text-xs text-muted">{user.email}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       {canRemoveUsers && user.id !== session?.user.id ? (
@@ -741,21 +592,16 @@ export function CloudBrowsersDashboardPage() {
                         >
                           Delete account
                         </button>
-                      ) : (
-                        canRemoveUsers &&
-                        (confirmRemoveUserId === user.id ? (
+                      ) : canRemoveUsers && (
+                        confirmRemoveUserId === user.id ? (
                           <div className="flex flex-wrap gap-2 md:justify-end">
                             <button
                               type="button"
-                              onClick={() =>
-                                void removeUser(user.id, user.email)
-                              }
+                              onClick={() => void removeUser(user.id, user.email)}
                               disabled={busy === `remove-${user.id}`}
                               className="h-8 rounded-md border border-red-400/35 bg-red-500/10 px-2.5 text-xs text-red-100 transition-colors hover:border-red-300/55 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              {busy === `remove-${user.id}`
-                                ? "Removing..."
-                                : "Confirm"}
+                              {busy === `remove-${user.id}` ? "Removing..." : "Confirm"}
                             </button>
                             <button
                               type="button"
@@ -774,7 +620,7 @@ export function CloudBrowsersDashboardPage() {
                           >
                             Remove
                           </button>
-                        ))
+                        )
                       )}
                     </div>
                   </div>
@@ -786,9 +632,7 @@ export function CloudBrowsersDashboardPage() {
               onSubmit={inviteUser}
               className="h-fit rounded-lg border border-rule bg-panel/70 p-4"
             >
-              <h2 className="mb-4 text-base font-medium text-ink">
-                Invite user
-              </h2>
+              <h2 className="mb-4 text-base font-medium text-ink">Invite user</h2>
               <label className="block">
                 <span className="mb-2 block text-xs uppercase text-muted">
                   Email
@@ -809,41 +653,6 @@ export function CloudBrowsersDashboardPage() {
                 {busy === "invite" ? "Sending..." : "Send invite"}
               </button>
             </form>
-          </section>
-        )}
-
-        {activeTab === "billing" && busy !== "session" && (
-          <section className="rounded-lg border border-rule bg-panel/70 p-5">
-            {busy === "billing" && <EmptyState>Loading billing...</EmptyState>}
-            {billing && (
-              <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-center">
-                <div>
-                  <p className="mb-2 text-sm text-muted">Current plan</p>
-                  <h2 className="text-3xl font-medium text-ink">
-                    {billing.plan}
-                  </h2>
-                  <p className="mt-3 text-sm text-muted">
-                    {billing.browserHoursUsedThisPeriod.toFixed(2)} of{" "}
-                    {billing.browserHoursLimit ?? "unlimited"} browser hours
-                    used this period.
-                  </p>
-                  <p className="mt-1 text-xs text-muted/75">
-                    Status: {billing.status}
-                    {billing.currentPeriodEnd
-                      ? ` · Renews ${formatDate(billing.currentPeriodEnd)}`
-                      : ""}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={openBilling}
-                  disabled={busy === "billing-portal"}
-                  className="libretto-button libretto-button--default h-10 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {busy === "billing-portal" ? "Opening..." : "Open billing"}
-                </button>
-              </div>
-            )}
           </section>
         )}
       </main>

@@ -1,0 +1,60 @@
+---
+title: Steel
+sidebarTitle: Steel
+"og:image": "https://libretto.sh/docs/og/browser-tools/providers/steel.png"
+---
+
+> Run agent browser sessions on Steel.
+
+Import from `libretto-browser-tools/steel`. For Libretto CLI `open` / `run` on Steel, see [Alternative providers: Steel](/alternative-providers/steel).
+
+## Configure
+
+```dotenv theme={null}
+STEEL_API_KEY=<steel-api-key>
+# optional
+# STEEL_BASE_URL=https://api.steel.dev
+# STEEL_CONNECT_URL=wss://connect.steel.dev
+```
+
+## Provider options
+
+Constructor / env settings for the provider itself:
+
+| Option | Env | Default | Description |
+| --- | --- | --- | --- |
+| `apiKey` | `STEEL_API_KEY` | (required) | API key |
+| `endpoint` | `STEEL_BASE_URL` | `https://api.steel.dev` | REST API base URL |
+| `connectEndpoint` | `STEEL_CONNECT_URL` | `wss://connect.steel.dev` | CDP connect websocket base |
+| `useProxy` | — | — | Enable Steel proxy when `true` |
+| `solveCaptcha` | — | — | Enable captcha solving when `true` |
+| `timeoutMs` | — | — | Session timeout in milliseconds |
+| `inactivityTimeoutMs` | — | — | Inactivity timeout in milliseconds |
+
+## Session create options
+
+Pass these to `provider.createSession({ ... })` (or via `browser_open({ url })` for `startUrl`):
+
+| Option | Description |
+| --- | --- |
+| `viewport` | `{ width, height }` via Steel `dimensions` |
+| `startUrl` | Accepted for API symmetry; Steel cannot preload it — `browser_open` navigates after connect |
+
+Created sessions may include `liveViewUrl` (Steel session viewer).
+
+## Example
+
+```typescript theme={null}
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+import { SteelBrowserProvider } from "libretto-browser-tools/steel";
+
+const { tools, dispose } = createAiSdkBrowserTools(
+  new SteelBrowserProvider({ useProxy: true }),
+);
+
+try {
+  // agent loop using tools…
+} finally {
+  await dispose();
+}
+```

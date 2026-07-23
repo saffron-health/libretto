@@ -52,6 +52,43 @@ pnpm -s cli
 - Prefer small, focused functions over large ones.
 - Name things for what they do, not how they're implemented.
 
+## Writing Rules
+
+Writing rules, from Orwell, 1946. These govern prose: docs, PR text, messages. Never touch code or technical terms; swap in everyday words only where precision survives.
+
+1. Never use a metaphor, simile or other figure of speech which you are used to seeing in print.
+2. Never use a long word where a short one will do.
+3. If it is possible to cut a word out, always cut it out.
+4. Never use the passive where you can use the active.
+5. Never use a foreign phrase, a scientific word or a jargon word if you can think of an everyday English equivalent.
+6. Break any of these rules sooner than say anything outright barbarous.
+
+Review every prose output against these rules before delivering.
+
+## Agent-facing error messages
+
+Errors returned to agents (tool `{ ok: false, error }` results, MCP `isError` content, CLI output an agent reads) must tell the agent what to do next — not just what went wrong.
+
+**Bad** — dead ends:
+
+```
+Unknown session ID: ses-4f2a
+Failed to navigate to https://example.com: net::ERR_NAME_NOT_RESOLVED
+Session "ses-4f2a" has no connected browser.
+```
+
+**Good** — diagnosis plus next step:
+
+```
+Unknown session ID: ses-4f2a. Call browser_open to get a session ID, then pass it to browser_exec.
+Could not navigate to https://example.com (net::ERR_NAME_NOT_RESOLVED). The session was closed. Call browser_open again — use a full https:// URL, or omit url and navigate with browser_exec via `await page.goto(...)`.
+Session "ses-4f2a" is no longer connected to a browser. Call browser_close if you still have this session ID, then browser_open to start a fresh session.
+```
+
+Reserve throws for host-level misconfiguration (missing API keys, provider down) that the agent cannot fix by changing its tool calls.
+
+In `packages/browser-tools`, format caught errors with `errorMessage()` from `src/errors.ts` — do not duplicate ad-hoc helpers.
+
 ## **FORBIDDEN** Actions
 
 - For stable releases on `main`: NEVER manually edit the `version` field in `packages/libretto/package.json`. Use `pnpm prepare-release` — that script opens a release PR, and CI publishes to npm under the `latest` dist-tag on merge.
@@ -65,3 +102,9 @@ pnpm -s cli
 - Edit `packages/libretto/README.template.md` directly for README changes, then run `pnpm sync:mirrors`.
 - Edit `packages/libretto/skills/libretto/SKILL.md` directly.
 - `packages/libretto/skills/libretto` is the source of truth for Libretto skill files.
+
+## Cursor Cloud specific instructions
+
+- **Browser runs are headless here** (no display). Pass `--headless` to `libretto open`/`run`, or they default to headed and hang.
+- The Notion CLI (`ntn`) is installed by `.cursor/environment.json`. When an authenticated command is needed, run `NOTION_KEYRING=0 ntn login --no-browser`, give the user the displayed verification URL and code, and wait for them to confirm authorization. Then prefix the displayed `ntn login poll` command with `NOTION_KEYRING=0` so the credential is stored in the agent's file-backed Notion config instead of an unavailable Linux keyring. Treat the resulting `auth.json` as a secret and never commit it. `NOTION_API_TOKEN` remains available for unattended authentication.
+- The Vercel CLI (`vercel`) is installed by `.cursor/environment.json`. Prefer `VERCEL_TOKEN` for unattended auth. For interactive login, run `vercel login` and complete the flow the CLI prints.

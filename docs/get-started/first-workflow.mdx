@@ -1,15 +1,14 @@
 ---
 title: First workflow
 sidebarTitle: First workflow
+"og:image": "https://libretto.sh/docs/og/get-started/first-workflow.png"
 ---
 
 > Author a minimal workflow, run it, and inspect the result.
 
 ## Agent prompt
 
-```text
-Ask me what website and workflow I want to demonstrate. If I’m not sure, give me a few examples of simple workflows I could do. Then open a Libretto browser session for the site I choose. After I finish, create a Libretto workflow.
-```
+> Ask me what website and workflow I want to demonstrate. If I’m not sure, give me a few examples of simple workflows I could do. Then open a Libretto browser session for the site I choose. After I finish, create a Libretto workflow.
 
 ## Manual
 
@@ -29,9 +28,9 @@ export default workflow(
     output: z.object({
       title: z.string(),
     }),
+    startUrl: "https://example.com",
   },
   async ({ page }) => {
-    await page.goto("https://example.com");
     const title = await page.title();
     console.log(`Page title: ${title}`);
 

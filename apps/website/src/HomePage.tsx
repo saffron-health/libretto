@@ -5,7 +5,6 @@ import {
   KonamiOverlay,
 } from "./components/CanvasAsciihedron";
 import { Text } from "./components/Text";
-import { TerminalDemo } from "./components/TerminalDemo";
 import { InstallSnippet } from "./components/InstallSnippet";
 import {
   OrchestrationContainer,
@@ -16,13 +15,7 @@ import { AsciiLogo } from "./components/AsciiLogo";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 import { VersionBadge } from "./components/VersionBadge";
-import { FeatureRows } from "./components/FeatureRows";
-import { BattleTestedBanner } from "./components/BattleTestedBanner";
-import { Benchmarks } from "./components/Benchmarks";
-import { MaintainingFeatures } from "./components/MaintainingFeatures";
-import { CloudProviders } from "./components/CloudProviders";
-import { FAQ } from "./components/FAQ";
-import { CTA } from "./components/CTA";
+import { ProductListing } from "./components/ProductListing";
 import { SectionDivider } from "./components/SectionDivider.js";
 
 function Hero({
@@ -37,12 +30,12 @@ function Hero({
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden px-8 pt-24 pb-16"
+      className="relative overflow-hidden px-8 pt-32 pb-24 md:pt-40 md:pb-32"
     >
       <div
         data-animate={AnimationTarget.Icosahedron}
         style={{ opacity: 0 }}
-        className="pointer-events-none absolute inset-0 flex -translate-y-24 max-md:-translate-y-48 items-center justify-center select-none"
+        className="pointer-events-none absolute inset-0 flex translate-y-8 max-md:translate-y-0 items-center justify-center select-none"
       >
         <CanvasAsciihedron
           className="h-[1600px] w-[1600px] min-h-[1200px] min-w-[1200px] shrink-0 max-h-[180vw] max-w-[180vw] text-ink"
@@ -68,7 +61,7 @@ function Hero({
           as="h1"
           size="5xl"
           style="serif"
-          className="crt-glow mx-auto mb-8 max-w-[720px] text-center tracking-[-0.04em] text-ink [text-wrap:balance]"
+          className="crt-glow mx-auto mb-8 max-w-[880px] text-center tracking-[-0.04em] text-ink [text-wrap:pretty]"
         >
           <AnimatedTitle
             className=""
@@ -86,12 +79,16 @@ function Hero({
           size="lg"
           data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
-          className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:balance]"
+          className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:pretty]"
         >
           Libretto makes tools for humans and agents to automate any browser
           task: Chrome extensions, CLIs, SDKs, cloud browsers, and more.
         </Text>
-        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }} className="mb-16 flex flex-col items-center justify-center gap-3">
+        <div
+          data-animate={AnimationTarget.Content}
+          style={{ opacity: 0 }}
+          className="flex flex-col items-center justify-center gap-3"
+        >
           <InstallSnippet />
           <div className="text-xs text-muted">
             or{" "}
@@ -100,12 +97,9 @@ function Hero({
               className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
               data-fathom-event="Hero demo click"
             >
-              BOOK A DEMO
+              TALK TO A DEV
             </a>
           </div>
-        </div>
-        <div data-animate={AnimationTarget.Content} style={{ opacity: 0 }}>
-          <TerminalDemo />
         </div>
       </div>
     </section>
@@ -125,19 +119,7 @@ export function HomePage() {
       <Hero paneUnlocked={paneUnlocked} onClosePane={closePane} />
       <div className="section-rails relative mx-auto max-w-[1100px]">
         <SectionDivider />
-        <FeatureRows />
-        <SectionDivider />
-        <Benchmarks />
-        <SectionDivider />
-        <BattleTestedBanner />
-        <SectionDivider />
-        <MaintainingFeatures />
-        <SectionDivider />
-        <CloudProviders />
-        <SectionDivider />
-        <FAQ />
-        <SectionDivider />
-        <CTA />
+        <ProductListing />
         <Footer />
       </div>
     </OrchestrationContainer>

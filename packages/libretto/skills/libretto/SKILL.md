@@ -4,7 +4,7 @@ description: "Browser automation CLI for building, maintaining, and running brow
 license: MIT
 metadata:
   author: saffron-health
-  version: "0.6.33"
+  version: "0.6.37"
 ---
 
 ## How Libretto Works
@@ -26,6 +26,8 @@ Read `references/shipped-source-and-documentation.md` for shipped source details
 Mix strategies freely across steps on a site.
 
 Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first navigation — deep URLs on a cold session are commonly blocked by edge bot protection.
+
+Always declare that entry URL as workflow `startUrl`. Do not open the same URL again with `page.goto` at the top of the handler; Libretto loads `startUrl` before the handler runs (and before CDP attach on Kernel / cloud providers).
 
 ## CAPTCHA Handling
 
@@ -62,7 +64,7 @@ If the user prefers a provider for all local CLI runs in a workspace or only dep
 - Ask instead of guessing when it is unclear what to click, type, or submit.
 - Do not treat visibility as interactivity. If an element will not act, inspect blockers before retrying.
 - Defer repo/code review until you begin generating code, unless the user explicitly asks for it earlier.
-- Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code.
+- Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code. Every generated workflow must set `startUrl` to the first page the automation needs.
 - For authenticated workflows, manual login is discovery only. After the user logs in, read only the sign-in action logs and identify the required credentials; if credentials are unclear, ask before writing code.
 - Add missing blank `LIBRETTO_CLOUD_<secret_name>=` entries without overwriting populated values. If any required credential is blank, stop and ask the user to fill it; until then, do not inspect logged-in pages, read authenticated network bodies, write workflow code, open validation sessions, or continue discovery.
 - Authenticated workflows must implement `librettoAuthenticate` with declared credentials before validation. Use a reusable `*_totp_secret` credential for authenticator-app MFA, not a one-time `otp_code`; text and email verification codes are not supported for fully automated sign-in.

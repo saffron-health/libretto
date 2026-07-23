@@ -1,5 +1,6 @@
 ---
 title: Jobs and logs
+"og:image": "https://libretto.sh/docs/og/libretto-cloud-api/jobs-and-logs.png"
 ---
 
 > Use the jobs API to run workflows and inspect results, and use the logs API to fetch executor logs for recent jobs.
@@ -18,12 +19,18 @@ Request fields:
 - `params`: workflow input object
 - `nonce`: optional idempotency-style nonce
 - `timeout_seconds`: optional timeout, default `1800`, max `3600`
+- `headless`: optional boolean browser mode override
+- `start_url`: optional start URL override for browser launch
+- `gpu`: optional boolean GPU override
+- `viewport`: optional `{ width, height }` viewport override
 - `callback_url`: optional callback URL
 - `callback_secret`: optional callback secret
 - `skip_callbacks`: optional boolean
 - `residential_proxy`: optional residential proxy location object
 
 If you set `callback_url`, you must also set `callback_secret`.
+
+Prefer declaring `startUrl`, `gpu`, and `viewport` on the workflow definition so they travel with the deploy artifact. Use the job-level fields when you need a one-off override, or until the hosted executor applies workflow launch metadata automatically.
 
 Use `residential_proxy` for location-sensitive runs that need traffic to originate from a specific residential proxy country, US state, city, ZIP code, or ASN. See [Residential proxy locations](/libretto-cloud-hosting/stealth#residential-proxy-locations) for the supported fields and combination rules.
 
@@ -187,7 +194,7 @@ curl -X POST "https://api.libretto.sh/v1/jobs/create" \
     Deploy workflows and inspect build state.
   </Card>
 
-  <Card title="Webhooks" icon="webhook" href="/libretto-cloud-api/webhooks">
+  <Card title="Webhooks" icon="lucide:webhook" href="/libretto-cloud-api/webhooks">
     Configure tenant-level job result webhooks.
   </Card>
 

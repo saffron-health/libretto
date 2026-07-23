@@ -1,8 +1,8 @@
-# Documentation Site (Mintlify)
+# Documentation Site (Holocron)
 
-This top-level `docs/` directory is the user-facing Mintlify documentation site. Put internal implementation notes and maintainer references under the relevant package instead, such as `packages/libretto/docs/`.
+This top-level `docs/` directory is the user-facing Holocron documentation site. Put internal implementation notes and maintainer references under the relevant package instead, such as `packages/libretto/docs/`.
 
-Config in `docs.json`. Preview with `pnpm docs:dev` (runs on `localhost:3000`).
+Config in `docs.json`. Preview with `pnpm docs:dev` (runs on `localhost:5173`).
 
 ## Navigation should follow URL structure
 

@@ -41,6 +41,11 @@ export type DaemonBrowserProviderConfig = {
   providerName: string;
   headless?: boolean;
   initialUrl?: string;
+  // Preferred start URL for providers that preload before CDP attach.
+  // Falls back to initialUrl when unset.
+  startUrl?: string;
+  gpu?: boolean;
+  viewport?: { width: number; height: number };
   authProfileName?: string;
   authProfilePersist?: boolean;
 };

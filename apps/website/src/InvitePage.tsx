@@ -118,7 +118,7 @@ export function InvitePage() {
         invitationId,
         tenantSlug,
       });
-      window.location.assign("/dashboard");
+      window.location.assign("/setup");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not accept invite.");
       setLoading(null);

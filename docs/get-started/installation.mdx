@@ -1,6 +1,7 @@
 ---
 title: Installation
 sidebarTitle: Installation
+"og:image": "https://libretto.sh/docs/og/get-started/installation.png"
 ---
 
 Install Libretto into the Node.js package that contains your browser automations. Run Libretto commands with `npx libretto` from that package.
@@ -71,9 +72,9 @@ If you already have a Node.js package that you plan to use for Libretto automati
         output: z.object({
           title: z.string(),
         }),
+        startUrl: "https://example.com",
       },
       async ({ page }) => {
-        await page.goto("https://example.com");
         const title = await page.title();
         console.log(`Page title: ${title}`);
 

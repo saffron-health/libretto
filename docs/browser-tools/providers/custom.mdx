@@ -1,0 +1,43 @@
+---
+title: Custom
+sidebarTitle: Custom
+"og:image": "https://libretto.sh/docs/og/browser-tools/providers/custom.png"
+---
+
+> Implement your own browser provider.
+
+Every provider implements `BrowserProvider`: produce a CDP websocket endpoint for a new session, and close it later.
+
+```typescript theme={null}
+import type {
+  BrowserProvider,
+  ProviderSession,
+  ProviderSessionClosed,
+  ProviderSessionCreateOptions,
+} from "libretto-browser-tools";
+
+class MyProvider implements BrowserProvider {
+  readonly name = "my-provider";
+
+  async createSession(
+    options: ProviderSessionCreateOptions = {},
+  ): Promise<ProviderSession> {
+    // Start or allocate a browser, then return its CDP endpoint.
+    // Per-session launch options (startUrl, gpu, viewport) arrive here.
+    return {
+      sessionId: "my-1",
+      cdpEndpoint: "ws://127.0.0.1:9222/devtools/browser/...",
+      // optional: liveViewUrl, recordingUrl, startUrlPreloaded
+    };
+  }
+
+  async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+    // Tear down the provider-owned session.
+    return {}; // optional: replayUrl
+  }
+}
+```
+
+Pass `new MyProvider()` into `createBrowserTools` or any framework adapter. Provider credentials and defaults belong on the constructor (with env-var fallbacks). Per-session launch options belong on `createSession`.
+
+Built-in providers live under import subpaths such as `libretto-browser-tools/kernel`. See [Providers](/browser-tools/providers/overview).

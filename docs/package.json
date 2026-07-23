@@ -1,0 +1,21 @@
+{
+  "name": "libretto-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "node dist/rsc/index.js"
+  },
+  "dependencies": {
+    "@holocron.so/vite": "^0.26.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "vite": "^8.0.10"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "wrangler": "^4.110.0"
+  }
+}

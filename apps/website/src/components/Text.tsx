@@ -17,6 +17,7 @@ const sizeClasses: Record<Size, string> = {
 interface TextProps {
   size?: Size;
   style?: "serif" | "sans";
+  wrap?: "balance" | "pretty";
   as?: keyof JSX.IntrinsicElements;
   id?: string;
   className?: string;
@@ -28,6 +29,7 @@ interface TextProps {
 export function Text({
   size = "md",
   style = "sans",
+  wrap,
   as: Tag = "span",
   className = "",
   children,
@@ -35,7 +37,13 @@ export function Text({
   ...rest
 }: TextProps) {
   const font = style === "serif" ? "font-serif" : "font-sans";
-  const classes = `${sizeClasses[size]} ${font} ${className}`.trim();
+  const textWrap =
+    wrap === "balance"
+      ? "[text-wrap:balance]"
+      : wrap === "pretty"
+        ? "[text-wrap:pretty]"
+        : "";
+  const classes = `${sizeClasses[size]} ${font} ${textWrap} ${className}`.trim();
 
   return (
     <Tag className={classes} style={htmlStyle} {...rest}>

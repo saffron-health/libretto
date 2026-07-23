@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { dirname } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { Agent, type AgentTool, type AgentEvent } from "@mariozechner/pi-agent-core";
 import { getModel } from "@mariozechner/pi-ai";
 import { Type, type Static } from "@sinclair/typebox";
@@ -58,6 +60,34 @@ interface ReleaseContext {
   previousTag: string;
   currentRef: string;
   pullRequests: PullRequestDetails[];
+}
+
+interface ToolCallAudit {
+  toolCallId: string;
+  toolName: string;
+  args: unknown;
+  isError?: boolean;
+  resultTextBytes?: number;
+  resultTextPreview?: string;
+}
+
+interface ChangelogAudit {
+  tag: string;
+  generatedAt: string;
+  previousTag: string;
+  currentRef: string;
+  eligiblePullRequests: Array<{
+    number: number;
+    title: string;
+    labels: string[];
+    files: string[];
+    url: string;
+  }>;
+  inspectedDiffPullRequests: number[];
+  missingDiffPullRequests: number[];
+  toolCalls: ToolCallAudit[];
+  rawFinalText: string;
+  finalText: string;
 }
 
 function runGh(args: string[]): string {
@@ -190,6 +220,7 @@ function buildReleaseContext(currentTag: string): ReleaseContext {
 
 const releaseContext = buildReleaseContext(tag);
 const allowedPullRequestNumbers = new Set(releaseContext.pullRequests.map((pr) => String(pr.number)));
+const auditFilePath = process.env.CHANGELOG_AUDIT_FILE;
 const pullRequestSummary = releaseContext.pullRequests
   .map((pr) => {
     const labels = pr.labels.map((label) => label.name).join(", ") || "none";
@@ -203,6 +234,13 @@ const pullRequestSummary = releaseContext.pullRequests
     ].join("\n");
   })
   .join("\n\n");
+
+console.error(`Changelog release range: ${releaseContext.previousTag}...${releaseContext.currentRef}`);
+console.error("Changelog-eligible PRs:");
+for (const pr of releaseContext.pullRequests) {
+  const labels = pr.labels.map((label) => label.name).join(", ") || "none";
+  console.error(`- #${pr.number} ${pr.title} [${labels}]`);
+}
 
 const GhToolParamsSchema = Type.Object({
   args: Type.String({ description: "Arguments to pass to gh (without the leading 'gh')" }),
@@ -242,6 +280,12 @@ const ghTool: AgentTool = {
           `PR #${number ?? "(missing)"} is outside the ${releaseContext.previousTag}...${releaseContext.currentRef} release range.`,
         );
       }
+
+      // Diff inspection enforcement counts successful 'pr diff NUMBER' calls,
+      // so reject flags like --name-only that would return less than the full diff.
+      if (action === "diff" && parts.length > 3) {
+        throw new Error("'pr diff' accepts only a PR number. Run 'pr diff NUMBER' with no extra arguments.");
+      }
     }
     try {
       const output = runGh(parts);
@@ -277,6 +321,9 @@ const agent = new Agent({
       "- Write concise, user-facing release notes in markdown.",
       "- Group changes into sections like Features, Fixes, and Improvements. Only include sections that have entries.",
       "- Focus on what changed from the user's perspective, not internal implementation details.",
+      "- For feature and improvement entries, include minimal code blocks when they make the change easier to use.",
+      "- Each relevant feature or improvement can have its own snippet.",
+      "- Keep each code block to at most 10 lines, and use at most one comment line inside the block if helpful.",
       "- Do NOT include PR numbers or links.",
       "- Skip PRs labeled 'skip-changelog'.",
       "- Your response must contain ONLY the raw markdown release notes. No preamble like 'Here are the release notes'. No commentary or explanation. No '---' separators. The very first character of your response must be '#'. Example format:",
@@ -291,8 +338,123 @@ const agent = new Agent({
 });
 
 let finalText = "";
+let rawFinalText = "";
+const toolCalls = new Map<string, ToolCallAudit>();
+
+function getObjectProperty(value: unknown, key: string): unknown {
+  if (typeof value !== "object" || value === null || !(key in value)) {
+    return undefined;
+  }
+
+  return (value as Record<string, unknown>)[key];
+}
+
+function getTextContent(value: unknown): string {
+  const content = getObjectProperty(value, "content");
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((block) => {
+      if (typeof block !== "object" || block === null) {
+        return "";
+      }
+      const type = getObjectProperty(block, "type");
+      const text = getObjectProperty(block, "text");
+      return type === "text" && typeof text === "string" ? text : "";
+    })
+    .filter((text) => text.length > 0)
+    .join("\n");
+}
+
+function getInspectedDiffPullRequests(): number[] {
+  const inspected = new Set<number>();
+  for (const toolCall of toolCalls.values()) {
+    if (toolCall.isError !== false) {
+      // Only count tool calls that completed successfully.
+      continue;
+    }
+
+    const args = getObjectProperty(toolCall.args, "args");
+    if (typeof args !== "string") {
+      continue;
+    }
+
+    const parts = args.trim().split(/\s+/);
+    if (parts[0] !== "pr" || parts[1] !== "diff") {
+      continue;
+    }
+
+    const number = Number(parts[2]);
+    if (Number.isInteger(number)) {
+      inspected.add(number);
+    }
+  }
+
+  return [...inspected].sort((a, b) => a - b);
+}
+
+function buildAudit(): ChangelogAudit {
+  const inspectedDiffPullRequests = getInspectedDiffPullRequests();
+  const inspected = new Set(inspectedDiffPullRequests);
+  const missingDiffPullRequests = releaseContext.pullRequests
+    .map((pr) => pr.number)
+    .filter((number) => !inspected.has(number));
+
+  return {
+    tag,
+    generatedAt: new Date().toISOString(),
+    previousTag: releaseContext.previousTag,
+    currentRef: releaseContext.currentRef,
+    eligiblePullRequests: releaseContext.pullRequests.map((pr) => ({
+      number: pr.number,
+      title: pr.title,
+      labels: pr.labels.map((label) => label.name),
+      files: pr.files.map((file) => file.path),
+      url: pr.url,
+    })),
+    inspectedDiffPullRequests,
+    missingDiffPullRequests,
+    toolCalls: [...toolCalls.values()],
+    rawFinalText,
+    finalText,
+  };
+}
+
+function writeAuditFile(): void {
+  if (!auditFilePath) {
+    return;
+  }
+
+  mkdirSync(dirname(auditFilePath), { recursive: true });
+  writeFileSync(auditFilePath, `${JSON.stringify(buildAudit(), null, 2)}\n`);
+}
 
 agent.subscribe((event: AgentEvent) => {
+  if (event.type === "tool_execution_start") {
+    toolCalls.set(event.toolCallId, {
+      toolCallId: event.toolCallId,
+      toolName: event.toolName,
+      args: event.args,
+    });
+  }
+
+  if (event.type === "tool_execution_end") {
+    const text = getTextContent(event.result);
+    const existing = toolCalls.get(event.toolCallId) ?? {
+      toolCallId: event.toolCallId,
+      toolName: event.toolName,
+      args: undefined,
+    };
+    toolCalls.set(event.toolCallId, {
+      ...existing,
+      isError: event.isError,
+      resultTextBytes: Buffer.byteLength(text, "utf8"),
+      resultTextPreview: text.slice(0, 2000),
+    });
+  }
+
   if (event.type === "agent_end") {
     const messages = event.messages;
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -300,7 +462,8 @@ agent.subscribe((event: AgentEvent) => {
       if (msg.role === "assistant" && Array.isArray(msg.content)) {
         for (const block of msg.content) {
           if (typeof block === "object" && "type" in block && block.type === "text" && "text" in block) {
-            finalText = block.text as string;
+            rawFinalText = block.text as string;
+            finalText = rawFinalText;
             return;
           }
         }
@@ -309,10 +472,18 @@ agent.subscribe((event: AgentEvent) => {
   }
 });
 
-await agent.prompt("Generate the release notes now.");
+try {
+  await agent.prompt("Generate the release notes now.");
+} catch (error) {
+  console.error("Changelog generation failed: agent prompt threw an error.");
+  console.error(error);
+  writeAuditFile();
+  process.exit(1);
+}
 
 if (!finalText) {
   console.error("Changelog generation failed: no text output from agent.");
+  writeAuditFile();
   process.exit(1);
 }
 
@@ -324,7 +495,30 @@ if (headingIndex >= 0) {
   // Already starts with a heading, keep as-is.
 } else {
   console.error("Changelog generation failed: output does not contain markdown headings.");
+  writeAuditFile();
   process.exit(1);
+}
+
+const inspectedDiffPullRequests = getInspectedDiffPullRequests();
+const missingDiffPullRequests = releaseContext.pullRequests
+  .map((pr) => pr.number)
+  .filter((number) => !inspectedDiffPullRequests.includes(number));
+
+console.error(`Inspected PR diffs: ${inspectedDiffPullRequests.map((number) => `#${number}`).join(", ") || "none"}`);
+
+if (missingDiffPullRequests.length > 0) {
+  console.error(
+    `Changelog generation failed: the agent did not inspect diffs for PRs ${missingDiffPullRequests
+      .map((number) => `#${number}`)
+      .join(", ")}.`,
+  );
+  writeAuditFile();
+  process.exit(1);
+}
+
+writeAuditFile();
+if (auditFilePath) {
+  console.error(`Wrote changelog audit: ${auditFilePath}`);
 }
 
 process.stdout.write(finalText);

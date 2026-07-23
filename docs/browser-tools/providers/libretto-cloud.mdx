@@ -1,0 +1,58 @@
+---
+title: Libretto Cloud
+sidebarTitle: Libretto Cloud
+"og:image": "https://libretto.sh/docs/og/browser-tools/providers/libretto-cloud.png"
+---
+
+> Run agent browser sessions on Libretto Cloud.
+
+Import from `libretto-browser-tools/libretto-cloud`. This is the SDK provider for hosted browsers — not the Libretto CLI `--provider` flag. For CLI hosting, see [Libretto Cloud Hosting](/libretto-cloud-hosting/overview).
+
+## Configure
+
+```dotenv theme={null}
+LIBRETTO_API_KEY=<libretto-api-key>
+# optional
+# LIBRETTO_API_URL=https://api.libretto.sh
+# LIBRETTO_TIMEOUT_SECONDS=3600
+```
+
+## Provider options
+
+Constructor / env settings for the provider itself:
+
+| Option | Env | Default | Description |
+| --- | --- | --- | --- |
+| `apiKey` | `LIBRETTO_API_KEY` | (required) | API key |
+| `apiUrl` | `LIBRETTO_API_URL` | `https://api.libretto.sh` | API base URL |
+| `timeoutSeconds` | `LIBRETTO_TIMEOUT_SECONDS` | `3600` | Browser session TTL at create time |
+| `headless` | — | `true` | Request a headless session |
+
+## Session create options
+
+Pass these to `provider.createSession({ ... })` (or via `browser_open({ url })` for `startUrl`):
+
+| Option | Description |
+| --- | --- |
+| `startUrl` | URL opened before CDP is returned |
+| `gpu` | Request GPU acceleration |
+| `viewport` | `{ width, height }` window size |
+
+Sessions may queue briefly until capacity is available (up to 10 minutes). Ready sessions expose `liveViewUrl`. Closing a session may return `replayUrl` when a recording is available. When `startUrl` is sent, the session returns `startUrlPreloaded: true`.
+
+## Example
+
+```typescript theme={null}
+import { createAiSdkBrowserTools } from "libretto-browser-tools/ai-sdk";
+import { LibrettoCloudBrowserProvider } from "libretto-browser-tools/libretto-cloud";
+
+const { tools, dispose } = createAiSdkBrowserTools(
+  new LibrettoCloudBrowserProvider(),
+);
+
+try {
+  // agent loop using tools…
+} finally {
+  await dispose();
+}
+```

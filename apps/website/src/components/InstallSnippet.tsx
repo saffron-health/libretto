@@ -5,17 +5,20 @@ const PROMPT =
   "Fetch and follow https://libretto.sh/start.md to set up Libretto and create a new browser automation.";
 
 export function InstallSnippet({
-  prompt = PROMPT,
   fathomEvent = "Hero copy prompt click",
+  onCopy,
+  prompt = PROMPT,
 }: {
-  prompt?: string;
   fathomEvent?: string;
+  onCopy?: () => void;
+  prompt?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
-    void navigator.clipboard.writeText(prompt);
+    void navigator.clipboard.writeText(prompt).catch(() => {});
     setCopied(true);
+    onCopy?.();
     setTimeout(() => setCopied(false), 1500);
   }
 

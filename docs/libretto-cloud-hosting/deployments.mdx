@@ -1,5 +1,6 @@
 ---
 title: Deployments
+"og:image": "https://libretto.sh/docs/og/libretto-cloud-hosting/deployments.png"
 ---
 
 > Deploy workflow bundles to Libretto Cloud, then use the failure emails and debug tools when runs break.
@@ -108,10 +109,9 @@ export default workflow(
     output: z.object({
       status: z.string(),
     }),
+    startUrl: "https://example.com/eligibility",
   },
   async ({ page }, input) => {
-    await page.goto("https://example.com/eligibility");
-
     return {
       status: "eligible",
     };
