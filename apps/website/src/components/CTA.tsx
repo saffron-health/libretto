@@ -1,5 +1,4 @@
 import { Button } from "./Button.js";
-import { InstallSnippet } from "./InstallSnippet.js";
 import { SectionIntro } from "./SectionIntro.js";
 import { SiteSection } from "./SiteSection.js";
 
@@ -7,21 +6,20 @@ export function CTA() {
   return (
     <SiteSection innerClassName="text-center">
       <SectionIntro copyClassName="mb-8" title="Ready to get started?">
-        Read the docs to set up Libretto and build your first integration in
-        minutes.
+        Hand off a task in Chrome, build an automation in your codebase, or give
+        your agent access to the web.
       </SectionIntro>
-      <div className="flex flex-col items-center gap-3">
-        <InstallSnippet fathomEvent="CTA copy prompt click" />
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-faint">or</span>
-          <Button
-            href="https://cal.com/team/libretto/demo"
-            variant="secondary"
-            data-fathom-event="CTA demo click"
-          >
-            book a demo
-          </Button>
-        </div>
+      <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+        <Button href="/chrome-extension" data-fathom-event="CTA Chrome click">
+          Automate with Chrome
+        </Button>
+        <Button
+          href="/docs/get-started/quickstart"
+          variant="secondary"
+          data-fathom-event="CTA docs click"
+        >
+          Explore developer tools
+        </Button>
       </div>
     </SiteSection>
   );

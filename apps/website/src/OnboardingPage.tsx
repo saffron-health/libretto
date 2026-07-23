@@ -22,9 +22,9 @@ function initialProduct(): Product | null {
 }
 
 function dashboardForProduct(product: Product | null): string {
-  if (product === "chrome-extension") return "/dashboard/chrome-extension";
-  if (product === "cloud-browsers") return "/dashboard/cloud-browsers";
-  if (product === "pr-agent") return "/dashboard/pr-agent";
+  if (product === "chrome-extension") return "/dashboard/workflows";
+  if (product === "cloud-browsers") return "/dashboard/workflow_runs";
+  if (product === "pr-agent") return "/dashboard/connected_repos";
   return "/dashboard";
 }
 

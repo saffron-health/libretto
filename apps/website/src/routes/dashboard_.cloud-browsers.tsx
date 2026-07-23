@@ -1,12 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { CloudBrowsersDashboardPage } from "../DashboardPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/dashboard_/cloud-browsers")({
-  head: () => ({
-    meta: [
-      { title: "Cloud Browsers | Libretto" },
-      { name: "robots", content: "noindex, nofollow" },
-    ],
-  }),
-  component: CloudBrowsersDashboardPage,
+  beforeLoad: () => {
+    throw redirect({
+      to: "/dashboard/$section",
+      params: { section: "workflow_runs" },
+    });
+  },
 });

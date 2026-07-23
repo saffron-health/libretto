@@ -97,7 +97,8 @@ function GlitchNavLink({
   trailingIcon?: boolean;
   fathomEvent: string;
 }) {
-  const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText(children);
+  const { display, isScrambling, hovered, onEnter, onLeave } =
+    useGlitchText(children);
 
   return (
     <a
@@ -111,7 +112,11 @@ function GlitchNavLink({
     >
       <span
         className={`inline-flex items-center gap-1.5 transition-colors duration-75 ${
-          isScrambling ? "text-amber" : hovered ? "text-accent-bright" : "text-ink"
+          isScrambling
+            ? "text-amber"
+            : hovered
+              ? "text-accent-bright"
+              : "text-ink"
         }`}
       >
         <Text
@@ -176,11 +181,12 @@ function CloudAccountLink({ session }: { session: CloudSession | null }) {
       className="inline-flex h-10 items-center gap-2 rounded-lg border border-rule bg-panel px-3 text-sm text-ink no-underline transition-colors hover:border-accent/45 hover:bg-panel-hi"
       data-fathom-event="Nav dashboard click"
       aria-label={`Open dashboard for ${session.user.email}`}
+      title={session.user.email}
     >
       <span className="grid size-6 shrink-0 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
         {userInitial(session)}
       </span>
-      <span className="hidden sm:block">Cloud dashboard</span>
+      <span>Dashboard</span>
     </a>
   );
 }
@@ -226,10 +232,17 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             >
               Docs
             </GlitchNavLink>
-            <GlitchNavLink href="/blog" external={false} fathomEvent="Nav blog click">
+            <GlitchNavLink
+              href="/blog"
+              external={false}
+              fathomEvent="Nav blog click"
+            >
               Blog
             </GlitchNavLink>
-            <GlitchNavLink href={RELEASES_URL} fathomEvent="Nav changelog click">
+            <GlitchNavLink
+              href={RELEASES_URL}
+              fathomEvent="Nav changelog click"
+            >
               Changelog
             </GlitchNavLink>
           </div>
@@ -243,7 +256,9 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
             data-fathom-event="Nav github click"
           >
             <GitHubStarIcon width={15} height={15} />
-            {stars !== null && <span className="text-sm font-medium">{formatStars(stars)}</span>}
+            {stars !== null && (
+              <span className="text-sm font-medium">{formatStars(stars)}</span>
+            )}
           </a>
           <div className="hidden sm:block">
             <CloudAccountLink session={session} />

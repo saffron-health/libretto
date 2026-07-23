@@ -25,6 +25,7 @@ import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
 import { Route as DashboardPrAgentRouteImport } from './routes/dashboard_.pr-agent'
 import { Route as DashboardCloudBrowsersRouteImport } from './routes/dashboard_.cloud-browsers'
 import { Route as DashboardChromeExtensionRouteImport } from './routes/dashboard_.chrome-extension'
+import { Route as DashboardSectionRouteImport } from './routes/dashboard_.$section'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
@@ -108,6 +109,11 @@ const DashboardChromeExtensionRoute =
     path: '/dashboard/chrome-extension',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DashboardSectionRoute = DashboardSectionRouteImport.update({
+  id: '/dashboard_/$section',
+  path: '/dashboard/$section',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BlogSlugRoute = BlogSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -125,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
   '/dashboard/chrome-extension': typeof DashboardChromeExtensionRoute
   '/dashboard/cloud-browsers': typeof DashboardCloudBrowsersRoute
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
   '/dashboard/chrome-extension': typeof DashboardChromeExtensionRoute
   '/dashboard/cloud-browsers': typeof DashboardCloudBrowsersRoute
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
@@ -163,6 +171,7 @@ export interface FileRoutesById {
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard_/$section': typeof DashboardSectionRoute
   '/dashboard_/chrome-extension': typeof DashboardChromeExtensionRoute
   '/dashboard_/cloud-browsers': typeof DashboardCloudBrowsersRoute
   '/dashboard_/pr-agent': typeof DashboardPrAgentRoute
@@ -184,6 +193,7 @@ export interface FileRouteTypes {
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
+    | '/dashboard/$section'
     | '/dashboard/chrome-extension'
     | '/dashboard/cloud-browsers'
     | '/dashboard/pr-agent'
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
+    | '/dashboard/$section'
     | '/dashboard/chrome-extension'
     | '/dashboard/cloud-browsers'
     | '/dashboard/pr-agent'
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
+    | '/dashboard_/$section'
     | '/dashboard_/chrome-extension'
     | '/dashboard_/cloud-browsers'
     | '/dashboard_/pr-agent'
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   SigninRoute: typeof SigninRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  DashboardSectionRoute: typeof DashboardSectionRoute
   DashboardChromeExtensionRoute: typeof DashboardChromeExtensionRoute
   DashboardCloudBrowsersRoute: typeof DashboardCloudBrowsersRoute
   DashboardPrAgentRoute: typeof DashboardPrAgentRoute
@@ -362,6 +375,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardChromeExtensionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard_/$section': {
+      id: '/dashboard_/$section'
+      path: '/dashboard/$section'
+      fullPath: '/dashboard/$section'
+      preLoaderRoute: typeof DashboardSectionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/blog/$slug': {
       id: '/blog/$slug'
       path: '/$slug'
@@ -396,6 +416,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   SigninRoute: SigninRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  DashboardSectionRoute: DashboardSectionRoute,
   DashboardChromeExtensionRoute: DashboardChromeExtensionRoute,
   DashboardCloudBrowsersRoute: DashboardCloudBrowsersRoute,
   DashboardPrAgentRoute: DashboardPrAgentRoute,

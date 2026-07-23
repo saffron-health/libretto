@@ -1,12 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PrAgentDashboardPage } from "../PrAgentDashboardPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/dashboard_/pr-agent")({
-  head: () => ({
-    meta: [
-      { title: "Debug Agents | Libretto" },
-      { name: "robots", content: "noindex, nofollow" },
-    ],
-  }),
-  component: PrAgentDashboardPage,
+  beforeLoad: () => {
+    throw redirect({
+      to: "/dashboard/$section",
+      params: { section: "connected_repos" },
+    });
+  },
 });

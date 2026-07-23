@@ -1,12 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ChromeExtensionDashboardPage } from "../ChromeExtensionDashboardPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/dashboard_/chrome-extension")({
-  head: () => ({
-    meta: [
-      { title: "Chrome automations | Libretto" },
-      { name: "robots", content: "noindex, nofollow" },
-    ],
-  }),
-  component: ChromeExtensionDashboardPage,
+  beforeLoad: () => {
+    throw redirect({
+      to: "/dashboard/$section",
+      params: { section: "workflows" },
+    });
+  },
 });

@@ -1,10 +1,16 @@
-import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRoute,
+} from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import "../index.css";
 
-const DEFAULT_TITLE = "Libretto | Turn website workflows into reliable APIs";
+const DEFAULT_TITLE =
+  "Libretto | Browser automation for people, developers, and agents";
 const DEFAULT_DESCRIPTION =
-  "Deterministic browser automation for AI agents and developers. Build fast, reliable scripts with agent-friendly debugging and seamless cloud deployment.";
+  "Automate browser work with tools for everyday tasks, reliable workflows, managed browsers, self-healing Playwright scripts, and agentic applications.";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -40,7 +46,11 @@ export const Route = createRootRoute({
         media: "(prefers-color-scheme: dark)",
       },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
+      },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&display=swap",
