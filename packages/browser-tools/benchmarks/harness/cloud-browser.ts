@@ -5,6 +5,7 @@ import { BrowserUseBrowserProvider } from "../../src/providers/browser-use.js";
 import { KernelBrowserProvider } from "../../src/providers/kernel.js";
 import { LocalBrowserProvider } from "../../src/providers/local.js";
 import { SteelBrowserProvider } from "../../src/providers/steel.js";
+import { getProviderSessionCdpEndpoint } from "../../src/provider.js";
 import { DEFAULT_TIMEOUT_MS } from "../agent.js";
 
 type BenchmarkBrowserProvider =
@@ -77,9 +78,16 @@ export async function createCloudBrowserConnection(
 ): Promise<CloudBrowserConnection> {
 	const provider = createBenchmarkBrowserProvider(providerName);
 	const session = await provider.createSession();
+	const cdpEndpoint = getProviderSessionCdpEndpoint(session);
+	if (!cdpEndpoint) {
+		await provider.closeSession(session.sessionId);
+		throw new Error(
+			`${providerName} did not expose its benchmark CDP endpoint. Use a provider that supports CDP attachment.`,
+		);
+	}
 	return {
 		provider: providerName,
-		cdpEndpoint: session.cdpEndpoint,
+		cdpEndpoint,
 		sessionId: session.sessionId,
 		sessionName: `benchmark-${session.sessionId}`,
 		async close() {

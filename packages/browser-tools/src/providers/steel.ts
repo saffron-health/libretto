@@ -1,8 +1,14 @@
+import type { Browser } from "playwright";
 import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
 	ProviderSessionCreateOptions,
+} from "../provider.js";
+import {
+	closeProviderBrowser,
+	connectProviderPage,
+	setProviderSessionCdpEndpoint,
 } from "../provider.js";
 
 const DEFAULT_STEEL_API_ENDPOINT = "https://api.steel.dev";
@@ -51,6 +57,7 @@ export class SteelBrowserProvider implements BrowserProvider {
 	private readonly solveCaptcha: boolean | undefined;
 	private readonly timeoutMs: number | undefined;
 	private readonly inactivityTimeoutMs: number | undefined;
+	private readonly browsers = new Map<string, Browser>();
 
 	constructor(options: SteelBrowserProviderOptions = {}) {
 		const apiKey = (options.apiKey ?? process.env.STEEL_API_KEY)?.trim();
@@ -114,19 +121,37 @@ export class SteelBrowserProvider implements BrowserProvider {
 			throw new Error(`Steel API error (${response.status}): ${body}`);
 		}
 		const session = (await response.json()) as SteelSessionResponse;
-		return {
-			sessionId: session.id,
-			cdpEndpoint: buildSteelCdpEndpoint(
+		try {
+			const cdpEndpoint = buildSteelCdpEndpoint(
 				this.connectEndpoint,
 				this.apiKey,
 				session.id,
-			),
-			liveViewUrl: session.sessionViewerUrl,
-			startUrlPreloaded: false,
-		};
+			);
+			const { browser, page } = await connectProviderPage(cdpEndpoint);
+			const providerSession: ProviderSession = {
+				sessionId: session.id,
+				page,
+				liveViewUrl: session.sessionViewerUrl,
+				startUrlPreloaded: false,
+			};
+			this.browsers.set(session.id, browser);
+			setProviderSessionCdpEndpoint(providerSession, cdpEndpoint);
+			return providerSession;
+		} catch (error) {
+			await this.releaseSession(session.id).catch(() => {});
+			throw error;
+		}
 	}
 
 	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+		const browser = this.browsers.get(sessionId);
+		if (!browser) return {};
+		this.browsers.delete(sessionId);
+		await closeProviderBrowser(browser, () => this.releaseSession(sessionId));
+		return {};
+	}
+
+	private async releaseSession(sessionId: string): Promise<void> {
 		const response = await fetch(
 			`${this.endpoint}/v1/sessions/${sessionId}/release`,
 			{
@@ -144,6 +169,5 @@ export class SteelBrowserProvider implements BrowserProvider {
 				`Steel API error closing session ${sessionId} (${response.status}): ${body}`,
 			);
 		}
-		return {};
 	}
 }

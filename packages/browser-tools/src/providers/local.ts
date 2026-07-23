@@ -7,6 +7,11 @@ import type {
 	ProviderSessionClosed,
 	ProviderSessionCreateOptions,
 } from "../provider.js";
+import {
+	closeProviderBrowser,
+	connectProviderPage,
+	setProviderSessionCdpEndpoint,
+} from "../provider.js";
 
 export type LocalBrowserProviderOptions = {
 	channel?: string;
@@ -49,16 +54,17 @@ async function fetchWebSocketDebuggerUrl(port: number): Promise<string> {
 }
 
 /**
- * Launches a local Chromium with an ephemeral remote-debugging port and hands
- * back its CDP websocket endpoint. This is the only provider that needs the
- * Chromium binary installed (`npx playwright install chromium`); cloud
- * providers attach over CDP without a local browser download.
+ * Launches local Chromium and returns its initial CDP-attached page. This is
+ * the only provider that needs a local browser binary.
  */
 export class LocalBrowserProvider implements BrowserProvider {
 	readonly name = "local";
 	private readonly channel: string | undefined;
 	private readonly headless: boolean;
-	private readonly browsers = new Map<string, Browser>();
+	private readonly sessions = new Map<
+		string,
+		{ browser: Browser; launchedBrowser: Browser }
+	>();
 	private nextSessionNumber = 1;
 
 	constructor(options: LocalBrowserProviderOptions = {}) {
@@ -70,23 +76,36 @@ export class LocalBrowserProvider implements BrowserProvider {
 		_options: ProviderSessionCreateOptions = {},
 	): Promise<ProviderSession> {
 		const port = await pickFreePort();
-		const browser = await chromium.launch({
+		const launchedBrowser = await chromium.launch({
 			...(this.channel ? { channel: this.channel } : {}),
 			headless: this.headless,
 			args: [`--remote-debugging-port=${port}`],
 		});
-		const cdpEndpoint = await fetchWebSocketDebuggerUrl(port);
-		const sessionId = `local-${this.nextSessionNumber++}`;
-		this.browsers.set(sessionId, browser);
-		return { sessionId, cdpEndpoint, startUrlPreloaded: false };
+		try {
+			const cdpEndpoint = await fetchWebSocketDebuggerUrl(port);
+			const { browser, page } = await connectProviderPage(cdpEndpoint);
+			const sessionId = `local-${this.nextSessionNumber++}`;
+			const session: ProviderSession = {
+				sessionId,
+				page,
+				startUrlPreloaded: false,
+			};
+			this.sessions.set(sessionId, { browser, launchedBrowser });
+			setProviderSessionCdpEndpoint(session, cdpEndpoint);
+			return session;
+		} catch (error) {
+			await launchedBrowser.close().catch(() => {});
+			throw error;
+		}
 	}
 
 	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
-		const browser = this.browsers.get(sessionId);
-		if (browser) {
-			this.browsers.delete(sessionId);
-			await browser.close();
-		}
+		const session = this.sessions.get(sessionId);
+		if (!session) return {};
+		this.sessions.delete(sessionId);
+		await closeProviderBrowser(session.browser, () =>
+			session.launchedBrowser.close(),
+		);
 		return {};
 	}
 }

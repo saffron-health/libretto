@@ -126,11 +126,7 @@ test("browser_open does not create a provider session for a blocked start URL", 
 			name: "preload",
 			async createSession() {
 				created = true;
-				return {
-					sessionId: "provider-session",
-					cdpEndpoint: "ws://127.0.0.1:1",
-					startUrlPreloaded: true,
-				};
+				throw new Error("provider.createSession should not be called");
 			},
 			async closeSession() {
 				return {};
@@ -151,15 +147,12 @@ test("browser_open does not create a provider session for a blocked start URL", 
 	await registry.dispose();
 });
 
-test("browser_open closes provider sessions when browser setup fails", async () => {
+test("browser_open reports provider setup failures", async () => {
 	let closedSessionId: string | undefined;
 	const registry = new SessionRegistry({
 		name: "unreachable",
 		async createSession() {
-			return {
-				sessionId: "provider-session",
-				cdpEndpoint: "ws://127.0.0.1:1",
-			};
+			throw new Error("connection failed");
 		},
 		async closeSession(sessionId) {
 			closedSessionId = sessionId;
@@ -167,8 +160,10 @@ test("browser_open closes provider sessions when browser setup fails", async () 
 		},
 	});
 
-	await expect(createOpenTool(registry).execute({})).rejects.toThrow();
-	expect(closedSessionId).toBe("provider-session");
+	await expect(createOpenTool(registry).execute({})).rejects.toThrow(
+		"connection failed",
+	);
+	expect(closedSessionId).toBeUndefined();
 	await registry.dispose();
 });
 
@@ -193,7 +188,7 @@ test("browser_open rejects a provider browser already showing a blocked page", a
 			async createSession() {
 				return {
 					sessionId: "provider-session",
-					cdpEndpoint: externalBrowser.cdpUrl,
+					page,
 				};
 			},
 			async closeSession(sessionId) {

@@ -1,8 +1,14 @@
+import type { Browser } from "playwright";
 import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
 	ProviderSessionCreateOptions,
+} from "../provider.js";
+import {
+	closeProviderBrowser,
+	connectProviderPage,
+	setProviderSessionCdpEndpoint,
 } from "../provider.js";
 
 const DEFAULT_HOSTED_API_URL = "https://api.libretto.sh";
@@ -111,6 +117,7 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 	private readonly endpoint: string;
 	private readonly timeoutSeconds: number;
 	private readonly headless: boolean;
+	private readonly browsers = new Map<string, Browser>();
 
 	constructor(options: LibrettoCloudBrowserProviderOptions = {}) {
 		const apiKey = (options.apiKey ?? process.env.LIBRETTO_API_KEY)?.trim();
@@ -174,18 +181,28 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 			throw error;
 		}
 
-		return {
-			sessionId: ready.session_id,
-			cdpEndpoint: ready.cdp_url,
-			liveViewUrl: ready.live_view_url ?? undefined,
-			startUrlPreloaded: Boolean(startUrl),
-		};
+		try {
+			const { browser, page } = await connectProviderPage(ready.cdp_url);
+			const providerSession: ProviderSession = {
+				sessionId: ready.session_id,
+				page,
+				liveViewUrl: ready.live_view_url ?? undefined,
+				startUrlPreloaded: Boolean(startUrl),
+			};
+			this.browsers.set(ready.session_id, browser);
+			setProviderSessionCdpEndpoint(providerSession, ready.cdp_url);
+			return providerSession;
+		} catch (error) {
+			await this.releaseSession(ready.session_id).catch(() => {});
+			throw error;
+		}
 	}
 
 	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
-		await cloudFetchOk(this.endpoint, this.apiKey, "/v1/sessions/close", {
-			session_id: sessionId,
-		});
+		const browser = this.browsers.get(sessionId);
+		if (!browser) return {};
+		this.browsers.delete(sessionId);
+		await closeProviderBrowser(browser, () => this.releaseSession(sessionId));
 
 		let replayUrl: string | undefined;
 		try {
@@ -200,5 +217,11 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 		}
 
 		return { replayUrl };
+	}
+
+	private async releaseSession(sessionId: string): Promise<void> {
+		await cloudFetchOk(this.endpoint, this.apiKey, "/v1/sessions/close", {
+			session_id: sessionId,
+		});
 	}
 }
