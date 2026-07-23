@@ -5,6 +5,7 @@ import {
   KonamiOverlay,
 } from "./components/CanvasAsciihedron";
 import { Text } from "./components/Text";
+import { Button } from "./components/Button";
 import {
   OrchestrationContainer,
   AnimationTarget,
@@ -85,6 +86,15 @@ function Hero({
           Libretto makes tools for humans and agents to automate any browser
           task: Chrome extensions, CLIs, SDKs, cloud browsers, and more.
         </Text>
+        <div
+          data-animate={AnimationTarget.Content}
+          style={{ opacity: 0 }}
+          className="flex justify-center"
+        >
+          <Button href="#products" data-fathom-event="Hero products click">
+            See the products ↓
+          </Button>
+        </div>
       </div>
     </section>
   );
