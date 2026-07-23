@@ -229,12 +229,12 @@ async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
 }
 ```
 
-- [ ] Ensure a named Kernel profile exists, treating an API conflict as “already exists.”
-- [ ] Send `profile: { name, save_changes: true }` when creating the browser.
-- [ ] Mark the provider as supporting auth profiles.
-- [ ] Add mocked HTTP tests for existing, new, and unprofiled flows.
-- [ ] Keep browser deletion as the persistence trigger.
-- [ ] Run the Kernel provider spec plus package type-check.
+- [x] Ensure a named Kernel profile exists, treating an API conflict as “already exists.”
+- [x] Send `profile: { name, save_changes: true }` when creating the browser.
+- [x] Mark the provider as supporting auth profiles.
+- [x] Add credential-gated live API tests for profile creation, reuse, and unprofiled sessions.
+- [x] Keep browser deletion as the persistence trigger.
+- [x] Run the Kernel provider spec plus package type-check.
 
 ### Phase 7: Add named Browser Use profiles
 
