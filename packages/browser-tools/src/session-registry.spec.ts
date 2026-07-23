@@ -1,9 +1,22 @@
 import { expect, test as base } from "vitest";
-import { ProviderCloseError } from "./provider.js";
+import { type BrowserProvider, ProviderCloseError } from "./provider.js";
 import { LocalBrowserProvider } from "./providers/local.js";
 import { SessionRegistry } from "./session-registry.js";
 
-const test = base.extend<{ registry: SessionRegistry }>({
+const test = base.extend<{
+	createRegistry: (provider: BrowserProvider) => SessionRegistry;
+	registry: SessionRegistry;
+}>({
+	createRegistry: async ({}, use) => {
+		let registry: SessionRegistry | undefined;
+		await use((provider) => {
+			if (registry) throw new Error("This fixture owns one registry per test.");
+			registry = new SessionRegistry(provider);
+			return registry;
+		});
+		const disposed = await registry?.dispose();
+		if (disposed instanceof Error) throw disposed;
+	},
 	registry: async ({}, use) => {
 		const registry = new SessionRegistry(
 			new LocalBrowserProvider({ headless: true }),
@@ -80,11 +93,13 @@ test("closeSession makes the session unknown", async ({ registry }) => {
 	expect(() => registry.getCurrentPage(sessionId)).toThrowError(sessionId);
 });
 
-test("closeSession releases the provider before disconnecting CDP", async () => {
+test("closeSession releases the provider before disconnecting CDP", async ({
+	createRegistry,
+}) => {
 	const localProvider = new LocalBrowserProvider({ headless: true });
 	let registryBrowserConnectedWhenProviderClosed = false;
 	let registryBrowserConnected: (() => boolean) | undefined;
-	const registry = new SessionRegistry({
+	const registry = createRegistry({
 		name: "ordered-close",
 		createSession: () => localProvider.createSession(),
 		async closeSession(sessionId) {
@@ -106,9 +121,11 @@ test("closeSession releases the provider before disconnecting CDP", async () => 
 	expect(browser.isConnected()).toBe(false);
 });
 
-test("closeSession removes the session when provider cleanup fails", async () => {
+test("closeSession removes the session when provider cleanup fails", async ({
+	createRegistry,
+}) => {
 	const localProvider = new LocalBrowserProvider({ headless: true });
-	const registry = new SessionRegistry({
+	const registry = createRegistry({
 		name: "failing-close",
 		createSession: () => localProvider.createSession(),
 		async closeSession(sessionId) {
@@ -129,10 +146,12 @@ test("closeSession removes the session when provider cleanup fails", async () =>
 	expect(registry.listSessions()).toEqual([]);
 });
 
-test("dispose closes remaining sessions after one provider cleanup fails", async () => {
+test("dispose closes remaining sessions after one provider cleanup fails", async ({
+	createRegistry,
+}) => {
 	const localProvider = new LocalBrowserProvider({ headless: true });
 	const closedProviderSessionIds: string[] = [];
-	const registry = new SessionRegistry({
+	const registry = createRegistry({
 		name: "partly-failing-close",
 		createSession: () => localProvider.createSession(),
 		async closeSession(sessionId) {

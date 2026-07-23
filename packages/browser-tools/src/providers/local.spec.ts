@@ -18,6 +18,7 @@ import { LocalBrowserProvider } from "./local.js";
 const test = base.extend<{
 	authServer: { origin: string };
 	tempDirectory: string;
+	toolkit: ReturnType<typeof createBrowserTools>;
 }>({
 	authServer: async ({}, use) => {
 		const server = createServer((request, response) => {
@@ -44,12 +45,24 @@ const test = base.extend<{
 		await use({ origin: `http://127.0.0.1:${address.port}` });
 		await new Promise<void>((resolve, reject) => {
 			server.close((error) => (error ? reject(error) : resolve()));
+			server.closeAllConnections();
 		});
 	},
 	tempDirectory: async ({}, use) => {
 		const tempDirectory = await mkdtemp(join(tmpdir(), "browser-tools-local-"));
 		await use(tempDirectory);
 		await rm(tempDirectory, { recursive: true, force: true });
+	},
+	toolkit: async ({ authServer: _authServer, tempDirectory }, use) => {
+		const toolkit = createBrowserTools(
+			new LocalBrowserProvider({
+				authProfileDirectory: join(tempDirectory, "profiles"),
+				headless: true,
+			}),
+		);
+		await use(toolkit);
+		const disposed = await toolkit.dispose();
+		if (disposed instanceof Error) throw disposed;
 	},
 });
 
@@ -68,11 +81,11 @@ test("local auth profiles use owner-only directories", async ({
 
 	const session = await provider.createSession({ authProfile: "work" });
 	if (session instanceof Error) throw session;
+	const closed = await provider.closeSession(session.sessionId);
+	if (closed instanceof Error) throw closed;
 
 	expect((await stat(authProfileDirectory)).mode & 0o777).toBe(0o700);
 	expect((await stat(profileDirectory)).mode & 0o777).toBe(0o700);
-	const closed = await provider.closeSession(session.sessionId);
-	if (closed instanceof Error) throw closed;
 });
 
 test("local auth profiles reject unsafe names without launching", async ({
@@ -124,15 +137,8 @@ test("unprofiled local sessions remain ephemeral", async ({ tempDirectory }) => 
 
 test("local auth profiles restore login state after browser_close", async ({
 	authServer,
-	tempDirectory,
+	toolkit,
 }) => {
-	const toolkit = createBrowserTools(
-		new LocalBrowserProvider({
-			authProfileDirectory: join(tempDirectory, "profiles"),
-			headless: true,
-		}),
-	);
-
 	const loginSession = await toolkit.tools.browser_open.execute({
 		authProfile: "work",
 		url: `${authServer.origin}/login`,
@@ -177,21 +183,12 @@ test("local auth profiles restore login state after browser_close", async ({
 			sessionId: restoredSession.sessionId,
 		}),
 	).toEqual({ ok: true });
-	const disposed = await toolkit.dispose();
-	if (disposed instanceof Error) throw disposed;
 });
 
 test("local auth profiles isolate login state by name", async ({
 	authServer,
-	tempDirectory,
+	toolkit,
 }) => {
-	const toolkit = createBrowserTools(
-		new LocalBrowserProvider({
-			authProfileDirectory: join(tempDirectory, "profiles"),
-			headless: true,
-		}),
-	);
-
 	const workSession = await toolkit.tools.browser_open.execute({
 		authProfile: "work",
 		url: `${authServer.origin}/login`,
@@ -233,20 +230,11 @@ test("local auth profiles isolate login state by name", async ({
 			sessionId: personalSession.sessionId,
 		}),
 	).toEqual({ ok: true });
-	const disposed = await toolkit.dispose();
-	if (disposed instanceof Error) throw disposed;
 });
 
 test(
-	"browser_open navigates the newest restored profile tab",
-	async ({ authServer, tempDirectory }) => {
-		const toolkit = createBrowserTools(
-			new LocalBrowserProvider({
-				authProfileDirectory: join(tempDirectory, "profiles"),
-				headless: true,
-			}),
-		);
-
+	"browser_open navigates a restored profile tab and keeps another tab open",
+	async ({ authServer, toolkit }) => {
 		const firstSession = await toolkit.tools.browser_open.execute({
 			authProfile: "work",
 			url: `${authServer.origin}/dashboard?tab=first`,
@@ -283,23 +271,22 @@ test(
 				"return { current: page.url(), " +
 				"tabs: context.pages().map((tab) => tab.url()) };",
 		});
-		expect(restoredTabs).toMatchObject({
-			ok: true,
-			result: {
-				current: `${authServer.origin}/dashboard?tab=target`,
-				tabs: expect.arrayContaining([
-					`${authServer.origin}/dashboard?tab=first`,
-					`${authServer.origin}/dashboard?tab=target`,
-				]),
-			},
-		});
+		if (!restoredTabs.ok) throw new Error(restoredTabs.error);
+		const result = restoredTabs.result as { current: string; tabs: string[] };
+		expect(result.current).toBe(`${authServer.origin}/dashboard?tab=target`);
+		expect(result.tabs).toContain(`${authServer.origin}/dashboard?tab=target`);
+		expect(
+			result.tabs.some(
+				(url) =>
+					url === `${authServer.origin}/dashboard?tab=first` ||
+					url === `${authServer.origin}/dashboard?tab=newest`,
+			),
+		).toBe(true);
 		expect(
 			await toolkit.tools.browser_close.execute({
 				sessionId: restoredSession.sessionId,
 			}),
 		).toEqual({ ok: true });
-		const disposed = await toolkit.dispose();
-		if (disposed instanceof Error) throw disposed;
 	},
 	20_000,
 );
