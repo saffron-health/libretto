@@ -1,11 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
-import type {
-	BrowserProvider,
-	ProviderSession,
-	ProviderSessionClosed,
-	ProviderSessionCreateOptions,
+import { errorMessage } from "../errors.js";
+import {
+	AuthProfileError,
+	ProviderCloseError,
+	type BrowserProvider,
+	type ProviderCloseResult,
+	type ProviderSession,
+	type ProviderSessionCreateOptions,
 } from "../provider.js";
 
 export type KernelBrowserProviderOptions = {
@@ -29,6 +32,7 @@ type KernelReplayResponse = {
 
 const CDP_READY_ATTEMPTS = 3;
 const CDP_HANDSHAKE_TIMEOUT_MS = 10_000;
+const KERNEL_PROFILE_NAME_PATTERN = /^[a-zA-Z0-9._-]{1,255}$/;
 
 async function cdpHandshakeStatus(cdpEndpoint: string): Promise<number> {
 	const url = new URL(cdpEndpoint);
@@ -132,27 +136,31 @@ async function kernelFetchJson<T>(
 	return (await response.json()) as T;
 }
 
-async function kernelFetchNoBody(
+async function kernelFetchOk(
 	endpoint: string,
 	apiKey: string,
 	path: string,
 	init: RequestInit,
+	acceptedStatuses: readonly number[] = [],
 ): Promise<void> {
 	const response = await fetch(`${endpoint}${path}`, {
 		...init,
 		headers: {
 			Authorization: `Bearer ${apiKey}`,
+			"Content-Type": "application/json",
 			...init.headers,
 		},
 	});
-	if (!response.ok) {
+	if (!response.ok && !acceptedStatuses.includes(response.status)) {
 		const body = await response.text();
 		throw new Error(`Kernel API error (${response.status}): ${body}`);
 	}
+	await response.arrayBuffer();
 }
 
 export class KernelBrowserProvider implements BrowserProvider {
 	readonly name = "kernel";
+	readonly supportsAuthProfiles = true;
 	private readonly apiKey: string;
 	private readonly endpoint: string;
 	private readonly headless: boolean;
@@ -192,8 +200,28 @@ export class KernelBrowserProvider implements BrowserProvider {
 
 	async createSession(
 		options: ProviderSessionCreateOptions = {},
-	): Promise<ProviderSession> {
+	): Promise<AuthProfileError | ProviderSession> {
 		const startUrl = options.startUrl?.trim() || undefined;
+		const authProfile = options.authProfile;
+		if (
+			authProfile !== undefined &&
+			!KERNEL_PROFILE_NAME_PATTERN.test(authProfile)
+		) {
+			return new AuthProfileError({
+				message: `Invalid Kernel auth profile name "${authProfile}".`,
+				recovery:
+					"Use 1-255 letters, numbers, dots, underscores, or hyphens in authProfile.",
+			});
+		}
+		if (authProfile) {
+			await kernelFetchOk(
+				this.endpoint,
+				this.apiKey,
+				"/profiles",
+				{ method: "POST", body: JSON.stringify({ name: authProfile }) },
+				[409],
+			);
+		}
 		const gpu = options.gpu;
 		const viewport = options.viewport;
 		const browser = await kernelFetchJson<KernelBrowserResponse>(
@@ -207,6 +235,9 @@ export class KernelBrowserProvider implements BrowserProvider {
 					stealth: this.stealth,
 					...(this.proxyId ? { proxy_id: this.proxyId } : {}),
 					...(startUrl ? { start_url: startUrl } : {}),
+						...(authProfile
+							? { profile: { name: authProfile, save_changes: true } }
+							: {}),
 					...(gpu !== undefined ? { gpu } : {}),
 					...(viewport
 						? {
@@ -223,13 +254,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 		try {
 			await waitForCdpReady(browser.cdp_ws_url);
 		} catch (error) {
-			await kernelFetchNoBody(
-				this.endpoint,
-				this.apiKey,
-				`/browsers/${browser.session_id}`,
-				{ method: "DELETE" },
-			).catch(() => {});
-			throw error;
+			return this.throwAfterFailedCreateCleanup(browser.session_id, error);
 		}
 
 		let replay: KernelReplayResponse | undefined;
@@ -248,13 +273,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 					);
 				}
 			} catch (error) {
-				await kernelFetchNoBody(
-					this.endpoint,
-					this.apiKey,
-					`/browsers/${browser.session_id}`,
-					{ method: "DELETE" },
-				).catch(() => {});
-				throw error;
+				return this.throwAfterFailedCreateCleanup(browser.session_id, error);
 			}
 		}
 
@@ -267,15 +286,40 @@ export class KernelBrowserProvider implements BrowserProvider {
 		};
 	}
 
-	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+	private async throwAfterFailedCreateCleanup(
+		sessionId: string,
+		createError: unknown,
+	): Promise<never> {
+		const closeError = await this.closeSession(sessionId);
+		if (closeError instanceof Error) {
+			throw new AggregateError(
+				[createError, closeError],
+				"Kernel session creation and cleanup both failed.",
+			);
+		}
+		throw createError;
+	}
+
+	async closeSession(sessionId: string): Promise<ProviderCloseResult> {
 		const replayUrl = this.replayUrlBySession.get(sessionId);
 
-		await kernelFetchNoBody(
+		const closed = await kernelFetchOk(
 			this.endpoint,
 			this.apiKey,
 			`/browsers/${sessionId}`,
 			{ method: "DELETE" },
+		).catch(
+			(cause: unknown) =>
+				new ProviderCloseError({
+					provider: this.name,
+					providerSessionId: sessionId,
+					detail: errorMessage(cause),
+					recovery:
+						"Call closeSession again, or delete the browser in the Kernel dashboard.",
+					cause,
+				}),
 		);
+		if (closed instanceof Error) return closed;
 		this.replayUrlBySession.delete(sessionId);
 
 		return { replayUrl };

@@ -1,8 +1,10 @@
-import type {
-	BrowserProvider,
-	ProviderSession,
-	ProviderSessionClosed,
-	ProviderSessionCreateOptions,
+import { errorMessage } from "../errors.js";
+import {
+	ProviderCloseError,
+	type BrowserProvider,
+	type ProviderCloseResult,
+	type ProviderSession,
+	type ProviderSessionCreateOptions,
 } from "../provider.js";
 
 const DEFAULT_STEEL_API_ENDPOINT = "https://api.steel.dev";
@@ -44,6 +46,9 @@ function buildSteelCdpEndpoint(
 
 export class SteelBrowserProvider implements BrowserProvider {
 	readonly name = "steel";
+	// Steel profiles expose generated IDs but no names, so they cannot satisfy
+	// the named authProfile contract without a durable Libretto mapping.
+	readonly supportsAuthProfiles = false;
 	private readonly apiKey: string;
 	private readonly endpoint: string;
 	private readonly connectEndpoint: string;
@@ -126,7 +131,7 @@ export class SteelBrowserProvider implements BrowserProvider {
 		};
 	}
 
-	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+	async closeSession(sessionId: string): Promise<ProviderCloseResult> {
 		const response = await fetch(
 			`${this.endpoint}/v1/sessions/${sessionId}/release`,
 			{
@@ -137,12 +142,27 @@ export class SteelBrowserProvider implements BrowserProvider {
 				},
 				body: JSON.stringify({}),
 			},
+		).catch(
+			(cause: unknown) =>
+				new ProviderCloseError({
+					provider: this.name,
+					providerSessionId: sessionId,
+					detail: errorMessage(cause),
+					recovery: "Release the session in the Steel dashboard.",
+					cause,
+				}),
 		);
+		if (response instanceof Error) return response;
 		if (!response.ok) {
-			const body = await response.text();
-			throw new Error(
-				`Steel API error closing session ${sessionId} (${response.status}): ${body}`,
-			);
+			const body = await response
+				.text()
+				.catch((cause: unknown) => errorMessage(cause));
+			return new ProviderCloseError({
+				provider: this.name,
+				providerSessionId: sessionId,
+				detail: `Steel API error (${response.status}): ${body}`,
+				recovery: "Release the session in the Steel dashboard.",
+			});
 		}
 		return {};
 	}

@@ -52,6 +52,32 @@ const result = await generateText({
 await dispose(); // close any sessions the agent left open
 ```
 
+## Auth profiles
+
+Auth profiles preserve signed-in browser state across sessions, so agents can reuse an account without signing in each time.
+
+```typescript
+import { createBrowserTools, LocalBrowserProvider } from "libretto-browser-tools";
+
+const toolkit = createBrowserTools(new LocalBrowserProvider());
+await toolkit.tools.browser_open.execute({ authProfile: "work" });
+```
+
+On supported providers, omitting `authProfile` uses the named `default` profile. Pass `authProfile: false` for incognito.
+
+| Provider | Named auth profiles |
+| --- | --- |
+| Local | Supported |
+| Libretto Cloud | Supported |
+| Kernel | Supported |
+| Browser Use | Supported |
+| Browserbase | Unsupported |
+| Steel | Unsupported |
+
+Browserbase and Steel expose provider IDs but not durable names. Libretto needs a durable name-to-ID mapping before they can support named profiles.
+
+Profiles contain signed-in browser state. Do not commit profile data. Changes persist only after `browser_close` or graceful `dispose()`. Do not open concurrent writable sessions against the same profile.
+
 ## Docs
 
 - Product page: https://libretto.sh/browser-tools

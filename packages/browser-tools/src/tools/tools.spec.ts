@@ -1,4 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Browser } from "playwright";
 import { chromium } from "playwright";
 import { expect, test as base } from "vitest";
@@ -47,6 +50,7 @@ async function fetchWebSocketDebuggerUrl(port: number): Promise<string> {
 }
 
 const test = base.extend<{
+	authProfileDirectory: string;
 	registry: SessionRegistry;
 	openTool: ReturnType<typeof createOpenTool>;
 	execTool: ReturnType<typeof createExecTool>;
@@ -56,12 +60,18 @@ const test = base.extend<{
 	connectTool: ReturnType<typeof createConnectTool>;
 	externalBrowser: { browser: Browser; cdpUrl: string };
 }>({
-	registry: async ({}, use) => {
+	authProfileDirectory: async ({}, use) => {
+		const directory = await mkdtemp(join(tmpdir(), "browser-tools-profiles-"));
+		await use(directory);
+		await rm(directory, { recursive: true, force: true });
+	},
+	registry: async ({ authProfileDirectory }, use) => {
 		const registry = new SessionRegistry(
-			new LocalBrowserProvider({ headless: true }),
+			new LocalBrowserProvider({ headless: true, authProfileDirectory }),
 		);
 		await use(registry);
-		await registry.dispose();
+		const disposed = await registry.dispose();
+		if (disposed instanceof Error) throw disposed;
 	},
 	openTool: async ({ registry }, use) => {
 		await use(createOpenTool(registry));
@@ -102,6 +112,33 @@ test("browser_open navigates to a url and returns a session ID", async ({
 	expect(result).toEqual({ ok: true, sessionId: expect.any(String) });
 });
 
+test("browser_open returns an actionable error for an invalid URL", async ({
+	openTool,
+}) => {
+	const result = await openTool.execute({ url: "not-a-url" });
+
+	expect(result).toMatchObject({ ok: false });
+	if (result.ok) throw new Error("Expected browser_open to reject an invalid URL");
+	expect(result.error).toContain("Could not navigate");
+	expect(result.error).toContain("full https:// URL");
+});
+
+test("browser_open returns an actionable invalid URL error with a domain policy", async () => {
+	const registry = new SessionRegistry(
+		new LocalBrowserProvider({ headless: true }),
+		{ blockedDomains: ["example.com"] },
+	);
+
+	const result = await createOpenTool(registry).execute({ url: "not-a-url" });
+
+	expect(result).toMatchObject({ ok: false });
+	if (result.ok) throw new Error("Expected browser_open to reject an invalid URL");
+	expect(result.error).toContain("Could not navigate");
+	expect(result.error).toContain("full https:// URL");
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
+});
+
 test("browser_open reports a blocked top-level navigation as a domain policy error", async () => {
 	const registry = new SessionRegistry(
 		new LocalBrowserProvider({ headless: true }),
@@ -116,7 +153,8 @@ test("browser_open reports a blocked top-level navigation as a domain policy err
 		domainPolicy: { blockedDomains: ["example.com"] },
 		attemptedNavigationUrl: "https://example.com/",
 	});
-	await registry.dispose();
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("browser_open does not create a provider session for a blocked start URL", async () => {
@@ -169,7 +207,8 @@ test("browser_open closes provider sessions when browser setup fails", async () 
 
 	await expect(createOpenTool(registry).execute({})).rejects.toThrow();
 	expect(closedSessionId).toBe("provider-session");
-	await registry.dispose();
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("browser_open rejects a provider browser already showing a blocked page", async ({
@@ -210,7 +249,8 @@ test("browser_open rejects a provider browser already showing a blocked page", a
 	});
 	expect(closedSessionId).toBe("provider-session");
 	expect(externalBrowser.browser.isConnected()).toBe(true);
-	await registry.dispose();
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("domain policy silently aborts blocked subresources", async () => {
@@ -233,7 +273,8 @@ test("domain policy silently aborts blocked subresources", async () => {
 	});
 
 	expect(result).toMatchObject({ ok: true, result: 0 });
-	await registry.dispose();
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("browser_exec runs Playwright code against an open session", async ({
@@ -325,6 +366,7 @@ test("browser_status lists sessions and pages at three zoom levels", async ({
 			{
 				sessionId: opened.sessionId,
 				provider: "local",
+				authProfile: "default",
 				pages: [{ pageId: expect.any(String), url: expect.any(String), active: true }],
 			},
 		],
@@ -349,6 +391,19 @@ test("browser_status lists sessions and pages at three zoom levels", async ({
 		active: true,
 		readyState: expect.any(String),
 	});
+});
+
+test("browser_open accepts authProfile false for an unprofiled session", async ({
+	openTool,
+	statusTool,
+}) => {
+	const opened = await openTool.execute({ authProfile: false });
+	if (!opened.ok) throw new Error(opened.error);
+
+	const status = await statusTool.execute({});
+
+	if (!status.ok || !("sessions" in status)) throw new Error("expected sessions");
+	expect(status.sessions[0]).not.toHaveProperty("authProfile");
 });
 
 test("browser_close removes a session from browser_status", async ({
@@ -395,6 +450,8 @@ test("browser_connect attaches to an external browser and close detaches without
 			},
 		],
 	});
+	if (!status.ok || !("sessions" in status)) throw new Error("expected sessions");
+	expect(status.sessions[0]).not.toHaveProperty("authProfile");
 
 	const execResult = await execTool.execute({
 		sessionId: connected.sessionId,
@@ -408,6 +465,33 @@ test("browser_connect attaches to an external browser and close detaches without
 
 	const all = await statusTool.execute({});
 	expect(all).toMatchObject({ ok: true, sessions: [] });
+});
+
+test("browser_status omits authProfile for a caller-owned page", async ({
+	externalBrowser,
+}) => {
+	const context =
+		externalBrowser.browser.contexts()[0] ??
+		(await externalBrowser.browser.newContext());
+	const page = context.pages()[0] ?? (await context.newPage());
+	const registry = new SessionRegistry(undefined);
+	const attached = registry.attachPage(page);
+
+	const status = await createStatusTool(registry).execute({});
+
+	expect(status).toMatchObject({
+		ok: true,
+		sessions: [
+			{
+				sessionId: attached.sessionId,
+				provider: "borrowed-page",
+			},
+		],
+	});
+	if (!status.ok || !("sessions" in status)) throw new Error("expected sessions");
+	expect(status.sessions[0]).not.toHaveProperty("authProfile");
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("domain policy applies to browser_connect sessions and browser_exec navigations", async ({
@@ -435,7 +519,8 @@ test("domain policy applies to browser_connect sessions and browser_exec navigat
 				"return 'caught'",
 		}),
 	).rejects.toBeInstanceOf(DomainPolicyRestricted);
-	await registry.dispose();
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("domain policy reports unawaited browser_exec navigations after stabilization", async ({
@@ -463,7 +548,8 @@ test("domain policy reports unawaited browser_exec navigations after stabilizati
 				"return 'started'",
 		}),
 	).rejects.toBeInstanceOf(DomainPolicyRestricted);
-	await registry.dispose();
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("domain policy rejects a connected browser already showing a blocked page", async ({
@@ -492,7 +578,8 @@ test("domain policy rejects a connected browser already showing a blocked page",
 		attemptedNavigationUrl: blockedUrl.href,
 	});
 	expect(externalBrowser.browser.isConnected()).toBe(true);
-	await registry.dispose();
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("browser_exec snapshot diff uses per-page cache across mixed pageId calls", async ({

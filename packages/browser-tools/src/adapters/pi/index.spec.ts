@@ -34,7 +34,8 @@ const test = base.extend<{ toolkit: PiBrowserToolkit }>({
 			new LocalBrowserProvider({ headless: true }),
 		);
 		await use(toolkit);
-		await toolkit.dispose();
+		const disposed = await toolkit.dispose();
+		if (disposed instanceof Error) throw disposed;
 	},
 });
 
@@ -54,6 +55,7 @@ test("Pi tools open a browser and execute Playwright code", async ({
 }) => {
 	const opened = await callTool(toolkit.tools, "browser_open", {
 		url: "data:text/html,<title>hello</title>",
+		authProfile: false,
 	});
 	expect(opened.details).toMatchObject({
 		ok: true,
@@ -71,6 +73,7 @@ test("Pi tools open a browser and execute Playwright code", async ({
 test("Pi snapshots carry screenshots as image content", async ({ toolkit }) => {
 	const opened = await callTool(toolkit.tools, "browser_open", {
 		url: "data:text/html,<main>hello</main>",
+		authProfile: false,
 	});
 	const sessionId = (opened.details as { sessionId: string }).sessionId;
 
@@ -100,5 +103,6 @@ test("createPiBrowserTools forwards domain policy options", async () => {
 			url: "https://example.com/",
 		}),
 	).rejects.toBeInstanceOf(DomainPolicyRestricted);
-	await toolkit.dispose();
+	const disposed = await toolkit.dispose();
+	if (disposed instanceof Error) throw disposed;
 });

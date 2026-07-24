@@ -41,6 +41,7 @@ pnpm -s cli
 - Do not add new dependencies without asking.
 - Do not remove or comment out code to "clean up" without asking — it may be there for a reason.
 - When code prints user-facing Libretto CLI commands, use the native `libretto` command in examples and guidance.
+- Errore adoption is incremental. Do not use Errore by default. Use it only when a task or existing code path explicitly opts in; the browser-tools auth-profile work is currently opted in. Before editing an opted-in path, read the `errore` skill. Keep existing public thrown-error contracts unless the task explicitly changes them.
 
 ## Testing
 
@@ -103,8 +104,8 @@ In `packages/browser-tools`, format caught errors with `errorMessage()` from `sr
 - Edit `packages/libretto/skills/libretto/SKILL.md` directly.
 - `packages/libretto/skills/libretto` is the source of truth for Libretto skill files.
 
-## Cursor Cloud specific instructions
+## Cloud sandbox instructions
 
 - **Browser runs are headless here** (no display). Pass `--headless` to `libretto open`/`run`, or they default to headed and hang.
-- The Notion CLI (`ntn`) is installed by `.cursor/environment.json`. When an authenticated command is needed, run `NOTION_KEYRING=0 ntn login --no-browser`, give the user the displayed verification URL and code, and wait for them to confirm authorization. Then prefix the displayed `ntn login poll` command with `NOTION_KEYRING=0` so the credential is stored in the agent's file-backed Notion config instead of an unavailable Linux keyring. Treat the resulting `auth.json` as a secret and never commit it. `NOTION_API_TOKEN` remains available for unattended authentication.
-- The Vercel CLI (`vercel`) is installed by `.cursor/environment.json`. Prefer `VERCEL_TOKEN` for unattended auth. For interactive login, run `vercel login` and complete the flow the CLI prints.
+- The Notion CLI (`ntn`) is installed by `.agents/setup`. When an authenticated command is needed, run `NOTION_KEYRING=0 ntn login --no-browser`, give the user the displayed verification URL and code, and wait for them to confirm authorization. Then prefix the displayed `ntn login poll` command with `NOTION_KEYRING=0` so the credential is stored in the agent's file-backed Notion config instead of an unavailable Linux keyring. Treat the resulting `auth.json` as a secret and never commit it. `NOTION_API_TOKEN` remains available for unattended authentication.
+- The Vercel CLI (`vercel`) is installed by `.agents/setup`. Prefer `VERCEL_TOKEN` for unattended auth. For interactive login, run `vercel login` and complete the flow the CLI prints.

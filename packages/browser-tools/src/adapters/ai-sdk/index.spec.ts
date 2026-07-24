@@ -11,10 +11,7 @@ import {
 	createAiSdkBrowserToolsForPage,
 } from "./index.js";
 
-type Toolkit = {
-	tools: ToolSet;
-	dispose(): Promise<void>;
-}
+type Toolkit = ReturnType<typeof createAiSdkBrowserTools>;
 
 const toolCallOptions = { toolCallId: "call-1", messages: [] };
 
@@ -30,7 +27,10 @@ async function callTool(
 }
 
 async function openSession(tools: ToolSet, url: string): Promise<string> {
-	const result = await callTool(tools, "browser_open", { url });
+	const result = await callTool(tools, "browser_open", {
+		url,
+		authProfile: false,
+	});
 	expect(result).toMatchObject({ ok: true });
 	return result.sessionId as string;
 }
@@ -41,7 +41,8 @@ const test = base.extend<{ toolkit: Toolkit }>({
 			new LocalBrowserProvider({ headless: true }),
 		);
 		await use(toolkit);
-		await toolkit.dispose();
+		const disposed = await toolkit.dispose();
+		if (disposed instanceof Error) throw disposed;
 	},
 });
 
@@ -126,7 +127,8 @@ borrowedPageTest(
 			ok: true,
 			result: { marker: "failed-page", draft: "unsaved" },
 		});
-		await toolkit.dispose();
+		const disposed = await toolkit.dispose();
+		if (disposed instanceof Error) throw disposed;
 	},
 );
 
@@ -168,7 +170,8 @@ borrowedPageTest(
 		});
 		expect(protectedServer.requestCount()).toBe(1);
 
-		await toolkit.dispose();
+		const disposed = await toolkit.dispose();
+		if (disposed instanceof Error) throw disposed;
 		expect(page.isClosed()).toBe(false);
 		expect(browser.isConnected()).toBe(true);
 		await page.locator("h1").evaluate((heading) => {
@@ -183,6 +186,7 @@ test("browser_open with a data: URL returns a session ID", async ({
 }) => {
 	const result = await callTool(toolkit.tools, "browser_open", {
 		url: "data:text/html,<title>hello</title>",
+		authProfile: false,
 	});
 	expect(result).toMatchObject({ ok: true, sessionId: expect.any(String) });
 });
@@ -198,7 +202,8 @@ test("createAiSdkBrowserTools forwards domain policy options", async () => {
 			url: "https://example.com/",
 		}),
 	).rejects.toBeInstanceOf(DomainPolicyRestricted);
-	await toolkit.dispose();
+	const disposed = await toolkit.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("browser_exec runs Playwright code against the opened page", async ({
@@ -325,7 +330,8 @@ test("dispose closes open sessions", async ({ toolkit }) => {
 		toolkit.tools,
 		"data:text/html,<title>bye</title>",
 	);
-	await toolkit.dispose();
+	const disposed = await toolkit.dispose();
+	if (disposed instanceof Error) throw disposed;
 
 	const result = await callTool(toolkit.tools, "browser_exec", {
 		sessionId,

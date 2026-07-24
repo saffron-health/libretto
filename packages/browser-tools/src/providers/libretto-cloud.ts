@@ -1,8 +1,11 @@
-import type {
-	BrowserProvider,
-	ProviderSession,
-	ProviderSessionClosed,
-	ProviderSessionCreateOptions,
+import { errorMessage } from "../errors.js";
+import {
+	AuthProfileError,
+	ProviderCloseError,
+	type BrowserProvider,
+	type ProviderCloseResult,
+	type ProviderSession,
+	type ProviderSessionCreateOptions,
 } from "../provider.js";
 
 const DEFAULT_HOSTED_API_URL = "https://api.libretto.sh";
@@ -107,6 +110,7 @@ async function waitForCloudSessionReady(args: {
  */
 export class LibrettoCloudBrowserProvider implements BrowserProvider {
 	readonly name = "libretto-cloud";
+	readonly supportsAuthProfiles = true;
 	private readonly apiKey: string;
 	private readonly endpoint: string;
 	private readonly timeoutSeconds: number;
@@ -136,8 +140,15 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 
 	async createSession(
 		options: ProviderSessionCreateOptions = {},
-	): Promise<ProviderSession> {
+	): Promise<AuthProfileError | ProviderSession> {
 		const startUrl = options.startUrl?.trim() || undefined;
+		const authProfile = options.authProfile;
+		if (authProfile !== undefined && !authProfile.trim()) {
+			return new AuthProfileError({
+				message: "Auth profile name is empty.",
+				recovery: "Pass a non-empty authProfile to createSession.",
+			});
+		}
 		const gpu = options.gpu;
 		const viewport = options.viewport;
 		const created = await cloudFetchJson<CloudSessionResponse>(
@@ -147,6 +158,9 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 			{
 				timeout_seconds: this.timeoutSeconds,
 				headless: this.headless,
+				...(authProfile
+					? { profile_name: authProfile, profile_persist: true }
+					: {}),
 				...(startUrl ? { start_url: startUrl } : {}),
 				...(gpu !== undefined ? { gpu } : {}),
 				...(viewport
@@ -160,19 +174,20 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 			},
 		);
 
-		let ready: CloudSessionResponse & { cdp_url: string };
-		try {
-			ready = await waitForCloudSessionReady({
+		const ready = await waitForCloudSessionReady({
 				endpoint: this.endpoint,
 				apiKey: this.apiKey,
 				session: created,
+			}).catch(async (createError: unknown) => {
+				const closeError = await this.closeSession(created.session_id);
+				if (closeError instanceof Error) {
+					throw new AggregateError(
+						[createError, closeError],
+						"Libretto Cloud session creation and cleanup both failed.",
+					);
+				}
+				throw createError;
 			});
-		} catch (error) {
-			await cloudFetchOk(this.endpoint, this.apiKey, "/v1/sessions/close", {
-				session_id: created.session_id,
-			}).catch(() => {});
-			throw error;
-		}
 
 		return {
 			sessionId: ready.session_id,
@@ -182,23 +197,36 @@ export class LibrettoCloudBrowserProvider implements BrowserProvider {
 		};
 	}
 
-	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
-		await cloudFetchOk(this.endpoint, this.apiKey, "/v1/sessions/close", {
-			session_id: sessionId,
-		});
+	async closeSession(sessionId: string): Promise<ProviderCloseResult> {
+		const closed = await cloudFetchOk(
+			this.endpoint,
+			this.apiKey,
+			"/v1/sessions/close",
+			{ session_id: sessionId },
+		).catch(
+			(cause: unknown) =>
+				new ProviderCloseError({
+					provider: this.name,
+					providerSessionId: sessionId,
+					detail: errorMessage(cause),
+					recovery:
+						"Call closeSession again, or close the session in the Libretto Cloud dashboard.",
+					cause,
+				}),
+		);
+		if (closed instanceof Error) return closed;
 
-		let replayUrl: string | undefined;
-		try {
-			const recording = await cloudFetchJson<{
+		const recording = await cloudFetchJson<{
 				recording_url: string | null;
 			}>(this.endpoint, this.apiKey, "/v1/recordings/get", {
 				session_id: sessionId,
+			}).catch((cause: unknown) => {
+				console.warn(
+					`Could not fetch recording for closed Libretto Cloud session ${sessionId}: ${errorMessage(cause)}`,
+				);
+				return null;
 			});
-			replayUrl = recording.recording_url ?? undefined;
-		} catch {
-			// Recording may not exist yet; closing the session still succeeded.
-		}
 
-		return { replayUrl };
+		return { replayUrl: recording?.recording_url ?? undefined };
 	}
 }
