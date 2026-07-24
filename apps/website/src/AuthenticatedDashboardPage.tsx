@@ -269,8 +269,44 @@ function EmptyTable({ message }: { message: string }) {
   );
 }
 
+function CliSetupEmptyTable({
+  title,
+  action,
+  fathomEvent,
+}: {
+  title: string;
+  action: string;
+  fathomEvent: string;
+}) {
+  return (
+    <div className="border-t border-rule px-5 py-12 text-center">
+      <h3 className="text-sm font-medium text-ink">{title}</h3>
+      <p className="mx-auto mt-2 max-w-[620px] text-sm leading-6 text-muted">
+        <a
+          href="/dashboard/api_keys"
+          className="text-accent-bright underline decoration-accent/50 underline-offset-4 hover:text-ink"
+        >
+          Create an API key
+        </a>
+        , then copy this prompt into your coding agent to set up the Libretto CLI
+        and {action}.
+      </p>
+      <div className="mt-5 flex justify-center">
+        <InstallSnippet
+          prompt={LIBRETTO_SETUP_PROMPT}
+          fathomEvent={fathomEvent}
+        />
+      </div>
+    </div>
+  );
+}
+
+function isApiKeyRequiredError(error: string): boolean {
+  return /api key.*required/i.test(error);
+}
+
 function tableErrorMessage(error: string, emptyMessage: string): string {
-  return /api key.*required/i.test(error) ? emptyMessage : error;
+  return isApiKeyRequiredError(error) ? emptyMessage : error;
 }
 
 function LoadingTable() {
@@ -592,10 +628,23 @@ function WorkflowsTable() {
         </tbody>
       </table>
       {rows === null && !error && <LoadingTable />}
-      {rows?.length === 0 && <EmptyTable message="No workflows yet." />}
-      {error && (
-        <EmptyTable message={tableErrorMessage(error, "No workflows yet.")} />
+      {rows?.length === 0 && (
+        <CliSetupEmptyTable
+          title="No workflows yet."
+          action="create your first workflow"
+          fathomEvent="Empty workflows copy Libretto setup prompt click"
+        />
       )}
+      {error &&
+        (isApiKeyRequiredError(error) ? (
+          <CliSetupEmptyTable
+            title="No workflows yet."
+            action="create your first workflow"
+            fathomEvent="Empty workflows copy Libretto setup prompt click"
+          />
+        ) : (
+          <EmptyTable message={error} />
+        ))}
     </TableShell>
   );
 }
@@ -711,10 +760,23 @@ function SchedulesTable() {
         </tbody>
       </table>
       {rows === null && !error && <LoadingTable />}
-      {rows?.length === 0 && <EmptyTable message="No schedules yet." />}
-      {error && (
-        <EmptyTable message={tableErrorMessage(error, "No schedules yet.")} />
+      {rows?.length === 0 && (
+        <CliSetupEmptyTable
+          title="No schedules yet."
+          action="create and schedule a workflow"
+          fathomEvent="Empty schedules copy Libretto setup prompt click"
+        />
       )}
+      {error &&
+        (isApiKeyRequiredError(error) ? (
+          <CliSetupEmptyTable
+            title="No schedules yet."
+            action="create and schedule a workflow"
+            fathomEvent="Empty schedules copy Libretto setup prompt click"
+          />
+        ) : (
+          <EmptyTable message={error} />
+        ))}
     </TableShell>
   );
 }
@@ -787,12 +849,23 @@ function WorkflowRunsTable() {
         </tbody>
       </table>
       {rows === null && !error && <LoadingTable />}
-      {rows?.length === 0 && <EmptyTable message="No workflow runs yet." />}
-      {error && (
-        <EmptyTable
-          message={tableErrorMessage(error, "No workflow runs yet.")}
+      {rows?.length === 0 && (
+        <CliSetupEmptyTable
+          title="No workflow runs yet."
+          action="create and run a workflow"
+          fathomEvent="Empty workflow runs copy Libretto setup prompt click"
         />
       )}
+      {error &&
+        (isApiKeyRequiredError(error) ? (
+          <CliSetupEmptyTable
+            title="No workflow runs yet."
+            action="create and run a workflow"
+            fathomEvent="Empty workflow runs copy Libretto setup prompt click"
+          />
+        ) : (
+          <EmptyTable message={error} />
+        ))}
     </TableShell>
   );
 }
