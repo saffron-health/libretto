@@ -428,7 +428,7 @@ function DashboardShell({
   const meta = sectionMeta[section];
   return (
     <div className="min-h-screen bg-bg text-ink">
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[252px] flex-col border-r border-rule bg-panel/95 md:flex">
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[280px] flex-col border-r border-rule bg-panel/95 md:flex">
         <div className="flex h-16 items-center border-b border-rule px-5">
           <a href="/" className="text-ink no-underline">
             <LibrettoLogoAndName />
@@ -440,7 +440,7 @@ function DashboardShell({
               key={item.id}
               href={`/dashboard/${item.id}`}
               aria-current={section === item.id ? "page" : undefined}
-              className="flex h-10 items-center gap-3 rounded-md border border-transparent px-3 text-sm text-muted no-underline transition-colors hover:bg-panel-hi hover:text-ink aria-[current=page]:border-accent/35 aria-[current=page]:bg-green-3/35 aria-[current=page]:text-accent-bright"
+              className="flex h-10 items-center gap-3 whitespace-nowrap rounded-md border border-transparent px-3 text-sm text-muted no-underline transition-colors hover:bg-panel-hi hover:text-ink aria-[current=page]:border-accent/35 aria-[current=page]:bg-green-3/35 aria-[current=page]:text-accent-bright"
             >
               {item.icon}
               {item.label}
@@ -456,7 +456,7 @@ function DashboardShell({
               key={item.id}
               href={`/dashboard/${item.id}`}
               aria-current={section === item.id ? "page" : undefined}
-              className="flex h-10 items-center gap-3 rounded-md border border-transparent px-3 text-sm text-muted no-underline transition-colors hover:bg-panel-hi hover:text-ink aria-[current=page]:border-accent/35 aria-[current=page]:bg-green-3/35 aria-[current=page]:text-accent-bright"
+              className="flex h-10 items-center gap-3 whitespace-nowrap rounded-md border border-transparent px-3 text-sm text-muted no-underline transition-colors hover:bg-panel-hi hover:text-ink aria-[current=page]:border-accent/35 aria-[current=page]:bg-green-3/35 aria-[current=page]:text-accent-bright"
             >
               {item.icon}
               {item.label}
@@ -468,7 +468,7 @@ function DashboardShell({
         </div>
       </aside>
 
-      <div className="md:pl-[252px]">
+      <div className="md:pl-[280px]">
         <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-rule bg-bg/90 px-4 backdrop-blur md:justify-end md:px-7">
           <a href="/" className="text-ink no-underline md:hidden">
             <LibrettoLogoAndName />
