@@ -250,12 +250,12 @@ async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
 }
 ```
 
-- [ ] Query every page of Browser Use profile search results for the requested name and require an exact-name match.
-- [ ] Create the named profile when no exact match exists.
-- [ ] Return an actionable error if more than one exact match exists.
-- [ ] Pass the resolved `profileId` when creating the browser and mark the provider as supporting profiles.
-- [ ] Keep the existing stop request as the persistence trigger.
-- [ ] Add one mocked HTTP test for an exact profile match and run package type-check.
+- [x] Query every page of Browser Use profile search results for the requested name and require an exact-name match.
+- [x] Create the named profile when no exact match exists.
+- [x] Return an actionable error if more than one exact match exists.
+- [x] Pass the resolved `profileId` when creating the browser and mark the provider as supporting profiles.
+- [x] Keep the existing stop request as the persistence trigger.
+- [x] Add one credential-gated live API test for profile creation and reuse, then run package type-check.
 
 ### Phase 8: Cover Browser Use profile resolution edges
 
