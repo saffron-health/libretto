@@ -648,7 +648,7 @@ export function SetupPage() {
                 <StepFooter
                   next={
                     <a
-                      href="/dashboard/cloud-browsers"
+                      href="/dashboard/browser_sessions"
                       className={ACTION_BUTTON_CLASS}
                     >
                       Open Cloud browsers →
