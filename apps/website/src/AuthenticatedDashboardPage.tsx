@@ -1333,8 +1333,6 @@ function SecretsTable({
 interface ApiKeyRow {
   id: string;
   name: string | null;
-  start: string | null;
-  prefix: string | null;
   enabled: boolean;
   last_request: string | null;
   expires_at: string | null;
@@ -1405,7 +1403,7 @@ function ApiKeysTable({
 
   async function remove(row: ApiKeyRow) {
     if (
-      !window.confirm(`Delete API key “${row.name || row.start || row.id}”?`)
+      !window.confirm(`Delete API key “${row.name || row.id}”?`)
     ) {
       return;
     }
@@ -1513,7 +1511,6 @@ function ApiKeysTable({
           <thead>
             <tr>
               <th className={thClass}>Name</th>
-              <th className={thClass}>Key</th>
               <th className={thClass}>Status</th>
               <th className={thClass}>Created by</th>
               <th className={thClass}>Last used</th>
@@ -1526,9 +1523,6 @@ function ApiKeysTable({
               <tr key={row.id} className="hover:bg-panel-hi/35">
                 <td className={`${tdClass} font-medium text-ink`}>
                   {row.name || "Unnamed key"}
-                </td>
-                <td className={`${tdClass} font-mono text-xs`}>
-                  {row.start || row.prefix || "••••••••"}…
                 </td>
                 <td className={tdClass}>
                   <StatusBadge status={row.enabled ? "active" : "disabled"} />
