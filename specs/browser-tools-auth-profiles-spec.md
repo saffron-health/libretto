@@ -314,16 +314,16 @@ Complete the remaining cloud-provider gap with a production API round trip. Gate
 
 Document the common named-profile workflow. Verify the local round trip automatically and run opt-in live tests for supported cloud providers when credentials are available.
 
-- [ ] Add a concise `browser_open({ authProfile: "..." })` example to `packages/browser-tools/README.md`.
-- [ ] Document that omitting `authProfile` uses the named `default` profile on supported providers.
-- [ ] Add a provider table that marks Local, Libretto Cloud, Kernel, and Browser Use as supported and Browserbase and Steel as unsupported.
-- [ ] Explain that Browserbase and Steel need a durable Libretto name-to-provider-ID mapping before they can support this contract.
-- [ ] State that profiles contain sensitive account access, should not be committed, and persist only after `browser_close` or graceful `dispose()`.
-- [ ] State that callers must not open concurrent writable sessions against one profile.
-- [ ] Run `pnpm --filter libretto-browser-tools test`.
-- [ ] Run `pnpm --filter libretto-browser-tools type-check`.
-- [ ] Run `pnpm -s lint`.
-- [ ] With available provider credentials, open a profile, set benign account state, close, reopen, and confirm restoration; skip unavailable providers rather than weakening automated request-contract tests.
+- [x] Add a concise `browser_open({ authProfile: "..." })` example to `packages/browser-tools/README.md`.
+- [x] Document that omitting `authProfile` uses the named `default` profile on supported providers.
+- [x] Add a provider table that marks Local, Libretto Cloud, Kernel, and Browser Use as supported and Browserbase and Steel as unsupported.
+- [x] Explain that Browserbase and Steel need a durable Libretto name-to-provider-ID mapping before they can support this contract.
+- [x] State that profiles contain sensitive account access, should not be committed, and persist only after `browser_close` or graceful `dispose()`.
+- [x] State that callers must not open concurrent writable sessions against one profile.
+- [x] Run `pnpm --filter libretto-browser-tools test`.
+- [x] Run `pnpm --filter libretto-browser-tools type-check`.
+- [x] Run `pnpm -s lint`.
+- [x] With available provider credentials, open a profile, set benign account state, close, reopen, and confirm restoration; skip unavailable providers rather than weakening automated request-contract tests.
 
 ### Phase 13: Migrate domain policy restrictions to Errore
 
