@@ -14,8 +14,12 @@ import { DEBUGGER_PROMPT } from "./prAgentSetup";
 
 const CLOUD_SETUP_PROMPT =
   "Fetch and follow https://libretto.sh/cloud.md to set up Libretto Cloud hosted browsers for this project.";
+const LIBRETTO_SETUP_PROMPT =
+  "Fetch and follow https://libretto.sh/start.md to set up Libretto and create a new browser automation.";
 const CLOUD_SETUP_DISMISSED_KEY =
   "libretto.dashboard.browserSessionsSetupDismissed";
+const WORKFLOW_SETUP_DISMISSED_KEY =
+  "libretto.dashboard.workflowSetupDismissed";
 const PR_AGENT_SETUP_DISMISSED_KEY =
   "libretto.dashboard.prAgentSetupDismissed";
 
@@ -1873,6 +1877,16 @@ export function AuthenticatedDashboardPage({
     ) : undefined;
   return (
     <DashboardShell section={section} session={session} action={action}>
+      {section === "workflows" && (
+        <SetupPromptBanner
+          eyebrow="Workflow setup"
+          title="Create a browser workflow"
+          description="Copy this prompt into your coding agent to set up Libretto and create a new browser automation."
+          prompt={LIBRETTO_SETUP_PROMPT}
+          storageKey={WORKFLOW_SETUP_DISMISSED_KEY}
+          fathomEvent="Workflows copy Libretto setup prompt click"
+        />
+      )}
       {section === "browser_sessions" && (
         <SetupPromptBanner
           eyebrow="Libretto Cloud setup"
