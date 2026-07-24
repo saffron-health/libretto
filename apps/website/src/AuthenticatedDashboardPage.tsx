@@ -1053,6 +1053,58 @@ interface SecretMutationResponse {
   message: string;
 }
 
+function SecretValueField({
+  value,
+  onChange,
+  visible,
+  onToggleVisibility,
+  placeholder,
+  autoFocus,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  visible: boolean;
+  onToggleVisibility: () => void;
+  placeholder: string;
+  autoFocus?: boolean;
+}) {
+  return (
+    <div className="relative">
+      <input
+        type={visible ? "text" : "password"}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        required
+        autoFocus={autoFocus}
+        className="h-10 w-full rounded-md border border-rule bg-bg px-3 pr-11 text-sm outline-none focus:border-accent"
+      />
+      <button
+        type="button"
+        onClick={onToggleVisibility}
+        aria-label={visible ? "Hide secret value" : "Show secret value"}
+        aria-pressed={visible}
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted hover:text-ink"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          className="size-[18px]"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+        >
+          <path d="M2.5 10s2.7-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.7 4.5-7.5 4.5S2.5 10 2.5 10Z" />
+          <circle cx="10" cy="10" r="2" />
+          {visible && <path d="m3 3 14 14" />}
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function SecretsTable({
   showCreate,
   onCloseCreate,
@@ -1069,6 +1121,8 @@ function SecretsTable({
   } | null>(null);
   const [editName, setEditName] = useState("");
   const [editValue, setEditValue] = useState("");
+  const [showValue, setShowValue] = useState(false);
+  const [showEditValue, setShowEditValue] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1098,6 +1152,7 @@ function SecretsTable({
       });
       setName("");
       setValue("");
+      setShowValue(false);
       setNotice("Secret created.");
       onCloseCreate();
       await refresh();
@@ -1112,6 +1167,7 @@ function SecretsTable({
     setEditing({ row, mode });
     setEditName(row.name);
     setEditValue("");
+    setShowEditValue(false);
     setError(null);
     setNotice(null);
   }
@@ -1131,6 +1187,7 @@ function SecretsTable({
       });
       setEditing(null);
       setEditValue("");
+      setShowEditValue(false);
       setNotice("Secret updated.");
       await refresh();
     } catch (err) {
@@ -1188,13 +1245,12 @@ function SecretsTable({
             <span className="mb-2 block text-xs uppercase text-muted">
               Secret value
             </span>
-            <input
-              type="password"
+            <SecretValueField
               value={value}
-              onChange={(event) => setValue(event.target.value)}
+              onChange={setValue}
+              visible={showValue}
+              onToggleVisibility={() => setShowValue((current) => !current)}
               placeholder="Stored encrypted and never shown again"
-              required
-              className={inputClass}
             />
           </label>
           <div className="flex gap-2">
@@ -1206,7 +1262,10 @@ function SecretsTable({
             </button>
             <button
               type="button"
-              onClick={onCloseCreate}
+              onClick={() => {
+                setShowValue(false);
+                onCloseCreate();
+              }}
               className="h-10 px-3 text-sm text-muted"
             >
               Cancel
@@ -1224,23 +1283,27 @@ function SecretsTable({
             <span className="mb-2 block text-xs uppercase text-muted">
               {editing.mode === "rename" ? "Secret name" : "New secret value"}
             </span>
-            <input
-              type={editing.mode === "rename" ? "text" : "password"}
-              value={editing.mode === "rename" ? editName : editValue}
-              onChange={(event) =>
-                editing.mode === "rename"
-                  ? setEditName(event.target.value)
-                  : setEditValue(event.target.value)
-              }
-              placeholder={
-                editing.mode === "replace"
-                  ? "The current value will be replaced"
-                  : undefined
-              }
-              required
-              autoFocus
-              className={inputClass}
-            />
+            {editing.mode === "rename" ? (
+              <input
+                type="text"
+                value={editName}
+                onChange={(event) => setEditName(event.target.value)}
+                required
+                autoFocus
+                className={inputClass}
+              />
+            ) : (
+              <SecretValueField
+                value={editValue}
+                onChange={setEditValue}
+                visible={showEditValue}
+                onToggleVisibility={() =>
+                  setShowEditValue((current) => !current)
+                }
+                placeholder="The current value will be replaced"
+                autoFocus
+              />
+            )}
           </label>
           <div className="flex gap-2">
             <button
@@ -1255,7 +1318,10 @@ function SecretsTable({
             </button>
             <button
               type="button"
-              onClick={() => setEditing(null)}
+              onClick={() => {
+                setShowEditValue(false);
+                setEditing(null);
+              }}
               className="h-10 px-3 text-sm text-muted"
             >
               Cancel
