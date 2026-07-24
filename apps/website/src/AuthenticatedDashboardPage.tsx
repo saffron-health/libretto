@@ -98,7 +98,7 @@ const navItems: NavItem[] = [
   },
   {
     id: "connected_repos",
-    label: "Connected repos",
+    label: "Self-Healing Playwright",
     icon: (
       <NavIcon>
         <circle cx="6" cy="5" r="1.5" />
@@ -189,7 +189,7 @@ const sectionMeta: Record<
     description: "Browsers opened for local tasks, workflow builds, and runs.",
   },
   connected_repos: {
-    title: "Connected repos",
+    title: "Self-Healing Playwright",
     description: "GitHub repositories where Libretto can open scoped fixes.",
   },
   users: {
