@@ -1,11 +1,17 @@
 import { randomBytes } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
+import type { Browser } from "playwright";
 import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
 	ProviderSessionCreateOptions,
+} from "../provider.js";
+import {
+	closeProviderBrowser,
+	connectProviderPage,
+	setProviderSessionCdpEndpoint,
 } from "../provider.js";
 
 export type KernelBrowserProviderOptions = {
@@ -160,6 +166,7 @@ export class KernelBrowserProvider implements BrowserProvider {
 	private readonly proxyId: string | undefined;
 	private readonly timeoutSeconds: number;
 	private readonly enableRecording: boolean;
+	private readonly browsers = new Map<string, Browser>();
 	private readonly replayUrlBySession = new Map<string, string>();
 
 	constructor(options: KernelBrowserProviderOptions = {}) {
@@ -241,12 +248,6 @@ export class KernelBrowserProvider implements BrowserProvider {
 					`/browsers/${browser.session_id}/replays`,
 					{ method: "POST", body: JSON.stringify({}) },
 				);
-				if (replay.replay_view_url) {
-					this.replayUrlBySession.set(
-						browser.session_id,
-						replay.replay_view_url,
-					);
-				}
 			} catch (error) {
 				await kernelFetchNoBody(
 					this.endpoint,
@@ -258,26 +259,46 @@ export class KernelBrowserProvider implements BrowserProvider {
 			}
 		}
 
-		return {
-			sessionId: browser.session_id,
-			cdpEndpoint: browser.cdp_ws_url,
-			liveViewUrl: browser.browser_live_view_url ?? undefined,
-			recordingUrl: replay?.replay_view_url ?? undefined,
-			startUrlPreloaded: Boolean(startUrl),
-		};
+		try {
+			const connected = await connectProviderPage(browser.cdp_ws_url);
+			const providerSession: ProviderSession = {
+				sessionId: browser.session_id,
+				page: connected.page,
+				liveViewUrl: browser.browser_live_view_url ?? undefined,
+				recordingUrl: replay?.replay_view_url ?? undefined,
+				startUrlPreloaded: Boolean(startUrl),
+			};
+			this.browsers.set(browser.session_id, connected.browser);
+			if (replay?.replay_view_url) {
+				this.replayUrlBySession.set(
+					browser.session_id,
+					replay.replay_view_url,
+				);
+			}
+			setProviderSessionCdpEndpoint(providerSession, browser.cdp_ws_url);
+			return providerSession;
+		} catch (error) {
+			await this.releaseSession(browser.session_id).catch(() => {});
+			throw error;
+		}
 	}
 
 	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+		const browser = this.browsers.get(sessionId);
+		if (!browser) return {};
 		const replayUrl = this.replayUrlBySession.get(sessionId);
+		this.browsers.delete(sessionId);
+		this.replayUrlBySession.delete(sessionId);
+		await closeProviderBrowser(browser, () => this.releaseSession(sessionId));
+		return { replayUrl };
+	}
 
+	private async releaseSession(sessionId: string): Promise<void> {
 		await kernelFetchNoBody(
 			this.endpoint,
 			this.apiKey,
 			`/browsers/${sessionId}`,
 			{ method: "DELETE" },
 		);
-		this.replayUrlBySession.delete(sessionId);
-
-		return { replayUrl };
 	}
 }

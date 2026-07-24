@@ -1,8 +1,14 @@
+import type { Browser } from "playwright";
 import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
 	ProviderSessionCreateOptions,
+} from "../provider.js";
+import {
+	closeProviderBrowser,
+	connectProviderPage,
+	setProviderSessionCdpEndpoint,
 } from "../provider.js";
 
 export type BrowserbaseBrowserProviderOptions = {
@@ -37,6 +43,7 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 	private readonly proxies: boolean | undefined;
 	private readonly solveCaptchas: boolean | undefined;
 	private readonly timeoutSeconds: number | undefined;
+	private readonly browsers = new Map<string, Browser>();
 
 	constructor(options: BrowserbaseBrowserProviderOptions = {}) {
 		const apiKey = (
@@ -103,14 +110,31 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 			throw new Error(`Browserbase API error (${response.status}): ${body}`);
 		}
 		const session = (await response.json()) as BrowserbaseSessionResponse;
-		return {
-			sessionId: session.id,
-			cdpEndpoint: session.connectUrl,
-			startUrlPreloaded: false,
-		};
+		try {
+			const { browser, page } = await connectProviderPage(session.connectUrl);
+			const providerSession: ProviderSession = {
+				sessionId: session.id,
+				page,
+				startUrlPreloaded: false,
+			};
+			this.browsers.set(session.id, browser);
+			setProviderSessionCdpEndpoint(providerSession, session.connectUrl);
+			return providerSession;
+		} catch (error) {
+			await this.releaseSession(session.id).catch(() => {});
+			throw error;
+		}
 	}
 
 	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+		const browser = this.browsers.get(sessionId);
+		if (!browser) return {};
+		this.browsers.delete(sessionId);
+		await closeProviderBrowser(browser, () => this.releaseSession(sessionId));
+		return {};
+	}
+
+	private async releaseSession(sessionId: string): Promise<void> {
 		const response = await fetch(
 			`${this.endpoint}/v1/sessions/${sessionId}`,
 			{
@@ -128,6 +152,5 @@ export class BrowserbaseBrowserProvider implements BrowserProvider {
 				`Browserbase API error closing session ${sessionId} (${response.status}): ${body}`,
 			);
 		}
-		return {};
 	}
 }

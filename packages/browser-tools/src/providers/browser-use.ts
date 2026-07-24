@@ -1,8 +1,14 @@
+import type { Browser } from "playwright";
 import type {
 	BrowserProvider,
 	ProviderSession,
 	ProviderSessionClosed,
 	ProviderSessionCreateOptions,
+} from "../provider.js";
+import {
+	closeProviderBrowser,
+	connectProviderPage,
+	setProviderSessionCdpEndpoint,
 } from "../provider.js";
 
 const DEFAULT_BROWSER_USE_ENDPOINT = "https://api.browser-use.com/api/v3";
@@ -33,6 +39,7 @@ export class BrowserUseBrowserProvider implements BrowserProvider {
 	private readonly endpoint: string;
 	private readonly proxyCountryCode: string | null | undefined;
 	private readonly timeoutMinutes: number | undefined;
+	private readonly browsers = new Map<string, Browser>();
 
 	constructor(options: BrowserUseBrowserProviderOptions = {}) {
 		const apiKey = (
@@ -80,19 +87,38 @@ export class BrowserUseBrowserProvider implements BrowserProvider {
 
 		const session = (await response.json()) as BrowserUseSessionResponse;
 		if (!session.cdpUrl) {
+			await this.releaseSession(session.id).catch(() => {});
 			throw new Error(
 				`Browser Use session ${session.id} did not return a CDP URL. Stop the session in the Browser Use dashboard, then create a fresh session.`,
 			);
 		}
-		return {
-			sessionId: session.id,
-			cdpEndpoint: normalizeCdpEndpoint(session.cdpUrl),
-			...(session.liveUrl ? { liveViewUrl: session.liveUrl } : {}),
-			startUrlPreloaded: false,
-		};
+		try {
+			const cdpEndpoint = normalizeCdpEndpoint(session.cdpUrl);
+			const { browser, page } = await connectProviderPage(cdpEndpoint);
+			const providerSession: ProviderSession = {
+				sessionId: session.id,
+				page,
+				...(session.liveUrl ? { liveViewUrl: session.liveUrl } : {}),
+				startUrlPreloaded: false,
+			};
+			this.browsers.set(session.id, browser);
+			setProviderSessionCdpEndpoint(providerSession, cdpEndpoint);
+			return providerSession;
+		} catch (error) {
+			await this.releaseSession(session.id).catch(() => {});
+			throw error;
+		}
 	}
 
 	async closeSession(sessionId: string): Promise<ProviderSessionClosed> {
+		const browser = this.browsers.get(sessionId);
+		if (!browser) return {};
+		this.browsers.delete(sessionId);
+		await closeProviderBrowser(browser, () => this.releaseSession(sessionId));
+		return {};
+	}
+
+	private async releaseSession(sessionId: string): Promise<void> {
 		const response = await fetch(`${this.endpoint}/browsers/${sessionId}`, {
 			method: "PATCH",
 			headers: {
@@ -107,6 +133,5 @@ export class BrowserUseBrowserProvider implements BrowserProvider {
 				`Browser Use API error closing session ${sessionId} (${response.status}): ${body}. Stop the session in the Browser Use dashboard.`,
 			);
 		}
-		return {};
 	}
 }

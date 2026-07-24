@@ -1,4 +1,4 @@
-import { createPiBrowserTools } from "libretto-browser-tools/pi";
+import { createPiBrowserTools } from "../../src/adapters/pi/index.js";
 import { SessionRunError, type SessionRun } from "../agent.js";
 import {
 	createBenchmarkBrowserProvider,
