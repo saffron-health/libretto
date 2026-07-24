@@ -21,7 +21,6 @@ describe("redirectAfterVerifiedEmail", () => {
 
     const redirectPromise = redirectAfterVerifiedEmail({
       hasTenant: true,
-      setupComplete: false,
       returnTo: null,
       hasCliLoginParams: true,
       approveCliLogin,
@@ -38,14 +37,13 @@ describe("redirectAfterVerifiedEmail", () => {
 
     approve(true);
 
-    await expect(redirectPromise).resolves.toBe("/setup");
+    await expect(redirectPromise).resolves.toBe("/dashboard");
   });
 
   it("does not redirect when CLI login approval fails", async () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: true,
-        setupComplete: false,
         returnTo: "/invite?accept=1",
         hasCliLoginParams: true,
         approveCliLogin: async () => false,
@@ -57,7 +55,6 @@ describe("redirectAfterVerifiedEmail", () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: true,
-        setupComplete: false,
         returnTo: "/dashboard",
         hasCliLoginParams: true,
         approveCliLogin: async () => {
@@ -71,7 +68,6 @@ describe("redirectAfterVerifiedEmail", () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: false,
-        setupComplete: false,
         returnTo: null,
         hasCliLoginParams: false,
         approveCliLogin: async () => {
@@ -81,23 +77,10 @@ describe("redirectAfterVerifiedEmail", () => {
     ).resolves.toBe("/onboarding");
   });
 
-  it("sends an existing tenant to setup after email verification", async () => {
+  it("sends an existing tenant to the dashboard after email verification", async () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: true,
-        setupComplete: false,
-        returnTo: null,
-        hasCliLoginParams: false,
-        approveCliLogin: async () => true,
-      }),
-    ).resolves.toBe("/setup");
-  });
-
-  it("sends a fully configured tenant to the dashboard", async () => {
-    await expect(
-      redirectAfterVerifiedEmail({
-        hasTenant: true,
-        setupComplete: true,
         returnTo: null,
         hasCliLoginParams: false,
         approveCliLogin: async () => true,
@@ -105,23 +88,10 @@ describe("redirectAfterVerifiedEmail", () => {
     ).resolves.toBe("/dashboard");
   });
 
-  it("does not let an incomplete tenant return directly to the dashboard", async () => {
+  it("preserves dashboard return targets for an existing tenant", async () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: true,
-        setupComplete: false,
-        returnTo: "/dashboard/cloud-browsers",
-        hasCliLoginParams: false,
-        approveCliLogin: async () => true,
-      }),
-    ).resolves.toBe("/setup");
-  });
-
-  it("preserves dashboard return targets after setup is complete", async () => {
-    await expect(
-      redirectAfterVerifiedEmail({
-        hasTenant: true,
-        setupComplete: true,
         returnTo: "/dashboard/cloud-browsers",
         hasCliLoginParams: false,
         approveCliLogin: async () => true,
@@ -129,11 +99,10 @@ describe("redirectAfterVerifiedEmail", () => {
     ).resolves.toBe("/dashboard/cloud-browsers");
   });
 
-  it("drops dashboard return targets before tenant setup exists", async () => {
+  it("drops dashboard return targets before a tenant exists", async () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: false,
-        setupComplete: false,
         returnTo: "/dashboard",
         hasCliLoginParams: false,
         approveCliLogin: async () => true,
@@ -141,11 +110,10 @@ describe("redirectAfterVerifiedEmail", () => {
     ).resolves.toBe("/onboarding");
   });
 
-  it("preserves GitHub setup return targets through tenant setup", async () => {
+  it("preserves GitHub return targets through organization creation", async () => {
     await expect(
       redirectAfterVerifiedEmail({
         hasTenant: false,
-        setupComplete: false,
         returnTo: "/github/setup?installation_id=123&setup_action=install",
         hasCliLoginParams: false,
         approveCliLogin: async () => true,

@@ -2,7 +2,6 @@ import { postAuthRedirect } from "./authRedirect";
 
 export async function redirectAfterVerifiedEmail(input: {
   hasTenant: boolean;
-  setupComplete: boolean;
   returnTo: string | null;
   hasCliLoginParams: boolean;
   approveCliLogin: () => Promise<boolean>;
@@ -15,7 +14,6 @@ export async function redirectAfterVerifiedEmail(input: {
   return postAuthRedirect({
     emailVerified: true,
     hasTenant: input.hasTenant,
-    setupComplete: input.setupComplete,
     returnTo: input.returnTo,
   });
 }

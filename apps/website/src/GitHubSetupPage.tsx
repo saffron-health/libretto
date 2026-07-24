@@ -82,9 +82,7 @@ export function GitHubSetupPage() {
               "/v1/github/syncInstallation",
               { installation_id: installationId },
             );
-            // Return to the setup wizard at the connected-repositories step so
-            // the remaining steps (generate API key, add debugger) continue.
-            window.location.assign("/setup?step=github-repositories");
+            window.location.assign("/dashboard/connected_repos");
           } catch (err) {
             setError(
               err instanceof Error
@@ -107,10 +105,10 @@ export function GitHubSetupPage() {
       <main className="mx-auto w-full max-w-[980px] px-4 py-8 md:px-8">
         <div className="mb-7 border-b border-rule pb-6">
           <p className="mb-2 font-mono text-xs uppercase text-accent">
-            Libretto setup
+            Self-Healing Playwright
           </p>
           <h1 className="font-serif text-[34px] font-[300] leading-tight md:text-[46px]">
-            Finish setup
+            Connect GitHub
           </h1>
         </div>
 
@@ -124,7 +122,7 @@ export function GitHubSetupPage() {
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                 <div className="min-w-0">
                   <p className="mb-2 font-mono text-xs uppercase text-accent">
-                    Step 2 of 4
+                    GitHub connection
                   </p>
                   <h2 className="flex items-center gap-3 text-lg font-semibold text-ink">
                     <GitHubIcon className="size-5 shrink-0 text-accent-bright" />
@@ -145,10 +143,10 @@ export function GitHubSetupPage() {
                     </button>
                   ) : (
                     <a
-                      href="/setup"
+                      href="/dashboard/connected_repos"
                       className="libretto-button libretto-button--sm inline-flex h-9 min-w-[148px] items-center justify-center whitespace-nowrap px-4"
                     >
-                      Return to setup
+                      Open Self-Healing Playwright
                     </a>
                   )}
                 </div>
@@ -156,8 +154,8 @@ export function GitHubSetupPage() {
 
               {!installationId && (
                 <p className="mt-4 rounded-md border border-amber/30 bg-amber/10 px-3 py-2 text-sm leading-5 text-amber-bright">
-                  No GitHub installation callback was found. Start from setup to
-                  connect GitHub.
+                  No GitHub installation callback was found. Return to
+                  Self-Healing Playwright to connect GitHub.
                 </p>
               )}
               {error && (

@@ -3,8 +3,6 @@ import { getSafeReturnTo } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
 import {
   getAuthStatus,
-  getSetupStatus,
-  isPrAgentSetupComplete,
   orpcCall,
 } from "./cloudApi";
 import { redirectAfterVerifiedEmail } from "./verifyEmailFlow";
@@ -49,14 +47,8 @@ export function VerifyEmailPage() {
         const status = await getAuthStatus();
         if (cancelled) return;
         if (status.emailVerified) {
-          const setupComplete = status.hasTenant
-            ? await getSetupStatus()
-                .then(isPrAgentSetupComplete)
-                .catch(() => false)
-            : false;
           const redirectTo = await redirectAfterVerifiedEmail({
             hasTenant: status.hasTenant,
-            setupComplete,
             returnTo: getSafeReturnTo(),
             hasCliLoginParams: Boolean(getCliLoginParams()),
             approveCliLogin: approveCliLoginIfPresent,
