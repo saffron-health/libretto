@@ -10,18 +10,10 @@ import {
 } from "./cloudApi";
 import { InstallSnippet } from "./components/InstallSnippet";
 import { GitHubIcon } from "./icons";
-import { DEBUGGER_PROMPT } from "./prAgentSetup";
+import { DEBUGGER_PROMPT, GITHUB_APP_INSTALL_URL } from "./prAgentSetup";
 
 const CLOUD_SETUP_PROMPT =
   "Fetch and follow https://libretto.sh/cloud.md to set up Libretto Cloud hosted browsers for this project.";
-const LIBRETTO_SETUP_PROMPT =
-  "Fetch and follow https://libretto.sh/start.md to set up Libretto and create a new browser automation.";
-const CLOUD_SETUP_DISMISSED_KEY =
-  "libretto.dashboard.browserSessionsSetupDismissed";
-const WORKFLOW_SETUP_DISMISSED_KEY =
-  "libretto.dashboard.workflowSetupDismissed";
-const PR_AGENT_SETUP_DISMISSED_KEY =
-  "libretto.dashboard.prAgentSetupDismissed";
 
 export const dashboardSections = [
   "workflows",
@@ -269,7 +261,7 @@ function EmptyTable({ message }: { message: string }) {
   );
 }
 
-function CliSetupEmptyTable({
+function CloudSetupEmptyTable({
   title,
   action,
   fathomEvent,
@@ -288,13 +280,46 @@ function CliSetupEmptyTable({
         >
           Create an API key
         </a>
-        , then copy this prompt into your coding agent to set up the Libretto CLI
+        , then copy this prompt into your coding agent to set up Libretto Cloud
         and {action}.
       </p>
       <div className="mt-5 flex justify-center">
         <InstallSnippet
-          prompt={LIBRETTO_SETUP_PROMPT}
+          prompt={CLOUD_SETUP_PROMPT}
           fathomEvent={fathomEvent}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PrAgentSetupEmptyTable() {
+  return (
+    <div className="border-t border-rule px-5 py-12 text-center">
+      <h3 className="text-sm font-medium text-ink">
+        No repositories connected yet.
+      </h3>
+      <p className="mx-auto mt-2 max-w-[660px] text-sm leading-6 text-muted">
+        <a
+          href="/dashboard/api_keys"
+          className="text-accent-bright underline decoration-accent/50 underline-offset-4 hover:text-ink"
+        >
+          Create an API key
+        </a>{" "}
+        and{" "}
+        <a
+          href={GITHUB_APP_INSTALL_URL}
+          className="text-accent-bright underline decoration-accent/50 underline-offset-4 hover:text-ink"
+        >
+          connect your repositories to Libretto
+        </a>
+        . Then copy this prompt into your coding agent to add the PR agent to
+        your Playwright project.
+      </p>
+      <div className="mt-5 flex justify-center">
+        <InstallSnippet
+          prompt={DEBUGGER_PROMPT}
+          fathomEvent="Empty connected repos copy PR agent prompt click"
         />
       </div>
     </div>
@@ -303,10 +328,6 @@ function CliSetupEmptyTable({
 
 function isApiKeyRequiredError(error: string): boolean {
   return /api key.*required/i.test(error);
-}
-
-function tableErrorMessage(error: string, emptyMessage: string): string {
-  return isApiKeyRequiredError(error) ? emptyMessage : error;
 }
 
 function LoadingTable() {
@@ -322,72 +343,6 @@ function TableShell({ children }: { children: ReactNode }) {
     <div className="overflow-hidden rounded-xl border border-rule bg-panel/65 shadow-[0_12px_40px_rgba(0,0,0,0.16)]">
       <div className="overflow-x-auto">{children}</div>
     </div>
-  );
-}
-
-function SetupPromptBanner({
-  eyebrow,
-  title,
-  description,
-  prompt,
-  storageKey,
-  fathomEvent,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-  prompt: string;
-  storageKey: string;
-  fathomEvent: string;
-}) {
-  const [visible, setVisible] = useState(
-    () => window.localStorage.getItem(storageKey) !== "1",
-  );
-
-  if (!visible) return null;
-
-  function dismiss() {
-    window.localStorage.setItem(storageKey, "1");
-    setVisible(false);
-  }
-
-  return (
-    <section className="relative mb-6 rounded-xl border border-accent/25 bg-green-9/10 px-4 py-4 pr-12 md:px-5 md:py-5 md:pr-14">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,auto)] lg:items-center">
-        <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-accent">
-            {eyebrow}
-          </p>
-          <h2 className="mt-1.5 text-base font-semibold text-ink">{title}</h2>
-          <p className="mt-1.5 max-w-[650px] text-sm leading-6 text-muted">
-            {description}
-          </p>
-        </div>
-        <div className="min-w-0 lg:justify-self-end">
-          <InstallSnippet prompt={prompt} fathomEvent={fathomEvent} />
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={dismiss}
-        aria-label={`Dismiss ${eyebrow.toLowerCase()} banner`}
-        className="absolute right-3 top-3 grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-panel-hi hover:text-ink"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          className="size-3.5"
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.8"
-        >
-          <path d="m4 4 8 8" />
-          <path d="m12 4-8 8" />
-        </svg>
-      </button>
-    </section>
   );
 }
 
@@ -629,18 +584,18 @@ function WorkflowsTable() {
       </table>
       {rows === null && !error && <LoadingTable />}
       {rows?.length === 0 && (
-        <CliSetupEmptyTable
+        <CloudSetupEmptyTable
           title="No workflows yet."
-          action="create your first workflow"
-          fathomEvent="Empty workflows copy Libretto setup prompt click"
+          action="create your first cloud workflow"
+          fathomEvent="Empty workflows copy cloud setup prompt click"
         />
       )}
       {error &&
         (isApiKeyRequiredError(error) ? (
-          <CliSetupEmptyTable
+          <CloudSetupEmptyTable
             title="No workflows yet."
-            action="create your first workflow"
-            fathomEvent="Empty workflows copy Libretto setup prompt click"
+            action="create your first cloud workflow"
+            fathomEvent="Empty workflows copy cloud setup prompt click"
           />
         ) : (
           <EmptyTable message={error} />
@@ -761,18 +716,18 @@ function SchedulesTable() {
       </table>
       {rows === null && !error && <LoadingTable />}
       {rows?.length === 0 && (
-        <CliSetupEmptyTable
+        <CloudSetupEmptyTable
           title="No schedules yet."
-          action="create and schedule a workflow"
-          fathomEvent="Empty schedules copy Libretto setup prompt click"
+          action="create and schedule a cloud workflow"
+          fathomEvent="Empty schedules copy cloud setup prompt click"
         />
       )}
       {error &&
         (isApiKeyRequiredError(error) ? (
-          <CliSetupEmptyTable
+          <CloudSetupEmptyTable
             title="No schedules yet."
-            action="create and schedule a workflow"
-            fathomEvent="Empty schedules copy Libretto setup prompt click"
+            action="create and schedule a cloud workflow"
+            fathomEvent="Empty schedules copy cloud setup prompt click"
           />
         ) : (
           <EmptyTable message={error} />
@@ -850,18 +805,18 @@ function WorkflowRunsTable() {
       </table>
       {rows === null && !error && <LoadingTable />}
       {rows?.length === 0 && (
-        <CliSetupEmptyTable
+        <CloudSetupEmptyTable
           title="No workflow runs yet."
-          action="create and run a workflow"
-          fathomEvent="Empty workflow runs copy Libretto setup prompt click"
+          action="create and run a cloud workflow"
+          fathomEvent="Empty workflow runs copy cloud setup prompt click"
         />
       )}
       {error &&
         (isApiKeyRequiredError(error) ? (
-          <CliSetupEmptyTable
+          <CloudSetupEmptyTable
             title="No workflow runs yet."
-            action="create and run a workflow"
-            fathomEvent="Empty workflow runs copy Libretto setup prompt click"
+            action="create and run a cloud workflow"
+            fathomEvent="Empty workflow runs copy cloud setup prompt click"
           />
         ) : (
           <EmptyTable message={error} />
@@ -944,12 +899,23 @@ function BrowserSessionsTable() {
         </tbody>
       </table>
       {rows === null && !error && <LoadingTable />}
-      {rows?.length === 0 && <EmptyTable message="No browser sessions yet." />}
-      {error && (
-        <EmptyTable
-          message={tableErrorMessage(error, "No browser sessions yet.")}
+      {rows?.length === 0 && (
+        <CloudSetupEmptyTable
+          title="No browser sessions yet."
+          action="start a hosted browser session"
+          fathomEvent="Empty browser sessions copy cloud setup prompt click"
         />
       )}
+      {error &&
+        (isApiKeyRequiredError(error) ? (
+          <CloudSetupEmptyTable
+            title="No browser sessions yet."
+            action="start a hosted browser session"
+            fathomEvent="Empty browser sessions copy cloud setup prompt click"
+          />
+        ) : (
+          <EmptyTable message={error} />
+        ))}
     </TableShell>
   );
 }
@@ -1005,14 +971,13 @@ function ConnectedReposTable() {
         </tbody>
       </table>
       {rows === null && !error && <LoadingTable />}
-      {rows?.length === 0 && (
-        <EmptyTable message="No repositories connected yet." />
-      )}
-      {error && (
-        <EmptyTable
-          message={tableErrorMessage(error, "No repositories connected yet.")}
-        />
-      )}
+      {rows?.length === 0 && <PrAgentSetupEmptyTable />}
+      {error &&
+        (isApiKeyRequiredError(error) ? (
+          <PrAgentSetupEmptyTable />
+        ) : (
+          <EmptyTable message={error} />
+        ))}
     </TableShell>
   );
 }
@@ -1936,7 +1901,7 @@ export function AuthenticatedDashboardPage({
   const action =
     section === "connected_repos" ? (
       <a
-        href="https://github.com/apps/libretto-agent/installations/new"
+        href={GITHUB_APP_INSTALL_URL}
         className="libretto-button libretto-button--default inline-flex h-10 items-center no-underline"
       >
         Connect repo
@@ -1970,36 +1935,6 @@ export function AuthenticatedDashboardPage({
     ) : undefined;
   return (
     <DashboardShell section={section} session={session} action={action}>
-      {section === "workflows" && (
-        <SetupPromptBanner
-          eyebrow="Workflow setup"
-          title="Create a browser workflow"
-          description="Copy this prompt into your coding agent to set up Libretto and create a new browser automation."
-          prompt={LIBRETTO_SETUP_PROMPT}
-          storageKey={WORKFLOW_SETUP_DISMISSED_KEY}
-          fathomEvent="Workflows copy Libretto setup prompt click"
-        />
-      )}
-      {section === "browser_sessions" && (
-        <SetupPromptBanner
-          eyebrow="Libretto Cloud setup"
-          title="Run browser sessions in Libretto Cloud"
-          description="Copy this prompt into your coding agent to add hosted browsers to your project and run without keeping your computer open."
-          prompt={CLOUD_SETUP_PROMPT}
-          storageKey={CLOUD_SETUP_DISMISSED_KEY}
-          fathomEvent="Browser sessions copy cloud setup prompt click"
-        />
-      )}
-      {section === "connected_repos" && (
-        <SetupPromptBanner
-          eyebrow="PR agent setup"
-          title="Add the PR agent to your Playwright project"
-          description="Connect your repository, then copy this prompt into your coding agent to install and wire up Libretto's debugging agent."
-          prompt={DEBUGGER_PROMPT}
-          storageKey={PR_AGENT_SETUP_DISMISSED_KEY}
-          fathomEvent="Connected repos copy PR agent setup prompt click"
-        />
-      )}
       {section === "workflows" && <WorkflowsTable />}
       {section === "schedules" && <SchedulesTable />}
       {section === "workflow_runs" && <WorkflowRunsTable />}
