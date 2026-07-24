@@ -13,7 +13,7 @@ export const PRODUCTS: ProductLink[] = [
     name: "Chrome Extension",
     tagline:
       "Tell an agent what you need done in Chrome, then save it as a workflow you can run again or schedule in the cloud.",
-    kicker: "// NO CODE --",
+    kicker: "// BROWSER EXTENSION --",
     status: "live",
     fathomEvent: "Product listing chrome extension click",
   },
