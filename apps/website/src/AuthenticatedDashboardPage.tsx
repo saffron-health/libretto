@@ -1063,7 +1063,10 @@ function SecretsTable({
   const [rows, setRows] = useState<SecretRow[] | null>(null);
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
-  const [editing, setEditing] = useState<SecretRow | null>(null);
+  const [editing, setEditing] = useState<{
+    row: SecretRow;
+    mode: "rename" | "replace";
+  } | null>(null);
   const [editName, setEditName] = useState("");
   const [editValue, setEditValue] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -1105,8 +1108,8 @@ function SecretsTable({
     }
   }
 
-  function startEditing(row: SecretRow) {
-    setEditing(row);
+  function startEditing(row: SecretRow, mode: "rename" | "replace") {
+    setEditing({ row, mode });
     setEditName(row.name);
     setEditValue("");
     setError(null);
@@ -1116,14 +1119,15 @@ function SecretsTable({
   async function update(event: FormEvent) {
     event.preventDefault();
     if (!editing) return;
-    setBusy(editing.credential_id);
+    setBusy(editing.row.credential_id);
     setError(null);
     setNotice(null);
     try {
       await orpcCall("/v1/dashboard/updateSecret", {
-        id: editing.credential_id,
-        name: editName.trim(),
-        ...(editValue ? { value: editValue } : {}),
+        id: editing.row.credential_id,
+        ...(editing.mode === "rename"
+          ? { name: editName.trim() }
+          : { value: editValue }),
       });
       setEditing(null);
       setEditValue("");
@@ -1147,7 +1151,7 @@ function SecretsTable({
         { id: row.credential_id },
       );
       if (!result.success) throw new Error(result.message);
-      if (editing?.credential_id === row.credential_id) setEditing(null);
+      if (editing?.row.credential_id === row.credential_id) setEditing(null);
       setNotice("Secret deleted.");
       await refresh();
     } catch (err) {
@@ -1212,38 +1216,42 @@ function SecretsTable({
       )}
 
       {editing && (
-        <form onSubmit={update} className={formClass}>
+        <form
+          onSubmit={update}
+          className="grid gap-3 rounded-xl border border-accent/25 bg-green-3/20 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
+        >
           <label>
             <span className="mb-2 block text-xs uppercase text-muted">
-              Secret name
+              {editing.mode === "rename" ? "Secret name" : "New secret value"}
             </span>
             <input
-              type="text"
-              value={editName}
-              onChange={(event) => setEditName(event.target.value)}
+              type={editing.mode === "rename" ? "text" : "password"}
+              value={editing.mode === "rename" ? editName : editValue}
+              onChange={(event) =>
+                editing.mode === "rename"
+                  ? setEditName(event.target.value)
+                  : setEditValue(event.target.value)
+              }
+              placeholder={
+                editing.mode === "replace"
+                  ? "The current value will be replaced"
+                  : undefined
+              }
               required
               autoFocus
               className={inputClass}
             />
           </label>
-          <label>
-            <span className="mb-2 block text-xs uppercase text-muted">
-              New value
-            </span>
-            <input
-              type="password"
-              value={editValue}
-              onChange={(event) => setEditValue(event.target.value)}
-              placeholder="Leave blank to keep the current value"
-              className={inputClass}
-            />
-          </label>
           <div className="flex gap-2">
             <button
-              disabled={busy === editing.credential_id}
+              disabled={busy === editing.row.credential_id}
               className="libretto-button libretto-button--default h-10"
             >
-              {busy === editing.credential_id ? "Saving…" : "Update secret"}
+              {busy === editing.row.credential_id
+                ? "Saving…"
+                : editing.mode === "rename"
+                  ? "Rename secret"
+                  : "Replace value"}
             </button>
             <button
               type="button"
@@ -1272,7 +1280,6 @@ function SecretsTable({
           <thead>
             <tr>
               <th className={thClass}>Name</th>
-              <th className={thClass}>Value</th>
               <th className={thClass}>Updated</th>
               <th className={thClass}>Created</th>
               <th className={thClass}>Actions</th>
@@ -1284,17 +1291,23 @@ function SecretsTable({
                 <td className={`${tdClass} font-mono text-xs text-ink`}>
                   {row.name}
                 </td>
-                <td className={`${tdClass} font-mono text-xs`}>••••••••••••</td>
                 <td className={tdClass}>{formatDate(row.updated_at)}</td>
                 <td className={tdClass}>{formatDate(row.created_at)}</td>
                 <td className={tdClass}>
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => startEditing(row)}
+                      onClick={() => startEditing(row, "rename")}
                       className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-ink"
                     >
-                      Update
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startEditing(row, "replace")}
+                      className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-ink"
+                    >
+                      Replace
                     </button>
                     <button
                       type="button"
