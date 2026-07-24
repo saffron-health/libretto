@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SigninRouteImport } from './routes/signin'
-import { Route as SetupRouteImport } from './routes/setup'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as DebugAgentsRouteImport } from './routes/debug-agents'
@@ -40,11 +39,6 @@ const VerifyEmailRoute = VerifyEmailRouteImport.update({
 const SigninRoute = SigninRouteImport.update({
   id: '/signin',
   path: '/signin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SetupRoute = SetupRouteImport.update({
-  id: '/setup',
-  path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -154,7 +148,6 @@ export interface FileRoutesByFullPath {
   '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
-  '/setup': typeof SetupRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -177,7 +170,6 @@ export interface FileRoutesByTo {
   '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
-  '/setup': typeof SetupRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -202,7 +194,6 @@ export interface FileRoutesById {
   '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
   '/onboarding': typeof OnboardingRoute
-  '/setup': typeof SetupRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -228,7 +219,6 @@ export interface FileRouteTypes {
     | '/debug-agents'
     | '/invite'
     | '/onboarding'
-    | '/setup'
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
@@ -251,7 +241,6 @@ export interface FileRouteTypes {
     | '/debug-agents'
     | '/invite'
     | '/onboarding'
-    | '/setup'
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
@@ -275,7 +264,6 @@ export interface FileRouteTypes {
     | '/debug-agents'
     | '/invite'
     | '/onboarding'
-    | '/setup'
     | '/signin'
     | '/verify-email'
     | '/blog/$slug'
@@ -300,7 +288,6 @@ export interface RootRouteChildren {
   DebugAgentsRoute: typeof DebugAgentsRoute
   InviteRoute: typeof InviteRoute
   OnboardingRoute: typeof OnboardingRoute
-  SetupRoute: typeof SetupRoute
   SigninRoute: typeof SigninRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   DashboardSectionRoute: typeof DashboardSectionRoute
@@ -327,13 +314,6 @@ declare module '@tanstack/react-router' {
       path: '/signin'
       fullPath: '/signin'
       preLoaderRoute: typeof SigninRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/setup': {
-      id: '/setup'
-      path: '/setup'
-      fullPath: '/setup'
-      preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding': {
@@ -496,7 +476,6 @@ const rootRouteChildren: RootRouteChildren = {
   DebugAgentsRoute: DebugAgentsRoute,
   InviteRoute: InviteRoute,
   OnboardingRoute: OnboardingRoute,
-  SetupRoute: SetupRoute,
   SigninRoute: SigninRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   DashboardSectionRoute: DashboardSectionRoute,
