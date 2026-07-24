@@ -18,8 +18,7 @@ const openInputSchema = z.object({
 		.union([z.string().min(1), z.literal(false)])
 		.optional()
 		.describe(
-			"Auth profile to restore and save when the session closes. Omit to use " +
-				'"default" when supported, or pass false to start without a profile.',
+			'Profile name. Omit to use "default" when supported; pass false for incognito.',
 		),
 });
 
@@ -39,12 +38,14 @@ export type OpenTool = {
 } & BrowserTool<OpenToolInput, OpenToolOutput>
 
 export function createOpenTool(registry: SessionRegistry): OpenTool {
+	const authProfileDescription = registry.provider?.supportsAuthProfiles
+		? "Named profiles save changes on close; omit `authProfile` to use `default`, or pass false for incognito. "
+		: "Named profiles are unavailable; omit `authProfile` or pass false for incognito. ";
 	return {
 		name: "browser_open",
 		description:
-			"Open a new browser session. Optionally opens `url` at session create " +
-			"(or after connect when the provider cannot preload) and restores `authProfile`. " +
-			"Profile changes save when the session closes. " +
+			"Open a browser session, optionally at `url`. " +
+			authProfileDescription +
 			"Returns a `sessionId` to pass to subsequent browser tools.",
 		inputSchema: openInputSchema,
 		async execute({ url, authProfile }): Promise<ToolResult<OpenToolOutput>> {

@@ -290,14 +290,13 @@ Resolve omitted profile input to `default` at the public tool and registry bound
 
 ### Phase 10: Make browser-open guidance provider-aware
 
-Tell the agent whether the configured provider supports named profiles. Supported providers describe the implicit `default` profile and save-on-close behavior; unsupported providers tell callers to omit `authProfile` or pass `false`.
+Tell the agent whether the configured provider supports named profiles. Supported providers describe the implicit `default` profile and save-on-close behavior; unsupported providers tell callers to omit `authProfile` or pass `false` for incognito.
 
-- [ ] Build the `browser_open` description from the configured provider capability.
-- [ ] For supported providers, state that omitting `authProfile` uses `default` and that changes save on close.
-- [ ] For unsupported providers, state that named auth profiles are unavailable and callers must omit `authProfile` or pass `false`.
-- [ ] Keep the existing actionable runtime error when a caller passes `authProfile` to an unsupported provider.
-- [ ] Add tool-description tests for supported and unsupported providers.
-- [ ] Run the tool specs plus package type-check.
+- [x] Build the `browser_open` description from the configured provider capability.
+- [x] For supported providers, state that omitting `authProfile` uses `default` and that changes save on close.
+- [x] For unsupported providers, state that named auth profiles are unavailable and callers must omit `authProfile` or pass `false` for incognito.
+- [x] Keep the existing actionable runtime error when a caller passes `authProfile` to an unsupported provider.
+- [x] Run the tool specs plus package type-check.
 
 ### Phase 11: Verify Libretto Cloud profile persistence live
 
