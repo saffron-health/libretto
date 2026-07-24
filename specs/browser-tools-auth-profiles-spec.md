@@ -6,18 +6,21 @@
 
 ## Solution overview
 
-Add an optional `authProfile` string to `browser_open` and pass it through the provider contract. Local sessions use a persistent Chromium user data directory. Cloud providers use their native profile or context APIs and save changes when `browser_close` releases the session.
+Add an `authProfile` string to `browser_open` and pass it through the provider contract. `browser_open` uses `default` when callers omit the field and the configured provider supports named profiles. Local sessions use a persistent Chromium user data directory. Supported cloud providers use their native named profiles and save changes when `browser_close` releases the session.
 
-The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use. Browserbase and Steel only expose opaque identifiers, so the string is an existing Browserbase context ID or Steel profile ID for those providers.
+The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use. Browserbase contexts and Steel profiles expose only opaque provider IDs, so they remain unsupported until Libretto has a durable name-to-ID mapping.
 
 ## Goals
 
 - An agent can open a browser with `browser_open({ authProfile: "work" })`.
+- An agent that omits `authProfile` gets the named `default` profile when the provider supports named profiles.
 - A human can sign in through the browser window or cloud live view, close the session, and find the login restored on the next open with the same profile.
 - Local profiles preserve the full Chromium user data directory, including cookies, local storage, IndexedDB, saved credentials, extensions, and browser settings.
-- Every bundled provider that has native profile support uses it: Libretto Cloud, Kernel, Browser Use, Browserbase, and Steel.
-- Providers without auth profile support return an actionable tool error instead of silently starting a fresh session.
-- Invalid, missing, ambiguous, or not-yet-ready profiles return actionable `{ ok: false, error }` tool results.
+- Every bundled provider that has native named profile support uses it: Libretto Cloud, Kernel, and Browser Use, plus the local provider.
+- Providers without auth profile support return an actionable tool error when a caller supplies `authProfile` instead of silently starting a fresh session.
+- `browser_open` tells the agent when the configured provider does not support named profiles.
+- `browser_status` reports the resolved profile name for each provider-owned session.
+- Invalid or ambiguous profile names return actionable `{ ok: false, error }` tool results.
 - Profile changes persist only after an explicit `browser_close` or graceful toolkit disposal.
 - Expected auth-profile failures flow as `AuthProfileError` values through providers and the session registry; host failures still reject.
 - Provider and browser cleanup failures return typed error values, including every cause when more than one cleanup step fails.
@@ -27,6 +30,7 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - No migrations or backfills.
 - No profile list, rename, delete, import, export, or login tools.
 - No common remote profile registry or local alias-to-ID mapping for providers that expose only opaque IDs.
+- No caller-facing ephemeral opt-out from `default` when `browser_open` uses a provider with named profile support.
 - No read-only profile mode; sessions opened with a profile write changes back on close.
 - No guarantee that profile changes survive `SIGKILL`, OOM, provider failure, or other hard crashes.
 - No support for concurrent writable sessions using the same profile.
@@ -42,11 +46,11 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 - `packages/browser-tools/src/providers/libretto-cloud.ts` — maps profile names to Libretto Cloud session creation.
 - `packages/browser-tools/src/providers/kernel.ts` — creates or reuses a named Kernel profile with `save_changes: true`.
 - `packages/browser-tools/src/providers/browser-use.ts` — resolves or creates a named Browser Use profile and passes its ID to the browser session.
-- `packages/browser-tools/src/providers/browserbase.ts` — passes an existing context ID with `persist: true`.
-- `packages/browser-tools/src/providers/steel.ts` — passes an existing profile ID with `persistProfile: true`.
+- `packages/browser-tools/src/providers/browserbase.ts` — remains unsupported because Browserbase contexts have generated IDs but no names.
+- `packages/browser-tools/src/providers/steel.ts` — remains unsupported because Steel profiles have generated IDs but no names.
 - `packages/browser-tools/src/tools/tools.spec.ts` — tests user-level `browser_open` → browser work → `browser_close` flows.
 - `packages/browser-tools/src/session-registry.spec.ts` — tests provider cleanup order and unsupported-provider behavior.
-- `packages/browser-tools/src/providers/*.spec.ts` — tests provider request bodies and profile lookup/create behavior with mocked HTTP responses.
+- `packages/browser-tools/src/providers/*.spec.ts` — tests local behavior and credential-gated live provider flows without stubbing cloud APIs.
 - `packages/browser-tools/package.json` — adds the `errore` runtime dependency.
 - `.agents/skills/errore/SKILL.md` — upstream Errore skill installed at repository scope.
 - `skills-lock.json` — tracks the upstream skill source and content hash.
@@ -73,7 +77,7 @@ Add the package and skill before changing error behavior. Scope the new conventi
 
 ### Phase 1: Add the browser-open auth profile contract
 
-Add the caller-facing input and provider capability contract without changing default sessions. Validate names and references as non-empty strings, pass the value only to providers that opt in, and return a next step when a provider does not support profiles.
+Add the caller-facing input and provider capability contract without changing default sessions. Validate names as non-empty strings, pass the value only to providers that opt in, and return a next step when a provider does not support profiles.
 
 ```ts
 // packages/browser-tools/src/provider.ts
@@ -267,74 +271,52 @@ Lock the cases most likely to select the wrong account or change unprofiled sess
 - [x] Defer later-page coverage rather than creating more than 100 production profiles.
 - [x] Run the Browser Use provider spec.
 
-### Phase 9: Add Browserbase context IDs
+### Phase 9: Make the default profile observable
 
-Pass an existing Browserbase context ID as `authProfile`. Browserbase has no context synchronization status API, so `browser_close` waits a short documented interval after release before reporting success.
+Resolve omitted profile input to `default` at the public tool and registry boundary for providers with named profile support. Keep direct `provider.createSession()` semantics unchanged so hosts can still request an unprofiled low-level session. Store the resolved name with the session so agents can confirm which profile a browser uses.
 
-```ts
-// packages/browser-tools/src/providers/browserbase.ts
-async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
-  return this.createBrowser({
-    ...
-    ...(authProfile
-      ? { browserSettings: { ...this.browserSettings, context: {
-          id: authProfile,
-          persist: true,
-        } } }
-      : {}),
-  });
-}
-```
+- [ ] Resolve an omitted `authProfile` to `default` when `supportsAuthProfiles` is true.
+- [ ] Keep an explicit profile name unchanged and let it override `default`.
+- [ ] Keep direct `provider.createSession()` calls unchanged; the implicit default belongs to `browser_open`.
+- [ ] Keep unsupported providers unprofiled when callers omit `authProfile`; reject an explicit profile as they do now.
+- [ ] Store the resolved profile name on provider-owned registry entries without adding profile behavior to `browser_connect` or caller-owned pages.
+- [ ] Add `authProfile?: string` to no-argument `browser_status` session summaries. Set it to the resolved explicit or `default` name for supported provider-owned sessions; omit it for unsupported-provider sessions, `browser_connect`, and caller-owned pages.
+- [ ] Add status tests for explicit, implicit `default`, unsupported-provider, connected-CDP, and caller-owned-page sessions.
+- [ ] Update the Kernel and Browser Use `browser_open({})` live tests to expect `default`; add direct `provider.createSession()` and `closeSession()` coverage for their unchanged unprofiled request paths.
+- [ ] Add a direct-provider regression test proving omitted `authProfile` remains unprofiled when `createSession()` bypasses `browser_open`.
+- [ ] Run the registry and tool specs plus package type-check.
 
-- [ ] Pass Browserbase `browserSettings.context: { id: authProfile, persist: true }`.
-- [ ] Preserve existing Browserbase browser settings when adding the context.
-- [ ] Mark the provider as supporting auth profiles.
-- [ ] Track which provider sessions use a context and wait three seconds after their release before `browser_close` succeeds.
-- [ ] Add mocked HTTP tests for profile-bearing and unchanged unprofiled session requests.
-- [ ] Ensure a missing or invalid context ID tells the agent to create or copy one from Browserbase.
-- [ ] Use fake timers to test the synchronization wait without slowing the suite.
-- [ ] Run the Browserbase provider spec plus package type-check.
+### Phase 10: Make browser-open guidance provider-aware
 
-### Phase 10: Add Steel profile IDs
+Tell the agent whether the configured provider supports named profiles. Supported providers describe the implicit `default` profile and save-on-close behavior; unsupported providers tell callers not to pass `authProfile`.
 
-Pass an existing Steel profile ID as `authProfile` and request write-back. After release, poll the profile endpoint until it reports `READY`, fail on `FAILED`, and return a retryable error on a bounded timeout.
+- [ ] Build the `browser_open` description from the configured provider capability.
+- [ ] For supported providers, state that omitting `authProfile` uses `default` and that changes save on close.
+- [ ] For unsupported providers, state that named auth profiles are unavailable and `authProfile` must be omitted.
+- [ ] Keep the existing actionable runtime error when a caller passes `authProfile` to an unsupported provider.
+- [ ] Add tool-description tests for supported and unsupported providers.
+- [ ] Run the tool specs plus package type-check.
 
-```ts
-// packages/browser-tools/src/providers/steel.ts
-async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
-  return this.createSteelSession({
-    ...
-    ...(authProfile ? {
-      profileId: authProfile,
-      persistProfile: true,
-    } : {}),
-  });
-}
-```
+### Phase 11: Verify Libretto Cloud profile persistence live
 
-- [ ] Pass `profileId: authProfile` and `persistProfile: true`.
-- [ ] Mark the provider as supporting auth profiles.
-- [ ] Track the profile ID by session so release can poll `GET /v1/profiles/{id}`.
-- [ ] Poll until `READY`, fail with the provider response on `FAILED`, and time out with an exact retry instruction.
-- [ ] Ensure a missing or invalid profile ID tells the agent to create or copy one from Steel.
-- [ ] Add mocked HTTP tests for a profile-bearing session that reaches `READY` and an unchanged unprofiled session.
-- [ ] Run the Steel provider spec plus package type-check.
+Complete the remaining cloud-provider gap with a production API round trip. Gate the test on `LIBRETTO_API_KEY` and clean up every browser session through a fixture even after assertion failures.
 
-### Phase 11: Cover Steel persistence failures
-
-Test bounded polling and every terminal profile state without adding more provider behavior.
-
-- [ ] Add mocked HTTP tests for `FAILED`, timeout, and an invalid profile ID.
-- [ ] Use fake timers so timeout coverage does not slow the suite.
-- [ ] Assert each `AuthProfileError` includes the exact next action.
-- [ ] Run the Steel provider spec.
+- [ ] Add a credential-gated live test that opens a unique named Libretto Cloud profile, writes benign local-storage state, closes it, reopens it, and confirms restoration.
+- [ ] Use the public browser tools rather than calling provider internals for the persistence flow.
+- [ ] Keep the existing unprofiled Libretto Cloud smoke test.
+- [ ] Use a random `browser-tools-test-` profile name so the test cannot alter a user profile.
+- [ ] In fixture teardown, dispose every open toolkit session, then delete that exact profile through `/v1/browserProfiles/delete` even when disposal fails; aggregate and report both cleanup failures.
+- [ ] Close the first session explicitly before reopening so the test proves that `browser_close` triggers persistence.
+- [ ] Run the Libretto Cloud provider spec plus package type-check.
 
 ### Phase 12: Document and verify the complete user flow
 
-Document the common workflow and the provider-specific meaning of `authProfile`. Verify the local round trip automatically and run opt-in live tests for cloud providers when credentials are available.
+Document the common named-profile workflow. Verify the local round trip automatically and run opt-in live tests for supported cloud providers when credentials are available.
 
 - [ ] Add a concise `browser_open({ authProfile: "..." })` example to `packages/browser-tools/README.md`.
-- [ ] Add a provider table distinguishing profile names from Browserbase context IDs and Steel profile IDs.
+- [ ] Document that omitting `authProfile` uses the named `default` profile on supported providers.
+- [ ] Add a provider table that marks Local, Libretto Cloud, Kernel, and Browser Use as supported and Browserbase and Steel as unsupported.
+- [ ] Explain that Browserbase and Steel need a durable Libretto name-to-provider-ID mapping before they can support this contract.
 - [ ] State that profiles contain sensitive account access, should not be committed, and persist only after `browser_close` or graceful `dispose()`.
 - [ ] State that callers must not open concurrent writable sessions against one profile.
 - [ ] Run `pnpm --filter libretto-browser-tools test`.
@@ -366,11 +348,12 @@ export class DomainPolicyRestricted extends errore.createTaggedError({
 
 ## Sanity checklist
 
-- [ ] `browser_open` without `authProfile` behaves exactly as it does before this work.
+- [ ] `browser_open` without `authProfile` uses `default` on supported providers and remains unprofiled on unsupported providers.
+- [ ] `browser_status` reports the resolved profile name for provider-owned sessions.
 - [ ] The same local profile restores cookie and local-storage state after a full close and reopen.
 - [ ] Different local profile names remain isolated.
-- [ ] Every cloud provider sends its documented persistence fields and runs its required release or stop endpoint.
-- [ ] `browser_close` does not report success before Browserbase's wait or Steel's readiness check completes.
+- [ ] Every supported cloud provider sends its documented persistence fields and runs its required release or stop endpoint.
+- [ ] Browserbase and Steel reject explicit named profiles with an actionable error.
 - [ ] Caller-fixable profile failures return actionable tool results; host and provider failures still throw.
 - [ ] Direct provider consumers narrow expected `AuthProfileError` values with `instanceof Error`; unexpected host failures still reject.
 - [ ] `dispose()` attempts to close every session even when one profile save fails.
