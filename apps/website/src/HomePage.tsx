@@ -71,7 +71,7 @@ function Hero({
               lineHeight: 1.05,
             }}
           >
-            Browser automation tooling for coding agents
+            Automate the work that happens in your browser
           </AnimatedTitle>
         </Text>
         <Text
@@ -81,8 +81,8 @@ function Hero({
           htmlStyle={{ opacity: 0 }}
           className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:pretty]"
         >
-          Open-source CLI, debug agents, and browser tools for building and
-          maintaining reliable web integrations
+          Libretto makes tools for humans and agents to automate any browser
+          task: Chrome extensions, CLIs, SDKs, cloud browsers, and more.
         </Text>
         <div
           data-animate={AnimationTarget.Content}
