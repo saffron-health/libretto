@@ -17,6 +17,7 @@ export const dashboardSections = [
   "browser_sessions",
   "connected_repos",
   "users",
+  "secrets",
   "api_keys",
   "billing",
 ] as const;
@@ -110,6 +111,16 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    id: "secrets",
+    label: "Secrets",
+    icon: (
+      <NavIcon>
+        <rect x="4" y="8" width="12" height="9" rx="2" />
+        <path d="M7 8V6a3 3 0 0 1 6 0v2M10 12v2" />
+      </NavIcon>
+    ),
+  },
+  {
     id: "api_keys",
     label: "API keys",
     icon: (
@@ -134,6 +145,7 @@ const navItems: NavItem[] = [
 const accountSectionOrder: DashboardSection[] = [
   "users",
   "billing",
+  "secrets",
   "api_keys",
 ];
 const primaryNavItems = navItems.filter(
@@ -174,6 +186,11 @@ const sectionMeta: Record<
   users: {
     title: "Users",
     description: "People with access to your Libretto workspace.",
+  },
+  secrets: {
+    title: "Secrets",
+    description:
+      "Encrypted values available to workflows without exposing them in code.",
   },
   api_keys: {
     title: "API keys",
@@ -1024,6 +1041,282 @@ function UsersTable({
   );
 }
 
+interface SecretRow {
+  credential_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SecretMutationResponse {
+  success: boolean;
+  message: string;
+}
+
+function SecretsTable({
+  showCreate,
+  onCloseCreate,
+}: {
+  showCreate: boolean;
+  onCloseCreate: () => void;
+}) {
+  const [rows, setRows] = useState<SecretRow[] | null>(null);
+  const [name, setName] = useState("");
+  const [value, setValue] = useState("");
+  const [editing, setEditing] = useState<SecretRow | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editValue, setEditValue] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function refresh() {
+    const result = await orpcCall<{ secrets: SecretRow[] }>(
+      "/v1/dashboard/secrets",
+    );
+    setRows(result.secrets);
+  }
+
+  useEffect(() => {
+    refresh().catch((err) =>
+      setError(err instanceof Error ? err.message : "Could not load secrets."),
+    );
+  }, []);
+
+  async function create(event: FormEvent) {
+    event.preventDefault();
+    setBusy("create");
+    setError(null);
+    setNotice(null);
+    try {
+      await orpcCall("/v1/dashboard/createSecret", {
+        name: name.trim(),
+        value,
+      });
+      setName("");
+      setValue("");
+      setNotice("Secret created.");
+      onCloseCreate();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create secret.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function startEditing(row: SecretRow) {
+    setEditing(row);
+    setEditName(row.name);
+    setEditValue("");
+    setError(null);
+    setNotice(null);
+  }
+
+  async function update(event: FormEvent) {
+    event.preventDefault();
+    if (!editing) return;
+    setBusy(editing.credential_id);
+    setError(null);
+    setNotice(null);
+    try {
+      await orpcCall("/v1/dashboard/updateSecret", {
+        id: editing.credential_id,
+        name: editName.trim(),
+        ...(editValue ? { value: editValue } : {}),
+      });
+      setEditing(null);
+      setEditValue("");
+      setNotice("Secret updated.");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update secret.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove(row: SecretRow) {
+    if (!window.confirm(`Delete secret “${row.name}”?`)) return;
+    setBusy(row.credential_id);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await orpcCall<SecretMutationResponse>(
+        "/v1/dashboard/deleteSecret",
+        { id: row.credential_id },
+      );
+      if (!result.success) throw new Error(result.message);
+      if (editing?.credential_id === row.credential_id) setEditing(null);
+      setNotice("Secret deleted.");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete secret.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const formClass =
+    "grid gap-3 rounded-xl border border-accent/25 bg-green-3/20 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] md:items-end";
+  const inputClass =
+    "h-10 w-full rounded-md border border-rule bg-bg px-3 text-sm outline-none focus:border-accent";
+
+  return (
+    <div className="space-y-4">
+      {showCreate && (
+        <form onSubmit={create} className={formClass}>
+          <label>
+            <span className="mb-2 block text-xs uppercase text-muted">
+              Secret name
+            </span>
+            <input
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="STRIPE_API_KEY"
+              required
+              autoFocus
+              className={inputClass}
+            />
+          </label>
+          <label>
+            <span className="mb-2 block text-xs uppercase text-muted">
+              Secret value
+            </span>
+            <input
+              type="password"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              placeholder="Stored encrypted and never shown again"
+              required
+              className={inputClass}
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              disabled={busy === "create"}
+              className="libretto-button libretto-button--default h-10"
+            >
+              {busy === "create" ? "Saving…" : "Save secret"}
+            </button>
+            <button
+              type="button"
+              onClick={onCloseCreate}
+              className="h-10 px-3 text-sm text-muted"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {editing && (
+        <form onSubmit={update} className={formClass}>
+          <label>
+            <span className="mb-2 block text-xs uppercase text-muted">
+              Secret name
+            </span>
+            <input
+              type="text"
+              value={editName}
+              onChange={(event) => setEditName(event.target.value)}
+              required
+              autoFocus
+              className={inputClass}
+            />
+          </label>
+          <label>
+            <span className="mb-2 block text-xs uppercase text-muted">
+              New value
+            </span>
+            <input
+              type="password"
+              value={editValue}
+              onChange={(event) => setEditValue(event.target.value)}
+              placeholder="Leave blank to keep the current value"
+              className={inputClass}
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              disabled={busy === editing.credential_id}
+              className="libretto-button libretto-button--default h-10"
+            >
+              {busy === editing.credential_id ? "Saving…" : "Update secret"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="h-10 px-3 text-sm text-muted"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {error && (
+        <p className="rounded-md border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="rounded-md border border-accent/25 bg-green-3/20 px-4 py-3 text-sm text-accent-bright">
+          {notice}
+        </p>
+      )}
+
+      <TableShell>
+        <table className="w-full min-w-[720px] border-collapse">
+          <thead>
+            <tr>
+              <th className={thClass}>Name</th>
+              <th className={thClass}>Value</th>
+              <th className={thClass}>Updated</th>
+              <th className={thClass}>Created</th>
+              <th className={thClass}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows?.map((row) => (
+              <tr key={row.credential_id} className="hover:bg-panel-hi/35">
+                <td className={`${tdClass} font-mono text-xs text-ink`}>
+                  {row.name}
+                </td>
+                <td className={`${tdClass} font-mono text-xs`}>••••••••••••</td>
+                <td className={tdClass}>{formatDate(row.updated_at)}</td>
+                <td className={tdClass}>{formatDate(row.created_at)}</td>
+                <td className={tdClass}>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startEditing(row)}
+                      className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-ink"
+                    >
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy === row.credential_id}
+                      onClick={() => void remove(row)}
+                      className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                    >
+                      {busy === row.credential_id ? "Deleting…" : "Delete"}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows === null && !error && <LoadingTable />}
+        {rows?.length === 0 && <EmptyTable message="No secrets yet." />}
+      </TableShell>
+    </div>
+  );
+}
+
 interface ApiKeyRow {
   id: string;
   name: string | null;
@@ -1371,6 +1664,7 @@ export function AuthenticatedDashboardPage({
   const [session, setSession] = useState<CloudSession | null>(null);
   const [checking, setChecking] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
+  const [showCreateSecret, setShowCreateSecret] = useState(false);
   const [showCreateKey, setShowCreateKey] = useState(false);
   useEffect(() => {
     getCloudSession()
@@ -1413,6 +1707,14 @@ export function AuthenticatedDashboardPage({
       >
         Add user
       </button>
+    ) : section === "secrets" ? (
+      <button
+        type="button"
+        onClick={() => setShowCreateSecret(true)}
+        className="libretto-button libretto-button--default h-10"
+      >
+        Add secret
+      </button>
     ) : section === "api_keys" ? (
       <button
         type="button"
@@ -1436,6 +1738,12 @@ export function AuthenticatedDashboardPage({
           session={session}
           showInvite={showInvite}
           onCloseInvite={() => setShowInvite(false)}
+        />
+      )}
+      {section === "secrets" && (
+        <SecretsTable
+          showCreate={showCreateSecret}
+          onCloseCreate={() => setShowCreateSecret(false)}
         />
       )}
       {section === "api_keys" && (
