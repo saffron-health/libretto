@@ -305,15 +305,8 @@ function PrAgentSetupEmptyTable() {
           className="text-accent-bright underline decoration-accent/50 underline-offset-4 hover:text-ink"
         >
           Create an API key
-        </a>{" "}
-        and{" "}
-        <a
-          href={GITHUB_APP_INSTALL_URL}
-          className="text-accent-bright underline decoration-accent/50 underline-offset-4 hover:text-ink"
-        >
-          connect your repositories to Libretto
         </a>
-        . Then copy this prompt into your coding agent to add the PR agent to
+        , then copy this prompt into your coding agent to add the PR agent to
         your Playwright project.
       </p>
       <div className="mt-5 flex justify-center">
@@ -322,6 +315,16 @@ function PrAgentSetupEmptyTable() {
           fathomEvent="Empty connected repos copy PR agent prompt click"
         />
       </div>
+      <p className="mx-auto mt-4 max-w-[660px] text-sm leading-6 text-muted">
+        Once the PR agent is set up, finish by{" "}
+        <a
+          href={GITHUB_APP_INSTALL_URL}
+          className="text-accent-bright underline decoration-accent/50 underline-offset-4 hover:text-ink"
+        >
+          connecting your repositories to Libretto
+        </a>
+        .
+      </p>
     </div>
   );
 }
