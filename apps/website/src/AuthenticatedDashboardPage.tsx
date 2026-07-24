@@ -269,6 +269,10 @@ function EmptyTable({ message }: { message: string }) {
   );
 }
 
+function tableErrorMessage(error: string, emptyMessage: string): string {
+  return /api key.*required/i.test(error) ? emptyMessage : error;
+}
+
 function LoadingTable() {
   return (
     <div className="border-t border-rule px-5 py-16 text-center text-sm text-muted">
@@ -589,7 +593,9 @@ function WorkflowsTable() {
       </table>
       {rows === null && !error && <LoadingTable />}
       {rows?.length === 0 && <EmptyTable message="No workflows yet." />}
-      {error && <EmptyTable message={error} />}
+      {error && (
+        <EmptyTable message={tableErrorMessage(error, "No workflows yet.")} />
+      )}
     </TableShell>
   );
 }
@@ -706,7 +712,9 @@ function SchedulesTable() {
       </table>
       {rows === null && !error && <LoadingTable />}
       {rows?.length === 0 && <EmptyTable message="No schedules yet." />}
-      {error && <EmptyTable message={error} />}
+      {error && (
+        <EmptyTable message={tableErrorMessage(error, "No schedules yet.")} />
+      )}
     </TableShell>
   );
 }
@@ -780,7 +788,11 @@ function WorkflowRunsTable() {
       </table>
       {rows === null && !error && <LoadingTable />}
       {rows?.length === 0 && <EmptyTable message="No workflow runs yet." />}
-      {error && <EmptyTable message={error} />}
+      {error && (
+        <EmptyTable
+          message={tableErrorMessage(error, "No workflow runs yet.")}
+        />
+      )}
     </TableShell>
   );
 }
@@ -860,7 +872,11 @@ function BrowserSessionsTable() {
       </table>
       {rows === null && !error && <LoadingTable />}
       {rows?.length === 0 && <EmptyTable message="No browser sessions yet." />}
-      {error && <EmptyTable message={error} />}
+      {error && (
+        <EmptyTable
+          message={tableErrorMessage(error, "No browser sessions yet.")}
+        />
+      )}
     </TableShell>
   );
 }
@@ -919,7 +935,11 @@ function ConnectedReposTable() {
       {rows?.length === 0 && (
         <EmptyTable message="No repositories connected yet." />
       )}
-      {error && <EmptyTable message={error} />}
+      {error && (
+        <EmptyTable
+          message={tableErrorMessage(error, "No repositories connected yet.")}
+        />
+      )}
     </TableShell>
   );
 }
