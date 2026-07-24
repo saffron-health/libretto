@@ -342,9 +342,12 @@ function CloudAccountLink({ session }: { session: CloudSession | null }) {
   return (
     <a
       href="/dashboard"
-      className="inline-flex h-10 items-center rounded-lg border border-rule bg-panel px-4 text-sm text-ink no-underline outline-none transition-colors hover:border-accent/45 hover:bg-panel-hi focus-visible:ring-2 focus-visible:ring-accent/40"
+      className="inline-flex h-10 items-center gap-2 rounded-lg border border-rule bg-panel px-3 text-sm text-ink no-underline outline-none transition-colors hover:border-accent/45 hover:bg-panel-hi focus-visible:ring-2 focus-visible:ring-accent/40"
       data-fathom-event="Nav dashboard click"
     >
+      <span className="grid size-6 shrink-0 place-items-center rounded-full border border-accent/35 bg-green-9/15 font-mono text-xs text-accent-bright">
+        {session.user.email.slice(0, 1).toUpperCase()}
+      </span>
       Dashboard
     </a>
   );
