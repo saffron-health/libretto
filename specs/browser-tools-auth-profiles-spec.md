@@ -302,13 +302,13 @@ Tell the agent whether the configured provider supports named profiles. Supporte
 
 Complete the remaining cloud-provider gap with a production API round trip. Gate the test on `LIBRETTO_API_KEY` and clean up every browser session through a fixture even after assertion failures.
 
-- [ ] Add a credential-gated live test that opens a unique named Libretto Cloud profile, writes benign local-storage state, closes it, reopens it, and confirms restoration.
-- [ ] Use the public browser tools rather than calling provider internals for the persistence flow.
-- [ ] Keep the existing unprofiled Libretto Cloud smoke test.
-- [ ] Use a random `browser-tools-test-` profile name so the test cannot alter a user profile.
-- [ ] In fixture teardown, dispose every open toolkit session, then delete that exact profile through `/v1/browserProfiles/delete` even when disposal fails; aggregate and report both cleanup failures.
-- [ ] Close the first session explicitly before reopening so the test proves that `browser_close` triggers persistence.
-- [ ] Run the Libretto Cloud provider spec plus package type-check.
+- [x] Add a credential-gated live test that opens a unique named Libretto Cloud profile, writes benign local-storage state, closes it, reopens it, and confirms restoration.
+- [x] Use the public browser tools rather than calling provider internals for the persistence flow.
+- [x] Keep the existing unprofiled Libretto Cloud smoke test.
+- [x] Use a random `browser-tools-test-` profile name so the test cannot alter a user profile.
+- [x] In fixture teardown, dispose every open toolkit session, then delete that exact profile through `/v1/browserProfiles/delete` even when disposal fails; aggregate and report both cleanup failures.
+- [x] Close the first session explicitly before reopening so the test proves that `browser_close` triggers persistence.
+- [x] Run the Libretto Cloud provider spec plus package type-check.
 
 ### Phase 12: Document and verify the complete user flow
 
