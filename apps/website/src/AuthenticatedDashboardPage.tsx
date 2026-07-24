@@ -8,7 +8,16 @@ import {
   orpcCall,
   type CloudSession,
 } from "./cloudApi";
+import { InstallSnippet } from "./components/InstallSnippet";
 import { GitHubIcon } from "./icons";
+import { DEBUGGER_PROMPT } from "./prAgentSetup";
+
+const CLOUD_SETUP_PROMPT =
+  "Fetch and follow https://libretto.sh/cloud.md to set up Libretto Cloud hosted browsers for this project.";
+const CLOUD_SETUP_DISMISSED_KEY =
+  "libretto.dashboard.browserSessionsSetupDismissed";
+const PR_AGENT_SETUP_DISMISSED_KEY =
+  "libretto.dashboard.prAgentSetupDismissed";
 
 export const dashboardSections = [
   "workflows",
@@ -269,6 +278,72 @@ function TableShell({ children }: { children: ReactNode }) {
     <div className="overflow-hidden rounded-xl border border-rule bg-panel/65 shadow-[0_12px_40px_rgba(0,0,0,0.16)]">
       <div className="overflow-x-auto">{children}</div>
     </div>
+  );
+}
+
+function SetupPromptBanner({
+  eyebrow,
+  title,
+  description,
+  prompt,
+  storageKey,
+  fathomEvent,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  prompt: string;
+  storageKey: string;
+  fathomEvent: string;
+}) {
+  const [visible, setVisible] = useState(
+    () => window.localStorage.getItem(storageKey) !== "1",
+  );
+
+  if (!visible) return null;
+
+  function dismiss() {
+    window.localStorage.setItem(storageKey, "1");
+    setVisible(false);
+  }
+
+  return (
+    <section className="relative mb-6 rounded-xl border border-accent/25 bg-green-9/10 px-4 py-4 pr-12 md:px-5 md:py-5 md:pr-14">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,auto)] lg:items-center">
+        <div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-accent">
+            {eyebrow}
+          </p>
+          <h2 className="mt-1.5 text-base font-semibold text-ink">{title}</h2>
+          <p className="mt-1.5 max-w-[650px] text-sm leading-6 text-muted">
+            {description}
+          </p>
+        </div>
+        <div className="min-w-0 lg:justify-self-end">
+          <InstallSnippet prompt={prompt} fathomEvent={fathomEvent} />
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label={`Dismiss ${eyebrow.toLowerCase()} banner`}
+        className="absolute right-3 top-3 grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-panel-hi hover:text-ink"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          className="size-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        >
+          <path d="m4 4 8 8" />
+          <path d="m12 4-8 8" />
+        </svg>
+      </button>
+    </section>
   );
 }
 
@@ -1798,6 +1873,26 @@ export function AuthenticatedDashboardPage({
     ) : undefined;
   return (
     <DashboardShell section={section} session={session} action={action}>
+      {section === "browser_sessions" && (
+        <SetupPromptBanner
+          eyebrow="Libretto Cloud setup"
+          title="Run browser sessions in Libretto Cloud"
+          description="Copy this prompt into your coding agent to add hosted browsers to your project and run without keeping your computer open."
+          prompt={CLOUD_SETUP_PROMPT}
+          storageKey={CLOUD_SETUP_DISMISSED_KEY}
+          fathomEvent="Browser sessions copy cloud setup prompt click"
+        />
+      )}
+      {section === "connected_repos" && (
+        <SetupPromptBanner
+          eyebrow="PR agent setup"
+          title="Add the PR agent to your Playwright project"
+          description="Connect your repository, then copy this prompt into your coding agent to install and wire up Libretto's debugging agent."
+          prompt={DEBUGGER_PROMPT}
+          storageKey={PR_AGENT_SETUP_DISMISSED_KEY}
+          fathomEvent="Connected repos copy PR agent setup prompt click"
+        />
+      )}
       {section === "workflows" && <WorkflowsTable />}
       {section === "schedules" && <SchedulesTable />}
       {section === "workflow_runs" && <WorkflowRunsTable />}
