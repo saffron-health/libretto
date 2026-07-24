@@ -27,7 +27,10 @@ async function callTool(
 }
 
 async function openSession(tools: ToolSet, url: string): Promise<string> {
-	const result = await callTool(tools, "browser_open", { url });
+	const result = await callTool(tools, "browser_open", {
+		url,
+		authProfile: false,
+	});
 	expect(result).toMatchObject({ ok: true });
 	return result.sessionId as string;
 }
@@ -183,6 +186,7 @@ test("browser_open with a data: URL returns a session ID", async ({
 }) => {
 	const result = await callTool(toolkit.tools, "browser_open", {
 		url: "data:text/html,<title>hello</title>",
+		authProfile: false,
 	});
 	expect(result).toMatchObject({ ok: true, sessionId: expect.any(String) });
 });

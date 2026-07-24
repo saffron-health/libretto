@@ -68,7 +68,7 @@ function validateAuthProfile(
 		return new AuthProfileError({
 			message: `Browser provider "${provider.name}" does not support auth profiles.`,
 			recovery:
-				"Call browser_open without authProfile, or ask the toolkit developer to configure a provider that supports auth profiles.",
+				"Call browser_open without authProfile or with authProfile: false, or ask the toolkit developer to configure a provider that supports auth profiles.",
 		});
 	}
 	return null;
@@ -77,6 +77,7 @@ function validateAuthProfile(
 type SessionEntry = {
 	providerSessionId: string | undefined;
 	providerName: string;
+	authProfile: string | undefined;
 	sessionSource: "existing-page" | "existing-cdp" | "new-session";
 	browser: Browser;
 	context: BrowserContext;
@@ -97,7 +98,15 @@ export type SessionPageSummary = {
 export type SessionSummary = {
 	sessionId: string;
 	provider: string;
+	authProfile?: string;
 	pages: SessionPageSummary[];
+}
+
+export type SessionOpenOptions = Omit<
+	ProviderSessionCreateOptions,
+	"authProfile"
+> & {
+	authProfile?: string | false;
 }
 
 export type PageStatus = {
@@ -128,7 +137,7 @@ export class SessionRegistry {
 	) {}
 
 	async openSession(
-		options: ProviderSessionCreateOptions = {},
+		options: SessionOpenOptions = {},
 	): Promise<
 		AuthProfileError | { sessionId: string; startUrlPreloaded: boolean }
 	> {
@@ -150,10 +159,16 @@ export class SessionRegistry {
 		) {
 			throw new DomainPolicyRestricted(this.domainPolicy, startUrl);
 		}
-		const authProfileError = validateAuthProfile(provider, options.authProfile);
+		const authProfile =
+			options.authProfile === false
+				? undefined
+				: (options.authProfile ??
+					(provider.supportsAuthProfiles ? "default" : undefined));
+		const authProfileError = validateAuthProfile(provider, authProfile);
 		if (authProfileError) return authProfileError;
 		const providerSession = await provider.createSession({
 			...options,
+			authProfile,
 			startUrl,
 		});
 		if (providerSession instanceof AuthProfileError) return providerSession;
@@ -166,6 +181,7 @@ export class SessionRegistry {
 			const entry = this.createSessionEntry({
 				providerSessionId: providerSession.sessionId,
 				providerName: provider.name,
+				authProfile,
 				sessionSource: "new-session",
 				browser,
 				context,
@@ -234,6 +250,7 @@ export class SessionRegistry {
 			const entry = this.createSessionEntry({
 				providerSessionId: undefined,
 				providerName: "attached",
+				authProfile: undefined,
 				sessionSource: "existing-cdp",
 				browser,
 				context,
@@ -278,6 +295,7 @@ export class SessionRegistry {
 		const entry = this.createSessionEntry({
 			providerSessionId: undefined,
 			providerName: "borrowed-page",
+			authProfile: undefined,
 			sessionSource: "existing-page",
 			browser,
 			context,
@@ -323,6 +341,7 @@ export class SessionRegistry {
 		return [...this.sessions].map(([sessionId, entry]) => ({
 			sessionId,
 			provider: entry.providerName,
+			...(entry.authProfile ? { authProfile: entry.authProfile } : {}),
 			pages: this.listPagesForEntry(entry),
 		}));
 	}
@@ -507,6 +526,7 @@ export class SessionRegistry {
 	private createSessionEntry(args: {
 		providerSessionId: string | undefined;
 		providerName: string;
+		authProfile: string | undefined;
 		sessionSource: SessionEntry["sessionSource"];
 		browser: Browser;
 		context: BrowserContext;
@@ -514,6 +534,7 @@ export class SessionRegistry {
 		const entry: SessionEntry = {
 			providerSessionId: args.providerSessionId,
 			providerName: args.providerName,
+			authProfile: args.authProfile,
 			sessionSource: args.sessionSource,
 			browser: args.browser,
 			context: args.context,

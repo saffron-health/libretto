@@ -85,7 +85,7 @@ export class BrowserUseBrowserProvider implements BrowserProvider {
 						new AuthProfileError({
 							message: `Could not resolve Browser Use auth profile "${options.authProfile}": ${errorMessage(cause)}.`,
 							recovery:
-								"Check the Browser Use API key, billing and profile limits, and service status, then retry browser_open. To continue without saved state, omit authProfile.",
+								"Check the Browser Use API key, billing and profile limits, and service status, then retry browser_open. To continue without saved state, pass authProfile: false.",
 						}),
 				)
 			: undefined;

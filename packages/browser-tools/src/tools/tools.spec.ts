@@ -1,4 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Browser } from "playwright";
 import { chromium } from "playwright";
 import { expect, test as base } from "vitest";
@@ -47,6 +50,7 @@ async function fetchWebSocketDebuggerUrl(port: number): Promise<string> {
 }
 
 const test = base.extend<{
+	authProfileDirectory: string;
 	registry: SessionRegistry;
 	openTool: ReturnType<typeof createOpenTool>;
 	execTool: ReturnType<typeof createExecTool>;
@@ -56,9 +60,14 @@ const test = base.extend<{
 	connectTool: ReturnType<typeof createConnectTool>;
 	externalBrowser: { browser: Browser; cdpUrl: string };
 }>({
-	registry: async ({}, use) => {
+	authProfileDirectory: async ({}, use) => {
+		const directory = await mkdtemp(join(tmpdir(), "browser-tools-profiles-"));
+		await use(directory);
+		await rm(directory, { recursive: true, force: true });
+	},
+	registry: async ({ authProfileDirectory }, use) => {
 		const registry = new SessionRegistry(
-			new LocalBrowserProvider({ headless: true }),
+			new LocalBrowserProvider({ headless: true, authProfileDirectory }),
 		);
 		await use(registry);
 		const disposed = await registry.dispose();
@@ -357,6 +366,7 @@ test("browser_status lists sessions and pages at three zoom levels", async ({
 			{
 				sessionId: opened.sessionId,
 				provider: "local",
+				authProfile: "default",
 				pages: [{ pageId: expect.any(String), url: expect.any(String), active: true }],
 			},
 		],
@@ -381,6 +391,19 @@ test("browser_status lists sessions and pages at three zoom levels", async ({
 		active: true,
 		readyState: expect.any(String),
 	});
+});
+
+test("browser_open accepts authProfile false for an unprofiled session", async ({
+	openTool,
+	statusTool,
+}) => {
+	const opened = await openTool.execute({ authProfile: false });
+	if (!opened.ok) throw new Error(opened.error);
+
+	const status = await statusTool.execute({});
+
+	if (!status.ok || !("sessions" in status)) throw new Error("expected sessions");
+	expect(status.sessions[0]).not.toHaveProperty("authProfile");
 });
 
 test("browser_close removes a session from browser_status", async ({
@@ -427,6 +450,8 @@ test("browser_connect attaches to an external browser and close detaches without
 			},
 		],
 	});
+	if (!status.ok || !("sessions" in status)) throw new Error("expected sessions");
+	expect(status.sessions[0]).not.toHaveProperty("authProfile");
 
 	const execResult = await execTool.execute({
 		sessionId: connected.sessionId,
@@ -440,6 +465,33 @@ test("browser_connect attaches to an external browser and close detaches without
 
 	const all = await statusTool.execute({});
 	expect(all).toMatchObject({ ok: true, sessions: [] });
+});
+
+test("browser_status omits authProfile for a caller-owned page", async ({
+	externalBrowser,
+}) => {
+	const context =
+		externalBrowser.browser.contexts()[0] ??
+		(await externalBrowser.browser.newContext());
+	const page = context.pages()[0] ?? (await context.newPage());
+	const registry = new SessionRegistry(undefined);
+	const attached = registry.attachPage(page);
+
+	const status = await createStatusTool(registry).execute({});
+
+	expect(status).toMatchObject({
+		ok: true,
+		sessions: [
+			{
+				sessionId: attached.sessionId,
+				provider: "borrowed-page",
+			},
+		],
+	});
+	if (!status.ok || !("sessions" in status)) throw new Error("expected sessions");
+	expect(status.sessions[0]).not.toHaveProperty("authProfile");
+	const disposed = await registry.dispose();
+	if (disposed instanceof Error) throw disposed;
 });
 
 test("domain policy applies to browser_connect sessions and browser_exec navigations", async ({

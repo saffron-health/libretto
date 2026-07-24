@@ -87,7 +87,10 @@ test("MCP clients can open a browser and run Playwright against it", async ({
 	const opened = CallToolResultSchema.parse(
 		await mcp.client.callTool({
 			name: "browser_open",
-			arguments: { url: "data:text/html,<title>hello from mcp</title>" },
+			arguments: {
+				url: "data:text/html,<title>hello from mcp</title>",
+				authProfile: false,
+			},
 		}),
 	);
 	const openedText = opened.content.find((content) => content.type === "text");
@@ -124,7 +127,10 @@ test("MCP snapshots return screenshots as image content", async ({ mcp }) => {
 	const opened = CallToolResultSchema.parse(
 		await mcp.client.callTool({
 			name: "browser_open",
-			arguments: { url: "data:text/html,<main>hello</main>" },
+			arguments: {
+				url: "data:text/html,<main>hello</main>",
+				authProfile: false,
+			},
 		}),
 	);
 	const openedText = opened.content.find((content) => content.type === "text");

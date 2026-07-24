@@ -6,7 +6,7 @@
 
 ## Solution overview
 
-Add an `authProfile` string to `browser_open` and pass it through the provider contract. `browser_open` uses `default` when callers omit the field and the configured provider supports named profiles. Local sessions use a persistent Chromium user data directory. Supported cloud providers use their native named profiles and save changes when `browser_close` releases the session.
+Add an `authProfile` string or `false` to `browser_open` and pass named profiles through the provider contract. `browser_open` uses `default` when callers omit the field and the configured provider supports named profiles; `false` starts an unprofiled session. Local sessions use a persistent Chromium user data directory. Supported cloud providers use their native named profiles and save changes when `browser_close` releases the session.
 
 The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use. Browserbase contexts and Steel profiles expose only opaque provider IDs, so they remain unsupported until Libretto has a durable name-to-ID mapping.
 
@@ -14,6 +14,7 @@ The string is a profile name for Local, Libretto Cloud, Kernel, and Browser Use.
 
 - An agent can open a browser with `browser_open({ authProfile: "work" })`.
 - An agent that omits `authProfile` gets the named `default` profile when the provider supports named profiles.
+- An agent can pass `authProfile: false` to start an unprofiled session.
 - A human can sign in through the browser window or cloud live view, close the session, and find the login restored on the next open with the same profile.
 - Local profiles preserve the full Chromium user data directory, including cookies, local storage, IndexedDB, saved credentials, extensions, and browser settings.
 - Every bundled provider that has native named profile support uses it: Libretto Cloud, Kernel, and Browser Use, plus the local provider.
@@ -107,11 +108,11 @@ export type BrowserProvider = {
 // packages/browser-tools/src/tools/open.ts
 const openInputSchema = z.object({
   url: z.string().optional(),
-  authProfile: z.string().min(1).optional(),
+  authProfile: z.union([z.string().min(1), z.literal(false)]).optional(),
 });
 ```
 
-- [x] Add `authProfile?: string` to `browser_open` and describe its restore-and-save behavior.
+- [x] Add `authProfile?: string | false` to `browser_open` and describe named, default, and unprofiled behavior.
 - [x] Extend `BrowserProvider.createSession` with an optional typed options object and an opt-in `supportsAuthProfiles` capability.
 - [x] Pass the selected profile from `createOpenTool()` through `SessionRegistry.openSession()` to the provider.
 - [x] Add an exported Errore tagged `AuthProfileError` with a required recovery instruction; providers use it only for caller-fixable profile failures.
@@ -273,26 +274,27 @@ Lock the cases most likely to select the wrong account or change unprofiled sess
 
 ### Phase 9: Make the default profile observable
 
-Resolve omitted profile input to `default` at the public tool and registry boundary for providers with named profile support. Keep direct `provider.createSession()` semantics unchanged so hosts can still request an unprofiled low-level session. Store the resolved name with the session so agents can confirm which profile a browser uses.
+Resolve omitted profile input to `default` at the public tool and registry boundary for providers with named profile support. Let callers pass `authProfile: false` for an unprofiled session. Keep direct `provider.createSession()` semantics unchanged. Store the resolved name with the session so agents can confirm which profile a browser uses.
 
-- [ ] Resolve an omitted `authProfile` to `default` when `supportsAuthProfiles` is true.
-- [ ] Keep an explicit profile name unchanged and let it override `default`.
-- [ ] Keep direct `provider.createSession()` calls unchanged; the implicit default belongs to `browser_open`.
-- [ ] Keep unsupported providers unprofiled when callers omit `authProfile`; reject an explicit profile as they do now.
-- [ ] Store the resolved profile name on provider-owned registry entries without adding profile behavior to `browser_connect` or caller-owned pages.
-- [ ] Add `authProfile?: string` to no-argument `browser_status` session summaries. Set it to the resolved explicit or `default` name for supported provider-owned sessions; omit it for unsupported-provider sessions, `browser_connect`, and caller-owned pages.
-- [ ] Add status tests for explicit, implicit `default`, unsupported-provider, connected-CDP, and caller-owned-page sessions.
-- [ ] Update the Kernel and Browser Use `browser_open({})` live tests to expect `default`; add direct `provider.createSession()` and `closeSession()` coverage for their unchanged unprofiled request paths.
-- [ ] Add a direct-provider regression test proving omitted `authProfile` remains unprofiled when `createSession()` bypasses `browser_open`.
-- [ ] Run the registry and tool specs plus package type-check.
+- [x] Resolve an omitted `authProfile` to `default` when `supportsAuthProfiles` is true.
+- [x] Keep an explicit profile name unchanged and let it override `default`.
+- [x] Treat `authProfile: false` as an explicit request for an unprofiled session.
+- [x] Keep direct `provider.createSession()` calls unchanged; the implicit default belongs to `browser_open`.
+- [x] Keep unsupported providers unprofiled when callers omit `authProfile`; reject an explicit profile as they do now.
+- [x] Store the resolved profile name on provider-owned registry entries without adding profile behavior to `browser_connect` or caller-owned pages.
+- [x] Add `authProfile?: string` to no-argument `browser_status` session summaries. Set it to the resolved explicit or `default` name for supported provider-owned sessions; omit it for unsupported-provider sessions, `browser_connect`, and caller-owned pages.
+- [x] Add status tests for explicit, implicit `default`, unsupported-provider, connected-CDP, and caller-owned-page sessions.
+- [x] Update the Kernel and Browser Use unprofiled live tests to pass `authProfile: false`; add direct `provider.createSession()` and `closeSession()` coverage for their unchanged unprofiled request paths.
+- [x] Add a direct-provider regression test proving omitted `authProfile` remains unprofiled when `createSession()` bypasses `browser_open`.
+- [x] Run the registry and tool specs plus package type-check.
 
 ### Phase 10: Make browser-open guidance provider-aware
 
-Tell the agent whether the configured provider supports named profiles. Supported providers describe the implicit `default` profile and save-on-close behavior; unsupported providers tell callers not to pass `authProfile`.
+Tell the agent whether the configured provider supports named profiles. Supported providers describe the implicit `default` profile and save-on-close behavior; unsupported providers tell callers to omit `authProfile` or pass `false`.
 
 - [ ] Build the `browser_open` description from the configured provider capability.
 - [ ] For supported providers, state that omitting `authProfile` uses `default` and that changes save on close.
-- [ ] For unsupported providers, state that named auth profiles are unavailable and `authProfile` must be omitted.
+- [ ] For unsupported providers, state that named auth profiles are unavailable and callers must omit `authProfile` or pass `false`.
 - [ ] Keep the existing actionable runtime error when a caller passes `authProfile` to an unsupported provider.
 - [ ] Add tool-description tests for supported and unsupported providers.
 - [ ] Run the tool specs plus package type-check.
@@ -349,6 +351,7 @@ export class DomainPolicyRestricted extends errore.createTaggedError({
 ## Sanity checklist
 
 - [ ] `browser_open` without `authProfile` uses `default` on supported providers and remains unprofiled on unsupported providers.
+- [ ] `browser_open` with `authProfile: false` remains unprofiled on every provider.
 - [ ] `browser_status` reports the resolved profile name for provider-owned sessions.
 - [ ] The same local profile restores cookie and local-storage state after a full close and reopen.
 - [ ] Different local profile names remain isolated.

@@ -76,9 +76,11 @@ test.runIf(hasKernelApiKey)(
 );
 
 test.runIf(hasKernelApiKey)(
-	"creates, connects to, and closes a Kernel browser",
+	"browser_open accepts authProfile false for Kernel",
 	async ({ kernel }) => {
-		const session = await kernel.toolkit.tools.browser_open.execute({});
+		const session = await kernel.toolkit.tools.browser_open.execute({
+			authProfile: false,
+		});
 		expect(session).toMatchObject({ ok: true });
 		if (!session.ok) throw new Error(session.error);
 		expect(
@@ -86,5 +88,16 @@ test.runIf(hasKernelApiKey)(
 				sessionId: session.sessionId,
 			}),
 		).toEqual({ ok: true });
+	},
+);
+
+test.runIf(hasKernelApiKey)(
+	"direct Kernel sessions remain unprofiled when authProfile is omitted",
+	async ({ kernel }) => {
+		const session = await kernel.provider.createSession();
+		if (session instanceof Error) throw session;
+
+		const closed = await kernel.provider.closeSession(session.sessionId);
+		if (closed instanceof Error) throw closed;
 	},
 );

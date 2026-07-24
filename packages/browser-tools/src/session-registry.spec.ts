@@ -1,12 +1,26 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test as base } from "vitest";
-import { type BrowserProvider, ProviderCloseError } from "./provider.js";
+import {
+	type BrowserProvider,
+	type ProviderSessionCreateOptions,
+	ProviderCloseError,
+} from "./provider.js";
 import { LocalBrowserProvider } from "./providers/local.js";
 import { SessionRegistry } from "./session-registry.js";
+import { createStatusTool } from "./tools/status.js";
 
 const test = base.extend<{
+	authProfileDirectory: string;
 	createRegistry: (provider: BrowserProvider) => SessionRegistry;
 	registry: SessionRegistry;
 }>({
+	authProfileDirectory: async ({}, use) => {
+		const directory = await mkdtemp(join(tmpdir(), "browser-tools-profiles-"));
+		await use(directory);
+		await rm(directory, { recursive: true, force: true });
+	},
 	createRegistry: async ({}, use) => {
 		let registry: SessionRegistry | undefined;
 		await use((provider) => {
@@ -17,9 +31,9 @@ const test = base.extend<{
 		const disposed = await registry?.dispose();
 		if (disposed instanceof Error) throw disposed;
 	},
-	registry: async ({}, use) => {
+	registry: async ({ authProfileDirectory }, use) => {
 		const registry = new SessionRegistry(
-			new LocalBrowserProvider({ headless: true }),
+			new LocalBrowserProvider({ headless: true, authProfileDirectory }),
 		);
 		await use(registry);
 		const disposed = await registry.dispose();
@@ -41,9 +55,9 @@ test("openSession returns a session ID and a usable current page", async ({
 test("a second openSession gives an independent session with a different ID", async ({
 	registry,
 }) => {
-	const first = await registry.openSession();
+	const first = await registry.openSession({ authProfile: false });
 	if (first instanceof Error) throw first;
-	const second = await registry.openSession();
+	const second = await registry.openSession({ authProfile: false });
 	if (second instanceof Error) throw second;
 	expect(second.sessionId).not.toBe(first.sessionId);
 
@@ -182,9 +196,9 @@ test("dispose closes remaining sessions after one provider cleanup fails", async
 });
 
 test("dispose closes all sessions and is idempotent", async ({ registry }) => {
-	const first = await registry.openSession();
+	const first = await registry.openSession({ authProfile: false });
 	if (first instanceof Error) throw first;
-	const second = await registry.openSession();
+	const second = await registry.openSession({ authProfile: false });
 	if (second instanceof Error) throw second;
 
 	const disposed = await registry.dispose();
@@ -199,4 +213,152 @@ test("dispose closes all sessions and is idempotent", async ({ registry }) => {
 
 	const disposedAgain = await registry.dispose();
 	if (disposedAgain instanceof Error) throw disposedAgain;
+});
+
+test("openSession uses the default auth profile when the provider supports profiles", async ({
+	authProfileDirectory,
+	createRegistry,
+}) => {
+	const localProvider = new LocalBrowserProvider({
+		headless: true,
+		authProfileDirectory,
+	});
+	let requestedOptions: ProviderSessionCreateOptions | undefined;
+	const registry = createRegistry({
+		name: "profiled",
+		supportsAuthProfiles: true,
+		createSession(options) {
+			requestedOptions = options;
+			return localProvider.createSession(options);
+		},
+		closeSession: (sessionId) => localProvider.closeSession(sessionId),
+	});
+
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+
+	expect(requestedOptions?.authProfile).toBe("default");
+	expect(registry.listSessions()).toEqual([
+		expect.objectContaining({
+			sessionId: opened.sessionId,
+			provider: "profiled",
+			authProfile: "default",
+		}),
+	]);
+});
+
+test("openSession preserves an explicit auth profile", async ({
+	authProfileDirectory,
+	createRegistry,
+}) => {
+	const localProvider = new LocalBrowserProvider({
+		headless: true,
+		authProfileDirectory,
+	});
+	let requestedOptions: ProviderSessionCreateOptions | undefined;
+	const registry = createRegistry({
+		name: "profiled",
+		supportsAuthProfiles: true,
+		createSession(options) {
+			requestedOptions = options;
+			return localProvider.createSession(options);
+		},
+		closeSession: (sessionId) => localProvider.closeSession(sessionId),
+	});
+
+	const opened = await registry.openSession({ authProfile: "work" });
+	if (opened instanceof Error) throw opened;
+
+	expect(requestedOptions?.authProfile).toBe("work");
+	const status = await createStatusTool(registry).execute({});
+	expect(status).toMatchObject({
+		ok: true,
+		sessions: [
+			{
+				sessionId: opened.sessionId,
+				authProfile: "work",
+			},
+		],
+	});
+});
+
+test("openSession starts without a profile when authProfile is false", async ({
+	authProfileDirectory,
+	createRegistry,
+}) => {
+	const localProvider = new LocalBrowserProvider({
+		headless: true,
+		authProfileDirectory,
+	});
+	let requestedOptions: ProviderSessionCreateOptions | undefined;
+	const registry = createRegistry({
+		name: "profiled",
+		supportsAuthProfiles: true,
+		createSession(options) {
+			requestedOptions = options;
+			return localProvider.createSession(options);
+		},
+		closeSession: (sessionId) => localProvider.closeSession(sessionId),
+	});
+
+	const opened = await registry.openSession({ authProfile: false });
+	if (opened instanceof Error) throw opened;
+
+	expect(requestedOptions?.authProfile).toBeUndefined();
+	const status = await createStatusTool(registry).execute({});
+	if (!status.ok || !("sessions" in status)) throw new Error("expected sessions");
+	expect(status.sessions[0]).not.toHaveProperty("authProfile");
+});
+
+test("openSession leaves an unsupported provider unprofiled when authProfile is omitted", async ({
+	authProfileDirectory,
+	createRegistry,
+}) => {
+	const localProvider = new LocalBrowserProvider({
+		headless: true,
+		authProfileDirectory,
+	});
+	let requestedOptions: ProviderSessionCreateOptions | undefined;
+	const registry = createRegistry({
+		name: "unsupported",
+		supportsAuthProfiles: false,
+		createSession(options) {
+			requestedOptions = options;
+			return localProvider.createSession(options);
+		},
+		closeSession: (sessionId) => localProvider.closeSession(sessionId),
+	});
+
+	const opened = await registry.openSession();
+	if (opened instanceof Error) throw opened;
+
+	expect(requestedOptions?.authProfile).toBeUndefined();
+	const status = await createStatusTool(registry).execute({});
+	if (!status.ok || !("sessions" in status)) throw new Error("expected sessions");
+	expect(status.sessions[0]).not.toHaveProperty("authProfile");
+});
+
+test("openSession rejects an explicit profile for an unsupported provider", async ({
+	createRegistry,
+}) => {
+	let created = false;
+	const registry = createRegistry({
+		name: "unsupported",
+		supportsAuthProfiles: false,
+		async createSession() {
+			created = true;
+			throw new Error("Unexpected createSession call.");
+		},
+		async closeSession() {
+			return {};
+		},
+	});
+
+	const opened = await registry.openSession({ authProfile: "work" });
+
+	expect(opened).toMatchObject({
+		name: "AuthProfileError",
+		message: expect.stringContaining("does not support auth profiles"),
+	});
+	expect(created).toBe(false);
 });

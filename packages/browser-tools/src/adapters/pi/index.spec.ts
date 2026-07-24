@@ -55,6 +55,7 @@ test("Pi tools open a browser and execute Playwright code", async ({
 }) => {
 	const opened = await callTool(toolkit.tools, "browser_open", {
 		url: "data:text/html,<title>hello</title>",
+		authProfile: false,
 	});
 	expect(opened.details).toMatchObject({
 		ok: true,
@@ -72,6 +73,7 @@ test("Pi tools open a browser and execute Playwright code", async ({
 test("Pi snapshots carry screenshots as image content", async ({ toolkit }) => {
 	const opened = await callTool(toolkit.tools, "browser_open", {
 		url: "data:text/html,<main>hello</main>",
+		authProfile: false,
 	});
 	const sessionId = (opened.details as { sessionId: string }).sessionId;
 

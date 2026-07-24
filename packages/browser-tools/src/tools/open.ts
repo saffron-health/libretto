@@ -15,11 +15,11 @@ const openInputSchema = z.object({
 				"navigation open it before CDP attach; others navigate after connect.",
 		),
 	authProfile: z
-		.string()
-		.min(1)
+		.union([z.string().min(1), z.literal(false)])
 		.optional()
 		.describe(
-			"Optional auth profile to restore for this session and save when it closes.",
+			"Auth profile to restore and save when the session closes. Omit to use " +
+				'"default" when supported, or pass false to start without a profile.',
 		),
 });
 

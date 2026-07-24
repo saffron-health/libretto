@@ -158,9 +158,11 @@ test.runIf(hasBrowserUseApiKey)(
 );
 
 test.runIf(hasBrowserUseApiKey)(
-	"creates and closes an unprofiled Browser Use browser",
+	"browser_open accepts authProfile false for Browser Use",
 	async ({ browserUse }) => {
-		const session = await browserUse.toolkit.tools.browser_open.execute({});
+		const session = await browserUse.toolkit.tools.browser_open.execute({
+			authProfile: false,
+		});
 		expect(session).toMatchObject({ ok: true });
 		if (!session.ok) throw new Error(session.error);
 		expect(
@@ -168,5 +170,16 @@ test.runIf(hasBrowserUseApiKey)(
 				sessionId: session.sessionId,
 			}),
 		).toEqual({ ok: true });
+	},
+);
+
+test.runIf(hasBrowserUseApiKey)(
+	"direct Browser Use sessions remain unprofiled when authProfile is omitted",
+	async ({ browserUse }) => {
+		const session = await browserUse.provider.createSession();
+		if (session instanceof Error) throw session;
+
+		const closed = await browserUse.provider.closeSession(session.sessionId);
+		if (closed instanceof Error) throw closed;
 	},
 );
