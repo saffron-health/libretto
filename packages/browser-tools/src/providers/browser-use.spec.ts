@@ -124,3 +124,49 @@ test.runIf(hasBrowserUseApiKey)(
 		).toEqual({ ok: true });
 	},
 );
+
+test.runIf(hasBrowserUseApiKey)(
+	"rejects duplicate exact-name Browser Use profiles",
+	async ({ browserUse }) => {
+		const headers = {
+			"X-Browser-Use-API-Key": process.env.BROWSER_USE_API_KEY?.trim() ?? "",
+			"Content-Type": "application/json",
+		};
+		for (let profileNumber = 1; profileNumber <= 2; profileNumber += 1) {
+			const response = await fetch(`${endpoint}/profiles`, {
+				method: "POST",
+				headers,
+				body: JSON.stringify({ name: browserUse.profileName }),
+			});
+			if (!response.ok) {
+				throw new Error(
+					`Could not create Browser Use duplicate test profile ${profileNumber} (${response.status}).`,
+				);
+			}
+		}
+
+		const result = await browserUse.toolkit.tools.browser_open.execute({
+			authProfile: browserUse.profileName,
+		});
+		expect(result).toMatchObject({ ok: false });
+		if (result.ok) throw new Error("Expected duplicate profiles to be rejected.");
+		expect(result.error).toContain(
+			`multiple Browser Use auth profiles named "${browserUse.profileName}"`,
+		);
+		expect(result.error).toContain("Rename or delete the duplicate profiles");
+	},
+);
+
+test.runIf(hasBrowserUseApiKey)(
+	"creates and closes an unprofiled Browser Use browser",
+	async ({ browserUse }) => {
+		const session = await browserUse.toolkit.tools.browser_open.execute({});
+		expect(session).toMatchObject({ ok: true });
+		if (!session.ok) throw new Error(session.error);
+		expect(
+			await browserUse.toolkit.tools.browser_close.execute({
+				sessionId: session.sessionId,
+			}),
+		).toEqual({ ok: true });
+	},
+);

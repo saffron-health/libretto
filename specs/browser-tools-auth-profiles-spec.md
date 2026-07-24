@@ -259,11 +259,13 @@ async createSession({ authProfile }: ProviderSessionCreateOptions = {}) {
 
 ### Phase 8: Cover Browser Use profile resolution edges
 
-Lock the cases most likely to select the wrong account or create a duplicate. Keep the HTTP fixtures explicit so pagination and exact-name behavior remain visible.
+Lock the cases most likely to select the wrong account or change unprofiled sessions. Run against the production Browser Use API when `BROWSER_USE_API_KEY` is available; do not stub the provider API. Profile creation and exact-name reuse are covered by Phase 7. A later-page production test is deferred because forcing a second result page would require creating more than 100 provider profiles.
 
-- [ ] Add mocked HTTP tests for a match on a later page, profile creation, duplicate exact matches, and an unprofiled session.
-- [ ] Assert duplicate matches return an `AuthProfileError` with a recovery instruction.
-- [ ] Run the Browser Use provider spec.
+- [x] Add credential-gated live API tests for duplicate exact matches and an unprofiled session.
+- [x] Assert duplicate matches return an `AuthProfileError` with a recovery instruction.
+- [x] Keep profile creation and exact-name reuse covered by the Phase 7 live test.
+- [x] Defer later-page coverage rather than creating more than 100 production profiles.
+- [x] Run the Browser Use provider spec.
 
 ### Phase 9: Add Browserbase context IDs
 
