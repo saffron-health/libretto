@@ -1,10 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/dashboard_/cloud-browsers")({
+export const Route = createFileRoute("/dashboard_/chrome-extension")({
   beforeLoad: () => {
     throw redirect({
       to: "/dashboard/$section",
-      params: { section: "workflow_runs" },
+      params: { section: "workflows" },
     });
   },
 });

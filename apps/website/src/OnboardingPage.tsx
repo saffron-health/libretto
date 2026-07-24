@@ -4,8 +4,6 @@ import { getSafeReturnTo, postAuthRedirect } from "./authRedirect";
 import { Navbar } from "./components/Navbar";
 import {
   getAuthStatus,
-  getSetupStatus,
-  isPrAgentSetupComplete,
   orpcCall,
 } from "./cloudApi";
 
@@ -42,14 +40,10 @@ export function OnboardingPage() {
           return;
         }
         if (status.hasTenant) {
-          const setupComplete = await getSetupStatus()
-            .then(isPrAgentSetupComplete)
-            .catch(() => false);
           window.location.assign(
             postAuthRedirect({
               emailVerified: status.emailVerified,
               hasTenant: status.hasTenant,
-              setupComplete,
               returnTo: getSafeReturnTo(),
             }),
           );
@@ -86,7 +80,6 @@ export function OnboardingPage() {
         postAuthRedirect({
           emailVerified: true,
           hasTenant: true,
-          setupComplete: false,
           returnTo: getSafeReturnTo(),
         }),
       );

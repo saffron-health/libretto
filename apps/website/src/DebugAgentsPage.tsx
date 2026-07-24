@@ -9,7 +9,7 @@ import { SectionIntro } from "./components/SectionIntro";
 import { SiteSection } from "./components/SiteSection";
 import { SectionDivider } from "./components/SectionDivider.js";
 
-const GET_STARTED_URL = "/signin?mode=signup&returnTo=%2Fsetup";
+const GET_STARTED_URL = "/signin?mode=signup";
 const TALK_TO_A_DEV_URL = "https://cal.com/team/libretto/demo";
 
 const SECTION_POINTS = [

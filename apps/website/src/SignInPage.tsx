@@ -11,8 +11,6 @@ import {
   authPost,
   getAuthStatus,
   getCloudSession,
-  getSetupStatus,
-  isPrAgentSetupComplete,
   orpcCall,
   type AuthStatus,
 } from "./cloudApi";
@@ -72,16 +70,9 @@ async function resolvePostAuthRedirect(
   status: AuthStatus,
   returnTo: string | null,
 ): Promise<string> {
-  const setupComplete =
-    status.emailVerified && status.hasTenant
-      ? await getSetupStatus()
-          .then(isPrAgentSetupComplete)
-          .catch(() => false)
-      : false;
   return postAuthRedirect({
     emailVerified: status.emailVerified,
     hasTenant: status.hasTenant,
-    setupComplete,
     returnTo,
   });
 }

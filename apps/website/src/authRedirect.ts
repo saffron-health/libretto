@@ -28,16 +28,13 @@ export function sanitizeReturnToForAuthState(
   if (
     pathname === "/signin" ||
     pathname === "/verify-email" ||
-    pathname === "/onboarding"
+    pathname === "/onboarding" ||
+    pathname === "/setup"
   ) {
     return null;
   }
 
-  if (
-    !hasTenant &&
-    (pathname === "/dashboard" ||
-      pathname === "/setup")
-  ) {
+  if (!hasTenant && pathname.startsWith("/dashboard")) {
     return null;
   }
 
@@ -47,18 +44,10 @@ export function sanitizeReturnToForAuthState(
 export function postAuthRedirect(input: {
   emailVerified: boolean;
   hasTenant: boolean;
-  setupComplete: boolean;
   returnTo: string | null;
 }): string {
   const returnTo = sanitizeReturnToForAuthState(input.returnTo, input.hasTenant);
   if (!input.emailVerified) return withReturnTo("/verify-email", returnTo);
   if (!input.hasTenant) return withReturnTo("/onboarding", returnTo);
-  if (
-    !input.setupComplete &&
-    returnTo &&
-    new URL(returnTo, window.location.origin).pathname.startsWith("/dashboard")
-  ) {
-    return "/setup";
-  }
-  return returnTo ?? (input.setupComplete ? "/dashboard" : "/setup");
+  return returnTo ?? "/dashboard";
 }
