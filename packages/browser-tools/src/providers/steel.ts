@@ -46,6 +46,9 @@ function buildSteelCdpEndpoint(
 
 export class SteelBrowserProvider implements BrowserProvider {
 	readonly name = "steel";
+	// Steel profiles expose generated IDs but no names, so they cannot satisfy
+	// the named authProfile contract without a durable Libretto mapping.
+	readonly supportsAuthProfiles = false;
 	private readonly apiKey: string;
 	private readonly endpoint: string;
 	private readonly connectEndpoint: string;

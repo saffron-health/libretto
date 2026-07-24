@@ -33,6 +33,9 @@ type BrowserbaseSessionRequest = {
 
 export class BrowserbaseBrowserProvider implements BrowserProvider {
 	readonly name = "browserbase";
+	// Browserbase contexts expose generated IDs but no names, so they cannot
+	// satisfy the named authProfile contract without a durable Libretto mapping.
+	readonly supportsAuthProfiles = false;
 	private readonly apiKey: string;
 	private readonly projectId: string | undefined;
 	private readonly endpoint: string;
