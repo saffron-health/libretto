@@ -294,7 +294,7 @@ function ProfileMenu({
 
   const sidebar = placement === "sidebar";
   return (
-    <details className={`group relative ${sidebar ? "w-full" : ""}`}>
+    <details className={`relative ${sidebar ? "w-full" : ""}`}>
       <summary
         className={`cursor-pointer list-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/30 [&::-webkit-details-marker]:hidden ${
           sidebar
@@ -312,9 +312,6 @@ function ProfileMenu({
               <span className="block truncate text-xs text-ink">
                 {session.user.email}
               </span>
-            </span>
-            <span className="text-xs text-muted transition-transform group-open:rotate-180">
-              ↑
             </span>
           </>
         )}
