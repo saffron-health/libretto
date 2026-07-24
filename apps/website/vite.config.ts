@@ -8,6 +8,18 @@ import { loadBlogPostInputs } from "./scripts/blog-posts.ts";
 const comptimePlugin = await comptime();
 const blogPosts = await loadBlogPostInputs();
 const blogPostPaths = blogPosts.map((post) => `/blog/${post.slug}`);
+const dashboardPaths = [
+  "/dashboard",
+  "/dashboard/workflows",
+  "/dashboard/schedules",
+  "/dashboard/workflow_runs",
+  "/dashboard/browser_sessions",
+  "/dashboard/connected_repos",
+  "/dashboard/users",
+  "/dashboard/secrets",
+  "/dashboard/api_keys",
+  "/dashboard/billing",
+];
 
 function localDocsRedirectPlugin(): Plugin {
   return {
@@ -42,7 +54,7 @@ export default defineConfig({
         enabled: true,
         crawlLinks: false,
       },
-      pages: blogPostPaths.map((path) => ({
+      pages: [...blogPostPaths, ...dashboardPaths].map((path) => ({
         path,
         prerender: { enabled: true },
       })),
