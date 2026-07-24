@@ -118,7 +118,7 @@ export function ProductListing() {
   return (
     <section className="section-crt px-8 py-8 md:py-12">
       <div className="mx-auto max-w-[1000px]">
-        {PRODUCTS.map((product, index) => {
+        {PRODUCTS.filter((product) => !product.hidden).map((product, index) => {
           const visualLeft = index % 2 === 1;
           return (
             <div key={product.href}>

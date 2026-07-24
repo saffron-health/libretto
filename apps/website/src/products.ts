@@ -5,6 +5,7 @@ export interface ProductLink {
   kicker: string;
   status: "live" | "soon";
   fathomEvent: string;
+  hidden?: boolean;
 }
 
 export const PRODUCTS: ProductLink[] = [
@@ -16,6 +17,7 @@ export const PRODUCTS: ProductLink[] = [
     kicker: "// BROWSER EXTENSION --",
     status: "live",
     fathomEvent: "Product listing chrome extension click",
+    hidden: true,
   },
   {
     href: "/cli",
