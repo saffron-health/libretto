@@ -198,12 +198,7 @@ function getDaemonUserKey(): string {
   try {
     const info = userInfo();
     if (info.uid >= 0) return String(info.uid);
-    if (info.username) {
-      return createHash("sha256")
-        .update(info.username)
-        .digest("hex")
-        .slice(0, 12);
-    }
+    if (info.username) return info.username;
   } catch {
     // Fall back below.
   }
