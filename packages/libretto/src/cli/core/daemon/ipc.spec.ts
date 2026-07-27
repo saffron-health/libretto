@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { dirname } from "node:path";
 import { describe, expect, test } from "vitest";
 import { getDaemonSocketPath } from "./ipc.js";
 
@@ -10,10 +12,11 @@ describe("daemon IPC endpoint paths", () => {
     expect(socketPath).not.toContain(".sock");
   });
 
-  test("uses a short Unix socket path on Unix-like platforms", () => {
+  test("uses the system temp directory on Unix-like platforms", () => {
     const socketPath = getDaemonSocketPath("unix-session", "linux");
 
-    expect(socketPath).toMatch(/^\/tmp\/libretto-.+-[a-f0-9]{12}\.sock$/);
+    expect(dirname(socketPath)).toBe(tmpdir());
+    expect(socketPath).toMatch(/libretto-[a-f0-9]{12}\.sock$/);
   });
 
   test("keeps daemon IPC endpoints deterministic per session", () => {

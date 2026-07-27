@@ -14,7 +14,7 @@
  * In both modes the daemon:
  * - Installs session telemetry (network/action logging)
  * - Serves IPC commands (exec, readonly-exec, pages, snapshot) over a
- *   Unix domain socket
+ *   Unix domain socket or Windows named pipe
  * - Stays alive until the browser disconnects or a signal is received
  */
 
