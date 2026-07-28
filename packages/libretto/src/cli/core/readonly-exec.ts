@@ -1,4 +1,4 @@
-import type { Locator, Page } from "playwright";
+import type { Frame, Locator, Page } from "playwright";
 
 const PAGE_READ_METHODS = new Set([
   "url",
@@ -21,6 +21,7 @@ const PAGE_LOCATOR_FACTORY_METHODS = new Set([
   "getByTitle",
   "getByTestId",
 ]);
+const PAGE_FRAME_COLLECTION_METHODS = new Set(["frames"]);
 
 const PAGE_ALLOWED_PROPERTIES = new Set<string>([]);
 
@@ -66,6 +67,32 @@ const LOCATOR_SCROLL_METHODS = new Set(["scrollIntoViewIfNeeded"]);
 
 const LOCATOR_ALLOWED_PROPERTIES = new Set<string>([]);
 
+const FRAME_READ_METHODS = new Set([
+  "url",
+  "name",
+  "title",
+  "content",
+  "isDetached",
+  "waitForLoadState",
+  "waitForURL",
+]);
+
+const FRAME_LOCATOR_FACTORY_METHODS = new Set([
+  "locator",
+  "getByRole",
+  "getByText",
+  "getByLabel",
+  "getByPlaceholder",
+  "getByAltText",
+  "getByTitle",
+  "getByTestId",
+]);
+
+const FRAME_COLLECTION_METHODS = new Set(["childFrames"]);
+const FRAME_PARENT_METHODS = new Set(["parentFrame"]);
+const FRAME_PAGE_METHODS = new Set(["page"]);
+const FRAME_ALLOWED_PROPERTIES = new Set<string>([]);
+
 type ReadonlyExecOptions = {
   onActivity?: () => void;
   console?: Console;
@@ -73,6 +100,7 @@ type ReadonlyExecOptions = {
 
 const readonlyPageCache = new WeakMap<Page, Page>();
 const readonlyLocatorCache = new WeakMap<Locator, Locator>();
+const readonlyFrameCache = new WeakMap<Frame, Frame>();
 
 function markActivity(onActivity?: () => void): void {
   onActivity?.();
@@ -85,7 +113,10 @@ export class ReadonlyExecDeniedError extends Error {
   }
 }
 
-function denyOperation(targetName: "page" | "locator", method: string): never {
+function denyOperation(
+  targetName: "page" | "locator" | "frame",
+  method: string,
+): never {
   throw new ReadonlyExecDeniedError(
     `${targetName}.${method} is blocked in readonly-exec`,
   );
@@ -153,6 +184,79 @@ export function wrapLocatorForReadonlyExec(
   return proxy as Locator;
 }
 
+export function wrapFrameForReadonlyExec(
+  frame: Frame,
+  options: ReadonlyExecOptions = {},
+): Frame {
+  const cached = readonlyFrameCache.get(frame);
+  if (cached) return cached;
+
+  const proxy = new Proxy(frame, {
+    get(target, prop, receiver) {
+      if (typeof prop !== "string") {
+        return Reflect.get(target, prop, receiver);
+      }
+
+      const value = Reflect.get(target, prop, target);
+      if (typeof value !== "function") {
+        if (FRAME_ALLOWED_PROPERTIES.has(prop)) {
+          return value;
+        }
+        return denyOperation("frame", prop);
+      }
+
+      if (FRAME_READ_METHODS.has(prop)) {
+        return (...args: unknown[]) => {
+          const result = value.apply(target, args);
+          markActivity(options.onActivity);
+          return result;
+        };
+      }
+
+      if (FRAME_LOCATOR_FACTORY_METHODS.has(prop)) {
+        return (...args: unknown[]) => {
+          const locator = value.apply(target, args) as Locator;
+          markActivity(options.onActivity);
+          return wrapLocatorForReadonlyExec(locator, options);
+        };
+      }
+
+      if (FRAME_COLLECTION_METHODS.has(prop)) {
+        return (...args: unknown[]) => {
+          const frames = value.apply(target, args) as Frame[];
+          markActivity(options.onActivity);
+          return frames.map((childFrame) =>
+            wrapFrameForReadonlyExec(childFrame, options),
+          );
+        };
+      }
+
+      if (FRAME_PARENT_METHODS.has(prop)) {
+        return (...args: unknown[]) => {
+          const parentFrame = value.apply(target, args) as Frame | null;
+          markActivity(options.onActivity);
+          return parentFrame
+            ? wrapFrameForReadonlyExec(parentFrame, options)
+            : null;
+        };
+      }
+
+      if (FRAME_PAGE_METHODS.has(prop)) {
+        return (...args: unknown[]) => {
+          const page = value.apply(target, args) as Page;
+          markActivity(options.onActivity);
+          return wrapPageForReadonlyExec(page, options);
+        };
+      }
+
+      return (..._args: unknown[]) => denyOperation("frame", prop);
+    },
+  });
+
+  readonlyFrameCache.set(frame, proxy as Frame);
+  return proxy as Frame;
+}
+
 export function wrapPageForReadonlyExec(
   page: Page,
   options: ReadonlyExecOptions = {},
@@ -187,6 +291,16 @@ export function wrapPageForReadonlyExec(
           const locator = value.apply(target, args) as Locator;
           markActivity(options.onActivity);
           return wrapLocatorForReadonlyExec(locator, options);
+        };
+      }
+
+      if (PAGE_FRAME_COLLECTION_METHODS.has(prop)) {
+        return (...args: unknown[]) => {
+          const frames = value.apply(target, args) as Frame[];
+          markActivity(options.onActivity);
+          return frames.map((frame) =>
+            wrapFrameForReadonlyExec(frame, options),
+          );
         };
       }
 

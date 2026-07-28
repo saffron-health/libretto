@@ -59,7 +59,7 @@ libretto pages --session failed-job-debug
 
 #### Helpers
 
-- `page` — a read-only Playwright `Page` proxy. Standard Playwright read methods work normally (`url()`, `title()`, `content()`, `getByRole()`, `locator()`, `textContent()`, `isVisible()`, `count()`, `scrollIntoViewIfNeeded()`, etc.). Anything that mutates the page (`click`, `fill`, `goto`, `evaluate`, `keyboard`, `mouse`) is blocked.
+- `page` — a read-only Playwright `Page` proxy. Standard Playwright read methods work normally (`url()`, `title()`, `content()`, `frames()`, `getByRole()`, `locator()`, `textContent()`, `isVisible()`, `count()`, `scrollIntoViewIfNeeded()`, etc.). `frames()` returns read-only `Frame` proxies, including from `childFrames()` and `parentFrame()`. Anything that mutates a page or frame (`click`, `fill`, `goto`, `evaluate`, `keyboard`, `mouse`) is blocked.
 - `state` — the current Libretto session state object.
 - `get(url, options?)` — HTTP client restricted to **GET and HEAD** requests. Replaces `fetch`, which is blocked in readonly mode. Any request with a body or a non-GET/HEAD method throws `ReadonlyExecDenied`.
 - `scrollBy(deltaX, deltaY)` — scroll the viewport by pixel offset. Use this to inspect content below the fold without targeting a specific element.
@@ -71,6 +71,7 @@ Standard JS globals `console`, `URL`, `Buffer`, `setTimeout`, and `setInterval` 
 ```bash
 libretto readonly-exec "return page.url()" --session failed-job-debug
 libretto readonly-exec "return await page.getByRole('heading').first().textContent()" --session failed-job-debug
+libretto readonly-exec "return await page.frames()[1]?.getByRole('heading').textContent()" --session failed-job-debug
 
 # HTTP GET inspection
 echo "const r = await get('https://api.example.com/status'); return await r.json()" \
