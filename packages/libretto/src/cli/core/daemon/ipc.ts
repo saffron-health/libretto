@@ -195,6 +195,8 @@ export function getDaemonSocketPath(
 }
 
 function getDaemonUserKey(): string {
+  if (typeof process.getuid === "function") return String(process.getuid());
+
   try {
     const info = userInfo();
     if (info.uid >= 0) return String(info.uid);
