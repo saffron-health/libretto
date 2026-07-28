@@ -112,17 +112,26 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			if (executionPolicyError) throw executionPolicyError;
 			if (!execResult.ok) return execResult;
 
+			// Settle after exec when the caller opted into a snapshot diff, or when
+			// a domain policy may still report an unawaited blocked navigation.
+			const settleAfterExec =
+				Boolean(diffSnapshot) || registry.hasDomainNavigationPolicy();
+
 			let snapshotDiff = "";
-			if (diffSnapshot && before) {
+			if (settleAfterExec) {
 				try {
 					await waitForPageStable(scope.page);
-					const after = await registry.captureSnapshotAfterExec(
-						sessionId,
-						pageId,
-					);
-					snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
+					if (diffSnapshot && before) {
+						const after = await registry.captureSnapshotAfterExec(
+							sessionId,
+							pageId,
+						);
+						snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
+					}
 				} catch {
-					registry.clearSnapshotCache(sessionId);
+					if (diffSnapshot) {
+						registry.clearSnapshotCache(sessionId);
+					}
 				}
 				const stabilizationPolicyError =
 					registry.consumeBlockedNavigationError(scope.page);

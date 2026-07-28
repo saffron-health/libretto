@@ -432,6 +432,14 @@ export class SessionRegistry {
 		if (entry) entry.latestSnapshotByPage.clear();
 	}
 
+	/** True when navigations may be aborted and reported after exec settles. */
+	hasDomainNavigationPolicy(): boolean {
+		return (
+			this.domainPolicy.allowedDomains !== undefined ||
+			Boolean(this.domainPolicy.blockedDomains?.length)
+		);
+	}
+
 	consumeBlockedNavigationError(
 		page: Page,
 	): DomainPolicyRestricted | undefined {
