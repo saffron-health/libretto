@@ -462,6 +462,27 @@ throw new Error('expected late exec failure');
     expect(result.stderr).toContain(`snapshot --session ${session}`);
   }, 45_000);
 
+  test("compact exec omits page changes unless --diff-snapshot is set", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-compact-exec-diff-opt-in";
+    const url = await writeFixturePage(
+      workspacePath,
+      "compact-exec-diff-opt-in",
+      "Compact Exec Diff Opt In Test",
+      `<main><h1>Before Heading</h1></main>`,
+    );
+
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const withoutFlag = await librettoCli(
+      `exec "await page.locator('h1').evaluate((node) => { node.textContent = 'After Heading'; })" --session ${session}`,
+    );
+    expect(withoutFlag.stdout).toContain("Executed successfully");
+    expect(withoutFlag.stdout).not.toContain("Page changes:");
+  }, 45_000);
+
   test("compact exec diff uses the snapshot cache as its before state", async ({
     librettoCli,
     workspacePath,
@@ -480,7 +501,7 @@ throw new Error('expected late exec failure');
     expect(beforeSnapshot.stdout).toContain("Before Heading");
 
     const result = await librettoCli(
-      `exec "await page.locator('h1').evaluate((node) => { node.textContent = 'After Heading'; })" --session ${session}`,
+      `exec "await page.locator('h1').evaluate((node) => { node.textContent = 'After Heading'; })" --session ${session} --diff-snapshot`,
     );
     expect(result.stdout).toContain("Executed successfully");
     expect(result.stdout).toContain("Page changes:");
@@ -503,7 +524,7 @@ throw new Error('expected late exec failure');
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(
-      `exec "await page.locator('main').evaluate((node) => node.insertAdjacentHTML('beforeend', '<p>New Content</p>'))" --session ${session}`,
+      `exec "await page.locator('main').evaluate((node) => node.insertAdjacentHTML('beforeend', '<p>New Content</p>'))" --session ${session} --diff-snapshot`,
     );
     expect(result.stdout).toContain("Executed successfully");
     expect(result.stdout).toContain("Page changes:");
@@ -525,7 +546,7 @@ throw new Error('expected late exec failure');
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const result = await librettoCli(
-      `exec "await page.close(), 'closed ok'" --session ${session}`,
+      `exec "await page.close(), 'closed ok'" --session ${session} --diff-snapshot`,
     );
     expect(result.stdout).toContain("closed ok");
     expect(result.stdout).not.toContain("Page changes:");

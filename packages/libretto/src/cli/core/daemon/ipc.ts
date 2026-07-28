@@ -23,6 +23,8 @@ export type DaemonExecArgs = {
   code: string;
   pageId?: string;
   visualize?: boolean;
+  /** When true, capture before/after compact snapshots and return a page-change diff. */
+  diffSnapshot?: boolean;
 };
 
 export type DaemonReadonlyExecArgs = { code: string; pageId?: string };

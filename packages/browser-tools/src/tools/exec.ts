@@ -26,6 +26,15 @@ const execInputSchema = z.object({
 		.describe(
 			'Optional page ID from browser_status. Defaults to the most recently opened tab.',
 		),
+	diffSnapshot: z
+		.boolean()
+		.optional()
+		.describe(
+			"When true, wait for the page to settle after a successful exec and return " +
+				"`snapshotDiff` — a compact accessibility-tree diff since the previous " +
+				"opted-in exec (or a fresh baseline). Use for exploratory mutations when " +
+				"you do not know what will change. Omit or set false to skip the cost.",
+		),
 });
 
 export type ExecToolInput = z.infer<typeof execInputSchema>;
@@ -34,7 +43,7 @@ export type ExecToolOutput = {
 	result: unknown;
 	stdout: string;
 	stderr: string;
-	/** Rendered a11y-tree diff since the previous exec on this session; empty when unchanged. */
+	/** Rendered a11y-tree diff when `diffSnapshot` was true; empty when off or unchanged. */
 	snapshotDiff: string;
 }
 
@@ -57,12 +66,18 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			"itself is the only state. In scope: `page` (the current playwright " +
 			"Page), `context` (BrowserContext), `browser` (Browser). TypeScript is " +
 			"fine. `console.log`/`console.error` output is captured and returned as " +
-			"stdout/stderr. Successful execs also return `snapshotDiff` — a compact " +
-			"text diff of accessibility-tree changes since the previous exec (empty when " +
-			"unchanged). Failures come back as `{ ok: false, error }` — read the error, " +
-			"fix the code, and try again.",
+			"stdout/stderr. Pass `diffSnapshot: true` to also return `snapshotDiff` — " +
+			"a compact text diff of accessibility-tree changes since the previous " +
+			"opted-in exec (empty when unchanged). Use that for exploratory mutations " +
+			"when you do not know what will change; omit it otherwise. Failures come " +
+			"back as `{ ok: false, error }` — read the error, fix the code, and try again.",
 		inputSchema: execInputSchema,
-		async execute({ sessionId, code, pageId }): Promise<ToolResult<ExecToolOutput>> {
+		async execute({
+			sessionId,
+			code,
+			pageId,
+			diffSnapshot,
+		}): Promise<ToolResult<ExecToolOutput>> {
 			let scope: ExecScope;
 			try {
 				const page = registry.getCurrentPage(sessionId, pageId);
@@ -87,7 +102,9 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 				};
 			}
 
-			const before = await registry.readSnapshotBaseline(sessionId, pageId);
+			const before = diffSnapshot
+				? await registry.readSnapshotBaseline(sessionId, pageId)
+				: undefined;
 			const execResult = await runExecCode(code, scope);
 			const executionPolicyError = registry.consumeBlockedNavigationError(
 				scope.page,
@@ -96,16 +113,21 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			if (!execResult.ok) return execResult;
 
 			let snapshotDiff = "";
-			try {
-				await waitForPageStable(scope.page);
-				const after = await registry.captureSnapshotAfterExec(sessionId, pageId);
-				snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
-			} catch {
-				registry.clearSnapshotCache(sessionId);
+			if (diffSnapshot && before) {
+				try {
+					await waitForPageStable(scope.page);
+					const after = await registry.captureSnapshotAfterExec(
+						sessionId,
+						pageId,
+					);
+					snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
+				} catch {
+					registry.clearSnapshotCache(sessionId);
+				}
+				const stabilizationPolicyError =
+					registry.consumeBlockedNavigationError(scope.page);
+				if (stabilizationPolicyError) throw stabilizationPolicyError;
 			}
-			const stabilizationPolicyError =
-				registry.consumeBlockedNavigationError(scope.page);
-			if (stabilizationPolicyError) throw stabilizationPolicyError;
 
 			return { ...execResult, snapshotDiff };
 		},

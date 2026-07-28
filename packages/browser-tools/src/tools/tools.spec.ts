@@ -321,8 +321,8 @@ test("browser_exec carries browser state across calls and supports TypeScript", 
 		result: "updated",
 		stdout: "mutated to updated",
 		stderr: "",
+		snapshotDiff: "",
 	});
-	expect(mutate.ok && mutate.snapshotDiff.length).toBeGreaterThan(0);
 
 	const read = await execTool.execute({
 		sessionId: opened.sessionId,
@@ -333,6 +333,40 @@ test("browser_exec carries browser state across calls and supports TypeScript", 
 		result: "updated",
 		stdout: "",
 		stderr: "",
+		snapshotDiff: "",
+	});
+});
+
+test("browser_exec returns snapshotDiff only when diffSnapshot is true", async ({
+	openTool,
+	execTool,
+}) => {
+	const opened = await openTool.execute({
+		url: "data:text/html,<h1 id='t'>start</h1>",
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const mutate = await execTool.execute({
+		sessionId: opened.sessionId,
+		diffSnapshot: true,
+		code:
+			"await page.locator('#t').evaluate((el: HTMLElement) => { el.textContent = 'updated'; }); " +
+			"return await page.locator('#t').textContent()",
+	});
+	expect(mutate).toMatchObject({
+		ok: true,
+		result: "updated",
+	});
+	expect(mutate.ok && mutate.snapshotDiff.length).toBeGreaterThan(0);
+
+	const read = await execTool.execute({
+		sessionId: opened.sessionId,
+		diffSnapshot: true,
+		code: "return await page.locator('#t').textContent()",
+	});
+	expect(read).toMatchObject({
+		ok: true,
+		result: "updated",
 		snapshotDiff: "",
 	});
 });
@@ -598,6 +632,7 @@ test("browser_exec snapshot diff uses per-page cache across mixed pageId calls",
 
 	const first = await execTool.execute({
 		sessionId: opened.sessionId,
+		diffSnapshot: true,
 		code:
 			"await page.locator('#t').evaluate((el: HTMLElement) => { el.textContent = 'first'; });",
 	});
@@ -607,6 +642,7 @@ test("browser_exec snapshot diff uses per-page cache across mixed pageId calls",
 	const second = await execTool.execute({
 		sessionId: opened.sessionId,
 		pageId,
+		diffSnapshot: true,
 		code:
 			"await page.locator('#t').evaluate((el: HTMLElement) => { el.textContent = 'second'; });",
 	});
@@ -615,6 +651,7 @@ test("browser_exec snapshot diff uses per-page cache across mixed pageId calls",
 
 	const third = await execTool.execute({
 		sessionId: opened.sessionId,
+		diffSnapshot: true,
 		code: "return await page.locator('#t').textContent()",
 	});
 	expect(third).toMatchObject({

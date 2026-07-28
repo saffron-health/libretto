@@ -141,11 +141,13 @@ npx libretto snapshot --session debug-example --page <page-id>
 - Let failures throw. Do not hide `exec` failures with `try/catch` or `.catch()`.
 - Do not run multiple `exec` commands in parallel.
 - Do not use `exec` in read-only diagnosis flows. Use `readonly-exec` from the `libretto-readonly` skill for those sessions.
-- After successful mutations, `exec` prints page-change diffs from compact snapshots.
+- Snapshot diffs are opt-in. Pass `--diff-snapshot` when you mutate the page and do not know what will change (for example clicking an unfamiliar control). Prefer returning a specific value or running `snapshot` when you already know what to check.
+- Without `--diff-snapshot`, `exec` skips the before/after compact snapshot work. After mutations, run a fresh `snapshot` before using refs if you need an up-to-date tree.
 
 ```bash
 npx libretto exec "await page.url()"
 npx libretto exec "await page.locator('button:has-text(\"Continue\")').click()"
+npx libretto exec --diff-snapshot "await page.locator('button:has-text(\"Continue\")').click()"
 echo "async function textOf(selector) { return await page.locator(selector).textContent(); }" | npx libretto exec - --session debug-example
 npx libretto exec --session debug-example "await textOf('h1')"
 ```

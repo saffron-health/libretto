@@ -738,14 +738,20 @@ class BrowserDaemon {
       targetPage = this.resolveTargetPage(args.pageId);
       const page = targetPage;
       const data = await this.withRequestTimeout(async () => {
-        const before =
-          this.latestCompactSnapshotByPage.get(page) ?? (await snapshot(page));
+        const before = args.diffSnapshot
+          ? (this.latestCompactSnapshotByPage.get(page) ??
+            (await snapshot(page)))
+          : undefined;
         const result = await handleExec(
           page,
           args.code,
           this.execRepl,
           args.visualize,
         );
+
+        if (!args.diffSnapshot || !before) {
+          return result;
+        }
 
         try {
           const waitResult = await waitForPageStable(page);

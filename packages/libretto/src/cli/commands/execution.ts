@@ -135,6 +135,7 @@ async function execViaDaemon(
     visualize?: boolean;
     pageId?: string;
     mode?: ExecMode;
+    diffSnapshot?: boolean;
   },
 ): Promise<void> {
   const mode = options.mode ?? "exec";
@@ -148,6 +149,7 @@ async function execViaDaemon(
     codePreview: cleanedCode.slice(0, 200),
     visualize: options.visualize,
     pageId: options.pageId,
+    diffSnapshot: options.diffSnapshot,
     via: "daemon",
   });
 
@@ -160,6 +162,7 @@ async function execViaDaemon(
             code: cleanedCode,
             pageId: options.pageId,
             visualize: options.visualize,
+            diffSnapshot: options.diffSnapshot,
           })
         : await client.readonlyExec({
             code: cleanedCode,
@@ -342,6 +345,7 @@ async function runExec(
     visualize?: boolean;
     pageId?: string;
     mode?: ExecMode;
+    diffSnapshot?: boolean;
   } = {},
 ): Promise<void> {
   const state = readSessionStateOrThrow(session);
@@ -710,11 +714,15 @@ export const execInput = SimpleCLI.input({
     visualize: SimpleCLI.flag({
       help: "Enable ghost cursor + highlight visualization",
     }),
+    diffSnapshot: SimpleCLI.flag({
+      name: "diff-snapshot",
+      help: "After a successful mutation, print compact snapshot page-change diffs",
+    }),
     page: pageOption(),
   },
 }).refine(
   (input) => input.code !== undefined,
-  `Usage: libretto exec <code|-> [--session <name>] [--visualize]\n       echo '<code>' | libretto exec - [--session <name>] [--visualize]`,
+  `Usage: libretto exec <code|-> [--session <name>] [--visualize] [--diff-snapshot]\n       echo '<code>' | libretto exec - [--session <name>] [--visualize] [--diff-snapshot]`,
 );
 
 export const execCommand = SimpleCLI.command({
@@ -739,6 +747,7 @@ export const execCommand = SimpleCLI.command({
         visualize: input.visualize,
         pageId: input.page,
         mode: "exec",
+        diffSnapshot: input.diffSnapshot,
       },
     );
   });
