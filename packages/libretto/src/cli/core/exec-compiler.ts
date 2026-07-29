@@ -1,9 +1,8 @@
 /**
  * Shared exec compilation utilities.
  *
- * Used by both the daemon (daemon/exec.ts) and the connect-based
- * session path (execution.ts) to compile user-provided code strings
- * into callable async functions.
+ * Used by the daemon exec path to compile user-provided code strings into
+ * callable async functions.
  */
 
 import * as moduleBuiltin from "node:module";
