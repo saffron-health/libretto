@@ -70,6 +70,8 @@ const REFS_BY_ROLE = new Set([
   "menuitem",
   "tab",
   "slider",
+  "dialog",
+  "alertdialog",
 ]);
 
 const INTERESTING_ATTRIBUTES = new Set([
@@ -84,6 +86,7 @@ const INTERESTING_ATTRIBUTES = new Set([
   "href",
   "src",
   "aria-label",
+  "aria-modal",
   "aria-expanded",
   "aria-pressed",
   "aria-selected",
@@ -557,8 +560,42 @@ function buildSnapshotTree(
   }
 
   const roots = [...byId.values()].filter((node) => !childIds.has(node.nodeId));
-  for (const root of roots) annotateSubtreeSize(root);
-  return roots;
+  const scopedRoots = scopeRootsToOpenModal(roots);
+  for (const root of scopedRoots) annotateSubtreeSize(root);
+  return scopedRoots;
+}
+
+/**
+ * When an open modal/dialog is present (Chromium AX `modal: true`), use that
+ * node as the snapshot root so agents see the focus-trapped UI instead of the
+ * inert page behind it.
+ */
+function scopeRootsToOpenModal(
+  roots: MutableSnapshotNode[],
+): MutableSnapshotNode[] {
+  const modals: MutableSnapshotNode[] = [];
+
+  function visit(node: MutableSnapshotNode): void {
+    if (isOpenModalNode(node)) modals.push(node);
+    for (const child of node.children) visit(child);
+  }
+
+  for (const root of roots) visit(root);
+  if (modals.length === 0) return roots;
+
+  // Last modal in tree order is typically the topmost / most recently opened.
+  const modal = modals[modals.length - 1]!;
+  modal.parent = null;
+  return [modal];
+}
+
+function isOpenModalNode(node: MutableSnapshotNode): boolean {
+  if (node.ignored) return false;
+  if (node.properties.modal === true) return true;
+  return (
+    (node.role === "dialog" || node.role === "alertdialog") &&
+    node.attributes["aria-modal"] === "true"
+  );
 }
 
 function annotateSubtreeSize(node: MutableSnapshotNode): number {
