@@ -222,7 +222,7 @@ function ToolsSection() {
                   <>
                     <span className="text-ink">browser_exec</span>{" "}
                     <span className="text-amber">
-                      &quot;await page.locator(&apos;.titleline &gt; a&apos;).first().click()&quot;
+                      {"{ code: \"await page.locator('.titleline > a').first().click()\", diffSnapshot: true }"}
                     </span>
                   </>
                 }
@@ -245,8 +245,9 @@ function ToolsSection() {
               />
             }
           >
-            Runs Playwright code on the live page. Each call returns a compact
-            snapshot diff that shows what changed.
+            Runs Playwright code on the live page. Pass{" "}
+            <span className="font-mono text-ink">diffSnapshot</span> to get a
+            compact snapshot diff of what changed.
           </ToolCard>
         </div>
 

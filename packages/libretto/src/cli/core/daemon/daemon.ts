@@ -66,7 +66,6 @@ import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { DaemonExecRepl } from "./exec-repl.js";
 import { handleCompactSnapshot } from "./snapshot.js";
-import type { Snapshot } from "../../../shared/snapshot/types.js";
 import { snapshot } from "../../../shared/snapshot/capture-snapshot.js";
 import { diffSnapshots } from "../../../shared/snapshot/diff-snapshots.js";
 import {
@@ -153,8 +152,6 @@ class BrowserDaemon {
   private readonly connectedClis = new Set<IpcPeer<DaemonToCliApi>>();
   private workflowController: WorkflowController | undefined;
   private shutdownPromise: Promise<DaemonCloseResult> | undefined;
-  private readonly latestCompactSnapshotByPage = new WeakMap<Page, Snapshot>();
-
   private constructor(
     private readonly session: string,
     private readonly experiments: Experiments,
@@ -684,22 +681,11 @@ class BrowserDaemon {
     args: Parameters<CliToDaemonApi["snapshot"]>[0],
   ): Promise<ReturnType<CliToDaemonApi["snapshot"]>> {
     const targetPage = this.resolveTargetPage(args.pageId);
-    const result = await this.withRequestTimeout(() =>
-      handleCompactSnapshot(
-        targetPage,
-        this.session,
-        this.logger,
-        {
-          pageId: args.pageId,
-          cachedSnapshot: this.latestCompactSnapshotByPage.get(targetPage),
-          useCachedSnapshot: args.useCachedSnapshot,
-        },
-      ),
+    return this.withRequestTimeout(() =>
+      handleCompactSnapshot(targetPage, this.session, this.logger, {
+        pageId: args.pageId,
+      }),
     );
-    if (!args.useCachedSnapshot) {
-      this.latestCompactSnapshotByPage.set(targetPage, result.snapshot);
-    }
-    return result;
   }
 
   private async withRequestTimeout<T>(
@@ -738,14 +724,17 @@ class BrowserDaemon {
       targetPage = this.resolveTargetPage(args.pageId);
       const page = targetPage;
       const data = await this.withRequestTimeout(async () => {
-        const before =
-          this.latestCompactSnapshotByPage.get(page) ?? (await snapshot(page));
+        const before = args.diffSnapshot ? await snapshot(page) : undefined;
         const result = await handleExec(
           page,
           args.code,
           this.execRepl,
           args.visualize,
         );
+
+        if (!args.diffSnapshot || !before) {
+          return result;
+        }
 
         try {
           const waitResult = await waitForPageStable(page);
@@ -759,21 +748,25 @@ class BrowserDaemon {
 
           const after = await snapshot(page);
           const snapshotDiff = diffSnapshots(before, after);
-          this.latestCompactSnapshotByPage.set(page, after);
           return { ...result, snapshotDiff };
         } catch (error) {
-          this.latestCompactSnapshotByPage.delete(page);
+          const message = error instanceof Error ? error.message : String(error);
           this.logger.warn("compact-exec-diff-failed", {
             session: this.session,
             pageId: args.pageId,
-            error: error instanceof Error ? error.message : String(error),
+            error: message,
           });
-          return result;
+          return {
+            ...result,
+            snapshotDiffError:
+              `Failed to do post-diff snapshot: ${message}. ` +
+              "The exec itself succeeded. Run libretto snapshot if you need the " +
+              "current page state, or omit --diff-snapshot when the page may close.",
+          };
         }
       });
       return { ok: true, data };
     } catch (error) {
-      if (targetPage) this.latestCompactSnapshotByPage.delete(targetPage);
       return this.createExecErrorResult(error);
     }
   }

@@ -8,8 +8,6 @@ import {
 	isUrlAllowed,
 } from "./domain-policy.js";
 import { errorMessage } from "./errors.js";
-import type { Snapshot } from "./snapshot/capture-snapshot.js";
-import { snapshot as captureSnapshot } from "./snapshot/capture-snapshot.js";
 import {
 	AuthProfileError,
 	ProviderCloseError,
@@ -85,8 +83,6 @@ type SessionEntry = {
 	pageById: Map<string, Page>;
 	contextPageListener: (page: Page) => void;
 	pageCloseListenerByPage: Map<Page, () => void>;
-	/** Post-exec snapshot baseline per page for snapshot diffs. */
-	latestSnapshotByPage: Map<Page, Snapshot>;
 }
 
 export type SessionPageSummary = {
@@ -403,33 +399,12 @@ export class SessionRegistry {
 		);
 	}
 
-	/** Baseline for the next exec diff — cached post-exec snapshot or a fresh capture. */
-	async readSnapshotBaseline(
-		sessionId: string,
-		pageId?: string,
-	): Promise<Snapshot> {
-		const entry = this.requireSession(sessionId);
-		const page = this.getCurrentPage(sessionId, pageId);
-		const cached = entry.latestSnapshotByPage.get(page);
-		if (cached) return cached;
-		return captureSnapshot(page);
-	}
-
-	/** Capture after exec and cache for the next call's baseline. */
-	async captureSnapshotAfterExec(
-		sessionId: string,
-		pageId?: string,
-	): Promise<Snapshot> {
-		const entry = this.requireSession(sessionId);
-		const page = this.getCurrentPage(sessionId, pageId);
-		const after = await captureSnapshot(page);
-		entry.latestSnapshotByPage.set(page, after);
-		return after;
-	}
-
-	clearSnapshotCache(sessionId: string): void {
-		const entry = this.sessions.get(sessionId);
-		if (entry) entry.latestSnapshotByPage.clear();
+	/** True when allowedDomains or blockedDomains constrain navigations. */
+	hasNonemptyDomainPolicy(): boolean {
+		return (
+			this.domainPolicy.allowedDomains !== undefined ||
+			Boolean(this.domainPolicy.blockedDomains?.length)
+		);
 	}
 
 	consumeBlockedNavigationError(
@@ -542,7 +517,6 @@ export class SessionRegistry {
 			pageById: new Map(),
 			contextPageListener: () => {},
 			pageCloseListenerByPage: new Map(),
-			latestSnapshotByPage: new Map(),
 		};
 		// Newest page wins, so popups and tabs become current automatically.
 		entry.contextPageListener = (page) => {
@@ -564,7 +538,6 @@ export class SessionRegistry {
 		const closeListener = () => {
 			entry.pageById.delete(pageId);
 			entry.pageCloseListenerByPage.delete(page);
-			entry.latestSnapshotByPage.delete(page);
 			if (entry.currentPage === page) {
 				entry.currentPage = undefined;
 			}
@@ -582,7 +555,6 @@ export class SessionRegistry {
 		}
 		entry.pageCloseListenerByPage.clear();
 		entry.pageById.clear();
-		entry.latestSnapshotByPage.clear();
 		entry.currentPage = undefined;
 	}
 

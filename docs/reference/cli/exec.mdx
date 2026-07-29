@@ -108,6 +108,13 @@ The `page` and `frame` globals are refreshed for each call, including calls that
   and element highlights as Playwright interacts with the page.
 </ParamField>
 
+<ParamField path="--diff-snapshot" type="boolean">
+  After a successful `exec`, wait for the page to settle and print a compact
+  accessibility-tree diff of what changed. Use this for exploratory mutations
+  when you do not know what will change. Omit it when you already know what to
+  check — return that value from `exec`, or run `snapshot` afterward.
+</ParamField>
+
 ### Return values
 
 If the code evaluates to a value, `exec` prints it to stdout:

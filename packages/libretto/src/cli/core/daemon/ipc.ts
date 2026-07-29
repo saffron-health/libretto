@@ -24,19 +24,22 @@ export type DaemonExecArgs = {
   code: string;
   pageId?: string;
   visualize?: boolean;
+  /** When true, capture before/after compact snapshots and return a page-change diff. */
+  diffSnapshot?: boolean;
 };
 
 export type DaemonReadonlyExecArgs = { code: string; pageId?: string };
 
 export type DaemonSnapshotArgs = {
   pageId?: string;
-  useCachedSnapshot?: boolean;
 };
 
 export type DaemonExecSuccess = {
   result: unknown;
   output?: DaemonExecOutput;
   snapshotDiff?: SnapshotDiff;
+  /** Set when `--diff-snapshot` was requested but after-diff capture failed. */
+  snapshotDiffError?: string;
 };
 
 export type DaemonSnapshotResult = {

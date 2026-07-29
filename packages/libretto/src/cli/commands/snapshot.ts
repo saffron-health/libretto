@@ -132,7 +132,6 @@ async function runCompactSnapshot(
   try {
     result = await client.snapshot({
       pageId: args.pageId,
-      useCachedSnapshot: args.ref !== undefined,
     });
   } finally {
     client.destroy();

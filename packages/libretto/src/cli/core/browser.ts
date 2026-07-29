@@ -1,10 +1,4 @@
-import {
-  chromium,
-  type Browser,
-  type BrowserContext,
-  type CDPSession,
-  type Page,
-} from "playwright";
+import { chromium, type Browser } from "playwright";
 import {
   existsSync,
   readFileSync,
@@ -126,38 +120,6 @@ export function normalizeDomain(url: URL): string {
   return url.hostname.replace(/^www\./, "");
 }
 
-async function tryConnectToCDP(
-  endpoint: string,
-  logger: LoggerApi,
-  timeoutMs: number = 5000,
-): Promise<Browser | null> {
-  logger.info("cdp-connect-attempt", { endpoint, timeoutMs });
-  try {
-    const connectPromise = chromium.connectOverCDP(endpoint);
-    const timeoutPromise = new Promise<null>((resolve) =>
-      setTimeout(() => resolve(null), timeoutMs),
-    );
-    const browser = await Promise.race([connectPromise, timeoutPromise]);
-    if (browser) {
-      logger.info("cdp-connect-success", {
-        endpoint,
-        contexts: browser.contexts().length,
-      });
-    } else {
-      logger.warn("cdp-connect-timeout", { endpoint, timeoutMs });
-    }
-    return browser;
-  } catch (err) {
-    logger.error("cdp-connect-error", { error: err, endpoint });
-    return null;
-  }
-}
-
-function isOperationalPage(page: Page): boolean {
-  const url = page.url();
-  return !url.startsWith("devtools://") && !url.startsWith("chrome-error://");
-}
-
 export function disconnectBrowser(
   browser: Browser,
   logger: LoggerApi,
@@ -171,163 +133,11 @@ export function disconnectBrowser(
   }
 }
 
-function resolveOperationalPages(browser: Browser): Page[] {
-  return browser
-    .contexts()
-    .flatMap((context) => context.pages())
-    .filter(isOperationalPage);
-}
-
-type PageReference = {
-  id: string;
-  page: Page;
-};
-
 export type OpenPageSummary = {
   id: string;
   url: string;
   active: boolean;
 };
-
-async function resolvePageId(page: Page): Promise<string> {
-  const cdpSession: CDPSession = await page.context().newCDPSession(page);
-  try {
-    const targetInfo = await cdpSession.send("Target.getTargetInfo");
-    const targetId = (targetInfo as { targetInfo?: { targetId?: unknown } })
-      ?.targetInfo?.targetId;
-    if (typeof targetId !== "string" || targetId.length === 0) {
-      throw new Error(
-        `Could not resolve target id for page at URL "${page.url()}".`,
-      );
-    }
-    return targetId;
-  } finally {
-    await cdpSession.detach();
-  }
-}
-
-async function resolvePageReferences(pages: Page[]): Promise<PageReference[]> {
-  const refs = await Promise.all(
-    pages.map(async (page) => {
-      const id = await resolvePageId(page);
-      return { id, page };
-    }),
-  );
-  return refs;
-}
-
-export async function connect(
-  session: string,
-  logger: LoggerApi,
-  timeoutMs: number = 10000,
-  options?: {
-    pageId?: string;
-    requireSinglePage?: boolean;
-  },
-): Promise<{
-  browser: Browser;
-  context: BrowserContext;
-  page: Page;
-  pageId: string;
-}> {
-  logger.info("connect", { session, timeoutMs });
-  const state = readSessionStateOrThrow(session);
-  const endpoint = state.cdpEndpoint ?? `http://localhost:${state.port}`;
-  const browser = await tryConnectToCDP(endpoint, logger, timeoutMs);
-  if (!browser) {
-    logger.error("connect-no-browser", {
-      session,
-      endpoint,
-      pid: state.pid,
-    });
-    // Provider sessions have no local PID to check liveness.
-    // Don't destroy the remote session on a transient failure —
-    // let the user retry or explicitly close.
-    if (state.provider) {
-      throw new Error(
-        `Could not connect to ${state.provider.name} session for "${session}" at ${endpoint}. ` +
-          `The remote session may still be active. Try again, or close with: libretto close --session ${session}`,
-      );
-    }
-
-    if (state.pid == null || !isPidRunning(state.pid)) {
-      clearSessionState(session, logger);
-      throw new Error(
-        `No browser running for session "${session}". Run 'libretto open <url> --session ${session}' first.`,
-      );
-    }
-
-    throw new Error(
-      `Could not connect to the browser for session "${session}" at ${endpoint}, but the session process (pid ${state.pid}) is still running. Try the command again, or close and reopen the session if it stays stuck.`,
-    );
-  }
-
-  const contexts = browser.contexts();
-  logger.info("connect-contexts", { session, contextCount: contexts.length });
-  if (contexts.length === 0) {
-    logger.error("connect-no-contexts", { session });
-    throw new Error("No browser context found.");
-  }
-
-  const allPages = contexts.flatMap((c) => c.pages());
-  const pages = resolveOperationalPages(browser);
-
-  logger.info("connect-pages", {
-    session,
-    totalPages: allPages.length,
-    filteredPages: pages.length,
-    urls: allPages.map((p) => p.url()),
-  });
-
-  if (pages.length === 0) {
-    logger.error("connect-no-pages", {
-      session,
-      allPageUrls: allPages.map((p) => p.url()),
-    });
-    throw new Error("No pages found.");
-  }
-
-  if (options?.requireSinglePage && !options.pageId && pages.length > 1) {
-    throw new Error(
-      `Multiple pages are open in session "${session}". Pass --page <id> to target a page (run "libretto pages --session ${session}" to list ids).`,
-    );
-  }
-
-  const pageRefs = await resolvePageReferences(pages);
-  const pageRef = options?.pageId
-    ? (pageRefs.find((ref) => ref.id === options.pageId) ?? null)
-    : pageRefs[pageRefs.length - 1]!;
-  if (!pageRef) {
-    throw new Error(
-      `Page "${options?.pageId}" was not found in session "${session}". Run "libretto pages --session ${session}" to list ids.`,
-    );
-  }
-  const page = pageRef.page;
-  const context = page.context();
-
-  page.on("close", () => {
-    logger.error("page-closed-during-command", {
-      session,
-      url: page.url(),
-      trace: new Error("page-closed-trace").stack,
-    });
-  });
-  page.on("crash", () => {
-    logger.error("page-crashed-during-command", {
-      session,
-      url: page.url(),
-    });
-  });
-  browser.on("disconnected", () => {
-    logger.error("browser-disconnected-during-command", {
-      session,
-      trace: new Error("browser-disconnected-trace").stack,
-    });
-  });
-
-  logger.info("connect-success", { session, pageUrl: page.url() });
-  return { browser, context, page, pageId: pageRef.id };
-}
 
 export async function runPages(
   session: string,
