@@ -1,11 +1,8 @@
 import { readFileSync } from "node:fs";
 import * as moduleBuiltin from "node:module";
 import { z } from "zod";
-import { installInstrumentation } from "../../shared/instrumentation/index.js";
 import type { LoggerApi } from "../../shared/logger/index.js";
 import {
-  connect,
-  disconnectBrowser,
   runClose,
   resolveWindowPosition,
   resolveViewport,
@@ -35,10 +32,7 @@ import {
 import {
   getAbsoluteIntegrationPath,
 } from "../core/workflow-runtime.js";
-import {
-  compileExecFunction,
-  stripEmptyCatchHandlers,
-} from "../core/exec-compiler.js";
+import { stripEmptyCatchHandlers } from "../core/exec-compiler.js";
 import {
   DaemonClient,
   type DaemonExecSuccess,
@@ -46,12 +40,6 @@ import {
   type DaemonToCliApi,
 } from "../core/daemon/ipc.js";
 import type { DaemonConfig } from "../core/daemon/config.js";
-import { createReadonlyExecHelpers } from "../core/readonly-exec.js";
-import {
-  readActionLog,
-  readNetworkLog,
-  wrapPageForActionLogging,
-} from "../core/session-logs.js";
 import type { SessionAccessMode } from "../../shared/state/index.js";
 import type { Experiments } from "../core/experiments.js";
 import { SimpleCLI } from "affordance";
@@ -195,148 +183,6 @@ async function execViaDaemon(
   writeDaemonSnapshotDiff(snapshotDiff);
 }
 
-async function execViaCdpFallback(
-  code: string,
-  session: string,
-  logger: LoggerApi,
-  options: {
-    visualize?: boolean;
-    pageId?: string;
-    mode?: ExecMode;
-  },
-): Promise<void> {
-  const visualize = options.visualize ?? false;
-  const pageId = options.pageId;
-  const mode = options.mode ?? "exec";
-  const { cleaned: cleanedCode, strippedCount } = stripEmptyCatchHandlers(code);
-  if (strippedCount > 0) {
-    console.log("(Stripped `.catch(() => {})` — letting errors bubble up)");
-  }
-  logger.info(`${mode}-start`, {
-    session,
-    codeLength: cleanedCode.length,
-    codePreview: cleanedCode.slice(0, 200),
-    visualize,
-    pageId,
-    via: "cdp-fallback",
-  });
-
-  const {
-    browser,
-    context,
-    page,
-    pageId: resolvedPageId,
-  } = await connect(session, logger, 10000, {
-    pageId,
-  });
-
-  const STALL_THRESHOLD_MS = 60_000;
-  let lastActivityTs = Date.now();
-  const onActivity = () => {
-    lastActivityTs = Date.now();
-  };
-
-  const stallInterval = setInterval(() => {
-    const silenceMs = Date.now() - lastActivityTs;
-    if (silenceMs >= STALL_THRESHOLD_MS) {
-      logger.warn(`${mode}-stall-warning`, {
-        session,
-        silenceMs,
-        codePreview: cleanedCode.slice(0, 200),
-        via: "cdp-fallback",
-      });
-      console.warn(
-        `[stall-warning] No Playwright activity for ${Math.round(silenceMs / 1000)}s — ${mode} may be hung (code: ${cleanedCode.slice(0, 100)}...)`,
-      );
-    }
-  }, STALL_THRESHOLD_MS);
-
-  const execStartTs = Date.now();
-  const sigintHandler = () => {
-    logger.info(`${mode}-interrupted`, {
-      session,
-      duration: Date.now() - execStartTs,
-      codePreview: cleanedCode.slice(0, 200),
-      via: "cdp-fallback",
-    });
-  };
-  process.on("SIGINT", sigintHandler);
-
-  if (mode === "exec") {
-    wrapPageForActionLogging(page, session, resolvedPageId, onActivity);
-  }
-
-  if (visualize && mode === "exec") {
-    await installInstrumentation(page, { visualize: true, logger });
-  }
-
-  try {
-    const execState: Record<string, unknown> = {};
-    const helpers =
-      mode === "readonly-exec"
-        ? createReadonlyExecHelpers(page, { onActivity })
-        : {
-            page,
-            context,
-            state: execState,
-            browser,
-            networkLog: (
-              opts: {
-                last?: number;
-                filter?: string;
-                method?: string;
-                pageId?: string;
-              } = {},
-            ) => readNetworkLog(session, opts),
-            actionLog: (
-              opts: {
-                last?: number;
-                filter?: string;
-                action?: string;
-                source?: string;
-                pageId?: string;
-              } = {},
-            ) => readActionLog(session, opts),
-            console,
-            setTimeout,
-            setInterval,
-            clearTimeout,
-            clearInterval,
-            fetch,
-            URL,
-            Buffer,
-          };
-
-    const helperNames = Object.keys(helpers);
-    const fn = compileExecFunction(cleanedCode, helperNames);
-    const result = await fn(...Object.values(helpers));
-    logger.info(`${mode}-success`, {
-      session,
-      hasResult: result !== undefined,
-      via: "cdp-fallback",
-    });
-    if (result !== undefined) {
-      console.log(
-        typeof result === "string" ? result : JSON.stringify(result, null, 2),
-      );
-    } else {
-      console.log("Executed successfully");
-    }
-  } catch (err) {
-    logger.error(`${mode}-error`, {
-      error: err,
-      session,
-      codePreview: cleanedCode.slice(0, 200),
-      via: "cdp-fallback",
-    });
-    throw err;
-  } finally {
-    clearInterval(stallInterval);
-    process.removeListener("SIGINT", sigintHandler);
-    disconnectBrowser(browser, logger, session);
-  }
-}
-
 async function runExec(
   code: string,
   session: string,
@@ -350,15 +196,10 @@ async function runExec(
 ): Promise<void> {
   const state = readSessionStateOrThrow(session);
   if (!state.daemonSocketPath) {
-    // Compatibility fallback for older sessions that predate daemon-backed
-    // command handling. Keep `exec` inspection working when state has a live
-    // CDP endpoint/port but no daemon socket.
-    logger.warn(`${options.mode ?? "exec"}-daemon-socket-missing-cdp-fallback`, {
-      session,
-      hasCdpEndpoint: Boolean(state.cdpEndpoint),
-      port: state.port,
-    });
-    return execViaCdpFallback(code, session, logger, options);
+    throw new Error(
+      `Session "${session}" has no daemon socket. The browser daemon may have crashed. ` +
+        `Close and reopen the session: libretto close --session ${session}`,
+    );
   }
   return execViaDaemon(code, session, state.daemonSocketPath, logger, options);
 }
