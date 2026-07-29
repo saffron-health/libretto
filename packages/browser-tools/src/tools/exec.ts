@@ -115,7 +115,7 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			// Settle after exec when the caller opted into a snapshot diff, or when
 			// a domain policy may still report an unawaited blocked navigation.
 			const settleAfterExec =
-				Boolean(diffSnapshot) || registry.hasDomainNavigationPolicy();
+				Boolean(diffSnapshot) || registry.hasNonemptyDomainPolicy();
 
 			let snapshotDiff = "";
 			if (settleAfterExec) {
