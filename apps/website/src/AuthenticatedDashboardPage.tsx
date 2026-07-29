@@ -1021,6 +1021,11 @@ function UsersTable({
   }, []);
   const currentUser = data?.users.find((user) => user.id === session.user.id);
   const canManage = currentUser?.role === "owner";
+  const isSoleMember = data?.users.length === 1;
+  const ownerCount =
+    data?.users.filter((user) => user.role === "owner").length ?? 0;
+  const canDeleteAccount =
+    canManage && (isSoleMember || ownerCount > 1);
   async function invite(event: FormEvent) {
     event.preventDefault();
     setBusy("invite");
@@ -1061,6 +1066,27 @@ function UsersTable({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not remove user.");
     } finally {
+      setBusy(null);
+    }
+  }
+  async function deleteAccount() {
+    const deletingWorkspace = isSoleMember;
+    const confirmed = window.confirm(
+      deletingWorkspace
+        ? `Permanently delete your account and the ${data?.organization.name ?? "current"} workspace, including its data, API keys, and billing?`
+        : "Permanently delete your Libretto Cloud account, sign-in methods, sessions, API keys, and workspace membership?",
+    );
+    if (!confirmed) return;
+
+    setBusy("delete-account");
+    setError(null);
+    try {
+      await orpcCall("/v1/dashboard/deleteAccount");
+      window.location.assign("/");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not delete account.",
+      );
       setBusy(null);
     }
   }
@@ -1156,7 +1182,7 @@ function UsersTable({
                 </td>
                 <td className={tdClass}>{formatDate(user.created_at)}</td>
                 <td className={tdClass}>
-                  {canManage && user.id !== session.user.id && (
+                  {user.id !== session.user.id && canManage ? (
                     <button
                       type="button"
                       disabled={busy === user.id}
@@ -1165,7 +1191,7 @@ function UsersTable({
                     >
                       Remove
                     </button>
-                  )}
+                  ) : null}
                 </td>
               </tr>
             ))}
@@ -1174,6 +1200,32 @@ function UsersTable({
         {data === null && !error && <LoadingTable />}
         {data?.users.length === 0 && <EmptyTable message="No users yet." />}
       </TableShell>
+      {data && canDeleteAccount && (
+        <details className="group text-xs text-muted">
+          <summary className="w-fit cursor-pointer select-none hover:text-ink">
+            Account options
+          </summary>
+          <div className="mt-3 flex flex-col gap-4 rounded-lg border border-rule/80 bg-panel/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-3xl leading-5">
+              {isSoleMember
+                ? "Delete your account and this workspace, including its data, API keys, and billing."
+                : "Delete your account, sign-in methods, sessions, API keys, and workspace membership."}
+            </p>
+            <button
+              type="button"
+              disabled={busy === "delete-account"}
+              onClick={() => void deleteAccount()}
+              className="h-8 shrink-0 self-start rounded border border-red-400/20 px-3 text-[11px] text-red-200/75 hover:border-red-300/40 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
+            >
+              {busy === "delete-account"
+                ? "Deleting…"
+                : isSoleMember
+                  ? "Delete account and workspace"
+                  : "Delete account"}
+            </button>
+          </div>
+        </details>
+      )}
     </div>
   );
 }
