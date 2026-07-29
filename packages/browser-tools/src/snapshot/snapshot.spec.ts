@@ -128,6 +128,39 @@ describe("renderSnapshot", () => {
 		);
 	});
 
+	test("scopes the snapshot root to an open aria-modal dialog", async ({
+		expectSnapshot,
+	}) => {
+		await expectSnapshot(
+			outdent`
+				<!doctype html>
+				<title>Shop</title>
+				<main>
+					<h1>Checkout</h1>
+					<button>Pay now</button>
+					<p>Order total $42</p>
+				</main>
+				<div role="dialog" aria-modal="true" aria-label="Confirm delete">
+					<p>Delete this item?</p>
+					<button>Cancel</button>
+					<button>Delete</button>
+				</div>
+			`,
+			outdent`
+				<page title="Shop" url="about:blank">
+					<frame index="0" url="about:blank">
+						<dialog ref="l1">
+							Confirm delete
+							Delete this item?
+							<button ref="l2">Cancel</button>
+							<button ref="l3">Delete</button>
+						</dialog>
+					</frame>
+				</page>
+			`,
+		);
+	});
+
 	test("compacts low-value wrappers, clickable generics, single-child chains, and long child lists", async ({
 		expectSnapshot,
 	}) => {

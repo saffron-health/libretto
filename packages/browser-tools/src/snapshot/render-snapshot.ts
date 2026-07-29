@@ -24,6 +24,8 @@ const PRESERVE_CHILDREN_BY_ROLE = new Set([
   "list",
   "table",
   "tabpanel",
+  "dialog",
+  "alertdialog",
 ]);
 
 const FLATTEN_ROLES = new Set([
@@ -86,6 +88,8 @@ const KEEP_ROLES = new Set([
   "option",
   "tab",
   "slider",
+  "dialog",
+  "alertdialog",
 ]);
 
 const BLOCK_FLATTEN_ROLES = new Set([
