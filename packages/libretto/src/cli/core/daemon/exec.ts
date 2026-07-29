@@ -1,5 +1,6 @@
 import type { Page } from "playwright";
 import { format, formatWithOptions, type InspectOptions } from "node:util";
+import { formatPlaywrightErrorMessage } from "../../../shared/errors/playwright-timeout.js";
 import { installInstrumentation } from "../../../shared/instrumentation/index.js";
 import { compileExecFunction } from "../exec-compiler.js";
 import { createReadonlyExecHelpers } from "../readonly-exec.js";
@@ -66,7 +67,10 @@ export async function handleExec(
 
   const result = await execRepl.run(code, helpers);
   if (!result.ok) {
-    throw new DaemonExecError(result.error.message, result.output);
+    throw new DaemonExecError(
+      formatPlaywrightErrorMessage(result.error),
+      result.output,
+    );
   }
   return { result: result.result, output: result.output };
 }
@@ -86,7 +90,7 @@ export async function handleReadonlyExec(
     return { result, output: buffered.output };
   } catch (error) {
     throw new DaemonExecError(
-      error instanceof Error ? error.message : String(error),
+      formatPlaywrightErrorMessage(error),
       buffered.output,
     );
   }

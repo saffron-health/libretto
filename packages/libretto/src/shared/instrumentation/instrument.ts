@@ -14,6 +14,7 @@ import {
   showHighlight,
   clearHighlights,
 } from "../visualization/highlight.js";
+import { isPlaywrightTimeoutError } from "../errors/playwright-timeout.js";
 import { enrichTimeoutError } from "./errors.js";
 
 export type InstrumentationOptions = {
@@ -139,7 +140,7 @@ function wrapLocatorActions(
           void enqueue(page, () => visualizeAfterAction(page));
         }
         // Enrich timeout errors for pointer actions
-        if (POINTER_ACTIONS.has(method) && isTimeoutError(err)) {
+        if (POINTER_ACTIONS.has(method) && isPlaywrightTimeoutError(err)) {
           await enrichTimeoutError(err, locator, page);
         }
         throw err;
@@ -254,15 +255,6 @@ function instrumentFrameLocator(
   return frameLocator;
 }
 
-function isTimeoutError(err: any): boolean {
-  if (!err || typeof err.message !== "string") return false;
-  return (
-    err.message.includes("Timeout") ||
-    err.message.includes("timeout") ||
-    err.name === "TimeoutError"
-  );
-}
-
 const PAGE_LOCATOR_FACTORIES = [
   "locator",
   "getByRole",
@@ -332,7 +324,7 @@ export async function installInstrumentation(
         }
         if (
           POINTER_ACTIONS.has(method) &&
-          isTimeoutError(err) &&
+          isPlaywrightTimeoutError(err) &&
           typeof args[0] === "string"
         ) {
           await enrichTimeoutError(err, page.locator(args[0]), page);

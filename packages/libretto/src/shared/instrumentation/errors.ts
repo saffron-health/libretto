@@ -1,17 +1,42 @@
 import type { Page, Locator } from "playwright";
+import {
+  enrichPlaywrightTimeoutMessage,
+  isPlaywrightTimeoutError,
+} from "../errors/playwright-timeout.js";
 
 /**
- * Enrich a timeout error from a pointer action (click/dblclick/hover) with
- * diagnostic information about why the action may have failed.
+ * Enrich a timeout error from a pointer action (click/dblclick/hover).
  *
- * Mutates err.message in-place to append the enrichment.
- * Best-effort: if any probe fails, we skip that check silently.
+ * Prefer Playwright's own Call-log actionability reason (promoted into the
+ * timeout headline). Fall back to live page probes only when the Call log has
+ * no actionability line.
+ *
+ * Mutates err.message in-place. Best-effort: probe failures are ignored.
  */
 export async function enrichTimeoutError(
   err: any,
   locator: Locator,
   page: Page,
 ): Promise<void> {
+  if (!err || typeof err.message !== "string") return;
+
+  const before = err.message as string;
+  const fromCallLog = enrichPlaywrightTimeoutMessage(before);
+  if (fromCallLog !== before) {
+    err.message = fromCallLog;
+    return;
+  }
+
+  if (!isPlaywrightTimeoutError(err) && !/Timeout \d+ms exceeded/i.test(before)) {
+    return;
+  }
+
+  // Headline already has a reason, or Call log had none — only probe as fallback
+  // when the headline is still a bare timeout.
+  if (!/Timeout \d+ms exceeded\.\s*$/m.test(before.split("\n")[0] ?? "")) {
+    return;
+  }
+
   const reasons: string[] = [];
 
   try {
@@ -20,7 +45,6 @@ export async function enrichTimeoutError(
       reasons.push("Element is not visible");
     }
 
-    // isInViewport is available in modern Playwright but may not exist in older versions
     if (typeof (locator as any).isInViewport === "function") {
       const inViewport = await (locator as any)
         .isInViewport()
@@ -35,7 +59,6 @@ export async function enrichTimeoutError(
       reasons.push("Element is not enabled (disabled)");
     }
 
-    // If the element appears visible and in viewport, check for intercepting elements
     if (reasons.length === 0) {
       const box = await locator.boundingBox().catch(() => null);
       if (box) {
@@ -50,7 +73,6 @@ export async function enrichTimeoutError(
               const topEl = els[0];
               if (!topEl) return null;
 
-              // Build a brief preview of the intercepting element
               const tag = topEl.tagName.toLowerCase();
               const id = topEl.id ? `#${topEl.id}` : "";
               const cls = topEl.className
