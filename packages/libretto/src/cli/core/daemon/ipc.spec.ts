@@ -12,11 +12,18 @@ describe("daemon IPC endpoint paths", () => {
     expect(socketPath).not.toContain(".sock");
   });
 
-  test("uses the system temp directory on Unix-like platforms", () => {
+  test("uses the system temp directory on Linux", () => {
     const socketPath = getDaemonSocketPath("unix-session", "linux");
 
     expect(dirname(socketPath)).toBe(tmpdir());
     expect(socketPath).toMatch(/libretto-[a-f0-9]{12}\.sock$/);
+  });
+
+  test("uses a short socket path on macOS", () => {
+    const socketPath = getDaemonSocketPath("macos-session", "darwin");
+
+    expect(socketPath).toMatch(/^\/tmp\/libretto-[a-f0-9]{12}\.sock$/);
+    expect(Buffer.byteLength(socketPath)).toBeLessThan(104);
   });
 
   test("keeps daemon IPC endpoints deterministic per session", () => {

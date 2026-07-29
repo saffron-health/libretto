@@ -170,9 +170,9 @@ export type DaemonClientSpawnResult = {
 /**
  * Deterministic IPC endpoint for a given session.
  *
- * Unix-like platforms use a socket path in the system temp directory. Windows
- * uses a named pipe path because filesystem Unix domain socket paths are not
- * portable there.
+ * Linux uses a socket path in the system temp directory. macOS uses `/tmp` to
+ * stay within its Unix socket path limit. Windows uses a named pipe path
+ * because filesystem Unix domain socket paths are not portable there.
  *
  * The hash combines `REPO_ROOT`, the session name, and a user key so different
  * repos, sessions, or local users never collide.
@@ -189,6 +189,12 @@ export function getDaemonSocketPath(
 
   if (platform === "win32") {
     return `\\\\.\\pipe\\libretto-${hash}`;
+  }
+
+  if (platform === "darwin") {
+    // macOS limits Unix socket paths to about 104 bytes. Its per-user tmpdir()
+    // path is often too long, while /tmp is a stable short alias.
+    return `/tmp/libretto-${hash}.sock`;
   }
 
   return join(tmpdir(), `libretto-${hash}.sock`);
