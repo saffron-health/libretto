@@ -371,6 +371,29 @@ test("browser_exec returns snapshotDiff only when diffSnapshot is true", async (
 	});
 });
 
+test("browser_exec keeps success and reports post-diff failure when the page closes", async ({
+	openTool,
+	execTool,
+}) => {
+	const opened = await openTool.execute({
+		url: "data:text/html,<title>closing</title>",
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const result = await execTool.execute({
+		sessionId: opened.sessionId,
+		diffSnapshot: true,
+		code: "await page.close(); return 'closed ok'",
+	});
+	expect(result).toMatchObject({
+		ok: true,
+		result: "closed ok",
+	});
+	expect(result.ok && result.snapshotDiff).toContain(
+		"Failed to do post-diff snapshot:",
+	);
+});
+
 test("browser_exec returns ok false for an unknown session ID", async ({
 	execTool,
 }) => {

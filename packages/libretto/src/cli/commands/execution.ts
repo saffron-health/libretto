@@ -165,7 +165,7 @@ async function execViaDaemon(
     throw new Error(response.message);
   }
 
-  const { result, output, snapshotDiff } = response.data;
+  const { result, output, snapshotDiff, snapshotDiffError } = response.data;
   writeDaemonExecOutput(output);
 
   logger.info(`${mode}-success`, {
@@ -181,6 +181,9 @@ async function execViaDaemon(
     console.log("Executed successfully");
   }
   writeDaemonSnapshotDiff(snapshotDiff);
+  if (snapshotDiffError) {
+    console.error(snapshotDiffError);
+  }
 }
 
 async function runExec(

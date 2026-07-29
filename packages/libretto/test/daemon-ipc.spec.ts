@@ -490,7 +490,7 @@ throw new Error('expected late exec failure');
     );
     expect(result.stdout).toContain("closed ok");
     expect(result.stdout).not.toContain("Page changes:");
-    expect(result.stderr).not.toContain("Target page, context or browser has been closed");
+    expect(result.stderr).toContain("Failed to do post-diff snapshot:");
   }, 45_000);
 
   test("readonly-exec does not print page changes", async ({

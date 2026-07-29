@@ -750,12 +750,19 @@ class BrowserDaemon {
           const snapshotDiff = diffSnapshots(before, after);
           return { ...result, snapshotDiff };
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
           this.logger.warn("compact-exec-diff-failed", {
             session: this.session,
             pageId: args.pageId,
-            error: error instanceof Error ? error.message : String(error),
+            error: message,
           });
-          return result;
+          return {
+            ...result,
+            snapshotDiffError:
+              `Failed to do post-diff snapshot: ${message}. ` +
+              "The exec itself succeeded. Run libretto snapshot if you need the " +
+              "current page state, or omit --diff-snapshot when the page may close.",
+          };
         }
       });
       return { ok: true, data };

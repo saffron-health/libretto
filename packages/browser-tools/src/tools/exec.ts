@@ -68,10 +68,10 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			"Page), `context` (BrowserContext), `browser` (Browser). TypeScript is " +
 			"fine. `console.log`/`console.error` output is captured and returned as " +
 			"stdout/stderr. Pass `diffSnapshot: true` to also return `snapshotDiff` — " +
-			"a compact text diff of accessibility-tree changes since the previous " +
-			"opted-in exec (empty when unchanged). Use that for exploratory mutations " +
-			"when you do not know what will change; omit it otherwise. Failures come " +
-			"back as `{ ok: false, error }` — read the error, fix the code, and try again.",
+			"a compact text diff of accessibility-tree changes from just before this " +
+			"exec (empty when unchanged). Use that for exploratory mutations when you " +
+			"do not know what will change; omit it otherwise. Failures come back as " +
+			"`{ ok: false, error }` — read the error, fix the code, and try again.",
 		inputSchema: execInputSchema,
 		async execute({
 			sessionId,
@@ -126,8 +126,14 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 						const after = await captureSnapshot(scope.page);
 						snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
 					}
-				} catch {
-					// Keep the successful exec result when after-snapshot capture fails.
+				} catch (err) {
+					// Keep the successful exec result when after-diff capture fails.
+					if (diffSnapshot) {
+						snapshotDiff =
+							`Failed to do post-diff snapshot: ${errorMessage(err)}. ` +
+							"The exec itself succeeded. Call browser_snapshot if you need " +
+							"the current page state, or omit diffSnapshot when the page may close.";
+					}
 				}
 				const stabilizationPolicyError =
 					registry.consumeBlockedNavigationError(scope.page);

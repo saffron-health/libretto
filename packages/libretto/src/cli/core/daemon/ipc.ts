@@ -37,6 +37,8 @@ export type DaemonExecSuccess = {
   result: unknown;
   output?: DaemonExecOutput;
   snapshotDiff?: SnapshotDiff;
+  /** Set when `--diff-snapshot` was requested but after-diff capture failed. */
+  snapshotDiffError?: string;
 };
 
 export type DaemonSnapshotResult = {
