@@ -3,7 +3,8 @@ import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { openSync, closeSync } from "node:fs";
 import * as moduleBuiltin from "node:module";
-import { homedir, userInfo } from "node:os";
+import { homedir, tmpdir, userInfo } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createIpcPeer, type IpcPeer } from "../../../shared/ipc/ipc.js";
 import { connectToIpcSocket } from "../../../shared/ipc/socket-transport.js";
@@ -169,9 +170,9 @@ export type DaemonClientSpawnResult = {
 /**
  * Deterministic IPC endpoint for a given session.
  *
- * Unix-like platforms use a socket path in `/tmp` to stay well under the macOS
- * 104-byte Unix socket path limit. Windows uses a named pipe path because
- * filesystem Unix domain socket paths are not portable there.
+ * Linux uses a socket path in the system temp directory. macOS uses `/tmp` to
+ * stay within its Unix socket path limit. Windows uses a named pipe path
+ * because filesystem Unix domain socket paths are not portable there.
  *
  * The hash combines `REPO_ROOT`, the session name, and a user key so different
  * repos, sessions, or local users never collide.
@@ -190,7 +191,13 @@ export function getDaemonSocketPath(
     return `\\\\.\\pipe\\libretto-${hash}`;
   }
 
-  return `/tmp/libretto-${userKey}-${hash}.sock`;
+  if (platform === "darwin") {
+    // macOS limits Unix socket paths to about 104 bytes. Its per-user tmpdir()
+    // path is often too long, while /tmp is a stable short alias.
+    return `/tmp/libretto-${hash}.sock`;
+  }
+
+  return join(tmpdir(), `libretto-${hash}.sock`);
 }
 
 function getDaemonUserKey(): string {
@@ -198,6 +205,7 @@ function getDaemonUserKey(): string {
 
   try {
     const info = userInfo();
+    if (info.uid >= 0) return String(info.uid);
     if (info.username) return info.username;
   } catch {
     // Fall back below.
