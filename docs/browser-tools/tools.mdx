@@ -53,10 +53,10 @@ Results are JSON-serialized when possible; values that cannot be serialized beco
 </ParamField>
 
 <ParamField path="diffSnapshot" type="boolean">
-  When `true`, wait for the page to settle after a successful exec and return
-  `snapshotDiff` — a compact accessibility-tree diff since the previous opted-in
-  exec (or a fresh baseline). Use for exploratory mutations when you do not know
-  what will change. Defaults to off.
+  When `true`, capture a compact accessibility-tree baseline before the exec,
+  wait for the page to settle after success, then return `snapshotDiff` against
+  a fresh after-tree. Use for exploratory mutations when you do not know what
+  will change. Defaults to off.
 </ParamField>
 
 Success:

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { errorMessage } from "../errors.js";
 import type { ExecScope } from "../exec/exec-engine.js";
 import { runExecCode } from "../exec/exec-engine.js";
+import { snapshot as captureSnapshot } from "../snapshot/capture-snapshot.js";
 import {
 	diffSnapshots,
 	renderSnapshotDiff,
@@ -30,10 +31,10 @@ const execInputSchema = z.object({
 		.boolean()
 		.optional()
 		.describe(
-			"When true, wait for the page to settle after a successful exec and return " +
-				"`snapshotDiff` — a compact accessibility-tree diff since the previous " +
-				"opted-in exec (or a fresh baseline). Use for exploratory mutations when " +
-				"you do not know what will change. Omit or set false to skip the cost.",
+			"When true, capture a compact accessibility-tree baseline before the exec, " +
+				"wait for the page to settle after success, then return `snapshotDiff` " +
+				"against a fresh after-tree. Use for exploratory mutations when you do " +
+				"not know what will change. Omit or set false to skip the cost.",
 		),
 });
 
@@ -103,7 +104,7 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			}
 
 			const before = diffSnapshot
-				? await registry.readSnapshotBaseline(sessionId, pageId)
+				? await captureSnapshot(scope.page)
 				: undefined;
 			const execResult = await runExecCode(code, scope);
 			const executionPolicyError = registry.consumeBlockedNavigationError(
@@ -122,16 +123,11 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 				try {
 					await waitForPageStable(scope.page);
 					if (diffSnapshot && before) {
-						const after = await registry.captureSnapshotAfterExec(
-							sessionId,
-							pageId,
-						);
+						const after = await captureSnapshot(scope.page);
 						snapshotDiff = renderSnapshotDiff(diffSnapshots(before, after));
 					}
 				} catch {
-					if (diffSnapshot) {
-						registry.clearSnapshotCache(sessionId);
-					}
+					// Keep the successful exec result when after-snapshot capture fails.
 				}
 				const stabilizationPolicyError =
 					registry.consumeBlockedNavigationError(scope.page);

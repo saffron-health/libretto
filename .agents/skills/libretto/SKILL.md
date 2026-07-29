@@ -121,8 +121,7 @@ npx libretto session-mode --session my-session
 
 - Use `snapshot` as the primary page observation tool.
 - Run `snapshot` without `--objective` or `--context`; the command prints a screenshot path and compact accessibility tree for the current page.
-- Run `snapshot <ref>` to inspect a subtree from the latest full snapshot. Use ref forms printed in the tree, such as `l16`; numeric-suffix aliases such as `e16` also match `l16`.
-- Run an unscoped snapshot before using refs. Subtree snapshots capture a fresh screenshot but reuse the latest cached tree.
+- Run `snapshot <ref>` to inspect a subtree. Each call captures a fresh screenshot and accessibility tree, then scopes output to that ref. Use ref forms printed in the tree, such as `l16`; numeric-suffix aliases such as `e16` also match `l16`.
 - Use it before guessing at selectors, after workflow failures, and whenever the visible page state is unclear.
 
 ```bash
@@ -142,7 +141,7 @@ npx libretto snapshot --session debug-example --page <page-id>
 - Do not run multiple `exec` commands in parallel.
 - Do not use `exec` in read-only diagnosis flows. Use `readonly-exec` from the `libretto-readonly` skill for those sessions.
 - Snapshot diffs are opt-in. Pass `--diff-snapshot` when you mutate the page and do not know what will change (for example clicking an unfamiliar control). Prefer returning a specific value or running `snapshot` when you already know what to check.
-- Without `--diff-snapshot`, `exec` skips the before/after compact snapshot work. After mutations, run a fresh `snapshot` before using refs if you need an up-to-date tree.
+- Without `--diff-snapshot`, `exec` skips the before/after compact snapshot work.
 
 ```bash
 npx libretto exec "await page.url()"

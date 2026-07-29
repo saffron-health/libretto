@@ -616,7 +616,7 @@ test("domain policy rejects a connected browser already showing a blocked page",
 	if (disposed instanceof Error) throw disposed;
 });
 
-test("browser_exec snapshot diff uses per-page cache across mixed pageId calls", async ({
+test("browser_exec snapshot diffs each call against a fresh before-tree", async ({
 	openTool,
 	execTool,
 	statusTool,

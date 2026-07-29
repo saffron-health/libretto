@@ -17,8 +17,8 @@ npx libretto snapshot --session debug-example
 
 <ParamField path="ref" type="string">
   Optional element ref to scope output to that subtree, for example `l16` or
-  `e16`. Run an unscoped snapshot first; subtree snapshots capture a fresh
-  screenshot but reuse the latest cached tree for that page.
+  `e16`. Each call captures a fresh screenshot and accessibility tree, then
+  scopes the printed tree to that ref.
 </ParamField>
 
 ### Required flags

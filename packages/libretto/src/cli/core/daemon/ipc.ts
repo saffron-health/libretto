@@ -31,7 +31,6 @@ export type DaemonReadonlyExecArgs = { code: string; pageId?: string };
 
 export type DaemonSnapshotArgs = {
   pageId?: string;
-  useCachedSnapshot?: boolean;
 };
 
 export type DaemonExecSuccess = {

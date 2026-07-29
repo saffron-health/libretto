@@ -30,33 +30,12 @@ export async function handleCompactSnapshot(
   logger: LoggerApi,
   options: {
     pageId?: string;
-    cachedSnapshot?: Snapshot | null;
-    useCachedSnapshot?: boolean;
   } = {},
 ): Promise<{
   mode: "compact";
   pngPath: string;
   snapshot: Snapshot;
 }> {
-  if (options.useCachedSnapshot) {
-    if (!options.cachedSnapshot) {
-      throw new Error(
-        `No compact snapshot is cached for session "${session}". Run libretto snapshot --session ${session} first.`,
-      );
-    }
-    const screenshot = await captureSnapshotScreenshot(
-      targetPage,
-      session,
-      logger,
-      options.pageId,
-    );
-    return {
-      mode: "compact",
-      pngPath: screenshot.pngPath,
-      snapshot: options.cachedSnapshot,
-    };
-  }
-
   const waitResult = await waitForPageStable(targetPage);
   if (!waitResult.ok) {
     logger.warn("compact-snapshot-stability-wait-incomplete", {
