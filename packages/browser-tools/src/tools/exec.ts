@@ -84,8 +84,9 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			"exec (empty when unchanged). Use that for exploratory mutations when you " +
 			"do not know what will change; omit it otherwise. Each call times out after " +
 			`${DEFAULT_EXEC_TIMEOUT_MS}ms by default — pass timeoutMs to raise the limit ` +
-			"for slow work. Failures come back as `{ ok: false, error }` — read the " +
-			"error, fix the code, and try again.",
+			"for slow work. On timeout, in-flight Playwright actions are aborted and the " +
+			"call drains before returning so the next exec does not overlap. Failures " +
+			"come back as `{ ok: false, error }` — read the error, fix the code, and try again.",
 		inputSchema: execInputSchema,
 		async execute({
 			sessionId,

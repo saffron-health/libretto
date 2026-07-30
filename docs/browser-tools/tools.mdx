@@ -61,8 +61,10 @@ Results are JSON-serialized when possible; values that cannot be serialized beco
 
 <ParamField path="timeoutMs" type="number">
   Max wall-clock time for this exec in milliseconds. Defaults to `10000` (10
-  seconds). Increase for slow navigations or long waits. Timeouts return
-  `{ ok: false, error }` — raise `timeoutMs` or simplify the code and retry.
+  seconds). Increase for slow navigations or long waits. On timeout, in-flight
+  Playwright actions are aborted and the call drains before returning
+  `{ ok: false, error }` so a later exec does not overlap — raise `timeoutMs`
+  or simplify the code and retry.
 </ParamField>
 
 Success:

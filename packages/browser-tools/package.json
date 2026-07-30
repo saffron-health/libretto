@@ -77,7 +77,7 @@
   "dependencies": {
     "@standard-schema/spec": "^1.0.0",
     "errore": "^0.14.1",
-    "playwright": "^1.58.2",
+    "playwright": "^1.62.0",
     "sucrase": "^3.35.0",
     "zod": "^4.3.6"
   },
