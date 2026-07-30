@@ -5,6 +5,9 @@ packages:
   - "evals"
   - "packages/*"
 
+catalog:
+  playwright: ^1.62.0
+
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - "@holocron.so/*"
