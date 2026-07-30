@@ -38,7 +38,7 @@ Add a CLI entry that creates `McpServer`, registers tools via existing `register
 - [x] Flags: `--headed`, `--allowed-domain` (repeatable), `--blocked-domain` (repeatable), `--help`
 - [x] Accept optional `mcp` subcommand; bare invocation also starts the server (Playwright MCP-style).
 - [x] Default headless.
-- [x] Update `docs/browser-tools/adapters/mcp.mdx` with npx / Hermes / OpenClaw config snippets.
+- [x] Update `docs/browser-tools/adapters/mcp.mdx` with the npx install snippet; add host pages for Hermes and OpenClaw.
 - [x] Tests: parse-args user-visible errors; spawn CLI over stdio and list tools / open+exec.
 
 Success criteria:
