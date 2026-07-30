@@ -16,6 +16,8 @@ const snapshotInputSchema = z.object({
 		.describe("When true, also return a PNG screenshot as base64 bytes."),
 	pageId: z
 		.string()
+		.trim()
+		.min(1)
 		.optional()
 		.describe(
 			'Optional page ID from browser_status. Defaults to the most recently opened tab.',

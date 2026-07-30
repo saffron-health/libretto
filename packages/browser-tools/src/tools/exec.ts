@@ -23,6 +23,8 @@ const execInputSchema = z.object({
 		),
 	pageId: z
 		.string()
+		.trim()
+		.min(1)
 		.optional()
 		.describe(
 			'Optional page ID from browser_status. Defaults to the most recently opened tab.',

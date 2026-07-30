@@ -309,7 +309,7 @@ export class SessionRegistry {
 
 	getCurrentPage(sessionId: string, pageId?: string): Page {
 		const entry = this.requireSession(sessionId);
-		if (pageId) {
+		if (pageId !== undefined) {
 			const page = entry.pageById.get(pageId);
 			if (!page || page.isClosed()) {
 				throw new Error(

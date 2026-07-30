@@ -704,6 +704,26 @@ test("browser_exec returns ok false for a stale page ID", async ({
 	expect(result.error).toMatch(/browser_status/);
 });
 
+test("browser_exec does not treat an empty page ID as the current page", async ({
+	openTool,
+	execTool,
+}) => {
+	const opened = await openTool.execute({
+		url: "data:text/html,<title>current-page</title>",
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const result = await execTool.execute({
+		sessionId: opened.sessionId,
+		pageId: "",
+		code: "return page.title()",
+	});
+	expect(result.ok).toBe(false);
+	if (result.ok) return;
+	expect(result.error).toMatch(/Unknown page ID/);
+	expect(result.error).toMatch(/browser_status/);
+});
+
 test("browser_snapshot returns ok false for a stale page ID", async ({
 	openTool,
 	snapshotTool,

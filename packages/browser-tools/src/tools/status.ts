@@ -11,6 +11,8 @@ const statusInputSchema = z.object({
 		.describe('Session ID from browser_open or browser_connect, e.g. "ses-4f2a".'),
 	pageId: z
 		.string()
+		.trim()
+		.min(1)
 		.optional()
 		.describe('Page ID from browser_status, e.g. "page-a1b2".'),
 });
