@@ -1,6 +1,6 @@
 # Browser harness benchmark results
 
-Results from three full Browser Use Cloud runs completed July 17–20, 2026, plus a later `browser-tools`-only Kernel re-run on July 29, 2026 after snapshot diffs became opt-in.
+Results from three full Browser Use Cloud runs completed July 17–20, 2026, a later `browser-tools`-only Kernel re-run on July 29, 2026 after snapshot diffs became opt-in, and a July 30, 2026 Kernel re-run after adding `browser_search`.
 
 ## Methodology
 
@@ -9,6 +9,7 @@ Results from three full Browser Use Cloud runs completed July 17–20, 2026, plu
 - GPT-5.6 Sol ran through the Pi agent with concurrency 5.
 - July 17–20 runs used Browser Use Cloud with a US proxy. Every full run scheduled 104 attempts: 26 tasks per harness.
 - The July 29 re-run used Kernel and only the `browser-tools` harness (26 attempts), with opt-in `diffSnapshot` on `browser_exec`.
+- The July 30 re-run used Kernel and only the `browser-tools` harness after adding `browser_search`.
 - A separate judge scored raw Pi events. Reporting a CAPTCHA, access denial, timeout, or tool failure counted as incomplete.
 - Cost, token, duration, and tool-call metrics below cover the task agent, not the judge.
 
@@ -29,7 +30,25 @@ pnpm --dir packages/browser-tools exec tsx benchmarks/index.ts run \
   --concurrency 5
 ```
 
-## Latest `browser-tools` run (Kernel, opt-in diffs)
+## Latest `browser-tools` run (Kernel, with `browser_search`)
+
+July 30, 2026. Run `2026-07-30T22-05-43-142Z-167296`. Agents could call the new `browser_search` HTML regex tool alongside the existing tools.
+
+| Metric | Value |
+|---|---:|
+| Passed | 24/26 |
+| Completed | 26/26 |
+| Avg duration | 64.0s |
+| Agent tokens | 1.75M |
+| Agent cost | $3.17 |
+| Tool calls | 234 |
+| Wall time | 7m 7s |
+
+Failures were anti-bot: Walmart and Yelp. Agents called `browser_search` 22 times across 16 of 26 cases. Tool mix: `browser_open` 26, `browser_exec` 112, `browser_snapshot` 48, `browser_search` 22, `browser_close` 26.
+
+Compared with the July 29 Kernel opt-in-diff run (23/26), this run passed one more case (Reddit succeeded) and finished faster on average (64.0s vs 88.6s). Token and cost totals were higher ($3.17 vs $2.78). Provider and live anti-bot state vary between runs, so the comparison is not causal for `browser_search`.
+
+## Prior `browser-tools` run (Kernel, opt-in diffs)
 
 July 29, 2026. Snapshot diffs were off unless the agent passed `diffSnapshot: true`.
 
