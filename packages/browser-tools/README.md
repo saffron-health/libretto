@@ -97,7 +97,7 @@ npx playwright install chromium
 }
 ```
 
-See the [MCP adapter docs](https://libretto.sh/docs/browser-tools/adapters/mcp) for Hermes, OpenClaw, flags, and the library API.
+See the [MCP adapter docs](https://libretto.sh/docs/browser-tools/adapters/mcp) for flags and the library API. Host guides: [Hermes](https://libretto.sh/docs/browser-tools/adapters/hermes), [OpenClaw](https://libretto.sh/docs/browser-tools/adapters/openclaw).
 
 ## Docs
 

@@ -37,28 +37,10 @@ Flags:
 
 The server exposes `browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, and `browser_close`.
 
-### Hermes
+Host-specific setup:
 
-Add the server under `mcp_servers` in `~/.hermes/config.yaml`. To use Browser Tools instead of Hermes' built-in browser stack, disable the `browser` toolset:
-
-```yaml theme={null}
-mcp_servers:
-  libretto:
-    command: npx
-    args: ["-y", "libretto-browser-tools"]
-
-agent:
-  disabled_toolsets:
-    - browser
-```
-
-### OpenClaw
-
-```bash theme={null}
-openclaw mcp add libretto -- npx -y libretto-browser-tools
-```
-
-Disable OpenClaw's bundled browser plugin if you want the agent to use only Browser Tools (see [OpenClaw browser docs](https://docs.openclaw.ai/tools/browser)).
+- [Hermes Agent](/browser-tools/adapters/hermes)
+- [OpenClaw](/browser-tools/adapters/openclaw)
 
 ## Library: registerMcpBrowserTools
 
@@ -115,4 +97,6 @@ The adapter publishes safety annotations for each tool. `browser_exec` is marked
 ## See also
 
 - [Tools](/browser-tools/tools) — inputs and outputs for each tool
+- [Hermes](/browser-tools/adapters/hermes) — Hermes Agent install
+- [OpenClaw](/browser-tools/adapters/openclaw) — OpenClaw install
 - [Custom adapters](/browser-tools/adapters/custom) — wrap `createBrowserTools` for another framework
