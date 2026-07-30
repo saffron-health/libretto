@@ -1,6 +1,12 @@
 import type { LanguageModel } from "ai";
 
-export type Provider = "google" | "vertex" | "anthropic" | "openai" | "openrouter";
+export type Provider =
+  | "google"
+  | "vertex"
+  | "anthropic"
+  | "openai"
+  | "openrouter"
+  | "minimax";
 
 const GEMINI_API_KEY_ENV_VARS = [
   "GEMINI_API_KEY",
@@ -12,6 +18,26 @@ const VERTEX_PROJECT_ENV_VARS = [
   "GCLOUD_PROJECT",
 ] as const;
 
+// MiniMax exposes OpenAI-compatible and Anthropic-compatible endpoints. The
+// global endpoint (api.minimax.io) and the China endpoint (api.minimaxi.com)
+// share the same path layout: the OpenAI-compatible base is `${host}/v1` and
+// the Anthropic-compatible base is `${host}/anthropic`.
+const MINIMAX_GLOBAL_HOST = "https://api.minimax.io";
+const MINIMAX_CHINA_HOST = "https://api.minimaxi.com";
+
+function isMinimaxChinaRegion(): boolean {
+  const region = process.env.MINIMAX_REGION?.trim().toLowerCase();
+  return region === "cn" || region === "cn_zh" || region === "china";
+}
+
+function resolveMinimaxOpenAiBaseUrl(): string {
+  return `${isMinimaxChinaRegion() ? MINIMAX_CHINA_HOST : MINIMAX_GLOBAL_HOST}/v1`;
+}
+
+function resolveMinimaxAnthropicBaseUrl(): string {
+  return `${isMinimaxChinaRegion() ? MINIMAX_CHINA_HOST : MINIMAX_GLOBAL_HOST}/anthropic`;
+}
+
 const SUPPORTED_PROVIDER_ALIASES = {
   google: "google",
   gemini: "google",
@@ -20,6 +46,7 @@ const SUPPORTED_PROVIDER_ALIASES = {
   codex: "openai",
   openai: "openai",
   openrouter: "openrouter",
+  minimax: "minimax",
 } as const satisfies Record<string, Provider>;
 
 function readFirstEnvValue(
@@ -52,7 +79,7 @@ export function parseModel(model: string): {
 
   if (!provider) {
     throw new Error(
-      `Unsupported provider "${providerInput}". Supported providers: openai/codex, anthropic, google (Gemini API), vertex, and openrouter.`,
+      `Unsupported provider "${providerInput}". Supported providers: openai/codex, anthropic, google (Gemini API), vertex, openrouter, and minimax.`,
     );
   }
 
@@ -74,6 +101,8 @@ export function hasProviderCredentials(
       return Boolean(env.OPENAI_API_KEY?.trim());
     case "openrouter":
       return Boolean(env.OPENROUTER_API_KEY?.trim());
+    case "minimax":
+      return Boolean(env.MINIMAX_API_KEY?.trim());
   }
 }
 
@@ -91,6 +120,9 @@ export function missingProviderCredentialsMessage(provider: Provider): string {
     }
     case "openrouter": {
       return "OpenRouter API key is missing. Set OPENROUTER_API_KEY.";
+    }
+    case "minimax": {
+      return "MiniMax API key is missing. Set MINIMAX_API_KEY.";
     }
   }
 }
@@ -155,6 +187,33 @@ async function getProviderModel(
         baseURL: "https://openrouter.ai/api/v1",
       });
       return openrouter(modelId);
+    }
+    case "minimax": {
+      const apiKey = process.env.MINIMAX_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error(missingProviderCredentialsMessage(provider));
+      }
+      // MiniMax models are reachable through either the OpenAI-compatible
+      // endpoint (default) or the Anthropic-compatible endpoint. Set
+      // MINIMAX_API_STYLE=anthropic to use the Anthropic-compatible base.
+      const useAnthropicStyle =
+        process.env.MINIMAX_API_STYLE?.trim().toLowerCase() === "anthropic";
+      if (useAnthropicStyle) {
+        // oxlint-disable-next-line libretto/no-await-import -- Human-approved: we don't want to import unless the user is using that subagent.
+        const { createAnthropic } = await import("@ai-sdk/anthropic");
+        const anthropic = createAnthropic({
+          apiKey,
+          baseURL: resolveMinimaxAnthropicBaseUrl(),
+        });
+        return anthropic(modelId);
+      }
+      // oxlint-disable-next-line libretto/no-await-import -- Human-approved: we don't want to import unless the user is using that subagent.
+      const { createOpenAI } = await import("@ai-sdk/openai");
+      const minimax = createOpenAI({
+        apiKey,
+        baseURL: resolveMinimaxOpenAiBaseUrl(),
+      });
+      return minimax(modelId);
     }
   }
 }

@@ -42,6 +42,10 @@ describe("parseAgentModel", () => {
       provider: "anthropic",
       modelId: "claude-sonnet-4-6",
     });
+    expect(parseAgentModel("minimax/MiniMax-M3")).toEqual({
+      provider: "minimax",
+      modelId: "MiniMax-M3",
+    });
   });
 
   it("rejects unsupported provider strings", () => {
