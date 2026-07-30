@@ -48,6 +48,20 @@ Failures were anti-bot: Walmart and Yelp. Agents called `browser_search` 22 time
 
 Excluding the three chronic anti-bot cases (Reddit, Walmart, Yelp): **23/23 passed**, **1.57M tokens**, **$2.80**, avg duration 61.8s, 210 tool calls. Those three alone cost 179k tokens / $0.38.
 
+### Same 23 cases without `browser_search`
+
+July 30, 2026. Run `2026-07-30T22-31-15-567Z-0565d8`. Same Kernel provider and case list, with `BENCHMARK_EXCLUDE_TOOLS=browser_search`.
+
+| Metric | With search | Without search | Delta |
+|---|---:|---:|---:|
+| Passed | 23/23 | 22/23 | −1 (Zillow anti-bot) |
+| Agent tokens | 1.57M | 1.34M | −14% |
+| Agent cost | $2.80 | $2.37 | −15% |
+| Avg duration | 61.8s | 65.7s | +3.9s |
+| Tool calls | 210 | 206 | −4 |
+
+Without search, agents used more `browser_exec` (114 vs 103) and slightly more `browser_snapshot` (45 vs 41). With search they made 20 `browser_search` calls. The no-search failure was Zillow’s Press & Hold challenge; the with-search run passed Zillow.
+
 Compared with the July 29 Kernel opt-in-diff run (23/26), this run passed one more case (Reddit succeeded) and finished faster on average (64.0s vs 88.6s). Token and cost totals were higher ($3.17 vs $2.78). Provider and live anti-bot state vary between runs, so the comparison is not causal for `browser_search`.
 
 Reddit, Walmart, and Yelp are now commented out in `cases.ts` so future suite runs skip them.
