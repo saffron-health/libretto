@@ -13,6 +13,8 @@ import type { ExecTool } from "./tools/exec.js";
 import { createExecTool } from "./tools/exec.js";
 import type { OpenTool } from "./tools/open.js";
 import { createOpenTool } from "./tools/open.js";
+import type { SearchTool } from "./tools/search.js";
+import { createSearchTool } from "./tools/search.js";
 import type { SnapshotTool } from "./tools/snapshot.js";
 import { createSnapshotTool } from "./tools/snapshot.js";
 import type { StatusTool } from "./tools/status.js";
@@ -23,6 +25,7 @@ export type BrowserToolkit = {
 		browser_open: OpenTool;
 		browser_exec: ExecTool;
 		browser_snapshot: SnapshotTool;
+		browser_search: SearchTool;
 		browser_status: StatusTool;
 		browser_close: CloseTool;
 		browser_connect: ConnectTool;
@@ -38,6 +41,7 @@ export type BorrowedPageBrowserToolkit = {
 	tools: {
 		browser_exec: ExecTool;
 		browser_snapshot: SnapshotTool;
+		browser_search: SearchTool;
 		browser_status: StatusTool;
 	};
 	/** Detaches tools without closing the caller-owned page, context, or browser. */
@@ -58,6 +62,7 @@ export function createBrowserTools(
 			browser_open: createOpenTool(registry),
 			browser_exec: createExecTool(registry),
 			browser_snapshot: createSnapshotTool(registry),
+			browser_search: createSearchTool(registry),
 			browser_status: createStatusTool(registry),
 			browser_close: createCloseTool(registry),
 			browser_connect: createConnectTool(registry),
@@ -74,6 +79,7 @@ export function createBrowserToolsForPage(page: Page): BorrowedPageBrowserToolki
 		tools: {
 			browser_exec: createExecTool(registry),
 			browser_snapshot: createSnapshotTool(registry),
+			browser_search: createSearchTool(registry),
 			browser_status: createStatusTool(registry),
 		},
 		dispose: () => registry.dispose(),

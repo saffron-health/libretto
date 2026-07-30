@@ -24,18 +24,20 @@ export const WEBSITE_CASES: WebsiteCase[] = [
 		name: "youtube playwright tutorial search",
 		task: 'Search YouTube for "Playwright tutorial". Tell me the title of the first video result.',
 	},
-	{
-		name: "reddit browser automation thread",
-		task: 'Search Reddit for "browser automation". Open one relevant thread and summarize the top comment.',
-	},
+	// Chronically blocked by anti-bot in Kernel/Browser Use runs — skip for now.
+	// {
+	// 	name: "reddit browser automation thread",
+	// 	task: 'Search Reddit for "browser automation". Open one relevant thread and summarize the top comment.',
+	// },
 	{
 		name: "amazon wireless mouse search",
 		task: 'Search Amazon for "wireless mouse". Tell me the name and price of the first organic result.',
 	},
-	{
-		name: "walmart paper towels search",
-		task: 'Search Walmart for "paper towels". Tell me the first product name, price, and whether pickup is available.',
-	},
+	// Chronically blocked by anti-bot in Kernel/Browser Use runs — skip for now.
+	// {
+	// 	name: "walmart paper towels search",
+	// 	task: 'Search Walmart for "paper towels". Tell me the first product name, price, and whether pickup is available.',
+	// },
 	{
 		name: "target coffee maker search",
 		task: 'Search Target for "coffee maker". Tell me the first product name, price, and rating.',
@@ -72,10 +74,11 @@ export const WEBSITE_CASES: WebsiteCase[] = [
 		name: "realtor.com denver homes search",
 		task: "Search Realtor.com for homes in Denver. Tell me the first listing price and number of bedrooms.",
 	},
-	{
-		name: "yelp brooklyn coffee shops search",
-		task: "Search Yelp for coffee shops in Brooklyn. Tell me the first business name, rating, and review count.",
-	},
+	// Chronically blocked by anti-bot in Kernel/Browser Use runs — skip for now.
+	// {
+	// 	name: "yelp brooklyn coffee shops search",
+	// 	task: "Search Yelp for coffee shops in Brooklyn. Tell me the first business name, rating, and review count.",
+	// },
 	{
 		name: "linkedin public job search",
 		task: 'Search LinkedIn for "browser automation engineer". Tell me if public results are visible without signing in.',

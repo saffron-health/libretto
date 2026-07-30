@@ -15,7 +15,7 @@ import { LocalBrowserProvider } from "libretto-browser-tools";
 const { tools, dispose } = createBrowserTools(new LocalBrowserProvider());
 
 // Each entry is a BrowserTool: { name, description, inputSchema, execute }
-const { browser_open, browser_exec, browser_snapshot, browser_status, browser_close, browser_connect } =
+const { browser_open, browser_exec, browser_snapshot, browser_search, browser_status, browser_close, browser_connect } =
   tools;
 
 // Map into your framework, for example:
@@ -33,4 +33,4 @@ const { browser_open, browser_exec, browser_snapshot, browser_status, browser_cl
 
 Always expose `dispose()` from the host so leftover sessions close when the agent loop ends. For snapshot screenshots, the base tool returns `{ base64, mimeType: "image/png" }` — convert that into your framework's multimodal content type if needed (see the [AI SDK](/browser-tools/adapters/ai-sdk), [Pi](/browser-tools/adapters/pi), and [MCP](/browser-tools/adapters/mcp) adapters).
 
-Borrowed-page toolkits use `createBrowserToolsForPage(page)` and only include `browser_exec`, `browser_snapshot`, and `browser_status`.
+Borrowed-page toolkits use `createBrowserToolsForPage(page)` and only include `browser_exec`, `browser_snapshot`, `browser_search`, and `browser_status`.

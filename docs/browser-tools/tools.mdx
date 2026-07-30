@@ -4,7 +4,7 @@ sidebarTitle: Tools
 "og:image": "https://libretto.sh/docs/og/browser-tools/tools.png"
 ---
 
-> Reference for the six browser tools agents call.
+> Reference for the seven browser tools agents call.
 
 Every tool returns the same envelope: `{ ok: true, ...payload }` on success, or `{ ok: false, error }` for model-fixable failures (unknown session ID, thrown Playwright code). Errors include a next step when possible. Host misconfiguration (missing API keys) and [domain policy](/browser-tools/advanced#domain-policy) violations throw instead of returning `{ ok: false }`.
 
@@ -95,6 +95,24 @@ Capture the current page as a compact text accessibility tree. Nodes include `re
 </ParamField>
 
 Success: `{ ok: true, tree, screenshot? }`.
+
+## browser_search
+
+Search the current page's condensed HTML snapshot with a JavaScript regex. Returns matching regions with surrounding context. Use this when you need markup the accessibility tree may omit — for example `data-*` attributes, hidden fields, or raw tag structure.
+
+<ParamField path="sessionId" type="string" required>
+  Session ID from `browser_open` or `browser_connect`.
+</ParamField>
+
+<ParamField path="pattern" type="string" required>
+  JavaScript regex pattern (RegExp source string) to search for in the formatted HTML.
+</ParamField>
+
+<ParamField path="pageId" type="string">
+  Optional page ID from `browser_status`. Defaults to the most recently opened tab.
+</ParamField>
+
+Success: `{ ok: true, matches, matchCount }`. Each match includes `startLine`, `endLine`, and `lines` (the matching region plus context). An empty `matches` array means nothing matched.
 
 ## browser_status
 

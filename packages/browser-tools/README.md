@@ -41,7 +41,7 @@ import { LocalBrowserProvider } from "libretto-browser-tools";
 
 const { tools, dispose } = createAiSdkBrowserTools(new LocalBrowserProvider());
 // The agent can now call browser_open, browser_connect, browser_exec,
-// browser_snapshot, browser_status, and browser_close.
+// browser_snapshot, browser_search, browser_status, and browser_close.
 
 const result = await generateText({
   model: anthropic("claude-sonnet-4-5"),

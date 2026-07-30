@@ -15,7 +15,7 @@ npx playwright install chromium
 
 ## createAiSdkBrowserTools
 
-Wraps the six browser tools as AI SDK tools for `generateText` / `streamText` / `ToolLoopAgent`.
+Wraps the seven browser tools as AI SDK tools for `generateText` / `streamText` / `ToolLoopAgent`.
 
 ```typescript theme={null}
 import { anthropic } from "@ai-sdk/anthropic";
@@ -57,7 +57,7 @@ Attach tools to an existing Playwright `Page` without owning browser lifecycle:
 import { createAiSdkBrowserToolsForPage } from "libretto-browser-tools/ai-sdk";
 
 const { sessionId, tools, dispose } = createAiSdkBrowserToolsForPage(page);
-// tools: browser_exec, browser_snapshot, browser_status
+// tools: browser_exec, browser_snapshot, browser_search, browser_status
 await dispose(); // detaches tools; does not close the page
 ```
 

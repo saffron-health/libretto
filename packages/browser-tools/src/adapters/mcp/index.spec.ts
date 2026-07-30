@@ -42,7 +42,7 @@ const test = base.extend<{ mcp: McpFixture }>({
 	},
 });
 
-test("MCP clients discover all six browser tools with safety annotations", async ({
+test("MCP clients discover all seven browser tools with safety annotations", async ({
 	mcp,
 }) => {
 	const listed = await mcp.client.listTools();
@@ -52,11 +52,20 @@ test("MCP clients discover all six browser tools with safety annotations", async
 		"browser_connect",
 		"browser_exec",
 		"browser_open",
+		"browser_search",
 		"browser_snapshot",
 		"browser_status",
 	]);
 	expect(
 		listed.tools.find((tool) => tool.name === "browser_snapshot")?.annotations,
+	).toMatchObject({
+		readOnlyHint: true,
+		destructiveHint: false,
+		idempotentHint: true,
+		openWorldHint: true,
+	});
+	expect(
+		listed.tools.find((tool) => tool.name === "browser_search")?.annotations,
 	).toMatchObject({
 		readOnlyHint: true,
 		destructiveHint: false,

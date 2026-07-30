@@ -12,12 +12,22 @@ export async function runBrowserToolsHarness(
 	provider: BrowserProviderName,
 ): Promise<SessionRun> {
 	const toolkit = createPiBrowserTools(createBenchmarkBrowserProvider(provider));
+	const exclude = new Set(
+		(process.env.BENCHMARK_EXCLUDE_TOOLS ?? "")
+			.split(",")
+			.map((name) => name.trim())
+			.filter(Boolean),
+	);
+	const customTools =
+		exclude.size === 0
+			? toolkit.tools
+			: toolkit.tools.filter((tool) => !exclude.has(tool.name));
 	let run: SessionRun;
 	try {
 		run = await runBrowserTask({
 			task,
 			workspace,
-			customTools: toolkit.tools,
+			customTools,
 			appendSystemPrompt: [
 				"Use the provided browser tools to complete the task. Before giving your final answer, close every browser session you opened with browser_close.",
 			],

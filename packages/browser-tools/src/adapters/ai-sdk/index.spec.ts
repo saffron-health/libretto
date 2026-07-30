@@ -88,7 +88,7 @@ const borrowedPageTest = base.extend<{
 	},
 });
 
-test("createAiSdkBrowserTools exposes all six browser tools", ({
+test("createAiSdkBrowserTools exposes all seven browser tools", ({
 	toolkit,
 }) => {
 	expect(Object.keys(toolkit.tools).sort()).toEqual([
@@ -96,6 +96,7 @@ test("createAiSdkBrowserTools exposes all six browser tools", ({
 		"browser_connect",
 		"browser_exec",
 		"browser_open",
+		"browser_search",
 		"browser_snapshot",
 		"browser_status",
 	]);
@@ -113,6 +114,7 @@ borrowedPageTest(
 		const toolkit = createAiSdkBrowserToolsForPage(page);
 		expect(Object.keys(toolkit.tools).sort()).toEqual([
 			"browser_exec",
+			"browser_search",
 			"browser_snapshot",
 			"browser_status",
 		]);

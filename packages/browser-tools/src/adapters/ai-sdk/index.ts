@@ -26,6 +26,7 @@ export function createAiSdkBrowserTools(
 		browser_open,
 		browser_exec,
 		browser_snapshot,
+		browser_search,
 		browser_status,
 		browser_close,
 		browser_connect,
@@ -47,6 +48,11 @@ export function createAiSdkBrowserTools(
 				inputSchema: browser_snapshot.inputSchema,
 				execute: (input) => browser_snapshot.execute(input),
 				toModelOutput: snapshotToModelOutput,
+			}),
+			browser_search: tool({
+				description: browser_search.description,
+				inputSchema: browser_search.inputSchema,
+				execute: (input) => browser_search.execute(input),
 			}),
 			browser_status: tool({
 				description: browser_status.description,
@@ -74,7 +80,8 @@ export function createAiSdkBrowserToolsForPage(page: Page): {
 	dispose(): Promise<BrowserCleanupError | null>;
 } {
 	const base = createBrowserToolsForPage(page);
-	const { browser_exec, browser_snapshot, browser_status } = base.tools;
+	const { browser_exec, browser_snapshot, browser_search, browser_status } =
+		base.tools;
 	return {
 		sessionId: base.sessionId,
 		tools: {
@@ -88,6 +95,11 @@ export function createAiSdkBrowserToolsForPage(page: Page): {
 				inputSchema: browser_snapshot.inputSchema,
 				execute: (input) => browser_snapshot.execute(input),
 				toModelOutput: snapshotToModelOutput,
+			}),
+			browser_search: tool({
+				description: browser_search.description,
+				inputSchema: browser_search.inputSchema,
+				execute: (input) => browser_search.execute(input),
 			}),
 			browser_status: tool({
 				description: browser_status.description,
