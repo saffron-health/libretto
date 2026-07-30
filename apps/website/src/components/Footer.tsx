@@ -60,6 +60,9 @@ export function Footer() {
             <a href="/blog" className={linkClass} data-fathom-event="Footer blog click">
               Blog
             </a>
+            <a href="/privacy" className={linkClass} data-fathom-event="Footer privacy click">
+              Privacy
+            </a>
             <a
               href="/cli#comparisons"
               className={linkClass}
