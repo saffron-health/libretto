@@ -3,6 +3,9 @@ import type { Browser, BrowserContext, Page } from "playwright";
 import { errorMessage } from "../errors.js";
 import type { ToolResult } from "../tool.js";
 
+/** Default wall-clock budget for agent-written exec code. */
+export const DEFAULT_EXEC_TIMEOUT_MS = 10_000;
+
 export type ExecScope = {
 	page: Page;
 	context: BrowserContext;
@@ -14,6 +17,11 @@ export type ExecResult = ToolResult<{
 	stdout: string;
 	stderr: string;
 }>;
+
+export type RunExecCodeOptions = {
+	/** Max wall-clock time for the exec in milliseconds. Defaults to 10000. */
+	timeoutMs?: number;
+}
 
 type AsyncFunctionConstructor = new (
 	...args: string[]
@@ -52,16 +60,25 @@ function toJsonSafe(result: unknown): unknown {
 	}
 }
 
+function timeoutErrorMessage(timeoutMs: number): string {
+	return (
+		`Exec timed out after ${timeoutMs}ms. Pass a larger timeoutMs on browser_exec ` +
+		"for slow work, or simplify the code so it finishes sooner."
+	);
+}
+
 /**
  * Runs agent-written code as the body of a fresh async function — stateless,
  * nothing persists between calls. A top-level `return` produces the result.
- * Code-level failures (parse errors, throws) come back as `ok: false`; this
- * function never throws for them.
+ * Code-level failures (parse errors, throws, timeouts) come back as `ok: false`;
+ * this function never throws for them.
  */
 export async function runExecCode(
 	code: string,
 	scope: ExecScope,
+	options: RunExecCodeOptions = {},
 ): Promise<ExecResult> {
+	const timeoutMs = options.timeoutMs ?? DEFAULT_EXEC_TIMEOUT_MS;
 	const stdoutLines: string[] = [];
 	const stderrLines: string[] = [];
 	const writeTo =
@@ -92,13 +109,30 @@ export async function runExecCode(
 			"console",
 			stripped,
 		);
-		const result = await fn(scope.page, scope.context, scope.browser, consoleProxy);
-		return {
-			ok: true,
-			result: toJsonSafe(result),
-			stdout: stdoutLines.join("\n"),
-			stderr: stderrLines.join("\n"),
-		};
+		const execution = Promise.resolve(
+			fn(scope.page, scope.context, scope.browser, consoleProxy),
+		);
+
+		let timerId: ReturnType<typeof setTimeout> | undefined;
+		const timedOut = new Promise<never>((_resolve, reject) => {
+			timerId = setTimeout(() => {
+				reject(new Error(timeoutErrorMessage(timeoutMs)));
+			}, timeoutMs);
+		});
+
+		try {
+			const result = await Promise.race([execution, timedOut]);
+			return {
+				ok: true,
+				result: toJsonSafe(result),
+				stdout: stdoutLines.join("\n"),
+				stderr: stderrLines.join("\n"),
+			};
+		} finally {
+			if (timerId !== undefined) clearTimeout(timerId);
+			// Losing the race must not leave an unhandled rejection.
+			void execution.catch(() => {});
+		}
 	} catch (err) {
 		return {
 			ok: false,

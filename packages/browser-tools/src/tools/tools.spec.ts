@@ -407,6 +407,26 @@ test("browser_exec returns ok false for an unknown session ID", async ({
 	expect(result.error).toMatch(/browser_open/);
 });
 
+test("browser_exec returns ok false when timeoutMs elapses", async ({
+	openTool,
+	execTool,
+}) => {
+	const opened = await openTool.execute({
+		url: "data:text/html,<title>timeout</title>",
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const result = await execTool.execute({
+		sessionId: opened.sessionId,
+		timeoutMs: 50,
+		code: "await new Promise((resolve) => setTimeout(resolve, 5000)); return 1;",
+	});
+	expect(result.ok).toBe(false);
+	if (result.ok) return;
+	expect(result.error).toMatch(/timed out after 50ms/);
+	expect(result.error).toMatch(/timeoutMs/);
+});
+
 test("browser_status lists sessions and pages at three zoom levels", async ({
 	openTool,
 	statusTool,

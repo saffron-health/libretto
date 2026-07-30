@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { errorMessage } from "../errors.js";
-import type { ExecScope } from "../exec/exec-engine.js";
-import { runExecCode } from "../exec/exec-engine.js";
+import {
+	DEFAULT_EXEC_TIMEOUT_MS,
+	type ExecScope,
+	runExecCode,
+} from "../exec/exec-engine.js";
 import { snapshot as captureSnapshot } from "../snapshot/capture-snapshot.js";
 import {
 	diffSnapshots,
@@ -35,6 +38,15 @@ const execInputSchema = z.object({
 				"wait for the page to settle after success, then return `snapshotDiff` " +
 				"against a fresh after-tree. Use for exploratory mutations when you do " +
 				"not know what will change. Omit or set false to skip the cost.",
+		),
+	timeoutMs: z
+		.number()
+		.int()
+		.positive()
+		.optional()
+		.describe(
+			`Max wall-clock time for this exec in milliseconds. Defaults to ${DEFAULT_EXEC_TIMEOUT_MS} ` +
+				"(10 seconds). Increase for slow navigations or long waits.",
 		),
 });
 
@@ -70,14 +82,17 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			"stdout/stderr. Pass `diffSnapshot: true` to also return `snapshotDiff` — " +
 			"a compact text diff of accessibility-tree changes from just before this " +
 			"exec (empty when unchanged). Use that for exploratory mutations when you " +
-			"do not know what will change; omit it otherwise. Failures come back as " +
-			"`{ ok: false, error }` — read the error, fix the code, and try again.",
+			"do not know what will change; omit it otherwise. Each call times out after " +
+			`${DEFAULT_EXEC_TIMEOUT_MS}ms by default — pass timeoutMs to raise the limit ` +
+			"for slow work. Failures come back as `{ ok: false, error }` — read the " +
+			"error, fix the code, and try again.",
 		inputSchema: execInputSchema,
 		async execute({
 			sessionId,
 			code,
 			pageId,
 			diffSnapshot,
+			timeoutMs,
 		}): Promise<ToolResult<ExecToolOutput>> {
 			let scope: ExecScope;
 			try {
@@ -106,7 +121,7 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			const before = diffSnapshot
 				? await captureSnapshot(scope.page)
 				: undefined;
-			const execResult = await runExecCode(code, scope);
+			const execResult = await runExecCode(code, scope, { timeoutMs });
 			const executionPolicyError = registry.consumeBlockedNavigationError(
 				scope.page,
 			);

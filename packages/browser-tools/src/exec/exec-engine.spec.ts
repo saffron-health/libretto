@@ -75,4 +75,22 @@ describe("runExecCode", () => {
 		const result = await runExecCode("return typeof y;", scope);
 		expect(result).toMatchObject({ ok: true, result: "undefined" });
 	});
+
+	it("returns ok: false when the code exceeds timeoutMs", async () => {
+		const result = await runExecCode(
+			"await new Promise((resolve) => setTimeout(resolve, 200)); return 1;",
+			scope,
+			{ timeoutMs: 50 },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toContain("timed out after 50ms");
+			expect(result.error).toContain("timeoutMs");
+		}
+	});
+
+	it("completes when the code finishes within timeoutMs", async () => {
+		const result = await runExecCode("return 7;", scope, { timeoutMs: 50 });
+		expect(result).toEqual({ ok: true, result: 7, stdout: "", stderr: "" });
+	});
 });
