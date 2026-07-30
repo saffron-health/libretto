@@ -88,6 +88,18 @@ describe("redirectAfterVerifiedEmail", () => {
     ).resolves.toBe("/dashboard");
   });
 
+  it("uses tenant status refreshed after browser login approval", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: false,
+        returnTo: null,
+        hasCliLoginParams: true,
+        approveCliLogin: async () => true,
+        getHasTenantAfterApproval: async () => true,
+      }),
+    ).resolves.toBe("/dashboard");
+  });
+
   it("preserves dashboard return targets for an existing tenant", async () => {
     await expect(
       redirectAfterVerifiedEmail({

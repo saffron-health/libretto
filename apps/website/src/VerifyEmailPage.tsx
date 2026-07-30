@@ -52,6 +52,8 @@ export function VerifyEmailPage() {
             returnTo: getSafeReturnTo(),
             hasCliLoginParams: Boolean(getCliLoginParams()),
             approveCliLogin: approveCliLoginIfPresent,
+            getHasTenantAfterApproval: async () =>
+              (await getAuthStatus()).hasTenant,
           });
           if (cancelled) return;
           if (!redirectTo) {

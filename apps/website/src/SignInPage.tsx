@@ -154,8 +154,9 @@ export function SignInPage() {
       return true;
     }
     window.history.replaceState(null, "", withoutCliLoginParams());
+    const statusAfterApproval = await getAuthStatus();
     window.location.assign(
-      await resolvePostAuthRedirect(statusBeforeApproval, null),
+      await resolvePostAuthRedirect(statusAfterApproval, null),
     );
     return true;
   }
