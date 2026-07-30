@@ -460,6 +460,97 @@ describe("state-driven CLI subprocess behavior", () => {
     });
   }, 60_000);
 
+  test("readonly-exec inspects frames without exposing mutations", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "readonly-exec-frames";
+    const htmlPath = workspacePath("fixtures", "readonly-frames.html");
+    await mkdir(workspacePath("fixtures"), { recursive: true });
+    await writeFile(
+      htmlPath,
+      [
+        "<!doctype html>",
+        "<html>",
+        "<head><title>Readonly Frames</title></head>",
+        "<body>",
+        '<iframe name="details" srcdoc="<h1>Frame heading</h1><input value=\'unchanged\' /><iframe name=\'nested\' srcdoc=\'<p>Nested frame</p>\'></iframe>"></iframe>',
+        "</body>",
+        "</html>",
+      ].join(""),
+      "utf8",
+    );
+
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await librettoCli(`open "${fileUrl}" --headless --session ${session}`);
+
+    const inspection = await librettoCli(
+      `readonly-exec - --session ${session}`,
+      undefined,
+      [
+        "const frames = page.frames();",
+        "const child = frames.find((frame) => frame.name() === 'details');",
+        "if (!child) throw new Error('Expected details frame');",
+        "const nested = child.childFrames()[0];",
+        "if (!nested) throw new Error('Expected nested frame');",
+        "const parent = child.parentFrame();",
+        "return {",
+        "  frameCount: frames.length,",
+        "  heading: await child.getByRole('heading').textContent(),",
+        "  inputValue: await child.locator('input').inputValue(),",
+        "  nestedText: await nested.getByText('Nested frame').textContent(),",
+        "  parentUrl: parent?.url(),",
+        "  childFrameCount: child.childFrames().length,",
+        "  pageUrl: child.page().url(),",
+        "};",
+      ].join("\n"),
+    );
+    expect(inspection.stderr).toBe("");
+    expect(parseJsonStdout<Record<string, unknown>>(inspection.stdout)).toEqual({
+      frameCount: 3,
+      heading: "Frame heading",
+      inputValue: "unchanged",
+      nestedText: "Nested frame",
+      parentUrl: fileUrl,
+      childFrameCount: 1,
+      pageUrl: fileUrl,
+    });
+
+    const blockedMutation = await librettoCli(
+      `readonly-exec "await page.frames()[1].goto('https://example.com')" --session ${session}`,
+    );
+    expect(blockedMutation.stderr).toContain(
+      "ReadonlyExecDenied: frame.goto is blocked in readonly-exec",
+    );
+
+    const blockedParentMutation = await librettoCli(
+      `readonly-exec "await page.frames()[1].parentFrame().goto('https://example.com')" --session ${session}`,
+    );
+    expect(blockedParentMutation.stderr).toContain(
+      "ReadonlyExecDenied: frame.goto is blocked in readonly-exec",
+    );
+
+    const blockedNestedMutation = await librettoCli(
+      `readonly-exec "await page.frames()[1].childFrames()[0].goto('https://example.com')" --session ${session}`,
+    );
+    expect(blockedNestedMutation.stderr).toContain(
+      "ReadonlyExecDenied: frame.goto is blocked in readonly-exec",
+    );
+
+    const blockedPageMutation = await librettoCli(
+      `readonly-exec "await page.frames()[1].page().goto('https://example.com')" --session ${session}`,
+    );
+    expect(blockedPageMutation.stderr).toContain(
+      "ReadonlyExecDenied: page.goto is blocked in readonly-exec",
+    );
+
+    const unchanged = await librettoCli(
+      `readonly-exec "return await page.frames()[1].locator('input').inputValue()" --session ${session}`,
+    );
+    expect(unchanged.stderr).toBe("");
+    expect(unchanged.stdout.trim()).toBe("unchanged");
+  }, 60_000);
+
   test("readonly-exec denies mutating Playwright APIs", async ({
     librettoCli,
     workspacePath,
