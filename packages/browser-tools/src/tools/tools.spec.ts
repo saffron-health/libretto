@@ -12,6 +12,7 @@ import { createCloseTool } from "./close.js";
 import { createConnectTool } from "./connect.js";
 import { createExecTool } from "./exec.js";
 import { createOpenTool } from "./open.js";
+import { createSearchTool } from "./search.js";
 import { createSnapshotTool } from "./snapshot.js";
 import { createStatusTool } from "./status.js";
 
@@ -55,6 +56,7 @@ const test = base.extend<{
 	openTool: ReturnType<typeof createOpenTool>;
 	execTool: ReturnType<typeof createExecTool>;
 	snapshotTool: ReturnType<typeof createSnapshotTool>;
+	searchTool: ReturnType<typeof createSearchTool>;
 	statusTool: ReturnType<typeof createStatusTool>;
 	closeTool: ReturnType<typeof createCloseTool>;
 	connectTool: ReturnType<typeof createConnectTool>;
@@ -90,6 +92,9 @@ const test = base.extend<{
 	},
 	snapshotTool: async ({ registry }, use) => {
 		await use(createSnapshotTool(registry));
+	},
+	searchTool: async ({ registry }, use) => {
+		await use(createSearchTool(registry));
 	},
 	externalBrowser: async ({}, use) => {
 		const port = await pickFreePort();
@@ -721,4 +726,76 @@ test("browser_snapshot returns ok false for a stale page ID", async ({
 	if (result.ok) return;
 	expect(result.error).toMatch(/page-nope/);
 	expect(result.error).toMatch(/browser_status/);
+});
+
+test("browser_search returns matching HTML regions with context", async ({
+	openTool,
+	searchTool,
+}) => {
+	const opened = await openTool.execute({
+		url:
+			"data:text/html," +
+			encodeURIComponent(
+				'<!doctype html><html><body><main><p data-testid="target">Needle</p></main></body></html>',
+			),
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const result = await searchTool.execute({
+		sessionId: opened.sessionId,
+		pattern: "Needle",
+	});
+	expect(result.ok).toBe(true);
+	if (!result.ok) return;
+	expect(result.matchCount).toBeGreaterThan(0);
+	expect(result.matches[0]?.lines.join("\n")).toContain("Needle");
+	expect(result.matches[0]?.lines.join("\n")).toContain('data-testid="target"');
+});
+
+test("browser_search returns an empty match list when nothing matches", async ({
+	openTool,
+	searchTool,
+}) => {
+	const opened = await openTool.execute({
+		url: "data:text/html,<title>empty</title>",
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const result = await searchTool.execute({
+		sessionId: opened.sessionId,
+		pattern: "this-string-is-not-on-the-page",
+	});
+	expect(result).toEqual({ ok: true, matches: [], matchCount: 0 });
+});
+
+test("browser_search returns ok false for an invalid regex", async ({
+	openTool,
+	searchTool,
+}) => {
+	const opened = await openTool.execute({
+		url: "data:text/html,<title>regex</title>",
+	});
+	if (!opened.ok) throw new Error(opened.error);
+
+	const result = await searchTool.execute({
+		sessionId: opened.sessionId,
+		pattern: "(",
+	});
+	expect(result.ok).toBe(false);
+	if (result.ok) return;
+	expect(result.error).toMatch(/Invalid JavaScript regex/);
+	expect(result.error).toMatch(/valid RegExp/);
+});
+
+test("browser_search returns ok false for an unknown session ID", async ({
+	searchTool,
+}) => {
+	const result = await searchTool.execute({
+		sessionId: "ses-missing",
+		pattern: "Needle",
+	});
+	expect(result.ok).toBe(false);
+	if (result.ok) return;
+	expect(result.error).toMatch(/ses-missing/);
+	expect(result.error).toMatch(/browser_open/);
 });

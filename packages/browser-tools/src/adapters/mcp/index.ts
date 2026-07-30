@@ -82,6 +82,7 @@ export function registerMcpBrowserTools(
 		browser_open,
 		browser_exec,
 		browser_snapshot,
+		browser_search,
 		browser_status,
 		browser_close,
 		browser_connect,
@@ -130,6 +131,21 @@ export function registerMcpBrowserTools(
 			},
 		},
 		async (input) => snapshotResult(await browser_snapshot.execute(input)),
+	);
+
+	server.registerTool(
+		browser_search.name,
+		{
+			description: browser_search.description,
+			inputSchema: browser_search.inputSchema,
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: true,
+			},
+		},
+		async (input) => textResult(await browser_search.execute(input)),
 	);
 
 	server.registerTool(

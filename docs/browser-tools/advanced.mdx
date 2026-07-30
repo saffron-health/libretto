@@ -35,7 +35,7 @@ import { createBrowserToolsForPage } from "libretto-browser-tools";
 // or: createAiSdkBrowserToolsForPage from "libretto-browser-tools/ai-sdk"
 
 const { sessionId, tools, dispose } = createBrowserToolsForPage(page);
-// tools: browser_exec, browser_snapshot, browser_status only
+// tools: browser_exec, browser_snapshot, browser_search, browser_status only
 await dispose(); // detaches tools; does not close page / context / browser
 ```
 

@@ -88,6 +88,7 @@ export function createPiBrowserTools(
 			toPiTool(base.tools.browser_open),
 			toPiTool(base.tools.browser_exec),
 			toPiTool(base.tools.browser_snapshot, snapshotContent),
+			toPiTool(base.tools.browser_search),
 			toPiTool(base.tools.browser_status),
 			toPiTool(base.tools.browser_close),
 			toPiTool(base.tools.browser_connect),

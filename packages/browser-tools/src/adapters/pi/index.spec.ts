@@ -39,12 +39,13 @@ const test = base.extend<{ toolkit: PiBrowserToolkit }>({
 	},
 });
 
-test("createPiBrowserTools exposes all six browser tools", ({ toolkit }) => {
+test("createPiBrowserTools exposes all seven browser tools", ({ toolkit }) => {
 	expect(toolkit.tools.map((tool) => tool.name).sort()).toEqual([
 		"browser_close",
 		"browser_connect",
 		"browser_exec",
 		"browser_open",
+		"browser_search",
 		"browser_snapshot",
 		"browser_status",
 	]);

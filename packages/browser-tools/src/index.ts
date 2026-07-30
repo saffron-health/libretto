@@ -31,3 +31,9 @@ export type {
 	SnapshotToolOutput,
 	SnapshotScreenshot,
 } from "./tools/snapshot.js";
+export type {
+	SearchTool,
+	SearchToolInput,
+	SearchToolOutput,
+	SearchMatch,
+} from "./tools/search.js";
