@@ -17,6 +17,9 @@
     "dist",
     "src"
   ],
+  "bin": {
+    "libretto-browser-tools": "./dist/cli/index.js"
+  },
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -75,6 +78,7 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@standard-schema/spec": "^1.0.0",
     "errore": "^0.14.1",
     "playwright": "^1.58.2",
@@ -83,14 +87,10 @@
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.3",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "ai": "^6.0.0"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-coding-agent": {
-      "optional": true
-    },
-    "@modelcontextprotocol/sdk": {
       "optional": true
     },
     "ai": {
@@ -99,7 +99,6 @@
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.6",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "@playwright/cli": "^0.1.17",
     "@types/node": "^25.5.0",
     "affordance": "workspace:*",

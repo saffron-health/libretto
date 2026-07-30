@@ -6,16 +6,68 @@ sidebarTitle: MCP
 
 > Expose browser tools to MCP clients and gateways.
 
-Import from `libretto-browser-tools/mcp`. Install the optional peer dependency `@modelcontextprotocol/sdk`.
+## Quickstart (stdio binary)
+
+Install Chromium once, then point any MCP client at the package binary:
 
 ```bash theme={null}
-pnpm add libretto-browser-tools @modelcontextprotocol/sdk
 npx playwright install chromium
 ```
 
-## registerMcpBrowserTools
+```json theme={null}
+{
+  "mcpServers": {
+    "libretto-browser-tools": {
+      "command": "npx",
+      "args": ["-y", "libretto-browser-tools"]
+    }
+  }
+}
+```
 
-Registers all six browser tools on a caller-owned `McpServer`. Your host owns the transport, authentication, and server lifecycle.
+Equivalent forms: `npx -y libretto-browser-tools mcp`, or `npx -y libretto-browser-tools --headed` for a visible browser.
+
+Flags:
+
+| Flag | Effect |
+| --- | --- |
+| `--headed` | Show the browser window (default is headless) |
+| `--allowed-domain <host>` | Restrict http(s) navigations to this host (repeatable) |
+| `--blocked-domain <host>` | Block http(s) navigations to this host (repeatable) |
+
+The server exposes `browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, and `browser_close`.
+
+### Hermes
+
+Add the server under `mcp_servers` in `~/.hermes/config.yaml`. To use Browser Tools instead of Hermes' built-in browser stack, disable the `browser` toolset:
+
+```yaml theme={null}
+mcp_servers:
+  libretto:
+    command: npx
+    args: ["-y", "libretto-browser-tools"]
+
+agent:
+  disabled_toolsets:
+    - browser
+```
+
+### OpenClaw
+
+```bash theme={null}
+openclaw mcp add libretto -- npx -y libretto-browser-tools
+```
+
+Disable OpenClaw's bundled browser plugin if you want the agent to use only Browser Tools (see [OpenClaw browser docs](https://docs.openclaw.ai/tools/browser)).
+
+## Library: registerMcpBrowserTools
+
+Import from `libretto-browser-tools/mcp` when you own the MCP server and transport. Install the package (the MCP SDK is included as a dependency).
+
+```bash theme={null}
+pnpm add libretto-browser-tools
+npx playwright install chromium
+```
 
 ```typescript theme={null}
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";

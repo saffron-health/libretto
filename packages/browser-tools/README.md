@@ -8,7 +8,7 @@
   <br/>
   <br/>
   <h3>Browser Tools SDK gives any AI agent a real browser.</h3>
-  <p>Six tools to open, inspect, and drive browsers from AI SDK, Pi, or your own agent loop.</p>
+  <p>Six tools to open, inspect, and drive browsers from AI SDK, Pi, MCP, or your own agent loop.</p>
   <p>
     <a href="https://libretto.sh/docs/browser-tools/quickstart">Quickstart</a> •
     <a href="https://libretto.sh/docs/browser-tools/quickstart">Documentation</a> •
@@ -78,11 +78,32 @@ Browserbase and Steel expose provider IDs but not durable names. Libretto needs 
 
 Profiles contain signed-in browser state. Do not commit profile data. Changes persist only after `browser_close` or graceful `dispose()`. Do not open concurrent writable sessions against the same profile.
 
+## MCP server
+
+Point any MCP client at the package binary:
+
+```bash
+npx playwright install chromium
+```
+
+```json
+{
+  "mcpServers": {
+    "libretto-browser-tools": {
+      "command": "npx",
+      "args": ["-y", "libretto-browser-tools"]
+    }
+  }
+}
+```
+
+See the [MCP adapter docs](https://libretto.sh/docs/browser-tools/adapters/mcp) for Hermes, OpenClaw, flags, and the library API.
+
 ## Docs
 
 - Product page: https://libretto.sh/browser-tools
 - Quickstart: https://libretto.sh/docs/browser-tools/quickstart
-- Adapters: [AI SDK](https://libretto.sh/docs/browser-tools/adapters/ai-sdk), [Pi](https://libretto.sh/docs/browser-tools/adapters/pi), [Custom](https://libretto.sh/docs/browser-tools/adapters/custom)
+- Adapters: [AI SDK](https://libretto.sh/docs/browser-tools/adapters/ai-sdk), [Pi](https://libretto.sh/docs/browser-tools/adapters/pi), [MCP](https://libretto.sh/docs/browser-tools/adapters/mcp), [Custom](https://libretto.sh/docs/browser-tools/adapters/custom)
 - Providers: https://libretto.sh/docs/browser-tools/providers/overview
 
 ## License
