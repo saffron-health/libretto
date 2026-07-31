@@ -45,8 +45,8 @@ const execInputSchema = z.object({
 		.positive()
 		.optional()
 		.describe(
-			`Max wall-clock time to wait for this exec in milliseconds. Defaults to ${DEFAULT_EXEC_TIMEOUT_MS} ` +
-				"(10 seconds). A timeout stops waiting — it does not cancel in-flight work. " +
+			`Max wall-clock time to wait for this exec in milliseconds. Defaults to ${DEFAULT_EXEC_TIMEOUT_MS}. ` +
+				"A timeout stops waiting — it does not cancel in-flight work. " +
 				"Increase for slow navigations, or browser_close then browser_open if the " +
 				"session may still be running the timed-out work.",
 		),
