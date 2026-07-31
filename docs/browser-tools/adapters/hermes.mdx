@@ -6,7 +6,7 @@ sidebarTitle: Hermes
 
 > Use Browser Tools with [Hermes Agent](https://hermes-agent.nousresearch.com/docs) over MCP.
 
-Point Hermes at the Browser Tools stdio binary to give the agent Playwright control through six tools (`browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, `browser_close`) instead of Hermes' built-in `browser_*` stack.
+Point Hermes at the Browser Tools stdio binary to replace Hermes' built-in `browser_*` stack with six Playwright tools (`browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, `browser_close`). Compact accessibility snapshots and a smaller tool surface usually use fewer tokens than Hermes' native browser tools.
 
 ## Requirements
 
@@ -71,23 +71,17 @@ See [Tools](/browser-tools/tools) for inputs and outputs, and [MCP](/browser-too
 
 Disable the `browser` toolset so Hermes does not keep its native `browser_navigate` / `browser_click` / … tools alongside Browser Tools.
 
-Hermes puts `web_search` in that same toolset as a quick-lookup fallback. Disabling `browser` therefore removes that `web_search` too. Search and page extract still come from Hermes' separate `web` toolset (`web_search`, `web_extract`) when that toolset stays enabled — the default on `hermes-cli`.
-
-You can also leave the native browser enabled and ask Hermes to use the MCP tools by name. Prefer disabling when you want Browser Tools to be the only browser stack.
+Leave Hermes' separate `web` toolset enabled (the default on `hermes-cli`). It provides `web_search` and `web_extract`, so disabling `browser` does not turn off search.
 
 ## Auth profiles
 
-Local sessions keep signed-in state in auth profiles under `~/.libretto/browser-tools/profiles/` on the Hermes host.
+Local sessions keep signed-in browser state in profiles under `~/.libretto/browser-tools/profiles/` on the Hermes host. The agent can reuse that state across runs so you do not have to sign in every time.
 
-- Omit `authProfile` (or pass a name such as `"work"`) on `browser_open` to reuse that profile.
-- Pass `authProfile: false` for an ephemeral session.
-- Changes persist only after `browser_close` (or graceful MCP shutdown). Do not open two writable sessions against the same profile at once.
-
-To sign in once: run with `--headed`, open a named profile, complete login in the window, then close the session. Later headless runs reuse the cookies.
+To sign in once, run the MCP server with `--headed`, ask the agent to open a browser session for the site, complete login in the window yourself, then ask it to close the session. Later headless runs reuse the cookies. Profile changes save only on a clean close; do not share profile directories across untrusted users.
 
 ## Security
 
-`browser_exec` runs Playwright and JavaScript in the MCP process — not inside a browser sandbox. Treat the Hermes host as the trust boundary: domain allow/block flags limit http(s) requests in the managed browser context, but they do not confine `browser_exec` itself. Profiles hold account cookies; do not share them across untrusted users.
+`browser_exec` runs Playwright and JavaScript in the MCP process — not inside a browser sandbox. Treat the Hermes host as the trust boundary: domain allow/block flags limit http(s) requests in the managed browser context, but they do not confine `browser_exec` itself.
 
 ## Cloud providers
 
@@ -100,8 +94,8 @@ The stock `libretto-browser-tools` binary always uses the local provider. Kernel
 | Server fails to start / Chromium missing | Run `npx playwright install chromium` (add `--with-deps` on Linux). |
 | Headed browser errors with no display | Drop `--headed`, or run Hermes where a display is available. |
 | Native browser tools still win | Confirm `agent.disabled_toolsets` includes `browser`, then reload MCP. |
-| Stale `sessionId` after idle | Hermes may recycle the MCP process; open a new session. |
-| Login state missing after a crash | Profiles save on graceful close only; sign in again. |
+| Browser sessions stop working after idle | Hermes may recycle the MCP process; ask the agent to open a fresh session. |
+| Login state missing after a crash | Profiles save on graceful close only; sign in again with `--headed`. |
 
 ## See also
 
