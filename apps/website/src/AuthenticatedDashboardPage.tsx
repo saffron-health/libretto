@@ -329,10 +329,6 @@ function PrAgentSetupEmptyTable() {
   );
 }
 
-function isApiKeyRequiredError(error: string): boolean {
-  return /api key.*required/i.test(error);
-}
-
 function LoadingTable() {
   return (
     <div className="border-t border-rule px-5 py-16 text-center text-sm text-muted">
@@ -593,16 +589,7 @@ function WorkflowsTable() {
           fathomEvent="Empty workflows copy cloud setup prompt click"
         />
       )}
-      {error &&
-        (isApiKeyRequiredError(error) ? (
-          <CloudSetupEmptyTable
-            title="No workflows yet."
-            action="create your first cloud workflow"
-            fathomEvent="Empty workflows copy cloud setup prompt click"
-          />
-        ) : (
-          <EmptyTable message={error} />
-        ))}
+      {error && <EmptyTable message={error} />}
     </TableShell>
   );
 }
@@ -725,16 +712,7 @@ function SchedulesTable() {
           fathomEvent="Empty schedules copy cloud setup prompt click"
         />
       )}
-      {error &&
-        (isApiKeyRequiredError(error) ? (
-          <CloudSetupEmptyTable
-            title="No schedules yet."
-            action="create and schedule a cloud workflow"
-            fathomEvent="Empty schedules copy cloud setup prompt click"
-          />
-        ) : (
-          <EmptyTable message={error} />
-        ))}
+      {error && <EmptyTable message={error} />}
     </TableShell>
   );
 }
@@ -814,16 +792,7 @@ function WorkflowRunsTable() {
           fathomEvent="Empty workflow runs copy cloud setup prompt click"
         />
       )}
-      {error &&
-        (isApiKeyRequiredError(error) ? (
-          <CloudSetupEmptyTable
-            title="No workflow runs yet."
-            action="create and run a cloud workflow"
-            fathomEvent="Empty workflow runs copy cloud setup prompt click"
-          />
-        ) : (
-          <EmptyTable message={error} />
-        ))}
+      {error && <EmptyTable message={error} />}
     </TableShell>
   );
 }
@@ -909,16 +878,7 @@ function BrowserSessionsTable() {
           fathomEvent="Empty browser sessions copy cloud setup prompt click"
         />
       )}
-      {error &&
-        (isApiKeyRequiredError(error) ? (
-          <CloudSetupEmptyTable
-            title="No browser sessions yet."
-            action="start a hosted browser session"
-            fathomEvent="Empty browser sessions copy cloud setup prompt click"
-          />
-        ) : (
-          <EmptyTable message={error} />
-        ))}
+      {error && <EmptyTable message={error} />}
     </TableShell>
   );
 }
@@ -975,12 +935,7 @@ function ConnectedReposTable() {
       </table>
       {rows === null && !error && <LoadingTable />}
       {rows?.length === 0 && <PrAgentSetupEmptyTable />}
-      {error &&
-        (isApiKeyRequiredError(error) ? (
-          <PrAgentSetupEmptyTable />
-        ) : (
-          <EmptyTable message={error} />
-        ))}
+      {error && <EmptyTable message={error} />}
     </TableShell>
   );
 }

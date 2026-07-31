@@ -4,24 +4,6 @@ import { Navbar } from "./components/Navbar";
 import { getAuthStatus, getCloudSession, orpcCall } from "./cloudApi";
 import { GitHubIcon } from "./icons";
 
-type GitHubRepository = {
-  id: string;
-  owner: string;
-  name: string;
-  full_name: string;
-  private: boolean;
-};
-
-type InstallationRepositoriesResponse = {
-  installation: {
-    id: string;
-    account_login: string;
-    account_type: string;
-    repository_selection: string;
-  };
-  repositories: GitHubRepository[];
-};
-
 function currentReturnTo(): string {
   const url = new URL(window.location.href);
   return `${url.pathname}${url.search}${url.hash}`;
@@ -78,11 +60,11 @@ export function GitHubSetupPage() {
 
         if (installationId) {
           try {
-            await orpcCall<InstallationRepositoriesResponse>(
-              "/v1/github/syncInstallation",
+            const result = await orpcCall<{ url: string }>(
+              "/v1/github/createInstallationConnectUrl",
               { installation_id: installationId },
             );
-            window.location.assign("/dashboard/connected_repos");
+            window.location.assign(result.url);
           } catch (err) {
             setError(
               err instanceof Error
