@@ -2,7 +2,6 @@ import { transform } from "sucrase";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { errorMessage } from "../errors.js";
 import type { ToolResult } from "../tool.js";
-import { bindAbortSignal } from "./bind-abort-signal.js";
 
 /** Default wall-clock budget for agent-written exec code. */
 export const DEFAULT_EXEC_TIMEOUT_MS = 10_000;
@@ -63,40 +62,10 @@ function toJsonSafe(result: unknown): unknown {
 
 function timeoutErrorMessage(timeoutMs: number): string {
 	return (
-		`Exec timed out after ${timeoutMs}ms. In-flight Playwright actions were aborted. ` +
-		"Pass a larger timeoutMs on browser_exec for slow work, or simplify the code so it " +
-		"finishes sooner."
+		`Exec timed out after ${timeoutMs}ms. Raise timeoutMs for slow work, simplify ` +
+		"the code, or call browser_close then browser_open if this session may still be " +
+		"running the timed-out work."
 	);
-}
-
-function raceUntilAbort<T>(
-	execution: Promise<T>,
-	signal: AbortSignal,
-): Promise<T> {
-	return new Promise<T>((resolve, reject) => {
-		const onAbort = (): void => {
-			reject(
-				signal.reason instanceof Error
-					? signal.reason
-					: new Error(String(signal.reason ?? "aborted")),
-			);
-		};
-		if (signal.aborted) {
-			onAbort();
-			return;
-		}
-		signal.addEventListener("abort", onAbort, { once: true });
-		execution.then(
-			(value) => {
-				signal.removeEventListener("abort", onAbort);
-				resolve(value);
-			},
-			(err: unknown) => {
-				signal.removeEventListener("abort", onAbort);
-				reject(err);
-			},
-		);
-	});
 }
 
 /**
@@ -105,9 +74,8 @@ function raceUntilAbort<T>(
  * Code-level failures (parse errors, throws, timeouts) come back as `ok: false`;
  * this function never throws for them.
  *
- * On timeout, an AbortSignal cancels in-flight Playwright actions on the proxied
- * `page`/`context`, then this waits for the user function to settle before
- * returning so a later exec cannot overlap with ghost work.
+ * `timeoutMs` stops waiting for the result. It does not cancel in-flight Playwright
+ * work; if the session looks wrong after a timeout, close it and open a fresh one.
  */
 export async function runExecCode(
 	code: string,
@@ -137,12 +105,6 @@ export async function runExecCode(
 		return { ok: false, error: errorMessage(err), stdout: "", stderr: "" };
 	}
 
-	const controller = new AbortController();
-	const timeoutError = new Error(timeoutErrorMessage(timeoutMs));
-	let timerId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => {
-		controller.abort(timeoutError);
-	}, timeoutMs);
-
 	try {
 		const fn = new AsyncFunction(
 			"page",
@@ -151,38 +113,29 @@ export async function runExecCode(
 			"console",
 			stripped,
 		);
-		const page = bindAbortSignal(scope.page, controller.signal);
-		const context = bindAbortSignal(scope.context, controller.signal);
 		const execution = Promise.resolve(
-			fn(page, context, scope.browser, consoleProxy),
+			fn(scope.page, scope.context, scope.browser, consoleProxy),
 		);
 
+		let timerId: ReturnType<typeof setTimeout> | undefined;
+		const timedOut = new Promise<never>((_resolve, reject) => {
+			timerId = setTimeout(() => {
+				reject(new Error(timeoutErrorMessage(timeoutMs)));
+			}, timeoutMs);
+		});
+
 		try {
-			const result = await raceUntilAbort(execution, controller.signal);
+			const result = await Promise.race([execution, timedOut]);
 			return {
 				ok: true,
 				result: toJsonSafe(result),
 				stdout: stdoutLines.join("\n"),
 				stderr: stderrLines.join("\n"),
 			};
-		} catch (err) {
-			if (controller.signal.aborted) {
-				// Cancelled Playwright work should settle quickly; wait so the page
-				// is quiet before callers start another exec.
-				await execution.catch(() => {});
-				return {
-					ok: false,
-					error: timeoutErrorMessage(timeoutMs),
-					stdout: stdoutLines.join("\n"),
-					stderr: stderrLines.join("\n"),
-				};
-			}
-			return {
-				ok: false,
-				error: errorMessage(err),
-				stdout: stdoutLines.join("\n"),
-				stderr: stderrLines.join("\n"),
-			};
+		} finally {
+			if (timerId !== undefined) clearTimeout(timerId);
+			// Losing the race must not leave an unhandled rejection.
+			void execution.catch(() => {});
 		}
 	} catch (err) {
 		return {
@@ -191,7 +144,5 @@ export async function runExecCode(
 			stdout: stdoutLines.join("\n"),
 			stderr: stderrLines.join("\n"),
 		};
-	} finally {
-		if (timerId !== undefined) clearTimeout(timerId);
 	}
 }

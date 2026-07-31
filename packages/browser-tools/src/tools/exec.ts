@@ -45,8 +45,10 @@ const execInputSchema = z.object({
 		.positive()
 		.optional()
 		.describe(
-			`Max wall-clock time for this exec in milliseconds. Defaults to ${DEFAULT_EXEC_TIMEOUT_MS} ` +
-				"(10 seconds). Increase for slow navigations or long waits.",
+			`Max wall-clock time to wait for this exec in milliseconds. Defaults to ${DEFAULT_EXEC_TIMEOUT_MS} ` +
+				"(10 seconds). A timeout stops waiting — it does not cancel in-flight work. " +
+				"Increase for slow navigations, or browser_close then browser_open if the " +
+				"session may still be running the timed-out work.",
 		),
 });
 
@@ -84,8 +86,8 @@ export function createExecTool(registry: SessionRegistry): ExecTool {
 			"exec (empty when unchanged). Use that for exploratory mutations when you " +
 			"do not know what will change; omit it otherwise. Each call times out after " +
 			`${DEFAULT_EXEC_TIMEOUT_MS}ms by default — pass timeoutMs to raise the limit ` +
-			"for slow work. On timeout, in-flight Playwright actions are aborted and the " +
-			"call drains before returning so the next exec does not overlap. Failures " +
+			"for slow work. A timeout stops waiting for the result; if the session may " +
+			"still be running that work, call browser_close then browser_open. Failures " +
 			"come back as `{ ok: false, error }` — read the error, fix the code, and try again.",
 		inputSchema: execInputSchema,
 		async execute({

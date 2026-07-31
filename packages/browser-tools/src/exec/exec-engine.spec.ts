@@ -86,63 +86,12 @@ describe("runExecCode", () => {
 		if (!result.ok) {
 			expect(result.error).toContain("timed out after 50ms");
 			expect(result.error).toContain("timeoutMs");
-			expect(result.error).toContain("aborted");
+			expect(result.error).toContain("browser_close");
 		}
 	});
 
 	it("completes when the code finishes within timeoutMs", async () => {
 		const result = await runExecCode("return 7;", scope, { timeoutMs: 50 });
 		expect(result).toEqual({ ok: true, result: 7, stdout: "", stderr: "" });
-	});
-
-	it("aborts in-flight Playwright work and drains before returning", async () => {
-		let waitSettled = false;
-		const abortablePage = {
-			continuedAfterWait: false,
-			async waitFor(
-				_state: string,
-				options?: { signal?: AbortSignal },
-			): Promise<void> {
-				await new Promise<void>((resolve, reject) => {
-					const timer = setTimeout(() => {
-						waitSettled = true;
-						resolve();
-					}, 5_000);
-					options?.signal?.addEventListener(
-						"abort",
-						() => {
-							clearTimeout(timer);
-							reject(
-								options.signal?.reason instanceof Error
-									? options.signal.reason
-									: new Error("aborted"),
-							);
-						},
-						{ once: true },
-					);
-				});
-			},
-		};
-		const abortScope = {
-			page: abortablePage,
-			context: {},
-			browser: {},
-		} as unknown as ExecScope;
-
-		const started = Date.now();
-		const result = await runExecCode(
-			"await page.waitFor('visible'); page.continuedAfterWait = true; return 1;",
-			abortScope,
-			{ timeoutMs: 50 },
-		);
-		const elapsed = Date.now() - started;
-
-		expect(result.ok).toBe(false);
-		if (!result.ok) {
-			expect(result.error).toContain("timed out after 50ms");
-		}
-		expect(elapsed).toBeLessThan(1_000);
-		expect(waitSettled).toBe(false);
-		expect(abortablePage.continuedAfterWait).toBe(false);
 	});
 });

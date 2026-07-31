@@ -425,44 +425,7 @@ test("browser_exec returns ok false when timeoutMs elapses", async ({
 	if (result.ok) return;
 	expect(result.error).toMatch(/timed out after 50ms/);
 	expect(result.error).toMatch(/timeoutMs/);
-});
-
-test("browser_exec aborts in-flight Playwright work so the next exec is quiet", async ({
-	openTool,
-	execTool,
-}) => {
-	const opened = await openTool.execute({
-		url: "data:text/html,<title>abort-timeout</title>",
-	});
-	if (!opened.ok) throw new Error(opened.error);
-
-	const started = Date.now();
-	const timedOut = await execTool.execute({
-		sessionId: opened.sessionId,
-		timeoutMs: 200,
-		code:
-			"await page.locator('#never-exists').waitFor({ state: 'attached', timeout: 60000 }); " +
-			"return 'should-not-finish';",
-	});
-	const elapsed = Date.now() - started;
-
-	expect(timedOut.ok).toBe(false);
-	if (timedOut.ok) return;
-	expect(timedOut.error).toMatch(/timed out after 200ms/);
-	expect(timedOut.error).toMatch(/aborted/);
-	expect(elapsed).toBeLessThan(3_000);
-
-	const next = await execTool.execute({
-		sessionId: opened.sessionId,
-		code: "return await page.title()",
-	});
-	expect(next).toMatchObject({
-		ok: true,
-		result: "abort-timeout",
-		stdout: "",
-		stderr: "",
-		snapshotDiff: "",
-	});
+	expect(result.error).toMatch(/browser_close/);
 });
 
 test("browser_status lists sessions and pages at three zoom levels", async ({
