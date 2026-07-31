@@ -6,15 +6,30 @@ sidebarTitle: Hermes
 
 > Use Browser Tools with [Hermes Agent](https://hermes-agent.nousresearch.com/docs) over MCP.
 
-Hermes loads MCP servers from `~/.hermes/config.yaml`. Point it at the Browser Tools stdio binary, then disable Hermes' built-in browser toolset so the agent uses Browser Tools instead of `browser_navigate` / `browser_click` / ….
+Point Hermes at the Browser Tools stdio binary to give the agent Playwright control through six tools (`browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, `browser_close`) instead of Hermes' built-in `browser_*` stack.
 
-## Install
+## Requirements
+
+The MCP binary runs a [local Chromium](/browser-tools/providers/local) session on the machine that launches the server (the Hermes host).
+
+- Node.js 18+ with `npx`
+- Playwright Chromium once per machine:
 
 ```bash theme={null}
 npx playwright install chromium
 ```
 
-## Configure
+On Linux hosts missing browser system libraries, use:
+
+```bash theme={null}
+npx playwright install --with-deps chromium
+```
+
+Headless is the default. `--headed` needs a graphical display on that same host — it does not open a window on your laptop when Hermes runs remotely.
+
+## Install and configure
+
+Add the server in `~/.hermes/config.yaml`:
 
 ```yaml theme={null}
 mcp_servers:
@@ -27,9 +42,16 @@ agent:
     - browser
 ```
 
-Reload MCP after editing config (`/reload-mcp` in a Hermes session, or restart Hermes).
+Or:
 
-Pass CLI flags in `args` when you need a headed browser or domain policy:
+```bash theme={null}
+hermes mcp add libretto --command npx --args -y --args libretto-browser-tools
+hermes tools disable browser
+```
+
+Reload MCP after changing config (`/reload-mcp` in a Hermes session, or restart Hermes). Confirm the server with `hermes mcp test libretto`.
+
+Pass flags in `args` for a visible browser or [domain policy](/browser-tools/advanced):
 
 ```yaml theme={null}
 mcp_servers:
@@ -43,14 +65,48 @@ mcp_servers:
       - "example.com"
 ```
 
-## What the agent gets
-
-Six tools: `browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, and `browser_close`. Hermes prefixes MCP tools with the server name (for example `mcp_libretto_browser_open`).
-
 See [Tools](/browser-tools/tools) for inputs and outputs, and [MCP](/browser-tools/adapters/mcp) for flags and the library API.
+
+## Disable Hermes' built-in browser
+
+Disable the `browser` toolset so Hermes does not keep its native `browser_navigate` / `browser_click` / … tools alongside Browser Tools.
+
+Hermes puts `web_search` in that same toolset as a quick-lookup fallback. Disabling `browser` therefore removes that `web_search` too. Search and page extract still come from Hermes' separate `web` toolset (`web_search`, `web_extract`) when that toolset stays enabled — the default on `hermes-cli`.
+
+You can also leave the native browser enabled and ask Hermes to use the MCP tools by name. Prefer disabling when you want Browser Tools to be the only browser stack.
+
+## Auth profiles
+
+Local sessions keep signed-in state in auth profiles under `~/.libretto/browser-tools/profiles/` on the Hermes host.
+
+- Omit `authProfile` (or pass a name such as `"work"`) on `browser_open` to reuse that profile.
+- Pass `authProfile: false` for an ephemeral session.
+- Changes persist only after `browser_close` (or graceful MCP shutdown). Do not open two writable sessions against the same profile at once.
+
+To sign in once: run with `--headed`, open a named profile, complete login in the window, then close the session. Later headless runs reuse the cookies.
+
+## Security
+
+`browser_exec` runs Playwright and JavaScript in the MCP process — not inside a browser sandbox. Treat the Hermes host as the trust boundary: domain allow/block flags limit http(s) requests in the managed browser context, but they do not confine `browser_exec` itself. Profiles hold account cookies; do not share them across untrusted users.
+
+## Cloud providers
+
+The stock `libretto-browser-tools` binary always uses the local provider. Kernel, Browserbase, Browser Use, Steel, and Libretto Cloud need a custom MCP server that calls [`registerMcpBrowserTools`](/browser-tools/adapters/mcp) with that provider. Setting cloud API keys on the stock binary has no effect.
+
+## Troubleshooting
+
+| Symptom | What to try |
+| --- | --- |
+| Server fails to start / Chromium missing | Run `npx playwright install chromium` (add `--with-deps` on Linux). |
+| Headed browser errors with no display | Drop `--headed`, or run Hermes where a display is available. |
+| Native browser tools still win | Confirm `agent.disabled_toolsets` includes `browser`, then reload MCP. |
+| Stale `sessionId` after idle | Hermes may recycle the MCP process; open a new session. |
+| Login state missing after a crash | Profiles save on graceful close only; sign in again. |
 
 ## See also
 
 - [MCP adapter](/browser-tools/adapters/mcp) — stdio binary and library registration
+- [Local provider](/browser-tools/providers/local) — Chromium install and options
 - [OpenClaw](/browser-tools/adapters/openclaw) — same binary on OpenClaw
 - [Hermes MCP docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp)
+- [Hermes toolsets](https://hermes-agent.nousresearch.com/docs/reference/toolsets-reference)
