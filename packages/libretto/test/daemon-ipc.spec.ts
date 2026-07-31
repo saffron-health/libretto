@@ -679,7 +679,7 @@ export default workflow("main", async ({ page }) => {
     await librettoCli(`open "${url}" --headless --session ${session}`);
 
     const snapshot = await librettoCli(
-      `exec "(await page._snapshotForAI({ track: 'response' })).full" --session ${session}`,
+      `exec "await page.ariaSnapshot({ mode: 'ai' })" --session ${session}`,
     );
     expect(snapshot.stdout).toContain("Click target");
     expect(snapshot.stdout).toContain("ref=e2");

@@ -4,6 +4,12 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    playwright:
+      specifier: ^1.62.0
+      version: 1.62.1
+
 importers:
 
   .:
@@ -36,8 +42,8 @@ importers:
         specifier: ^0.24.0
         version: 0.24.0
       playwright:
-        specifier: ^1.58.2
-        version: 1.58.2
+        specifier: 'catalog:'
+        version: 1.62.1
       satori:
         specifier: ^0.28.0
         version: 0.28.0
@@ -239,7 +245,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(vite@8.0.16(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))
+        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(vite@8.0.16(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -256,8 +262,8 @@ importers:
         specifier: ^0.14.1
         version: 0.14.1
       playwright:
-        specifier: ^1.58.2
-        version: 1.58.2
+        specifier: 'catalog:'
+        version: 1.62.1
       sucrase:
         specifier: ^3.35.0
         version: 3.35.1
@@ -303,7 +309,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(vite@8.0.16(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))
+        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(vite@8.0.16(@types/node@25.5.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))
 
   packages/create-libretto: {}
 
@@ -337,8 +343,8 @@ importers:
         specifier: ^0.27.0
         version: 0.27.4
       playwright:
-        specifier: ^1.58.2
-        version: 1.58.2
+        specifier: 'catalog:'
+        version: 1.62.1
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -414,8 +420,8 @@ importers:
         specifier: ^25.5.0
         version: 25.5.0
       playwright:
-        specifier: ^1.58.2
-        version: 1.58.2
+        specifier: 'catalog:'
+        version: 1.62.1
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(tsx@4.23.0)(typescript@5.9.3)(yaml@2.9.0)
@@ -6690,6 +6696,11 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   playwright@1.58.2:
     resolution: {integrity: sha512-vA30H8Nvkq/cPBnNw4Q8TWz1EJyqgpuinBcHET0YVJVFldr8JDNiU9LaWAE1KqSkRYazuaBhTpB5ZzShOezQ6A==}
     engines: {node: '>=18'}
@@ -6697,6 +6708,11 @@ packages:
 
   playwright@1.62.0-alpha-1783623505000:
     resolution: {integrity: sha512-6KV9h4PP3hqu4NaGdxxcijWfYh9LJcFI/R2sP4TTC4I5cFo3oRawN0ETlW5MkE3cQEgKhhoj0KUNz4sfpCT0Tg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.62.1:
+    resolution: {integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -15498,6 +15514,8 @@ snapshots:
 
   playwright-core@1.62.0-alpha-1783623505000: {}
 
+  playwright-core@1.62.1: {}
+
   playwright@1.58.2:
     dependencies:
       playwright-core: 1.58.2
@@ -15507,6 +15525,12 @@ snapshots:
   playwright@1.62.0-alpha-1783623505000:
     dependencies:
       playwright-core: 1.62.0-alpha-1783623505000
+    optionalDependencies:
+      fsevents: 2.3.2
+
+  playwright@1.62.1:
+    dependencies:
+      playwright-core: 1.62.1
     optionalDependencies:
       fsevents: 2.3.2
 

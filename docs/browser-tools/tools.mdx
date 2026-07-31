@@ -59,6 +59,14 @@ Results are JSON-serialized when possible; values that cannot be serialized beco
   will change. Defaults to off.
 </ParamField>
 
+<ParamField path="timeoutMs" type="number">
+  Max wall-clock time to wait for this exec in milliseconds. Defaults to
+  `10000` (10 seconds). A timeout returns `{ ok: false, error }` and stops
+  waiting — it does not cancel in-flight Playwright work. Raise `timeoutMs`,
+  simplify the code, or call `browser_close` then `browser_open` if the
+  session may still be running the timed-out work.
+</ParamField>
+
 Success:
 
 ```typescript theme={null}
