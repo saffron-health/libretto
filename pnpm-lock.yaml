@@ -246,6 +246,9 @@ importers:
 
   packages/browser-tools:
     dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.29.0
+        version: 1.29.0(zod@4.4.3)
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.1.0
@@ -265,9 +268,6 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: ^0.80.6
         version: 0.80.6(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.29.0
-        version: 1.29.0(zod@4.4.3)
       '@playwright/cli':
         specifier: ^0.1.17
         version: 0.1.17

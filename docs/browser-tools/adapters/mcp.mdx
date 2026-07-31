@@ -6,16 +6,50 @@ sidebarTitle: MCP
 
 > Expose browser tools to MCP clients and gateways.
 
-Import from `libretto-browser-tools/mcp`. Install the optional peer dependency `@modelcontextprotocol/sdk`.
+## Quickstart (stdio binary)
+
+Install Chromium once, then point any MCP client at the package binary:
 
 ```bash theme={null}
-pnpm add libretto-browser-tools @modelcontextprotocol/sdk
 npx playwright install chromium
 ```
 
-## registerMcpBrowserTools
+```json theme={null}
+{
+  "mcpServers": {
+    "libretto-browser-tools": {
+      "command": "npx",
+      "args": ["-y", "libretto-browser-tools"]
+    }
+  }
+}
+```
 
-Registers all six browser tools on a caller-owned `McpServer`. Your host owns the transport, authentication, and server lifecycle.
+Equivalent forms: `npx -y libretto-browser-tools mcp`, or `npx -y libretto-browser-tools --headed` for a visible browser.
+
+Flags:
+
+| Flag | Effect |
+| --- | --- |
+| `--headed` | Show the browser window (default is headless) |
+| `--allowed-domain <host>` | Restrict http(s) navigations to this host (repeatable) |
+| `--blocked-domain <host>` | Block http(s) navigations to this host (repeatable) |
+
+The server exposes `browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, and `browser_close`.
+
+Host-specific setup:
+
+- [Hermes Agent](/browser-tools/adapters/hermes)
+- [OpenClaw](/browser-tools/adapters/openclaw)
+
+## Library: registerMcpBrowserTools
+
+Import from `libretto-browser-tools/mcp` when you own the MCP server and transport. Install the package (the MCP SDK is included as a dependency).
+
+```bash theme={null}
+pnpm add libretto-browser-tools
+npx playwright install chromium
+```
 
 ```typescript theme={null}
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -63,4 +97,6 @@ The adapter publishes safety annotations for each tool. `browser_exec` is marked
 ## See also
 
 - [Tools](/browser-tools/tools) — inputs and outputs for each tool
+- [Hermes](/browser-tools/adapters/hermes) — Hermes Agent install
+- [OpenClaw](/browser-tools/adapters/openclaw) — OpenClaw install
 - [Custom adapters](/browser-tools/adapters/custom) — wrap `createBrowserTools` for another framework

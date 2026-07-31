@@ -134,6 +134,8 @@
               "browser-tools/adapters/ai-sdk",
               "browser-tools/adapters/pi",
               "browser-tools/adapters/mcp",
+              "browser-tools/adapters/hermes",
+              "browser-tools/adapters/openclaw",
               "browser-tools/adapters/custom"
             ]
           },
