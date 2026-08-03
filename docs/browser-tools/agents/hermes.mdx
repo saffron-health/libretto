@@ -85,13 +85,23 @@ To sign in once, run the MCP server with `--headed`, ask the agent to open a bro
 
 ## Cloud providers
 
-The stock `libretto-browser-tools` binary always uses the local provider. Kernel, Browserbase, Browser Use, Steel, and Libretto Cloud need a custom MCP server that calls [`registerMcpBrowserTools`](/browser-tools/adapters/mcp) with that provider. Setting cloud API keys on the stock binary has no effect.
+Pass `--provider` to use a [cloud browser](/browser-tools/providers/overview) instead of local Chromium:
+
+```yaml theme={null}
+mcp_servers:
+  libretto:
+    command: npx
+    args: ["-y", "libretto-browser-tools", "--provider", "kernel"]
+```
+
+Put the provider API key in Hermes' environment (for example `KERNEL_API_KEY` in `~/.hermes/.env`). Supported names: `local`, `kernel`, `browserbase`, `browser-use`, `steel`, `libretto-cloud`.
 
 ## Troubleshooting
 
 | Symptom | What to try |
 | --- | --- |
-| Server fails to start / Chromium missing | Run `npx playwright install chromium` (add `--with-deps` on Linux). |
+| Server fails to start / Chromium missing | For `--provider local`, run `npx playwright install chromium` (add `--with-deps` on Linux). |
+| Missing cloud API key | Set the provider key in Hermes env (for example `KERNEL_API_KEY`), or use `--provider local`. |
 | Headed browser errors with no display | Drop `--headed`, or run Hermes where a display is available. |
 | Native browser tools still win | Confirm `agent.disabled_toolsets` includes `browser`, then reload MCP. |
 | Browser sessions stop working after idle | Hermes may recycle the MCP process; ask the agent to open a fresh session. |

@@ -6,20 +6,20 @@ Hosts such as Hermes and OpenClaw can load Browser Tools over MCP, but `libretto
 
 ## Solution overview
 
-Ship a package `bin` that starts a stdio MCP server with the six browser tools and a local Chromium provider.
+Ship a package `bin` that starts a stdio MCP server with the six browser tools. Default provider is local Chromium; `--provider` selects Kernel, Browserbase, Browser Use, Steel, or Libretto Cloud (credentials from the environment).
 
 ## Goals
 
 - User runs `npx -y libretto-browser-tools` (or `… mcp`) and an MCP client can list and call the six tools.
-- User can pass `--headed` / domain-policy flags without writing a custom server script.
+- User can pass `--headed` / domain-policy / `--provider` flags without writing a custom server script.
 - Docs show the npx install snippet for MCP clients.
 
 ## Non-goals
 
 - OpenClaw native plugin (later phase).
 - Hermes-specific packaging.
-- Cloud browser providers in the CLI.
 - HTTP / SSE MCP transport.
+- Per-provider CLI flags beyond `--provider` and `--headed` (proxy IDs, recording, etc. stay on env / library constructors).
 
 ## Implementation plan
 
@@ -46,3 +46,17 @@ Success criteria:
 - [x] `pnpm --filter libretto-browser-tools test` passes.
 - [x] `pnpm --filter libretto-browser-tools type-check` passes.
 - [x] Spawning the CLI with an MCP stdio client lists the six tool names.
+
+### Phase 2: `--provider` for cloud browsers
+
+- [x] Flag `--provider <name>` with values `local` (default), `kernel`, `browserbase`, `browser-use`, `steel`, `libretto-cloud`.
+- [x] Construct the matching provider; cloud credentials from env only.
+- [x] `--headed` applies to local, kernel, and libretto-cloud; warn when ignored for other providers.
+- [x] Actionable parse/startup errors for unknown providers and missing API keys.
+- [x] Docs: MCP flags table + Hermes cloud section.
+- [x] Tests: parse `--provider`, unknown provider recovery, missing `KERNEL_API_KEY`.
+
+Success criteria:
+
+- [x] `pnpm --filter libretto-browser-tools test` passes.
+- [x] `pnpm --filter libretto-browser-tools type-check` passes.

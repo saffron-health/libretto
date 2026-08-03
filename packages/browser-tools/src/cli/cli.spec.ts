@@ -4,6 +4,7 @@ import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
+import { createCliBrowserProvider } from "./create-cli-provider.js";
 import { getHelpText, parseCliArgs } from "./parse-args.js";
 
 const cliEntry = fileURLToPath(new URL("./index.ts", import.meta.url));
@@ -15,6 +16,8 @@ test("help text tells the user how to wire an MCP client", () => {
 	const help = getHelpText();
 	expect(help).toContain("libretto-browser-tools");
 	expect(help).toContain('args ["-y", "libretto-browser-tools"]');
+	expect(help).toContain("--provider");
+	expect(help).toContain("kernel");
 	expect(help).toContain("npx playwright install chromium");
 });
 
@@ -22,14 +25,18 @@ test("parseCliArgs accepts bare invocation and mcp subcommand with domain flags"
 	expect(parseCliArgs([])).toEqual({
 		kind: "mcp",
 		options: {
+			provider: "local",
 			headless: true,
 			allowedDomains: [],
 			blockedDomains: [],
 		},
 	});
-	expect(parseCliArgs(["mcp", "--headed", "--allowed-domain", "example.com"])).toEqual({
+	expect(
+		parseCliArgs(["mcp", "--headed", "--allowed-domain", "example.com"]),
+	).toEqual({
 		kind: "mcp",
 		options: {
+			provider: "local",
 			headless: false,
 			allowedDomains: ["example.com"],
 			blockedDomains: [],
@@ -38,22 +45,70 @@ test("parseCliArgs accepts bare invocation and mcp subcommand with domain flags"
 	expect(parseCliArgs(["--blocked-domain=ads.example.com"])).toEqual({
 		kind: "mcp",
 		options: {
+			provider: "local",
 			headless: true,
 			allowedDomains: [],
 			blockedDomains: ["ads.example.com"],
 		},
 	});
+	expect(parseCliArgs(["--provider", "kernel"])).toEqual({
+		kind: "mcp",
+		options: {
+			provider: "kernel",
+			headless: true,
+			allowedDomains: [],
+			blockedDomains: [],
+		},
+	});
+	expect(parseCliArgs(["--provider=libretto-cloud"])).toEqual({
+		kind: "mcp",
+		options: {
+			provider: "libretto-cloud",
+			headless: true,
+			allowedDomains: [],
+			blockedDomains: [],
+		},
+	});
 });
 
-test("parseCliArgs reports unknown flags with recovery text", () => {
-	const parsed = parseCliArgs(["--wat"]);
-	expect(parsed).toMatchObject({
+test("parseCliArgs reports unknown flags and providers with recovery text", () => {
+	const unknownFlag = parseCliArgs(["--wat"]);
+	expect(unknownFlag).toMatchObject({
 		kind: "error",
 		message: "Unknown argument: --wat",
 	});
-	if (parsed.kind === "error") {
-		expect(parsed.recovery).toContain("--help");
+	if (unknownFlag.kind === "error") {
+		expect(unknownFlag.recovery).toContain("--help");
 	}
+
+	const unknownProvider = parseCliArgs(["--provider", "camofox"]);
+	expect(unknownProvider).toMatchObject({
+		kind: "error",
+		message: "Unknown provider: camofox",
+	});
+	if (unknownProvider.kind === "error") {
+		expect(unknownProvider.recovery).toContain("kernel");
+	}
+});
+
+test("createCliBrowserProvider reports missing cloud credentials", () => {
+	const previous = process.env.KERNEL_API_KEY;
+	delete process.env.KERNEL_API_KEY;
+	const provider = createCliBrowserProvider({
+		provider: "kernel",
+		headless: true,
+	});
+	if (previous === undefined) {
+		delete process.env.KERNEL_API_KEY;
+	} else {
+		process.env.KERNEL_API_KEY = previous;
+	}
+	expect(provider).toBeInstanceOf(Error);
+	if (!(provider instanceof Error)) {
+		throw new Error("expected missing KERNEL_API_KEY to return Error");
+	}
+	expect(provider.message).toContain("KERNEL_API_KEY");
+	expect(provider.message).toContain("--provider local");
 });
 
 test("stdio MCP binary lists tools and runs Playwright against a page", async () => {

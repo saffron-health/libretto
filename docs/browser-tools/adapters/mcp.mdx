@@ -25,15 +25,18 @@ npx playwright install chromium
 }
 ```
 
-Equivalent forms: `npx -y libretto-browser-tools mcp`, or `npx -y libretto-browser-tools --headed` for a visible browser.
+Equivalent forms: `npx -y libretto-browser-tools mcp`, `npx -y libretto-browser-tools --headed` for a visible local browser, or `npx -y libretto-browser-tools --provider kernel` for a cloud provider.
 
 Flags:
 
 | Flag | Effect |
 | --- | --- |
-| `--headed` | Show the browser window (default is headless) |
+| `--provider <name>` | Browser provider: `local` (default), `kernel`, `browserbase`, `browser-use`, `steel`, `libretto-cloud` |
+| `--headed` | Show the browser window (default is headless). Applies to `local`, `kernel`, and `libretto-cloud` |
 | `--allowed-domain <host>` | Restrict http(s) navigations to this host (repeatable) |
 | `--blocked-domain <host>` | Block http(s) navigations to this host (repeatable) |
+
+Cloud providers read API keys from the MCP server environment (for example `KERNEL_API_KEY`, `BROWSERBASE_API_KEY`, `BROWSER_USE_API_KEY`, `STEEL_API_KEY`, `LIBRETTO_API_KEY`). See each [provider](/browser-tools/providers/overview) page for required variables. Local Chromium (`npx playwright install chromium`) is only required for `--provider local`.
 
 The server exposes `browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, and `browser_close`.
 

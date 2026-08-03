@@ -21,5 +21,11 @@ export async function runCli(argv: readonly string[]): Promise<void> {
 		return;
 	}
 
-	await startMcpStdioServer(parsed.options);
+	const started = await startMcpStdioServer(parsed.options);
+	if (started instanceof Error) {
+		process.stderr.write(
+			`${started.message}\n\n${getHelpText()}\n`,
+		);
+		process.exitCode = 1;
+	}
 }
