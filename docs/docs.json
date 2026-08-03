@@ -134,14 +134,14 @@
               "browser-tools/adapters/ai-sdk",
               "browser-tools/adapters/pi",
               "browser-tools/adapters/mcp",
-              "browser-tools/adapters/openclaw",
               "browser-tools/adapters/custom"
             ]
           },
           {
             "group": "Agents",
             "pages": [
-              "browser-tools/agents/hermes"
+              "browser-tools/agents/hermes",
+              "browser-tools/agents/openclaw"
             ]
           },
           {
