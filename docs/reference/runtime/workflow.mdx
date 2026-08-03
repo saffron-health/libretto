@@ -95,7 +95,7 @@ The CLI compiles the file with `tsx`, launches a Chromium browser, and calls you
 
 #### Browser launch options
 
-Always declare `startUrl` on every workflow. It is the entry URL Libretto opens before the handler runs. Kernel and Libretto Cloud preload it at browser create time (before CDP attach). Browserbase and Steel open it immediately after CDP connect.
+Always declare `startUrl` on every workflow. It is the entry URL Libretto opens before the handler runs when Libretto launches the browser (local Chromium or a provider session). Kernel and Libretto Cloud preload it at browser create time (before CDP attach). Browserbase and Steel open it immediately after CDP connect. `run --cdp` attaches to an existing page and does not navigate to `startUrl`.
 
 ```typescript theme={null}
 export default workflow(
@@ -114,10 +114,12 @@ export default workflow(
 ```
 
 <ParamField path="startUrl" type="string">
-  Entry URL for the workflow. Declare this on every workflow. Libretto opens it
-  before the handler runs. On Kernel, Libretto sends it as `start_url` at
-  session create time and does not navigate again after connect. Prefer this
-  over an initial `page.goto` in the handler.
+  Entry URL for the workflow. Declare this on every workflow. When Libretto
+  launches the browser, it opens this URL before the handler runs. On Kernel,
+  Libretto sends it as `start_url` at session create time and does not navigate
+  again after connect. `run --cdp` leaves the existing page URL unchanged.
+  Prefer this over an initial `page.goto` in the handler for launch and provider
+  runs.
 </ParamField>
 
 <ParamField path="gpu" type="boolean">

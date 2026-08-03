@@ -4,15 +4,15 @@
 
 ## Solution overview
 
-Add `--cdp <url>` to `libretto run` as a third browser source alongside local launch and `--provider`. The command spawns a daemon with existing `browser.kind: "connect"` plus a workflow config, navigates to the workflow's required `startUrl`, then runs the handler. `connect` stays the interactive attach path; this spec does not add workflow attach to an already-open Libretto session.
+Add `--cdp <url>` to `libretto run` as a third browser source alongside local launch and `--provider`. The command spawns a daemon with existing `browser.kind: "connect"` plus a workflow config, attaches to the selected page without navigating to `startUrl`, then runs the handler. `connect` stays the interactive attach path; this spec does not add workflow attach to an already-open Libretto session.
 
 ## Goals
 
-- `libretto run ./workflow.ts --cdp http://127.0.0.1:9222` connects over CDP, opens the workflow `startUrl`, and runs the default-exported workflow.
-- Workflow `startUrl` remains required and is navigated before the handler, including on CDP runs.
+- `libretto run ./workflow.ts --cdp http://127.0.0.1:9222` connects over CDP, attaches to the existing page without changing its URL, and runs the default-exported workflow.
+- Workflow `startUrl` remains declared for launch/provider runs; `run --cdp` does not navigate to it so existing page URL and auth state stay intact.
 - CDP runs never terminate the remote browser or Electron app on success, failure, or `close`.
 - `--cdp` is mutually exclusive with `--provider` and with local-only launch flags that do not apply (`--headed`/`--headless`, `--viewport`).
-- Optional `--page <id>` selects which existing CDP page receives navigation and the workflow `page` context.
+- Optional `--page <id>` selects which existing CDP page becomes the workflow `page` context.
 
 ## Non-goals
 
@@ -81,9 +81,9 @@ export function createRunBrowserConfig(args: {
 - [x] Update `run` usage/help text to include `--cdp`.
 - [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
-### Phase 2: Apply workflow `startUrl` to CDP connect runs
+### Phase 2: Do not apply workflow `startUrl` to CDP connect runs
 
-Connect+workflow must navigate to `startUrl` before the handler, matching local and provider `run` behavior. Today only `launch` gets `initialUrl` from workflow metadata.
+Launch and provider `run` still open `startUrl` before the handler. Connect/CDP workflow runs must attach without navigation so the existing page URL and authentication state remain intact. Automatic CDP navigation discarded useful state and could hit Libretto's navigation timeout before the handler began.
 
 ```ts
 // packages/libretto/src/cli/core/daemon/config.ts
@@ -91,11 +91,7 @@ export function applyWorkflowStartUrlToBrowserConfig(
   browser: DaemonConfig["browser"],
   startUrl: string | undefined,
 ): DaemonConfig["browser"] {
-  if (
-    !startUrl ||
-    (browser.kind !== "launch" && browser.kind !== "connect") ||
-    browser.initialUrl
-  ) {
+  if (!startUrl || browser.kind !== "launch" || browser.initialUrl) {
     return browser;
   }
   return { ...browser, initialUrl: startUrl };
@@ -104,35 +100,36 @@ export function applyWorkflowStartUrlToBrowserConfig(
 
 Daemon `main` calls this for non-provider browser configs after loading the workflow.
 
-- [x] Extend the workflow `startUrl` → `initialUrl` merge to `kind: "connect"` (not only `launch`).
-- [x] Keep requiring `startUrl` on the workflow; do not add a CDP exception that skips navigation.
-- [x] Add a focused unit/integration assertion that a connect+workflow daemon config ends up with `initialUrl` equal to the workflow `startUrl`.
+- [x] Apply workflow `startUrl` → `initialUrl` only for `kind: "launch"` (not `connect`).
+- [x] Keep requiring/declaring `startUrl` on workflows for launch and provider runs; CDP attach skips navigation.
+- [x] Add a focused unit assertion that a connect+workflow daemon config does not gain `initialUrl` from workflow `startUrl`.
 - [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 3: End-to-end `run --cdp` coverage
 
-Prove the primary Electron/CDP path: external Chromium with remote debugging, `run --cdp`, navigation to `startUrl`, workflow completion, remote browser still alive after Libretto disconnects.
+Prove the primary Electron/CDP path: external Chromium with remote debugging, `run --cdp`, attach without `startUrl` navigation, workflow completion, remote browser still alive after Libretto disconnects.
 
-Tests live in `packages/libretto/test/run-cdp.spec.ts`. They start a CDP-capable browser via `libretto open --headless`, then point `run --cdp` at that port (same pattern as connect E2E). Flag-conflict coverage for `--cdp` + `--provider` / `--headless` is in `packages/libretto/test/basic.spec.ts`.
+Tests live in `packages/libretto/test/run-cdp.spec.ts`. They start a CDP-capable browser via `libretto open --headless`, then point `run --cdp` at that port (same pattern as connect E2E). Flag-conflict coverage for `--cdp` + `--provider` / `--headless` is in `packages/libretto/test/basic.spec.ts`. Launch-mode `startUrl` navigation stays covered in the same file.
 
 ```ts
 // packages/libretto/test/run-cdp.spec.ts
-test("executes a workflow against an external CDP browser and leaves it alive", async ({
+test("attaches without navigating away from the existing page", async ({
   librettoCli,
   writeWorkflow,
   workspacePath,
 }) => {
-  await librettoCli(`open about:blank --headless --session ${sourceSession}`);
+  await librettoCli(`open data:text/html,... --headless --session ${sourceSession}`);
   // read CDP port from source session state
   await librettoCli(
     `run "${integrationFilePath}" --cdp http://127.0.0.1:${port} --session ${runSession}`,
   );
-  // assert startUrl navigation + source browser still alive
+  // assert existing page preserved + source browser still alive
 });
 ```
 
-- [x] Add an integration test that starts a CDP-enabled Chromium, runs a small workflow with `startUrl` via `run --cdp`, and asserts success.
-- [x] Assert the workflow landed on `startUrl` (handler checks `page.url()` or equivalent).
+- [x] Add an integration test that starts a CDP-enabled Chromium, runs a small workflow with `startUrl` via `run --cdp`, and asserts success without navigating to `startUrl`.
+- [x] Assert the workflow stays on the pre-existing page (handler checks `page.url()` / title / body).
+- [x] Assert launch-mode `run` still navigates to workflow `startUrl`.
 - [x] Assert a normal successful CDP run disconnects the Libretto session without killing the CDP browser process.
 - [x] Assert `--stay-open-on-success` leaves a daemon-backed session usable with `pages` / `snapshot` against the same CDP browser.
 - [x] Assert conflicting flags (`--cdp` + `--provider`, `--cdp` + `--headless`) fail with actionable errors.
@@ -140,7 +137,7 @@ test("executes a workflow against an external CDP browser and leaves it alive", 
 
 ### Phase 4: Optional `--page` for multi-target CDP browsers
 
-Electron and multi-window Chrome often expose several pages. Let `run --cdp` select which page gets `startUrl` navigation and becomes `ctx.page`.
+Electron and multi-window Chrome often expose several pages. Let `run --cdp` select which page becomes `ctx.page` (without navigating away from that page's current URL).
 
 Initial pages discovered at daemon start are tracked as stable `page-0` .. `page-N` ids (later popups still get random ids). `run --cdp --page page-1` selects by that index among pages found at connect time, so the id matches what `pages` shows on another CDP session attached to the same browser.
 
@@ -156,20 +153,20 @@ export type DaemonBrowserConnectConfig = {
 // packages/libretto/src/cli/core/daemon/daemon.ts
 if (config.pageId) {
   const pageIndex = parseConnectPageIndex(config.pageId);
-  // select operationalPages[pageIndex] before initialize + startUrl navigation
+  // select operationalPages[pageIndex] before initialize (no startUrl navigation)
 }
 ```
 
 - [x] Add optional `--page` to `run` (same id form as `exec` / `snapshot`).
-- [x] Plumb `pageId` through daemon workflow start so navigation and `WorkflowController` use that page.
+- [x] Plumb `pageId` through daemon workflow start so `WorkflowController` uses that page.
 - [x] On unknown page id, fail with the same next-step style as `exec` (`libretto pages --session ...`).
 - [x] When `--page` is omitted, keep current connect default (last operational page, or create one).
-- [x] Add a test with two pages on one CDP browser: `run --cdp --page <id>` targets the chosen page.
+- [x] Add a test with two pages on one CDP browser: `run --cdp --page <id>` targets the chosen page without navigating.
 - [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 5: Docs and skill guidance
 
-Document the scripted CDP path without changing the interactive `connect` story.
+Document the scripted CDP path without changing the interactive `connect` story. Document that `run --cdp` does not navigate to workflow `startUrl`.
 
 - [x] Update `docs/reference/cli/run-and-resume.mdx` with `--cdp`, `--page`, lifecycle notes, and an Electron/CDP example.
 - [x] Update `docs/reference/cli/open-and-connect.mdx` to point scripted workflow execution at `run --cdp`.

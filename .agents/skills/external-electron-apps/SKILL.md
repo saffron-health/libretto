@@ -82,7 +82,7 @@ npx libretto snapshot --session slack-desktop --page <page-id>
 
 ## Scripted workflows
 
-After interactive discovery, run a default-exported `workflow()` against the same CDP endpoint. Libretto navigates to the workflow `startUrl` before the handler. Closing the Libretto session does not quit the Electron app.
+After interactive discovery, run a default-exported `workflow()` against the same CDP endpoint. Libretto attaches to the selected page without navigating to workflow `startUrl`, so leave the app on the target screen first (or navigate in the handler). Closing the Libretto session does not quit the Electron app.
 
 ```bash
 npx libretto run ./slack-workflow.ts --cdp http://127.0.0.1:9222

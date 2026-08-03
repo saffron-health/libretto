@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 import { test } from "./fixtures";
 
 describe("run --cdp", () => {
-  test("executes a workflow against an external CDP browser and leaves it alive", async ({
+  test("attaches without navigating away from the existing page", async ({
     librettoCli,
     writeWorkflow,
     workspacePath,
@@ -12,7 +12,7 @@ describe("run --cdp", () => {
     const runSession = "run-cdp-workflow";
 
     await librettoCli(
-      `open about:blank --headless --session ${sourceSession}`,
+      `open data:text/html,<title>CDP Existing</title><body>keep-me</body> --headless --session ${sourceSession}`,
     );
 
     const sourceState = JSON.parse(
@@ -31,6 +31,7 @@ export default workflow(
   async ({ page }) => {
     console.log("CDP_RUN_URL", page.url());
     console.log("CDP_RUN_TITLE", await page.title());
+    console.log("CDP_RUN_BODY", await page.locator("body").innerText());
   },
 );
 `,
@@ -40,8 +41,9 @@ export default workflow(
       `run "${integrationFilePath}" --cdp http://127.0.0.1:${sourceState.port} --session ${runSession}`,
     );
     expect(result.stdout).toContain("Connecting to CDP endpoint");
-    expect(result.stdout).toContain("CDP_RUN_URL https://example.com/");
-    expect(result.stdout).toContain("CDP_RUN_TITLE Example Domain");
+    expect(result.stdout).toContain("CDP_RUN_TITLE CDP Existing");
+    expect(result.stdout).toContain("CDP_RUN_BODY keep-me");
+    expect(result.stdout).not.toContain("CDP_RUN_URL https://example.com/");
     expect(result.stdout).toContain("Integration completed.");
 
     const missingRunSession = await librettoCli(`pages --session ${runSession}`);
@@ -51,13 +53,14 @@ export default workflow(
     expect(missingRunSession.stderr).toContain(`Active sessions:`);
     expect(missingRunSession.stderr).toContain(sourceSession);
 
-    // Source open session still owns the live browser.
+    // Source open session still owns the live browser on the original page.
     const sourcePages = await librettoCli(`pages --session ${sourceSession}`);
-    expect(sourcePages.stdout).toContain("example.com");
+    expect(sourcePages.stdout).toContain("keep-me");
+    expect(sourcePages.stdout).not.toContain("example.com");
     expect(() => process.kill(sourceState.pid, 0)).not.toThrow();
   }, 90_000);
 
-  test("run --cdp --page targets a specific discovered page", async ({
+  test("run --cdp --page targets a specific discovered page without navigating", async ({
     librettoCli,
     writeWorkflow,
     workspacePath,
@@ -104,6 +107,7 @@ export default workflow(
   { startUrl: "https://example.com/user/" },
   async ({ page }) => {
     console.log("CDP_PAGE_URL", page.url());
+    console.log("CDP_PAGE_BODY", await page.locator("body").innerText());
   },
 );
 `,
@@ -114,11 +118,14 @@ export default workflow(
     );
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain("Integration completed.");
-    expect(result.stdout).toContain("CDP_PAGE_URL https://example.com/user/");
+    expect(result.stdout).toContain("CDP_PAGE_BODY page-one");
+    expect(result.stdout).not.toContain(
+      "CDP_PAGE_URL https://example.com/user/",
+    );
 
     const afterPages = await librettoCli(`pages --session ${sourceSession}`);
-    expect(afterPages.stdout).toContain("https://example.com/user/");
-    expect(afterPages.stdout).not.toContain("page-one");
+    expect(afterPages.stdout).toContain("page-one");
+    expect(afterPages.stdout).not.toContain("https://example.com/user/");
     expect(afterPages.stdout).toMatch(
       /id=page-0 url=https:\/\/example\.com\/?(?: |\n|$)/,
     );
@@ -133,7 +140,7 @@ export default workflow(
     const runSession = "run-cdp-stay-open";
 
     await librettoCli(
-      `open about:blank --headless --session ${sourceSession}`,
+      `open data:text/html,<title>Stay Open CDP</title><body>inspect-me</body> --headless --session ${sourceSession}`,
     );
 
     const sourceState = JSON.parse(
@@ -159,14 +166,99 @@ export default workflow(
     const result = await librettoCli(
       `run "${integrationFilePath}" --cdp http://127.0.0.1:${sourceState.port} --session ${runSession} --stay-open-on-success`,
     );
-    expect(result.stdout).toContain("CDP_STAY_OPEN Example Domain");
+    expect(result.stdout).toContain("CDP_STAY_OPEN Stay Open CDP");
     expect(result.stdout).toContain("Integration completed.");
     expect(result.stdout).toContain("Browser is still open");
 
     const pages = await librettoCli(`pages --session ${runSession}`);
-    expect(pages.stdout).toContain("example.com");
+    expect(pages.stdout).toContain("inspect-me");
+    expect(pages.stdout).not.toContain("example.com");
 
     const snapshot = await librettoCli(`snapshot --session ${runSession}`);
-    expect(snapshot.stdout).toMatch(/Example Domain|example\.com/i);
+    expect(snapshot.stdout).toMatch(/Stay Open CDP|inspect-me/i);
+  }, 90_000);
+
+  test("run --cdp without startUrl still attaches and runs the handler", async ({
+    librettoCli,
+    writeWorkflow,
+    workspacePath,
+  }) => {
+    const sourceSession = "run-cdp-no-starturl-source";
+    const runSession = "run-cdp-no-starturl";
+
+    await librettoCli(
+      `open data:text/html,<title>No StartUrl</title><body>ready</body> --headless --session ${sourceSession}`,
+    );
+
+    const sourceState = JSON.parse(
+      await readFile(
+        workspacePath(".libretto", "sessions", sourceSession, "state.json"),
+        "utf8",
+      ),
+    ) as { port: number };
+
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-cdp-no-starturl.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  console.log("CDP_NO_STARTURL", await page.title());
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --cdp http://127.0.0.1:${sourceState.port} --session ${runSession}`,
+    );
+    expect(result.stdout).toContain("CDP_NO_STARTURL No StartUrl");
+    expect(result.stdout).toContain("Integration completed.");
+  }, 90_000);
+});
+
+describe("run launch startUrl", () => {
+  test("navigates to workflow startUrl when Libretto launches the browser", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-launch-starturl.mjs",
+      `
+export default workflow(
+  "main",
+  { startUrl: "https://example.com/" },
+  async ({ page }) => {
+    console.log("LAUNCH_RUN_URL", page.url());
+    console.log("LAUNCH_RUN_TITLE", await page.title());
+  },
+);
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session run-launch-starturl --headless`,
+    );
+    expect(result.stdout).toContain("LAUNCH_RUN_URL https://example.com/");
+    expect(result.stdout).toContain("LAUNCH_RUN_TITLE Example Domain");
+    expect(result.stdout).toContain("Integration completed.");
+  }, 90_000);
+
+  test("runs without startUrl when Libretto launches the browser", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-launch-no-starturl.mjs",
+      `
+export default workflow("main", async ({ page }) => {
+  console.log("LAUNCH_NO_STARTURL", page.url());
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session run-launch-no-starturl --headless`,
+    );
+    expect(result.stdout).toContain("LAUNCH_NO_STARTURL");
+    expect(result.stdout).not.toContain("example.com");
+    expect(result.stdout).toContain("Integration completed.");
   }, 90_000);
 });
