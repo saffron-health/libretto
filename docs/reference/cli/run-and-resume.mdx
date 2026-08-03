@@ -69,7 +69,21 @@ npx libretto run <file> [flags]
 <ParamField path="--provider" type="string">
   Browser provider to use for this run. Must be `local`, `kernel`, `browserbase`,
   `steel`, or `libretto-cloud`. Overrides `LIBRETTO_PROVIDER` and the `provider` setting
-  in `.libretto/config.json`.
+  in `.libretto/config.json`. Cannot be combined with `--cdp`.
+</ParamField>
+
+<ParamField path="--cdp" type="string">
+  Connect to an existing Chrome DevTools Protocol endpoint instead of launching a
+  browser. Use this for Electron apps or Chrome started with
+  `--remote-debugging-port`. Cannot be combined with `--provider`, `--headed`,
+  `--headless`, or `--viewport`. Libretto still navigates to the workflow
+  `startUrl` before the handler runs. Closing the Libretto session disconnects
+  from CDP and does not terminate the remote browser.
+</ParamField>
+
+<ParamField path="--page" type="string">
+  When using `--cdp`, target a specific discovered page id such as `page-0` or
+  `page-1`. Omit to use the default (last operational page). Requires `--cdp`.
 </ParamField>
 
 <Info>
@@ -78,6 +92,18 @@ npx libretto run <file> [flags]
   providers](/alternative-providers/overview) for Kernel, Browserbase, Steel, AWS, and
   GCP setup.
 </Info>
+
+#### Run against an external CDP browser
+
+Use `--cdp` when the browser already exists (Electron, remote debugging Chrome, CI browser). Use interactive [`connect`](/reference/cli/open-and-connect#connect) to explore with `exec` / `snapshot`; use `run --cdp` to execute a workflow file against that same endpoint.
+
+```bash theme={null}
+# Chrome or Electron started with --remote-debugging-port=9222
+npx libretto run ./integration.ts --cdp http://127.0.0.1:9222
+
+# Target a specific window/page (ids from `libretto pages` on a connect session)
+npx libretto run ./integration.ts --cdp http://127.0.0.1:9222 --page page-1
+```
 
 #### Behavior on failure
 
@@ -123,6 +149,9 @@ npx libretto run ./integration.ts --params-file ./params.json
 
 # Run with explicit session name for post-failure inspection
 npx libretto run ./integration.ts --session debug-flow --headed
+
+# Run against an external CDP / Electron browser
+npx libretto run ./integration.ts --cdp http://127.0.0.1:9222
 ```
 
 ---

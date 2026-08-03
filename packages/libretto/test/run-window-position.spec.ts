@@ -85,4 +85,33 @@ describe("createRunBrowserConfig", () => {
       headless: false,
     });
   });
+
+  it("uses connect config for CDP workflow runs", () => {
+    expect(
+      createRunBrowserConfig({
+        cdpEndpoint: "http://127.0.0.1:9222/",
+        headless: true,
+        viewport: { width: 1440, height: 900 },
+        windowPosition: { x: 536, y: 33 },
+        providerName: "kernel",
+      }),
+    ).toEqual({
+      kind: "connect",
+      cdpEndpoint: "http://127.0.0.1:9222/",
+    });
+  });
+
+  it("passes page id through to CDP connect config", () => {
+    expect(
+      createRunBrowserConfig({
+        cdpEndpoint: "http://127.0.0.1:9222/",
+        pageId: "page-1",
+        headless: true,
+      }),
+    ).toEqual({
+      kind: "connect",
+      cdpEndpoint: "http://127.0.0.1:9222/",
+      pageId: "page-1",
+    });
+  });
 });

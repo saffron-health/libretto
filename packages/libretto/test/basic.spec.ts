@@ -541,10 +541,27 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("--read-only");
     expect(result.stdout).toContain("--no-visualize");
     expect(result.stdout).toContain("--stay-open-on-success");
+    expect(result.stdout).toContain("--cdp");
     expect(result.stdout).toContain(
       "Disable ghost cursor + highlight visualization in headed mode",
     );
     expect(result.stderr).toBe("");
+  });
+
+  test("run rejects --cdp with launch-only flags", async ({ librettoCli }) => {
+    const withHeadless = await librettoCli(
+      "run ./missing-workflow.ts --cdp http://127.0.0.1:9222 --headless",
+    );
+    expect(withHeadless.stderr).toContain("--cdp");
+    expect(withHeadless.stderr).toContain("--headed");
+    expect(withHeadless.stderr).toContain("--headless");
+    expect(withHeadless.stderr).toContain("--viewport");
+
+    const withProvider = await librettoCli(
+      "run ./missing-workflow.ts --cdp http://127.0.0.1:9222 --provider kernel",
+    );
+    expect(withProvider.stderr).toContain("--cdp");
+    expect(withProvider.stderr).toContain("--provider");
   });
 
   test("prints session-mode help", async ({ librettoCli }) => {

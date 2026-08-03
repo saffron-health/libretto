@@ -154,6 +154,8 @@ npx libretto connect ws://127.0.0.1:9223 --session another-session
 - You are driving an Electron app exposed over CDP.
 - You want to attach to a remote browser in a CI environment that has already navigated to the right state.
 
+For executing a default-exported `workflow()` file against that same CDP endpoint without an interactive session first, use [`run --cdp`](/reference/cli/run-and-resume#run-against-an-external-cdp-browser) instead.
+
 #### Flags
 
 <ParamField path="cdp-url" type="string" required>
