@@ -17,6 +17,7 @@ Do not default to this for this repository's own Electron app unless the user ex
 4. Verify targets with `npx libretto pages --session <session>`.
 5. Run interactions with `npx libretto exec "<code>" --session <session>`.
 6. Capture evidence with `npx libretto snapshot --session <session>`.
+7. When a reusable workflow file is ready, execute it with `npx libretto run ./workflow.ts --cdp http://127.0.0.1:<port>` (optional `--page page-N`).
 
 ## Launch examples
 
@@ -77,6 +78,15 @@ Electron apps often have multiple windows/pages. Use `pages` to list them and `-
 npx libretto pages --session slack-desktop
 npx libretto exec --session slack-desktop --page <page-id> "return await page.url()"
 npx libretto snapshot --session slack-desktop --page <page-id>
+```
+
+## Scripted workflows
+
+After interactive discovery, run a default-exported `workflow()` against the same CDP endpoint. Libretto navigates to the workflow `startUrl` before the handler. Closing the Libretto session does not quit the Electron app.
+
+```bash
+npx libretto run ./slack-workflow.ts --cdp http://127.0.0.1:9222
+npx libretto run ./slack-workflow.ts --cdp http://127.0.0.1:9222 --page page-1
 ```
 
 ## Troubleshooting

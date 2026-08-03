@@ -142,26 +142,37 @@ test("executes a workflow against an external CDP browser and leaves it alive", 
 
 Electron and multi-window Chrome often expose several pages. Let `run --cdp` select which page gets `startUrl` navigation and becomes `ctx.page`.
 
+Initial pages discovered at daemon start are tracked as stable `page-0` .. `page-N` ids (later popups still get random ids). `run --cdp --page page-1` selects by that index among pages found at connect time, so the id matches what `pages` shows on another CDP session attached to the same browser.
+
 ```ts
+// packages/libretto/src/cli/core/daemon/config.ts
+export type DaemonBrowserConnectConfig = {
+  kind: "connect";
+  cdpEndpoint: string;
+  initialUrl?: string;
+  pageId?: string;
+};
+
 // packages/libretto/src/cli/core/daemon/daemon.ts
-// Before navigateUrl / startWorkflow, when pageId is provided:
-const targetPage = daemon.resolveTargetPage(pageId);
-// use targetPage for goto(startUrl) and WorkflowController page
+if (config.pageId) {
+  const pageIndex = parseConnectPageIndex(config.pageId);
+  // select operationalPages[pageIndex] before initialize + startUrl navigation
+}
 ```
 
-- [ ] Add optional `--page` to `run` (same id form as `exec` / `snapshot`).
-- [ ] Plumb `pageId` through daemon workflow start so navigation and `WorkflowController` use that page.
-- [ ] On unknown page id, fail with the same next-step style as `exec` (`libretto pages --session ...`).
-- [ ] When `--page` is omitted, keep current connect default (last operational page, or create one).
-- [ ] Add a test with two pages on one CDP browser: `run --cdp --page <id>` targets the chosen page.
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
+- [x] Add optional `--page` to `run` (same id form as `exec` / `snapshot`).
+- [x] Plumb `pageId` through daemon workflow start so navigation and `WorkflowController` use that page.
+- [x] On unknown page id, fail with the same next-step style as `exec` (`libretto pages --session ...`).
+- [x] When `--page` is omitted, keep current connect default (last operational page, or create one).
+- [x] Add a test with two pages on one CDP browser: `run --cdp --page <id>` targets the chosen page.
+- [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 5: Docs and skill guidance
 
 Document the scripted CDP path without changing the interactive `connect` story.
 
-- [ ] Update `docs/reference/cli/run-and-resume.mdx` with `--cdp`, `--page`, lifecycle notes, and an Electron/CDP example.
-- [ ] Update `docs/reference/cli/open-and-connect.mdx` to point scripted workflow execution at `run --cdp`.
-- [ ] Update `packages/libretto/skills/libretto/SKILL.md` run-modes / commands: use `run --cdp` for workflows on external CDP; keep `connect` for explore/`exec`.
-- [ ] Update `.agents/skills/external-electron-apps/SKILL.md` with a `run --cdp` example after interactive discovery.
-- [ ] Run `pnpm sync:mirrors` if skill mirrors need regeneration; run `pnpm check:mirrors`.
+- [x] Update `docs/reference/cli/run-and-resume.mdx` with `--cdp`, `--page`, lifecycle notes, and an Electron/CDP example.
+- [x] Update `docs/reference/cli/open-and-connect.mdx` to point scripted workflow execution at `run --cdp`.
+- [x] Update `packages/libretto/skills/libretto/SKILL.md` run-modes / commands: use `run --cdp` for workflows on external CDP; keep `connect` for explore/`exec`.
+- [x] Update `.agents/skills/external-electron-apps/SKILL.md` with a `run --cdp` example after interactive discovery.
+- [x] Run `pnpm sync:mirrors` if skill mirrors need regeneration; run `pnpm check:mirrors`.

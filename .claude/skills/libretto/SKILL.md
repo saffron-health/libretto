@@ -167,6 +167,8 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 - Workflows define their input shape with a Zod schema (see `references/code-generation-rules.md`). `run` validates `--params` against that schema before calling the handler and prints a clear field-by-field error if the input doesn't match.
 - Successful runs close the browser by default. Pass `--stay-open-on-success` when you need to inspect the completed state with `pages`, `snapshot`, or `exec`.
 - Use `--provider <name>` when validating behavior in that provider's browser runtime.
+- Use `--cdp <url>` to run a workflow against an existing CDP endpoint (Electron or Chrome with `--remote-debugging-port`). Libretto still navigates to workflow `startUrl`. Do not pass `--provider`, `--headed`, `--headless`, or `--viewport` with `--cdp`. Optional `--page page-N` selects which discovered page receives navigation.
+- Prefer `connect` + `exec` / `snapshot` for interactive exploration of an external CDP browser; use `run --cdp` once the workflow file is ready.
 - Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.
 - If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.
 - Insert `await pause(session)` statements in the workflow file when you need to stop at specific states for interactive debugging, like breakpoints in the browser flow.
@@ -176,6 +178,8 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 ```bash
 npx libretto run ./integration.ts --params '{"status":"open"}'
 npx libretto run ./integration.ts --provider libretto-cloud
+npx libretto run ./integration.ts --cdp http://127.0.0.1:9222
+npx libretto run ./integration.ts --cdp http://127.0.0.1:9222 --page page-1
 npx libretto run ./integration.ts --read-only
 npx libretto run ./integration.ts --stay-open-on-success
 ```
