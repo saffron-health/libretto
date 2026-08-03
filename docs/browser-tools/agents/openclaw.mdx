@@ -1,0 +1,145 @@
+---
+title: OpenClaw
+sidebarTitle: OpenClaw
+"og:image": "https://libretto.sh/docs/og/browser-tools/agents/openclaw.png"
+---
+
+> Use Browser Tools with [OpenClaw](https://docs.openclaw.ai) over MCP.
+
+Point OpenClaw at the Browser Tools stdio binary to replace OpenClaw's bundled browser stack with six Playwright tools (`browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, `browser_close`). Compact accessibility snapshots and a smaller tool surface usually use fewer tokens than a large native browser tool set.
+
+Browser Tools launches an agent-owned browser session. It does not replace OpenClaw's Chrome extension / `user` profile path for driving signed-in tabs in your personal browser.
+
+## Requirements
+
+The MCP binary runs on the machine that launches the server (usually the OpenClaw Gateway host).
+
+- Node.js 18+ with `npx` (OpenClaw itself needs a newer Node; see [OpenClaw install](https://docs.openclaw.ai/install))
+- Playwright Chromium once per machine when using the local provider:
+
+```bash theme={null}
+npx playwright install chromium
+```
+
+On Linux hosts missing browser system libraries, use:
+
+```bash theme={null}
+npx playwright install --with-deps chromium
+```
+
+Headless is the default. `--headed` needs a graphical display on that same host — it does not open a window on your laptop when the Gateway runs remotely.
+
+## Install and configure
+
+The simplest path is OpenClaw's MCP CLI:
+
+```bash theme={null}
+openclaw mcp add libretto --command npx --arg -y --arg libretto-browser-tools
+openclaw mcp doctor libretto --probe
+```
+
+That saves the server under `mcp.servers` in `~/.openclaw/openclaw.json` and proves it starts and exposes the six tools. You can also add the server in the Control UI under MCP settings (`/settings/mcp`).
+
+Pass more `--arg` flags for a visible browser or [domain policy](/browser-tools/advanced):
+
+```bash theme={null}
+openclaw mcp add libretto \
+  --command npx \
+  --arg -y \
+  --arg libretto-browser-tools \
+  --arg --headed \
+  --arg --allowed-domain \
+  --arg example.com
+```
+
+Reload or restart the Gateway process that should see the new server (`openclaw mcp reload` only affects the current CLI process).
+
+See [Tools](/browser-tools/tools) for inputs and outputs, and [MCP](/browser-tools/adapters/mcp) for flags and the library API.
+
+## Disable OpenClaw's bundled browser
+
+Disable the bundled browser plugin so OpenClaw does not keep its native `browser` tool alongside Browser Tools:
+
+```json5 theme={null}
+{
+  plugins: {
+    entries: {
+      browser: {
+        enabled: false,
+      },
+    },
+  },
+}
+```
+
+Restart the Gateway after changing plugin config. See [OpenClaw browser docs](https://docs.openclaw.ai/tools/browser).
+
+Keep the bundled browser enabled when you still need OpenClaw's signed-in `user` / Chrome-extension attach paths.
+
+## Auth profiles
+
+Local sessions keep signed-in browser state in profiles under `~/.libretto/browser-tools/profiles/` on the Gateway host. The agent can reuse that state across runs so you do not have to sign in every time.
+
+To sign in once, run the MCP server with `--headed`, ask the agent to open a browser session for the site, complete login in the window yourself, then ask it to close the session. Later headless runs reuse the cookies. Profile changes save only on a clean close; do not share profile directories across untrusted users.
+
+## OpenAI models and MCP tools
+
+OpenAI agent models default to the Codex runtime, which may not project custom MCP tools. For Browser Tools with an OpenAI API key, pin the embedded OpenClaw runtime on that model:
+
+```json5 theme={null}
+{
+  agents: {
+    defaults: {
+      model: "openai/gpt-5.4-mini",
+      models: {
+        "openai/gpt-5.4-mini": {
+          agentRuntime: { id: "openclaw" },
+        },
+      },
+    },
+  },
+}
+```
+
+See [OpenClaw agent runtimes](https://docs.openclaw.ai/concepts/agent-runtimes).
+
+## Security
+
+`browser_exec` runs Playwright and JavaScript in the MCP process — not inside a browser sandbox. Treat the Gateway host as the trust boundary: domain allow/block flags limit http(s) requests in the managed browser context, but they do not confine `browser_exec` itself.
+
+## Cloud providers
+
+Pass `--provider` to use a [cloud browser](/browser-tools/providers/overview) instead of local Chromium:
+
+```bash theme={null}
+openclaw mcp add libretto \
+  --command npx \
+  --arg -y \
+  --arg libretto-browser-tools \
+  --arg --provider \
+  --arg kernel \
+  --env KERNEL_API_KEY=$KERNEL_API_KEY
+```
+
+Put the provider API key in the MCP server environment (`--env` on `mcp add`, or the Gateway process env). Supported names: `local`, `kernel`, `browserbase`, `browser-use`, `steel`, `libretto-cloud`.
+
+## Troubleshooting
+
+| Symptom | What to try |
+| --- | --- |
+| Server fails to start / Chromium missing | For `--provider local`, run `npx playwright install chromium` (add `--with-deps` on Linux). |
+| Missing cloud API key | Pass `--env PROVIDER_API_KEY=…` on `mcp add`, or set it on the Gateway host. |
+| Headed browser errors with no display | Drop `--headed`, or run the Gateway where a display is available. |
+| Native browser tools still win | Set `plugins.entries.browser.enabled` to `false`, then restart the Gateway. |
+| MCP tools missing on OpenAI models | Pin `agentRuntime.id: "openclaw"` on that model (see above). |
+| Server saved but agent cannot see tools | Run `openclaw mcp doctor libretto --probe`, then restart the Gateway (not only `mcp reload`). |
+| Browser sessions stop working after idle | One-shot agent runs tear down MCP children when the turn ends; open a fresh session next turn. |
+| Login state missing after a crash | Profiles save on graceful close only; sign in again with `--headed`. |
+
+## See also
+
+- [MCP adapter](/browser-tools/adapters/mcp) — stdio binary and library registration
+- [Local provider](/browser-tools/providers/local) — Chromium install and options
+- [Hermes](/browser-tools/agents/hermes) — same binary on Hermes Agent
+- [OpenClaw MCP CLI](https://docs.openclaw.ai/cli/mcp)
+- [OpenClaw browser](https://docs.openclaw.ai/tools/browser)
