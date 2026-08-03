@@ -17,11 +17,14 @@ openclaw mcp add libretto -- npx -y libretto-browser-tools
 
 Or add the server in the Control UI under MCP settings (`/settings/mcp`).
 
-Pass flags after the package name when you need a headed browser or domain policy:
+Pass flags after the package name when you need a headed browser, a cloud provider, or domain policy:
 
 ```bash theme={null}
 openclaw mcp add libretto -- npx -y libretto-browser-tools --headed
+openclaw mcp add libretto -- npx -y libretto-browser-tools --provider kernel
 ```
+
+Cloud providers read API keys from the Gateway environment (for example `KERNEL_API_KEY`). See [MCP](/browser-tools/adapters/mcp) for provider names and required variables.
 
 ## Disable the bundled browser
 

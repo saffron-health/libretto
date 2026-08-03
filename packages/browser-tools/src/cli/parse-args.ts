@@ -1,4 +1,11 @@
+import {
+	formatCliProviderList,
+	isCliProviderName,
+	type CliProviderName,
+} from "./create-cli-provider.js";
+
 export type McpCliOptions = {
+	provider: CliProviderName;
 	headless: boolean;
 	allowedDomains: string[];
 	blockedDomains: string[];
@@ -15,22 +22,39 @@ Usage:
   libretto-browser-tools [mcp] [options]
 
 Options:
+  --provider <name>        Browser provider (default: local)
+                           ${formatCliProviderList()}
   --headed                 Show the browser window (default: headless)
   --allowed-domain <host>  Allow http(s) navigation to this host (repeatable)
   --blocked-domain <host>  Block http(s) navigation to this host (repeatable)
   -h, --help               Show this help
 
+Cloud providers read API keys from the environment (for example KERNEL_API_KEY).
+--headed applies to local, kernel, and libretto-cloud.
+
 Examples:
   npx -y libretto-browser-tools
   npx -y libretto-browser-tools mcp --headed
+  npx -y libretto-browser-tools --provider kernel
   npx -y libretto-browser-tools --allowed-domain example.com
 
 Configure an MCP client with command "npx" and args ["-y", "libretto-browser-tools"].
-Install Chromium once with: npx playwright install chromium
+Install Chromium once for --provider local: npx playwright install chromium
 `;
 
 export function getHelpText(): string {
 	return HELP;
+}
+
+function missingFlagValue(
+	flag: string,
+	example: string,
+): Extract<ParsedCli, { kind: "error" }> {
+	return {
+		kind: "error",
+		message: `Missing value for ${flag}.`,
+		recovery: `Pass a value after the flag, for example \`${example}\`.`,
+	};
 }
 
 /**
@@ -42,6 +66,7 @@ export function parseCliArgs(argv: readonly string[]): ParsedCli {
 		tokens.shift();
 	}
 
+	let provider: CliProviderName = "local";
 	let headless = true;
 	const allowedDomains: string[] = [];
 	const blockedDomains: string[] = [];
@@ -64,15 +89,51 @@ export function parseCliArgs(argv: readonly string[]): ParsedCli {
 			continue;
 		}
 
+		if (token === "--provider") {
+			const value = tokens[++i];
+			if (value === undefined || value.startsWith("-")) {
+				return missingFlagValue(
+					"--provider",
+					`--provider kernel`,
+				);
+			}
+			if (!isCliProviderName(value)) {
+				return {
+					kind: "error",
+					message: `Unknown provider: ${value}`,
+					recovery: `Use one of: ${formatCliProviderList()}.`,
+				};
+			}
+			provider = value;
+			continue;
+		}
+
+		if (token.startsWith("--provider=")) {
+			const value = token.slice("--provider=".length);
+			if (value.length === 0) {
+				return missingFlagValue(
+					"--provider",
+					`--provider=kernel`,
+				);
+			}
+			if (!isCliProviderName(value)) {
+				return {
+					kind: "error",
+					message: `Unknown provider: ${value}`,
+					recovery: `Use one of: ${formatCliProviderList()}.`,
+				};
+			}
+			provider = value;
+			continue;
+		}
+
 		if (token === "--allowed-domain") {
 			const value = tokens[++i];
 			if (value === undefined || value.startsWith("-")) {
-				return {
-					kind: "error",
-					message: "Missing value for --allowed-domain.",
-					recovery:
-						"Pass a hostname after the flag, for example `--allowed-domain example.com`.",
-				};
+				return missingFlagValue(
+					"--allowed-domain",
+					`--allowed-domain example.com`,
+				);
 			}
 			allowedDomains.push(value);
 			continue;
@@ -81,12 +142,10 @@ export function parseCliArgs(argv: readonly string[]): ParsedCli {
 		if (token.startsWith("--allowed-domain=")) {
 			const value = token.slice("--allowed-domain=".length);
 			if (value.length === 0) {
-				return {
-					kind: "error",
-					message: "Missing value for --allowed-domain.",
-					recovery:
-						"Pass a hostname after the flag, for example `--allowed-domain=example.com`.",
-				};
+				return missingFlagValue(
+					"--allowed-domain",
+					`--allowed-domain=example.com`,
+				);
 			}
 			allowedDomains.push(value);
 			continue;
@@ -95,12 +154,10 @@ export function parseCliArgs(argv: readonly string[]): ParsedCli {
 		if (token === "--blocked-domain") {
 			const value = tokens[++i];
 			if (value === undefined || value.startsWith("-")) {
-				return {
-					kind: "error",
-					message: "Missing value for --blocked-domain.",
-					recovery:
-						"Pass a hostname after the flag, for example `--blocked-domain ads.example.com`.",
-				};
+				return missingFlagValue(
+					"--blocked-domain",
+					`--blocked-domain ads.example.com`,
+				);
 			}
 			blockedDomains.push(value);
 			continue;
@@ -109,12 +166,10 @@ export function parseCliArgs(argv: readonly string[]): ParsedCli {
 		if (token.startsWith("--blocked-domain=")) {
 			const value = token.slice("--blocked-domain=".length);
 			if (value.length === 0) {
-				return {
-					kind: "error",
-					message: "Missing value for --blocked-domain.",
-					recovery:
-						"Pass a hostname after the flag, for example `--blocked-domain=ads.example.com`.",
-				};
+				return missingFlagValue(
+					"--blocked-domain",
+					`--blocked-domain=ads.example.com`,
+				);
 			}
 			blockedDomains.push(value);
 			continue;
@@ -130,6 +185,6 @@ export function parseCliArgs(argv: readonly string[]): ParsedCli {
 
 	return {
 		kind: "mcp",
-		options: { headless, allowedDomains, blockedDomains },
+		options: { provider, headless, allowedDomains, blockedDomains },
 	};
 }

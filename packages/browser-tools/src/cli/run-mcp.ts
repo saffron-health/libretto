@@ -3,7 +3,10 @@ import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerMcpBrowserTools } from "../adapters/mcp/index.js";
-import { LocalBrowserProvider } from "../providers/local.js";
+import {
+	createCliBrowserProvider,
+	providerSupportsHeadless,
+} from "./create-cli-provider.js";
 import type { McpCliOptions } from "./parse-args.js";
 
 const require = createRequire(fileURLToPath(import.meta.url));
@@ -23,25 +26,31 @@ function readPackageVersion(): string {
  */
 export async function startMcpStdioServer(
 	options: McpCliOptions,
-): Promise<void> {
+): Promise<Error | void> {
+	const provider = createCliBrowserProvider({
+		provider: options.provider,
+		headless: options.headless,
+	});
+	if (provider instanceof Error) {
+		return provider;
+	}
+
+	if (!options.headless && !providerSupportsHeadless(options.provider)) {
+		process.stderr.write(
+			`--headed is ignored for --provider ${options.provider}; that provider has no headed mode in this CLI.\n`,
+		);
+	}
+
 	const server = new McpServer({
 		name: "libretto-browser-tools",
 		version: readPackageVersion(),
 	});
-	const toolkit = registerMcpBrowserTools(
-		server,
-		new LocalBrowserProvider({ headless: options.headless }),
-		{
-			allowedDomains:
-				options.allowedDomains.length > 0
-					? options.allowedDomains
-					: undefined,
-			blockedDomains:
-				options.blockedDomains.length > 0
-					? options.blockedDomains
-					: undefined,
-		},
-	);
+	const toolkit = registerMcpBrowserTools(server, provider, {
+		allowedDomains:
+			options.allowedDomains.length > 0 ? options.allowedDomains : undefined,
+		blockedDomains:
+			options.blockedDomains.length > 0 ? options.blockedDomains : undefined,
+	});
 
 	let shuttingDown = false;
 	async function shutdown(): Promise<void> {
