@@ -79,6 +79,7 @@ import {
   type DaemonBrowserConnectConfig,
   type DaemonBrowserProviderConfig,
   type DaemonWorkflowConfig,
+  applyWorkflowStartUrlToBrowserConfig,
 } from "./config.js";
 import type { Experiments } from "../experiments.js";
 import { getCloudProviderApi } from "../providers/index.js";
@@ -967,15 +968,11 @@ async function main(): Promise<void> {
           // Explicit daemon/CLI viewport wins over workflow viewport.
           viewport: config.browser.viewport ?? loadedWorkflow.viewport,
         };
-      } else if (
-        config.browser.kind === "launch" &&
-        loadedWorkflow.startUrl &&
-        !config.browser.initialUrl
-      ) {
-        browserConfig = {
-          ...config.browser,
-          initialUrl: loadedWorkflow.startUrl,
-        };
+      } else {
+        browserConfig = applyWorkflowStartUrlToBrowserConfig(
+          config.browser,
+          loadedWorkflow.startUrl,
+        );
       }
     } catch (error) {
       throw new UserFacingStartupError(

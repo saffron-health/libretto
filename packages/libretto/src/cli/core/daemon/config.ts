@@ -69,3 +69,21 @@ export type DaemonConfig = {
     | DaemonBrowserProviderConfig;
   workflow?: DaemonWorkflowConfig;
 };
+
+/**
+ * Copy workflow `startUrl` onto launch/connect `initialUrl` when the CLI did
+ * not already set one. Provider configs use a separate `startUrl` field.
+ */
+export function applyWorkflowStartUrlToBrowserConfig(
+  browser: DaemonConfig["browser"],
+  startUrl: string | undefined,
+): DaemonConfig["browser"] {
+  if (
+    !startUrl ||
+    (browser.kind !== "launch" && browser.kind !== "connect") ||
+    browser.initialUrl
+  ) {
+    return browser;
+  }
+  return { ...browser, initialUrl: startUrl };
+}

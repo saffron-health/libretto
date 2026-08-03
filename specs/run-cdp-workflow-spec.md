@@ -86,28 +86,28 @@ export function createRunBrowserConfig(args: {
 Connect+workflow must navigate to `startUrl` before the handler, matching local and provider `run` behavior. Today only `launch` gets `initialUrl` from workflow metadata.
 
 ```ts
-// packages/libretto/src/cli/core/daemon/daemon.ts
-if (config.browser.kind === "provider") {
-  browserConfig = {
-    ...config.browser,
-    // ... existing startUrl / gpu / viewport merge ...
-  };
-} else if (
-  (config.browser.kind === "launch" || config.browser.kind === "connect") &&
-  loadedWorkflow.startUrl &&
-  !config.browser.initialUrl
-) {
-  browserConfig = {
-    ...config.browser,
-    initialUrl: loadedWorkflow.startUrl,
-  };
+// packages/libretto/src/cli/core/daemon/config.ts
+export function applyWorkflowStartUrlToBrowserConfig(
+  browser: DaemonConfig["browser"],
+  startUrl: string | undefined,
+): DaemonConfig["browser"] {
+  if (
+    !startUrl ||
+    (browser.kind !== "launch" && browser.kind !== "connect") ||
+    browser.initialUrl
+  ) {
+    return browser;
+  }
+  return { ...browser, initialUrl: startUrl };
 }
 ```
 
-- [ ] Extend the workflow `startUrl` → `initialUrl` merge to `kind: "connect"` (not only `launch`).
-- [ ] Keep requiring `startUrl` on the workflow; do not add a CDP exception that skips navigation.
-- [ ] Add a focused unit/integration assertion that a connect+workflow daemon config ends up with `initialUrl` equal to the workflow `startUrl`.
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
+Daemon `main` calls this for non-provider browser configs after loading the workflow.
+
+- [x] Extend the workflow `startUrl` → `initialUrl` merge to `kind: "connect"` (not only `launch`).
+- [x] Keep requiring `startUrl` on the workflow; do not add a CDP exception that skips navigation.
+- [x] Add a focused unit/integration assertion that a connect+workflow daemon config ends up with `initialUrl` equal to the workflow `startUrl`.
+- [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 3: End-to-end `run --cdp` coverage
 
