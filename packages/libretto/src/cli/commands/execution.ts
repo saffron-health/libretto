@@ -62,6 +62,7 @@ type RunIntegrationCommandRequest = {
   windowPosition?: WindowPositionConfig;
   accessMode: SessionAccessMode;
   providerName?: string;
+  cdpEndpoint?: string;
   stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
   experiments: Experiments;
@@ -71,11 +72,15 @@ type ExecMode = "exec" | "readonly-exec";
 const require = moduleBuiltin.createRequire(import.meta.url);
 
 export function createRunBrowserConfig(args: {
+  cdpEndpoint?: string;
   providerName?: string;
   headless: boolean;
   viewport?: { width: number; height: number };
   windowPosition?: WindowPositionConfig;
 }): DaemonConfig["browser"] {
+  if (args.cdpEndpoint) {
+    return { kind: "connect", cdpEndpoint: args.cdpEndpoint };
+  }
   if (args.providerName) {
     return {
       kind: "provider",
@@ -93,6 +98,31 @@ export function createRunBrowserConfig(args: {
       ? { windowPosition: args.windowPosition }
       : {}),
   };
+}
+
+function parseCdpEndpoint(cdpUrl: string): { endpoint: string; port: number } {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(cdpUrl);
+  } catch {
+    throw new Error(
+      [
+        `Invalid CDP URL: ${cdpUrl}`,
+        ``,
+        `Expected an HTTP or WebSocket URL pointing to a Chrome DevTools Protocol endpoint, for example:`,
+        `  libretto run ./workflow.ts --cdp http://127.0.0.1:9222`,
+        `  libretto run ./workflow.ts --cdp ws://127.0.0.1:9222/devtools/browser/<id>`,
+      ].join("\n"),
+    );
+  }
+
+  const port = parsedUrl.port
+    ? Number(parsedUrl.port)
+    : parsedUrl.protocol === "https:" || parsedUrl.protocol === "wss:"
+      ? 443
+      : 80;
+
+  return { endpoint: parsedUrl.href, port };
 }
 
 function writeDaemonExecOutput(output?: { stdout: string; stderr: string }) {
@@ -469,11 +499,15 @@ async function runIntegrationFromFile(
     handlers,
   });
 
+  const cdpEndpoint = args.cdpEndpoint ?? provider?.cdpEndpoint;
+  const cdpPort = args.cdpEndpoint
+    ? parseCdpEndpoint(args.cdpEndpoint).port
+    : 0;
   writeSessionState(
     {
-      port: 0,
+      port: cdpPort,
       pid,
-      cdpEndpoint: provider?.cdpEndpoint,
+      cdpEndpoint,
       session: args.session,
       startedAt: new Date().toISOString(),
       status: "active",
@@ -630,7 +664,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     });
   });
 
-const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH] [--provider <provider>]`;
+const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH] [--provider <provider> | --cdp <url>]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -675,6 +709,9 @@ export const runInput = SimpleCLI.input({
       help: "Browser provider (local, kernel, browserbase, steel)",
       aliases: ["-p"],
     }),
+    cdp: SimpleCLI.option(z.string().optional(), {
+      help: "Connect to an existing CDP endpoint instead of launching a browser",
+    }),
   },
 })
   .refine(
@@ -692,6 +729,15 @@ export const runInput = SimpleCLI.input({
   .refine(
     (input) => !(input.readOnly && input.writeAccess),
     "Cannot pass both --read-only and --write-access.",
+  )
+  .refine(
+    (input) => !(input.cdp && input.provider),
+    "Pass either --cdp or --provider, not both.",
+  )
+  .refine(
+    (input) =>
+      !(input.cdp && (input.headed || input.headless || input.viewport)),
+    "--cdp connects to an existing browser, so --headed, --headless, and --viewport do not apply. Drop those flags or omit --cdp.",
   );
 
 function resolveRunParams(
@@ -727,20 +773,29 @@ export const runCommand = SimpleCLI.command({
     assertSessionAvailableForStart(ctx.session, ctx.logger);
 
     const params = resolveRunParams(input.params, input.paramsFile);
+    const visualize = !input.noVisualize;
+    const cdpEndpoint = input.cdp
+      ? parseCdpEndpoint(input.cdp).endpoint
+      : undefined;
+
     const headlessMode = input.headed
       ? false
       : input.headless
         ? true
         : undefined;
-    const visualize = !input.noVisualize;
     const cliViewport = parseViewportArg(input.viewport);
     const configViewport = readLibrettoConfig().viewport;
     // Only pass an explicit CLI/config viewport into provider runs so workflow
     // viewport metadata can fill in. Local launches still resolve a default.
     const explicitViewport = cliViewport ?? configViewport;
-    const viewport = resolveViewport(cliViewport, ctx.logger);
+    const viewport = cdpEndpoint
+      ? undefined
+      : resolveViewport(cliViewport, ctx.logger);
 
-    const providerName = resolveProviderName(input.provider);
+    // --cdp owns the browser source; ignore config/env provider selection.
+    const providerName = cdpEndpoint
+      ? "local"
+      : resolveProviderName(input.provider);
     const daemonProviderName = providerName === "local" ? undefined : providerName;
     if (daemonProviderName) {
       console.log(
@@ -751,11 +806,18 @@ export const runCommand = SimpleCLI.command({
       });
       console.log(`Connecting to ${providerName} browser...`);
     }
+    if (cdpEndpoint) {
+      console.log(
+        `Connecting to CDP endpoint at ${cdpEndpoint} (session: ${ctx.session})...`,
+      );
+      ctx.logger.info("run-cdp-session-requested", { cdpEndpoint });
+    }
 
     const headless = headlessMode ?? false;
-    const windowPosition = headless
-      ? undefined
-      : resolveWindowPosition(ctx.logger);
+    const windowPosition =
+      cdpEndpoint || headless
+        ? undefined
+        : resolveWindowPosition(ctx.logger);
 
     await runIntegrationFromFile(
       {
@@ -765,10 +827,15 @@ export const runCommand = SimpleCLI.command({
         tsconfigPath: input.tsconfig,
         headless,
         visualize,
-        viewport: daemonProviderName ? explicitViewport : viewport,
+        viewport: cdpEndpoint
+          ? undefined
+          : daemonProviderName
+            ? explicitViewport
+            : viewport,
         windowPosition,
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
         providerName: daemonProviderName,
+        cdpEndpoint,
         stayOpenOnSuccess: input.stayOpenOnSuccess,
         experiments: ctx.experiments,
       },

@@ -73,13 +73,13 @@ export function createRunBrowserConfig(args: {
 }
 ```
 
-- [ ] Add optional `--cdp` string option to `runInput` (CDP HTTP or WebSocket URL).
-- [ ] Refine: cannot pass `--cdp` with `--provider` / `-p`.
-- [ ] Refine: cannot pass `--cdp` with `--headed`, `--headless`, or `--viewport` (error must say those only apply when Libretto launches the browser; drop them or omit `--cdp`).
-- [ ] Pass `cdpEndpoint` through `runIntegrationFromFile` into `createRunBrowserConfig`.
-- [ ] When `--cdp` is set, mark the session as externally managed the same way `connect` does (disconnect on close; do not kill the remote process).
-- [ ] Update `run` usage/help text to include `--cdp`.
-- [ ] Verify `pnpm -s type-check --filter=libretto` passes.
+- [x] Add optional `--cdp` string option to `runInput` (CDP HTTP or WebSocket URL).
+- [x] Refine: cannot pass `--cdp` with `--provider` / `-p`.
+- [x] Refine: cannot pass `--cdp` with `--headed`, `--headless`, or `--viewport` (error must say those only apply when Libretto launches the browser; drop them or omit `--cdp`).
+- [x] Pass `cdpEndpoint` through `runIntegrationFromFile` into `createRunBrowserConfig`.
+- [x] When `--cdp` is set, mark the session as externally managed the same way `connect` does (disconnect on close; do not kill the remote process).
+- [x] Update `run` usage/help text to include `--cdp`.
+- [x] Verify `pnpm -s type-check --filter=libretto` passes.
 
 ### Phase 2: Apply workflow `startUrl` to CDP connect runs
 
