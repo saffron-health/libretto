@@ -1,0 +1,106 @@
+---
+title: Hermes Agent
+sidebarTitle: Hermes
+"og:image": "https://libretto.sh/docs/og/browser-tools/agents/hermes.png"
+---
+
+> Use Browser Tools with [Hermes Agent](https://hermes-agent.nousresearch.com/docs) over MCP.
+
+Point Hermes at the Browser Tools stdio binary to replace Hermes' built-in `browser_*` stack with six Playwright tools (`browser_open`, `browser_connect`, `browser_exec`, `browser_snapshot`, `browser_status`, `browser_close`). Compact accessibility snapshots and a smaller tool surface usually use fewer tokens than Hermes' native browser tools.
+
+## Requirements
+
+The MCP binary runs a [local Chromium](/browser-tools/providers/local) session on the machine that launches the server (the Hermes host).
+
+- Node.js 18+ with `npx`
+- Playwright Chromium once per machine:
+
+```bash theme={null}
+npx playwright install chromium
+```
+
+On Linux hosts missing browser system libraries, use:
+
+```bash theme={null}
+npx playwright install --with-deps chromium
+```
+
+Headless is the default. `--headed` needs a graphical display on that same host — it does not open a window on your laptop when Hermes runs remotely.
+
+## Install and configure
+
+Add the server in `~/.hermes/config.yaml`:
+
+```yaml theme={null}
+mcp_servers:
+  libretto:
+    command: npx
+    args: ["-y", "libretto-browser-tools"]
+
+agent:
+  disabled_toolsets:
+    - browser
+```
+
+Or:
+
+```bash theme={null}
+hermes mcp add libretto --command npx --args -y --args libretto-browser-tools
+hermes tools disable browser
+```
+
+Reload MCP after changing config (`/reload-mcp` in a Hermes session, or restart Hermes). Confirm the server with `hermes mcp test libretto`.
+
+Pass flags in `args` for a visible browser or [domain policy](/browser-tools/advanced):
+
+```yaml theme={null}
+mcp_servers:
+  libretto:
+    command: npx
+    args:
+      - "-y"
+      - "libretto-browser-tools"
+      - "--headed"
+      - "--allowed-domain"
+      - "example.com"
+```
+
+See [Tools](/browser-tools/tools) for inputs and outputs, and [MCP](/browser-tools/adapters/mcp) for flags and the library API.
+
+## Disable Hermes' built-in browser
+
+Disable the `browser` toolset so Hermes does not keep its native `browser_navigate` / `browser_click` / … tools alongside Browser Tools.
+
+Leave Hermes' separate `web` toolset enabled (the default on `hermes-cli`). It provides `web_search` and `web_extract`, so disabling `browser` does not turn off search.
+
+## Auth profiles
+
+Local sessions keep signed-in browser state in profiles under `~/.libretto/browser-tools/profiles/` on the Hermes host. The agent can reuse that state across runs so you do not have to sign in every time.
+
+To sign in once, run the MCP server with `--headed`, ask the agent to open a browser session for the site, complete login in the window yourself, then ask it to close the session. Later headless runs reuse the cookies. Profile changes save only on a clean close; do not share profile directories across untrusted users.
+
+## Security
+
+`browser_exec` runs Playwright and JavaScript in the MCP process — not inside a browser sandbox. Treat the Hermes host as the trust boundary: domain allow/block flags limit http(s) requests in the managed browser context, but they do not confine `browser_exec` itself.
+
+## Cloud providers
+
+The stock `libretto-browser-tools` binary always uses the local provider. Kernel, Browserbase, Browser Use, Steel, and Libretto Cloud need a custom MCP server that calls [`registerMcpBrowserTools`](/browser-tools/adapters/mcp) with that provider. Setting cloud API keys on the stock binary has no effect.
+
+## Troubleshooting
+
+| Symptom | What to try |
+| --- | --- |
+| Server fails to start / Chromium missing | Run `npx playwright install chromium` (add `--with-deps` on Linux). |
+| Headed browser errors with no display | Drop `--headed`, or run Hermes where a display is available. |
+| Native browser tools still win | Confirm `agent.disabled_toolsets` includes `browser`, then reload MCP. |
+| Browser sessions stop working after idle | Hermes may recycle the MCP process; ask the agent to open a fresh session. |
+| Login state missing after a crash | Profiles save on graceful close only; sign in again with `--headed`. |
+
+## See also
+
+- [MCP adapter](/browser-tools/adapters/mcp) — stdio binary and library registration
+- [Local provider](/browser-tools/providers/local) — Chromium install and options
+- [OpenClaw](/browser-tools/adapters/openclaw) — same binary on OpenClaw
+- [Hermes MCP docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp)
+- [Hermes toolsets](https://hermes-agent.nousresearch.com/docs/reference/toolsets-reference)
