@@ -113,25 +113,30 @@ Daemon `main` calls this for non-provider browser configs after loading the work
 
 Prove the primary Electron/CDP path: external Chromium with remote debugging, `run --cdp`, navigation to `startUrl`, workflow completion, remote browser still alive after Libretto disconnects.
 
+Tests live in `packages/libretto/test/run-cdp.spec.ts`. They start a CDP-capable browser via `libretto open --headless`, then point `run --cdp` at that port (same pattern as connect E2E). Flag-conflict coverage for `--cdp` + `--provider` / `--headless` is in `packages/libretto/test/basic.spec.ts`.
+
 ```ts
-// packages/libretto/test/... (follow docs/tests-guide.md)
-test("run --cdp executes workflow against an external CDP browser", async ({
-  ...
+// packages/libretto/test/run-cdp.spec.ts
+test("executes a workflow against an external CDP browser and leaves it alive", async ({
+  librettoCli,
+  writeWorkflow,
+  workspacePath,
 }) => {
-  // Launch Chromium with --remote-debugging-port (or reuse test helper).
-  // libretto run ./wf.ts --cdp http://127.0.0.1:<port> --session run-cdp
-  // Assert workflow output / success.
-  // Assert remote browser process still running after run completes.
-  // Assert Libretto session is closed (unless --stay-open-on-success).
+  await librettoCli(`open about:blank --headless --session ${sourceSession}`);
+  // read CDP port from source session state
+  await librettoCli(
+    `run "${integrationFilePath}" --cdp http://127.0.0.1:${port} --session ${runSession}`,
+  );
+  // assert startUrl navigation + source browser still alive
 });
 ```
 
-- [ ] Add an integration test that starts a CDP-enabled Chromium, runs a small workflow with `startUrl` via `run --cdp`, and asserts success.
-- [ ] Assert the workflow landed on `startUrl` (handler checks `page.url()` or equivalent).
-- [ ] Assert a normal successful CDP run disconnects the Libretto session without killing the CDP browser process.
-- [ ] Assert `--stay-open-on-success` leaves a daemon-backed session usable with `pages` / `snapshot` against the same CDP browser.
-- [ ] Assert conflicting flags (`--cdp` + `--provider`, `--cdp` + `--headless`) fail with actionable errors.
-- [ ] Run the new tests with the project's existing test command for this package.
+- [x] Add an integration test that starts a CDP-enabled Chromium, runs a small workflow with `startUrl` via `run --cdp`, and asserts success.
+- [x] Assert the workflow landed on `startUrl` (handler checks `page.url()` or equivalent).
+- [x] Assert a normal successful CDP run disconnects the Libretto session without killing the CDP browser process.
+- [x] Assert `--stay-open-on-success` leaves a daemon-backed session usable with `pages` / `snapshot` against the same CDP browser.
+- [x] Assert conflicting flags (`--cdp` + `--provider`, `--cdp` + `--headless`) fail with actionable errors.
+- [x] Run the new tests with the project's existing test command for this package.
 
 ### Phase 4: Optional `--page` for multi-target CDP browsers
 
