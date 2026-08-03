@@ -63,6 +63,7 @@ export default workflow(
     workspacePath,
   }) => {
     const sourceSession = "run-cdp-page-source";
+    const probeSession = "run-cdp-page-probe";
     const runSession = "run-cdp-page-target";
 
     const opened = await librettoCli(
@@ -74,22 +75,26 @@ export default workflow(
       `exec "const p = await context.newPage(); await p.goto('data:text/html,<body>page-one</body>'), context.pages().length" --session ${sourceSession}`,
     );
 
-    const sourcePages = await librettoCli(`pages --session ${sourceSession}`);
-    expect(sourcePages.stderr).toBe("");
-    expect(sourcePages.stdout).toContain("id=page-0");
-    expect(sourcePages.stdout).toContain("page-one");
-    const pageLines = sourcePages.stdout
-      .trimEnd()
-      .split("\n")
-      .filter((line) => line.startsWith("  id="));
-    expect(pageLines).toHaveLength(2);
-
     const sourceState = JSON.parse(
       await readFile(
         workspacePath(".libretto", "sessions", sourceSession, "state.json"),
         "utf8",
       ),
     ) as { port: number };
+
+    // Probe with connect so page-N ids match the order run --cdp will see.
+    await librettoCli(
+      `connect http://127.0.0.1:${sourceState.port} --session ${probeSession}`,
+    );
+    const probePages = await librettoCli(`pages --session ${probeSession}`);
+    expect(probePages.stderr).toBe("");
+    const pageOneLine = probePages.stdout
+      .split("\n")
+      .find((line) => line.includes("page-one"));
+    expect(pageOneLine).toBeTruthy();
+    const pageOneId = pageOneLine!.match(/id=([^\s]+)/)?.[1];
+    expect(pageOneId).toMatch(/^page-\d+$/);
+    await librettoCli(`close --session ${probeSession}`);
 
     const integrationFilePath = await writeWorkflow(
       "integration-run-cdp-page.mjs",
@@ -105,16 +110,18 @@ export default workflow(
     );
 
     const result = await librettoCli(
-      `run "${integrationFilePath}" --cdp http://127.0.0.1:${sourceState.port} --session ${runSession} --page page-1`,
+      `run "${integrationFilePath}" --cdp http://127.0.0.1:${sourceState.port} --session ${runSession} --page ${pageOneId}`,
     );
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain("Integration completed.");
     expect(result.stdout).toContain("CDP_PAGE_URL https://example.com/user/");
 
-    // page-1 received startUrl; the other discovered page should still show page-one.
     const afterPages = await librettoCli(`pages --session ${sourceSession}`);
     expect(afterPages.stdout).toContain("https://example.com/user/");
-    expect(afterPages.stdout).toContain("page-one");
+    expect(afterPages.stdout).not.toContain("page-one");
+    expect(afterPages.stdout).toMatch(
+      /id=page-0 url=https:\/\/example\.com\/?(?: |\n|$)/,
+    );
   }, 90_000);
 
   test("run --cdp --stay-open-on-success keeps the Libretto session for inspection", async ({
