@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import type { SessionRun } from "../agent.js";
+import type { HarnessRun } from "../harness-run.js";
 import {
 	closeCloudBrowserConnection,
 	createCloudBrowserConnection,
@@ -20,7 +20,7 @@ export async function runAgentBrowserHarness(
 	task: string,
 	workspace: string,
 	provider: BrowserProviderName,
-): Promise<SessionRun> {
+): Promise<HarnessRun> {
 	const browser = await createCloudBrowserConnection(provider);
 	try {
 		const command = [
