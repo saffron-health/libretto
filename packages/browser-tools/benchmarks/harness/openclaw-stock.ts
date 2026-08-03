@@ -6,9 +6,10 @@ import {
 import type { BrowserProviderName } from "./cloud-browser.js";
 import {
 	extractHostAnswer,
-	hostEventsFromProcess,
+	hostEventsFromOpenClawHome,
 	hostMetrics,
 	hostTaskPrompt,
+	OPENCLAW_AGENT_DONE,
 	requireCommandOnPath,
 	requireOpenAiApiKey,
 	runHostProcess,
@@ -34,6 +35,12 @@ export async function runOpenclawStockHarness(
 		join(configDir, "openclaw.json"),
 		`${JSON.stringify(
 			{
+				browser: {
+					enabled: true,
+					headless: true,
+					noSandbox: true,
+					executablePath: "/usr/bin/google-chrome-stable",
+				},
 				plugins: {
 					entries: {
 						browser: { enabled: true },
@@ -71,12 +78,22 @@ export async function runOpenclawStockHarness(
 			OPENAI_API_KEY: openAiKey,
 			OPENCLAW_HOME: openclawHome,
 			OPENCLAW_STATE_DIR: configDir,
+			OPENCLAW_BROWSER_HEADLESS: "1",
+			DISPLAY: "",
+			WAYLAND_DISPLAY: "",
 		},
+		exitOnStdoutMatch: OPENCLAW_AGENT_DONE,
+		alsoKillCwdContains: openclawHome,
 	});
 	const answer = extractHostAnswer(result.stdout, result.stderr);
 	const run: HarnessRun = {
 		answer,
-		events: hostEventsFromProcess({ prompt, result, answer }),
+		events: hostEventsFromOpenClawHome({
+			openclawHome,
+			prompt,
+			result,
+			answer,
+		}),
 		metrics: hostMetrics(result.durationMs),
 		browserBackend: "host-stock",
 		async dispose() {},

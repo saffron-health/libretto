@@ -37,14 +37,23 @@ export async function runHermesBrowserToolsHarness(
 		.join("\n");
 
 	const envLines = [`OPENAI_API_KEY=${openAiKey}`];
+	const mcpEnvEntries: string[] = [];
 	if (provider === "kernel" && providerKey) {
 		envLines.push(`KERNEL_API_KEY=${providerKey}`);
+		mcpEnvEntries.push(`      KERNEL_API_KEY: ${JSON.stringify(providerKey)}`);
 	} else if (provider === "browserbase" && providerKey) {
 		envLines.push(`BROWSERBASE_API_KEY=${providerKey}`);
+		mcpEnvEntries.push(
+			`      BROWSERBASE_API_KEY: ${JSON.stringify(providerKey)}`,
+		);
 	} else if (provider === "browser-use" && providerKey) {
 		envLines.push(`BROWSER_USE_API_KEY=${providerKey}`);
+		mcpEnvEntries.push(
+			`      BROWSER_USE_API_KEY: ${JSON.stringify(providerKey)}`,
+		);
 	} else if (provider === "steel" && providerKey) {
 		envLines.push(`STEEL_API_KEY=${providerKey}`);
+		mcpEnvEntries.push(`      STEEL_API_KEY: ${JSON.stringify(providerKey)}`);
 	}
 
 	await writeTextFile(
@@ -65,6 +74,9 @@ export async function runHermesBrowserToolsHarness(
 			"    args:",
 			`      - ${JSON.stringify(mcpBinary)}`,
 			providerArgs,
+			...(mcpEnvEntries.length > 0
+				? ["    env:", ...mcpEnvEntries]
+				: []),
 			"",
 		].join("\n"),
 	);

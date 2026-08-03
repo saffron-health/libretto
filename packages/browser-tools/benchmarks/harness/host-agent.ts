@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { accessSync, constants } from "node:fs";
+import { accessSync, constants, readdirSync, readFileSync, readlinkSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -103,6 +103,10 @@ export async function runHostProcess(options: {
 	cwd: string;
 	env: NodeJS.ProcessEnv;
 	timeoutMs?: number;
+	/** When stdout matches, stop waiting and kill the process tree. */
+	exitOnStdoutMatch?: RegExp;
+	/** Also SIGKILL processes whose cwd contains this path (orphaned helpers). */
+	alsoKillCwdContains?: string;
 }): Promise<HostProcessResult> {
 	const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 	const startedMs = Date.now();
@@ -111,28 +115,65 @@ export async function runHostProcess(options: {
 			cwd: options.cwd,
 			env: options.env,
 			stdio: ["ignore", "pipe", "pipe"],
+			detached: true,
 		});
 		const stdoutChunks: Buffer[] = [];
 		const stderrChunks: Buffer[] = [];
 		let timedOut = false;
-		const timer = setTimeout(() => {
-			timedOut = true;
-			child.kill("SIGKILL");
-		}, timeoutMs);
-		child.stdout.on("data", (chunk: Buffer) => {
-			stdoutChunks.push(chunk);
-			process.stdout.write(chunk);
-		});
-		child.stderr.on("data", (chunk: Buffer) => {
-			stderrChunks.push(chunk);
-			process.stderr.write(chunk);
-		});
-		child.once("error", (error) => {
+		let settled = false;
+		const killByCwdHint = (): void => {
+			const hint = options.alsoKillCwdContains;
+			if (!hint) return;
+			try {
+				const pids = readdirSync("/proc").filter((name) => /^\d+$/.test(name));
+				for (const pid of pids) {
+					try {
+						const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8");
+						if (
+							!cmdline.includes("openclaw-agent") &&
+							!cmdline.includes("google-chrome")
+						) {
+							continue;
+						}
+						const cwd = readlinkSync(`/proc/${pid}/cwd`);
+						if (!cwd.includes(hint)) continue;
+						process.kill(Number(pid), "SIGKILL");
+					} catch {
+						// ignore vanishing procs / permission
+					}
+				}
+			} catch {
+				// ignore
+			}
+		};
+		const killTree = (signal: NodeJS.Signals): void => {
+			if (child.pid != null) {
+				try {
+					process.kill(-child.pid, signal);
+				} catch {
+					try {
+						child.kill(signal);
+					} catch {
+						// already gone
+					}
+				}
+			}
+			if (signal === "SIGKILL") killByCwdHint();
+		};
+		const finish = (exitCode: number | null): void => {
+			if (settled) return;
+			settled = true;
 			clearTimeout(timer);
-			reject(error);
-		});
-		child.once("close", (exitCode) => {
-			clearTimeout(timer);
+			try {
+				child.stdout.destroy();
+			} catch {
+				// ignore
+			}
+			try {
+				child.stderr.destroy();
+			} catch {
+				// ignore
+			}
 			resolvePromise({
 				exitCode,
 				stdout: Buffer.concat(stdoutChunks).toString("utf8"),
@@ -140,24 +181,85 @@ export async function runHostProcess(options: {
 				durationMs: Date.now() - startedMs,
 				timedOut,
 			});
+		};
+		const timer = setTimeout(() => {
+			timedOut = true;
+			killTree("SIGKILL");
+			finish(null);
+		}, timeoutMs);
+		const maybeExitEarly = (): void => {
+			if (!options.exitOnStdoutMatch) return;
+			if (settled) return;
+			const text =
+				Buffer.concat(stdoutChunks).toString("utf8") +
+				Buffer.concat(stderrChunks).toString("utf8");
+			if (!options.exitOnStdoutMatch.test(text)) return;
+			setTimeout(() => {
+				if (settled) return;
+				killTree("SIGTERM");
+				setTimeout(() => {
+					if (settled) return;
+					killTree("SIGKILL");
+					finish(child.exitCode);
+				}, 1_500);
+			}, 300);
+		};
+		child.stdout.on("data", (chunk: Buffer) => {
+			stdoutChunks.push(chunk);
+			process.stdout.write(chunk);
+			maybeExitEarly();
+		});
+		child.stderr.on("data", (chunk: Buffer) => {
+			stderrChunks.push(chunk);
+			process.stderr.write(chunk);
+			maybeExitEarly();
+		});
+		child.once("error", (error) => {
+			clearTimeout(timer);
+			if (settled) return;
+			settled = true;
+			reject(error);
+		});
+		child.once("exit", (exitCode) => {
+			// OpenClaw's CLI wrapper can exit while openclaw-agent keeps stdio
+			// open. When exitOnStdoutMatch is set, wait for that (or timeout).
+			if (options.exitOnStdoutMatch) return;
+			finish(exitCode);
+		});
+		child.once("close", (exitCode) => {
+			finish(exitCode);
 		});
 	});
 }
 
+export const OPENCLAW_AGENT_DONE =
+	/\[agents\/agent-command\] \[agent\] run \S+ ended with stopReason=/;
+
+const HOST_OUTPUT_NOISE =
+	/^(Query:|Initializing|Testing |Transport:|Auth:|✓|✗|┊|──|╭|╰|│|\[diagnostic\]|\[plugins\]|\[provider-|\[agent\/|\[agents\/|\[tools\]|\[browser\/|Resume this session|Session:|Duration:|Messages:|MCP doctor|Saved MCP|Removed MCP|Goodbye|hermes --resume\b)/;
+
 /**
- * Pull a final answer from host CLI output. Prefer the last non-empty line that
- * looks like content rather than progress chrome.
+ * Prefer the Hermes chat reply box when present; otherwise the last non-noise
+ * content line from host stdout/stderr.
  */
 export function extractHostAnswer(stdout: string, stderr: string): string {
 	const combined = `${stdout}\n${stderr}`;
+	const hermesBox = combined.match(/╭─[^\n]*\n([\s\S]*?)\n╰─/);
+	if (hermesBox?.[1]) {
+		const boxed = hermesBox[1]
+			.split(/\r?\n/)
+			.map((line) => line.replace(/^\s*│\s?/, "").trimEnd())
+			.join("\n")
+			.trim();
+		if (boxed) return boxed;
+	}
 	const lines = combined
 		.split(/\r?\n/)
 		.map((line) => line.trim())
 		.filter((line) => line.length > 0);
-	const ignored = /^(Query:|Initializing|Testing |Transport:|Auth:|✓|✗|┊|──|╭|╰|\[diagnostic\]|\[plugins\]|\[provider-|\[agent\/|\[agents\/|Resume this session|Session:|Duration:|Messages:|MCP doctor|Saved MCP|Removed MCP|Goodbye)/;
 	for (let i = lines.length - 1; i >= 0; i -= 1) {
 		const line = lines[i];
-		if (!line || ignored.test(line)) continue;
+		if (!line || HOST_OUTPUT_NOISE.test(line)) continue;
 		if (line.startsWith("http://") || line.startsWith("https://")) continue;
 		return line;
 	}
@@ -172,19 +274,39 @@ export function hostEventsFromProcess(options: {
 	const events: HarnessEvent[] = [
 		{ type: "message", role: "user", text: options.prompt },
 	];
-	if (options.result.stdout.trim()) {
+	const hostLog = [options.result.stdout, options.result.stderr]
+		.filter((part) => part.trim().length > 0)
+		.join("\n");
+	if (hostLog) {
+		// Emit a synthetic tool span so the shared judge can treat host CLI
+		// stdout/stderr as observed browser evidence (hosts do not emit Pi tool events).
 		events.push({
-			type: "log",
-			stream: "stdout",
-			text: options.result.stdout,
+			type: "tool_execution_start",
+			toolName: "host_browser",
+			args: { source: "host-cli" },
 		});
-	}
-	if (options.result.stderr.trim()) {
 		events.push({
-			type: "log",
-			stream: "stderr",
-			text: options.result.stderr,
+			type: "tool_execution_end",
+			toolName: "host_browser",
+			isError:
+				options.result.timedOut ||
+				(options.result.exitCode !== 0 && options.result.exitCode !== null),
+			result: hostLog,
 		});
+		if (options.result.stdout.trim()) {
+			events.push({
+				type: "log",
+				stream: "stdout",
+				text: options.result.stdout,
+			});
+		}
+		if (options.result.stderr.trim()) {
+			events.push({
+				type: "log",
+				stream: "stderr",
+				text: options.result.stderr,
+			});
+		}
 	}
 	if (options.result.timedOut) {
 		events.push({
@@ -209,6 +331,161 @@ export function hostEventsFromProcess(options: {
 
 export function hostMetrics(durationMs: number): UsageMetrics {
 	return { durationMs };
+}
+
+function textFromOpenClawContent(content: unknown): string | null {
+	if (typeof content === "string") return content;
+	if (!Array.isArray(content)) return null;
+	const parts: string[] = [];
+	for (const part of content) {
+		if (!part || typeof part !== "object") continue;
+		const record = part as { type?: unknown; text?: unknown };
+		if (record.type === "text" && typeof record.text === "string") {
+			parts.push(record.text);
+		}
+	}
+	return parts.length > 0 ? parts.join("\n") : null;
+}
+
+/**
+ * Convert OpenClaw session JSONL (under OPENCLAW_STATE_DIR) into HarnessEvents
+ * so the shared judge sees real tool calls instead of only process stdout.
+ */
+export function hostEventsFromOpenClawHome(options: {
+	openclawHome: string;
+	prompt: string;
+	result: HostProcessResult;
+	answer: string;
+}): HarnessEvent[] {
+	const sessionsDir = join(
+		options.openclawHome,
+		".openclaw",
+		"agents",
+		"main",
+		"sessions",
+	);
+	let sessionFiles: string[] = [];
+	try {
+		sessionFiles = readdirSync(sessionsDir)
+			.filter(
+				(name) =>
+					name.endsWith(".jsonl") &&
+					!name.endsWith(".trajectory.jsonl") &&
+					name !== "sessions.json",
+			)
+			.map((name) => join(sessionsDir, name));
+	} catch {
+		sessionFiles = [];
+	}
+
+	const events: HarnessEvent[] = [];
+	for (const sessionFile of sessionFiles) {
+		let lines: string[] = [];
+		try {
+			lines = readFileSync(sessionFile, "utf8").split(/\r?\n/);
+		} catch {
+			continue;
+		}
+		for (const line of lines) {
+			if (!line.trim()) continue;
+			let record: unknown;
+			try {
+				record = JSON.parse(line);
+			} catch {
+				continue;
+			}
+			if (!record || typeof record !== "object") continue;
+			const entry = record as {
+				type?: unknown;
+				message?: {
+					role?: unknown;
+					content?: unknown;
+					toolName?: unknown;
+					isError?: unknown;
+				};
+			};
+			if (entry.type !== "message" || !entry.message) continue;
+			const message = entry.message;
+			if (message.role === "user" || message.role === "assistant") {
+				const text = textFromOpenClawContent(message.content);
+				if (text) {
+					events.push({
+						type: "message",
+						role: message.role,
+						text,
+					});
+				}
+				if (message.role === "assistant" && Array.isArray(message.content)) {
+					for (const part of message.content) {
+						if (!part || typeof part !== "object") continue;
+						const toolCall = part as {
+							type?: unknown;
+							name?: unknown;
+							arguments?: unknown;
+						};
+						if (toolCall.type !== "toolCall") continue;
+						if (typeof toolCall.name !== "string") continue;
+						events.push({
+							type: "tool_execution_start",
+							toolName: toolCall.name,
+							args: toolCall.arguments,
+						});
+					}
+				}
+				continue;
+			}
+			if (message.role === "toolResult") {
+				const toolName =
+					typeof message.toolName === "string"
+						? message.toolName
+						: "tool";
+				events.push({
+					type: "tool_execution_end",
+					toolName,
+					isError: Boolean(message.isError),
+					result: message.content,
+				});
+			}
+		}
+	}
+
+	if (events.length === 0) {
+		return hostEventsFromProcess({
+			prompt: options.prompt,
+			result: options.result,
+			answer: options.answer,
+		});
+	}
+
+	if (options.result.timedOut) {
+		events.push({
+			type: "error",
+			message: `Host process timed out after ${options.result.durationMs}ms.`,
+		});
+	} else if (
+		options.result.exitCode !== 0 &&
+		options.result.exitCode !== null
+	) {
+		events.push({
+			type: "error",
+			message: `Host process exited with code ${options.result.exitCode}.`,
+		});
+	}
+
+	const hasAssistantAnswer = events.some(
+		(event) =>
+			event.type === "message" &&
+			event.role === "assistant" &&
+			event.text.trim() === options.answer.trim(),
+	);
+	if (options.answer && !hasAssistantAnswer) {
+		events.push({
+			type: "message",
+			role: "assistant",
+			text: options.answer,
+		});
+	}
+	return events;
 }
 
 export function hostTaskPrompt(
