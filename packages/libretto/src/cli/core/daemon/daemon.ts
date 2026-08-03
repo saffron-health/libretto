@@ -80,6 +80,7 @@ import {
   type DaemonBrowserProviderConfig,
   type DaemonWorkflowConfig,
   applyWorkflowStartUrlToBrowserConfig,
+  parseConnectPageIndex,
 } from "./config.js";
 import type { Experiments } from "../experiments.js";
 import { getCloudProviderApi } from "../providers/index.js";
@@ -175,8 +176,11 @@ class BrowserDaemon {
     });
   }
 
-  private trackPage(page: Page): string {
-    const id = `page-${Math.random().toString(36).slice(2, 5)}`;
+  private trackPage(page: Page, preferredId?: string): string {
+    const id =
+      preferredId && !this.pageById.has(preferredId)
+        ? preferredId
+        : `page-${Math.random().toString(36).slice(2, 5)}`;
     this.pageById.set(id, page);
     page.on("close", () => this.pageById.delete(id));
     return id;
@@ -285,9 +289,11 @@ class BrowserDaemon {
 
     // Action logging and page tracking must be registered before optional
     // navigation so popups opened during the initial load are visible to IPC.
-    for (const p of initialPages) {
+    // Initial pages get stable page-0..page-N ids so run --cdp --page can target
+    // the same window another CDP daemon listed via `pages`.
+    for (const [index, p] of initialPages.entries()) {
       wrapPageForActionLogging(p, session);
-      daemon.trackPage(p);
+      daemon.trackPage(p, `page-${index}`);
     }
     await Promise.all(
       initialPages.map((initialPage) =>
@@ -435,10 +441,29 @@ class BrowserDaemon {
     const context =
       contexts.length > 0 ? contexts[0] : await browser.newContext();
     const operationalPages = context.pages().filter(isOperationalPage);
-    const page =
-      operationalPages.length > 0
-        ? operationalPages[operationalPages.length - 1]
-        : await context.newPage();
+    let page: Page;
+    if (config.pageId) {
+      const pageIndex = parseConnectPageIndex(config.pageId);
+      if (
+        pageIndex === undefined ||
+        pageIndex < 0 ||
+        pageIndex >= operationalPages.length
+      ) {
+        throw new UserFacingStartupError(
+          [
+            `Page "${config.pageId}" was not found while connecting to ${config.cdpEndpoint}.`,
+            `Discovered ${operationalPages.length} page(s) (use page-0 .. page-${Math.max(operationalPages.length - 1, 0)}).`,
+            `List pages on an interactive session with: libretto connect ${config.cdpEndpoint} && libretto pages`,
+          ].join(" "),
+        );
+      }
+      page = operationalPages[pageIndex];
+    } else {
+      page =
+        operationalPages.length > 0
+          ? operationalPages[operationalPages.length - 1]
+          : await context.newPage();
+    }
 
     const daemon = await BrowserDaemon.initialize({
       session,

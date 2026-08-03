@@ -57,6 +57,66 @@ export default workflow(
     expect(() => process.kill(sourceState.pid, 0)).not.toThrow();
   }, 90_000);
 
+  test("run --cdp --page targets a specific discovered page", async ({
+    librettoCli,
+    writeWorkflow,
+    workspacePath,
+  }) => {
+    const sourceSession = "run-cdp-page-source";
+    const runSession = "run-cdp-page-target";
+
+    const opened = await librettoCli(
+      `open https://example.com --headless --session ${sourceSession}`,
+    );
+    expect(opened.stdout).toContain("Browser open");
+
+    await librettoCli(
+      `exec "const p = await context.newPage(); await p.goto('data:text/html,<body>page-one</body>'), context.pages().length" --session ${sourceSession}`,
+    );
+
+    const sourcePages = await librettoCli(`pages --session ${sourceSession}`);
+    expect(sourcePages.stderr).toBe("");
+    expect(sourcePages.stdout).toContain("id=page-0");
+    expect(sourcePages.stdout).toContain("page-one");
+    const pageLines = sourcePages.stdout
+      .trimEnd()
+      .split("\n")
+      .filter((line) => line.startsWith("  id="));
+    expect(pageLines).toHaveLength(2);
+
+    const sourceState = JSON.parse(
+      await readFile(
+        workspacePath(".libretto", "sessions", sourceSession, "state.json"),
+        "utf8",
+      ),
+    ) as { port: number };
+
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-cdp-page.mjs",
+      `
+export default workflow(
+  "main",
+  { startUrl: "https://example.com/user/" },
+  async ({ page }) => {
+    console.log("CDP_PAGE_URL", page.url());
+  },
+);
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --cdp http://127.0.0.1:${sourceState.port} --session ${runSession} --page page-1`,
+    );
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("Integration completed.");
+    expect(result.stdout).toContain("CDP_PAGE_URL https://example.com/user/");
+
+    // page-1 received startUrl; the other discovered page should still show page-one.
+    const afterPages = await librettoCli(`pages --session ${sourceSession}`);
+    expect(afterPages.stdout).toContain("https://example.com/user/");
+    expect(afterPages.stdout).toContain("page-one");
+  }, 90_000);
+
   test("run --cdp --stay-open-on-success keeps the Libretto session for inspection", async ({
     librettoCli,
     writeWorkflow,

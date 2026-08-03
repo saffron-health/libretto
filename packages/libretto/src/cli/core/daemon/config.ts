@@ -29,6 +29,8 @@ export type DaemonBrowserConnectConfig = {
   kind: "connect";
   cdpEndpoint: string;
   initialUrl?: string;
+  /** Target page id (`page-0`, `page-1`, …) among pages discovered at connect. */
+  pageId?: string;
 };
 
 /**
@@ -86,4 +88,14 @@ export function applyWorkflowStartUrlToBrowserConfig(
     return browser;
   }
   return { ...browser, initialUrl: startUrl };
+}
+
+/**
+ * Resolve a connect-time `--page` id to an index among discovered pages.
+ * Accepts `page-0` / `page-1` (stable initial ids) or bare `0` / `1`.
+ */
+export function parseConnectPageIndex(pageId: string): number | undefined {
+  const match = /^(?:page-)?(\d+)$/.exec(pageId);
+  if (!match) return undefined;
+  return Number(match[1]);
 }

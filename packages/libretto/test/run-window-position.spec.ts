@@ -100,4 +100,18 @@ describe("createRunBrowserConfig", () => {
       cdpEndpoint: "http://127.0.0.1:9222/",
     });
   });
+
+  it("passes page id through to CDP connect config", () => {
+    expect(
+      createRunBrowserConfig({
+        cdpEndpoint: "http://127.0.0.1:9222/",
+        pageId: "page-1",
+        headless: true,
+      }),
+    ).toEqual({
+      kind: "connect",
+      cdpEndpoint: "http://127.0.0.1:9222/",
+      pageId: "page-1",
+    });
+  });
 });

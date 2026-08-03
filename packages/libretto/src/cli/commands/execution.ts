@@ -63,6 +63,7 @@ type RunIntegrationCommandRequest = {
   accessMode: SessionAccessMode;
   providerName?: string;
   cdpEndpoint?: string;
+  pageId?: string;
   stayOpenOnSuccess: boolean;
   tsconfigPath?: string;
   experiments: Experiments;
@@ -73,13 +74,18 @@ const require = moduleBuiltin.createRequire(import.meta.url);
 
 export function createRunBrowserConfig(args: {
   cdpEndpoint?: string;
+  pageId?: string;
   providerName?: string;
   headless: boolean;
   viewport?: { width: number; height: number };
   windowPosition?: WindowPositionConfig;
 }): DaemonConfig["browser"] {
   if (args.cdpEndpoint) {
-    return { kind: "connect", cdpEndpoint: args.cdpEndpoint };
+    return {
+      kind: "connect",
+      cdpEndpoint: args.cdpEndpoint,
+      ...(args.pageId ? { pageId: args.pageId } : {}),
+    };
   }
   if (args.providerName) {
     return {
@@ -664,7 +670,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     });
   });
 
-const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH] [--provider <provider> | --cdp <url>]`;
+const runUsage = `Usage: libretto run <integrationFile> [--params <json> | --params-file <path>] [--tsconfig <path>] [--headed|--headless] [--read-only|--write-access] [--no-visualize] [--stay-open-on-success] [--viewport WxH] [--provider <provider> | --cdp <url>] [--page <id>]`;
 
 export const runInput = SimpleCLI.input({
   positionals: [
@@ -712,6 +718,9 @@ export const runInput = SimpleCLI.input({
     cdp: SimpleCLI.option(z.string().optional(), {
       help: "Connect to an existing CDP endpoint instead of launching a browser",
     }),
+    page: pageOption(
+      "Target a specific page id when using --cdp (page-0, page-1, …)",
+    ),
   },
 })
   .refine(
@@ -738,6 +747,10 @@ export const runInput = SimpleCLI.input({
     (input) =>
       !(input.cdp && (input.headed || input.headless || input.viewport)),
     "--cdp connects to an existing browser, so --headed, --headless, and --viewport do not apply. Drop those flags or omit --cdp.",
+  )
+  .refine(
+    (input) => !(input.page && !input.cdp),
+    "--page requires --cdp. Pass --cdp <url> to target a page on an external browser.",
   );
 
 function resolveRunParams(
@@ -836,6 +849,7 @@ export const runCommand = SimpleCLI.command({
         accessMode: input.readOnly ? "read-only" : input.writeAccess ? "write-access" : (readLibrettoConfig().sessionMode ?? "write-access"),
         providerName: daemonProviderName,
         cdpEndpoint,
+        pageId: input.page,
         stayOpenOnSuccess: input.stayOpenOnSuccess,
         experiments: ctx.experiments,
       },
