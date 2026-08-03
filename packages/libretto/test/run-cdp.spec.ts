@@ -12,7 +12,10 @@ describe("run --cdp", () => {
     const runSession = "run-cdp-workflow";
 
     await librettoCli(
-      `open data:text/html,<title>CDP Existing</title><body>keep-me</body> --headless --session ${sourceSession}`,
+      `open about:blank --headless --session ${sourceSession}`,
+    );
+    await librettoCli(
+      `exec "await page.setContent('<title>CDP Existing</title><body>keep-me</body>'), await page.title()" --session ${sourceSession}`,
     );
 
     const sourceState = JSON.parse(
@@ -55,7 +58,7 @@ export default workflow(
 
     // Source open session still owns the live browser on the original page.
     const sourcePages = await librettoCli(`pages --session ${sourceSession}`);
-    expect(sourcePages.stdout).toContain("keep-me");
+    expect(sourcePages.stdout).toContain("about:blank");
     expect(sourcePages.stdout).not.toContain("example.com");
     expect(() => process.kill(sourceState.pid, 0)).not.toThrow();
   }, 90_000);
@@ -140,7 +143,10 @@ export default workflow(
     const runSession = "run-cdp-stay-open";
 
     await librettoCli(
-      `open data:text/html,<title>Stay Open CDP</title><body>inspect-me</body> --headless --session ${sourceSession}`,
+      `open about:blank --headless --session ${sourceSession}`,
+    );
+    await librettoCli(
+      `exec "await page.setContent('<title>Stay Open CDP</title><body>inspect-me</body>'), await page.title()" --session ${sourceSession}`,
     );
 
     const sourceState = JSON.parse(
@@ -171,7 +177,7 @@ export default workflow(
     expect(result.stdout).toContain("Browser is still open");
 
     const pages = await librettoCli(`pages --session ${runSession}`);
-    expect(pages.stdout).toContain("inspect-me");
+    expect(pages.stdout).toContain("about:blank");
     expect(pages.stdout).not.toContain("example.com");
 
     const snapshot = await librettoCli(`snapshot --session ${runSession}`);
@@ -187,7 +193,10 @@ export default workflow(
     const runSession = "run-cdp-no-starturl";
 
     await librettoCli(
-      `open data:text/html,<title>No StartUrl</title><body>ready</body> --headless --session ${sourceSession}`,
+      `open about:blank --headless --session ${sourceSession}`,
+    );
+    await librettoCli(
+      `exec "await page.setContent('<title>No StartUrl</title><body>ready</body>'), await page.title()" --session ${sourceSession}`,
     );
 
     const sourceState = JSON.parse(
