@@ -5,6 +5,7 @@ import {
   warnIfLibrettoVersionsDiffer,
 } from "./core/skill-version.js";
 import { loadEnv } from "../shared/env/load-env.js";
+import { WorkflowRunError } from "./core/workflow-runner/workflow-error.js";
 
 function renderVersion(): string {
   return readCurrentCliVersion();
@@ -59,20 +60,27 @@ export async function runLibrettoCLI(): Promise<void> {
       console.log(result);
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (message.startsWith("Unknown command: ")) {
-      if (hasRootHelp(message, app)) {
-        const summary = message.split("\n", 1)[0] ?? message;
-        console.error(`${summary}\n`);
-        console.log(app.renderHelp());
-      } else if (hasScopedHelp(message)) {
-        console.error(message);
-      } else {
-        console.error(`${message}\n`);
-        console.log(app.renderHelp());
+    if (err instanceof WorkflowRunError) {
+      console.error(err.stack ?? err.message);
+      if (err.guidance) {
+        console.error(err.guidance);
       }
     } else {
-      console.error(message);
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.startsWith("Unknown command: ")) {
+        if (hasRootHelp(message, app)) {
+          const summary = message.split("\n", 1)[0] ?? message;
+          console.error(`${summary}\n`);
+          console.log(app.renderHelp());
+        } else if (hasScopedHelp(message)) {
+          console.error(message);
+        } else {
+          console.error(`${message}\n`);
+          console.log(app.renderHelp());
+        }
+      } else {
+        console.error(message);
+      }
     }
     exitCode = 1;
   }

@@ -90,6 +90,7 @@ import {
   loadDefaultWorkflow,
 } from "../workflow-runtime.js";
 import { WorkflowController } from "../workflow-runner/runner.js";
+import { errorToMessage } from "../workflow-runner/workflow-error.js";
 import { validateWorkflowInput } from "../../../shared/workflow/workflow.js";
 import { captureAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
 import { applyWindowPosition } from "../../../shared/run/window-position.js";
@@ -1036,7 +1037,7 @@ async function main(): Promise<void> {
         }),
       )
       .catch((error) => {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorToMessage(error);
         daemon.logger.error("workflow-failed", {
           error: message,
         });

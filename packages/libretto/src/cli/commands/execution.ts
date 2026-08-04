@@ -51,6 +51,7 @@ import {
   withExperiments,
   withRequiredSession,
 } from "./shared.js";
+import { WorkflowRunError } from "../core/workflow-runner/workflow-error.js";
 
 type RunIntegrationCommandRequest = {
   integrationPath: string;
@@ -451,9 +452,9 @@ async function runResume(
   }
   if (outcome.status === "failed") {
     setSessionStatus(session, "failed", logger);
-    throw new Error(
+    throw new WorkflowRunError(
       outcome.message
-        ? `Workflow failed after resume: ${outcome.message}`
+        ? `Workflow failed after resume:\n${outcome.message}`
         : "Workflow failed after resume.",
     );
   }
@@ -551,12 +552,12 @@ async function runIntegrationFromFile(
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
-    if (outcome.phase === "workflow") {
-      throw new Error(
-        `${outcome.message ?? "Workflow failed during run."}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`,
-      );
-    }
-    throw new Error(outcome.message ?? "Workflow failed during run.");
+    throw new WorkflowRunError(
+      outcome.message ?? "Workflow failed during run.",
+      outcome.phase === "workflow"
+        ? "Browser is still open. You can use `exec` to inspect it. Call `run` to re-run the workflow."
+        : undefined,
+    );
   }
   if (outcome.status === "exited") {
     setSessionStatus(args.session, "exited", logger);

@@ -15,6 +15,7 @@ import {
   installHeadedWorkflowVisualization,
   loadDefaultWorkflow,
 } from "../workflow-runtime.js";
+import { errorToMessage } from "./workflow-error.js";
 
 type WorkflowPausedState = {
   state: "paused";
@@ -178,12 +179,7 @@ export class WorkflowController {
           workflow,
         });
       } catch (error) {
-        this.emitOutcome({
-          state: "finished",
-          result: "failed",
-          message: error instanceof Error ? error.message : String(error),
-          phase: "workflow",
-        });
+        this.emitOutcome(this.createFailedOutcome(error, "workflow"));
         return;
       } finally {
         uninstallPauseHandler();
@@ -196,15 +192,22 @@ export class WorkflowController {
         completedAt: new Date().toISOString(),
       });
     } catch (error) {
-      this.emitOutcome({
-        state: "finished",
-        result: "failed",
-        message: error instanceof Error ? error.message : String(error),
-        phase: "setup",
-      });
+      this.emitOutcome(this.createFailedOutcome(error, "setup"));
     } finally {
       restoreOutput();
     }
+  }
+
+  private createFailedOutcome(
+    error: unknown,
+    phase: "setup" | "workflow",
+  ): WorkflowFinishedState {
+    return {
+      state: "finished",
+      result: "failed",
+      message: errorToMessage(error),
+      phase,
+    };
   }
 
   private emitOutcome(outcome: WorkflowOutcome): void {

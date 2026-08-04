@@ -270,4 +270,56 @@ export default workflow("main", async ({ page }) => {
     expect(result.stdout).not.toContain("example.com");
     expect(result.stdout).toContain("Integration completed.");
   }, 90_000);
+
+  test("run --cdp prints workflow call stack for waitForResponse timeouts", async ({
+    librettoCli,
+    writeWorkflow,
+    workspacePath,
+  }) => {
+    const sourceSession = "run-cdp-wait-stack-source";
+    const runSession = "run-cdp-wait-stack-run";
+
+    await librettoCli(
+      `open about:blank --headless --session ${sourceSession}`,
+    );
+    await librettoCli(
+      `exec "await page.setContent('<title>CDP Wait Stack</title>'), await page.title()" --session ${sourceSession}`,
+    );
+
+    const sourceState = JSON.parse(
+      await readFile(
+        workspacePath(".libretto", "sessions", sourceSession, "state.json"),
+        "utf8",
+      ),
+    ) as { port: number };
+
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-cdp-wait-stack.ts",
+      `
+async function waitForMissingApi(page: import("playwright").Page) {
+  await page.waitForResponse("**/never-comes-from-cdp-workflow", {
+    timeout: 500,
+  });
+}
+
+async function extractExampleData(page: import("playwright").Page) {
+  await waitForMissingApi(page);
+}
+
+export default workflow("main", async ({ page }) => {
+  await extractExampleData(page);
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --cdp http://127.0.0.1:${sourceState.port} --session ${runSession}`,
+    );
+    expect(result.stderr).toContain(
+      'page.waitForResponse: Timeout 500ms exceeded while waiting for event "response"',
+    );
+    expect(result.stderr).toContain("at waitForMissingApi (");
+    expect(result.stderr).toContain("integration-run-cdp-wait-stack.ts");
+    expect(result.stderr).toContain("at extractExampleData (");
+  }, 90_000);
 });
