@@ -93,6 +93,7 @@ import { WorkflowController } from "../workflow-runner/runner.js";
 import { errorToMessage } from "../workflow-runner/workflow-error.js";
 import { validateWorkflowInput } from "../../../shared/workflow/workflow.js";
 import { captureAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
+import * as errore from "errore";
 import { applyWindowPosition } from "../../../shared/run/window-position.js";
 
 function isOperationalPage(page: Page): boolean {
@@ -121,26 +122,32 @@ function firstLine(error: unknown): string {
   return message.split("\n", 1)[0] ?? message;
 }
 
-function failedToConnectCdp(cdpEndpoint: string, error: unknown): Error {
-  return new Error(
-    [
-      `Failed to connect to CDP endpoint ${cdpEndpoint}: ${firstLine(error)}.`,
-      "Confirm the target is listening and that this process can reach it",
-      "(sandbox, firewall, or network policy may block the connection).",
-    ].join(" "),
-    { cause: error },
-  );
-}
+class CdpConnectError extends errore.createTaggedError({
+  name: "CdpConnectError",
+  message:
+    "Failed to connect to CDP endpoint $cdpEndpoint: $detail. Confirm the target is listening and that this process can reach it (sandbox, firewall, or network policy may block the connection).",
+}) {}
+
+class ChromiumLaunchError extends errore.createTaggedError({
+  name: "ChromiumLaunchError",
+  message: "Failed to launch Chromium: $detail",
+}) {}
+
+class ConnectPageNotFoundError extends errore.createTaggedError({
+  name: "ConnectPageNotFoundError",
+  message:
+    'Page "$pageId" was not found while connecting to $cdpEndpoint. Discovered $pageCount page(s) (use page-0 .. page-$lastPageIndex). List pages on an interactive session with: libretto connect $cdpEndpoint && libretto pages',
+}) {}
 
 function resolveAuthProfileStorageStatePath(args: {
   authProfileName?: string;
   session: string;
-}): string | undefined {
+}): Error | string | undefined {
   if (!args.authProfileName) return undefined;
   const profileName = normalizeProfileName(args.authProfileName);
   const profilePath = getProfilePath(profileName);
   if (!hasProfile(profileName)) {
-    throw new Error(
+    return new Error(
       formatMissingLocalAuthProfileMessage({
         profileName,
         profilePath,
@@ -376,7 +383,7 @@ class BrowserDaemon {
     experiments: Experiments;
     browser: DaemonBrowserLaunchConfig;
     workflow?: DaemonWorkflowConfig;
-  }): Promise<BrowserDaemon> {
+  }) {
     const { session, browser: config } = args;
     const storageStatePath =
       config.storageStatePath ??
@@ -384,13 +391,14 @@ class BrowserDaemon {
         authProfileName: args.workflow?.authProfileName,
         session,
       });
+    if (storageStatePath instanceof Error) return storageStatePath;
+
     const windowPositionArg = config.windowPosition
       ? `--window-position=${config.windowPosition.x},${config.windowPosition.y}`
       : undefined;
 
-    let browser: Browser;
-    try {
-      browser = await chromium.launch({
+    const browser = await chromium
+      .launch({
         headless: !config.headed,
         args: [
           "--disable-blink-features=AutomationControlled",
@@ -401,12 +409,12 @@ class BrowserDaemon {
           "--no-focus-on-check",
           ...(windowPositionArg ? [windowPositionArg] : []),
         ],
-      });
-    } catch (error) {
-      throw new Error(`Failed to launch Chromium: ${firstLine(error)}`, {
-        cause: error,
-      });
-    }
+      })
+      .catch(
+        (cause: unknown) =>
+          new ChromiumLaunchError({ detail: firstLine(cause), cause }),
+      );
+    if (browser instanceof Error) return browser;
 
     const context = await browser.newContext({
       ...(storageStatePath ? { storageState: storageStatePath } : {}),
@@ -449,43 +457,48 @@ class BrowserDaemon {
     session: string;
     experiments: Experiments;
     browser: DaemonBrowserConnectConfig;
-  }): Promise<BrowserDaemon> {
+  }) {
     const { session, browser: config } = args;
-    let browser: Browser;
-    try {
-      browser = await chromium.connectOverCDP(config.cdpEndpoint);
-    } catch (error) {
-      throw failedToConnectCdp(config.cdpEndpoint, error);
-    }
+    const browser = await chromium
+      .connectOverCDP(config.cdpEndpoint)
+      .catch(
+        (cause: unknown) =>
+          new CdpConnectError({
+            cdpEndpoint: config.cdpEndpoint,
+            detail: firstLine(cause),
+            cause,
+          }),
+      );
+    if (browser instanceof Error) return browser;
 
     // Discover existing contexts and pages.
     const contexts = browser.contexts();
     const context =
       contexts.length > 0 ? contexts[0] : await browser.newContext();
     const operationalPages = context.pages().filter(isOperationalPage);
-    let page: Page;
-    if (config.pageId) {
+
+    const page = await (async (): Promise<ConnectPageNotFoundError | Page> => {
+      if (!config.pageId) {
+        return operationalPages.length > 0
+          ? operationalPages[operationalPages.length - 1]
+          : await context.newPage();
+      }
       const pageIndex = parseConnectPageIndex(config.pageId);
       if (
         pageIndex === undefined ||
         pageIndex < 0 ||
         pageIndex >= operationalPages.length
       ) {
-        throw new Error(
-          [
-            `Page "${config.pageId}" was not found while connecting to ${config.cdpEndpoint}.`,
-            `Discovered ${operationalPages.length} page(s) (use page-0 .. page-${Math.max(operationalPages.length - 1, 0)}).`,
-            `List pages on an interactive session with: libretto connect ${config.cdpEndpoint} && libretto pages`,
-          ].join(" "),
-        );
+        return new ConnectPageNotFoundError({
+          pageId: config.pageId,
+          cdpEndpoint: config.cdpEndpoint,
+          pageCount: String(operationalPages.length),
+          lastPageIndex: String(Math.max(operationalPages.length - 1, 0)),
+        });
       }
-      page = operationalPages[pageIndex];
-    } else {
-      page =
-        operationalPages.length > 0
-          ? operationalPages[operationalPages.length - 1]
-          : await context.newPage();
-    }
+      return operationalPages[pageIndex];
+    })();
+    if (page instanceof Error) return page;
 
     const daemon = await BrowserDaemon.initialize({
       session,
@@ -512,7 +525,7 @@ class BrowserDaemon {
     session: string;
     experiments: Experiments;
     browser: DaemonBrowserProviderConfig;
-  }): Promise<BrowserDaemon> {
+  }) {
     const { session, browser: config } = args;
     const provider = getCloudProviderApi(config.providerName);
     let providerSession: ProviderSession | undefined;
@@ -520,22 +533,39 @@ class BrowserDaemon {
       provider,
       getProviderSession: () => providerSession,
     });
-    try {
+
+    const result = await (async () => {
       const startUrl = config.startUrl ?? config.initialUrl;
-      providerSession = await provider.createSession({
-        authProfileName: config.authProfileName,
-        authProfilePersist: config.authProfilePersist,
-        headless: config.headless,
-        startUrl,
-        gpu: config.gpu,
-        viewport: config.viewport,
-      });
-      let browser: Browser;
-      try {
-        browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
-      } catch (error) {
-        throw failedToConnectCdp(providerSession.cdpEndpoint, error);
-      }
+      const created = await provider
+        .createSession({
+          authProfileName: config.authProfileName,
+          authProfilePersist: config.authProfilePersist,
+          headless: config.headless,
+          startUrl,
+          gpu: config.gpu,
+          viewport: config.viewport,
+        })
+        .catch(
+          (cause: unknown) =>
+            new Error(
+              `Failed to create ${config.providerName} session: ${firstLine(cause)}`,
+              { cause },
+            ),
+        );
+      if (created instanceof Error) return created;
+      providerSession = created;
+
+      const browser = await chromium
+        .connectOverCDP(created.cdpEndpoint)
+        .catch(
+          (cause: unknown) =>
+            new CdpConnectError({
+              cdpEndpoint: created.cdpEndpoint,
+              detail: firstLine(cause),
+              cause,
+            }),
+        );
+      if (browser instanceof Error) return browser;
 
       const contexts = browser.contexts();
       const context =
@@ -558,29 +588,29 @@ class BrowserDaemon {
         // second page.goto — that re-triggers bot detection on some sites.
         // Providers without create-time start_url still navigate here so
         // workflow startUrl works without a first-handler page.goto.
-        navigateUrl: providerSession.startUrlPreloaded ? undefined : startUrl,
+        navigateUrl: created.startUrlPreloaded ? undefined : startUrl,
         readyProvider: {
           name: config.providerName,
-          sessionId: providerSession.sessionId,
-          cdpEndpoint: providerSession.cdpEndpoint,
-          liveViewUrl: providerSession.liveViewUrl,
-          recordingUrl: providerSession.recordingUrl,
+          sessionId: created.sessionId,
+          cdpEndpoint: created.cdpEndpoint,
+          liveViewUrl: created.liveViewUrl,
+          recordingUrl: created.recordingUrl,
         },
         providerSession: {
           provider,
           name: config.providerName,
-          sessionId: providerSession.sessionId,
-          recordingUrl: providerSession.recordingUrl,
+          sessionId: created.sessionId,
+          recordingUrl: created.recordingUrl,
         },
         beforeReady: startupCleanup.dispose,
       });
 
       daemon.logger.info("child-provider-connected", {
         provider: config.providerName,
-        sessionId: providerSession.sessionId,
+        sessionId: created.sessionId,
         url: config.initialUrl,
         startUrl,
-        startUrlPreloaded: providerSession.startUrlPreloaded === true,
+        startUrlPreloaded: created.startUrlPreloaded === true,
         gpu: config.gpu,
         viewport: config.viewport,
         pid: process.pid,
@@ -588,13 +618,18 @@ class BrowserDaemon {
       });
 
       return daemon;
-    } catch (error) {
+    })().catch((cause: unknown) =>
+      cause instanceof Error ? cause : new Error(String(cause), { cause }),
+    );
+
+    if (result instanceof Error) {
       startupCleanup.dispose();
       if (providerSession) {
         await provider.closeSession(providerSession.sessionId);
       }
-      throw error;
+      return result;
     }
+    return result;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────
@@ -986,7 +1021,7 @@ function createProviderStartupCleanup(args: {
 
 // ── Main ───────────────────────────────────────────────────────────────
 
-async function main(): Promise<void> {
+async function main(): Promise<Error | void> {
   const config = JSON.parse(process.argv[2]) as DaemonConfig;
   const headed =
     config.browser.kind === "launch" ? config.browser.headed : false;
@@ -995,37 +1030,45 @@ async function main(): Promise<void> {
   let workflowConfig = config.workflow;
   let browserConfig = config.browser;
   if (config.workflow) {
-    try {
-      loadedWorkflow = await loadDefaultWorkflow(
-        getAbsoluteIntegrationPath(config.workflow.integrationPath),
-      );
-      validateWorkflowInput(loadedWorkflow, config.workflow.params ?? {});
-      const authProfileName = loadedWorkflow.authProfileName;
-      const authProfilePersist =
-        loadedWorkflow.authProfileRefresh === true;
-      workflowConfig = {
-        ...config.workflow,
+    const workflow = config.workflow;
+    const loaded = await loadDefaultWorkflow(
+      getAbsoluteIntegrationPath(workflow.integrationPath),
+    ).catch(
+      (cause: unknown) => new Error(firstLine(cause), { cause }),
+    );
+    if (loaded instanceof Error) return loaded;
+
+    const validated = errore.try({
+      try: () => {
+        validateWorkflowInput(loaded, workflow.params ?? {});
+      },
+      catch: (cause) => new Error(firstLine(cause), { cause }),
+    });
+    if (validated instanceof Error) return validated;
+    loadedWorkflow = loaded;
+
+    const authProfileName = loadedWorkflow.authProfileName;
+    const authProfilePersist = loadedWorkflow.authProfileRefresh === true;
+    workflowConfig = {
+      ...workflow,
+      authProfileName,
+      authProfilePersist,
+    };
+    if (config.browser.kind === "provider") {
+      browserConfig = {
+        ...config.browser,
         authProfileName,
         authProfilePersist,
+        startUrl: loadedWorkflow.startUrl ?? config.browser.startUrl,
+        gpu: loadedWorkflow.gpu ?? config.browser.gpu,
+        // Explicit daemon/CLI viewport wins over workflow viewport.
+        viewport: config.browser.viewport ?? loadedWorkflow.viewport,
       };
-      if (config.browser.kind === "provider") {
-        browserConfig = {
-          ...config.browser,
-          authProfileName,
-          authProfilePersist,
-          startUrl: loadedWorkflow.startUrl ?? config.browser.startUrl,
-          gpu: loadedWorkflow.gpu ?? config.browser.gpu,
-          // Explicit daemon/CLI viewport wins over workflow viewport.
-          viewport: config.browser.viewport ?? loadedWorkflow.viewport,
-        };
-      } else {
-        browserConfig = applyWorkflowStartUrlToBrowserConfig(
-          config.browser,
-          loadedWorkflow.startUrl,
-        );
-      }
-    } catch (error) {
-      throw new Error(firstLine(error), { cause: error });
+    } else {
+      browserConfig = applyWorkflowStartUrlToBrowserConfig(
+        config.browser,
+        loadedWorkflow.startUrl,
+      );
     }
   }
 
@@ -1048,6 +1091,7 @@ async function main(): Promise<void> {
             browser: browserConfig,
             workflow: workflowConfig,
           });
+  if (daemon instanceof Error) return daemon;
 
   if (workflowConfig) {
     void waitForSessionState(config.session)
@@ -1103,12 +1147,11 @@ async function main(): Promise<void> {
   // letting the process exit naturally.
 }
 
-async function reportStartupError(error: unknown): Promise<never> {
+async function reportStartupError(error: Error): Promise<never> {
   const message = firstLine(error);
   // Prefer the original failure (via cause) for the session log; IPC gets the
   // wrapped message so the parent shows operation + endpoint context.
-  const logged =
-    error instanceof Error && error.cause !== undefined ? error.cause : error;
+  const logged = error.cause !== undefined ? error.cause : error;
   console.error(
     logged instanceof Error ? (logged.stack ?? String(logged)) : String(logged),
   );
@@ -1126,8 +1169,7 @@ async function reportStartupError(error: unknown): Promise<never> {
   throw new Error("unreachable");
 }
 
-try {
-  await main();
-} catch (error) {
-  await reportStartupError(error);
-}
+const startup = await main().catch((cause: unknown) =>
+  cause instanceof Error ? cause : new Error(String(cause), { cause }),
+);
+if (startup instanceof Error) await reportStartupError(startup);

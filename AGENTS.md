@@ -41,7 +41,7 @@ pnpm -s cli
 - Do not add new dependencies without asking.
 - Do not remove or comment out code to "clean up" without asking — it may be there for a reason.
 - When code prints user-facing Libretto CLI commands, use the native `libretto` command in examples and guidance.
-- Errore adoption is incremental. Do not use Errore by default. Use it only when a task or existing code path explicitly opts in; the browser-tools auth-profile work is currently opted in. Before editing an opted-in path, read the `errore` skill. Keep existing public thrown-error contracts unless the task explicitly changes them.
+- Errore adoption is incremental. Do not use Errore by default. Use it only when a task or existing code path explicitly opts in; the browser-tools auth-profile work and the libretto daemon startup path (`packages/libretto/src/cli/core/daemon/daemon.ts`) are currently opted in. Before editing an opted-in path, read the `errore` skill. Keep existing public thrown-error contracts unless the task explicitly changes them.
 
 ## Testing
 
