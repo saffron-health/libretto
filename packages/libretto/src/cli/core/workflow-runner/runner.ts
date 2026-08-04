@@ -203,11 +203,12 @@ export class WorkflowController {
         completedAt: new Date().toISOString(),
       });
     } catch (error) {
-      const absolutePath = getAbsoluteIntegrationPath(
-        workflowConfig.integrationPath,
-      );
       this.emitOutcome(
-        this.createFailedOutcome(error, "setup", absolutePath),
+        this.createFailedOutcome(
+          error,
+          "setup",
+          workflowConfig.integrationPath,
+        ),
       );
     } finally {
       restoreOutput();
