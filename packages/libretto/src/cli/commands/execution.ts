@@ -51,7 +51,7 @@ import {
   withExperiments,
   withRequiredSession,
 } from "./shared.js";
-import { workflowFailureMessage } from "../core/workflow-runner/workflow-error.js";
+import { WorkflowRunError } from "../core/workflow-runner/workflow-error.js";
 
 type RunIntegrationCommandRequest = {
   integrationPath: string;
@@ -334,27 +334,6 @@ function createDeferred<T>(): Deferred<T> {
   return { promise, resolve };
 }
 
-function createWorkflowRunError(
-  outcome: WorkflowOutcome,
-  options: {
-    messagePrefix?: string;
-    includeStayOpenGuidance?: boolean;
-  } = {},
-): Error {
-  const formatted = workflowFailureMessage(
-    outcome.message ?? "Workflow failed during run.",
-    { includeStayOpenGuidance: options.includeStayOpenGuidance === true },
-  );
-  // outcome.message is already errorToMessage(...) from the daemon, so treat
-  // plain strings as the printable text (including stack frames).
-  const message = options.messagePrefix
-    ? `${options.messagePrefix}${formatted}`
-    : formatted;
-  const error = new Error(message);
-  error.stack = message;
-  return error;
-}
-
 function createWorkflowHandlers(
   settleOutcome: (outcome: WorkflowOutcome) => void,
 ): DaemonToCliApi {
@@ -473,10 +452,11 @@ async function runResume(
   }
   if (outcome.status === "failed") {
     setSessionStatus(session, "failed", logger);
-    throw createWorkflowRunError(outcome, {
-      messagePrefix: "Workflow failed after resume: ",
-      includeStayOpenGuidance: false,
-    });
+    throw new WorkflowRunError(
+      outcome.message
+        ? `Workflow failed after resume:\n${outcome.message}`
+        : "Workflow failed after resume.",
+    );
   }
   if (outcome.status === "exited") {
     setSessionStatus(session, "exited", logger);
@@ -572,9 +552,12 @@ async function runIntegrationFromFile(
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
-    throw createWorkflowRunError(outcome, {
-      includeStayOpenGuidance: outcome.phase === "workflow",
-    });
+    const message = outcome.message ?? "Workflow failed during run.";
+    throw new WorkflowRunError(
+      outcome.phase === "workflow"
+        ? `${message}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`
+        : message,
+    );
   }
   if (outcome.status === "exited") {
     setSessionStatus(args.session, "exited", logger);

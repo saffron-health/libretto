@@ -5,7 +5,7 @@ import {
   warnIfLibrettoVersionsDiffer,
 } from "./core/skill-version.js";
 import { loadEnv } from "../shared/env/load-env.js";
-import { errorToMessage } from "./core/workflow-runner/workflow-error.js";
+import { WorkflowRunError } from "./core/workflow-runner/workflow-error.js";
 
 function renderVersion(): string {
   return readCurrentCliVersion();
@@ -36,24 +36,6 @@ function hasScopedHelp(message: string): boolean {
   return message.includes("\nUsage: ");
 }
 
-function formatCliError(err: unknown): string {
-  if (!(err instanceof Error)) {
-    return String(err);
-  }
-  // Prefer message when it already carries stack/guidance text (workflow run
-  // failures and parser errors with attached help).
-  if (
-    err.message.includes("\n    at ") ||
-    err.message.includes("Caused by:") ||
-    err.message.includes("Browser is still open.") ||
-    err.message.includes("\nUsage: ") ||
-    err.cause === undefined
-  ) {
-    return err.message;
-  }
-  return errorToMessage(err);
-}
-
 export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   let exitCode = 0;
@@ -78,20 +60,24 @@ export async function runLibrettoCLI(): Promise<void> {
       console.log(result);
     }
   } catch (err) {
-    const message = formatCliError(err);
-    if (message.startsWith("Unknown command: ")) {
-      if (hasRootHelp(message, app)) {
-        const summary = message.split("\n", 1)[0] ?? message;
-        console.error(`${summary}\n`);
-        console.log(app.renderHelp());
-      } else if (hasScopedHelp(message)) {
-        console.error(message);
-      } else {
-        console.error(`${message}\n`);
-        console.log(app.renderHelp());
-      }
+    if (err instanceof WorkflowRunError) {
+      console.error(err.stack ?? err.message);
     } else {
-      console.error(message);
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.startsWith("Unknown command: ")) {
+        if (hasRootHelp(message, app)) {
+          const summary = message.split("\n", 1)[0] ?? message;
+          console.error(`${summary}\n`);
+          console.log(app.renderHelp());
+        } else if (hasScopedHelp(message)) {
+          console.error(message);
+        } else {
+          console.error(`${message}\n`);
+          console.log(app.renderHelp());
+        }
+      } else {
+        console.error(message);
+      }
     }
     exitCode = 1;
   }
