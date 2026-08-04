@@ -48,6 +48,10 @@ function formatCliError(err: unknown): string {
   ) {
     return err.message;
   }
+  // Keep parser/usage errors on message so attached help text stays intact.
+  if (err.cause === undefined) {
+    return err.message;
+  }
   return formatErrorWithCauses(err);
 }
 
