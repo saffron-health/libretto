@@ -116,37 +116,20 @@ async function waitForSessionState(session: string): Promise<void> {
   );
 }
 
-class UserFacingStartupError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "UserFacingStartupError";
-  }
-}
-
-function startupErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
-
-function startupErrorSummary(error: unknown): string {
-  const message = startupErrorMessage(error);
+function firstLine(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
   return message.split("\n", 1)[0] ?? message;
 }
 
-async function connectOverCdp(cdpEndpoint: string): Promise<Browser> {
-  try {
-    return await chromium.connectOverCDP(cdpEndpoint);
-  } catch (error) {
-    // Parent redirects child stderr into the session log file.
-    console.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
-    throw new UserFacingStartupError(
-      [
-        `Failed to connect to CDP endpoint ${cdpEndpoint}: ${startupErrorSummary(error)}.`,
-        "Confirm the target is listening and that this process can reach it",
-        "(sandbox, firewall, or network policy may block the connection).",
-      ].join(" "),
-    );
-  }
+function failedToConnectCdp(cdpEndpoint: string, error: unknown): Error {
+  return new Error(
+    [
+      `Failed to connect to CDP endpoint ${cdpEndpoint}: ${firstLine(error)}.`,
+      "Confirm the target is listening and that this process can reach it",
+      "(sandbox, firewall, or network policy may block the connection).",
+    ].join(" "),
+    { cause: error },
+  );
 }
 
 function resolveAuthProfileStorageStatePath(args: {
@@ -157,7 +140,7 @@ function resolveAuthProfileStorageStatePath(args: {
   const profileName = normalizeProfileName(args.authProfileName);
   const profilePath = getProfilePath(profileName);
   if (!hasProfile(profileName)) {
-    throw new UserFacingStartupError(
+    throw new Error(
       formatMissingLocalAuthProfileMessage({
         profileName,
         profilePath,
@@ -420,13 +403,9 @@ class BrowserDaemon {
         ],
       });
     } catch (error) {
-      // Parent redirects child stderr into the session log file.
-      console.error(
-        error instanceof Error ? (error.stack ?? error.message) : String(error),
-      );
-      throw new UserFacingStartupError(
-        `Failed to launch Chromium: ${startupErrorSummary(error)}`,
-      );
+      throw new Error(`Failed to launch Chromium: ${firstLine(error)}`, {
+        cause: error,
+      });
     }
 
     const context = await browser.newContext({
@@ -472,7 +451,12 @@ class BrowserDaemon {
     browser: DaemonBrowserConnectConfig;
   }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
-    const browser = await connectOverCdp(config.cdpEndpoint);
+    let browser: Browser;
+    try {
+      browser = await chromium.connectOverCDP(config.cdpEndpoint);
+    } catch (error) {
+      throw failedToConnectCdp(config.cdpEndpoint, error);
+    }
 
     // Discover existing contexts and pages.
     const contexts = browser.contexts();
@@ -487,7 +471,7 @@ class BrowserDaemon {
         pageIndex < 0 ||
         pageIndex >= operationalPages.length
       ) {
-        throw new UserFacingStartupError(
+        throw new Error(
           [
             `Page "${config.pageId}" was not found while connecting to ${config.cdpEndpoint}.`,
             `Discovered ${operationalPages.length} page(s) (use page-0 .. page-${Math.max(operationalPages.length - 1, 0)}).`,
@@ -546,7 +530,12 @@ class BrowserDaemon {
         gpu: config.gpu,
         viewport: config.viewport,
       });
-      const browser = await connectOverCdp(providerSession.cdpEndpoint);
+      let browser: Browser;
+      try {
+        browser = await chromium.connectOverCDP(providerSession.cdpEndpoint);
+      } catch (error) {
+        throw failedToConnectCdp(providerSession.cdpEndpoint, error);
+      }
 
       const contexts = browser.contexts();
       const context =
@@ -1036,9 +1025,7 @@ async function main(): Promise<void> {
         );
       }
     } catch (error) {
-      throw new UserFacingStartupError(
-        error instanceof Error ? error.message : String(error),
-      );
+      throw new Error(firstLine(error), { cause: error });
     }
   }
 
@@ -1117,30 +1104,21 @@ async function main(): Promise<void> {
 }
 
 async function reportStartupError(error: unknown): Promise<never> {
-  const message = startupErrorMessage(error);
-  // Parent redirects child stderr into the session log file.
-  console.error(error instanceof Error ? (error.stack ?? message) : message);
+  const message = firstLine(error);
+  // Prefer the original failure (via cause) for the session log; IPC gets the
+  // wrapped message so the parent shows operation + endpoint context.
+  const logged =
+    error instanceof Error && error.cause !== undefined ? error.cause : error;
+  console.error(
+    logged instanceof Error ? (logged.stack ?? String(logged)) : String(logged),
+  );
 
-  await new Promise<void>((resolve) => {
-    if (typeof process.send !== "function") {
-      resolve();
-      return;
-    }
-    let settled = false;
-    const done = (): void => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    try {
-      process.send({ type: "startup-error", message }, done);
-    } catch {
-      done();
-      return;
-    }
-    // If IPC is broken, do not hang forever waiting for the callback.
-    setTimeout(done, 250);
-  });
+  if (typeof process.send === "function") {
+    await new Promise<void>((resolve) => {
+      process.send!({ type: "startup-error", message }, () => resolve());
+      setTimeout(resolve, 250);
+    });
+  }
 
   process.exit(
     process.exitCode && process.exitCode !== 0 ? process.exitCode : 1,
