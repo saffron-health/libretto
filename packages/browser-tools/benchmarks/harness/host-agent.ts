@@ -812,4 +812,26 @@ export function hermesIsolatedEnv(
 	};
 }
 
+/**
+ * Hermes Browser Tools MCP needs the optional `mcp` extra (`hermes-agent[mcp]`).
+ */
+export function requireHermesMcpSdk(): void {
+	const result = spawnSync(
+		"python3",
+		["-c", "import mcp"],
+		{
+			encoding: "utf8",
+			env: {
+				...process.env,
+				PYTHONUSERBASE:
+					process.env.PYTHONUSERBASE?.trim() || join(homedir(), ".local"),
+			},
+		},
+	);
+	if (result.status === 0) return;
+	throw new Error(
+		"Hermes MCP support is not installed (missing Python package `mcp`). Install with `pip install 'hermes-agent[mcp]'`, then rerun with hermes-browser-tools.",
+	);
+}
+
 export { MODEL_SELECTOR, packageRoot };

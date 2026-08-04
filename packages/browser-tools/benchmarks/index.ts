@@ -27,6 +27,7 @@ import { runPlaywrightCliHarness } from "./harness/playwright-cli.js";
 import {
 	requireBrowserToolsMcpBinary,
 	requireCommandOnPath,
+	requireHermesMcpSdk,
 } from "./harness/host-agent.js";
 import {
 	HarnessRunError,
@@ -270,6 +271,9 @@ function requireHostHarnesses(harnesses: HarnessName[]): void {
 	if (selected.length === 0) return;
 	if (selected.some((name) => name.startsWith("hermes-"))) {
 		requireCommandOnPath("hermes");
+	}
+	if (selected.includes("hermes-browser-tools")) {
+		requireHermesMcpSdk();
 	}
 	if (selected.some((name) => name.startsWith("openclaw-"))) {
 		requireCommandOnPath("openclaw");
