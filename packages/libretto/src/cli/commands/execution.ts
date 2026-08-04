@@ -552,11 +552,11 @@ async function runIntegrationFromFile(
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
-    const message = outcome.message ?? "Workflow failed during run.";
     throw new WorkflowRunError(
+      outcome.message ?? "Workflow failed during run.",
       outcome.phase === "workflow"
-        ? `${message}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`
-        : message,
+        ? "Browser is still open. You can use `exec` to inspect it. Call `run` to re-run the workflow."
+        : undefined,
     );
   }
   if (outcome.status === "exited") {

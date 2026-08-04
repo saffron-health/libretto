@@ -9,13 +9,18 @@ export function errorToMessage(error: unknown): string {
 }
 
 /**
- * Workflow failure already formatted with its remote stack in `message`/`stack`.
- * CLI prints `stack` for this type instead of inventing a local throw-site stack.
+ * Carries the stack captured inside the workflow process across the CLI
+ * boundary. `.stack` is set to that remote stack (not the local throw site in
+ * execution.ts) so the printed failure still points at workflow file/line.
  */
 export class WorkflowRunError extends Error {
-  constructor(message: string) {
-    super(message);
+  readonly guidance?: string;
+
+  constructor(workflowStack: string, guidance?: string) {
+    const summary = workflowStack.split("\n", 1)[0] ?? workflowStack;
+    super(summary);
     this.name = "WorkflowRunError";
-    this.stack = message;
+    this.stack = workflowStack;
+    this.guidance = guidance;
   }
 }

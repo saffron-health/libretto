@@ -62,6 +62,9 @@ export async function runLibrettoCLI(): Promise<void> {
   } catch (err) {
     if (err instanceof WorkflowRunError) {
       console.error(err.stack ?? err.message);
+      if (err.guidance) {
+        console.error(err.guidance);
+      }
     } else {
       const message = err instanceof Error ? err.message : String(err);
       if (message.startsWith("Unknown command: ")) {
