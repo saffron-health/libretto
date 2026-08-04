@@ -90,10 +90,7 @@ import {
   loadDefaultWorkflow,
 } from "../workflow-runtime.js";
 import { WorkflowController } from "../workflow-runner/runner.js";
-import {
-  createWorkflowFailureError,
-  serializeWorkflowError,
-} from "../workflow-runner/workflow-error.js";
+import { errorToMessage } from "../workflow-runner/workflow-error.js";
 import { validateWorkflowInput } from "../../../shared/workflow/workflow.js";
 import { captureAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
 import { applyWindowPosition } from "../../../shared/run/window-position.js";
@@ -858,7 +855,6 @@ class BrowserDaemon {
                 result: "failed",
                 message: outcome.message,
                 phase: outcome.phase,
-                error: outcome.error,
               },
         );
       },
@@ -1041,11 +1037,7 @@ async function main(): Promise<void> {
         }),
       )
       .catch((error) => {
-        const workflowError = createWorkflowFailureError(error, {
-          cwd: process.cwd(),
-          integrationPath: workflowConfig.integrationPath,
-        });
-        const message = workflowError.message;
+        const message = errorToMessage(error);
         daemon.logger.error("workflow-failed", {
           error: message,
         });
@@ -1054,7 +1046,6 @@ async function main(): Promise<void> {
             result: "failed" as const,
             message,
             phase: "setup" as const,
-            error: serializeWorkflowError(workflowError),
           })
           .finally(() => daemon.shutdown("workflow-start-failed", true));
       });

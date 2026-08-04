@@ -1782,14 +1782,12 @@ export default workflow("main", async ({ page }) => {
     const result = await librettoCli(
       `run "${integrationFilePath}" --session ${session} --headless`,
     );
-    expect(result.stderr).toContain("waitForResponse timed out after 500ms");
+    expect(result.stderr).toContain(
+      'page.waitForResponse: Timeout 500ms exceeded while waiting for event "response"',
+    );
     expect(result.stderr).toContain("at waitForMissingApi (");
     expect(result.stderr).toContain("integration-wait-for-response-stack.ts");
     expect(result.stderr).toContain("at extractExampleData (");
-    expect(result.stderr).toContain("Caused by:");
-    expect(result.stderr).toContain(
-      'Timeout 500ms exceeded while waiting for event "response"',
-    );
     expect(result.stderr).toContain("Browser is still open.");
   }, 60_000);
 

@@ -5,7 +5,7 @@ import {
   warnIfLibrettoVersionsDiffer,
 } from "./core/skill-version.js";
 import { loadEnv } from "../shared/env/load-env.js";
-import { formatErrorWithCauses } from "./core/workflow-runner/workflow-error.js";
+import { errorToMessage } from "./core/workflow-runner/workflow-error.js";
 
 function renderVersion(): string {
   return readCurrentCliVersion();
@@ -40,19 +40,18 @@ function formatCliError(err: unknown): string {
   if (!(err instanceof Error)) {
     return String(err);
   }
-  // Workflow run failures already embed the actionable stack (+ cause) in message.
+  // Prefer message when it already carries stack/guidance text (workflow run
+  // failures and parser errors with attached help).
   if (
     err.message.includes("\n    at ") ||
     err.message.includes("Caused by:") ||
-    err.message.includes("Browser is still open.")
+    err.message.includes("Browser is still open.") ||
+    err.message.includes("\nUsage: ") ||
+    err.cause === undefined
   ) {
     return err.message;
   }
-  // Keep parser/usage errors on message so attached help text stays intact.
-  if (err.cause === undefined) {
-    return err.message;
-  }
-  return formatErrorWithCauses(err);
+  return errorToMessage(err);
 }
 
 export async function runLibrettoCLI(): Promise<void> {

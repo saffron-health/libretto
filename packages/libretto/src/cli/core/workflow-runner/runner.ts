@@ -15,11 +15,7 @@ import {
   installHeadedWorkflowVisualization,
   loadDefaultWorkflow,
 } from "../workflow-runtime.js";
-import {
-  createWorkflowFailureError,
-  serializeWorkflowError,
-  type SerializedWorkflowError,
-} from "./workflow-error.js";
+import { errorToMessage } from "./workflow-error.js";
 
 type WorkflowPausedState = {
   state: "paused";
@@ -30,12 +26,7 @@ type WorkflowPausedState = {
 
 export type WorkflowFinishedArgs =
   | { result: "completed"; completedAt: string }
-  | {
-      result: "failed";
-      message: string;
-      phase: "setup" | "workflow";
-      error?: SerializedWorkflowError;
-    };
+  | { result: "failed"; message: string; phase: "setup" | "workflow" };
 
 type WorkflowFinishedState = {
   state: "finished";
@@ -188,9 +179,7 @@ export class WorkflowController {
           workflow,
         });
       } catch (error) {
-        this.emitOutcome(
-          this.createFailedOutcome(error, "workflow", absolutePath),
-        );
+        this.emitOutcome(this.createFailedOutcome(error, "workflow"));
         return;
       } finally {
         uninstallPauseHandler();
@@ -203,13 +192,7 @@ export class WorkflowController {
         completedAt: new Date().toISOString(),
       });
     } catch (error) {
-      this.emitOutcome(
-        this.createFailedOutcome(
-          error,
-          "setup",
-          workflowConfig.integrationPath,
-        ),
-      );
+      this.emitOutcome(this.createFailedOutcome(error, "setup"));
     } finally {
       restoreOutput();
     }
@@ -218,18 +201,12 @@ export class WorkflowController {
   private createFailedOutcome(
     error: unknown,
     phase: "setup" | "workflow",
-    integrationPath: string,
   ): WorkflowFinishedState {
-    const workflowError = createWorkflowFailureError(error, {
-      cwd: process.cwd(),
-      integrationPath,
-    });
     return {
       state: "finished",
       result: "failed",
-      message: workflowError.message,
+      message: errorToMessage(error),
       phase,
-      error: serializeWorkflowError(workflowError),
     };
   }
 

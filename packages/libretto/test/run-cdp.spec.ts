@@ -315,13 +315,11 @@ export default workflow("main", async ({ page }) => {
     const result = await librettoCli(
       `run "${integrationFilePath}" --cdp http://127.0.0.1:${sourceState.port} --session ${runSession}`,
     );
-    expect(result.stderr).toContain("waitForResponse timed out after 500ms");
+    expect(result.stderr).toContain(
+      'page.waitForResponse: Timeout 500ms exceeded while waiting for event "response"',
+    );
     expect(result.stderr).toContain("at waitForMissingApi (");
     expect(result.stderr).toContain("integration-run-cdp-wait-stack.ts");
     expect(result.stderr).toContain("at extractExampleData (");
-    expect(result.stderr).toContain("Caused by:");
-    expect(result.stderr).toContain(
-      'Timeout 500ms exceeded while waiting for event "response"',
-    );
   }, 90_000);
 });

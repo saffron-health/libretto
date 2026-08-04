@@ -51,11 +51,7 @@ import {
   withExperiments,
   withRequiredSession,
 } from "./shared.js";
-import {
-  deserializeWorkflowError,
-  formatWorkflowRunFailure,
-  type SerializedWorkflowError,
-} from "../core/workflow-runner/workflow-error.js";
+import { workflowFailureMessage } from "../core/workflow-runner/workflow-error.js";
 
 type RunIntegrationCommandRequest = {
   integrationPath: string;
@@ -323,7 +319,6 @@ type WorkflowOutcome = {
   status: "completed" | "paused" | "failed" | "exited";
   message?: string;
   phase?: "setup" | "workflow";
-  error?: SerializedWorkflowError;
 };
 
 type Deferred<T> = {
@@ -346,19 +341,16 @@ function createWorkflowRunError(
     includeStayOpenGuidance?: boolean;
   } = {},
 ): Error {
-  const baseError = outcome.error
-    ? deserializeWorkflowError(outcome.error)
-    : new Error(outcome.message ?? "Workflow failed during run.");
-  const formatted = formatWorkflowRunFailure(baseError, {
-    includeStayOpenGuidance: options.includeStayOpenGuidance === true,
-  });
+  const formatted = workflowFailureMessage(
+    outcome.message ?? "Workflow failed during run.",
+    { includeStayOpenGuidance: options.includeStayOpenGuidance === true },
+  );
+  // outcome.message is already errorToMessage(...) from the daemon, so treat
+  // plain strings as the printable text (including stack frames).
   const message = options.messagePrefix
     ? `${options.messagePrefix}${formatted}`
     : formatted;
   const error = new Error(message);
-  error.name = baseError.name;
-  // Embed the actionable stack (+ cause text) in message/stack so CLI printers
-  // that only show message still surface workflow call sites.
   error.stack = message;
   return error;
 }
@@ -384,7 +376,6 @@ function createWorkflowHandlers(
         status: "failed",
         message: event.message,
         phase: event.phase,
-        error: event.error,
       });
     },
   };
