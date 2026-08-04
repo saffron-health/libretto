@@ -1,0 +1,77 @@
+---
+title: Auth profiles
+sidebarTitle: Auth profiles
+"og:image": "https://libretto.sh/docs/og/browser-tools/auth-profiles.png"
+---
+
+> Preserve signed-in browser state across agent sessions.
+
+Auth profiles are named browser state for Browser Tools sessions. Pass a profile name to [`browser_open`](/browser-tools/tools#browser_open), sign in once, close cleanly, and later sessions with the same name start already logged in.
+
+```typescript theme={null}
+// First run — complete login in the browser, then close
+await tools.browser_open.execute({
+  url: "https://portal.example.com",
+  authProfile: "work",
+});
+await tools.browser_close.execute({ sessionId });
+
+// Later run — same profile, already signed in
+await tools.browser_open.execute({
+  url: "https://portal.example.com",
+  authProfile: "work",
+});
+```
+
+## Defaults
+
+On providers that support profiles:
+
+| `authProfile` | Behavior |
+| --- | --- |
+| omitted | Uses `default` |
+| `"work"` (any non-empty name) | Loads or creates that named profile |
+| `false` | Opens without saved state (incognito) |
+
+[`browser_status`](/browser-tools/tools#browser_status) includes `authProfile` on sessions that have one.
+
+## Sign in once
+
+1. Open a headed session with a profile name (`LocalBrowserProvider` defaults to headed).
+2. Complete login in the browser window, or with [`browser_exec`](/browser-tools/tools#browser_exec).
+3. Call `browser_close` or toolkit `dispose()` so the provider saves profile changes.
+4. Open again later with the same name — the session starts from that saved state.
+
+Profile changes persist only after a clean close. A crash does not write half-updated state.
+
+## Provider support
+
+| Provider | Named auth profiles |
+| --- | --- |
+| [Local](/browser-tools/providers/local) | Supported |
+| [Libretto Cloud](/browser-tools/providers/libretto-cloud) | Supported |
+| [Kernel](/browser-tools/providers/kernel) | Supported |
+| [Browser Use](/browser-tools/providers/browser-use) | Supported |
+| [Browserbase](/browser-tools/providers/browserbase) | Unsupported |
+| [Steel](/browser-tools/providers/steel) | Unsupported |
+
+Browserbase and Steel expose provider IDs, but not durable names. On unsupported providers, omit `authProfile` or pass `false`. Passing a profile name returns `{ ok: false, error }` with a next step.
+
+## Local storage
+
+Local profiles live under `~/.libretto/browser-tools/profiles/<name>/` by default. Pass `authProfileDirectory` to `LocalBrowserProvider` to change the root:
+
+```typescript theme={null}
+new LocalBrowserProvider({
+  authProfileDirectory: "/path/to/profiles",
+});
+```
+
+Cloud providers that support profiles keep provider-native state behind the same `authProfile` string.
+
+## Caveats
+
+- Profiles store browser state after login (cookies / provider profile data), not passwords.
+- Do not commit profile directories or share them across untrusted users.
+- Do not open concurrent writable sessions against the same profile.
+- This is the Browser Tools harness surface (`browser_open` / MCP). For Libretto workflow `authProfile`, see [Website authentication](/understand-libretto/website-authentication).
