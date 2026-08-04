@@ -526,6 +526,7 @@ class BrowserDaemon {
     experiments: Experiments;
     browser: DaemonBrowserProviderConfig;
   }) {
+    await using cleanup = new errore.AsyncDisposableStack();
     const { session, browser: config } = args;
     const provider = getCloudProviderApi(config.providerName);
     let providerSession: ProviderSession | undefined;
@@ -533,103 +534,100 @@ class BrowserDaemon {
       provider,
       getProviderSession: () => providerSession,
     });
-
-    const result = await (async () => {
-      const startUrl = config.startUrl ?? config.initialUrl;
-      const created = await provider
-        .createSession({
-          authProfileName: config.authProfileName,
-          authProfilePersist: config.authProfilePersist,
-          headless: config.headless,
-          startUrl,
-          gpu: config.gpu,
-          viewport: config.viewport,
-        })
-        .catch(
-          (cause: unknown) =>
-            new Error(
-              `Failed to create ${config.providerName} session: ${firstLine(cause)}`,
-              { cause },
-            ),
-        );
-      if (created instanceof Error) return created;
-      providerSession = created;
-
-      const browser = await chromium
-        .connectOverCDP(created.cdpEndpoint)
-        .catch(
-          (cause: unknown) =>
-            new CdpConnectError({
-              cdpEndpoint: created.cdpEndpoint,
-              detail: firstLine(cause),
-              cause,
-            }),
-        );
-      if (browser instanceof Error) return browser;
-
-      const contexts = browser.contexts();
-      const context =
-        contexts.length > 0 ? contexts[0] : await browser.newContext();
-      const operationalPages = context.pages().filter(isOperationalPage);
-      const page =
-        operationalPages.length > 0
-          ? operationalPages[operationalPages.length - 1]
-          : await context.newPage();
-
-      const daemon = await BrowserDaemon.initialize({
-        session,
-        experiments: args.experiments,
-        externallyManaged: true,
-        browser,
-        context,
-        page,
-        initialPages: operationalPages.length > 0 ? operationalPages : [page],
-        // Providers that preload start_url before CDP attach must not get a
-        // second page.goto — that re-triggers bot detection on some sites.
-        // Providers without create-time start_url still navigate here so
-        // workflow startUrl works without a first-handler page.goto.
-        navigateUrl: created.startUrlPreloaded ? undefined : startUrl,
-        readyProvider: {
-          name: config.providerName,
-          sessionId: created.sessionId,
-          cdpEndpoint: created.cdpEndpoint,
-          liveViewUrl: created.liveViewUrl,
-          recordingUrl: created.recordingUrl,
-        },
-        providerSession: {
-          provider,
-          name: config.providerName,
-          sessionId: created.sessionId,
-          recordingUrl: created.recordingUrl,
-        },
-        beforeReady: startupCleanup.dispose,
-      });
-
-      daemon.logger.info("child-provider-connected", {
-        provider: config.providerName,
-        sessionId: created.sessionId,
-        url: config.initialUrl,
-        startUrl,
-        startUrlPreloaded: created.startUrlPreloaded === true,
-        gpu: config.gpu,
-        viewport: config.viewport,
-        pid: process.pid,
-        session,
-      });
-
-      return daemon;
-    })().catch((cause: unknown) =>
-      cause instanceof Error ? cause : new Error(String(cause), { cause }),
-    );
-
-    if (result instanceof Error) {
+    cleanup.defer(async () => {
       startupCleanup.dispose();
       if (providerSession) {
         await provider.closeSession(providerSession.sessionId);
       }
-      return result;
-    }
-    return result;
+    });
+
+    const startUrl = config.startUrl ?? config.initialUrl;
+    const created = await provider
+      .createSession({
+        authProfileName: config.authProfileName,
+        authProfilePersist: config.authProfilePersist,
+        headless: config.headless,
+        startUrl,
+        gpu: config.gpu,
+        viewport: config.viewport,
+      })
+      .catch(
+        (cause: unknown) =>
+          new Error(
+            `Failed to create ${config.providerName} session: ${firstLine(cause)}`,
+            { cause },
+          ),
+      );
+    if (created instanceof Error) return created;
+    providerSession = created;
+
+    const browser = await chromium
+      .connectOverCDP(created.cdpEndpoint)
+      .catch(
+        (cause: unknown) =>
+          new CdpConnectError({
+            cdpEndpoint: created.cdpEndpoint,
+            detail: firstLine(cause),
+            cause,
+          }),
+      );
+    if (browser instanceof Error) return browser;
+
+    const contexts = browser.contexts();
+    const context =
+      contexts.length > 0 ? contexts[0] : await browser.newContext();
+    const operationalPages = context.pages().filter(isOperationalPage);
+    const page =
+      operationalPages.length > 0
+        ? operationalPages[operationalPages.length - 1]
+        : await context.newPage();
+
+    const daemon = await BrowserDaemon.initialize({
+      session,
+      experiments: args.experiments,
+      externallyManaged: true,
+      browser,
+      context,
+      page,
+      initialPages: operationalPages.length > 0 ? operationalPages : [page],
+      // Providers that preload start_url before CDP attach must not get a
+      // second page.goto — that re-triggers bot detection on some sites.
+      // Providers without create-time start_url still navigate here so
+      // workflow startUrl works without a first-handler page.goto.
+      navigateUrl: created.startUrlPreloaded ? undefined : startUrl,
+      readyProvider: {
+        name: config.providerName,
+        sessionId: created.sessionId,
+        cdpEndpoint: created.cdpEndpoint,
+        liveViewUrl: created.liveViewUrl,
+        recordingUrl: created.recordingUrl,
+      },
+      providerSession: {
+        provider,
+        name: config.providerName,
+        sessionId: created.sessionId,
+        recordingUrl: created.recordingUrl,
+      },
+      beforeReady: () => {
+        // Daemon owns the provider session now — drop failure-path cleanup.
+        cleanup.move();
+        startupCleanup.dispose();
+      },
+    });
+
+    daemon.logger.info("child-provider-connected", {
+      provider: config.providerName,
+      sessionId: created.sessionId,
+      url: config.initialUrl,
+      startUrl,
+      startUrlPreloaded: created.startUrlPreloaded === true,
+      gpu: config.gpu,
+      viewport: config.viewport,
+      pid: process.pid,
+      session,
+    });
+
+    return daemon;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────
