@@ -76,9 +76,10 @@ npx libretto run <file> [flags]
   Connect to an existing Chrome DevTools Protocol endpoint instead of launching a
   browser. Use this for Electron apps or Chrome started with
   `--remote-debugging-port`. Cannot be combined with `--provider`, `--headed`,
-  `--headless`, or `--viewport`. Libretto still navigates to the workflow
-  `startUrl` before the handler runs. Closing the Libretto session disconnects
-  from CDP and does not terminate the remote browser.
+  `--headless`, or `--viewport`. Libretto attaches to the selected page without
+  navigating to workflow `startUrl`, so the existing URL and authentication
+  state stay intact. Closing the Libretto session disconnects from CDP and does
+  not terminate the remote browser.
 </ParamField>
 
 <ParamField path="--page" type="string">
@@ -95,7 +96,7 @@ npx libretto run <file> [flags]
 
 #### Run against an external CDP browser
 
-Use `--cdp` when the browser already exists (Electron, remote debugging Chrome, CI browser). Use interactive [`connect`](/reference/cli/open-and-connect#connect) to explore with `exec` / `snapshot`; use `run --cdp` to execute a workflow file against that same endpoint.
+Use `--cdp` when the browser already exists (Electron, remote debugging Chrome, CI browser). Use interactive [`connect`](/reference/cli/open-and-connect#connect) to explore with `exec` / `snapshot`; use `run --cdp` to execute a workflow file against that same endpoint. Unlike a normal `run`, `--cdp` does not open workflow `startUrl` — put the browser on the page you want before the run, or navigate inside the handler.
 
 ```bash theme={null}
 # Chrome or Electron started with --remote-debugging-port=9222

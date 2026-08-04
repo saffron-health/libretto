@@ -27,7 +27,7 @@ Mix strategies freely across steps on a site.
 
 Prefer to enter sites at a user-facing URL (homepage, login, etc.) on the first navigation — deep URLs on a cold session are commonly blocked by edge bot protection.
 
-Always declare that entry URL as workflow `startUrl`. Do not open the same URL again with `page.goto` at the top of the handler; Libretto loads `startUrl` before the handler runs (and before CDP attach on Kernel / cloud providers).
+Always declare that entry URL as workflow `startUrl`. Do not open the same URL again with `page.goto` at the top of the handler when Libretto launches the browser; Libretto loads `startUrl` before the handler runs (and before CDP attach on Kernel / cloud providers). `run --cdp` attaches without navigating, so leave the existing page as-is or navigate inside the handler.
 
 ## CAPTCHA Handling
 
@@ -167,7 +167,7 @@ npx libretto exec --session debug-example --page <page-id> "await page.url()"
 - Workflows define their input shape with a Zod schema (see `references/code-generation-rules.md`). `run` validates `--params` against that schema before calling the handler and prints a clear field-by-field error if the input doesn't match.
 - Successful runs close the browser by default. Pass `--stay-open-on-success` when you need to inspect the completed state with `pages`, `snapshot`, or `exec`.
 - Use `--provider <name>` when validating behavior in that provider's browser runtime.
-- Use `--cdp <url>` to run a workflow against an existing CDP endpoint (Electron or Chrome with `--remote-debugging-port`). Libretto still navigates to workflow `startUrl`. Do not pass `--provider`, `--headed`, `--headless`, or `--viewport` with `--cdp`. Optional `--page page-N` selects which discovered page receives navigation.
+- Use `--cdp <url>` to run a workflow against an existing CDP endpoint (Electron or Chrome with `--remote-debugging-port`). Libretto attaches without navigating to workflow `startUrl`, preserving the page URL and auth state. Do not pass `--provider`, `--headed`, `--headless`, or `--viewport` with `--cdp`. Optional `--page page-N` selects which discovered page becomes `ctx.page`.
 - Prefer `connect` + `exec` / `snapshot` for interactive exploration of an external CDP browser; use `run --cdp` once the workflow file is ready.
 - Pass `--read-only` if the preserved session should come back locked for follow-up terminal inspection after the workflow run.
 - If the workflow fails, Libretto keeps the browser open. Inspect the failed state with `snapshot` and `exec` before editing code.

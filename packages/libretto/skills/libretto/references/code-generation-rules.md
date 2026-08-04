@@ -26,14 +26,15 @@ const outputSchema = z.object({
 export default workflow("myWorkflow", {
   input: inputSchema,
   output: outputSchema,
-  // Always declare the entry URL. Libretto opens it before the handler runs
-  // (and before CDP attach on Kernel / cloud providers).
+  // Always declare the entry URL. On launch/provider runs Libretto opens it
+  // before the handler (and before CDP attach on Kernel / cloud providers).
+  // run --cdp does not navigate to startUrl.
   startUrl: "https://example.com",
   handler: async (ctx: LibrettoWorkflowContext, input) => {
     const { session, page } = ctx;
 
     console.log("workflow-start", { session, query: input.query });
-    // Do not page.goto(startUrl) here — the browser is already on startUrl.
+    // Do not page.goto(startUrl) here on launch/provider runs — already there.
     await pause(session);
 
     return { results: [] };
