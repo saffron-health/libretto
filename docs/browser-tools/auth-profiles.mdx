@@ -71,7 +71,7 @@ Cloud providers that support profiles keep provider-native state behind the same
 
 ## Caveats
 
-- Profiles store browser state after login (cookies / provider profile data), not passwords.
+- Profiles hold signed-in browser state. Local profiles are full Chromium user data directories and can include cookies, local storage, IndexedDB, saved credentials, extensions, and settings.
 - Do not commit profile directories or share them across untrusted users.
 - Do not open concurrent writable sessions against the same profile.
 - This is the Browser Tools harness surface (`browser_open` / MCP). For Libretto workflow `authProfile`, see [Website authentication](/understand-libretto/website-authentication).
