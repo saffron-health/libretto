@@ -1756,6 +1756,43 @@ export default workflow("main", async (ctx) => {
     );
   }, 60_000);
 
+  test("run prints workflow call stack for waitForResponse timeouts", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const session = "wait-for-response-stack";
+    const integrationFilePath = await writeWorkflow(
+      "integration-wait-for-response-stack.ts",
+      `
+async function waitForMissingApi(page: import("playwright").Page) {
+  await page.waitForResponse("**/never-comes-from-workflow", { timeout: 500 });
+}
+
+async function extractExampleData(page: import("playwright").Page) {
+  await waitForMissingApi(page);
+}
+
+export default workflow("main", async ({ page }) => {
+  await page.goto("https://example.com");
+  await extractExampleData(page);
+});
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --session ${session} --headless`,
+    );
+    expect(result.stderr).toContain("waitForResponse timed out after 500ms");
+    expect(result.stderr).toContain("at waitForMissingApi (");
+    expect(result.stderr).toContain("integration-wait-for-response-stack.ts");
+    expect(result.stderr).toContain("at extractExampleData (");
+    expect(result.stderr).toContain("Caused by:");
+    expect(result.stderr).toContain(
+      'Timeout 500ms exceeded while waiting for event "response"',
+    );
+    expect(result.stderr).toContain("Browser is still open.");
+  }, 60_000);
+
   test("fails save with missing target usage error", async ({
     librettoCli,
   }) => {

@@ -51,6 +51,11 @@ import {
   withExperiments,
   withRequiredSession,
 } from "./shared.js";
+import {
+  deserializeWorkflowError,
+  formatWorkflowRunFailure,
+  type SerializedWorkflowError,
+} from "../core/workflow-runner/workflow-error.js";
 
 type RunIntegrationCommandRequest = {
   integrationPath: string;
@@ -318,6 +323,7 @@ type WorkflowOutcome = {
   status: "completed" | "paused" | "failed" | "exited";
   message?: string;
   phase?: "setup" | "workflow";
+  error?: SerializedWorkflowError;
 };
 
 type Deferred<T> = {
@@ -331,6 +337,30 @@ function createDeferred<T>(): Deferred<T> {
     resolve = resolvePromise;
   });
   return { promise, resolve };
+}
+
+function createWorkflowRunError(
+  outcome: WorkflowOutcome,
+  options: {
+    messagePrefix?: string;
+    includeStayOpenGuidance?: boolean;
+  } = {},
+): Error {
+  const baseError = outcome.error
+    ? deserializeWorkflowError(outcome.error)
+    : new Error(outcome.message ?? "Workflow failed during run.");
+  const formatted = formatWorkflowRunFailure(baseError, {
+    includeStayOpenGuidance: options.includeStayOpenGuidance === true,
+  });
+  const message = options.messagePrefix
+    ? `${options.messagePrefix}${formatted}`
+    : formatted;
+  const error = new Error(message);
+  error.name = baseError.name;
+  // Embed the actionable stack (+ cause text) in message/stack so CLI printers
+  // that only show message still surface workflow call sites.
+  error.stack = message;
+  return error;
 }
 
 function createWorkflowHandlers(
@@ -354,6 +384,7 @@ function createWorkflowHandlers(
         status: "failed",
         message: event.message,
         phase: event.phase,
+        error: event.error,
       });
     },
   };
@@ -451,11 +482,10 @@ async function runResume(
   }
   if (outcome.status === "failed") {
     setSessionStatus(session, "failed", logger);
-    throw new Error(
-      outcome.message
-        ? `Workflow failed after resume: ${outcome.message}`
-        : "Workflow failed after resume.",
-    );
+    throw createWorkflowRunError(outcome, {
+      messagePrefix: "Workflow failed after resume: ",
+      includeStayOpenGuidance: false,
+    });
   }
   if (outcome.status === "exited") {
     setSessionStatus(session, "exited", logger);
@@ -551,12 +581,9 @@ async function runIntegrationFromFile(
   }
   if (outcome.status === "failed") {
     setSessionStatus(args.session, "failed", logger);
-    if (outcome.phase === "workflow") {
-      throw new Error(
-        `${outcome.message ?? "Workflow failed during run."}\nBrowser is still open. You can use \`exec\` to inspect it. Call \`run\` to re-run the workflow.`,
-      );
-    }
-    throw new Error(outcome.message ?? "Workflow failed during run.");
+    throw createWorkflowRunError(outcome, {
+      includeStayOpenGuidance: outcome.phase === "workflow",
+    });
   }
   if (outcome.status === "exited") {
     setSessionStatus(args.session, "exited", logger);

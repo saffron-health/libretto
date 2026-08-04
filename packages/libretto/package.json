@@ -83,6 +83,7 @@
     "ai": "^6.0.116",
     "esbuild": "^0.27.0",
     "playwright": "catalog:",
+    "serialize-error": "^13.0.1",
     "tsx": "^4.21.0",
     "zod": "^4.3.6"
   }

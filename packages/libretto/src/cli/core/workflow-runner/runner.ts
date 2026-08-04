@@ -15,6 +15,11 @@ import {
   installHeadedWorkflowVisualization,
   loadDefaultWorkflow,
 } from "../workflow-runtime.js";
+import {
+  createWorkflowFailureError,
+  serializeWorkflowError,
+  type SerializedWorkflowError,
+} from "./workflow-error.js";
 
 type WorkflowPausedState = {
   state: "paused";
@@ -25,7 +30,12 @@ type WorkflowPausedState = {
 
 export type WorkflowFinishedArgs =
   | { result: "completed"; completedAt: string }
-  | { result: "failed"; message: string; phase: "setup" | "workflow" };
+  | {
+      result: "failed";
+      message: string;
+      phase: "setup" | "workflow";
+      error?: SerializedWorkflowError;
+    };
 
 type WorkflowFinishedState = {
   state: "finished";
@@ -178,12 +188,9 @@ export class WorkflowController {
           workflow,
         });
       } catch (error) {
-        this.emitOutcome({
-          state: "finished",
-          result: "failed",
-          message: error instanceof Error ? error.message : String(error),
-          phase: "workflow",
-        });
+        this.emitOutcome(
+          this.createFailedOutcome(error, "workflow", absolutePath),
+        );
         return;
       } finally {
         uninstallPauseHandler();
@@ -196,15 +203,33 @@ export class WorkflowController {
         completedAt: new Date().toISOString(),
       });
     } catch (error) {
-      this.emitOutcome({
-        state: "finished",
-        result: "failed",
-        message: error instanceof Error ? error.message : String(error),
-        phase: "setup",
-      });
+      const absolutePath = getAbsoluteIntegrationPath(
+        workflowConfig.integrationPath,
+      );
+      this.emitOutcome(
+        this.createFailedOutcome(error, "setup", absolutePath),
+      );
     } finally {
       restoreOutput();
     }
+  }
+
+  private createFailedOutcome(
+    error: unknown,
+    phase: "setup" | "workflow",
+    integrationPath: string,
+  ): WorkflowFinishedState {
+    const workflowError = createWorkflowFailureError(error, {
+      cwd: process.cwd(),
+      integrationPath,
+    });
+    return {
+      state: "finished",
+      result: "failed",
+      message: workflowError.message,
+      phase,
+      error: serializeWorkflowError(workflowError),
+    };
   }
 
   private emitOutcome(outcome: WorkflowOutcome): void {

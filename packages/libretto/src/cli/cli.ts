@@ -5,6 +5,7 @@ import {
   warnIfLibrettoVersionsDiffer,
 } from "./core/skill-version.js";
 import { loadEnv } from "../shared/env/load-env.js";
+import { formatErrorWithCauses } from "./core/workflow-runner/workflow-error.js";
 
 function renderVersion(): string {
   return readCurrentCliVersion();
@@ -35,6 +36,21 @@ function hasScopedHelp(message: string): boolean {
   return message.includes("\nUsage: ");
 }
 
+function formatCliError(err: unknown): string {
+  if (!(err instanceof Error)) {
+    return String(err);
+  }
+  // Workflow run failures already embed the actionable stack (+ cause) in message.
+  if (
+    err.message.includes("\n    at ") ||
+    err.message.includes("Caused by:") ||
+    err.message.includes("Browser is still open.")
+  ) {
+    return err.message;
+  }
+  return formatErrorWithCauses(err);
+}
+
 export async function runLibrettoCLI(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   let exitCode = 0;
@@ -59,7 +75,7 @@ export async function runLibrettoCLI(): Promise<void> {
       console.log(result);
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = formatCliError(err);
     if (message.startsWith("Unknown command: ")) {
       if (hasRootHelp(message, app)) {
         const summary = message.split("\n", 1)[0] ?? message;
