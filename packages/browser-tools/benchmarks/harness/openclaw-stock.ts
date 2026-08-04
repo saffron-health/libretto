@@ -13,6 +13,7 @@ import {
 	requireCommandOnPath,
 	requireOpenAiApiKey,
 	runHostProcess,
+	usageFromOpenClawHome,
 	writeTextFile,
 } from "./host-agent.js";
 
@@ -86,15 +87,19 @@ export async function runOpenclawStockHarness(
 		alsoKillCwdContains: openclawHome,
 	});
 	const answer = extractHostAnswer(result.stdout, result.stderr);
+	const events = hostEventsFromOpenClawHome({
+		openclawHome,
+		prompt,
+		result,
+		answer,
+	});
 	const run: HarnessRun = {
 		answer,
-		events: hostEventsFromOpenClawHome({
-			openclawHome,
-			prompt,
-			result,
-			answer,
+		events,
+		metrics: hostMetrics(result.durationMs, {
+			events,
+			usage: usageFromOpenClawHome(openclawHome),
 		}),
-		metrics: hostMetrics(result.durationMs),
 		browserBackend: "host-stock",
 		async dispose() {},
 	};

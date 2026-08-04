@@ -12,6 +12,7 @@ import {
 	requireCommandOnPath,
 	requireOpenAiApiKey,
 	runHostProcess,
+	usageFromHermesHome,
 	writeTextFile,
 } from "./host-agent.js";
 
@@ -58,10 +59,14 @@ export async function runHermesStockHarness(
 		},
 	});
 	const answer = extractHostAnswer(result.stdout, result.stderr);
+	const events = hostEventsFromProcess({ prompt, result, answer });
 	const run: HarnessRun = {
 		answer,
-		events: hostEventsFromProcess({ prompt, result, answer }),
-		metrics: hostMetrics(result.durationMs),
+		events,
+		metrics: hostMetrics(result.durationMs, {
+			events,
+			usage: usageFromHermesHome(hermesHome),
+		}),
 		browserBackend: "host-stock",
 		async dispose() {},
 	};

@@ -1,5 +1,12 @@
-import { spawn } from "node:child_process";
-import { accessSync, constants, readdirSync, readFileSync, readlinkSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import {
+	accessSync,
+	constants,
+	existsSync,
+	readdirSync,
+	readFileSync,
+	readlinkSync,
+} from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -329,8 +336,285 @@ export function hostEventsFromProcess(options: {
 	return events;
 }
 
-export function hostMetrics(durationMs: number): UsageMetrics {
-	return { durationMs };
+function toolCallCountsFromEvents(
+	events: HarnessEvent[],
+): Record<string, number> {
+	const counts: Record<string, number> = {};
+	for (const event of events) {
+		if (event.type !== "tool_execution_start") continue;
+		counts[event.toolName] = (counts[event.toolName] ?? 0) + 1;
+	}
+	return counts;
+}
+
+function numberOrUndefined(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
+}
+
+function sumDefined(...values: Array<number | undefined>): number | undefined {
+	const present = values.filter((value): value is number => value !== undefined);
+	if (present.length === 0) return undefined;
+	return present.reduce((total, value) => total + value, 0);
+}
+
+/**
+ * Build host UsageMetrics. Token/cost fields stay undefined when unknown —
+ * never invent zeros for missing host telemetry.
+ */
+export function hostMetrics(
+	durationMs: number,
+	options?: {
+		events?: HarnessEvent[];
+		usage?: Partial<UsageMetrics>;
+	},
+): UsageMetrics {
+	const usage = options?.usage ?? {};
+	const toolCalls =
+		options?.events !== undefined
+			? toolCallCountsFromEvents(options.events)
+			: usage.toolCalls;
+	const totalToolCalls =
+		toolCalls !== undefined
+			? Object.values(toolCalls).reduce((total, count) => total + count, 0)
+			: usage.totalToolCalls;
+	const inputTokens = numberOrUndefined(usage.inputTokens);
+	const outputTokens = numberOrUndefined(usage.outputTokens);
+	const cacheReadTokens = numberOrUndefined(usage.cacheReadTokens);
+	const cacheWriteTokens = numberOrUndefined(usage.cacheWriteTokens);
+	const totalTokens =
+		numberOrUndefined(usage.totalTokens) ??
+		sumDefined(inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens);
+	return {
+		durationMs,
+		...(inputTokens !== undefined ? { inputTokens } : {}),
+		...(outputTokens !== undefined ? { outputTokens } : {}),
+		...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+		...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+		...(totalTokens !== undefined ? { totalTokens } : {}),
+		...(numberOrUndefined(usage.maxRequestContextTokens) !== undefined
+			? { maxRequestContextTokens: usage.maxRequestContextTokens }
+			: {}),
+		...(numberOrUndefined(usage.costUsd) !== undefined
+			? { costUsd: usage.costUsd }
+			: {}),
+		...(numberOrUndefined(usage.turns) !== undefined
+			? { turns: usage.turns }
+			: {}),
+		...(toolCalls !== undefined ? { toolCalls } : {}),
+		...(totalToolCalls !== undefined ? { totalToolCalls } : {}),
+	};
+}
+
+/**
+ * Read token/cost totals for the latest Hermes session from HERMES_HOME/state.db.
+ * Missing fields stay omitted (undefined), including when the DB is absent.
+ */
+export function usageFromHermesHome(hermesHome: string): Partial<UsageMetrics> {
+	const dbPath = join(hermesHome, "state.db");
+	if (!existsSync(dbPath)) return {};
+	const query = [
+		"SELECT input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,",
+		"api_call_count, COALESCE(actual_cost_usd, estimated_cost_usd) AS cost_usd",
+		"FROM sessions ORDER BY started_at DESC LIMIT 1;",
+	].join(" ");
+	const result = spawnSync(
+		"python3",
+		[
+			"-c",
+			[
+				"import json, sqlite3, sys",
+				"db = sqlite3.connect(sys.argv[1])",
+				"row = db.execute(sys.argv[2]).fetchone()",
+				"print(json.dumps(row))",
+			].join("; "),
+			dbPath,
+			query,
+		],
+		{ encoding: "utf8" },
+	);
+	if (result.status !== 0 || !result.stdout.trim()) return {};
+	let row: unknown;
+	try {
+		row = JSON.parse(result.stdout.trim());
+	} catch {
+		return {};
+	}
+	if (!Array.isArray(row) || row.length < 6) return {};
+	const inputTokens = numberOrUndefined(row[0]);
+	const outputTokens = numberOrUndefined(row[1]);
+	const cacheReadTokens = numberOrUndefined(row[2]);
+	const cacheWriteTokens = numberOrUndefined(row[3]);
+	const turns = numberOrUndefined(row[4]);
+	const costUsd = numberOrUndefined(row[5]);
+	const totalTokens = sumDefined(
+		inputTokens,
+		outputTokens,
+		cacheReadTokens,
+		cacheWriteTokens,
+	);
+	// Hermes defaults missing counters to 0 in SQLite; treat an all-zero row
+	// with no API calls as "unknown" rather than a real zero-token run.
+	const hasSignal =
+		(turns !== undefined && turns > 0) ||
+		(totalTokens !== undefined && totalTokens > 0) ||
+		(costUsd !== undefined && costUsd > 0);
+	if (!hasSignal) return {};
+	return {
+		...(inputTokens !== undefined ? { inputTokens } : {}),
+		...(outputTokens !== undefined ? { outputTokens } : {}),
+		...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+		...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+		...(totalTokens !== undefined ? { totalTokens } : {}),
+		...(costUsd !== undefined ? { costUsd } : {}),
+		...(turns !== undefined ? { turns } : {}),
+	};
+}
+
+type OpenClawUsageBuckets = {
+	input: number;
+	output: number;
+	cacheRead: number;
+	cacheWrite: number;
+	total: number;
+	cost: number;
+	assistantTurns: number;
+	maxRequestContextTokens: number;
+};
+
+function emptyOpenClawUsageBuckets(): OpenClawUsageBuckets {
+	return {
+		input: 0,
+		output: 0,
+		cacheRead: 0,
+		cacheWrite: 0,
+		total: 0,
+		cost: 0,
+		assistantTurns: 0,
+		maxRequestContextTokens: 0,
+	};
+}
+
+function addOpenClawMessageUsage(
+	buckets: OpenClawUsageBuckets,
+	message: {
+		role?: unknown;
+		usage?: {
+			input?: unknown;
+			output?: unknown;
+			cacheRead?: unknown;
+			cacheWrite?: unknown;
+			total?: unknown;
+			cost?: unknown | { total?: unknown };
+		};
+	},
+): void {
+	if (message.role !== "assistant") return;
+	const usage = message.usage;
+	if (!usage || typeof usage !== "object") return;
+	const input = numberOrUndefined(usage.input) ?? 0;
+	const output = numberOrUndefined(usage.output) ?? 0;
+	const cacheRead = numberOrUndefined(usage.cacheRead) ?? 0;
+	const cacheWrite = numberOrUndefined(usage.cacheWrite) ?? 0;
+	const componentTotal = input + output + cacheRead + cacheWrite;
+	const total = numberOrUndefined(usage.total) ?? componentTotal;
+	const cost =
+		numberOrUndefined(usage.cost) ??
+		(usage.cost && typeof usage.cost === "object"
+			? numberOrUndefined((usage.cost as { total?: unknown }).total)
+			: undefined) ??
+		0;
+	buckets.input += input;
+	buckets.output += output;
+	buckets.cacheRead += cacheRead;
+	buckets.cacheWrite += cacheWrite;
+	buckets.total += total;
+	buckets.cost += cost;
+	buckets.assistantTurns += 1;
+	const requestContext = input + cacheRead + cacheWrite;
+	buckets.maxRequestContextTokens = Math.max(
+		buckets.maxRequestContextTokens,
+		requestContext,
+	);
+}
+
+/**
+ * Sum token/cost usage from OpenClaw session JSONL under OPENCLAW_STATE_DIR.
+ */
+export function usageFromOpenClawHome(
+	openclawHome: string,
+): Partial<UsageMetrics> {
+	const sessionsDir = join(
+		openclawHome,
+		".openclaw",
+		"agents",
+		"main",
+		"sessions",
+	);
+	let sessionFiles: string[] = [];
+	try {
+		sessionFiles = readdirSync(sessionsDir)
+			.filter(
+				(name) =>
+					name.endsWith(".jsonl") &&
+					!name.endsWith(".trajectory.jsonl") &&
+					name !== "sessions.json",
+			)
+			.map((name) => join(sessionsDir, name));
+	} catch {
+		return {};
+	}
+
+	const buckets = emptyOpenClawUsageBuckets();
+	for (const sessionFile of sessionFiles) {
+		let lines: string[] = [];
+		try {
+			lines = readFileSync(sessionFile, "utf8").split(/\r?\n/);
+		} catch {
+			continue;
+		}
+		for (const line of lines) {
+			if (!line.trim()) continue;
+			let record: unknown;
+			try {
+				record = JSON.parse(line);
+			} catch {
+				continue;
+			}
+			if (!record || typeof record !== "object") continue;
+			const entry = record as {
+				type?: unknown;
+				message?: {
+					role?: unknown;
+					usage?: {
+						input?: unknown;
+						output?: unknown;
+						cacheRead?: unknown;
+						cacheWrite?: unknown;
+						total?: unknown;
+						cost?: unknown | { total?: unknown };
+					};
+				};
+			};
+			if (entry.type !== "message" || !entry.message) continue;
+			addOpenClawMessageUsage(buckets, entry.message);
+		}
+	}
+
+	if (buckets.assistantTurns === 0 && buckets.total === 0) return {};
+	return {
+		inputTokens: buckets.input,
+		outputTokens: buckets.output,
+		cacheReadTokens: buckets.cacheRead,
+		cacheWriteTokens: buckets.cacheWrite,
+		totalTokens: buckets.total,
+		...(buckets.maxRequestContextTokens > 0
+			? { maxRequestContextTokens: buckets.maxRequestContextTokens }
+			: {}),
+		...(buckets.cost > 0 ? { costUsd: buckets.cost } : {}),
+		turns: buckets.assistantTurns,
+	};
 }
 
 function textFromOpenClawContent(content: unknown): string | null {

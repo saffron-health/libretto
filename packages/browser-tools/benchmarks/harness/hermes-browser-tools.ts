@@ -15,6 +15,7 @@ import {
 	requireOpenAiApiKey,
 	requireProviderApiKey,
 	runHostProcess,
+	usageFromHermesHome,
 	writeTextFile,
 } from "./host-agent.js";
 
@@ -109,10 +110,14 @@ export async function runHermesBrowserToolsHarness(
 		env: childEnv,
 	});
 	const answer = extractHostAnswer(result.stdout, result.stderr);
+	const events = hostEventsFromProcess({ prompt, result, answer });
 	const run: HarnessRun = {
 		answer,
-		events: hostEventsFromProcess({ prompt, result, answer }),
-		metrics: hostMetrics(result.durationMs),
+		events,
+		metrics: hostMetrics(result.durationMs, {
+			events,
+			usage: usageFromHermesHome(hermesHome),
+		}),
 		browserBackend: "benchmark-provider",
 		async dispose() {},
 	};

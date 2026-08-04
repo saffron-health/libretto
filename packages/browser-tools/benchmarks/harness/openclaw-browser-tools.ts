@@ -16,6 +16,7 @@ import {
 	requireOpenAiApiKey,
 	requireProviderApiKey,
 	runHostProcess,
+	usageFromOpenClawHome,
 	writeTextFile,
 } from "./host-agent.js";
 
@@ -116,15 +117,19 @@ export async function runOpenclawBrowserToolsHarness(
 		alsoKillCwdContains: openclawHome,
 	});
 	const answer = extractHostAnswer(result.stdout, result.stderr);
+	const events = hostEventsFromOpenClawHome({
+		openclawHome,
+		prompt,
+		result,
+		answer,
+	});
 	const run: HarnessRun = {
 		answer,
-		events: hostEventsFromOpenClawHome({
-			openclawHome,
-			prompt,
-			result,
-			answer,
+		events,
+		metrics: hostMetrics(result.durationMs, {
+			events,
+			usage: usageFromOpenClawHome(openclawHome),
 		}),
-		metrics: hostMetrics(result.durationMs),
 		browserBackend: "benchmark-provider",
 		async dispose() {},
 	};
