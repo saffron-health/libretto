@@ -1895,18 +1895,23 @@ type CodeSharingStatus = {
 
 function SettingsPanel({ session }: { session: CloudSession }) {
   const [sharing, setSharing] = useState<CodeSharingStatus | null>(null);
-  const [canManage, setCanManage] = useState(false);
+  const [canManage, setCanManage] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      orpcCall<CodeSharingStatus>("/v1/tenant/codeSharing"),
-      orpcCall<UsersResponse>("/v1/dashboard/users"),
-    ])
-      .then(([sharingStatus, users]) => {
-        setSharing(sharingStatus);
+    orpcCall<CodeSharingStatus>("/v1/tenant/codeSharing")
+      .then(setSharing)
+      .catch((err) =>
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not load workflow sharing status.",
+        ),
+      );
+    orpcCall<UsersResponse>("/v1/dashboard/users")
+      .then((users) => {
         setCanManage(
           users.users.some(
             (user) => user.id === session.user.id && user.role === "owner",
@@ -1915,7 +1920,9 @@ function SettingsPanel({ session }: { session: CloudSession }) {
       })
       .catch((err) =>
         setError(
-          err instanceof Error ? err.message : "Could not load settings.",
+          err instanceof Error
+            ? err.message
+            : "Could not load workspace permissions.",
         ),
       );
   }, [session.user.id]);
@@ -1960,12 +1967,19 @@ function SettingsPanel({ session }: { session: CloudSession }) {
   return (
     <div className="max-w-3xl space-y-4">
       {error && (
-        <p className="rounded-md border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <p
+          role="alert"
+          className="rounded-md border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+        >
           {error}
         </p>
       )}
       {notice && (
-        <p className="rounded-md border border-accent/30 bg-green-9/10 px-4 py-3 text-sm text-accent-bright">
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-md border border-accent/30 bg-green-9/10 px-4 py-3 text-sm text-accent-bright"
+        >
           {notice}
         </p>
       )}
@@ -1975,7 +1989,10 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             <h2 className="text-base font-medium text-ink">
               Public workflow sharing
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+            <p
+              id="workflow-sharing-description"
+              className="mt-2 max-w-2xl text-sm leading-6 text-muted"
+            >
               Allow people in this workspace to publish workflow source code
               to the Libretto Marketplace. Credentials, run history, and
               per-run parameters are never included.
@@ -1986,7 +2003,9 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             role="switch"
             aria-label="Public workflow sharing"
             aria-checked={sharing?.enabled ?? false}
-            disabled={!sharing || !canManage || busy}
+            aria-busy={busy}
+            aria-describedby="workflow-sharing-description workflow-sharing-state"
+            disabled={!sharing || canManage !== true || busy}
             onClick={() => void toggleSharing()}
             className={`relative mt-1 h-7 w-12 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${
               sharing?.enabled
@@ -2001,13 +2020,21 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             />
           </button>
         </div>
-        <div className="mt-5 border-t border-rule pt-4 text-xs leading-5 text-muted">
+        <div
+          id="workflow-sharing-state"
+          className="mt-5 border-t border-rule pt-4 text-xs leading-5 text-muted"
+        >
           {!sharing
-            ? "Loading sharing status…"
+            ? error
+              ? "Sharing status is unavailable."
+              : "Loading sharing status…"
             : sharing.enabled
               ? "Enabled · Individual workflows are still private by default and must be shared explicitly."
               : "Disabled · Workflows from this workspace cannot be published."}
-          {sharing && !canManage && (
+          {sharing && canManage === null && (
+            <span className="mt-1 block">Checking workspace permissions…</span>
+          )}
+          {sharing && canManage === false && (
             <span className="mt-1 block">
               Only a workspace owner can change this setting.
             </span>
