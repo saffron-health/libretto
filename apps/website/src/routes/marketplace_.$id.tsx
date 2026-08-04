@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MarketplaceWorkflowPage } from "../MarketplacePage";
 
-export const Route = createFileRoute("/marketplace/$id")({
+export const Route = createFileRoute("/marketplace_/$id")({
   head: () => ({
     meta: [{ title: "Marketplace Workflow | Libretto" }],
   }),

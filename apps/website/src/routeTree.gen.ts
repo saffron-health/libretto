@@ -26,7 +26,7 @@ import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as VsStagehandRouteImport } from './routes/vs/stagehand'
 import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs/playwright-codegen'
 import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
-import { Route as MarketplaceIdRouteImport } from './routes/marketplace.$id'
+import { Route as MarketplaceIdRouteImport } from './routes/marketplace_.$id'
 import { Route as GithubSetupRouteImport } from './routes/github.setup'
 import { Route as DashboardPrAgentRouteImport } from './routes/dashboard_.pr-agent'
 import { Route as DashboardCloudBrowsersRouteImport } from './routes/dashboard_.cloud-browsers'
@@ -120,9 +120,9 @@ const VsBrowserUseRoute = VsBrowserUseRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketplaceIdRoute = MarketplaceIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => MarketplaceRoute,
+  id: '/marketplace_/$id',
+  path: '/marketplace/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const GithubSetupRoute = GithubSetupRouteImport.update({
   id: '/github/setup',
@@ -165,7 +165,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
-  '/marketplace': typeof MarketplaceRouteWithChildren
+  '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
@@ -190,7 +190,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
-  '/marketplace': typeof MarketplaceRouteWithChildren
+  '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
@@ -217,7 +217,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
   '/invite': typeof InviteRoute
-  '/marketplace': typeof MarketplaceRouteWithChildren
+  '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
@@ -228,7 +228,7 @@ export interface FileRoutesById {
   '/dashboard_/cloud-browsers': typeof DashboardCloudBrowsersRoute
   '/dashboard_/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
-  '/marketplace/$id': typeof MarketplaceIdRoute
+  '/marketplace_/$id': typeof MarketplaceIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -307,7 +307,7 @@ export interface FileRouteTypes {
     | '/dashboard_/cloud-browsers'
     | '/dashboard_/pr-agent'
     | '/github/setup'
-    | '/marketplace/$id'
+    | '/marketplace_/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -323,7 +323,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   DebugAgentsRoute: typeof DebugAgentsRoute
   InviteRoute: typeof InviteRoute
-  MarketplaceRoute: typeof MarketplaceRouteWithChildren
+  MarketplaceRoute: typeof MarketplaceRoute
   OnboardingRoute: typeof OnboardingRoute
   PrivacyRoute: typeof PrivacyRoute
   SigninRoute: typeof SigninRoute
@@ -333,6 +333,7 @@ export interface RootRouteChildren {
   DashboardCloudBrowsersRoute: typeof DashboardCloudBrowsersRoute
   DashboardPrAgentRoute: typeof DashboardPrAgentRoute
   GithubSetupRoute: typeof GithubSetupRoute
+  MarketplaceIdRoute: typeof MarketplaceIdRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
@@ -459,12 +460,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VsBrowserUseRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/marketplace/$id': {
-      id: '/marketplace/$id'
-      path: '/$id'
+    '/marketplace_/$id': {
+      id: '/marketplace_/$id'
+      path: '/marketplace/$id'
       fullPath: '/marketplace/$id'
       preLoaderRoute: typeof MarketplaceIdRouteImport
-      parentRoute: typeof MarketplaceRoute
+      parentRoute: typeof rootRouteImport
     }
     '/github/setup': {
       id: '/github/setup'
@@ -525,18 +526,6 @@ const BlogRouteRouteWithChildren = BlogRouteRoute._addFileChildren(
   BlogRouteRouteChildren,
 )
 
-interface MarketplaceRouteChildren {
-  MarketplaceIdRoute: typeof MarketplaceIdRoute
-}
-
-const MarketplaceRouteChildren: MarketplaceRouteChildren = {
-  MarketplaceIdRoute: MarketplaceIdRoute,
-}
-
-const MarketplaceRouteWithChildren = MarketplaceRoute._addFileChildren(
-  MarketplaceRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BlogRouteRoute: BlogRouteRouteWithChildren,
@@ -546,7 +535,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   DebugAgentsRoute: DebugAgentsRoute,
   InviteRoute: InviteRoute,
-  MarketplaceRoute: MarketplaceRouteWithChildren,
+  MarketplaceRoute: MarketplaceRoute,
   OnboardingRoute: OnboardingRoute,
   PrivacyRoute: PrivacyRoute,
   SigninRoute: SigninRoute,
@@ -556,6 +545,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardCloudBrowsersRoute: DashboardCloudBrowsersRoute,
   DashboardPrAgentRoute: DashboardPrAgentRoute,
   GithubSetupRoute: GithubSetupRoute,
+  MarketplaceIdRoute: MarketplaceIdRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,
