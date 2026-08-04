@@ -16,6 +16,7 @@ const dashboardPaths = [
   "/dashboard/browser_sessions",
   "/dashboard/connected_repos",
   "/dashboard/users",
+  "/dashboard/settings",
   "/dashboard/secrets",
   "/dashboard/api_keys",
   "/dashboard/billing",

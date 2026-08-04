@@ -22,6 +22,7 @@ export const dashboardSections = [
   "browser_sessions",
   "connected_repos",
   "users",
+  "settings",
   "secrets",
   "api_keys",
   "billing",
@@ -116,6 +117,16 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    id: "settings",
+    label: "Settings",
+    icon: (
+      <NavIcon>
+        <circle cx="10" cy="10" r="2.5" />
+        <path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M15.3 4.7l-1.4 1.4M6.1 13.9l-1.4 1.4" />
+      </NavIcon>
+    ),
+  },
+  {
     id: "secrets",
     label: "Secrets",
     icon: (
@@ -149,6 +160,7 @@ const navItems: NavItem[] = [
 
 const accountSectionOrder: DashboardSection[] = [
   "users",
+  "settings",
   "billing",
   "secrets",
   "api_keys",
@@ -191,6 +203,10 @@ const sectionMeta: Record<
   users: {
     title: "Users",
     description: "People with access to your Libretto workspace.",
+  },
+  settings: {
+    title: "Settings",
+    description: "Workspace-wide controls for Libretto features.",
   },
   secrets: {
     title: "Secrets",
@@ -1873,6 +1889,142 @@ function ManageBillingButton() {
   );
 }
 
+type CodeSharingStatus = {
+  enabled: boolean;
+};
+
+function SettingsPanel({ session }: { session: CloudSession }) {
+  const [sharing, setSharing] = useState<CodeSharingStatus | null>(null);
+  const [canManage, setCanManage] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      orpcCall<CodeSharingStatus>("/v1/tenant/codeSharing"),
+      orpcCall<UsersResponse>("/v1/dashboard/users"),
+    ])
+      .then(([sharingStatus, users]) => {
+        setSharing(sharingStatus);
+        setCanManage(
+          users.users.some(
+            (user) => user.id === session.user.id && user.role === "owner",
+          ),
+        );
+      })
+      .catch((err) =>
+        setError(
+          err instanceof Error ? err.message : "Could not load settings.",
+        ),
+      );
+  }, [session.user.id]);
+
+  async function toggleSharing() {
+    if (!sharing || !canManage) return;
+    const enabled = !sharing.enabled;
+    if (
+      !enabled &&
+      !window.confirm(
+        "Disable public workflow sharing? Every workflow from this workspace will be removed from the marketplace. Re-enabling sharing will not republish them automatically.",
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const updated = await orpcCall<CodeSharingStatus>(
+        "/v1/tenant/updateCodeSharing",
+        { enabled },
+      );
+      setSharing(updated);
+      setNotice(
+        enabled
+          ? "Workflow sharing is enabled. Workflows remain private until someone explicitly shares them."
+          : "Workflow sharing is disabled and existing marketplace listings were unpublished.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not update workflow sharing.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="max-w-3xl space-y-4">
+      {error && (
+        <p className="rounded-md border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="rounded-md border border-accent/30 bg-green-9/10 px-4 py-3 text-sm text-accent-bright">
+          {notice}
+        </p>
+      )}
+      <section className="rounded-xl border border-rule bg-panel/65 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.16)] sm:p-6">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <h2 className="text-base font-medium text-ink">
+              Public workflow sharing
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+              Allow people in this workspace to publish workflow source code
+              to the Libretto Marketplace. Credentials, run history, and
+              per-run parameters are never included.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-label="Public workflow sharing"
+            aria-checked={sharing?.enabled ?? false}
+            disabled={!sharing || !canManage || busy}
+            onClick={() => void toggleSharing()}
+            className={`relative mt-1 h-7 w-12 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+              sharing?.enabled
+                ? "border-accent/50 bg-green-9"
+                : "border-rule bg-bg"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 size-5 rounded-full bg-ink transition-transform ${
+                sharing?.enabled ? "translate-x-6" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+        <div className="mt-5 border-t border-rule pt-4 text-xs leading-5 text-muted">
+          {!sharing
+            ? "Loading sharing status…"
+            : sharing.enabled
+              ? "Enabled · Individual workflows are still private by default and must be shared explicitly."
+              : "Disabled · Workflows from this workspace cannot be published."}
+          {sharing && !canManage && (
+            <span className="mt-1 block">
+              Only a workspace owner can change this setting.
+            </span>
+          )}
+          {sharing?.enabled && (
+            <span className="mt-1 block">
+              Disabling this setting unpublishes every current listing.
+              Re-enabling it does not automatically republish previous
+              listings.
+            </span>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function AuthenticatedDashboardPage({
   section,
 }: {
@@ -1957,6 +2109,7 @@ export function AuthenticatedDashboardPage({
           onCloseInvite={() => setShowInvite(false)}
         />
       )}
+      {section === "settings" && <SettingsPanel session={session} />}
       {section === "secrets" && (
         <SecretsTable
           showCreate={showCreateSecret}
