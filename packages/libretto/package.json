@@ -81,6 +81,7 @@
     "@ai-sdk/openai": "^3.0.66",
     "affordance": "workspace:^",
     "ai": "^6.0.116",
+    "errore": "^0.14.1",
     "esbuild": "^0.27.0",
     "playwright": "catalog:",
     "tsx": "^4.21.0",

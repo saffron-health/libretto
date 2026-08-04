@@ -93,6 +93,7 @@ import { WorkflowController } from "../workflow-runner/runner.js";
 import { errorToMessage } from "../workflow-runner/workflow-error.js";
 import { validateWorkflowInput } from "../../../shared/workflow/workflow.js";
 import { captureAuthProfileStorageState } from "../../../shared/workflow/auth-profile-state.js";
+import * as errore from "errore";
 import { applyWindowPosition } from "../../../shared/run/window-position.js";
 
 function isOperationalPage(page: Page): boolean {
@@ -116,22 +117,37 @@ async function waitForSessionState(session: string): Promise<void> {
   );
 }
 
-class UserFacingStartupError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "UserFacingStartupError";
-  }
+function firstLine(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.split("\n", 1)[0] ?? message;
 }
+
+class CdpConnectError extends errore.createTaggedError({
+  name: "CdpConnectError",
+  message:
+    "Failed to connect to CDP endpoint $cdpEndpoint: $detail. Confirm the target is listening and that this process can reach it (sandbox, firewall, or network policy may block the connection).",
+}) {}
+
+class ChromiumLaunchError extends errore.createTaggedError({
+  name: "ChromiumLaunchError",
+  message: "Failed to launch Chromium: $detail",
+}) {}
+
+class ConnectPageNotFoundError extends errore.createTaggedError({
+  name: "ConnectPageNotFoundError",
+  message:
+    'Page "$pageId" was not found while connecting to $cdpEndpoint. Discovered $pageCount page(s) (use page-0 .. page-$lastPageIndex). List pages on an interactive session with: libretto connect $cdpEndpoint && libretto pages',
+}) {}
 
 function resolveAuthProfileStorageStatePath(args: {
   authProfileName?: string;
   session: string;
-}): string | undefined {
+}): Error | string | undefined {
   if (!args.authProfileName) return undefined;
   const profileName = normalizeProfileName(args.authProfileName);
   const profilePath = getProfilePath(profileName);
   if (!hasProfile(profileName)) {
-    throw new UserFacingStartupError(
+    return new Error(
       formatMissingLocalAuthProfileMessage({
         profileName,
         profilePath,
@@ -367,7 +383,7 @@ class BrowserDaemon {
     experiments: Experiments;
     browser: DaemonBrowserLaunchConfig;
     workflow?: DaemonWorkflowConfig;
-  }): Promise<BrowserDaemon> {
+  }) {
     const { session, browser: config } = args;
     const storageStatePath =
       config.storageStatePath ??
@@ -375,22 +391,30 @@ class BrowserDaemon {
         authProfileName: args.workflow?.authProfileName,
         session,
       });
+    if (storageStatePath instanceof Error) return storageStatePath;
+
     const windowPositionArg = config.windowPosition
       ? `--window-position=${config.windowPosition.x},${config.windowPosition.y}`
       : undefined;
 
-    const browser = await chromium.launch({
-      headless: !config.headed,
-      args: [
-        "--disable-blink-features=AutomationControlled",
-        ...(config.remoteDebuggingPort
-          ? [`--remote-debugging-port=${config.remoteDebuggingPort}`]
-          : []),
-        "--remote-debugging-address=127.0.0.1",
-        "--no-focus-on-check",
-        ...(windowPositionArg ? [windowPositionArg] : []),
-      ],
-    });
+    const browser = await chromium
+      .launch({
+        headless: !config.headed,
+        args: [
+          "--disable-blink-features=AutomationControlled",
+          ...(config.remoteDebuggingPort
+            ? [`--remote-debugging-port=${config.remoteDebuggingPort}`]
+            : []),
+          "--remote-debugging-address=127.0.0.1",
+          "--no-focus-on-check",
+          ...(windowPositionArg ? [windowPositionArg] : []),
+        ],
+      })
+      .catch(
+        (cause: unknown) =>
+          new ChromiumLaunchError({ detail: firstLine(cause), cause }),
+      );
+    if (browser instanceof Error) return browser;
 
     const context = await browser.newContext({
       ...(storageStatePath ? { storageState: storageStatePath } : {}),
@@ -433,15 +457,26 @@ class BrowserDaemon {
     session: string;
     experiments: Experiments;
     browser: DaemonBrowserConnectConfig;
-  }): Promise<BrowserDaemon> {
+  }) {
     const { session, browser: config } = args;
-    const browser = await chromium.connectOverCDP(config.cdpEndpoint);
+    const browser = await chromium
+      .connectOverCDP(config.cdpEndpoint)
+      .catch(
+        (cause: unknown) =>
+          new CdpConnectError({
+            cdpEndpoint: config.cdpEndpoint,
+            detail: firstLine(cause),
+            cause,
+          }),
+      );
+    if (browser instanceof Error) return browser;
 
     // Discover existing contexts and pages.
     const contexts = browser.contexts();
     const context =
       contexts.length > 0 ? contexts[0] : await browser.newContext();
     const operationalPages = context.pages().filter(isOperationalPage);
+
     let page: Page;
     if (config.pageId) {
       const pageIndex = parseConnectPageIndex(config.pageId);
@@ -450,13 +485,12 @@ class BrowserDaemon {
         pageIndex < 0 ||
         pageIndex >= operationalPages.length
       ) {
-        throw new UserFacingStartupError(
-          [
-            `Page "${config.pageId}" was not found while connecting to ${config.cdpEndpoint}.`,
-            `Discovered ${operationalPages.length} page(s) (use page-0 .. page-${Math.max(operationalPages.length - 1, 0)}).`,
-            `List pages on an interactive session with: libretto connect ${config.cdpEndpoint} && libretto pages`,
-          ].join(" "),
-        );
+        return new ConnectPageNotFoundError({
+          pageId: config.pageId,
+          cdpEndpoint: config.cdpEndpoint,
+          pageCount: String(operationalPages.length),
+          lastPageIndex: String(Math.max(operationalPages.length - 1, 0)),
+        });
       }
       page = operationalPages[pageIndex];
     } else {
@@ -491,7 +525,7 @@ class BrowserDaemon {
     session: string;
     experiments: Experiments;
     browser: DaemonBrowserProviderConfig;
-  }): Promise<BrowserDaemon> {
+  }) {
     const { session, browser: config } = args;
     const provider = getCloudProviderApi(config.providerName);
     let providerSession: ProviderSession | undefined;
@@ -499,78 +533,118 @@ class BrowserDaemon {
       provider,
       getProviderSession: () => providerSession,
     });
-    try {
-      const startUrl = config.startUrl ?? config.initialUrl;
-      providerSession = await provider.createSession({
-        authProfileName: config.authProfileName,
-        authProfilePersist: config.authProfilePersist,
-        headless: config.headless,
-        startUrl,
-        gpu: config.gpu,
-        viewport: config.viewport,
-      });
-      const browser = await chromium.connectOverCDP(
-        providerSession.cdpEndpoint,
-      );
 
-      const contexts = browser.contexts();
-      const context =
-        contexts.length > 0 ? contexts[0] : await browser.newContext();
-      const operationalPages = context.pages().filter(isOperationalPage);
-      const page =
-        operationalPages.length > 0
-          ? operationalPages[operationalPages.length - 1]
-          : await context.newPage();
+    const result = await errore.tryAsync({
+      try: async () => {
+        const startUrl = config.startUrl ?? config.initialUrl;
+        const created = await provider
+          .createSession({
+            authProfileName: config.authProfileName,
+            authProfilePersist: config.authProfilePersist,
+            headless: config.headless,
+            startUrl,
+            gpu: config.gpu,
+            viewport: config.viewport,
+          })
+          .catch(
+            (cause: unknown) =>
+              new Error(
+                `Failed to create ${config.providerName} session: ${firstLine(cause)}`,
+                { cause },
+              ),
+          );
+        if (created instanceof Error) return created;
+        providerSession = created;
 
-      const daemon = await BrowserDaemon.initialize({
-        session,
-        experiments: args.experiments,
-        externallyManaged: true,
-        browser,
-        context,
-        page,
-        initialPages: operationalPages.length > 0 ? operationalPages : [page],
-        // Providers that preload start_url before CDP attach must not get a
-        // second page.goto — that re-triggers bot detection on some sites.
-        // Providers without create-time start_url still navigate here so
-        // workflow startUrl works without a first-handler page.goto.
-        navigateUrl: providerSession.startUrlPreloaded ? undefined : startUrl,
-        readyProvider: {
-          name: config.providerName,
-          sessionId: providerSession.sessionId,
-          cdpEndpoint: providerSession.cdpEndpoint,
-          liveViewUrl: providerSession.liveViewUrl,
-          recordingUrl: providerSession.recordingUrl,
-        },
-        providerSession: {
-          provider,
-          name: config.providerName,
-          sessionId: providerSession.sessionId,
-          recordingUrl: providerSession.recordingUrl,
-        },
-        beforeReady: startupCleanup.dispose,
-      });
+        const browser = await chromium
+          .connectOverCDP(created.cdpEndpoint)
+          .catch(
+            (cause: unknown) =>
+              new CdpConnectError({
+                cdpEndpoint: created.cdpEndpoint,
+                detail: firstLine(cause),
+                cause,
+              }),
+          );
+        if (browser instanceof Error) return browser;
 
-      daemon.logger.info("child-provider-connected", {
-        provider: config.providerName,
-        sessionId: providerSession.sessionId,
-        url: config.initialUrl,
-        startUrl,
-        startUrlPreloaded: providerSession.startUrlPreloaded === true,
-        gpu: config.gpu,
-        viewport: config.viewport,
-        pid: process.pid,
-        session,
-      });
+        const contexts = browser.contexts();
+        const context =
+          contexts.length > 0 ? contexts[0] : await browser.newContext();
+        const operationalPages = context.pages().filter(isOperationalPage);
+        const page =
+          operationalPages.length > 0
+            ? operationalPages[operationalPages.length - 1]
+            : await context.newPage();
 
-      return daemon;
-    } catch (error) {
+        const daemon = await BrowserDaemon.initialize({
+          session,
+          experiments: args.experiments,
+          externallyManaged: true,
+          browser,
+          context,
+          page,
+          initialPages: operationalPages.length > 0 ? operationalPages : [page],
+          // Providers that preload start_url before CDP attach must not get a
+          // second page.goto — that re-triggers bot detection on some sites.
+          // Providers without create-time start_url still navigate here so
+          // workflow startUrl works without a first-handler page.goto.
+          navigateUrl: created.startUrlPreloaded ? undefined : startUrl,
+          readyProvider: {
+            name: config.providerName,
+            sessionId: created.sessionId,
+            cdpEndpoint: created.cdpEndpoint,
+            liveViewUrl: created.liveViewUrl,
+            recordingUrl: created.recordingUrl,
+          },
+          providerSession: {
+            provider,
+            name: config.providerName,
+            sessionId: created.sessionId,
+            recordingUrl: created.recordingUrl,
+          },
+          beforeReady: startupCleanup.dispose,
+        });
+
+        daemon.logger.info("child-provider-connected", {
+          provider: config.providerName,
+          sessionId: created.sessionId,
+          url: config.initialUrl,
+          startUrl,
+          startUrlPreloaded: created.startUrlPreloaded === true,
+          gpu: config.gpu,
+          viewport: config.viewport,
+          pid: process.pid,
+          session,
+        });
+
+        return daemon;
+      },
+      catch: (cause) =>
+        cause instanceof Error ? cause : new Error(String(cause), { cause }),
+    });
+
+    if (result instanceof Error) {
       startupCleanup.dispose();
       if (providerSession) {
-        await provider.closeSession(providerSession.sessionId);
+        const closed = await provider
+          .closeSession(providerSession.sessionId)
+          .catch((cause: unknown) =>
+            cause instanceof Error
+              ? cause
+              : new Error(String(cause), { cause }),
+          );
+        if (closed instanceof Error) {
+          // Keep the original startup failure as the returned error; only log
+          // cleanup trouble so it cannot replace the real cause over IPC.
+          console.error(
+            `Also failed to close ${config.providerName} session ${providerSession.sessionId} during startup cleanup: ${closed.message}`,
+          );
+        }
       }
-      throw error;
+      return result;
     }
+    return result;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────
@@ -962,7 +1036,7 @@ function createProviderStartupCleanup(args: {
 
 // ── Main ───────────────────────────────────────────────────────────────
 
-async function main(): Promise<void> {
+async function main(): Promise<Error | void> {
   const config = JSON.parse(process.argv[2]) as DaemonConfig;
   const headed =
     config.browser.kind === "launch" ? config.browser.headed : false;
@@ -971,38 +1045,45 @@ async function main(): Promise<void> {
   let workflowConfig = config.workflow;
   let browserConfig = config.browser;
   if (config.workflow) {
-    try {
-      loadedWorkflow = await loadDefaultWorkflow(
-        getAbsoluteIntegrationPath(config.workflow.integrationPath),
-      );
-      validateWorkflowInput(loadedWorkflow, config.workflow.params ?? {});
-      const authProfileName = loadedWorkflow.authProfileName;
-      const authProfilePersist =
-        loadedWorkflow.authProfileRefresh === true;
-      workflowConfig = {
-        ...config.workflow,
+    const workflow = config.workflow;
+    const loaded = await loadDefaultWorkflow(
+      getAbsoluteIntegrationPath(workflow.integrationPath),
+    ).catch((cause: unknown) =>
+      cause instanceof Error ? cause : new Error(String(cause), { cause }),
+    );
+    if (loaded instanceof Error) return loaded;
+
+    const validated = errore.try({
+      try: () => {
+        validateWorkflowInput(loaded, workflow.params ?? {});
+      },
+      catch: (cause) =>
+        cause instanceof Error ? cause : new Error(String(cause), { cause }),
+    });
+    if (validated instanceof Error) return validated;
+    loadedWorkflow = loaded;
+
+    const authProfileName = loadedWorkflow.authProfileName;
+    const authProfilePersist = loadedWorkflow.authProfileRefresh === true;
+    workflowConfig = {
+      ...workflow,
+      authProfileName,
+      authProfilePersist,
+    };
+    if (config.browser.kind === "provider") {
+      browserConfig = {
+        ...config.browser,
         authProfileName,
         authProfilePersist,
+        startUrl: loadedWorkflow.startUrl ?? config.browser.startUrl,
+        gpu: loadedWorkflow.gpu ?? config.browser.gpu,
+        // Explicit daemon/CLI viewport wins over workflow viewport.
+        viewport: config.browser.viewport ?? loadedWorkflow.viewport,
       };
-      if (config.browser.kind === "provider") {
-        browserConfig = {
-          ...config.browser,
-          authProfileName,
-          authProfilePersist,
-          startUrl: loadedWorkflow.startUrl ?? config.browser.startUrl,
-          gpu: loadedWorkflow.gpu ?? config.browser.gpu,
-          // Explicit daemon/CLI viewport wins over workflow viewport.
-          viewport: config.browser.viewport ?? loadedWorkflow.viewport,
-        };
-      } else {
-        browserConfig = applyWorkflowStartUrlToBrowserConfig(
-          config.browser,
-          loadedWorkflow.startUrl,
-        );
-      }
-    } catch (error) {
-      throw new UserFacingStartupError(
-        error instanceof Error ? error.message : String(error),
+    } else {
+      browserConfig = applyWorkflowStartUrlToBrowserConfig(
+        config.browser,
+        loadedWorkflow.startUrl,
       );
     }
   }
@@ -1026,6 +1107,7 @@ async function main(): Promise<void> {
             browser: browserConfig,
             workflow: workflowConfig,
           });
+  if (daemon instanceof Error) return daemon;
 
   if (workflowConfig) {
     void waitForSessionState(config.session)
@@ -1081,20 +1163,29 @@ async function main(): Promise<void> {
   // letting the process exit naturally.
 }
 
-function reportStartupError(error: unknown): never {
-  if (error instanceof UserFacingStartupError) {
-    process.send?.({
-      type: "startup-error",
-      message: error.message,
+async function reportStartupError(error: Error): Promise<never> {
+  // Keep the full message — auth/workflow guidance is often multi-line.
+  // Playwright call logs only appear when we put firstLine() into $detail.
+  const message = error.message;
+  const logged = error.cause !== undefined ? error.cause : error;
+  console.error(
+    logged instanceof Error ? (logged.stack ?? String(logged)) : String(logged),
+  );
+
+  if (typeof process.send === "function") {
+    await new Promise<void>((resolve) => {
+      process.send!({ type: "startup-error", message }, () => resolve());
+      setTimeout(resolve, 250);
     });
   }
+
   process.exit(
     process.exitCode && process.exitCode !== 0 ? process.exitCode : 1,
   );
+  throw new Error("unreachable");
 }
 
-try {
-  await main();
-} catch (error) {
-  reportStartupError(error);
-}
+const startup = await main().catch((cause: unknown) =>
+  cause instanceof Error ? cause : new Error(String(cause), { cause }),
+);
+if (startup instanceof Error) await reportStartupError(startup);
