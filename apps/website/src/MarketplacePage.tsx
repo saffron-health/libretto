@@ -50,14 +50,20 @@ function pageShell(children: React.ReactNode) {
 }
 
 export function MarketplacePage() {
-  const [workflows, setWorkflows] = useState<MarketplaceWorkflowSummary[] | null>(null);
+  const [workflows, setWorkflows] = useState<
+    MarketplaceWorkflowSummary[] | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     publicCloudGet<{ workflows: MarketplaceWorkflowSummary[] }>("/marketplace")
       .then((result) => setWorkflows(result.workflows))
       .catch((reason) =>
-        setError(reason instanceof Error ? reason.message : "Could not load workflows."),
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "Could not load workflows.",
+        ),
       );
   }, []);
 
@@ -71,13 +77,19 @@ export function MarketplacePage() {
           Reusable browser workflows.
         </h1>
         <p className="mt-5 text-base leading-7 text-muted">
-          Add a public workflow to your Libretto account, connect your own secrets, and
-          get a private cloud deployment.
+          Add a public workflow to your Libretto account, connect your own
+          secrets, and get a private cloud deployment.
         </p>
       </header>
 
-      {workflows === null && !error && <p className="text-sm text-muted">Loading workflows…</p>}
-      {error && <p className="rounded-lg border border-red-400/30 bg-red-950/20 p-4 text-red-200">{error}</p>}
+      {workflows === null && !error && (
+        <p className="text-sm text-muted">Loading workflows…</p>
+      )}
+      {error && (
+        <p className="rounded-lg border border-red-400/30 bg-red-950/20 p-4 text-red-200">
+          {error}
+        </p>
+      )}
       {workflows?.length === 0 && (
         <p className="rounded-xl border border-rule bg-panel p-8 text-muted">
           No public workflows have been shared yet.
@@ -91,13 +103,16 @@ export function MarketplacePage() {
             className="rounded-xl border border-rule bg-panel p-5 text-ink no-underline transition hover:border-accent/50 hover:bg-panel-hi"
           >
             <div className="flex items-start justify-between gap-4">
-              <h2 className="font-serif text-2xl font-light">{workflow.workflow_name}</h2>
+              <h2 className="font-serif text-2xl font-light">
+                {workflow.workflow_name}
+              </h2>
               <span className="rounded-full border border-rule px-2 py-1 font-mono text-[10px] uppercase text-muted">
                 {workflow.import_count} uses
               </span>
             </div>
             <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted">
-              {workflow.description || "A shared Libretto workflow ready to configure."}
+              {workflow.description ||
+                "A shared Libretto workflow ready to configure."}
             </p>
             <p className="mt-5 font-mono text-xs text-accent-bright">
               by {workflow.publisher_name}
@@ -110,7 +125,9 @@ export function MarketplacePage() {
 }
 
 export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
-  const [workflow, setWorkflow] = useState<MarketplaceWorkflowDetail | null>(null);
+  const [workflow, setWorkflow] = useState<MarketplaceWorkflowDetail | null>(
+    null,
+  );
   const [session, setSession] = useState<CloudSession | null>(null);
   const [hasTenant, setHasTenant] = useState(false);
   const [secrets, setSecrets] = useState<SecretRow[]>([]);
@@ -121,10 +138,16 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
   const [build, setBuild] = useState<WorkflowBuildStatus | null>(null);
 
   useEffect(() => {
-    publicCloudGet<MarketplaceWorkflowDetail>(`/marketplace/${encodeURIComponent(shareId)}/data`)
+    publicCloudGet<MarketplaceWorkflowDetail>(
+      `/marketplace/${encodeURIComponent(shareId)}/data`,
+    )
       .then(setWorkflow)
       .catch((reason) =>
-        setError(reason instanceof Error ? reason.message : "Could not load this workflow."),
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "Could not load this workflow.",
+        ),
       );
     getCloudSession()
       .then(async (result) => {
@@ -149,7 +172,11 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
       })
         .then(setBuild)
         .catch((reason) =>
-          setError(reason instanceof Error ? reason.message : "Could not check build status."),
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Could not check build status.",
+          ),
         );
     }, 3000);
     return () => window.clearInterval(timer);
@@ -186,8 +213,10 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
           credentialIds.push(saved.credential_id);
           continue;
         }
-        const value = values[name]?.trim();
-        if (!value) throw new Error(`Enter a value for ${name}.`);
+        const value = values[name];
+        if (!value || value.trim().length === 0) {
+          throw new Error(`Enter a value for ${name}.`);
+        }
         const created = await orpcCall<{ credential_id: string }>(
           "/v1/dashboard/createSecret",
           { name, value },
@@ -210,7 +239,11 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
       });
       setConfiguring(false);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not use this workflow.");
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Could not use this workflow.",
+      );
     } finally {
       setBusy(false);
     }
@@ -226,7 +259,10 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
 
   return pageShell(
     <>
-      <a href="/marketplace" className="font-mono text-xs text-muted hover:text-ink">
+      <a
+        href="/marketplace"
+        className="font-mono text-xs text-muted hover:text-ink"
+      >
         ← Marketplace
       </a>
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -238,15 +274,27 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
             {workflow.workflow_name}
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-7 text-muted">
-            {workflow.description || "A public Libretto workflow you can add to your account."}
+            {workflow.description ||
+              "A public Libretto workflow you can add to your account."}
+          </p>
+          <p className="mt-3 max-w-2xl text-xs leading-6 text-muted">
+            Review the shared source and package.json dependencies before
+            importing. Marketplace workflows run publisher-provided code in your
+            private deployment.
           </p>
           <div className="mt-8 space-y-4">
             {workflow.files.map((file) => (
-              <details key={file.file_name} className="rounded-xl border border-rule bg-panel" open={workflow.files.length === 1}>
+              <details
+                key={file.file_name}
+                className="rounded-xl border border-rule bg-panel"
+                open={workflow.files.length === 1}
+              >
                 <summary className="cursor-pointer px-4 py-3 font-mono text-xs text-muted">
                   {file.file_name}
                 </summary>
-                <pre className="max-h-[520px] overflow-auto border-t border-rule p-4 text-xs leading-6 text-ink"><code>{file.code}</code></pre>
+                <pre className="max-h-[520px] overflow-auto border-t border-rule p-4 text-xs leading-6 text-ink">
+                  <code>{file.code}</code>
+                </pre>
               </details>
             ))}
           </div>
@@ -272,17 +320,25 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
                     ? "Your private workflow is deployed and available in Libretto and the Chrome extension."
                     : build.error || "The workflow could not be built."}
               </p>
-              <a href="/dashboard/workflows" className="libretto-button libretto-button--default mt-5 inline-flex h-10 items-center no-underline">
+              <a
+                href="/dashboard/workflows"
+                className="libretto-button libretto-button--default mt-5 inline-flex h-10 items-center no-underline"
+              >
                 View workflows
               </a>
             </div>
           ) : configuring ? (
             <form onSubmit={importWorkflow}>
-              <p className="font-mono text-xs uppercase text-accent">Configure workflow</p>
-              <h2 className="mt-3 font-serif text-2xl font-light">Connect your secrets</h2>
+              <p className="font-mono text-xs uppercase text-accent">
+                Configure workflow
+              </p>
+              <h2 className="mt-3 font-serif text-2xl font-light">
+                Connect your secrets
+              </h2>
               {workflow.credential_names.length === 0 ? (
                 <p className="mt-3 text-sm leading-6 text-muted">
-                  This workflow does not require any saved secrets. Workflow parameters are entered each time you run it.
+                  This workflow does not require any saved secrets. Workflow
+                  parameters are entered each time you run it.
                 </p>
               ) : (
                 <div className="mt-5 space-y-4">
@@ -290,7 +346,9 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
                     const saved = savedSecrets.get(name);
                     return (
                       <label key={name} className="block">
-                        <span className="mb-2 block font-mono text-xs text-muted">{name}</span>
+                        <span className="mb-2 block font-mono text-xs text-muted">
+                          {name}
+                        </span>
                         {saved ? (
                           <span className="block rounded-md border border-accent/30 bg-green-3/20 px-3 py-2 text-sm text-accent-bright">
                             Using saved secret
@@ -302,7 +360,10 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
                             autoComplete="off"
                             value={values[name] || ""}
                             onChange={(event) =>
-                              setValues((current) => ({ ...current, [name]: event.target.value }))
+                              setValues((current) => ({
+                                ...current,
+                                [name]: event.target.value,
+                              }))
                             }
                             placeholder="Stored encrypted"
                             className="h-10 w-full rounded-md border border-rule bg-bg px-3 text-sm outline-none focus:border-accent"
@@ -313,19 +374,31 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
                   })}
                 </div>
               )}
-              <button disabled={busy} className="libretto-button libretto-button--default mt-5 h-10 w-full">
+              <button
+                disabled={busy}
+                className="libretto-button libretto-button--default mt-5 h-10 w-full"
+              >
                 {busy ? "Starting build…" : "Generate my workflow"}
               </button>
-              <button type="button" onClick={() => setConfiguring(false)} className="mt-2 h-9 w-full text-xs text-muted">
+              <button
+                type="button"
+                onClick={() => setConfiguring(false)}
+                className="mt-2 h-9 w-full text-xs text-muted"
+              >
                 Cancel
               </button>
             </form>
           ) : (
             <div>
-              <p className="font-mono text-xs uppercase text-accent">Private copy</p>
-              <h2 className="mt-3 font-serif text-2xl font-light">Use this workflow</h2>
+              <p className="font-mono text-xs uppercase text-accent">
+                Private copy
+              </p>
+              <h2 className="mt-3 font-serif text-2xl font-light">
+                Use this workflow
+              </h2>
               <p className="mt-3 text-sm leading-6 text-muted">
-                Sign in, connect your own secrets, and build a private deployment. Parameters are entered when you run it.
+                Sign in, connect your own secrets, and build a private
+                deployment. Parameters are entered when you run it.
               </p>
               <button
                 type="button"
@@ -337,12 +410,15 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
               </button>
               {!workflow.import_available && (
                 <p className="mt-3 text-xs leading-5 text-red-200">
-                  The publisher must update this shared workflow before it can be imported.
+                  The publisher must update this shared workflow before it can
+                  be imported.
                 </p>
               )}
             </div>
           )}
-          {error && <p className="mt-4 text-xs leading-5 text-red-200">{error}</p>}
+          {error && (
+            <p className="mt-4 text-xs leading-5 text-red-200">{error}</p>
+          )}
         </aside>
       </div>
     </>,
