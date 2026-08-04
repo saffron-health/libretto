@@ -1033,8 +1033,8 @@ async function main(): Promise<Error | void> {
     const workflow = config.workflow;
     const loaded = await loadDefaultWorkflow(
       getAbsoluteIntegrationPath(workflow.integrationPath),
-    ).catch(
-      (cause: unknown) => new Error(firstLine(cause), { cause }),
+    ).catch((cause: unknown) =>
+      cause instanceof Error ? cause : new Error(String(cause), { cause }),
     );
     if (loaded instanceof Error) return loaded;
 
@@ -1042,7 +1042,8 @@ async function main(): Promise<Error | void> {
       try: () => {
         validateWorkflowInput(loaded, workflow.params ?? {});
       },
-      catch: (cause) => new Error(firstLine(cause), { cause }),
+      catch: (cause) =>
+        cause instanceof Error ? cause : new Error(String(cause), { cause }),
     });
     if (validated instanceof Error) return validated;
     loadedWorkflow = loaded;
@@ -1148,9 +1149,9 @@ async function main(): Promise<Error | void> {
 }
 
 async function reportStartupError(error: Error): Promise<never> {
-  const message = firstLine(error);
-  // Prefer the original failure (via cause) for the session log; IPC gets the
-  // wrapped message so the parent shows operation + endpoint context.
+  // Keep the full message — auth/workflow guidance is often multi-line.
+  // Playwright call logs only appear when we put firstLine() into $detail.
+  const message = error.message;
   const logged = error.cause !== undefined ? error.cause : error;
   console.error(
     logged instanceof Error ? (logged.stack ?? String(logged)) : String(logged),

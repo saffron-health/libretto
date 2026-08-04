@@ -322,4 +322,64 @@ export default workflow("main", async ({ page }) => {
     expect(result.stderr).toContain("integration-run-cdp-wait-stack.ts");
     expect(result.stderr).toContain("at extractExampleData (");
   }, 90_000);
+
+  test("run --cdp surfaces unreachable endpoint instead of a generic daemon exit", async ({
+    librettoCli,
+    writeWorkflow,
+  }) => {
+    const endpoint = "ws://127.0.0.1:1/devtools/browser/fake";
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-cdp-unreachable.mjs",
+      `
+export default workflow("main", async () => "should-not-run");
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --cdp ${endpoint} --session run-cdp-unreachable`,
+    );
+
+    expect(result.stderr).toContain(`Failed to connect to CDP endpoint ${endpoint}`);
+    expect(result.stderr).toContain("ECONNREFUSED");
+    expect(result.stderr).not.toContain("Daemon exited before startup");
+    expect(result.stdout).not.toContain("should-not-run");
+    expect(result.stdout).not.toContain("Integration completed.");
+  });
+
+  test("run --cdp --page reports missing page ids with recovery guidance", async ({
+    librettoCli,
+    writeWorkflow,
+    workspacePath,
+  }) => {
+    const sourceSession = "run-cdp-missing-page-source";
+    const runSession = "run-cdp-missing-page-run";
+
+    await librettoCli(
+      `open about:blank --headless --session ${sourceSession}`,
+    );
+    const sourceState = JSON.parse(
+      await readFile(
+        workspacePath(".libretto", "sessions", sourceSession, "state.json"),
+        "utf8",
+      ),
+    ) as { port: number };
+    const endpoint = `http://127.0.0.1:${sourceState.port}`;
+
+    const integrationFilePath = await writeWorkflow(
+      "integration-run-cdp-missing-page.mjs",
+      `
+export default workflow("main", async () => "should-not-run");
+`,
+    );
+
+    const result = await librettoCli(
+      `run "${integrationFilePath}" --cdp ${endpoint} --page page-99 --session ${runSession}`,
+    );
+
+    expect(result.stderr).toContain('Page "page-99" was not found');
+    expect(result.stderr).toContain(endpoint);
+    expect(result.stderr).toContain("libretto pages");
+    expect(result.stderr).not.toContain("Daemon exited before startup");
+    expect(result.stdout).not.toContain("should-not-run");
+  }, 90_000);
 });
