@@ -8,19 +8,17 @@ sidebarTitle: Auth profiles
 
 Auth profiles are named browser state for Browser Tools sessions. Pass a profile name to [`browser_open`](/browser-tools/tools#browser_open), sign in once, close cleanly, and later sessions with the same name start already logged in.
 
-```typescript theme={null}
-// First run — complete login in the browser, then close
-await tools.browser_open.execute({
-  url: "https://portal.example.com",
-  authProfile: "work",
-});
-await tools.browser_close.execute({ sessionId });
+```text theme={null}
+# First run — agent opens a profiled session; human or agent completes login
+browser_open({ url: "https://portal.example.com", authProfile: "work" })
+# → { ok: true, sessionId: "ses-1" }
 
-// Later run — same profile, already signed in
-await tools.browser_open.execute({
-  url: "https://portal.example.com",
-  authProfile: "work",
-});
+browser_close({ sessionId: "ses-1" })
+# → profile "work" saved
+
+# Later run — same profile, already signed in
+browser_open({ url: "https://portal.example.com", authProfile: "work" })
+# → { ok: true, sessionId: "ses-2" }
 ```
 
 ## Defaults

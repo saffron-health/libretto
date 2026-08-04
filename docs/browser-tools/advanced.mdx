@@ -45,11 +45,12 @@ await dispose(); // detaches tools; does not close page / context / browser
 
 Use `browser_connect` when Chromium (or an Electron app) is already running with a remote-debugging endpoint:
 
-```typescript theme={null}
-// Agent tool call shape
-await tools.browser_connect.execute({
+```text theme={null}
+# Agent tool call
+browser_connect({
   cdpUrl: "ws://127.0.0.1:9222/devtools/browser/<id>",
-});
+})
+# → { ok: true, sessionId: "ses-1" }
 ```
 
 Closing that session detaches Playwright and leaves the external browser running. Prefer `browser_open` when the provider should create and tear down the browser for you.
