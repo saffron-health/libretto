@@ -477,12 +477,8 @@ class BrowserDaemon {
       contexts.length > 0 ? contexts[0] : await browser.newContext();
     const operationalPages = context.pages().filter(isOperationalPage);
 
-    const page = await (async (): Promise<ConnectPageNotFoundError | Page> => {
-      if (!config.pageId) {
-        return operationalPages.length > 0
-          ? operationalPages[operationalPages.length - 1]
-          : await context.newPage();
-      }
+    let page: Page;
+    if (config.pageId) {
       const pageIndex = parseConnectPageIndex(config.pageId);
       if (
         pageIndex === undefined ||
@@ -496,9 +492,13 @@ class BrowserDaemon {
           lastPageIndex: String(Math.max(operationalPages.length - 1, 0)),
         });
       }
-      return operationalPages[pageIndex];
-    })();
-    if (page instanceof Error) return page;
+      page = operationalPages[pageIndex];
+    } else {
+      page =
+        operationalPages.length > 0
+          ? operationalPages[operationalPages.length - 1]
+          : await context.newPage();
+    }
 
     const daemon = await BrowserDaemon.initialize({
       session,
@@ -627,7 +627,20 @@ class BrowserDaemon {
     if (result instanceof Error) {
       startupCleanup.dispose();
       if (providerSession) {
-        await provider.closeSession(providerSession.sessionId);
+        const closed = await provider
+          .closeSession(providerSession.sessionId)
+          .catch((cause: unknown) =>
+            cause instanceof Error
+              ? cause
+              : new Error(String(cause), { cause }),
+          );
+        if (closed instanceof Error) {
+          // Keep the original startup failure as the returned error; only log
+          // cleanup trouble so it cannot replace the real cause over IPC.
+          console.error(
+            `Also failed to close ${config.providerName} session ${providerSession.sessionId} during startup cleanup: ${closed.message}`,
+          );
+        }
       }
       return result;
     }
