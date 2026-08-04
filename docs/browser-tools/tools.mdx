@@ -16,6 +16,10 @@ Open a new browser session through the configured provider. Optionally opens `ur
   Optional start URL for the session. Use a full `https://` URL, or omit `url` and navigate with `browser_exec` via `await page.goto(...)`. Kernel and Libretto Cloud can open this before CDP attach; other providers navigate after connect.
 </ParamField>
 
+<ParamField path="authProfile" type="string | false">
+  Named browser state for signed-in sessions. On supported providers, omit to use `default`, or pass `false` for a session with no saved state. See [Auth profiles](/browser-tools/auth-profiles).
+</ParamField>
+
 Success: `{ ok: true, sessionId }`.
 
 If navigation fails, the session is closed and the tool returns `{ ok: false, error }` so the agent can open again.
@@ -110,7 +114,7 @@ Inspect open sessions and pages. Start here when the agent is unsure which tab t
 
 | Args | Returns |
 | --- | --- |
-| (none) | `{ ok: true, sessions }` — each session lists `sessionId`, `provider`, and `pages` |
+| (none) | `{ ok: true, sessions }` — each session lists `sessionId`, `provider`, `pages`, and `authProfile` when set |
 | `sessionId` | `{ ok: true, pages }` for that session |
 | `sessionId` + `pageId` | Page detail: `url`, `title`, `viewport`, `active`, `readyState` |
 

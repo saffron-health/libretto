@@ -125,6 +125,7 @@
             "pages": [
               "browser-tools/quickstart",
               "browser-tools/tools",
+              "browser-tools/auth-profiles",
               "browser-tools/advanced"
             ]
           },

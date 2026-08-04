@@ -78,7 +78,7 @@ Keep the bundled browser enabled when you still need OpenClaw's signed-in `user`
 
 ## Auth profiles
 
-Local sessions keep signed-in browser state in profiles under `~/.libretto/browser-tools/profiles/` on the Gateway host. The agent can reuse that state across runs so you do not have to sign in every time.
+Local sessions keep signed-in browser state in [auth profiles](/browser-tools/auth-profiles) under `~/.libretto/browser-tools/profiles/` on the Gateway host.
 
 To sign in once, run the MCP server with `--headed`, ask the agent to open a browser session for the site, complete login in the window yourself, then ask it to close the session. Later headless runs reuse the cookies. Profile changes save only on a clean close; do not share profile directories across untrusted users.
 
