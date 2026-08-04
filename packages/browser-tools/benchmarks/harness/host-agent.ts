@@ -8,6 +8,7 @@ import {
 	readlinkSync,
 } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -789,6 +790,26 @@ export async function writeTextFile(
 
 export function mcpProviderArgs(provider: BrowserProviderName): string[] {
 	return ["--provider", provider];
+}
+
+/**
+ * Env for a Hermes child with an isolated HOME/HERMES_HOME.
+ * Keep PYTHONUSERBASE on the real user base so a pip --user install of
+ * hermes-agent remains importable after HOME is redirected.
+ */
+export function hermesIsolatedEnv(
+	hermesHome: string,
+	extra: NodeJS.ProcessEnv = {},
+): NodeJS.ProcessEnv {
+	const realUserBase =
+		process.env.PYTHONUSERBASE?.trim() || join(homedir(), ".local");
+	return {
+		...process.env,
+		HOME: hermesHome,
+		HERMES_HOME: hermesHome,
+		PYTHONUSERBASE: realUserBase,
+		...extra,
+	};
 }
 
 export { MODEL_SELECTOR, packageRoot };

@@ -9,6 +9,7 @@ import {
 	hostEventsFromProcess,
 	hostMetrics,
 	hostTaskPrompt,
+	hermesIsolatedEnv,
 	requireCommandOnPath,
 	requireOpenAiApiKey,
 	runHostProcess,
@@ -51,12 +52,9 @@ export async function runHermesStockHarness(
 		command: hermesBin,
 		args: ["chat", "-q", prompt],
 		cwd: workspace,
-		env: {
-			...process.env,
-			HOME: hermesHome,
-			HERMES_HOME: hermesHome,
+		env: hermesIsolatedEnv(hermesHome, {
 			OPENAI_API_KEY: openAiKey,
-		},
+		}),
 	});
 	const answer = extractHostAnswer(result.stdout, result.stderr);
 	const events = hostEventsFromProcess({ prompt, result, answer });

@@ -6,6 +6,7 @@ import {
 import type { BrowserProviderName } from "./cloud-browser.js";
 import {
 	extractHostAnswer,
+	hermesIsolatedEnv,
 	hostEventsFromProcess,
 	hostMetrics,
 	hostTaskPrompt,
@@ -83,10 +84,7 @@ export async function runHermesBrowserToolsHarness(
 	);
 	await writeTextFile(join(hermesHome, ".env"), `${envLines.join("\n")}\n`);
 
-	const childEnv: NodeJS.ProcessEnv = {
-		...process.env,
-		HOME: hermesHome,
-		HERMES_HOME: hermesHome,
+	const providerEnv: NodeJS.ProcessEnv = {
 		OPENAI_API_KEY: openAiKey,
 	};
 	if (providerKey) {
@@ -100,14 +98,14 @@ export async function runHermesBrowserToolsHarness(
 						: provider === "steel"
 							? "STEEL_API_KEY"
 							: null;
-		if (keyName) childEnv[keyName] = providerKey;
+		if (keyName) providerEnv[keyName] = providerKey;
 	}
 
 	const result = await runHostProcess({
 		command: hermesBin,
 		args: ["chat", "-q", prompt],
 		cwd: workspace,
-		env: childEnv,
+		env: hermesIsolatedEnv(hermesHome, providerEnv),
 	});
 	const answer = extractHostAnswer(result.stdout, result.stderr);
 	const events = hostEventsFromProcess({ prompt, result, answer });
