@@ -758,8 +758,8 @@ export default workflow("main", async (ctx) => {
     const result = await librettoCli("open https://example.com", {
       PLAYWRIGHT_BROWSERS_PATH: "/definitely-not-real",
     });
-    expect(result.stderr).toContain("Daemon exited before startup");
-    expect(result.stderr).toContain("Check logs:");
+    expect(result.stderr).toContain("Failed to launch Chromium");
+    expect(result.stderr).not.toContain("Daemon exited before startup");
   });
 
   test("warns on open when the installed skill version is out of date", async ({
@@ -781,7 +781,23 @@ export default workflow("main", async (ctx) => {
     expect(result.stderr).toContain("agent skill:   0.0.0");
     expectNoPackageUpdateCommand(result.stderr);
     expectSkillSetupCommand(result.stderr);
-    expect(result.stderr).toContain("Daemon exited before startup");
+    expect(result.stderr).toContain("Failed to launch Chromium");
+  });
+
+  test("surfaces CDP connect failures instead of a generic daemon exit", async ({
+    librettoCli,
+  }) => {
+    const endpoint = "ws://127.0.0.1:1/devtools/browser/fake";
+    const result = await librettoCli(
+      `connect ${endpoint} --session connect-startup-error`,
+    );
+
+    expect(result.stderr).toContain(`Failed to connect to CDP endpoint ${endpoint}`);
+    expect(result.stderr).toContain("ECONNREFUSED");
+    expect(result.stderr).toContain(
+      "sandbox, firewall, or network policy may block the connection",
+    );
+    expect(result.stderr).not.toContain("Daemon exited before startup");
   });
 
   test("does not warn when only the current command differs from the local package", async ({

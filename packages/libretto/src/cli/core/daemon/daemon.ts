@@ -123,6 +123,32 @@ class UserFacingStartupError extends Error {
   }
 }
 
+function startupErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function startupErrorSummary(error: unknown): string {
+  const message = startupErrorMessage(error);
+  return message.split("\n", 1)[0] ?? message;
+}
+
+async function connectOverCdp(cdpEndpoint: string): Promise<Browser> {
+  try {
+    return await chromium.connectOverCDP(cdpEndpoint);
+  } catch (error) {
+    // Parent redirects child stderr into the session log file.
+    console.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
+    throw new UserFacingStartupError(
+      [
+        `Failed to connect to CDP endpoint ${cdpEndpoint}: ${startupErrorSummary(error)}.`,
+        "Confirm the target is listening and that this process can reach it",
+        "(sandbox, firewall, or network policy may block the connection).",
+      ].join(" "),
+    );
+  }
+}
+
 function resolveAuthProfileStorageStatePath(args: {
   authProfileName?: string;
   session: string;
@@ -379,18 +405,29 @@ class BrowserDaemon {
       ? `--window-position=${config.windowPosition.x},${config.windowPosition.y}`
       : undefined;
 
-    const browser = await chromium.launch({
-      headless: !config.headed,
-      args: [
-        "--disable-blink-features=AutomationControlled",
-        ...(config.remoteDebuggingPort
-          ? [`--remote-debugging-port=${config.remoteDebuggingPort}`]
-          : []),
-        "--remote-debugging-address=127.0.0.1",
-        "--no-focus-on-check",
-        ...(windowPositionArg ? [windowPositionArg] : []),
-      ],
-    });
+    let browser: Browser;
+    try {
+      browser = await chromium.launch({
+        headless: !config.headed,
+        args: [
+          "--disable-blink-features=AutomationControlled",
+          ...(config.remoteDebuggingPort
+            ? [`--remote-debugging-port=${config.remoteDebuggingPort}`]
+            : []),
+          "--remote-debugging-address=127.0.0.1",
+          "--no-focus-on-check",
+          ...(windowPositionArg ? [windowPositionArg] : []),
+        ],
+      });
+    } catch (error) {
+      // Parent redirects child stderr into the session log file.
+      console.error(
+        error instanceof Error ? (error.stack ?? error.message) : String(error),
+      );
+      throw new UserFacingStartupError(
+        `Failed to launch Chromium: ${startupErrorSummary(error)}`,
+      );
+    }
 
     const context = await browser.newContext({
       ...(storageStatePath ? { storageState: storageStatePath } : {}),
@@ -435,7 +472,7 @@ class BrowserDaemon {
     browser: DaemonBrowserConnectConfig;
   }): Promise<BrowserDaemon> {
     const { session, browser: config } = args;
-    const browser = await chromium.connectOverCDP(config.cdpEndpoint);
+    const browser = await connectOverCdp(config.cdpEndpoint);
 
     // Discover existing contexts and pages.
     const contexts = browser.contexts();
@@ -509,9 +546,7 @@ class BrowserDaemon {
         gpu: config.gpu,
         viewport: config.viewport,
       });
-      const browser = await chromium.connectOverCDP(
-        providerSession.cdpEndpoint,
-      );
+      const browser = await connectOverCdp(providerSession.cdpEndpoint);
 
       const contexts = browser.contexts();
       const context =
@@ -1081,20 +1116,40 @@ async function main(): Promise<void> {
   // letting the process exit naturally.
 }
 
-function reportStartupError(error: unknown): never {
-  if (error instanceof UserFacingStartupError) {
-    process.send?.({
-      type: "startup-error",
-      message: error.message,
-    });
-  }
+async function reportStartupError(error: unknown): Promise<never> {
+  const message = startupErrorMessage(error);
+  // Parent redirects child stderr into the session log file.
+  console.error(error instanceof Error ? (error.stack ?? message) : message);
+
+  await new Promise<void>((resolve) => {
+    if (typeof process.send !== "function") {
+      resolve();
+      return;
+    }
+    let settled = false;
+    const done = (): void => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    try {
+      process.send({ type: "startup-error", message }, done);
+    } catch {
+      done();
+      return;
+    }
+    // If IPC is broken, do not hang forever waiting for the callback.
+    setTimeout(done, 250);
+  });
+
   process.exit(
     process.exitCode && process.exitCode !== 0 ? process.exitCode : 1,
   );
+  throw new Error("unreachable");
 }
 
 try {
   await main();
 } catch (error) {
-  reportStartupError(error);
+  await reportStartupError(error);
 }
