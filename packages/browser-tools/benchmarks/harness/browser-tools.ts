@@ -1,5 +1,5 @@
 import { createPiBrowserTools } from "libretto-browser-tools/pi";
-import { SessionRunError, type SessionRun } from "../agent.js";
+import { HarnessRunError, type HarnessRun } from "../harness-run.js";
 import {
 	createBenchmarkBrowserProvider,
 	type BrowserProviderName,
@@ -10,9 +10,9 @@ export async function runBrowserToolsHarness(
 	task: string,
 	workspace: string,
 	provider: BrowserProviderName,
-): Promise<SessionRun> {
+): Promise<HarnessRun> {
 	const toolkit = createPiBrowserTools(createBenchmarkBrowserProvider(provider));
-	let run: SessionRun;
+	let run: HarnessRun;
 	try {
 		run = await runBrowserTask({
 			task,
@@ -37,7 +37,7 @@ export async function runBrowserToolsHarness(
 	try {
 		await toolkit.dispose();
 	} catch (error) {
-		throw new SessionRunError(
+		throw new HarnessRunError(
 			new Error(
 				`Browser cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
 			),

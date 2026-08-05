@@ -5,11 +5,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import {
-	emptyMetrics,
-	eventsJsonl,
 	MODEL_SELECTOR,
 	SessionRunError,
-	transcriptFor,
 	usageMetrics,
 	type SessionRun,
 	type UsageMetrics,
@@ -22,15 +19,37 @@ import {
 	type BrowserProviderName,
 } from "./harness/cloud-browser.js";
 import { runDevBrowserHarness } from "./harness/dev-browser.js";
+import { runHermesBrowserToolsHarness } from "./harness/hermes-browser-tools.js";
+import { runHermesStockHarness } from "./harness/hermes-stock.js";
+import { runOpenclawBrowserToolsHarness } from "./harness/openclaw-browser-tools.js";
+import { runOpenclawStockHarness } from "./harness/openclaw-stock.js";
 import { runPlaywrightCliHarness } from "./harness/playwright-cli.js";
+import {
+	requireBrowserToolsMcpBinary,
+	requireCommandOnPath,
+	requireHermesMcpSdk,
+} from "./harness/host-agent.js";
+import {
+	HarnessRunError,
+	harnessEventsJsonl,
+	transcriptFromHarnessEvents,
+	type HarnessRun,
+} from "./harness-run.js";
 import { judgeBrowserRun, type Judgment } from "./judge.js";
 
 const DEFAULT_CONCURRENCY = 5;
-const HARNESS_NAMES = [
+const DEFAULT_HARNESS_NAMES = [
 	"browser-tools",
 	"agent-browser",
 	"playwright-cli",
 	"dev-browser",
+] as const;
+const HARNESS_NAMES = [
+	...DEFAULT_HARNESS_NAMES,
+	"hermes-stock",
+	"hermes-browser-tools",
+	"openclaw-stock",
+	"openclaw-browser-tools",
 ] as const;
 type HarnessName = (typeof HARNESS_NAMES)[number];
 const HarnessNameSchema = z.enum(HARNESS_NAMES);
@@ -41,13 +60,23 @@ const HARNESS_RUNNERS: Record<
 		task: string,
 		workspace: string,
 		provider: BrowserProviderName,
-	) => Promise<SessionRun>
+	) => Promise<HarnessRun>
 > = {
 	"browser-tools": runBrowserToolsHarness,
 	"agent-browser": runAgentBrowserHarness,
 	"playwright-cli": runPlaywrightCliHarness,
 	"dev-browser": runDevBrowserHarness,
+	"hermes-stock": runHermesStockHarness,
+	"hermes-browser-tools": runHermesBrowserToolsHarness,
+	"openclaw-stock": runOpenclawStockHarness,
+	"openclaw-browser-tools": runOpenclawBrowserToolsHarness,
 };
+const HOST_HARNESS_NAMES = new Set<HarnessName>([
+	"hermes-stock",
+	"hermes-browser-tools",
+	"openclaw-stock",
+	"openclaw-browser-tools",
+]);
 const packageRoot = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageRoot, "../..");
 
@@ -146,9 +175,9 @@ const benchmarkInput = SimpleCLI.input({
 			},
 		),
 		harnesses: SimpleCLI.option(
-			forAffordance(z.string().default(HARNESS_NAMES.join(","))),
+			forAffordance(z.string().default(DEFAULT_HARNESS_NAMES.join(","))),
 			{
-				help: `Comma-separated harnesses (default: ${HARNESS_NAMES.join(",")})`,
+				help: `Comma-separated harnesses (default: ${DEFAULT_HARNESS_NAMES.join(",")}; also: hermes-stock,hermes-browser-tools,openclaw-stock,openclaw-browser-tools)`,
 			},
 		),
 		provider: SimpleCLI.option(
@@ -187,8 +216,18 @@ function requireEnvironment(name: string): string {
 	return value;
 }
 
-function requireProviderEnvironment(provider: BrowserProviderName): void {
+function harnessNeedsBenchmarkProvider(harness: HarnessName): boolean {
+	return (
+		!HOST_HARNESS_NAMES.has(harness) || harness.endsWith("-browser-tools")
+	);
+}
+
+function requireProviderEnvironment(
+	provider: BrowserProviderName,
+	harnesses: HarnessName[],
+): void {
 	requireEnvironment("OPENAI_API_KEY");
+	if (!harnesses.some(harnessNeedsBenchmarkProvider)) return;
 	switch (provider) {
 		case "kernel":
 			requireEnvironment("KERNEL_API_KEY");
@@ -227,14 +266,47 @@ function jsonReplacer(key: string, value: unknown): unknown {
 	return value;
 }
 
+function requireHostHarnesses(harnesses: HarnessName[]): void {
+	const selected = harnesses.filter((name) => HOST_HARNESS_NAMES.has(name));
+	if (selected.length === 0) return;
+	if (selected.some((name) => name.startsWith("hermes-"))) {
+		requireCommandOnPath("hermes");
+	}
+	if (selected.includes("hermes-browser-tools")) {
+		requireHermesMcpSdk();
+	}
+	if (selected.some((name) => name.startsWith("openclaw-"))) {
+		requireCommandOnPath("openclaw");
+	}
+	if (selected.some((name) => name.endsWith("-browser-tools"))) {
+		requireBrowserToolsMcpBinary();
+	}
+}
+
+function formatMetric(value: number | undefined, digits?: number): string {
+	if (value === undefined) return "—";
+	if (digits === undefined) return String(value);
+	return value.toFixed(digits);
+}
+
 async function writeAgentArtifacts(
-	run: SessionRun,
+	run: HarnessRun,
 	transcriptPath: string,
 	eventsPath: string,
+	sessionPath: string,
 ): Promise<void> {
-	const transcript = transcriptFor(run.session);
-	await writeFile(transcriptPath, `${transcript}\n`, "utf8");
-	await writeFile(eventsPath, eventsJsonl(run.events), "utf8");
+	await writeFile(
+		transcriptPath,
+		`${transcriptFromHarnessEvents(run.events)}\n`,
+		"utf8",
+	);
+	await writeFile(eventsPath, harnessEventsJsonl(run.events), "utf8");
+	const { dispose: _dispose, ...serializable } = run;
+	await writeFile(
+		sessionPath,
+		`${JSON.stringify(serializable, jsonReplacer, 2)}\n`,
+		"utf8",
+	);
 }
 
 async function runAttempt(options: {
@@ -248,12 +320,12 @@ async function runAttempt(options: {
 	const caseDir = join(options.runDir, "cases", id);
 	const transcriptPath = join(caseDir, "transcript.md");
 	const eventsPath = join(caseDir, "events.jsonl");
-	const sessionPath = join(caseDir, "session.jsonl");
+	const sessionPath = join(caseDir, "session.json");
 	const resultPath = join(caseDir, "result.json");
 	await mkdir(caseDir, { recursive: true });
 
 	const startedAt = new Date().toISOString();
-	let agentRun: SessionRun | null = null;
+	let agentRun: HarnessRun | null = null;
 	let judgeRun: SessionRun | null = null;
 	let answer: string | null = null;
 	let judgment: Judgment | null = null;
@@ -268,15 +340,16 @@ async function runAttempt(options: {
 				options.provider,
 			);
 		} catch (error) {
-			if (error instanceof SessionRunError) agentRun = error.run;
+			if (error instanceof HarnessRunError) agentRun = error.run;
 			throw error;
 		}
 		await writeAgentArtifacts(
 			agentRun,
 			transcriptPath,
 			eventsPath,
+			sessionPath,
 		);
-		answer = agentRun.session.getLastAssistantText()?.trim() || null;
+		answer = agentRun.answer.trim() || null;
 		if (!answer) throw new Error("Browser agent returned no final answer.");
 		try {
 			const judged = await judgeBrowserRun({
@@ -295,11 +368,26 @@ async function runAttempt(options: {
 			agentRun &&
 			(!existsSync(transcriptPath) || !existsSync(eventsPath))
 		) {
-			await writeAgentArtifacts(agentRun, transcriptPath, eventsPath);
+			await writeAgentArtifacts(
+				agentRun,
+				transcriptPath,
+				eventsPath,
+				sessionPath,
+			);
 		}
 		errorMessage = error instanceof Error ? error.message : String(error);
 	} finally {
-		agentRun?.session.dispose();
+		if (agentRun) {
+			try {
+				await agentRun.dispose();
+			} catch (cleanupError) {
+				const message =
+					cleanupError instanceof Error
+						? cleanupError.message
+						: String(cleanupError);
+				process.stderr.write(`[${id}] dispose failed: ${message}\n`);
+			}
+		}
 		judgeRun?.session.dispose();
 	}
 
@@ -312,8 +400,8 @@ async function runAttempt(options: {
 		status: errorMessage ? "error" : "completed",
 		answer,
 		judgment,
-		agentMetrics: agentRun ? usageMetrics(agentRun) : emptyMetrics(),
-		judgeMetrics: judgeRun ? usageMetrics(judgeRun) : emptyMetrics(),
+		agentMetrics: agentRun?.metrics ?? {},
+		judgeMetrics: judgeRun ? usageMetrics(judgeRun) : {},
 		startedAt,
 		finishedAt: new Date().toISOString(),
 		error: errorMessage,
@@ -358,15 +446,32 @@ async function mapWithConcurrency<Input, Output>(
 function totalMetric(
 	results: AttemptResult[],
 	key: "durationMs" | "totalTokens" | "costUsd" | "totalToolCalls",
-): number {
-	return results.reduce((total, result) => total + result.agentMetrics[key], 0);
+): number | undefined {
+	let total = 0;
+	let sawValue = false;
+	for (const result of results) {
+		const value = result.agentMetrics[key];
+		if (typeof value !== "number") continue;
+		total += value;
+		sawValue = true;
+	}
+	return sawValue ? total : undefined;
 }
 
-function maxContextTokens(results: AttemptResult[]): number {
-	return results.reduce(
-		(max, result) => Math.max(max, result.agentMetrics.maxRequestContextTokens),
-		0,
-	);
+function maxContextTokens(results: AttemptResult[]): number | undefined {
+	let max: number | undefined;
+	for (const result of results) {
+		const value = result.agentMetrics.maxRequestContextTokens;
+		if (typeof value !== "number") continue;
+		max = max === undefined ? value : Math.max(max, value);
+	}
+	return max;
+}
+
+function averageDurationSeconds(results: AttemptResult[]): string {
+	const total = totalMetric(results, "durationMs");
+	if (total === undefined || results.length === 0) return "—";
+	return `${(total / results.length / 1000).toFixed(1)}s`;
 }
 
 function summaryMarkdown(options: {
@@ -382,6 +487,8 @@ function summaryMarkdown(options: {
 	const passed = options.results.filter(
 		(result) => result.judgment?.completed === true,
 	).length;
+	const agentDurationMs = totalMetric(options.results, "durationMs");
+	const agentCostUsd = totalMetric(options.results, "costUsd");
 	const lines = [
 		"# Browser Harness Benchmark",
 		"",
@@ -393,11 +500,11 @@ function summaryMarkdown(options: {
 		`- Attempts: \`${options.results.length}\``,
 		`- Completed: \`${completed}\``,
 		`- Passed: \`${passed}\``,
-		`- Agent duration: \`${(totalMetric(options.results, "durationMs") / 1000).toFixed(1)}s\``,
-		`- Maximum request context: \`${maxContextTokens(options.results)}\``,
-		`- Agent tokens: \`${totalMetric(options.results, "totalTokens")}\``,
-		`- Agent cost: \`$${totalMetric(options.results, "costUsd").toFixed(4)}\``,
-		`- Browser tool calls: \`${totalMetric(options.results, "totalToolCalls")}\``,
+		`- Agent duration: \`${agentDurationMs === undefined ? "—" : `${(agentDurationMs / 1000).toFixed(1)}s`}\``,
+		`- Maximum request context: \`${formatMetric(maxContextTokens(options.results))}\``,
+		`- Agent tokens: \`${formatMetric(totalMetric(options.results, "totalTokens"))}\``,
+		`- Agent cost: \`${agentCostUsd === undefined ? "—" : `$${agentCostUsd.toFixed(4)}`}\``,
+		`- Browser tool calls: \`${formatMetric(totalMetric(options.results, "totalToolCalls"))}\``,
 		"",
 		"## Harnesses",
 		"",
@@ -409,8 +516,9 @@ function summaryMarkdown(options: {
 			(result) => result.harness === harness,
 		);
 		if (harnessResults.length === 0) continue;
+		const harnessCost = totalMetric(harnessResults, "costUsd");
 		lines.push(
-			`| ${harness} | ${harnessResults.length} | ${harnessResults.filter((result) => result.status === "completed").length} | ${harnessResults.filter((result) => result.judgment?.completed === true).length} | ${(totalMetric(harnessResults, "durationMs") / harnessResults.length / 1000).toFixed(1)}s | ${maxContextTokens(harnessResults)} | ${totalMetric(harnessResults, "totalTokens")} | $${totalMetric(harnessResults, "costUsd").toFixed(4)} | ${totalMetric(harnessResults, "totalToolCalls")} |`,
+			`| ${harness} | ${harnessResults.length} | ${harnessResults.filter((result) => result.status === "completed").length} | ${harnessResults.filter((result) => result.judgment?.completed === true).length} | ${averageDurationSeconds(harnessResults)} | ${formatMetric(maxContextTokens(harnessResults))} | ${formatMetric(totalMetric(harnessResults, "totalTokens"))} | ${harnessCost === undefined ? "—" : `$${harnessCost.toFixed(4)}`} | ${formatMetric(totalMetric(harnessResults, "totalToolCalls"))} |`,
 		);
 	}
 	lines.push(
@@ -421,8 +529,10 @@ function summaryMarkdown(options: {
 		"|---|---|---:|---|---|---:|---:|---:|---:|",
 	);
 	for (const result of options.results) {
+		const durationMs = result.agentMetrics.durationMs;
+		const costUsd = result.agentMetrics.costUsd;
 		lines.push(
-			`| ${result.caseName} | ${result.harness} | ${result.repeat} | ${result.status} | ${result.judgment?.completed === true ? "pass" : "fail"} | ${(result.agentMetrics.durationMs / 1000).toFixed(1)}s | ${result.agentMetrics.maxRequestContextTokens} | ${result.agentMetrics.totalTokens} | $${result.agentMetrics.costUsd.toFixed(4)} |`,
+			`| ${result.caseName} | ${result.harness} | ${result.repeat} | ${result.status} | ${result.judgment?.completed === true ? "pass" : "fail"} | ${durationMs === undefined ? "—" : `${(durationMs / 1000).toFixed(1)}s`} | ${formatMetric(result.agentMetrics.maxRequestContextTokens)} | ${formatMetric(result.agentMetrics.totalTokens)} | ${costUsd === undefined ? "—" : `$${costUsd.toFixed(4)}`} |`,
 		);
 	}
 	return `${lines.join("\n")}\n`;
@@ -430,7 +540,8 @@ function summaryMarkdown(options: {
 
 async function runBenchmarks(options: CliOptions): Promise<void> {
 	loadRepoEnv();
-	requireProviderEnvironment(options.provider);
+	requireProviderEnvironment(options.provider, options.harnesses);
+	requireHostHarnesses(options.harnesses);
 
 	const matchingCases = options.casePattern
 		? WEBSITE_CASES.filter((websiteCase) =>
@@ -554,6 +665,7 @@ const app = SimpleCLI.define(
 			"For --provider browserbase: BROWSERBASE_API_KEY.",
 			"For --provider browser-use: BROWSER_USE_API_KEY.",
 			"For --provider steel: STEEL_API_KEY.",
+			"Host harnesses (hermes-*/openclaw-*) need hermes or openclaw on PATH; *-browser-tools also needs a built packages/browser-tools/dist/cli/index.js.",
 		].join(" "),
 	},
 );
