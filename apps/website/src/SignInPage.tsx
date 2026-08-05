@@ -9,6 +9,7 @@ import {
 import { Navbar } from "./components/Navbar";
 import {
   authPost,
+  cloudApiUrl,
   getAuthStatus,
   getCloudSession,
   orpcCall,
@@ -19,6 +20,7 @@ import { GitHubIcon } from "./icons";
 type AuthResponse = {
   redirect?: boolean;
   url?: string;
+  uri?: string;
 };
 
 type AuthMode = "signin" | "signup";
@@ -64,6 +66,27 @@ function currentSigninCallbackUrl(): string {
     url.searchParams.set("cliLoginSecret", cliLogin.secret);
   }
   return url.toString();
+}
+
+function currentOAuthQuery(): string | null {
+  if (typeof window === "undefined") return null;
+  const query = window.location.search.replace(/^\?/, "");
+  const params = new URLSearchParams(query);
+  return params.has("client_id") && params.has("sig") ? query : null;
+}
+
+function oauthAuthorizeUrl(query: string): string {
+  const params = new URLSearchParams(query);
+  params.delete("exp");
+  params.delete("sig");
+  return `${cloudApiUrl}/api/auth/oauth2/authorize?${params}`;
+}
+
+function followAuthResponse(result: AuthResponse): boolean {
+  const destination = result.url ?? result.uri;
+  if (!destination) return false;
+  window.location.assign(destination);
+  return true;
 }
 
 async function resolvePostAuthRedirect(
@@ -169,6 +192,11 @@ export function SignInPage() {
     getCloudSession()
       .then((session) => {
         if (!session) return;
+        const oauthQuery = currentOAuthQuery();
+        if (oauthQuery) {
+          window.location.assign(oauthAuthorizeUrl(oauthQuery));
+          return;
+        }
         if (getCliLoginParams()) {
           approveCliLogin().catch((err) => {
             setError(err instanceof Error ? err.message : "CLI login approval failed.");
@@ -194,9 +222,11 @@ export function SignInPage() {
     setError(null);
     setNotice(null);
     try {
+      const oauthQuery = currentOAuthQuery();
       const result = await authPost<AuthResponse>("/api/auth/sign-in/email", {
         email,
         password,
+        ...(oauthQuery ? { oauth_query: oauthQuery } : {}),
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
           : `${window.location.origin}${withReturnTo(
@@ -204,10 +234,7 @@ export function SignInPage() {
               sanitizeReturnToForAuthState(getSafeReturnTo(), true),
             )}`,
       });
-      if (result.url) {
-        window.location.assign(result.url);
-        return;
-      }
+      if (followAuthResponse(result)) return;
       if (await approveCliLogin()) return;
       window.location.assign(
         await resolvePostAuthRedirect(await getAuthStatus(), getSafeReturnTo()),
@@ -226,14 +253,17 @@ export function SignInPage() {
     try {
       const returnTo = getSafeReturnTo();
       const callbackReturnTo = sanitizeReturnToForAuthState(returnTo, false);
-      await authPost<AuthResponse>("/api/auth/sign-up/email", {
+      const oauthQuery = currentOAuthQuery();
+      const result = await authPost<AuthResponse>("/api/auth/sign-up/email", {
         name,
         email,
         password,
+        ...(oauthQuery ? { oauth_query: oauthQuery } : {}),
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
           : `${window.location.origin}${withReturnTo("/verify-email", callbackReturnTo)}`,
       });
+      if (followAuthResponse(result)) return;
       if (await approveCliLogin()) return;
       window.location.assign(withReturnTo("/verify-email", callbackReturnTo));
     } catch (err) {
@@ -252,8 +282,10 @@ export function SignInPage() {
         returnTo,
         mode === "signin",
       );
+      const oauthQuery = currentOAuthQuery();
       const result = await authPost<AuthResponse>("/api/auth/sign-in/social", {
         provider,
+        ...(oauthQuery ? { oauth_query: oauthQuery } : {}),
         callbackURL: getCliLoginParams()
           ? currentSigninCallbackUrl()
           : `${window.location.origin}${withReturnTo(
@@ -261,10 +293,7 @@ export function SignInPage() {
               callbackReturnTo,
             )}`,
       });
-      if (result.url) {
-        window.location.assign(result.url);
-        return;
-      }
+      if (followAuthResponse(result)) return;
       if (await approveCliLogin()) return;
       window.location.assign(
         await resolvePostAuthRedirect(await getAuthStatus(), callbackReturnTo),

@@ -25,6 +25,7 @@ import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as VsStagehandRouteImport } from './routes/vs/stagehand'
 import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs/playwright-codegen'
 import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
+import { Route as OauthContinueRouteImport } from './routes/oauth.continue'
 import { Route as GithubSetupRouteImport } from './routes/github.setup'
 import { Route as DashboardPrAgentRouteImport } from './routes/dashboard_.pr-agent'
 import { Route as DashboardCloudBrowsersRouteImport } from './routes/dashboard_.cloud-browsers'
@@ -112,6 +113,11 @@ const VsBrowserUseRoute = VsBrowserUseRouteImport.update({
   path: '/vs/browser-use',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthContinueRoute = OauthContinueRouteImport.update({
+  id: '/oauth/continue',
+  path: '/oauth/continue',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GithubSetupRoute = GithubSetupRouteImport.update({
   id: '/github/setup',
   path: '/github/setup',
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/cloud-browsers': typeof DashboardCloudBrowsersRoute
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
+  '/oauth/continue': typeof OauthContinueRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByTo {
   '/dashboard/cloud-browsers': typeof DashboardCloudBrowsersRoute
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
+  '/oauth/continue': typeof OauthContinueRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -211,6 +219,7 @@ export interface FileRoutesById {
   '/dashboard_/cloud-browsers': typeof DashboardCloudBrowsersRoute
   '/dashboard_/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
+  '/oauth/continue': typeof OauthContinueRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -237,6 +246,7 @@ export interface FileRouteTypes {
     | '/dashboard/cloud-browsers'
     | '/dashboard/pr-agent'
     | '/github/setup'
+    | '/oauth/continue'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/dashboard/cloud-browsers'
     | '/dashboard/pr-agent'
     | '/github/setup'
+    | '/oauth/continue'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/dashboard_/cloud-browsers'
     | '/dashboard_/pr-agent'
     | '/github/setup'
+    | '/oauth/continue'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -308,6 +320,7 @@ export interface RootRouteChildren {
   DashboardCloudBrowsersRoute: typeof DashboardCloudBrowsersRoute
   DashboardPrAgentRoute: typeof DashboardPrAgentRoute
   GithubSetupRoute: typeof GithubSetupRoute
+  OauthContinueRoute: typeof OauthContinueRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
@@ -427,6 +440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VsBrowserUseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oauth/continue': {
+      id: '/oauth/continue'
+      path: '/oauth/continue'
+      fullPath: '/oauth/continue'
+      preLoaderRoute: typeof OauthContinueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/github/setup': {
       id: '/github/setup'
       path: '/github/setup'
@@ -504,6 +524,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardCloudBrowsersRoute: DashboardCloudBrowsersRoute,
   DashboardPrAgentRoute: DashboardPrAgentRoute,
   GithubSetupRoute: GithubSetupRoute,
+  OauthContinueRoute: OauthContinueRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,
