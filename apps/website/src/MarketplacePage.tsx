@@ -134,6 +134,7 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [configuring, setConfiguring] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [autoRepair, setAutoRepair] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [build, setBuild] = useState<WorkflowBuildStatus | null>(null);
 
@@ -230,6 +231,7 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
       }>("/v1/marketplace/import", {
         share_id: workflow.id,
         credential_ids: credentialIds,
+        auto_repair: autoRepair,
       });
       setBuild({
         build_id: result.build_id,
@@ -374,6 +376,24 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
                   })}
                 </div>
               )}
+              <label className="mt-5 flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={autoRepair}
+                  onChange={(event) => setAutoRepair(event.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm text-ink">
+                    Automatically repair failed runs
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-muted">
+                    When a hosted run fails, Libretto can attempt to fix the
+                    workflow. Turn this off for a private deployment that only
+                    reports failures.
+                  </span>
+                </span>
+              </label>
               <button
                 disabled={busy}
                 className="libretto-button libretto-button--default mt-5 h-10 w-full"
