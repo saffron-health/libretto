@@ -68,14 +68,13 @@ export const shareWorkflowCommand = SimpleCLI.command({
       input: {
         workflow: input.workflow,
         refresh: input.refresh,
-        ...(input.privacyReviewId
-          ? {
-              privacyReview: {
-                reviewId: input.privacyReviewId,
-                acknowledgeWarnings: input.acknowledgePrivacyWarnings,
-              },
-            }
-          : {}),
+        privacyReview: {
+          capability: "workflow_privacy_review_v1",
+          ...(input.privacyReviewId
+            ? { reviewId: input.privacyReviewId }
+            : {}),
+          acknowledgeWarnings: input.acknowledgePrivacyWarnings,
+        },
       },
       credential: ctx.credential,
     });
@@ -96,11 +95,15 @@ export const shareWorkflowCommand = SimpleCLI.command({
           `To share this exact reviewed version anyway, rerun with --privacy-review-id ${response.review_id} --acknowledge-privacy-warnings.`,
         );
       }
-      return;
+      throw new Error(
+        response.status === "blocked"
+          ? "Workflow sharing is blocked by the privacy review."
+          : "Workflow sharing requires explicit privacy-warning acknowledgement.",
+      );
     }
     if (response.status === "review_expired") {
       console.log("That privacy review expired or no longer matches this workflow. Run the share command again to review the current version.");
-      return;
+      throw new Error("Workflow privacy review expired or no longer matches.");
     }
     if (!("marketplace_url" in response)) return;
 
