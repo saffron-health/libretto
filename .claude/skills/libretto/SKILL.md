@@ -58,10 +58,6 @@ When editing a deployed workflow, validate changes with `run --provider <deploym
 
 If the user prefers a provider for all local CLI runs in a workspace or only deploys workflows to that provider, update `.libretto/config.json` with `provider` instead of repeating `--provider`. Read `references/configuration-file-reference.md` first.
 
-## Public Workflow Sharing
-
-Before `libretto cloud share`, follow `references/workflow-sharing.md`.
-
 ## Working Rules
 
 - Announce which session you are using and what page you are on.
@@ -308,3 +304,4 @@ To run it again, use: npx libretto run ./integration.ts
 - Read `references/pages-and-page-targeting.md` when a session has multiple open pages or you need `--page`.
 - Read `references/action-logs.md` for full action log field descriptions and user-vs-agent event semantics.
 - If the workflow code is deployed to the Libretto Cloud platform and you need to reference its API docs, fetch [https://libretto.sh/docs/llms.txt](https://libretto.sh/docs/llms.txt) and follow the relevant page links.
+- Before `libretto cloud share`, follow `references/workflow-sharing.md`.
