@@ -34,7 +34,11 @@ const playwrightDebugger = createPlaywrightDebugger({
 
 The `agent.model` value uses Libretto's `provider/model-id` convention. For
 example, `openai/gpt-5.4` resolves to provider `openai` and model id `gpt-5.4`.
-The first version supports `openai/...` and `anthropic/...`.
+Supported providers are `openai/...`, `anthropic/...`, and `minimax/...`.
+
+MiniMax is OpenAI-compatible by default. Set `MINIMAX_API_STYLE=anthropic` to
+use the Anthropic-compatible endpoint, and `MINIMAX_REGION=cn` to target the
+China host (`api.minimaxi.com`) instead of the global host (`api.minimax.io`).
 
 Initialize this debugger once at module scope. At the existing failure point,
 await `debugFailure()` with the error and the live `Page` before Playwright
@@ -103,6 +107,8 @@ Set the provider API key in the environment where the Playwright script runs:
 export OPENAI_API_KEY=...
 # or
 export ANTHROPIC_API_KEY=...
+# or
+export MINIMAX_API_KEY=...
 ```
 
 You can also pass `agent.apiKey` directly when the key is provided by your
