@@ -7,10 +7,13 @@ const PROMPT =
 export function InstallSnippet({
   fathomEvent = "Hero copy prompt click",
   onCopy,
+  preview,
   prompt = PROMPT,
 }: {
   fathomEvent?: string;
   onCopy?: () => void;
+  /** Short label shown in the snippet; the full `prompt` is still copied. */
+  preview?: string;
   prompt?: string;
 }) {
   const [copied, setCopied] = useState(false);
@@ -25,7 +28,9 @@ export function InstallSnippet({
   return (
     <div className="install-prompt inline-flex max-w-full items-stretch overflow-hidden">
       <span className="install-prompt__snippet" aria-hidden="true">
-        <span className="install-prompt__snippet-text">{prompt}</span>
+        <span className="install-prompt__snippet-text">
+          {preview ?? prompt}
+        </span>
       </span>
       <Button
         onClick={handleCopy}
