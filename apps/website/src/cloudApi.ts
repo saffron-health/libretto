@@ -91,6 +91,18 @@ export async function authGet<T>(path: string): Promise<T> {
   return body as T;
 }
 
+export async function publicCloudGet<T>(path: string): Promise<T> {
+  const response = await fetch(`${cloudApiUrl}${path}`, {
+    method: "GET",
+    credentials: "omit",
+  });
+  const body = await parseJson(response);
+  if (!response.ok) {
+    throw new Error(errorMessage(body, `${path} failed (${response.status})`));
+  }
+  return body as T;
+}
+
 export async function authPost<T>(
   path: string,
   input: Record<string, unknown>,

@@ -35,7 +35,10 @@ export const shareWorkflowCommand = SimpleCLI.command({
     const response = await orpcCall<ShareWorkflowResponse>({
       apiUrl: ctx.apiUrl,
       path: "/v1/workflows/share",
-      input: { workflow: input.workflow, refresh: input.refresh },
+      input: {
+        workflow: input.workflow,
+        refresh: input.refresh,
+      },
       credential: ctx.credential,
     });
 

@@ -16,6 +16,7 @@ const dashboardPaths = [
   "/dashboard/browser_sessions",
   "/dashboard/connected_repos",
   "/dashboard/users",
+  "/dashboard/settings",
   "/dashboard/secrets",
   "/dashboard/api_keys",
   "/dashboard/billing",
@@ -54,7 +55,7 @@ export default defineConfig({
         enabled: true,
         crawlLinks: false,
       },
-      pages: [...blogPostPaths, ...dashboardPaths].map((path) => ({
+      pages: [...blogPostPaths, ...dashboardPaths, "/marketplace"].map((path) => ({
         path,
         prerender: { enabled: true },
       })),
