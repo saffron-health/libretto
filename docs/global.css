@@ -1,5 +1,10 @@
-/* Maui's compact UI rhythm, expressed with Libretto's green brand. */
+/* Libretto docs — Holocron userland overrides.
+   Variables only: every rule here overrides a documented Holocron CSS token
+   (shadcn-style naming) instead of targeting internal selectors, so upgrades
+   of @holocron.so/vite cannot break this file. Brand primary color and the
+   Fraunces heading font come from docs.json, not from here. */
 :root {
+  /* System font stacks instead of Holocron's bundled Inter/JetBrains Mono. */
   --font-sans:
     ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica,
     'Apple Color Emoji', Arial, sans-serif, 'Segoe UI Emoji', 'Segoe UI Symbol';
@@ -7,6 +12,7 @@
     ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', monospace;
 
+  /* Compact type scale and reading rhythm. */
   --type-body-size: 15px;
   --type-heading-1-size: 30px;
   --type-heading-2-size: 22px;
@@ -14,7 +20,6 @@
   --type-small-size: 12px;
   --type-code-size: 12px;
   --type-nav-group-size: 11px;
-  --weight-regular: 400;
   --weight-prose: 400;
   --weight-heading: 300;
   --lh-heading: 1.3;
@@ -23,100 +28,95 @@
   --section-gap: 40px;
   --list-gap: 6px;
 
+  /* Compact header. */
   --header-padding-y: 12px;
   --logo-height: 28px;
   --tab-bar-height: 40px;
   --layout-gap: 32px;
 
+  /* Neutral gray surfaces with green accents. */
   --background: #fbfbfb;
   --foreground: #202020;
   --card: #f5f5f5;
-  --card-foreground: #202020;
-  --popover: #ffffff;
-  --popover-foreground: #202020;
-  --secondary: #f1f1f1;
-  --secondary-foreground: #202020;
   --muted: #f5f5f5;
   --muted-foreground: #666666;
   --accent: rgba(6, 122, 34, 0.08);
   --accent-foreground: #045d1b;
+  --ring: rgba(6, 122, 34, 0.55);
   --border: rgba(0, 0, 0, 0.08);
   --border-subtle: rgba(0, 0, 0, 0.08);
   --divider: rgba(0, 0, 0, 0.05);
-  --input: rgba(0, 0, 0, 0.1);
-  --ring: rgba(6, 122, 34, 0.55);
-  --sidebar: #f5f5f5;
   --sidebar-foreground: #666666;
   --sidebar-primary: #202020;
-  --sidebar-accent: rgba(6, 122, 34, 0.08);
-  --sidebar-accent-foreground: #045d1b;
-  --sidebar-border: rgba(0, 0, 0, 0.08);
   --text-tertiary: rgba(0, 0, 0, 0.32);
 
-  --docs-hover: rgba(0, 0, 0, 0.06);
-  --docs-selected: rgba(6, 122, 34, 0.1);
-  --docs-outline: rgba(0, 0, 0, 0.1);
-  --docs-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.04),
-    0 1px 1px -0.5px rgba(0, 0, 0, 0.08),
-    0 3px 3px -1.5px rgba(0, 0, 0, 0.08);
-  --docs-shadow-foreground-rgb: 38, 36, 42;
-  --docs-shadow-blur-opacity: 0.06;
-  --docs-shadow-minimal:
-    rgba(0, 0, 0, 0) 0 0 0 0,
-    rgba(0, 0, 0, 0) 0 0 0 0,
-    rgba(var(--docs-shadow-foreground-rgb), 0.06) 0 0 0 1px,
-    rgba(0, 0, 0, var(--docs-shadow-blur-opacity)) 0 1px 1px -0.5px,
-    rgba(0, 0, 0, var(--docs-shadow-blur-opacity)) 0 3px 3px -1.5px;
-  --docs-focus:
-    0 0 0 1px rgba(6, 122, 34, 0.65),
-    0 0 8px 1px rgba(6, 122, 34, 0.1);
+  /* Sidebar nav: rounded links, tighter indent, roomier group labels,
+     neutral hover, green pill behind the active page. */
+  --sidebar-group-margin-top: 16px;
+  --sidebar-link-radius: 4px;
+  --sidebar-indent: 8px;
+  --sidebar-active-background: rgba(6, 122, 34, 0.1);
+  --sidebar-hover-background: rgba(0, 0, 0, 0.06);
+
+  /* Compact rectangular search input. */
+  --search-input-radius: 4px;
+
+  /* Framed code blocks with a soft layered shadow instead of a border. */
   --code-block-background: #f7f7f7;
+  --code-block-shadow:
+    rgba(38, 36, 42, 0.06) 0 0 0 1px,
+    rgba(0, 0, 0, 0.06) 0 1px 1px -0.5px,
+    rgba(0, 0, 0, 0.06) 0 3px 3px -1.5px;
   --code-block-radius: 6px;
   --code-block-padding-x: 12px;
   --code-block-padding-y: 12px;
+
+  /* Thin blockquote rule, heavier weight. */
+  --blockquote-border-width: 2px;
+  --blockquote-border-color: var(--border-subtle);
+  --blockquote-font-weight: 500;
+
+  /* Compact cards with shadow instead of border. */
+  --card-padding: 12px;
+  --card-border: none;
+  --card-shadow:
+    rgba(38, 36, 42, 0.06) 0 0 0 1px,
+    rgba(0, 0, 0, 0.06) 0 1px 1px -0.5px,
+    rgba(0, 0, 0, 0.06) 0 3px 3px -1.5px;
+
+  /* Rounded tables. */
+  --table-radius: 6px;
 }
 
 .dark {
   --background: #111111;
   --foreground: #eeeeee;
   --card: #191919;
-  --card-foreground: #eeeeee;
-  --popover: #222222;
-  --popover-foreground: #eeeeee;
-  --secondary: #222222;
-  --secondary-foreground: #eeeeee;
   --muted: #191919;
   --muted-foreground: #b4b4b4;
   --accent: rgba(18, 206, 65, 0.1);
   --accent-foreground: #7ee79a;
+  --ring: rgba(18, 206, 65, 0.55);
   --border: rgba(255, 255, 255, 0.05);
   --border-subtle: rgba(255, 255, 255, 0.1);
   --divider: rgba(255, 255, 255, 0.05);
-  --input: rgba(255, 255, 255, 0.1);
-  --ring: rgba(18, 206, 65, 0.55);
-  --sidebar: #191919;
   --sidebar-foreground: #b4b4b4;
   --sidebar-primary: #eeeeee;
-  --sidebar-accent: rgba(18, 206, 65, 0.1);
-  --sidebar-accent-foreground: #7ee79a;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-active-background: rgba(18, 206, 65, 0.12);
+  --sidebar-hover-background: rgba(255, 255, 255, 0.1);
   --text-tertiary: #6e6e6e;
 
-  --docs-hover: rgba(255, 255, 255, 0.1);
-  --docs-selected: rgba(18, 206, 65, 0.12);
-  --docs-outline: rgba(255, 255, 255, 0.1);
-  --docs-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 1px 1px -0.5px rgba(0, 0, 0, 0.12),
-    0 3px 3px -1.5px rgba(0, 0, 0, 0.12);
-  --docs-shadow-foreground-rgb: 227, 226, 229;
-  --docs-shadow-blur-opacity: 0.12;
-  --docs-focus:
-    0 0 0 1px rgba(18, 206, 65, 0.65),
-    0 0 8px 1px rgba(18, 206, 65, 0.1);
   --code-block-background: var(--card);
+  --card-shadow:
+    rgba(227, 226, 229, 0.06) 0 0 0 1px,
+    rgba(0, 0, 0, 0.12) 0 1px 1px -0.5px,
+    rgba(0, 0, 0, 0.12) 0 3px 3px -1.5px;
+  --code-block-shadow:
+    rgba(227, 226, 229, 0.06) 0 0 0 1px,
+    rgba(0, 0, 0, 0.12) 0 1px 1px -0.5px,
+    rgba(0, 0, 0, 0.12) 0 3px 3px -1.5px;
 
+  /* Green-tinted Prism palette for dark mode. */
   --prism-fg: #eeeeee;
   --prism-keyword: #7ee79a;
   --prism-string: #6fbf9a;
@@ -132,245 +132,6 @@
   --prism-spread: #7ee79a;
   --prism-regex: #6fbf9a;
   --prism-bash-fn: #8fd9b8;
-}
-
-/* Compact navigation controls. */
-.slot-sidebar-left div:has(> .search-input) {
-  padding-right: 0 !important;
-  padding-left: 0 !important;
-}
-
-.slot-sidebar-left .search-input {
-  height: 30px;
-  padding: 4px 32px 4px 28px !important;
-  border: 1px solid var(--divider);
-  border-radius: 4px !important;
-  background: transparent !important;
-  font-size: 13px;
-  line-height: 18px !important;
-  transition:
-    background 80ms ease-in-out,
-    border-color 80ms ease-in-out,
-    box-shadow 80ms ease-in-out;
-}
-
-.slot-sidebar-left .search-input:hover {
-  border-color: var(--border-subtle);
-  background: transparent !important;
-}
-
-.slot-sidebar-left .search-input:focus {
-  border-color: var(--ring);
-  box-shadow: var(--docs-focus);
-}
-
-.slot-sidebar-left div:has(> .search-input) > span:first-child {
-  left: 10px !important;
-}
-
-.slot-sidebar-left div:has(> .search-input) kbd {
-  border: 0 !important;
-  border-radius: 4px !important;
-  background: var(--docs-hover);
-}
-
-.slot-sidebar-left nav {
-  gap: 4px;
-}
-
-.slot-sidebar-left nav .cursor-default {
-  margin-top: 16px !important;
-  padding-right: 0;
-  padding-left: 0;
-  color: var(--muted-foreground);
-  font-size: var(--type-nav-group-size) !important;
-  font-weight: 500;
-  line-height: 18px;
-  letter-spacing: 0.02em;
-}
-
-.dark .slot-sidebar-left nav .cursor-default {
-  color: var(--text-tertiary) !important;
-}
-
-.slot-sidebar-left nav a,
-.slot-sidebar-left nav button {
-  border-radius: 4px;
-  transition:
-    color 80ms ease-in-out,
-    background 80ms ease-in-out,
-    box-shadow 80ms ease-in-out;
-}
-
-.slot-sidebar-left nav a:hover,
-.slot-sidebar-left nav button:hover {
-  background: var(--docs-hover) !important;
-  box-shadow: 0 0 0 2px var(--docs-hover) !important;
-}
-
-.slot-sidebar-left nav [data-active='true'] {
-  color: var(--primary) !important;
-  background: var(--docs-selected) !important;
-  box-shadow: 0 0 0 2px var(--docs-selected) !important;
-}
-
-.slot-sidebar-left nav > div:first-child > a {
-  align-items: center;
-  padding: 2px 10px 2px 6px;
-}
-
-.slot-sidebar-left nav > div:first-child > a > span:last-child {
-  margin-right: 0;
-}
-
-.slot-sidebar-left nav ul[class~='pl-3'] {
-  padding-left: 8px !important;
-}
-
-.slot-sidebar-left nav ul[class~='pl-3'] a {
-  padding-left: 4px;
-}
-
-/* Maui-style reading rhythm with Libretto's editorial headings. */
-.slot-main :where(p, li),
-.prose :where(p, li) {
-  letter-spacing: 0;
-}
-
-.slot-main :where(a):not(:where([class~='not-prose'] *)),
-.prose :where(a):not(:where([class~='not-prose'] *)) {
-  font-weight: 500;
-  text-underline-offset: 3px;
-}
-
-.slot-main
-  :where(blockquote):not(:where([class~='not-prose'], [class~='not-prose'] *)),
-.prose
-  :where(blockquote):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
-  margin: 0;
-  padding-left: 16px;
-  border-inline-start: 2px solid var(--border-subtle);
-  color: var(--muted-foreground);
-  font-style: italic;
-  font-weight: 500;
-}
-
-.slot-main
-  :where(blockquote p:first-of-type):not(
-    :where([class~='not-prose'], [class~='not-prose'] *)
-  )::before,
-.slot-main
-  :where(blockquote p:last-of-type):not(
-    :where([class~='not-prose'], [class~='not-prose'] *)
-  )::after,
-.prose
-  :where(blockquote p:first-of-type):not(
-    :where([class~='not-prose'], [class~='not-prose'] *)
-  )::before,
-.prose
-  :where(blockquote p:last-of-type):not(
-    :where([class~='not-prose'], [class~='not-prose'] *)
-  )::after {
-  content: none;
-}
-
-/* Neutral framed surfaces for code, cards, and tables. */
-.slot-main figure[class~='group/code'] {
-  padding: 12px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--code-block-background);
-  box-shadow: var(--docs-shadow-minimal);
-}
-
-.slot-main figure[class~='group/code'] button[aria-label='Copy code'] {
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-}
-
-.slot-main figure[class~='group/code'] button[aria-label='Copy code']:hover {
-  background: var(--docs-hover);
-}
-
-.slot-main
-  figure[class~='group/code']:hover
-  button[aria-label='Copy code'] {
-  opacity: 1;
-}
-
-.slot-main pre:has(code.language-text) {
-  overflow-x: hidden;
-}
-
-.slot-main pre:has(code.language-text) > div {
-  min-width: 0;
-}
-
-.slot-main code.language-text {
-  flex: 1 1 0;
-  min-width: 0;
-  white-space: pre-wrap !important;
-  overflow-wrap: anywhere;
-}
-
-.slot-main [class~='group/card'] {
-  flex-flow: row wrap;
-  align-content: flex-start;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 12px !important;
-  border-color: transparent;
-  border-radius: 6px;
-  background: var(--card);
-  box-shadow: var(--docs-shadow-minimal);
-  transition:
-    background 80ms ease-in-out,
-    border-color 80ms ease-in-out;
-}
-
-.slot-main [class~='group/card'] > :first-child {
-  order: 1;
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.slot-main [class~='group/card'] > :nth-child(2) {
-  order: 3;
-  flex: 0 0 100%;
-}
-
-.slot-main
-  [class~='group/card']
-  > [class~='text-primary']:last-child {
-  order: 2;
-  flex: 0 0 auto;
-  color: var(--primary);
-}
-
-.slot-main :where(a):hover > [class~='group/card'] {
-  border-color: transparent;
-  background: var(--docs-hover);
-  box-shadow: var(--docs-shadow-minimal);
-}
-
-.slot-main
-  ol[class~='[counter-reset:step]']
-  > li
-  > div:first-child
-  > div:first-child {
-  border: 1px solid var(--border-subtle);
-}
-
-.slot-main table {
-  border-color: var(--border-subtle);
-  border-radius: 6px;
-  box-shadow: none;
-}
-
-.slot-main :where(input, button, a):focus-visible {
-  outline: none;
-  box-shadow: var(--docs-focus);
 }
 
 @media (max-width: 767px) {

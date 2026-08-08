@@ -14,7 +14,7 @@ It is not the Libretto CLI and does not run workflow files. For CLI workflows, s
 
 Use this prompt with a coding agent to set up the Browser Tools SDK:
 
-```text
+```text wrap
 Install libretto-browser-tools with the Vercel AI SDK adapter and LocalBrowserProvider. Wire createAiSdkBrowserTools into a generateText (or ToolLoopAgent) loop, install Playwright Chromium for local sessions, run a short task that opens a page and answers a question about it, and always call dispose() when the loop ends.
 ```
 
