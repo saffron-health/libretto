@@ -11,6 +11,8 @@ import {
 	hostMetrics,
 	hostTaskPrompt,
 	mcpProviderArgs,
+	playwrightBrowsersPath,
+	playwrightBrowsersPathEnv,
 	requireBrowserToolsMcpBinary,
 	requireCommandOnPath,
 	requireOpenAiApiKey,
@@ -37,9 +39,12 @@ export async function runHermesBrowserToolsHarness(
 	const providerArgs = mcpProviderArgs(provider)
 		.map((arg) => `      - ${JSON.stringify(arg)}`)
 		.join("\n");
+	const playwrightBrowsersPathValue = playwrightBrowsersPath();
 
 	const envLines = [`OPENAI_API_KEY=${openAiKey}`];
-	const mcpEnvEntries: string[] = [];
+	const mcpEnvEntries: string[] = [
+		`      PLAYWRIGHT_BROWSERS_PATH: ${JSON.stringify(playwrightBrowsersPathValue)}`,
+	];
 	if (provider === "kernel" && providerKey) {
 		envLines.push(`KERNEL_API_KEY=${providerKey}`);
 		mcpEnvEntries.push(`      KERNEL_API_KEY: ${JSON.stringify(providerKey)}`);
@@ -76,9 +81,8 @@ export async function runHermesBrowserToolsHarness(
 			"    args:",
 			`      - ${JSON.stringify(mcpBinary)}`,
 			providerArgs,
-			...(mcpEnvEntries.length > 0
-				? ["    env:", ...mcpEnvEntries]
-				: []),
+			"    env:",
+			...mcpEnvEntries,
 			"",
 		].join("\n"),
 	);
@@ -86,6 +90,7 @@ export async function runHermesBrowserToolsHarness(
 
 	const providerEnv: NodeJS.ProcessEnv = {
 		OPENAI_API_KEY: openAiKey,
+		PLAYWRIGHT_BROWSERS_PATH: playwrightBrowsersPathValue,
 	};
 	if (providerKey) {
 		const keyName =

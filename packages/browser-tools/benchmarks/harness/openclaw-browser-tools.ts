@@ -38,7 +38,9 @@ export async function runOpenclawBrowserToolsHarness(
 	const prompt = hostTaskPrompt(task, "mcp");
 	const model = "openai/gpt-5.6-sol";
 
-	const mcpEnv: Record<string, string> = {};
+	const mcpEnv: Record<string, string> = {
+		...playwrightBrowsersPathEnv(),
+	};
 	if (provider === "kernel" && providerKey) {
 		mcpEnv.KERNEL_API_KEY = providerKey;
 	} else if (provider === "browserbase" && providerKey) {
@@ -78,7 +80,7 @@ export async function runOpenclawBrowserToolsHarness(
 						libretto: {
 							command: "node",
 							args: [mcpBinary, ...mcpProviderArgs(provider)],
-							...(Object.keys(mcpEnv).length > 0 ? { env: mcpEnv } : {}),
+							env: mcpEnv,
 						},
 					},
 				},

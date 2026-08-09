@@ -796,11 +796,16 @@ export function mcpProviderArgs(provider: BrowserProviderName): string[] {
  * Playwright browsers live under the real user cache. Isolated HOME for Hermes
  * and OpenClaw would otherwise force a fresh `playwright install` per attempt.
  */
-export function playwrightBrowsersPathEnv(): NodeJS.ProcessEnv {
-	const existing = process.env.PLAYWRIGHT_BROWSERS_PATH?.trim();
+export function playwrightBrowsersPath(): string {
+	return (
+		process.env.PLAYWRIGHT_BROWSERS_PATH?.trim() ||
+		join(homedir(), ".cache", "ms-playwright")
+	);
+}
+
+export function playwrightBrowsersPathEnv(): Record<string, string> {
 	return {
-		PLAYWRIGHT_BROWSERS_PATH:
-			existing || join(homedir(), ".cache", "ms-playwright"),
+		PLAYWRIGHT_BROWSERS_PATH: playwrightBrowsersPath(),
 	};
 }
 
