@@ -324,10 +324,14 @@ class BrowserDaemon {
     });
 
     // Navigate after telemetry is installed (so we capture the initial
-    // page load) but before starting the IPC server (so callers polling
-    // for IPC readiness see a page that has already loaded).
+    // document) but before starting the IPC server (so callers polling
+    // for IPC readiness see a committed navigation). Wait only for
+    // "commit": some apps (e.g. eCW) paint a usable shell without ever
+    // finishing DOMContentLoaded/load, and Playwright's default "load"
+    // would block daemon ready until the 45s navigation timeout / 60s
+    // startup guard. Workflows should wait for site-specific readiness.
     if (navigateUrl) {
-      await page.goto(navigateUrl);
+      await page.goto(navigateUrl, { waitUntil: "commit" });
     }
 
     const ipcServer = createIpcSocketServer((transport) => {
