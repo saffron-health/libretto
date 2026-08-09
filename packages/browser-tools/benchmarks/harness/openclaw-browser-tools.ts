@@ -11,6 +11,7 @@ import {
 	hostTaskPrompt,
 	mcpProviderArgs,
 	OPENCLAW_AGENT_DONE,
+	playwrightBrowsersPathEnv,
 	requireBrowserToolsMcpBinary,
 	requireCommandOnPath,
 	requireOpenAiApiKey,
@@ -94,6 +95,7 @@ export async function runOpenclawBrowserToolsHarness(
 		OPENCLAW_HOME: openclawHome,
 		OPENCLAW_STATE_DIR: configDir,
 		OPENCLAW_BROWSER_HEADLESS: "1",
+		...playwrightBrowsersPathEnv(),
 		...mcpEnv,
 	};
 

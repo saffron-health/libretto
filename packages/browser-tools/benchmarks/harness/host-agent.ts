@@ -793,6 +793,18 @@ export function mcpProviderArgs(provider: BrowserProviderName): string[] {
 }
 
 /**
+ * Playwright browsers live under the real user cache. Isolated HOME for Hermes
+ * and OpenClaw would otherwise force a fresh `playwright install` per attempt.
+ */
+export function playwrightBrowsersPathEnv(): NodeJS.ProcessEnv {
+	const existing = process.env.PLAYWRIGHT_BROWSERS_PATH?.trim();
+	return {
+		PLAYWRIGHT_BROWSERS_PATH:
+			existing || join(homedir(), ".cache", "ms-playwright"),
+	};
+}
+
+/**
  * Env for a Hermes child with an isolated HOME/HERMES_HOME.
  * Keep PYTHONUSERBASE on the real user base so a pip --user install of
  * hermes-agent remains importable after HOME is redirected.
@@ -808,6 +820,7 @@ export function hermesIsolatedEnv(
 		HOME: hermesHome,
 		HERMES_HOME: hermesHome,
 		PYTHONUSERBASE: realUserBase,
+		...playwrightBrowsersPathEnv(),
 		...extra,
 	};
 }
