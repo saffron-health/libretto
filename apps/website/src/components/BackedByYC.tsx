@@ -17,7 +17,7 @@ export function BackedByYC({
       data-fathom-event={fathomEvent}
     >
       <YCLogo className="size-3.5 shrink-0" />
-      Backed by YC
+      YC P26
     </a>
   );
 }
