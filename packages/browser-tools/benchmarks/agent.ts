@@ -16,47 +16,63 @@ import { dirname, join } from "node:path";
 const MODEL_PROVIDER = "openai";
 const MODEL_ID = "gpt-5.6-sol";
 const BENCHMARK_SYSTEM_PROMPT =
-  "You are an AI agent in a controlled benchmark. Follow the user's instructions, use the available tools, and report only evidence you actually observed.";
-const COMMON_BROWSER_TASK_INSTRUCTIONS = [
-  "Complete the task on the requested live website and ground the final answer in observed page evidence.",
-  "Use only the browser tools provided by the benchmark harness. Do not launch or connect to a browser outside those tools.",
-  "If the intended site shows a CAPTCHA, reCAPTCHA, Cloudflare challenge, or similar test, wait up to 2 minutes for the browser's automatic solver. Do not try to solve it yourself or click a Cloudflare checkbox. If Cloudflare shows Ready, continue with the task; report blocked only if the challenge remains after waiting.",
-  "If the browser tools cannot complete the task because of anti-bot protection, a connection failure, or another blocker, stop and end with a concise explanation of why the task could not be completed.",
-  "Do not use another site, an API, a cached copy, or prior knowledge as a fallback.",
-  "Return a concise final answer after completing the task.",
+	"You are an AI agent in a controlled benchmark. Follow the user's instructions, use the available tools, and report only evidence you actually observed.";
+const SHARED_BROWSER_TASK_RULES = [
+	"Complete the task on the requested live website and ground the final answer in observed page evidence.",
+	"If the intended site shows a CAPTCHA, reCAPTCHA, Cloudflare challenge, or similar test, wait up to 2 minutes for the browser's automatic solver. Do not try to solve it yourself or click a Cloudflare checkbox. If Cloudflare shows Ready, continue with the task; report blocked only if the challenge remains after waiting.",
+	"If the browser tools cannot complete the task because of anti-bot protection, a connection failure, or another blocker, stop and end with a concise explanation of why the task could not be completed.",
+	"Do not use another site, an API, a cached copy, or prior knowledge as a fallback.",
+	"Return a concise final answer after completing the task.",
 ].join(" ");
+
+export type BrowserToolGuidance =
+	| "harness-provided"
+	| "stock"
+	| "mcp";
+
+function browserToolGuidanceText(guidance: BrowserToolGuidance): string {
+	switch (guidance) {
+		case "harness-provided":
+			return "Use only the browser tools provided by the benchmark harness. Do not launch or connect to a browser outside those tools.";
+		case "stock":
+			return "Use the built-in browser tools.";
+		case "mcp":
+			return "Use the mcp browser tools.";
+	}
+}
 
 export const MODEL_SELECTOR = `${MODEL_PROVIDER}/${MODEL_ID}`;
 export const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
+/** Metrics the harness observed. Omit fields the host did not report. */
 export type UsageMetrics = {
-  durationMs: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  totalTokens: number;
-  maxRequestContextTokens: number;
-  costUsd: number;
-  turns: number;
-  toolCalls: Record<string, number>;
-  totalToolCalls: number;
+	durationMs?: number;
+	inputTokens?: number;
+	outputTokens?: number;
+	cacheReadTokens?: number;
+	cacheWriteTokens?: number;
+	totalTokens?: number;
+	maxRequestContextTokens?: number;
+	costUsd?: number;
+	turns?: number;
+	toolCalls?: Record<string, number>;
+	totalToolCalls?: number;
 };
 
 export type SessionRun = {
-  session: AgentSession;
-  events: AgentSessionEvent[];
-  durationMs: number;
+	session: AgentSession;
+	events: AgentSessionEvent[];
+	durationMs: number;
 };
 
 export class SessionRunError extends Error {
-  readonly run: SessionRun;
+	readonly run: SessionRun;
 
-  constructor(error: unknown, run: SessionRun) {
-    super(error instanceof Error ? error.message : String(error));
-    this.name = "SessionRunError";
-    this.run = run;
-  }
+	constructor(error: unknown, run: SessionRun) {
+		super(error instanceof Error ? error.message : String(error));
+		this.name = "SessionRunError";
+		this.run = run;
+	}
 }
 
 export async function createPiSession(options: {
@@ -130,10 +146,15 @@ export async function createPiSession(options: {
   return session;
 }
 
-export function browserTaskPrompt(options: { task: string }): string {
-  return [COMMON_BROWSER_TASK_INSTRUCTIONS, `TASK:\n${options.task}`]
-    .filter((part): part is string => Boolean(part))
-    .join("\n\n");
+export function browserTaskPrompt(options: {
+	task: string;
+	guidance?: BrowserToolGuidance;
+}): string {
+	const guidance = options.guidance ?? "harness-provided";
+	return [
+		[browserToolGuidanceText(guidance), SHARED_BROWSER_TASK_RULES].join(" "),
+		`TASK:\n${options.task}`,
+	].join("\n\n");
 }
 
 export async function runPrompt(
@@ -189,68 +210,59 @@ function toolCallCounts(events: AgentSessionEvent[]): Record<string, number> {
 }
 
 export function usageMetrics(run: SessionRun): UsageMetrics {
-  const stats = run.session.getSessionStats();
-  const toolCalls = toolCallCounts(run.events);
-  return {
-    durationMs: run.durationMs,
-    inputTokens: stats.tokens.input,
-    outputTokens: stats.tokens.output,
-    cacheReadTokens: stats.tokens.cacheRead,
-    cacheWriteTokens: stats.tokens.cacheWrite,
-    totalTokens: stats.tokens.total,
-    maxRequestContextTokens: maxRequestContextTokens(run.events),
-    costUsd: stats.cost,
-    turns: stats.assistantMessages,
-    toolCalls,
-    totalToolCalls: Object.values(toolCalls).reduce(
-      (total, count) => total + count,
-      0,
-    ),
-  };
+	const stats = run.session.getSessionStats();
+	const toolCalls = toolCallCounts(run.events);
+	const totalToolCalls = Object.values(toolCalls).reduce(
+		(total, count) => total + count,
+		0,
+	);
+	const maxTokens = maxRequestContextTokens(run.events);
+	return {
+		durationMs: run.durationMs,
+		inputTokens: stats.tokens.input,
+		outputTokens: stats.tokens.output,
+		cacheReadTokens: stats.tokens.cacheRead,
+		cacheWriteTokens: stats.tokens.cacheWrite,
+		totalTokens: stats.tokens.total,
+		...(maxTokens !== undefined
+			? { maxRequestContextTokens: maxTokens }
+			: {}),
+		costUsd: stats.cost,
+		turns: stats.assistantMessages,
+		toolCalls,
+		totalToolCalls,
+	};
 }
 
-export function emptyMetrics(): UsageMetrics {
-  return {
-    durationMs: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheWriteTokens: 0,
-    totalTokens: 0,
-    maxRequestContextTokens: 0,
-    costUsd: 0,
-    turns: 0,
-    toolCalls: {},
-    totalToolCalls: 0,
-  };
-}
-
-function maxRequestContextTokens(events: AgentSessionEvent[]): number {
-  let maxTokens = 0;
-  for (const event of events) {
-    if (event.type !== "message_end") continue;
-    const message = event.message as {
-      role?: unknown;
-      usage?: {
-        input?: unknown;
-        cacheRead?: unknown;
-        cacheWrite?: unknown;
-      };
-    };
-    if (message.role !== "assistant") continue;
-    const input =
-      typeof message.usage?.input === "number" ? message.usage.input : 0;
-    const cacheRead =
-      typeof message.usage?.cacheRead === "number"
-        ? message.usage.cacheRead
-        : 0;
-    const cacheWrite =
-      typeof message.usage?.cacheWrite === "number"
-        ? message.usage.cacheWrite
-        : 0;
-    maxTokens = Math.max(maxTokens, input + cacheRead + cacheWrite);
-  }
-  return maxTokens;
+function maxRequestContextTokens(
+	events: AgentSessionEvent[],
+): number | undefined {
+	let maxTokens: number | undefined;
+	for (const event of events) {
+		if (event.type !== "message_end") continue;
+		const message = event.message as {
+			role?: unknown;
+			usage?: {
+				input?: unknown;
+				cacheRead?: unknown;
+				cacheWrite?: unknown;
+			};
+		};
+		if (message.role !== "assistant") continue;
+		const input =
+			typeof message.usage?.input === "number" ? message.usage.input : 0;
+		const cacheRead =
+			typeof message.usage?.cacheRead === "number"
+				? message.usage.cacheRead
+				: 0;
+		const cacheWrite =
+			typeof message.usage?.cacheWrite === "number"
+				? message.usage.cacheWrite
+				: 0;
+		const total = input + cacheRead + cacheWrite;
+		maxTokens = maxTokens === undefined ? total : Math.max(maxTokens, total);
+	}
+	return maxTokens;
 }
 
 function eventReplacer(key: string, value: unknown): unknown {

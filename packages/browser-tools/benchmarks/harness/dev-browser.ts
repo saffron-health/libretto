@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import type { SessionRun } from "../agent.js";
+import type { HarnessRun } from "../harness-run.js";
 import {
 	closeCloudBrowserConnection,
 	createCloudBrowserConnection,
@@ -19,7 +19,7 @@ export async function runDevBrowserHarness(
 	task: string,
 	workspace: string,
 	provider: BrowserProviderName,
-): Promise<SessionRun> {
+): Promise<HarnessRun> {
 	const browser = await createCloudBrowserConnection(provider);
 	try {
 		const command = [
