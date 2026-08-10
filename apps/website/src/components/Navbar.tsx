@@ -137,33 +137,16 @@ function GlitchNavLink({
 }
 
 function YCNavLink() {
-  const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText("P26");
-
   return (
     <a
       href={YC_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="hidden h-[1.9375rem] items-center no-underline lg:flex"
+      className="hidden h-[1.9375rem] items-center gap-1.5 text-ink/70 no-underline transition-colors hover:text-ink lg:flex"
       data-fathom-event="Nav YC click"
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
     >
-      <span
-        className={`inline-flex items-center gap-1.5 transition-colors duration-75 ${
-          isScrambling ? "text-amber" : hovered ? "text-accent-bright" : "text-ink"
-        }`}
-      >
-        <YCLogo className="size-3.5 shrink-0" />
-        <Text
-          size="sm"
-          className={`font-medium leading-none ${
-            isScrambling ? "font-mono" : ""
-          }`}
-        >
-          {display}
-        </Text>
-      </span>
+      <YCLogo className="size-3.5 shrink-0" />
+      <span className="text-sm font-medium">P26</span>
     </a>
   );
 }
