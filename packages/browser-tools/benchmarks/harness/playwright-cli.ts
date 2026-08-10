@@ -1,4 +1,4 @@
-import type { SessionRun } from "../agent.js";
+import type { HarnessRun } from "../harness-run.js";
 import {
 	closeCloudBrowserConnection,
 	createCloudBrowserConnection,
@@ -12,7 +12,7 @@ export async function runPlaywrightCliHarness(
 	task: string,
 	workspace: string,
 	provider: BrowserProviderName,
-): Promise<SessionRun> {
+): Promise<HarnessRun> {
 	const browser = await createCloudBrowserConnection(provider);
 	try {
 		const session = shellQuote(browser.sessionName);
