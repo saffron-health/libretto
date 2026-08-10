@@ -1,15 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text } from "./Text";
-import { DiscordIcon, GitHubIcon, NpmIcon, YCLogo } from "../icons";
-import {
-  DISCORD_URL,
-  DISCUSSIONS_URL,
-  NPM_URL,
-  RELEASES_URL,
-  REPO_URL,
-  YC_URL,
-} from "../site";
+import { DiscordIcon, GitHubIcon, NpmIcon } from "../icons";
+import { DISCORD_URL, DISCUSSIONS_URL, NPM_URL, RELEASES_URL, REPO_URL } from "../site";
 import { LIBRETTO_ASCII_NAME, LIBRETTO_ASCII_NAME_COLS } from "../brand.js";
+import { BackedByYC } from "./BackedByYC";
 
 const linkClass = "text-muted/60 transition-colors hover:text-accent-bright text-xs no-underline";
 
@@ -54,16 +48,10 @@ export function Footer() {
             <Text size="xs" className="text-muted/50">
               © {new Date().getFullYear()} Saffron Health
             </Text>
-            <a
-              href={YC_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs text-muted/50 no-underline transition-colors hover:text-muted"
-              data-fathom-event="Footer YC click"
-            >
-              <YCLogo className="size-3.5 shrink-0" />
-              Backed by YC
-            </a>
+            <BackedByYC
+              className="text-xs text-muted/50 hover:text-muted"
+              fathomEvent="Footer YC click"
+            />
           </div>
           <div className="flex flex-wrap justify-end gap-x-6 gap-y-2">
             <a href="/cli" className={linkClass} data-fathom-event="Footer cli click">

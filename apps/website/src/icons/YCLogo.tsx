@@ -1,18 +1,19 @@
-/** Y Combinator mark — orange square with white Y. */
-export function YCLogo(props: React.SVGProps<SVGSVGElement>) {
+/** Y Combinator mark — official orange square with white Y. */
+export function YCLogo({
+  className,
+  width = 14,
+  height = 14,
+  ...props
+}: Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src" | "alt">) {
   return (
-    <svg
-      viewBox="0 0 16 16"
-      width="14"
-      height="14"
-      aria-hidden="true"
+    <img
+      src="/yc-logo.png"
+      alt=""
+      width={width}
+      height={height}
+      className={className}
+      draggable={false}
       {...props}
-    >
-      <rect width="16" height="16" fill="#FF6600" />
-      <path
-        fill="#fff"
-        d="M8.05 9.1 4.7 3.2h1.95l1.95 3.55c.18.34.32.62.42.88.1-.26.25-.55.45-.9L11.4 3.2h1.85L9.85 9.1V13H8.05V9.1Z"
-      />
-    </svg>
+    />
   );
 }
