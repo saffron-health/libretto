@@ -36,7 +36,7 @@ export function BackedByYC({
       data-fathom-event={fathomEvent}
     >
       <YCLogo className="size-3.5 shrink-0" />
-      YC P26
+      Backed by YC
       <ExternalArrowIcon className="size-3 shrink-0 opacity-70" />
     </a>
   );

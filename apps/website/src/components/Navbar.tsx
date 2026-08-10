@@ -9,9 +9,9 @@ import {
 } from "react-aria-components";
 import { Text } from "./Text";
 import { Button } from "./Button";
-import { GitHubStarIcon } from "../icons";
+import { GitHubStarIcon, YCLogo } from "../icons";
 import { AnimationTarget } from "./AnimationOrchestration";
-import { RELEASES_URL, REPO_URL } from "../site";
+import { RELEASES_URL, REPO_URL, YC_URL } from "../site";
 import { MobileMenu } from "./MobileMenu";
 import { LibrettoLogoAndName } from "../brand.js";
 import { getCloudSession, type CloudSession } from "../cloudApi";
@@ -132,6 +132,21 @@ function GlitchNavLink({
         </Text>
         {trailingIcon && <ExternalIcon />}
       </span>
+    </a>
+  );
+}
+
+function YCNavLink() {
+  return (
+    <a
+      href={YC_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hidden h-[1.9375rem] items-center gap-1.5 text-ink/70 no-underline transition-colors hover:text-ink lg:flex"
+      data-fathom-event="Nav YC click"
+    >
+      <YCLogo className="size-3.5 shrink-0" />
+      <span className="text-sm font-medium">P26</span>
     </a>
   );
 }
@@ -407,6 +422,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
           </div>
         </div>
         <div className="flex items-center gap-3 md:gap-4">
+          <YCNavLink />
           <a
             href={REPO_URL}
             target="_blank"
