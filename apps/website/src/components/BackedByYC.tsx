@@ -23,11 +23,9 @@ function ExternalArrowIcon({ className }: { className?: string }) {
 export function BackedByYC({
   className = "",
   fathomEvent,
-  label,
 }: {
   className?: string;
   fathomEvent: string;
-  label: string;
 }) {
   return (
     <a
@@ -38,7 +36,7 @@ export function BackedByYC({
       data-fathom-event={fathomEvent}
     >
       <YCLogo className="size-3.5 shrink-0" />
-      {label}
+      Backed by YC
       <ExternalArrowIcon className="size-3 shrink-0 opacity-70" />
     </a>
   );

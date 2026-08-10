@@ -9,13 +9,12 @@ import {
 } from "react-aria-components";
 import { Text } from "./Text";
 import { Button } from "./Button";
-import { GitHubStarIcon } from "../icons";
+import { GitHubStarIcon, YCLogo } from "../icons";
 import { AnimationTarget } from "./AnimationOrchestration";
-import { RELEASES_URL, REPO_URL } from "../site";
+import { RELEASES_URL, REPO_URL, YC_URL } from "../site";
 import { MobileMenu } from "./MobileMenu";
 import { LibrettoLogoAndName } from "../brand.js";
 import { getCloudSession, type CloudSession } from "../cloudApi";
-import { BackedByYC } from "./BackedByYC";
 
 const GLITCH_CHARS = "@#$%&*+=<>{}[]|/\\~^!?";
 
@@ -132,6 +131,38 @@ function GlitchNavLink({
           {display}
         </Text>
         {trailingIcon && <ExternalIcon />}
+      </span>
+    </a>
+  );
+}
+
+function YCNavLink() {
+  const { display, isScrambling, hovered, onEnter, onLeave } = useGlitchText("P26");
+
+  return (
+    <a
+      href={YC_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hidden h-[1.9375rem] items-center no-underline lg:flex"
+      data-fathom-event="Nav YC click"
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <span
+        className={`inline-flex items-center gap-1.5 transition-colors duration-75 ${
+          isScrambling ? "text-amber" : hovered ? "text-accent-bright" : "text-ink"
+        }`}
+      >
+        <YCLogo className="size-3.5 shrink-0" />
+        <Text
+          size="sm"
+          className={`font-medium leading-none ${
+            isScrambling ? "font-mono" : ""
+          }`}
+        >
+          {display}
+        </Text>
       </span>
     </a>
   );
@@ -408,11 +439,7 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
           </div>
         </div>
         <div className="flex items-center gap-3 md:gap-4">
-          <BackedByYC
-            className="hidden h-[1.9375rem] text-xs text-muted/70 hover:text-muted lg:inline-flex"
-            fathomEvent="Nav YC click"
-            label="YC P26"
-          />
+          <YCNavLink />
           <a
             href={REPO_URL}
             target="_blank"
