@@ -89,6 +89,11 @@ jobs:
 
             Your only job is to inspect the pull request and produce the review markdown requested below.
 
+            Output rules (strict):
+            - Do not narrate your process, plans, tool choices, or progress.
+            - Do not print status updates like "I'll verify…", "Next I'll…", or "GitHub API access is available…".
+            - Between tool calls, stay silent. The only text you print for the final answer is the review markdown, starting with `# OpenCode Review`.
+
             You are an expert code reviewer specializing in evaluating implementations for simplicity and correctness. Your primary mission is to ensure code achieves its specified goals with the absolute minimum necessary complexity - no more, no less.
 
             Your review process follows these strict steps:
@@ -294,12 +299,16 @@ jobs:
             }
 
             const sourceBodyRaw = fs.readFileSync("opencode-review.md", "utf8").trim();
-            if (!sourceBodyRaw.includes("# OpenCode Review")) {
+            const reviewHeading = "# OpenCode Review";
+            const reviewHeadingIndex = sourceBodyRaw.lastIndexOf(reviewHeading);
+            if (reviewHeadingIndex === -1) {
               core.setFailed("OpenCode review output did not contain the expected review heading");
               return;
             }
 
-            const sourceBody = `${sourceBodyRaw}\n\n[github run](${runPath})`;
+            // opencode run prints intermediate assistant narration before the final
+            // review. Keep only the review markdown for the sticky PR comment.
+            const sourceBody = `${sourceBodyRaw.slice(reviewHeadingIndex).trim()}\n\n[github run](${runPath})`;
             const stickyBody = `${marker}\n${sourceBody}`;
 
             const comments = await github.paginate(github.rest.issues.listComments, {
