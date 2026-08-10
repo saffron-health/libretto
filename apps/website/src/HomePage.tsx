@@ -17,8 +17,6 @@ import { Footer } from "./components/Footer";
 import { VersionBadge } from "./components/VersionBadge";
 import { ProductListing } from "./components/ProductListing";
 import { SectionDivider } from "./components/SectionDivider.js";
-import { BackedByYC } from "./components/BackedByYC";
-
 function Hero({
   paneUnlocked,
   onClosePane,
@@ -101,10 +99,6 @@ function Hero({
               TALK TO A DEV
             </a>
           </div>
-          <BackedByYC
-            className="mt-3 text-xs text-muted/60 hover:text-muted"
-            fathomEvent="Hero YC click"
-          />
         </div>
       </div>
     </section>

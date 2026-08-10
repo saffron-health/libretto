@@ -51,6 +51,7 @@ export function Footer() {
             <BackedByYC
               className="text-xs text-muted/50 hover:text-muted"
               fathomEvent="Footer YC click"
+              label="Backed by YC"
             />
           </div>
           <div className="flex flex-wrap justify-end gap-x-6 gap-y-2">

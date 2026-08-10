@@ -15,6 +15,7 @@ import { RELEASES_URL, REPO_URL } from "../site";
 import { MobileMenu } from "./MobileMenu";
 import { LibrettoLogoAndName } from "../brand.js";
 import { getCloudSession, type CloudSession } from "../cloudApi";
+import { BackedByYC } from "./BackedByYC";
 
 const GLITCH_CHARS = "@#$%&*+=<>{}[]|/\\~^!?";
 
@@ -388,6 +389,11 @@ export function Navbar({ animate = false }: { animate?: boolean }) {
           >
             <LibrettoLogoAndName />
           </a>
+          <BackedByYC
+            className="h-[1.9375rem] text-xs text-muted/70 hover:text-muted"
+            fathomEvent="Nav YC click"
+            label="YC P26"
+          />
           <div className="hidden items-center gap-6 lg:flex">
             <OpenSourceNavMenu />
             <GlitchNavLink
