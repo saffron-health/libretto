@@ -129,6 +129,7 @@ export async function runHostProcess(options: {
 		const stderrChunks: Buffer[] = [];
 		let timedOut = false;
 		let settled = false;
+		let earlyExitScheduled = false;
 		const killByCwdHint = (): void => {
 			const hint = options.alsoKillCwdContains;
 			if (!hint) return;
@@ -197,11 +198,12 @@ export async function runHostProcess(options: {
 		}, timeoutMs);
 		const maybeExitEarly = (): void => {
 			if (!options.exitOnStdoutMatch) return;
-			if (settled) return;
+			if (settled || earlyExitScheduled) return;
 			const text =
 				Buffer.concat(stdoutChunks).toString("utf8") +
 				Buffer.concat(stderrChunks).toString("utf8");
 			if (!options.exitOnStdoutMatch.test(text)) return;
+			earlyExitScheduled = true;
 			setTimeout(() => {
 				if (settled) return;
 				killTree("SIGTERM");
@@ -447,7 +449,9 @@ export function usageFromHermesHome(hermesHome: string): Partial<UsageMetrics> {
 	const outputTokens = numberOrUndefined(row[1]);
 	const cacheReadTokens = numberOrUndefined(row[2]);
 	const cacheWriteTokens = numberOrUndefined(row[3]);
-	const turns = numberOrUndefined(row[4]);
+	// api_call_count is not assistant-message turns (Pi/OpenClaw measure those).
+	// Keep it only as a presence signal for an all-zero telemetry row.
+	const apiCallCount = numberOrUndefined(row[4]);
 	const costUsd = numberOrUndefined(row[5]);
 	const totalTokens = sumDefined(
 		inputTokens,
@@ -458,7 +462,7 @@ export function usageFromHermesHome(hermesHome: string): Partial<UsageMetrics> {
 	// Hermes defaults missing counters to 0 in SQLite; treat an all-zero row
 	// with no API calls as "unknown" rather than a real zero-token run.
 	const hasSignal =
-		(turns !== undefined && turns > 0) ||
+		(apiCallCount !== undefined && apiCallCount > 0) ||
 		(totalTokens !== undefined && totalTokens > 0) ||
 		(costUsd !== undefined && costUsd > 0);
 	if (!hasSignal) return {};
@@ -469,7 +473,6 @@ export function usageFromHermesHome(hermesHome: string): Partial<UsageMetrics> {
 		...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
 		...(totalTokens !== undefined ? { totalTokens } : {}),
 		...(costUsd !== undefined ? { costUsd } : {}),
-		...(turns !== undefined ? { turns } : {}),
 	};
 }
 
