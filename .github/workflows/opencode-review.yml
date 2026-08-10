@@ -299,8 +299,13 @@ jobs:
             }
 
             const sourceBodyRaw = fs.readFileSync("opencode-review.md", "utf8").trim();
-            const reviewHeading = "# OpenCode Review";
-            const reviewHeadingIndex = sourceBodyRaw.lastIndexOf(reviewHeading);
+            // Match a full markdown heading line only. Do not use indexOf/lastIndexOf on
+            // the bare string — reviews often mention `# OpenCode Review` in prose/code.
+            const reviewHeadingPattern = /^# OpenCode Review\s*$/gm;
+            let reviewHeadingIndex = -1;
+            for (const match of sourceBodyRaw.matchAll(reviewHeadingPattern)) {
+              reviewHeadingIndex = match.index ?? -1;
+            }
             if (reviewHeadingIndex === -1) {
               core.setFailed("OpenCode review output did not contain the expected review heading");
               return;
