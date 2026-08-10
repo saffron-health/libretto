@@ -53,7 +53,7 @@ function Hero({
           style={{ opacity: 0 }}
           className="mb-8 flex justify-center"
         >
-          <BackedByYC variant="badge" fathomEvent="Hero YC click" />
+          <VersionBadge />
         </div>
         <div
           data-animate={AnimationTarget.AsciiLogo}
@@ -105,8 +105,8 @@ function Hero({
               TALK TO A DEV
             </a>
           </div>
-          <div className="mt-2">
-            <VersionBadge />
+          <div className="mt-10">
+            <BackedByYC variant="badge" fathomEvent="Hero YC click" />
           </div>
         </div>
       </div>
