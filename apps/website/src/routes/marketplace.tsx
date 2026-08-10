@@ -1,15 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { MarketplacePage } from "../MarketplacePage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/marketplace")({
-  head: () => ({
-    meta: [
-      { title: "Workflow Marketplace | Libretto" },
-      {
-        name: "description",
-        content: "Add reusable browser workflows to your Libretto account.",
-      },
-    ],
-  }),
-  component: MarketplacePage,
+  beforeLoad: () => {
+    throw redirect({
+      to: "/open-workflows",
+    });
+  },
 });

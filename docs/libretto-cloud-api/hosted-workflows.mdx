@@ -1,0 +1,106 @@
+---
+title: Hosted workflows
+"og:image": "https://libretto.sh/docs/og/libretto-cloud-api/hosted-workflows.png"
+---
+
+> Publish an opaque run API for a deployed workflow. Consumers call it with their own API key and credentials; source stays with the publisher.
+
+Hosted workflows are consumer-run, source-hidden APIs. Jobs and credentials belong to the **consumer** tenant. Publishers pin a ready deployment with `POST /v1/workflows/host`; consumers discover and run it under `/v1/hosted-workflows…`.
+
+This is different from [open workflows](/libretto-cloud-api/open-workflows), which publish source for forking/import. It is also different from private `POST /v1/jobs/create` against workflows you own.
+
+### Publisher: host and unhost
+
+These routes require `x-api-key`. The tenant must have an organization slug.
+
+#### POST `/v1/workflows/host`
+
+Host a ready workflow in the public catalog. Re-hosting replaces the live publication (bumps deployment version).
+
+Request fields:
+
+- `workflow`: deployed workflow name
+- `description`: optional public description
+- `credential_requirements`: optional array of `{ name, description }`. When omitted, Libretto derives requirements from the workflow's declared credential names.
+
+Response fields:
+
+- `id`
+- `hosted_workflow`: public key `tenantSlug/workflowName`
+- `page_url`: public HTML docs page on the API host
+- `deployment_version`
+
+Workflows that use auth profiles cannot be hosted in v1.
+
+#### POST `/v1/workflows/unhost`
+
+Tombstone a live publication. Catalog and run endpoints return 404 afterward. In-flight consumer jobs are left alone. Known consumers may receive a best-effort email.
+
+Request fields:
+
+- `workflow`: deployed workflow name
+
+Response fields:
+
+- `success`
+- `hosted_workflow`
+- `notified_consumers`
+
+### Consumer catalog and run
+
+Authenticated routes require `x-api-key` (session auth is also accepted where applicable). Former `/v1/published-workflows` paths permanently redirect to `/v1/hosted-workflows`.
+
+#### GET `/v1/hosted-workflows`
+
+List hosted workflows. Optional query `q` filters the catalog.
+
+#### GET `/v1/hosted-workflows/:tenantSlug/:workflowName`
+
+Return metadata for one hosted workflow, including:
+
+- `input_schema` / `output_schema`
+- `credential_requirements`
+- `deployment_version`
+- `published_at`
+- `page_url`
+
+#### POST `/v1/hosted-workflows/run/:tenantSlug/:workflowName`
+
+Start a consumer-owned job against the publisher's pinned deployment.
+
+Request body fields (JSON, not ORPC `{ "json": ... }` wrapping):
+
+- `params`: workflow input object
+- `credential_id`: optional single credential id
+- `nonce`: optional idempotency-style nonce
+- `timeout_seconds`: optional timeout
+- `headless`, `start_url`, `gpu`, `viewport`, `residential_proxy`: optional launch overrides
+- `callback_url` / `callback_secret`: delivery target for results
+- `skip_callbacks`: optional boolean
+
+Callback rules:
+
+- Provide both `callback_url` and `callback_secret`, **or** set `skip_callbacks: true` and poll `POST /v1/jobs/get` with the returned `job_id`.
+- Hosted runs do not fall back to the consumer's stored tenant webhooks unless you opt into callbacks that way through normal job delivery after a callback is set.
+
+Credentials:
+
+- Create credentials in **your** tenant with the exact names listed in `credential_requirements` before running.
+- The publisher cannot list your jobs or read your credential values.
+
+Response fields:
+
+- `success`
+- `job_id`
+- `status`
+- `hosted_workflow`
+- `message`
+
+### Public HTML pages
+
+These routes do not require auth:
+
+- `GET /hosted-workflows` — catalog index
+- `GET /hosted-workflows/:tenantSlug/:workflowName` — docs page with credential requirements and example curl
+
+Former `/published-workflows` paths permanently redirect here.

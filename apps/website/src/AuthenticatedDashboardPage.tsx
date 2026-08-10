@@ -1933,7 +1933,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
     if (
       !enabled &&
       !window.confirm(
-        "Disable public workflow sharing? Every workflow from this workspace will be removed from the marketplace. Re-enabling sharing will not republish them automatically.",
+        "Disable public workflow sharing? Every workflow from this workspace will be removed from Open workflows. Re-enabling sharing will not republish them automatically.",
       )
     ) {
       return;
@@ -1951,7 +1951,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
       setNotice(
         enabled
           ? "Workflow sharing is enabled. Workflows remain private until someone explicitly shares them."
-          : "Workflow sharing is disabled and existing marketplace listings were unpublished.",
+          : "Workflow sharing is disabled and existing Open workflows listings were unpublished.",
       );
     } catch (err) {
       setError(
@@ -1994,8 +1994,8 @@ function SettingsPanel({ session }: { session: CloudSession }) {
               className="mt-2 max-w-2xl text-sm leading-6 text-muted"
             >
               Allow people in this workspace to publish workflow source code
-              to the Libretto Marketplace. Credentials, run history, and
-              per-run parameters are never included.
+              to Open workflows. Credentials, run history, and per-run
+              parameters are never included.
             </p>
           </div>
           <button

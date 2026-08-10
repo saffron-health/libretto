@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as OpenWorkflowsRouteImport } from './routes/open-workflows'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MarketplaceRouteImport } from './routes/marketplace'
 import { Route as InviteRouteImport } from './routes/invite'
@@ -26,6 +27,7 @@ import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as VsStagehandRouteImport } from './routes/vs/stagehand'
 import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs/playwright-codegen'
 import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
+import { Route as OpenWorkflowsIdRouteImport } from './routes/open-workflows_.$id'
 import { Route as MarketplaceIdRouteImport } from './routes/marketplace_.$id'
 import { Route as GithubSetupRouteImport } from './routes/github.setup'
 import { Route as DashboardPrAgentRouteImport } from './routes/dashboard_.pr-agent'
@@ -47,6 +49,11 @@ const SigninRoute = SigninRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OpenWorkflowsRoute = OpenWorkflowsRouteImport.update({
+  id: '/open-workflows',
+  path: '/open-workflows',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -119,6 +126,11 @@ const VsBrowserUseRoute = VsBrowserUseRouteImport.update({
   path: '/vs/browser-use',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OpenWorkflowsIdRoute = OpenWorkflowsIdRouteImport.update({
+  id: '/open-workflows_/$id',
+  path: '/open-workflows/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MarketplaceIdRoute = MarketplaceIdRouteImport.update({
   id: '/marketplace_/$id',
   path: '/marketplace/$id',
@@ -167,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/invite': typeof InviteRoute
   '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
+  '/open-workflows': typeof OpenWorkflowsRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -177,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
   '/marketplace/$id': typeof MarketplaceIdRoute
+  '/open-workflows/$id': typeof OpenWorkflowsIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -192,6 +206,7 @@ export interface FileRoutesByTo {
   '/invite': typeof InviteRoute
   '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
+  '/open-workflows': typeof OpenWorkflowsRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -202,6 +217,7 @@ export interface FileRoutesByTo {
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
   '/marketplace/$id': typeof MarketplaceIdRoute
+  '/open-workflows/$id': typeof OpenWorkflowsIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -219,6 +235,7 @@ export interface FileRoutesById {
   '/invite': typeof InviteRoute
   '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
+  '/open-workflows': typeof OpenWorkflowsRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -229,6 +246,7 @@ export interface FileRoutesById {
   '/dashboard_/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
   '/marketplace_/$id': typeof MarketplaceIdRoute
+  '/open-workflows_/$id': typeof OpenWorkflowsIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
@@ -247,6 +265,7 @@ export interface FileRouteTypes {
     | '/invite'
     | '/marketplace'
     | '/onboarding'
+    | '/open-workflows'
     | '/privacy'
     | '/signin'
     | '/verify-email'
@@ -257,6 +276,7 @@ export interface FileRouteTypes {
     | '/dashboard/pr-agent'
     | '/github/setup'
     | '/marketplace/$id'
+    | '/open-workflows/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -272,6 +292,7 @@ export interface FileRouteTypes {
     | '/invite'
     | '/marketplace'
     | '/onboarding'
+    | '/open-workflows'
     | '/privacy'
     | '/signin'
     | '/verify-email'
@@ -282,6 +303,7 @@ export interface FileRouteTypes {
     | '/dashboard/pr-agent'
     | '/github/setup'
     | '/marketplace/$id'
+    | '/open-workflows/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -298,6 +320,7 @@ export interface FileRouteTypes {
     | '/invite'
     | '/marketplace'
     | '/onboarding'
+    | '/open-workflows'
     | '/privacy'
     | '/signin'
     | '/verify-email'
@@ -308,6 +331,7 @@ export interface FileRouteTypes {
     | '/dashboard_/pr-agent'
     | '/github/setup'
     | '/marketplace_/$id'
+    | '/open-workflows_/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
@@ -325,6 +349,7 @@ export interface RootRouteChildren {
   InviteRoute: typeof InviteRoute
   MarketplaceRoute: typeof MarketplaceRoute
   OnboardingRoute: typeof OnboardingRoute
+  OpenWorkflowsRoute: typeof OpenWorkflowsRoute
   PrivacyRoute: typeof PrivacyRoute
   SigninRoute: typeof SigninRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
@@ -334,6 +359,7 @@ export interface RootRouteChildren {
   DashboardPrAgentRoute: typeof DashboardPrAgentRoute
   GithubSetupRoute: typeof GithubSetupRoute
   MarketplaceIdRoute: typeof MarketplaceIdRoute
+  OpenWorkflowsIdRoute: typeof OpenWorkflowsIdRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
@@ -360,6 +386,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/open-workflows': {
+      id: '/open-workflows'
+      path: '/open-workflows'
+      fullPath: '/open-workflows'
+      preLoaderRoute: typeof OpenWorkflowsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding': {
@@ -460,6 +493,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VsBrowserUseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/open-workflows_/$id': {
+      id: '/open-workflows_/$id'
+      path: '/open-workflows/$id'
+      fullPath: '/open-workflows/$id'
+      preLoaderRoute: typeof OpenWorkflowsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/marketplace_/$id': {
       id: '/marketplace_/$id'
       path: '/marketplace/$id'
@@ -537,6 +577,7 @@ const rootRouteChildren: RootRouteChildren = {
   InviteRoute: InviteRoute,
   MarketplaceRoute: MarketplaceRoute,
   OnboardingRoute: OnboardingRoute,
+  OpenWorkflowsRoute: OpenWorkflowsRoute,
   PrivacyRoute: PrivacyRoute,
   SigninRoute: SigninRoute,
   VerifyEmailRoute: VerifyEmailRoute,
@@ -546,6 +587,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardPrAgentRoute: DashboardPrAgentRoute,
   GithubSetupRoute: GithubSetupRoute,
   MarketplaceIdRoute: MarketplaceIdRoute,
+  OpenWorkflowsIdRoute: OpenWorkflowsIdRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,
@@ -553,12 +595,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

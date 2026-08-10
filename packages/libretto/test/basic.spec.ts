@@ -425,7 +425,7 @@ describe("basic CLI subprocess behavior", () => {
   test("prints cloud share help", async ({ librettoCli }) => {
     const result = await librettoCli("help cloud share");
     expect(result.stdout).toContain(
-      "Share one hosted workflow's code publicly",
+      "Share one workflow's source as a public open workflow",
     );
     expect(result.stdout).toContain("libretto cloud share <workflow>");
     expect(result.stdout).toContain("--refresh");

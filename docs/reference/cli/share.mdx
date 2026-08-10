@@ -3,9 +3,11 @@ title: share
 "og:image": "https://libretto.sh/docs/og/reference/cli/share.png"
 ---
 
-> Make hosted workflow source code public through Libretto Cloud.
+> Make workflow source code public as an Open workflow through Libretto Cloud.
 
-The `cloud share` command creates a public code share for a workflow that is already deployed to Libretto Cloud. Use it when you want anyone with the generated URL to fork your automation code and use it as the starting point for their own automation.
+The `cloud share` command creates a public Open workflows listing for a workflow that is already deployed to Libretto Cloud. Use it when you want anyone with the generated URL to fork your automation code and use it as the starting point for their own automation.
+
+Open workflows share source. They are not the same as [hosted workflows](/libretto-cloud-api/hosted-workflows), which expose an opaque run API without publishing source.
 
 <Info>
   Workflow sharing requires a Libretto Cloud account, API key, and tenant-level
@@ -27,12 +29,12 @@ npx libretto cloud share <workflow> [flags]
 ```
 
 <ParamField path="workflow" type="string" required>
-  The hosted workflow name to share. This is the workflow name declared in code
-  and deployed with `npx libretto cloud deploy`.
+  The deployed workflow name to publish as an open workflow. This is the
+  workflow name declared in code and deployed with `npx libretto cloud deploy`.
 </ParamField>
 
 <ParamField path="--refresh" type="boolean">
-  Refresh an existing share from the workflow's current deployment.
+  Refresh an existing open workflow from the workflow's current deployment.
 </ParamField>
 
 #### Prerequisites
@@ -68,7 +70,7 @@ npx libretto cloud share <workflow> [flags]
   </Step>
 
   <Step title="Deploy the workflow">
-    Share works on hosted workflows. Deploy the package that contains the
+    Share works on deployed workflows. Deploy the package that contains the
     workflow before sharing it:
 
     ```bash theme={null}
@@ -79,12 +81,12 @@ npx libretto cloud share <workflow> [flags]
 
 #### Output
 
-When sharing succeeds, Libretto prints the public marketplace URL and code URL:
+When sharing succeeds, Libretto prints the public Open workflow URL and code URL:
 
 ```bash theme={null}
 Shared workflow: check-eligibility
-Marketplace URL: https://libretto.sh/...
-Code URL: https://libretto.sh/...
+Open workflow URL: https://libretto.sh/open-workflows/...
+Code URL: https://api.libretto.sh/open-workflows/.../code
 ```
 
 If the workflow is already shared, rerun the command with `--refresh` to update the shared code from the current deployment:

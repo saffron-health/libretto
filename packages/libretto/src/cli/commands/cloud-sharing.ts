@@ -11,22 +11,22 @@ type ShareWorkflowResponse = {
   id: string;
   status: "created" | "existing" | "refreshed";
   workflow: string;
-  marketplace_url: string;
+  open_workflow_url: string;
   code_url: string;
 };
 
 export const shareWorkflowCommand = SimpleCLI.command({
-  description: "Share one hosted workflow's code publicly",
+  description: "Share one workflow's source as a public open workflow",
 })
   .input(SimpleCLI.input({
     positionals: [
       SimpleCLI.positional("workflow", z.string().min(1), {
-        help: "Hosted workflow name to share",
+        help: "Deployed workflow name to publish as an open workflow",
       }),
     ],
     named: {
       refresh: SimpleCLI.flag({
-        help: "Refresh an existing share from the workflow's current deployment",
+        help: "Refresh an existing open workflow from the workflow's current deployment",
       }),
     },
   }))
@@ -50,9 +50,9 @@ export const shareWorkflowCommand = SimpleCLI.command({
     } else {
       console.log(`Shared workflow: ${response.workflow}`);
     }
-    console.log(`Marketplace URL: ${response.marketplace_url}`);
+    console.log(`Open workflow URL: ${response.open_workflow_url}`);
     console.log(`Code URL: ${response.code_url}`);
-    return response.marketplace_url;
+    return response.open_workflow_url;
   });
 
 export const codeSharingStatusCommand = SimpleCLI.command({
