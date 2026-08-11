@@ -65,11 +65,6 @@ import {
 import { handlePages } from "./pages.js";
 import { handleExec, handleReadonlyExec } from "./exec.js";
 import { DaemonExecRepl } from "./exec-repl.js";
-import {
-  CONTROL_OPERATION_TIMEOUT_MS,
-  interruptPageExecution,
-  runWithOperationTimeout,
-} from "./operation-timeout.js";
 import { handleCompactSnapshot } from "./snapshot.js";
 import { snapshot } from "../../../shared/snapshot/capture-snapshot.js";
 import { diffSnapshots } from "../../../shared/snapshot/diff-snapshots.js";
@@ -166,6 +161,7 @@ function resolveAuthProfileStorageStatePath(args: {
 // ── BrowserDaemon ──────────────────────────────────────────────────────
 
 const PROTOCOL_VERSION = 1;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 class BrowserDaemon {
   readonly logger: LoggerApi;
@@ -768,13 +764,11 @@ class BrowserDaemon {
     return {
       ping: () => ({ protocolVersion: PROTOCOL_VERSION }),
       pages: () =>
-        this.withControlTimeout("pages", () =>
-          handlePages(this.pageById, this.page),
-        ),
+        this.withRequestTimeout(() => handlePages(this.pageById, this.page)),
       exec: (args) => this.runExec(args),
       readonlyExec: (args) => this.runReadonlyExec(args),
       captureAuthProfileStorageState: (args) =>
-        this.withControlTimeout("captureAuthProfileStorageState", () =>
+        this.withRequestTimeout(() =>
           captureAuthProfileStorageState(this.context, args.sites),
         ),
       snapshot: (args) => this.runSnapshot(args),
@@ -791,36 +785,33 @@ class BrowserDaemon {
     args: Parameters<CliToDaemonApi["snapshot"]>[0],
   ): Promise<ReturnType<CliToDaemonApi["snapshot"]>> {
     const targetPage = this.resolveTargetPage(args.pageId);
-    return this.withControlTimeout(
-      "snapshot",
-      () =>
-        handleCompactSnapshot(targetPage, this.session, this.logger, {
-          pageId: args.pageId,
-        }),
-      { pageId: args.pageId, page: targetPage },
+    return this.withRequestTimeout(() =>
+      handleCompactSnapshot(targetPage, this.session, this.logger, {
+        pageId: args.pageId,
+      }),
     );
   }
 
-  /**
-   * Safety deadline for small control ops. A dead browser can otherwise hang
-   * the CLI forever. Exec/workflow use Playwright timeouts (or an optional
-   * explicit exec timeout) instead of this blanket guard.
-   */
-  private async withControlTimeout<T>(
-    operation: string,
-    run: () => Promise<T> | T,
-    options: { pageId?: string; page?: Page } = {},
+  private async withRequestTimeout<T>(
+    operation: () => Promise<T> | T,
   ): Promise<T> {
-    return runWithOperationTimeout((_signal) => run(), {
-      operation,
-      session: this.session,
-      timeoutMs: CONTROL_OPERATION_TIMEOUT_MS,
-      pageId: options.pageId,
-      onTimeout:
-        options.page !== undefined
-          ? () => interruptPageExecution(options.page!)
-          : undefined,
+    // Safety timeout for small control ops (pages, snapshot, auth capture).
+    // Exec/readonly-exec intentionally skip this so Playwright timeouts
+    // surface their own diagnostics instead of a generic 60s race.
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timerId = setTimeout(
+        () =>
+          reject(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`)),
+        REQUEST_TIMEOUT_MS,
+      );
     });
+
+    try {
+      return await Promise.race([operation(), timeout]);
+    } finally {
+      if (timerId) clearTimeout(timerId);
+    }
   }
 
   private async runExec(
@@ -836,60 +827,49 @@ class BrowserDaemon {
     try {
       targetPage = this.resolveTargetPage(args.pageId);
       const page = targetPage;
-      const data = await runWithOperationTimeout(
-        async () => {
-          const before = args.diffSnapshot ? await snapshot(page) : undefined;
-          const result = await handleExec(
-            page,
-            args.code,
-            this.execRepl,
-            args.visualize,
-          );
-
-          if (!args.diffSnapshot || !before) {
-            return result;
-          }
-
-          try {
-            const waitResult = await waitForPageStable(page);
-            if (!waitResult.ok) {
-              this.logger.warn("compact-exec-stability-wait-incomplete", {
-                session: this.session,
-                pageId: args.pageId,
-                diagnostics: waitResult.diagnostics,
-              });
-            }
-
-            const after = await snapshot(page);
-            const snapshotDiff = diffSnapshots(before, after);
-            return { ...result, snapshotDiff };
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            this.logger.warn("compact-exec-diff-failed", {
-              session: this.session,
-              pageId: args.pageId,
-              error: message,
-            });
-            return {
-              ...result,
-              snapshotDiffError:
-                `Failed to do post-diff snapshot: ${message}. ` +
-                "The exec itself succeeded. Run libretto snapshot if you need the " +
-                "current page state, or omit --diff-snapshot when the page may close.",
-            };
-          }
-        },
-        {
-          operation: "exec",
-          session: this.session,
-          // No default deadline — Playwright/application timeouts apply.
-          timeoutMs: args.timeoutMs,
-          pageId: args.pageId,
-          onTimeout: () => interruptPageExecution(page),
-        },
+      const before = args.diffSnapshot ? await snapshot(page) : undefined;
+      const result = await handleExec(
+        page,
+        args.code,
+        this.execRepl,
+        args.visualize,
       );
-      return { ok: true, data };
+
+      if (!args.diffSnapshot || !before) {
+        return { ok: true, data: result };
+      }
+
+      try {
+        const waitResult = await waitForPageStable(page);
+        if (!waitResult.ok) {
+          this.logger.warn("compact-exec-stability-wait-incomplete", {
+            session: this.session,
+            pageId: args.pageId,
+            diagnostics: waitResult.diagnostics,
+          });
+        }
+
+        const after = await snapshot(page);
+        const snapshotDiff = diffSnapshots(before, after);
+        return { ok: true, data: { ...result, snapshotDiff } };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn("compact-exec-diff-failed", {
+          session: this.session,
+          pageId: args.pageId,
+          error: message,
+        });
+        return {
+          ok: true,
+          data: {
+            ...result,
+            snapshotDiffError:
+              `Failed to do post-diff snapshot: ${message}. ` +
+              "The exec itself succeeded. Run libretto snapshot if you need the " +
+              "current page state, or omit --diff-snapshot when the page may close.",
+          },
+        };
+      }
     } catch (error) {
       return this.createExecErrorResult(error);
     }
@@ -899,16 +879,9 @@ class BrowserDaemon {
     args: Parameters<CliToDaemonApi["readonlyExec"]>[0],
   ): Promise<DaemonExecResult> {
     try {
-      const targetPage = this.resolveTargetPage(args.pageId);
-      const data = await runWithOperationTimeout(
-        () => handleReadonlyExec(targetPage, args.code),
-        {
-          operation: "readonly-exec",
-          session: this.session,
-          timeoutMs: args.timeoutMs,
-          pageId: args.pageId,
-          onTimeout: () => interruptPageExecution(targetPage),
-        },
+      const data = await handleReadonlyExec(
+        this.resolveTargetPage(args.pageId),
+        args.code,
       );
       return { ok: true, data };
     } catch (error) {
