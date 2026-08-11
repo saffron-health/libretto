@@ -8,6 +8,7 @@ import { GitHubPRMock } from "./components/GitHubPRMock";
 import { SectionIntro } from "./components/SectionIntro";
 import { SiteSection } from "./components/SiteSection";
 import { SectionDivider } from "./components/SectionDivider.js";
+import { CanvasAsciihedron } from "./components/CanvasAsciihedron";
 
 const GET_STARTED_URL = "/signin?mode=signup";
 const TALK_TO_A_DEV_URL = "https://cal.com/team/libretto/demo";
@@ -99,43 +100,55 @@ function TalkToADevLink({ fathomEvent }: { fathomEvent: string }) {
 
 function DebugAgentsHero() {
   return (
-    <section className="relative overflow-hidden px-8 pt-16 pb-16 md:pt-24">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_20%,color-mix(in_oklch,var(--color-accent)_12%,transparent),transparent_55%)]" />
-      <div className="relative mx-auto max-w-[1200px] text-center">
-        <Kicker className="mb-4">// PLAYWRIGHT PR AGENTS --</Kicker>
-        <Text
-          as="h1"
-          size="5xl"
-          style="serif"
-          className="crt-glow mx-auto mb-6 max-w-[780px] tracking-[-0.04em] text-ink [text-wrap:pretty]"
-          htmlStyle={{
-            fontWeight: 300,
-            fontSize: "clamp(36px, 5vw, 64px)",
-            lineHeight: 1.05,
-          }}
-        >
-          Automatically fix failing Playwright scripts
-        </Text>
-        <Text
-          as="p"
-          size="lg"
-          className="mx-auto mb-8 max-w-[680px] leading-relaxed text-muted [text-wrap:pretty]"
-        >
-          Keep the browser automations you already run. When one fails,
-          Libretto investigates the live page and opens a GitHub pull request
-          with a proposed code fix.
-        </Text>
-        <div className="mb-16 flex flex-col items-center justify-center gap-3">
-          <Button
-            href={GET_STARTED_URL}
-            className="h-12 min-w-[240px] px-8 text-sm"
-            data-fathom-event="Debug agents hero get started click"
+    <section className="relative overflow-hidden px-6 pt-16 pb-20 md:px-8 md:pt-24 md:pb-28">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_at_64%_28%,color-mix(in_oklch,var(--color-green-9)_11%,transparent),transparent_48%)]" />
+      <div className="pointer-events-none absolute inset-0 flex translate-y-6 items-center justify-center select-none max-md:translate-y-0 lg:justify-end lg:pr-[4%]">
+        <CanvasAsciihedron
+          className="h-[1200px] w-[1200px] min-h-[900px] min-w-[900px] max-h-[160vw] max-w-[160vw] shrink-0 text-ink lg:h-[1400px] lg:w-[1400px]"
+          showAnnotations={false}
+          objectScale={1.15}
+          baseOpacity={0.1}
+        />
+      </div>
+      <div className="relative mx-auto grid max-w-[1120px] items-center gap-14 lg:grid-cols-[0.92fr_1.08fr] lg:gap-20">
+        <div>
+          <Kicker className="mb-5">// PLAYWRIGHT PR AGENTS --</Kicker>
+          <Text
+            as="h1"
+            size="5xl"
+            style="serif"
+            wrap="pretty"
+            className="crt-glow mb-6 max-w-[620px] tracking-[-0.045em] text-ink"
+            htmlStyle={{
+              fontWeight: 300,
+              fontSize: "clamp(42px, 6vw, 72px)",
+              lineHeight: 0.98,
+            }}
           >
-            Get started
-          </Button>
-          <TalkToADevLink fathomEvent="Debug agents hero talk to dev click" />
+            Automatically fix failing Playwright scripts
+          </Text>
+          <Text
+            as="p"
+            size="lg"
+            wrap="pretty"
+            className="mb-9 max-w-[560px] leading-relaxed text-muted"
+          >
+            Keep the browser automations you already run. When one fails,
+            Libretto investigates the live page and opens a GitHub pull request
+            with a proposed code fix.
+          </Text>
+          <div className="flex flex-col items-start gap-3">
+            <Button
+              href={GET_STARTED_URL}
+              className="h-12 min-w-[240px] px-8 text-sm"
+              data-fathom-event="Debug agents hero get started click"
+            >
+              Get started
+            </Button>
+            <TalkToADevLink fathomEvent="Debug agents hero talk to dev click" />
+          </div>
         </div>
-        <GitHubPRMock className="mx-auto max-w-[900px] text-left" />
+        <GitHubPRMock className="w-full text-left" />
       </div>
     </section>
   );

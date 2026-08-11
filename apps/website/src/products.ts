@@ -5,20 +5,9 @@ export interface ProductLink {
   kicker: string;
   status: "live" | "soon";
   fathomEvent: string;
-  hidden?: boolean;
 }
 
 export const PRODUCTS: ProductLink[] = [
-  {
-    href: "/chrome-extension",
-    name: "Chrome Extension",
-    tagline:
-      "Tell an agent what you need done in Chrome, then save it as a workflow you can run again or schedule in the cloud.",
-    kicker: "// BROWSER EXTENSION --",
-    status: "live",
-    fathomEvent: "Product listing chrome extension click",
-    hidden: true,
-  },
   {
     href: "/cli",
     name: "Libretto CLI",
@@ -45,5 +34,14 @@ export const PRODUCTS: ProductLink[] = [
     kicker: "// SDK --",
     status: "live",
     fathomEvent: "Product listing browser tools click",
+  },
+  {
+    href: "/chrome-extension",
+    name: "Chrome Extension",
+    tagline:
+      "Tell an agent what you need done in Chrome, then save it as a workflow you can run again or schedule in the cloud.",
+    kicker: "// BROWSER EXTENSION --",
+    status: "live",
+    fathomEvent: "Product listing chrome extension click",
   },
 ];

@@ -21,12 +21,21 @@ export function GitHubPRMock({ className = "" }: { className?: string }) {
         <div className="mb-2 font-mono text-[11px] text-muted">
           workflows/book-appointment.ts
         </div>
-        <div className="overflow-hidden rounded-md border border-rule font-mono text-xs leading-5">
-          <div className="bg-red-500/10 px-3 py-1 text-red-300">
-            {`- await page.locator('input[name="username"]').fill(login);`}
+        <div className="overflow-x-auto rounded-md border border-rule font-mono text-xs leading-5">
+          <div className="min-w-max bg-panel/60 px-3 py-1 text-muted">
+            {`  export async function signIn(page, login) {`}
           </div>
-          <div className="bg-green-9/15 px-3 py-1 text-accent-bright">
-            {`+ await page.locator('input[name="login"]').fill(login);`}
+          <div className="min-w-max bg-red-500/10 px-3 py-1 text-red-300">
+            {`-   await page.locator('input[name="username"]').fill(login);`}
+          </div>
+          <div className="min-w-max bg-green-9/15 px-3 py-1 text-accent-bright">
+            {`+   await page.locator('input[name="login"]').fill(login);`}
+          </div>
+          <div className="min-w-max bg-panel/60 px-3 py-1 text-muted">
+            {`    await page.getByRole('button', { name: 'Sign in' }).click();`}
+          </div>
+          <div className="min-w-max bg-panel/60 px-3 py-1 text-muted">
+            {`  }`}
           </div>
         </div>
         <p className="mt-3 text-xs leading-5 text-muted">
