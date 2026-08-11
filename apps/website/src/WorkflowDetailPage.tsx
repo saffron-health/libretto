@@ -378,7 +378,13 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     Source code
                   </p>
                 </div>
-                <span className="rounded-full border border-rule px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted">
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wide ${
+                    detail.open_workflow.stale
+                      ? "border-rule text-muted"
+                      : "border-accent/30 bg-green-9/10 text-accent-bright"
+                  }`}
+                >
                   {detail.open_workflow.stale ? "Older version" : "Live"}
                 </span>
               </div>
@@ -424,7 +430,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
 
         {detail.hosted_workflow && (
           <section className={panelClass}>
-            <div className="flex items-center justify-between gap-4 border-b border-rule px-5 py-4">
+            <div className="flex items-center justify-between gap-4 px-5 pb-2 pt-4">
               <div className="flex items-center gap-3">
                 <div>
                   <h2 className="text-base font-medium text-ink">Hosted workflow</h2>
@@ -432,7 +438,13 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     Runnable API
                   </p>
                 </div>
-                <span className="rounded-full border border-rule px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted">
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wide ${
+                    detail.hosted_workflow.stale
+                      ? "border-rule text-muted"
+                      : "border-accent/30 bg-green-9/10 text-accent-bright"
+                  }`}
+                >
                   {detail.hosted_workflow.stale ? "Older version" : "Live"}
                 </span>
               </div>
@@ -470,7 +482,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                 className={
                   detail.hosted_workflow.stale
                     ? primaryButtonClass
-                    : secondaryButtonClass
+                    : "inline-flex h-8 items-center justify-center rounded-md border border-accent/35 bg-green-9/10 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-accent-bright transition-colors hover:bg-green-9/25 disabled:cursor-not-allowed disabled:opacity-40"
                 }
               >
                 {busy === "host"
@@ -480,7 +492,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     : "Redeploy"}
               </button>
             </div>
-            <div className="border-t border-rule px-5 py-4">
+            <div className="px-5 py-4">
               <h3 className="text-sm font-medium text-ink">External runs</h3>
             </div>
             <HostedRunsTable summary={hostedRuns} />
