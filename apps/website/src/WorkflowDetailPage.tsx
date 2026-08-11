@@ -374,9 +374,6 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
               <div className="flex items-center gap-3">
                 <div>
                   <h2 className="text-base font-medium text-ink">Open workflow</h2>
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-muted">
-                    Source code
-                  </p>
                 </div>
                 <span
                   className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wide ${
@@ -434,9 +431,6 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
               <div className="flex items-center gap-3">
                 <div>
                   <h2 className="text-base font-medium text-ink">Hosted workflow</h2>
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-muted">
-                    Runnable API
-                  </p>
                 </div>
                 <span
                   className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wide ${
@@ -528,7 +522,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                   Make workflow publicly available
                 </span>
                 <span className="mt-1 block text-xs text-muted">
-                  Share its source or publish a runnable API.
+                  Choose how others can use it.
                 </span>
               </span>
               <span className="text-xs text-muted" aria-hidden>
@@ -551,7 +545,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     <div className="rounded-lg border border-rule bg-bg/25 p-4">
                       <h3 className="text-sm font-medium text-ink">Open workflow</h3>
                       <p className="mt-2 min-h-8 text-xs leading-5 text-muted">
-                        Publish source code others can inspect and import.
+                        Publish a version others can inspect and import.
                       </p>
                       <button
                         type="button"
@@ -569,7 +563,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     <div className="rounded-lg border border-rule bg-bg/25 p-4">
                       <h3 className="text-sm font-medium text-ink">Hosted workflow</h3>
                       <p className="mt-2 min-h-8 text-xs leading-5 text-muted">
-                        Publish an API others can run without seeing the source.
+                        Publish a hosted version others can run.
                       </p>
                       <button
                         type="button"
