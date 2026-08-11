@@ -161,6 +161,7 @@ async function execViaDaemon(
     pageId?: string;
     mode?: ExecMode;
     diffSnapshot?: boolean;
+    timeoutMs?: number;
   },
 ): Promise<void> {
   const mode = options.mode ?? "exec";
@@ -175,6 +176,7 @@ async function execViaDaemon(
     visualize: options.visualize,
     pageId: options.pageId,
     diffSnapshot: options.diffSnapshot,
+    timeoutMs: options.timeoutMs,
     via: "daemon",
   });
 
@@ -188,10 +190,12 @@ async function execViaDaemon(
             pageId: options.pageId,
             visualize: options.visualize,
             diffSnapshot: options.diffSnapshot,
+            timeoutMs: options.timeoutMs,
           })
         : await client.readonlyExec({
             code: cleanedCode,
             pageId: options.pageId,
+            timeoutMs: options.timeoutMs,
           });
   } finally {
     client.destroy();
@@ -232,6 +236,7 @@ async function runExec(
     pageId?: string;
     mode?: ExecMode;
     diffSnapshot?: boolean;
+    timeoutMs?: number;
   } = {},
 ): Promise<void> {
   const state = readSessionStateOrThrow(session);
@@ -604,10 +609,13 @@ export const execInput = SimpleCLI.input({
       help: "After a successful mutation, print compact snapshot page-change diffs",
     }),
     page: pageOption(),
+    timeout: SimpleCLI.option(z.coerce.number().int().positive().optional(), {
+      help: "Optional wall-clock timeout in ms (omit to use only Playwright timeouts)",
+    }),
   },
 }).refine(
   (input) => input.code !== undefined,
-  `Usage: libretto exec <code|-> [--session <name>] [--visualize] [--diff-snapshot]\n       echo '<code>' | libretto exec - [--session <name>] [--visualize] [--diff-snapshot]`,
+  `Usage: libretto exec <code|-> [--session <name>] [--visualize] [--diff-snapshot] [--timeout <ms>]\n       echo '<code>' | libretto exec - [--session <name>] [--visualize] [--diff-snapshot] [--timeout <ms>]`,
 );
 
 export const execCommand = SimpleCLI.command({
@@ -633,6 +641,7 @@ export const execCommand = SimpleCLI.command({
         pageId: input.page,
         mode: "exec",
         diffSnapshot: input.diffSnapshot,
+        timeoutMs: input.timeout,
       },
     );
   });
@@ -646,10 +655,13 @@ export const readonlyExecInput = SimpleCLI.input({
   named: {
     session: sessionOption(),
     page: pageOption(),
+    timeout: SimpleCLI.option(z.coerce.number().int().positive().optional(), {
+      help: "Optional wall-clock timeout in ms (omit to use only Playwright timeouts)",
+    }),
   },
 }).refine(
   (input) => input.code !== undefined,
-  `Usage: libretto readonly-exec <code|-> [--session <name>] [--page <id>]\n       echo '<code>' | libretto readonly-exec - [--session <name>] [--page <id>]`,
+  `Usage: libretto readonly-exec <code|-> [--session <name>] [--page <id>] [--timeout <ms>]\n       echo '<code>' | libretto readonly-exec - [--session <name>] [--page <id>] [--timeout <ms>]`,
 );
 
 export const readonlyExecCommand = SimpleCLI.command({
@@ -668,6 +680,7 @@ export const readonlyExecCommand = SimpleCLI.command({
     await runExec(codeFromArgsOrStdin, ctx.session, ctx.logger, {
       pageId: input.page,
       mode: "readonly-exec",
+      timeoutMs: input.timeout,
     });
   });
 

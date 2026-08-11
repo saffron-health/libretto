@@ -64,6 +64,32 @@ describe("daemon IPC", () => {
     expect(result.stdout).toContain("Exec Test");
   }, 45_000);
 
+  test("exec --timeout reports session details instead of hanging", async ({
+    librettoCli,
+    workspacePath,
+  }) => {
+    const session = "daemon-ipc-exec-timeout";
+    const url = await writeFixturePage(
+      workspacePath,
+      "exec-timeout",
+      "Exec Timeout",
+    );
+    await librettoCli(`open "${url}" --headless --session ${session}`);
+
+    const result = await librettoCli(
+      `exec "await page.evaluate(() => new Promise(() => {}))" --session ${session} --timeout 200`,
+    );
+    expect(result.stderr).toContain("exec timed out after 200ms");
+    expect(result.stderr).toContain(`session: ${session}`);
+    expect(result.stderr).toContain("Raise --timeout");
+
+    // Cancel should free the session for later commands.
+    const followUp = await librettoCli(
+      `exec "await page.title()" --session ${session}`,
+    );
+    expect(followUp.stdout).toContain("Exec Timeout");
+  }, 45_000);
+
   test("exec prints console output through daemon IPC", async ({
     librettoCli,
     workspacePath,

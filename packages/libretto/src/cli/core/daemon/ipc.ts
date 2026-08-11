@@ -26,9 +26,22 @@ export type DaemonExecArgs = {
   visualize?: boolean;
   /** When true, capture before/after compact snapshots and return a page-change diff. */
   diffSnapshot?: boolean;
+  /**
+   * Optional wall-clock deadline in ms. Omit for no outer deadline so Playwright
+   * and application timeouts surface their own diagnostics.
+   */
+  timeoutMs?: number;
 };
 
-export type DaemonReadonlyExecArgs = { code: string; pageId?: string };
+export type DaemonReadonlyExecArgs = {
+  code: string;
+  pageId?: string;
+  /**
+   * Optional wall-clock deadline in ms. Omit for no outer deadline so Playwright
+   * and application timeouts surface their own diagnostics.
+   */
+  timeoutMs?: number;
+};
 
 export type DaemonSnapshotArgs = {
   pageId?: string;
