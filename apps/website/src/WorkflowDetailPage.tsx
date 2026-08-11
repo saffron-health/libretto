@@ -58,9 +58,6 @@ type ShareResponse =
     }
   | { status: "review_expired" };
 
-type RunTab = "workflow" | "hosted";
-type PublishingMode = "open" | "hosted" | null;
-
 const panelClass =
   "overflow-hidden rounded-xl border border-rule bg-panel/55 shadow-[0_12px_40px_rgba(0,0,0,0.14)]";
 const primaryButtonClass =
@@ -221,9 +218,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
   const [detail, setDetail] = useState<WorkflowDetail | null>(null);
   const [hostedRuns, setHostedRuns] = useState<HostedRunSummary | null>(null);
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
-  const [activeTab, setActiveTab] = useState<RunTab>("workflow");
   const [publishingOpen, setPublishingOpen] = useState(false);
-  const [publishingMode, setPublishingMode] = useState<PublishingMode>(null);
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -339,8 +334,8 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
 
   const canPublish =
     detail.sharing_enabled && detail.deployment_status === "ready";
-  const hasHostedTab =
-    Boolean(detail.hosted_workflow) || hostedRuns.has_publication_history;
+  const hasPublicWorkflow =
+    Boolean(detail.open_workflow) || Boolean(detail.hosted_workflow);
 
   return (
     <DashboardShell
@@ -370,255 +365,220 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
           <div className="border-b border-rule px-5 py-4">
             <h2 className="text-base font-medium text-ink">Runs</h2>
           </div>
-          {hasHostedTab && (
-            <div className="border-b border-rule bg-bg/20 px-5 py-3">
-              <div
-                className="inline-flex rounded-lg border border-rule bg-bg/50 p-1"
-                role="tablist"
-                aria-label="Workflow run type"
-              >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "workflow"}
-                onClick={() => setActiveTab("workflow")}
-                className={`rounded-md px-3 py-2 text-xs transition-colors ${
-                  activeTab === "workflow"
-                    ? "bg-panel-hi text-ink shadow-sm"
-                    : "text-muted hover:text-ink"
-                }`}
-              >
-                Workflow runs
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "hosted"}
-                onClick={() => setActiveTab("hosted")}
-                className={`rounded-md px-3 py-2 text-xs transition-colors ${
-                  activeTab === "hosted"
-                    ? "bg-panel-hi text-ink shadow-sm"
-                    : "text-muted hover:text-ink"
-                }`}
-              >
-                Hosted runs
-                <span className="ml-1.5 text-[10px] text-muted">external</span>
-              </button>
-            </div>
-            </div>
-          )}
-          {activeTab === "hosted" && hasHostedTab ? (
-            <HostedRunsTable summary={hostedRuns} />
-          ) : (
-            <WorkflowRunsTable runs={workflowRuns} />
-          )}
+          <WorkflowRunsTable runs={workflowRuns} />
         </section>
 
-        <section className={panelClass}>
-          <button
-            type="button"
-            aria-expanded={publishingOpen}
-            onClick={() => setPublishingOpen((open) => !open)}
-            className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-panel-hi/25"
-          >
-            <span className="flex items-center gap-3">
-              <span className="text-sm font-medium text-ink">Publishing</span>
-              {(detail.open_workflow || detail.hosted_workflow) && (
-                <span className="rounded-full border border-rule px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted">
-                  {[detail.open_workflow, detail.hosted_workflow].filter(Boolean).length} live
-                </span>
-              )}
-            </span>
-            <span className="text-xs text-muted">
-              {publishingOpen ? "Hide" : "Manage"} <span aria-hidden>{publishingOpen ? "↑" : "↓"}</span>
-            </span>
-          </button>
-          {publishingOpen && (
-            <div className="border-t border-rule">
-              {!detail.sharing_enabled && (
-                <div className="border-b border-amber-300/20 bg-amber-300/5 px-5 py-3 text-xs text-amber-100">
-                  Publishing is disabled. Enable it in{" "}
-                  <a href="/dashboard/settings" className="underline">
-                    Settings
-                  </a>
-                  .
+        {detail.open_workflow && (
+          <section className={panelClass}>
+            <div className="flex items-center justify-between gap-4 border-b border-rule px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div>
+                  <h2 className="text-base font-medium text-ink">Open workflow</h2>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-muted">
+                    Source code
+                  </p>
                 </div>
-              )}
-
-              <div className="grid gap-3 p-4 sm:grid-cols-2">
-                {([
-                  {
-                    mode: "open" as const,
-                    title: "Open workflow",
-                    kind: "Source code",
-                    publication: detail.open_workflow,
-                  },
-                  {
-                    mode: "hosted" as const,
-                    title: "Hosted workflow",
-                    kind: "Runnable API",
-                    publication: detail.hosted_workflow,
-                  },
-                ]).map((option) => (
-                  <button
-                    key={option.mode}
-                    type="button"
-                    aria-pressed={publishingMode === option.mode}
-                    onClick={() =>
-                      setPublishingMode((current) =>
-                        current === option.mode ? null : option.mode,
-                      )
-                    }
-                    className={`flex items-center justify-between rounded-lg border px-4 py-4 text-left transition-colors ${
-                      publishingMode === option.mode
-                        ? "border-accent/45 bg-green-9/10"
-                        : "border-rule bg-bg/25 hover:border-accent/25 hover:bg-panel-hi/25"
-                    }`}
-                  >
-                    <span>
-                      <span className="block text-sm font-medium text-ink">
-                        {option.title}
-                      </span>
-                      <span className="mt-1 block text-[10px] uppercase tracking-[0.08em] text-muted">
-                        {option.kind}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-3">
-                      <span className="rounded-full border border-rule px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted">
-                        {option.publication
-                          ? option.publication.stale
-                            ? "Older"
-                            : "Live"
-                          : "Off"}
-                      </span>
-                      <span aria-hidden className="text-muted">›</span>
-                    </span>
-                  </button>
-                ))}
+                <span className="rounded-full border border-rule px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted">
+                  {detail.open_workflow.stale ? "Older version" : "Live"}
+                </span>
               </div>
+              <a
+                href={detail.open_workflow.open_workflow_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-muted no-underline hover:text-ink"
+              >
+                Public page ↗
+              </a>
+            </div>
+            {detail.open_workflow.stale && (
+              <div className="px-5 py-4">
+                <button
+                  type="button"
+                  disabled={!canPublish || busy !== null}
+                  onClick={() => void runAction("open", async () => shareOpen())}
+                  className={`${primaryButtonClass} min-w-40`}
+                >
+                  {busy === "open" ? "Publishing…" : "Publish latest"}
+                </button>
+              </div>
+            )}
+            <div className="flex justify-end border-t border-rule px-5 py-3">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => {
+                  if (!window.confirm("Stop sharing this workflow's source?")) return;
+                  void runAction("unshare", async () => {
+                    await orpcCall("/v1/workflows/unshare", { workflow });
+                    setNotice("Source sharing stopped.");
+                  });
+                }}
+                className="text-xs text-red-200/75 hover:text-red-200 disabled:opacity-40"
+              >
+                Stop sharing
+              </button>
+            </div>
+          </section>
+        )}
 
-              {publishingMode === "open" && (
-                <div className="border-t border-rule bg-bg/15">
-                  <div className="px-5 py-5">
-                    <h3 className="text-base font-medium text-ink">Open workflow</h3>
-                    {detail.open_workflow?.stale && (
-                      <p className="mt-1 text-xs text-muted">
-                        The public copy uses an older deployment.
+        {detail.hosted_workflow && (
+          <section className={panelClass}>
+            <div className="flex items-center justify-between gap-4 border-b border-rule px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div>
+                  <h2 className="text-base font-medium text-ink">Hosted workflow</h2>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-muted">
+                    Runnable API
+                  </p>
+                </div>
+                <span className="rounded-full border border-rule px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted">
+                  {detail.hosted_workflow.stale ? "Older version" : "Live"}
+                </span>
+              </div>
+              <a
+                href={detail.hosted_workflow.page_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-muted no-underline hover:text-ink"
+              >
+                Hosted page ↗
+              </a>
+            </div>
+            <div className="px-5 py-5">
+              <label className="block max-w-xl text-[10px] uppercase tracking-[0.08em] text-muted">
+                Description
+                <input
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  maxLength={2000}
+                  className="mt-1.5 h-9 w-full rounded-md border border-rule bg-bg/55 px-3 text-xs normal-case tracking-normal text-ink outline-none focus:border-accent/50"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={!canPublish || busy !== null}
+                onClick={() =>
+                  void runAction("host", async () => {
+                    await orpcCall("/v1/workflows/host", {
+                      workflow,
+                      description: description.trim() || undefined,
+                    });
+                    setNotice("Hosted workflow deployed.");
+                  })
+                }
+                className={`${primaryButtonClass} mt-4 min-w-40`}
+              >
+                {busy === "host"
+                  ? "Deploying…"
+                  : detail.hosted_workflow.stale
+                    ? "Deploy latest"
+                    : "Redeploy"}
+              </button>
+            </div>
+            <div className="border-t border-rule px-5 py-4">
+              <h3 className="text-sm font-medium text-ink">External runs</h3>
+            </div>
+            <HostedRunsTable summary={hostedRuns} />
+            <div className="flex justify-end border-t border-rule px-5 py-3">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => {
+                  if (!window.confirm("Stop hosting this workflow?")) return;
+                  void runAction("unhost", async () => {
+                    await orpcCall("/v1/workflows/unhost", { workflow });
+                    setNotice("Hosted workflow removed.");
+                  });
+                }}
+                className="text-xs text-red-200/75 hover:text-red-200 disabled:opacity-40"
+              >
+                Stop hosting
+              </button>
+            </div>
+          </section>
+        )}
+
+        {(!detail.open_workflow || !detail.hosted_workflow) && (
+          <section className={panelClass}>
+            <button
+              type="button"
+              aria-expanded={publishingOpen}
+              onClick={() => setPublishingOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-panel-hi/25"
+            >
+              <span>
+                <span className="block text-sm font-medium text-ink">
+                  {hasPublicWorkflow
+                    ? "Add another public version"
+                    : "Make workflow publicly available"}
+                </span>
+                {!hasPublicWorkflow && (
+                  <span className="mt-1 block text-xs text-muted">
+                    Share its source or publish a runnable API.
+                  </span>
+                )}
+              </span>
+              <span className="text-xs text-muted" aria-hidden>
+                {publishingOpen ? "↑" : "↓"}
+              </span>
+            </button>
+            {publishingOpen && (
+              <div className="border-t border-rule">
+                {!detail.sharing_enabled && (
+                  <div className="border-b border-amber-300/20 bg-amber-300/5 px-5 py-3 text-xs text-amber-100">
+                    Publishing is disabled. Enable it in{" "}
+                    <a href="/dashboard/settings" className="underline">
+                      Settings
+                    </a>
+                    .
+                  </div>
+                )}
+                <div className="grid gap-3 p-4 sm:grid-cols-2">
+                  {!detail.open_workflow && (
+                    <div className="rounded-lg border border-rule bg-bg/25 p-4">
+                      <h3 className="text-sm font-medium text-ink">Open workflow</h3>
+                      <p className="mt-2 min-h-8 text-xs leading-5 text-muted">
+                        Publish source code others can inspect and import.
                       </p>
-                    )}
-                    {(!detail.open_workflow || detail.open_workflow.stale) && (
                       <button
                         type="button"
                         disabled={!canPublish || busy !== null}
                         onClick={() =>
                           void runAction("open", async () => shareOpen())
                         }
-                        className={`${primaryButtonClass} mt-5 min-w-44`}
+                        className={`${primaryButtonClass} mt-4 w-full`}
                       >
-                        {busy === "open"
-                          ? "Publishing…"
-                          : detail.open_workflow
-                            ? "Publish latest"
-                            : "Publish source"}
+                        {busy === "open" ? "Publishing…" : "Publish Open workflow"}
                       </button>
-                    )}
-                  </div>
-                  {detail.open_workflow && (
-                    <div className="flex items-center justify-between border-t border-rule px-5 py-3 text-xs">
-                      <a
-                        href={detail.open_workflow.open_workflow_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-muted no-underline hover:text-ink"
-                      >
-                        Public page ↗
-                      </a>
+                    </div>
+                  )}
+                  {!detail.hosted_workflow && (
+                    <div className="rounded-lg border border-rule bg-bg/25 p-4">
+                      <h3 className="text-sm font-medium text-ink">Hosted workflow</h3>
+                      <p className="mt-2 min-h-8 text-xs leading-5 text-muted">
+                        Publish an API others can run without seeing the source.
+                      </p>
                       <button
                         type="button"
-                        disabled={busy !== null}
-                        onClick={() => {
-                          if (!window.confirm("Stop sharing this workflow's source?")) return;
-                          void runAction("unshare", async () => {
-                            await orpcCall("/v1/workflows/unshare", { workflow });
-                            setNotice("Source sharing stopped.");
-                          });
-                        }}
-                        className="text-red-200/75 hover:text-red-200 disabled:opacity-40"
+                        disabled={!canPublish || busy !== null}
+                        onClick={() =>
+                          void runAction("host", async () => {
+                            await orpcCall("/v1/workflows/host", { workflow });
+                            setNotice("Hosted workflow published.");
+                          })
+                        }
+                        className={`${primaryButtonClass} mt-4 w-full`}
                       >
-                        Stop sharing
+                        {busy === "host" ? "Publishing…" : "Publish Hosted workflow"}
                       </button>
                     </div>
                   )}
                 </div>
-              )}
-
-              {publishingMode === "hosted" && (
-                <div className="border-t border-rule bg-bg/15">
-                  <div className="px-5 py-5">
-                    <h3 className="text-base font-medium text-ink">Hosted workflow</h3>
-                    <label className="mt-4 block max-w-xl text-[10px] uppercase tracking-[0.08em] text-muted">
-                      Description
-                      <input
-                        value={description}
-                        onChange={(event) => setDescription(event.target.value)}
-                        maxLength={2000}
-                        className="mt-1.5 h-9 w-full rounded-md border border-rule bg-bg/55 px-3 text-xs normal-case tracking-normal text-ink outline-none focus:border-accent/50"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      disabled={!canPublish || busy !== null}
-                      onClick={() =>
-                        void runAction("host", async () => {
-                          await orpcCall("/v1/workflows/host", {
-                            workflow,
-                            description: description.trim() || undefined,
-                          });
-                          setNotice("Hosted workflow published.");
-                        })
-                      }
-                      className={`${primaryButtonClass} mt-4 min-w-44`}
-                    >
-                      {busy === "host"
-                        ? "Publishing…"
-                        : detail.hosted_workflow?.stale
-                          ? "Publish latest"
-                          : detail.hosted_workflow
-                            ? "Save"
-                            : "Publish hosted"}
-                    </button>
-                  </div>
-                  {detail.hosted_workflow && (
-                    <div className="flex items-center justify-between border-t border-rule px-5 py-3 text-xs">
-                      <a
-                        href={detail.hosted_workflow.page_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-muted no-underline hover:text-ink"
-                      >
-                        Hosted page ↗
-                      </a>
-                      <button
-                        type="button"
-                        disabled={busy !== null}
-                        onClick={() => {
-                          if (!window.confirm("Stop hosting this workflow?")) return;
-                          void runAction("unhost", async () => {
-                            await orpcCall("/v1/workflows/unhost", { workflow });
-                            setNotice("Hosted workflow removed.");
-                          });
-                        }}
-                        className="text-red-200/75 hover:text-red-200 disabled:opacity-40"
-                      >
-                        Stop hosting
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </DashboardShell>
   );
