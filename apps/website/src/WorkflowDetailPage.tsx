@@ -499,7 +499,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
           </section>
         )}
 
-        {(!detail.open_workflow || !detail.hosted_workflow) && (
+        {!hasPublicWorkflow && (
           <section className={panelClass}>
             <button
               type="button"
@@ -509,15 +509,11 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
             >
               <span>
                 <span className="block text-sm font-medium text-ink">
-                  {hasPublicWorkflow
-                    ? "Add another public version"
-                    : "Make workflow publicly available"}
+                  Make workflow publicly available
                 </span>
-                {!hasPublicWorkflow && (
-                  <span className="mt-1 block text-xs text-muted">
-                    Share its source or publish a runnable API.
-                  </span>
-                )}
+                <span className="mt-1 block text-xs text-muted">
+                  Share its source or publish a runnable API.
+                </span>
               </span>
               <span className="text-xs text-muted" aria-hidden>
                 {publishingOpen ? "↑" : "↓"}
