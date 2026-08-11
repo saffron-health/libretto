@@ -518,10 +518,10 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
             >
               <span>
                 <span className="block text-sm font-medium text-ink">
-                  Make workflow publicly available
+                  Share workflow outside this workspace
                 </span>
                 <span className="mt-1 block text-xs text-muted">
-                  Choose how others can use it.
+                  Choose whether to share its source or a public Hosted run API.
                 </span>
               </span>
               <span className="text-xs text-muted" aria-hidden>
