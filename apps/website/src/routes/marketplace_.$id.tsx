@@ -1,14 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { MarketplaceWorkflowPage } from "../MarketplacePage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/marketplace_/$id")({
-  head: () => ({
-    meta: [{ title: "Marketplace Workflow | Libretto" }],
-  }),
-  component: MarketplaceWorkflowRoute,
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/open-workflows/$id",
+      params: { id: params.id },
+    });
+  },
 });
-
-function MarketplaceWorkflowRoute() {
-  const { id } = Route.useParams();
-  return <MarketplaceWorkflowPage shareId={id} />;
-}
