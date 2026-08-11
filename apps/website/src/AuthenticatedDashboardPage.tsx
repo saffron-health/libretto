@@ -549,11 +549,14 @@ function WorkflowsTable() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     orpcCall<{
-      deployed_workflows: WorkflowRow[];
-      in_progress_builds: WorkflowBuildRow[];
+      deployed_workflows?: WorkflowRow[];
+      in_progress_builds?: WorkflowBuildRow[];
     }>("/v1/workflows/list")
       .then((result) =>
-        setRows([...result.in_progress_builds, ...result.deployed_workflows]),
+        setRows([
+          ...(result.in_progress_builds ?? []),
+          ...(result.deployed_workflows ?? []),
+        ]),
       )
       .catch((err) =>
         setError(
