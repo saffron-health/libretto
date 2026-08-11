@@ -17,15 +17,11 @@ type WorkflowDetail = {
   deployment_status: "building" | "ready" | "failed";
   updated_at: string;
   sharing_enabled: boolean;
-  open_workflow: (Publication & {
-    open_workflow_url: string;
-  }) | null;
-  hosted_workflow: (Publication & {
-    page_url: string;
-  }) | null;
+  open_workflow: (Publication & { open_workflow_url: string }) | null;
+  hosted_workflow: (Publication & { page_url: string }) | null;
 };
 
-type RunSummary = {
+type HostedRunSummary = {
   has_publication_history: boolean;
   metrics: {
     runs_last_30_days: number;
@@ -36,6 +32,15 @@ type RunSummary = {
     ran_at: string;
     outcome: "succeeded" | "failed" | "in_progress" | "cancelled";
   }>;
+};
+
+type WorkflowRun = {
+  job_id: string;
+  status: "queued" | "starting_browser" | "running" | "completed" | "failed" | "cancelled";
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  failure_class: string | null;
 };
 
 type PrivacyFinding = {
@@ -53,10 +58,16 @@ type ShareResponse =
     }
   | { status: "review_expired" };
 
-const cardClass =
-  "rounded-xl border border-rule bg-panel/65 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.16)] sm:p-6";
-const buttonClass =
-  "libretto-button libretto-button--default inline-flex h-10 items-center justify-center disabled:cursor-not-allowed disabled:opacity-50";
+type RunTab = "workflow" | "hosted";
+
+const panelClass =
+  "overflow-hidden rounded-xl border border-rule bg-panel/55 shadow-[0_12px_40px_rgba(0,0,0,0.14)]";
+const primaryButtonClass =
+  "inline-flex h-8 items-center justify-center rounded-md border border-accent/45 bg-green-9/55 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-ink transition-colors hover:bg-green-9/80 disabled:cursor-not-allowed disabled:opacity-40";
+const secondaryButtonClass =
+  "inline-flex h-8 items-center justify-center rounded-md border border-rule bg-bg/35 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-muted no-underline transition-colors hover:border-accent/35 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40";
+const dangerButtonClass =
+  "inline-flex h-8 items-center justify-center rounded-md border border-red-400/20 bg-transparent px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-red-200 transition-colors hover:border-red-400/40 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -65,25 +76,173 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function formatDuration(startedAt: string | null, completedAt: string | null) {
+  if (!startedAt || !completedAt) return "—";
+  const seconds = Math.max(
+    0,
+    Math.round(
+      (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000,
+    ),
+  );
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function StatusPill({ value }: { value: string }) {
+  const success = value === "completed" || value === "succeeded";
+  const failed = value === "failed";
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.06em] ${
+        success
+          ? "border-accent/25 bg-green-9/10 text-accent-bright"
+          : failed
+            ? "border-red-400/25 bg-red-500/10 text-red-200"
+            : "border-rule bg-bg/40 text-muted"
+      }`}
+    >
+      {value.replaceAll("_", " ")}
+    </span>
+  );
+}
+
+function EmptyRuns({ hosted }: { hosted?: boolean }) {
+  return (
+    <div className="px-5 py-12 text-center">
+      <p className="text-sm text-ink">
+        {hosted ? "No external Hosted runs yet." : "No workflow runs yet."}
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        Runs will appear here after this workflow is invoked.
+      </p>
+    </div>
+  );
+}
+
+function WorkflowRunsTable({ runs }: { runs: WorkflowRun[] }) {
+  if (runs.length === 0) return <EmptyRuns />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[700px] border-collapse">
+        <thead>
+          <tr className="border-b border-rule bg-panel-hi/30">
+            <th className="px-5 py-3 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+              Started
+            </th>
+            <th className="px-5 py-3 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+              Status
+            </th>
+            <th className="px-5 py-3 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+              Runtime
+            </th>
+            <th className="px-5 py-3 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+              Result
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {runs.map((run) => (
+            <tr key={run.job_id} className="border-b border-rule last:border-0">
+              <td className="px-5 py-4 text-sm text-muted">
+                {formatDate(run.started_at ?? run.created_at)}
+              </td>
+              <td className="px-5 py-4">
+                <StatusPill value={run.status} />
+              </td>
+              <td className="px-5 py-4 font-mono text-xs text-muted">
+                {formatDuration(run.started_at, run.completed_at)}
+              </td>
+              <td className="px-5 py-4 text-sm text-muted">
+                {run.failure_class ?? (run.status === "completed" ? "Completed" : "—")}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function HostedRunsTable({ summary }: { summary: HostedRunSummary }) {
+  return (
+    <>
+      <div className="grid gap-px border-b border-rule bg-rule sm:grid-cols-3">
+        {[
+          ["Runs in 30 days", summary.metrics.runs_last_30_days],
+          ["Succeeded", summary.metrics.succeeded_last_30_days],
+          ["Failed", summary.metrics.failed_last_30_days],
+        ].map(([label, value]) => (
+          <div key={label} className="bg-panel px-5 py-4">
+            <p className="font-mono text-2xl text-ink">{value}</p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-muted">
+              {label}
+            </p>
+          </div>
+        ))}
+      </div>
+      {summary.runs.length === 0 ? (
+        <EmptyRuns hosted />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] border-collapse">
+            <thead>
+              <tr className="border-b border-rule bg-panel-hi/30">
+                <th className="px-5 py-3 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+                  Ran at
+                </th>
+                <th className="px-5 py-3 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+                  Outcome
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.runs.map((run, index) => (
+                <tr
+                  key={`${run.ran_at}-${index}`}
+                  className="border-b border-rule last:border-0"
+                >
+                  <td className="px-5 py-4 text-sm text-muted">
+                    {formatDate(run.ran_at)}
+                  </td>
+                  <td className="px-5 py-4">
+                    <StatusPill value={run.outcome} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function WorkflowDetailPage({ workflow }: { workflow: string }) {
   const [session, setSession] = useState<CloudSession | null>(null);
   const [detail, setDetail] = useState<WorkflowDetail | null>(null);
-  const [runs, setRuns] = useState<RunSummary | null>(null);
+  const [hostedRuns, setHostedRuns] = useState<HostedRunSummary | null>(null);
+  const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
+  const [activeTab, setActiveTab] = useState<RunTab>("workflow");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function refresh() {
-    const [nextDetail, nextRuns] = await Promise.all([
+    const [nextDetail, nextHostedRuns, nextWorkflowRuns] = await Promise.all([
       orpcCall<WorkflowDetail>("/v1/workflows/get", { workflow }),
-      orpcCall<RunSummary>("/v1/workflows/hostedRuns", {
+      orpcCall<HostedRunSummary>("/v1/workflows/hostedRuns", {
+        workflow,
+        limit: 100,
+      }),
+      orpcCall<{ jobs: WorkflowRun[] }>("/v1/dashboard/jobs", {
         workflow,
         limit: 100,
       }),
     ]);
     setDetail(nextDetail);
-    setRuns(nextRuns);
+    setHostedRuns(nextHostedRuns);
+    setWorkflowRuns(nextWorkflowRuns.jobs);
     setDescription(nextDetail.hosted_workflow?.description ?? "");
   }
 
@@ -169,7 +328,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
     }
   }
 
-  if (!session || !detail) {
+  if (!session || !detail || !hostedRuns) {
     return (
       <div className="grid min-h-screen place-items-center bg-bg px-6 text-sm text-muted">
         {error ?? "Loading workflow…"}
@@ -179,6 +338,9 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
 
   const canPublish =
     detail.sharing_enabled && detail.deployment_status === "ready";
+  const hasHostedTab =
+    Boolean(detail.hosted_workflow) || hostedRuns.has_publication_history;
+
   return (
     <DashboardShell
       section="workflows"
@@ -186,11 +348,8 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
       title={detail.workflow}
       description={`Updated ${formatDate(detail.updated_at)}`}
       action={
-        <a
-          href="/dashboard/workflows"
-          className="libretto-button inline-flex h-10 items-center no-underline"
-        >
-          Back to workflows
+        <a href="/dashboard/workflows" className={secondaryButtonClass}>
+          ← Workflows
         </a>
       }
     >
@@ -205,200 +364,203 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
             {notice}
           </p>
         )}
-        {!detail.sharing_enabled && (
-          <p className="rounded-md border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
-            Workflow sharing is disabled. A workspace owner can enable it in{" "}
-            <a href="/dashboard/settings" className="underline">
-              Settings
-            </a>
-            .
-          </p>
-        )}
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className={cardClass}>
-            <h2 className="text-lg font-medium text-ink">Open workflow</h2>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              Publish source that other users can inspect and import.
-            </p>
-            {detail.open_workflow && (
-              <p className="mt-3 text-xs text-muted">
-                {detail.open_workflow.stale
-                  ? "A newer deployment is available."
-                  : "Published from the current workflow."}
+        <section className={panelClass}>
+          <div className="flex items-end justify-between border-b border-rule px-5 pt-5">
+            <div>
+              <h2 className="text-base font-medium text-ink">Runs</h2>
+              <p className="mt-1 pb-4 text-xs text-muted">
+                Execution history for this workflow.
               </p>
-            )}
-            <div className="mt-5 flex flex-wrap gap-2">
+            </div>
+            <div className="flex gap-5" role="tablist" aria-label="Workflow run type">
               <button
                 type="button"
-                disabled={!canPublish || busy !== null}
-                onClick={() =>
-                  void runAction("open", async () => shareOpen())
-                }
-                className={buttonClass}
+                role="tab"
+                aria-selected={activeTab === "workflow"}
+                onClick={() => setActiveTab("workflow")}
+                className={`border-b-2 pb-4 text-xs transition-colors ${
+                  activeTab === "workflow"
+                    ? "border-accent text-ink"
+                    : "border-transparent text-muted hover:text-ink"
+                }`}
               >
-                {busy === "open"
-                  ? "Publishing…"
-                  : detail.open_workflow
-                    ? "Refresh"
-                    : "Publish"}
+                Workflow runs
               </button>
-              {detail.open_workflow && (
-                <>
-                  <a
-                    href={detail.open_workflow.open_workflow_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="libretto-button inline-flex h-10 items-center no-underline"
-                  >
-                    View
-                  </a>
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() => {
-                      if (!window.confirm("Remove this Open workflow?")) return;
-                      void runAction("unshare", async () => {
-                        await orpcCall("/v1/workflows/unshare", { workflow });
-                        setNotice("Open workflow removed.");
-                      });
-                    }}
-                    className="libretto-button h-10"
-                  >
-                    Remove
-                  </button>
-                </>
+              {hasHostedTab && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "hosted"}
+                  onClick={() => setActiveTab("hosted")}
+                  className={`border-b-2 pb-4 text-xs transition-colors ${
+                    activeTab === "hosted"
+                      ? "border-accent text-ink"
+                      : "border-transparent text-muted hover:text-ink"
+                  }`}
+                >
+                  Hosted runs
+                </button>
               )}
             </div>
-          </section>
+          </div>
+          {activeTab === "hosted" && hasHostedTab ? (
+            <HostedRunsTable summary={hostedRuns} />
+          ) : (
+            <WorkflowRunsTable runs={workflowRuns} />
+          )}
+        </section>
 
-          <section className={cardClass}>
-            <h2 className="text-lg font-medium text-ink">Hosted workflow</h2>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              Publish an opaque API that external users run with their own
-              credentials.
+        <section className={panelClass}>
+          <div className="border-b border-rule px-5 py-4">
+            <h2 className="text-sm font-medium text-ink">Publishing</h2>
+            <p className="mt-1 text-xs text-muted">
+              Optional public versions of this workflow.
             </p>
-            <label className="mt-4 block text-xs text-muted">
-              Public description
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                maxLength={2000}
-                rows={3}
-                className="mt-2 w-full rounded-md border border-rule bg-bg px-3 py-2 text-sm text-ink outline-none focus:border-accent/50"
-              />
-            </label>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={!canPublish || busy !== null}
-                onClick={() =>
-                  void runAction("host", async () => {
-                    await orpcCall("/v1/workflows/host", {
-                      workflow,
-                      description: description.trim() || undefined,
-                    });
-                    setNotice("Hosted workflow published.");
-                  })
-                }
-                className={buttonClass}
-              >
-                {busy === "host"
-                  ? "Publishing…"
-                  : detail.hosted_workflow
-                    ? "Update"
-                    : "Publish"}
-              </button>
-              {detail.hosted_workflow && (
-                <>
-                  <a
-                    href={detail.hosted_workflow.page_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="libretto-button inline-flex h-10 items-center no-underline"
-                  >
-                    View
-                  </a>
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() => {
-                      if (!window.confirm("Unhost this workflow?")) return;
-                      void runAction("unhost", async () => {
-                        await orpcCall("/v1/workflows/unhost", { workflow });
-                        setNotice("Hosted workflow removed.");
-                      });
-                    }}
-                    className="libretto-button h-10"
-                  >
-                    Unhost
-                  </button>
-                </>
-              )}
+          </div>
+          {!detail.sharing_enabled && (
+            <div className="border-b border-amber-300/20 bg-amber-300/5 px-5 py-3 text-xs text-amber-100">
+              Workflow sharing is disabled. A workspace owner can enable it in{" "}
+              <a href="/dashboard/settings" className="underline">
+                Settings
+              </a>
+              .
             </div>
-          </section>
-        </div>
+          )}
 
-        {runs?.has_publication_history && (
-          <section className={cardClass}>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="divide-y divide-rule">
+            <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-lg font-medium text-ink">
-                  External Hosted runs
-                </h2>
-                <p className="mt-1 text-sm text-muted">
-                  Times and outcomes only. Consumer identity and run data stay
-                  private.
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-medium text-ink">Open workflow</h3>
+                  {detail.open_workflow && (
+                    <span className="rounded-full border border-rule px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted">
+                      {detail.open_workflow.stale ? "Update available" : "Published"}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  Public source that others can inspect and import.
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                {[
-                  ["30-day runs", runs.metrics.runs_last_30_days],
-                  ["Succeeded", runs.metrics.succeeded_last_30_days],
-                  ["Failed", runs.metrics.failed_last_30_days],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-md border border-rule px-3 py-2">
-                    <p className="text-lg text-ink">{value}</p>
-                    <p className="text-[10px] uppercase tracking-wide text-muted">
-                      {label}
-                    </p>
-                  </div>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={!canPublish || busy !== null}
+                  onClick={() =>
+                    void runAction("open", async () => shareOpen())
+                  }
+                  className={primaryButtonClass}
+                >
+                  {busy === "open"
+                    ? "Publishing…"
+                    : detail.open_workflow
+                      ? "Refresh"
+                      : "Publish open"}
+                </button>
+                {detail.open_workflow && (
+                  <>
+                    <a
+                      href={detail.open_workflow.open_workflow_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={secondaryButtonClass}
+                    >
+                      View
+                    </a>
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => {
+                        if (!window.confirm("Remove this Open workflow?")) return;
+                        void runAction("unshare", async () => {
+                          await orpcCall("/v1/workflows/unshare", { workflow });
+                          setNotice("Open workflow removed.");
+                        });
+                      }}
+                      className={dangerButtonClass}
+                    >
+                      Remove
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[520px] border-collapse">
-                <thead>
-                  <tr>
-                    <th className="border-b border-rule px-3 py-2 text-left text-xs text-muted">
-                      Ran at
-                    </th>
-                    <th className="border-b border-rule px-3 py-2 text-left text-xs text-muted">
-                      Outcome
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.runs.map((run, index) => (
-                    <tr key={`${run.ran_at}-${index}`}>
-                      <td className="border-b border-rule px-3 py-3 text-sm text-muted">
-                        {formatDate(run.ran_at)}
-                      </td>
-                      <td className="border-b border-rule px-3 py-3 text-sm text-ink">
-                        {run.outcome.replace("_", " ")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {runs.runs.length === 0 && (
-                <p className="py-6 text-center text-sm text-muted">
-                  No external runs yet.
+
+            <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-medium text-ink">Hosted workflow</h3>
+                  {detail.hosted_workflow && (
+                    <span className="rounded-full border border-rule px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted">
+                      {detail.hosted_workflow.stale ? "Update available" : "Published"}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  Opaque API that external users run with their own credentials.
                 </p>
-              )}
+                <label className="mt-3 block max-w-xl text-[10px] uppercase tracking-[0.08em] text-muted">
+                  Public description
+                  <input
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    maxLength={2000}
+                    className="mt-1.5 h-9 w-full rounded-md border border-rule bg-bg/55 px-3 text-xs normal-case tracking-normal text-ink outline-none focus:border-accent/50"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={!canPublish || busy !== null}
+                  onClick={() =>
+                    void runAction("host", async () => {
+                      await orpcCall("/v1/workflows/host", {
+                        workflow,
+                        description: description.trim() || undefined,
+                      });
+                      setNotice("Hosted workflow published.");
+                    })
+                  }
+                  className={primaryButtonClass}
+                >
+                  {busy === "host"
+                    ? "Publishing…"
+                    : detail.hosted_workflow
+                      ? "Update hosted"
+                      : "Publish hosted"}
+                </button>
+                {detail.hosted_workflow && (
+                  <>
+                    <a
+                      href={detail.hosted_workflow.page_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={secondaryButtonClass}
+                    >
+                      View
+                    </a>
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => {
+                        if (!window.confirm("Unhost this workflow?")) return;
+                        void runAction("unhost", async () => {
+                          await orpcCall("/v1/workflows/unhost", { workflow });
+                          setNotice("Hosted workflow removed.");
+                        });
+                      }}
+                      className={dangerButtonClass}
+                    >
+                      Unhost
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
       </div>
     </DashboardShell>
   );
