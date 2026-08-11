@@ -11,6 +11,7 @@ import { SectionDivider } from "./components/SectionDivider.js";
 import { Text } from "./components/Text";
 import { InstallSnippet } from "./components/InstallSnippet";
 import { Kicker } from "./components/Kicker";
+import { CanvasAsciihedron } from "./components/CanvasAsciihedron";
 
 const DEMO_VIDEO_SRC = "/demos/cli-demo.mp4";
 const DEMO_VIDEO_SOURCE =
@@ -18,19 +19,29 @@ const DEMO_VIDEO_SOURCE =
 
 function CliHero() {
   return (
-    <section className="relative overflow-hidden px-8 pt-16 pb-16 md:pt-24">
-      <div className="relative mx-auto max-w-[1200px]">
-        <div className="text-center">
-          <Kicker className="mb-4">// LIBRETTO CLI --</Kicker>
+    <section className="relative overflow-hidden px-6 pt-16 pb-20 md:px-8 md:pt-24 md:pb-28">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_at_64%_28%,color-mix(in_oklch,var(--color-green-9)_11%,transparent),transparent_48%)]" />
+      <div className="pointer-events-none absolute inset-0 flex translate-y-6 items-center justify-center select-none max-md:translate-y-0 lg:justify-end lg:pr-[4%]">
+        <CanvasAsciihedron
+          className="h-[1200px] w-[1200px] min-h-[900px] min-w-[900px] max-h-[160vw] max-w-[160vw] shrink-0 text-ink lg:h-[1400px] lg:w-[1400px]"
+          showAnnotations={false}
+          objectScale={1.15}
+          baseOpacity={0.1}
+        />
+      </div>
+      <div className="relative mx-auto grid max-w-[1120px] items-center gap-14 lg:grid-cols-[0.92fr_1.08fr] lg:gap-20">
+        <div>
+          <Kicker className="mb-5">// LIBRETTO CLI --</Kicker>
           <Text
             as="h1"
             size="5xl"
             style="serif"
-            className="crt-glow mx-auto mb-6 max-w-[720px] tracking-[-0.04em] text-ink [text-wrap:pretty]"
+            wrap="pretty"
+            className="crt-glow mb-6 max-w-[620px] tracking-[-0.045em] text-ink"
             htmlStyle={{
               fontWeight: 300,
-              fontSize: "clamp(36px, 5vw, 64px)",
-              lineHeight: 1.05,
+              fontSize: "clamp(42px, 6vw, 72px)",
+              lineHeight: 0.98,
             }}
           >
             Turn website workflows into reliable APIs
@@ -38,12 +49,13 @@ function CliHero() {
           <Text
             as="p"
             size="lg"
-            className="mx-auto mb-8 max-w-[640px] leading-relaxed text-muted [text-wrap:pretty]"
+            wrap="pretty"
+            className="mb-9 max-w-[560px] leading-relaxed text-muted"
           >
             An open-source CLI that records live browser workflows and compiles
             them into fast, reusable scripts in your codebase.
           </Text>
-          <div className="mb-16 flex flex-col items-center justify-center gap-3">
+          <div className="flex flex-col items-start gap-3">
             <InstallSnippet />
             <div className="text-xs text-muted">
               or{" "}
@@ -57,7 +69,7 @@ function CliHero() {
             </div>
           </div>
         </div>
-        <div className="mx-auto max-w-[960px] overflow-hidden rounded-xl border border-rule bg-panel/50 shadow-lg shadow-black/30">
+        <div className="w-full overflow-hidden rounded-xl border border-rule bg-panel/50 shadow-lg shadow-black/30">
           <div className="flex items-center gap-2 border-b border-rule px-4 py-2.5">
             <span className="size-2.5 rounded-full bg-rule" />
             <span className="size-2.5 rounded-full bg-rule" />

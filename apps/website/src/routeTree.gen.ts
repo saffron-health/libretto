@@ -19,6 +19,7 @@ import { Route as InviteRouteImport } from './routes/invite'
 import { Route as DebugAgentsRouteImport } from './routes/debug-agents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CliRouteImport } from './routes/cli'
+import { Route as ChromeExtensionRouteImport } from './routes/chrome-extension'
 import { Route as BrowserToolsRouteImport } from './routes/browser-tools'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
 import { Route as BlogRouteRouteImport } from './routes/blog/route'
@@ -85,6 +86,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const CliRoute = CliRouteImport.update({
   id: '/cli',
   path: '/cli',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChromeExtensionRoute = ChromeExtensionRouteImport.update({
+  id: '/chrome-extension',
+  path: '/chrome-extension',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrowserToolsRoute = BrowserToolsRouteImport.update({
@@ -180,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
   '/browser-tools': typeof BrowserToolsRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/brand-kit': typeof BrandKitRoute
   '/browser-tools': typeof BrowserToolsRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
   '/browser-tools': typeof BrowserToolsRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/blog'
     | '/brand-kit'
     | '/browser-tools'
+    | '/chrome-extension'
     | '/cli'
     | '/dashboard'
     | '/debug-agents'
@@ -297,6 +307,7 @@ export interface FileRouteTypes {
     | '/'
     | '/brand-kit'
     | '/browser-tools'
+    | '/chrome-extension'
     | '/cli'
     | '/dashboard'
     | '/debug-agents'
@@ -326,6 +337,7 @@ export interface FileRouteTypes {
     | '/blog'
     | '/brand-kit'
     | '/browser-tools'
+    | '/chrome-extension'
     | '/cli'
     | '/dashboard'
     | '/debug-agents'
@@ -356,6 +368,7 @@ export interface RootRouteChildren {
   BlogRouteRoute: typeof BlogRouteRouteWithChildren
   BrandKitRoute: typeof BrandKitRoute
   BrowserToolsRoute: typeof BrowserToolsRoute
+  ChromeExtensionRoute: typeof ChromeExtensionRoute
   CliRoute: typeof CliRoute
   DashboardRoute: typeof DashboardRoute
   DebugAgentsRoute: typeof DebugAgentsRoute
@@ -449,6 +462,13 @@ declare module '@tanstack/react-router' {
       path: '/cli'
       fullPath: '/cli'
       preLoaderRoute: typeof CliRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chrome-extension': {
+      id: '/chrome-extension'
+      path: '/chrome-extension'
+      fullPath: '/chrome-extension'
+      preLoaderRoute: typeof ChromeExtensionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/browser-tools': {
@@ -592,6 +612,7 @@ const rootRouteChildren: RootRouteChildren = {
   BlogRouteRoute: BlogRouteRouteWithChildren,
   BrandKitRoute: BrandKitRoute,
   BrowserToolsRoute: BrowserToolsRoute,
+  ChromeExtensionRoute: ChromeExtensionRoute,
   CliRoute: CliRoute,
   DashboardRoute: DashboardRoute,
   DebugAgentsRoute: DebugAgentsRoute,

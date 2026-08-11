@@ -76,7 +76,7 @@ function Hero({
               lineHeight: 1.05,
             }}
           >
-            Automate the work that happens in your browser
+            Turn any workflow into a stable API.
           </AnimatedTitle>
         </Text>
         <Text
@@ -86,8 +86,8 @@ function Hero({
           htmlStyle={{ opacity: 0 }}
           className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:pretty]"
         >
-          Libretto makes tools for humans and agents to automate any browser
-          task: Chrome extensions, CLIs, SDKs, cloud browsers, and more.
+          Libretto helps agents build the most token-efficient automations
+          across public websites and on-prem systems.
         </Text>
         <div
           data-animate={AnimationTarget.Content}
@@ -106,7 +106,7 @@ function Hero({
             </a>
           </div>
           <div className="mt-10">
-            <BackedByYC variant="badge" fathomEvent="Hero YC click" />
+            <BackedByYC />
           </div>
         </div>
       </div>
