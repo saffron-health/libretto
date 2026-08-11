@@ -2009,7 +2009,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
               id="workflow-sharing-description"
               className="mt-2 max-w-2xl text-sm leading-6 text-muted"
             >
-              Allow people in this workspace to publish Open workflows with
+              Allow people in this workspace to publish open source workflows with
               source or Hosted workflows with an opaque run API. Credentials,
               inputs, and outputs are never included in publisher telemetry.
             </p>

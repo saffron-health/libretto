@@ -296,7 +296,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
       },
     });
     if (!("findings" in response) && response.status !== "review_expired") {
-      setNotice("Open workflow published.");
+      setNotice("Open source workflow published.");
       return;
     }
     if (response.status === "review_expired") {
@@ -373,7 +373,9 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
             <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div>
-                  <h2 className="text-base font-medium text-ink">Open workflow</h2>
+                  <h2 className="text-base font-medium text-ink">
+                    Open source workflow
+                  </h2>
                 </div>
                 <span
                   className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wide ${
@@ -543,7 +545,9 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                 <div className="grid gap-3 p-4 sm:grid-cols-2">
                   {!detail.open_workflow && (
                     <div className="rounded-lg border border-rule bg-bg/25 p-4">
-                      <h3 className="text-sm font-medium text-ink">Open workflow</h3>
+                      <h3 className="text-sm font-medium text-ink">
+                        Open source workflow
+                      </h3>
                       <p className="mt-2 min-h-8 text-xs leading-5 text-muted">
                         Publish a version others can inspect and import.
                       </p>
@@ -555,7 +559,9 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                         }
                         className={`${primaryButtonClass} mt-4 w-full`}
                       >
-                        {busy === "open" ? "Publishing…" : "Publish Open workflow"}
+                        {busy === "open"
+                          ? "Publishing…"
+                          : "Publish open source workflow"}
                       </button>
                     </div>
                   )}
