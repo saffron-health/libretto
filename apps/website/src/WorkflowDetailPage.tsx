@@ -488,9 +488,6 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     : "Redeploy"}
               </button>
             </div>
-            <div className="px-5 py-4">
-              <h3 className="text-sm font-medium text-ink">External runs</h3>
-            </div>
             <HostedRunsTable summary={hostedRuns} />
             <div className="flex justify-end border-t border-rule px-5 py-3">
               <button
