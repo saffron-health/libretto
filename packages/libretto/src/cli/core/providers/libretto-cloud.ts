@@ -31,6 +31,9 @@ export function createLibrettoCloudProvider(): ProviderApi {
       const startUrl = options?.startUrl?.trim() || undefined;
       const gpu = options?.gpu;
       const viewport = options?.viewport;
+      const disableDefaultProxy =
+        options?.disableDefaultProxy ??
+        readBooleanEnv("LIBRETTO_DISABLE_DEFAULT_PROXY", false);
       const resp = await fetch(`${endpoint}/v1/sessions/create`, {
         method: "POST",
         headers: {
@@ -53,6 +56,7 @@ export function createLibrettoCloudProvider(): ProviderApi {
                   },
                 }
               : {}),
+            ...(disableDefaultProxy ? { disable_default_proxy: true } : {}),
           },
         }),
       });
@@ -91,7 +95,8 @@ export function createLibrettoCloudProvider(): ProviderApi {
         sessionId: readySession.session_id,
         cdpEndpoint: readySession.cdp_url,
         liveViewUrl: readySession.live_view_url ?? undefined,
-        // Hosted sessions apply start_url before CDP is returned when set.
+        // Hosted sessions apply start_url before CDP is returned when set
+        // (including after disable_default_proxy flips Kernel to direct egress).
         startUrlPreloaded: Boolean(startUrl),
       };
     },
@@ -288,6 +293,12 @@ function readPositiveNumberEnv(name: string, fallback: number): number {
   if (!raw) return fallback;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function readBooleanEnv(name: string, defaultValue: boolean): boolean {
+  const value = process.env[name]?.trim().toLowerCase();
+  if (!value) return defaultValue;
+  return value === "1" || value === "true" || value === "yes";
 }
 
 function sendStartupStatus(message: string): void {

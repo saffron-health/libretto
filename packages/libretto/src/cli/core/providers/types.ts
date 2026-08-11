@@ -5,6 +5,10 @@ export type ProviderSessionCreateOptions = {
   startUrl?: string;
   gpu?: boolean;
   viewport?: { width: number; height: number };
+  // Libretto Cloud / Kernel only: turn off the provider's default residential
+  // stealth proxy so traffic uses direct egress. Mutually exclusive with a
+  // custom residential_proxy on the Cloud API.
+  disableDefaultProxy?: boolean;
 };
 
 export type ProviderSession = {

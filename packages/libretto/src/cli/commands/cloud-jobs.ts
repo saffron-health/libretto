@@ -97,6 +97,10 @@ export const createCloudJobInput = SimpleCLI.input({
       name: "residential-proxy",
       help: "Residential proxy config as a JSON object",
     }),
+    disableDefaultProxy: SimpleCLI.flag({
+      name: "disable-default-proxy",
+      help: "Disable Kernel's default residential stealth proxy (direct egress). Mutually exclusive with --residential-proxy. Needed for sites that fail with ERR_TUNNEL_CONNECTION_FAILED on the default proxy.",
+    }),
   },
 })
   .refine((input) => Boolean(input.workflow), createJobUsage)
@@ -113,6 +117,10 @@ export const createCloudJobInput = SimpleCLI.input({
       (!input.callbackUrl && !input.callbackSecret) ||
       Boolean(input.callbackUrl && input.callbackSecret),
     "Pass both --callback-url and --callback-secret, or omit both.",
+  )
+  .refine(
+    (input) => !(input.disableDefaultProxy && input.residentialProxy),
+    "Cannot pass both --disable-default-proxy and --residential-proxy.",
   );
 
 export const createCloudJobCommand = SimpleCLI.command({
@@ -149,6 +157,9 @@ export const createCloudJobCommand = SimpleCLI.command({
     if (input.skipCallbacks) payload.skip_callbacks = true;
     if (residentialProxy !== undefined) {
       payload.residential_proxy = residentialProxy;
+    }
+    if (input.disableDefaultProxy) {
+      payload.disable_default_proxy = true;
     }
 
     const response = await orpcCall<CreateJobResponse>({

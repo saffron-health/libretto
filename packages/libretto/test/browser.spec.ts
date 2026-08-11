@@ -570,6 +570,75 @@ describe("Libretto Cloud provider", () => {
     });
   });
 
+  it("forwards disableDefaultProxy and still marks startUrlPreloaded", async () => {
+    vi.stubEnv("LIBRETTO_API_KEY", "test-key");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/v1/sessions/create") {
+          return jsonResponse({
+            json: {
+              session_id: "session-direct-egress",
+              status: "open",
+              cdp_url:
+                "wss://cloud.example.test/devtools/session-direct-egress",
+              live_view_url: null,
+            },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await createLibrettoCloudProvider().createSession({
+      startUrl: "https://etendering.tenderboard.gov.om/product/publicDash",
+      disableDefaultProxy: true,
+    });
+
+    expect(session.startUrlPreloaded).toBe(true);
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
+      json: {
+        timeout_seconds: 3600,
+        start_url: "https://etendering.tenderboard.gov.om/product/publicDash",
+        disable_default_proxy: true,
+      },
+    });
+  });
+
+  it("reads LIBRETTO_DISABLE_DEFAULT_PROXY for cloud browser sessions", async () => {
+    vi.stubEnv("LIBRETTO_API_KEY", "test-key");
+    vi.stubEnv("LIBRETTO_DISABLE_DEFAULT_PROXY", "1");
+
+    const fetchMock = vi.fn(
+      async (url: string | URL | Request, _init?: RequestInit) => {
+        const pathname = new URL(String(url)).pathname;
+        if (pathname === "/v1/sessions/create") {
+          return jsonResponse({
+            json: {
+              session_id: "session-env-proxy",
+              status: "open",
+              cdp_url: "wss://cloud.example.test/devtools/session-env-proxy",
+              live_view_url: null,
+            },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createLibrettoCloudProvider().createSession();
+
+    expect(await readJsonBody(fetchMock.mock.calls[0]?.[1])).toEqual({
+      json: {
+        timeout_seconds: 3600,
+        disable_default_proxy: true,
+      },
+    });
+  });
+
   it("waits for queued sessions to receive a CDP URL", async () => {
     vi.stubEnv("LIBRETTO_API_KEY", "test-key");
     vi.stubEnv("LIBRETTO_TIMEOUT_SECONDS", "123");
