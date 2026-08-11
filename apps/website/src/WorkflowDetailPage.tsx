@@ -370,7 +370,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
 
         {detail.open_workflow && (
           <section className={panelClass}>
-            <div className="flex items-center justify-between gap-4 border-b border-rule px-5 py-4">
+            <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div>
                   <h2 className="text-base font-medium text-ink">Open workflow</h2>
@@ -382,42 +382,42 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                   {detail.open_workflow.stale ? "Older version" : "Live"}
                 </span>
               </div>
-              <a
-                href={detail.open_workflow.open_workflow_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-muted no-underline hover:text-ink"
-              >
-                Public page ↗
-              </a>
-            </div>
-            {detail.open_workflow.stale && (
-              <div className="px-5 py-4">
+              <div className="flex items-center gap-4">
+                {detail.open_workflow.stale && (
+                  <button
+                    type="button"
+                    disabled={!canPublish || busy !== null}
+                    onClick={() =>
+                      void runAction("open", async () => shareOpen())
+                    }
+                    className={primaryButtonClass}
+                  >
+                    {busy === "open" ? "Publishing…" : "Publish latest"}
+                  </button>
+                )}
+                <a
+                  href={detail.open_workflow.open_workflow_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-muted no-underline hover:text-ink"
+                >
+                  Public page ↗
+                </a>
                 <button
                   type="button"
-                  disabled={!canPublish || busy !== null}
-                  onClick={() => void runAction("open", async () => shareOpen())}
-                  className={`${primaryButtonClass} min-w-40`}
+                  disabled={busy !== null}
+                  onClick={() => {
+                    if (!window.confirm("Stop sharing this workflow's source?")) return;
+                    void runAction("unshare", async () => {
+                      await orpcCall("/v1/workflows/unshare", { workflow });
+                      setNotice("Source sharing stopped.");
+                    });
+                  }}
+                  className="text-xs text-red-200/75 hover:text-red-200 disabled:opacity-40"
                 >
-                  {busy === "open" ? "Publishing…" : "Publish latest"}
+                  Stop sharing
                 </button>
               </div>
-            )}
-            <div className="flex justify-end border-t border-rule px-5 py-3">
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => {
-                  if (!window.confirm("Stop sharing this workflow's source?")) return;
-                  void runAction("unshare", async () => {
-                    await orpcCall("/v1/workflows/unshare", { workflow });
-                    setNotice("Source sharing stopped.");
-                  });
-                }}
-                className="text-xs text-red-200/75 hover:text-red-200 disabled:opacity-40"
-              >
-                Stop sharing
-              </button>
             </div>
           </section>
         )}
@@ -445,14 +445,14 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                 Hosted page ↗
               </a>
             </div>
-            <div className="px-5 py-5">
-              <label className="block max-w-xl text-[10px] uppercase tracking-[0.08em] text-muted">
+            <div className="flex flex-col gap-3 border-b border-rule px-5 py-3 sm:flex-row sm:items-end">
+              <label className="block min-w-0 flex-1 text-[10px] uppercase tracking-[0.08em] text-muted sm:max-w-xl">
                 Description
                 <input
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   maxLength={2000}
-                  className="mt-1.5 h-9 w-full rounded-md border border-rule bg-bg/55 px-3 text-xs normal-case tracking-normal text-ink outline-none focus:border-accent/50"
+                  className="mt-1 h-8 w-full rounded-md border border-rule bg-bg/55 px-3 text-xs normal-case tracking-normal text-ink outline-none focus:border-accent/50"
                 />
               </label>
               <button
@@ -467,7 +467,11 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     setNotice("Hosted workflow deployed.");
                   })
                 }
-                className={`${primaryButtonClass} mt-4 min-w-40`}
+                className={
+                  detail.hosted_workflow.stale
+                    ? primaryButtonClass
+                    : secondaryButtonClass
+                }
               >
                 {busy === "host"
                   ? "Deploying…"
