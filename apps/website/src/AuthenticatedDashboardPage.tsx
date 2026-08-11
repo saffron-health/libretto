@@ -922,18 +922,25 @@ interface RepoRow {
   linked_at: string;
   account_login: string;
 }
-function ConnectedReposTable() {
+function ConnectedReposTable({
+  onHasRepositoriesChange,
+}: {
+  onHasRepositoriesChange: (hasRepositories: boolean) => void;
+}) {
   const [rows, setRows] = useState<RepoRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     orpcCall<{ repositories: RepoRow[] }>("/v1/github/listLinkedRepositories")
-      .then((r) => setRows(r.repositories))
+      .then((r) => {
+        setRows(r.repositories);
+        onHasRepositoriesChange(r.repositories.length > 0);
+      })
       .catch((err) =>
         setError(
           err instanceof Error ? err.message : "Could not load repositories.",
         ),
       );
-  }, []);
+  }, [onHasRepositoriesChange]);
   return (
     <TableShell>
       <table className="w-full min-w-[700px] border-collapse">
@@ -1909,6 +1916,359 @@ type CodeSharingStatus = {
   enabled: boolean;
 };
 
+type WebhookEndpoint = {
+  webhook_endpoint_id: string;
+  url: string;
+  description?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type WebhookCreateResponse = {
+  success: true;
+  webhook_endpoint_id: string;
+  message: string;
+  signing_secret?: string;
+};
+
+function WebhookSettingsPanel() {
+  const [endpoints, setEndpoints] = useState<WebhookEndpoint[] | null>(null);
+  const [editing, setEditing] = useState<WebhookEndpoint | "new" | null>(null);
+  const [url, setUrl] = useState("");
+  const [description, setDescription] = useState("");
+  const [signingSecret, setSigningSecret] = useState("");
+  const [active, setActive] = useState(true);
+  const [generatedSecret, setGeneratedSecret] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function refresh() {
+    const result = await orpcCall<{ webhook_endpoints: WebhookEndpoint[] }>(
+      "/v1/webhooks/list",
+    );
+    setEndpoints(result.webhook_endpoints);
+  }
+
+  async function refreshAfterMutation() {
+    try {
+      await refresh();
+    } catch {
+      setError(
+        "The change was saved, but the endpoint list could not be refreshed. Reload the page to see the latest state.",
+      );
+    }
+  }
+
+  useEffect(() => {
+    refresh().catch((err) =>
+      setError(
+        err instanceof Error ? err.message : "Could not load webhook endpoints.",
+      ),
+    );
+  }, []);
+
+  function startCreating() {
+    setEditing("new");
+    setUrl("");
+    setDescription("");
+    setSigningSecret("");
+    setActive(true);
+    setError(null);
+    setNotice(null);
+    setGeneratedSecret(null);
+  }
+
+  function startEditing(endpoint: WebhookEndpoint) {
+    setEditing(endpoint);
+    setUrl(endpoint.url);
+    setDescription(endpoint.description ?? "");
+    setSigningSecret("");
+    setActive(endpoint.active);
+    setError(null);
+    setNotice(null);
+    setGeneratedSecret(null);
+  }
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!editing) return;
+    const id = editing === "new" ? "new" : editing.webhook_endpoint_id;
+    setBusy(id);
+    setError(null);
+    setNotice(null);
+    setGeneratedSecret(null);
+    try {
+      if (editing === "new") {
+        const result = await orpcCall<WebhookCreateResponse>(
+          "/v1/webhooks/create",
+          {
+            url: url.trim(),
+            description: description.trim(),
+            active,
+          },
+        );
+        setGeneratedSecret(result.signing_secret ?? null);
+        setNotice("Webhook endpoint added.");
+      } else {
+        await orpcCall("/v1/webhooks/update", {
+          id: editing.webhook_endpoint_id,
+          url: url.trim(),
+          description: description.trim(),
+          active,
+          ...(signingSecret ? { signing_secret: signingSecret } : {}),
+        });
+        setNotice("Webhook endpoint updated.");
+      }
+      setEditing(null);
+      setSigningSecret("");
+      await refreshAfterMutation();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not save webhook endpoint.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove(endpoint: WebhookEndpoint) {
+    if (!window.confirm(`Delete webhook endpoint “${endpoint.url}”?`)) return;
+    setBusy(endpoint.webhook_endpoint_id);
+    setError(null);
+    setNotice(null);
+    try {
+      await orpcCall("/v1/webhooks/delete", {
+        id: endpoint.webhook_endpoint_id,
+      });
+      if (
+        editing !== "new" &&
+        editing?.webhook_endpoint_id === endpoint.webhook_endpoint_id
+      ) {
+        setEditing(null);
+      }
+      setNotice("Webhook endpoint deleted.");
+      await refreshAfterMutation();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not delete webhook endpoint.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function copyGeneratedSecret() {
+    if (!generatedSecret) return;
+    await navigator.clipboard.writeText(generatedSecret);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  const inputClass =
+    "h-10 w-full rounded-md border border-rule bg-bg px-3 text-sm outline-none focus:border-accent";
+
+  return (
+    <section className="rounded-xl border border-rule bg-panel/65 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.16)] sm:p-6">
+      <div>
+        <h2 className="text-base font-medium text-ink">Webhook endpoints</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+          Send completed workflow results to your application. Each request
+          includes a signature that your application can verify.
+        </p>
+        {editing === null && (
+          <button
+            type="button"
+            onClick={startCreating}
+            disabled={busy !== null}
+            className="mt-3 h-8 rounded-md border border-rule bg-bg/30 px-3 font-mono text-[10px] uppercase tracking-[0.08em] text-muted hover:border-accent/35 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Add endpoint
+          </button>
+        )}
+      </div>
+
+      {generatedSecret && (
+        <div className="mt-5 rounded-lg border border-accent/30 bg-green-3/25 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-accent-bright">
+                Signing secret created
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                Copy it now. It will not be shown again.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setGeneratedSecret(null)}
+              aria-label="Dismiss signing secret"
+              className="text-sm text-muted hover:text-ink"
+            >
+              ×
+            </button>
+          </div>
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-rule bg-bg p-2">
+            <code className="min-w-0 flex-1 overflow-x-auto px-2 font-mono text-xs text-ink">
+              {generatedSecret}
+            </code>
+            <button
+              type="button"
+              onClick={() => void copyGeneratedSecret()}
+              className="libretto-button libretto-button--sm h-8"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <form
+          onSubmit={save}
+          className="mt-4 space-y-4 rounded-lg border border-rule bg-bg/25 p-4"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="sm:col-span-2">
+              <span className="mb-2 block text-xs uppercase text-muted">
+                Endpoint URL
+              </span>
+              <input
+                type="url"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="https://example.com/libretto-webhook"
+                required
+                autoFocus
+                className={inputClass}
+              />
+            </label>
+            <label className={editing === "new" ? "sm:col-span-2" : undefined}>
+              <span className="mb-2 block text-xs uppercase text-muted">
+                Description
+              </span>
+              <input
+                type="text"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Production job results"
+                className={inputClass}
+              />
+            </label>
+            {editing !== "new" && (
+              <label>
+                <span className="mb-2 block text-xs uppercase text-muted">
+                  New signing secret
+                </span>
+                <input
+                  type="password"
+                  value={signingSecret}
+                  onChange={(event) => setSigningSecret(event.target.value)}
+                  placeholder="Leave blank to keep the current secret"
+                  className={inputClass}
+                />
+              </label>
+            )}
+          </div>
+          <label className="flex w-fit items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(event) => setActive(event.target.checked)}
+              className="size-4 accent-green-7"
+            />
+            Deliver workflow results to this endpoint
+          </label>
+          <div className="flex gap-2">
+            <button
+              disabled={busy !== null}
+              className="h-9 rounded-md border border-accent/35 bg-green-9/25 px-3 text-sm text-ink hover:bg-green-9/45 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy !== null
+                ? "Saving…"
+                : editing === "new"
+                  ? "Add endpoint"
+                  : "Save changes"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              disabled={busy !== null}
+              className="h-9 px-3 text-sm text-muted disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {error && (
+        <p className="mt-5 rounded-md border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-5 rounded-md border border-accent/30 bg-green-9/10 px-4 py-3 text-sm text-accent-bright"
+        >
+          {notice}
+        </p>
+      )}
+
+      <div className="mt-5 divide-y divide-rule border-y border-rule">
+        {endpoints?.map((endpoint) => (
+          <div
+            key={endpoint.webhook_endpoint_id}
+            className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="truncate font-mono text-xs text-ink">
+                  {endpoint.url}
+                </p>
+                <StatusBadge status={endpoint.active ? "active" : "disabled"} />
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                {endpoint.description || `Updated ${formatDate(endpoint.updated_at)}`}
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => startEditing(endpoint)}
+                disabled={busy !== null}
+                className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/35 hover:text-ink disabled:opacity-60"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => void remove(endpoint)}
+                disabled={busy !== null}
+                className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+              >
+                {busy === endpoint.webhook_endpoint_id ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        ))}
+        {endpoints === null && !error && (
+          <p className="py-5 text-sm text-muted">Loading webhook endpoints…</p>
+        )}
+        {endpoints?.length === 0 && (
+          <p className="py-5 text-sm text-muted">No webhook endpoints configured.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function SettingsPanel({ session }: { session: CloudSession }) {
   const [sharing, setSharing] = useState<CodeSharingStatus | null>(null);
   const [canManage, setCanManage] = useState<boolean | null>(null);
@@ -1946,12 +2306,10 @@ function SettingsPanel({ session }: { session: CloudSession }) {
   async function toggleSharing() {
     if (!sharing || !canManage) return;
     const enabled = !sharing.enabled;
-    if (
-      !enabled &&
-      !window.confirm(
-        "Disable public workflow sharing? Every Open and Hosted workflow from this workspace will be removed. Re-enabling sharing will not republish them automatically.",
-      )
-    ) {
+    const confirmation = enabled
+      ? "Enable public workflow sharing? Workspace members will be able to share workflows with people outside this workspace. Existing workflows remain private until explicitly shared."
+      : "Disable public workflow sharing? Every Open and Hosted workflow from this workspace will be removed. Re-enabling sharing will not republish them automatically.";
+    if (!window.confirm(confirmation)) {
       return;
     }
 
@@ -1999,21 +2357,28 @@ function SettingsPanel({ session }: { session: CloudSession }) {
           {notice}
         </p>
       )}
-      <section className="rounded-xl border border-rule bg-panel/65 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.16)] sm:p-6">
-        <div className="flex items-start justify-between gap-6">
-          <div>
-            <h2 className="text-base font-medium text-ink">
-              Public workflow sharing
-            </h2>
-            <p
-              id="workflow-sharing-description"
-              className="mt-2 max-w-2xl text-sm leading-6 text-muted"
-            >
-              Allow people in this workspace to publish open source workflows with
-              source or Hosted workflows with an opaque run API. Credentials,
-              inputs, and outputs are never included in publisher telemetry.
-            </p>
-          </div>
+      <WebhookSettingsPanel />
+      <details className="group rounded-xl border border-rule bg-panel/65 shadow-[0_12px_40px_rgba(0,0,0,0.16)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 sm:p-6">
+          <h2 className="text-base font-medium text-ink">
+            Public workflow sharing
+          </h2>
+          <span
+            aria-hidden="true"
+            className="text-xs text-muted transition-transform group-open:rotate-180"
+          >
+            ↓
+          </span>
+        </summary>
+        <div className="border-t border-rule px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+          <p
+            id="workflow-sharing-description"
+            className="max-w-2xl text-sm leading-6 text-muted"
+          >
+            Allow workspace members to publish workflows for people outside
+            this workspace. They can share source code or provide a Hosted
+            workflow with a public run API.
+          </p>
           <button
             type="button"
             role="switch"
@@ -2023,47 +2388,43 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             aria-describedby="workflow-sharing-description workflow-sharing-state"
             disabled={!sharing || canManage !== true || busy}
             onClick={() => void toggleSharing()}
-            className={`relative mt-1 h-7 w-12 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`mt-4 inline-flex h-8 min-w-24 items-center justify-center rounded-md border px-3 font-mono text-[10px] uppercase tracking-[0.08em] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               sharing?.enabled
-                ? "border-accent/50 bg-green-9"
-                : "border-rule bg-bg"
+                ? "border-accent/45 bg-green-9/35 text-accent-bright hover:bg-green-9/50"
+                : "border-rule bg-bg/40 text-muted hover:border-accent/30 hover:text-ink"
             }`}
           >
-            <span
-              className={`absolute top-0.5 size-5 rounded-full bg-ink transition-transform ${
-                sharing?.enabled ? "translate-x-6" : "translate-x-0.5"
-              }`}
-            />
+            {sharing?.enabled ? "Enabled" : "Disabled"}
           </button>
+          <div
+            id="workflow-sharing-state"
+            className="mt-5 border-t border-rule pt-4 text-xs leading-5 text-muted"
+          >
+            {!sharing
+              ? error
+                ? "Sharing status is unavailable."
+                : "Loading sharing status…"
+              : sharing.enabled
+                ? "Enabled · Workflows can be shared outside this workspace, but remain private by default."
+                : "Disabled · Workflows cannot be shared outside this workspace."}
+            {sharing && canManage === null && (
+              <span className="mt-1 block">Checking workspace permissions…</span>
+            )}
+            {sharing && canManage === false && (
+              <span className="mt-1 block">
+                Only a workspace owner can change this setting.
+              </span>
+            )}
+            {sharing?.enabled && (
+              <span className="mt-1 block">
+                Disabling this setting unpublishes every current listing.
+                Re-enabling it does not automatically republish previous
+                listings.
+              </span>
+            )}
+          </div>
         </div>
-        <div
-          id="workflow-sharing-state"
-          className="mt-5 border-t border-rule pt-4 text-xs leading-5 text-muted"
-        >
-          {!sharing
-            ? error
-              ? "Sharing status is unavailable."
-              : "Loading sharing status…"
-            : sharing.enabled
-              ? "Enabled · Individual workflows are still private by default and must be shared explicitly."
-              : "Disabled · Workflows from this workspace cannot be published."}
-          {sharing && canManage === null && (
-            <span className="mt-1 block">Checking workspace permissions…</span>
-          )}
-          {sharing && canManage === false && (
-            <span className="mt-1 block">
-              Only a workspace owner can change this setting.
-            </span>
-          )}
-          {sharing?.enabled && (
-            <span className="mt-1 block">
-              Disabling this setting unpublishes every current listing.
-              Re-enabling it does not automatically republish previous
-              listings.
-            </span>
-          )}
-        </div>
-      </section>
+      </details>
     </div>
   );
 }
@@ -2078,6 +2439,7 @@ export function AuthenticatedDashboardPage({
   const [showInvite, setShowInvite] = useState(false);
   const [showCreateSecret, setShowCreateSecret] = useState(false);
   const [showCreateKey, setShowCreateKey] = useState(false);
+  const [hasConnectedRepos, setHasConnectedRepos] = useState(false);
   useEffect(() => {
     getCloudSession()
       .then(async (result) => {
@@ -2104,7 +2466,7 @@ export function AuthenticatedDashboardPage({
       </div>
     );
   const action =
-    section === "connected_repos" ? (
+    section === "connected_repos" && hasConnectedRepos ? (
       <a
         href={GITHUB_APP_INSTALL_URL}
         className="libretto-button libretto-button--default inline-flex h-10 items-center no-underline"
@@ -2144,7 +2506,11 @@ export function AuthenticatedDashboardPage({
       {section === "schedules" && <SchedulesTable />}
       {section === "workflow_runs" && <WorkflowRunsTable />}
       {section === "browser_sessions" && <BrowserSessionsTable />}
-      {section === "connected_repos" && <ConnectedReposTable />}
+      {section === "connected_repos" && (
+        <ConnectedReposTable
+          onHasRepositoriesChange={setHasConnectedRepos}
+        />
+      )}
       {section === "users" && (
         <UsersTable
           session={session}
