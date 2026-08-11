@@ -428,15 +428,19 @@ function ProfileMenu({
   );
 }
 
-function DashboardShell({
+export function DashboardShell({
   section,
   session,
   action,
+  title,
+  description,
   children,
 }: {
   section: DashboardSection;
   session: CloudSession;
   action?: ReactNode;
+  title?: string;
+  description?: string;
   children: ReactNode;
 }) {
   const meta = sectionMeta[section];
@@ -507,10 +511,10 @@ function DashboardShell({
           <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="font-serif text-[36px] font-[300] tracking-[-0.025em] md:text-[44px]">
-                {meta.title}
+                {title ?? meta.title}
               </h1>
               <p className="mt-2 text-sm leading-6 text-muted">
-                {meta.description}
+                {description ?? meta.description}
               </p>
             </div>
             {action}
@@ -545,11 +549,14 @@ function WorkflowsTable() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     orpcCall<{
-      deployed_workflows: WorkflowRow[];
-      in_progress_builds: WorkflowBuildRow[];
+      deployed_workflows?: WorkflowRow[];
+      in_progress_builds?: WorkflowBuildRow[];
     }>("/v1/workflows/list")
       .then((result) =>
-        setRows([...result.in_progress_builds, ...result.deployed_workflows]),
+        setRows([
+          ...(result.in_progress_builds ?? []),
+          ...(result.deployed_workflows ?? []),
+        ]),
       )
       .catch((err) =>
         setError(
@@ -578,7 +585,16 @@ function WorkflowsTable() {
                 className="hover:bg-panel-hi/35"
               >
                 <td className={`${tdClass} font-medium text-ink`}>
-                  {build ? row.workflow_name || "New workflow" : row.name}
+                  {build ? (
+                    row.workflow_name || "New workflow"
+                  ) : (
+                    <a
+                      href={`/dashboard/workflows/${encodeURIComponent(row.name)}`}
+                      className="text-ink underline decoration-rule underline-offset-4 hover:decoration-accent"
+                    >
+                      {row.name}
+                    </a>
+                  )}
                 </td>
                 <td className={tdClass}>
                   <StatusBadge
@@ -1933,7 +1949,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
     if (
       !enabled &&
       !window.confirm(
-        "Disable public workflow sharing? Every workflow from this workspace will be removed from Open workflows. Re-enabling sharing will not republish them automatically.",
+        "Disable public workflow sharing? Every Open and Hosted workflow from this workspace will be removed. Re-enabling sharing will not republish them automatically.",
       )
     ) {
       return;
@@ -1951,7 +1967,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
       setNotice(
         enabled
           ? "Workflow sharing is enabled. Workflows remain private until someone explicitly shares them."
-          : "Workflow sharing is disabled and existing Open workflows listings were unpublished.",
+          : "Workflow sharing is disabled and existing Open and Hosted workflows were unpublished.",
       );
     } catch (err) {
       setError(
@@ -1993,9 +2009,9 @@ function SettingsPanel({ session }: { session: CloudSession }) {
               id="workflow-sharing-description"
               className="mt-2 max-w-2xl text-sm leading-6 text-muted"
             >
-              Allow people in this workspace to publish workflow source code
-              to Open workflows. Credentials, run history, and per-run
-              parameters are never included.
+              Allow people in this workspace to publish open source workflows with
+              source or Hosted workflows with an opaque run API. Credentials,
+              inputs, and outputs are never included in publisher telemetry.
             </p>
           </div>
           <button

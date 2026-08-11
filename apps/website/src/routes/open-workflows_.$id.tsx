@@ -3,7 +3,7 @@ import { OpenWorkflowPage } from "../OpenWorkflowsPage";
 
 export const Route = createFileRoute("/open-workflows_/$id")({
   head: () => ({
-    meta: [{ title: "Open workflow | Libretto" }],
+    meta: [{ title: "Open source workflow | Libretto" }],
   }),
   component: OpenWorkflowRoute,
 });

@@ -135,7 +135,7 @@ export function OpenWorkflowsPage() {
           size="xs"
           className="mb-4 uppercase tracking-[0.18em] text-accent"
         >
-          Open workflows
+          Open source workflows
         </Text>
         <Text
           as="h1"
@@ -461,7 +461,7 @@ export function OpenWorkflowPage({ shareId }: { shareId: string }) {
         href="/open-workflows"
         className="inline-flex pt-4 font-mono text-xs text-muted no-underline transition hover:text-ink"
       >
-        ← Open workflows
+        ← Open source workflows
       </a>
 
       <header className="mt-8">

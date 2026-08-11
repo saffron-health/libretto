@@ -35,6 +35,7 @@ import { Route as DashboardCloudBrowsersRouteImport } from './routes/dashboard_.
 import { Route as DashboardChromeExtensionRouteImport } from './routes/dashboard_.chrome-extension'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard_.$section'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
+import { Route as DashboardWorkflowsWorkflowRouteImport } from './routes/dashboard_.workflows_.$workflow'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
@@ -167,6 +168,12 @@ const BlogSlugRoute = BlogSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => BlogRouteRoute,
 } as any)
+const DashboardWorkflowsWorkflowRoute =
+  DashboardWorkflowsWorkflowRouteImport.update({
+    id: '/dashboard_/workflows_/$workflow',
+    path: '/dashboard/workflows/$workflow',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -195,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
   '/blog/': typeof BlogIndexRoute
+  '/dashboard/workflows/$workflow': typeof DashboardWorkflowsWorkflowRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -222,6 +230,7 @@ export interface FileRoutesByTo {
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
   '/blog': typeof BlogIndexRoute
+  '/dashboard/workflows/$workflow': typeof DashboardWorkflowsWorkflowRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -251,6 +260,7 @@ export interface FileRoutesById {
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
   '/blog/': typeof BlogIndexRoute
+  '/dashboard_/workflows_/$workflow': typeof DashboardWorkflowsWorkflowRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -281,6 +291,7 @@ export interface FileRouteTypes {
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
     | '/blog/'
+    | '/dashboard/workflows/$workflow'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -308,6 +319,7 @@ export interface FileRouteTypes {
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
     | '/blog'
+    | '/dashboard/workflows/$workflow'
   id:
     | '__root__'
     | '/'
@@ -336,6 +348,7 @@ export interface FileRouteTypes {
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
     | '/blog/'
+    | '/dashboard_/workflows_/$workflow'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -363,6 +376,7 @@ export interface RootRouteChildren {
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
+  DashboardWorkflowsWorkflowRoute: typeof DashboardWorkflowsWorkflowRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -549,6 +563,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof BlogRouteRoute
     }
+    '/dashboard_/workflows_/$workflow': {
+      id: '/dashboard_/workflows_/$workflow'
+      path: '/dashboard/workflows/$workflow'
+      fullPath: '/dashboard/workflows/$workflow'
+      preLoaderRoute: typeof DashboardWorkflowsWorkflowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -591,7 +612,17 @@ const rootRouteChildren: RootRouteChildren = {
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,
+  DashboardWorkflowsWorkflowRoute: DashboardWorkflowsWorkflowRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
