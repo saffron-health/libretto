@@ -11,7 +11,18 @@ This is different from [open workflows](/libretto-cloud-api/open-workflows), whi
 
 ### Publisher: host and unhost
 
-These routes require `x-api-key`. The tenant must have an organization slug.
+These routes require `x-api-key`. The tenant must have an organization slug and workflow sharing must be enabled:
+
+```bash
+libretto cloud sharing enable
+```
+
+Publish and remove a Hosted workflow from the CLI:
+
+```bash
+libretto cloud host dailyReport --description "Generate the daily report"
+libretto cloud unhost dailyReport
+```
 
 #### POST `/v1/workflows/host`
 
@@ -71,7 +82,7 @@ Start a consumer-owned job against the publisher's pinned deployment.
 Request body fields (JSON, not ORPC `{ "json": ... }` wrapping):
 
 - `params`: workflow input object
-- `credential_id`: optional single credential id
+- `credentials`: optional map from each required credential name to a credential id or secret name in the consumer tenant
 - `nonce`: optional idempotency-style nonce
 - `timeout_seconds`: optional timeout
 - `headless`, `start_url`, `gpu`, `viewport`, `residential_proxy`: optional launch overrides
@@ -86,7 +97,8 @@ Callback rules:
 Credentials:
 
 - Create credentials in **your** tenant with the exact names listed in `credential_requirements` before running.
-- The publisher cannot list your jobs or read your credential values.
+- The publisher can see only when an external run started and whether it succeeded, failed, was cancelled, or is still in progress.
+- The publisher cannot see your identity, inputs, credentials, outputs, errors, or job details.
 
 Response fields:
 

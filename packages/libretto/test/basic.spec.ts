@@ -443,6 +443,36 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toContain("libretto cloud auth api-key issue");
   });
 
+  test("prints cloud host help", async ({ librettoCli }) => {
+    const result = await librettoCli("help cloud host");
+    expect(result.stdout).toContain(
+      "Publish a deployed workflow as a public hosted workflow",
+    );
+    expect(result.stdout).toContain("libretto cloud host <workflow>");
+    expect(result.stdout).toContain("--description");
+    expect(result.stderr).toBe("");
+  });
+
+  test("cloud host requires an API key", async ({ librettoCli }) => {
+    const result = await librettoCli("cloud host testWorkflow", {
+      LIBRETTO_API_KEY: undefined,
+    });
+
+    expect(result.stderr).toContain(
+      "LIBRETTO_API_KEY is required to publish a Libretto Cloud hosted workflow.",
+    );
+    expect(result.stderr).toContain("libretto cloud auth api-key issue");
+  });
+
+  test("prints cloud unhost help", async ({ librettoCli }) => {
+    const result = await librettoCli("help cloud unhost");
+    expect(result.stdout).toContain(
+      "Remove a workflow from public hosted workflows",
+    );
+    expect(result.stdout).toContain("libretto cloud unhost <workflow>");
+    expect(result.stderr).toBe("");
+  });
+
   test("prints deploy help with auto repair flag", async ({ librettoCli }) => {
     const result = await librettoCli("help cloud deploy", {
       npm_command: undefined,
