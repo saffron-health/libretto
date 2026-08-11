@@ -74,11 +74,11 @@ export function VersionBadge() {
   const release = useLatestRelease("saffron-health/libretto");
 
   if (release === null) {
-    return <div className="mb-8 h-[26px]" />;
+    return <div className="h-[26px]" />;
   }
 
   return (
-    <div className="mb-8 flex items-center justify-center">
+    <div className="flex items-center justify-center">
       <a
         href={release.url}
         target="_blank"

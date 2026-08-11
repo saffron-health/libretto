@@ -17,6 +17,8 @@ import { Footer } from "./components/Footer";
 import { VersionBadge } from "./components/VersionBadge";
 import { ProductListing } from "./components/ProductListing";
 import { SectionDivider } from "./components/SectionDivider.js";
+import { BackedByYC } from "./components/BackedByYC";
+
 function Hero({
   paneUnlocked,
   onClosePane,
@@ -46,7 +48,11 @@ function Hero({
         />
       </div>
       <div className="relative mx-auto max-w-[1200px]">
-        <div data-animate={AnimationTarget.Navbar} style={{ opacity: 0 }}>
+        <div
+          data-animate={AnimationTarget.Navbar}
+          style={{ opacity: 0 }}
+          className="mb-8 flex justify-center"
+        >
           <VersionBadge />
         </div>
         <div
@@ -98,6 +104,9 @@ function Hero({
             >
               TALK TO A DEV
             </a>
+          </div>
+          <div className="mt-10">
+            <BackedByYC variant="badge" fathomEvent="Hero YC click" />
           </div>
         </div>
       </div>

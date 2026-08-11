@@ -20,13 +20,33 @@ function ExternalArrowIcon({ className }: { className?: string }) {
   );
 }
 
+/** `badge` is the prominent hero lockup; `credit` is the compact footer mark. */
 export function BackedByYC({
   className = "",
   fathomEvent,
+  variant = "credit",
 }: {
   className?: string;
   fathomEvent: string;
+  variant?: "badge" | "credit";
 }) {
+  if (variant === "badge") {
+    return (
+      <a
+        href={YC_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`inline-flex items-center gap-2 font-mono text-xs text-muted/60 no-underline transition-colors hover:text-muted sm:text-[13px] ${className}`}
+        data-fathom-event={fathomEvent}
+      >
+        <YCLogo className="size-4 shrink-0 sm:size-[18px]" width={18} height={18} />
+        <span className="leading-none">
+          Backed by Y Combinator
+        </span>
+      </a>
+    );
+  }
+
   return (
     <a
       href={YC_URL}
