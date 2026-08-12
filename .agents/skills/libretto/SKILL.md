@@ -52,7 +52,7 @@ There are three ways to run workflows:
 
 - Local browser run: `npx libretto run ./workflow.ts` runs workflow code and local Chromium on the current machine. This is easy to watch and private, but most likely to hit CAPTCHAs or anti-bot checks.
 - Hosted browser run: `npx libretto run ./workflow.ts --provider libretto-cloud` runs workflow code locally while the browser runs on provider infrastructure with stealth mechanisms. Use this for anti-bot/CAPTCHA issues, provider-specific behavior, and pre-deploy validation. If the user has not specified a provider, prefer `libretto-cloud` because it includes one free allocated browser-hour and does not require a third-party provider API key.
-- Deployed workflow: Libretto Cloud packages the workflow as a private API-backed workflow with the same remote-browser anti-bot mechanisms as hosted provider runs. Deploy only after the workflow passes with the target provider. Private deploy is not public hosting.
+- Deployed workflow: Libretto Cloud packages the workflow as an API-backed workflow with the same remote-browser anti-bot mechanisms as hosted provider runs. Deploy only after the workflow passes with the target provider.
 
 When editing a deployed workflow, validate changes with `run --provider <deployment-provider>` before redeploying; do not debug by repeatedly deploying and running the deployed job.
 
@@ -67,7 +67,7 @@ If the user prefers a provider for all local CLI runs in a workspace or only dep
 - Read and follow guidelines in `references/code-generation-rules.md` before generating or editing production workflow code. Every generated workflow must set `startUrl` to the first page the automation needs.
 - For authenticated workflows, manual login is discovery only. After the user logs in, read only the sign-in action logs and identify the required credentials; if credentials are unclear, ask before writing code.
 - Add missing blank `LIBRETTO_CLOUD_<secret_name>=` entries without overwriting populated values. If any required credential is blank, stop and ask the user to fill it; until then, do not inspect logged-in pages, read authenticated network bodies, write workflow code, open validation sessions, or continue discovery.
-- Authenticated workflows must implement `librettoAuthenticate` with declared credentials before validation. Use a reusable `*_totp_secret` credential for authenticator-app MFA when the portal supports it (not a one-time `otp_code`). For SMS one-time codes, provision a Libretto Cloud SMS inbox (`libretto cloud sms-numbers`), register that E.164 on the portal, prefer one number per portal, then use `waitForSmsOtp` after clicking send-code. Do not run concurrent SMS OTP waits on the same inbox number.
+- Authenticated workflows must implement `librettoAuthenticate` with declared credentials before validation. Use a reusable `*_totp_secret` credential for authenticator-app MFA, not a one-time `otp_code`; text and email verification codes are not supported for fully automated sign-in.
 - Read `references/website-authentication.md` when you need `librettoAuthenticate` examples or auth-profile details.
 - Validation requires a successful clean `run` on a fresh, unauthenticated session with confirmation of the actual returned output, not just process success. Use the same headed or headless mode that the workflow run is already using.
 - After validation, always show the user: (1) the output/results from the validation run, and (2) the same command so they can re-run it themselves. Include any `--params`, `--provider`, `--headed`, or `--headless` flags the workflow needs. Do not add `--auth-profile` to `run`; workflow `authProfile` metadata controls profile use.
@@ -304,4 +304,4 @@ To run it again, use: npx libretto run ./integration.ts
 - Read `references/pages-and-page-targeting.md` when a session has multiple open pages or you need `--page`.
 - Read `references/action-logs.md` for full action log field descriptions and user-vs-agent event semantics.
 - If the workflow code is deployed to the Libretto Cloud platform and you need to reference its API docs, fetch [https://libretto.sh/docs/llms.txt](https://libretto.sh/docs/llms.txt) and follow the relevant page links.
-- External public sharing (open workflows or hosted run APIs) is done in the website dashboard. Follow `references/sharing-workflows-externally.md` when the user asks how to share publicly. Bare "publish" means private deploy.
+- Details of how users can share workflows externally are in `references/sharing-workflows-externally.md`.
