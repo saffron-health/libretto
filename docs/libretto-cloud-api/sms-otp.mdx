@@ -24,7 +24,7 @@ libretto cloud sms-numbers list
 
 Dashboard: **Phone numbers**. Copy the phone number (with country code) and set it on the portal MFA settings.
 
-### POST `/v1/sms-numbers/provision`
+### POST `/v1/smsNumbers/provision`
 
 Requires `x-api-key`.
 
@@ -34,15 +34,15 @@ Request fields:
 - `country` (optional): two-letter country code
 - `area_code` (optional): preferred area code
 
-### POST `/v1/sms-numbers/list`
+### POST `/v1/smsNumbers/list`
 
 Lists pool numbers. Pass `include_released: true` to include released rows.
 
-### POST `/v1/sms-numbers/update`
+### POST `/v1/smsNumbers/update`
 
 Update a number's `label`.
 
-### POST `/v1/sms-numbers/release`
+### POST `/v1/smsNumbers/release`
 
 Release the number on AgentPhone and mark it released in Libretto. Irreversible.
 
@@ -71,8 +71,8 @@ export default workflow("portal-login", {
 
 `waitForSmsOtp` calls:
 
-1. `POST /v1/sms-otp/claims/create` — exclusive open claim on the inbox
-2. `POST /v1/sms-otp/claims/get` — poll until fulfilled, then consume the code once
+1. `POST /v1/smsOtp/claims/create` — exclusive open claim on the inbox
+2. `POST /v1/smsOtp/claims/get` — poll until fulfilled, then consume the code once
 
 Deployed jobs receive a short-lived `input.__libretto.smsOtp` token at dispatch. Local runs use `LIBRETTO_API_KEY`.
 

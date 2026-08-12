@@ -41,7 +41,7 @@ export const provisionSmsNumberCommand = SimpleCLI.command({
       message: string;
     }>({
       apiUrl: ctx.apiUrl,
-      path: "/v1/sms-numbers/provision",
+      path: "/v1/smsNumbers/provision",
       input: {
         label: input.label,
         country: input.country,
@@ -78,7 +78,7 @@ export const listSmsNumbersCommand = SimpleCLI.command({
   .handle(async ({ input, ctx }) => {
     const response = await orpcCall<{ numbers: SmsNumber[] }>({
       apiUrl: ctx.apiUrl,
-      path: "/v1/sms-numbers/list",
+      path: "/v1/smsNumbers/list",
       input: { include_released: input.includeReleased || undefined },
       credential: ctx.credential,
     });
@@ -124,7 +124,7 @@ export const updateSmsNumberCommand = SimpleCLI.command({
     }
     const response = await orpcCall<{ success: true; number: SmsNumber }>({
       apiUrl: ctx.apiUrl,
-      path: "/v1/sms-numbers/update",
+      path: "/v1/smsNumbers/update",
       input: {
         id: input.id,
         label: input.clearLabel ? null : input.label === "" ? null : input.label,
@@ -153,7 +153,7 @@ export const releaseSmsNumberCommand = SimpleCLI.command({
   .handle(async ({ input, ctx }) => {
     const response = await orpcCall<{ success: true; message: string }>({
       apiUrl: ctx.apiUrl,
-      path: "/v1/sms-numbers/release",
+      path: "/v1/smsNumbers/release",
       input: { id: input.id },
       credential: ctx.credential,
     });

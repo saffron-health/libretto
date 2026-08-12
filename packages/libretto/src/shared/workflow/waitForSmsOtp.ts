@@ -6,7 +6,7 @@ export type LibrettoSmsOtpAuth = {
 };
 
 export type WaitForSmsOtpOptions = {
-  /** Pool number id from /v1/sms-numbers. */
+  /** Pool number id from /v1/smsNumbers. */
   numberId?: string;
   /** Tenant label (e.g. `uhc`). Prefer one number per portal. */
   label?: string;
@@ -146,7 +146,7 @@ export async function waitForSmsOtp(
 
   const created = await orpcPost<CreateClaimResponse>(
     auth,
-    "/v1/sms-otp/claims/create",
+    "/v1/smsOtp/claims/create",
     {
       number_id: options.numberId,
       label: options.label,
@@ -162,7 +162,7 @@ export async function waitForSmsOtp(
   while (Date.now() < deadline) {
     const polled = await orpcPost<ClaimResponse>(
       auth,
-      "/v1/sms-otp/claims/get",
+      "/v1/smsOtp/claims/get",
       { claim_id: claimId, consume: true },
     );
     const claim = polled.claim;
