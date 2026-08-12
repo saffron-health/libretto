@@ -4,10 +4,11 @@ import { OpenWorkflowsPage } from "../OpenWorkflowsPage";
 export const Route = createFileRoute("/open-workflows")({
   head: () => ({
     meta: [
-      { title: "Open source workflows | Libretto" },
+      { title: "Open Source Workflows | Libretto" },
       {
         name: "description",
-        content: "Add reusable browser workflows to your Libretto account.",
+        content:
+          "Browse shared Libretto workflow source, connect secrets, and deploy a private copy.",
       },
     ],
   }),

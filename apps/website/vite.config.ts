@@ -55,7 +55,12 @@ export default defineConfig({
         enabled: true,
         crawlLinks: false,
       },
-      pages: [...blogPostPaths, ...dashboardPaths, "/open-workflows"].map((path) => ({
+      pages: [
+        ...blogPostPaths,
+        ...dashboardPaths,
+        "/open-workflows",
+        "/hosted-workflows",
+      ].map((path) => ({
         path,
         prerender: { enabled: true },
       })),

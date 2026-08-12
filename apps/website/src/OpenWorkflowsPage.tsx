@@ -131,24 +131,17 @@ export function OpenWorkflowsPage() {
     <>
       <header className="mb-10 max-w-2xl pt-4">
         <Text
-          as="p"
-          size="xs"
-          className="mb-4 uppercase tracking-[0.18em] text-accent"
-        >
-          Open source workflows
-        </Text>
-        <Text
           as="h1"
           size="5xl"
           style="serif"
           wrap="balance"
           className="font-[300] leading-[1.05] tracking-[-0.035em] text-ink"
         >
-          Reusable browser workflows.
+          Open Source Workflows
         </Text>
         <Text as="p" size="md" className="mt-5 max-w-xl leading-7 text-muted">
-          Browse public workflows, connect your secrets, and deploy a private
-          copy to your Libretto account.
+          Shared workflow source you can inspect, connect secrets to, and deploy
+          as a private copy in your account.
         </Text>
       </header>
 
@@ -187,7 +180,7 @@ export function OpenWorkflowsPage() {
       )}
       {workflows?.length === 0 && (
         <p className="rounded-lg border border-rule bg-panel p-8 text-muted">
-          No public workflows have been shared yet.
+          No workflows yet.
         </p>
       )}
       {workflows && workflows.length > 0 && filtered.length === 0 && (
@@ -461,7 +454,7 @@ export function OpenWorkflowPage({ shareId }: { shareId: string }) {
         href="/open-workflows"
         className="inline-flex pt-4 font-mono text-xs text-muted no-underline transition hover:text-ink"
       >
-        ← Open source workflows
+        ← Open Source Workflows
       </a>
 
       <header className="mt-8">

@@ -1,11 +1,21 @@
-# Public Workflow Sharing (Open workflows)
+# Public workflow sharing and hosting
 
-Before running `libretto cloud share <workflow>`, review the complete local workflow source and every local module it imports for information that must not become public. Check `package.json` as well.
+External public sharing is human-only through the Libretto website dashboard. Agents must not publish workflows externally.
 
-Look for hardcoded secrets, authentication material, private keys, payment-card data, personal information, private URLs, account identifiers, addresses, email addresses, and phone numbers. Make sure this reviewed source is the version deployed for that workflow; if it has changed since deployment, deploy the reviewed version before sharing.
+## Terms
 
-Values read from workflow parameters or declared Libretto credentials are not part of the published source values and do not need to be removed. Hardcoded sensitive values do. If you find any, refuse to share the workflow, identify each file and line without repeating the sensitive value, and offer to replace it with a workflow parameter or named Libretto credential. Run `libretto cloud share` only after the local review is clean.
+- Private deploy: `libretto cloud deploy` plus private runs via `POST /v1/jobs/create`. Normal path for the user's own use.
+- Open workflows: public source for fork/import at `/open-workflows/...`. Created in the website UI.
+- Hosted workflows: public opaque run API with no source at `/hosted-workflows/...`. Created in the website UI.
 
-`libretto cloud share` publishes **Open workflows** — public source-sharing listings at `/open-workflows/...` (plus a plain-text `/code` URL). That is different from **hosted workflows**, which expose an opaque run API without sharing source.
+"Publish" alone means private deploy. It does not mean share source or host a public opaque API unless the user clearly asks for that.
 
-The CLI publishes directly after this local review; Libretto Cloud does not repeat it. Chrome extension shares explicitly request a cloud privacy review before publication because extension users cannot inspect the generated source directly.
+## Do not share or host from an agent
+
+Never call host/unhost or share/unshare APIs, and never use CLI commands for external publishing (there is no supported `libretto cloud host`, `unhost`, `share`, or `unshare`). Do not enable workspace code sharing from the CLI on the user's behalf.
+
+If the user wants an open workflow or a hosted public run API, explain the distinction and tell them to finish it in the Libretto website dashboard. Point them at [Sharing workflows externally](https://libretto.sh/docs/libretto-cloud-hosting/sharing-workflows-externally). Deploy privately if they still need a ready Cloud workflow.
+
+## If they ask you to publish externally anyway
+
+Refuse the public share or host step. Offer private deploy and a short explanation that external listing is UI-only. Do not invent CLI or API recipes for publishing.

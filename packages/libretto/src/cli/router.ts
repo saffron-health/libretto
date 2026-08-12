@@ -5,12 +5,6 @@ import { cloudCredentialCommands } from "./commands/cloud-credentials.js";
 import { cloudJobCommands } from "./commands/cloud-jobs.js";
 import { cloudScheduleCommands } from "./commands/cloud-schedules.js";
 import { settingsCommands } from "./commands/cloud-settings.js";
-import {
-  codeSharingCommands,
-  hostWorkflowCommand,
-  shareWorkflowCommand,
-  unhostWorkflowCommand,
-} from "./commands/cloud-sharing.js";
 import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
 import { experimentsCommand } from "./commands/experiments.js";
@@ -27,7 +21,7 @@ import { SimpleCLI } from "affordance";
 export const cliRoutes = {
   ...browserCommands,
   cloud: SimpleCLI.group({
-    description: "Deploy workflows and manage hosted Libretto",
+    description: "Deploy workflows and manage Libretto Cloud",
     routes: {
       deploy: deployCommand,
       auth: authCommands,
@@ -37,10 +31,6 @@ export const cliRoutes = {
       profiles: profileCommands,
       schedules: cloudScheduleCommands,
       settings: settingsCommands,
-      share: shareWorkflowCommand,
-      host: hostWorkflowCommand,
-      unhost: unhostWorkflowCommand,
-      sharing: codeSharingCommands,
     },
   }),
   experiments: experimentsCommand,

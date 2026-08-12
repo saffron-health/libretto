@@ -3,11 +3,11 @@ title: Open workflows
 "og:image": "https://libretto.sh/docs/og/libretto-cloud-api/open-workflows.png"
 ---
 
-> Browse and import public workflow source. Open workflows are a source-sharing catalog, not an opaque run API.
+> Browse and import public workflow source. Open workflows are a source catalog, not an opaque run API.
 
-Open workflows let publishers share automation source so others can fork it locally or import a private Cloud copy. Credentials, run history, and per-run parameters are never included.
+Open workflows let others fork automation source locally or import a private Cloud copy. Credentials, run history, and per-run parameters are never included.
 
-This is different from [hosted workflows](/libretto-cloud-api/hosted-workflows), which expose a consumer-run API without publishing source. Private runs of your own deployments still use [jobs/create](/libretto-cloud-api/jobs-and-logs#jobs).
+Publishing a new open workflow is a human action in the website dashboard. See [Sharing workflows externally](/libretto-cloud-hosting/sharing-workflows-externally). Do not confuse this with private deploy (your own ready deployment, run with [jobs/create](/libretto-cloud-api/jobs-and-logs#jobs)).
 
 Public catalog and source routes live on the API host (`https://api.libretto.sh`). The website SPA at `https://libretto.sh/open-workflows` consumes the same JSON.
 
@@ -17,7 +17,7 @@ These routes do not require `x-api-key`.
 
 #### GET `/open-workflows`
 
-List published open workflows.
+List open workflows in the public catalog.
 
 Optional query:
 
@@ -80,34 +80,3 @@ Response fields:
 - `workflow_name`
 
 Missing required credentials must be created in your tenant (matching names) before or during import. The website SPA can create secrets and then call this route.
-
-### Publisher share / unshare
-
-These routes require `x-api-key`. Tenant code sharing must be enabled (`POST /v1/tenant/updateCodeSharing` or `npx libretto cloud sharing enable`).
-
-#### POST `/v1/workflows/share`
-
-Publish the current deployment's source as an open workflow.
-
-Request fields:
-
-- `workflow`: deployed workflow name
-- `refresh`: optional boolean to refresh an existing share from the current deployment
-
-Response fields:
-
-- `id`
-- `status`: `created` | `existing` | `refreshed`
-- `workflow`
-- `open_workflow_url`: website URL such as `https://libretto.sh/open-workflows/<id>`
-- `code_url`: API plain-text URL such as `https://api.libretto.sh/open-workflows/<id>/code`
-
-#### POST `/v1/workflows/unshare`
-
-Remove a workflow from the open-workflows catalog.
-
-Request fields:
-
-- `workflow`: deployed workflow name
-
-See also the CLI: [share](/reference/cli/share).
