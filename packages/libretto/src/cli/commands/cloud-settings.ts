@@ -24,7 +24,7 @@ function printTenantSettings(
 ): TenantSettingsResponse {
   const notificationsEnabled = !settings.disable_job_failure_notifications;
   console.log(
-    `Workflow sharing: ${settings.code_sharing_enabled ? "enabled" : "disabled"}`,
+    `Code sharing: ${settings.code_sharing_enabled ? "enabled" : "disabled"}`,
   );
   console.log(
     `Job failure notifications: ${notificationsEnabled ? "enabled" : "disabled"}`,
@@ -78,7 +78,7 @@ export const setSettingsCommand = SimpleCLI.command({
 
     if (Object.keys(updates).length === 0) {
       throw new Error(
-        "No settings provided. For example, use `libretto cloud settings set --job-failure-notifications disabled`. Use `libretto cloud sharing enable` or `disable` to change workflow sharing.",
+        "No settings provided. Use one or more flags, for example `libretto cloud settings set --job-failure-notifications disabled`.",
       );
     }
 

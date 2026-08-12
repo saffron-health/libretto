@@ -532,7 +532,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
               <div className="border-t border-rule">
                 {!detail.sharing_enabled && (
                   <div className="border-b border-amber-300/20 bg-amber-300/5 px-5 py-3 text-xs text-amber-100">
-                    Publishing is disabled. Enable it in{" "}
+                    Sharing is disabled. Enable it in{" "}
                     <a href="/dashboard/settings" className="underline">
                       Settings
                     </a>
@@ -566,7 +566,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     <div className="rounded-lg border border-rule bg-bg/25 p-4">
                       <h3 className="text-sm font-medium text-ink">Hosted workflow</h3>
                       <p className="mt-2 min-h-8 text-xs leading-5 text-muted">
-                        Publish a hosted version others can run.
+                        Host a version others can run as an opaque API.
                       </p>
                       <button
                         type="button"
@@ -574,12 +574,12 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                         onClick={() =>
                           void runAction("host", async () => {
                             await orpcCall("/v1/workflows/host", { workflow });
-                            setNotice("Hosted workflow published.");
+                            setNotice("Hosted workflow is now public.");
                           })
                         }
                         className={`${primaryButtonClass} mt-4 w-full`}
                       >
-                        {busy === "host" ? "Publishing…" : "Publish Hosted workflow"}
+                        {busy === "host" ? "Hosting…" : "Host workflow"}
                       </button>
                     </div>
                   )}

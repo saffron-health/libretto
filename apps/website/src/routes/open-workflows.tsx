@@ -7,7 +7,8 @@ export const Route = createFileRoute("/open-workflows")({
       { title: "Open source workflows | Libretto" },
       {
         name: "description",
-        content: "Add reusable browser workflows to your Libretto account.",
+        content:
+          "Browse shared Libretto workflow source, connect secrets, and deploy a private copy.",
       },
     ],
   }),
