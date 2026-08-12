@@ -5,6 +5,11 @@ export type LibrettoSmsOtpAuth = {
   jobId?: string;
 };
 
+/** API claim lock bounds (seconds). Keep in sync with Libretto Cloud. */
+const MIN_CLAIM_TTL_SECONDS = 30;
+const MAX_CLAIM_TTL_SECONDS = 5 * 60;
+const DEFAULT_TIMEOUT_MS = 120_000;
+
 export type WaitForSmsOtpOptions = {
   /** Pool number id from /v1/smsNumbers. */
   numberId?: string;
@@ -12,12 +17,13 @@ export type WaitForSmsOtpOptions = {
   label?: string;
   /** Phone number with country code (e.g. +15551234567) from the tenant pool. */
   phoneNumber?: string;
-  /** Max time to wait for the inbound SMS OTP. */
+  /**
+   * How long to wait for the inbound SMS OTP. Also sets the inbox claim lock
+   * (clamped to 30–300 seconds on the API).
+   */
   timeoutMs?: number;
   /** Poll interval while waiting. */
   pollIntervalMs?: number;
-  /** Claim TTL requested from the API (seconds). */
-  ttlSeconds?: number;
   /**
    * Auth for Libretto Cloud. For deployed jobs, pass `params.__libretto`
    * (injected at dispatch). For local runs, omit and use LIBRETTO_API_KEY.
@@ -31,6 +37,13 @@ export type WaitForSmsOtpOptions = {
   };
   auth?: LibrettoSmsOtpAuth;
 };
+
+function claimTtlSecondsFromTimeout(timeoutMs: number): number {
+  return Math.min(
+    MAX_CLAIM_TTL_SECONDS,
+    Math.max(MIN_CLAIM_TTL_SECONDS, Math.ceil(timeoutMs / 1000)),
+  );
+}
 
 type ClaimResponse = {
   claim: {
@@ -140,7 +153,7 @@ export async function waitForSmsOtp(
   }
 
   const auth = resolveAuth(options);
-  const timeoutMs = options.timeoutMs ?? 120_000;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const pollIntervalMs = options.pollIntervalMs ?? 1_500;
   const deadline = Date.now() + timeoutMs;
 
@@ -152,7 +165,7 @@ export async function waitForSmsOtp(
       label: options.label,
       phone_number: options.phoneNumber,
       job_id: auth.jobId,
-      ttl_seconds: options.ttlSeconds,
+      ttl_seconds: claimTtlSecondsFromTimeout(timeoutMs),
     },
   );
 

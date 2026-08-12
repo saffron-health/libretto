@@ -80,7 +80,7 @@ Deployed jobs receive a short-lived `input.__libretto.smsOtp` token at dispatch.
 
 Both accept `x-api-key` or `x-libretto-sms-otp-token`.
 
-**Create** — `number_id`, `label`, or `phone_number`; optional `job_id`, `ttl_seconds` (30–300, default 300).
+**Create** — `number_id`, `label`, or `phone_number`; optional `job_id`, `ttl_seconds` (30–300, default 300). `waitForSmsOtp` sets `ttl_seconds` from `timeoutMs` and does not expose a separate TTL option.
 
 **Get** — `claim_id`; optional `consume` (default true). Returns `code` once when fulfilled.
 

@@ -63,6 +63,10 @@ describe("waitForSmsOtp", () => {
       claimId: "claim-1",
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    const createBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as { body?: string })?.body),
+    ) as { json: { ttl_seconds: number } };
+    expect(createBody.json.ttl_seconds).toBe(30);
   });
 
   it("requires a number selector", async () => {
