@@ -304,4 +304,4 @@ To run it again, use: npx libretto run ./integration.ts
 - Read `references/pages-and-page-targeting.md` when a session has multiple open pages or you need `--page`.
 - Read `references/action-logs.md` for full action log field descriptions and user-vs-agent event semantics.
 - If the workflow code is deployed to the Libretto Cloud platform and you need to reference its API docs, fetch [https://libretto.sh/docs/llms.txt](https://libretto.sh/docs/llms.txt) and follow the relevant page links.
-- Never publish a workflow externally (open-workflow source share or hosted public run API). That is UI-only for humans. Bare "publish" means private deploy. Follow `references/workflow-sharing.md` if the user asks about public sharing or hosting.
+- Never publish a workflow externally (open-workflow source share or hosted public run API). That is UI-only for humans. Bare "publish" means private deploy. Follow `references/sharing-workflows-externally.md` if the user asks about public sharing or hosting.
