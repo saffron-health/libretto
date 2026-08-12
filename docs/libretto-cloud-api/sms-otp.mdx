@@ -3,7 +3,7 @@ title: SMS OTP
 "og:image": "https://libretto.sh/docs/og/libretto-cloud-api/sms-otp.png"
 ---
 
-> Receive portal SMS one-time codes through tenant-owned AgentPhone inbox numbers, then wait for the code inside a workflow.
+> Receive portal SMS one-time codes through tenant-owned Libretto Cloud inbox numbers, then wait for the code inside a workflow.
 
 SMS OTP is for portals that text a code to a phone number. Prefer authenticator TOTP (`*_totp_secret`) when the portal supports it.
 
@@ -11,7 +11,7 @@ SMS OTP is for portals that text a code to a phone number. Prefer authenticator 
 
 1. Provision an inbox number into your tenant pool (CLI or dashboard).
 2. Register that full phone number (with country code, like `+15551234567`) as the MFA phone on the portal account.
-3. In the workflow: open a claim, click send-code, then `waitForSmsOtp` polls Libretto Cloud until the AgentPhone webhook writes the code.
+3. In the workflow: open a claim, click send-code, then `waitForSmsOtp` polls Libretto Cloud until the inbound SMS is written to the claim.
 
 Use **one phone number per portal** (or per portal login). Do not run concurrent SMS OTP waits on the same inbox number. A claim locks the inbox for up to 5 minutes; pulling the code unlocks it, and a new claim can take over after the lock expires.
 
@@ -44,7 +44,7 @@ Update a number's `label`.
 
 ### POST `/v1/smsNumbers/release`
 
-Release the number on AgentPhone and mark it released in Libretto. Irreversible.
+Release the number and remove it from your tenant pool. Irreversible.
 
 ## Wait for a code in a workflow
 
@@ -87,6 +87,6 @@ Both accept `x-api-key` or `x-libretto-sms-otp-token`.
 ## Isolation rules
 
 - Numbers are tenant-scoped (RLS).
-- Routing is by which AgentPhone number received the SMS — inbound SMS has no tenant metadata.
+- Inbound SMS is matched to the inbox number that received it.
 - At most one open claim per number (HTTP 409 if busy). Create expires stale open locks (≥5 minutes) before taking the lock.
 - Codes are encrypted at rest, single-consume, and treated as secrets in log sanitization.

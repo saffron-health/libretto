@@ -6,7 +6,6 @@ import { withCloudApiKey } from "./shared.js";
 type SmsNumber = {
   id: string;
   phone_number: string;
-  agentphone_number_id: string;
   label: string | null;
   status: "active" | "released";
   created_at: string;
@@ -14,7 +13,7 @@ type SmsNumber = {
 };
 
 export const provisionSmsNumberCommand = SimpleCLI.command({
-  description: "Provision an AgentPhone inbox number into your tenant pool",
+  description: "Provision an SMS inbox number into your tenant pool",
 })
   .input(
     SimpleCLI.input({

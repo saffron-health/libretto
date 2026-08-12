@@ -124,8 +124,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Open an SMS OTP claim on a tenant inbox number, then poll until the
- * AgentPhone webhook fulfills it (or the wait times out).
+ * Open an SMS OTP claim on a tenant inbox number, then poll until Libretto
+ * Cloud fulfills it from the inbound SMS (or the wait times out).
  *
  * Configure numbers outside the workflow (CLI/dashboard). Prefer one number
  * per portal. Do not run concurrent waits on the same inbox number.
@@ -183,6 +183,6 @@ export async function waitForSmsOtp(
   }
 
   throw new Error(
-    `Timed out after ${timeoutMs}ms waiting for SMS OTP on ${phoneNumber}. Confirm the portal sent the text to this number and the AgentPhone webhook is configured.`,
+    `Timed out after ${timeoutMs}ms waiting for SMS OTP on ${phoneNumber}. Confirm the portal sent the text to this number and that SMS OTP is set up for your tenant.`,
   );
 }

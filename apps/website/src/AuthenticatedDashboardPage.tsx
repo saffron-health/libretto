@@ -1599,7 +1599,6 @@ function SecretsTable({
 interface SmsNumberRow {
   id: string;
   phone_number: string;
-  agentphone_number_id: string;
   label: string | null;
   status: "active" | "released";
   created_at: string;
