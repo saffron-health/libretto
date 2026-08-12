@@ -91,4 +91,3 @@ After verifying Libretto is setup and working properly, summarize the steps take
 
 - Fix only setup-related failures.
 - Do not make unrelated changes or invent secrets.
-- Do not ask the user to run CLI commands.
