@@ -116,7 +116,7 @@ function expectedRootHelp(): string {
       pages  List open pages in the session
       session-mode  View or set the session access mode
       close  Close the browser
-      cloud <subcommand>  Deploy workflows and manage hosted Libretto
+      cloud <subcommand>  Deploy workflows and manage Libretto Cloud
       experiments  List or update Libretto experiment flags
       import-chrome-profiles  Fetch scoped auth state from a Chrome CDP session into a local profile
       exec  Execute Playwright TypeScript code
@@ -734,7 +734,7 @@ export default workflow("main", async (ctx) => {
     const result = await librettoCli("cloud opne");
     expect(result.stderr).toContain("Unknown command: cloud opne");
     expect(result.stderr).toContain(
-      "Deploy workflows and manage hosted Libretto",
+      "Deploy workflows and manage Libretto Cloud",
     );
     expect(result.stderr).toContain("Usage: libretto cloud <subcommand>");
     expect(result.stderr).toContain(
