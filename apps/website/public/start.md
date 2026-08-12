@@ -91,5 +91,4 @@ After verifying Libretto is setup and working properly, summarize the steps take
 
 - Fix only setup-related failures.
 - Do not make unrelated changes or invent secrets.
-- Do not spend time installing OS packages or fighting sandbox Chromium dependency gaps; run Libretto Cloud auth/verify yourself and share any browser URL with the user.
 - Do not ask the user to run CLI commands.
