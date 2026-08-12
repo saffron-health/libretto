@@ -70,15 +70,13 @@ Agent sandboxes (for example Claude Cowork) can install npm packages but often c
 
 Fall back in this order:
 
-1. Ask the user to run `npx libretto login` if they are not already logged in, then verify with Libretto Cloud:
+1. Check auth with `npx libretto cloud auth whoami`. If not logged in, run `npx libretto cloud auth login` yourself (use `npx libretto cloud auth signup` when they need a new account). That command prints a browser sign-in/sign-up URL and waits; share the URL with the user, do not ask them to run the CLI. After auth succeeds, verify with Libretto Cloud:
 
 ```bash
 npx libretto run src/workflows/scrape-page.ts --provider libretto-cloud
 ```
 
-2. If cloud login is unavailable, ask the user to run the local `--headless` command on their host machine and confirm the result.
-
-If the package is installed, the smoke workflow exists, and you have given a clear next verify command (cloud or host), treat setup as complete even when the sandbox cannot host a browser.
+2. If cloud auth cannot complete in this environment, stop fighting local Chromium. Treat setup as complete once the package is installed and the smoke workflow exists, and report that browser verification needs Libretto Cloud or a host machine with working Chromium. Do not ask the user to run CLI commands.
 
 ## 5. Finish
 
@@ -93,4 +91,5 @@ After verifying Libretto is setup and working properly, summarize the steps take
 
 - Fix only setup-related failures.
 - Do not make unrelated changes or invent secrets.
-- Do not spend time installing OS packages or fighting sandbox Chromium dependency gaps; use the Libretto Cloud or host-machine fallback.
+- Do not spend time installing OS packages or fighting sandbox Chromium dependency gaps; run Libretto Cloud auth/verify yourself and share any browser URL with the user.
+- Do not ask the user to run CLI commands.
