@@ -117,6 +117,11 @@ export {
   type LibrettoAuthenticateOptions,
 } from "./shared/workflow/authenticate.js";
 export {
+  waitForSmsOtp,
+  type LibrettoSmsOtpAuth,
+  type WaitForSmsOtpOptions,
+} from "./shared/workflow/waitForSmsOtp.js";
+export {
   getDefaultWorkflowFromModuleExports,
   getWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,

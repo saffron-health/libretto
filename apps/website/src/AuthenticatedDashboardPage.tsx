@@ -24,6 +24,7 @@ export const dashboardSections = [
   "users",
   "settings",
   "secrets",
+  "phone_numbers",
   "api_keys",
   "billing",
 ] as const;
@@ -137,6 +138,16 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    id: "phone_numbers",
+    label: "Phone numbers",
+    icon: (
+      <NavIcon>
+        <rect x="5" y="2.5" width="10" height="15" rx="2" />
+        <path d="M8 14.5h4M10 5v1" />
+      </NavIcon>
+    ),
+  },
+  {
     id: "api_keys",
     label: "API keys",
     icon: (
@@ -163,6 +174,7 @@ const accountSectionOrder: DashboardSection[] = [
   "settings",
   "billing",
   "secrets",
+  "phone_numbers",
   "api_keys",
 ];
 const primaryNavItems = navItems.filter(
@@ -212,6 +224,11 @@ const sectionMeta: Record<
     title: "Secrets",
     description:
       "Encrypted values available to workflows without exposing them in code.",
+  },
+  phone_numbers: {
+    title: "Phone numbers",
+    description:
+      "SMS inbox numbers for portal OTP. Prefer one number per portal, and register the E.164 on the portal account.",
   },
   api_keys: {
     title: "API keys",
@@ -1579,6 +1596,208 @@ function SecretsTable({
   );
 }
 
+interface SmsNumberRow {
+  id: string;
+  phone_number: string;
+  agentphone_number_id: string;
+  label: string | null;
+  status: "active" | "released";
+  created_at: string;
+  updated_at: string;
+}
+
+function PhoneNumbersTable({
+  showCreate,
+  onCloseCreate,
+}: {
+  showCreate: boolean;
+  onCloseCreate: () => void;
+}) {
+  const [rows, setRows] = useState<SmsNumberRow[] | null>(null);
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function refresh() {
+    const result = await orpcCall<{ numbers: SmsNumberRow[] }>(
+      "/v1/dashboard/smsNumbers",
+    );
+    setRows(result.numbers);
+  }
+
+  useEffect(() => {
+    refresh().catch((err) =>
+      setError(
+        err instanceof Error ? err.message : "Could not load phone numbers.",
+      ),
+    );
+  }, []);
+
+  async function provision(event: FormEvent) {
+    event.preventDefault();
+    setBusy("create");
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await orpcCall<{
+        success: true;
+        number: SmsNumberRow;
+        message: string;
+      }>("/v1/dashboard/provisionSmsNumber", {
+        label: label.trim() || undefined,
+      });
+      setLabel("");
+      setNotice(
+        `${result.message} Number: ${result.number.phone_number}. Register it on the portal MFA settings.`,
+      );
+      onCloseCreate();
+      await refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not provision a number.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function release(row: SmsNumberRow) {
+    if (
+      !window.confirm(
+        `Release ${row.phone_number}? This is irreversible and the portal MFA phone must be updated.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(row.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await orpcCall<{ success: true; message: string }>(
+        "/v1/dashboard/releaseSmsNumber",
+        { id: row.id },
+      );
+      setNotice(result.message);
+      await refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not release the number.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {showCreate && (
+        <form
+          onSubmit={(event) => void provision(event)}
+          className="rounded-xl border border-rule bg-panel/40 p-4"
+        >
+          <p className="text-sm text-muted">
+            Prefer one number per portal. After provisioning, register the E.164
+            as the MFA phone on that portal account.
+          </p>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="block text-sm">
+              <span className="text-muted">Label (optional)</span>
+              <input
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder="uhc"
+                className="mt-1 block w-48 rounded-md border border-rule bg-transparent px-3 py-2"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={busy === "create"}
+              className="libretto-button libretto-button--default h-10"
+            >
+              {busy === "create" ? "Provisioning…" : "Provision number"}
+            </button>
+            <button
+              type="button"
+              onClick={onCloseCreate}
+              className="libretto-button libretto-button--ghost h-10"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      {error && (
+        <p className="rounded-md border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="rounded-md border border-accent/30 bg-green-3/25 px-4 py-3 text-sm text-accent-bright">
+          {notice}
+        </p>
+      )}
+      <TableShell>
+        <table className="w-full min-w-[720px] border-collapse">
+          <thead>
+            <tr>
+              <th className={thClass}>Phone</th>
+              <th className={thClass}>Label</th>
+              <th className={thClass}>Created</th>
+              <th className={thClass}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows?.map((row) => (
+              <tr key={row.id} className="hover:bg-panel-hi/35">
+                <td className={`${tdClass} font-mono text-xs text-ink`}>
+                  {row.phone_number}
+                </td>
+                <td className={tdClass}>{row.label ?? "—"}</td>
+                <td className={tdClass}>{formatDate(row.created_at)}</td>
+                <td className={tdClass}>
+                  <button
+                    type="button"
+                    disabled={busy === row.id}
+                    onClick={() => void release(row)}
+                    className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                  >
+                    {busy === row.id ? "Releasing…" : "Release"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows === null && !error && <LoadingTable />}
+        {rows?.length === 0 && (
+          <EmptyTable message="No SMS inbox numbers yet. Provision one per portal." />
+        )}
+      </TableShell>
+    </div>
+  );
+}
+
+interface ApiKeyRow {
+  id: string;
+  name: string | null;
+  enabled: boolean;
+  last_request: string | null;
+  expires_at: string | null;
+  created_at: string;
+  creator: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+interface CreatedApiKey {
+  id: string;
+  name: string | null;
+  key: string;
+}
+
 interface ApiKeyRow {
   id: string;
   name: string | null;
@@ -2438,6 +2657,7 @@ export function AuthenticatedDashboardPage({
   const [checking, setChecking] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [showCreateSecret, setShowCreateSecret] = useState(false);
+  const [showCreatePhoneNumber, setShowCreatePhoneNumber] = useState(false);
   const [showCreateKey, setShowCreateKey] = useState(false);
   const [hasConnectedRepos, setHasConnectedRepos] = useState(false);
   useEffect(() => {
@@ -2489,6 +2709,14 @@ export function AuthenticatedDashboardPage({
       >
         Add secret
       </button>
+    ) : section === "phone_numbers" ? (
+      <button
+        type="button"
+        onClick={() => setShowCreatePhoneNumber(true)}
+        className="libretto-button libretto-button--default h-10"
+      >
+        Add phone number
+      </button>
     ) : section === "api_keys" ? (
       <button
         type="button"
@@ -2523,6 +2751,12 @@ export function AuthenticatedDashboardPage({
         <SecretsTable
           showCreate={showCreateSecret}
           onCloseCreate={() => setShowCreateSecret(false)}
+        />
+      )}
+      {section === "phone_numbers" && (
+        <PhoneNumbersTable
+          showCreate={showCreatePhoneNumber}
+          onCloseCreate={() => setShowCreatePhoneNumber(false)}
         />
       )}
       {section === "api_keys" && (

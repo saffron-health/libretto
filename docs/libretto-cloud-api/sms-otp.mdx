@@ -1,0 +1,92 @@
+---
+title: SMS OTP
+"og:image": "https://libretto.sh/docs/og/libretto-cloud-api/sms-otp.png"
+---
+
+> Receive portal SMS one-time codes through tenant-owned AgentPhone inbox numbers, then wait for the code inside a workflow.
+
+SMS OTP is for portals that text a code to a phone number. Prefer authenticator TOTP (`*_totp_secret`) when the portal supports it.
+
+## How it works
+
+1. Provision an inbox number into your tenant pool (CLI or dashboard).
+2. Register that E.164 as the MFA phone on the portal account.
+3. In the workflow: open a claim, click send-code, then `waitForSmsOtp` polls Libretto Cloud until the AgentPhone webhook writes the code.
+
+Use **one phone number per portal** (or per portal login). Do not run concurrent SMS OTP waits on the same inbox number.
+
+## Configure numbers (outside workflows)
+
+```bash
+libretto cloud sms-numbers provision --label uhc
+libretto cloud sms-numbers list
+```
+
+Dashboard: **Phone numbers**. Copy the E.164 and set it on the portal MFA settings.
+
+### POST `/v1/sms-numbers/provision`
+
+Requires `x-api-key`.
+
+Request fields:
+
+- `label` (optional): portal label such as `uhc`
+- `country` (optional): two-letter country code
+- `area_code` (optional): preferred area code
+
+### POST `/v1/sms-numbers/list`
+
+Lists pool numbers. Pass `include_released: true` to include released rows.
+
+### POST `/v1/sms-numbers/update`
+
+Update a number's `label`.
+
+### POST `/v1/sms-numbers/release`
+
+Release the number on AgentPhone and mark it released in Libretto. Irreversible.
+
+## Wait for a code in a workflow
+
+```typescript
+import { waitForSmsOtp, workflow } from "libretto";
+
+export default workflow("portal-login", {
+  credentials: ["username", "password"],
+  async handler(ctx, input) {
+    // ... fill username/password, then:
+    const wait = waitForSmsOtp({
+      label: "uhc",
+      // Deployed jobs: pass the injected cloud auth blob
+      cloud: (input as { __libretto?: { smsOtp?: { apiUrl: string; token: string; jobId: string } } }).__libretto,
+      // Local runs: omit cloud and use LIBRETTO_API_KEY
+    });
+
+    await ctx.page.click('button:has-text("Send code")');
+    const { code } = await wait;
+    await ctx.page.fill('input[name="otp"]', code);
+  },
+});
+```
+
+`waitForSmsOtp` calls:
+
+1. `POST /v1/sms-otp/claims/create` — exclusive open claim on the inbox
+2. `POST /v1/sms-otp/claims/get` — poll until fulfilled, then consume the code once
+
+Deployed jobs receive a short-lived `input.__libretto.smsOtp` token at dispatch. Local runs use `LIBRETTO_API_KEY`.
+
+### Claim routes
+
+Both accept `x-api-key` or `x-libretto-sms-otp-token`.
+
+**Create** — `number_id`, `label`, or `phone_number`; optional `job_id`, `ttl_seconds` (30–900, default 300).
+
+**Get** — `claim_id`; optional `consume` (default true). Returns `code` once when fulfilled.
+
+## Isolation rules
+
+- Numbers are tenant-scoped (RLS).
+- Routing is by which AgentPhone number received the SMS — inbound SMS has no tenant metadata.
+- At most one open claim per number (HTTP 409 if busy).
+- Codes are encrypted at rest, single-consume, and treated as secrets in log sanitization.
