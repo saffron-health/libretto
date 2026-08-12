@@ -10,7 +10,7 @@ export type WaitForSmsOtpOptions = {
   numberId?: string;
   /** Tenant label (e.g. `uhc`). Prefer one number per portal. */
   label?: string;
-  /** E.164 phone number from the tenant pool. */
+  /** Phone number with country code (e.g. +15551234567) from the tenant pool. */
   phoneNumber?: string;
   /** Max time to wait for the inbound SMS OTP. */
   timeoutMs?: number;

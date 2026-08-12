@@ -10,10 +10,10 @@ SMS OTP is for portals that text a code to a phone number. Prefer authenticator 
 ## How it works
 
 1. Provision an inbox number into your tenant pool (CLI or dashboard).
-2. Register that E.164 as the MFA phone on the portal account.
+2. Register that full phone number (with country code, like `+15551234567`) as the MFA phone on the portal account.
 3. In the workflow: open a claim, click send-code, then `waitForSmsOtp` polls Libretto Cloud until the AgentPhone webhook writes the code.
 
-Use **one phone number per portal** (or per portal login). Do not run concurrent SMS OTP waits on the same inbox number.
+Use **one phone number per portal** (or per portal login). Do not run concurrent SMS OTP waits on the same inbox number. A claim locks the inbox for up to 5 minutes; pulling the code unlocks it, and a new claim can take over after the lock expires.
 
 ## Configure numbers (outside workflows)
 
@@ -22,7 +22,7 @@ libretto cloud sms-numbers provision --label uhc
 libretto cloud sms-numbers list
 ```
 
-Dashboard: **Phone numbers**. Copy the E.164 and set it on the portal MFA settings.
+Dashboard: **Phone numbers**. Copy the phone number (with country code) and set it on the portal MFA settings.
 
 ### POST `/v1/sms-numbers/provision`
 
@@ -80,7 +80,7 @@ Deployed jobs receive a short-lived `input.__libretto.smsOtp` token at dispatch.
 
 Both accept `x-api-key` or `x-libretto-sms-otp-token`.
 
-**Create** — `number_id`, `label`, or `phone_number`; optional `job_id`, `ttl_seconds` (30–900, default 300).
+**Create** — `number_id`, `label`, or `phone_number`; optional `job_id`, `ttl_seconds` (30–300, default 300).
 
 **Get** — `claim_id`; optional `consume` (default true). Returns `code` once when fulfilled.
 
@@ -88,5 +88,5 @@ Both accept `x-api-key` or `x-libretto-sms-otp-token`.
 
 - Numbers are tenant-scoped (RLS).
 - Routing is by which AgentPhone number received the SMS — inbound SMS has no tenant metadata.
-- At most one open claim per number (HTTP 409 if busy).
+- At most one open claim per number (HTTP 409 if busy). Create expires stale open locks (≥5 minutes) before taking the lock.
 - Codes are encrypted at rest, single-consume, and treated as secrets in log sanitization.

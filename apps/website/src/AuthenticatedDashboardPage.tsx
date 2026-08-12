@@ -228,7 +228,7 @@ const sectionMeta: Record<
   phone_numbers: {
     title: "Phone numbers",
     description:
-      "SMS inbox numbers for portal OTP. Prefer one number per portal, and register the E.164 on the portal account.",
+      "SMS inbox numbers for portal OTP. Prefer one number per portal, and register the full phone number (with country code, like +15551234567) on the portal account.",
   },
   api_keys: {
     title: "API keys",
@@ -1697,8 +1697,9 @@ function PhoneNumbersTable({
           className="rounded-xl border border-rule bg-panel/40 p-4"
         >
           <p className="text-sm text-muted">
-            Prefer one number per portal. After provisioning, register the E.164
-            as the MFA phone on that portal account.
+            Prefer one number per portal. After provisioning, register the full
+            phone number (with country code, like +15551234567) as the MFA phone
+            on that portal account.
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <label className="block text-sm">
