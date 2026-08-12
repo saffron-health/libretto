@@ -101,7 +101,7 @@ npx libretto open https://portal.example.com --headed --session portal-login
 npx libretto save portal --session portal-login --sites portal.example.com
 ```
 
-Use this when the login cannot be scripted with Playwright, such as CAPTCHAs, device approvals, or magic links. For repeatable SMS one-time codes on Libretto Cloud, see [SMS OTP](/libretto-cloud-api/sms-otp). Once an auth profile is saved, the workflow can use `authProfile: "portal"` or `authProfile: { name: "portal", refresh: true }` without repeating the manual login every run.
+Use this when the login cannot be scripted with Playwright, such as CAPTCHAs, SMS codes, device approvals, or magic links. Once saved, the workflow can use `authProfile: "portal"` or `authProfile: { name: "portal", refresh: true }` without repeating the manual login every run.
 
 If you already have a signed-in Chrome profile and explicitly want to copy from it, start that Chrome profile with remote debugging enabled and import only the sites you need:
 

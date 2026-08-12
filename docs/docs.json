@@ -199,7 +199,6 @@
               "libretto-cloud-api/open-workflows",
               "libretto-cloud-api/jobs-and-logs",
               "libretto-cloud-api/credentials",
-              "libretto-cloud-api/sms-otp",
               "libretto-cloud-api/webhooks",
               "libretto-cloud-api/schedules"
             ]
