@@ -137,7 +137,7 @@ export function OpenWorkflowsPage() {
           wrap="balance"
           className="font-[300] leading-[1.05] tracking-[-0.035em] text-ink"
         >
-          Open Source Workflows
+          Open source workflows
         </Text>
         <Text as="p" size="md" className="mt-5 max-w-xl leading-7 text-muted">
           Shared workflow source you can inspect, connect secrets to, and deploy
@@ -454,7 +454,7 @@ export function OpenWorkflowPage({ shareId }: { shareId: string }) {
         href="/open-workflows"
         className="inline-flex pt-4 font-mono text-xs text-muted no-underline transition hover:text-ink"
       >
-        ← Open Source Workflows
+        ← Open source workflows
       </a>
 
       <header className="mt-8">

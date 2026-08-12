@@ -19,7 +19,7 @@ Workspace code sharing must be on in organization settings before either option 
 2. Deploy the workflow so it is ready in Cloud.
 3. Open the workflow and expand Share workflow outside this workspace.
 4. Choose one:
-   - Publish open source workflow — lists source on [Open Source Workflows](https://libretto.sh/open-workflows)
+   - Publish open source workflow — lists source on [Open source workflows](https://libretto.sh/open-workflows)
    - Host workflow — lists a run API on [Hosted Workflow APIs](https://libretto.sh/hosted-workflows)
 5. If the UI asks to enable sharing, turn it on in [Settings](https://libretto.sh/dashboard/settings), then confirm.
 

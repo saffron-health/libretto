@@ -4,7 +4,7 @@ import { OpenWorkflowsPage } from "../OpenWorkflowsPage";
 export const Route = createFileRoute("/open-workflows")({
   head: () => ({
     meta: [
-      { title: "Open Source Workflows | Libretto" },
+      { title: "Open source workflows | Libretto" },
       {
         name: "description",
         content:
