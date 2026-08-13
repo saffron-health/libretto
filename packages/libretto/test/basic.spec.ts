@@ -388,7 +388,7 @@ describe("basic CLI subprocess behavior", () => {
   test("prints cloud jobs status help", async ({ librettoCli }) => {
     const result = await librettoCli("help cloud jobs status");
     expect(result.stdout).toContain(
-      "Get or watch one of your tenant's deployed workflow jobs",
+      "Get or watch a deployed workflow job",
     );
     expect(result.stdout).toContain("libretto cloud jobs status [jobId]");
     expect(result.stdout).toContain("--watch");

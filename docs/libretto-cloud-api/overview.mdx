@@ -10,7 +10,7 @@ The Libretto Cloud API base URL is `https://api.libretto.sh`.
 
 ### Request format
 
-Most Libretto Cloud API routes in this section are `POST` requests. Hosted
+Most Libretto Cloud API routes in this section are `POST` requests. Published
 workflow catalogue and bookmark routes also use `GET` and `DELETE`.
 
 Authenticated routes use:
@@ -20,8 +20,8 @@ Authenticated routes use:
 - JSON request bodies for state-changing requests
 
 The RPC routes documented in this section wrap input as `{ "json": { ... } }`.
-Hosted workflow routes use direct JSON bodies as shown on the
-[Hosted workflows](/libretto-cloud-api/hosted-workflows) page.
+Published workflow routes use direct JSON bodies as shown on the
+[Published workflows](/libretto-cloud-api/hosted-workflows) page.
 
 For example:
 
@@ -65,7 +65,7 @@ This section documents the public `/v1/*` routes exposed by Libretto Cloud in th
     Start jobs, poll results, inspect debug reports, and fetch logs.
   </Card>
 
-  <Card title="Hosted Workflows" icon="lucide:library" href="/libretto-cloud-api/hosted-workflows">
+  <Card title="Published Workflows" icon="lucide:library" href="/libretto-cloud-api/hosted-workflows">
     Search, run, and save workflows published by other tenants.
   </Card>
 

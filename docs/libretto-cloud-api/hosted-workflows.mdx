@@ -1,28 +1,32 @@
 ---
-title: Hosted workflows
+title: Published workflows
 "og:image": "https://libretto.sh/docs/og/libretto-cloud-api/hosted-workflows.png"
 ---
 
-> Search, run, and save opaque workflows published by other Libretto Cloud tenants.
+> Search, run, and save public workflows shared by other Libretto Cloud tenants.
 
-Hosted workflow commands require `LIBRETTO_API_KEY`. The API key's tenant owns
+Published workflow commands require `LIBRETTO_API_KEY`. The API key's tenant owns
 each run and bookmark. Publishers do not receive access to the caller's tenant,
 credentials, or results.
+
+Each published workflow also exposes reviewed source code on its public page.
+See [Sharing workflows externally](/libretto-cloud-hosting/sharing-workflows-externally)
+for the publisher flow.
 
 ### CLI
 
 Search the public catalogue and inspect a workflow before running it:
 
 ```bash
-libretto cloud hosted-workflows search eligibility
-libretto cloud hosted-workflows get acme/check-eligibility
+libretto cloud published-workflows search eligibility
+libretto cloud published-workflows get acme/check-eligibility
 ```
 
 Start a run with input parameters and references to credentials already stored
 in your Libretto Cloud tenant:
 
 ```bash
-libretto cloud hosted-workflows run acme/check-eligibility \
+libretto cloud published-workflows run acme/check-eligibility \
   --params '{"member_id":"123"}' \
   --credentials '{"portal_login":"payer-portal"}'
 ```
@@ -31,21 +35,21 @@ The command returns a job ID. Poll once or wait until it reaches a terminal
 state:
 
 ```bash
-libretto cloud hosted-workflows status <job-id>
-libretto cloud hosted-workflows status <job-id> --watch
+libretto cloud published-workflows status <job-id>
+libretto cloud published-workflows status <job-id> --watch
 ```
 
 Save a workflow with an optional alias, notes, and non-secret defaults:
 
 ```bash
-libretto cloud hosted-workflows save acme/check-eligibility \
+libretto cloud published-workflows save acme/check-eligibility \
   --alias eligibility \
   --notes "Default west region" \
   --defaults '{"region":"west"}'
 
-libretto cloud hosted-workflows saved
-libretto cloud hosted-workflows run eligibility --params '{"member_id":"123"}'
-libretto cloud hosted-workflows remove <bookmark-id>
+libretto cloud published-workflows saved
+libretto cloud published-workflows run eligibility --params '{"member_id":"123"}'
+libretto cloud published-workflows remove <bookmark-id>
 ```
 
 Explicit run parameters override saved defaults. Use `--json` on any command
@@ -85,6 +89,6 @@ The bookmark save body uses this shape:
 }
 ```
 
-If a publisher unhosts a workflow or disables code sharing, the bookmark stays
+If a publisher stops sharing a workflow or disables sharing, the bookmark stays
 in the tenant's saved list and becomes unavailable. Libretto does not return
 the disabled publication's schemas and will not run it.

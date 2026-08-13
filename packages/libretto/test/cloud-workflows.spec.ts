@@ -117,7 +117,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   };
 
   const search = await librettoCli(
-    "cloud hosted-workflows search patient --limit 5 --json",
+    "cloud published-workflows search patient --limit 5 --json",
     env,
   );
   expect(JSON.parse(search.stdout)).toMatchObject({
@@ -125,7 +125,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   });
 
   const get = await librettoCli(
-    "cloud hosted-workflows get acme/patient-lookup --json",
+    "cloud published-workflows get acme/patient-lookup --json",
     env,
   );
   expect(JSON.parse(get.stdout)).toMatchObject({
@@ -134,24 +134,24 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   });
 
   const save = await librettoCli(
-    `cloud hosted-workflows save acme/patient-lookup --alias patient --defaults '{"region":"west"}' --json`,
+    `cloud published-workflows save acme/patient-lookup --alias patient --defaults '{"region":"west"}' --json`,
     env,
   );
   expect(JSON.parse(save.stdout)).toMatchObject({ bookmark: { id: bookmarkId } });
 
-  const saved = await librettoCli("cloud hosted-workflows saved --json", env);
+  const saved = await librettoCli("cloud published-workflows saved --json", env);
   expect(JSON.parse(saved.stdout)).toMatchObject({
     workflows: [{ alias: "patient", available: true }],
   });
 
   const run = await librettoCli(
-    `cloud hosted-workflows run patient --params '{"patient_id":"p-1"}' --credentials '{"portal":"credential-1"}' --json`,
+    `cloud published-workflows run patient --params '{"patient_id":"p-1"}' --credentials '{"portal":"credential-1"}' --json`,
     env,
   );
   expect(JSON.parse(run.stdout)).toMatchObject({ job_id: jobId });
 
   const status = await librettoCli(
-    `cloud hosted-workflows status ${jobId} --watch --interval-seconds 0.1 --json`,
+    `cloud published-workflows status ${jobId} --watch --interval-seconds 0.1 --json`,
     env,
   );
   expect(JSON.parse(status.stdout)).toMatchObject({
@@ -161,7 +161,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   expect(statusCalls).toBe(2);
 
   const remove = await librettoCli(
-    `cloud hosted-workflows remove ${bookmarkId} --json`,
+    `cloud published-workflows remove ${bookmarkId} --json`,
     env,
   );
   expect(JSON.parse(remove.stdout)).toEqual({ id: bookmarkId, removed: true });
@@ -182,11 +182,11 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
 });
 
 test("cloud workflow commands require an API key", async ({ librettoCli }) => {
-  const result = await librettoCli("cloud hosted-workflows search", {
+  const result = await librettoCli("cloud published-workflows search", {
     LIBRETTO_API_KEY: undefined,
   });
   expect(result.stderr).toContain(
-    "LIBRETTO_API_KEY is required to search Hosted workflows.",
+    "LIBRETTO_API_KEY is required to search published workflows.",
   );
   expect(result.stderr).toContain("libretto cloud auth api-key issue");
 });
