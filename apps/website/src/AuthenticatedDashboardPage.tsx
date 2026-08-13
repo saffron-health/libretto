@@ -1659,7 +1659,6 @@ function PhoneNumbersTable({
   const [label, setLabel] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<SmsNumberRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1678,16 +1677,6 @@ function PhoneNumbersTable({
       ),
     );
   }, []);
-
-  // Escape closes the delete dialog, matching the browser confirm it replaces.
-  useEffect(() => {
-    if (!pendingDelete) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setPendingDelete(null);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [pendingDelete]);
 
   async function provision(event: FormEvent) {
     event.preventDefault();
@@ -1744,9 +1733,14 @@ function PhoneNumbersTable({
     }
   }
 
-  async function confirmDelete() {
-    const row = pendingDelete;
-    if (!row) return;
+  async function deleteNumber(row: SmsNumberRow) {
+    if (
+      !window.confirm(
+        `Delete ${row.phone_number}? This releases the number for good, and any portal still texting passcodes here must be updated.`,
+      )
+    ) {
+      return;
+    }
     setBusy(row.id);
     setError(null);
     setNotice(null);
@@ -1755,7 +1749,6 @@ function PhoneNumbersTable({
         "/v1/dashboard/releaseSmsNumber",
         { id: row.id },
       );
-      setPendingDelete(null);
       setNotice(result.message);
       await refresh();
     } catch (err) {
@@ -1875,10 +1868,11 @@ function PhoneNumbersTable({
                 <td className={tdClass}>
                   <button
                     type="button"
-                    onClick={() => setPendingDelete(row)}
-                    className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
+                    disabled={busy === row.id}
+                    onClick={() => void deleteNumber(row)}
+                    className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
                   >
-                    Delete
+                    {busy === row.id ? "Deleting…" : "Delete"}
                   </button>
                 </td>
               </tr>
@@ -1891,47 +1885,6 @@ function PhoneNumbersTable({
         )}
       </TableShell>
 
-      {pendingDelete && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-number-title"
-          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setPendingDelete(null);
-          }}
-        >
-          <div className="w-full max-w-md rounded-xl border border-rule bg-panel p-5">
-            <h2 id="delete-number-title" className="text-base text-ink">
-              Delete {pendingDelete.phone_number}?
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              This releases the number for good — it cannot be recovered, and a
-              new one will have a different phone number. Update the MFA phone on
-              any portal still sending passcodes here first, or those sign-ins
-              will start failing.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                autoFocus
-                onClick={() => setPendingDelete(null)}
-                className="h-10 px-3 text-sm text-muted hover:text-ink"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={busy === pendingDelete.id}
-                onClick={() => void confirmDelete()}
-                className="h-10 rounded-md border border-red-400/40 bg-red-500/15 px-3 text-sm text-red-200 hover:bg-red-500/25 disabled:opacity-60"
-              >
-                {busy === pendingDelete.id ? "Deleting…" : "Delete number"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
