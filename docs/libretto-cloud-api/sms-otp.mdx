@@ -52,20 +52,20 @@ Release the number and remove it from your tenant pool. Irreversible.
 
 Pass one of `phoneNumber`, `phoneNumberId`, or `phoneNumberLabel` to select the inbox.
 
-Auth: pass `apiKey` from a workflow credential (same locally and on hosted Cloud). Declare `libretto_api_key` in `credentials`, store it in the dashboard (or `LIBRETTO_CLOUD_LIBRETTO_API_KEY` locally), and pass `apiKey: input.credentials.libretto_api_key`.
+Auth is automatic — do not put an API key in workflow source:
+
+- Local: set `LIBRETTO_API_KEY` (same key as deploy/CLI)
+- Hosted Cloud: dispatch injects a short-lived job token; `claimSmsOtp` picks it up with no extra args
 
 ```typescript
 import { claimSmsOtp, workflow } from "libretto";
 
 export default workflow("portal-login", {
-  credentials: ["username", "password", "libretto_api_key"],
+  credentials: ["username", "password"],
   async handler(ctx, input) {
     // ... fill username/password, then:
-    const otp = await claimSmsOtp({
-      phoneNumberLabel: "uhc",
-      apiKey: input.credentials.libretto_api_key,
-    });
-    // Inbox is locked. otp.phoneNumber is the claimed E.164 number.
+    const otp = await claimSmsOtp({ phoneNumberLabel: "uhc" });
+    // Inbox is locked. otp.phoneNumber is the claimed number.
 
     await ctx.page.click('button:has-text("Send code")');
     const { code } = await otp.wait();
@@ -83,7 +83,7 @@ export default workflow("portal-login", {
 
 ### Claim routes
 
-All require `x-api-key`.
+Accept `x-api-key` or `x-libretto-job-token` (hosted jobs inject the job token automatically).
 
 **Create** — `number_id`, `label`, or `phone_number`; optional `ttl_seconds` (30–300, default 300). `claimSmsOtp` sets `ttl_seconds` from `timeoutMs` and does not expose a separate TTL option.
 

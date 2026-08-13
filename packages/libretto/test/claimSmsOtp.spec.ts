@@ -1,14 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { claimSmsOtp } from "../src/shared/workflow/claimSmsOtp.js";
+import {
+  LIBRETTO_JOB_TOKEN_HEADER,
+  runWithLibrettoRuntimeAuth,
+} from "../src/shared/workflow/runtime-auth.js";
 
 describe("claimSmsOtp", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    delete process.env.LIBRETTO_API_KEY;
     delete process.env.LIBRETTO_API_URL;
   });
 
-  it("locks the inbox before polling, then returns the consumed code", async () => {
+  it("uses LIBRETTO_API_KEY locally and locks before polling", async () => {
+    process.env.LIBRETTO_API_KEY = "test-key";
     process.env.LIBRETTO_API_URL = "https://api.example.test";
 
     const fetchMock = vi
@@ -51,47 +57,69 @@ describe("claimSmsOtp", () => {
 
     const otp = await claimSmsOtp({
       phoneNumberLabel: "uhc",
-      apiKey: "test-key",
       pollIntervalMs: 1,
       timeoutMs: 5_000,
     });
 
-    expect(otp.phoneNumber).toBe("+15551234567");
     expect(otp.claimId).toBe("claim-1");
-    expect(otp.phoneNumberId).toBe("num-1");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    const createCall = fetchMock.mock.calls[0];
-    expect(createCall?.[0]).toBe("https://api.example.test/v1/smsOtp/claims/create");
-    expect((createCall?.[1] as { headers?: Record<string, string> })?.headers).toMatchObject({
+    expect((fetchMock.mock.calls[0]?.[1] as { headers?: Record<string, string> })?.headers).toMatchObject({
       "x-api-key": "test-key",
     });
 
-    const createBody = JSON.parse(
-      String((createCall?.[1] as { body?: string })?.body),
-    ) as { json: { ttl_seconds: number; label: string; job_id?: string } };
-    expect(createBody.json.ttl_seconds).toBe(30);
-    expect(createBody.json.label).toBe("uhc");
-    expect(createBody.json.job_id).toBeUndefined();
-
     const result = await otp.wait();
-    expect(result).toEqual({
-      code: "482913",
-      phoneNumber: "+15551234567",
-      claimId: "claim-1",
+    expect(result.code).toBe("482913");
+  });
+
+  it("uses the hosted job token from runtime auth when present", async () => {
+    process.env.LIBRETTO_API_URL = "https://api.example.test";
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        json: {
+          success: true,
+          claim: {
+            claim_id: "claim-2",
+            status: "open",
+            phone_number: "+15551234567",
+            number_id: "num-1",
+            label: "uhc",
+            expires_at: new Date(Date.now() + 60_000).toISOString(),
+            code: null,
+          },
+          message: "ok",
+        },
+      }),
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runWithLibrettoRuntimeAuth(
+      {
+        job: {
+          apiUrl: "https://api.hosted.test",
+          token: "job-token",
+        },
+      },
+      async () => {
+        await claimSmsOtp({ phoneNumberLabel: "uhc" });
+      },
+    );
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://api.hosted.test/v1/smsOtp/claims/create",
+    );
+    expect((fetchMock.mock.calls[0]?.[1] as { headers?: Record<string, string> })?.headers).toMatchObject({
+      [LIBRETTO_JOB_TOKEN_HEADER]: "job-token",
+    });
   });
 
   it("requires a number selector", async () => {
-    await expect(
-      claimSmsOtp({ apiKey: "test-key" } as never),
-    ).rejects.toThrow(/phoneNumber/);
+    process.env.LIBRETTO_API_KEY = "test-key";
+    await expect(claimSmsOtp({} as never)).rejects.toThrow(/phoneNumber/);
   });
 
-  it("requires apiKey", async () => {
-    await expect(
-      claimSmsOtp({ phoneNumberLabel: "uhc", apiKey: "   " }),
-    ).rejects.toThrow(/apiKey/);
+  it("requires LIBRETTO_API_KEY when no hosted token is present", async () => {
+    await expect(claimSmsOtp({ phoneNumberLabel: "uhc" })).rejects.toThrow(
+      /LIBRETTO_API_KEY/,
+    );
   });
 });

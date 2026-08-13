@@ -1,3 +1,9 @@
+import {
+  getLibrettoRuntimeJobAuth,
+  LIBRETTO_JOB_TOKEN_HEADER,
+  type LibrettoJobAuth,
+} from "./runtime-auth.js";
+
 /** API claim lock bounds (seconds). Keep in sync with Libretto Cloud. */
 const MIN_CLAIM_TTL_SECONDS = 30;
 const MAX_CLAIM_TTL_SECONDS = 5 * 60;
@@ -19,11 +25,10 @@ export type ClaimSmsOtpOptions = {
   /** Poll interval while waiting. */
   pollIntervalMs?: number;
   /**
-   * Libretto Cloud API key. Pass from a workflow credential (e.g.
-   * `input.credentials.libretto_api_key`) so local and hosted runs use the
-   * same path.
+   * Optional override. Prefer omitting this: hosted jobs inject a job token
+   * automatically; local runs use `LIBRETTO_API_KEY`.
    */
-  apiKey: string;
+  apiKey?: string;
   /** Libretto Cloud API base URL. Defaults to LIBRETTO_API_URL or https://api.libretto.sh. */
   apiUrl?: string;
 };
@@ -43,11 +48,6 @@ export type SmsOtpClaim = {
   claimId: string;
   phoneNumberId: string;
   wait(): Promise<SmsOtpCode>;
-};
-
-type SmsOtpAuth = {
-  apiUrl: string;
-  apiKey: string;
 };
 
 function claimTtlSecondsFromTimeout(timeoutMs: number): number {
@@ -75,31 +75,56 @@ type CreateClaimResponse = {
   message: string;
 };
 
-function resolveAuth(options: ClaimSmsOtpOptions): SmsOtpAuth {
-  const apiKey = options.apiKey.trim();
-  if (!apiKey) {
-    throw new Error(
-      "claimSmsOtp requires apiKey. Declare a workflow credential (e.g. libretto_api_key) and pass apiKey: input.credentials.libretto_api_key.",
-    );
-  }
+function resolveAuth(options: ClaimSmsOtpOptions): LibrettoJobAuth {
   const apiUrl =
     options.apiUrl?.trim() ||
     process.env.LIBRETTO_API_URL?.trim() ||
     DEFAULT_API_URL;
-  return { apiUrl, apiKey };
+
+  // Explicit override wins (tests / advanced callers).
+  const explicitKey = options.apiKey?.trim();
+  if (explicitKey) {
+    return { apiUrl, apiKey: explicitKey };
+  }
+
+  // Hosted Cloud jobs: minted token injected via params.__libretto (ALS).
+  const injected = getLibrettoRuntimeJobAuth();
+  if (injected?.token && injected.apiUrl) {
+    return injected;
+  }
+
+  // Local runs: same env var as deploy / CLI / playwright-debugger.
+  const apiKey = process.env.LIBRETTO_API_KEY?.trim();
+  if (apiKey) {
+    return { apiUrl, apiKey };
+  }
+
+  throw new Error(
+    "claimSmsOtp needs auth. For local runs set LIBRETTO_API_KEY. Hosted Cloud jobs inject auth automatically — redeploy if this error appears in Cloud.",
+  );
 }
 
 async function orpcPost<T>(
-  auth: SmsOtpAuth,
+  auth: LibrettoJobAuth,
   path: string,
   input: Record<string, unknown>,
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
+  if (auth.token) {
+    headers[LIBRETTO_JOB_TOKEN_HEADER] = auth.token;
+  } else if (auth.apiKey) {
+    headers["x-api-key"] = auth.apiKey;
+  } else {
+    throw new Error(
+      "claimSmsOtp auth is missing token and apiKey. Set LIBRETTO_API_KEY locally, or run inside a Libretto Cloud job.",
+    );
+  }
+
   const response = await fetch(new URL(path, auth.apiUrl).toString(), {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": auth.apiKey,
-    },
+    headers,
     body: JSON.stringify({ json: input }),
   });
 
@@ -132,7 +157,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function pollForCode(options: {
-  auth: SmsOtpAuth;
+  auth: LibrettoJobAuth;
   claimId: string;
   phoneNumber: string;
   timeoutMs: number;
@@ -170,7 +195,6 @@ async function pollForCode(options: {
     );
   } catch (err) {
     // Free the inbox lock when the wait ends without a code (timeout / errors).
-    // No-op if the claim is already consumed, fulfilled, or expired.
     try {
       await orpcPost(auth, "/v1/smsOtp/claims/expire", { claim_id: claimId });
     } catch {
@@ -187,17 +211,15 @@ async function pollForCode(options: {
  * `otp.wait()` for the code:
  *
  * ```ts
- * const otp = await claimSmsOtp({
- *   phoneNumberLabel: "uhc",
- *   apiKey: input.credentials.libretto_api_key,
- * });
+ * const otp = await claimSmsOtp({ phoneNumberLabel: "uhc" });
  * await page.click('button:has-text("Send code")');
  * const { code } = await otp.wait();
  * ```
  *
- * Auth: pass `apiKey` from a workflow credential (same locally and on hosted
- * Cloud). Configure numbers outside the workflow (CLI/dashboard). Prefer one
- * number per portal. Do not run concurrent claims on the same inbox number.
+ * Auth is automatic: set `LIBRETTO_API_KEY` locally; hosted Cloud jobs inject
+ * a short-lived job token. Do not put the API key in workflow source.
+ * Configure numbers outside the workflow (CLI/dashboard). Prefer one number
+ * per portal. Do not run concurrent claims on the same inbox number.
  */
 export async function claimSmsOtp(
   options: ClaimSmsOtpOptions,

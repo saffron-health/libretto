@@ -55,7 +55,7 @@ import { claimSmsOtp, librettoAuthenticate, workflow } from "libretto";
 
 export default workflow("portal-login", {
   startUrl: "https://portal.example.com/login",
-  credentials: ["username", "password", "libretto_api_key"],
+  credentials: ["username", "password"],
   async handler(ctx, input) {
     const { page } = ctx;
 
@@ -73,10 +73,8 @@ export default workflow("portal-login", {
         await page.getByRole("button", { name: "Sign in" }).click();
 
         // Lock the inbox before asking the portal to text the code.
-        const otp = await claimSmsOtp({
-          phoneNumberLabel: "uhc",
-          apiKey: credentials.libretto_api_key,
-        });
+        // Auth: local uses LIBRETTO_API_KEY; hosted Cloud injects a job token.
+        const otp = await claimSmsOtp({ phoneNumberLabel: "uhc" });
         await page.getByRole("button", { name: "Send code" }).click();
         const { code } = await otp.wait();
         await page.getByLabel("Code").fill(code);
@@ -86,7 +84,7 @@ export default workflow("portal-login", {
 });
 ```
 
-Pass the Libretto Cloud API key as a normal workflow credential (`libretto_api_key`). Locally set `LIBRETTO_CLOUD_LIBRETTO_API_KEY`; on Cloud, store the same credential in the dashboard. Do not run concurrent SMS OTP claims on the same inbox number. Select the inbox with `phoneNumber`, `phoneNumberId`, or `phoneNumberLabel`.
+Locally set `LIBRETTO_API_KEY` (same key as deploy/CLI). Hosted jobs inject auth automatically — do not put the API key in workflow source or credentials. Do not run concurrent SMS OTP claims on the same inbox number. Select the inbox with `phoneNumber`, `phoneNumberId`, or `phoneNumberLabel`.
 
 ## Auth Profiles
 

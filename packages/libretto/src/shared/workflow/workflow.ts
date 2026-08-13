@@ -10,6 +10,10 @@ import {
   mergeCredentialsIntoInput,
   normalizeCredentialNames,
 } from "./credentials.js";
+import {
+  runWithLibrettoRuntimeAuth,
+  takeLibrettoRuntimeFromInput,
+} from "./runtime-auth.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
@@ -205,10 +209,11 @@ export class LibrettoWorkflow<
     ctx: LibrettoWorkflowContext,
     input: unknown,
   ): Promise<z.infer<OutputSchema>> {
+    const { input: withoutRuntime, store } = takeLibrettoRuntimeFromInput(input);
     const parsed = parseWorkflowInput(
       this.name,
       this.inputSchema,
-      mergeCredentialsIntoInput(input, this.credentialNames),
+      mergeCredentialsIntoInput(withoutRuntime, this.credentialNames),
     );
     const workflowContext =
       !this.recoveryAction
@@ -219,7 +224,9 @@ export class LibrettoWorkflow<
               recoveryAction: this.recoveryAction,
             }),
           };
-    return this.handler(workflowContext, parsed);
+    return runWithLibrettoRuntimeAuth(store, () =>
+      this.handler(workflowContext, parsed),
+    );
   }
 }
 
