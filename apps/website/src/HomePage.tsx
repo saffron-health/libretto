@@ -96,10 +96,13 @@ function Hero({
           className="flex flex-col items-center justify-center gap-3"
         >
           <InstallSnippet />
+          <span className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+            or
+          </span>
           <Button
             href="https://cal.com/team/libretto/15-min"
             variant="outline"
-            className="mt-2 min-w-56"
+            className="mt-1 min-w-56"
             data-fathom-event="Hero demo click"
           >
             Talk to a dev · 15 min
