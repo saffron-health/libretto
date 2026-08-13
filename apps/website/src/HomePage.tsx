@@ -81,13 +81,13 @@ function Hero({
         </Text>
         <Text
           as="p"
-          size="lg"
+          size="xl"
           data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
-          className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:pretty]"
+          className="mx-auto mb-8 max-w-[780px] text-center leading-relaxed [text-wrap:pretty]"
         >
-          Libretto helps agents build the most token-efficient automations
-          across public websites and on-prem systems.
+          Libretto helps coding agents autonomously manage integrations—browser
+          workflows, web scrapers, on-prem desktop apps, and more.
         </Text>
         <div
           data-animate={AnimationTarget.Content}
