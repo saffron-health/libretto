@@ -352,17 +352,17 @@ function EndpointBar({ method, url }: { method: string; url: string }) {
 
   return (
     <div className="flex min-w-0 items-stretch overflow-hidden rounded-lg border border-rule bg-panel shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
-      <span className="inline-flex shrink-0 items-center border-r border-rule bg-accent/[0.08] px-4 font-mono text-[11px] font-semibold tracking-[0.1em] text-accent-bright">
+      <span className="inline-flex shrink-0 items-center border-r border-rule bg-accent/[0.08] px-3 font-mono text-[10px] font-semibold tracking-[0.1em] text-accent-bright">
         {method}
       </span>
-      <div className="min-w-0 flex-1 px-4 py-3">
-        <code className="break-all font-mono text-[12px] leading-5 text-ink sm:whitespace-nowrap">
+      <div className="min-w-0 flex-1 px-3 py-3">
+        <code className="break-all font-mono text-[11px] leading-5 text-ink xl:whitespace-nowrap">
           {url}
         </code>
       </div>
       <button
         type="button"
-        className="shrink-0 border-l border-rule px-4 font-mono text-[10px] uppercase tracking-[0.1em] text-muted transition hover:bg-panel-hi hover:text-ink"
+        className="shrink-0 border-l border-rule px-3 font-mono text-[10px] uppercase tracking-[0.1em] text-muted transition hover:bg-panel-hi hover:text-ink"
         onClick={() => {
           void navigator.clipboard.writeText(url).catch(() => {});
           setCopied(true);
@@ -878,16 +878,12 @@ export function HostedWorkflowPage({
         })}
       </div>
 
-      {activeView === "api" && (
-        <div className="mt-6">
-          <EndpointBar method="POST" url={runUrl} />
-        </div>
-      )}
-
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
         <div className="min-w-0 space-y-6">
           {activeView === "api" ? (
             <>
+              <EndpointBar method="POST" url={runUrl} />
+
               <section>
                 <div className="border-b border-rule pb-4">
                   <h2 className="text-2xl font-medium tracking-tight text-ink">
