@@ -440,10 +440,10 @@ function RawJsonDetails({ value, label }: { value: unknown; label: string }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border-t border-rule/80">
+    <div className="pt-3">
       <button
         type="button"
-        className="flex w-full items-center justify-between px-4 py-3 text-left font-mono text-[11px] uppercase tracking-[0.1em] text-faint transition hover:bg-white/[0.03] hover:text-muted"
+        className="inline-flex items-center gap-3 rounded-md border border-rule bg-panel px-3 py-2 text-left font-mono text-[11px] uppercase tracking-[0.1em] text-muted transition hover:border-accent/40 hover:bg-panel-hi hover:text-ink"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
@@ -453,7 +453,7 @@ function RawJsonDetails({ value, label }: { value: unknown; label: string }) {
       {open && (
         <pre
           aria-label={label}
-          className="max-h-[min(50vh,22rem)] overflow-auto border-t border-rule/80 bg-[#0f120f] p-4 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]"
+          className="mt-3 max-h-[min(50vh,22rem)] overflow-auto rounded-md border border-rule/80 bg-[#0f120f] p-4 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]"
         >
           <code
             className={CODE_TOKEN_CLASSES}
@@ -924,7 +924,7 @@ export function HostedWorkflowPage({
               Use this workflow
             </p>
             <p className="mt-1.5 text-xs leading-5 text-muted">
-              Call the API or deploy an editable copy.
+              Call the API directly or deploy an editable copy.
             </p>
             <Button
               type="button"
