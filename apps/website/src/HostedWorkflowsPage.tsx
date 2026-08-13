@@ -933,7 +933,7 @@ export function HostedWorkflowPage({
               Use this workflow
             </p>
             <p className="mt-1.5 text-xs leading-5 text-muted">
-              Call the API directly or deploy an editable copy.
+              Call the API directly or deploy your own copy.
             </p>
             <Button
               type="button"
@@ -945,7 +945,7 @@ export function HostedWorkflowPage({
                 window.setTimeout(() => setCopied(false), 1500);
               }}
             >
-              {copied ? "Copied" : "Copy prompt to use API"}
+              {copied ? "Copied" : "Prompt to use the hosted API"}
             </Button>
             {!session && (
               <Button
@@ -1041,7 +1041,7 @@ export function HostedWorkflowPage({
                     {busy
                       ? "Deploying…"
                       : session
-                        ? "Fork and deploy a copy"
+                        ? "Fork and deploy your own copy"
                         : "Sign up to fork a copy"}
                   </Button>
                   {!workflow.import_available && (
