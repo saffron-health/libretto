@@ -82,10 +82,10 @@ function Hero({
         </Text>
         <Text
           as="p"
-          size="xl"
+          size="lg"
           data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
-          className="mx-auto mb-8 max-w-[780px] text-center leading-relaxed [text-wrap:pretty]"
+          className="mx-auto mb-8 max-w-[720px] text-center leading-relaxed [text-wrap:pretty]"
         >
           Libretto helps coding agents autonomously manage integrations—browser
           workflows, web scrapers, on-prem desktop apps, and more.
@@ -97,9 +97,9 @@ function Hero({
         >
           <InstallSnippet />
           <Button
-            href="https://cal.com/michael-kronovet/meeting"
+            href="https://cal.com/team/libretto/15-min"
             variant="outline"
-            className="min-w-64"
+            className="mt-2 min-w-56"
             data-fathom-event="Hero demo click"
           >
             Talk to a dev · 15 min
