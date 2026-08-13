@@ -380,8 +380,16 @@ function TableShell({ children }: { children: ReactNode }) {
 
 const thClass =
   "whitespace-nowrap border-b border-rule bg-panel-hi/65 px-5 py-3 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted";
-const tdClass =
-  "border-b border-rule px-5 py-4 text-sm text-muted last:border-b-0";
+const tdClass = "border-b border-rule px-5 py-4 text-sm text-muted";
+const tableClass =
+  "w-full border-collapse [&_tbody_tr:last-child_td]:border-b-0";
+const tableActionClass =
+  "inline-flex h-7 items-center rounded-md border border-rule px-2.5 text-xs text-muted no-underline transition-colors hover:border-accent/40 hover:text-ink";
+const tableDangerActionClass =
+  "inline-flex h-7 items-center rounded-md border border-red-400/25 px-2.5 text-xs text-red-200 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60";
+const tableSelectClass =
+  "-ml-2 h-7 max-w-full rounded-md border border-transparent bg-transparent py-0 pl-2 pr-7 text-sm text-muted outline-none transition-colors hover:border-rule focus:border-accent/45 disabled:opacity-60";
+const tableSelectStaticClass = "inline-flex h-7 items-center text-sm text-muted";
 
 function ProfileMenu({
   session,
@@ -583,7 +591,7 @@ function WorkflowsTable() {
   }, []);
   return (
     <TableShell>
-      <table className="w-full min-w-[760px] border-collapse">
+      <table className={`${tableClass} min-w-[760px]`}>
         <thead>
           <tr>
             <th className={thClass}>Workflow</th>
@@ -699,7 +707,7 @@ function SchedulesTable() {
   }
   return (
     <TableShell>
-      <table className="w-full min-w-[900px] border-collapse">
+      <table className={`${tableClass} min-w-[900px]`}>
         <thead>
           <tr>
             <th className={thClass}>Workflow</th>
@@ -736,14 +744,14 @@ function SchedulesTable() {
                   <button
                     type="button"
                     onClick={() => void toggle(row)}
-                    className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-ink"
+                    className={tableActionClass}
                   >
                     {row.enabled ? "Pause" : "Resume"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void remove(row)}
-                    className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
+                    className={tableDangerActionClass}
                   >
                     Delete
                   </button>
@@ -789,7 +797,7 @@ function WorkflowRunsTable() {
   }, []);
   return (
     <TableShell>
-      <table className="w-full min-w-[850px] border-collapse">
+      <table className={`${tableClass} min-w-[850px]`}>
         <thead>
           <tr>
             <th className={thClass}>Workflow</th>
@@ -874,7 +882,7 @@ function BrowserSessionsTable() {
   }, []);
   return (
     <TableShell>
-      <table className="w-full min-w-[850px] border-collapse">
+      <table className={`${tableClass} min-w-[850px]`}>
         <thead>
           <tr>
             <th className={thClass}>Session</th>
@@ -883,7 +891,7 @@ function BrowserSessionsTable() {
             <th className={thClass}>Provider</th>
             <th className={thClass}>Started</th>
             <th className={thClass}>Runtime</th>
-            <th className={thClass}></th>
+            <th className={thClass}>Live view</th>
           </tr>
         </thead>
         <tbody>
@@ -904,15 +912,17 @@ function BrowserSessionsTable() {
               <td className={tdClass}>{formatDate(row.started_at)}</td>
               <td className={tdClass}>{formatDuration(row.duration_ms)}</td>
               <td className={tdClass}>
-                {row.live_view_url && (
+                {row.live_view_url ? (
                   <a
                     href={row.live_view_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-accent-bright underline underline-offset-4"
+                    className={tableActionClass}
                   >
                     Open
                   </a>
+                ) : (
+                  <span className="text-xs text-muted/50">—</span>
                 )}
               </td>
             </tr>
@@ -960,7 +970,7 @@ function ConnectedReposTable({
   }, [onHasRepositoriesChange]);
   return (
     <TableShell>
-      <table className="w-full min-w-[700px] border-collapse">
+      <table className={`${tableClass} min-w-[700px]`}>
         <thead>
           <tr>
             <th className={thClass}>Repository</th>
@@ -1147,7 +1157,7 @@ function UsersTable({
         </p>
       )}
       <TableShell>
-        <table className="w-full min-w-[760px] border-collapse">
+        <table className={`${tableClass} min-w-[760px]`}>
           <thead>
             <tr>
               <th className={thClass}>User</th>
@@ -1177,13 +1187,16 @@ function UsersTable({
                       onChange={(event) =>
                         void updateRole(user, event.target.value)
                       }
-                      className="h-8 rounded-md border border-rule bg-bg px-2 text-xs text-ink"
+                      className={tableSelectClass}
+                      aria-label={`Role for ${user.email}`}
                     >
                       <option value="member">Member</option>
                       <option value="owner">Owner</option>
                     </select>
                   ) : (
-                    titleCase(user.role)
+                    <span className={tableSelectStaticClass}>
+                      {titleCase(user.role)}
+                    </span>
                   )}
                 </td>
                 <td className={tdClass}>
@@ -1198,7 +1211,7 @@ function UsersTable({
                       type="button"
                       disabled={busy === user.id}
                       onClick={() => void remove(user)}
-                      className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
+                      className={tableDangerActionClass}
                     >
                       Remove
                     </button>
@@ -1542,7 +1555,7 @@ function SecretsTable({
       )}
 
       <TableShell>
-        <table className="w-full min-w-[720px] border-collapse">
+        <table className={`${tableClass} min-w-[720px]`}>
           <thead>
             <tr>
               <th className={thClass}>Name</th>
@@ -1564,14 +1577,14 @@ function SecretsTable({
                     <button
                       type="button"
                       onClick={() => startEditing(row, "rename")}
-                      className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-ink"
+                      className={tableActionClass}
                     >
                       Rename
                     </button>
                     <button
                       type="button"
                       onClick={() => startEditing(row, "replace")}
-                      className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-ink"
+                      className={tableActionClass}
                     >
                       Replace
                     </button>
@@ -1579,7 +1592,7 @@ function SecretsTable({
                       type="button"
                       disabled={busy === row.credential_id}
                       onClick={() => void remove(row)}
-                      className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                      className={tableDangerActionClass}
                     >
                       {busy === row.credential_id ? "Deleting…" : "Delete"}
                     </button>
@@ -1975,7 +1988,7 @@ function ApiKeysTable({
       )}
 
       <TableShell>
-        <table className="w-full min-w-[820px] border-collapse">
+        <table className={`${tableClass} min-w-[820px]`}>
           <thead>
             <tr>
               <th className={thClass}>Name</th>
@@ -2007,7 +2020,7 @@ function ApiKeysTable({
                       type="button"
                       disabled={busy === row.id}
                       onClick={() => void remove(row)}
-                      className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                      className={tableDangerActionClass}
                     >
                       {busy === row.id ? "Deleting…" : "Delete"}
                     </button>
@@ -2061,7 +2074,7 @@ function BillingTable() {
         </p>
       )}
       <TableShell>
-        <table className="w-full min-w-[760px] border-collapse">
+        <table className={`${tableClass} min-w-[760px]`}>
           <thead>
             <tr>
               <th className={thClass}>Plan</th>
@@ -2470,7 +2483,7 @@ function WebhookSettingsPanel() {
                 type="button"
                 onClick={() => void remove(endpoint)}
                 disabled={busy !== null}
-                className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                className={tableDangerActionClass}
               >
                 {busy === endpoint.webhook_endpoint_id ? "Deleting…" : "Delete"}
               </button>
@@ -2527,7 +2540,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
     const enabled = !sharing.enabled;
     const confirmation = enabled
       ? "Enable public workflow sharing? Workspace members will be able to share workflows with people outside this workspace. Existing workflows remain private until explicitly shared."
-      : "Disable public workflow sharing? Every Open and Hosted workflow from this workspace will be removed. Re-enabling sharing will not republish them automatically.";
+      : "Disable public workflow sharing? Every Open and Hosted workflow from this workspace will be removed. Re-enabling sharing will not restore them automatically.";
     if (!window.confirm(confirmation)) {
       return;
     }
@@ -2544,7 +2557,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
       setNotice(
         enabled
           ? "Workflow sharing is enabled. Workflows remain private until someone explicitly shares them."
-          : "Workflow sharing is disabled and existing Open and Hosted workflows were unpublished.",
+          : "Workflow sharing is disabled and existing Open and Hosted workflows were removed.",
       );
     } catch (err) {
       setError(
@@ -2594,7 +2607,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             id="workflow-sharing-description"
             className="max-w-2xl text-sm leading-6 text-muted"
           >
-            Allow workspace members to publish workflows for people outside
+            Allow workspace members to share workflows for people outside
             this workspace. They can share source code or provide a Hosted
             workflow with a public run API.
           </p>
@@ -2636,9 +2649,8 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             )}
             {sharing?.enabled && (
               <span className="mt-1 block">
-                Disabling this setting unpublishes every current listing.
-                Re-enabling it does not automatically republish previous
-                listings.
+                Disabling this setting removes every current Open and Hosted
+                listing. Re-enabling it does not restore previous listings.
               </span>
             )}
           </div>

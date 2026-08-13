@@ -7,7 +7,9 @@
     "light": "#12ce41",
     "dark": "#067a22"
   },
-  "icons": { "library": "fontawesome" },
+  "icons": {
+    "library": "fontawesome"
+  },
   "favicon": {
     "light": "/docs/brand-kit/logos/libretto-icosahedron-light.svg",
     "dark": "/docs/brand-kit/logos/libretto-icosahedron-dark.svg"
@@ -100,8 +102,7 @@
               "reference/cli/exec",
               "reference/cli/run-and-resume",
               "reference/cli/session-logs",
-              "reference/cli/pages",
-              "reference/cli/share"
+              "reference/cli/pages"
             ]
           },
           {
@@ -170,6 +171,7 @@
               "libretto-cloud-hosting/overview",
               "libretto-cloud-hosting/authentication",
               "libretto-cloud-hosting/deployments",
+              "libretto-cloud-hosting/sharing-workflows-externally",
               "libretto-cloud-hosting/observability-and-debugging",
               "libretto-cloud-hosting/billing",
               "libretto-cloud-hosting/stealth",
@@ -194,9 +196,7 @@
               "libretto-cloud-api/sessions",
               "libretto-cloud-api/recordings",
               "libretto-cloud-api/deployments-and-workflows",
-              "libretto-cloud-api/open-workflows",
               "libretto-cloud-api/sms-otp",
-              "libretto-cloud-api/hosted-workflows",
               "libretto-cloud-api/jobs-and-logs",
               "libretto-cloud-api/credentials",
               "libretto-cloud-api/webhooks",

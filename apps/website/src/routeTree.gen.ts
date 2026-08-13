@@ -16,6 +16,7 @@ import { Route as OpenWorkflowsRouteImport } from './routes/open-workflows'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MarketplaceRouteImport } from './routes/marketplace'
 import { Route as InviteRouteImport } from './routes/invite'
+import { Route as HostedWorkflowsRouteImport } from './routes/hosted-workflows'
 import { Route as DebugAgentsRouteImport } from './routes/debug-agents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CliRouteImport } from './routes/cli'
@@ -36,6 +37,7 @@ import { Route as DashboardCloudBrowsersRouteImport } from './routes/dashboard_.
 import { Route as DashboardChromeExtensionRouteImport } from './routes/dashboard_.chrome-extension'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard_.$section'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
+import { Route as HostedWorkflowsTenantSlugWorkflowNameRouteImport } from './routes/hosted-workflows_.$tenantSlug.$workflowName'
 import { Route as DashboardWorkflowsWorkflowRouteImport } from './routes/dashboard_.workflows_.$workflow'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
@@ -71,6 +73,11 @@ const MarketplaceRoute = MarketplaceRouteImport.update({
 const InviteRoute = InviteRouteImport.update({
   id: '/invite',
   path: '/invite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HostedWorkflowsRoute = HostedWorkflowsRouteImport.update({
+  id: '/hosted-workflows',
+  path: '/hosted-workflows',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DebugAgentsRoute = DebugAgentsRouteImport.update({
@@ -174,6 +181,12 @@ const BlogSlugRoute = BlogSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => BlogRouteRoute,
 } as any)
+const HostedWorkflowsTenantSlugWorkflowNameRoute =
+  HostedWorkflowsTenantSlugWorkflowNameRouteImport.update({
+    id: '/hosted-workflows_/$tenantSlug/$workflowName',
+    path: '/hosted-workflows/$tenantSlug/$workflowName',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DashboardWorkflowsWorkflowRoute =
   DashboardWorkflowsWorkflowRouteImport.update({
     id: '/dashboard_/workflows_/$workflow',
@@ -190,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
+  '/hosted-workflows': typeof HostedWorkflowsRoute
   '/invite': typeof InviteRoute
   '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
@@ -210,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/vs/stagehand': typeof VsStagehandRoute
   '/blog/': typeof BlogIndexRoute
   '/dashboard/workflows/$workflow': typeof DashboardWorkflowsWorkflowRoute
+  '/hosted-workflows/$tenantSlug/$workflowName': typeof HostedWorkflowsTenantSlugWorkflowNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -219,6 +234,7 @@ export interface FileRoutesByTo {
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
+  '/hosted-workflows': typeof HostedWorkflowsRoute
   '/invite': typeof InviteRoute
   '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
@@ -239,6 +255,7 @@ export interface FileRoutesByTo {
   '/vs/stagehand': typeof VsStagehandRoute
   '/blog': typeof BlogIndexRoute
   '/dashboard/workflows/$workflow': typeof DashboardWorkflowsWorkflowRoute
+  '/hosted-workflows/$tenantSlug/$workflowName': typeof HostedWorkflowsTenantSlugWorkflowNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -250,6 +267,7 @@ export interface FileRoutesById {
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
+  '/hosted-workflows': typeof HostedWorkflowsRoute
   '/invite': typeof InviteRoute
   '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
@@ -270,6 +288,7 @@ export interface FileRoutesById {
   '/vs/stagehand': typeof VsStagehandRoute
   '/blog/': typeof BlogIndexRoute
   '/dashboard_/workflows_/$workflow': typeof DashboardWorkflowsWorkflowRoute
+  '/hosted-workflows_/$tenantSlug/$workflowName': typeof HostedWorkflowsTenantSlugWorkflowNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -282,6 +301,7 @@ export interface FileRouteTypes {
     | '/cli'
     | '/dashboard'
     | '/debug-agents'
+    | '/hosted-workflows'
     | '/invite'
     | '/marketplace'
     | '/onboarding'
@@ -302,6 +322,7 @@ export interface FileRouteTypes {
     | '/vs/stagehand'
     | '/blog/'
     | '/dashboard/workflows/$workflow'
+    | '/hosted-workflows/$tenantSlug/$workflowName'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -311,6 +332,7 @@ export interface FileRouteTypes {
     | '/cli'
     | '/dashboard'
     | '/debug-agents'
+    | '/hosted-workflows'
     | '/invite'
     | '/marketplace'
     | '/onboarding'
@@ -331,6 +353,7 @@ export interface FileRouteTypes {
     | '/vs/stagehand'
     | '/blog'
     | '/dashboard/workflows/$workflow'
+    | '/hosted-workflows/$tenantSlug/$workflowName'
   id:
     | '__root__'
     | '/'
@@ -341,6 +364,7 @@ export interface FileRouteTypes {
     | '/cli'
     | '/dashboard'
     | '/debug-agents'
+    | '/hosted-workflows'
     | '/invite'
     | '/marketplace'
     | '/onboarding'
@@ -361,6 +385,7 @@ export interface FileRouteTypes {
     | '/vs/stagehand'
     | '/blog/'
     | '/dashboard_/workflows_/$workflow'
+    | '/hosted-workflows_/$tenantSlug/$workflowName'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -372,6 +397,7 @@ export interface RootRouteChildren {
   CliRoute: typeof CliRoute
   DashboardRoute: typeof DashboardRoute
   DebugAgentsRoute: typeof DebugAgentsRoute
+  HostedWorkflowsRoute: typeof HostedWorkflowsRoute
   InviteRoute: typeof InviteRoute
   MarketplaceRoute: typeof MarketplaceRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -390,6 +416,7 @@ export interface RootRouteChildren {
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
   DashboardWorkflowsWorkflowRoute: typeof DashboardWorkflowsWorkflowRoute
+  HostedWorkflowsTenantSlugWorkflowNameRoute: typeof HostedWorkflowsTenantSlugWorkflowNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -441,6 +468,13 @@ declare module '@tanstack/react-router' {
       path: '/invite'
       fullPath: '/invite'
       preLoaderRoute: typeof InviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hosted-workflows': {
+      id: '/hosted-workflows'
+      path: '/hosted-workflows'
+      fullPath: '/hosted-workflows'
+      preLoaderRoute: typeof HostedWorkflowsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/debug-agents': {
@@ -583,6 +617,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof BlogRouteRoute
     }
+    '/hosted-workflows_/$tenantSlug/$workflowName': {
+      id: '/hosted-workflows_/$tenantSlug/$workflowName'
+      path: '/hosted-workflows/$tenantSlug/$workflowName'
+      fullPath: '/hosted-workflows/$tenantSlug/$workflowName'
+      preLoaderRoute: typeof HostedWorkflowsTenantSlugWorkflowNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard_/workflows_/$workflow': {
       id: '/dashboard_/workflows_/$workflow'
       path: '/dashboard/workflows/$workflow'
@@ -616,6 +657,7 @@ const rootRouteChildren: RootRouteChildren = {
   CliRoute: CliRoute,
   DashboardRoute: DashboardRoute,
   DebugAgentsRoute: DebugAgentsRoute,
+  HostedWorkflowsRoute: HostedWorkflowsRoute,
   InviteRoute: InviteRoute,
   MarketplaceRoute: MarketplaceRoute,
   OnboardingRoute: OnboardingRoute,
@@ -634,6 +676,8 @@ const rootRouteChildren: RootRouteChildren = {
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,
   DashboardWorkflowsWorkflowRoute: DashboardWorkflowsWorkflowRoute,
+  HostedWorkflowsTenantSlugWorkflowNameRoute:
+    HostedWorkflowsTenantSlugWorkflowNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
