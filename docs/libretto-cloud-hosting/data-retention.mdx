@@ -1,0 +1,36 @@
+---
+title: Data retention
+"og:image": "https://libretto.sh/docs/og/libretto-cloud-hosting/data-retention.png"
+---
+
+> How long Libretto Cloud keeps job results, debug artifacts, and logs.
+
+These are the default retention periods for hosted Libretto Cloud. Custom retention periods can be negotiated. Email `team@libretto.sh` if you need a different window.
+
+See also the [privacy policy](https://libretto.sh/privacy).
+
+### Defaults
+
+| Data | Default retention |
+| --- | --- |
+| Job results and run history | For the life of your account |
+| Saved credentials | Until you delete them, or the account is deleted |
+| Failure screenshots and page snapshots | 90 days |
+| Executor and workflow logs | 30 days |
+| Session recordings | A limited time after the run |
+
+Job results are the `result` payload on `POST /v1/jobs/get` and on `job.completed` webhooks. Libretto Cloud does not automatically delete job history.
+
+Failure screenshots and page snapshots are captured when a hosted job fails. Signed download links expire quickly. The files themselves follow the 90-day window.
+
+Executor and workflow logs are the records returned by `POST /v1/logs/list`.
+
+Session recordings are available through `POST /v1/recordings/get` when a run captured a recording. Recording links expire. Request a new link for the same job or session while the recording still exists.
+
+### Custom retention
+
+If you need a longer or shorter retention period, email `team@libretto.sh`. Custom retention can be negotiated for job results, logs, and debug artifacts.
+
+### Deleting data
+
+You can delete saved credentials and workflows through the API. To delete an account or request deletion of job history, email `team@libretto.sh`.
