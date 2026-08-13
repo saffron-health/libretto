@@ -117,6 +117,12 @@ export {
   type LibrettoAuthenticateOptions,
 } from "./shared/workflow/authenticate.js";
 export {
+  claimSmsOtp,
+  type ClaimSmsOtpOptions,
+  type SmsOtpClaim,
+  type SmsOtpCode,
+} from "./shared/workflow/claimSmsOtp.js";
+export {
   getDefaultWorkflowFromModuleExports,
   getWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,
