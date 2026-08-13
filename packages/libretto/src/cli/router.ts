@@ -7,8 +7,8 @@ import { cloudScheduleCommands } from "./commands/cloud-schedules.js";
 import { cloudSmsNumberCommands } from "./commands/cloud-sms-numbers.js";
 import { settingsCommands } from "./commands/cloud-settings.js";
 import {
-  publishWorkflowCommand,
-  unpublishWorkflowCommand,
+  shareWorkflowCommand,
+  unshareWorkflowCommand,
 } from "./commands/cloud-publishing.js";
 import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
@@ -37,8 +37,8 @@ export const cliRoutes = {
       schedules: cloudScheduleCommands,
       "sms-numbers": cloudSmsNumberCommands,
       settings: settingsCommands,
-      publish: publishWorkflowCommand,
-      unpublish: unpublishWorkflowCommand,
+      share: shareWorkflowCommand,
+      unshare: unshareWorkflowCommand,
     },
   }),
   experiments: experimentsCommand,

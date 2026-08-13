@@ -223,7 +223,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
   const [detail, setDetail] = useState<WorkflowDetail | null>(null);
   const [hostedRuns, setHostedRuns] = useState<HostedRunSummary | null>(null);
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
-  const [publishingOpen, setPublishingOpen] = useState(false);
+  const [sharingOpen, setSharingOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -283,11 +283,11 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
     }
   }
 
-  async function publishExternally(acknowledgement?: {
+  async function sharePublicly(acknowledgement?: {
     reviewId: string;
     acknowledgeWarnings: boolean;
   }): Promise<void> {
-    const response = await orpcCall<ShareResponse>("/v1/workflows/publish", {
+    const response = await orpcCall<ShareResponse>("/v1/workflows/share", {
       workflow,
       refresh: Boolean(detail?.publication),
       description: description.trim() || undefined,
@@ -302,11 +302,11 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
       },
     });
     if (!("findings" in response) && response.status !== "review_expired") {
-      setNotice("Workflow published externally.");
+      setNotice("Workflow shared publicly.");
       return;
     }
     if (response.status === "review_expired") {
-      throw new Error("The privacy review expired. Publish again to rerun it.");
+      throw new Error("The privacy review expired. Share again to rerun it.");
     }
     if (!("findings" in response)) return;
     const findings = response.findings
@@ -316,14 +316,14 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
       )
       .join("\n");
     if (response.status === "blocked") {
-      throw new Error(`Publishing is blocked by the privacy review:\n${findings}`);
+      throw new Error(`Sharing is blocked by the privacy review:\n${findings}`);
     }
     if (
       window.confirm(
-        `The privacy review found warnings:\n\n${findings}\n\nPublish anyway?`,
+        `The privacy review found warnings:\n\n${findings}\n\nShare publicly anyway?`,
       )
     ) {
-      await publishExternally({
+      await sharePublicly({
         reviewId: response.review_id,
         acknowledgeWarnings: true,
       });
@@ -338,7 +338,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
     );
   }
 
-  const canPublish =
+  const canShare =
     detail.sharing_enabled && detail.deployment_status === "ready";
   const hasPublicWorkflow = Boolean(detail.publication);
 
@@ -378,7 +378,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
             <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <h2 className="text-base font-medium text-ink">
-                  Published externally
+                  Shared publicly
                 </h2>
                 <span
                   className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wide ${
@@ -413,9 +413,9 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
               </label>
               <button
                 type="button"
-                disabled={!canPublish || busy !== null}
+                disabled={!canShare || busy !== null}
                 onClick={() =>
-                  void runAction("publish", async () => publishExternally())
+                  void runAction("share", async () => sharePublicly())
                 }
                 className={
                   detail.publication.stale
@@ -423,11 +423,11 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     : "inline-flex h-8 items-center justify-center rounded-md border border-accent/35 bg-green-9/10 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-accent-bright transition-colors hover:bg-green-9/25 disabled:cursor-not-allowed disabled:opacity-40"
                 }
               >
-                {busy === "publish"
-                  ? "Publishing…"
+                {busy === "share"
+                  ? "Sharing…"
                   : detail.publication.stale
-                    ? "Publish latest"
-                    : "Republish"}
+                    ? "Share latest"
+                    : "Update shared version"}
               </button>
             </div>
             <HostedRunsTable summary={hostedRuns} />
@@ -438,14 +438,14 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                 onClick={() => {
                   if (!window.confirm("Remove the public API and source code?"))
                     return;
-                  void runAction("unpublish", async () => {
-                    await orpcCall("/v1/workflows/unpublish", { workflow });
-                    setNotice("External publication removed.");
+                  void runAction("unshare", async () => {
+                    await orpcCall("/v1/workflows/unshare", { workflow });
+                    setNotice("Workflow is no longer shared publicly.");
                   });
                 }}
                 className="text-xs text-red-200/75 hover:text-red-200 disabled:opacity-40"
               >
-                Unpublish
+                Stop sharing
               </button>
             </div>
           </section>
@@ -455,8 +455,8 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
           <section className={panelClass}>
             <button
               type="button"
-              aria-expanded={publishingOpen}
-              onClick={() => setPublishingOpen((open) => !open)}
+              aria-expanded={sharingOpen}
+              onClick={() => setSharingOpen((open) => !open)}
               className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-panel-hi/25"
             >
               <span>
@@ -464,14 +464,14 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                   Share workflow outside this workspace
                 </span>
                 <span className="mt-1 block text-xs text-muted">
-                  Publish a public run API with visible, reusable source code.
+                  Share a public run API with visible, reusable source code.
                 </span>
               </span>
               <span className="text-xs text-muted" aria-hidden>
-                {publishingOpen ? "↑" : "↓"}
+                {sharingOpen ? "↑" : "↓"}
               </span>
             </button>
-            {publishingOpen && (
+            {sharingOpen && (
               <div className="border-t border-rule">
                 {!detail.sharing_enabled && (
                   <div className="border-b border-amber-300/20 bg-amber-300/5 px-5 py-3 text-xs text-amber-100">
@@ -494,17 +494,17 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                   </label>
                   <p className="mt-3 text-xs leading-5 text-muted">
                     Libretto reviews the source for sensitive information
-                    before publishing.
+                    before sharing.
                   </p>
                   <button
                     type="button"
-                    disabled={!canPublish || busy !== null}
+                    disabled={!canShare || busy !== null}
                     onClick={() =>
-                      void runAction("publish", async () => publishExternally())
+                      void runAction("share", async () => sharePublicly())
                     }
                     className={`${primaryButtonClass} mt-4 w-full`}
                   >
-                    {busy === "publish" ? "Publishing…" : "Publish externally"}
+                    {busy === "share" ? "Sharing…" : "Share publicly"}
                   </button>
                 </div>
               </div>

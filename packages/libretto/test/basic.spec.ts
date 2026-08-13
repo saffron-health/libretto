@@ -361,8 +361,8 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("jobs");
     expect(result.stdout).toContain("schedules");
     expect(result.stdout).toContain("settings");
-    expect(result.stdout).toMatch(/\bpublish\b/);
-    expect(result.stdout).toMatch(/\bunpublish\b/);
+    expect(result.stdout).toMatch(/\bshare\b/);
+    expect(result.stdout).toMatch(/\bunshare\b/);
     expect(result.stdout).not.toMatch(/\bhost\b/);
     expect(result.stdout).not.toMatch(/\bunhost\b/);
     expect(result.stderr).toBe("");

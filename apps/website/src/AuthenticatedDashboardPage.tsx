@@ -2637,8 +2637,8 @@ function SettingsPanel({ session }: { session: CloudSession }) {
     if (!sharing || !canManage) return;
     const enabled = !sharing.enabled;
     const confirmation = enabled
-      ? "Enable external workflow publishing? Workspace members will be able to publish workflows with a public API and visible source. Existing workflows remain private until explicitly published."
-      : "Disable external workflow publishing? Every public workflow API and source listing from this workspace will be removed. Re-enabling publishing will not restore them automatically.";
+      ? "Enable public workflow sharing? Workspace members will be able to share workflows with a public API and visible source. Existing workflows remain private until explicitly shared."
+      : "Disable public workflow sharing? Every public workflow API and source listing from this workspace will be removed. Re-enabling sharing will not restore them automatically.";
     if (!window.confirm(confirmation)) {
       return;
     }
@@ -2654,8 +2654,8 @@ function SettingsPanel({ session }: { session: CloudSession }) {
       setSharing(updated);
       setNotice(
         enabled
-          ? "External publishing is enabled. Workflows remain private until someone explicitly publishes them."
-          : "External publishing is disabled and existing public workflow APIs and source listings were removed.",
+          ? "Public sharing is enabled. Workflows remain private until someone explicitly shares them."
+          : "Public sharing is disabled and existing public workflow APIs and source listings were removed.",
       );
     } catch (err) {
       setError(
@@ -2691,7 +2691,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
       <details className="group rounded-xl border border-rule bg-panel/65 shadow-[0_12px_40px_rgba(0,0,0,0.16)]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 sm:p-6">
           <h2 className="text-base font-medium text-ink">
-            External workflow publishing
+            Public workflow sharing
           </h2>
           <span
             aria-hidden="true"
@@ -2705,7 +2705,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             id="workflow-sharing-description"
             className="max-w-2xl text-sm leading-6 text-muted"
           >
-            Allow workspace members to publish workflows for people outside
+            Allow workspace members to share workflows with people outside
             this workspace. Each publication includes a Hosted workflow API
             and reviewed source code.
           </p>
