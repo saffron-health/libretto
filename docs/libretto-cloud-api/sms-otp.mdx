@@ -50,6 +50,8 @@ Release the number and remove it from your tenant pool. Irreversible.
 
 `claimSmsOtp` first locks the inbox (exclusive claim), then returns a handle. Always await the claim before clicking send-code so the lock is held when the SMS arrives. Call `otp.wait()` after send-code.
 
+Full runtime API: [`claimSmsOtp`](/reference/runtime/sms-otp).
+
 Pass one of `phoneNumber`, `phoneNumberId`, or `phoneNumberLabel` to select the inbox.
 
 Auth is automatic — do not put an API key in workflow source:
