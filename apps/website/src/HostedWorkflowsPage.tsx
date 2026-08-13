@@ -348,14 +348,29 @@ function SectionHeading({
 }
 
 function EndpointBar({ method, url }: { method: string; url: string }) {
+  const [copied, setCopied] = useState(false);
+
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-rule bg-panel p-3 sm:flex-row sm:items-center">
-      <span className="inline-flex h-8 shrink-0 items-center justify-center rounded-md bg-accent/15 px-3 font-mono text-xs font-semibold tracking-[0.08em] text-accent-bright">
+    <div className="flex min-w-0 items-stretch overflow-hidden rounded-lg border border-rule bg-panel shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+      <span className="inline-flex shrink-0 items-center border-r border-rule bg-accent/[0.08] px-4 font-mono text-[11px] font-semibold tracking-[0.1em] text-accent-bright">
         {method}
       </span>
-      <code className="min-w-0 break-all font-mono text-[12px] leading-5 text-ink sm:text-[13px]">
-        {url}
-      </code>
+      <div className="min-w-0 flex-1 overflow-x-auto px-4 py-3 [scrollbar-width:none]">
+        <code className="whitespace-nowrap font-mono text-[12px] leading-5 text-ink">
+          {url}
+        </code>
+      </div>
+      <button
+        type="button"
+        className="shrink-0 border-l border-rule px-4 font-mono text-[10px] uppercase tracking-[0.1em] text-muted transition hover:bg-panel-hi hover:text-ink"
+        onClick={() => {
+          void navigator.clipboard.writeText(url).catch(() => {});
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1500);
+        }}
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
     </div>
   );
 }
@@ -868,10 +883,9 @@ export function HostedWorkflowPage({
           {activeView === "api" ? (
             <>
               <section>
-                <SectionHeading title="Run endpoint">
-                  Send a POST request to run this workflow in your Libretto
-                  workspace.
-                </SectionHeading>
+                <h2 className="mb-4 text-2xl font-medium tracking-tight text-ink">
+                  API endpoint
+                </h2>
                 <EndpointBar method="POST" url={runUrl} />
               </section>
 
