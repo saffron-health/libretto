@@ -39,6 +39,55 @@ export default workflow("accountWorkflow", {
 });
 ```
 
+## MFA
+
+Prefer authenticator TOTP when the portal supports it. Declare a reusable `*_totp_secret` credential (not a one-time `otp_code`) and enter the current code from that secret during `signIn`.
+
+### SMS one-time codes (Libretto Cloud)
+
+For portals that text a code to a phone number:
+
+1. Provision an inbox outside the workflow (`libretto cloud sms-numbers provision --label uhc`), then register that full phone number (with country code, like `+15551234567`) as the MFA phone on the portal. Prefer one number per portal.
+2. In the workflow: claim/lock the inbox first, click send-code, then wait for the code.
+
+```typescript
+import { claimSmsOtp, librettoAuthenticate, workflow } from "libretto";
+
+export default workflow("portal-login", {
+  startUrl: "https://portal.example.com/login",
+  credentials: ["username", "password", "libretto_api_key"],
+  async handler(ctx, input) {
+    const { page } = ctx;
+
+    await librettoAuthenticate(ctx, {
+      credentials: input.credentials,
+      isSignedIn: async () =>
+        await page
+          .getByRole("heading", { name: "Dashboard" })
+          .isVisible()
+          .catch(() => false),
+      signIn: async (_ctx, credentials) => {
+        await page.goto("https://portal.example.com/login");
+        await page.getByLabel("Email").fill(credentials.username);
+        await page.getByLabel("Password").fill(credentials.password);
+        await page.getByRole("button", { name: "Sign in" }).click();
+
+        // Lock the inbox before asking the portal to text the code.
+        const otp = await claimSmsOtp({
+          phoneNumberLabel: "uhc",
+          apiKey: credentials.libretto_api_key,
+        });
+        await page.getByRole("button", { name: "Send code" }).click();
+        const { code } = await otp.wait();
+        await page.getByLabel("Code").fill(code);
+      },
+    });
+  },
+});
+```
+
+Pass the Libretto Cloud API key as a normal workflow credential (`libretto_api_key`). Locally set `LIBRETTO_CLOUD_LIBRETTO_API_KEY`; on Cloud, store the same credential in the dashboard. Do not run concurrent SMS OTP claims on the same inbox number. Select the inbox with `phoneNumber`, `phoneNumberId`, or `phoneNumberLabel`.
+
 ## Auth Profiles
 
 Auth profiles save the signed-in browser state (cookies, localStorage, IndexedDB) so later runs can reuse a logged-in session instead of signing in from scratch. The sign-in logic still takes priority: do not add a profile until the `librettoAuthenticate` sign-in step has been verified from a signed-out browser with no profile present. If you add a profile first, validation passes on the saved session while the untested sign-in logic fails the first time that session expires.

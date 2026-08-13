@@ -55,7 +55,7 @@ export const provisionSmsNumberCommand = SimpleCLI.command({
       console.log(`label: ${response.number.label}`);
     }
     console.log(
-      "Register this phone number as the MFA phone on the portal account before using waitForSmsOtp.",
+      "Register this phone number as the MFA phone on the portal account before using claimSmsOtp.",
     );
   });
 

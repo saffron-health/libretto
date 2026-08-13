@@ -1,16 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { waitForSmsOtp } from "../src/shared/workflow/waitForSmsOtp.js";
+import { claimSmsOtp } from "../src/shared/workflow/claimSmsOtp.js";
 
-describe("waitForSmsOtp", () => {
+describe("claimSmsOtp", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
-    delete process.env.LIBRETTO_API_KEY;
     delete process.env.LIBRETTO_API_URL;
   });
 
-  it("creates a claim and returns the consumed code", async () => {
-    process.env.LIBRETTO_API_KEY = "test-key";
+  it("locks the inbox before polling, then returns the consumed code", async () => {
     process.env.LIBRETTO_API_URL = "https://api.example.test";
 
     const fetchMock = vi
@@ -51,25 +49,49 @@ describe("waitForSmsOtp", () => {
       });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await waitForSmsOtp({
-      label: "uhc",
+    const otp = await claimSmsOtp({
+      phoneNumberLabel: "uhc",
+      apiKey: "test-key",
       pollIntervalMs: 1,
       timeoutMs: 5_000,
     });
 
+    expect(otp.phoneNumber).toBe("+15551234567");
+    expect(otp.claimId).toBe("claim-1");
+    expect(otp.phoneNumberId).toBe("num-1");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const createCall = fetchMock.mock.calls[0];
+    expect(createCall?.[0]).toBe("https://api.example.test/v1/smsOtp/claims/create");
+    expect((createCall?.[1] as { headers?: Record<string, string> })?.headers).toMatchObject({
+      "x-api-key": "test-key",
+    });
+
+    const createBody = JSON.parse(
+      String((createCall?.[1] as { body?: string })?.body),
+    ) as { json: { ttl_seconds: number; label: string; job_id?: string } };
+    expect(createBody.json.ttl_seconds).toBe(30);
+    expect(createBody.json.label).toBe("uhc");
+    expect(createBody.json.job_id).toBeUndefined();
+
+    const result = await otp.wait();
     expect(result).toEqual({
       code: "482913",
       phoneNumber: "+15551234567",
       claimId: "claim-1",
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    const createBody = JSON.parse(
-      String((fetchMock.mock.calls[0]?.[1] as { body?: string })?.body),
-    ) as { json: { ttl_seconds: number } };
-    expect(createBody.json.ttl_seconds).toBe(30);
   });
 
   it("requires a number selector", async () => {
-    await expect(waitForSmsOtp({} as never)).rejects.toThrow(/numberId/);
+    await expect(
+      claimSmsOtp({ apiKey: "test-key" } as never),
+    ).rejects.toThrow(/phoneNumber/);
+  });
+
+  it("requires apiKey", async () => {
+    await expect(
+      claimSmsOtp({ phoneNumberLabel: "uhc", apiKey: "   " }),
+    ).rejects.toThrow(/apiKey/);
   });
 });
