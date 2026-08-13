@@ -12,6 +12,7 @@ import {
 } from "./cloudApi";
 import { withReturnTo } from "./authRedirect";
 import { Prism } from "./prism";
+import { SourceBrowser } from "./SourceBrowser";
 
 export type HostedWorkflowSummary = {
   tenant_slug: string;
@@ -27,6 +28,7 @@ export type HostedWorkflowSummary = {
 type HostedWorkflowDetail = HostedWorkflowSummary & {
   input_schema: unknown;
   output_schema: unknown;
+  files: Array<{ file_name: string; code: string }>;
 };
 
 type SchemaNode = {
@@ -276,7 +278,7 @@ function buildHostedAgentPrompt(workflow: HostedWorkflowDetail): string {
         ].join("\n");
 
   return [
-    "Use this Libretto hosted workflow via the API (opaque — no source access).",
+    "Use this published Libretto workflow through its hosted API or adapt its public source code.",
     "",
     `Hosted workflow: ${hostedKey(workflow)}`,
     workflow.description?.trim()
@@ -566,11 +568,11 @@ export function HostedWorkflowsPage() {
           wrap="balance"
           className="font-[300] leading-[1.05] tracking-[-0.035em] text-ink"
         >
-          Hosted Workflow APIs
+          Published workflows
         </Text>
         <Text as="p" size="md" className="mt-5 max-w-xl leading-7 text-muted">
           Public run endpoints you call with your own API key. Input and output
-          types are listed; source stays with the publisher.
+          types and reviewed source code are included on every listing.
         </Text>
       </header>
 
@@ -642,7 +644,7 @@ export function HostedWorkflowsPage() {
             </h2>
             <Text as="p" size="sm" className="mt-3 line-clamp-3 leading-6 text-muted">
               {workflow.description?.trim() ||
-                "A hosted Libretto workflow you can call as an opaque API."}
+                "A published Libretto workflow you can call or adapt from its source."}
             </Text>
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="rounded border border-rule px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
@@ -715,7 +717,7 @@ export function HostedWorkflowPage({
         href="/hosted-workflows"
         className="inline-flex pt-4 font-mono text-xs text-muted no-underline transition hover:text-ink"
       >
-        ← Hosted Workflow APIs
+        ← Published workflows
       </a>
 
       <header className="mt-8 max-w-3xl">
@@ -738,7 +740,7 @@ export function HostedWorkflowPage({
             v{workflow.deployment_version}
           </span>
           <span className="rounded border border-rule px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
-            Hosted API — source not shared
+            Hosted API + source
           </span>
         </div>
       </header>
@@ -783,6 +785,19 @@ export function HostedWorkflowPage({
             schema={workflow.output_schema}
             emptyLabel="No output schema is published for this workflow."
           />
+
+          <section>
+            <SectionHeading eyebrow="Source" title="Workflow code">
+              Review the published source before calling the API or adapting
+              the workflow.
+            </SectionHeading>
+            <SourceBrowser
+              files={workflow.files.map((file) => ({
+                file_name: file.file_name,
+                code: file.code,
+              }))}
+            />
+          </section>
         </div>
 
         <aside className="h-fit lg:sticky lg:top-24">

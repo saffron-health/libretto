@@ -1,16 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { OpenWorkflowsPage } from "../OpenWorkflowsPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/open-workflows")({
-  head: () => ({
-    meta: [
-      { title: "Open source workflows | Libretto" },
-      {
-        name: "description",
-        content:
-          "Browse shared Libretto workflow source, connect secrets, and deploy a private copy.",
-      },
-    ],
-  }),
-  component: OpenWorkflowsPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/hosted-workflows" });
+  },
 });
