@@ -87,8 +87,8 @@ function Hero({
           htmlStyle={{ opacity: 0 }}
           className="mx-auto mb-8 max-w-[720px] text-center leading-relaxed [text-wrap:pretty]"
         >
-          Libretto helps coding agents autonomously manage integrations—browser
-          workflows, web scrapers, on-prem desktop apps, and more.
+          Libretto helps coding agents autonomously manage integrations: browser
+          workflows, web scrapers, on-prem apps, and more.
         </Text>
         <div
           data-animate={AnimationTarget.Content}
