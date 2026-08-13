@@ -1606,6 +1606,48 @@ interface SmsNumberRow {
   updated_at: string;
 }
 
+function CopyNumberButton({ phoneNumber }: { phoneNumber: string }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard.writeText(phoneNumber).then(() => setCopied(true));
+      }}
+      aria-label={copied ? "Copied" : `Copy ${phoneNumber}`}
+      title={copied ? "Copied" : "Copy number"}
+      className="text-muted transition-colors hover:text-accent-bright"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        className="size-4"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      >
+        {copied ? (
+          <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+        ) : (
+          <>
+            <rect x="7.5" y="7.5" width="9" height="9" rx="1.5" />
+            <path d="M12.5 4.5H5A1.5 1.5 0 0 0 3.5 6v7" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
+}
+
 function PhoneNumbersTable({
   showCreate,
   onCloseCreate,
@@ -1615,6 +1657,9 @@ function PhoneNumbersTable({
 }) {
   const [rows, setRows] = useState<SmsNumberRow[] | null>(null);
   const [label, setLabel] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<SmsNumberRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1634,6 +1679,16 @@ function PhoneNumbersTable({
     );
   }, []);
 
+  // Escape closes the delete dialog, matching the browser confirm it replaces.
+  useEffect(() => {
+    if (!pendingDelete) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setPendingDelete(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pendingDelete]);
+
   async function provision(event: FormEvent) {
     event.preventDefault();
     setBusy("create");
@@ -1649,7 +1704,7 @@ function PhoneNumbersTable({
       });
       setLabel("");
       setNotice(
-        `${result.message} Number: ${result.number.phone_number}. Register it on the portal MFA settings.`,
+        `${result.number.phone_number} is ready. Register it as the MFA phone on the portal account.`,
       );
       onCloseCreate();
       await refresh();
@@ -1662,14 +1717,36 @@ function PhoneNumbersTable({
     }
   }
 
-  async function release(row: SmsNumberRow) {
-    if (
-      !window.confirm(
-        `Release ${row.phone_number}? This is irreversible and the portal MFA phone must be updated.`,
-      )
-    ) {
-      return;
+  function startEditingLabel(row: SmsNumberRow) {
+    setEditingId(row.id);
+    setEditLabel(row.label ?? "");
+    setError(null);
+    setNotice(null);
+  }
+
+  async function saveLabel(row: SmsNumberRow) {
+    const trimmed = editLabel.trim();
+    setEditingId(null);
+    if (trimmed === (row.label ?? "")) return;
+    setBusy(row.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await orpcCall("/v1/dashboard/updateSmsNumber", {
+        id: row.id,
+        label: trimmed || null,
+      });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the label.");
+    } finally {
+      setBusy(null);
     }
+  }
+
+  async function confirmDelete() {
+    const row = pendingDelete;
+    if (!row) return;
     setBusy(row.id);
     setError(null);
     setNotice(null);
@@ -1678,11 +1755,12 @@ function PhoneNumbersTable({
         "/v1/dashboard/releaseSmsNumber",
         { id: row.id },
       );
+      setPendingDelete(null);
       setNotice(result.message);
       await refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not release the number.",
+        err instanceof Error ? err.message : "Could not delete the number.",
       );
     } finally {
       setBusy(null);
@@ -1694,23 +1772,21 @@ function PhoneNumbersTable({
       {showCreate && (
         <form
           onSubmit={(event) => void provision(event)}
-          className="rounded-xl border border-rule bg-panel/40 p-4"
+          className="grid gap-3 rounded-xl border border-accent/25 bg-green-3/20 p-4 md:grid-cols-[minmax(0,18rem)_auto] md:items-end"
         >
-          <p className="text-sm text-muted">
-            Prefer one number per portal. After provisioning, register the full
-            phone number (with country code, like +15551234567) as the MFA phone
-            on that portal account.
-          </p>
-          <div className="mt-3 flex flex-wrap items-end gap-3">
-            <label className="block text-sm">
-              <span className="text-muted">Label (optional)</span>
-              <input
-                value={label}
-                onChange={(event) => setLabel(event.target.value)}
-                placeholder="uhc"
-                className="mt-1 block w-48 rounded-md border border-rule bg-transparent px-3 py-2"
-              />
-            </label>
+          <label>
+            <span className="mb-2 block text-xs uppercase text-muted">
+              Label (optional)
+            </span>
+            <input
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              placeholder="uhc"
+              autoFocus
+              className="h-10 w-full rounded-md border border-rule bg-bg px-3 text-sm outline-none focus:border-accent"
+            />
+          </label>
+          <div className="flex gap-2">
             <button
               type="submit"
               disabled={busy === "create"}
@@ -1721,7 +1797,7 @@ function PhoneNumbersTable({
             <button
               type="button"
               onClick={onCloseCreate}
-              className="libretto-button libretto-button--ghost h-10"
+              className="h-10 px-3 text-sm text-muted hover:text-ink"
             >
               Cancel
             </button>
@@ -1751,19 +1827,58 @@ function PhoneNumbersTable({
           <tbody>
             {rows?.map((row) => (
               <tr key={row.id} className="hover:bg-panel-hi/35">
-                <td className={`${tdClass} font-mono text-xs text-ink`}>
-                  {row.phone_number}
+                <td className={tdClass}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-ink">
+                      {row.phone_number}
+                    </span>
+                    <CopyNumberButton phoneNumber={row.phone_number} />
+                  </div>
                 </td>
-                <td className={tdClass}>{row.label ?? "—"}</td>
+                <td className={tdClass}>
+                  {editingId === row.id ? (
+                    <input
+                      value={editLabel}
+                      onChange={(event) => setEditLabel(event.target.value)}
+                      onBlur={() => void saveLabel(row)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void saveLabel(row);
+                        }
+                        if (event.key === "Escape") {
+                          event.preventDefault();
+                          setEditingId(null);
+                        }
+                      }}
+                      placeholder="uhc"
+                      aria-label={`Label for ${row.phone_number}`}
+                      autoFocus
+                      className="h-8 w-40 rounded-md border border-accent/40 bg-bg px-2 text-sm outline-none"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEditingLabel(row)}
+                      title="Click to edit"
+                      className="rounded-md border border-transparent px-2 py-1 text-left text-sm hover:border-rule hover:bg-panel-hi/50"
+                    >
+                      {busy === row.id && editingId === null
+                        ? "Saving…"
+                        : (row.label ?? (
+                            <span className="text-muted">Add label</span>
+                          ))}
+                    </button>
+                  )}
+                </td>
                 <td className={tdClass}>{formatDate(row.created_at)}</td>
                 <td className={tdClass}>
                   <button
                     type="button"
-                    disabled={busy === row.id}
-                    onClick={() => void release(row)}
-                    className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                    onClick={() => setPendingDelete(row)}
+                    className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
                   >
-                    {busy === row.id ? "Releasing…" : "Release"}
+                    Delete
                   </button>
                 </td>
               </tr>
@@ -1775,6 +1890,48 @@ function PhoneNumbersTable({
           <EmptyTable message="No SMS inbox numbers yet. Provision one per portal." />
         )}
       </TableShell>
+
+      {pendingDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-number-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setPendingDelete(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-rule bg-panel p-5">
+            <h2 id="delete-number-title" className="text-base text-ink">
+              Delete {pendingDelete.phone_number}?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              This releases the number for good — it cannot be recovered, and a
+              new one will have a different phone number. Update the MFA phone on
+              any portal still sending passcodes here first, or those sign-ins
+              will start failing.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setPendingDelete(null)}
+                className="h-10 px-3 text-sm text-muted hover:text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy === pendingDelete.id}
+                onClick={() => void confirmDelete()}
+                className="h-10 rounded-md border border-red-400/40 bg-red-500/15 px-3 text-sm text-red-200 hover:bg-red-500/25 disabled:opacity-60"
+              >
+                {busy === pendingDelete.id ? "Deleting…" : "Delete number"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
