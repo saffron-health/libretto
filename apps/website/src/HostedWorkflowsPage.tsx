@@ -883,9 +883,6 @@ export function HostedWorkflowPage({
           {activeView === "api" ? (
             <>
               <section>
-                <h2 className="mb-4 text-2xl font-medium tracking-tight text-ink">
-                  API endpoint
-                </h2>
                 <EndpointBar method="POST" url={runUrl} />
               </section>
 
