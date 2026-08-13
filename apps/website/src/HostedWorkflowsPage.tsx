@@ -871,7 +871,7 @@ export function HostedWorkflowPage({
                   : "border-transparent text-muted hover:bg-panel-hi hover:text-ink"
               }`}
             >
-              {view === "api" ? "Use the API" : "Source code"}
+              {view === "api" ? "API docs" : "Source code"}
             </button>
           );
         })}
