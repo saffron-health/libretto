@@ -356,7 +356,7 @@ function EndpointBar({ method, url }: { method: string; url: string }) {
         {method}
       </span>
       <div className="min-w-0 flex-1 px-3 py-3">
-        <code className="break-all font-mono text-[11px] leading-5 text-ink xl:whitespace-nowrap">
+        <code className="break-all font-mono text-[11px] leading-5 text-ink">
           {url}
         </code>
       </div>
