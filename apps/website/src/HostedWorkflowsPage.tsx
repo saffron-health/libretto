@@ -71,7 +71,6 @@ function matchesQuery(workflow: HostedWorkflowSummary, query: string): boolean {
     workflow.description ?? "",
     workflow.publisher_name,
     workflow.tenant_slug,
-    ...workflow.credential_requirements.map((req) => req.name),
   ]
     .join(" ")
     .toLowerCase();
@@ -578,7 +577,7 @@ export function HostedWorkflowsPage() {
 
       <div className="mb-8 max-w-xl">
         <label className="relative block">
-          <span className="sr-only">Search hosted workflows</span>
+          <span className="sr-only">Search published workflows</span>
           <span
             aria-hidden="true"
             className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center font-mono text-sm text-faint"
@@ -589,7 +588,7 @@ export function HostedWorkflowsPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search name, publisher, or secret…"
+            placeholder="Search workflows or publishers…"
             className="h-11 w-full rounded-lg border border-rule bg-panel py-2 pr-4 pl-8 text-sm text-ink outline-none transition placeholder:text-faint focus:border-accent/45 focus:bg-panel-hi focus:shadow-[0_0_0_3px_rgba(18,206,65,0.08)]"
           />
         </label>
@@ -627,18 +626,13 @@ export function HostedWorkflowsPage() {
             href={hostedPath(workflow)}
             className="group rounded-lg border border-rule bg-panel p-5 no-underline transition hover:border-accent/35 hover:bg-panel-hi hover:shadow-[0_0_24px_rgba(18,206,65,0.06)]"
           >
-            <div className="flex items-start justify-between gap-3">
-              <Text
-                as="p"
-                size="xs"
-                className="uppercase tracking-[0.14em] text-accent"
-              >
-                {workflow.publisher_name}
-              </Text>
-              <span className="font-mono text-[10px] text-faint">
-                v{workflow.deployment_version}
-              </span>
-            </div>
+            <Text
+              as="p"
+              size="xs"
+              className="uppercase tracking-[0.14em] text-accent"
+            >
+              {workflow.publisher_name}
+            </Text>
             <h2 className="mt-3 font-mono text-lg font-medium tracking-tight text-ink group-hover:text-accent-bright">
               {workflow.workflow_name}
             </h2>
@@ -646,19 +640,6 @@ export function HostedWorkflowsPage() {
               {workflow.description?.trim() ||
                 "A published Libretto workflow you can call or adapt from its source."}
             </Text>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded border border-rule px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
-                Hosted API
-              </span>
-              {workflow.credential_requirements.length > 0 && (
-                <Text as="span" size="xs" className="text-faint">
-                  {workflow.credential_requirements.length}{" "}
-                  {workflow.credential_requirements.length === 1
-                    ? "credential"
-                    : "credentials"}
-                </Text>
-              )}
-            </div>
           </a>
         ))}
       </section>
@@ -791,12 +772,7 @@ export function HostedWorkflowPage({
               Review the published source before calling the API or adapting
               the workflow.
             </SectionHeading>
-            <SourceBrowser
-              files={workflow.files.map((file) => ({
-                file_name: file.file_name,
-                code: file.code,
-              }))}
-            />
+            <SourceBrowser files={workflow.files} />
           </section>
         </div>
 
