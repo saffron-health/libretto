@@ -96,7 +96,7 @@ function Hero({
           className="flex flex-col items-center justify-center gap-3"
         >
           <InstallSnippet />
-          <span className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+          <span className="mt-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
             or
           </span>
           <Button
