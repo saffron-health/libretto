@@ -377,34 +377,33 @@ function ParamRow({
 }) {
   return (
     <div
-      className="grid gap-2 border-b border-rule/70 px-4 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)] sm:gap-4"
-      style={{ paddingLeft: `${16 + depth * 16}px` }}
+      className="border-b border-rule/70 py-4 last:border-b-0"
+      style={{ paddingLeft: `${depth * 20}px` }}
     >
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <code className="font-mono text-[13px] text-ink">{name}</code>
-          <span className="font-mono text-[11px] text-accent/80">{typeLabel}</span>
-          <span
-            className={`font-mono text-[10px] uppercase tracking-[0.08em] ${
-              required ? "text-amber" : "text-faint"
-            }`}
-          >
-            {required ? "required" : "optional"}
-          </span>
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <code className="font-mono text-[14px] font-medium text-ink">{name}</code>
+        <span className="font-mono text-[12px] text-accent/80">{typeLabel}</span>
+        <span
+          className={`text-xs ${required ? "text-muted" : "text-faint"}`}
+        >
+          {required ? "Required" : "Optional"}
+        </span>
+      </div>
+      {description && (
+        <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
+      )}
+      {extras.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {extras.map((extra) => (
+            <span
+              key={extra}
+              className="rounded border border-rule/80 px-1.5 py-0.5 font-mono text-[10px] text-faint"
+            >
+              {extra}
+            </span>
+          ))}
         </div>
-      </div>
-      <div className="min-w-0 space-y-1.5">
-        {description ? (
-          <p className="text-sm leading-6 text-muted">{description}</p>
-        ) : (
-          <p className="text-sm leading-6 text-faint">No description.</p>
-        )}
-        {extras.map((extra) => (
-          <p key={extra} className="font-mono text-[11px] leading-5 text-faint">
-            {extra}
-          </p>
-        ))}
-      </div>
+      )}
     </div>
   );
 }
@@ -482,7 +481,10 @@ function SchemaReference({
   return (
     <section>
       <div className="border-b border-rule pb-4">
-        <SectionHeading title={title}>{description}</SectionHeading>
+        <h2 className="text-2xl font-medium tracking-tight text-ink">{title}</h2>
+        <Text as="p" size="sm" className="mt-2 leading-6 text-muted">
+          {description}
+        </Text>
       </div>
       {schema == null ? (
         <p className="py-5 text-sm text-muted">{emptyLabel}</p>
@@ -497,20 +499,14 @@ function SchemaReference({
           />
         </div>
       ) : (
-        <div>
-          <div className="hidden border-b border-rule/70 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-faint sm:grid sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)] sm:gap-4">
-            <span>Property</span>
-            <span>Details</span>
-          </div>
-          <SchemaTreeRows nodes={nodes} />
-        </div>
+        <SchemaTreeRows nodes={nodes} />
       )}
       {schema != null && <RawJsonDetails value={schema} label={`${title} JSON`} />}
     </section>
   );
 }
 
-function AccessReference({
+function CredentialsReference({
   requirements,
 }: {
   requirements: HostedWorkflowDetail["credential_requirements"];
@@ -518,23 +514,19 @@ function AccessReference({
   return (
     <section>
       <div className="border-b border-rule pb-4">
-        <SectionHeading title="Access">
-          Use your own Libretto API key and credentials. They stay in your
-          workspace and are never shared with the publisher.
-        </SectionHeading>
+        <h2 className="text-2xl font-medium tracking-tight text-ink">
+          Credentials
+        </h2>
+        <Text as="p" size="sm" className="mt-2 leading-6 text-muted">
+          Pass these values under <code className="text-ink">credentials</code>{" "}
+          in the request body.
+        </Text>
       </div>
       <div>
-        <ParamRow
-          name="x-api-key"
-          typeLabel="header"
-          required
-          description="Your Libretto API key."
-          extras={[]}
-        />
         {requirements.map((req) => (
           <ParamRow
             key={req.name}
-            name={`credentials.${req.name}`}
+            name={req.name}
             typeLabel="string"
             required
             description={
@@ -545,8 +537,8 @@ function AccessReference({
           />
         ))}
         {requirements.length === 0 && (
-          <p className="border-b border-rule/70 px-4 py-4 text-sm text-muted">
-            This workflow does not require any additional credentials.
+          <p className="border-b border-rule/70 py-4 text-sm text-muted">
+            No credentials required.
           </p>
         )}
       </div>
@@ -883,7 +875,22 @@ export function HostedWorkflowPage({
                 <EndpointBar method="POST" url={runUrl} />
               </section>
 
-              <AccessReference
+              <section>
+                <div className="border-b border-rule pb-4">
+                  <h2 className="text-2xl font-medium tracking-tight text-ink">
+                    Authentication
+                  </h2>
+                </div>
+                <ParamRow
+                  name="x-api-key"
+                  typeLabel="header"
+                  required
+                  description="Send your Libretto API key with every request."
+                  extras={[]}
+                />
+              </section>
+
+              <CredentialsReference
                 requirements={workflow.credential_requirements}
               />
 
@@ -914,11 +921,10 @@ export function HostedWorkflowPage({
         <aside className="h-fit lg:sticky lg:top-24">
           <div className="rounded-lg border border-rule bg-panel p-4">
             <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-              Coding agent
+              Use this workflow
             </p>
             <p className="mt-1.5 text-xs leading-5 text-muted">
-              Prompt for a coding agent to call this hosted run endpoint with
-              credentials and the input schema.
+              Call the API or deploy an editable copy.
             </p>
             <Button
               type="button"
@@ -930,7 +936,7 @@ export function HostedWorkflowPage({
                 window.setTimeout(() => setCopied(false), 1500);
               }}
             >
-              {copied ? "Copied" : "Copy prompt to call this API"}
+              {copied ? "Copied" : "Copy API instructions"}
             </Button>
             {!session && (
               <Button
@@ -942,10 +948,7 @@ export function HostedWorkflowPage({
               </Button>
             )}
 
-            <div className="mt-5 border-t border-rule/80 pt-5">
-              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-                Your own copy
-              </p>
+            <div className="mt-3">
               {build ? (
                 <>
                   <p className="mt-1.5 text-xs leading-5 text-muted">
@@ -964,7 +967,7 @@ export function HostedWorkflowPage({
               ) : configuring ? (
                 <form onSubmit={submitOwnCopy}>
                   <p className="mt-1.5 text-xs leading-5 text-muted">
-                    Connect the credentials required by your private copy.
+                    Add the credentials needed by your copy.
                   </p>
                   <div className="mt-3 space-y-3">
                     {workflow.credential_names.map((name) => {
@@ -1007,7 +1010,7 @@ export function HostedWorkflowPage({
                     <span className="text-xs text-ink">Auto-repair failed runs</span>
                   </label>
                   <Button type="submit" disabled={busy} className="mt-3 w-full">
-                    {busy ? "Deploying…" : "Fork and deploy"}
+                    {busy ? "Deploying…" : "Deploy copy"}
                   </Button>
                   <button
                     type="button"
@@ -1019,21 +1022,18 @@ export function HostedWorkflowPage({
                 </form>
               ) : (
                 <>
-                  <p className="mt-1.5 text-xs leading-5 text-muted">
-                    Fork the source and deploy a private copy to your workspace.
-                  </p>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     onClick={startDeployingOwnCopy}
                     disabled={!workflow.import_available || busy}
-                    className="mt-3 w-full"
+                    className="w-full"
                   >
                     {busy
                       ? "Deploying…"
                       : session
-                        ? "Fork and deploy your own"
-                        : "Sign up to fork and deploy"}
+                        ? "Fork and deploy a copy"
+                        : "Sign up to fork a copy"}
                   </Button>
                   {!workflow.import_available && (
                     <p className="mt-2 text-xs leading-5 text-red-200">
