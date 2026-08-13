@@ -6,6 +6,7 @@ import {
   type CloudSession,
 } from "./cloudApi";
 import { DashboardShell } from "./AuthenticatedDashboardPage";
+import { CheckIcon, CopyIcon } from "./icons/index.js";
 
 type Publication = {
   description: string | null;
@@ -49,10 +50,26 @@ type WorkflowRun = {
 };
 
 type PrivacyFinding = {
+  severity: "warning" | "blocked";
+  category:
+    | "secret"
+    | "payment"
+    | "personal_information"
+    | "private_url"
+    | "other";
   file: string;
   line: number | null;
   explanation: string;
+  suggestedFix: string;
 };
+
+type PrivacyReviewState =
+  | {
+      status: "needs_review" | "blocked";
+      reviewId: string;
+      findings: PrivacyFinding[];
+    }
+  | { status: "review_expired" };
 
 type ShareResponse =
   | { status: "created" | "existing" | "refreshed" }
@@ -69,6 +86,157 @@ const primaryButtonClass =
   "inline-flex h-8 items-center justify-center rounded-md border border-accent/45 bg-green-9/55 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-ink transition-colors hover:bg-green-9/80 disabled:cursor-not-allowed disabled:opacity-40";
 const secondaryButtonClass =
   "inline-flex h-8 items-center justify-center rounded-md border border-rule bg-bg/35 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-muted no-underline transition-colors hover:border-accent/35 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40";
+
+function privacyReviewAgentPrompt(findings: PrivacyFinding[]) {
+  return [
+    "Fix these privacy findings before sharing this Libretto workflow publicly.",
+    "Do not include or repeat sensitive values in your response.",
+    "",
+    ...findings.flatMap((finding) => [
+      `${finding.file}${finding.line ? `:${finding.line}` : ""}`,
+      `Issue: ${finding.explanation}`,
+      `Suggested fix: ${finding.suggestedFix}`,
+      "",
+    ]),
+  ].join("\n");
+}
+
+function PrivacyReviewPanel({
+  review,
+  busy,
+  onAcknowledge,
+  onDismiss,
+  onRetry,
+}: {
+  review: PrivacyReviewState;
+  busy: boolean;
+  onAcknowledge: () => void;
+  onDismiss: () => void;
+  onRetry: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (review.status === "review_expired") {
+    return (
+      <section className="rounded-xl border border-amber-300/30 bg-amber-300/[0.06] px-5 py-4">
+        <h2 className="text-sm font-medium text-amber-100">
+          Privacy review expired
+        </h2>
+        <p className="mt-1 text-xs leading-5 text-muted">
+          Run the review again before sharing this workflow.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRetry}
+          className={`${primaryButtonClass} mt-4`}
+        >
+          {busy ? "Reviewing…" : "Run review again"}
+        </button>
+      </section>
+    );
+  }
+
+  const blocked = review.status === "blocked";
+  return (
+    <section
+      className={`overflow-hidden rounded-xl border ${
+        blocked
+          ? "border-red-400/30 bg-red-500/[0.06]"
+          : "border-amber-300/30 bg-amber-300/[0.06]"
+      }`}
+    >
+      <div className="flex flex-col gap-4 border-b border-rule px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2
+            className={`text-sm font-medium ${
+              blocked ? "text-red-100" : "text-amber-100"
+            }`}
+          >
+            {blocked
+              ? "Sensitive information blocks sharing"
+              : "Review warnings before sharing"}
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-muted">
+            {blocked
+              ? "Fix these findings in the workflow source, redeploy, and try again."
+              : "These findings may be specific to your workspace. Fix them or explicitly share anyway."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard
+              .writeText(privacyReviewAgentPrompt(review.findings))
+              .catch(() => {});
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          }}
+          className={`${secondaryButtonClass} shrink-0 gap-2 no-underline`}
+          aria-label="Copy privacy findings for a coding agent"
+        >
+          {copied ? (
+            <CheckIcon width={15} height={15} />
+          ) : (
+            <CopyIcon width={15} height={15} />
+          )}
+          {copied ? "Copied" : "Copy for coding agent"}
+        </button>
+      </div>
+      <div className="divide-y divide-rule">
+        {review.findings.map((finding) => (
+          <article
+            key={`${finding.file}:${finding.line ?? "file"}:${finding.explanation}`}
+            className="px-5 py-4"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="text-xs text-ink">
+                {finding.file}
+                {finding.line ? `:${finding.line}` : ""}
+              </code>
+              <span
+                className={`rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.06em] ${
+                  finding.severity === "blocked"
+                    ? "border-red-400/30 text-red-200"
+                    : "border-amber-300/30 text-amber-100"
+                }`}
+              >
+                {finding.severity === "blocked" ? "Blocked" : "Warning"}
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-ink">
+              {finding.explanation}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-muted">
+              <span className="font-medium text-ink">Suggested fix:</span>{" "}
+              {finding.suggestedFix}
+            </p>
+          </article>
+        ))}
+      </div>
+      <div className="flex flex-wrap justify-end gap-3 border-t border-rule px-5 py-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onDismiss}
+          className={secondaryButtonClass}
+        >
+          Close
+        </button>
+        {!blocked && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onAcknowledge}
+            className={primaryButtonClass}
+          >
+            {busy ? "Sharing…" : "Share anyway"}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -228,6 +396,8 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [privacyReview, setPrivacyReview] =
+    useState<PrivacyReviewState | null>(null);
 
   async function refresh() {
     const [nextDetail, nextHostedRuns, nextWorkflowRuns] = await Promise.all([
@@ -302,32 +472,20 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
       },
     });
     if (!("findings" in response) && response.status !== "review_expired") {
+      setPrivacyReview(null);
       setNotice("Workflow shared publicly.");
       return;
     }
     if (response.status === "review_expired") {
-      throw new Error("The privacy review expired. Share again to rerun it.");
+      setPrivacyReview({ status: "review_expired" });
+      return;
     }
     if (!("findings" in response)) return;
-    const findings = response.findings
-      .map(
-        (finding) =>
-          `${finding.file}${finding.line ? `:${finding.line}` : ""}: ${finding.explanation}`,
-      )
-      .join("\n");
-    if (response.status === "blocked") {
-      throw new Error(`Sharing is blocked by the privacy review:\n${findings}`);
-    }
-    if (
-      window.confirm(
-        `The privacy review found warnings:\n\n${findings}\n\nShare publicly anyway?`,
-      )
-    ) {
-      await sharePublicly({
-        reviewId: response.review_id,
-        acknowledgeWarnings: true,
-      });
-    }
+    setPrivacyReview({
+      status: response.status,
+      reviewId: response.review_id,
+      findings: response.findings,
+    });
   }
 
   if (!session || !detail || !hostedRuns) {
@@ -364,6 +522,25 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
           <p className="rounded-md border border-accent/30 bg-green-9/10 px-4 py-3 text-sm text-accent-bright">
             {notice}
           </p>
+        )}
+        {privacyReview && (
+          <PrivacyReviewPanel
+            review={privacyReview}
+            busy={busy !== null}
+            onDismiss={() => setPrivacyReview(null)}
+            onRetry={() =>
+              void runAction("share", async () => sharePublicly())
+            }
+            onAcknowledge={() => {
+              if (privacyReview.status !== "needs_review") return;
+              void runAction("share", async () =>
+                sharePublicly({
+                  reviewId: privacyReview.reviewId,
+                  acknowledgeWarnings: true,
+                }),
+              );
+            }}
+          />
         )}
 
         <section className={panelClass}>
