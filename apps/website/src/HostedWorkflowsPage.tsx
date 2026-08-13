@@ -854,7 +854,7 @@ export function HostedWorkflowPage({
       <div
         role="tablist"
         aria-label="Workflow details"
-        className="mt-8 flex border-b border-rule"
+        className="mt-8 grid max-w-md grid-cols-2 gap-1 rounded-lg border border-rule bg-panel p-1"
       >
         {(["api", "source"] as const).map((view) => {
           const selected = activeView === view;
@@ -865,14 +865,13 @@ export function HostedWorkflowPage({
               role="tab"
               aria-selected={selected}
               onClick={() => setActiveView(view)}
-              className={`relative px-5 py-3 font-mono text-xs uppercase tracking-[0.1em] transition ${
-                selected ? "text-accent-bright" : "text-muted hover:text-ink"
+              className={`rounded-md border px-5 py-3 font-mono text-xs uppercase tracking-[0.1em] transition ${
+                selected
+                  ? "border-accent/35 bg-accent/[0.12] text-accent-bright shadow-[inset_0_0_18px_rgba(18,206,65,0.06)]"
+                  : "border-transparent text-muted hover:bg-panel-hi hover:text-ink"
               }`}
             >
               {view === "api" ? "Use the API" : "Source code"}
-              {selected && (
-                <span className="absolute inset-x-0 -bottom-px h-px bg-accent" />
-              )}
             </button>
           );
         })}
