@@ -11,25 +11,13 @@ import {
 import { InstallSnippet } from "./components/InstallSnippet";
 import { GitHubIcon } from "./icons";
 import { DEBUGGER_PROMPT, GITHUB_APP_INSTALL_URL } from "./prAgentSetup";
+import type { DashboardSection } from "./dashboardSections";
 
 const CLOUD_SETUP_PROMPT =
   "Fetch and follow https://libretto.sh/cloud.md to set up Libretto Cloud hosted browsers for this project.";
 
-export const dashboardSections = [
-  "workflows",
-  "schedules",
-  "workflow_runs",
-  "browser_sessions",
-  "connected_repos",
-  "users",
-  "settings",
-  "secrets",
-  "phone_numbers",
-  "api_keys",
-  "billing",
-] as const;
-
-export type DashboardSection = (typeof dashboardSections)[number];
+export { dashboardSections } from "./dashboardSections";
+export type { DashboardSection } from "./dashboardSections";
 
 interface NavItem {
   id: DashboardSection;
