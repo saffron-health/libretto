@@ -18,6 +18,7 @@ import { VersionBadge } from "./components/VersionBadge";
 import { ProductListing } from "./components/ProductListing";
 import { SectionDivider } from "./components/SectionDivider.js";
 import { BackedByYC } from "./components/BackedByYC";
+import { Button } from "./components/Button";
 
 function Hero({
   paneUnlocked,
@@ -95,16 +96,14 @@ function Hero({
           className="flex flex-col items-center justify-center gap-3"
         >
           <InstallSnippet />
-          <div className="text-xs text-muted">
-            or{" "}
-            <a
-              href="https://cal.com/team/libretto/demo"
-              className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
-              data-fathom-event="Hero demo click"
-            >
-              TALK TO A DEV
-            </a>
-          </div>
+          <Button
+            href="https://cal.com/michael-kronovet/meeting"
+            variant="outline"
+            className="min-w-64"
+            data-fathom-event="Hero demo click"
+          >
+            Talk to a dev · 15 min
+          </Button>
           <div className="mt-10">
             <BackedByYC />
           </div>
