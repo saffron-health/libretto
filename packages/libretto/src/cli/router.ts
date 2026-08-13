@@ -6,6 +6,10 @@ import { cloudJobCommands } from "./commands/cloud-jobs.js";
 import { cloudScheduleCommands } from "./commands/cloud-schedules.js";
 import { cloudSmsNumberCommands } from "./commands/cloud-sms-numbers.js";
 import { settingsCommands } from "./commands/cloud-settings.js";
+import {
+  publishWorkflowCommand,
+  unpublishWorkflowCommand,
+} from "./commands/cloud-publishing.js";
 import { deployCommand } from "./commands/deploy.js";
 import { executionCommands } from "./commands/execution.js";
 import { experimentsCommand } from "./commands/experiments.js";
@@ -33,6 +37,8 @@ export const cliRoutes = {
       schedules: cloudScheduleCommands,
       "sms-numbers": cloudSmsNumberCommands,
       settings: settingsCommands,
+      publish: publishWorkflowCommand,
+      unpublish: unpublishWorkflowCommand,
     },
   }),
   experiments: experimentsCommand,
