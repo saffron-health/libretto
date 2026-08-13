@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Button } from "./components/Button";
 import { Footer } from "./components/Footer";
 import { Navbar } from "./components/Navbar";
@@ -6,6 +12,7 @@ import { Text } from "./components/Text";
 import {
   getAuthStatus,
   getCloudSession,
+  orpcCall,
   publicCloudGet,
   cloudApiUrl,
   type CloudSession,
@@ -28,7 +35,22 @@ export type HostedWorkflowSummary = {
 type HostedWorkflowDetail = HostedWorkflowSummary & {
   input_schema: unknown;
   output_schema: unknown;
+  source_share_id: string;
+  credential_names: string[];
+  import_available: boolean;
   files: Array<{ file_name: string; code: string }>;
+};
+
+type SecretRow = {
+  credential_id: string;
+  name: string;
+};
+
+type WorkflowBuildStatus = {
+  build_id: string;
+  status: "deploying" | "ready" | "failed";
+  workflow_name: string | null;
+  error: string | null;
 };
 
 type SchemaNode = {
@@ -458,14 +480,14 @@ function SchemaReference({
   const nodes = useMemo(() => schemaRootNodes(schema), [schema]);
 
   return (
-    <section className="rounded-lg border border-rule bg-panel">
-      <div className="border-b border-rule px-4 py-4">
+    <section>
+      <div className="border-b border-rule pb-4">
         <SectionHeading title={title}>{description}</SectionHeading>
       </div>
       {schema == null ? (
-        <p className="px-4 py-5 text-sm text-muted">{emptyLabel}</p>
+        <p className="py-5 text-sm text-muted">{emptyLabel}</p>
       ) : nodes.length === 0 ? (
-        <div className="px-4 py-5">
+        <div className="py-2">
           <ParamRow
             name="(schema)"
             typeLabel={formatSchemaType(schema)}
@@ -488,47 +510,46 @@ function SchemaReference({
   );
 }
 
-function CredentialsSection({
+function AccessReference({
   requirements,
 }: {
   requirements: HostedWorkflowDetail["credential_requirements"];
 }) {
   return (
-    <section className="rounded-lg border border-rule bg-panel">
-      <div className="border-b border-rule px-4 py-4">
-        <SectionHeading
-          eyebrow="Request body"
-          title="Credentials"
-        >
-          Pass these under <code className="text-ink">credentials</code> in the
-          run body. Each value is a secret name or credential id from your
-          tenant — not the publisher&apos;s.
+    <section>
+      <div className="border-b border-rule pb-4">
+        <SectionHeading title="Access">
+          Use your own Libretto API key and credentials. They stay in your
+          workspace and are never shared with the publisher.
         </SectionHeading>
       </div>
-      {requirements.length === 0 ? (
-        <p className="px-4 py-5 text-sm text-muted">
-          This workflow does not require credentials.
-        </p>
-      ) : (
-        <div>
-          <div className="hidden border-b border-rule/70 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-faint sm:grid sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)] sm:gap-4">
-            <span>Name</span>
-            <span>Details</span>
-          </div>
-          {requirements.map((req) => (
-            <ParamRow
-              key={req.name}
-              name={req.name}
-              typeLabel="string"
-              required
-              description={req.description}
-              extras={[
-                "Map this key to a secret name or credential id in your tenant.",
-              ]}
-            />
-          ))}
-        </div>
-      )}
+      <div>
+        <ParamRow
+          name="x-api-key"
+          typeLabel="header"
+          required
+          description="Your Libretto API key."
+          extras={[]}
+        />
+        {requirements.map((req) => (
+          <ParamRow
+            key={req.name}
+            name={`credentials.${req.name}`}
+            typeLabel="string"
+            required
+            description={
+              req.description ||
+              "A secret name or credential id from your workspace."
+            }
+            extras={[]}
+          />
+        ))}
+        {requirements.length === 0 && (
+          <p className="border-b border-rule/70 px-4 py-4 text-sm text-muted">
+            This workflow does not require any additional credentials.
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -656,6 +677,14 @@ export function HostedWorkflowPage({
 }) {
   const [workflow, setWorkflow] = useState<HostedWorkflowDetail | null>(null);
   const [session, setSession] = useState<CloudSession | null>(null);
+  const [hasTenant, setHasTenant] = useState(false);
+  const [secrets, setSecrets] = useState<SecretRow[]>([]);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [configuring, setConfiguring] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [autoRepair, setAutoRepair] = useState(true);
+  const [build, setBuild] = useState<WorkflowBuildStatus | null>(null);
+  const [activeView, setActiveView] = useState<"api" | "source">("api");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -675,10 +704,107 @@ export function HostedWorkflowPage({
       .then(async (result) => {
         setSession(result);
         if (!result) return;
-        await getAuthStatus().catch(() => null);
+        const status = await getAuthStatus();
+        setHasTenant(status.hasTenant);
+        if (!status.hasTenant) return;
+        const secretResult = await orpcCall<{ secrets: SecretRow[] }>(
+          "/v1/dashboard/secrets",
+        );
+        setSecrets(secretResult.secrets);
       })
       .catch(() => setSession(null));
   }, [tenantSlug, workflowName]);
+
+  useEffect(() => {
+    if (!build || build.status === "ready" || build.status === "failed") return;
+    const timer = window.setInterval(() => {
+      orpcCall<WorkflowBuildStatus>("/v1/workflows/buildStatus", {
+        build_id: build.build_id,
+      })
+        .then(setBuild)
+        .catch((reason) =>
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Could not check build status.",
+          ),
+        );
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [build]);
+
+  const savedSecrets = useMemo(
+    () => new Map(secrets.map((secret) => [secret.name, secret])),
+    [secrets],
+  );
+  const secretsNeedingValues = useMemo(
+    () =>
+      workflow?.credential_names.filter((name) => !savedSecrets.has(name)) ?? [],
+    [savedSecrets, workflow],
+  );
+
+  async function deployOwnCopy() {
+    if (!workflow) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const credentialIds: string[] = [];
+      for (const name of workflow.credential_names) {
+        const saved = savedSecrets.get(name);
+        if (saved) {
+          credentialIds.push(saved.credential_id);
+          continue;
+        }
+        const value = values[name];
+        if (!value?.trim()) throw new Error(`Enter a value for ${name}.`);
+        const created = await orpcCall<{ credential_id: string }>(
+          "/v1/dashboard/createSecret",
+          { name, value },
+        );
+        credentialIds.push(created.credential_id);
+      }
+      const result = await orpcCall<{
+        build_id: string;
+        status: "deploying";
+        workflow_name: string;
+      }>("/v1/openWorkflows/import", {
+        share_id: workflow.source_share_id,
+        credential_ids: credentialIds,
+        auto_repair: autoRepair,
+      });
+      setBuild({ ...result, error: null });
+      setConfiguring(false);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Could not deploy this workflow.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startDeployingOwnCopy() {
+    if (!workflow) return;
+    const returnTo = hostedPath(workflow);
+    if (!session) {
+      window.location.assign(withReturnTo("/signin", returnTo));
+      return;
+    }
+    if (!hasTenant) {
+      window.location.assign(withReturnTo("/onboarding", returnTo));
+      return;
+    }
+    if (secretsNeedingValues.length === 0) {
+      void deployOwnCopy();
+      return;
+    }
+    setConfiguring(true);
+  }
+
+  function submitOwnCopy(event: FormEvent) {
+    event.preventDefault();
+    void deployOwnCopy();
+  }
 
   if (!workflow) {
     return pageShell(
@@ -716,64 +842,73 @@ export function HostedWorkflowPage({
           {workflow.description?.trim() ||
             "A public Libretto hosted workflow you can call with your API key."}
         </Text>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="rounded border border-rule px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
-            v{workflow.deployment_version}
-          </span>
-          <span className="rounded border border-rule px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
-            Hosted API + source
-          </span>
-        </div>
       </header>
 
-      <div className="mt-8">
-        <EndpointBar method="POST" url={runUrl} />
+      <div
+        role="tablist"
+        aria-label="Workflow details"
+        className="mt-8 flex border-b border-rule"
+      >
+        {(["api", "source"] as const).map((view) => {
+          const selected = activeView === view;
+          return (
+            <button
+              key={view}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setActiveView(view)}
+              className={`relative px-5 py-3 font-mono text-xs uppercase tracking-[0.1em] transition ${
+                selected ? "text-accent-bright" : "text-muted hover:text-ink"
+              }`}
+            >
+              {view === "api" ? "Use the API" : "Source code"}
+              {selected && (
+                <span className="absolute inset-x-0 -bottom-px h-px bg-accent" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
         <div className="min-w-0 space-y-6">
-          <section className="rounded-lg border border-rule bg-panel px-4 py-4">
-            <SectionHeading eyebrow="Security" title="Authentication">
-              Send your Libretto API key in the{" "}
-              <code className="text-ink">x-api-key</code> header. Jobs and
-              secrets stay in your tenant; the publisher cannot see them.
-            </SectionHeading>
-            <div className="overflow-hidden rounded-md border border-rule/80">
-              <ParamRow
-                name="x-api-key"
-                typeLabel="string"
-                required
-                description="API key from your Libretto workspace."
-                extras={["Header"]}
+          {activeView === "api" ? (
+            <>
+              <section>
+                <SectionHeading title="Run endpoint">
+                  Send a POST request to run this workflow in your Libretto
+                  workspace.
+                </SectionHeading>
+                <EndpointBar method="POST" url={runUrl} />
+              </section>
+
+              <AccessReference
+                requirements={workflow.credential_requirements}
               />
-            </div>
-          </section>
 
-          <CredentialsSection
-            requirements={workflow.credential_requirements}
-          />
+              <SchemaReference
+                title="Request fields"
+                description="Pass these fields under params in the JSON request body."
+                schema={workflow.input_schema}
+                emptyLabel="This workflow has no declared request fields."
+              />
 
-          <SchemaReference
-            title="Request body · params"
-            description="JSON fields under params in the run request body."
-            schema={workflow.input_schema}
-            emptyLabel="No input schema is published for this workflow."
-          />
-
-          <SchemaReference
-            title="Response · result"
-            description="Shape of the workflow result when the job completes."
-            schema={workflow.output_schema}
-            emptyLabel="No output schema is published for this workflow."
-          />
-
-          <section>
-            <SectionHeading eyebrow="Source" title="Workflow code">
-              Review the published source before calling the API or adapting
-              the workflow.
-            </SectionHeading>
-            <SourceBrowser files={workflow.files} />
-          </section>
+              <SchemaReference
+                title="Response fields"
+                description="The workflow returns these fields when the job completes."
+                schema={workflow.output_schema}
+                emptyLabel="This workflow has no declared response fields."
+              />
+            </>
+          ) : (
+            <section>
+              <SectionHeading title="Workflow code">
+                Review or adapt the source included with this shared workflow.
+              </SectionHeading>
+              <SourceBrowser files={workflow.files} />
+            </section>
+          )}
         </div>
 
         <aside className="h-fit lg:sticky lg:top-24">
@@ -797,17 +932,118 @@ export function HostedWorkflowPage({
             >
               {copied ? "Copied" : "Copy prompt to call this API"}
             </Button>
-            <Button
-              href={
-                session
-                  ? "/dashboard/api_keys"
-                  : withReturnTo("/signin", returnTo)
-              }
-              variant="secondary"
-              className="mt-4 w-full"
-            >
-              {session ? "Manage API keys" : "Sign up to generate an API key"}
-            </Button>
+            {!session && (
+              <Button
+                href={withReturnTo("/signin", returnTo)}
+                variant="secondary"
+                className="mt-3 w-full"
+              >
+                Sign up to generate an API key
+              </Button>
+            )}
+
+            <div className="mt-5 border-t border-rule/80 pt-5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+                Your own copy
+              </p>
+              {build ? (
+                <>
+                  <p className="mt-1.5 text-xs leading-5 text-muted">
+                    {build.status === "deploying"
+                      ? "Forking the source and deploying a private copy…"
+                      : build.status === "ready"
+                        ? "Your private copy is ready in Libretto Cloud."
+                        : build.error || "The private copy could not be deployed."}
+                  </p>
+                  {build.status === "ready" && (
+                    <Button href="/dashboard/workflows" className="mt-3 w-full">
+                      View your workflows
+                    </Button>
+                  )}
+                </>
+              ) : configuring ? (
+                <form onSubmit={submitOwnCopy}>
+                  <p className="mt-1.5 text-xs leading-5 text-muted">
+                    Connect the credentials required by your private copy.
+                  </p>
+                  <div className="mt-3 space-y-3">
+                    {workflow.credential_names.map((name) => {
+                      const saved = savedSecrets.has(name);
+                      return (
+                        <label key={name} className="block">
+                          <span className="mb-1.5 block font-mono text-xs text-muted">
+                            {name}
+                          </span>
+                          {saved ? (
+                            <span className="block rounded-md border border-accent/30 bg-green-3/20 px-3 py-2 text-xs text-accent-bright">
+                              Using saved credential
+                            </span>
+                          ) : (
+                            <input
+                              type="password"
+                              required
+                              autoComplete="off"
+                              value={values[name] || ""}
+                              onChange={(event) =>
+                                setValues((current) => ({
+                                  ...current,
+                                  [name]: event.target.value,
+                                }))
+                              }
+                              placeholder="Stored encrypted"
+                              className="h-9 w-full rounded-md border border-rule bg-bg px-3 text-xs outline-none focus:border-accent"
+                            />
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <label className="mt-3 flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={autoRepair}
+                      onChange={(event) => setAutoRepair(event.target.checked)}
+                    />
+                    <span className="text-xs text-ink">Auto-repair failed runs</span>
+                  </label>
+                  <Button type="submit" disabled={busy} className="mt-3 w-full">
+                    {busy ? "Deploying…" : "Fork and deploy"}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setConfiguring(false)}
+                    className="mt-2 h-8 w-full text-xs text-muted"
+                  >
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <p className="mt-1.5 text-xs leading-5 text-muted">
+                    Fork the source and deploy a private copy to your workspace.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={startDeployingOwnCopy}
+                    disabled={!workflow.import_available || busy}
+                    className="mt-3 w-full"
+                  >
+                    {busy
+                      ? "Deploying…"
+                      : session
+                        ? "Fork and deploy your own"
+                        : "Sign up to fork and deploy"}
+                  </Button>
+                  {!workflow.import_available && (
+                    <p className="mt-2 text-xs leading-5 text-red-200">
+                      The publisher must update this workflow before it can be forked.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+            {error && <p className="mt-3 text-xs leading-5 text-red-200">{error}</p>}
           </div>
         </aside>
       </div>
