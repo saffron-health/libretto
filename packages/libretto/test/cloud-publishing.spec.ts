@@ -5,7 +5,7 @@ vi.mock("../src/cli/core/auth-fetch.js", () => ({
 }));
 
 import { orpcCall } from "../src/cli/core/auth-fetch.js";
-import { publishWorkflowWithPrivacyReview } from "../src/cli/commands/cloud-publishing.js";
+import { shareWorkflowWithPrivacyReview } from "../src/cli/commands/cloud-publishing.js";
 
 const context = {
   apiUrl: "https://api.libretto.test",
@@ -22,13 +22,13 @@ const warning = {
   suggestedFix: "Move the URL to a secret.",
 };
 
-describe("cloud publish privacy review", () => {
+describe("cloud share privacy review", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
-  it("blocks publication when the privacy review blocks the source", async () => {
+  it("blocks sharing when the privacy review blocks the source", async () => {
     vi.mocked(orpcCall).mockResolvedValueOnce({
       workflow: "syncClaims",
       status: "blocked",
@@ -38,11 +38,11 @@ describe("cloud publish privacy review", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(
-      publishWorkflowWithPrivacyReview(context, {
+      shareWorkflowWithPrivacyReview(context, {
         workflow: "syncClaims",
         acknowledgeWarnings: false,
       }),
-    ).rejects.toThrow("Publishing is blocked");
+    ).rejects.toThrow("Sharing is blocked");
     expect(orpcCall).toHaveBeenCalledTimes(1);
   });
 
@@ -56,7 +56,7 @@ describe("cloud publish privacy review", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(
-      publishWorkflowWithPrivacyReview(context, {
+      shareWorkflowWithPrivacyReview(context, {
         workflow: "syncClaims",
         acknowledgeWarnings: false,
       }),
@@ -64,7 +64,7 @@ describe("cloud publish privacy review", () => {
     expect(orpcCall).toHaveBeenCalledTimes(1);
   });
 
-  it("acknowledges the exact review before publishing", async () => {
+  it("acknowledges the exact review before sharing", async () => {
     const reviewId = "2edbf679-dda3-4df8-822b-9dc2228c48f8";
     vi.mocked(orpcCall)
       .mockResolvedValueOnce({
@@ -83,7 +83,7 @@ describe("cloud publish privacy review", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(
-      publishWorkflowWithPrivacyReview(context, {
+      shareWorkflowWithPrivacyReview(context, {
         workflow: "syncClaims",
         description: "Sync claims",
         acknowledgeWarnings: true,

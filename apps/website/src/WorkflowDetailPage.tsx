@@ -6,6 +6,7 @@ import {
   type CloudSession,
 } from "./cloudApi";
 import { DashboardShell } from "./AuthenticatedDashboardPage";
+import { CheckIcon, CopyIcon } from "./icons/index.js";
 
 type Publication = {
   description: string | null;
@@ -17,8 +18,13 @@ type WorkflowDetail = {
   deployment_status: "building" | "ready" | "failed";
   updated_at: string;
   sharing_enabled: boolean;
-  open_workflow: (Publication & { open_workflow_url: string }) | null;
-  hosted_workflow: (Publication & { page_url: string }) | null;
+  publication:
+    | (Publication & {
+        page_url: string;
+        hosted_workflow: string;
+        deployment_version: number;
+      })
+    | null;
 };
 
 type HostedRunSummary = {
@@ -44,10 +50,26 @@ type WorkflowRun = {
 };
 
 type PrivacyFinding = {
+  severity: "warning" | "blocked";
+  category:
+    | "secret"
+    | "payment"
+    | "personal_information"
+    | "private_url"
+    | "other";
   file: string;
   line: number | null;
   explanation: string;
+  suggestedFix: string;
 };
+
+type PrivacyReviewState =
+  | {
+      status: "needs_review" | "blocked";
+      reviewId: string;
+      findings: PrivacyFinding[];
+    }
+  | { status: "review_expired" };
 
 type ShareResponse =
   | { status: "created" | "existing" | "refreshed" }
@@ -64,6 +86,157 @@ const primaryButtonClass =
   "inline-flex h-8 items-center justify-center rounded-md border border-accent/45 bg-green-9/55 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-ink transition-colors hover:bg-green-9/80 disabled:cursor-not-allowed disabled:opacity-40";
 const secondaryButtonClass =
   "inline-flex h-8 items-center justify-center rounded-md border border-rule bg-bg/35 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-muted no-underline transition-colors hover:border-accent/35 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40";
+
+function privacyReviewAgentPrompt(findings: PrivacyFinding[]) {
+  return [
+    "Fix these privacy findings before sharing this Libretto workflow publicly.",
+    "Do not include or repeat sensitive values in your response.",
+    "",
+    ...findings.flatMap((finding) => [
+      `${finding.file}${finding.line ? `:${finding.line}` : ""}`,
+      `Issue: ${finding.explanation}`,
+      `Suggested fix: ${finding.suggestedFix}`,
+      "",
+    ]),
+  ].join("\n");
+}
+
+function PrivacyReviewPanel({
+  review,
+  busy,
+  onAcknowledge,
+  onDismiss,
+  onRetry,
+}: {
+  review: PrivacyReviewState;
+  busy: boolean;
+  onAcknowledge: () => void;
+  onDismiss: () => void;
+  onRetry: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (review.status === "review_expired") {
+    return (
+      <section className="rounded-xl border border-amber-300/30 bg-amber-300/[0.06] px-5 py-4">
+        <h2 className="text-sm font-medium text-amber-100">
+          Privacy review expired
+        </h2>
+        <p className="mt-1 text-xs leading-5 text-muted">
+          Run the review again before sharing this workflow.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRetry}
+          className={`${primaryButtonClass} mt-4`}
+        >
+          {busy ? "Reviewing…" : "Run review again"}
+        </button>
+      </section>
+    );
+  }
+
+  const blocked = review.status === "blocked";
+  return (
+    <section
+      className={`overflow-hidden rounded-xl border ${
+        blocked
+          ? "border-red-400/30 bg-red-500/[0.06]"
+          : "border-amber-300/30 bg-amber-300/[0.06]"
+      }`}
+    >
+      <div className="flex flex-col gap-4 border-b border-rule px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2
+            className={`text-sm font-medium ${
+              blocked ? "text-red-100" : "text-amber-100"
+            }`}
+          >
+            {blocked
+              ? "Sensitive information blocks sharing"
+              : "Review warnings before sharing"}
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-muted">
+            {blocked
+              ? "Fix these findings in the workflow source, redeploy, and try again."
+              : "These findings may be specific to your workspace. Fix them or explicitly share anyway."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard
+              .writeText(privacyReviewAgentPrompt(review.findings))
+              .catch(() => {});
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          }}
+          className={`${secondaryButtonClass} shrink-0 gap-2 no-underline`}
+          aria-label="Copy privacy findings for a coding agent"
+        >
+          {copied ? (
+            <CheckIcon width={15} height={15} />
+          ) : (
+            <CopyIcon width={15} height={15} />
+          )}
+          {copied ? "Copied" : "Copy for coding agent"}
+        </button>
+      </div>
+      <div className="divide-y divide-rule">
+        {review.findings.map((finding) => (
+          <article
+            key={`${finding.file}:${finding.line ?? "file"}:${finding.explanation}`}
+            className="px-5 py-4"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="text-xs text-ink">
+                {finding.file}
+                {finding.line ? `:${finding.line}` : ""}
+              </code>
+              <span
+                className={`rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.06em] ${
+                  finding.severity === "blocked"
+                    ? "border-red-400/30 text-red-200"
+                    : "border-amber-300/30 text-amber-100"
+                }`}
+              >
+                {finding.severity === "blocked" ? "Blocked" : "Warning"}
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-ink">
+              {finding.explanation}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-muted">
+              <span className="font-medium text-ink">Suggested fix:</span>{" "}
+              {finding.suggestedFix}
+            </p>
+          </article>
+        ))}
+      </div>
+      <div className="flex flex-wrap justify-end gap-3 border-t border-rule px-5 py-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onDismiss}
+          className={secondaryButtonClass}
+        >
+          Close
+        </button>
+        {!blocked && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onAcknowledge}
+            className={primaryButtonClass}
+          >
+            {busy ? "Sharing…" : "Share anyway"}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -218,11 +391,13 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
   const [detail, setDetail] = useState<WorkflowDetail | null>(null);
   const [hostedRuns, setHostedRuns] = useState<HostedRunSummary | null>(null);
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
-  const [publishingOpen, setPublishingOpen] = useState(false);
+  const [sharingOpen, setSharingOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [privacyReview, setPrivacyReview] =
+    useState<PrivacyReviewState | null>(null);
 
   async function refresh() {
     const [nextDetail, nextHostedRuns, nextWorkflowRuns] = await Promise.all([
@@ -239,7 +414,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
     setDetail(nextDetail);
     setHostedRuns(nextHostedRuns);
     setWorkflowRuns(nextWorkflowRuns.jobs);
-    setDescription(nextDetail.hosted_workflow?.description ?? "");
+    setDescription(nextDetail.publication?.description ?? "");
   }
 
   useEffect(() => {
@@ -278,13 +453,14 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
     }
   }
 
-  async function shareOpen(acknowledgement?: {
+  async function sharePublicly(acknowledgement?: {
     reviewId: string;
     acknowledgeWarnings: boolean;
   }): Promise<void> {
     const response = await orpcCall<ShareResponse>("/v1/workflows/share", {
       workflow,
-      refresh: Boolean(detail?.open_workflow),
+      refresh: Boolean(detail?.publication),
+      description: description.trim() || undefined,
       privacyReview: {
         capability: "workflow_privacy_review_v1",
         ...(acknowledgement
@@ -296,32 +472,20 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
       },
     });
     if (!("findings" in response) && response.status !== "review_expired") {
-      setNotice("Open source workflow published.");
+      setPrivacyReview(null);
+      setNotice("Workflow shared publicly.");
       return;
     }
     if (response.status === "review_expired") {
-      throw new Error("The privacy review expired. Publish again to rerun it.");
+      setPrivacyReview({ status: "review_expired" });
+      return;
     }
     if (!("findings" in response)) return;
-    const findings = response.findings
-      .map(
-        (finding) =>
-          `${finding.file}${finding.line ? `:${finding.line}` : ""}: ${finding.explanation}`,
-      )
-      .join("\n");
-    if (response.status === "blocked") {
-      throw new Error(`Publishing is blocked by the privacy review:\n${findings}`);
-    }
-    if (
-      window.confirm(
-        `The privacy review found warnings:\n\n${findings}\n\nPublish anyway?`,
-      )
-    ) {
-      await shareOpen({
-        reviewId: response.review_id,
-        acknowledgeWarnings: true,
-      });
-    }
+    setPrivacyReview({
+      status: response.status,
+      reviewId: response.review_id,
+      findings: response.findings,
+    });
   }
 
   if (!session || !detail || !hostedRuns) {
@@ -332,10 +496,9 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
     );
   }
 
-  const canPublish =
+  const canShare =
     detail.sharing_enabled && detail.deployment_status === "ready";
-  const hasPublicWorkflow =
-    Boolean(detail.open_workflow) || Boolean(detail.hosted_workflow);
+  const hasPublicWorkflow = Boolean(detail.publication);
 
   return (
     <DashboardShell
@@ -360,6 +523,25 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
             {notice}
           </p>
         )}
+        {privacyReview && (
+          <PrivacyReviewPanel
+            review={privacyReview}
+            busy={busy !== null}
+            onDismiss={() => setPrivacyReview(null)}
+            onRetry={() =>
+              void runAction("share", async () => sharePublicly())
+            }
+            onAcknowledge={() => {
+              if (privacyReview.status !== "needs_review") return;
+              void runAction("share", async () =>
+                sharePublicly({
+                  reviewId: privacyReview.reviewId,
+                  acknowledgeWarnings: true,
+                }),
+              );
+            }}
+          />
+        )}
 
         <section className={panelClass}>
           <div className="border-b border-rule px-5 py-4">
@@ -368,90 +550,33 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
           <WorkflowRunsTable runs={workflowRuns} />
         </section>
 
-        {detail.open_workflow && (
+        {detail.publication && (
           <section className={panelClass}>
             <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <div>
-                  <h2 className="text-base font-medium text-ink">
-                    Open source workflow
-                  </h2>
-                </div>
+                <h2 className="text-base font-medium text-ink">
+                  Shared publicly
+                </h2>
                 <span
                   className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wide ${
-                    detail.open_workflow.stale
+                    detail.publication.stale
                       ? "border-rule text-muted"
                       : "border-accent/30 bg-green-9/10 text-accent-bright"
                   }`}
                 >
-                  {detail.open_workflow.stale ? "Older version" : "Live"}
+                  {detail.publication.stale ? "Older version" : "Live"}
                 </span>
               </div>
               <div className="flex items-center gap-4">
-                {detail.open_workflow.stale && (
-                  <button
-                    type="button"
-                    disabled={!canPublish || busy !== null}
-                    onClick={() =>
-                      void runAction("open", async () => shareOpen())
-                    }
-                    className={primaryButtonClass}
-                  >
-                    {busy === "open" ? "Publishing…" : "Publish latest"}
-                  </button>
-                )}
                 <a
-                  href={detail.open_workflow.open_workflow_url}
+                  href={detail.publication.page_url}
                   target="_blank"
                   rel="noreferrer"
                   className="text-xs text-muted no-underline hover:text-ink"
                 >
                   Public page ↗
                 </a>
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => {
-                    if (!window.confirm("Stop sharing this workflow's source?")) return;
-                    void runAction("unshare", async () => {
-                      await orpcCall("/v1/workflows/unshare", { workflow });
-                      setNotice("Source sharing stopped.");
-                    });
-                  }}
-                  className="text-xs text-red-200/75 hover:text-red-200 disabled:opacity-40"
-                >
-                  Stop sharing
-                </button>
               </div>
-            </div>
-          </section>
-        )}
-
-        {detail.hosted_workflow && (
-          <section className={panelClass}>
-            <div className="flex items-center justify-between gap-4 px-5 pb-2 pt-4">
-              <div className="flex items-center gap-3">
-                <div>
-                  <h2 className="text-base font-medium text-ink">Hosted workflow</h2>
-                </div>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wide ${
-                    detail.hosted_workflow.stale
-                      ? "border-rule text-muted"
-                      : "border-accent/30 bg-green-9/10 text-accent-bright"
-                  }`}
-                >
-                  {detail.hosted_workflow.stale ? "Older version" : "Live"}
-                </span>
-              </div>
-              <a
-                href={detail.hosted_workflow.page_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-muted no-underline hover:text-ink"
-              >
-                Hosted page ↗
-              </a>
             </div>
             <div className="flex flex-col gap-3 border-b border-rule px-5 py-3 sm:flex-row sm:items-end">
               <label className="block min-w-0 flex-1 text-[10px] uppercase tracking-[0.08em] text-muted sm:max-w-xl">
@@ -465,27 +590,21 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
               </label>
               <button
                 type="button"
-                disabled={!canPublish || busy !== null}
+                disabled={!canShare || busy !== null}
                 onClick={() =>
-                  void runAction("host", async () => {
-                    await orpcCall("/v1/workflows/host", {
-                      workflow,
-                      description: description.trim() || undefined,
-                    });
-                    setNotice("Hosted workflow deployed.");
-                  })
+                  void runAction("share", async () => sharePublicly())
                 }
                 className={
-                  detail.hosted_workflow.stale
+                  detail.publication.stale
                     ? primaryButtonClass
                     : "inline-flex h-8 items-center justify-center rounded-md border border-accent/35 bg-green-9/10 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-accent-bright transition-colors hover:bg-green-9/25 disabled:cursor-not-allowed disabled:opacity-40"
                 }
               >
-                {busy === "host"
-                  ? "Deploying…"
-                  : detail.hosted_workflow.stale
-                    ? "Deploy latest"
-                    : "Redeploy"}
+                {busy === "share"
+                  ? "Sharing…"
+                  : detail.publication.stale
+                    ? "Share latest"
+                    : "Update shared version"}
               </button>
             </div>
             <HostedRunsTable summary={hostedRuns} />
@@ -494,15 +613,16 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                 type="button"
                 disabled={busy !== null}
                 onClick={() => {
-                  if (!window.confirm("Stop hosting this workflow?")) return;
-                  void runAction("unhost", async () => {
-                    await orpcCall("/v1/workflows/unhost", { workflow });
-                    setNotice("Hosted workflow removed.");
+                  if (!window.confirm("Remove the public API and source code?"))
+                    return;
+                  void runAction("unshare", async () => {
+                    await orpcCall("/v1/workflows/unshare", { workflow });
+                    setNotice("Workflow is no longer shared publicly.");
                   });
                 }}
                 className="text-xs text-red-200/75 hover:text-red-200 disabled:opacity-40"
               >
-                Stop hosting
+                Stop sharing
               </button>
             </div>
           </section>
@@ -512,8 +632,8 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
           <section className={panelClass}>
             <button
               type="button"
-              aria-expanded={publishingOpen}
-              onClick={() => setPublishingOpen((open) => !open)}
+              aria-expanded={sharingOpen}
+              onClick={() => setSharingOpen((open) => !open)}
               className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-panel-hi/25"
             >
               <span>
@@ -521,14 +641,14 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                   Share workflow outside this workspace
                 </span>
                 <span className="mt-1 block text-xs text-muted">
-                  Choose whether to share its source or a public Hosted run API.
+                  Share a public run API with visible, reusable source code.
                 </span>
               </span>
               <span className="text-xs text-muted" aria-hidden>
-                {publishingOpen ? "↑" : "↓"}
+                {sharingOpen ? "↑" : "↓"}
               </span>
             </button>
-            {publishingOpen && (
+            {sharingOpen && (
               <div className="border-t border-rule">
                 {!detail.sharing_enabled && (
                   <div className="border-b border-amber-300/20 bg-amber-300/5 px-5 py-3 text-xs text-amber-100">
@@ -539,50 +659,30 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                     .
                   </div>
                 )}
-                <div className="grid gap-3 p-4 sm:grid-cols-2">
-                  {!detail.open_workflow && (
-                    <div className="rounded-lg border border-rule bg-bg/25 p-4">
-                      <h3 className="text-sm font-medium text-ink">
-                        Open source workflow
-                      </h3>
-                      <p className="mt-2 min-h-8 text-xs leading-5 text-muted">
-                        Publish a version others can inspect and import.
-                      </p>
-                      <button
-                        type="button"
-                        disabled={!canPublish || busy !== null}
-                        onClick={() =>
-                          void runAction("open", async () => shareOpen())
-                        }
-                        className={`${primaryButtonClass} mt-4 w-full`}
-                      >
-                        {busy === "open"
-                          ? "Publishing…"
-                          : "Publish open source workflow"}
-                      </button>
-                    </div>
-                  )}
-                  {!detail.hosted_workflow && (
-                    <div className="rounded-lg border border-rule bg-bg/25 p-4">
-                      <h3 className="text-sm font-medium text-ink">Hosted workflow</h3>
-                      <p className="mt-2 min-h-8 text-xs leading-5 text-muted">
-                        Host a version others can run as an opaque API.
-                      </p>
-                      <button
-                        type="button"
-                        disabled={!canPublish || busy !== null}
-                        onClick={() =>
-                          void runAction("host", async () => {
-                            await orpcCall("/v1/workflows/host", { workflow });
-                            setNotice("Hosted workflow is now public.");
-                          })
-                        }
-                        className={`${primaryButtonClass} mt-4 w-full`}
-                      >
-                        {busy === "host" ? "Hosting…" : "Host workflow"}
-                      </button>
-                    </div>
-                  )}
+                <div className="p-4">
+                  <label className="block text-[10px] uppercase tracking-[0.08em] text-muted">
+                    Description
+                    <input
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      maxLength={2000}
+                      className="mt-1 h-8 w-full rounded-md border border-rule bg-bg/55 px-3 text-xs normal-case tracking-normal text-ink outline-none focus:border-accent/50"
+                    />
+                  </label>
+                  <p className="mt-3 text-xs leading-5 text-muted">
+                    Libretto reviews the source for sensitive information
+                    before sharing.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={!canShare || busy !== null}
+                    onClick={() =>
+                      void runAction("share", async () => sharePublicly())
+                    }
+                    className={`${primaryButtonClass} mt-4 w-full`}
+                  >
+                    {busy === "share" ? "Sharing…" : "Share publicly"}
+                  </button>
                 </div>
               </div>
             )}

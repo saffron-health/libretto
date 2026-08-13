@@ -2637,8 +2637,8 @@ function SettingsPanel({ session }: { session: CloudSession }) {
     if (!sharing || !canManage) return;
     const enabled = !sharing.enabled;
     const confirmation = enabled
-      ? "Enable public workflow sharing? Workspace members will be able to share workflows with people outside this workspace. Existing workflows remain private until explicitly shared."
-      : "Disable public workflow sharing? Every Open and Hosted workflow from this workspace will be removed. Re-enabling sharing will not restore them automatically.";
+      ? "Enable public workflow sharing? Workspace members will be able to share workflows with a public API and visible source. Existing workflows remain private until explicitly shared."
+      : "Disable public workflow sharing? Every public workflow API and source listing from this workspace will be removed. Re-enabling sharing will not restore them automatically.";
     if (!window.confirm(confirmation)) {
       return;
     }
@@ -2654,8 +2654,8 @@ function SettingsPanel({ session }: { session: CloudSession }) {
       setSharing(updated);
       setNotice(
         enabled
-          ? "Workflow sharing is enabled. Workflows remain private until someone explicitly shares them."
-          : "Workflow sharing is disabled and existing Open and Hosted workflows were removed.",
+          ? "Public sharing is enabled. Workflows remain private until someone explicitly shares them."
+          : "Public sharing is disabled and existing public workflow APIs and source listings were removed.",
       );
     } catch (err) {
       setError(
@@ -2705,9 +2705,9 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             id="workflow-sharing-description"
             className="max-w-2xl text-sm leading-6 text-muted"
           >
-            Allow workspace members to share workflows for people outside
-            this workspace. They can share source code or provide a Hosted
-            workflow with a public run API.
+            Allow workspace members to share workflows with people outside
+            this workspace. Each publication includes a Hosted workflow API
+            and reviewed source code.
           </p>
           <button
             type="button"
@@ -2747,8 +2747,8 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             )}
             {sharing?.enabled && (
               <span className="mt-1 block">
-                Disabling this setting removes every current Open and Hosted
-                listing. Re-enabling it does not restore previous listings.
+                Disabling this setting removes every current public API and
+                source listing. Re-enabling it does not restore previous listings.
               </span>
             )}
           </div>

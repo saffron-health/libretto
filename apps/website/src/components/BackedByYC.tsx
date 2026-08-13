@@ -7,9 +7,9 @@ export function BackedByYC({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-2 font-mono text-xs text-muted/60 sm:text-[13px] ${className}`}
+      className={`inline-flex items-center gap-2 font-mono text-[13px] text-muted/60 sm:text-sm ${className}`}
     >
-      <YCLogo className="size-4 shrink-0 sm:size-[18px]" width={18} height={18} />
+      <YCLogo className="size-[18px] shrink-0 sm:size-5" width={20} height={20} />
       <span className="leading-none">Backed by Y Combinator</span>
     </span>
   );

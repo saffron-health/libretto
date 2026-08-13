@@ -1,7 +1,7 @@
 import type * as React from "react";
 
 type ButtonSize = "default" | "sm";
-type ButtonVariant = "primary" | "secondary";
+type ButtonVariant = "primary" | "secondary" | "outline";
 
 const base =
   "libretto-button inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap text-center no-underline outline-none disabled:pointer-events-none disabled:opacity-64";
@@ -14,6 +14,7 @@ const sizeClasses: Record<ButtonSize, string> = {
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "",
   secondary: "libretto-button--secondary",
+  outline: "libretto-button--outline",
 };
 
 type ButtonAsButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {

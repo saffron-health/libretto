@@ -11,7 +11,7 @@ type PrivacyFinding = {
   suggestedFix: string;
 };
 
-type PublishResponse =
+type ShareResponse =
   | {
       status: "created" | "existing" | "refreshed";
       workflow: string;
@@ -37,13 +37,13 @@ function printFindings(findings: PrivacyFinding[]): void {
   }
 }
 
-export async function publishWorkflowWithPrivacyReview(
+export async function shareWorkflowWithPrivacyReview(
   ctx: CloudApiKeyContext,
   input: { workflow: string; description?: string; acknowledgeWarnings: boolean },
-): Promise<PublishResponse> {
-  const first = await orpcCall<PublishResponse>({
+): Promise<ShareResponse> {
+  const first = await orpcCall<ShareResponse>({
     apiUrl: ctx.apiUrl,
-    path: "/v1/workflows/publish",
+    path: "/v1/workflows/share",
     input: {
       workflow: input.workflow,
       description: input.description,
@@ -53,18 +53,18 @@ export async function publishWorkflowWithPrivacyReview(
   });
   if (first.status === "blocked") {
     printFindings(first.findings);
-    throw new Error("Publishing is blocked. Fix the findings and deploy again.");
+    throw new Error("Sharing is blocked. Fix the findings and deploy again.");
   }
   if (first.status !== "needs_review") return first;
   printFindings(first.findings);
   if (!input.acknowledgeWarnings) {
     throw new Error(
-      "Review the warnings, then run the command again with --acknowledge-warnings to publish this exact deployment.",
+      "Review the warnings, then run the command again with --acknowledge-warnings to share this exact deployment.",
     );
   }
-  return orpcCall<PublishResponse>({
+  return orpcCall<ShareResponse>({
     apiUrl: ctx.apiUrl,
-    path: "/v1/workflows/publish",
+    path: "/v1/workflows/share",
     input: {
       workflow: input.workflow,
       description: input.description,
@@ -78,14 +78,14 @@ export async function publishWorkflowWithPrivacyReview(
   });
 }
 
-export const publishWorkflowCommand = SimpleCLI.command({
-  description: "Publish a deployed workflow outside your workspace",
+export const shareWorkflowCommand = SimpleCLI.command({
+  description: "Share a deployed workflow publicly",
 })
   .input(
     SimpleCLI.input({
       positionals: [
         SimpleCLI.positional("workflow", z.string().min(1), {
-          help: "Deployed workflow name to publish",
+          help: "Deployed workflow name to share publicly",
         }),
       ],
       named: {
@@ -93,49 +93,49 @@ export const publishWorkflowCommand = SimpleCLI.command({
           help: "Public workflow description",
         }),
         acknowledgeWarnings: SimpleCLI.flag({
-          help: "Publish after acknowledging privacy review warnings",
+          help: "Share after acknowledging privacy review warnings",
         }),
       },
     }),
   )
-  .use(withCloudApiKey("publish a Libretto Cloud workflow"))
+  .use(withCloudApiKey("share a Libretto Cloud workflow publicly"))
   .handle(async ({ input, ctx }) => {
-    const response = await publishWorkflowWithPrivacyReview(ctx, input);
+    const response = await shareWorkflowWithPrivacyReview(ctx, input);
     if (!("page_url" in response)) {
       throw new Error(
         response.status === "review_expired"
-          ? "The privacy review expired. Run publish again."
-          : "The workflow was not published.",
+          ? "The privacy review expired. Run share again."
+          : "The workflow was not shared.",
       );
     }
-    console.log(`Published workflow: ${response.hosted_workflow}`);
+    console.log(`Shared workflow: ${response.hosted_workflow}`);
     console.log(`Public page: ${response.page_url}`);
     console.log(`Deployment version: ${response.deployment_version}`);
     console.log("Source code: public");
     return response.page_url;
   });
 
-export const unpublishWorkflowCommand = SimpleCLI.command({
-  description: "Remove a workflow's public API and source code",
+export const unshareWorkflowCommand = SimpleCLI.command({
+  description: "Stop sharing a workflow's public API and source code",
 })
   .input(
     SimpleCLI.input({
       positionals: [
         SimpleCLI.positional("workflow", z.string().min(1), {
-          help: "Published workflow name to remove",
+          help: "Publicly shared workflow name to remove",
         }),
       ],
       named: {},
     }),
   )
-  .use(withCloudApiKey("unpublish a Libretto Cloud workflow"))
+  .use(withCloudApiKey("stop sharing a Libretto Cloud workflow"))
   .handle(async ({ input, ctx }) => {
     const response = await orpcCall<{ hosted_workflow: string }>({
       apiUrl: ctx.apiUrl,
-      path: "/v1/workflows/unpublish",
+      path: "/v1/workflows/unshare",
       input: { workflow: input.workflow },
       credential: ctx.credential,
     });
-    console.log(`Unpublished workflow: ${response.hosted_workflow}`);
+    console.log(`Stopped sharing workflow: ${response.hosted_workflow}`);
     return response.hosted_workflow;
   });
